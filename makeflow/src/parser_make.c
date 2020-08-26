@@ -367,7 +367,7 @@ static int dag_parse_make_directive_MAKEFLOW(struct lexer *bk, struct dag_node *
 
 	if(t->type != TOKEN_LITERAL)
 	{
-		lexer_report_error(bk, "Expected LITERAL token (CATEGORY|MODE|CORES|DISK|MEMORY|SIZE|MPI_PROCESSES), got: %s\n", lexer_print_token(t));
+		lexer_report_error(bk, "Expected LITERAL token (CATEGORY|MODE|CORES|DISK|MEMORY|WALL_TIME|SIZE|MPI_PROCESSES), got: %s\n", lexer_print_token(t));
 	}
 
 	struct token *t2 = lexer_next_token(bk);
@@ -388,6 +388,7 @@ static int dag_parse_make_directive_MAKEFLOW(struct lexer *bk, struct dag_node *
 	else if((   !strcmp("CORES",  t->lexeme))
 			|| (!strcmp("DISK",   t->lexeme))
 			|| (!strcmp("MEMORY", t->lexeme))
+			|| (!strcmp("WALL_TIME", t->lexeme))
 			|| (!strcmp("MPI_PROCESSES", t->lexeme)))
 	{
 		if(!(string_metric_parse(t2->lexeme) >= 0))
@@ -427,7 +428,7 @@ static int dag_parse_make_directive_MAKEFLOW(struct lexer *bk, struct dag_node *
 	}
 	else
 	{
-		lexer_report_error(bk, "Unsupported .MAKEFLOW directive, expected (CATEGORY|MODE|CORES|DISK|MEMORY|SIZE|MPI_PROCESSES), got: %s\n", t->lexeme);
+		lexer_report_error(bk, "Unsupported .MAKEFLOW directive, expected (CATEGORY|MODE|CORES|DISK|MEMORY|WALL_TIME|SIZE|MPI_PROCESSES), got: %s\n", t->lexeme);
 	}
 
 	if(set_var) {

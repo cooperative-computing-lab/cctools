@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "batch_job.h"
 #include "batch_job_internal.h"
+#include "buffer.h"
 #include "debug.h"
 #include "path.h"
 #include "stringtools.h"
@@ -13,6 +14,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "jx.h"
 #include "jx_match.h"
+#include "macros.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -106,24 +108,33 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 
 static char *cluster_set_resource_string(struct batch_queue *q, const struct rmsummary *resources)
 {
-	char *cluster_resources = NULL;
-	const char *ignore_mem = hash_table_lookup(q->options, "ignore-mem-spec");
-	const char *mem_type = hash_table_lookup(q->options, "mem-type");
+	if(batch_queue_option_is_yes(q, "safe-submit-mode")) {
+		return xxstrdup("");
+	}
+
+	int ignore_mem  = batch_queue_option_is_yes(q, "ignore-mem-spec");
+	int ignore_disk = batch_queue_option_is_yes(q, "ignore-disk-spec");
+	int ignore_time = batch_queue_option_is_yes(q, "ignore-time-spec");
+
+	buffer_t cluster_resources;
+	buffer_init(&cluster_resources);
 
 	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
-		char *mem = string_format(",mem=%" PRId64 "mb", resources->memory);
-		char *disk = string_format(",file=%" PRId64 "mb", resources->disk);
-		cluster_resources = string_format(" -l nodes=1:ppn=%" PRId64 "%s%s ", 
-			resources->cores>0 ? resources->cores : 1,
-			resources->memory>0 ? mem : "",
-			resources->disk>0 ? disk  : "");
-		free(mem);
-		free(disk);
-	} else if(q->type == BATCH_QUEUE_TYPE_SLURM){
-		char *mem = NULL;
-		if(!strcmp("no", ignore_mem)){
-			mem = string_format(" --mem=%" PRId64 "M", resources->memory);
+		buffer_printf(&cluster_resources, " -l nodes=1:ppn=%" PRId64, resources->cores > 0 ? resources->cores : 1);
+		if(!ignore_mem && resources->memory > 0) {
+			buffer_printf(&cluster_resources, ",mem=%" PRId64 "mb", resources->memory);
 		}
+		if(!ignore_disk && resources->disk > 0) {
+			buffer_printf(&cluster_resources, ",file=%" PRId64 "mb", resources->disk);
+		}
+	} else if(q->type == BATCH_QUEUE_TYPE_SLURM){
+		if(!ignore_mem && resources->memory > 0) {
+			buffer_printf(&cluster_resources, " --mem=%" PRId64 "M", resources->memory);
+		}
+		if(!ignore_time && resources->wall_time > 0) {
+			buffer_printf(&cluster_resources, " --time=%" PRId64, DIV_INT_ROUND_UP(resources->wall_time, 60*1000000));
+		}
+
 		/* The value of max_concurrent_processes is set by the .MAKEFLOW MPI_PROCESSES.
 		 * If set, the number of cores should be divisible by max_concurrent_processes. */
 		int64_t procs = resources->max_concurrent_processes > 0 ? resources->max_concurrent_processes : 1;
@@ -136,31 +147,25 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 				fatal("The number of MPI processes (%d) does not eqully divide the number of cores (%d).", procs, resources->cores);
 			}
 		}
-		// Currently leaving out tmp as SLURM assumes a shared FS and tmp may be limiting
-		// char *disk = string_format(" --tmp=%" PRId64 "M", resources->disk);
-		cluster_resources = string_format(" -N 1 -n %" PRId64 " -c %" PRId64 "%s ",
-				procs, cores,
-				(resources->memory>0 && mem) ? mem : "") ;
-		free(mem);
-	} else if(q->type == BATCH_QUEUE_TYPE_SGE){
-		char *mem = NULL;
-		mem = string_format(" -l %s=%" PRId64 "M", (mem_type ? mem_type : "h_vmem"), resources->memory);
-		// SGE assumes shared FS, ignoring possible disk specification
-		cluster_resources = string_format(" -pe smp %" PRId64 "%s ", 
-			resources->cores>0 ? resources->cores : 1,
-			(resources->memory>0 && mem) ? mem : "");
-		free(mem);
 
+		buffer_printf(&cluster_resources, " -N 1 -n %" PRId64 " -c %" PRId64, procs, cores);
+	} else if(q->type == BATCH_QUEUE_TYPE_SGE){
+		if(!ignore_mem && resources->memory > 0) {
+			const char *mem_type = batch_queue_get_option(q, "mem-type");
+			buffer_printf(&cluster_resources, " -l %s=%" PRId64 "M", mem_type ? mem_type : "h_vmem", resources->memory);
+		}
+		if(!ignore_time && resources->wall_time > 0) {
+			buffer_printf(&cluster_resources, " -l h_rt=00:%" PRId64 ":00", DIV_INT_ROUND_UP(resources->wall_time, 60*1000000));
+		}
+
+		buffer_printf(&cluster_resources, " -pe smp %" PRId64, resources->cores>0 ? resources->cores : 1);
 	}
-	const char *safe_mode = hash_table_lookup(q->options, "safe-submit-mode");
-	if(safe_mode && !strcmp("yes", safe_mode)) {
-		free(cluster_resources);
-		cluster_resources = NULL;
-	}
-	if(!cluster_resources) {
-		cluster_resources = xxstrdup("");
-	}
-	return cluster_resources;
+
+	buffer_printf(&cluster_resources, " ");
+	char *resources_str = xxstrdup(buffer_tostring(&cluster_resources));
+	buffer_free(&cluster_resources);
+
+	return resources_str;
 }
 
 static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )

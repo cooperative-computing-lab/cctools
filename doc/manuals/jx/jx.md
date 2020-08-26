@@ -173,6 +173,9 @@ required, in MB. `"memory"` gives the RAM required, in MB.
 
 `"wall-time"` specifies the maximum allowed running time, in seconds.
 
+`"mpi-processes"` specifies the number of MPI processes the job needs.
+Currently this is only used when submitting SLURM jobs.
+
 
 ## JX Expressions
 
