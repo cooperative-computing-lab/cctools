@@ -113,6 +113,12 @@ static int resources_from_jx(struct hash_table *h, struct jx *j, int nodeid)
 				debug(D_MAKEFLOW_PARSER, "%d gpus", gpus);
 				dag_variable_add_value(RESOURCES_GPUS, h, nodeid, string_format("%d", gpus));
 			}
+		} else if(!strcmp(key, "mpi-processes")) {
+			int procs = jx_lookup_integer(j, "mpi-processes");
+			if(procs) {
+				debug(D_MAKEFLOW_PARSER, "%d mpi-processes", procs);
+				dag_variable_add_value(RESOURCES_MPI_PROCESSES, h, nodeid, string_format("%d", procs));
+			}
 		} else if(!strcmp(key, "wall-time")) {
 			int wall_time = jx_lookup_integer(j, "wall-time");
 			if(wall_time) {
