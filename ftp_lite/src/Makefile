@@ -17,7 +17,7 @@ libftp_lite.a: $(OBJECTS)
 $(PROGRAMS): libftp_lite.a $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS)
+	rm -f $(OBJECTS) $(TARGETS) *.o
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
