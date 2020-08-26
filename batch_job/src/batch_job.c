@@ -154,6 +154,17 @@ const char *batch_queue_get_option (struct batch_queue *q, const char *what)
 	return hash_table_lookup(q->options, what);
 }
 
+int batch_queue_option_is_yes (struct batch_queue *q, const char *what)
+{
+	const char *result = batch_queue_get_option(q, what);
+
+	if(!result || strcmp(result, "yes")) {
+		return 0;
+	}
+
+	return 1;
+}
+
 const char *batch_queue_supports_feature (struct batch_queue *q, const char *what)
 {
 	return hash_table_lookup(q->features, what);
