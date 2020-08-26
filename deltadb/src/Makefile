@@ -16,7 +16,7 @@ libdeltadb.a: $(OBJECTS)
 $(PROGRAMS): $(LIBRARIES) $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS)
+	rm -f $(OBJECTS) $(TARGETS) *.o
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin

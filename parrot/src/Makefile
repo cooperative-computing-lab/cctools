@@ -81,7 +81,7 @@ parrot_namespace: pfs_mountfile.o pfs_resolve_mount.o
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) $(PROGRAMS) $(LIBRARIES) tracer.table.c tracer.table.h tracer.table64.c tracer.table64.h
+	rm -f $(OBJECTS) $(TARGETS) $(PROGRAMS) $(LIBRARIES) tracer.table.c tracer.table.h tracer.table64.c tracer.table64.h *.o
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
