@@ -176,6 +176,7 @@ FILE  *log_inotify = NULL;      /* List of opened files is written to this file.
 char *template_path = NULL;     /* Prefix of all output files names */
 
 int debug_active = 0;           /* 1 if ACTIVATE_DEBUG_FILE exists. If 1, debug info goes to ACTIVATE_DEBUG_FILE ".log" */
+int enforce_limits = 1;         /* 0 if monitor should only measure, 1 if enforcing resources limits. */
 
 struct jx *verbatim_summary_fields; /* fields added to the summary without change */
 
@@ -1136,9 +1137,14 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 
 	if(summary->limits_exceeded)
 	{
+		/* record that limits were exceeded in the summary, but only change the
+		 * exit_status when enforcing limits. */
 		free(summary->exit_type);
 		summary->exit_type   = xxstrdup("limits");
-		summary->exit_status = 128 + SIGTERM;
+
+		if(enforce_limits) {
+			summary->exit_status = 128 + SIGTERM;
+		}
 	}
 }
 
@@ -1289,7 +1295,7 @@ int rmonitor_final_summary()
 
 	int status;
 
-	if(summary->limits_exceeded) {
+	if(summary->limits_exceeded && enforce_limits) {
 		status = RM_OVERFLOW;
 	} else if(summary->exit_status != 0) {
 		status = RM_TASK_ERROR;
@@ -1819,8 +1825,9 @@ int rmonitor_dispatch_msg(void)
 
 	summary->last_error = msg.error;
 
-	if(!rmsummary_check_limits(summary, resources_limits))
+	if(!rmsummary_check_limits(summary, resources_limits) && enforce_limits) {
 		rmonitor_final_cleanup(SIGTERM);
+	}
 
 	// find out if messages are urgent:
 	if(msg.type == SNAPSHOT) {
@@ -2041,6 +2048,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
     fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify.\n", "-L,--limits=<string>");
     fprintf(stdout, "%-30s resource limits. Can be specified multiple times.\n", "");
+    fprintf(stdout, "%-30s Do not enforce resource limits, only measure resources.\n", "--measure-only");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
     fprintf(stdout, "\n");
@@ -2106,7 +2114,7 @@ int rmonitor_resources(long int interval /*in seconds */)
 		rmonitor_find_max_tree(snapshot, resources_now);
 		rmonitor_log_row(resources_now);
 
-		if(!rmsummary_check_limits(summary, resources_limits)) {
+		if(!rmsummary_check_limits(summary, resources_limits) && enforce_limits) {
 			rmonitor_final_cleanup(SIGTERM);
 		}
 
@@ -2213,7 +2221,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_CATALOG_SERVER,
 		LONG_OPT_CATALOG_PROJECT,
 		LONG_OPT_CATALOG_INTERVAL,
-		LONG_OPT_PID
+		LONG_OPT_PID,
+		LONG_OPT_MEASURE_ONLY
 	};
 
     static const struct option long_options[] =
@@ -2228,6 +2237,7 @@ int main(int argc, char **argv) {
 		    {"limits-file",required_argument, 0, 'l'},
 		    {"sh",         required_argument, 0, 'c'},
 		    {"pid",        required_argument, 0, LONG_OPT_PID},
+		    {"measure-only", no_argument, 0, LONG_OPT_MEASURE_ONLY},
 
 		    {"verbatim-to-summary",required_argument, 0, 'V'},
 
@@ -2347,6 +2357,9 @@ int main(int argc, char **argv) {
 					first_pid_manually_set = 1;
 					first_process_pid = (pid_t) p;
 				}
+				break;
+			case LONG_OPT_MEASURE_ONLY:
+				enforce_limits = 0;
 				break;
 			case LONG_OPT_CATALOG_TASK_READABLE_NAME:
 				catalog_task_readable_name = xxstrdup(optarg);
