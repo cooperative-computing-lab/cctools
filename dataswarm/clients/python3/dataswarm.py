@@ -14,6 +14,8 @@ class DataSwarm:
         self.id = 1
         self.wq = None
 
+    # Handle sending and receiving messages
+
     def send_recv(self, request):
         request = json.dumps(request)
         self.send(request)
@@ -23,16 +25,6 @@ class DataSwarm:
         self.id += 1
 
         return response
-
-    def connect(self, address, port ):
-        i = 1
-        while True:
-            try:
-                self.socket.connect(address,port)
-                break
-            except:
-                sleep(0.1*i)
-                i *= 2
 
     def send(self, msg):
         length = len(msg)
@@ -67,19 +59,136 @@ class DataSwarm:
         
         return response
 
-    def submit(self, task):
+    # Handle connecting to and disconnecting from manager
+
+    def connect(self, address, port):
+        i = 1
+        while True:
+            try:
+                self.socket.connect(address,port)
+                break
+            except:
+                sleep(0.1*i)
+                i *= 2
+
+    def disconnect(self):
+        self.socket.close()
+
+    # Task methods
+
+    # t is a task description in JSON
+    def task_submit(self, t):
         request = {
-            "jsonrpc" : "2.0",
-            "method" : "submit",
+            "method" : "task-submit",
             "id" : self.id,
-            "params" : task
+            "params" : t
         }
 
         return self.send_recv(request)
 
+    def task_delete(self, taskid):
+        request = {
+            "method" : "task-delete",
+            "id" : self.id,
+            "params" : taskid
+        }
+
+        return self.send_recv(request)
+
+    def task_retrieve(self, taskid):
+        request = {
+            "method" : "task-retrieve",
+            "id" : self.id,
+            "params" : taskid
+        }
+
+        return self.send_recv(request)
+
+    # File methods
+
+    # f is a file description in JSON
+    def file_submit(self, f):
+        request = {
+            "method" : "file-submit",
+            "id" : self.id,
+            "params" : f
+        }
+
+        return self.send_recv(request)
+
+    def file_commit(self, fileid):
+        request = {
+            "method" : "file-commit",
+            "id" : self.id,
+            "params" : fileid
+        }
+
+        return self.send_recv(request)
+
+    def file_delete(self, fileid):
+        request = {
+            "method" : "file-submit",
+            "id" : self.id,
+            "params" : fileid
+        }
+
+        return self.send_recv(request)
+
+    def file_copy(self, fileid):
+        request = {
+            "method" : "file-submit",
+            "id" : self.id,
+            "params" : fileid
+        }
+
+        return self.send_recv(request)
+
+    # Service methods
+
+    # s is a service description in JSON
+    def service_submit(self, s):
+        request = {
+            "method" : "service-submit",
+            "id" : self.id,
+            "params" : s
+        }
+
+        return self.send_recv(request)
+
+    def service_delete(self, serviceid):
+        request = {
+            "method" : "service-delete",
+            "id" : self.id,
+            "params" : serviceid
+        }
+
+        return self.send_recv(request)
+
+    # Project methods
+
+    # p is a project description in JSON
+    def project_create(self, p):
+        request = {
+            "method" : "project-create",
+            "id" : self.id,
+            "params" : p
+        }
+
+        return self.send_recv(request)
+
+    def project_delete(self, projectid):
+        request = {
+            "method" : "project-delete",
+            "id" : self.id,
+            "params" : projectid
+        }
+
+        return self.send_recv(request)        
+
+    # Other methods
+
     def wait(self, timeout):
         request = {
-            "jsonrpc" : "2.0",
             "method" : "wait",
             "id" : self.id,
             "params" : timeout
@@ -87,23 +196,9 @@ class DataSwarm:
 
         return self.send_recv(request)
 
-    def remove(self, taskid):
+    def queue_empty(self):
         request = {
-            "jsonrpc" : "2.0",
-            "method" : "remove",
-            "id" : self.id,
-            "params" : taskid
-        }
-
-        return self.send_recv(request)
-
-    def disconnect(self):
-        self.socket.close()
-
-    def empty(self):
-        request = {
-            "jsonrpc" : "2.0",
-            "method" : "empty",
+            "method" : "queue-empty",
             "id" : self.id,
             "params" : ""
         }
@@ -116,3 +211,15 @@ class DataSwarm:
             return False
         else:
             return True
+
+    # uuid is the id of the desired item (file, task, service, or project) 
+    # if no uuid is provided, give the status of everything (?)
+    def status(self, uuid=None):
+
+        request = {
+            "method" : "status",
+            "id" : self.id,
+            "params" : uuid
+        }
+
+        return self.send_recv(request)
