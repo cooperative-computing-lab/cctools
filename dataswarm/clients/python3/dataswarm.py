@@ -81,7 +81,9 @@ class DataSwarm:
         request = {
             "method" : "task-submit",
             "id" : self.id,
-            "params" : t
+            "params" : {
+                "task" : t
+            }
         }
 
         return self.send_recv(request)
@@ -90,7 +92,9 @@ class DataSwarm:
         request = {
             "method" : "task-delete",
             "id" : self.id,
-            "params" : taskid
+            "params" : {
+                "task_id" : taskid
+            }
         }
 
         return self.send_recv(request)
@@ -99,7 +103,9 @@ class DataSwarm:
         request = {
             "method" : "task-retrieve",
             "id" : self.id,
-            "params" : taskid
+            "params" : {
+                "task_id" : taskid
+            }
         }
 
         return self.send_recv(request)
@@ -111,7 +117,9 @@ class DataSwarm:
         request = {
             "method" : "file-submit",
             "id" : self.id,
-            "params" : f
+            "params" : {
+                "description" : f
+            }
         }
 
         return self.send_recv(request)
@@ -120,7 +128,9 @@ class DataSwarm:
         request = {
             "method" : "file-commit",
             "id" : self.id,
-            "params" : fileid
+            "params" : {
+                "uuid" : fileid
+            }
         }
 
         return self.send_recv(request)
@@ -129,7 +139,9 @@ class DataSwarm:
         request = {
             "method" : "file-submit",
             "id" : self.id,
-            "params" : fileid
+            "params" : {
+                "uuid" : fileid
+            }
         }
 
         return self.send_recv(request)
@@ -138,7 +150,9 @@ class DataSwarm:
         request = {
             "method" : "file-submit",
             "id" : self.id,
-            "params" : fileid
+            "params" : {
+                "uuid" : fileid
+            }
         }
 
         return self.send_recv(request)
@@ -150,7 +164,9 @@ class DataSwarm:
         request = {
             "method" : "service-submit",
             "id" : self.id,
-            "params" : s
+            "params" : {
+                "description" : s
+            }
         }
 
         return self.send_recv(request)
@@ -159,7 +175,9 @@ class DataSwarm:
         request = {
             "method" : "service-delete",
             "id" : self.id,
-            "params" : serviceid
+            "params" : {
+                "uuid" : serviceid
+            }
         }
 
         return self.send_recv(request)
@@ -171,7 +189,9 @@ class DataSwarm:
         request = {
             "method" : "project-create",
             "id" : self.id,
-            "params" : p
+            "params" : {
+                "description" : p
+            }
         }
 
         return self.send_recv(request)
@@ -180,7 +200,9 @@ class DataSwarm:
         request = {
             "method" : "project-delete",
             "id" : self.id,
-            "params" : projectid
+            "params" : {
+                "uuid" : projectid
+            }
         }
 
         return self.send_recv(request)        
@@ -191,7 +213,9 @@ class DataSwarm:
         request = {
             "method" : "wait",
             "id" : self.id,
-            "params" : timeout
+            "params" : {
+                "timeout" : timeout
+            }
         }
 
         return self.send_recv(request)
@@ -219,7 +243,9 @@ class DataSwarm:
         request = {
             "method" : "status",
             "id" : self.id,
-            "params" : uuid
+            "params" : {
+                "uuid" : uuid
+            }
         }
 
         return self.send_recv(request)
