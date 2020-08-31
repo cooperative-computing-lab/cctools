@@ -1294,9 +1294,10 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 	char cmd[WORK_QUEUE_LINE_MAX];
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	char *cur_pos;
+	char *cmd_tmp;
+	struct stat info;
 
 	if(mode != WORK_QUEUE_FS_CMD) {
-		struct stat info;
 		if(stat(path, &info) != 0) {
 			debug(D_WQ, "Path %s not accessible. (%s)\n", path, strerror(errno));
 			return 0;
@@ -1325,6 +1326,11 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 		*cur_pos = '/';
 	}
 
+	if(stat(cached_filename, &info) == 0) {
+		/* file is already present */
+		return 1;
+	}
+
 	switch (mode) {
 	case WORK_QUEUE_FS_SYMLINK:
 		if(symlink(path, cached_filename) != 0) {
@@ -1340,7 +1346,10 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 		}
 		break;
 	case WORK_QUEUE_FS_CMD:
-		string_nformat(cmd, sizeof(cmd), "%s > %s", path, cached_filename);
+		cmd_tmp = string_replace_percents(path, cached_filename);
+		string_nformat(cmd, sizeof(cmd), "%s", cmd_tmp);
+		free(cmd_tmp);
+		debug(D_WQ, "Transfering %s via cmd: %s", cached_filename, cmd);
 		if(system(cmd) != 0) {
 			debug(D_WQ, "Could not thirdget %s, command (%s) failed. (%s)\n", filename, cmd, strerror(errno));
 			return 0;

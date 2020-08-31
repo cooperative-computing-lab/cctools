@@ -4793,6 +4793,10 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 		}
 	}
 
+	if(strstr(cmd, "%%") == NULL) {
+		fatal("command to transfer file does not contain %%%% specifier: %s", cmd);
+	}
+
 	tf = work_queue_file_create(cmd, remote_name, WORK_QUEUE_REMOTECMD, flags);
 	if(!tf) return 0;
 
