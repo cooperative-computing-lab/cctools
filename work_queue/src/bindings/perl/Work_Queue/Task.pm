@@ -105,6 +105,23 @@ sub specify_file {
 					$args{flags});
 }
 
+sub specify_file_command {
+	my $self = shift;
+	my %args = @_;
+
+	croak "At least remote_name and cmd should be specified." unless $args{remote_name} and $args{cmd};
+
+	$args{type}        //= $WORK_QUEUE_INPUT;
+	$args{cache}       //= 1;
+	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
+
+	return work_queue_task_specify_file_command($self->{_task},
+					$args{remote_name},
+					$args{cmd},
+					$args{type},
+					$args{flags});
+}
+
 sub specify_file_piece {
 	my $self = shift;
 	my %args = @_;
@@ -591,6 +608,43 @@ Legacy parameter for setting file caching attribute.  By default this is enabled
 		$t->specify_file(local_name => ...);
 
 		$t->specify_file(local_name => ..., remote_name => ..., );
+
+=head3 C<specify_file_command>
+
+Add a file to the task which will be transfered with a command at the worker.
+
+=item remote_name
+
+The name of the file at the execution site.
+
+=item cmd
+
+The shell command to transfer the file. Any occurance of the string %% will be
+replaced with the internal name that work queue uses for the file.
+
+=item type
+
+Must be one of the following values: $Work_Queue::WORK_QUEUE_INPUT or $Work_Queue::WORK_QUEUE_OUTPUT
+
+=item flags
+
+May be zero to indicate no special handling, or any of the following or'd together:
+
+=over 24
+
+=item $Work_Queue::WORK_QUEUE_NOCACHE
+
+=item $Work_Queue::WORK_QUEUE_CACHE
+
+=back
+
+=item cache
+
+Legacy parameter for setting file caching attribute.  By default this is enabled.
+
+=back
+
+        $t->specify_file_command("my.result", "chirp_put %% chirp://somewhere/result.file", type=$Work_Queue::WORK_QUEUE_OUTPUT)
 
 =head3 C<specify_file_piece>
 

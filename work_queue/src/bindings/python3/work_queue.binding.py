@@ -170,6 +170,34 @@ class Task(object):
         return work_queue_task_specify_file(self._task, local_name, remote_name, type, flags)
 
     ##
+    # Add a file to the task which will be transfered with a command at the worker.
+    #
+    # @param self           Reference to the current task object.
+    # @param remote_name    The name of the file as seen by the task.
+    # @param cmd            The shell command to transfer the file. Any
+    #                       occurance of the string %% will be replaced with the
+    #                       internal name that work queue uses for the file.
+    # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref work_queue_file_flags_t or'd together The most common are:
+    #                       - @ref WORK_QUEUE_NOCACHE (default)
+    #                       - @ref WORK_QUEUE_CACHE
+    #                       - @ref WORK_QUEUE_WATCH
+    # @param cache          Legacy parameter for setting file caching attribute. (True/False, deprecated, use the flags parameter.)
+    #
+    # For example:
+    # @code
+    # # The following are equivalent
+    # >>> task.specify_file_command("my.result", "chirp_put %% chirp://somewhere/result.file", type=WORK_QUEUE_OUTPUT)
+    # @endcode
+    def specify_file_command(self, remote_name, cmd, type=None, flags=None, cache=None):
+        if type is None:
+            type = WORK_QUEUE_INPUT
+
+        flags = Task._determine_file_flags(flags, cache)
+        return work_queue_task_specify_file_command(self._task, remote_name, cmd, type, flags)
+
+    ##
     # Add a file piece to the task.
     #
     # @param self           Reference to the current task object.
