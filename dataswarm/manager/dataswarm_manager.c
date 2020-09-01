@@ -23,9 +23,10 @@ See the file COPYING for details.
 #include "catalog_query.h"
 
 #include "dataswarm_message.h"
-#include "dataswarm_worker_rep.h"
-#include "dataswarm_client_rep.h"
+#include "dataswarm_worker.h"
+#include "dataswarm_client.h"
 #include "dataswarm_manager.h"
+#include "dataswarm_file.h"
 
 struct jx * manager_status_jx( struct dataswarm_manager *m )
 {
@@ -113,14 +114,21 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 		if(!strcmp(conn_type,"worker")) {
 			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
-			struct dataswarm_worker_rep *w = dataswarm_worker_rep_create(l);
+			struct dataswarm_worker *w = dataswarm_worker_create(l);
 			hash_table_insert(m->worker_table,manager_key,w);
 		} else if(!strcmp(conn_type,"client")) {
 			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
-			struct dataswarm_client_rep *c = dataswarm_client_rep_create(l);
+			struct dataswarm_client *c = dataswarm_client_create(l);
 			hash_table_insert(m->client_table,manager_key,c);
 		} else {
 			/* dataswarm_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
+			link_close(l);
+			break;
+		}
+
+		free(manager_key);
+		jx_delete(msg);
+	}
 			link_close(l);
 			break;
 		}
@@ -148,23 +156,31 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 
 	if(!strcmp(method,"task-submit")) {
 		/* */
-	} else if(!strcmp(method,"file-submit")) {
-		/* */
-	} else if(!strcmp(method,"status-report")) {
-		/* */
-	} else if(!strcmp(method,"status-request")) {
+	} else if(!strcmp(method,"task-delete")) {
 		/* */
 	} else if(!strcmp(method,"task-retrieve")) {
 		/* */
-	} else if(!strcmp(method,"task-reap")) {
+	} else if(!strcmp(method,"file-submit")) {
 		/* */
-	} else if(!strcmp(method,"task-cancel")) {
+	} else if(!strcmp(method,"file-commit")) {
 		/* */
-	} else if(!strcmp(method,"blob-delete")) {
+	} else if(!strcmp(method,"file-delete")) {
 		/* */
-	} else if(!strcmp(method,"blob-commit")) {
+	} else if(!strcmp(method,"file-copy")) {
 		/* */
-	} else if(!strcmp(method,"blob-copy")) {
+	} else if(!strcmp(method,"service-submit")) {
+		/* */
+    } else if(!strcmp(method,"service-delete")) {
+		/* */
+	} else if(!strcmp(method,"project-create")) {
+		/* */
+	} else if(!strcmp(method,"project-delete")) {
+		/* */
+	} else if(!strcmp(method,"wait")) {
+		/* */
+	} else if(!strcmp(method,"queue-empty")) {
+		/* */
+	} else if(!strcmp(method,"status")) {
 		/* */
 	} else {
 		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
@@ -220,33 +236,6 @@ int handle_messages( struct dataswarm_manager *m, int msec )
 
 	n = 1;
 
-	hash_table_firstkey(m->client_table);
-	while(hash_table_nextkey(m->client_table, &key, (void **) &c)) {
-		table[n].link = c->link;
-		table[n].events = LINK_READ;
-		table[n].revents = 0;
-		n++;
-	}
-
-	hash_table_firstkey(m->worker_table);
-	while(hash_table_nextkey(m->worker_table, &key, (void **) &w)) {
-		table[n].link = w->link;
-		table[n].events = LINK_READ;
-		table[n].revents = 0;
-		n++;
-	}
-
-	link_poll(table,n,msec);
-
-	int i;
-	for(i=0;i<n;i++) {
-		if(table[i].revents&LINK_READ) {
-
-			char *key = string_format("%p",table[i].link);
-
-			if(i==0) {
-				handle_connect_message(m,time(0)+m->connect_timeout);
-			} else if((c=hash_table_lookup(m->client_table,key))) {
 				handle_client_message(m,c,time(0)+m->stall_timeout);
 			} else if((w==hash_table_lookup(m->worker_table,key))) {
 				handle_worker_message(m,w,time(0)+m->stall_timeout);
