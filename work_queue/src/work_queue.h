@@ -1000,12 +1000,26 @@ rm specifies the maximum resources a task in the default category may use.
 */
 void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsummary *rm);
 
+/** Sets the minimum resources a task without an explicit category ("default" category).
+rm specifies the maximum resources a task in the default category may use.
+@param q  Reference to the current work queue object.
+@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+*/
+void work_queue_specify_min_resources(struct work_queue *q,  const struct rmsummary *rm);
+
 /** Sets the maximum resources a task in the category may use.
 @param q         Reference to the current work queue object.
 @param category  Name of the category.
-@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+@param rm Structure indicating minimum values. See @rmsummary for possible fields.
 */
 void work_queue_specify_category_max_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm);
+
+/** Sets the minimum resources a task in the category may use.
+@param q         Reference to the current work queue object.
+@param category  Name of the category.
+@param rm Structure indicating minimum values. See @rmsummary for possible fields.
+*/
+void work_queue_specify_category_min_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm);
 
 /** Set the initial guess for resource autolabeling for the given category.
 @param q         Reference to the current work queue object.

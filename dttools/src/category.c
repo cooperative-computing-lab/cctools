@@ -25,12 +25,12 @@ struct peak_count_time {
 	double  times;
 };
 
-static int64_t memory_bucket_size    = 50;          /* 50 MB */
-static int64_t disk_bucket_size      = 50;          /* 50 MB */
-static int64_t time_bucket_size      = 300000000;   /* 5 minutes */
-static int64_t bytes_bucket_size     = 5*MEGABYTE;  /* 5 MB */
-static int64_t bandwidth_bucket_size = 1000000;     /* 1 Mbit/s */
-static int64_t cores_avg_bucket_size = 100;         /* 1/10 of a core */
+static int64_t memory_bucket_size    = 250;           /* 250 MB */
+static int64_t disk_bucket_size      = 250;           /* 250 MB */
+static int64_t time_bucket_size      = 15*60*USECOND; /* 15 minutes */
+static int64_t bytes_bucket_size     = 250*MEGABYTE;  /* 250 MB */
+static int64_t bandwidth_bucket_size = 100*1000000;   /* 100 Mbit/s */
+static int64_t cores_avg_bucket_size = 200;           /* 2/10 of a core */
 
 static int64_t first_allocation_every_n_tasks = 25; /* tasks */
 
@@ -47,6 +47,7 @@ struct category *category_create(const char *name) {
 
 	c->first_allocation    = NULL;
 	c->max_allocation      = rmsummary_create(-1);
+	c->min_allocation      = rmsummary_create(-1);
 	c->autolabel_resource  = rmsummary_create(0);
 
 	c->max_resources_seen      = rmsummary_create(-1);
@@ -98,6 +99,17 @@ void category_specify_max_allocation(struct category *c, const struct rmsummary 
 	c->max_allocation = rmsummary_create(-1);
 
 	rmsummary_merge_max(c->max_allocation, s);
+}
+
+void category_specify_min_allocation(struct category *c, const struct rmsummary *s) {
+	rmsummary_delete(c->min_allocation);
+	c->min_allocation = rmsummary_create(-1);
+
+	rmsummary_merge_max(c->min_allocation, s);
+
+    /* consider the minimum allocation as a measurement. This ensures that max
+     * dynamic allocation is never below min dynamic allocation */
+	rmsummary_merge_max(c->max_resources_seen, s);
 }
 
 void category_specify_first_allocation_guess(struct category *c, const struct rmsummary *s) {
@@ -227,6 +239,7 @@ void category_delete(struct hash_table *categories, const char *name) {
 	category_delete_histograms(c);
 
 	rmsummary_delete(c->max_allocation);
+	rmsummary_delete(c->min_allocation);
 	rmsummary_delete(c->first_allocation);
 	rmsummary_delete(c->autolabel_resource);
 	rmsummary_delete(c->max_resources_seen);
@@ -499,6 +512,9 @@ int category_update_first_allocation(struct category *c, const struct rmsummary 
 	update_first_allocation_field(c, top, c->time_peak_independece, max_concurrent_processes);
 	update_first_allocation_field(c, top, c->time_peak_independece, total_processes);
 
+    /* don't go below min allocation */
+    rmsummary_merge_max(c->first_allocation, c->min_allocation);
+
 	/* From here on we only print debugging info. */
 	struct jx *jsum = rmsummary_to_json(c->first_allocation, 1);
 	if(jsum) {
@@ -530,14 +546,17 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 	const struct rmsummary *max  = c->max_allocation;
 	const struct rmsummary *seen = c->max_resources_seen;
 
-	int new_maximum ;
+	int new_maximum = 0;
 	if(rs
 			&& (max->cores  > 0 || rs->cores  <= seen->cores)
 			&& (max->memory > 0 || rs->memory <= seen->memory)
 			&& (max->disk   > 0 || rs->disk   <= seen->disk)) {
 		new_maximum = 0;
 	} else {
-		new_maximum = 1;
+        if(c->steady_state) {
+            /* count new maximums only in steady state. */
+            new_maximum = 1;
+        }
 	}
 
 	/* a new maximum has been seen, first-allocation is obsolete. */
@@ -702,7 +721,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 		rmsummary_merge_override(internal, first);
 	}
 
-	/* chip in user values */
+	/* chip in user values if explicitely given */
 	rmsummary_merge_override(internal, user);
 
 	return internal;
@@ -712,7 +731,7 @@ const struct rmsummary *category_dynamic_task_min_resources(struct category *c, 
 
 	static struct rmsummary *internal = NULL;
 
-	const struct rmsummary *max = category_dynamic_task_max_resources(c, user, request);
+	const struct rmsummary *allocation = category_dynamic_task_max_resources(c, user, request);
 
 	if(internal) {
 		rmsummary_delete(internal);
@@ -729,7 +748,11 @@ const struct rmsummary *category_dynamic_task_min_resources(struct category *c, 
 			internal->disk   = seen->disk;
 	}
 
-	rmsummary_merge_override(internal, max);
+    /* prefer first allocation (if available) to maximum seen. */
+	rmsummary_merge_override(internal, allocation);
+
+    /* but don't go below the minimum defined for the category. */
+	rmsummary_merge_max(internal, c->min_allocation);
 
 	return internal;
 }

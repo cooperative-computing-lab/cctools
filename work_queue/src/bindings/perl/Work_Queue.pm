@@ -346,9 +346,19 @@ sub specify_max_resources {
 	return work_queue_specify_max_resources($self->{_work_queue}, $rm);
 }
 
+sub specify_min_resources {
+	my ($self, $rm) = @_;
+	return work_queue_specify_min_resources($self->{_work_queue}, $rm);
+}
+
 sub specify_category_max_resources {
 	my ($self, $category, $rm) = @_;
 	return work_queue_specify_category_max_resources($self->{_work_queue}, $category, $rm);
+}
+
+sub specify_category_min_resources {
+	my ($self, $category, $rm) = @_;
+	return work_queue_specify_category_min_resources($self->{_work_queue}, $category, $rm);
 }
 
 sub specify_category_first_allocation_guess {
@@ -1094,6 +1104,29 @@ A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
 		q->specify_max_resources({'cores' => 8, 'memory' => 1024, 'disk' => 10240});
 
 
+=head3 C<specify_min_resources>
+
+Specifies the min resources for tasks without an explicit category ("default"
+category).  rm specifies the minimum resources a task in the default category
+may use.
+
+=over 12
+
+=item rm
+
+Hash reference indicating minimum values. See @resources_measured for possible fields.
+
+=back
+
+A minimum of 2 cores is found on any worker:
+
+		q->specify_min_resources({'cores' => 2});
+
+A minimum of 4 cores, 1GB of memory, and 10GB disk are found on any worker:
+
+		q->specify_min_resources({'cores' => 4, 'memory' => 1024, 'disk' => 10240});
+
+
 =head3 C<specify_category_max_resources>
 
 Specifies the max resources for tasks in the given category.
@@ -1115,6 +1148,29 @@ A maximum of 4 cores is found on any worker:
 A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
 
 		q->specify_category_max_resources('my_category', {'cores' => 8, 'memory' => 1024, 'disk' => 10240});
+
+
+=head3 C<specify_category_min_resources>
+
+Specifies the min resources for tasks in the given category.
+
+=over 12
+
+=item category
+
+Name of the category
+
+=item rm
+
+Hash reference indicating minimum values. See @resources_measured for possible fields.
+
+A minimum of 2 cores is found on any worker:
+
+		q->specify_category_min_resources('my_category', {'cores' => 2});
+
+A minimum of 2 cores, 1GB of memory, and 10GB disk are found on any worker:
+
+		q->specify_category_min_resources('my_category', {'cores' => 2, 'memory' => 1024, 'disk' => 10240});
 
 
 =head3 C<specify_category_first_allocation_guess

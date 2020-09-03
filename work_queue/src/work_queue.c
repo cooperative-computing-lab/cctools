@@ -2200,6 +2200,7 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	jx_insert_integer(j, "tasks_done",       s.tasks_done);
 	jx_insert_integer(j, "tasks_failed",     s.tasks_failed);
 	jx_insert_integer(j, "tasks_cancelled",  s.tasks_cancelled);
+	jx_insert_integer(j, "workers_able",	 s.workers_able);
 
 	struct rmsummary *largest = largest_waiting_declared_resources(q, c->name);
 
@@ -6953,9 +6954,18 @@ void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsumm
 	work_queue_specify_category_max_resources(q,  "default", rm);
 }
 
+void work_queue_specify_min_resources(struct work_queue *q,  const struct rmsummary *rm) {
+	work_queue_specify_category_min_resources(q,  "default", rm);
+}
+
 void work_queue_specify_category_max_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = work_queue_category_lookup_or_create(q, category);
 	category_specify_max_allocation(c, rm);
+}
+
+void work_queue_specify_category_min_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
+	struct category *c = work_queue_category_lookup_or_create(q, category);
+	category_specify_min_allocation(c, rm);
 }
 
 void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  const char *category, const struct rmsummary *rm) {

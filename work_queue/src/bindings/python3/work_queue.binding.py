@@ -1207,6 +1207,26 @@ class WorkQueue(object):
         return work_queue_specify_max_resources(self._work_queue, rm)
 
     ##
+    #
+    # Specifies the minimum resources allowed for the default category.
+    # @param self      Reference to the current work queue object.
+    # @param rm        Dictionary indicating minimum values. See @resources_measured for possible fields.
+    # For example:
+    # @code
+    # >>> # A minimum of 2 cores is found on any worker:
+    # >>> q.specify_min_resources({'cores': 2})
+    # >>> # A minimum of 4 cores, 512MB of memory, and 1GB disk are found on any worker:
+    # >>> q.specify_min_resources({'cores': 4, 'memory':  512, 'disk': 1024})
+    # @endcode
+
+    def specify_min_resources(self, rmd):
+        rm = rmsummary_create(-1)
+        for k in rmd:
+            old_value = getattr(rm, k) # to raise an exception for unknown keys
+            setattr(rm, k, rmd[k])
+        return work_queue_specify_min_resources(self._work_queue, rm)
+
+    ##
     # Specifies the maximum resources allowed for the given category.
     #
     # @param self      Reference to the current work queue object.
@@ -1228,6 +1248,27 @@ class WorkQueue(object):
         return work_queue_specify_category_max_resources(self._work_queue, category, rm)
 
     ##
+    # Specifies the minimum resources allowed for the given category.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param category  Name of the category.
+    # @param rm        Dictionary indicating minimum values. See @resources_measured for possible fields.
+    # For example:
+    # @code
+    # >>> # A minimum of 2 cores is found on any worker:
+    # >>> q.specify_category_min_resources("my_category", {'cores': 2})
+    # >>> # A minimum of 4 cores, 512MB of memory, and 1GB disk are found on any worker:
+    # >>> q.specify_category_min_resources("my_category", {'cores': 4, 'memory':  512, 'disk': 1024})
+    # @endcode
+
+    def specify_category_min_resources(self, category, rmd):
+        rm = rmsummary_create(-1)
+        for k in rmd:
+            old_value = getattr(rm, k) # to raise an exception for unknown keys
+            setattr(rm, k, rmd[k])
+        return work_queue_specify_category_min_resources(self._work_queue, category, rm)
+
+    ##
     # Specifies the first-allocation guess for the given category
     #
     # @param self      Reference to the current work queue object.
@@ -1235,10 +1276,10 @@ class WorkQueue(object):
     # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
     # For example:
     # @code
-    # >>> # A maximum of 4 cores may be used by a task in the category:
-    # >>> q.specify_max_category_resources("my_category", {'cores': 4})
-    # >>> # A maximum of 8 cores, 1GB of memory, and 10GB may be used by a task:
-    # >>> q.specify_max_category_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
+    # >>> # Tasks are first tried with 4 cores:
+    # >>> q.specify_category_first_allocation_guess("my_category", {'cores': 4})
+    # >>> # Tasks are first tried with 8 cores, 1GB of memory, and 10GB:
+    # >>> q.specify_category_first_allocation_guess("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
     # @endcode
 
     def specify_category_first_allocation_guess(self, category, rmd):
