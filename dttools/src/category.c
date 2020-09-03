@@ -25,12 +25,12 @@ struct peak_count_time {
 	double  times;
 };
 
-static int64_t memory_bucket_size    = 50;          /* 50 MB */
-static int64_t disk_bucket_size      = 50;          /* 50 MB */
-static int64_t time_bucket_size      = 300000000;   /* 5 minutes */
-static int64_t bytes_bucket_size     = 5*MEGABYTE;  /* 5 MB */
-static int64_t bandwidth_bucket_size = 1000000;     /* 1 Mbit/s */
-static int64_t cores_avg_bucket_size = 100;         /* 1/10 of a core */
+static int64_t memory_bucket_size    = 250;           /* 250 MB */
+static int64_t disk_bucket_size      = 250;           /* 250 MB */
+static int64_t time_bucket_size      = 15*60*USECOND; /* 15 minutes */
+static int64_t bytes_bucket_size     = 250*MEGABYTE;  /* 250 MB */
+static int64_t bandwidth_bucket_size = 100*1000000;   /* 100 Mbit/s */
+static int64_t cores_avg_bucket_size = 200;           /* 2/10 of a core */
 
 static int64_t first_allocation_every_n_tasks = 25; /* tasks */
 
