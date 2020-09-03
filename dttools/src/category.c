@@ -546,7 +546,7 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 	const struct rmsummary *max  = c->max_allocation;
 	const struct rmsummary *seen = c->max_resources_seen;
 
-	int new_maximum;
+	int new_maximum = 0;
 	if(rs
 			&& (max->cores  > 0 || rs->cores  <= seen->cores)
 			&& (max->memory > 0 || rs->memory <= seen->memory)
