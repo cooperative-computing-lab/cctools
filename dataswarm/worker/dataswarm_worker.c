@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "create_dir.h"
 
 #include "dataswarm_message.h"
+#include "dataswarm_blob.h"
 
 // Give up and reconnect if no message received after this time.
 int idle_timeout = 300;
@@ -44,10 +45,11 @@ int catalog_timeout = 60;
 int message_id = 1;
 
 
-void handle_manager_message( struct link *manager_link, struct jx *msg )
+struct jx *handle_manager_message( struct link *manager_link, struct jx *msg )
 {
+    struct jx *response = NULL;
 	if(!msg) {
-		return;
+		return response;
 	}
 
 	const char *method = jx_lookup_string(msg,"method");
@@ -56,7 +58,7 @@ void handle_manager_message( struct link *manager_link, struct jx *msg )
 		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 		/* should the worker add the manager to a banned list at least temporarily? */
 		/* disconnect from manager */
-		return;
+		return response;
 	}
 
 	if(!strcmp(method,"task-submit")) {
@@ -70,20 +72,28 @@ void handle_manager_message( struct link *manager_link, struct jx *msg )
 	} else if(!strcmp(method,"status-request")) {
 		/* */
 	} else if(!strcmp(method,"blob-create")) {
-		/* */
+        /* blob-id, size, metadata, userdata */
+        response = dataswarm_blob_create(params);
 	} else if(!strcmp(method,"blob-put")) {
-		/* */
+		/* blob-id size */
+        response = dataswarm_blob_put(manager_link, params);
 	} else if(!strcmp(method,"blob-get")) {
-		/* */
+		/* blob-id */
+        response = dataswarm_blob_get(manager_link, params);
 	} else if(!strcmp(method,"blob-delete")) {
-		/* */
+		/* blob-id */
+        response = dataswarm_blob_delete(params);
 	} else if(!strcmp(method,"blob-commit")) {
-		/* */
+		/* blob-id */
+        response = dataswarm_blob_commit(params);
 	} else if(!strcmp(method,"blob-copy")) {
-		/* */
+		/* blob-id */
+        response = dataswarm_blob_copy(params);
 	} else {
 		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 	}
+
+    return response;
 }
 
 void send_status_report( struct link *manager_link, time_t stoptime ) {
@@ -116,7 +126,7 @@ int worker_main_loop( struct link *manager_link )
                     jx_delete(msg);
                 } else {
                     /* handle manager disconnection */
-                    return;
+                    return 0;
                 }
             } else {
                 break;
