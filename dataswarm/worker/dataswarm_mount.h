@@ -28,9 +28,11 @@ struct dataswarm_mount {
 
 // Parse a whole object full of mounts 
 struct dataswarm_mount * dataswarm_mounts_create( struct jx *jmounts );
+struct jx * dataswarm_mounts_to_jx( struct dataswarm_mount *m );
 
 // Parse a single mount object.
 struct dataswarm_mount * dataswarm_mount_create( const char *uuid, struct jx *jmount );
+struct jx * dataswarm_mount_to_jx( struct dataswarm_mount *m );
 
 void dataswarm_mount_delete( struct dataswarm_mount *m );
 

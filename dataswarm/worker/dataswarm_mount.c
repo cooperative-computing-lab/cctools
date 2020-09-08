@@ -45,6 +45,18 @@ dataswarm_flags_t dataswarm_flags_parse( const char *s )
 	return flags;
 }
 
+struct jx * dataswarm_flags_to_jx( dataswarm_flags_t flags )
+{
+	static char str[4];
+	str[0] = 0;
+	
+	if(flags&DATASWARM_FLAGS_READ) strcat(str,"R");
+	if(flags&DATASWARM_FLAGS_WRITE) strcat(str,"W");
+	if(flags&DATASWARM_FLAGS_APPEND) strcat(str,"A");
+
+	return jx_string(str);	
+}
+
 struct dataswarm_mount * dataswarm_mount_create( const char *uuid, struct jx *jmount )
 {
 	struct dataswarm_mount *m = malloc(sizeof(*m));
@@ -81,11 +93,40 @@ struct dataswarm_mount * dataswarm_mount_create( const char *uuid, struct jx *jm
 	return m;
 }
 
+struct jx * dataswarm_mounts_to_jx( struct dataswarm_mount *m )
+{
+	struct jx *jmounts = jx_object(0);
+
+	while(m) {
+		struct jx *jm = dataswarm_mount_to_jx(m);
+		jx_insert(jmounts,jx_string(m->uuid),jm);
+		m = m->next;
+	}
+
+	return jmounts;
+}
+
+struct jx * dataswarm_mount_to_jx( struct dataswarm_mount *m )
+{
+	struct jx *j = jx_object(0);
+	if(m->type==DATASWARM_MOUNT_PATH) {
+		jx_insert_string(j,"type","path");	
+		jx_insert_string(j,"path",m->path);
+		jx_insert(j,jx_string("flags"),dataswarm_flags_to_jx(m->flags));
+	} else if(m->type==DATASWARM_MOUNT_FD) {
+		jx_insert_string(j,"type","fd");	
+		jx_insert_integer(j,"fd",m->fd);
+		jx_insert(j,jx_string("flags"),dataswarm_flags_to_jx(m->flags));
+	}
+
+	return j;
+}
+
 void dataswarm_mount_delete( struct dataswarm_mount *m )
 {
 	if(!m) return;
-       	free(m);
 	dataswarm_mount_delete(m->next);
+       	free(m);
 }
 
 

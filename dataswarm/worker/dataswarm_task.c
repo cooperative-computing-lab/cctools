@@ -22,11 +22,24 @@ struct dataswarm_task * dataswarm_task_create( struct jx *jtask )
 
 }
 
+struct jx * dataswarm_task_to_jx( struct dataswarm_task *t )
+{
+	struct jx *jtask = jx_object(0);
+	if(t->command) jx_insert_string(jtask,"command",t->command);
+	if(t->taskid) jx_insert_string(jtask,"taskid",t->taskid);
+	if(t->environment) jx_insert(jtask,jx_string("environment"),jx_copy(t->environment));
+	if(t->resources) jx_insert(jtask,jx_string("resources"),dataswarm_resources_to_jx(t->resources));
+	if(t->mounts) jx_insert(jtask,jx_string("namespace"),dataswarm_mounts_to_jx(t->mounts));
+	return jtask;
+}
+
+
 void dataswarm_task_delete( struct dataswarm_task *t )
 {
-	if(!t) return 0;
+	if(!t) return;
 	dataswarm_resources_delete(t->resources);
-	dataswarm_mounts_delete(t->mounts);
+	dataswarm_mount_delete(t->mounts);
+	dataswarm_process_delete(t->process);
 	jx_delete(t->jtask);
 	free(t);
 }

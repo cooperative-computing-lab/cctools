@@ -57,7 +57,8 @@ struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task 
 
 void dataswarm_process_delete(struct dataswarm_process *p)
 {
-	// don't free taskid, it's a constant in the jx task
+	if(!p) return;
+	// don't free taskid, it's a circular link
 	if(p->sandbox) {
 		delete_dir(p->sandbox);
 		free(p->sandbox);
@@ -97,9 +98,9 @@ static void specify_integer_env_var( struct dataswarm_process *p, const char *na
 
 static void specify_resources_vars(struct dataswarm_process *p)
 {
-	if(p->task->resources.cores > 0) specify_integer_env_var(p, "CORES", p->task->resources.cores);
-	if(p->task->resources.memory > 0) specify_integer_env_var(p, "MEMORY", p->task->resources.memory);
-	if(p->task->resources.disk > 0) specify_integer_env_var(p, "DISK", p->task->resources.disk);
+	if(p->task->resources->cores > 0) specify_integer_env_var(p, "CORES", p->task->resources->cores);
+	if(p->task->resources->memory > 0) specify_integer_env_var(p, "MEMORY", p->task->resources->memory);
+	if(p->task->resources->disk > 0) specify_integer_env_var(p, "DISK", p->task->resources->disk);
 }
 
 static int setup_namespace( struct dataswarm_process *p )
