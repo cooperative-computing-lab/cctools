@@ -22,8 +22,11 @@ See the file COPYING for details.
 #include "macros.h"
 #include "catalog_query.h"
 #include "create_dir.h"
+#include "hash_table.h"
 
 #include "dataswarm_message.h"
+#include "dataswarm_task.h"
+#include "dataswarm_process.h"
 #include "dataswarm_blob.h"
 
 // Give up and reconnect if no message received after this time.
@@ -44,6 +47,29 @@ int catalog_timeout = 60;
 // id msg counter
 int message_id = 1;
 
+// taskid -> dataswarm_task *
+struct hash_table *task_table = 0;
+
+// This dummy function translates UUIDs of blobs to path.
+// Remove after integrating blob support.
+
+char *UUID_TO_LOCAL_PATH( const char *uuid )
+{
+	return string_format("/the/path/to/blob/%s",uuid);
+}
+
+void send_response_message( struct link *l, struct jx *original, struct jx *params )
+{
+	struct jx *message = jx_object(0);
+	
+	jx_insert_string(message,"method","response");
+	jx_insert_integer(message,"id",jx_lookup_integer(original,"id"));
+	jx_insert(message,jx_string("params"),jx_copy(params));
+
+	dataswarm_json_send(l,message,time(0)+long_timeout);
+
+	jx_delete(message);
+}
 
 struct jx *handle_manager_message( struct link *manager_link, struct jx *msg )
 {
@@ -54,6 +80,8 @@ struct jx *handle_manager_message( struct link *manager_link, struct jx *msg )
 
 	const char *method = jx_lookup_string(msg,"method");
 	struct jx *params = jx_lookup(msg,"params");
+	const char *id = jx_lookup_string(msg,"id");
+
 	if(!method || !params) {
 		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 		/* should the worker add the manager to a banned list at least temporarily? */
@@ -61,14 +89,26 @@ struct jx *handle_manager_message( struct link *manager_link, struct jx *msg )
 		return response;
 	}
 
+	const char *taskid = jx_lookup_string(params,"taskid");
+	struct dataswarm_task *task = 0;
+
 	if(!strcmp(method,"task-submit")) {
-		/* */
+		task = dataswarm_task_create(params);
+		hash_table_insert(task_table,taskid,task);
+		// no response?
 	} else if(!strcmp(method,"task-retrieve")) {
-		/* */
+		task = hash_table_lookup(task_table,taskid);
+		struct jx *jtask = dataswarm_task_to_jx(task);
+		send_response_message(manager_link,msg,jtask);
 	} else if(!strcmp(method,"task-reap")) {
-		/* */
+		task = hash_table_remove(task_table,taskid);		
+		if(task->process) dataswarm_process_kill(task->process);
+		dataswarm_task_delete(task);
+		// No response?
 	} else if(!strcmp(method,"task-cancel")) {
-		/* */
+		task = hash_table_lookup(task_table,taskid);
+		if(task->process) dataswarm_process_kill(task->process);
+		// No response?
 	} else if(!strcmp(method,"status-request")) {
 		/* */
     } else if(!strcmp(method,"blob-create")) {
@@ -299,6 +339,8 @@ int main(int argc, char *argv[])
 		fprintf(stderr,"%s: couldn't create workspace %s: %s\n",argv[0],workspace_dir,strerror(errno));
 		return 1;
 	}
+
+	task_table = hash_table_create(0,0);
 
 	if(manager_name) {
 		worker_connect_by_name(manager_name);
