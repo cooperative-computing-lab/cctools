@@ -71,27 +71,25 @@ struct jx *handle_manager_message( struct link *manager_link, struct jx *msg )
 		/* */
 	} else if(!strcmp(method,"status-request")) {
 		/* */
-	} else if(!strcmp(method,"blob-create")) {
-        /* blob-id, size, metadata, userdata */
-        response = dataswarm_blob_create(params);
-	} else if(!strcmp(method,"blob-put")) {
-		/* blob-id size */
-        response = dataswarm_blob_put(manager_link, params);
-	} else if(!strcmp(method,"blob-get")) {
-		/* blob-id */
-        response = dataswarm_blob_get(manager_link, params);
-	} else if(!strcmp(method,"blob-delete")) {
-		/* blob-id */
-        response = dataswarm_blob_delete(params);
-	} else if(!strcmp(method,"blob-commit")) {
-		/* blob-id */
-        response = dataswarm_blob_commit(params);
-	} else if(!strcmp(method,"blob-copy")) {
-		/* blob-id */
-        response = dataswarm_blob_copy(params);
-	} else {
-		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
-	}
+    } else if(!strcmp(method,"blob-create")) {
+        response = dataswarm_blob_create(jx_lookup_string(params, "blob-id"),
+                jx_lookup_integer(params, "size"),
+                jx_lookup(params, "metadata"),
+                jx_lookup(params, "userdata"));
+    } else if(!strcmp(method,"blob-put")) {
+        response = dataswarm_blob_put(jx_lookup_string(params, "blob-id"), manager_link);
+    } else if(!strcmp(method,"blob-get")) {
+        response = dataswarm_blob_get(jx_lookup_string(params, "blob-id"), manager_link);
+    } else if(!strcmp(method,"blob-delete")) {
+        response = dataswarm_blob_delete(jx_lookup_string(params, "blob-id"));
+    } else if(!strcmp(method,"blob-commit")) {
+        response = dataswarm_blob_commit(jx_lookup_string(params, "blob-id"));
+    } else if(!strcmp(method,"blob-copy")) {
+        response = dataswarm_blob_copy(jx_lookup_string(params, "blob-id"), 
+                                        jx_lookup_string(params, "blob-id-source"));
+    } else {
+        response = dataswarm_message_error_response(DS_MSG_UNEXPECTED_METHOD, msg);
+    }
 
     return response;
 }

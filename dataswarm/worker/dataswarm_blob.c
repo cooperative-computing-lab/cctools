@@ -17,23 +17,14 @@
 #include <errno.h>
 #include <string.h>
 
-struct jx *dataswarm_blob_create( struct jx *params )
+struct jx *dataswarm_blob_create(const char *blobid, jx_int_t size, struct jx *meta, struct jx *user)
 {
-    const char *blobid =  jx_lookup_string(params, "blob-id");
-    if(!blobid) {
-        return dataswarm_message_error_response(DS_MSG_MALFORMED_PARAMETERS, params);
-    }
-
-
-    jx_int_t size = jx_lookup_integer(params, "size");
-    if(!size) {
-        return dataswarm_message_error_response(DS_MSG_MALFORMED_PARAMETERS, params);
+    if(!blobid || size < 1) {
+        // XXX return obj with incorrect parameters
+        return NULL;
     }
 
     // XXX should here check for available space
-
-    struct jx *meta =  jx_lookup(params, "metadata");
-    struct jx *user =  jx_lookup(params, "userdata");
 
 	char *blob_dir = string_format("rw/%s",blobid);
 	char *blob_meta = string_format("rw/%s/meta",blob_dir);
@@ -70,11 +61,11 @@ struct jx *dataswarm_blob_create( struct jx *params )
 	return dataswarm_message_state_response("allocated", NULL);
 }
 
-struct jx *dataswarm_blob_put( struct link *l, struct jx *params )
+struct jx *dataswarm_blob_put(const char *blobid, struct link *l)
 {
-    const char *blobid =  jx_lookup_string(params, "blob-id");
     if(!blobid) {
-        return dataswarm_message_error_response(DS_MSG_MALFORMED_PARAMETERS, params);
+        // XXX return obj with incorrect parameters
+        return NULL;
     }
 
 	char *blob_dir = string_format("rw/%s",blobid);
@@ -116,11 +107,12 @@ struct jx *dataswarm_blob_put( struct link *l, struct jx *params )
 	return dataswarm_message_state_response("written", NULL);
 }
 
-struct jx *dataswarm_blob_get( struct link *l, struct jx *params )
+
+struct jx *dataswarm_blob_get(const char *blobid, struct link *l)
 {
-    const char *blobid =  jx_lookup_string(params, "blob-id");
     if(!blobid) {
-        return dataswarm_message_error_response(DS_MSG_MALFORMED_PARAMETERS, params);
+        // XXX return obj with incorrect parameters
+        return NULL;
     }
 
 	char *blob_dir = string_format("rw/%s",blobid);
@@ -174,11 +166,11 @@ a read-only blob, fixing its size and properties for all time,
 allowing the object to be duplicated to other nodes.
 */
 
-struct jx *dataswarm_blob_commit( struct jx *params )
+struct jx *dataswarm_blob_commit(const char *blobid)
 {
-    const char *blobid =  jx_lookup_string(params, "blob-id");
     if(!blobid) {
-        return dataswarm_message_error_response(DS_MSG_MALFORMED_PARAMETERS, params);
+        // XXX return obj with incorrect parameters
+        return NULL;
     }
 
 	char *ro_name = string_format("ro/%s",blobid);
@@ -204,11 +196,11 @@ fails or the worker crashes, all deleted blobs can be cleaned up on restart.
 */
 
 
-struct jx *dataswarm_blob_delete( struct jx *params )
+struct jx *dataswarm_blob_delete(const char *blobid)
 {
-    const char *blobid =  jx_lookup_string(params, "blob-id");
     if(!blobid) {
-        return dataswarm_message_error_response(DS_MSG_MALFORMED_PARAMETERS, params);
+        // XXX return obj with incorrect parameters
+        return NULL;
     }
 
 	char *ro_name = string_format("ro/%s",blobid);
@@ -236,16 +228,11 @@ dataswarm_blob_copy message requests a blob to be duplicated. The new copy is
 read-write with a new blob-id.
 */
 
-struct jx *dataswarm_blob_copy( struct jx *params )
+struct jx *dataswarm_blob_copy(const char *blobid, const char *blobid_src)
 {
-    const char *blobid_src =  jx_lookup_string(params, "blob-id-source");
-    if(!blobid_src) {
-        return dataswarm_message_error_response(DS_MSG_MALFORMED_PARAMETERS, params);
-    }
-
-    const char *blobid =  jx_lookup_string(params, "blob-id");
-    if(!blobid) {
-        return dataswarm_message_error_response(DS_MSG_MALFORMED_PARAMETERS, params);
+    if(!blobid || !blobid_src) {
+        // XXX return obj with incorrect parameters
+        return NULL;
     }
 
     /* XXX do the copying */
