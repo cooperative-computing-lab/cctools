@@ -30,6 +30,7 @@ struct dataswarm_process {
 
 struct dataswarm_process * dataswarm_process_create( struct dataswarm_task *task );
 pid_t dataswarm_process_execute( struct dataswarm_process *p );
+int   dataswarm_process_isdone( struct dataswarm_process *p );
 void  dataswarm_process_kill( struct dataswarm_process *p );
 void  dataswarm_process_delete( struct dataswarm_process *p );
 

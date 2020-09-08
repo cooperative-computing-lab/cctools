@@ -167,6 +167,19 @@ pid_t dataswarm_process_execute( struct dataswarm_process *p )
 	return 0;
 }
 
+int dataswarm_process_isdone( struct dataswarm_process *p )
+{
+	pid_t pid = waitpid(p->pid,&p->exit_status,WNOHANG);
+	if(pid==p->pid) {
+		p->execution_end = timestamp_get();
+		return 1;
+	} else {
+		// XXX flag something here so we don't wait multiple times.
+		return 0;
+	}
+}
+
+
 void dataswarm_process_kill(struct dataswarm_process *p)
 {
 	//make sure a few seconds have passed since child process was created to avoid sending a signal
@@ -182,6 +195,5 @@ void dataswarm_process_kill(struct dataswarm_process *p)
 	// This is done to ensure delivery of signal to processes forked by the child.
 	kill((-1 * p->pid), SIGKILL);
 
-	// Reap the child process to avoid zombies.
-	waitpid(p->pid, NULL, 0);
+	// Note that we still must wait for the process to be done before deleting the process.
 }

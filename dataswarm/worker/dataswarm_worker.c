@@ -36,6 +36,60 @@ char *UUID_TO_LOCAL_PATH(const char *uuid)
 	return string_format("/the/path/to/blob/%s", uuid);
 }
 
+/*
+Consider each task currently in possession of the worker,
+and act according to it's current state.
+*/
+
+void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
+{
+	struct dataswarm_task *task;
+	char *taskid;
+
+	hash_table_firstkey(w->task_table);
+	while(hash_table_nextkey(w->task_table,&taskid,(void**)&task)) {
+
+		switch(task->state) {
+			case DATASWARM_TASK_READY:
+				// XXX only start tasks when resources available.
+				task->process = dataswarm_process_create(task);
+				if(task->process) {
+					// XXX check failure conditions
+					if(dataswarm_process_execute(task->process)) {
+						task->state = DATASWARM_TASK_RUNNING;
+					} else {
+						// send failure message?
+						task->state = DATASWARM_TASK_FAILED;
+					}
+				} else {
+					// send failure message?
+					task->state = DATASWARM_TASK_FAILED;
+				}
+				break;
+			case DATASWARM_TASK_RUNNING:
+				if(dataswarm_process_isdone(task->process)) {
+					task->state = DATASWARM_TASK_DONE;
+					// Send completion message
+				}
+				break;
+			case DATASWARM_TASK_DONE:
+				// Do nothing until reaped.
+				break;
+			case DATASWARM_TASK_FAILED:
+				// Do nothing until reaped.
+				break;
+			case DATASWARM_TASK_DELETING:
+				// XXX Is this safe to do during an iteration?
+				// XXX Careful: Has the process actually exited yet?
+				hash_table_remove(w->task_table,taskid);
+				dataswarm_process_delete(task->process);
+				dataswarm_task_delete(task);
+				break;
+		}
+	}
+
+}
+
 void dataswarm_worker_send_response(struct dataswarm_worker *w, struct jx *original, struct jx *params)
 {
 	struct jx *message = jx_object(0);
@@ -73,22 +127,17 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 	if(!strcmp(method, "task-submit")) {
 		task = dataswarm_task_create(params);
 		hash_table_insert(w->task_table, taskid, task);
-		// no response?
 	} else if(!strcmp(method, "task-retrieve")) {
 		task = hash_table_lookup(w->task_table, taskid);
 		struct jx *jtask = dataswarm_task_to_jx(task);
 		dataswarm_worker_send_response(w, msg, jtask);
 	} else if(!strcmp(method, "task-reap")) {
-		task = hash_table_remove(w->task_table, taskid);
-		if(task->process)
-			dataswarm_process_kill(task->process);
-		dataswarm_task_delete(task);
-		// No response?
+		task = hash_table_lookup(w->task_table, taskid);
+		task->state = DATASWARM_TASK_DELETING;
 	} else if(!strcmp(method, "task-cancel")) {
 		task = hash_table_lookup(w->task_table, taskid);
-		if(task->process)
-			dataswarm_process_kill(task->process);
-		// No response?
+		if(task) dataswarm_process_kill(task->process);
+		task->state = DATASWARM_TASK_DELETING;
 	} else if(!strcmp(method, "status-request")) {
 		/* */
 	} else if(!strcmp(method, "blob-create")) {
@@ -148,6 +197,9 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 			}
 		}
 
+		/* after processing all messages, work on tasks. */
+		dataswarm_worker_advance_tasks(w);
+
 		/* testing: send status report every cycle for now */
 		dataswarm_worker_status_report(w, stoptime);
 
@@ -155,6 +207,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 		//this will probably go away with Tim's library
 		time_t sleeptime = stoptime - time(0);
 		if(sleeptime > 0) {
+			// XXX make sure this is interrupted at the completion of a task. 
 			sleep(sleeptime);
 		}
 	}
