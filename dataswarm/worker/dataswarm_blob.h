@@ -3,11 +3,11 @@
 
 #include "jx.h"
 #include "link.h"
-
-int dataswarm_blob_create( const char *blobid, struct jx *metadata );
-int dataswarm_blob_upload( const char *blobid, struct link *l );
-int dataswarm_blob_download( const char *blobid, struct link *l );
-int dataswarm_blob_commit( const char *blobid );
-int dataswarm_blob_delete( const char *blobid );
+struct jx *dataswarm_blob_create(const char *blobid, jx_int_t size, struct jx *meta, struct jx *user);
+struct jx *dataswarm_blob_put(const char *blobid, struct link *l);
+struct jx *dataswarm_blob_get(const char *blobid, struct link *l);
+struct jx *dataswarm_blob_delete(const char *blobid);
+struct jx *dataswarm_blob_commit(const char *blobid);
+struct jx *dataswarm_blob_copy(const char *blobid, const char *blobid_src);
 
 #endif

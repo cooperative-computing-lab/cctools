@@ -15,9 +15,13 @@ enum dataswarm_message_error {
 };
 
 int         dataswarm_json_send( struct link *l, struct jx *j, time_t stoptime );
-struct jx * dataswarm_json_recv( struct link *l, time_t stoptime );
+struct jx *dataswarm_json_recv( struct link *l, time_t stoptime );
 
 int    dataswarm_message_send( struct link *l, const char *str, int length, time_t stoptime );
-char * dataswarm_message_recv( struct link *l, time_t stoptime );
+char *dataswarm_message_recv( struct link *l, time_t stoptime );
+
+/* where evidence is params of original message if DS_MSG_MALFORMED_PARAMETERS, or the whole message otherwise. */
+struct jx *dataswarm_message_error_response( enum dataswarm_message_error code, struct jx *evidence );
+struct jx *dataswarm_message_state_response( const char *state, const char *reason );
 
 #endif

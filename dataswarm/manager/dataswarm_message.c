@@ -55,3 +55,30 @@ struct jx * dataswarm_json_recv( struct link *l, time_t stoptime )
 	return j;
 }
 
+struct jx *dataswarm_message_error_response( enum dataswarm_message_error code, struct jx *evidence ) {
+    struct jx *response = jx_object(0);
+
+    jx_insert_integer(response, "error", code);
+
+    if(evidence) {
+        jx_insert(response, jx_string("result"), evidence);
+    }
+
+    return response;
+}
+
+struct jx *dataswarm_message_state_response( const char *state, const char *reason ) {
+    struct jx *response = jx_object(0);
+    struct jx *result = jx_object(0);
+
+    jx_insert(response, jx_string("error"), jx_null());
+    jx_insert(response, jx_string("result"), result);
+
+    jx_insert_string(result, "state", state);
+
+    if(reason) {
+        jx_insert_string(result, "reason", reason);
+    }
+
+    return response;
+}

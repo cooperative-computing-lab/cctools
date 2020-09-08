@@ -163,7 +163,7 @@ int link_buffer_empty(struct link *link) {
 	return link->buffer_length > 0 ? 0 : 1;
 }
 
-static int errno_is_temporary(int e)
+int errno_is_temporary(int e)
 {
 	if(e == EINTR || e == EWOULDBLOCK || e == EAGAIN || e == EINPROGRESS || e == EALREADY || e == EISCONN) {
 		return 1;
@@ -241,6 +241,7 @@ int link_sleep(struct link *link, time_t stoptime, int reading, int writing)
 	}
 
 	return link_internal_sleep(link, tptr, NULL, reading, writing);
+
 }
 
 int link_usleep(struct link *link, int usec, int reading, int writing)
@@ -437,21 +438,28 @@ struct link *link_serve_address(const char *addr, int port)
 struct link *link_accept(struct link *master, time_t stoptime)
 {
 	struct link *link = 0;
+	int fd = -1;
 
 	if(master->type == LINK_TYPE_FILE) {
 		return NULL;
 	}
 
+	do {
+		fd = accept(master->fd, 0, 0);
+		if (fd >= 0) {
+			break;
+		} else if (stoptime == LINK_NOWAIT && errno_is_temporary(errno)) {
+				return NULL;
+		}
+		if(!link_sleep(master, stoptime, 1, 0)) {
+				goto failure;
+		}
+	} while(1);
+
 	link = link_create();
 	if(!link)
 		goto failure;
-
-	while(1) {
-		if(!link_sleep(master, stoptime, 1, 0))
-			goto failure;
-		link->fd = accept(master->fd, 0, 0);
-		break;
-	}
+	link->fd = fd;
 
 	if(!link_nonblocking(link, 1))
 		goto failure;
@@ -464,6 +472,7 @@ struct link *link_accept(struct link *master, time_t stoptime)
 	return link;
 
 	  failure:
+	close(fd);
 	if(link)
 		link_close(link);
 	return 0;
@@ -482,6 +491,11 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 	link = link_create();
 	if(!link)
 		goto failure;
+
+	// in case we exit early for a non-blocking connect
+	link->rport = port;
+	strncpy(link->raddr, addr, sizeof(link->raddr));
+	link->raddr[sizeof(link->raddr) - 1] = 0;
 
 	link_squelch();
 
@@ -512,6 +526,9 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 		// Otherwise, a non-temporary errno should cause us to bail out.
 		if(result<0 && !errno_is_temporary(errno)) break;
+
+		// Let a non-blocking connect continue in the background
+		if (stoptime == LINK_NOWAIT) return link;
 
 		// If the remote address is valid, we are connected no matter what.
 		if(link_address_remote(link, link->raddr, &link->rport)) {

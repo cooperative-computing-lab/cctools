@@ -156,6 +156,7 @@ check_function()
 	echon "checking for $name in $header..."
 
 cat > .configure.tmp.c << EOF
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <${header}>
 int main(int argc, char **argv) {
@@ -224,7 +225,7 @@ require_path ()
 
 require_function ()
 {
-	if check_function $1 $2
+	if check_function "$1" "$2"
 	then
 		return 0
 	else

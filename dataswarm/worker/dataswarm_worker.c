@@ -27,6 +27,7 @@ See the file COPYING for details.
 #include "dataswarm_message.h"
 #include "dataswarm_task.h"
 #include "dataswarm_process.h"
+#include "dataswarm_blob.h"
 
 // Give up and reconnect if no message received after this time.
 int idle_timeout = 300;
@@ -70,10 +71,11 @@ void send_response_message( struct link *l, struct jx *original, struct jx *para
 	jx_delete(message);
 }
 
-void handle_manager_message( struct link *manager_link, struct jx *msg )
+struct jx *handle_manager_message( struct link *manager_link, struct jx *msg )
 {
+    struct jx *response = NULL;
 	if(!msg) {
-		return;
+		return response;
 	}
 
 	const char *method = jx_lookup_string(msg,"method");
@@ -84,7 +86,7 @@ void handle_manager_message( struct link *manager_link, struct jx *msg )
 		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 		/* should the worker add the manager to a banned list at least temporarily? */
 		/* disconnect from manager */
-		return;
+		return response;
 	}
 
 	const char *taskid = jx_lookup_string(params,"taskid");
@@ -109,21 +111,27 @@ void handle_manager_message( struct link *manager_link, struct jx *msg )
 		// No response?
 	} else if(!strcmp(method,"status-request")) {
 		/* */
-	} else if(!strcmp(method,"blob-create")) {
-		/* */
-	} else if(!strcmp(method,"blob-put")) {
-		/* */
-	} else if(!strcmp(method,"blob-get")) {
-		/* */
-	} else if(!strcmp(method,"blob-delete")) {
-		/* */
-	} else if(!strcmp(method,"blob-commit")) {
-		/* */
-	} else if(!strcmp(method,"blob-copy")) {
-		/* */
-	} else {
-		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
-	}
+    } else if(!strcmp(method,"blob-create")) {
+        response = dataswarm_blob_create(jx_lookup_string(params, "blob-id"),
+                jx_lookup_integer(params, "size"),
+                jx_lookup(params, "metadata"),
+                jx_lookup(params, "userdata"));
+    } else if(!strcmp(method,"blob-put")) {
+        response = dataswarm_blob_put(jx_lookup_string(params, "blob-id"), manager_link);
+    } else if(!strcmp(method,"blob-get")) {
+        response = dataswarm_blob_get(jx_lookup_string(params, "blob-id"), manager_link);
+    } else if(!strcmp(method,"blob-delete")) {
+        response = dataswarm_blob_delete(jx_lookup_string(params, "blob-id"));
+    } else if(!strcmp(method,"blob-commit")) {
+        response = dataswarm_blob_commit(jx_lookup_string(params, "blob-id"));
+    } else if(!strcmp(method,"blob-copy")) {
+        response = dataswarm_blob_copy(jx_lookup_string(params, "blob-id"), 
+                                        jx_lookup_string(params, "blob-id-source"));
+    } else {
+        response = dataswarm_message_error_response(DS_MSG_UNEXPECTED_METHOD, msg);
+    }
+
+    return response;
 }
 
 void send_status_report( struct link *manager_link, time_t stoptime ) {
@@ -156,7 +164,7 @@ int worker_main_loop( struct link *manager_link )
                     jx_delete(msg);
                 } else {
                     /* handle manager disconnection */
-                    return;
+                    return 0;
                 }
             } else {
                 break;

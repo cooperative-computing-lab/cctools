@@ -127,6 +127,7 @@ disk                      current size of working directories in the tree, in MB
 - **-c --sh <str>** Read command line from **str**, and execute as '/bin/sh -c **str**'.
 - **-l --limits-file <file>** Use maxfile with list of var: value pairs for resource limits.
 - **-L --limits <string>** String of the form "var: value, var: value\ to specify resource limits. (Could be specified multiple times.)
+- **--measure-only Do not enforce resource limits, only measure resources.
 - **-f, --child-in-foreground** Keep the monitored process in foreground (for interactive use).
 - **-O --with-output-files <template>** Specify **template** for log files (default=**resource-pid**).
 - **--with-time-series** Write resource time series to **template.series**.
