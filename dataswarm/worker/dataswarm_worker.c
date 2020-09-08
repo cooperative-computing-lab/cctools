@@ -8,7 +8,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <getopt.h>
 #include <errno.h>
 
 #include "link.h"
@@ -17,7 +16,6 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "debug.h"
 #include "stringtools.h"
-#include "cctools.h"
 #include "domain_name.h"
 #include "macros.h"
 #include "catalog_query.h"
@@ -38,7 +36,7 @@ char *UUID_TO_LOCAL_PATH(const char *uuid)
 	return string_format("/the/path/to/blob/%s", uuid);
 }
 
-void send_response_message(struct dataswarm_worker *w, struct jx *original, struct jx *params)
+void dataswarm_worker_send_response(struct dataswarm_worker *w, struct jx *original, struct jx *params)
 {
 	struct jx *message = jx_object(0);
 
@@ -51,7 +49,7 @@ void send_response_message(struct dataswarm_worker *w, struct jx *original, stru
 	jx_delete(message);
 }
 
-struct jx *handle_manager_message(struct dataswarm_worker *w, struct jx *msg)
+struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 {
 	struct jx *response = NULL;
 	if(!msg) {
@@ -79,7 +77,7 @@ struct jx *handle_manager_message(struct dataswarm_worker *w, struct jx *msg)
 	} else if(!strcmp(method, "task-retrieve")) {
 		task = hash_table_lookup(w->task_table, taskid);
 		struct jx *jtask = dataswarm_task_to_jx(task);
-		send_response_message(w, msg, jtask);
+		dataswarm_worker_send_response(w, msg, jtask);
 	} else if(!strcmp(method, "task-reap")) {
 		task = hash_table_remove(w->task_table, taskid);
 		if(task->process)
@@ -112,7 +110,7 @@ struct jx *handle_manager_message(struct dataswarm_worker *w, struct jx *msg)
 	return response;
 }
 
-void send_status_report(struct dataswarm_worker *w, time_t stoptime)
+void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
 {
 	struct jx *msg = jx_object(NULL);
 	struct jx *params = jx_object(NULL);
@@ -129,7 +127,7 @@ void send_status_report(struct dataswarm_worker *w, time_t stoptime)
 }
 
 
-int worker_main_loop(struct dataswarm_worker *w)
+int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 {
 	while(1) {
 		time_t stoptime = time(0) + 5;	/* read messages for at most 5 seconds. remove with Tim's library. */
@@ -139,7 +137,7 @@ int worker_main_loop(struct dataswarm_worker *w)
 				debug(D_DATASWARM, "reading new message...");
 				struct jx *msg = dataswarm_json_recv(w->manager_link, stoptime);
 				if(msg) {
-					handle_manager_message(w, msg);
+					dataswarm_worker_handle_message(w, msg);
 					jx_delete(msg);
 				} else {
 					/* handle manager disconnection */
@@ -151,7 +149,7 @@ int worker_main_loop(struct dataswarm_worker *w)
 		}
 
 		/* testing: send status report every cycle for now */
-		send_status_report(w, stoptime);
+		dataswarm_worker_status_report(w, stoptime);
 
 		//do not busy sleep more than stoptime
 		//this will probably go away with Tim's library
@@ -162,7 +160,7 @@ int worker_main_loop(struct dataswarm_worker *w)
 	}
 }
 
-void worker_connect_loop(struct dataswarm_worker *w, const char *manager_host, int manager_port)
+void dataswarm_worker_connect_loop(struct dataswarm_worker *w, const char *manager_host, int manager_port)
 {
 	char manager_addr[LINK_ADDRESS_MAX];
 	int sleeptime = w->min_connect_retry;
@@ -187,7 +185,7 @@ void worker_connect_loop(struct dataswarm_worker *w, const char *manager_host, i
 			dataswarm_json_send(w->manager_link, msg, time(0) + w->long_timeout);
 			jx_delete(msg);
 
-			worker_main_loop(w);
+			dataswarm_worker_main_loop(w);
 			link_close(w->manager_link);
 			w->manager_link = 0;
 			sleeptime = w->min_connect_retry;
@@ -201,7 +199,7 @@ void worker_connect_loop(struct dataswarm_worker *w, const char *manager_host, i
 	printf("worker shutting down.\n");
 }
 
-void worker_connect_by_name(struct dataswarm_worker *w, const char *manager_name)
+void dataswarm_worker_connect_by_name(struct dataswarm_worker *w, const char *manager_name)
 {
 	char *expr = string_format("type==\"dataswarm_manager\" && project==\"%s\"", manager_name);
 	int sleeptime = w->min_connect_retry;
@@ -216,7 +214,7 @@ void worker_connect_by_name(struct dataswarm_worker *w, const char *manager_name
 			if(j) {
 				const char *host = jx_lookup_string(j, "name");
 				int port = jx_lookup_integer(j, "port");
-				worker_connect_loop(w, host, port);
+				dataswarm_worker_connect_loop(w, host, port);
 				got_result = 1;
 			}
 			catalog_query_delete(query);
@@ -277,86 +275,3 @@ void dataswarm_worker_delete(struct dataswarm_worker *w)
 	free(w);
 }
 
-static const struct option long_options[] = {
-	{"manager-name", required_argument, 0, 'N'},
-	{"manager-host", required_argument, 0, 'm'},
-	{"manager-port", required_argument, 0, 'p'},
-	{"debug", required_argument, 0, 'd'},
-	{"debug-file", required_argument, 0, 'o'},
-	{"help", no_argument, 0, 'h'},
-	{"version", no_argument, 0, 'v'}
-};
-
-static void show_help(const char *cmd)
-{
-	printf("use: %s [options]\n", cmd);
-	printf("where options are:\n");
-	printf("-N,--manager-name=<name>  Manager project name.\n");
-	printf("-m,--manager-host=<host>  Manager host or address.\n");
-	printf("-p,--manager-port=<port>  Manager port number.\n");
-	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
-	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
-	printf("-h,--help                 Show this help string\n");
-	printf("-v,--version              Show version string\n");
-}
-
-int main(int argc, char *argv[])
-{
-	const char *manager_name = 0;
-	const char *manager_host = 0;
-	int manager_port = 0;
-	const char *workspace_dir = string_format("/tmp/dataswarm-worker-%d", getuid());
-
-	int c;
-	while((c = getopt_long(argc, argv, "w:N:m:p:d:o:hv", long_options, 0)) != -1) {
-
-		switch (c) {
-		case 'w':
-			workspace_dir = optarg;
-			break;
-		case 'N':
-			manager_name = optarg;
-			break;
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'o':
-			debug_config_file(optarg);
-			break;
-		case 'm':
-			manager_host = optarg;
-			break;
-		case 'p':
-			manager_port = atoi(optarg);
-			break;
-		case 'v':
-			cctools_version_print(stdout, argv[0]);
-			return 0;
-			break;
-		default:
-		case 'h':
-			show_help(argv[0]);
-			return 0;
-			break;
-		}
-	}
-
-	struct dataswarm_worker *w = dataswarm_worker_create(workspace_dir);
-
-	if(!w) {
-		fprintf(stderr, "%s: couldn't create workspace %s: %s\n", argv[0], workspace_dir, strerror(errno));
-		return 1;
-	}
-
-	if(manager_name) {
-		worker_connect_by_name(w, manager_name);
-	} else if(manager_host && manager_port) {
-		worker_connect_loop(w, manager_host, manager_port);
-	} else {
-		fprintf(stderr, "%s: must specify manager name (-N) or host (-m) and port (-p)\n", argv[0]);
-	}
-
-	dataswarm_worker_delete(w);
-
-	return 0;
-}

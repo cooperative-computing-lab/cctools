@@ -4,7 +4,7 @@ include ../../rules.mk
 TARGETS=$(PROGRAMS)
 PROGRAMS=dataswarm_worker
 
-SOURCES=dataswarm_worker.c dataswarm_message.c dataswarm_blob.c dataswarm_process.c dataswarm_task.c dataswarm_mount.c dataswarm_resources.c
+SOURCES=dataswarm_worker_main.c dataswarm_worker.c dataswarm_message.c dataswarm_blob.c dataswarm_process.c dataswarm_task.c dataswarm_mount.c dataswarm_resources.c
 OBJECTS=$(SOURCES:%.c=%.o)
 LOCAL_LINKAGE = -L ../../dttools/src -ldttools
 

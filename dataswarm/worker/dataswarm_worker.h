@@ -35,6 +35,10 @@ struct dataswarm_worker {
 };
 
 struct dataswarm_worker *dataswarm_worker_create();
+
+void dataswarm_worker_connect_by_name( struct dataswarm_worker *w, const char *manager_name );
+void dataswarm_worker_connect_loop( struct dataswarm_worker *w, const char *manager_host, int manager_port );
+
 void dataswarm_worker_delete(struct dataswarm_worker *w);
 
 
