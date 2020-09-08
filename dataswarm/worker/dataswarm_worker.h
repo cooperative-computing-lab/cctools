@@ -28,8 +28,8 @@ struct dataswarm_worker {
 	int message_id;
 };
 
-struct dataswarm_worker * dataswarm_worker_create();
-void dataswarm_worker_delete( struct dataswarm_worker *w );
+struct dataswarm_worker *dataswarm_worker_create();
+void dataswarm_worker_delete(struct dataswarm_worker *w);
 
 
 #endif
