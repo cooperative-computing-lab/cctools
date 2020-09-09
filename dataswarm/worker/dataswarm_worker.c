@@ -132,12 +132,14 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 		return response;
 	}
 
-	const char *taskid = jx_lookup_string(params, "taskid");
+	const char *taskid = jx_lookup_string(params,"taskid");
+	const char *blobid = jx_lookup_string(params,"blobid");
 	struct dataswarm_task *task = 0;
 
 	if(!strcmp(method, "task-submit")) {
 		task = dataswarm_task_create(params);
 		hash_table_insert(w->task_table, taskid, task);
+		update_task_state(w,task,DATASWARM_TASK_READY);
 
 	} else if(!strcmp(method, "task-get")) {
 		task = hash_table_lookup(w->task_table, taskid);
@@ -151,17 +153,17 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 	} else if(!strcmp(method, "status-request")) {
 		/* */
 	} else if(!strcmp(method, "blob-create")) {
-		response = dataswarm_blob_create(w,jx_lookup_string(params, "blob-id"), jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
+		response = dataswarm_blob_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
 	} else if(!strcmp(method, "blob-put")) {
-		response = dataswarm_blob_put(w,jx_lookup_string(params, "blob-id"), w->manager_link);
+		response = dataswarm_blob_put(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-get")) {
-		response = dataswarm_blob_get(w,jx_lookup_string(params, "blob-id"), w->manager_link);
+		response = dataswarm_blob_get(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-delete")) {
-		response = dataswarm_blob_delete(w,jx_lookup_string(params, "blob-id"));
+		response = dataswarm_blob_delete(w,blobid);
 	} else if(!strcmp(method, "blob-commit")) {
-		response = dataswarm_blob_commit(w,jx_lookup_string(params, "blob-id"));
+		response = dataswarm_blob_commit(w,blobid);
 	} else if(!strcmp(method, "blob-copy")) {
-		response = dataswarm_blob_copy(w,jx_lookup_string(params, "blob-id"), jx_lookup_string(params, "blob-id-source"));
+		response = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else {
 		response = dataswarm_message_error_response(DS_MSG_UNEXPECTED_METHOD, msg);
 	}
