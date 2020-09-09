@@ -28,7 +28,7 @@ struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid,
 	char *blob_dir = string_format("%s/blob/rw/%s", w->workspace, blobid);
 	char *blob_meta = string_format("%s/meta", blob_dir);
 
-	if(!mkdir(blob_dir, 0777)) {
+	if(mkdir(blob_dir, 0777)<0) {
 		debug(D_DATASWARM, "couldn't mkdir %s: %s", blob_dir, strerror(errno));
 		free(blob_dir);
 		free(blob_meta);
