@@ -60,6 +60,14 @@ void do_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r
 	free(msg);
 }
 
+void do_task_remove( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
+{
+	char *msg = string_format("{\"method\" : \"task-remove\", \"params\" : {  \"task-id\" : \"%s\" } }",taskid);
+	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
+	free(msg);
+}
+
+
 void dataswarm_test_script( struct dataswarm_manager *m, struct dataswarm_worker_rep *r )
 {
 	const char *bloba = "abc123";
@@ -82,5 +90,15 @@ void dataswarm_test_script( struct dataswarm_manager *m, struct dataswarm_worker
 	sleep(1);
 
 	do_task_submit(m,r,"t93",bloba,blobb);
+
+	sleep(10);
+
+	do_task_remove(m,r,"t93");
+
+	sleep(1);
+
+	do_blob_delete(m,r,bloba);
+	do_blob_delete(m,r,blobb);
+
 }
 
