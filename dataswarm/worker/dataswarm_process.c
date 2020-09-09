@@ -28,8 +28,6 @@
 #include <sys/types.h>
 #include <stdlib.h>
 
-extern const char *UUID_TO_LOCAL_PATH ( const char *uuid );
-
 struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task, struct dataswarm_worker *w )
 {
 	struct dataswarm_process *p = malloc(sizeof(*p));
@@ -112,18 +110,26 @@ static void specify_resources_vars(struct dataswarm_process *p)
 	if(p->task->resources->disk > 0) specify_integer_env_var(p, "DISK", p->task->resources->disk);
 }
 
-static int setup_namespace( struct dataswarm_process *p )
+static int setup_namespace( struct dataswarm_process *p, struct dataswarm_worker *w )
 {
 	struct dataswarm_mount *m;
 
 	for(m=p->task->mounts;m;m=m->next) {
-		const char *uuidpath = UUID_TO_LOCAL_PATH(m->uuid);
+		const char *mode;
+		if(m->flags&(DATASWARM_FLAGS_WRITE|DATASWARM_FLAGS_APPEND)) {
+			mode = "rw";
+		} else {
+			mode = "ro";
+		}
+
+		const char *blobpath = string_format("%s/blob/%s/%s/data",w->workspace,mode,m->uuid);
+
 		if(m->type==DATASWARM_MOUNT_PATH) {
-			symlink(uuidpath,m->path);
+			symlink(blobpath,m->path);
 			// check errors here
 		} else if(m->type==DATASWARM_MOUNT_FD) {
 			// need to set open flags appropriately here
-			int fd = open(uuidpath,O_RDONLY,0);
+			int fd = open(blobpath,O_RDONLY,0);
 			// check errors here
 			dup2(fd,m->fd);
 			close(fd);
@@ -135,7 +141,7 @@ static int setup_namespace( struct dataswarm_process *p )
 	return 1;
 }
 
-int dataswarm_process_start( struct dataswarm_process *p )
+int dataswarm_process_start( struct dataswarm_process *p, struct dataswarm_worker *w )
 {
 	/*
 	Before forking a process, it is necessary to flush all standard I/O stream,
@@ -172,7 +178,7 @@ int dataswarm_process_start( struct dataswarm_process *p )
 		}
 
 		// Check errors on these.
-		setup_namespace(p);
+		setup_namespace(p,w);
 		clear_environment();
 		specify_resources_vars(p);
 		export_environment(p);

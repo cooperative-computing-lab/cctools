@@ -70,7 +70,7 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 				task->process = dataswarm_process_create(task,w);
 				if(task->process) {
 					// XXX check for invalid mounts?
-					if(dataswarm_process_start(task->process)) {
+					if(dataswarm_process_start(task->process,w)) {
 						update_task_state(w,task,DATASWARM_TASK_RUNNING);
 					} else {
 						update_task_state(w,task,DATASWARM_TASK_FAILED);
@@ -134,6 +134,7 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 
 	const char *taskid = jx_lookup_string(params,"taskid");
 	const char *blobid = jx_lookup_string(params,"blobid");
+
 	struct dataswarm_task *task = 0;
 
 	if(!strcmp(method, "task-submit")) {

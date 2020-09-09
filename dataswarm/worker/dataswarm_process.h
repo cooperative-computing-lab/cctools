@@ -54,7 +54,7 @@ struct dataswarm_process {
 struct dataswarm_process * dataswarm_process_create( struct dataswarm_task *task, struct dataswarm_worker *w );
 
 /* Start the process running, return true on success. */
-int  dataswarm_process_start( struct dataswarm_process *p );
+int  dataswarm_process_start( struct dataswarm_process *p, struct dataswarm_worker *w );
 
 /* Send a kill signal to a process (if still running).  After doing so, must call isdone() to collect the status. */
 void dataswarm_process_kill( struct dataswarm_process *p );
