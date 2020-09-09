@@ -22,6 +22,19 @@ struct dataswarm_task * dataswarm_task_create( struct jx *jtask )
 
 }
 
+const char * dataswarm_task_state_string( dataswarm_task_state_t state )
+{
+	switch(state) {
+		case DATASWARM_TASK_READY: return "ready";
+		case DATASWARM_TASK_RUNNING: return "running";
+		case DATASWARM_TASK_DONE: return "done";
+		case DATASWARM_TASK_FAILED: return "failed";
+		case DATASWARM_TASK_KILLED: return "killed";
+		case DATASWARM_TASK_DELETING: return "deleting";
+		default: return "unknown";
+	}
+}
+
 struct jx * dataswarm_task_to_jx( struct dataswarm_task *t )
 {
 	struct jx *jtask = jx_object(0);
@@ -30,6 +43,7 @@ struct jx * dataswarm_task_to_jx( struct dataswarm_task *t )
 	if(t->environment) jx_insert(jtask,jx_string("environment"),jx_copy(t->environment));
 	if(t->resources) jx_insert(jtask,jx_string("resources"),dataswarm_resources_to_jx(t->resources));
 	if(t->mounts) jx_insert(jtask,jx_string("namespace"),dataswarm_mounts_to_jx(t->mounts));
+	jx_insert_string(jtask,"state",dataswarm_task_state_string(t->state));
 	return jtask;
 }
 
