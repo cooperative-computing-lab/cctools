@@ -75,6 +75,8 @@ int main(int argc, char *argv[])
 
 	struct dataswarm_worker *w = dataswarm_worker_create(workspace_dir);
 
+	dataswarm_blob_purge(w);
+
 	if(!w) {
 		fprintf(stderr, "%s: couldn't create workspace %s: %s\n", argv[0], workspace_dir, strerror(errno));
 		return 1;

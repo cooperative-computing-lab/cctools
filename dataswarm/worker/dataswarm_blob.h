@@ -13,4 +13,7 @@ struct jx *dataswarm_blob_delete( struct dataswarm_worker *w, const char *blobid
 struct jx *dataswarm_blob_commit( struct dataswarm_worker *w, const char *blobid);
 struct jx *dataswarm_blob_copy( struct dataswarm_worker *w, const char *blobid, const char *blobid_src);
 
+void dataswarm_blob_purge( struct dataswarm_worker *w );
+
+
 #endif
