@@ -127,16 +127,12 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 	if(!strcmp(method, "task-submit")) {
 		task = dataswarm_task_create(params);
 		hash_table_insert(w->task_table, taskid, task);
-	} else if(!strcmp(method, "task-retrieve")) {
+	} else if(!strcmp(method, "task-get")) {
 		task = hash_table_lookup(w->task_table, taskid);
 		struct jx *jtask = dataswarm_task_to_jx(task);
 		dataswarm_worker_send_response(w, msg, jtask);
-	} else if(!strcmp(method, "task-reap")) {
+	} else if(!strcmp(method, "task-remove")) {
 		task = hash_table_lookup(w->task_table, taskid);
-		task->state = DATASWARM_TASK_DELETING;
-	} else if(!strcmp(method, "task-cancel")) {
-		task = hash_table_lookup(w->task_table, taskid);
-		if(task) dataswarm_process_kill(task->process);
 		task->state = DATASWARM_TASK_DELETING;
 	} else if(!strcmp(method, "status-request")) {
 		/* */

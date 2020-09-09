@@ -29,7 +29,6 @@ const char * dataswarm_task_state_string( dataswarm_task_state_t state )
 		case DATASWARM_TASK_RUNNING: return "running";
 		case DATASWARM_TASK_DONE: return "done";
 		case DATASWARM_TASK_FAILED: return "failed";
-		case DATASWARM_TASK_KILLED: return "killed";
 		case DATASWARM_TASK_DELETING: return "deleting";
 		default: return "unknown";
 	}
