@@ -27,6 +27,8 @@ See the file COPYING for details.
 #include "dataswarm_client_rep.h"
 #include "dataswarm_manager.h"
 
+#include "dataswarm_test.h"
+
 struct jx * manager_status_jx( struct dataswarm_manager *m )
 {
 	char owner[USERNAME_MAX];
@@ -115,6 +117,10 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
 			struct dataswarm_worker_rep *w = dataswarm_worker_rep_create(l);
 			hash_table_insert(m->worker_table,manager_key,w);
+
+			// XXX This is a HACK to get some messages going for testing
+			dataswarm_test_script(m,w);
+
 		} else if(!strcmp(conn_type,"client")) {
 			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
 			struct dataswarm_client_rep *c = dataswarm_client_rep_create(l);
