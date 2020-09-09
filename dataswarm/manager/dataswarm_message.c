@@ -28,12 +28,13 @@ char * dataswarm_message_recv( struct link *l, time_t stoptime )
 	if(!result) return 0;
 
 	int length = atoi(lenstr);
-	char *str = malloc(length);
+	char *str = malloc(length+1);
 	result = link_read(l,str,length,stoptime);
 	if(result!=length) {
 		free(str);
 		return 0;
 	}
+	str[length] = 0;
     debug(D_DATASWARM, "rx: %s", str);
 	return str;
 }
