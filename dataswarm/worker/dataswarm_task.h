@@ -27,6 +27,7 @@ struct dataswarm_task {
 
 struct dataswarm_task * dataswarm_task_create( struct jx *jtask );
 struct jx * dataswarm_task_to_jx( struct dataswarm_task *task );
+const char *dataswarm_task_state_string( dataswarm_task_state_t state );
 void dataswarm_task_delete( struct dataswarm_task *t );
 
 #endif

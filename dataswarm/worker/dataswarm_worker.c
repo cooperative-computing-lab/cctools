@@ -37,6 +37,21 @@ char *UUID_TO_LOCAL_PATH(const char *uuid)
 }
 
 /*
+Every time a task changes state, send an async update message.
+*/
+
+void update_task_state( struct dataswarm_worker *w, struct dataswarm_task *task, dataswarm_task_state_t state )
+{
+	task->state = state;
+
+	char *str = string_format("{\"method\":\"task-update\",\"params\":{\"taskid\":\"%s\",\"state\":\"%s\"}}",
+		task->taskid,dataswarm_task_state_string(state));
+	dataswarm_message_send(w->manager_link,str,strlen(str),time(0)+w->long_timeout);
+	free(str);
+}
+
+
+/*
 Consider each task currently in possession of the worker,
 and act according to it's current state.
 */
@@ -54,33 +69,29 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 				// XXX only start tasks when resources available.
 				task->process = dataswarm_process_create(task);
 				if(task->process) {
-					// XXX check failure conditions
+					// XXX check for invalid mounts?
 					if(dataswarm_process_start(task->process)) {
-						task->state = DATASWARM_TASK_RUNNING;
+						update_task_state(w,task,DATASWARM_TASK_RUNNING);
 					} else {
-						// send failure message?
-						task->state = DATASWARM_TASK_FAILED;
+						update_task_state(w,task,DATASWARM_TASK_FAILED);
 					}
 				} else {
-					// send failure message?
-					task->state = DATASWARM_TASK_FAILED;
+					update_task_state(w,task,DATASWARM_TASK_FAILED);
 				}
 				break;
 			case DATASWARM_TASK_RUNNING:
 				if(dataswarm_process_isdone(task->process)) {
-					task->state = DATASWARM_TASK_DONE;
-					// Send completion message
+					update_task_state(w,task,DATASWARM_TASK_DONE);
 				}
 				break;
 			case DATASWARM_TASK_DONE:
-				// Do nothing until reaped.
+				// Do nothing until removed.
 				break;
 			case DATASWARM_TASK_FAILED:
-				// Do nothing until reaped.
+				// Do nothing until removed.
 				break;
 			case DATASWARM_TASK_DELETING:
 				// XXX Is this safe to do during an iteration?
-				// XXX Careful: Has the process actually exited yet?
 				hash_table_remove(w->task_table,taskid);
 				dataswarm_process_delete(task->process);
 				dataswarm_task_delete(task);
@@ -127,13 +138,16 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 	if(!strcmp(method, "task-submit")) {
 		task = dataswarm_task_create(params);
 		hash_table_insert(w->task_table, taskid, task);
+
 	} else if(!strcmp(method, "task-get")) {
 		task = hash_table_lookup(w->task_table, taskid);
 		struct jx *jtask = dataswarm_task_to_jx(task);
 		dataswarm_worker_send_response(w, msg, jtask);
+
 	} else if(!strcmp(method, "task-remove")) {
 		task = hash_table_lookup(w->task_table, taskid);
-		task->state = DATASWARM_TASK_DELETING;
+		update_task_state(w,task,DATASWARM_TASK_DELETING);
+
 	} else if(!strcmp(method, "status-request")) {
 		/* */
 	} else if(!strcmp(method, "blob-create")) {
