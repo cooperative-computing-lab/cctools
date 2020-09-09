@@ -28,13 +28,20 @@ See the file COPYING for details.
 #include "dataswarm_process.h"
 #include "dataswarm_blob.h"
 
-// This dummy function translates UUIDs of blobs to path.
-// Remove after integrating blob support.
+/*
+Every time a task changes state, send an async update message.
+*/
 
-char *UUID_TO_LOCAL_PATH(const char *uuid)
+void update_task_state( struct dataswarm_worker *w, struct dataswarm_task *task, dataswarm_task_state_t state )
 {
-	return string_format("/the/path/to/blob/%s", uuid);
+	task->state = state;
+
+	char *str = string_format("{\"method\":\"task-update\",\"params\":{\"taskid\":\"%s\",\"state\":\"%s\"}}",
+		task->taskid,dataswarm_task_state_string(state));
+	dataswarm_message_send(w->manager_link,str,strlen(str),time(0)+w->long_timeout);
+	free(str);
 }
+
 
 /*
 Consider each task currently in possession of the worker,
@@ -52,37 +59,33 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 		switch(task->state) {
 			case DATASWARM_TASK_READY:
 				// XXX only start tasks when resources available.
-				task->process = dataswarm_process_create(task);
+				task->process = dataswarm_process_create(task,w);
 				if(task->process) {
-					// XXX check failure conditions
-					if(dataswarm_process_execute(task->process)) {
-						task->state = DATASWARM_TASK_RUNNING;
+					// XXX check for invalid mounts?
+					if(dataswarm_process_start(task->process,w)) {
+						update_task_state(w,task,DATASWARM_TASK_RUNNING);
 					} else {
-						// send failure message?
-						task->state = DATASWARM_TASK_FAILED;
+						update_task_state(w,task,DATASWARM_TASK_FAILED);
 					}
 				} else {
-					// send failure message?
-					task->state = DATASWARM_TASK_FAILED;
+					update_task_state(w,task,DATASWARM_TASK_FAILED);
 				}
 				break;
 			case DATASWARM_TASK_RUNNING:
 				if(dataswarm_process_isdone(task->process)) {
-					task->state = DATASWARM_TASK_DONE;
-					// Send completion message
+					update_task_state(w,task,DATASWARM_TASK_DONE);
 				}
 				break;
 			case DATASWARM_TASK_DONE:
-				// Do nothing until reaped.
+				// Do nothing until removed.
 				break;
 			case DATASWARM_TASK_FAILED:
-				// Do nothing until reaped.
+				// Do nothing until removed.
 				break;
 			case DATASWARM_TASK_DELETING:
-				// XXX Is this safe to do during an iteration?
-				// XXX Careful: Has the process actually exited yet?
 				hash_table_remove(w->task_table,taskid);
 				dataswarm_process_delete(task->process);
+				update_task_state(w,task,DATASWARM_TASK_DELETED);
 				dataswarm_task_delete(task);
 				break;
 		}
@@ -121,37 +124,39 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 		return response;
 	}
 
-	const char *taskid = jx_lookup_string(params, "taskid");
+	const char *taskid = jx_lookup_string(params,"task-id");
+	const char *blobid = jx_lookup_string(params,"blob-id");
+
 	struct dataswarm_task *task = 0;
 
 	if(!strcmp(method, "task-submit")) {
 		task = dataswarm_task_create(params);
 		hash_table_insert(w->task_table, taskid, task);
-	} else if(!strcmp(method, "task-retrieve")) {
+		update_task_state(w,task,DATASWARM_TASK_READY);
+
+	} else if(!strcmp(method, "task-get")) {
 		task = hash_table_lookup(w->task_table, taskid);
 		struct jx *jtask = dataswarm_task_to_jx(task);
 		dataswarm_worker_send_response(w, msg, jtask);
-	} else if(!strcmp(method, "task-reap")) {
+
+	} else if(!strcmp(method, "task-remove")) {
 		task = hash_table_lookup(w->task_table, taskid);
-		task->state = DATASWARM_TASK_DELETING;
-	} else if(!strcmp(method, "task-cancel")) {
-		task = hash_table_lookup(w->task_table, taskid);
-		if(task) dataswarm_process_kill(task->process);
-		task->state = DATASWARM_TASK_DELETING;
+		update_task_state(w,task,DATASWARM_TASK_DELETING);
+
 	} else if(!strcmp(method, "status-request")) {
 		/* */
 	} else if(!strcmp(method, "blob-create")) {
-		response = dataswarm_blob_create(jx_lookup_string(params, "blob-id"), jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"), jx_lookup(params, "userdata"));
+		response = dataswarm_blob_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
 	} else if(!strcmp(method, "blob-put")) {
-		response = dataswarm_blob_put(jx_lookup_string(params, "blob-id"), w->manager_link);
+		response = dataswarm_blob_put(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-get")) {
-		response = dataswarm_blob_get(jx_lookup_string(params, "blob-id"), w->manager_link);
+		response = dataswarm_blob_get(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-delete")) {
-		response = dataswarm_blob_delete(jx_lookup_string(params, "blob-id"));
+		response = dataswarm_blob_delete(w,blobid);
 	} else if(!strcmp(method, "blob-commit")) {
-		response = dataswarm_blob_commit(jx_lookup_string(params, "blob-id"));
+		response = dataswarm_blob_commit(w,blobid);
 	} else if(!strcmp(method, "blob-copy")) {
-		response = dataswarm_blob_copy(jx_lookup_string(params, "blob-id"), jx_lookup_string(params, "blob-id-source"));
+		response = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else {
 		response = dataswarm_message_error_response(DS_MSG_UNEXPECTED_METHOD, msg);
 	}

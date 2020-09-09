@@ -28,19 +28,16 @@
 #include <sys/types.h>
 #include <stdlib.h>
 
-extern const char *UUID_TO_LOCAL_PATH ( const char *uuid );
-
-struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task )
+struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task, struct dataswarm_worker *w )
 {
 	struct dataswarm_process *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
 
 	p->task = task;
+	p->state = DATASWARM_PROCESS_READY;
 
 	/* create a unique directory for this task */
-	char *cwd = path_getcwd();
-	p->sandbox = string_format("%s/task.%s", cwd, p->task->taskid );
-	free(cwd);
+	p->sandbox = string_format("%s/task/%s/sandbox", w->workspace, p->task->taskid );
 	if(!create_dir(p->sandbox, 0777)) goto failure;
 
 	/* inside the sandbox, make a unique tempdir for this task */
@@ -58,6 +55,16 @@ struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task 
 void dataswarm_process_delete(struct dataswarm_process *p)
 {
 	if(!p) return;
+
+	// XXX move sandbox to deleting dir.
+
+	if(!dataswarm_process_isdone(p)) {
+		dataswarm_process_kill(p);
+		while(!dataswarm_process_isdone(p)) {
+			sleep(1);
+		}
+	}
+
 	// don't free taskid, it's a circular link
 	if(p->sandbox) {
 		delete_dir(p->sandbox);
@@ -103,32 +110,76 @@ static void specify_resources_vars(struct dataswarm_process *p)
 	if(p->task->resources->disk > 0) specify_integer_env_var(p, "DISK", p->task->resources->disk);
 }
 
-static int setup_namespace( struct dataswarm_process *p )
+static int flags_to_unix_mode( dataswarm_flags_t flags )
 {
-	struct dataswarm_mount *m;
+	if(flags==DATASWARM_FLAGS_READ) {
+		return O_RDONLY;
+	}
 
-	for(m=p->task->mounts;m;m=m->next) {
-		const char *uuidpath = UUID_TO_LOCAL_PATH(m->uuid);
-		if(m->type==DATASWARM_MOUNT_PATH) {
-			symlink(uuidpath,m->path);
-			// check errors here
-		} else if(m->type==DATASWARM_MOUNT_FD) {
-			// need to set open flags appropriately here
-			int fd = open(uuidpath,O_RDONLY,0);
-			// check errors here
-			dup2(fd,m->fd);
-			close(fd);
-		} else {
-			// error on invalid type
+	if(flags&DATASWARM_FLAGS_APPEND) {
+		return O_RDWR | O_CREAT | O_APPEND;
+	} else {
+		return O_RDWR | O_CREAT | O_TRUNC;
+	}
+}
+
+static int setup_mount( struct dataswarm_mount *m, struct dataswarm_process *p, struct dataswarm_worker *w )
+{
+	const char *mode;
+	if(m->flags&(DATASWARM_FLAGS_WRITE|DATASWARM_FLAGS_APPEND)) {
+		mode = "rw";
+	} else {
+		mode = "ro";
+	}
+
+	char *blobpath = string_format("%s/blob/%s/%s/data",w->workspace,mode,m->uuid);
+
+	if(m->type==DATASWARM_MOUNT_PATH) {
+		int r = symlink(blobpath,m->path);
+		if(r<0) {
+			debug(D_DATASWARM,"couldn't symlink %s -> %s: %s",m->path,blobpath,strerror(errno));
+			free(blobpath);
+			return 0;
 		}
+		free(blobpath);
+	} else if(m->type==DATASWARM_MOUNT_FD) {
+		int fd = open(blobpath,flags_to_unix_mode(m->flags),0666);
+		if(fd<0) {
+			debug(D_DATASWARM,"couldn't open %s: %s",blobpath,strerror(errno));
+			free(blobpath);
+			return 0;
+		}
+		dup2(fd,m->fd);
+		close(fd);
+		free(blobpath);
+	} else {
+		free(blobpath);
+		return 0;
 	}
 
 	return 1;
 }
 
-pid_t dataswarm_process_execute( struct dataswarm_process *p )
+static int setup_namespace( struct dataswarm_process *p, struct dataswarm_worker *w )
 {
-	fflush(NULL);		/* why is this necessary? */
+	struct dataswarm_mount *m;
+
+	for(m=p->task->mounts;m;m=m->next) {
+		if(!setup_mount(m,p,w)) return 0;
+	}
+
+	return 1;
+}
+
+int dataswarm_process_start( struct dataswarm_process *p, struct dataswarm_worker *w )
+{
+	/*
+	Before forking a process, it is necessary to flush all standard I/O stream,
+	otherwise buffered data is carried into the forked child process and can
+	result in confusion.
+	*/
+
+	fflush(NULL);
 
 	p->execution_start = timestamp_get();
 	p->pid = fork();
@@ -143,12 +194,13 @@ pid_t dataswarm_process_execute( struct dataswarm_process *p )
 		// This is currently used by kill_task().
 		setpgid(p->pid, 0);
 		debug(D_WQ, "started process %d: %s", p->pid, p->task->command);
-		return p->pid;
+		p->state = DATASWARM_PROCESS_RUNNING;
+		return 1;
 
 	} else if(p->pid < 0) {
 
 		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
-		return p->pid;
+		return 0;
 
 	} else {
 		if(chdir(p->sandbox)) {
@@ -156,7 +208,7 @@ pid_t dataswarm_process_execute( struct dataswarm_process *p )
 		}
 
 		// Check errors on these.
-		setup_namespace(p);
+		setup_namespace(p,w);
 		clear_environment();
 		specify_resources_vars(p);
 		export_environment(p);
@@ -164,24 +216,34 @@ pid_t dataswarm_process_execute( struct dataswarm_process *p )
 		execl("/bin/sh", "sh", "-c", p->task->command, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
-	return 0;
+
+	return 1;
 }
 
 int dataswarm_process_isdone( struct dataswarm_process *p )
 {
-	pid_t pid = waitpid(p->pid,&p->exit_status,WNOHANG);
-	if(pid==p->pid) {
-		p->execution_end = timestamp_get();
+	if(p->state==DATASWARM_PROCESS_RUNNING) {
+		// XXX get the rusage too
+		pid_t pid = waitpid(p->pid,&p->unix_status,WNOHANG);
+		if(pid==p->pid) {
+			p->state = DATASWARM_PROCESS_DONE;
+			p->execution_end = timestamp_get();
+			return 1;
+		}
+	} else if(p->state==DATASWARM_PROCESS_DONE) {
 		return 1;
 	} else {
-		// XXX flag something here so we don't wait multiple times.
 		return 0;
 	}
+
+	return 0;
 }
 
 
 void dataswarm_process_kill(struct dataswarm_process *p)
 {
+	if(p->state!=DATASWARM_PROCESS_RUNNING) return;
+
 	//make sure a few seconds have passed since child process was created to avoid sending a signal
 	//before it has been fully initialized. Else, the signal sent to that process gets lost.
 	timestamp_t elapsed_time_execution_start = timestamp_get() - p->execution_start;
