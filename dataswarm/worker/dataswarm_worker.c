@@ -85,6 +85,7 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 			case DATASWARM_TASK_DELETING:
 				hash_table_remove(w->task_table,taskid);
 				dataswarm_process_delete(task->process);
+				update_task_state(w,task,DATASWARM_TASK_DELETED);
 				dataswarm_task_delete(task);
 				break;
 		}
@@ -123,8 +124,8 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 		return response;
 	}
 
-	const char *taskid = jx_lookup_string(params,"taskid");
-	const char *blobid = jx_lookup_string(params,"blobid");
+	const char *taskid = jx_lookup_string(params,"task-id");
+	const char *blobid = jx_lookup_string(params,"blob-id");
 
 	struct dataswarm_task *task = 0;
 
