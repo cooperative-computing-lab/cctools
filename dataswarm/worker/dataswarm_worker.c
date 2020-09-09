@@ -67,7 +67,7 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 		switch(task->state) {
 			case DATASWARM_TASK_READY:
 				// XXX only start tasks when resources available.
-				task->process = dataswarm_process_create(task);
+				task->process = dataswarm_process_create(task,w);
 				if(task->process) {
 					// XXX check for invalid mounts?
 					if(dataswarm_process_start(task->process)) {

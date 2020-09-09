@@ -30,7 +30,7 @@
 
 extern const char *UUID_TO_LOCAL_PATH ( const char *uuid );
 
-struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task )
+struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task, struct dataswarm_worker *w )
 {
 	struct dataswarm_process *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
@@ -39,9 +39,7 @@ struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task 
 	p->state = DATASWARM_PROCESS_READY;
 
 	/* create a unique directory for this task */
-	char *cwd = path_getcwd();
-	p->sandbox = string_format("%s/task.%s", cwd, p->task->taskid );
-	free(cwd);
+	p->sandbox = string_format("%s/task/%s/sandbox", w->workspace, p->task->taskid );
 	if(!create_dir(p->sandbox, 0777)) goto failure;
 
 	/* inside the sandbox, make a unique tempdir for this task */
@@ -59,6 +57,8 @@ struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task 
 void dataswarm_process_delete(struct dataswarm_process *p)
 {
 	if(!p) return;
+
+	// XXX move sandbox to deleting dir.
 
 	if(!dataswarm_process_isdone(p)) {
 		dataswarm_process_kill(p);

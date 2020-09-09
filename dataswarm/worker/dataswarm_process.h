@@ -2,6 +2,7 @@
 #define DATASWARM_PROCESS_H
 
 #include "dataswarm_task.h"
+#include "dataswarm_worker.h"
 #include "timestamp.h"
 
 #include <unistd.h>
@@ -50,7 +51,7 @@ struct dataswarm_process {
 };
 
 /* Create a new process for this task and set up the corresponding sandbox. */
-struct dataswarm_process * dataswarm_process_create( struct dataswarm_task *task );
+struct dataswarm_process * dataswarm_process_create( struct dataswarm_task *task, struct dataswarm_worker *w );
 
 /* Start the process running, return true on success. */
 int  dataswarm_process_start( struct dataswarm_process *p );
