@@ -17,7 +17,7 @@
 #include <errno.h>
 #include <string.h>
 
-struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta, struct jx *user)
+struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
 {
 	if(!blobid || size < 1) {
 		// XXX return obj with incorrect parameters
@@ -27,7 +27,6 @@ struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid,
 
 	char *blob_dir = string_format("%s/rw/%s", w->workspace, blobid);
 	char *blob_meta = string_format("%s/rw/%s/meta", w->workspace, blob_dir);
-	char *blob_user = string_format("%s/rw/%s/user", w->workspace, blob_dir);
 
 	if(!mkdir(blob_dir, 0777)) {
 		debug(D_DATASWARM, "couldn't mkdir %s: %s", blob_dir, strerror(errno));
@@ -41,16 +40,6 @@ struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid,
 			return dataswarm_message_state_response("internal-failure", "could not write metadata");
 		}
 		jx_print_stream(meta, file);
-		fclose(file);
-	}
-
-	if(user) {
-		FILE *file = fopen(blob_user, "w");
-		if(!file) {
-			debug(D_DATASWARM, "couldn't open %s: %s", blob_user, strerror(errno));
-			return dataswarm_message_state_response("internal-failure", "could not write userdata");
-		}
-		jx_print_stream(user, file);
 		fclose(file);
 	}
 

@@ -151,7 +151,7 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 	} else if(!strcmp(method, "status-request")) {
 		/* */
 	} else if(!strcmp(method, "blob-create")) {
-		response = dataswarm_blob_create(w,jx_lookup_string(params, "blob-id"), jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"), jx_lookup(params, "userdata"));
+		response = dataswarm_blob_create(w,jx_lookup_string(params, "blob-id"), jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
 	} else if(!strcmp(method, "blob-put")) {
 		response = dataswarm_blob_put(w,jx_lookup_string(params, "blob-id"), w->manager_link);
 	} else if(!strcmp(method, "blob-get")) {
