@@ -55,7 +55,7 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 				task->process = dataswarm_process_create(task);
 				if(task->process) {
 					// XXX check failure conditions
-					if(dataswarm_process_execute(task->process)) {
+					if(dataswarm_process_start(task->process)) {
 						task->state = DATASWARM_TASK_RUNNING;
 					} else {
 						// send failure message?

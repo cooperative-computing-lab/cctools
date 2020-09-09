@@ -36,6 +36,7 @@ struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task 
 	memset(p,0,sizeof(*p));
 
 	p->task = task;
+	p->state = DATASWARM_PROCESS_READY;
 
 	/* create a unique directory for this task */
 	char *cwd = path_getcwd();
@@ -58,6 +59,14 @@ struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task 
 void dataswarm_process_delete(struct dataswarm_process *p)
 {
 	if(!p) return;
+
+	if(!dataswarm_process_isdone(p)) {
+		dataswarm_process_kill(p);
+		while(!dataswarm_process_isdone(p)) {
+			sleep(1);
+		}
+	}
+
 	// don't free taskid, it's a circular link
 	if(p->sandbox) {
 		delete_dir(p->sandbox);
@@ -126,9 +135,15 @@ static int setup_namespace( struct dataswarm_process *p )
 	return 1;
 }
 
-pid_t dataswarm_process_execute( struct dataswarm_process *p )
+int dataswarm_process_start( struct dataswarm_process *p )
 {
-	fflush(NULL);		/* why is this necessary? */
+	/*
+	Before forking a process, it is necessary to flush all standard I/O stream,
+	otherwise buffered data is carried into the forked child process and can
+	result in confusion.
+	*/
+
+	fflush(NULL);
 
 	p->execution_start = timestamp_get();
 	p->pid = fork();
@@ -143,12 +158,13 @@ pid_t dataswarm_process_execute( struct dataswarm_process *p )
 		// This is currently used by kill_task().
 		setpgid(p->pid, 0);
 		debug(D_WQ, "started process %d: %s", p->pid, p->task->command);
-		return p->pid;
+		p->state = DATASWARM_PROCESS_RUNNING;
+		return 1;
 
 	} else if(p->pid < 0) {
 
 		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
-		return p->pid;
+		return 0;
 
 	} else {
 		if(chdir(p->sandbox)) {
@@ -164,24 +180,34 @@ pid_t dataswarm_process_execute( struct dataswarm_process *p )
 		execl("/bin/sh", "sh", "-c", p->task->command, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
-	return 0;
+
+	return 1;
 }
 
 int dataswarm_process_isdone( struct dataswarm_process *p )
 {
-	pid_t pid = waitpid(p->pid,&p->exit_status,WNOHANG);
-	if(pid==p->pid) {
-		p->execution_end = timestamp_get();
+	if(p->state==DATASWARM_PROCESS_RUNNING) {
+		// XXX get the rusage too
+		pid_t pid = waitpid(p->pid,&p->unix_status,WNOHANG);
+		if(pid==p->pid) {
+			p->state = DATASWARM_PROCESS_DONE;
+			p->execution_end = timestamp_get();
+			return 1;
+		}
+	} else if(p->state==DATASWARM_PROCESS_DONE) {
 		return 1;
 	} else {
-		// XXX flag something here so we don't wait multiple times.
 		return 0;
 	}
+
+	return 0;
 }
 
 
 void dataswarm_process_kill(struct dataswarm_process *p)
 {
+	if(p->state!=DATASWARM_PROCESS_RUNNING) return;
+
 	//make sure a few seconds have passed since child process was created to avoid sending a signal
 	//before it has been fully initialized. Else, the signal sent to that process gets lost.
 	timestamp_t elapsed_time_execution_start = timestamp_get() - p->execution_start;
