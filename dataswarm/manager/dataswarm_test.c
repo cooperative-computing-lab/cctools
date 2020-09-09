@@ -55,7 +55,7 @@ void do_blob_delete( struct dataswarm_manager *m, struct dataswarm_worker_rep *r
 
 void do_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid, const char *bloba, const char *blobb )
 {
-  char *msg = string_format("{\"method\" : \"task-submit\", \"params\" : {  \"task-id\": \"%s\",\"command\" : \"ls -la; cat myinput\", \"namespace\" : { \"%s\" : {\"type\" : \"path\", \"mode\" : \"R\" }, \"%s\" : {\"type\" : \"stdout\" } } } }",taskid,bloba,blobb);
+  char *msg = string_format("{\"method\" : \"task-submit\", \"params\" : {  \"task-id\": \"%s\",\"command\" : \"ls -la; cat myinput\", \"namespace\" : { \"%s\" : {\"type\" : \"path\", \"path\" : \"myinput\", \"mode\" : \"R\" }, \"%s\" : {\"type\" : \"stdout\" } } } }",taskid,bloba,blobb);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
 }
