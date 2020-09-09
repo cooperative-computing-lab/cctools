@@ -110,53 +110,62 @@ static void specify_resources_vars(struct dataswarm_process *p)
 	if(p->task->resources->disk > 0) specify_integer_env_var(p, "DISK", p->task->resources->disk);
 }
 
+static int flags_to_unix_mode( dataswarm_flags_t flags )
+{
+	if(flags==DATASWARM_FLAGS_READ) {
+		return O_RDONLY;
+	}
+
+	if(flags&DATASWARM_FLAGS_APPEND) {
+		return O_RDWR | O_CREAT | O_APPEND;
+	} else {
+		return O_RDWR | O_CREAT | O_TRUNC;
+	}
+}
+
+static int setup_mount( struct dataswarm_mount *m, struct dataswarm_process *p, struct dataswarm_worker *w )
+{
+	const char *mode;
+	if(m->flags&(DATASWARM_FLAGS_WRITE|DATASWARM_FLAGS_APPEND)) {
+		mode = "rw";
+	} else {
+		mode = "ro";
+	}
+
+	char *blobpath = string_format("%s/blob/%s/%s/data",w->workspace,mode,m->uuid);
+
+	if(m->type==DATASWARM_MOUNT_PATH) {
+		int r = symlink(blobpath,m->path);
+		if(r<0) {
+			debug(D_DATASWARM,"couldn't symlink %s -> %s: %s",m->path,blobpath,strerror(errno));
+			free(blobpath);
+			return 0;
+		}
+		free(blobpath);
+	} else if(m->type==DATASWARM_MOUNT_FD) {
+		int fd = open(blobpath,flags_to_unix_mode(m->flags),0666);
+		if(fd<0) {
+			debug(D_DATASWARM,"couldn't open %s: %s",blobpath,strerror(errno));
+			free(blobpath);
+			return 0;
+		}
+		dup2(fd,m->fd);
+		close(fd);
+		free(blobpath);
+	} else {
+		free(blobpath);
+		return 0;
+	}
+
+	return 1;
+}
+
 static int setup_namespace( struct dataswarm_process *p, struct dataswarm_worker *w )
 {
 	struct dataswarm_mount *m;
 
 	for(m=p->task->mounts;m;m=m->next) {
-		const char *mode;
-		if(m->flags&(DATASWARM_FLAGS_WRITE|DATASWARM_FLAGS_APPEND)) {
-			mode = "rw";
-		} else {
-			mode = "ro";
-		}
-
-		char *blobpath = string_format("%s/blob/%s/%s/data",w->workspace,mode,m->uuid);
-
-		if(m->type==DATASWARM_MOUNT_PATH) {
-			int r = symlink(blobpath,m->path);
-			if(r<0) {
-				debug(D_DATASWARM,"couldn't symlink %s -> %s: %s",m->path,blobpath,strerror(errno));
-				free(blobpath);
-				return 0;
-			}
-			free(blobpath);
-		} else if(m->type==DATASWARM_MOUNT_FD) {
-		       	int unix_flags = 0;
-			if(m->flags==DATASWARM_FLAGS_READ) {
-				unix_flags = O_RDONLY;
-			} else {
-			       	unix_flags = O_RDWR;
-				if(m->flags&DATASWARM_FLAGS_APPEND) {
-					unix_flags = O_APPEND;
-				} else {
-					unix_flags = O_TRUNC;
-				}
-			}
-			int fd = open(blobpath,unix_flags,0666);
-			if(fd<0) {
-				debug(D_DATASWARM,"couldn't open %s: %s",blobpath,strerror(errno));
-				free(blobpath);
-				return 0;
-			}
-			dup2(fd,m->fd);
-			close(fd);
-			free(blobpath);
-		} else {
-			free(blobpath);
-			return 0;
-		}
+		if(!setup_mount(m,p,w)) return 0;
 	}
 
 	return 1;
