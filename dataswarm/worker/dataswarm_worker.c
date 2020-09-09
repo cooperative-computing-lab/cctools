@@ -28,14 +28,6 @@ See the file COPYING for details.
 #include "dataswarm_process.h"
 #include "dataswarm_blob.h"
 
-// This dummy function translates UUIDs of blobs to path.
-// Remove after integrating blob support.
-
-char *UUID_TO_LOCAL_PATH(const char *uuid)
-{
-	return string_format("/the/path/to/blob/%s", uuid);
-}
-
 /*
 Every time a task changes state, send an async update message.
 */
@@ -91,7 +83,6 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 				// Do nothing until removed.
 				break;
 			case DATASWARM_TASK_DELETING:
-				// XXX Is this safe to do during an iteration?
 				hash_table_remove(w->task_table,taskid);
 				dataswarm_process_delete(task->process);
 				dataswarm_task_delete(task);
