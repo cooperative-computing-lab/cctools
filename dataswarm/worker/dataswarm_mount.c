@@ -8,10 +8,19 @@
 
 struct dataswarm_mount * dataswarm_mounts_create( struct jx *jmounts )
 {
-/*
-Need to find a clean way of iterating over an object and producing a linked list.
-*/
-  return 0;
+	struct jx_pair *p;
+	struct dataswarm_mount *head = 0;
+
+	for(p=jmounts->u.pairs;p;p=p->next) {
+		const char *key = p->key->u.string_value;
+		struct jx *value = p->value;
+		struct dataswarm_mount *m; 
+		m = dataswarm_mount_create(key,value);
+		m->next = head;
+		head = m;
+	}
+
+	return head;
 }
 
 dataswarm_flags_t dataswarm_flags_parse( const char *s )
@@ -128,6 +137,7 @@ void dataswarm_mount_delete( struct dataswarm_mount *m )
 {
 	if(!m) return;
 	dataswarm_mount_delete(m->next);
+	free(m->path);
        	free(m);
 }
 

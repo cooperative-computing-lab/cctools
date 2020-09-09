@@ -21,7 +21,7 @@ struct dataswarm_mount {
 
 	// would be better to make this a variant type
 	int fd;	
-	const char *path;
+	char *path;
 	dataswarm_flags_t flags;
 	struct dataswarm_mount *next;
 };
