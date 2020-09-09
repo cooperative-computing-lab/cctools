@@ -8,9 +8,19 @@
 
 struct dataswarm_mount * dataswarm_mounts_create( struct jx *jmounts )
 {
-/*
-Need to find a clean way of iterating over an object and producing a linked list.
-*/
+	struct jx_pair *p;
+	struct dataswarm_mount *head = 0;
+
+	for(p=jmounts->u.pairs;p;p=p->next) {
+		const char *key = p->key->u.string_value;
+		struct jx *value = p->value;
+		struct dataswarm_mount *m; 
+		m = dataswarm_mount_create(key,value);
+		m->next = head;
+		head = m;
+	}
+
+	return head;
 }
 
 dataswarm_flags_t dataswarm_flags_parse( const char *s )
@@ -62,12 +72,13 @@ struct dataswarm_mount * dataswarm_mount_create( const char *uuid, struct jx *jm
 	struct dataswarm_mount *m = malloc(sizeof(*m));
 	memset(m,0,sizeof(*m));
 
-	m->uuid = uuid;
+	m->uuid = strdup(uuid);
 
 	const char *type = jx_lookup_string(jmount,"type");
 	if(!strcmp(type,"path")) {
 		m->type = DATASWARM_MOUNT_PATH;
 		m->path = jx_lookup_string(jmount,"path");
+		if(m->path) m->path = strdup(m->path);
 		m->flags = dataswarm_flags_parse(jx_lookup_string(jmount,"flags"));
 	} else if(!strcmp(type,"fd")) {
 		m->type = DATASWARM_MOUNT_FD;
@@ -84,7 +95,7 @@ struct dataswarm_mount * dataswarm_mount_create( const char *uuid, struct jx *jm
 	} else if(!strcmp(type,"stderr")) {
 		m->type = DATASWARM_MOUNT_FD;
 		m->fd = 2;
-		m->flags = DATASWARM_FLAGS_READ|DATASWARM_FLAGS_TRUNCATE;
+		m->flags = DATASWARM_FLAGS_WRITE|DATASWARM_FLAGS_TRUNCATE;
 	} else {
 		dataswarm_mount_delete(m);
 		return 0;
@@ -126,6 +137,7 @@ void dataswarm_mount_delete( struct dataswarm_mount *m )
 {
 	if(!m) return;
 	dataswarm_mount_delete(m->next);
+	free(m->path);
        	free(m);
 }
 

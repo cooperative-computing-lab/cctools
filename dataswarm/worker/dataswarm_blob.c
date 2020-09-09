@@ -28,7 +28,7 @@ struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid,
 	char *blob_dir = string_format("%s/blob/rw/%s", w->workspace, blobid);
 	char *blob_meta = string_format("%s/meta", blob_dir);
 
-	if(!mkdir(blob_dir, 0777)) {
+	if(mkdir(blob_dir, 0777)<0) {
 		debug(D_DATASWARM, "couldn't mkdir %s: %s", blob_dir, strerror(errno));
 		free(blob_dir);
 		free(blob_meta);
@@ -226,4 +226,30 @@ struct jx *dataswarm_blob_copy(struct dataswarm_worker *w, const char *blobid, c
 	/* XXX do the copying */
 
 	return dataswarm_message_state_response("allocated", NULL);
+}
+
+/*
+Delete all the stale objects currently in the deleting directory.
+*/
+
+void dataswarm_blob_purge( struct dataswarm_worker *w )
+{
+	char *dirname = string_format("%s/blob/deleting",w->workspace);
+
+	debug(D_DATASWARM,"checking %s for stale blobs to delete:",dirname);
+
+	DIR *dir = opendir(dirname);
+	if(dir) {
+		struct dirent *d;
+		while((d=readdir(dir))) {
+			if(!strcmp(d->d_name,".")) continue;
+			if(!strcmp(d->d_name,"..")) continue;
+			char *blobname = string_format("%s/%s",dirname,blobname);
+			debug(D_DATASWARM,"deleting blob: %s",blobname);
+			delete_dir(blobname);
+			free(blobname);
+		}
+	}
+
+	free(dirname);
 }

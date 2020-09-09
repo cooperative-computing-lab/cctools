@@ -173,8 +173,6 @@ void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
 	jx_insert(msg, jx_string("params"), params);
 	jx_insert_string(params, "hello", "manager");
 
-	debug(D_DATASWARM, "Sending status-report message");
-
 	dataswarm_json_send(w->manager_link, msg, stoptime);
 
 	jx_delete(msg);
@@ -188,7 +186,6 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 
 		while(1) {
 			if(link_sleep(w->manager_link, stoptime, stoptime, 0)) {
-				debug(D_DATASWARM, "reading new message...");
 				struct jx *msg = dataswarm_json_recv(w->manager_link, stoptime);
 				if(msg) {
 					dataswarm_worker_handle_message(w, msg);
