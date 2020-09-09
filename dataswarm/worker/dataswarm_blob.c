@@ -17,7 +17,7 @@
 #include <errno.h>
 #include <string.h>
 
-struct jx *dataswarm_blob_create(const char *blobid, jx_int_t size, struct jx *meta, struct jx *user)
+struct jx *dataswarm_blob_create( struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta, struct jx *user)
 {
     if(!blobid || size < 1) {
         // XXX return obj with incorrect parameters
@@ -26,9 +26,9 @@ struct jx *dataswarm_blob_create(const char *blobid, jx_int_t size, struct jx *m
 
     // XXX should here check for available space
 
-	char *blob_dir = string_format("rw/%s",blobid);
-	char *blob_meta = string_format("rw/%s/meta",blob_dir);
-	char *blob_user = string_format("rw/%s/user",blob_dir);
+	char *blob_dir = string_format("%s/rw/%s",w->workspace,blobid);
+	char *blob_meta = string_format("%s/rw/%s/meta",w->workspace,blob_dir);
+	char *blob_user = string_format("%s/rw/%s/user",w->workspace,blob_dir);
 
 	if(!mkdir(blob_dir,0777)) {
 		debug(D_DATASWARM,"couldn't mkdir %s: %s",blob_dir,strerror(errno));
@@ -61,15 +61,15 @@ struct jx *dataswarm_blob_create(const char *blobid, jx_int_t size, struct jx *m
 	return dataswarm_message_state_response("allocated", NULL);
 }
 
-struct jx *dataswarm_blob_put(const char *blobid, struct link *l)
+struct jx *dataswarm_blob_put( struct dataswarm_worker *w, const char *blobid, struct link *l)
 {
     if(!blobid) {
         // XXX return obj with incorrect parameters
         return NULL;
     }
 
-	char *blob_dir = string_format("rw/%s",blobid);
-	char *blob_data = string_format("rw/%s/data",blob_dir);
+	char *blob_dir = string_format("%s/rw/%s",w->workspace,blobid);
+	char *blob_data = string_format("%s/rw/%s/data",w->workspace,blob_dir);
 
 	char line[32];
 
@@ -108,15 +108,15 @@ struct jx *dataswarm_blob_put(const char *blobid, struct link *l)
 }
 
 
-struct jx *dataswarm_blob_get(const char *blobid, struct link *l)
+struct jx *dataswarm_blob_get( struct dataswarm_worker *w, const char *blobid, struct link *l)
 {
     if(!blobid) {
         // XXX return obj with incorrect parameters
         return NULL;
     }
 
-	char *blob_dir = string_format("rw/%s",blobid);
-	char *blob_data = string_format("rw/%s/data",blob_dir);
+	char *blob_dir = string_format("%s/rw/%s",w->workspace,blobid);
+	char *blob_data = string_format("%s/rw/%s/data",w->workspace,blob_dir);
 
 	struct stat info;
 	int status = stat(blob_data,&info);
@@ -166,15 +166,15 @@ a read-only blob, fixing its size and properties for all time,
 allowing the object to be duplicated to other nodes.
 */
 
-struct jx *dataswarm_blob_commit(const char *blobid)
+struct jx *dataswarm_blob_commit( struct dataswarm_worker *w, const char *blobid)
 {
     if(!blobid) {
         // XXX return obj with incorrect parameters
         return NULL;
     }
 
-	char *ro_name = string_format("ro/%s",blobid);
-	char *rw_name = string_format("rw/%s",blobid);
+	char *ro_name = string_format("%s/ro/%s",w->workspace,blobid);
+	char *rw_name = string_format("%s/rw/%s",w->workspace,blobid);
 
     int status = rename(ro_name,rw_name);
     free(ro_name);
@@ -196,15 +196,15 @@ fails or the worker crashes, all deleted blobs can be cleaned up on restart.
 */
 
 
-struct jx *dataswarm_blob_delete(const char *blobid)
+struct jx *dataswarm_blob_delete( struct dataswarm_worker *w, const char *blobid)
 {
     if(!blobid) {
         // XXX return obj with incorrect parameters
         return NULL;
     }
 
-	char *ro_name = string_format("ro/%s",blobid);
-	char *rw_name = string_format("rw/%s",blobid);
+    char *ro_name = string_format("%s/ro/%s",w->workspace,blobid);
+    char *rw_name = string_format("%s/rw/%s",w->workspace,blobid);
 	char *deleting_name = string_format("deleting/%s",blobid);
 
     int status = (rename(ro_name,deleting_name)==0 || rename(rw_name,deleting_name)==0);
@@ -228,7 +228,7 @@ dataswarm_blob_copy message requests a blob to be duplicated. The new copy is
 read-write with a new blob-id.
 */
 
-struct jx *dataswarm_blob_copy(const char *blobid, const char *blobid_src)
+struct jx *dataswarm_blob_copy( struct dataswarm_worker *w, const char *blobid, const char *blobid_src)
 {
     if(!blobid || !blobid_src) {
         // XXX return obj with incorrect parameters
