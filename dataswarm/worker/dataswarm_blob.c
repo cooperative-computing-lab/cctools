@@ -25,11 +25,13 @@ struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid,
 	}
 	// XXX should here check for available space
 
-	char *blob_dir = string_format("%s/rw/%s", w->workspace, blobid);
-	char *blob_meta = string_format("%s/rw/%s/meta", w->workspace, blob_dir);
+	char *blob_dir = string_format("%s/blob/rw/%s", w->workspace, blobid);
+	char *blob_meta = string_format("%s/meta", blob_dir);
 
 	if(!mkdir(blob_dir, 0777)) {
 		debug(D_DATASWARM, "couldn't mkdir %s: %s", blob_dir, strerror(errno));
+		free(blob_dir);
+		free(blob_meta);
 		return dataswarm_message_state_response("internal-failure", "could not create blob directory");
 	}
 
@@ -37,6 +39,8 @@ struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid,
 		FILE *file = fopen(blob_meta, "w");
 		if(!file) {
 			debug(D_DATASWARM, "couldn't open %s: %s", blob_meta, strerror(errno));
+			free(blob_dir);
+			free(blob_meta);
 			return dataswarm_message_state_response("internal-failure", "could not write metadata");
 		}
 		jx_print_stream(meta, file);
@@ -56,8 +60,7 @@ struct jx *dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, st
 		return NULL;
 	}
 
-	char *blob_dir = string_format("%s/rw/%s", w->workspace, blobid);
-	char *blob_data = string_format("%s/rw/%s/data", w->workspace, blob_dir);
+	char *blob_data = string_format("%s/blob/rw/%s/data", w->workspace, blobid);
 
 	char line[32];
 
@@ -65,7 +68,8 @@ struct jx *dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, st
 	time_t stoptime = time(0) + 3600;
 
 	if(!link_readline(l, line, sizeof(line), stoptime)) {
-		debug(D_DATASWARM, "couldn't read file length: %s: %s", blob_dir, strerror(errno));
+		debug(D_DATASWARM, "couldn't read file length: %s: %s", blob_data, strerror(errno));
+		free(blob_data);
 		return dataswarm_message_state_response("internal-failure", "could not read file length");
 	}
 
@@ -76,11 +80,9 @@ struct jx *dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, st
 	// XXX should handle directory transfers.
 
 	FILE *file = fopen(blob_data, "w");
-	free(blob_dir);
-	free(blob_data);
-
 	if(!file) {
 		debug(D_DATASWARM, "couldn't open %s: %s", blob_data, strerror(errno));
+		free(blob_data);
 		return dataswarm_message_state_response("internal-failure", "could not open file for writing");
 	}
 
@@ -89,9 +91,11 @@ struct jx *dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, st
 
 	if(bytes_transfered != length) {
 		debug(D_DATASWARM, "couldn't stream to %s: %s", blob_data, strerror(errno));
+		free(blob_data);
 		return dataswarm_message_state_response("internal-failure", "could not stream file");
 	}
 
+	free(blob_data);
 	return dataswarm_message_state_response("written", NULL);
 }
 
@@ -103,26 +107,20 @@ struct jx *dataswarm_blob_get(struct dataswarm_worker *w, const char *blobid, st
 		return NULL;
 	}
 
-	char *blob_dir = string_format("%s/rw/%s", w->workspace, blobid);
-	char *blob_data = string_format("%s/rw/%s/data", w->workspace, blob_dir);
+	char *blob_data = string_format("%s/blob/rw/%s/data", w->workspace, blobid);
 
 	struct stat info;
 	int status = stat(blob_data, &info);
-
-	free(blob_dir);
-	free(blob_data);
-
 	if(!status) {
 		debug(D_DATASWARM, "couldn't stat blob: %s: %s", blob_data, strerror(errno));
+		free(blob_data);
 		return dataswarm_message_state_response("internal-failure", "could not stat file");
 	}
 
 	FILE *file = fopen(blob_data, "r");
-	free(blob_dir);
-	free(blob_data);
-
 	if(!file) {
 		debug(D_DATASWARM, "couldn't open %s: %s", blob_data, strerror(errno));
+		free(blob_data);
 		return dataswarm_message_state_response("internal-failure", "could not open file for reading");
 	}
 
@@ -141,9 +139,11 @@ struct jx *dataswarm_blob_get(struct dataswarm_worker *w, const char *blobid, st
 
 	if(bytes_transfered != length) {
 		debug(D_DATASWARM, "couldn't stream from %s: %s", blob_data, strerror(errno));
+		free(blob_data);
 		return dataswarm_message_state_response("internal-failure", "could not stream file");
 	}
 
+	free(blob_data);
 	return dataswarm_message_state_response("written", NULL);
 }
 
@@ -161,8 +161,8 @@ struct jx *dataswarm_blob_commit(struct dataswarm_worker *w, const char *blobid)
 		return NULL;
 	}
 
-	char *ro_name = string_format("%s/ro/%s", w->workspace, blobid);
-	char *rw_name = string_format("%s/rw/%s", w->workspace, blobid);
+	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
+	char *rw_name = string_format("%s/blob/rw/%s", w->workspace, blobid);
 
 	int status = rename(ro_name, rw_name);
 	free(ro_name);
@@ -191,9 +191,9 @@ struct jx *dataswarm_blob_delete(struct dataswarm_worker *w, const char *blobid)
 		return NULL;
 	}
 
-	char *ro_name = string_format("%s/ro/%s", w->workspace, blobid);
-	char *rw_name = string_format("%s/rw/%s", w->workspace, blobid);
-	char *deleting_name = string_format("deleting/%s", blobid);
+	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
+	char *rw_name = string_format("%s/blob/rw/%s", w->workspace, blobid);
+	char *deleting_name = string_format("%s/blob/deleting/%s", w->workspace,blobid);
 
 	int status = (rename(ro_name, deleting_name) == 0 || rename(rw_name, deleting_name) == 0);
 	free(ro_name);
