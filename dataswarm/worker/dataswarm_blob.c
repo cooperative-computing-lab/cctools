@@ -164,7 +164,7 @@ struct jx *dataswarm_blob_commit(struct dataswarm_worker *w, const char *blobid)
 	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
 	char *rw_name = string_format("%s/blob/rw/%s", w->workspace, blobid);
 
-	int status = rename(ro_name, rw_name);
+	int status = rename(rw_name, ro_name);
 	free(ro_name);
 	free(rw_name);
 

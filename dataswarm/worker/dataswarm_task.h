@@ -16,14 +16,13 @@ typedef enum {
 } dataswarm_task_state_t;
 
 struct dataswarm_task {
-	const char *command;
-	const char *taskid;
+	char *command;
+	char *taskid;
 	dataswarm_task_state_t state;
 	struct dataswarm_mount *mounts;
 	struct dataswarm_resources *resources;
 	struct jx *environment;
 	struct dataswarm_process *process;
-	struct jx *jtask;
 };
 
 struct dataswarm_task * dataswarm_task_create( struct jx *jtask );
