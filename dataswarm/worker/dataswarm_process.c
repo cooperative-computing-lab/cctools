@@ -122,19 +122,40 @@ static int setup_namespace( struct dataswarm_process *p, struct dataswarm_worker
 			mode = "ro";
 		}
 
-		const char *blobpath = string_format("%s/blob/%s/%s/data",w->workspace,mode,m->uuid);
+		char *blobpath = string_format("%s/blob/%s/%s/data",w->workspace,mode,m->uuid);
 
 		if(m->type==DATASWARM_MOUNT_PATH) {
-			symlink(blobpath,m->path);
-			// check errors here
+			int r = symlink(blobpath,m->path);
+			if(r<0) {
+				debug(D_DATASWARM,"couldn't symlink %s -> %s: %s",m->path,blobpath,strerror(errno));
+				free(blobpath);
+				return 0;
+			}
+			free(blobpath);
 		} else if(m->type==DATASWARM_MOUNT_FD) {
-			// need to set open flags appropriately here
-			int fd = open(blobpath,O_RDONLY,0);
-			// check errors here
+		       	int unix_flags = 0;
+			if(m->flags==DATASWARM_FLAGS_READ) {
+				unix_flags = O_RDONLY;
+			} else {
+			       	unix_flags = O_RDWR;
+				if(m->flags&DATASWARM_FLAGS_APPEND) {
+					unix_flags = O_APPEND;
+				} else {
+					unix_flags = O_TRUNC;
+				}
+			}
+			int fd = open(blobpath,unix_flags,0666);
+			if(fd<0) {
+				debug(D_DATASWARM,"couldn't open %s: %s",blobpath,strerror(errno));
+				free(blobpath);
+				return 0;
+			}
 			dup2(fd,m->fd);
 			close(fd);
+			free(blobpath);
 		} else {
-			// error on invalid type
+			free(blobpath);
+			return 0;
 		}
 	}
 
