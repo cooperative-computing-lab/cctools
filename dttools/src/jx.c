@@ -200,6 +200,16 @@ const char * jx_lookup_string( struct jx *object, const char *key )
 	}
 }
 
+char * jx_lookup_string_dup( struct jx *object, const char *key )
+{
+	const char *str = jx_lookup_string(object,key);
+	if(str) {
+		return strdup(str);
+	} else {
+		return 0;
+	}
+}
+
 jx_int_t jx_lookup_integer( struct jx *object, const char *key )
 {
 	struct jx *j = jx_lookup(object,key);

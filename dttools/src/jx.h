@@ -245,8 +245,11 @@ struct jx * jx_lookup( struct jx *object, const char *key );
 /* Like @ref jx_lookup, but found is set to 1 when the key is found. Useful for when value is false. */
 struct jx * jx_lookup_guard( struct jx *j, const char *key, int *found );
 
-/** Search for a string item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The C string value of the matching object, or null if it is not found, or is not a string. */
+/** Search for a string item in an object.  The key is an ordinary string value. @param object The object in which to search.  @param key The string key to match.  @return The C string value of the matching object, or null if it is not found, or is not a string. */
 const char * jx_lookup_string( struct jx *object, const char *key );
+
+/** Search for a string item in an object.  Behaves the same as jx_lookup_string, but returns a duplicated copy.  The result must be deallocated with free(). @param object The object in which to search.  @param key The string key to match.  @return The C string value of the matching object, or null if it is not found, or is not a string. */
+char * jx_lookup_string_dup( struct jx *object, const char *key );
 
 /** Search for an integer item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The integer value of the matching object, or zero if it is not found, or is not an integer. */
 jx_int_t jx_lookup_integer( struct jx *object, const char *key );
