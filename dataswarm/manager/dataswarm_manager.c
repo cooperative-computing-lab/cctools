@@ -195,7 +195,7 @@ void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 	link_address_remote(w->link, addr, &port);
-	debug(D_DATASWARM, "worker %s:%d rx: %s", method);
+	debug(D_DATASWARM, "worker %s:%d rx: %s", w->addr, w->port, method);
 
 
 	if(!strcmp(method,"task-change")) {

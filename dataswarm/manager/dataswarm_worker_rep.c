@@ -26,6 +26,7 @@ struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l )
 {
 	struct dataswarm_worker_rep *w = malloc(sizeof(*w));
 	w->link = l;
+	link_address_remote(w->link,w->addr,&w->port);
 	return w;
 }
 
