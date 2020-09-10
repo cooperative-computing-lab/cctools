@@ -10,11 +10,8 @@ struct dataswarm_task * dataswarm_task_create( struct jx *jtask )
 	struct dataswarm_task *t = malloc(sizeof(*t));
 	memset(t,0,sizeof(*t));
 
-	t->command = jx_lookup_string(jtask,"command");
-	if(t->command) t->command = strdup(t->command);
-
-	t->taskid = jx_lookup_string(jtask,"task-id");
-	if(t->taskid) t->taskid = strdup(t->taskid);
+	t->command = jx_lookup_string_dup(jtask,"command");
+	t->taskid = jx_lookup_string_dup(jtask,"task-id");
 
 	t->environment = jx_lookup(jtask,"environment");
 	if(t->environment) t->environment = jx_copy(t->environment);
