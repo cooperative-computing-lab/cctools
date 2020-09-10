@@ -83,10 +83,16 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 				// Do nothing until removed.
 				break;
 			case DATASWARM_TASK_DELETING:
-				hash_table_remove(w->task_table,taskid);
+				// Remove the local state assocated with the process.
 				dataswarm_process_delete(task->process);
+				task->process = 0;
+				// Send the deleted message.
 				update_task_state(w,task,DATASWARM_TASK_DELETED);
+				// Now actually remove it from the data structures.
+				hash_table_remove(w->task_table,taskid);
 				dataswarm_task_delete(task);
+				break;
+			case DATASWARM_TASK_DELETED:
 				break;
 		}
 	}

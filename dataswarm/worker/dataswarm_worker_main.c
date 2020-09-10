@@ -1,4 +1,5 @@
 #include "dataswarm_worker.h"
+#include "dataswarm_blob.h"
 
 #include "debug.h"
 #include "stringtools.h"
