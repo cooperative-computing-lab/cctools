@@ -293,6 +293,11 @@ int jx_insert_unless_empty( struct jx *object, struct jx *key, struct jx *value 
 	}
 }
 
+void jx_insert_boolean( struct jx *j, const char *key, int value )
+{
+	jx_insert(j,jx_string(key),jx_boolean(value));
+}
+
 void jx_insert_integer( struct jx *j, const char *key, jx_int_t value )
 {
 	jx_insert(j,jx_string(key),jx_integer(value));

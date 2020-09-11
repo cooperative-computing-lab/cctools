@@ -230,6 +230,9 @@ int jx_insert( struct jx *object, struct jx *key, struct jx *value );
 /** Insert a key-value pair into an object, unless the value is an empty collection, in which case delete the key and value.  @param key The key.  @param value The value. @return 1 on success, -1 on empty value, 0 on failure.  Failure can only occur if the object is not a @ref JX_OBJECT. */
 int jx_insert_unless_empty( struct jx *object, struct jx *key, struct jx *value );
 
+/** Insert a boolean value into an object @param object The object @param key The key represented as a C string  @param value The boolean value. */
+void jx_insert_boolean( struct jx *object, const char *key, int value );
+
 /** Insert an integer value into an object @param object The object @param key The key represented as a C string  @param value The integer value. */
 void jx_insert_integer( struct jx *object, const char *key, jx_int_t value );
 
