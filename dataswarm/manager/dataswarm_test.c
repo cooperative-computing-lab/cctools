@@ -13,17 +13,19 @@
 
 int long_timeout = 60;
 
+int msg_id = 1000;
+
 
 void do_blob_create( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, int64_t size )
 {
-	char *msg = string_format("{\"method\" : \"blob-create\", \"params\" : {  \"blob-id\" : \"%s\", \"size\" : %lld, \"metadata\": {} } }",blobid,(long long)size);
+	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-create\", \"params\" : {  \"blob-id\" : \"%s\", \"size\" : %lld, \"metadata\": {} } }",msg_id++,blobid,(long long)size);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
 }
 
 void do_blob_put( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
 {
-	char *msg = string_format("{\"method\" : \"blob-put\", \"params\" : {  \"blob-id\" : \"%s\" } }",blobid);
+	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-put\", \"params\" : {  \"blob-id\" : \"%s\" } }",msg_id++,blobid);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
 
@@ -40,14 +42,14 @@ void do_blob_put( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, c
 
 void do_blob_commit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
 {
-	char *msg = string_format("{\"method\" : \"blob-commit\", \"params\" : {  \"blob-id\" : \"%s\" } }",blobid);
+	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-commit\", \"params\" : {  \"blob-id\" : \"%s\" } }",msg_id++,blobid);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
 }
 
 void do_blob_delete( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
 {
-	char *msg = string_format("{\"method\" : \"blob-delete\", \"params\" : {  \"blob-id\" : \"%s\" } }",blobid);
+	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-delete\", \"params\" : {  \"blob-id\" : \"%s\" } }",msg_id++,blobid);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
 }
@@ -55,14 +57,14 @@ void do_blob_delete( struct dataswarm_manager *m, struct dataswarm_worker_rep *r
 
 void do_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid, const char *bloba, const char *blobb )
 {
-  char *msg = string_format("{\"method\" : \"task-submit\", \"params\" : {  \"task-id\": \"%s\",\"command\" : \"ls -la; cat myinput\", \"namespace\" : { \"%s\" : {\"type\" : \"path\", \"path\" : \"myinput\", \"mode\" : \"R\" }, \"%s\" : {\"type\" : \"stdout\" } } } }",taskid,bloba,blobb);
+  char *msg = string_format("{\"id\": %d, \"method\" : \"task-submit\", \"params\" : {  \"task-id\": \"%s\",\"command\" : \"ls -la; cat myinput\", \"namespace\" : { \"%s\" : {\"type\" : \"path\", \"path\" : \"myinput\", \"mode\" : \"R\" }, \"%s\" : {\"type\" : \"stdout\" } } } }",msg_id++,taskid,bloba,blobb);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
 }
 
 void do_task_remove( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
 {
-	char *msg = string_format("{\"method\" : \"task-remove\", \"params\" : {  \"task-id\" : \"%s\" } }",taskid);
+	char *msg = string_format("{\"id\": %d, \"method\" : \"task-remove\", \"params\" : {  \"task-id\" : \"%s\" } }",msg_id++,taskid);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
 }
