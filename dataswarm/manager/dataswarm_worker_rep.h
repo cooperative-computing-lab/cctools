@@ -10,6 +10,8 @@ of the actual client process that runs somewhere else.
 
 struct dataswarm_worker_rep {
 	struct link *link;
+	char addr[LINK_ADDRESS_MAX];
+	int port;
 	/* list of files and states */
 
 };

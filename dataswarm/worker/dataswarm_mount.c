@@ -77,8 +77,7 @@ struct dataswarm_mount * dataswarm_mount_create( const char *uuid, struct jx *jm
 	const char *type = jx_lookup_string(jmount,"type");
 	if(!strcmp(type,"path")) {
 		m->type = DATASWARM_MOUNT_PATH;
-		m->path = jx_lookup_string(jmount,"path");
-		if(m->path) m->path = strdup(m->path);
+		m->path = jx_lookup_string_dup(jmount,"path");
 		m->flags = dataswarm_flags_parse(jx_lookup_string(jmount,"flags"));
 	} else if(!strcmp(type,"fd")) {
 		m->type = DATASWARM_MOUNT_FD;

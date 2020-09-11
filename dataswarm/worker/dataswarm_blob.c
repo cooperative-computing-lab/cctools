@@ -17,11 +17,11 @@
 #include <errno.h>
 #include <string.h>
 
-struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
+dataswarm_result_t dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
 {
 	if(!blobid || size < 1) {
 		// XXX return obj with incorrect parameters
-		return NULL;
+		return DS_MSG_MALFORMED_PARAMETERS;
 	}
 	// XXX should here check for available space
 
@@ -32,7 +32,7 @@ struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid,
 		debug(D_DATASWARM, "couldn't mkdir %s: %s", blob_dir, strerror(errno));
 		free(blob_dir);
 		free(blob_meta);
-		return dataswarm_message_state_response("internal-failure", "could not create blob directory");
+		return DS_MSG_UNABLE;
 	}
 
 	if(meta) {
@@ -41,7 +41,7 @@ struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid,
 			debug(D_DATASWARM, "couldn't open %s: %s", blob_meta, strerror(errno));
 			free(blob_dir);
 			free(blob_meta);
-			return dataswarm_message_state_response("internal-failure", "could not write metadata");
+			return DS_MSG_UNABLE;
 		}
 		jx_print_stream(meta, file);
 		fclose(file);
@@ -50,14 +50,15 @@ struct jx *dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid,
 	free(blob_dir);
 	free(blob_meta);
 
-	return dataswarm_message_state_response("allocated", NULL);
+	return DS_MSG_SUCCESS;
 }
 
-struct jx *dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, struct link *l)
+
+dataswarm_result_t dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, struct link *l)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return NULL;
+		return DS_MSG_MALFORMED_PARAMETERS;
 	}
 
 	char *blob_data = string_format("%s/blob/rw/%s/data", w->workspace, blobid);
@@ -70,7 +71,7 @@ struct jx *dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, st
 	if(!link_readline(l, line, sizeof(line), stoptime)) {
 		debug(D_DATASWARM, "couldn't read file length: %s: %s", blob_data, strerror(errno));
 		free(blob_data);
-		return dataswarm_message_state_response("internal-failure", "could not read file length");
+		return DS_MSG_UNABLE;
 	}
 
 	int64_t length = atoll(line);
@@ -83,7 +84,7 @@ struct jx *dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, st
 	if(!file) {
 		debug(D_DATASWARM, "couldn't open %s: %s", blob_data, strerror(errno));
 		free(blob_data);
-		return dataswarm_message_state_response("internal-failure", "could not open file for writing");
+		return DS_MSG_UNABLE;
 	}
 
 	int bytes_transfered = link_stream_to_file(l, file, length, stoptime);
@@ -92,19 +93,19 @@ struct jx *dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, st
 	if(bytes_transfered != length) {
 		debug(D_DATASWARM, "couldn't stream to %s: %s", blob_data, strerror(errno));
 		free(blob_data);
-		return dataswarm_message_state_response("internal-failure", "could not stream file");
+		return DS_MSG_UNABLE;
 	}
 
 	free(blob_data);
-	return dataswarm_message_state_response("written", NULL);
+	return DS_MSG_SUCCESS;
 }
 
 
-struct jx *dataswarm_blob_get(struct dataswarm_worker *w, const char *blobid, struct link *l)
+dataswarm_result_t dataswarm_blob_get(struct dataswarm_worker *w, const char *blobid, struct link *l)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return NULL;
+		return DS_MSG_MALFORMED_PARAMETERS;
 	}
 
 	char *blob_data = string_format("%s/blob/rw/%s/data", w->workspace, blobid);
@@ -114,14 +115,14 @@ struct jx *dataswarm_blob_get(struct dataswarm_worker *w, const char *blobid, st
 	if(!status) {
 		debug(D_DATASWARM, "couldn't stat blob: %s: %s", blob_data, strerror(errno));
 		free(blob_data);
-		return dataswarm_message_state_response("internal-failure", "could not stat file");
+		return DS_MSG_UNABLE;
 	}
 
 	FILE *file = fopen(blob_data, "r");
 	if(!file) {
 		debug(D_DATASWARM, "couldn't open %s: %s", blob_data, strerror(errno));
 		free(blob_data);
-		return dataswarm_message_state_response("internal-failure", "could not open file for reading");
+		return DS_MSG_UNABLE;
 	}
 
 	int64_t length = info.st_size;
@@ -139,12 +140,11 @@ struct jx *dataswarm_blob_get(struct dataswarm_worker *w, const char *blobid, st
 
 	if(bytes_transfered != length) {
 		debug(D_DATASWARM, "couldn't stream from %s: %s", blob_data, strerror(errno));
-		free(blob_data);
-		return dataswarm_message_state_response("internal-failure", "could not stream file");
+		return DS_MSG_UNABLE;
 	}
 
 	free(blob_data);
-	return dataswarm_message_state_response("written", NULL);
+	return DS_MSG_SUCCESS;
 }
 
 
@@ -154,11 +154,11 @@ a read-only blob, fixing its size and properties for all time,
 allowing the object to be duplicated to other nodes.
 */
 
-struct jx *dataswarm_blob_commit(struct dataswarm_worker *w, const char *blobid)
+dataswarm_result_t dataswarm_blob_commit(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return NULL;
+		return DS_MSG_MALFORMED_PARAMETERS;
 	}
 
 	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
@@ -169,10 +169,10 @@ struct jx *dataswarm_blob_commit(struct dataswarm_worker *w, const char *blobid)
 	free(rw_name);
 
 	if(status == 0) {
-		return dataswarm_message_state_response("committed", NULL);
+		return DS_MSG_SUCCESS;
 	} else {
 		debug(D_DATASWARM, "couldn't commit %s: %s", blobid, strerror(errno));
-		return dataswarm_message_state_response("internal-error", "could not commit blob");
+		return DS_MSG_UNABLE;
 	}
 }
 
@@ -184,11 +184,11 @@ fails or the worker crashes, all deleted blobs can be cleaned up on restart.
 */
 
 
-struct jx *dataswarm_blob_delete(struct dataswarm_worker *w, const char *blobid)
+dataswarm_result_t dataswarm_blob_delete(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return NULL;
+		return DS_MSG_MALFORMED_PARAMETERS;
 	}
 
 	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
@@ -200,15 +200,15 @@ struct jx *dataswarm_blob_delete(struct dataswarm_worker *w, const char *blobid)
 	free(rw_name);
 
 	if(!status) {
-		debug(D_DATASWARM, "couldn't delete %s: %s", deleting_name, strerror(errno));
-        free(deleting_name);
-		return dataswarm_message_state_response("internal-error", "could not delete blob");
+		  debug(D_DATASWARM, "couldn't delete %s: %s", deleting_name, strerror(errno));
+      free(deleting_name);
+	    return DS_MSG_UNABLE;
 	}
 
 	delete_dir(deleting_name);
 	free(deleting_name);
 
-	return dataswarm_message_state_response("deleting", NULL);
+	return DS_MSG_SUCCESS;
 }
 
 
@@ -217,16 +217,16 @@ dataswarm_blob_copy message requests a blob to be duplicated. The new copy is
 read-write with a new blob-id.
 */
 
-struct jx *dataswarm_blob_copy(struct dataswarm_worker *w, const char *blobid, const char *blobid_src)
+dataswarm_result_t dataswarm_blob_copy(struct dataswarm_worker *w, const char *blobid, const char *blobid_src)
 {
 	if(!blobid || !blobid_src) {
 		// XXX return obj with incorrect parameters
-		return NULL;
+		return DS_MSG_MALFORMED_PARAMETERS;
 	}
 
 	/* XXX do the copying */
 
-	return dataswarm_message_state_response("allocated", NULL);
+	return DS_MSG_SUCCESS;
 }
 
 /*

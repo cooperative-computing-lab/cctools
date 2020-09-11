@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include "dataswarm_worker.h"
 #include "dataswarm_message.h"
 #include "dataswarm_task.h"
+#include "dataswarm_task_table.h"
 #include "dataswarm_process.h"
 #include "dataswarm_blob.h"
 
@@ -32,138 +33,52 @@ See the file COPYING for details.
 Every time a task changes state, send an async update message.
 */
 
-void update_task_state( struct dataswarm_worker *w, struct dataswarm_task *task, dataswarm_task_state_t state )
+void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 {
-	task->state = state;
-
-	char *str = string_format("{\"method\":\"task-update\",\"params\":{\"taskid\":\"%s\",\"state\":\"%s\"}}",
-		task->taskid,dataswarm_task_state_string(state));
-	dataswarm_message_send(w->manager_link,str,strlen(str),time(0)+w->long_timeout);
-	free(str);
-}
-
-
-/*
-Consider each task currently in possession of the worker,
-and act according to it's current state.
-*/
-
-void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
-{
-	struct dataswarm_task *task;
-	char *taskid;
-
-	hash_table_firstkey(w->task_table);
-	while(hash_table_nextkey(w->task_table,&taskid,(void**)&task)) {
-
-		switch(task->state) {
-			case DATASWARM_TASK_READY:
-				// XXX only start tasks when resources available.
-				task->process = dataswarm_process_create(task,w);
-				if(task->process) {
-					// XXX check for invalid mounts?
-					if(dataswarm_process_start(task->process,w)) {
-						update_task_state(w,task,DATASWARM_TASK_RUNNING);
-					} else {
-						update_task_state(w,task,DATASWARM_TASK_FAILED);
-					}
-				} else {
-					update_task_state(w,task,DATASWARM_TASK_FAILED);
-				}
-				break;
-			case DATASWARM_TASK_RUNNING:
-				if(dataswarm_process_isdone(task->process)) {
-					update_task_state(w,task,DATASWARM_TASK_DONE);
-				}
-				break;
-			case DATASWARM_TASK_DONE:
-				// Do nothing until removed.
-				break;
-			case DATASWARM_TASK_FAILED:
-				// Do nothing until removed.
-				break;
-			case DATASWARM_TASK_DELETING:
-				hash_table_remove(w->task_table,taskid);
-				dataswarm_process_delete(task->process);
-				update_task_state(w,task,DATASWARM_TASK_DELETED);
-				dataswarm_task_delete(task);
-				break;
-		}
-	}
-
-}
-
-void dataswarm_worker_send_response(struct dataswarm_worker *w, struct jx *original, struct jx *params)
-{
-	struct jx *message = jx_object(0);
-
-	jx_insert_string(message, "method", "response");
-	jx_insert_integer(message, "id", jx_lookup_integer(original, "id"));
-	jx_insert(message, jx_string("params"), jx_copy(params));
-
-	dataswarm_json_send(w->manager_link, message, time(0) + w->long_timeout);
-
-	jx_delete(message);
-}
-
-struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
-{
-	struct jx *response = NULL;
-	if(!msg) {
-		return response;
-	}
-
 	const char *method = jx_lookup_string(msg, "method");
 	struct jx *params = jx_lookup(msg, "params");
-	int id = jx_lookup_integer(msg, "id");
+	int64_t id = jx_lookup_integer(msg, "id");
 
 	if(!method || !params) {
-		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MSG, stoptime); */
 		/* should the worker add the manager to a banned list at least temporarily? */
 		/* disconnect from manager */
-		return response;
 	}
 
 	const char *taskid = jx_lookup_string(params,"task-id");
 	const char *blobid = jx_lookup_string(params,"blob-id");
 
-	struct dataswarm_task *task = 0;
+	dataswarm_result_t result = DS_MSG_SUCCESS;
+	struct jx *result_params = 0;
 
 	if(!strcmp(method, "task-submit")) {
-		task = dataswarm_task_create(params);
-		hash_table_insert(w->task_table, taskid, task);
-		update_task_state(w,task,DATASWARM_TASK_READY);
-
+		result = dataswarm_task_table_submit(w,taskid,params);
 	} else if(!strcmp(method, "task-get")) {
-		task = hash_table_lookup(w->task_table, taskid);
-		struct jx *jtask = dataswarm_task_to_jx(task);
-		dataswarm_worker_send_response(w, msg, jtask);
-
+		result = dataswarm_task_table_get(w,taskid,&result_params);
 	} else if(!strcmp(method, "task-remove")) {
-		task = hash_table_lookup(w->task_table, taskid);
-		update_task_state(w,task,DATASWARM_TASK_DELETING);
-
+		result = dataswarm_task_table_remove(w,taskid);
 	} else if(!strcmp(method, "status-request")) {
-		/* */
+		result = DS_MSG_SUCCESS;
 	} else if(!strcmp(method, "blob-create")) {
-		response = dataswarm_blob_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
+		result = dataswarm_blob_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
 	} else if(!strcmp(method, "blob-put")) {
-		response = dataswarm_blob_put(w,blobid, w->manager_link);
+		result = dataswarm_blob_put(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-get")) {
-		response = dataswarm_blob_get(w,blobid, w->manager_link);
+		result = dataswarm_blob_get(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-delete")) {
-		response = dataswarm_blob_delete(w,blobid);
+		result = dataswarm_blob_delete(w,blobid);
 	} else if(!strcmp(method, "blob-commit")) {
-		response = dataswarm_blob_commit(w,blobid);
+		result = dataswarm_blob_commit(w,blobid);
 	} else if(!strcmp(method, "blob-copy")) {
-		response = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
+		result = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else {
-		response = dataswarm_message_error_response(DS_MSG_UNEXPECTED_METHOD, msg);
+		result = DS_MSG_UNEXPECTED_METHOD;
 	}
 
-    jx_insert_integer(response, "id", id);
-
-	return response;
+	struct jx *response = dataswarm_message_standard_response(id,result,result_params);
+	dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
+	jx_delete(response);
+	jx_delete(result_params);
 }
 
 void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
@@ -190,10 +105,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 			if(link_sleep(w->manager_link, stoptime, stoptime, 0)) {
 				struct jx *msg = dataswarm_json_recv(w->manager_link, stoptime);
 				if(msg) {
-					struct jx *response = dataswarm_worker_handle_message(w, msg);
-                    if(response) {
-                        dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
-                    }
+            dataswarm_worker_handle_message(w, msg);
 					jx_delete(msg);
 				} else {
 					/* handle manager disconnection */
@@ -205,7 +117,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 		}
 
 		/* after processing all messages, work on tasks. */
-		dataswarm_worker_advance_tasks(w);
+		dataswarm_task_table_advance(w);
 
 		/* testing: send status report every cycle for now */
 		dataswarm_worker_status_report(w, stoptime);

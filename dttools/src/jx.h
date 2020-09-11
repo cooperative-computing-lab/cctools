@@ -230,6 +230,9 @@ int jx_insert( struct jx *object, struct jx *key, struct jx *value );
 /** Insert a key-value pair into an object, unless the value is an empty collection, in which case delete the key and value.  @param key The key.  @param value The value. @return 1 on success, -1 on empty value, 0 on failure.  Failure can only occur if the object is not a @ref JX_OBJECT. */
 int jx_insert_unless_empty( struct jx *object, struct jx *key, struct jx *value );
 
+/** Insert a boolean value into an object @param object The object @param key The key represented as a C string  @param value The boolean value. */
+void jx_insert_boolean( struct jx *object, const char *key, int value );
+
 /** Insert an integer value into an object @param object The object @param key The key represented as a C string  @param value The integer value. */
 void jx_insert_integer( struct jx *object, const char *key, jx_int_t value );
 
@@ -245,8 +248,11 @@ struct jx * jx_lookup( struct jx *object, const char *key );
 /* Like @ref jx_lookup, but found is set to 1 when the key is found. Useful for when value is false. */
 struct jx * jx_lookup_guard( struct jx *j, const char *key, int *found );
 
-/** Search for a string item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The C string value of the matching object, or null if it is not found, or is not a string. */
+/** Search for a string item in an object.  The key is an ordinary string value. @param object The object in which to search.  @param key The string key to match.  @return The C string value of the matching object, or null if it is not found, or is not a string. */
 const char * jx_lookup_string( struct jx *object, const char *key );
+
+/** Search for a string item in an object.  Behaves the same as jx_lookup_string, but returns a duplicated copy.  The result must be deallocated with free(). @param object The object in which to search.  @param key The string key to match.  @return The C string value of the matching object, or null if it is not found, or is not a string. */
+char * jx_lookup_string_dup( struct jx *object, const char *key );
 
 /** Search for an integer item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The integer value of the matching object, or zero if it is not found, or is not an integer. */
 jx_int_t jx_lookup_integer( struct jx *object, const char *key );
