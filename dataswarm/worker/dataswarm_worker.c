@@ -29,10 +29,6 @@ See the file COPYING for details.
 #include "dataswarm_process.h"
 #include "dataswarm_blob.h"
 
-/*
-Every time a task changes state, send an async update message.
-*/
-
 void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 {
 	const char *method = jx_lookup_string(msg, "method");
