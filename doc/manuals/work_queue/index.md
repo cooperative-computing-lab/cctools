@@ -485,7 +485,43 @@ Your job 153098 ("worker.sh") has been submitted
 Your job 153099 ("worker.sh") has been submitted
 ...
 ```
-    
+
+Project names are particularly useful when automatically maintaining a pool of workers with the **work queue factory**, as explained next.
+
+### Work Queue Factory
+
+Instead of launching each worker manually from the command line, the utility
+**work_queue_factory** may be used to launch workers are needed. The factory
+will submit and maintain a number of workers according to the tasks available
+in one or more masters.
+For example, we can supply a minimum of 2 workers and a maximum of 10 to
+a master with the project name `myproject` via the condor batch system as follows:
+
+```sh
+work_queue_factory -Tcondor --min-workers=2 --max-workers=10 --master-name myproject
+```
+
+This arguments can be specified in a file. The factory will periodically
+re-read this file, which allows adjustments to the number of workers desired:
+
+Configuarion file `factory.json`:
+```json
+{
+    "master-name": "myproject",
+    "max-workers": 10,
+    "min-workers": 2
+}
+```
+```sh
+work_queue_factory -Tcondor -Cfactory.json
+```
+
+For further options, please refer to the work queue factory [manual](/man_pages/work_queue_factory).
+
+By default, the factory submits as many tasks that are waiting and running up
+to a specified maximum. To run more than one task in a worker, please refer
+to the following section on describing [task resources](#task-resources) and [worker resources](#work-queue-factory-and-resources).
+
 ## Task Resources
 
 Unless otherwise specified, Work Queue assumes that a single task runs on a
@@ -578,6 +614,26 @@ $ sge_submit_workers --cores 4 MACHINENAME 9123
     
 The variables `$cores `, `$memory `, and `$disk `, have the values of the
 options passed to `--cores`, `--memory`, `--disk. `
+
+### Work Queue Factory and Resources
+
+The `work_queue_factory` accepts the arguments `--cores`, `--memory`, and
+`--disk` to specify the size of the desired workers. Resources may also be
+specified in the configuration file as follows:
+
+```json
+{
+    "master-name": "myproject",
+    "max-workers": 4,
+    "min-workers": 1,
+    "cores": 4,
+    "memory": 4096,
+    "disk": 4096
+}
+```
+
+Both memory and disk are specified in `MB`.
+ 
 
 
 ## Recommended Practices
