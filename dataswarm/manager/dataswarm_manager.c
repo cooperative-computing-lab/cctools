@@ -285,7 +285,8 @@ static const struct option long_options[] =
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
 	{"help", no_argument, 0, 'h' },
-	{"version", no_argument, 0, 'v' }
+	{"version", no_argument, 0, 'v' },
+	{0, 0, 0, 0}
 };
 
 static void show_help( const char *cmd )
