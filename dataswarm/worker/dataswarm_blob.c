@@ -21,7 +21,7 @@ dataswarm_result_t dataswarm_blob_create(struct dataswarm_worker *w, const char 
 {
 	if(!blobid || size < 1) {
 		// XXX return obj with incorrect parameters
-		return DS_MSG_MALFORMED_PARAMETERS;
+		return DS_RESULT_MALFORMED_PARAMETERS;
 	}
 	// XXX should here check for available space
 
@@ -32,7 +32,7 @@ dataswarm_result_t dataswarm_blob_create(struct dataswarm_worker *w, const char 
 		debug(D_DATASWARM, "couldn't mkdir %s: %s", blob_dir, strerror(errno));
 		free(blob_dir);
 		free(blob_meta);
-		return DS_MSG_UNABLE;
+		return DS_RESULT_UNABLE;
 	}
 
 	if(meta) {
@@ -41,7 +41,7 @@ dataswarm_result_t dataswarm_blob_create(struct dataswarm_worker *w, const char 
 			debug(D_DATASWARM, "couldn't open %s: %s", blob_meta, strerror(errno));
 			free(blob_dir);
 			free(blob_meta);
-			return DS_MSG_UNABLE;
+			return DS_RESULT_UNABLE;
 		}
 		jx_print_stream(meta, file);
 		fclose(file);
@@ -50,7 +50,7 @@ dataswarm_result_t dataswarm_blob_create(struct dataswarm_worker *w, const char 
 	free(blob_dir);
 	free(blob_meta);
 
-	return DS_MSG_SUCCESS;
+	return DS_RESULT_SUCCESS;
 }
 
 
@@ -58,7 +58,7 @@ dataswarm_result_t dataswarm_blob_put(struct dataswarm_worker *w, const char *bl
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return DS_MSG_MALFORMED_PARAMETERS;
+		return DS_RESULT_MALFORMED_PARAMETERS;
 	}
 
 	char *blob_data = string_format("%s/blob/rw/%s/data", w->workspace, blobid);
@@ -71,7 +71,7 @@ dataswarm_result_t dataswarm_blob_put(struct dataswarm_worker *w, const char *bl
 	if(!link_readline(l, line, sizeof(line), stoptime)) {
 		debug(D_DATASWARM, "couldn't read file length: %s: %s", blob_data, strerror(errno));
 		free(blob_data);
-		return DS_MSG_UNABLE;
+		return DS_RESULT_UNABLE;
 	}
 
 	int64_t length = atoll(line);
@@ -84,7 +84,7 @@ dataswarm_result_t dataswarm_blob_put(struct dataswarm_worker *w, const char *bl
 	if(!file) {
 		debug(D_DATASWARM, "couldn't open %s: %s", blob_data, strerror(errno));
 		free(blob_data);
-		return DS_MSG_UNABLE;
+		return DS_RESULT_UNABLE;
 	}
 
 	int bytes_transfered = link_stream_to_file(l, file, length, stoptime);
@@ -93,11 +93,11 @@ dataswarm_result_t dataswarm_blob_put(struct dataswarm_worker *w, const char *bl
 	if(bytes_transfered != length) {
 		debug(D_DATASWARM, "couldn't stream to %s: %s", blob_data, strerror(errno));
 		free(blob_data);
-		return DS_MSG_UNABLE;
+		return DS_RESULT_UNABLE;
 	}
 
 	free(blob_data);
-	return DS_MSG_SUCCESS;
+	return DS_RESULT_SUCCESS;
 }
 
 
@@ -105,7 +105,7 @@ dataswarm_result_t dataswarm_blob_get(struct dataswarm_worker *w, const char *bl
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return DS_MSG_MALFORMED_PARAMETERS;
+		return DS_RESULT_MALFORMED_PARAMETERS;
 	}
 
 	char *blob_data = string_format("%s/blob/rw/%s/data", w->workspace, blobid);
@@ -115,14 +115,14 @@ dataswarm_result_t dataswarm_blob_get(struct dataswarm_worker *w, const char *bl
 	if(!status) {
 		debug(D_DATASWARM, "couldn't stat blob: %s: %s", blob_data, strerror(errno));
 		free(blob_data);
-		return DS_MSG_UNABLE;
+		return DS_RESULT_UNABLE;
 	}
 
 	FILE *file = fopen(blob_data, "r");
 	if(!file) {
 		debug(D_DATASWARM, "couldn't open %s: %s", blob_data, strerror(errno));
 		free(blob_data);
-		return DS_MSG_UNABLE;
+		return DS_RESULT_UNABLE;
 	}
 
 	int64_t length = info.st_size;
@@ -140,11 +140,11 @@ dataswarm_result_t dataswarm_blob_get(struct dataswarm_worker *w, const char *bl
 
 	if(bytes_transfered != length) {
 		debug(D_DATASWARM, "couldn't stream from %s: %s", blob_data, strerror(errno));
-		return DS_MSG_UNABLE;
+		return DS_RESULT_UNABLE;
 	}
 
 	free(blob_data);
-	return DS_MSG_SUCCESS;
+	return DS_RESULT_SUCCESS;
 }
 
 
@@ -158,7 +158,7 @@ dataswarm_result_t dataswarm_blob_commit(struct dataswarm_worker *w, const char 
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return DS_MSG_MALFORMED_PARAMETERS;
+		return DS_RESULT_MALFORMED_PARAMETERS;
 	}
 
 	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
@@ -169,10 +169,10 @@ dataswarm_result_t dataswarm_blob_commit(struct dataswarm_worker *w, const char 
 	free(rw_name);
 
 	if(status == 0) {
-		return DS_MSG_SUCCESS;
+		return DS_RESULT_SUCCESS;
 	} else {
 		debug(D_DATASWARM, "couldn't commit %s: %s", blobid, strerror(errno));
-		return DS_MSG_UNABLE;
+		return DS_RESULT_UNABLE;
 	}
 }
 
@@ -188,7 +188,7 @@ dataswarm_result_t dataswarm_blob_delete(struct dataswarm_worker *w, const char 
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return DS_MSG_MALFORMED_PARAMETERS;
+		return DS_RESULT_MALFORMED_PARAMETERS;
 	}
 
 	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
@@ -202,13 +202,13 @@ dataswarm_result_t dataswarm_blob_delete(struct dataswarm_worker *w, const char 
 	if(!status) {
 		  debug(D_DATASWARM, "couldn't delete %s: %s", deleting_name, strerror(errno));
       free(deleting_name);
-	    return DS_MSG_UNABLE;
+	    return DS_RESULT_UNABLE;
 	}
 
 	delete_dir(deleting_name);
 	free(deleting_name);
 
-	return DS_MSG_SUCCESS;
+	return DS_RESULT_SUCCESS;
 }
 
 
@@ -221,12 +221,12 @@ dataswarm_result_t dataswarm_blob_copy(struct dataswarm_worker *w, const char *b
 {
 	if(!blobid || !blobid_src) {
 		// XXX return obj with incorrect parameters
-		return DS_MSG_MALFORMED_PARAMETERS;
+		return DS_RESULT_MALFORMED_PARAMETERS;
 	}
 
 	/* XXX do the copying */
 
-	return DS_MSG_SUCCESS;
+	return DS_RESULT_SUCCESS;
 }
 
 /*

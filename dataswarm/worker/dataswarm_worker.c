@@ -40,7 +40,7 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	int64_t id = jx_lookup_integer(msg, "id");
 
 	if(!method || !params) {
-		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MSG, stoptime); */
+		/* dataswarm_json_send_error_result(l, msg, DS_RESULT_MALFORMED_MSG, stoptime); */
 		/* should the worker add the manager to a banned list at least temporarily? */
 		/* disconnect from manager */
 	}
@@ -48,7 +48,7 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	const char *taskid = jx_lookup_string(params,"task-id");
 	const char *blobid = jx_lookup_string(params,"blob-id");
 
-	dataswarm_result_t result = DS_MSG_SUCCESS;
+	dataswarm_result_t result = DS_RESULT_SUCCESS;
 	struct jx *result_params = 0;
 
 	if(!strcmp(method, "task-submit")) {
@@ -58,7 +58,7 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	} else if(!strcmp(method, "task-remove")) {
 		result = dataswarm_task_table_remove(w,taskid);
 	} else if(!strcmp(method, "status-request")) {
-		result = DS_MSG_SUCCESS;
+		result = DS_RESULT_SUCCESS;
 	} else if(!strcmp(method, "blob-create")) {
 		result = dataswarm_blob_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
 	} else if(!strcmp(method, "blob-put")) {
@@ -72,7 +72,7 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	} else if(!strcmp(method, "blob-copy")) {
 		result = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else {
-		result = DS_MSG_UNEXPECTED_METHOD;
+		result = DS_RESULT_UNEXPECTED_METHOD;
 	}
 
 	struct jx *response = dataswarm_message_standard_response(id,result,result_params);

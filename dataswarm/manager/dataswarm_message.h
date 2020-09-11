@@ -7,14 +7,14 @@
 #include "jx.h"
 
 typedef enum {
-    DS_MSG_SUCCESS = 0,
-    DS_MSG_UNEXPECTED_METHOD,      /* method does not specify a known msg, or in the wrong context */
-    DS_MSG_MALFORMED_ID,           /* method that needs a reply is missing the id field */
-    DS_MSG_MALFORMED_MESSAGE,      /* message without the method and params fields */
-    DS_MSG_MALFORMED_PARAMETERS,   /* params keys missing or of incorrect type */
-    DS_MSG_NO_SUCH_TASKID,	   /* requested taskid does not exist */
-    DS_MSG_NO_SUCH_BLOBID,	   /* requested blobid does not exist */
-    DS_MSG_UNABLE,                 /* could not complete request */
+    DS_RESULT_SUCCESS = 0,
+    DS_RESULT_UNEXPECTED_METHOD,      /* method does not specify a known msg, or in the wrong context */
+    DS_RESULT_MALFORMED_ID,           /* method that needs a reply is missing the id field */
+    DS_RESULT_MALFORMED_MESSAGE,      /* message without the method and params fields */
+    DS_RESULT_MALFORMED_PARAMETERS,   /* params keys missing or of incorrect type */
+    DS_RESULT_NO_SUCH_TASKID,	   /* requested taskid does not exist */
+    DS_RESULT_NO_SUCH_BLOBID,	   /* requested blobid does not exist */
+    DS_RESULT_UNABLE,                 /* could not complete request */
 } dataswarm_result_t;
 
 int         dataswarm_json_send( struct link *l, struct jx *j, time_t stoptime );
