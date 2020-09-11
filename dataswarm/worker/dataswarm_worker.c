@@ -25,112 +25,13 @@ See the file COPYING for details.
 #include "dataswarm_worker.h"
 #include "dataswarm_message.h"
 #include "dataswarm_task.h"
+#include "dataswarm_task_table.h"
 #include "dataswarm_process.h"
 #include "dataswarm_blob.h"
 
 /*
 Every time a task changes state, send an async update message.
 */
-
-void update_task_state( struct dataswarm_worker *w, struct dataswarm_task *task, dataswarm_task_state_t state )
-{
-	task->state = state;
-
-	char *str = string_format("{\"method\":\"task-update\",\"params\":{\"taskid\":\"%s\",\"state\":\"%s\"}}",
-		task->taskid,dataswarm_task_state_string(state));
-	dataswarm_message_send(w->manager_link,str,strlen(str),time(0)+w->long_timeout);
-	free(str);
-}
-
-
-/*
-Consider each task currently in possession of the worker,
-and act according to it's current state.
-*/
-
-void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
-{
-	struct dataswarm_task *task;
-	char *taskid;
-
-	hash_table_firstkey(w->task_table);
-	while(hash_table_nextkey(w->task_table,&taskid,(void**)&task)) {
-
-		switch(task->state) {
-			case DATASWARM_TASK_READY:
-				// XXX only start tasks when resources available.
-				task->process = dataswarm_process_create(task,w);
-				if(task->process) {
-					// XXX check for invalid mounts?
-					if(dataswarm_process_start(task->process,w)) {
-						update_task_state(w,task,DATASWARM_TASK_RUNNING);
-					} else {
-						update_task_state(w,task,DATASWARM_TASK_FAILED);
-					}
-				} else {
-					update_task_state(w,task,DATASWARM_TASK_FAILED);
-				}
-				break;
-			case DATASWARM_TASK_RUNNING:
-				if(dataswarm_process_isdone(task->process)) {
-					update_task_state(w,task,DATASWARM_TASK_DONE);
-				}
-				break;
-			case DATASWARM_TASK_DONE:
-				// Do nothing until removed.
-				break;
-			case DATASWARM_TASK_FAILED:
-				// Do nothing until removed.
-				break;
-			case DATASWARM_TASK_DELETING:
-				// Remove the local state assocated with the process.
-				dataswarm_process_delete(task->process);
-				task->process = 0;
-				// Send the deleted message.
-				update_task_state(w,task,DATASWARM_TASK_DELETED);
-				// Now actually remove it from the data structures.
-				hash_table_remove(w->task_table,taskid);
-				dataswarm_task_delete(task);
-				break;
-			case DATASWARM_TASK_DELETED:
-				break;
-		}
-	}
-
-}
-
-dataswarm_result_t dataswarm_task_table_submit( struct dataswarm_worker *w, const char *taskid, struct jx *jtask )
-{
-	struct dataswarm_task *task = dataswarm_task_create(jtask);
-	if(task) {
-		hash_table_insert(w->task_table, taskid, task);
-		return DS_MSG_SUCCESS;
-	} else {
-		return DS_MSG_MALFORMED_PARAMETERS;
-	}
-}
-		
-dataswarm_result_t dataswarm_task_table_get( struct dataswarm_worker *w, const char *taskid, struct jx **jtask )
-{
-	struct dataswarm_task *task = hash_table_lookup(w->task_table, taskid);
-	if(task) {
-		*jtask = dataswarm_task_to_jx(task);
-		return DS_MSG_SUCCESS;
-	} else {
-		return DS_MSG_NO_SUCH_TASKID;
-	}
-}
-		
-dataswarm_result_t dataswarm_task_table_remove( struct dataswarm_worker *w, const char *taskid )
-{
-	struct dataswarm_task *task = hash_table_lookup(w->task_table, taskid);
-	if(task) {
-		update_task_state(w,task,DATASWARM_TASK_DELETING);
-		return DS_MSG_SUCCESS;
-	} else {
-		return DS_MSG_NO_SUCH_TASKID;
-	}
-}
 
 void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 {
@@ -216,7 +117,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 		}
 
 		/* after processing all messages, work on tasks. */
-		dataswarm_worker_advance_tasks(w);
+		dataswarm_task_table_advance(w);
 
 		/* testing: send status report every cycle for now */
 		dataswarm_worker_status_report(w, stoptime);

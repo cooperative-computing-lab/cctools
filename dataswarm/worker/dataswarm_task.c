@@ -59,3 +59,4 @@ void dataswarm_task_delete( struct dataswarm_task *t )
 	dataswarm_process_delete(t->process);
 	free(t);
 }
+
