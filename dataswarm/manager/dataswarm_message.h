@@ -14,6 +14,7 @@ typedef enum {
     DS_MSG_MALFORMED_PARAMETERS,   /* params keys missing or of incorrect type */
     DS_MSG_NO_SUCH_TASKID,	   /* requested taskid does not exist */
     DS_MSG_NO_SUCH_BLOBID,	   /* requested blobid does not exist */
+    DS_MSG_UNABLE,                 /* could not complete request */
 } dataswarm_message_error_t;
 
 int         dataswarm_json_send( struct link *l, struct jx *j, time_t stoptime );

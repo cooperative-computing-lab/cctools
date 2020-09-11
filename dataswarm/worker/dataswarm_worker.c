@@ -101,8 +101,6 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 
 void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 {
-	struct jx *response = NULL;
-
 	const char *method = jx_lookup_string(msg, "method");
 	struct jx *params = jx_lookup(msg, "params");
 	int64_t id = jx_lookup_integer(msg, "id");
@@ -118,56 +116,58 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 
 	struct dataswarm_task *task = 0;
 
+	dataswarm_message_error_t result = DS_MSG_SUCCESS;
+	struct jx *result_params = 0;
+
 	if(!strcmp(method, "task-submit")) {
 		task = dataswarm_task_create(params);
 		if(task) {
 			hash_table_insert(w->task_table, taskid, task);
-			response = dataswarm_message_standard_response(id,0,0);
+			result = DS_MSG_SUCCESS;
 		} else {
-			response = dataswarm_message_standard_response(id,DS_MSG_MALFORMED_PARAMETERS,0);
+			result = DS_MSG_MALFORMED_PARAMETERS;
 		}
 
 	} else if(!strcmp(method, "task-get")) {
 		task = hash_table_lookup(w->task_table, taskid);
 		if(task) {
-			struct jx *jtask = dataswarm_task_to_jx(task);
-			response = dataswarm_message_standard_response(id,0,jtask);
-			jx_delete(jtask);
+			result_params = dataswarm_task_to_jx(task);
+			result = DS_MSG_SUCCESS;
 		} else {
-			response = dataswarm_message_standard_response(id,DS_MSG_NO_SUCH_TASKID,0);
+			result = DS_MSG_NO_SUCH_TASKID;
 		}
 		
 	} else if(!strcmp(method, "task-remove")) {
 		task = hash_table_lookup(w->task_table, taskid);
 		if(task) {
 			update_task_state(w,task,DATASWARM_TASK_DELETING);
-			response = dataswarm_message_standard_response(id,DS_MSG_SUCCESS,0);
+			result = DS_MSG_SUCCESS;
 		} else {
-			response = dataswarm_message_standard_response(id,DS_MSG_NO_SUCH_TASKID,0);
+			result = DS_MSG_NO_SUCH_TASKID;
 		}
 
 	} else if(!strcmp(method, "status-request")) {
-		/* */
+		result = DS_MSG_SUCCESS;
 	} else if(!strcmp(method, "blob-create")) {
-		response = dataswarm_blob_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
+		result = dataswarm_blob_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
 	} else if(!strcmp(method, "blob-put")) {
-		response = dataswarm_blob_put(w,blobid, w->manager_link);
+		result = dataswarm_blob_put(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-get")) {
-		response = dataswarm_blob_get(w,blobid, w->manager_link);
+		result = dataswarm_blob_get(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-delete")) {
-		response = dataswarm_blob_delete(w,blobid);
+		result = dataswarm_blob_delete(w,blobid);
 	} else if(!strcmp(method, "blob-commit")) {
-		response = dataswarm_blob_commit(w,blobid);
+		result = dataswarm_blob_commit(w,blobid);
 	} else if(!strcmp(method, "blob-copy")) {
-		response = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
+		result = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else {
-		response = dataswarm_message_error_response(DS_MSG_UNEXPECTED_METHOD, msg);
+		result = DS_MSG_UNEXPECTED_METHOD;
 	}
 
-	if(response) {
-		dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
-		jx_delete(response);
-	}
+	struct jx *response = dataswarm_message_standard_response(id,result,result_params);
+	dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
+	jx_delete(response);
+	jx_delete(result_params);
 }
 
 void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
