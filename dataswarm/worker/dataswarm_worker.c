@@ -115,7 +115,7 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 
 	const char *method = jx_lookup_string(msg, "method");
 	struct jx *params = jx_lookup(msg, "params");
-	const char *id = jx_lookup_string(msg, "id");
+	int id = jx_lookup_integer(msg, "id");
 
 	if(!method || !params) {
 		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
@@ -161,6 +161,8 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 		response = dataswarm_message_error_response(DS_MSG_UNEXPECTED_METHOD, msg);
 	}
 
+    jx_insert_integer(response, "id", id);
+
 	return response;
 }
 
@@ -188,7 +190,10 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 			if(link_sleep(w->manager_link, stoptime, stoptime, 0)) {
 				struct jx *msg = dataswarm_json_recv(w->manager_link, stoptime);
 				if(msg) {
-					dataswarm_worker_handle_message(w, msg);
+					struct jx *response = dataswarm_worker_handle_message(w, msg);
+                    if(response) {
+                        dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
+                    }
 					jx_delete(msg);
 				} else {
 					/* handle manager disconnection */
