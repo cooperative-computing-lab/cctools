@@ -105,7 +105,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 			if(link_sleep(w->manager_link, stoptime, stoptime, 0)) {
 				struct jx *msg = dataswarm_json_recv(w->manager_link, stoptime);
 				if(msg) {
-					dataswarm_worker_handle_message(w, msg);
+            dataswarm_worker_handle_message(w, msg);
 					jx_delete(msg);
 				} else {
 					/* handle manager disconnection */
