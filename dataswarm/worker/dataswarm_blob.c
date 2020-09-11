@@ -17,7 +17,7 @@
 #include <errno.h>
 #include <string.h>
 
-dataswarm_message_error_t dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
+dataswarm_result_t dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
 {
 	if(!blobid || size < 1) {
 		// XXX return obj with incorrect parameters
@@ -54,7 +54,7 @@ dataswarm_message_error_t dataswarm_blob_create(struct dataswarm_worker *w, cons
 }
 
 
-dataswarm_message_error_t dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, struct link *l)
+dataswarm_result_t dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, struct link *l)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -101,7 +101,7 @@ dataswarm_message_error_t dataswarm_blob_put(struct dataswarm_worker *w, const c
 }
 
 
-dataswarm_message_error_t dataswarm_blob_get(struct dataswarm_worker *w, const char *blobid, struct link *l)
+dataswarm_result_t dataswarm_blob_get(struct dataswarm_worker *w, const char *blobid, struct link *l)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -154,7 +154,7 @@ a read-only blob, fixing its size and properties for all time,
 allowing the object to be duplicated to other nodes.
 */
 
-dataswarm_message_error_t dataswarm_blob_commit(struct dataswarm_worker *w, const char *blobid)
+dataswarm_result_t dataswarm_blob_commit(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -184,7 +184,7 @@ fails or the worker crashes, all deleted blobs can be cleaned up on restart.
 */
 
 
-dataswarm_message_error_t dataswarm_blob_delete(struct dataswarm_worker *w, const char *blobid)
+dataswarm_result_t dataswarm_blob_delete(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -216,7 +216,7 @@ dataswarm_blob_copy message requests a blob to be duplicated. The new copy is
 read-write with a new blob-id.
 */
 
-dataswarm_message_error_t dataswarm_blob_copy(struct dataswarm_worker *w, const char *blobid, const char *blobid_src)
+dataswarm_result_t dataswarm_blob_copy(struct dataswarm_worker *w, const char *blobid, const char *blobid_src)
 {
 	if(!blobid || !blobid_src) {
 		// XXX return obj with incorrect parameters

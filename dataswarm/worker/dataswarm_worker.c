@@ -99,6 +99,39 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 
 }
 
+dataswarm_result_t dataswarm_task_table_submit( struct dataswarm_worker *w, const char *taskid, struct jx *jtask )
+{
+	struct dataswarm_task *task = dataswarm_task_create(jtask);
+	if(task) {
+		hash_table_insert(w->task_table, taskid, task);
+		return DS_MSG_SUCCESS;
+	} else {
+		return DS_MSG_MALFORMED_PARAMETERS;
+	}
+}
+		
+dataswarm_result_t dataswarm_task_table_get( struct dataswarm_worker *w, const char *taskid, struct jx **jtask )
+{
+	struct dataswarm_task *task = hash_table_lookup(w->task_table, taskid);
+	if(task) {
+		*jtask = dataswarm_task_to_jx(task);
+		return DS_MSG_SUCCESS;
+	} else {
+		return DS_MSG_NO_SUCH_TASKID;
+	}
+}
+		
+dataswarm_result_t dataswarm_task_table_remove( struct dataswarm_worker *w, const char *taskid )
+{
+	struct dataswarm_task *task = hash_table_lookup(w->task_table, taskid);
+	if(task) {
+		update_task_state(w,task,DATASWARM_TASK_DELETING);
+		return DS_MSG_SUCCESS;
+	} else {
+		return DS_MSG_NO_SUCH_TASKID;
+	}
+}
+
 void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 {
 	const char *method = jx_lookup_string(msg, "method");
@@ -114,38 +147,15 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	const char *taskid = jx_lookup_string(params,"task-id");
 	const char *blobid = jx_lookup_string(params,"blob-id");
 
-	struct dataswarm_task *task = 0;
-
-	dataswarm_message_error_t result = DS_MSG_SUCCESS;
+	dataswarm_result_t result = DS_MSG_SUCCESS;
 	struct jx *result_params = 0;
 
 	if(!strcmp(method, "task-submit")) {
-		task = dataswarm_task_create(params);
-		if(task) {
-			hash_table_insert(w->task_table, taskid, task);
-			result = DS_MSG_SUCCESS;
-		} else {
-			result = DS_MSG_MALFORMED_PARAMETERS;
-		}
-
+		result = dataswarm_task_table_submit(w,taskid,params);
 	} else if(!strcmp(method, "task-get")) {
-		task = hash_table_lookup(w->task_table, taskid);
-		if(task) {
-			result_params = dataswarm_task_to_jx(task);
-			result = DS_MSG_SUCCESS;
-		} else {
-			result = DS_MSG_NO_SUCH_TASKID;
-		}
-		
+		result = dataswarm_task_table_get(w,taskid,&result_params);
 	} else if(!strcmp(method, "task-remove")) {
-		task = hash_table_lookup(w->task_table, taskid);
-		if(task) {
-			update_task_state(w,task,DATASWARM_TASK_DELETING);
-			result = DS_MSG_SUCCESS;
-		} else {
-			result = DS_MSG_NO_SUCH_TASKID;
-		}
-
+		result = dataswarm_task_table_remove(w,taskid);
 	} else if(!strcmp(method, "status-request")) {
 		result = DS_MSG_SUCCESS;
 	} else if(!strcmp(method, "blob-create")) {
