@@ -1,10 +1,10 @@
 #ifndef DATASWARM_MESSAGE_H
 #define DATASWARM_MESSAGE_H
 
-#include <time.h>
-
 #include "link.h"
 #include "jx.h"
+
+#include <time.h>
 
 typedef enum {
     DS_RESULT_SUCCESS = 0,
@@ -23,6 +23,8 @@ struct jx *dataswarm_json_recv( struct link *l, time_t stoptime );
 int    dataswarm_message_send( struct link *l, const char *str, int length, time_t stoptime );
 char *dataswarm_message_recv( struct link *l, time_t stoptime );
 
-struct jx *dataswarm_message_standard_response( int64_t id, dataswarm_result_t code, struct jx *params );
+struct jx * dataswarm_message_standard_response( int64_t id, dataswarm_result_t code, struct jx *params );
+struct jx * dataswarm_message_task_update( const char *taskid, const char *state );
+struct jx * dataswarm_message_blob_update( const char *blobid, const char *state );
 
 #endif

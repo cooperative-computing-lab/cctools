@@ -79,4 +79,31 @@ struct jx * dataswarm_message_standard_response( int64_t id, dataswarm_result_t 
 	return message;
 }
 
+struct jx * dataswarm_message_task_update( const char *taskid, const char *state )
+{
+	struct jx *params = jx_object(0);
+	jx_insert_string(params,"task-id",taskid);
+	jx_insert_string(params,"state",state);
+
+	struct jx *message = jx_object(0);
+	jx_insert_string(message, "method", "task-update");
+	jx_insert(message,jx_string("params"),params);
+
+	return message;
+}
+
+struct jx * dataswarm_message_blob_update( const char *blobid, const char *state )
+{
+	struct jx *params = jx_object(0);
+	jx_insert_string(params,"blob-id",blobid);
+	jx_insert_string(params,"state",state);
+
+	struct jx *message = jx_object(0);
+	jx_insert_string(message, "method", "blob-update");
+	jx_insert(message,jx_string("params"),params);
+
+	return message;
+}
+
+
 
