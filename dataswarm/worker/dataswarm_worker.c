@@ -99,28 +99,6 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 
 }
 
-void jx_insert_boolean( struct jx *j, const char *key, int b );
-
-struct jx * standard_response( int64_t id, int code, struct jx *params )
-{
-	struct jx *message = jx_object(0);
-
-	jx_insert_string(message, "method", "response");
-	jx_insert_integer(message, "id", id );
-	jx_insert_boolean(message, "success", code==DS_MSG_NO_ERROR );
-
-	if(code!=DS_MSG_NO_ERROR) {
-		// XXX send string instead?
-		jx_insert_integer(message,"error",code);
-	}
-
-	if(params) {
-		jx_insert(message,jx_string("params"),jx_copy(params));
-	}
-
-	return message;
-}
-
 void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 {
 	struct jx *response = NULL;
@@ -144,28 +122,28 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 		task = dataswarm_task_create(params);
 		if(task) {
 			hash_table_insert(w->task_table, taskid, task);
-			response = standard_response(id,0,0);
+			response = dataswarm_message_standard_response(id,0,0);
 		} else {
-			response = standard_response(id,DS_MSG_MALFORMED_PARAMETERS,0);
+			response = dataswarm_message_standard_response(id,DS_MSG_MALFORMED_PARAMETERS,0);
 		}
 
 	} else if(!strcmp(method, "task-get")) {
 		task = hash_table_lookup(w->task_table, taskid);
 		if(task) {
 			struct jx *jtask = dataswarm_task_to_jx(task);
-			response = standard_response(id,0,jtask);
+			response = dataswarm_message_standard_response(id,0,jtask);
 			jx_delete(jtask);
 		} else {
-			response = standard_response(id,DS_MSG_NO_SUCH_TASKID,0);
+			response = dataswarm_message_standard_response(id,DS_MSG_NO_SUCH_TASKID,0);
 		}
 		
 	} else if(!strcmp(method, "task-remove")) {
 		task = hash_table_lookup(w->task_table, taskid);
 		if(task) {
 			update_task_state(w,task,DATASWARM_TASK_DELETING);
-			response = standard_response(id,DS_MSG_NO_ERROR,0);
+			response = dataswarm_message_standard_response(id,DS_MSG_SUCCESS,0);
 		} else {
-			response = standard_response(id,DS_MSG_NO_SUCH_TASKID,0);
+			response = dataswarm_message_standard_response(id,DS_MSG_NO_SUCH_TASKID,0);
 		}
 
 	} else if(!strcmp(method, "status-request")) {
