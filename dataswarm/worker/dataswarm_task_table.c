@@ -29,7 +29,7 @@ dataswarm_result_t dataswarm_task_table_submit( struct dataswarm_worker *w, cons
 		hash_table_insert(w->task_table, taskid, task);
 		return DS_RESULT_SUCCESS;
 	} else {
-		return DS_RESULT_MALFORMED_PARAMETERS;
+		return DS_RESULT_BAD_PARAMS;
 	}
 }
 		

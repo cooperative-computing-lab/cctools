@@ -21,7 +21,7 @@ dataswarm_result_t dataswarm_blob_create(struct dataswarm_worker *w, const char 
 {
 	if(!blobid || size < 1) {
 		// XXX return obj with incorrect parameters
-		return DS_RESULT_MALFORMED_PARAMETERS;
+		return DS_RESULT_BAD_PARAMS;
 	}
 	// XXX should here check for available space
 
@@ -58,7 +58,7 @@ dataswarm_result_t dataswarm_blob_put(struct dataswarm_worker *w, const char *bl
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return DS_RESULT_MALFORMED_PARAMETERS;
+		return DS_RESULT_BAD_PARAMS;
 	}
 
 	char *blob_data = string_format("%s/blob/rw/%s/data", w->workspace, blobid);
@@ -105,7 +105,7 @@ dataswarm_result_t dataswarm_blob_get(struct dataswarm_worker *w, const char *bl
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return DS_RESULT_MALFORMED_PARAMETERS;
+		return DS_RESULT_BAD_PARAMS;
 	}
 
 	char *blob_data = string_format("%s/blob/rw/%s/data", w->workspace, blobid);
@@ -158,7 +158,7 @@ dataswarm_result_t dataswarm_blob_commit(struct dataswarm_worker *w, const char 
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return DS_RESULT_MALFORMED_PARAMETERS;
+		return DS_RESULT_BAD_PARAMS;
 	}
 
 	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
@@ -188,7 +188,7 @@ dataswarm_result_t dataswarm_blob_delete(struct dataswarm_worker *w, const char 
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
-		return DS_RESULT_MALFORMED_PARAMETERS;
+		return DS_RESULT_BAD_PARAMS;
 	}
 
 	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
@@ -221,7 +221,7 @@ dataswarm_result_t dataswarm_blob_copy(struct dataswarm_worker *w, const char *b
 {
 	if(!blobid || !blobid_src) {
 		// XXX return obj with incorrect parameters
-		return DS_RESULT_MALFORMED_PARAMETERS;
+		return DS_RESULT_BAD_PARAMS;
 	}
 
 	/* XXX do the copying */

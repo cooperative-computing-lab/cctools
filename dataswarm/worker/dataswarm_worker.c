@@ -35,17 +35,22 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	struct jx *params = jx_lookup(msg, "params");
 	int64_t id = jx_lookup_integer(msg, "id");
 
-	if(!method || !params) {
-		/* dataswarm_json_send_error_result(l, msg, DS_RESULT_MALFORMED_MSG, stoptime); */
-		/* should the worker add the manager to a banned list at least temporarily? */
-		/* disconnect from manager */
+	dataswarm_result_t result = DS_RESULT_SUCCESS;
+	struct jx *result_params = 0;
+
+	if(!method) {
+		result = DS_RESULT_BAD_METHOD;
+		goto done;
+	} else if(!id) {
+		result = DS_RESULT_BAD_ID;
+		goto done;
+	} else if(!params) {
+		result = DS_RESULT_BAD_PARAMS;
+		goto done;
 	}
 
 	const char *taskid = jx_lookup_string(params,"task-id");
 	const char *blobid = jx_lookup_string(params,"blob-id");
-
-	dataswarm_result_t result = DS_RESULT_SUCCESS;
-	struct jx *result_params = 0;
 
 	if(!strcmp(method, "task-submit")) {
 		result = dataswarm_task_table_submit(w,taskid,params);
@@ -68,10 +73,13 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	} else if(!strcmp(method, "blob-copy")) {
 		result = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else {
-		result = DS_RESULT_UNEXPECTED_METHOD;
+		result = DS_RESULT_BAD_METHOD;
 	}
 
-	struct jx *response = dataswarm_message_standard_response(id,result,result_params);
+	struct jx *response;
+
+	done:
+	response = dataswarm_message_standard_response(id,result,result_params);
 	dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
 	jx_delete(response);
 	jx_delete(result_params);
