@@ -11,7 +11,9 @@ enum dataswarm_message_error {
     DS_MSG_UNEXPECTED_METHOD,      /* method does not specify a known msg, or in the wrong context */
     DS_MSG_MALFORMED_ID,           /* method that needs a reply is missing the id field */
     DS_MSG_MALFORMED_MESSAGE,      /* message without the method and params fields */
-    DS_MSG_MALFORMED_PARAMETERS    /* params keys missing or of incorrect type */
+    DS_MSG_MALFORMED_PARAMETERS,    /* params keys missing or of incorrect type */
+    DS_MSG_NO_SUCH_TASKID,	   /* requested taskid does not exist */
+    DS_MSG_NO_SUCH_BLOBID,	   /* requested blobid does not exist */
 };
 
 int         dataswarm_json_send( struct link *l, struct jx *j, time_t stoptime );

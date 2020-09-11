@@ -99,35 +99,40 @@ void dataswarm_worker_advance_tasks( struct dataswarm_worker *w )
 
 }
 
-void dataswarm_worker_send_response(struct dataswarm_worker *w, struct jx *original, struct jx *params)
+void jx_insert_boolean( struct jx *j, const char *key, int b );
+
+struct jx * standard_response( int64_t id, int code, struct jx *params )
 {
 	struct jx *message = jx_object(0);
 
 	jx_insert_string(message, "method", "response");
-	jx_insert_integer(message, "id", jx_lookup_integer(original, "id"));
-	jx_insert(message, jx_string("params"), jx_copy(params));
+	jx_insert_integer(message, "id", id );
+	jx_insert_boolean(message, "success", code==DS_MSG_NO_ERROR );
 
-	dataswarm_json_send(w->manager_link, message, time(0) + w->long_timeout);
+	if(code!=DS_MSG_NO_ERROR) {
+		// XXX send string instead?
+		jx_insert_integer(message,"error",code);
+	}
 
-	jx_delete(message);
+	if(params) {
+		jx_insert(message,jx_string("params"),jx_copy(params));
+	}
+
+	return message;
 }
 
-struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
+void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 {
 	struct jx *response = NULL;
-	if(!msg) {
-		return response;
-	}
 
 	const char *method = jx_lookup_string(msg, "method");
 	struct jx *params = jx_lookup(msg, "params");
-	const char *id = jx_lookup_string(msg, "id");
+	int64_t id = jx_lookup_integer(msg, "id");
 
 	if(!method || !params) {
-		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MSG, stoptime); */
 		/* should the worker add the manager to a banned list at least temporarily? */
 		/* disconnect from manager */
-		return response;
 	}
 
 	const char *taskid = jx_lookup_string(params,"task-id");
@@ -137,17 +142,31 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 
 	if(!strcmp(method, "task-submit")) {
 		task = dataswarm_task_create(params);
-		hash_table_insert(w->task_table, taskid, task);
-		update_task_state(w,task,DATASWARM_TASK_READY);
+		if(task) {
+			hash_table_insert(w->task_table, taskid, task);
+			response = standard_response(id,0,0);
+		} else {
+			response = standard_response(id,DS_MSG_MALFORMED_PARAMETERS,0);
+		}
 
 	} else if(!strcmp(method, "task-get")) {
 		task = hash_table_lookup(w->task_table, taskid);
-		struct jx *jtask = dataswarm_task_to_jx(task);
-		dataswarm_worker_send_response(w, msg, jtask);
-
+		if(task) {
+			struct jx *jtask = dataswarm_task_to_jx(task);
+			response = standard_response(id,0,jtask);
+			jx_delete(jtask);
+		} else {
+			response = standard_response(id,DS_MSG_NO_SUCH_TASKID,0);
+		}
+		
 	} else if(!strcmp(method, "task-remove")) {
 		task = hash_table_lookup(w->task_table, taskid);
-		update_task_state(w,task,DATASWARM_TASK_DELETING);
+		if(task) {
+			update_task_state(w,task,DATASWARM_TASK_DELETING);
+			response = standard_response(id,DS_MSG_NO_ERROR,0);
+		} else {
+			response = standard_response(id,DS_MSG_NO_SUCH_TASKID,0);
+		}
 
 	} else if(!strcmp(method, "status-request")) {
 		/* */
@@ -167,7 +186,10 @@ struct jx *dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx
 		response = dataswarm_message_error_response(DS_MSG_UNEXPECTED_METHOD, msg);
 	}
 
-	return response;
+	if(response) {
+		dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
+		jx_delete(response);
+	}
 }
 
 void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
