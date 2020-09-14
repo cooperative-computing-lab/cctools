@@ -12,6 +12,7 @@ struct dataswarm_manager {
 	int connect_timeout;
 	int stall_timeout;
 	int server_port;
+	int message_id;
 
 	int force_update;
 	time_t catalog_last_update_time;

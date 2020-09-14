@@ -362,7 +362,7 @@ struct dataswarm_manager * dataswarm_manager_create()
 	m->connect_timeout = 5;
 	m->stall_timeout = 30;
 	m->update_interval = 60;
-
+	m->message_id = 1000;
 	m->project_name = "dataswarm";
 
 	return m;
