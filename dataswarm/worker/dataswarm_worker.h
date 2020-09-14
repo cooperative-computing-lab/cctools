@@ -1,6 +1,10 @@
 #ifndef DATASWARM_WORKER_H
 #define DATASWARM_WORKER_H
 
+#include <time.h>
+#include "hash_table.h"
+#include "link.h"
+
 struct dataswarm_worker {
 	// Network connection to the manager process.
 	struct link *manager_link;
@@ -32,6 +36,12 @@ struct dataswarm_worker {
 
 	// id msg counter
 	int message_id;
+
+	// Time last status update was sent to manager.
+	time_t last_status_report;
+
+	// Seconds between updates.
+	int status_report_interval;
 };
 
 struct dataswarm_worker *dataswarm_worker_create();

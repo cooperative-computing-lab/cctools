@@ -136,8 +136,12 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 		/* after processing all messages, work on tasks. */
 		dataswarm_task_table_advance(w);
 
-		/* testing: send status report every cycle for now */
-		dataswarm_worker_status_report(w, stoptime);
+		time_t current = time(0);
+
+		if(current > (w->last_status_report+w->status_report_interval) ) {
+			w->last_status_report = current;
+			dataswarm_worker_status_report(w, stoptime);
+		}
 
 		//do not busy sleep more than stoptime
 		//this will probably go away with Tim's library
@@ -230,6 +234,8 @@ struct dataswarm_worker *dataswarm_worker_create(const char *workspace)
 	w->max_connect_retry = 60;
 	w->catalog_timeout = 60;
 	w->message_id = 1;
+	w->last_status_report = 0;
+	w->status_report_interval = 60;
 
 	if(!create_dir(w->workspace, 0777)) {
 		dataswarm_worker_delete(w);
