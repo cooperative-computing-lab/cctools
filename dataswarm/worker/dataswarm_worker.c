@@ -29,58 +29,6 @@ See the file COPYING for details.
 #include "dataswarm_process.h"
 #include "dataswarm_blob.h"
 
-/*
-Every time a task changes state, send an async update message.
-*/
-
-void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
-{
-	const char *method = jx_lookup_string(msg, "method");
-	struct jx *params = jx_lookup(msg, "params");
-	int64_t id = jx_lookup_integer(msg, "id");
-
-	if(!method || !params) {
-		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MSG, stoptime); */
-		/* should the worker add the manager to a banned list at least temporarily? */
-		/* disconnect from manager */
-	}
-
-	const char *taskid = jx_lookup_string(params,"task-id");
-	const char *blobid = jx_lookup_string(params,"blob-id");
-
-	dataswarm_result_t result = DS_MSG_SUCCESS;
-	struct jx *result_params = 0;
-
-	if(!strcmp(method, "task-submit")) {
-		result = dataswarm_task_table_submit(w,taskid,params);
-	} else if(!strcmp(method, "task-get")) {
-		result = dataswarm_task_table_get(w,taskid,&result_params);
-	} else if(!strcmp(method, "task-remove")) {
-		result = dataswarm_task_table_remove(w,taskid);
-	} else if(!strcmp(method, "status-request")) {
-		result = DS_MSG_SUCCESS;
-	} else if(!strcmp(method, "blob-create")) {
-		result = dataswarm_blob_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
-	} else if(!strcmp(method, "blob-put")) {
-		result = dataswarm_blob_put(w,blobid, w->manager_link);
-	} else if(!strcmp(method, "blob-get")) {
-		result = dataswarm_blob_get(w,blobid, w->manager_link);
-	} else if(!strcmp(method, "blob-delete")) {
-		result = dataswarm_blob_delete(w,blobid);
-	} else if(!strcmp(method, "blob-commit")) {
-		result = dataswarm_blob_commit(w,blobid);
-	} else if(!strcmp(method, "blob-copy")) {
-		result = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
-	} else {
-		result = DS_MSG_UNEXPECTED_METHOD;
-	}
-
-	struct jx *response = dataswarm_message_standard_response(id,result,result_params);
-	dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
-	jx_delete(response);
-	jx_delete(result_params);
-}
-
 void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
 {
 	struct jx *msg = jx_object(NULL);
@@ -95,6 +43,75 @@ void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
 	jx_delete(msg);
 }
 
+struct jx * dataswarm_worker_handshake( struct dataswarm_worker *w )
+{
+	struct jx *msg = jx_object(NULL);
+	struct jx *params = jx_object(NULL);
+
+	jx_insert_string(msg, "method", "handshake");
+	jx_insert(msg, jx_string("params"), params);
+	jx_insert_string(params, "type", "worker");
+	jx_insert_integer(msg, "id", w->message_id++);	/* need function to register msgs and their ids */
+
+	return msg;
+}
+
+
+void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
+{
+	const char *method = jx_lookup_string(msg, "method");
+	struct jx *params = jx_lookup(msg, "params");
+	int64_t id = jx_lookup_integer(msg, "id");
+
+	dataswarm_result_t result = DS_RESULT_SUCCESS;
+	struct jx *result_params = 0;
+
+	if(!method) {
+		result = DS_RESULT_BAD_METHOD;
+		goto done;
+	} else if(!id) {
+		result = DS_RESULT_BAD_ID;
+		goto done;
+	} else if(!params) {
+		result = DS_RESULT_BAD_PARAMS;
+		goto done;
+	}
+
+	const char *taskid = jx_lookup_string(params,"task-id");
+	const char *blobid = jx_lookup_string(params,"blob-id");
+
+	if(!strcmp(method, "task-submit")) {
+		result = dataswarm_task_table_submit(w,taskid,params);
+	} else if(!strcmp(method, "task-get")) {
+		result = dataswarm_task_table_get(w,taskid,&result_params);
+	} else if(!strcmp(method, "task-remove")) {
+		result = dataswarm_task_table_remove(w,taskid);
+	} else if(!strcmp(method, "status-request")) {
+		result = DS_RESULT_SUCCESS;
+	} else if(!strcmp(method, "blob-create")) {
+		result = dataswarm_blob_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
+	} else if(!strcmp(method, "blob-put")) {
+		result = dataswarm_blob_put(w,blobid, w->manager_link);
+	} else if(!strcmp(method, "blob-get")) {
+		result = dataswarm_blob_get(w,blobid, w->manager_link);
+	} else if(!strcmp(method, "blob-delete")) {
+		result = dataswarm_blob_delete(w,blobid);
+	} else if(!strcmp(method, "blob-commit")) {
+		result = dataswarm_blob_commit(w,blobid);
+	} else if(!strcmp(method, "blob-copy")) {
+		result = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
+	} else {
+		result = DS_RESULT_BAD_METHOD;
+	}
+
+	struct jx *response;
+
+	done:
+	response = dataswarm_message_standard_response(id,result,result_params);
+	dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
+	jx_delete(response);
+	jx_delete(result_params);
+}
 
 int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 {
@@ -105,7 +122,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 			if(link_sleep(w->manager_link, stoptime, stoptime, 0)) {
 				struct jx *msg = dataswarm_json_recv(w->manager_link, stoptime);
 				if(msg) {
-            dataswarm_worker_handle_message(w, msg);
+					dataswarm_worker_handle_message(w, msg);
 					jx_delete(msg);
 				} else {
 					/* handle manager disconnection */
@@ -119,8 +136,12 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 		/* after processing all messages, work on tasks. */
 		dataswarm_task_table_advance(w);
 
-		/* testing: send status report every cycle for now */
-		dataswarm_worker_status_report(w, stoptime);
+		time_t current = time(0);
+
+		if(current > (w->last_status_report+w->status_report_interval) ) {
+			w->last_status_report = current;
+			dataswarm_worker_status_report(w, stoptime);
+		}
 
 		//do not busy sleep more than stoptime
 		//this will probably go away with Tim's library
@@ -146,14 +167,8 @@ void dataswarm_worker_connect_loop(struct dataswarm_worker *w, const char *manag
 
 		w->manager_link = link_connect(manager_addr, manager_port, time(0) + sleeptime);
 		if(w->manager_link) {
-			struct jx *msg = jx_object(NULL);
-			struct jx *params = jx_object(NULL);
 
-			jx_insert_string(msg, "method", "handshake");
-			jx_insert(msg, jx_string("params"), params);
-			jx_insert_string(params, "type", "worker");
-			jx_insert_integer(msg, "id", w->message_id++);	/* need function to register msgs and their ids */
-
+			struct jx *msg = dataswarm_worker_handshake(w);
 			dataswarm_json_send(w->manager_link, msg, time(0) + w->long_timeout);
 			jx_delete(msg);
 
@@ -219,6 +234,8 @@ struct dataswarm_worker *dataswarm_worker_create(const char *workspace)
 	w->max_connect_retry = 60;
 	w->catalog_timeout = 60;
 	w->message_id = 1;
+	w->last_status_report = 0;
+	w->status_report_interval = 60;
 
 	if(!create_dir(w->workspace, 0777)) {
 		dataswarm_worker_delete(w);

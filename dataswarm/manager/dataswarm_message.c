@@ -59,45 +59,15 @@ struct jx *dataswarm_json_recv(struct link *l, time_t stoptime)
 	return j;
 }
 
-struct jx *dataswarm_message_error_response( dataswarm_result_t code, struct jx *evidence)
-{
-	struct jx *response = jx_object(0);
-
-	jx_insert_integer(response, "error", code);
-
-	if(evidence) {
-		jx_insert(response, jx_string("result"), evidence);
-	}
-
-	return response;
-}
-
-struct jx *dataswarm_message_state_response(const char *state, const char *reason)
-{
-	struct jx *response = jx_object(0);
-	struct jx *result = jx_object(0);
-
-	jx_insert(response, jx_string("error"), jx_null());
-	jx_insert(response, jx_string("result"), result);
-
-	jx_insert_string(result, "state", state);
-
-	if(reason) {
-		jx_insert_string(result, "reason", reason);
-	}
-
-	return response;
-}
-
 struct jx * dataswarm_message_standard_response( int64_t id, dataswarm_result_t code, struct jx *params )
 {
 	struct jx *message = jx_object(0);
 
 	jx_insert_string(message, "method", "response");
 	jx_insert_integer(message, "id", id );
-	jx_insert_boolean(message, "success", code==DS_MSG_SUCCESS );
+	jx_insert_boolean(message, "success", code==DS_RESULT_SUCCESS );
 
-	if(code!=DS_MSG_SUCCESS) {
+	if(code!=DS_RESULT_SUCCESS) {
 		// XXX send string instead?
 		jx_insert_integer(message,"error",code);
 	}
@@ -108,5 +78,32 @@ struct jx * dataswarm_message_standard_response( int64_t id, dataswarm_result_t 
 
 	return message;
 }
+
+struct jx * dataswarm_message_task_update( const char *taskid, const char *state )
+{
+	struct jx *params = jx_object(0);
+	jx_insert_string(params,"task-id",taskid);
+	jx_insert_string(params,"state",state);
+
+	struct jx *message = jx_object(0);
+	jx_insert_string(message, "method", "task-update");
+	jx_insert(message,jx_string("params"),params);
+
+	return message;
+}
+
+struct jx * dataswarm_message_blob_update( const char *blobid, const char *state )
+{
+	struct jx *params = jx_object(0);
+	jx_insert_string(params,"blob-id",blobid);
+	jx_insert_string(params,"state",state);
+
+	struct jx *message = jx_object(0);
+	jx_insert_string(message, "method", "blob-update");
+	jx_insert(message,jx_string("params"),params);
+
+	return message;
+}
+
 
 
