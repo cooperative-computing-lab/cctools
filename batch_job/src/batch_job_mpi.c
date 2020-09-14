@@ -495,7 +495,7 @@ void mpi_worker_handle_execute( struct jx *job )
 /*
 Handle the completion of a given pid by looking up
 the corresponding job in the job_table, and if found,
-send back a completion message to the master.
+send back a completion message to the manager.
 */
 
 void mpi_worker_handle_complete( pid_t pid, int status )
@@ -522,7 +522,7 @@ void mpi_worker_handle_complete( pid_t pid, int status )
 }
 
 /*
-Main loop for dedicated worker communicating with master.
+Main loop for dedicated worker communicating with manager.
 Note that there is no clear way to simultaneously wait for
 an MPI message and also wait for a child process to exit.
 When necessary, we alternate between a non-blocking MPI_Probe
@@ -605,7 +605,7 @@ static int mpi_worker_main_loop(int worldsize, int rank, const char *procname )
 }
 
 /*
-Perform the setup unique to the master process,
+Perform the setup unique to the manager process,
 by setting up the table of workers and receiving
 basic resource configuration.
 
@@ -621,7 +621,7 @@ and send it a terminate message, leaving one active
 worker per machine.
 */
 
-static void batch_job_mpi_master_setup(int mpi_world_size, int manual_cores, int manual_memory )
+static void batch_job_mpi_manager_setup(int mpi_world_size, int manual_cores, int manual_memory )
 {
 	int i;
 
@@ -630,7 +630,7 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int manual_cores, int
 
 	const char *prev_name = 0;
 
-	debug(D_BATCH,"rank 0 (master)");
+	debug(D_BATCH,"rank 0 (manager)");
 
 	for(i = 1; i < mpi_world_size; i++) {
 		struct mpi_worker *w = &workers[i];
@@ -656,8 +656,8 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int manual_cores, int
 }
 
 /*
-Common initialization for both master and workers.
-Determine the rank and then (if master) initalize and return,
+Common initialization for both manager and workers.
+Determine the rank and then (if manager) initalize and return,
 or (if worker) continue on to the worker code.
 */
 
@@ -673,8 +673,8 @@ void batch_job_mpi_setup( const char *debug_filename, int manual_cores, int manu
 	MPI_Get_processor_name(procname, &procnamelen);
 
 	if(mpi_rank == 0) {
-		printf("MPI master process ready.\n");
-		batch_job_mpi_master_setup(mpi_world_size, manual_cores, manual_memory );
+		printf("MPI manager process ready.\n");
+		batch_job_mpi_manager_setup(mpi_world_size, manual_cores, manual_memory );
 	} else {
 		printf("MPI worker process ready.\n");
 		procname[procnamelen] = 0;
