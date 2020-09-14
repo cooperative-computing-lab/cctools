@@ -65,7 +65,7 @@ struct jx * dataswarm_message_standard_response( int64_t id, dataswarm_result_t 
 
 	jx_insert_string(message, "method", "response");
 	jx_insert_integer(message, "id", id );
-	jx_insert_boolean(message, "success", code==DS_RESULT_SUCCESS );
+	jx_insert_integer(message, "result", code );
 
 	if(code!=DS_RESULT_SUCCESS) {
 		// XXX send string instead?
