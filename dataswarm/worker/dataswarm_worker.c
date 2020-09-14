@@ -29,6 +29,34 @@ See the file COPYING for details.
 #include "dataswarm_process.h"
 #include "dataswarm_blob.h"
 
+void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
+{
+	struct jx *msg = jx_object(NULL);
+	struct jx *params = jx_object(NULL);
+
+	jx_insert_string(msg, "method", "status-report");
+	jx_insert(msg, jx_string("params"), params);
+	jx_insert_string(params, "hello", "manager");
+
+	dataswarm_json_send(w->manager_link, msg, stoptime);
+
+	jx_delete(msg);
+}
+
+struct jx * dataswarm_worker_handshake( struct dataswarm_worker *w )
+{
+	struct jx *msg = jx_object(NULL);
+	struct jx *params = jx_object(NULL);
+
+	jx_insert_string(msg, "method", "handshake");
+	jx_insert(msg, jx_string("params"), params);
+	jx_insert_string(params, "type", "worker");
+	jx_insert_integer(msg, "id", w->message_id++);	/* need function to register msgs and their ids */
+
+	return msg;
+}
+
+
 void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 {
 	const char *method = jx_lookup_string(msg, "method");
@@ -85,34 +113,6 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	jx_delete(result_params);
 }
 
-void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
-{
-	struct jx *msg = jx_object(NULL);
-	struct jx *params = jx_object(NULL);
-
-	jx_insert_string(msg, "method", "status-report");
-	jx_insert(msg, jx_string("params"), params);
-	jx_insert_string(params, "hello", "manager");
-
-	dataswarm_json_send(w->manager_link, msg, stoptime);
-
-	jx_delete(msg);
-}
-
-struct jx * create_handshake_message( struct dataswarm_worker *w )
-{
-	struct jx *msg = jx_object(NULL);
-	struct jx *params = jx_object(NULL);
-
-	jx_insert_string(msg, "method", "handshake");
-	jx_insert(msg, jx_string("params"), params);
-	jx_insert_string(params, "type", "worker");
-	jx_insert_integer(msg, "id", w->message_id++);	/* need function to register msgs and their ids */
-
-	return msg;
-}
-
-
 int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 {
 	while(1) {
@@ -164,7 +164,7 @@ void dataswarm_worker_connect_loop(struct dataswarm_worker *w, const char *manag
 		w->manager_link = link_connect(manager_addr, manager_port, time(0) + sleeptime);
 		if(w->manager_link) {
 
-			struct jx *msg = create_handshake_message(w);
+			struct jx *msg = dataswarm_worker_handshake(w);
 			dataswarm_json_send(w->manager_link, msg, time(0) + w->long_timeout);
 			jx_delete(msg);
 
