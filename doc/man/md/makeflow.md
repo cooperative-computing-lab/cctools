@@ -188,7 +188,7 @@ OPTION_END
 
 ### Kubernetes Options
 
-- **--k8s-image docker_image**  Indicate the Docker image for running pods on Kubernetes cluster.
+- **--k8s-image docker_image**  Indicate the Docker image for running pods on Kubernetes cluster. 
 
 
 ### Mountfile Support
