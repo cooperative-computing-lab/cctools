@@ -16,14 +16,39 @@ int long_timeout = 60;
 int msg_id = 1000;
 
 
-void do_blob_create( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, int64_t size )
+dataswarm_result_t get_response( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, jx_int_t id )
+{
+	while(1) {
+		struct jx * msg = dataswarm_json_recv(w->link,time(0)+long_timeout);
+
+		jx_int_t msgid = jx_lookup_integer(msg,"id");
+		if(msgid!=0) {
+			if(id==msgid) {
+				dataswarm_result_t result = jx_lookup_integer(msg,"result");
+				jx_delete(msg);
+				return result;
+			} else {
+			  debug(D_NOTICE|D_DATASWARM,"out-of-order message from worker: %d",(int)msgid);
+				jx_delete(msg);
+				// keep going?
+			}
+		} else {
+			// handle an asynchronous message
+			jx_delete(msg);
+		}
+	}
+}
+
+
+dataswarm_result_t do_blob_create( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, int64_t size )
 {
 	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-create\", \"params\" : {  \"blob-id\" : \"%s\", \"size\" : %lld, \"metadata\": {} } }",msg_id++,blobid,(long long)size);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
+	return get_response(m,r,msg_id-1);
 }
 
-void do_blob_put( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
+dataswarm_result_t do_blob_put( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
 {
 	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-put\", \"params\" : {  \"blob-id\" : \"%s\" } }",msg_id++,blobid);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
@@ -38,35 +63,41 @@ void do_blob_put( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, c
 	link_write(r->link,msg,strlen(msg),time(0)+long_timeout);
 	link_stream_from_file(r->link,file,length,time(0)+long_timeout);
 	fclose(file);
+
+	return get_response(m,r,msg_id-1);
 }
 
-void do_blob_commit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
+dataswarm_result_t do_blob_commit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
 {
 	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-commit\", \"params\" : {  \"blob-id\" : \"%s\" } }",msg_id++,blobid);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
+	return get_response(m,r,msg_id-1);
 }
 
-void do_blob_delete( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
+dataswarm_result_t do_blob_delete( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
 {
 	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-delete\", \"params\" : {  \"blob-id\" : \"%s\" } }",msg_id++,blobid);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
+	return get_response(m,r,msg_id-1);
 }
 
 
-void do_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid, const char *bloba, const char *blobb )
+dataswarm_result_t do_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid, const char *bloba, const char *blobb )
 {
   char *msg = string_format("{\"id\": %d, \"method\" : \"task-submit\", \"params\" : {  \"task-id\": \"%s\",\"command\" : \"ls -la; cat myinput\", \"namespace\" : { \"%s\" : {\"type\" : \"path\", \"path\" : \"myinput\", \"mode\" : \"R\" }, \"%s\" : {\"type\" : \"stdout\" } } } }",msg_id++,taskid,bloba,blobb);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
+	return get_response(m,r,msg_id-1);
 }
 
-void do_task_remove( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
+dataswarm_result_t do_task_remove( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
 {
 	char *msg = string_format("{\"id\": %d, \"method\" : \"task-remove\", \"params\" : {  \"task-id\" : \"%s\" } }",msg_id++,taskid);
 	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
 	free(msg);
+	return get_response(m,r,msg_id-1);
 }
 
 
