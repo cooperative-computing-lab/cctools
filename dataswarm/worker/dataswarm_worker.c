@@ -99,6 +99,19 @@ void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
 	jx_delete(msg);
 }
 
+struct jx * create_handshake_message( struct dataswarm_worker *w )
+{
+	struct jx *msg = jx_object(NULL);
+	struct jx *params = jx_object(NULL);
+
+	jx_insert_string(msg, "method", "handshake");
+	jx_insert(msg, jx_string("params"), params);
+	jx_insert_string(params, "type", "worker");
+	jx_insert_integer(msg, "id", w->message_id++);	/* need function to register msgs and their ids */
+
+	return msg;
+}
+
 
 int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 {
@@ -109,7 +122,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 			if(link_sleep(w->manager_link, stoptime, stoptime, 0)) {
 				struct jx *msg = dataswarm_json_recv(w->manager_link, stoptime);
 				if(msg) {
-            dataswarm_worker_handle_message(w, msg);
+					dataswarm_worker_handle_message(w, msg);
 					jx_delete(msg);
 				} else {
 					/* handle manager disconnection */
@@ -150,14 +163,8 @@ void dataswarm_worker_connect_loop(struct dataswarm_worker *w, const char *manag
 
 		w->manager_link = link_connect(manager_addr, manager_port, time(0) + sleeptime);
 		if(w->manager_link) {
-			struct jx *msg = jx_object(NULL);
-			struct jx *params = jx_object(NULL);
 
-			jx_insert_string(msg, "method", "handshake");
-			jx_insert(msg, jx_string("params"), params);
-			jx_insert_string(params, "type", "worker");
-			jx_insert_integer(msg, "id", w->message_id++);	/* need function to register msgs and their ids */
-
+			struct jx *msg = create_handshake_message(w);
 			dataswarm_json_send(w->manager_link, msg, time(0) + w->long_timeout);
 			jx_delete(msg);
 
