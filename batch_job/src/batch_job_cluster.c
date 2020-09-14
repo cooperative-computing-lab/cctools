@@ -114,6 +114,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 
 	int ignore_mem  = batch_queue_option_is_yes(q, "ignore-mem-spec");
 	int ignore_disk = batch_queue_option_is_yes(q, "ignore-disk-spec");
+	int ignore_time = batch_queue_option_is_yes(q, "ignore-time-spec");
 
 	buffer_t cluster_resources;
 	buffer_init(&cluster_resources);
@@ -130,6 +131,10 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		if(!ignore_mem && resources->memory > 0) {
 			buffer_printf(&cluster_resources, " --mem=%" PRId64 "M", resources->memory);
 		}
+		if(!ignore_time && resources->wall_time > 0) {
+			buffer_printf(&cluster_resources, " --time=%" PRId64, DIV_INT_ROUND_UP(resources->wall_time, 60*1000000));
+		}
+
 		/* The value of max_concurrent_processes is set by the .MAKEFLOW MPI_PROCESSES.
 		 * If set, the number of cores should be divisible by max_concurrent_processes. */
 		int64_t procs = resources->max_concurrent_processes > 0 ? resources->max_concurrent_processes : 1;
