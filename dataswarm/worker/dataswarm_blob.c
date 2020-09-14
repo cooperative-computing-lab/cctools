@@ -195,20 +195,29 @@ dataswarm_result_t dataswarm_blob_delete(struct dataswarm_worker *w, const char 
 	char *rw_name = string_format("%s/blob/rw/%s", w->workspace, blobid);
 	char *deleting_name = string_format("%s/blob/deleting/%s", w->workspace,blobid);
 
-	int status = (rename(ro_name, deleting_name) == 0 || rename(rw_name, deleting_name) == 0);
-	free(ro_name);
-	free(rw_name);
+	dataswarm_result_t result = DS_RESULT_SUCCESS;
 
-	if(!status) {
-		  debug(D_DATASWARM, "couldn't delete %s: %s", deleting_name, strerror(errno));
-      free(deleting_name);
-	    return DS_RESULT_UNABLE;
+	int status = rename(ro_name, deleting_name);
+	if(status!=0) {
+		status = rename(rw_name,deleting_name);
+		if(status!=0) {
+			if(errno==ENOENT) {
+				// Never existed, so just fall through.
+				result = DS_RESULT_SUCCESS;
+			} else {
+				debug(D_DATASWARM, "couldn't delete blob %s: %s", blobid, strerror(errno));
+				result = DS_RESULT_UNABLE;
+			}
+		}
 	}
 
 	delete_dir(deleting_name);
+
+	free(ro_name);
+	free(rw_name);
 	free(deleting_name);
 
-	return DS_RESULT_SUCCESS;
+	return result;
 }
 
 
