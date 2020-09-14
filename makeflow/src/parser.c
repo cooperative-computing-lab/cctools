@@ -193,6 +193,9 @@ void rmsummary_set_resources_from_env(struct rmsummary *rs, struct dag_variable_
 	val = dag_variable_lookup(RESOURCES_WALL_TIME, &s);
 	if(val) {
 		rs->wall_time = atoll(val->value);
+
+        /* value in RESOURCES_WALL_TIME is in seconds. struct rmsummary expects it in useconds. */
+		rs->wall_time *= 1000000;
 	}
 }
 

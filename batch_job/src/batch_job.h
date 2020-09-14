@@ -195,6 +195,13 @@ time a job is submitted.
 */
 const char *batch_queue_get_option(struct batch_queue *q, const char *what);
 
+/** Check if option is set to yes
+@param q The batch queue.
+@param what The option key.
+@return 1 if option is yes, 0 if unset or not set to yes.
+*/
+int batch_queue_option_is_yes (struct batch_queue *q, const char *what);
+
 /** Get batch queue feature.
 This call returns a valid const char if the feaute specified is
 supported by the given queue type.

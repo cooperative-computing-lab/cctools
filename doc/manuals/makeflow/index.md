@@ -151,8 +151,9 @@ Learn more about JX [here](../jx).
 
 Most batch systems require information about what resources each job needs, so
 as to schedule them appropriately. You can convey this by setting the
-variables CORES, MEMORY (in MB), and DISK (in MB) ahead of each job. Makeflow
-will translate this information as needed to the underlying batch system. For
+variables CORES, MEMORY (in MB), and DISK (in MB), ahead
+of each job. Makeflow will translate this information as needed to the
+underlying batch system. For
 example:
 
 ```make
@@ -337,8 +338,8 @@ Use the `-T torque` option to submit jobs to the [Torque Resource
 Manager](http://www.adaptivecomputing.com/products/open-source/torque) batch
 system.
 
-This will add the values for cores, memory, and disk. These values will be
-added onto `qsub` in this format:  
+This will any of the values for cores, memory, disk, and wall-time defined.
+These values will be added onto `qsub` in this format:  
 
 ```make
 -l nodes=1:ppn=${CORES},mem=${MEMORY}mb,file=${DISK}mb
@@ -356,8 +357,12 @@ This will add the values for cores and memory. These values will be added onto
 `sbatch` in this format:  
 
 ```sh
--N 1 -n 1 -c ${CORES} --mem=${MEMORY}M
+-N 1 -n 1 -c ${CORES} --mem=${MEMORY}M --time=${WALL_TIME_in_minutes}
 ```
+
+Note that slurm expects this time to be in minutes, while makeflow expects
+WALL_TIME to be in seconds. You should specify `.MAKEFLOW WALL_TIME` in seconds, and
+makeflow will round-up this value to minutes when submiting the job.
 
 To remove resources specification at submission use Makeflow option `--safe-submit-mode`.
 
