@@ -25,7 +25,7 @@ See the file COPYING for details.
 The watcher keeps a linked list of files that must be watched.
 For each one, it tracks the path and size (obviously) but also
 the taskid and logical path, so that it can send back enough
-info for the master to match the updates up with the right file.
+info for the manager to match the updates up with the right file.
 */
 
 struct work_queue_watcher {
@@ -165,7 +165,7 @@ In all cases, the complete file is sent back in the normal way
 when the task ends, to ensure reliable output.
 */
 
-int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *master, time_t stoptime )
+int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *manager, time_t stoptime )
 {
 	struct entry *e;
 
@@ -185,8 +185,8 @@ int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *
 				}
 
 				lseek(fd,offset,SEEK_SET);
-				link_putfstring(master,"update %"PRId64" %s %"PRId64" %"PRId64"\n",stoptime,e->taskid,e->logical_path,offset,length);
-				int actual = link_stream_from_fd(master,fd,length,stoptime);
+				link_putfstring(manager,"update %"PRId64" %s %"PRId64" %"PRId64"\n",stoptime,e->taskid,e->logical_path,offset,length);
+				int actual = link_stream_from_fd(manager,fd,length,stoptime);
 				close(fd);
 				if(actual!=length) return 0;
 				e->size = info.st_size;

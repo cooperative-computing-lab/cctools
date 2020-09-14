@@ -70,7 +70,7 @@ See the file COPYING for details.
 // Seconds between updates to the catalog
 #define WORK_QUEUE_UPDATE_INTERVAL 60
 
-// Seconds between measurement of master local resources
+// Seconds between measurement of manager local resources
 #define WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL 30
 
 #define WORKER_ADDRPORT_MAX 32
@@ -138,7 +138,7 @@ struct work_queue {
 
 	char workingdir[PATH_MAX];
 
-	struct link      *master_link;   // incoming tcp connection for workers.
+	struct link      *manager_link;   // incoming tcp connection for workers.
 	struct link_info *poll_table;
 	int poll_table_size;
 
@@ -190,7 +190,7 @@ struct work_queue {
 	int keepalive_timeout;
 	timestamp_t link_poll_end;	//tracks when we poll link; used to timeout unacknowledged keepalive checks
 
-    char *master_preferred_connection; 
+    char *manager_preferred_connection; 
 
 	int monitor_mode;
 	FILE *monitor_file;
@@ -245,7 +245,7 @@ struct work_queue_worker {
 struct work_queue_task_report {
 	timestamp_t transfer_time;
 	timestamp_t exec_time;
-	timestamp_t master_time;
+	timestamp_t manager_time;
 
 	struct rmsummary *resources;
 };
@@ -330,7 +330,7 @@ Thie performs a deep copy of the file list.
 */
 static struct list *work_queue_task_file_list_clone(struct list *list);
 
-/** Write master's resources to resource summary file and close the file **/
+/** Write manager's resources to resource summary file and close the file **/
 void work_queue_disable_monitoring(struct work_queue *q);
 
 /******************************************************/
@@ -482,7 +482,7 @@ static void log_queue_stats(struct work_queue *q)
 	buffer_printf(&B, " %d", s.capacity_disk);
 	buffer_printf(&B, " %d", s.capacity_instantaneous);
 	buffer_printf(&B, " %d", s.capacity_weighted);
-	buffer_printf(&B, " %f", s.master_load);
+	buffer_printf(&B, " %f", s.manager_load);
 
 	buffer_printf(&B, " %" PRId64, s.total_cores);
 	buffer_printf(&B, " %" PRId64, s.total_memory);
@@ -530,7 +530,7 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 
 	debug(D_WQ, "tx to %s (%s): %s", w->hostname, w->addrport, buffer_tostring(B));
 
-	//If foreman, then we wait until foreman gives the master some attention.
+	//If foreman, then we wait until foreman gives the manager some attention.
 	if(w->type == WORKER_TYPE_FOREMAN)
 		stoptime = time(0) + q->long_timeout;
 	else
@@ -568,24 +568,24 @@ work_queue_msg_code_t process_name(struct work_queue *q, struct work_queue_worke
 
 work_queue_msg_code_t advertise_tlq_url(struct work_queue *q, struct work_queue_worker *w, char *line)
 {
-	//attempt to find local TLQ server to retrieve master URL
+	//attempt to find local TLQ server to retrieve manager URL
 	if(q->tlq_port && q->debug_path && !q->tlq_url) {
-		debug(D_TLQ, "looking up master TLQ URL");
+		debug(D_TLQ, "looking up manager TLQ URL");
 		time_t config_stoptime = time(0) + 10;
 		q->tlq_url = tlq_config_url(q->tlq_port, q->debug_path, config_stoptime);
-		if(q->tlq_url) debug(D_TLQ, "set master TLQ URL: %s", q->tlq_url);
-		else debug(D_TLQ, "error setting master TLQ URL");
+		if(q->tlq_url) debug(D_TLQ, "set manager TLQ URL: %s", q->tlq_url);
+		else debug(D_TLQ, "error setting manager TLQ URL");
 	}
-	else if(q->tlq_port && !q->debug_path && !q->tlq_url) debug(D_TLQ, "cannot get master TLQ URL: no debug log path set");
+	else if(q->tlq_port && !q->debug_path && !q->tlq_url) debug(D_TLQ, "cannot get manager TLQ URL: no debug log path set");
 
 	char worker_url[WORK_QUEUE_LINE_MAX];
 	int n = sscanf(line, "tlq %s", worker_url);
 	if(n != 1) debug(D_TLQ, "empty TLQ URL received from worker (%s)", w->addrport);
 	else debug(D_TLQ, "received worker (%s) TLQ URL %s", w->addrport, worker_url);
 
-	//send master TLQ URL if there is one
+	//send manager TLQ URL if there is one
 	if(q->tlq_url) {
-		debug(D_TLQ, "sending master TLQ URL to worker (%s)", w->addrport);
+		debug(D_TLQ, "sending manager TLQ URL to worker (%s)", w->addrport);
 		send_worker_msg(q, w, "tlq %s\n", q->tlq_url);
 	}
 	return MSG_PROCESSED;
@@ -643,7 +643,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, char *line, size_t length )
 {
 	time_t stoptime;
-	//If foreman, then we wait until foreman gives the master some attention.
+	//If foreman, then we wait until foreman gives the manager some attention.
 	if(w->type == WORKER_TYPE_FOREMAN)
 		stoptime = time(0) + q->long_timeout;
 	else
@@ -677,7 +677,7 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		debug(D_WQ|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
 		result = MSG_FAILURE;
 	} else if (string_prefix_is(line,"ready")) {
-		debug(D_WQ|D_NOTICE,"worker (%s) is an older worker that is not compatible with this master.",w->addrport);
+		debug(D_WQ|D_NOTICE,"worker (%s) is an older worker that is not compatible with this manager.",w->addrport);
 		result = MSG_FAILURE;
 	} else if (string_prefix_is(line, "name")) {
 		result = process_name(q, w, line);
@@ -745,7 +745,7 @@ The overall effect is to reject transfers that are 10x slower than what has been
 Two exceptions are made:
 - The transfer time cannot be below a configurable minimum time.
 - A foreman must have a high minimum, because its attention is divided
-  between the master and the workers that it serves.
+  between the manager and the workers that it serves.
 */
 
 static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, int64_t length)
@@ -766,10 +766,10 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	int timeout = length / tolerable_transfer_rate;
 
 	if(w->type == WORKER_TYPE_FOREMAN) {
-		// A foreman must have a much larger minimum timeout, b/c it does not respond immediately to the master.
+		// A foreman must have a much larger minimum timeout, b/c it does not respond immediately to the manager.
 		timeout = MAX(q->foreman_transfer_timeout,timeout);
 	} else {
-		// An ordinary master has a lower minimum timeout b/c it responds immediately to the master.
+		// An ordinary manager has a lower minimum timeout b/c it responds immediately to the manager.
 		timeout = MAX(q->minimum_transfer_timeout,timeout);
 	}
 
@@ -797,12 +797,12 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	// If host and port are not set, pick defaults.
 	if(!q->catalog_hosts) q->catalog_hosts = xxstrdup(CATALOG_HOST);
 
-	// Generate the master status in an jx, and print it to a buffer.
+	// Generate the manager status in an jx, and print it to a buffer.
 	struct jx *j = queue_to_jx(q,foreman_uplink);
 	char *str = jx_print_string(j);
 
 	// Send the buffer.
-	debug(D_WQ, "Advertising master status to the catalog server(s) at %s ...", q->catalog_hosts);
+	debug(D_WQ, "Advertising manager status to the catalog server(s) at %s ...", q->catalog_hosts);
 	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
 
 		// If the send failed b/c the buffer is too big, send the lean version instead.
@@ -986,7 +986,7 @@ static void add_worker(struct work_queue *q)
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 
-	link = link_accept(q->master_link, time(0) + q->short_timeout);
+	link = link_accept(q->manager_link, time(0) + q->short_timeout);
 	if(!link) return;
 
 	link_keepalive(link, 1);
@@ -1070,7 +1070,7 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 
 	// Create the local file.
 	debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
-	// Check if there is space for incoming file at master
+	// Check if there is space for incoming file at manager
 	if(!check_disk_space_for_filesize(dirname, length, disk_avail_threshold)) {
 		debug(D_WQ, "Could not recieve file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
 		return WQ_APP_FAILURE;
@@ -1107,7 +1107,7 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 
 /*
 This function implements the recursive get protocol.
-The master sents a single get message, then the worker
+The manager sents a single get message, then the worker
 responds with a continuous stream of dir and file message
 that indicate the entire contents of the directory.
 This makes it efficient to move deep directory hierarchies with
@@ -1713,7 +1713,7 @@ static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w
 
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w)
 {
-	//WQ failures happen in the master-worker interactions. In this case, we
+	//WQ failures happen in the manager-worker interactions. In this case, we
 	//remove the worker and retry the tasks dispatched to it elsewhere.
 	remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
 	return;
@@ -1767,7 +1767,7 @@ static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
 
 	if(cctools_version_cmp(CCTOOLS_VERSION, w->version) != 0) {
-		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s, and master is version %s", w->hostname, w->addrport, w->version, CCTOOLS_VERSION);
+		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s, and manager is version %s", w->hostname, w->addrport, w->version, CCTOOLS_VERSION);
 	}
 
 
@@ -1775,7 +1775,7 @@ static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work
 }
 
 /*
-If the master has requested that a file be watched with WORK_QUEUE_WATCH,
+If the manager has requested that a file be watched with WORK_QUEUE_WATCH,
 the worker will periodically send back update messages indicating that
 the file has been written to.  There are a variety of ways in which the
 message could be stale (e.g. task was cancelled) so if the message does
@@ -2296,7 +2296,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	char owner[USERNAME_MAX];
 	username_get(owner);
 
-	jx_insert_string(j,"type","wq_master");
+	jx_insert_string(j,"type","wq_manager");
 	if(q->name) jx_insert_string(j,"project",q->name);
 	jx_insert_integer(j,"starttime",(q->stats->time_when_started/1000000)); // catalog expects time_t not timestamp_t
 	jx_insert_string(j,"working_dir",q->workingdir);
@@ -2304,7 +2304,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
 	jx_insert_integer(j,"port",work_queue_port(q));
 	jx_insert_integer(j,"priority",info.priority);
-	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
+	jx_insert_string(j,"manager_preferred_connection",q->manager_preferred_connection);
 
 	struct jx *interfaces = interfaces_of_host();
 	if(interfaces) {
@@ -2374,7 +2374,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
-	jx_insert_integer(j,"master_load",info.master_load);
+	jx_insert_integer(j,"manager_load",info.manager_load);
 
 	if(q->tlq_url) jx_insert_string(j,"tlq_url",q->tlq_url);
 
@@ -2383,7 +2383,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	aggregate_workers_resources(q,&r,NULL);
 	work_queue_resources_add_to_jx(&r,j);
 
-	// If this is a foreman, add the master address and the disk resources
+	// If this is a foreman, add the manager address and the disk resources
 	if(foreman_uplink) {
 		int port;
 		char address[LINK_ADDRESS_MAX];
@@ -2391,7 +2391,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 
 		link_address_remote(foreman_uplink,address,&port);
 		sprintf(addrport,"%s:%d",address,port);
-		jx_insert_string(j,"my_master",addrport);
+		jx_insert_string(j,"my_manager",addrport);
 
 		// get foreman local resources and overwrite disk usage
 		struct work_queue_resources local_resources;
@@ -2430,9 +2430,9 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	struct work_queue_stats info;
 	work_queue_get_stats(q,&info);
 
-	//information regarding how to contact the master
+	//information regarding how to contact the manager
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
-	jx_insert_string(j,"type","wq_master");
+	jx_insert_string(j,"type","wq_manager");
 	jx_insert_integer(j,"port",work_queue_port(q));
 
 	char owner[USERNAME_MAX];
@@ -2441,7 +2441,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 
 	if(q->name) jx_insert_string(j,"project",q->name);
 	jx_insert_integer(j,"starttime",(q->stats->time_when_started/1000000)); // catalog expects time_t not timestamp_t
-	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
+	jx_insert_string(j,"manager_preferred_connection",q->manager_preferred_connection);
 
 
 
@@ -2465,7 +2465,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
-	jx_insert_double(j,"master_load",info.master_load);
+	jx_insert_double(j,"manager_load",info.manager_load);
 
 	//resources information the factory needs
 	struct rmsummary *total = total_resources_needed(q);
@@ -2492,7 +2492,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 
 		link_address_remote(foreman_uplink,address,&port);
 		sprintf(addrport,"%s:%d",address,port);
-		jx_insert_string(j,"my_master",addrport);
+		jx_insert_string(j,"my_manager",addrport);
 	}
 
 	return j;
@@ -2682,7 +2682,7 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 		w->resources->tag = r.total;
 	} else if(n == 4) {
 
-		/* inuse is computed by the master, so we save it here */
+		/* inuse is computed by the manager, so we save it here */
 		int64_t inuse;
 
 		if(!strcmp(resource_name,"cores")) {
@@ -2766,7 +2766,7 @@ static work_queue_result_code_t handle_worker(struct work_queue *q, struct link 
 	return WQ_SUCCESS;
 }
 
-static int build_poll_table(struct work_queue *q, struct link *master)
+static int build_poll_table(struct work_queue *q, struct link *manager)
 {
 	int n = 0;
 	char *key;
@@ -2781,15 +2781,15 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 		}
 	}
 
-	// The first item in the poll table is the master link, which accepts new connections.
-	q->poll_table[0].link = q->master_link;
+	// The first item in the poll table is the manager link, which accepts new connections.
+	q->poll_table[0].link = q->manager_link;
 	q->poll_table[0].events = LINK_READ;
 	q->poll_table[0].revents = 0;
 	n = 1;
 
-	if(master) {
+	if(manager) {
 		/* foreman uplink */
-		q->poll_table[1].link = master;
+		q->poll_table[1].link = manager;
 		q->poll_table[1].events = LINK_READ;
 		q->poll_table[1].revents = 0;
 		n++;
@@ -3399,7 +3399,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 
 	tr->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
 	tr->exec_time     = t->time_workers_execute_last;
-	tr->master_time   = (((t->time_when_done - t->time_when_commit_start) - tr->transfer_time) - tr->exec_time);
+	tr->manager_time   = (((t->time_when_done - t->time_when_commit_start) - tr->transfer_time) - tr->exec_time);
 	tr->resources     = rmsummary_copy(t->resources_allocated);
 
 	list_push_tail(q->task_reports, tr);
@@ -3418,7 +3418,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 
 /*
 Compute queue capacity based on stored task reports
-and the summary of master activity.
+and the summary of manager activity.
 */
 
 static void compute_capacity(const struct work_queue *q, struct work_queue_stats *s)
@@ -3450,7 +3450,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		while((tr = list_next_item(q->task_reports))) {
 			capacity->transfer_time += tr->transfer_time;
 			capacity->exec_time     += tr->exec_time;
-			capacity->master_time   += tr->master_time;
+			capacity->manager_time   += tr->manager_time;
 
 			if(tr->resources) {
 				capacity->resources->cores  += tr->resources ? tr->resources->cores  : 1;
@@ -3461,24 +3461,24 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 
 		tr = list_peek_tail(q->task_reports);
 		if(tr->transfer_time > 0) {
-			capacity_instantaneous = DIV_INT_ROUND_UP(tr->exec_time, (tr->transfer_time + tr->master_time));
+			capacity_instantaneous = DIV_INT_ROUND_UP(tr->exec_time, (tr->transfer_time + tr->manager_time));
 			q->stats->capacity_weighted = (int) ceil((alpha * (float) capacity_instantaneous) + ((1.0 - alpha) * q->stats->capacity_weighted));
 			time_t ts;
 			time(&ts);
-			debug(D_WQ, "capacity: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, q->stats->capacity_weighted, s->tasks_done, s->workers_connected);
+			debug(D_WQ, "capacity: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->manager_time, q->stats->capacity_weighted, s->tasks_done, s->workers_connected);
 		}
 	}
 
 	capacity->transfer_time = MAX(1, capacity->transfer_time);
 	capacity->exec_time     = MAX(1, capacity->exec_time);
-	capacity->master_time   = MAX(1, capacity->master_time);
+	capacity->manager_time   = MAX(1, capacity->manager_time);
 
 	debug(D_WQ, "capacity.exec_time: %lld", (long long) capacity->exec_time);
 	debug(D_WQ, "capacity.transfer_time: %lld", (long long) capacity->transfer_time);
-	debug(D_WQ, "capacity.master_time: %lld", (long long) capacity->master_time);
+	debug(D_WQ, "capacity.manager_time: %lld", (long long) capacity->manager_time);
 
 	// Never go below the default capacity
-	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->master_time)));
+	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->manager_time)));
 
 	q->stats->capacity_tasks  = ratio;
 	q->stats->capacity_cores  = DIV_INT_ROUND_UP(capacity->resources->cores  * ratio, count);
@@ -3489,11 +3489,11 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	task_report_delete(capacity);
 }
 
-void compute_master_load(struct work_queue *q, int task_activity) {
+void compute_manager_load(struct work_queue *q, int task_activity) {
 
 	double alpha = 0.05;
 
-	double load = q->stats->master_load;
+	double load = q->stats->manager_load;
 
 	if(task_activity) {
 		load = load * (1 - alpha) + 1 * alpha;
@@ -3501,7 +3501,7 @@ void compute_master_load(struct work_queue *q, int task_activity) {
 		load = load * (1 - alpha) + 0 * alpha;
 	}
 
-	q->stats->master_load = load;
+	q->stats->manager_load = load;
 }
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
@@ -5006,15 +5006,15 @@ struct work_queue *work_queue_create(int port)
 	if (getenv("WORK_QUEUE_HIGH_PORT"))
 		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
 
-	q->master_link = link_serve(port);
+	q->manager_link = link_serve(port);
 
-	if(!q->master_link) {
+	if(!q->manager_link) {
 		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
 		free(q);
 		return 0;
 	} else {
 		char address[LINK_ADDRESS_MAX];
-		link_address_local(q->master_link, address, &q->port);
+		link_address_local(q->manager_link, address, &q->port);
 	}
 
 	getcwd(q->workingdir,PATH_MAX);
@@ -5079,7 +5079,7 @@ struct work_queue *work_queue_create(int port)
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1*MEGABYTE;
 
-	q->master_preferred_connection = xxstrdup("by_ip");
+	q->manager_preferred_connection = xxstrdup("by_ip");
 
 	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
 		q->bandwidth = string_metric_parse(envstring);
@@ -5200,7 +5200,7 @@ int work_queue_port(struct work_queue *q)
 
 	if(!q) return 0;
 
-	if(link_address_local(q->master_link, addr, &port)) {
+	if(link_address_local(q->manager_link, addr, &port)) {
 		return port;
 	} else {
 		return 0;
@@ -5269,7 +5269,7 @@ void work_queue_specify_num_tasks_left(struct work_queue *q, int ntasks)
 	}
 }
 
-void work_queue_specify_master_mode(struct work_queue *q, int mode)
+void work_queue_specify_manager_mode(struct work_queue *q, int mode)
 {
 	// Deprecated: Report to the catalog iff a name is given.
 }
@@ -5363,17 +5363,17 @@ void work_queue_delete(struct work_queue *q)
 		if(q->name)
 			free(q->name);
 
-		if(q->master_preferred_connection)
-			free(q->master_preferred_connection);
+		if(q->manager_preferred_connection)
+			free(q->manager_preferred_connection);
 
 		free(q->poll_table);
-		link_close(q->master_link);
+		link_close(q->manager_link);
 		if(q->logfile) {
 			fclose(q->logfile);
 		}
 
 		if(q->transactions_logfile) {
-			write_transaction(q, "MASTER END");
+			write_transaction(q, "MANAGER END");
 			fclose(q->transactions_logfile);
 		}
 
@@ -5438,7 +5438,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 						NULL)));
 
 		if(q->name) {
-			jx_insert_string(extra, "master_name", q->name);
+			jx_insert_string(extra, "manager_name", q->name);
 		}
 
 		rmsummary_print(final, q->measured_local_resources, /* pprint */ 0, extra);
@@ -5872,7 +5872,7 @@ static void print_password_warning( struct work_queue *q )
 	if(did_password_warning) return;
 
 		if(!q->password && q->name) {
-			fprintf(stderr,"warning: this work queue master is visible to the public.\n");
+			fprintf(stderr,"warning: this work queue manager is visible to the public.\n");
 			fprintf(stderr,"warning: you should set a password with the --password option.\n");
 		did_password_warning = 1;
 	}
@@ -5940,7 +5940,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 	// Consider the foreman_uplink passed into the function and disregard if inactive.
 	if(foreman_uplink) {
 		if(q->poll_table[1].revents) {
-			*foreman_uplink_active = 1; //signal that the master link saw activity
+			*foreman_uplink_active = 1; //signal that the manager link saw activity
 		} else {
 			*foreman_uplink_active = 0;
 		}
@@ -5982,14 +5982,14 @@ static int connect_new_workers(struct work_queue *q, int stoptime, int max_new_w
 {
 	int new_workers = 0;
 
-	// If the master link was awake, then accept at most max_new_workers.
+	// If the manager link was awake, then accept at most max_new_workers.
 	// Note we are using the information gathered in poll_active_workers, which
 	// is a little ugly.
 	if(q->poll_table[0].revents) {
 		do {
 			add_worker(q);
 			new_workers++;
-		} while(link_usleep(q->master_link, 0, 1, 0) && (stoptime >= time(0) && (max_new_workers > new_workers)));
+		} while(link_usleep(q->manager_link, 0, 1, 0) && (stoptime >= time(0) && (max_new_workers > new_workers)));
 	}
 
 	return new_workers;
@@ -6082,7 +6082,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(result) {
 			// retrieved at least one task
 			events++;
-			compute_master_load(q, 1);
+			compute_manager_load(q, 1);
 			continue;
 		}
 
@@ -6093,12 +6093,12 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(result) {
 			// expired at least one task
 			events++;
-			compute_master_load(q, 1);
+			compute_manager_load(q, 1);
 			continue;
 		}
 
 		// record that there was not task activity for this iteration
-		compute_master_load(q, 0);
+		compute_manager_load(q, 0);
 
 		// tasks waiting to be dispatched?
 		BEGIN_ACCUM_TIME(q, time_send);
@@ -6111,7 +6111,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 
 		//we reach here only if no task was neither sent nor received. 
-		compute_master_load(q, 1);
+		compute_manager_load(q, 1);
 
 		// send keepalives to appropriate workers
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
@@ -6367,10 +6367,10 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 	q->keepalive_timeout = timeout;
 }
 
-void work_queue_master_preferred_connection(struct work_queue *q, const char *preferred_connection)
+void work_queue_manager_preferred_connection(struct work_queue *q, const char *preferred_connection)
 {
-	free(q->master_preferred_connection);
-	q->master_preferred_connection = xxstrdup(preferred_connection);
+	free(q->manager_preferred_connection);
+	q->manager_preferred_connection = xxstrdup(preferred_connection);
 }
 
 int work_queue_tune(struct work_queue *q, const char *name, double value)
@@ -6607,7 +6607,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 	 * that tasks_on_workers. */
 	s->tasks_running = MIN(s->tasks_running, s->tasks_on_workers);
 
-	/* Account also for workers connected directly to the master. */
+	/* Account also for workers connected directly to the manager. */
 	s->workers_connected = s->workers_joined - s->workers_removed;
 
 	s->workers_joined       += q->stats_disconnected_workers->workers_joined;
@@ -6702,14 +6702,14 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			" tasks_waiting tasks_on_workers tasks_running tasks_with_results"
 			// tasks cummulative
 			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts"
-			// master time statistics:
+			// manager time statistics:
 			" time_when_started time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application"
 			// workers time statistics:
 			" time_execute time_execute_good time_execute_exhaustion"
 			// bandwidth:
 			" bytes_sent bytes_received bandwidth"
 			// resources:
-			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted master_load"
+			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted manager_load"
 			" total_cores total_memory total_disk"
 			" committed_cores committed_memory committed_disk"
 			" max_cores max_memory max_disk"
@@ -6910,18 +6910,18 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 		setvbuf(q->transactions_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
 		debug(D_WQ, "transactions log enabled and is being written to %s\n", logfile);
 
-		fprintf(q->transactions_logfile, "# time master-pid MASTER START|END\n");
-		fprintf(q->transactions_logfile, "# time master-pid WORKER worker-id host:port {CONNECTION|DISCONNECTION {UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT}}\n");
-		fprintf(q->transactions_logfile, "# time master-pid WORKER worker-id RESOURCES resources\n");
-		fprintf(q->transactions_logfile, "# time master-pid CATEGORY name MAX resources-max-per-task\n");
-		fprintf(q->transactions_logfile, "# time master-pid CATEGORY name MIN resources-min-per-task-per-worker\n");
-		fprintf(q->transactions_logfile, "# time master-pid CATEGORY name FIRST {FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT} resources-requested\n");
-		fprintf(q->transactions_logfile, "# time master-pid TASK taskid WAITING category-name {FIRST_RESOURCES|MAX_RESOURCES} resources-requested\n");
-		fprintf(q->transactions_logfile, "# time master-pid TASK taskid RUNNING worker-address {FIRST_RESOURCES|MAX_RESOURCES} resources-given\n");
-		fprintf(q->transactions_logfile, "# time master-pid TASK taskid WAITING_RETRIEVAL worker-address\n");
-		fprintf(q->transactions_logfile, "# time master-pid TASK taskid {RETRIEVED|DONE} {SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION} {exit-code} {limits-exceeded} {resources-measured}\n\n");
+		fprintf(q->transactions_logfile, "# time manager-pid MANAGER START|END\n");
+		fprintf(q->transactions_logfile, "# time manager-pid WORKER worker-id host:port {CONNECTION|DISCONNECTION {UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT}}\n");
+		fprintf(q->transactions_logfile, "# time manager-pid WORKER worker-id RESOURCES resources\n");
+		fprintf(q->transactions_logfile, "# time manager-pid CATEGORY name MAX resources-max-per-task\n");
+		fprintf(q->transactions_logfile, "# time manager-pid CATEGORY name MIN resources-min-per-task-per-worker\n");
+		fprintf(q->transactions_logfile, "# time manager-pid CATEGORY name FIRST {FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT} resources-requested\n");
+		fprintf(q->transactions_logfile, "# time manager-pid TASK taskid WAITING category-name {FIRST_RESOURCES|MAX_RESOURCES} resources-requested\n");
+		fprintf(q->transactions_logfile, "# time manager-pid TASK taskid RUNNING worker-address {FIRST_RESOURCES|MAX_RESOURCES} resources-given\n");
+		fprintf(q->transactions_logfile, "# time manager-pid TASK taskid WAITING_RETRIEVAL worker-address\n");
+		fprintf(q->transactions_logfile, "# time manager-pid TASK taskid {RETRIEVED|DONE} {SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION} {exit-code} {limits-exceeded} {resources-measured}\n\n");
 
-		write_transaction(q, "MASTER START");
+		write_transaction(q, "MANAGER START");
 		return 1;
 	}
 	else

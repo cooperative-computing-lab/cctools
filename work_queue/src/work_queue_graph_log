@@ -145,7 +145,7 @@ class WQPlot:
         pout(file, """
 set term {fmt} size {geo} butt linewidth 1
 set title  '{title}'
-set xlabel 'master lifetime in {x_units}'
+set xlabel 'manager lifetime in {x_units}'
 set ylabel '{y_units}'
 set yrange [0:]
 set noborder
@@ -260,7 +260,7 @@ def show_usage():
                             Default is gnuplot.
         -o <prefix-output>  Generate prefix-output.{{workers,workers-accum,
                                                     tasks,tasks-accum,
-                                                    time-master,time-workers,
+                                                    time-manager,time-workers,
                                                     transfer,cores}}.{format}
                             Default is <work-queue-log>.
         -r <range>          Range of time to plot, in time units (see -u) from
@@ -356,10 +356,10 @@ if __name__ == '__main__':
                 fields = ['tasks_submitted', 'tasks_dispatched', 'tasks_done', 'tasks_failed', 'tasks_cancelled', 'tasks_exhausted_attempts'],
                 labels = ['submitted', 'dispatched', 'done', 'failed', 'cancelled', 'exhausted attempts'])
 
-        plots['time-master'] = WQPlot(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
-            title = "cumulative times at the master",
+        plots['time-manager'] = WQPlot(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
+            title = "cumulative times at the manager",
             fields = ['time_send', 'time_receive', 'time_polling', 'time_status_msgs', 'time_internal', 'time_application'],
-            labels = ['send', 'receive', 'master polling', 'master status msgs', 'master internal', 'master application'])
+            labels = ['send', 'receive', 'manager polling', 'manager status msgs', 'manager internal', 'manager application'])
 
         plots['time-workers'] = WQPlot(x_units = x_units, y_units = 'h', ylabel = unit_labels['h'], range = x_range,
             title = "cumulative times at workers",
@@ -367,12 +367,12 @@ if __name__ == '__main__':
             labels = ['execute', 'execute good', 'execute exhaustion'])
 
         plots['transfer'] = WQPlot(x_units = x_units, y_units = 'GB', ylabel = 'GB', range = x_range,
-            title = "master data transfer",
+            title = "manager data transfer",
             fields = ['bytes_sent', 'bytes_received'],
             labels = ['sent', 'received'])
 
         plots['times-stacked'] = WQPlot(x_units = x_units, y_units = 's', ylabel = 'utilization per time sample (%)', range = x_range, stack = True,
-                title = 'master time proportions',
+                title = 'manager time proportions',
                 fields = ['stack_time_other', 'stack_time_application', 'stack_time_receive', 'stack_time_send', 'stack_time_polling', 'stack_time_internal', 'stack_time_status_msgs'],
                 labels = ['other', 'application', 'receive', 'send', 'polling', 'internal', 'status msgs'])
 

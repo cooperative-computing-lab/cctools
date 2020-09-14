@@ -7,10 +7,10 @@ See the file COPYING for details.
 #ifndef WORK_QUEUE_JSON_H
 #define WORK_QUEUE_JSON_H
 
-/** @file work_queue_json.h A master-worker library.
- The work queue provides an implementation of the master-worker computing model
+/** @file work_queue_json.h A manager-worker library.
+ The work queue provides an implementation of the manager-worker computing model
  using TCP sockets, Unix applications, and files as intermediate buffers.  A
- master process uses @ref work_queue_json_create to create a queue, then @ref
+ manager process uses @ref work_queue_json_create to create a queue, then @ref
  work_queue_json_submit to submit tasks. Once tasks are running, call @ref
  work_queue_json_wait to wait for completion.
 */
@@ -45,7 +45,7 @@ task document: (only "command_line" is required.)
 
 file document:
 {
-    "local_name"  : <i>string</i>,   # name of the file at the machine running the master
+    "local_name"  : <i>string</i>,   # name of the file at the machine running the manager
     "remote_name" : <i>string</i>,   # name of the file local_name is copied to/from the machine running the task.
     "flags"       : {
                         "cache" : <i>boolean</i>,  # whether the file should be cached at the worker. Default is false.
