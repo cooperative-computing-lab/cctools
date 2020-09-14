@@ -45,7 +45,7 @@ sub Work_Queue::new {
 	}, $class;
 
 	$q->specify_name($args{name})           if $args{name};
-	$q->specify_master_mode($args{catalog}) if $args{catalog};
+	$q->specify_manager_mode($args{catalog}) if $args{catalog};
 
     $q->specify_transactions_log($args{transactions_log}) if $args{transactions_log};
     $q->specify_log($args{stats_log}) if $args{stats_log};
@@ -224,9 +224,14 @@ sub specify_name {
 	return work_queue_specify_name($self->{_work_queue}, $name);
 }
 
+sub specify_manager_preferred_connection {
+	my ($self, $mode) = @_;
+	return work_queue_manager_preferred_connection($self->{_work_queue}, $mode);
+}
+
 sub specify_master_preferred_connection {
 	my ($self, $mode) = @_;
-	return work_queue_master_preferred_connection($self->{_work_queue}, $mode);
+	return work_queue_manager_preferred_connection($self->{_work_queue}, $mode);
 }
 
 sub specify_min_taskid {
@@ -242,6 +247,11 @@ sub specify_priority {
 sub specify_num_tasks_left {
 	my ($self, $ntasks) = @_;
 	return work_queue_specify_num_tasks_left($self->{_work_queue}, $ntasks);
+}
+
+sub specify_manager_mode {
+	my ($self, $mode) = @_;
+	return work_queue_specify_manager_mode($self->{_work_queue}, $mode);
 }
 
 sub specify_master_mode {
@@ -490,13 +500,13 @@ Get the listening port of the queue.
 
 =head3 C<stats>
 
-Get the master's queue statistics.
+Get the manager's queue statistics.
 
 		 print $q->stats->{workers_busy};
 
 =head3 C<stats_hierarchy>
 
-Get the queue statistics, including master and foremen.
+Get the queue statistics, including manager and foremen.
 
 		 print $q->stats_hierarchy->{workers_busy};
 
@@ -538,7 +548,7 @@ Task fails (default).
 
 If maximum values are specified for cores, memory, or disk (e.g. via C<specify_max_category_resources> or C<specify_memory>), and one of those
 resources is exceeded, the task fails.  Otherwise it is retried until a large
-enough worker connects to the master, using the maximum values specified, and
+enough worker connects to the manager, using the maximum values specified, and
 the maximum values so far seen for resources not specified. Use
 C<specify_max_retries> to set a limit on the number of times work queue attemps
 to complete the task.
@@ -756,7 +766,7 @@ Set the minimum taskid of future submitted tasks.
 
 Further submitted tasks are guaranteed to have a taskid larger or equal to
 minid.  This function is useful to make taskids consistent in a workflow that
-consists of sequential masters. (Note: This function is rarely used).  If the
+consists of sequential managers. (Note: This function is rarely used).  If the
 minimum id provided is smaller than the last taskid computed, the minimum id
 provided is ignored.
 
@@ -782,7 +792,7 @@ Change the project priority for the given queue.
 
 =item priority
 
-An integer that presents the priorty of this work queue master. The higher the value, the higher the priority.
+An integer that presents the priorty of this work queue manager. The higher the value, the higher the priority.
 
 =back
 
@@ -803,9 +813,9 @@ ntasks Number of tasks yet to be submitted.
 =back
 
 
-=head3 C<specify_master_mode>
+=head3 C<specify_manager_mode>
 
-Specify the master mode for the given queue.
+Specify the manager mode for the given queue.
 
 =over 12
 
@@ -825,7 +835,7 @@ This may be one of the following values:
 
 =head3 C<specify_catalog_server>
 
-Specify the catalog server the master should report to.
+Specify the catalog server the manager should report to.
 
 =over 12
 
@@ -976,7 +986,7 @@ Reference to the current work queue object.
 
 =item local_name
 
-Name of the file as seen by the master.
+Name of the file as seen by the manager.
 
 =back
 
@@ -1005,7 +1015,7 @@ Minimum number of seconds to wait for a keepalive response from worker before ma
 
 =head3 C<estimate_capacity>
 
-Turn on master capacity measurements.
+Turn on manager capacity measurements.
 
 =head3 C<activate_worker_waiting>
 
