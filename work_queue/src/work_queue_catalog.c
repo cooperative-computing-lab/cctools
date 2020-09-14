@@ -47,8 +47,8 @@ int work_queue_catalog_parse( char *server_string, char **host, int *port )
 }
 
 /*
-Query the catalog for all WQ masters whose project name matches the given regex.
-Return a linked list of jx expressions describing the masters.
+Query the catalog for all WQ managers whose project name matches the given regex.
+Return a linked list of jx expressions describing the managers.
 */
 
 struct list * work_queue_catalog_query( const char *catalog_host, int catalog_port, const char *project_regex )
@@ -68,38 +68,38 @@ struct list * work_queue_catalog_query( const char *catalog_host, int catalog_po
 		return 0;
 	}
 
-	struct list *masters_list = list_create();
+	struct list *managers_list = list_create();
 
 	// for each expression returned by the query
 	struct jx *j;
 	while((j = catalog_query_read(q, stoptime))) {
-		// if it is a WQ master...
+		// if it is a WQ manager...
 		const char *type = jx_lookup_string(j,"type");
-		if(type && !strcmp(type,"wq_master")) {
+		if(type && (!strcmp(type,"wq_master") || !strcmp(type, "wq_manager"))) {
 			// and the project name matches...
 			const char *project = jx_lookup_string(j,"project");
 			if(project && whole_string_match_regex(project,project_regex)) {
 				// put the item in the list.
-				list_push_head(masters_list,j);
+				list_push_head(managers_list,j);
 				continue;
 			}
 		}
-		// we reach here unless j is push into masters_list
+		// we reach here unless j is push into managers_list
 		jx_delete(j);
 	}
 	catalog_query_delete(q);
 
-	return masters_list;
+	return managers_list;
 }
 
 struct list *work_queue_catalog_query_cached( const char *catalog_host, int catalog_port, const char *project_regex )
 {
-	static struct list * masters_list = 0;
-	static time_t masters_list_timestamp = 0;
+	static struct list * managers_list = 0;
+	static time_t managers_list_timestamp = 0;
 	static char *prev_regex = 0;
 
-	if(prev_regex && !strcmp(project_regex, prev_regex) && masters_list && (time(0)-masters_list_timestamp)<60) {
-		return masters_list;
+	if(prev_regex && !strcmp(project_regex, prev_regex) && managers_list && (time(0)-managers_list_timestamp)<60) {
+		return managers_list;
 	}
 
 	if(prev_regex)
@@ -108,25 +108,25 @@ struct list *work_queue_catalog_query_cached( const char *catalog_host, int cata
 	}
 	prev_regex = xxstrdup(project_regex);
 
-	if(masters_list) {
+	if(managers_list) {
 		struct jx *j;
-		while((j=list_pop_head(masters_list))) {
+		while((j=list_pop_head(managers_list))) {
 			jx_delete(j);
 		}
-		list_delete(masters_list);
+		list_delete(managers_list);
 	}
 
 	while(1) {
-		debug(D_WQ,"querying catalog for masters with project=%s",project_regex);
-		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
-		if(masters_list) break;
+		debug(D_WQ,"querying catalog for managers with project=%s",project_regex);
+		managers_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
+		if(managers_list) break;
 		debug(D_WQ,"unable to contact catalog, still trying...");
 		sleep(5);
 	}
 
-	masters_list_timestamp = time(0);
+	managers_list_timestamp = time(0);
 
-	return masters_list;
+	return managers_list;
 }
 
 /* vim: set noexpandtab tabstop=4: */
