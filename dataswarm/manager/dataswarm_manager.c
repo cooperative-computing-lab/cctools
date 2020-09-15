@@ -27,6 +27,8 @@ See the file COPYING for details.
 #include "dataswarm_client_rep.h"
 #include "dataswarm_manager.h"
 
+#include "dataswarm_test.h"
+
 struct jx * manager_status_jx( struct dataswarm_manager *m )
 {
 	char owner[USERNAME_MAX];
@@ -115,6 +117,10 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
 			struct dataswarm_worker_rep *w = dataswarm_worker_rep_create(l);
 			hash_table_insert(m->worker_table,manager_key,w);
+
+			// XXX This is a HACK to get some messages going for testing
+			dataswarm_test_script(m,w);
+
 		} else if(!strcmp(conn_type,"client")) {
 			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
 			struct dataswarm_client_rep *c = dataswarm_client_rep_create(l);
@@ -189,7 +195,7 @@ void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 	link_address_remote(w->link, addr, &port);
-	debug(D_DATASWARM, "worker %s:%d rx: %s", method);
+	debug(D_DATASWARM, "worker %s:%d rx: %s", w->addr, w->port, method);
 
 
 	if(!strcmp(method,"task-change")) {
@@ -279,7 +285,8 @@ static const struct option long_options[] =
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
 	{"help", no_argument, 0, 'h' },
-	{"version", no_argument, 0, 'v' }
+	{"version", no_argument, 0, 'v' },
+	{0, 0, 0, 0}
 };
 
 static void show_help( const char *cmd )
@@ -355,7 +362,7 @@ struct dataswarm_manager * dataswarm_manager_create()
 	m->connect_timeout = 5;
 	m->stall_timeout = 30;
 	m->update_interval = 60;
-
+	m->message_id = 1000;
 	m->project_name = "dataswarm";
 
 	return m;

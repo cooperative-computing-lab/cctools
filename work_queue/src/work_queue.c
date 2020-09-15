@@ -2231,6 +2231,7 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	jx_insert_integer(j, "tasks_done",       s.tasks_done);
 	jx_insert_integer(j, "tasks_failed",     s.tasks_failed);
 	jx_insert_integer(j, "tasks_cancelled",  s.tasks_cancelled);
+	jx_insert_integer(j, "workers_able",	 s.workers_able);
 
 	struct rmsummary *largest = largest_waiting_declared_resources(q, c->name);
 
@@ -4793,6 +4794,10 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 		}
 	}
 
+	if(strstr(cmd, "%%") == NULL) {
+		fatal("command to transfer file does not contain %%%% specifier: %s", cmd);
+	}
+
 	tf = work_queue_file_create(cmd, remote_name, WORK_QUEUE_REMOTECMD, flags);
 	if(!tf) return 0;
 
@@ -5477,28 +5482,29 @@ void work_queue_monitor_add_files(struct work_queue *q, struct work_queue_task *
 
 char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct rmsummary *limits)
 {
-	char *extra_options = string_format("-V 'task_id: %d'", t->taskid);
+	buffer_t b;
+	buffer_init(&b);
+
+	buffer_printf(&b, "-V 'task_id: %d'", t->taskid);
 
 	if(t->category) {
-		char *tmp = extra_options;
-		extra_options = string_format("%s -V 'category: %s'", extra_options, t->category);
-		free(tmp);
+		buffer_printf(&b, " -V 'category: %s'", t->category);
 	}
 
 	if(t->monitor_snapshot_file) {
-		char *tmp = extra_options;
-		extra_options = string_format("%s --snapshot-events %s", tmp, RESOURCE_MONITOR_REMOTE_NAME_EVENTS);
-		free(tmp);
+		buffer_printf(&b, " --snapshot-events %s", RESOURCE_MONITOR_REMOTE_NAME_EVENTS);
+	}
+
+	if(q->monitor_mode & MON_WATCHDOG) {
+		buffer_printf(&b, " --measure-only");
 	}
 
 	int extra_files = (q->monitor_mode & MON_FULL);
 
-	struct rmsummary *watch_limits = (q->monitor_mode & MON_WATCHDOG) ? limits : NULL;
-
-	char *monitor_cmd = resource_monitor_write_command("./" RESOURCE_MONITOR_REMOTE_NAME, RESOURCE_MONITOR_REMOTE_NAME, watch_limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0, /* measure_dir */ NULL);
+	char *monitor_cmd = resource_monitor_write_command("./" RESOURCE_MONITOR_REMOTE_NAME, RESOURCE_MONITOR_REMOTE_NAME, limits, /* extra options */ buffer_tostring(&b), /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0, /* measure_dir */ NULL);
 	char *wrap_cmd  = string_wrap_command(t->command_line, monitor_cmd);
 
-	free(extra_options);
+	buffer_free(&b);
 	free(monitor_cmd);
 
 	return wrap_cmd;
@@ -6997,9 +7003,18 @@ void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsumm
 	work_queue_specify_category_max_resources(q,  "default", rm);
 }
 
+void work_queue_specify_min_resources(struct work_queue *q,  const struct rmsummary *rm) {
+	work_queue_specify_category_min_resources(q,  "default", rm);
+}
+
 void work_queue_specify_category_max_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = work_queue_category_lookup_or_create(q, category);
 	category_specify_max_allocation(c, rm);
+}
+
+void work_queue_specify_category_min_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
+	struct category *c = work_queue_category_lookup_or_create(q, category);
+	category_specify_min_allocation(c, rm);
 }
 
 void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  const char *category, const struct rmsummary *rm) {

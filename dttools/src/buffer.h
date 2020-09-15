@@ -171,6 +171,14 @@ void buffer_rewind(buffer_t * b, size_t n);
   */
 size_t buffer_pos(buffer_t * b);
 
+/** Make room for at least n additional chars.
+ *
+ * @param b The buffer.
+ * @param n Number of bytes to add to existing buffer.
+ * @returns -1 on error.
+ */
+int buffer_grow(buffer_t * b, size_t n);
+
 /** Allocate a buffer named `name' on the stack of at most `size' bytes.
 	Does not abort on failure, but hits the max size and drops further bytes
 	written. You can turn on aborts on failure manually using

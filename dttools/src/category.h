@@ -54,6 +54,7 @@ struct category {
 
 	struct rmsummary *first_allocation;
 	struct rmsummary *max_allocation;
+	struct rmsummary *min_allocation;
 	struct rmsummary *max_resources_seen;
 
 	/* if 1, use first allocations. 0, use max fixed (if given) */
@@ -103,6 +104,7 @@ void category_specify_allocation_mode(struct category *c, int mode);
 int category_enable_auto_resource(struct category *c, const char *resource_name, int autolabel);
 
 void category_specify_max_allocation(struct category *c, const struct rmsummary *s);
+void category_specify_min_allocation(struct category *c, const struct rmsummary *s);
 void category_specify_first_allocation_guess(struct category *c, const struct rmsummary *s);
 
 struct category *category_create(const char *name);

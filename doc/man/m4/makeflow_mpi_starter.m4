@@ -13,7 +13,7 @@ BOLD(makeflow_mpi_starter) is an MPI wrapper program that will start Makeflow an
 WorkQueue on the nodes allocated to it. It is intended as a simple, easy way for 
 users to take advantage of MPI-based system while using Makeflow and WorkQueue. To
 use it, the user simply needs to call it as one would a regular MPI program. For
-the program to work, cctools needs to be configured with CODE(--with-mpicc-path).
+the program to work, cctools needs to be configured with CODE(--with-mpi-path).
 
 SECTION(OPTIONS)
 When CODE(makeflow_mpi_starter) is ran without arguments, it will attempt to execute the

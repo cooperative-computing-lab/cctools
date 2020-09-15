@@ -26,7 +26,11 @@ struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l )
 {
 	struct dataswarm_worker_rep *w = malloc(sizeof(*w));
 	w->link = l;
+	link_address_remote(w->link,w->addr,&w->port);
 	return w;
 }
 
-/* vim: set noexpandtab tabstop=4: */
+void dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg )
+{
+	/* do something with the message ! */
+}

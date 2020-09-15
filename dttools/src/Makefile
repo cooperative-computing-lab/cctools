@@ -17,6 +17,7 @@ SOURCES = \
 	catalog_query.c \
 	category.c \
 	cctools.c \
+	cctools_endian.c \
 	change_process_title.c \
 	chunk.c \
 	clean_dir.c \
@@ -78,6 +79,7 @@ SOURCES = \
 	md5.c \
 	memfdexe.c \
 	mkdir_recursive.c \
+	mq.c \
 	twister.c \
 	nvpair.c \
 	nvpair_jx.c \
@@ -85,6 +87,7 @@ SOURCES = \
 	path.c \
 	path_disk_size_info.c \
 	pattern.c \
+	ppoll_compat.c \
 	preadwrite.c \
 	process.c \
 	random.c \
@@ -150,6 +153,7 @@ HEADERS_PUBLIC = \
 	load_average.h \
 	md5.h \
 	macros.h \
+	mq.h \
 	path.h \
 	rmonitor_poll.h \
 	rmsummary.h \
@@ -180,7 +184,7 @@ PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
-TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test histogram_test category_test jx_binary_test
+TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test histogram_test category_test jx_binary_test mq_poll_test mq_wait_test mq_store_test
 
 all: $(TARGETS) catalog_query
 

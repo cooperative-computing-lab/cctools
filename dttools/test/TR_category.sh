@@ -11,7 +11,7 @@ run()
 {
 	value=$(../src/category_test disk-test.data | tail -n1)
 
-	test "$value" = 1300
+	test "$value" = 1500
 	return $?
 }
 
