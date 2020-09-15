@@ -85,7 +85,7 @@ Work Queue Options:
      -monitor <dir>           Enables monitoring and specifies the directory each tasks resource monitoring is placed.
      -monitor-full            Enables full monitoring that creates a time series of tasks, may be extremely large.
 
-     -stats <file>            Specifies the file were Work Queue master stats are written.
+     -stats <file>            Specifies the file were Work Queue manager stats are written.
 
      -dynamic_env             Configures maker EXE at work site. Only for use where maker -EXE correctly locates executables.
 ";
@@ -435,7 +435,7 @@ sub parse_genome_file {
 
 sub parse_contig_dirs {
 	my $output_dirs = {};
-	open my $output_db, '<', "$base_name.maker.output/$base_name\_master_datastore_index.log" or die "Could not open $base_name\_master_datastore_index.log $!\n";
+	open my $output_db, '<', "$base_name.maker.output/$base_name\_manager_datastore_index.log" or die "Could not open $base_name\_manager_datastore_index.log $!\n";
 	while (my $line = <$output_db>) {
 		if ($debug) { 
 			print $line;

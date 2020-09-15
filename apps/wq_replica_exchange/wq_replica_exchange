@@ -551,7 +551,7 @@ if __name__ == "__main__":
 
 	#Create help string for user.
 	usage_str = "Usage: %s <PDB_FILE> <PSF_FILE> <PAR_FILE> <MIN_TEMP> <MAX_TEMP> <NUM_OF_REPLICAS>" % sys.argv[0]
-	help_str = "-N		-	specify a project name for WQ master\n"
+	help_str = "-N		-	specify a project name for WQ manager\n"
 	help_str += "-x		-	specify the name of the xyz file for output\n"
 	help_str += "-d		-	specify the name of the dcd file for output\n"
 	help_str += "-m		-	specify the number of monte carlo steps\n"

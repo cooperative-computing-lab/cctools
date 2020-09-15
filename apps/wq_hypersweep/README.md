@@ -66,7 +66,7 @@ README.md   - README provided by distribution
 resnet.py   - Python script to build/train/validate one ResNet model
 script.sh   - Pilot script used by test.py to unpack a conda environment at a remote worker and execute resnet.py
 sweep.sh    - Sample bash script that performs a local hyperparameter sweep
-test.py     - Work Queue master program used to distribute training tasks to remote workers  
+test.py     - Work Queue manager program used to distribute training tasks to remote workers  
 ```
 
 ## Run:
@@ -83,7 +83,7 @@ In a second terminal, run the following command to create workers to complete th
 ```bash
 condor_submit_workers $HOSTNAME 9123 400
 ```
-The results of all 400 executions are reported back to the Work Queue master un-collated. To collate these results for plotting, run:
+The results of all 400 executions are reported back to the Work Queue manager un-collated. To collate these results for plotting, run:
 ```bash
 echo "loss, accuracy, batch_size, num_res_net_blocks, dropout_rate, epochs, steps_per_epoch, validation_steps" > output.csv
 awk 'FNR==2{print $0 >> "output.csv"}' results*.csv
@@ -99,4 +99,4 @@ usage: resnet.py -b <batch size> -r <number of ResNet blocks> -d <dropout rate> 
 
 When the application completes, you will find the collated results of the collections (.csv) along with plots of each collection's results as a function of their hyperparameters (.png) as output files in the application's directory. A sample output is provided below:
 
-![Output](https://github.com/tjuedema/cctools/blob/master/apps/wq_hypersweep/output.png)
+![Output](https://github.com/tjuedema/cctools/blob/manager/apps/wq_hypersweep/output.png)

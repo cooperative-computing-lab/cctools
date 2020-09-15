@@ -16,10 +16,10 @@ http://gmod.org/wiki/MAKER
 4. Run './wq_maker -g <FASTA_FILE' to annotate sequences in file <FASTA_FILE>.
 5. Start workers:
 work_queue_worker -d all <HOSTNAME> <PORT>
-where <HOSTNAME> is the name of the host on which the master is running
-	  <PORT> is the port number on which the master is listening.
+where <HOSTNAME> is the name of the host on which the manager is running
+	  <PORT> is the port number on which the manager is listening.
 
-Alternatively, you can also specify a project name for the master and use that
+Alternatively, you can also specify a project name for the manager and use that
 to start workers:
 
 1. ./wq_maker -g agambiae.fa -N WQMAKER

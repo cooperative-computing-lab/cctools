@@ -11,10 +11,10 @@ http://bio-bwa.sourceforge.net
 3. Run './wq_bwa <REFERENCE_FILE> <FASTQ_FILE>' to align sequences in <FASTQ_FILE>.
 4. Start workers:
 work_queue_worker -d all <HOSTNAME> <PORT>
-where <HOSTNAME> is the name of the host on which the master is running
-	  <PORT> is the port number on which the master is listening.
+where <HOSTNAME> is the name of the host on which the manager is running
+	  <PORT> is the port number on which the manager is listening.
 
-Alternatively, you can also specify a project name for the master and use that
+Alternatively, you can also specify a project name for the manager and use that
 to start workers:
 
 1. ./wq_bwa <REFERENCE_FILE> <FASTQ_FILE> -N WQBWA
