@@ -236,9 +236,41 @@ int handle_messages( struct dataswarm_manager *m, int msec )
 
 	n = 1;
 
-	handle_client_message(m,c,time(0)+m->stall_timeout);
-    if((w==hash_table_lookup(m->worker_table,key))) {
-		handle_worker_message(m,w,time(0)+m->stall_timeout);
+	hash_table_firstkey(m->client_table);
+	while(hash_table_nextkey(m->client_table, &key, (void **) &c)) {
+		table[n].link = c->link;
+		table[n].events = LINK_READ;
+		table[n].revents = 0;
+		n++;
+	}
+
+	hash_table_firstkey(m->worker_table);
+	while(hash_table_nextkey(m->worker_table, &key, (void **) &w)) {
+		table[n].link = w->link;
+		table[n].events = LINK_READ;
+		table[n].revents = 0;
+		n++;
+	}
+
+	link_poll(table,n,msec);
+
+	int i;
+	for(i=0;i<n;i++) {
+		if(table[i].revents&LINK_READ) {
+
+			char *key = string_format("%p",table[i].link);
+
+			if(i==0) {
+				handle_connect_message(m,time(0)+m->connect_timeout);
+			} else if((c=hash_table_lookup(m->client_table,key))) {
+				handle_client_message(m,c,time(0)+m->stall_timeout);
+			} else if((w==hash_table_lookup(m->worker_table,key))) {
+				handle_worker_message(m,w,time(0)+m->stall_timeout);
+			}
+
+			free(key);
+
+		}
 	}
 
 	free(table);
