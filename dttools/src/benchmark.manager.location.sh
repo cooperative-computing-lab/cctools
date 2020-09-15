@@ -8,7 +8,7 @@ ulimit -c 400000000
 # project name returned by work_queue_status would be $user-$proj-$worker.
 # $user is the unix login username and $worker is the number of workers are
 # provided for the corresponding run.
-proj="master.location"
+proj="manager.location"
 
 # number of workloads to run in each experiment iteration
 workloads=(1 2 4 6 8 10 12 14 15 16 18 20)
@@ -176,7 +176,7 @@ start_workers () {
 	done
 	echo $((workloads_max * num_of_workers)) are started successfully.
 
-	echo Starting workers for hosting multiple masters ...
+	echo Starting workers for hosting multiple managers ...
 	./work_queue_factory -T condor -f -a -N lyu2.0 -t 86400 $((workloads_max))
 	echo $((workloads_max + 10)) are started successfully.
 }
@@ -206,7 +206,7 @@ run_experiment () {
 		makeflowoutput="$makeflowscript.stdout.stderr"
 
 
-		echo Start running $expr masters experiment \($i workloads\) ...
+		echo Start running $expr managers experiment \($i workloads\) ...
 		if [ "$expr" = "local" ] ; then
 			./makeflow -d all -j $i -r $retry_max $makeflowargs $makeflowscript &> $makeflowoutput
 		fi
