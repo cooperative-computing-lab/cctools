@@ -137,7 +137,7 @@ class DataSwarm:
 
     def file_delete(self, fileid):
         request = {
-            "method" : "file-submit",
+            "method" : "file-delete",
             "id" : self.id,
             "params" : {
                 "uuid" : fileid
@@ -148,7 +148,7 @@ class DataSwarm:
 
     def file_copy(self, fileid):
         request = {
-            "method" : "file-submit",
+            "method" : "file-copy",
             "id" : self.id,
             "params" : {
                 "uuid" : fileid
