@@ -23,10 +23,10 @@ See the file COPYING for details.
 #include "catalog_query.h"
 
 #include "dataswarm_message.h"
-#include "dataswarm_worker.h"
-#include "dataswarm_client.h"
+#include "dataswarm_worker_rep.h"
+#include "dataswarm_client_rep.h"
 #include "dataswarm_manager.h"
-#include "dataswarm_file.h"
+#include "dataswarm_client_ops.h"
 
 #include "dataswarm_test.h"
 
@@ -116,7 +116,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 		if(!strcmp(conn_type,"worker")) {
 			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
-			struct dataswarm_worker *w = dataswarm_worker_create(l);
+			struct dataswarm_worker_rep *w = dataswarm_worker_rep_create(l);
 			hash_table_insert(m->worker_table,manager_key,w);
 
 			// XXX This is a HACK to get some messages going for testing
@@ -124,7 +124,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 		} else if(!strcmp(conn_type,"client")) {
 			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
-			struct dataswarm_client *c = dataswarm_client_create(l);
+			struct dataswarm_client_rep *c = dataswarm_client_rep_create(l);
 			hash_table_insert(m->client_table,manager_key,c);
 		} else {
 			/* dataswarm_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
@@ -134,13 +134,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 		free(manager_key);
 		jx_delete(msg);
-	}
-			link_close(l);
-			break;
-		}
 
-		free(manager_key);
-		jx_delete(msg);
 	}
 }
 
@@ -242,14 +236,9 @@ int handle_messages( struct dataswarm_manager *m, int msec )
 
 	n = 1;
 
-				handle_client_message(m,c,time(0)+m->stall_timeout);
-			} else if((w==hash_table_lookup(m->worker_table,key))) {
-				handle_worker_message(m,w,time(0)+m->stall_timeout);
-			}
-
-			free(key);
-
-		}
+	handle_client_message(m,c,time(0)+m->stall_timeout);
+    if((w==hash_table_lookup(m->worker_table,key))) {
+		handle_worker_message(m,w,time(0)+m->stall_timeout);
 	}
 
 	free(table);
