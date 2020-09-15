@@ -155,33 +155,33 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 	}
 
 	if(!strcmp(method,"task-submit")) {
-		/* */
+		/* dataswarm_submit_task(); */
 	} else if(!strcmp(method,"task-delete")) {
-		/* */
+		/* dataswarm_delete_task(); */
 	} else if(!strcmp(method,"task-retrieve")) {
-		/* */
+		/* dataswarm_retrieve_task(); */
 	} else if(!strcmp(method,"file-submit")) {
-		/* */
+		//dataswarm_declare_file();
 	} else if(!strcmp(method,"file-commit")) {
-		/* */
+		//dataswarm_commit_file();
 	} else if(!strcmp(method,"file-delete")) {
-		/* */
+		//dataswarm_delete_file();
 	} else if(!strcmp(method,"file-copy")) {
-		/* */
+		//dataswarm_copy_file();
 	} else if(!strcmp(method,"service-submit")) {
-		/* */
+		/* dataswarm_submit_service(); */
     } else if(!strcmp(method,"service-delete")) {
-		/* */
+		/* dataswarm_delete_service(); */
 	} else if(!strcmp(method,"project-create")) {
-		/* */
+		/* dataswarm_create_project(); */
 	} else if(!strcmp(method,"project-delete")) {
-		/* */
+		/* dataswarm_delete_project(); */
 	} else if(!strcmp(method,"wait")) {
-		/* */
+		/* dataswarm_wait(); */
 	} else if(!strcmp(method,"queue-empty")) {
-		/* */
+		/* dataswarm_queue_empty(); */
 	} else if(!strcmp(method,"status")) {
-		/* */
+		/* dataswarm_status(); */
 	} else {
 		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 	}
