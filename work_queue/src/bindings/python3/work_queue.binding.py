@@ -1336,32 +1336,46 @@ class WorkQueue(object):
         return work_queue_shut_down_workers(self._work_queue, n)
 
     ##
-    # Blacklist workers running on host.
+    # Block workers running on host from working for the manager.
     #
     # @param self   Reference to the current work queue object.
     # @param host   The hostname the host running the workers.
-    def blacklist(self, host):
-        return work_queue_blacklist_add(self._work_queue, host)
+    def block_host(self, host):
+        return work_queue_block_host(self._work_queue, host)
 
     ##
-    # Blacklist workers running on host for the duration of the given timeout.
+    # See @ref block
+    def blacklist(self, host):
+        return self.block_host(host)
+
+    ##
+    # Block workers running on host for the duration of the given timeout.
     #
     # @param self    Reference to the current work queue object.
     # @param host    The hostname the host running the workers.
-    # @param timeout How long this blacklist entry lasts (in seconds). If less than 1, blacklist indefinitely.
-    def blacklist_with_timeout(self, host, timeout):
-        return work_queue_blacklist_add_with_timeout(self._work_queue, host, timeout)
+    # @param timeout How long this block entry lasts (in seconds). If less than 1, block indefinitely.
+    def block_host_with_timeout(self, host, timeout):
+        return work_queue_block_host_with_timeout(self._work_queue, host, timeout)
 
     ##
-    # Remove host from blacklist. Clear all blacklist if host not provided.
+    # See @block_with_timeout
+    def blacklist_with_timeout(self, host, timeout):
+        return self.block_host_with_timeout(host, timeout)
+
+    ##
+    # Unblock given host, of all hosts if host not given
     #
     # @param self   Reference to the current work queue object.
     # @param host   The of the hostname the host.
-    def blacklist_clear(self, host=None):
+    def unblock_host(self, host=None):
         if host is None:
-            return work_queue_blacklist_clear(self._work_queue)
+            return work_queue_unblock_all(self._work_queue)
+        return work_queue_unblock_host(self._work_queue, host)
 
-        return work_queue_blacklist_remove(self._work_queue, host)
+    ##
+    # See @ref unblock_host
+    def blacklist_clear(self, host=None):
+        return self.unblock_host(host)
 
     ##
     # Delete file from workers's caches.

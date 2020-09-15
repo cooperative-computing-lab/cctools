@@ -126,7 +126,7 @@ static uint64_t disk_avail_threshold = 100;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
 /* default timeout for slow workers to come back to the pool */
-double wq_option_blacklist_slow_workers_timeout = 900;
+double wq_option_blocklist_slow_workers_timeout = 900;
 
 struct work_queue {
 	char *name;
@@ -147,7 +147,7 @@ struct work_queue {
 	struct list   *ready_list;      // ready to be sent to a worker
 
 	struct hash_table *worker_table;
-	struct hash_table *worker_blacklist;
+	struct hash_table *worker_blocklist;
 	struct itable  *worker_task_map;
 
 	struct hash_table *categories;
@@ -252,9 +252,9 @@ struct work_queue_task_report {
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
 
-struct blacklist_host_info {
-	int    blacklisted;
-	int    times_blacklisted;
+struct blocklist_host_info {
+	int    blocked;
+	int    times_blocked;
 	time_t release_at;
 };
 
@@ -437,7 +437,7 @@ static void log_queue_stats(struct work_queue *q)
 	buffer_printf(&B, " %d", s.workers_released);
 	buffer_printf(&B, " %d", s.workers_idled_out);
 	buffer_printf(&B, " %d", s.workers_fast_aborted);
-	buffer_printf(&B, " %d", s.workers_blacklisted);
+	buffer_printf(&B, " %d", s.workers_blocked);
 	buffer_printf(&B, " %d", s.workers_lost);
 
 	/* Stats for the current state of tasks: */
@@ -906,7 +906,7 @@ static void record_removed_worker_stats(struct work_queue *q, struct work_queue_
 	accumulate_stat(qs, ws, workers_released);
 	accumulate_stat(qs, ws, workers_idled_out);
 	accumulate_stat(qs, ws, workers_fast_aborted);
-	accumulate_stat(qs, ws, workers_blacklisted);
+	accumulate_stat(qs, ws, workers_blocked);
 	accumulate_stat(qs, ws, workers_lost);
 
 	accumulate_stat(qs, ws, time_send);
@@ -2051,19 +2051,19 @@ static int update_task_result(struct work_queue_task *t, work_queue_result_t new
 	return t->result;
 }
 
-static struct jx *blacklisted_to_json( struct work_queue  *q ) {
-	if(hash_table_size(q->worker_blacklist) < 1) {
+static struct jx *blocked_to_json( struct work_queue  *q ) {
+	if(hash_table_size(q->worker_blocklist) < 1) {
 		return NULL;
 	}
 
 	struct jx *j = jx_array(0);
 
 	char *hostname;
-	struct blacklist_host_info *info;
+	struct blocklist_host_info *info;
 
-	hash_table_firstkey(q->worker_blacklist);
-	while(hash_table_nextkey(q->worker_blacklist, &hostname, (void *) &info)) {
-		if(info->blacklisted) {
+	hash_table_firstkey(q->worker_blocklist);
+	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
+		if(info->blocked) {
 			jx_array_insert(j, jx_string(hostname));
 		}
 	}
@@ -2326,10 +2326,10 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"workers_fast_aborted",info.workers_fast_aborted);
 	jx_insert_integer(j,"workers_lost",info.workers_lost);
 
-	//workers_blacklisted adds host names, not a count
-	struct jx *blacklist = blacklisted_to_json(q);
-	if(blacklist) {
-		jx_insert(j,jx_string("workers_blacklisted"), blacklist);
+	//workers_blocked adds host names, not a count
+	struct jx *blocklist = blocked_to_json(q);
+	if(blocklist) {
+		jx_insert(j,jx_string("workers_blocked"), blocklist);
 	}
 
 
@@ -2479,9 +2479,9 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 
 
 	//additional worker information the factory needs
-	struct jx *blacklist = blacklisted_to_json(q);
-	if(blacklist) {
-		jx_insert(j,jx_string("workers_blacklisted"), blacklist);   //danger! unbounded field
+	struct jx *blocklist = blocked_to_json(q);
+	if(blocklist) {
+		jx_insert(j,jx_string("workers_blocked"), blocklist);   //danger! unbounded field
 	}
 
 	// Add information about the foreman
@@ -3519,8 +3519,8 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	}
 
 	if(w->type != WORKER_TYPE_FOREMAN) {
-		struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, w->hostname);
-		if (info && info->blacklisted) {
+		struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
+		if (info && info->blocked) {
 			return 0;
 		}
 	}
@@ -4038,7 +4038,7 @@ static int abort_slow_workers(struct work_queue *q)
 			if(w && (w->type == WORKER_TYPE_WORKER))
 			{
 				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
-				work_queue_blacklist_add_with_timeout(q, w->hostname, wq_option_blacklist_slow_workers_timeout);
+				work_queue_block_host_with_timeout(q, w->hostname, wq_option_blocklist_slow_workers_timeout);
 				remove_worker(q, w, WORKER_DISCONNECT_FAST_ABORT);
 
 				q->stats->workers_fast_aborted++;
@@ -5028,7 +5028,7 @@ struct work_queue *work_queue_create(int port)
 	q->task_state_map = itable_create(0);
 
 	q->worker_table = hash_table_create(0, 0);
-	q->worker_blacklist = hash_table_create(0, 0);
+	q->worker_blocklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
 
 	q->measured_local_resources   = rmsummary_create(-1);
@@ -5331,7 +5331,7 @@ void work_queue_delete(struct work_queue *q)
 		if(q->catalog_hosts) free(q->catalog_hosts);
 
 		hash_table_delete(q->worker_table);
-		hash_table_delete(q->worker_blacklist);
+		hash_table_delete(q->worker_blocklist);
 		itable_delete(q->worker_task_map);
 
 		struct category *c;
@@ -5793,61 +5793,61 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 	return work_queue_submit_internal(q, t);
 }
 
-void work_queue_blacklist_add_with_timeout(struct work_queue *q, const char *hostname, time_t timeout)
+void work_queue_block_host_with_timeout(struct work_queue *q, const char *hostname, time_t timeout)
 {
-	struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, hostname);
+	struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, hostname);
 
 	if(!info) {
-		info = malloc(sizeof(struct blacklist_host_info));
-		info->times_blacklisted = 0;
-		info->blacklisted       = 0;
+		info = malloc(sizeof(struct blocklist_host_info));
+		info->times_blocked = 0;
+		info->blocked       = 0;
 	}
 
-	q->stats->workers_blacklisted++;
+	q->stats->workers_blocked++;
 
-	/* count the times the worker goes from active to blacklisted. */
-	if(!info->blacklisted)
-		info->times_blacklisted++;
+	/* count the times the worker goes from active to blocked. */
+	if(!info->blocked)
+		info->times_blocked++;
 
-	info->blacklisted = 1;
+	info->blocked = 1;
 
 	if(timeout > 0) {
-		debug(D_WQ, "Blacklisting host %s by %" PRIu64 " seconds (blacklisted %d times).\n", hostname, (uint64_t) timeout, info->times_blacklisted);
+		debug(D_WQ, "Blocking host %s by %" PRIu64 " seconds (blocked %d times).\n", hostname, (uint64_t) timeout, info->times_blocked);
 		info->release_at = time(0) + timeout;
 	} else {
-		debug(D_WQ, "Blacklisting host %s indefinitely.\n", hostname);
+		debug(D_WQ, "Blocking host %s indefinitely.\n", hostname);
 		info->release_at = -1;
 	}
 
-	hash_table_insert(q->worker_blacklist, hostname, (void *) info);
+	hash_table_insert(q->worker_blocklist, hostname, (void *) info);
 }
 
-void work_queue_blacklist_add(struct work_queue *q, const char *hostname)
+void work_queue_block_host(struct work_queue *q, const char *hostname)
 {
-	work_queue_blacklist_add_with_timeout(q, hostname, -1);
+	work_queue_block_host_with_timeout(q, hostname, -1);
 }
 
-void work_queue_blacklist_remove(struct work_queue *q, const char *hostname)
+void work_queue_unblock_host(struct work_queue *q, const char *hostname)
 {
-	struct blacklist_host_info *info = hash_table_remove(q->worker_blacklist, hostname);
+	struct blocklist_host_info *info = hash_table_remove(q->worker_blocklist, hostname);
 	if(info) {
-		info->blacklisted = 0;
+		info->blocked = 0;
 		info->release_at  = 0;
 	}
 }
 
 /* deadline < 1 means release all, regardless of release_at time. */
-static void work_queue_blacklist_clear_by_time(struct work_queue *q, time_t deadline)
+static void work_queue_unblock_all_by_time(struct work_queue *q, time_t deadline)
 {
 	char *hostname;
-	struct blacklist_host_info *info;
+	struct blocklist_host_info *info;
 
-	hash_table_firstkey(q->worker_blacklist);
-	while(hash_table_nextkey(q->worker_blacklist, &hostname, (void *) &info)) {
-		if(!info->blacklisted)
+	hash_table_firstkey(q->worker_blocklist);
+	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
+		if(!info->blocked)
 			continue;
 
-		/* do not clear if blacklisted indefinitely, and we are not clearing the whole list. */
+		/* do not clear if blocked indefinitely, and we are not clearing the whole list. */
 		if(info->release_at < 1 && deadline > 0)
 			continue;
 
@@ -5855,14 +5855,14 @@ static void work_queue_blacklist_clear_by_time(struct work_queue *q, time_t dead
 		if(deadline > 0 && info->release_at > deadline)
 			continue;
 
-		debug(D_WQ, "Clearing hostname %s from blacklist.\n", hostname);
-		work_queue_blacklist_remove(q, hostname);
+		debug(D_WQ, "Clearing hostname %s from blocklist.\n", hostname);
+		work_queue_unblock_host(q, hostname);
 	}
 }
 
-void work_queue_blacklist_clear(struct work_queue *q)
+void work_queue_unblock_all(struct work_queue *q)
 {
-	work_queue_blacklist_clear_by_time(q, -1);
+	work_queue_unblock_all_by_time(q, -1);
 }
 
 static void print_password_warning( struct work_queue *q )
@@ -6122,7 +6122,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result  = abort_slow_workers(q);
 		result += abort_drained_workers(q);
-		work_queue_blacklist_clear_by_time(q, time(0));
+		work_queue_unblock_all_by_time(q, time(0));
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
 			// removed at least one worker
@@ -6697,7 +6697,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// workers current:
 			" workers_connected workers_init workers_idle workers_busy workers_able"
 			// workers cummulative:
-			" workers_joined workers_removed workers_released workers_idled_out workers_blacklisted workers_fast_aborted workers_lost"
+			" workers_joined workers_removed workers_released workers_idled_out workers_blocked workers_fast_aborted workers_lost"
 			// tasks current:
 			" tasks_waiting tasks_on_workers tasks_running tasks_with_results"
 			// tasks cummulative

@@ -200,7 +200,7 @@ struct work_queue_stats {
 	int workers_released;     /**< Total number of worker connections that were asked by the manager to disconnect. */
 	int workers_idled_out;    /**< Total number of worker that disconnected for being idle. */
 	int workers_fast_aborted; /**< Total number of worker connections terminated for being too slow. (see @ref work_queue_activate_fast_abort) */
-	int workers_blacklisted ; /**< Total number of workers blacklisted by the manager. (Includes workers_fast_aborted.) */
+	int workers_blocked ;     /**< Total number of workers blocked by the manager. (Includes workers_fast_aborted.) */
 	int workers_lost;         /**< Total number of worker connections that were unexpectedly lost. (does not include idled-out or fast-aborted) */
 
 	/* Stats for the current state of tasks: */
@@ -315,6 +315,7 @@ struct work_queue_stats {
 	int workers_full;               /**< @deprecated Use workers_busy insead. */
 	int total_worker_slots;         /**< @deprecated Use tasks_running instead. */
 	int avg_capacity;               /**< @deprecated Use capacity_cores instead. */
+	int workers_blacklisted;         /**< @deprecated Use workers_blocked instead. */
 };
 
 /* Forward declare the queue's structure. This structure is opaque and defined in work_queue.c */
@@ -661,33 +662,32 @@ provided is ignored.
 */
 int work_queue_specify_min_taskid(struct work_queue *q, int minid);
 
-/** Blacklist hostname from a queue.
+/** Block workers in hostname from working for queue q.
 @param q A work queue object.
 @param hostname A string for hostname.
 */
-void work_queue_blacklist_add(struct work_queue *q, const char *hostname);
+void work_queue_block_host(struct work_queue *q, const char *hostname);
 
-/** Blacklist hostname from a queue. Remove from blacklist in timeout seconds.
-  If timeout is less than 1, then the hostname is blacklisted indefinitely, as
-  if @ref work_queue_blacklist_add was called instead.
+/** Block workers in hostname from a queue, but remove block after timeout seconds.
+  If timeout is less than 1, then the hostname is blocked indefinitely, as
+  if @ref work_queue_block_host was called instead.
   @param q A work queue object.
   @param hostname A string for hostname.
-  @param seconds Number of seconds to the hostname will be in the blacklist.
+  @param seconds Number of seconds to the hostname will be blocked.
   */
-void work_queue_blacklist_add_with_timeout(struct work_queue *q, const char *hostname, time_t seconds);
+void work_queue_block_host_with_timeout(struct work_queue *q, const char *hostname, time_t seconds);
 
 
-/** Unblacklist host from a queue.
+/** Unblock host from a queue.
 @param q A work queue object.
 @param hostname A string for hostname.
 */
-void work_queue_blacklist_remove(struct work_queue *q, const char *hostname);
+void work_queue_unblock_host(struct work_queue *q, const char *hostname);
 
-
-/** Clear blacklist of a queue.
+/** Unblock all host.
 @param q A work queue object.
 */
-void work_queue_blacklist_clear(struct work_queue *q);
+void work_queue_unblock_all(struct work_queue *q);
 
 /** Invalidate cached file.
 The file or directory with the given local name specification is deleted from
@@ -1146,15 +1146,14 @@ char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid);
  */
 void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value );
 
-
-/** See work_queue_manager_preferred_connection
-*/
-void work_queue_master_preferred_connection(struct work_queue *q, const char *preferred_connection);
-
-/** See work_queue_specify_manager_mode
-*/
-void work_queue_specify_master_mode(struct work_queue *q, int mode);
-
 //@}
+
+// Renames for backwards compatibility
+#define work_queue_master_preferred_connection work_queue_manager_preferred_connection
+#define work_queue_specify_master_mode         work_queue_specify_manager_mode
+#define work_queue_blacklist_add               work_queue_block_host
+#define work_queue_blacklist_add_with_timeout  work_queue_block_host_with_timeout
+#define work_queue_blacklist_remove            work_queue_unblock_host
+#define work_queue_blacklist_clear             work_queue_unblock_all
 
 #endif

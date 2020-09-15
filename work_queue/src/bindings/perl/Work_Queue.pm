@@ -299,25 +299,40 @@ sub shutdown_workers {
 	return work_queue_shut_down_workers($self->{_work_queue}, $n);
 }
 
+sub block_host {
+	my ($self, $host) = @_;
+	return work_queue_block_host($self->{_work_queue}, $host);
+}
+
 sub blacklist {
 	my ($self, $host) = @_;
-	return work_queue_blacklist_add($self->{_work_queue}, $host);
+	return $self->block_host($host);
+}
+
+sub block_host_with_timeout {
+	my ($self, $host, $timeout) = @_;
+	return work_queue_block_host_with_timeout($self->{_work_queue}, $host, $timeout);
 }
 
 sub blacklist_with_timeout {
 	my ($self, $host, $timeout) = @_;
-	return work_queue_blacklist_add_with_timeout($self->{_work_queue}, $host, $timeout);
+	return $self->block_host($host, $timeout);
+}
+
+sub unblock_host {
+	my ($self, $host) = @_;
+
+	if($host) {
+		return work_queue_unblock_host($self->{_work_queue}, $host);
+	}
+	else {
+		return work_queue_unblock_all($self->{_work_queue});
+	}
 }
 
 sub blacklist_clear {
 	my ($self, $host) = @_;
-
-	if($host) {
-		return work_queue_blacklist_remove($self->{_work_queue}, $host);
-	}
-	else {
-		return work_queue_blacklist_clear($self->{_work_queue});
-	}
+    return $self->unblock_host($host);
 }
 
 sub invalidate_cache_file {
@@ -934,9 +949,9 @@ The number to shutdown.  To shut down all workers, specify 0.
 
 =back
 
-=head3 C<blacklist>
+=head3 C<block_host>
 
-Blacklist workers running on host.
+Block workers running on host from working to this queue.
 
 =over 12
 
@@ -946,9 +961,9 @@ The hostname the host running the workers.
 
 =back
 
-=head3 C<blacklist_with_timeout>
+=head3 C<block_host_with_timeout>
 
-Blacklist workers running on host.
+Temporarily block workers running on host timeout seconds.
 
 =over 12
 
@@ -958,13 +973,13 @@ The hostname the host running the workers.
 
 =item timeout
 
-The duration of this blacklist entry.
+The duration of the block.
 
 =back
 
-=head3 C<blacklist_clear>
+=head3 C<unblock_host>
 
-Remove host from blacklist. Clear all blacklist if host not provided.
+Unblock workers in host from work for the queue. Clear all blocks if host not provided.
 
 =over 12
 
