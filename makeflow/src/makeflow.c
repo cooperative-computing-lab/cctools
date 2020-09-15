@@ -1370,7 +1370,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	s = getenv("WORK_QUEUE_MANAGER_MODE") || getenv("WORK_QUEUE_MASTER_MODE");
+	s = getenv("WORK_QUEUE_MANAGER_MODE") ? getenv("WORK_QUEUE_MANAGER_MODE") : getenv("WORK_QUEUE_MASTER_MODE");
 	if(s) {
 		work_queue_manager_mode = s;
 	}

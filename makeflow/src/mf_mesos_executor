@@ -137,7 +137,7 @@ class MakeflowMesosExecutor(Executor):
                     self.executor_id, self.task_id))
             driver.stop()
         if message_list[1].strip(' \t\n\r') == "retrieve":
-            print "The output of task {0} has been retrieved by master".format(self.task_id)
+            print "The output of task {0} has been retrieved by manager".format(self.task_id)
             print "Removing the sandbox directory....."
             shutil.rmtree(self.get_sandbox_dir(self.hostname))
             driver.stop()
