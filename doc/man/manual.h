@@ -35,7 +35,7 @@ define(SEE_ALSO_SAND,
 `LIST_BEGIN
 LIST_ITEM(MANUAL(Cooperative Computing Tools Documentation,"../index.html"))
 LIST_ITEM(MANUAL(SAND User Manual,"../sand.html"))
-LIST_ITEM(MANPAGE(sand_filter_manager,1)  MANPAGE(sand_filter_kernel,1)  MANPAGE(sand_align_manager,1)  MANPAGE(sand_align_kernel,1)  MANPAGE(sand_compress_reads,1)  MANPAGE(sand_uncompress_reads,1)  MANPAGE(work_queue_worker,1))
+LIST_ITEM(MANPAGE(sand_filter_master,1)  MANPAGE(sand_filter_kernel,1)  MANPAGE(sand_align_master,1)  MANPAGE(sand_align_kernel,1)  MANPAGE(sand_compress_reads,1)  MANPAGE(sand_uncompress_reads,1)  MANPAGE(work_queue_worker,1))
 LIST_END')dnl
 define(SEE_ALSO_LINKER,
 `LIST_BEGIN
