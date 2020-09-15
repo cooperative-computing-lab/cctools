@@ -1,9 +1,8 @@
 
 #include "dataswarm_manager.h"
 #include "dataswarm_worker_rep.h"
-#include "dataswarm_message.h"
+#include "dataswarm_rpc.h"
 
-#include "link.h"
 #include "debug.h"
 #include "stringtools.h"
 
@@ -11,96 +10,45 @@
 #include <stdlib.h>
 #include <string.h>
 
-int long_timeout = 60;
-
-int msg_id = 1000;
-
-
-void do_blob_create( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, int64_t size )
-{
-	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-create\", \"params\" : {  \"blob-id\" : \"%s\", \"size\" : %lld, \"metadata\": {} } }",msg_id++,blobid,(long long)size);
-	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
-	free(msg);
-}
-
-void do_blob_put( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
-{
-	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-put\", \"params\" : {  \"blob-id\" : \"%s\" } }",msg_id++,blobid);
-	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
-	free(msg);
-
-
-	FILE *file = fopen(filename,"r");
-	fseek(file,0,SEEK_END);
-	int64_t length = ftell(file);
-	fseek(file,0,SEEK_SET);
-	msg = string_format("%lld\n",(long long)length);
-	link_write(r->link,msg,strlen(msg),time(0)+long_timeout);
-	link_stream_from_file(r->link,file,length,time(0)+long_timeout);
-	fclose(file);
-}
-
-void do_blob_commit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
-{
-	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-commit\", \"params\" : {  \"blob-id\" : \"%s\" } }",msg_id++,blobid);
-	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
-	free(msg);
-}
-
-void do_blob_delete( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
-{
-	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-delete\", \"params\" : {  \"blob-id\" : \"%s\" } }",msg_id++,blobid);
-	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
-	free(msg);
-}
-
-
-void do_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid, const char *bloba, const char *blobb )
-{
-  char *msg = string_format("{\"id\": %d, \"method\" : \"task-submit\", \"params\" : {  \"task-id\": \"%s\",\"command\" : \"ls -la; cat myinput\", \"namespace\" : { \"%s\" : {\"type\" : \"path\", \"path\" : \"myinput\", \"mode\" : \"R\" }, \"%s\" : {\"type\" : \"stdout\" } } } }",msg_id++,taskid,bloba,blobb);
-	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
-	free(msg);
-}
-
-void do_task_remove( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
-{
-	char *msg = string_format("{\"id\": %d, \"method\" : \"task-remove\", \"params\" : {  \"task-id\" : \"%s\" } }",msg_id++,taskid);
-	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+long_timeout);
-	free(msg);
-}
-
-
 void dataswarm_test_script( struct dataswarm_manager *m, struct dataswarm_worker_rep *r )
 {
 	const char *bloba = "abc123";
 	const char *blobb = "xyz456";
 
-	do_blob_delete(m,r,bloba);
-	do_blob_delete(m,r,blobb);
+	dataswarm_rpc_blob_delete(m,r,bloba);
+	dataswarm_rpc_blob_delete(m,r,blobb);
 
 	sleep(1);
 
-	do_blob_create(m,r,bloba,100000);
-	do_blob_put(m,r,bloba,"/usr/share/dict/words");
-	do_blob_commit(m,r,bloba);
+	dataswarm_rpc_blob_create(m,r,bloba,100000);
+	dataswarm_rpc_blob_put(m,r,bloba,"/usr/share/dict/words");
+	dataswarm_rpc_blob_commit(m,r,bloba);
 
 	sleep(1);
 
-	do_blob_create(m,r,blobb,100000);
-	do_blob_put(m,r,blobb,"/usr/share/dict/words");
+	dataswarm_rpc_blob_create(m,r,blobb,100000);
 
 	sleep(1);
 
-	do_task_submit(m,r,"t93",bloba,blobb);
+	/* Create a simple task that reads from bloba mounted as myinput and writes to blob mounted as stdout. */
+	char *taskinfo = string_format("{ \"task-id\": \"%s\",\"command\" : \"wc -l myinput\", \"namespace\" : { \"%s\" : {\"type\" : \"path\", \"path\" : \"myinput\", \"mode\" : \"R\" }, \"%s\" : {\"type\" : \"stdout\" } } }","t93",bloba,blobb);
+	dataswarm_rpc_task_submit(m,r,taskinfo);
+	free(taskinfo);
 
-	sleep(10);
+	sleep(5);
 
-	do_task_remove(m,r,"t93");
+	// need to wait for task to complete
+	dataswarm_rpc_blob_get(m,r,blobb,"/dev/stdout");
 
 	sleep(1);
 
-	do_blob_delete(m,r,bloba);
-	do_blob_delete(m,r,blobb);
+	dataswarm_rpc_task_remove(m,r,"t93");
+
+	sleep(1);
+
+
+	dataswarm_rpc_blob_delete(m,r,bloba);
+	dataswarm_rpc_blob_delete(m,r,blobb);
 
 }
 

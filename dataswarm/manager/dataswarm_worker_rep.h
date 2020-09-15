@@ -7,6 +7,7 @@ of the actual client process that runs somewhere else.
 */
 
 #include "link.h"
+#include "jx.h"
 
 struct dataswarm_worker_rep {
 	struct link *link;
@@ -17,5 +18,7 @@ struct dataswarm_worker_rep {
 };
 
 struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l );
+
+void dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg );
 
 #endif
