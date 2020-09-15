@@ -160,7 +160,7 @@ OPTIONS_END
 
 SUBSECTION(Mesos Options)
 OPTIONS_BEGIN
-OPTION_PAIR(--mesos-manager, hostname) Indicate the host name of preferred mesos manager.
+OPTION_PAIR(--mesos-master, hostname) Indicate the host name of preferred mesos manager.
 OPTION_PAIR(--mesos-path, filepath) Indicate the path to mesos python2 site-packages.
 OPTION_PAIR(--mesos-preload, library) Indicate the linking libraries for running mesos..
 

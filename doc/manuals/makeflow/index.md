@@ -469,7 +469,7 @@ mpirun -np $NSLOTS makeflow -T mpi example.makeflow
 
 Makeflow can be used with Apache Mesos. To run Makeflow with Mesos, give the
 batch mode via `-T mesos` and pass the hostname and port number of Mesos
-manager to Makeflow with the `--mesos-manager` option. Since the Makeflow-Mesos
+manager to Makeflow with the `--mesos-master` option. Since the Makeflow-Mesos
 Scheduler is based on Mesos Python2 API, the path to Mesos Python2 library
 should be included in the `$PATH`, or one can specify a preferred Mesos
 Python2 API via ` --mesos-path ` option. To successfully import the Python
@@ -481,7 +481,7 @@ the manager listening on port 5050 of localhost, with a user specified python
 library:
 
 ```sh
-$ makeflow -T mesos --mesos-manager localhost:5050 --mesos-path /path/to/mesos-0.26.0/lib/python2.6/site-packages example.makeflow ...
+$ makeflow -T mesos --mesos-master localhost:5050 --mesos-path /path/to/mesos-0.26.0/lib/python2.6/site-packages example.makeflow ...
 ```
 
 

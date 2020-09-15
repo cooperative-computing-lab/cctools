@@ -1250,7 +1250,7 @@ static void show_help_run(const char *cmd)
 	printf(" --enforcement                  Enforce access to only named inputs/outputs.\n");
 	printf(" --parrot-path=<path>           Path to parrot_run for --enforcement.\n");
 	printf(" --env-replace-path=<path>      Path to env_replace for --enforcement.\n");
-	printf(" --mesos-manager=<hostname:port> Mesos manager address and port\n");
+	printf(" --mesos-master=<hostname:port> Mesos manager address and port\n");
 	printf(" --mesos-path=<path>            Path to mesos python2 site-packages.\n");
 	printf(" --mesos-preload=<path>         Path to libraries needed by Mesos.\n");
 	printf(" --k8s-image=<path>             Container image used by kubernetes.\n");
@@ -1579,8 +1579,8 @@ int main(int argc, char *argv[])
 		{"archive-dir", required_argument, 0, LONG_OPT_ARCHIVE_DIR},
 		{"archive-read", no_argument, 0, LONG_OPT_ARCHIVE_READ},
 		{"archive-write", no_argument, 0, LONG_OPT_ARCHIVE_WRITE},
-		{"mesos-manager", required_argument, 0, LONG_OPT_MESOS_MANAGER},
-		{"mesos-master",  required_argument, 0, LONG_OPT_MESOS_MANAGER}, //same as mesos-manager
+		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MANAGER},
+		{"mesos-master",  required_argument, 0, LONG_OPT_MESOS_MANAGER}, //same as mesos-master
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
@@ -2284,7 +2284,7 @@ int main(int argc, char *argv[])
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
 		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
-		batch_queue_set_option(remote_queue, "mesos-manager", mesos_manager);
+		batch_queue_set_option(remote_queue, "mesos-master", mesos_manager);
 		batch_queue_set_option(remote_queue, "mesos-preload", mesos_preload);
 	}
 

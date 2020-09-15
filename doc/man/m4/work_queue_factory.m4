@@ -73,7 +73,7 @@ OPTION_TRIPLET(-d,debug,subsystem)Enable debugging for this subsystem.
 OPTION_ITEM(--amazon-config)Specify Amazon config file (for use with -T amazon).
 OPTION_ITEM(--wrapper)Wrap factory with this command prefix.
 OPTION_ITEM(--wrapper-input)Add this input file needed by the wrapper.
-OPTION_PAIR(--mesos-manager,hostname)Specify the host name to mesos manager node (for use with -T mesos).
+OPTION_PAIR(--mesos-master,hostname)Specify the host name to mesos manager node (for use with -T mesos).
 OPTION_PAIR(--mesos-path,filepath)Specify path to mesos python library (for use with -T mesos).
 OPTION_PAIR(--mesos-preload,library)Specify the linking libraries for running mesos (for use with -T mesos).
 OPTION_ITEM(--k8s-image)Specify the container image for using Kubernetes (for use with -T k8s).

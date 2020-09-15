@@ -1022,7 +1022,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify Amazon config file (for use with -T amazon).\n", "--amazon-config");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
-	printf(" %-30s Specify the host name to mesos manager node (for use with -T mesos).\n", "--mesos-manager");
+	printf(" %-30s Specify the host name to mesos manager node (for use with -T mesos).\n", "--mesos-master");
 	printf(" %-30s Specify path to mesos python library (for use with -T mesos).\n", "--mesos-path");
 	printf(" %-30s Specify the linking libraries for running mesos (for use with -T mesos).\n", "--mesos-preload");
 	printf(" %-30s Specify the container image for using Kubernetes (for use with -T k8s).\n", "--k8s-image");
@@ -1087,7 +1087,7 @@ static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"max-workers", required_argument, 0, 'W'},
 	{"memory", required_argument,  0,  LONG_OPT_MEMORY},
-	{"mesos-manager", required_argument, 0, LONG_OPT_MESOS_MANAGER},
+	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MANAGER},
 	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 	{"min-workers", required_argument, 0, 'w'},
@@ -1466,7 +1466,7 @@ int main(int argc, char *argv[])
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
 		batch_queue_set_option(queue, "mesos-path", mesos_path);
-		batch_queue_set_option(queue, "mesos-manager", mesos_manager);
+		batch_queue_set_option(queue, "mesos-master", mesos_manager);
 		batch_queue_set_option(queue, "mesos-preload", mesos_preload);
 		batch_queue_set_logfile(queue, "work_queue_factory.mesoslog");
 	}

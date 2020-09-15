@@ -182,7 +182,7 @@ OPTION_END
 
 ### Mesos Options
 
-- **--mesos-manager hostname**  Indicate the host name of preferred mesos manager.
+- **--mesos-master hostname**  Indicate the host name of preferred mesos manager.
 - **--mesos-path filepath**  Indicate the path to mesos python2 site-packages.
 - **--mesos-preload library**  Indicate the linking libraries for running mesos..
 

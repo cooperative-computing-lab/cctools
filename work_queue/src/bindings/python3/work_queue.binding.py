@@ -1510,7 +1510,7 @@ class Factory(object):
         "max-workers",
         "manager-name",
         "memory",
-        "mesos-manager",
+        "mesos-master",
         "mesos-path",
         "mesos-preload",
         "min-workers",

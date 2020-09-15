@@ -95,7 +95,7 @@ remove all running workers before exiting.
 - **--amazon-config** Specify Amazon config file (for use with -T amazon).
 - **--wrapper** Wrap factory with this command prefix.
 - **--wrapper-input** Add this input file needed by the wrapper.
-- **--mesos-manager hostname** Specify the host name to mesos manager node (for use with -T mesos).
+- **--mesos-master hostname** Specify the host name to mesos manager node (for use with -T mesos).
 - **--mesos-path filepath** Specify path to mesos python library (for use with -T mesos).
 - **--mesos-preload library** Specify the linking libraries for running mesos (for use with -T mesos).
 - **--k8s-image** Specify the container image for using Kubernetes (for use with -T k8s).
