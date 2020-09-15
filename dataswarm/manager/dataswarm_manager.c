@@ -116,7 +116,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 		if(!strcmp(conn_type,"worker")) {
 			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
-			struct dataswarm_worker_rep *w = dataswarm_worker_create(l);
+			struct dataswarm_worker_rep *w = dataswarm_worker_rep_create(l);
 			hash_table_insert(m->worker_table,manager_key,w);
 
 			// XXX This is a HACK to get some messages going for testing
@@ -124,7 +124,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 		} else if(!strcmp(conn_type,"client")) {
 			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
-			struct dataswarm_client_rep *c = dataswarm_client_create(l);
+			struct dataswarm_client_rep *c = dataswarm_client_rep_create(l);
 			hash_table_insert(m->client_table,manager_key,c);
 		} else {
 			/* dataswarm_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
