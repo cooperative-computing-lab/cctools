@@ -437,7 +437,7 @@ a fully-qualified logical name, resolve it according to
 the mount list, split it into its components, and fill
 in the name structure. Return true on success, false otherwise.
 */
-extern int pfs_master_timeout;
+extern int pfs_main_timeout;
 
 extern FILE *namelist_file;
 extern struct hash_table *namelist_table;
@@ -486,7 +486,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 		char tmp[PFS_PATH_MAX];
 		mode &= ~E_OK;
 		path_dirname(pname->logical_name, dirname);
-		result = pfs_resolve(dirname,tmp,W_OK,time(0)+pfs_master_timeout);
+		result = pfs_resolve(dirname,tmp,W_OK,time(0)+pfs_main_timeout);
 		switch(result) {
 			case PFS_RESOLVE_DENIED:
 				return errno = EACCES, 0;
@@ -500,7 +500,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 		}
 	}
 
-	result = pfs_resolve(pname->logical_name,pname->path,mode,time(0)+pfs_master_timeout);
+	result = pfs_resolve(pname->logical_name,pname->path,mode,time(0)+pfs_main_timeout);
 
 	if(namelist_table) {
 		namelist_table_insert(pname->path, is_special_syscall);

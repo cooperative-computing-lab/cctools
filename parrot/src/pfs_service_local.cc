@@ -642,7 +642,7 @@ RETRY:
 
 	/*
 	We do not actually change to the new directory,
-	because this is performed within the PFS master
+	because this is performed within the PFS main
 	process, and we do not want to change the meaning
 	of open() on filenames used for configuration,
 	security and so forth.  We also do not change and then

@@ -416,15 +416,15 @@ struct dirent * pfs_fdreaddir( int fd )
 	return result;
 }
 
-extern int pfs_master_timeout;
+extern int pfs_main_timeout;
 int pfs_timeout( const char *str )
 {
 	BEGIN
 	debug(D_LIBCALL, "timeout %s", str);
-	if(str) pfs_master_timeout = string_time_parse(str);
-	else if(isatty(0)) pfs_master_timeout = 300;
-	else pfs_master_timeout = 3600;
-	result = pfs_master_timeout;
+	if(str) pfs_main_timeout = string_time_parse(str);
+	else if(isatty(0)) pfs_main_timeout = 300;
+	else pfs_main_timeout = 3600;
+	result = pfs_main_timeout;
 	END
 }
 

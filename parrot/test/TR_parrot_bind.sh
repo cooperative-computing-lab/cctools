@@ -43,12 +43,12 @@ int main (int argc, char *argv[])
 	pid_t child = fork();
 	if (child == 0) {
 		CATCHUNIX(alarm(2));
-		int manager = socket(AF_UNIX, SOCK_STREAM, 0);
-		CATCHUNIX(manager);
+		int server = socket(AF_UNIX, SOCK_STREAM, 0);
+		CATCHUNIX(server);
 		unlink(addr.sun_path);
-		CATCHUNIX(bind(manager, (struct sockaddr *)&addr, sizeof(addr)));
-		CATCHUNIX(listen(manager, 1));
-		int client = accept(manager, NULL, NULL);
+		CATCHUNIX(bind(server, (struct sockaddr *)&addr, sizeof(addr)));
+		CATCHUNIX(listen(server, 1));
+		int client = accept(server, NULL, NULL);
 		CATCHUNIX(client);
 		char buf[4096];
 		ssize_t n = read(client, buf, sizeof(buf));
@@ -56,7 +56,7 @@ int main (int argc, char *argv[])
 		n = write(client, buf, n);
 		CATCHUNIX(n);
 		CATCHUNIX(close(client));
-		CATCHUNIX(close(manager));
+		CATCHUNIX(close(server));
 		CATCHUNIX(unlink(argv[1]));
 		exit(EXIT_SUCCESS);
 	} else if (child > 0) {

@@ -40,7 +40,7 @@ extern "C" {
 #include <string>
 #include <list>
 
-extern int pfs_master_timeout;
+extern int pfs_main_timeout;
 extern char pfs_temp_dir[];
 extern const char * pfs_cvmfs_repo_arg;
 extern const char * pfs_cvmfs_config_arg;
@@ -657,8 +657,8 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 			enable_alien_on_this_repository ? repo_name : "",
 			enable_alien_on_this_repository ? "," : "",
 
-			pfs_master_timeout,
-			pfs_master_timeout,
+			pfs_main_timeout,
+			pfs_main_timeout,
 			pfs_cvmfs_http_proxy ? ",proxies=" : "",
 			pfs_cvmfs_http_proxy ? pfs_cvmfs_http_proxy : "",
 			&f->subst_offset,
@@ -668,8 +668,8 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 			&repo_name_offset,
 			repo_name,
 
-			pfs_master_timeout,
-			pfs_master_timeout,
+			pfs_main_timeout,
+			pfs_main_timeout,
 			pfs_cvmfs_http_proxy ? ",proxies=" : "",
 			pfs_cvmfs_http_proxy ? pfs_cvmfs_http_proxy : "",
 			&f->subst_offset,
