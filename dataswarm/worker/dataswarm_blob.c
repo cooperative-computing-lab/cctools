@@ -112,7 +112,7 @@ dataswarm_result_t dataswarm_blob_get(struct dataswarm_worker *w, const char *bl
 
 	struct stat info;
 	int status = stat(blob_data, &info);
-	if(!status) {
+	if(status<0) {
 		debug(D_DATASWARM, "couldn't stat blob: %s: %s", blob_data, strerror(errno));
 		free(blob_data);
 		return DS_RESULT_UNABLE;
