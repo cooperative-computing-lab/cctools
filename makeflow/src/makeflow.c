@@ -1250,7 +1250,7 @@ static void show_help_run(const char *cmd)
 	printf(" --enforcement                  Enforce access to only named inputs/outputs.\n");
 	printf(" --parrot-path=<path>           Path to parrot_run for --enforcement.\n");
 	printf(" --env-replace-path=<path>      Path to env_replace for --enforcement.\n");
-	printf(" --mesos-master=<hostname:port> Mesos master address and port\n");
+	printf(" --mesos-manager=<hostname:port> Mesos manager address and port\n");
 	printf(" --mesos-path=<path>            Path to mesos python2 site-packages.\n");
 	printf(" --mesos-preload=<path>         Path to libraries needed by Mesos.\n");
 	printf(" --k8s-image=<path>             Container image used by kubernetes.\n");
@@ -1301,7 +1301,7 @@ int main(int argc, char *argv[])
 	timestamp_t time_completed = 0;
 	const char *work_queue_keepalive_interval = NULL;
 	const char *work_queue_keepalive_timeout = NULL;
-	const char *work_queue_master_mode = "standalone";
+	const char *work_queue_manager_mode = "standalone";
 	const char *work_queue_port_file = NULL;
 	double wq_option_fast_abort_multiplier = -1.0;
 	const char *amazon_config = NULL;
@@ -1322,7 +1322,7 @@ int main(int argc, char *argv[])
 	char *debug_file_name = 0;
 	char *batch_mem_type = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
-	char *mesos_master = "127.0.0.1:5050/";
+	char *mesos_manager = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
 
@@ -1370,9 +1370,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	s = getenv("WORK_QUEUE_MASTER_MODE");
+	s = getenv("WORK_QUEUE_MANAGER_MODE") || getenv("WORK_QUEUE_MASTER_MODE");
 	if(s) {
-		work_queue_master_mode = s;
+		work_queue_manager_mode = s;
 	}
 
 	s = getenv("WORK_QUEUE_NAME");
@@ -1459,7 +1459,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_ARCHIVE_DIR,
 		LONG_OPT_ARCHIVE_READ,
 		LONG_OPT_ARCHIVE_WRITE,
-		LONG_OPT_MESOS_MASTER,
+		LONG_OPT_MESOS_MANAGER,
 		LONG_OPT_MESOS_PATH,
 		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_SEND_ENVIRONMENT,
@@ -1579,7 +1579,8 @@ int main(int argc, char *argv[])
 		{"archive-dir", required_argument, 0, LONG_OPT_ARCHIVE_DIR},
 		{"archive-read", no_argument, 0, LONG_OPT_ARCHIVE_READ},
 		{"archive-write", no_argument, 0, LONG_OPT_ARCHIVE_WRITE},
-		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
+		{"mesos-manager", required_argument, 0, LONG_OPT_MESOS_MANAGER},
+		{"mesos-master",  required_argument, 0, LONG_OPT_MESOS_MANAGER}, //same as mesos-manager
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
@@ -1595,7 +1596,7 @@ int main(int argc, char *argv[])
 	while((c = jx_getopt(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
 			case 'a':
-				work_queue_master_mode = "catalog";
+				work_queue_manager_mode = "catalog";
 				break;
 			case 'A':
 				disable_afs_check = 1;
@@ -1754,7 +1755,7 @@ int main(int argc, char *argv[])
 			case 'N':
 				free(project);
 				project = xxstrdup(optarg);
-				work_queue_master_mode = "catalog";
+				work_queue_manager_mode = "catalog";
 				catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
@@ -1967,8 +1968,8 @@ int main(int argc, char *argv[])
 					goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("umbrella_spec"), jx_string(optarg));
 				break;
-			case LONG_OPT_MESOS_MASTER:
-				mesos_master = xxstrdup(optarg);
+			case LONG_OPT_MESOS_MANAGER:
+				mesos_manager = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MESOS_PATH:
 				mesos_path = xxstrdup(optarg);
@@ -2168,7 +2169,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		if(strcmp(work_queue_master_mode, "catalog") == 0 && project == NULL) {
+		if(strcmp(work_queue_manager_mode, "catalog") == 0 && project == NULL) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
 			fprintf(stderr, "makeflow: Run \"makeflow -h\" for help with options.\n");
 			return 1;
@@ -2176,7 +2177,7 @@ int main(int argc, char *argv[])
 		// Use Work Queue default port in standalone mode when port is not
 		// specified with -p option. In Work Queue catalog mode, Work Queue
 		// would choose an arbitrary port when port is not explicitly specified.
-		if(!port_set && strcmp(work_queue_master_mode, "standalone") == 0) {
+		if(!port_set && strcmp(work_queue_manager_mode, "standalone") == 0) {
 			port_set = 1;
 			port = WORK_QUEUE_DEFAULT_PORT;
 		}
@@ -2283,7 +2284,7 @@ int main(int argc, char *argv[])
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
 		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
-		batch_queue_set_option(remote_queue, "mesos-master", mesos_master);
+		batch_queue_set_option(remote_queue, "mesos-manager", mesos_manager);
 		batch_queue_set_option(remote_queue, "mesos-preload", mesos_preload);
 	}
 
@@ -2311,7 +2312,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
 	batch_queue_set_option(remote_queue, "batch-options", batch_submit_options);
 	batch_queue_set_option(remote_queue, "password", work_queue_password);
-	batch_queue_set_option(remote_queue, "master-mode", work_queue_master_mode);
+	batch_queue_set_option(remote_queue, "manager-mode", work_queue_manager_mode);
 	batch_queue_set_option(remote_queue, "name", project);
 	batch_queue_set_option(remote_queue, "debug", debug_file_name);
 	batch_queue_set_option(remote_queue, "priority", priority);
@@ -2322,7 +2323,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
 	batch_queue_set_option(remote_queue, "lambda-config", lambda_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
-	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
+	batch_queue_set_option(remote_queue, "manager-preferred-connection", work_queue_preferred_connection);
 	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
 	batch_queue_set_option(remote_queue, "amazon-batch-img", amazon_batch_img);
 	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");
