@@ -6,7 +6,7 @@ of machines at once.  If you have a large quantity of computational
 work to accomplish that would take years to complete on your laptop,
 then you have come to the right place.
 
-<img src="https://github.com/cooperative-computing-lab/makeflow-examples/raw/master/banner.png" width=100%>
+<img src="https://github.com/cooperative-computing-lab/makeflow-examples/raw/manager/banner.png" width=100%>
 
 If you are a first-time user, start by checking out the 
 [Makeflow workflow system](../makeflow), and use it to get your work

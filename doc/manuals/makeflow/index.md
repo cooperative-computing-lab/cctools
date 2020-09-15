@@ -469,7 +469,7 @@ mpirun -np $NSLOTS makeflow -T mpi example.makeflow
 
 Makeflow can be used with Apache Mesos. To run Makeflow with Mesos, give the
 batch mode via `-T mesos` and pass the hostname and port number of Mesos
-master to Makeflow with the `--mesos-master` option. Since the Makeflow-Mesos
+manager to Makeflow with the `--mesos-manager` option. Since the Makeflow-Mesos
 Scheduler is based on Mesos Python2 API, the path to Mesos Python2 library
 should be included in the `$PATH`, or one can specify a preferred Mesos
 Python2 API via ` --mesos-path ` option. To successfully import the Python
@@ -477,11 +477,11 @@ library, you may need to indicate dependencies through `--mesos-preload `
 option.
 
 For example, here is the command to run Makeflow on a Mesos cluster that has
-the master listening on port 5050 of localhost, with a user specified python
+the manager listening on port 5050 of localhost, with a user specified python
 library:
 
 ```sh
-$ makeflow -T mesos --mesos-master localhost:5050 --mesos-path /path/to/mesos-0.26.0/lib/python2.6/site-packages example.makeflow ...
+$ makeflow -T mesos --mesos-manager localhost:5050 --mesos-path /path/to/mesos-0.26.0/lib/python2.6/site-packages example.makeflow ...
 ```
 
 
@@ -690,7 +690,7 @@ options or other details. Please refer to [Work Queue manual ](../work_queue) fo
 Makeflow listens on a port which the remote workers would connect to. The
 default port number is 9123. Sometimes, however, the port number might be not
 available on your system. You can change the default port via the `-p` option.
-For example, if you want the master to listen on port 9567 by default, you can
+For example, if you want the manager to listen on port 9567 by default, you can
 run the following command:
 
 ```sh
@@ -700,19 +700,19 @@ $ makeflow -T wq -p 9567 example.makeflow
 ### Project Names
 
 If you do not like using port numbers, an easier way to match workers to
-masters is to use a project name. You can give each master a project name with
+managers is to use a project name. You can give each manager a project name with
 the -N option.
 
 ```sh
 $ makeflow -T wq -N MyProject example.makeflow
 ```
 
-The -N option gives the master a project name called `MyProject`, and will
+The -N option gives the manager a project name called `MyProject`, and will
 cause it to advertise its information such as the project name, running status,
 hostname and port number, to a default globally available catalog server. Then
 a worker can simply identify the workload by its project name.
 
-To start a worker that automatically finds the master named __MyProject__ via the default
+To start a worker that automatically finds the manager named __MyProject__ via the default
 catalog server:
 
 ```sh
@@ -722,8 +722,8 @@ $ work_queue_worker -N MyProject
 You can also give multiple `-N` options to a worker. The worker will find out
 which ones of the specified projects are running from the catalog server and
 randomly select one to work for. When one project is done, the worker would
-repeat this process. Thus, the worker can work for a different master without
-being stopped and given the different hostname and port of the master. An example
+repeat this process. Thus, the worker can work for a different manager without
+being stopped and given the different hostname and port of the manager. An example
 of specifying multiple projects:
 
 ```sh

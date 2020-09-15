@@ -6,30 +6,30 @@ BOLD(work_queue_worker) - worker process for executing tasks
 dispatched through Work Queue
 
 SECTION(SYNOPSIS)
-CODE(BOLD(work_queue_worker [options] PARAM(masterhost) PARAM(port)))
+CODE(BOLD(work_queue_worker [options] PARAM(managerhost) PARAM(port)))
 
-CODE(BOLD(work_queue_worker [options] PARAM(masterhost:port])))
+CODE(BOLD(work_queue_worker [options] PARAM(managerhost:port])))
 
-CODE(BOLD(work_queue_worker [options] "PARAM(masterhost:port;[masterhost:port;masterhost:port;...])))"
+CODE(BOLD(work_queue_worker [options] "PARAM(managerhost:port;[managerhost:port;managerhost:port;...])))"
 
 CODE(BOLD(work_queue_worker [options] -M PARAM(projectname)))
 
 SECTION(DESCRIPTION)
 
 BOLD(work_queue_worker) is the worker process for executing tasks dispatched
-from a master application built using the BOLD(Work Queue) API. BOLD(work_queue_worker)
-connects to the master application, accepts, runs, and returns tasks dispatched to it.
+from a manager application built using the BOLD(Work Queue) API. BOLD(work_queue_worker)
+connects to the manager application, accepts, runs, and returns tasks dispatched to it.
 
 PARA
 
-The BOLD(masterhost) and BOLD(port) arguments specify the hostname and port
-number of the master application for work_queue_worker to connect. Several
-masterhosts and ports may be specified, separated with a semicolon (;), with the
-worker connecting to any of the masters specified (When specifying multiple
-masters, remember to escape the ; from shell interpretation, for example, using
+The BOLD(managerhost) and BOLD(port) arguments specify the hostname and port
+number of the manager application for work_queue_worker to connect. Several
+managerhosts and ports may be specified, separated with a semicolon (;), with the
+worker connecting to any of the managers specified (When specifying multiple
+managers, remember to escape the ; from shell interpretation, for example, using
 quotes.)
 
-Alternatevely, the master may be specified by name, using the BOLD(-M) option.
+Alternatevely, the manager may be specified by name, using the BOLD(-M) option.
 
 PARA
 
@@ -41,23 +41,23 @@ SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_ITEM(-v, --version')Show version string.
 OPTION_ITEM(-h, --help')Show this help message.
-OPTION_TRIPLET(-N,-M, master-name, name)Set the name of the project this worker should work for.  A worker can have multiple projects.
+OPTION_TRIPLET(-N,-M, manager-name, name)Set the name of the project this worker should work for.  A worker can have multiple projects.
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 OPTION_PAIR(--debug-max-rotate, bytes)Set the maximum file size of the debug log.  If the log exceeds this size, it is renamed to "filename.old" and a new logfile is opened.  (default=10M. 0 disables)
-OPTION_ITEM(--debug-release-reset)Debug file will be closed, renamed, and a new one opened after being released from a master.
+OPTION_ITEM(--debug-release-reset)Debug file will be closed, renamed, and a new one opened after being released from a manager.
 OPTION_ITEM(`--foreman')Enable foreman mode.
 OPTION_TRIPLET(-f, foreman-name, name)Set the project name of this foreman to PARAM(project). Implies --foreman.
 OPTION_PAIR(--foreman-port, port[:highport]) Set the port for the foreman to listen on.  If PARAM(highport) is specified the port is chosen from between PARAM(port) and PARAM(highport). Implies --foreman.
 OPTION_TRIPLET(-Z, foreman-port-file, file)Select port to listen to at random and write to this file.  Implies --foreman.
 OPTION_TRIPLET(-F, fast-abort, mult)Set the fast abort multiplier for foreman (default=disabled).
 OPTION_PAIR(--specify-log, logfile)Send statistics about foreman to this file.
-OPTION_TRIPLET(-P, password, pwfile)Password file for authenticating to the master.
+OPTION_TRIPLET(-P, password, pwfile)Password file for authenticating to the manager.
 OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time. (default=900s)
 OPTION_TRIPLET(-w, tcp-window-size, size)Set TCP window size.
-OPTION_TRIPLET(-i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a master. (default=1s)
-OPTION_TRIPLET(-b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)
+OPTION_TRIPLET(-i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+OPTION_TRIPLET(-b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
 OPTION_TRIPLET(-z, disk-threshold, size)Minimum free disk space in MB. When free disk space is less than this value, the worker will clean up and try to reconnect. (default=100MB)
 OPTION_PAIR(--memory-threshold, size)Set available memory threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
 OPTION_TRIPLET(-A, arch, arch)Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
@@ -79,8 +79,8 @@ OPTIONS_END
 SECTION(FOREMAN MODE)
 
 BOLD(work_queue_worker) can also be run in BOLD(foreman) mode, in which it connects to a
-master as a worker while acting as a master itself.  Any tasks the foreman receives from
-its master are sent to its subordinate worker processes.
+manager as a worker while acting as a manager itself.  Any tasks the foreman receives from
+its manager are sent to its subordinate worker processes.
 
 PARA
 
@@ -91,7 +91,7 @@ contact the foreman.
 
 SECTION(CONTAINER MODE)
 BOLD(work_queue_worker) can be run with container. Docker is the default management tool and docker deamon should be enabled
-in computing nodes. Tasks received from master can be run with container based on user specified docker image.
+in computing nodes. Tasks received from manager can be run with container based on user specified docker image.
 
 PARA
 
@@ -106,13 +106,13 @@ On success, returns zero.  On failure, returns non-zero.
 
 SECTION(EXAMPLES)
 
-To run BOLD(work_queue_worker) to join a specific master process running on host CODE(master.somewhere.edu) port 9123:
+To run BOLD(work_queue_worker) to join a specific manager process running on host CODE(manager.somewhere.edu) port 9123:
 LONGCODE_BEGIN
-% work_queue_worker master.somewhere.edu 9123
+% work_queue_worker manager.somewhere.edu 9123
 LONGCODE_END
 
 To run BOLD(work_queue_worker) in auto mode with debugging turned on for all subsystems and
-to accept tasks only from a master application with project name set to project_A:
+to accept tasks only from a manager application with project name set to project_A:
 LONGCODE_BEGIN
 % work_queue_worker -a -d all -M project_A
 LONGCODE_END

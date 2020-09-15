@@ -61,7 +61,7 @@ LONGCODE_END
 The raw event output of a query can be saved to a file, and then queried using the --file option, which can accelerate operations on reduced data.  For example:
 
 LONGCODE_BEGIN
-% deltadb_query --db /data/catalog.history --from 2014-01-01 --to 2015-01-01 --filter 'type=="wq_master"' > wq.data
+% deltadb_query --db /data/catalog.history --from 2014-01-01 --to 2015-01-01 --filter 'type=="wq_manager"' > wq.data
 % deltadb_query --file wq.data --from 2014-01-01 --output 'COUNT(name)' --output 'MAX(tasks_running)'
 LONGCODE_END
 

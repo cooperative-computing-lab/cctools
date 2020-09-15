@@ -238,8 +238,8 @@ Copying Gromacs forcefield files
 
 #### Running AWE-WQ
 
-There are two components to consider when running AWE-WQ: the master process
-and the resources. The master is the driver of the algorithm, managing task
+There are two components to consider when running AWE-WQ: the manager process
+and the resources. The manager is the driver of the algorithm, managing task
 definitions, scheduling, processing, and the resampling procedure. In order to
 run the walkers, resources must be allocated.
 
@@ -250,7 +250,7 @@ This runs AWE-WQ maintaining 10 walkers in 100 cells, whose definition is
 provided in cells.dat with initial weights in Data/Populations.dat. The
 coordinates for the walkers are found in the Walkers directory. The metastable
 regions are provided in folded.dat and unfolded.dat as a list of cell id
-numbers belonging to each region. Finally, we give a name to the master (“awe-
+numbers belonging to each region. Finally, we give a name to the manager (“awe-
 wq”) to that workers can easily locate the host and port.
 
 ```sh
@@ -262,7 +262,7 @@ to run tasks locally. To run jobs on SGE or CONDOR use ` sge_submit_workers`
 and `condor_submit_workers`. Additionally, resources can be managed
 automatically using `work_queue_factory`. Using `work_queue_worker` also
 allows the worker to operate as a ”Foreman”, enabling the hierarchical
-distribution of tasks. Since the master has started we can start a worker
+distribution of tasks. Since the manager has started we can start a worker
 locally.
 
 ```sh

@@ -3,7 +3,7 @@
 This is the API reference manual for the CCTools code,
 which includes Makeflow, Work Queue, Parrot, Chirp and other software.
 
-If you are writing a Work Queue master program, start here:
+If you are writing a Work Queue manager program, start here:
 
 - @ref work_queue.h
 

@@ -2,11 +2,11 @@
 
 ## Overview
 
-Work Queue is a framework for building large scale master-worker applications.
-Using the Work Queue library, you create a custom master program that defines
+Work Queue is a framework for building large scale manager-worker applications.
+Using the Work Queue library, you create a custom manager program that defines
 and submits a large number of small tasks. Each task is distributed to a
 remote worker process which executes it and returns the results. As results
-are created, the master may generate more tasks to be executed. It is not
+are created, the manager may generate more tasks to be executed. It is not
 unusual to write programs that distribute millions of tasks to thousands of
 remote workers.
 
@@ -78,7 +78,7 @@ $ gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctoo
 The example application simply compresses a bunch of files in parallel. The
 files to be compressed must be listed on the command line. Each will be
 transmitted to a remote worker, compressed, and then sent back to the Work
-Queue master. To compress files `a`, `b`, and `c` with this example
+Queue manager. To compress files `a`, `b`, and `c` with this example
 application, run it as:
 
 ```sh
@@ -105,7 +105,7 @@ waiting for tasks to complete...
 ```
     
 
-The Work Queue master is now waiting for workers to connect and begin
+The Work Queue manager is now waiting for workers to connect and begin
 requesting work. (Without any workers, it will wait forever.) You can start
 one worker on the same machine by opening a new shell and running:
 
@@ -156,8 +156,8 @@ $ slurm_submit_workers MACHINENAME 9123 10
 $ ec2_submit_workers MACHINENAME 9123 10
 ```
 
-When the master completes, if the workers were not shut down in the master,
-your workers will still be available, so you can either run another master
+When the manager completes, if the workers were not shut down in the manager,
+your workers will still be available, so you can either run another manager
 with the same workers, or you can remove the workers with `kill`, `condor_rm`,
 or `qdel` as appropriate. If you forget to remove them, they will exit
 automatically after fifteen minutes. (This can be adjusted with the `-t`
@@ -168,7 +168,7 @@ option to `worker`.)
 The easiest way to start writing your own program using WorkQueue is to modify
 with one of the examples in [Python](examples/work_queue_example.py),
 [Perl](examples/work_queue_example.pl), or [C](examples/work_queue_example.c).
-The basic outline of a WorkQueue master is:
+The basic outline of a WorkQueue manager is:
 
 1. Create and configure the tasks' queue.
 2. Create tasks and add them to the queue.
@@ -203,7 +203,7 @@ my $q = Work_Queue->new(9123);
 struct work_queue *q = work_queue_create(9123);
 ```
     
-The master then creates tasks to submit to the queue. Each task consists of a
+The manager then creates tasks to submit to the queue. Each task consists of a
 command line to run and a statement of what data is needed, and what data will
 be produced by the command. Input data can be provided in the form of a file
 or a local memory buffer. Output data can be provided in the form of a file or
@@ -244,13 +244,13 @@ since they are not used by subsequent tasks in this example.
 #### Python
     
 ```python
-# t.specify_input_file("name at master", "name when copied at execution site", ...)
+# t.specify_input_file("name at manager", "name when copied at execution site", ...)
 
 t.specify_input_file("/usr/bin/gzip", "gzip",       cache = True)
 t.specify_input_file("my-file",       "my-file",    cache = False)
 t.specify_output_file("my-file.gz",   "my-file.gz", cache = False)
 
-# when the name at master is the same as the exection site, we can write instead:
+# when the name at manager is the same as the exection site, we can write instead:
 t.specify_input_file("my-file",     cache = False)
 t.specify_output_file("my-file.gz", cache = False)
 ```
@@ -258,13 +258,13 @@ t.specify_output_file("my-file.gz", cache = False)
 #### Perl
     
 ```perl
-# $t->specify_input_file(local_name => "name at master", remote_name => "name when copied at execution site", ...);
+# $t->specify_input_file(local_name => "name at manager", remote_name => "name when copied at execution site", ...);
 
 $t->specify_input_file(local_name => "/usr/bin/gzip", remote_name => "gzip",       cache = True);
 $t->specify_input_file(local_name => "my-file",       remote_name => "my-file",    cache = False);
 $t->specify_output_file(local_name => "my-file.gz",   remote_name => "my-file.gz", cache = False);
 
-# when the name at master is the same as the exection site, we can write instead:
+# when the name at manager is the same as the exection site, we can write instead:
 $t->specify_input_file(local_name => "my-file",     cache = False);
 $t->specify_output_file(local_name => "my-file.gz", cache = False);
 ```
@@ -273,7 +273,7 @@ $t->specify_output_file(local_name => "my-file.gz", cache = False);
 #### C
 
 ```C
-# work_queue_task_specify_file(t, "name at master", "name when copied at execution site", ...)
+# work_queue_task_specify_file(t, "name at manager", "name when copied at execution site", ...)
 
 work_queue_task_specify_file(t, "/usr/bin/gzip", "gzip",       WORK_QUEUE_INPUT,  WORK_QUEUE_CACHE);
 work_queue_task_specify_file(t, "my-file",       "my-file",    WORK_QUEUE_INPUT,  WORK_QUEUE_NOCACHE);
@@ -422,22 +422,22 @@ Full details of all of the Work Queue functions can be found in the [Work Queue 
 
 ## Project Names and the Catalog Server
 
-Keeping track of the master's hostname and port can get cumbersome, especially
-if there are multiple masters. To help with difficulty, we provide the project
-name feature to identify a Work Queue master with a more recognizable project
-name. Work Queue workers can then be started for their masters by providing
+Keeping track of the manager's hostname and port can get cumbersome, especially
+if there are multiple managers. To help with difficulty, we provide the project
+name feature to identify a Work Queue manager with a more recognizable project
+name. Work Queue workers can then be started for their managers by providing
 the project names.
 
 The project name feature uses the **catalog server** to maintain and track the
-project names of masters and their respective locations. It works as follows:
-the master advertises its project name along with its hostname and port to the
-catalog server. Work Queue workers that are provided with the master's project
-name query the catalog server to find the hostname and port of the master with
-the given project name. So, to utilize this feature, the master must be
-specified to run in the `WORK_QUEUE_MASTER_MODE_CATALOG`. See [Catalog
+project names of managers and their respective locations. It works as follows:
+the manager advertises its project name along with its hostname and port to the
+catalog server. Work Queue workers that are provided with the manager's project
+name query the catalog server to find the hostname and port of the manager with
+the given project name. So, to utilize this feature, the manager must be
+specified to run in the `WORK_QUEUE_MANAGER_MODE_CATALOG`. See [Catalog
 Servers](../catalog) for details on specifying catalog servers.
 
-For example, to have a Work Queue master advertise its project name as
+For example, to have a Work Queue manager advertise its project name as
 `myproject`, add the following code snippet after creating the queue:
 
 #### Python
@@ -458,7 +458,7 @@ work_queue_specify_name(q, "myproject");
     
 
     
-To start a worker for this master, specify the project name (`myproject`) to
+To start a worker for this manager, specify the project name (`myproject`) to
 connect in the `-M` option:
 
 ```sh
@@ -466,7 +466,7 @@ $ work_queue_worker -M myproject
 ```
     
 
-You can start ten workers for this master on Condor using
+You can start ten workers for this manager on Condor using
 `condor_submit_workers` by providing the same option arguments.:
     
 ```sh
@@ -493,12 +493,12 @@ Project names are particularly useful when automatically maintaining a pool of w
 Instead of launching each worker manually from the command line, the utility
 **work_queue_factory** may be used to launch workers are needed. The factory
 will submit and maintain a number of workers according to the tasks available
-in one or more masters.
+in one or more managers.
 For example, we can supply a minimum of 2 workers and a maximum of 10 to
-a master with the project name `myproject` via the condor batch system as follows:
+a manager with the project name `myproject` via the condor batch system as follows:
 
 ```sh
-work_queue_factory -Tcondor --min-workers=2 --max-workers=10 --master-name myproject
+work_queue_factory -Tcondor --min-workers=2 --max-workers=10 --manager-name myproject
 ```
 
 This arguments can be specified in a file. The factory will periodically
@@ -507,7 +507,7 @@ re-read this file, which allows adjustments to the number of workers desired:
 Configuarion file `factory.json`:
 ```json
 {
-    "master-name": "myproject",
+    "manager-name": "myproject",
     "max-workers": 10,
     "min-workers": 2
 }
@@ -623,7 +623,7 @@ specified in the configuration file as follows:
 
 ```json
 {
-    "master-name": "myproject",
+    "manager-name": "myproject",
     "max-workers": 4,
     "min-workers": 1,
     "cores": 4,
@@ -641,7 +641,7 @@ Both memory and disk are specified in `MB`.
 ### Security
 
 By default, Work Queue does **not** perform any authentication, so any workers
-will be able to connect to your master, and vice versa. This may be fine for a
+will be able to connect to your manager, and vice versa. This may be fine for a
 short running anonymous application, but is not safe for a long running
 application with a public name.
 
@@ -653,7 +653,7 @@ the contents of the file are taken verbatim as the password; this means that
 any new line character at the end of the phrase will be considered as part of
 the password.
 
-Then, modify your master program to use the password:
+Then, modify your manager program to use the password:
 
 #### Python
 
@@ -681,14 +681,14 @@ workers:
 $ work_queue_worker --password mypwfile -M myproject
 ```
 
-With this option enabled, both the master and the workers will verify that the
+With this option enabled, both the manager and the workers will verify that the
 other has the matching password before proceeding. The password is not sent in
 the clear, but is securely verified through a SHA1-based challenge-response
 protocol.
 
 ### Debugging
 
-Work Queue can be set up to print debug messages at the master and worker to
+Work Queue can be set up to print debug messages at the manager and worker to
 help troubleshoot failures, bugs, and errors. To activate debug output:
 
 
@@ -808,7 +808,7 @@ if(q->hungry()) {
 If you would like to see the output of a task as it is produced, add
 `WORK_QUEUE_WATCH` to the flags argument of `specify_file`. This will
 cause the worker to periodically send output appended to that file back to the
-master. This is useful for a program that produces a log or progress bar as
+manager. This is useful for a program that produces a log or progress bar as
 part of its output.
 
 #### Python
@@ -956,7 +956,7 @@ t = work_queue_cancel_by_tasktag(q, "my-tag");
 ### Worker Blacklist
 
 You may find that certain hosts are not correctly configured to run your
-tasks. The master can be directed to ignore certain workers with the blacklist
+tasks. The manager can be directed to ignore certain workers with the blacklist
 feature. For example:
 
 #### Python
@@ -1013,19 +1013,19 @@ The statistics available are:
 | Field | Description
 |-------|------------
 |-      | **Stats for the current state of workers**
-| workers_connected;	   | Number of workers currently connected to the master.
+| workers_connected;	   | Number of workers currently connected to the manager.
 | workers_init;          | Number of workers connected, but that have not send their available resources report yet
 | workers_idle;          | Number of workers that are not running a task.
 | workers_busy;          | Number of workers that are running at least one task.
 | workers_able;          | Number of workers on which the largest task can run.
 | 
 |-      | **Cumulative stats for workers**
-| workers_joined;        | Total number of worker connections that were established to the master.
-| workers_removed;       | Total number of worker connections that were released by the master, idled-out, fast-aborted, or lost.
-| workers_released;      | Total number of worker connections that were asked by the master to disconnect.
+| workers_joined;        | Total number of worker connections that were established to the manager.
+| workers_removed;       | Total number of worker connections that were released by the manager, idled-out, fast-aborted, or lost.
+| workers_released;      | Total number of worker connections that were asked by the manager to disconnect.
 | workers_idled_out;     | Total number of worker that disconnected for being idle.
 | workers_fast_aborted;  | Total number of worker connections terminated for being too slow.
-| workers_blacklisted ;  | Total number of workers blacklisted by the master. (Includes fast-aborted.)
+| workers_blacklisted ;  | Total number of workers blacklisted by the manager. (Includes fast-aborted.)
 | workers_lost;          | Total number of worker connections that were unexpectedly lost. (does not include idled-out or fast-aborted)
 | 
 |-      | **Stats for the current state of tasks**
@@ -1043,14 +1043,14 @@ The statistics available are:
 | tasks_exhausted_attempts;   | Total number of task executions that failed given resource exhaustion.
 | 
 | - | **Master time statistics (in microseconds)**
-| time_when_started;  | Absolute time at which the master started.
+| time_when_started;  | Absolute time at which the manager started.
 | time_send;          | Total time spent in sending tasks to workers (tasks descriptions, and input files.).
 | time_receive;       | Total time spent in receiving results from workers (output files.).
 | time_send_good;     | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS.
 | time_receive_good;  | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS.
 | time_status_msgs;   | Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc.
 | time_internal;      | Total time the queue spents in internal processing.
-| time_polling;       | Total time blocking waiting for worker communications (i.e., master idle waiting for a worker message).
+| time_polling;       | Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message).
 | time_application;   | Total time spent outside work_queue_wait.
 | 
 | - | **Wrokers time statistics (in microseconds)**
@@ -1059,17 +1059,17 @@ The statistics available are:
 | time_workers_execute_exhaustion;  | Total time workers spent executing tasks that exhausted resources.
 | 
 | - | **Transfer statistics**
-| bytes_sent;      | Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master.
-| bytes_received;  | Total number of file bytes (not including protocol control msg bytes) received from the workers by the master.
-|  bandwidth;       | Average network bandwidth in MB/S observed by the master when transferring to workers.
+| bytes_sent;      | Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the manager.
+| bytes_received;  | Total number of file bytes (not including protocol control msg bytes) received from the workers by the manager.
+|  bandwidth;       | Average network bandwidth in MB/S observed by the manager when transferring to workers.
 | 
 | - | **Resources statistics**
-| capacity_tasks;      | The estimated number of tasks that this master can effectively support.
-| capacity_cores;      | The estimated number of workers' cores that this master can effectively support.
-| capacity_memory;     | The estimated number of workers' MB of RAM that this master can effectively support.
-| capacity_disk;       | The estimated number of workers' MB of disk that this master can effectively support.
-| capacity_instantaneous;       | The estimated number of tasks that this master can support considering only the most recently completed task.
-| capacity_weighted;   | The estimated number of tasks that this master can support placing greater weight on the most recently completed task.
+| capacity_tasks;      | The estimated number of tasks that this manager can effectively support.
+| capacity_cores;      | The estimated number of workers' cores that this manager can effectively support.
+| capacity_memory;     | The estimated number of workers' MB of RAM that this manager can effectively support.
+| capacity_disk;       | The estimated number of workers' MB of disk that this manager can effectively support.
+| capacity_instantaneous;       | The estimated number of tasks that this manager can support considering only the most recently completed task.
+| capacity_weighted;   | The estimated number of tasks that this manager can support placing greater weight on the most recently completed task.
 | 
 | total_cores;       | Total number of cores aggregated across the connected workers.
 | total_memory;      | Total memory in MB aggregated across the connected workers.
@@ -1087,7 +1087,7 @@ The statistics available are:
 | min_memory;        | The smallest memory size in MB observed among the connected workers.
 | min_disk;          | The smallest disk space in MB observed among the connected workers.
 | 
-| master_load;       | In the range of [0,1]. If close to 1, then the master is at full load and spends most of its time sending and receiving taks, and thus cannot accept connections from new workers. If close to 0, the master is spending most of its time waiting for something to happen.
+| manager_load;       | In the range of [0,1]. If close to 1, then the manager is at full load and spends most of its time sending and receiving taks, and thus cannot accept connections from new workers. If close to 0, the manager is spending most of its time waiting for something to happen.
 
 ## Further Information
 
