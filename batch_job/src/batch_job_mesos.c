@@ -49,10 +49,10 @@
 static int counter = 0;
 static struct itable *finished_tasks = NULL;
 static int is_mesos_py_path_known = 0;
-static int is_mesos_manager_known = 0;
+static int is_mesos_master_known = 0;
 static int is_scheduler_running = 0;
 static const char *mesos_py_path = NULL;
-static const char *mesos_manager = NULL;
+static const char *mesos_master = NULL;
 static const char *mesos_preload = NULL;
 
 static void start_mesos_scheduler(struct batch_queue *q)
@@ -123,7 +123,7 @@ static void start_mesos_scheduler(struct batch_queue *q)
 		
 
 		execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, 
-			mesos_manager, (char *) 0, envs);
+			mesos_master, (char *) 0, envs);
 
 		exit(errno);
 
@@ -150,21 +150,21 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 		is_mesos_py_path_known = 1;
 	}
 
-	// Get the mesos manager address
-	if (!is_mesos_manager_known) {
-		mesos_manager = batch_queue_get_option(q, "mesos-manager");
-		if (mesos_manager == NULL) {
-			fatal("Please specify the hostname of mesos manager by using --mesos-manager");
+	// Get the mesos master address
+	if (!is_mesos_master_known) {
+		mesos_master = batch_queue_get_option(q, "mesos-master");
+		if (mesos_master == NULL) {
+			fatal("Please specify the hostname of mesos master by using --mesos-master");
 		} else {
 			debug(D_INFO, "Get mesos_path %s from command line\n", mesos_py_path);
-			is_mesos_manager_known = 1;
+			is_mesos_master_known = 1;
 		}
 	}
 
 	mesos_preload = batch_queue_get_option(q, "mesos-preload");
 
 	if (is_mesos_py_path_known && 
-		is_mesos_manager_known && 
+		is_mesos_master_known && 
 		!is_scheduler_running ) {
 		// start mesos scheduler if it is not running
 		start_mesos_scheduler(q);

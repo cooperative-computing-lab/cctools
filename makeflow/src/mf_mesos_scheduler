@@ -10,14 +10,14 @@
 # to Mesos. They are,
 # 
 # 1. A simple httpserver, which is responsible for handle file transfer request from  
-# 	 Mesos manager.
+# 	 Mesos master.
 # 2. A workflow state monitor(i.e. MakefowMonitor), which will monitor the two files
 #    (i.e. mesos_task_info and mesos_task_state) and synchronize the workflow states
 #    of Makeflow and Mesos. 
-# 3. A Makeflow Mesos Scheduler, which submits ready tasks to Mesos manager, resubmits 
+# 3. A Makeflow Mesos Scheduler, which submits ready tasks to Mesos master, resubmits 
 #    failed tasks and write complete tasks' states to mesos_task_state.
 #  
-# In current version, each time when scheduler submit a new task to manager a new 
+# In current version, each time when scheduler submit a new task to master a new 
 # executor will be created and binded to the task. The scheduler will be terminated 
 # when the mesos_done_file is created.
 
@@ -124,30 +124,30 @@ def start_httpserver(httpd, port):
 # Makeflow mesos scheduler
 class MakeflowScheduler(Scheduler):
 
-    def __init__(self, mf_wk_dir, manager_addr, mf_hostname, http_port):
+    def __init__(self, mf_wk_dir, master_addr, mf_hostname, http_port):
         self.mf_wk_dir = mf_wk_dir
-        self.manager_addr = manager_addr
+        self.master_addr = master_addr
         self.mf_hostname = mf_hostname
         self.http_port = http_port
         self.finished_tasks = 0
         
     # Print out the dynamic static information of mesos cluster
     def print_mesos_info(self, task_id):
-        metrics_snapshot_url = "http://{0}/metrics/snapshot".format(self.manager_addr)
+        metrics_snapshot_url = "http://{0}/metrics/snapshot".format(self.master_addr)
 
-        manager_metrics = json.load(urllib2.urlopen(metrics_snapshot_url))
+        master_metrics = json.load(urllib2.urlopen(metrics_snapshot_url))
 
-        cpu_offered = manager_metrics['manager/cpus_total'] 
-        cpu_used = manager_metrics['manager/cpus_used']
-        mem_offered = manager_metrics['manager/mem_total']
-        mem_used = manager_metrics['manager/mem_used']
-        disk_offered = manager_metrics['manager/disk_total']
-        disk_used = manager_metrics['manager/disk_used'] 
+        cpu_offered = master_metrics['master/cpus_total'] 
+        cpu_used = master_metrics['master/cpus_used']
+        mem_offered = master_metrics['master/mem_total']
+        mem_used = master_metrics['master/mem_used']
+        disk_offered = master_metrics['master/disk_total']
+        disk_used = master_metrics['master/disk_used'] 
         self.finished_tasks = 0
-        tasks_running = manager_metrics['manager/tasks_running']
-        tasks_staging = manager_metrics['manager/tasks_staging']
-        tasks_starting = manager_metrics['manager/tasks_starting']
-        tasks_finished = manager_metrics['manager/tasks_finished']
+        tasks_running = master_metrics['master/tasks_running']
+        tasks_staging = master_metrics['master/tasks_staging']
+        tasks_starting = master_metrics['master/tasks_starting']
+        tasks_finished = master_metrics['master/tasks_finished']
 
         # treat running, staging and starting as running
         num_running_tasks = tasks_running + tasks_staging + tasks_starting
@@ -669,7 +669,7 @@ if __name__ == '__main__':
 
     # make us a framework
     mms.mf_wk_dir = sys.argv[1]
-    mesos_manager_addr = sys.argv[2]
+    mesos_master_addr = sys.argv[2]
 
     # create the "task_state" and "task_info" file
     if not os.path.isfile(FILE_TASK_STATE):
@@ -684,9 +684,9 @@ if __name__ == '__main__':
     mf_hostname = socket.getfqdn()
 
     driver = MesosSchedulerDriver(
-        MakeflowScheduler(mms.mf_wk_dir, mesos_manager_addr, mf_hostname, port),
+        MakeflowScheduler(mms.mf_wk_dir, mesos_master_addr, mf_hostname, port),
         framework,
-        mesos_manager_addr  # assumes running on the manager
+        mesos_master_addr  # assumes running on the master
     )
 
     # Start the monitor thread 
