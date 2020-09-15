@@ -14,6 +14,7 @@ for a broader discussion of how each tool is used.
   * [makeflow_viz(1)](man_pages/makeflow_viz.md)
   * [makeflow_graph_log(1)](man_pages/makeflow_graph_log.md)
   * [starch(1)](man_pages/starch.md)
+  * [makeflow_ec2_estimate(1)](man_pages/makeflow_ec2_estimate.md)
   * [makeflow_ec2_setup(1)](man_pages/makeflow_ec2_setup.md)
   * [makeflow_ec2_cleanup(1)](man_pages/makeflow_ec2_cleanup.md)
   * [condor_submit_makeflow(1)](man_pages/condor_submit_makeflow.md)
