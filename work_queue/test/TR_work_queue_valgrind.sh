@@ -31,36 +31,36 @@ prepare()
 
 run()
 {
-	cat > master.script << EOF
+	cat > manager.script << EOF
 submit 1 0 1 $TASKS
 wait
 quit
 EOF
 
-	echo "starting master"
-	(${VALGRIND} --log-file=master.valgrind -- work_queue_test -d all -o master.log -Z master.port < master.script; echo $? > master.exitcode ) &
+	echo "starting manager"
+	(${VALGRIND} --log-file=manager.valgrind -- work_queue_test -d all -o manager.log -Z manager.port < manager.script; echo $? > manager.exitcode ) &
 
-	echo "waiting for master to get ready"
-	wait_for_file_creation master.port 5
+	echo "waiting for manager to get ready"
+	wait_for_file_creation manager.port 5
 
-	port=$(cat master.port)
+	port=$(cat manager.port)
 
 	echo "starting worker"
 	(${VALGRIND} --log-file=worker.valgrind -- work_queue_worker -d all -o worker.log localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot; echo $? > worker.exitcode)
 
-	wait_for_file_creation master.exitcode 5
+	wait_for_file_creation manager.exitcode 5
 	wait_for_file_creation worker.exitcode 1
 
 	echo "checking for valgrind errors"
-	master=$(cat master.exitcode)
+	manager=$(cat manager.exitcode)
 	worker=$(cat worker.exitcode)
 
 	overall=0
 
-	if [ "$master" != 0 ]
+	if [ "$manager" != 0 ]
 	then
-		echo "valgrind found errors with the master."
-		[ -f master.valgrind ] && cat master.valgrind && overall=1
+		echo "valgrind found errors with the manager."
+		[ -f manager.valgrind ] && cat manager.valgrind && overall=1
 	fi
 
 	if [ "$worker" != 0 ]
@@ -74,7 +74,7 @@ EOF
 
 clean()
 {
-	rm -f master.script master.log master.port master.exitcode master.valgrind worker.log worker.exitcode worker.valgrind output.* input.*
+	rm -f manager.script manager.log manager.port manager.exitcode manager.valgrind worker.log worker.exitcode worker.valgrind output.* input.*
 }
 
 dispatch "$@"
