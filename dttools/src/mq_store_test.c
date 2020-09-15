@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "mq.h"
 #include "buffer.h"
@@ -11,9 +14,15 @@
 int main (int argc, char *argv[]) {
 	const char *string1 = "test message";
 
+	int srcfd = open(argv[0], O_RDONLY);
+	assert(srcfd != -1);
+	int dstfd = open(argv[1], O_WRONLY|O_CREAT|O_TRUNC, 0777);
+	assert(dstfd != -1);
+
 	buffer_t *test1 = xxmalloc(sizeof(*test1));
 	buffer_init(test1);
 	buffer_putstring(test1, string1);
+	buffer_t *got;
 
 	int rc;
 	buffer_t got_string;
@@ -46,6 +55,47 @@ int main (int argc, char *argv[]) {
 	assert(!strcmp(string1, buffer_tostring(&got_string)));
 	buffer_free(&got_string);
 
+	struct mq_poll *p = mq_poll_create();
+	assert(p);
+	rc = mq_poll_add(p, conn, NULL);
+	assert(rc == 0);
+	rc = mq_poll_add(p, client, NULL);
+	assert(rc == 0);
+
+	rc = mq_send_fd(conn, srcfd);
+	assert(rc == 0);
+	rc = mq_store_fd(client, dstfd);
+	assert(rc == 0);
+
+	rc = mq_poll_wait(p, time(NULL) + 5);
+	assert(rc == 1);
+	rc = mq_recv(client, NULL);
+	assert(rc == MQ_MSG_FD);
+
+	srcfd = open(argv[0], O_RDONLY);
+	assert(srcfd != -1);
+	dstfd = open(argv[2], O_WRONLY|O_CREAT|O_TRUNC, 0777);
+	assert(dstfd != -1);
+
+	rc = mq_send_fd(client, srcfd);
+	assert(rc == 0);
+
+	rc = mq_poll_wait(p, time(NULL) + 5);
+	assert(rc == 1);
+	rc = mq_recv(conn, &got);
+	assert(rc == MQ_MSG_NEWBUFFER);
+
+	rc = mq_send_buffer(client, got);
+	assert(rc != -1);
+	rc = mq_store_fd(conn, dstfd);
+	assert(rc == 0);
+
+	rc = mq_poll_wait(p, time(NULL) + 5);
+	assert(rc == 1);
+	rc = mq_recv(conn, NULL);
+	assert(rc == MQ_MSG_FD);
+
+	mq_poll_delete(p);
 	mq_close(client);
 	mq_close(conn);
 	mq_close(server);

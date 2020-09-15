@@ -122,8 +122,7 @@ typedef enum {
 	MQ_MSG_NONE = 0,
 	MQ_MSG_NEWBUFFER,
 	MQ_MSG_BUFFER,
-	//MQ_MSG_FILE,
-	//MQ_MSG_PROCESS,
+	MQ_MSG_FD,
 } mq_msg_t;
 
 
@@ -303,6 +302,22 @@ void *mq_poll_error(struct mq_poll *p);
  */
 int mq_send_buffer(struct mq *mq, buffer_t *buf);
 
+/** Stream a file descriptor across the wire.
+ *
+ * This operates in the same way as @ref mq_send_buffer, but takes
+ * a file descriptor. Note that the queue takes ownership of fd and will
+ * close it when the message is sent, so callers MUST NOT use/close fd
+ * after passing it in. This function will read from fd until reaching the
+ * end of the file. This function will not seek fd, so it's possible to send
+ * slices from within files.
+ * @param mq The message queue.
+ * @param fd The file descriptor to read.
+ * @returns 0 on success. Note that this only indicates that the message was
+ *  successfully queued. It gives no indication about delivery.
+ * @returns -1 on failure.
+ */
+int mq_send_fd(struct mq *mq, int fd);
+
 /** Pop a message from the receive queue.
  *
  * This is a non-blocking operation, and will return immediately if no
@@ -319,8 +334,7 @@ int mq_send_buffer(struct mq *mq, buffer_t *buf);
  * @returns MQ_MSG_NEWBUFFER if a message was stored in a newly-allocated
  *  buffer (pointed to by out).
  * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided buffer.
- * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided file.
- * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided process.
+ * @returns MQ_MSG_FD if a message has been written to a previously-provided fd.
  */
 mq_msg_t mq_recv(struct mq *mq, buffer_t **out);
 
@@ -342,7 +356,18 @@ mq_msg_t mq_recv(struct mq *mq, buffer_t **out);
  */
 int mq_store_buffer(struct mq *mq, buffer_t *buf);
 
-//int mq_store_file(struct mq *mq, ...);
-//int mq_store_process(struct mq *mq, ...);
+/** Write the next message to the given file descriptor.
+ *
+ * This function operates in the same way as @ref mq_store_buffer, but takes a
+ * file descriptor. Note that the queue takes ownership of fd and will
+ * close it when the message is received, so callers MUST NOT use/close fd
+ * after passing it in. This function will not seek fd, so it is possible to
+ * write to arbitrary positions within a file.
+ * @param mq The message queue.
+ * @param fd Then file descriptor to write to.
+ * @returns 0 on success.
+ * @returns -1 on failure, with errno set appropriately.
+ */
+int mq_store_fd(struct mq *mq, int fd);
 
 #endif

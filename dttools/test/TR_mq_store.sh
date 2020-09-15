@@ -2,6 +2,10 @@
 
 . ../../dttools/test/test_runner_common.sh
 
+TESTCMD=../src/mq_store_test
+TESTOUT1=mq_store.out1
+TESTOUT2=mq_store.out2
+
 prepare()
 {
 	return 0
@@ -9,12 +13,15 @@ prepare()
 
 run()
 {
-	../src/mq_store_test
-	return $?
+	$TESTCMD $TESTOUT1 $TESTOUT2 || return $?
+	cmp $TESTCMD $TESTOUT1 || return $?
+	cmp $TESTCMD $TESTOUT2 || return $?
+	return 0
 }
 
 clean()
 {
+	rm -f $TESTOUT1 $TESTOUT2
 	return 0
 }
 
