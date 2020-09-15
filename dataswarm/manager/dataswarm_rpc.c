@@ -59,6 +59,7 @@ dataswarm_result_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct d
 	free(msg);
 
 	FILE *file = fopen(filename,"r");
+
 	fseek(file,0,SEEK_END);
 	int64_t length = ftell(file);
 	fseek(file,0,SEEK_SET);
@@ -117,9 +118,9 @@ dataswarm_result_t dataswarm_rpc_blob_copy( struct dataswarm_manager *m, struct 
 	return dataswarm_rpc(m,w,msg);
 }
 
-dataswarm_result_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, const char *taskid, const char *bloba, const char *blobb )
+dataswarm_result_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, const char *taskinfo )
 {
-	char *msg = string_format("{\"id\": %d, \"method\" : \"task-submit\", \"params\" : {  \"task-id\": \"%s\",\"command\" : \"ls -la; cat myinput\", \"namespace\" : { \"%s\" : {\"type\" : \"path\", \"path\" : \"myinput\", \"mode\" : \"R\" }, \"%s\" : {\"type\" : \"stdout\" } } } }",m->message_id,taskid,bloba,blobb);
+	char *msg = string_format("{\"id\": %d, \"method\" : \"task-submit\", \"params\" : %s }",m->message_id,taskinfo);
 	return dataswarm_rpc(m,w,msg);
 }
 
