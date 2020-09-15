@@ -434,7 +434,7 @@ static int submit_worker( struct batch_queue *queue )
 	return status;
 }
 
-static void update_blacklisted_workers( struct batch_queue *queue, struct list *managers_list ) {
+static void update_blocked_hosts( struct batch_queue *queue, struct list *managers_list ) {
 
 	if(!managers_list || list_size(managers_list) < 1)
 		return;
@@ -447,20 +447,20 @@ static void update_blacklisted_workers( struct batch_queue *queue, struct list *
 	const char *sep = "";
 	list_first_item(managers_list);
 	while((j=list_next_item(managers_list))) {
-		struct jx *blacklisted = jx_lookup(j,"workers_blacklisted");
+		struct jx *blocked = jx_lookup(j,"workers_blocked");
 
-		if(!blacklisted) {
+		if(!blocked) {
 			continue;
 		}
 
-		if(jx_istype(blacklisted, JX_STRING)) {
-			buffer_printf(&b, "%s%s", sep, blacklisted->u.string_value);
+		if(jx_istype(blocked, JX_STRING)) {
+			buffer_printf(&b, "%s%s", sep, blocked->u.string_value);
 			sep = " ";
 		}
 
-		if(jx_istype(blacklisted, JX_ARRAY)) {
+		if(jx_istype(blocked, JX_ARRAY)) {
 			struct jx *item;
-			for (void *i = NULL; (item = jx_iterate_array(blacklisted, &i));) {
+			for (void *i = NULL; (item = jx_iterate_array(blocked, &i));) {
 				if(jx_istype(item, JX_STRING)) {
 					buffer_printf(&b, "%s%s", sep, item->u.string_value);
 					sep = " ";
@@ -470,9 +470,9 @@ static void update_blacklisted_workers( struct batch_queue *queue, struct list *
 	}
 
 	if(buffer_pos(&b) > 0) {
-		batch_queue_set_option(queue, "workers-blacklisted", buffer_tostring(&b));
+		batch_queue_set_option(queue, "workers-blocked", buffer_tostring(&b));
 	} else {
-		batch_queue_set_option(queue, "workers-blacklisted", NULL);
+		batch_queue_set_option(queue, "workers-blocked", NULL);
 	}
 
 	buffer_free(&b);
@@ -947,7 +947,7 @@ static void mainloop( struct batch_queue *queue )
 		free(update_str);
 		jx_delete(j);
 
-		update_blacklisted_workers(queue, managers_list);
+		update_blocked_hosts(queue, managers_list);
 
 		if(new_workers_needed > 0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
