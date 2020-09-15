@@ -84,8 +84,8 @@ static char *project_regex = 0;
 static char *submission_regex = 0;
 static char *foremen_regex = 0;
 
-char *master_host = 0;
-int master_port = 0;
+char *manager_host = 0;
+int manager_port = 0;
 int using_catalog = 0;
 
 static char *extra_worker_args=0;
@@ -132,7 +132,7 @@ static void ignore_signal( int sig )
 {
 }
 
-int master_workers_capacity(struct jx *j) {
+int manager_workers_capacity(struct jx *j) {
 	int capacity_tasks   = jx_lookup_integer(j, "capacity_tasks");
 	int capacity_cores   = jx_lookup_integer(j, "capacity_cores");
 	int capacity_memory  = jx_lookup_integer(j, "capacity_memory");
@@ -176,7 +176,7 @@ int master_workers_capacity(struct jx *j) {
 	return capacity;
 }
 
-int master_workers_needed_by_resource(struct jx *j) {
+int manager_workers_needed_by_resource(struct jx *j) {
 	int tasks_total_cores  = jx_lookup_integer(j, "tasks_total_cores");
 	int tasks_total_memory = jx_lookup_integer(j, "tasks_total_memory");
 	int tasks_total_disk   = jx_lookup_integer(j, "tasks_total_disk");
@@ -202,24 +202,24 @@ int master_workers_needed_by_resource(struct jx *j) {
 	return needed;
 }
 
-struct list* do_direct_query( const char *master_host, int master_port )
+struct list* do_direct_query( const char *manager_host, int manager_port )
 {
 	const char * query_string = "queue";
 
 	struct link *l;
 
-	char master_addr[LINK_ADDRESS_MAX];
+	char manager_addr[LINK_ADDRESS_MAX];
 
 	time_t stoptime = time(0) + work_queue_status_timeout;
 
-	if(!domain_name_cache_lookup(master_host,master_addr)) {
-		fprintf(stderr,"couldn't find address of %s\n",master_host);
+	if(!domain_name_cache_lookup(manager_host,manager_addr)) {
+		fprintf(stderr,"couldn't find address of %s\n",manager_host);
 		return 0;
 	}
 
-	l = link_connect(master_addr,master_port,stoptime);
+	l = link_connect(manager_addr,manager_port,stoptime);
 	if(!l) {
-		fprintf(stderr,"couldn't connect to %s port %d: %s\n",master_host,master_port,strerror(errno));
+		fprintf(stderr,"couldn't connect to %s port %d: %s\n",manager_host,manager_port,strerror(errno));
 		return 0;
 	}
 
@@ -229,29 +229,29 @@ struct list* do_direct_query( const char *master_host, int master_port )
 	link_close(l);
 
 	if(!jarray || jarray->type!=JX_ARRAY || !jarray->u.items ) {
-		fprintf(stderr,"couldn't read %s status from %s port %d\n",query_string,master_host,master_port);
+		fprintf(stderr,"couldn't read %s status from %s port %d\n",query_string,manager_host,manager_port);
 		return 0;
 	}
 
 	struct jx *j = jarray->u.items->value;
 	j->type = JX_OBJECT;
 	
-	struct list* master_list = list_create();
-	list_push_head(master_list, j);
-	return master_list;
+	struct list* manager_list = list_create();
+	list_push_head(manager_list, j);
+	return manager_list;
 }
 
-static int count_workers_connected( struct list *masters_list )
+static int count_workers_connected( struct list *managers_list )
 {
 	int connected_workers=0;
 	struct jx *j;
 
-	if(!masters_list) {
+	if(!managers_list) {
 		return connected_workers;
 	}
 
-	list_first_item(masters_list);
-	while((j=list_next_item(masters_list))) {
+	list_first_item(managers_list);
+	while((j=list_next_item(managers_list))) {
 		const int workers = jx_lookup_integer(j,"workers");
 		connected_workers += workers;
 	}
@@ -260,22 +260,22 @@ static int count_workers_connected( struct list *masters_list )
 }
 
 /*
-Count up the workers needed in a given list of masters, IGNORING how many
+Count up the workers needed in a given list of managers, IGNORING how many
 workers are actually connected.
 */
 
-static int count_workers_needed( struct list *masters_list, int only_not_running )
+static int count_workers_needed( struct list *managers_list, int only_not_running )
 {
 	int needed_workers=0;
-	int masters=0;
+	int managers=0;
 	struct jx *j;
 
-	if(!masters_list) {
+	if(!managers_list) {
 		return needed_workers;
 	}
 
-	list_first_item(masters_list);
-	while((j=list_next_item(masters_list))) {
+	list_first_item(managers_list);
+	while((j=list_next_item(managers_list))) {
 
 		const char *project =jx_lookup_string(j,"project");
 		const char *host =   jx_lookup_string(j,"name");
@@ -285,7 +285,7 @@ static int count_workers_needed( struct list *masters_list, int only_not_running
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 
-		int capacity = master_workers_capacity(j);
+		int capacity = manager_workers_capacity(j);
 
 		// first assume one task per worker
 		int need;
@@ -302,7 +302,7 @@ static int count_workers_needed( struct list *masters_list, int only_not_running
 		}
 
 		// consider if tasks declared resources...
-		need = MAX(need, master_workers_needed_by_resource(j));
+		need = MAX(need, manager_workers_needed_by_resource(j));
 
 		if(consider_capacity && capacity > 0) {
 			need = MIN(need, capacity);
@@ -310,7 +310,7 @@ static int count_workers_needed( struct list *masters_list, int only_not_running
 
 		debug(D_WQ,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tw+tl+tr,capacity,need,tr);
 		needed_workers += need;
-		masters++;
+		managers++;
 	}
 
 	return needed_workers;
@@ -370,8 +370,8 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = string_format(
 		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s",
 		worker,
-		master_host,
-		master_port,
+		manager_host,
+		manager_port,
 		worker_timeout,
 		catalog_host,
 		password_file ? "-P pwfile" : "",
@@ -434,9 +434,9 @@ static int submit_worker( struct batch_queue *queue )
 	return status;
 }
 
-static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
+static void update_blacklisted_workers( struct batch_queue *queue, struct list *managers_list ) {
 
-	if(!masters_list || list_size(masters_list) < 1)
+	if(!managers_list || list_size(managers_list) < 1)
 		return;
 
 	buffer_t b;
@@ -445,8 +445,8 @@ static void update_blacklisted_workers( struct batch_queue *queue, struct list *
 	buffer_init(&b);
 
 	const char *sep = "";
-	list_first_item(masters_list);
-	while((j=list_next_item(masters_list))) {
+	list_first_item(managers_list);
+	while((j=list_next_item(managers_list))) {
 		struct jx *blacklisted = jx_lookup(j,"workers_blacklisted");
 
 		if(!blacklisted) {
@@ -533,7 +533,7 @@ void print_stats(struct jx *j) {
 
 	jx_table_print_header(queue_headers,stdout,columns);
 
-	struct jx *a = jx_lookup(j, "masters");
+	struct jx *a = jx_lookup(j, "managers");
 	if(a) {
 		struct jx *m;
 		for (void *i = NULL; (m = jx_iterate_array(a, &i));) {
@@ -553,7 +553,7 @@ void print_stats(struct jx *j) {
 	fflush(stdout);
 }
 
-struct jx *master_to_jx(struct jx *m) {
+struct jx *manager_to_jx(struct jx *m) {
 
 	struct jx *j = jx_object(NULL);
 
@@ -562,13 +562,13 @@ struct jx *master_to_jx(struct jx *m) {
 	if(project_name) {
 		jx_insert_string(j, "project", jx_lookup_string(m, "project"));
 	} else {
-		jx_insert_string(j, "project", master_host);
+		jx_insert_string(j, "project", manager_host);
 	}
 
 	if(using_catalog) {
 		jx_insert_string(j, "name", jx_lookup_string(m, "name"));
 	} else {
-		jx_insert_string(j, "name", master_host);
+		jx_insert_string(j, "name", manager_host);
 	}
 
 	jx_insert_integer(j, "port",           jx_lookup_integer(m, "port"));
@@ -580,7 +580,7 @@ struct jx *master_to_jx(struct jx *m) {
 	return j;
 }
 
-struct jx *factory_to_jx(struct list *masters, struct list *foremen, int submitted, int needed, int requested, int connected) {
+struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submitted, int needed, int requested, int connected) {
 
 	struct jx *j= jx_object(NULL);
 	jx_insert_string(j, "type", "wq_factory");
@@ -602,16 +602,16 @@ struct jx *factory_to_jx(struct list *masters, struct list *foremen, int submitt
 	jx_insert_integer(j, "workers_to_connect", to_connect);
 
 	struct jx *ms = jx_array(NULL);
-	if(masters && list_size(masters) > 0)
+	if(managers && list_size(managers) > 0)
 	{
 		struct jx *m;
-		list_first_item(masters);
-		while((m = list_next_item(masters)))
+		list_first_item(managers);
+		while((m = list_next_item(managers)))
 		{
-			jx_array_append(ms, master_to_jx(m));
+			jx_array_append(ms, manager_to_jx(m));
 		}
 	}
-	jx_insert(j, jx_string("masters"), ms);
+	jx_insert(j, jx_string("managers"), ms);
 
 
 	struct jx *fs = jx_array(NULL);
@@ -621,7 +621,7 @@ struct jx *factory_to_jx(struct list *masters, struct list *foremen, int submitt
 		list_first_item(foremen);
 		while((f = list_next_item(foremen)))
 		{
-			jx_array_append(fs, master_to_jx(f));
+			jx_array_append(fs, manager_to_jx(f));
 
 		}
 	}
@@ -694,15 +694,22 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_INTEGER, integer_value)
 
-	assign_new_value(new_project_regex, project_regex, master-name, const char *, JX_STRING, string_value)
+	/* first try with old master option, then with manager */
+	assign_new_value(new_project_regex_old_opt, project_regex, master-name, const char *, JX_STRING, string_value)
+	assign_new_value(new_project_regex, project_regex, manager-name, const char *, JX_STRING, string_value)
+
 	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_extra_worker_args, extra_worker_args, worker-extra-options, const char *, JX_STRING, string_value)
 
 	assign_new_value(new_condor_requirements, condor_requirements, condor-requirements, const char *, JX_STRING, string_value)
 
-	if(!master_host) {
+	if(!manager_host) {
+		if(!new_project_regex) {
+			// if manager-name not given, try with the old master-name
+			new_project_regex = new_project_regex_old_opt;
+		}
 		if(!new_project_regex || strlen(new_project_regex) == 0) {
-			debug(D_NOTICE, "%s: master name is missing and no master host was given.\n", config_file);
+			debug(D_NOTICE, "%s: manager name is missing and no manager host was given.\n", config_file);
 			error_found = 1;
 		}
 	}
@@ -771,7 +778,7 @@ int read_config_file(const char *config_file) {
 	last_time_modified = new_time_modified;
 	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
-	fprintf(stdout, "master-name: %s\n", project_regex);
+	fprintf(stdout, "manager-name: %s\n", project_regex);
 	if(foremen_regex) {
 		fprintf(stdout, "foremen-name: %s\n", foremen_regex);
 	}
@@ -812,7 +819,7 @@ end:
 
 /*
 Main loop of work queue pool.  Determine the number of workers needed by our
-current list of masters, compare it to the number actually submitted, then
+current list of managers, compare it to the number actually submitted, then
 submit more until the desired state is reached.
 */
 
@@ -821,7 +828,7 @@ static void mainloop( struct batch_queue *queue )
 	int workers_submitted = 0;
 	struct itable *job_table = itable_create(0);
 
-	struct list *masters_list = NULL;
+	struct list *managers_list = NULL;
 	struct list *foremen_list = NULL;
 
 	int64_t factory_timeout_start = time(0);
@@ -838,13 +845,13 @@ static void mainloop( struct batch_queue *queue )
 		submission_regex = foremen_regex ? foremen_regex : project_regex;
 
 		if(using_catalog) {
-			masters_list = work_queue_catalog_query(catalog_host,-1,project_regex);
+			managers_list = work_queue_catalog_query(catalog_host,-1,project_regex);
 		}
 		else {
-			masters_list = do_direct_query(master_host,master_port);
+			managers_list = do_direct_query(manager_host,manager_port);
 		}
 
-		if(masters_list && list_size(masters_list) > 0)
+		if(managers_list && list_size(managers_list) > 0)
 		{
 			factory_timeout_start = time(0);
 		} else {
@@ -852,23 +859,23 @@ static void mainloop( struct batch_queue *queue )
 			if(factory_timeout > 0)
 			{
 				if(time(0) - factory_timeout_start > factory_timeout) {
-					fprintf(stderr, "There have been no masters for longer then the factory timeout, exiting\n");
+					fprintf(stderr, "There have been no managers for longer then the factory timeout, exiting\n");
 					abort_flag=1;
 					break;
 				}
 			}
 		}
 	
-		debug(D_WQ,"evaluating master list...");
-		int workers_connected = count_workers_connected(masters_list);
+		debug(D_WQ,"evaluating manager list...");
+		int workers_connected = count_workers_connected(managers_list);
 		int workers_needed = 0;
 
 		if(foremen_regex)
 		{
 			/* If there are foremen, we only look at tasks not running in the
-			 * masters' list. The rest of the tasks will be counted as waiting
+			 * managers' list. The rest of the tasks will be counted as waiting
 			 * or running on the foremen. */
-			workers_needed = count_workers_needed(masters_list, /* do not count running tasks */ 1);
+			workers_needed = count_workers_needed(managers_list, /* do not count running tasks */ 1);
 			debug(D_WQ,"evaluating foremen list...");
 			foremen_list    = work_queue_catalog_query(catalog_host,-1,foremen_regex);
 
@@ -880,12 +887,12 @@ static void mainloop( struct batch_queue *queue )
 			debug(D_WQ,"%d total workers needed across %d foremen",workers_needed,list_size(foremen_list));
 		} else {
 			/* If there are no foremen, workers needed are computed directly
-			 * from the tasks running, waiting, and left from the masters'
+			 * from the tasks running, waiting, and left from the managers'
 			 * list. */
-			workers_needed = count_workers_needed(masters_list, 0);
-			debug(D_WQ,"%d total workers needed across %d masters",
+			workers_needed = count_workers_needed(managers_list, 0);
+			debug(D_WQ,"%d total workers needed across %d managers",
 					workers_needed,
-					masters_list ? list_size(masters_list) : 0);
+					managers_list ? list_size(managers_list) : 0);
 		}
 
 		debug(D_WQ,"raw workers needed: %d", workers_needed);
@@ -931,7 +938,7 @@ static void mainloop( struct batch_queue *queue )
 		debug(D_WQ,"workers submitted: %d", workers_submitted);
 		debug(D_WQ,"workers requested: %d", MAX(0, new_workers_needed));
 
-		struct jx *j = factory_to_jx(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
+		struct jx *j = factory_to_jx(managers_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
 		char *update_str = jx_print_string(j);
 		debug(D_WQ, "Sending status to the catalog server(s) at %s ...", catalog_host);
@@ -940,7 +947,7 @@ static void mainloop( struct batch_queue *queue )
 		free(update_str);
 		jx_delete(j);
 
-		update_blacklisted_workers(queue, masters_list);
+		update_blacklisted_workers(queue, managers_list);
 
 		if(new_workers_needed > 0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
@@ -971,7 +978,7 @@ static void mainloop( struct batch_queue *queue )
 			}
 		}
 
-		delete_projects_list(masters_list);
+		delete_projects_list(managers_list);
 		delete_projects_list(foremen_list);
 
 		sleep(factory_period);
@@ -985,15 +992,15 @@ static void mainloop( struct batch_queue *queue )
 
 static void show_help(const char *cmd)
 {
-	printf("Use: work_queue_factory [options] <masterhost> <port>\nor\n     work_queue_factory [options] -M projectname\n");
+	printf("Use: work_queue_factory [options] <managerhost> <port>\nor\n     work_queue_factory [options] -M projectname\n");
 	printf("where options are:\n");
-	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,-N,--master-name=<project>");\
+	printf(" %-30s Project name of managers to serve, can be a regular expression.\n", "-M,-N,--manager-name=<project>");\
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
-	printf(" %-30s Catalog server to query for masters (default: %s:%d).\n", "--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
+	printf(" %-30s Catalog server to query for managers (default: %s:%d).\n", "--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
 	printf(" %-30s Batch system type (required). One of:\n", "-T,--batch-type=<type>");
 	printf(" %-30s %s\n","",batch_queue_type_string());
 	printf(" %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
-	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
+	printf(" %-30s Password file for workers to authenticate to manager.\n","-P,--password");
 	printf(" %-30s Use configuration file <file>.\n","-C,--config-file=<file>");
 	printf(" %-30s Minimum workers running (default=%d).\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running (default=%d).\n", "-W,--max-workers", workers_max);
@@ -1008,14 +1015,14 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
 	printf(" %-30s Automatically size a worker to an available slot (Condor, Mesos, and Kubernetes).\n", "--autosize");
 	printf(" %-30s Set requirements for the workers as Condor jobs. May be specified several times with expresions and-ed together (Condor only).\n", "--condor-requirements");
-	printf(" %-30s Exit after no master has been seen in <n> seconds.\n", "--factory-timeout");
+	printf(" %-30s Exit after no manager has been seen in <n> seconds.\n", "--factory-timeout");
 	printf(" %-30s Use this scratch dir for temporary files (default is /tmp/wq-pool-$uid).\n","-S,--scratch-dir");
-	printf(" %-30s Use worker capacity reported by masters.\n","-c,--capacity");
+	printf(" %-30s Use worker capacity reported by managers.\n","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Specify Amazon config file (for use with -T amazon).\n", "--amazon-config");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
-	printf(" %-30s Specify the host name to mesos master node (for use with -T mesos).\n", "--mesos-master");
+	printf(" %-30s Specify the host name to mesos manager node (for use with -T mesos).\n", "--mesos-manager");
 	printf(" %-30s Specify path to mesos python library (for use with -T mesos).\n", "--mesos-path");
 	printf(" %-30s Specify the linking libraries for running mesos (for use with -T mesos).\n", "--mesos-preload");
 	printf(" %-30s Specify the container image for using Kubernetes (for use with -T k8s).\n", "--k8s-image");
@@ -1024,7 +1031,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify the size of the debug file (must use with -o option).\n", "-O,--debug-file-size=<mb>");
 	printf(" %-30s Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.\n","--runos=<img>");
-	printf(" %-30s Force factory to run itself as a work queue master.\n","--run-factory-as-master");
+	printf(" %-30s Force factory to run itself as a work queue manager.\n","--run-factory-as-manager");
 	printf(" %-30s Show the version string.\n", "-v,--version");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
@@ -1043,14 +1050,14 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WORKER_BINARY,
-		LONG_OPT_MESOS_MASTER, 
+		LONG_OPT_MESOS_MANAGER, 
 		LONG_OPT_MESOS_PATH,
 		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_K8S_IMAGE,
 		LONG_OPT_K8S_WORKER_IMAGE,
 		LONG_OPT_CATALOG,
 		LONG_OPT_ENVIRONMENT_VARIABLE,
-		LONG_OPT_RUN_AS_MASTER,
+		LONG_OPT_RUN_AS_MANAGER,
 		LONG_OPT_RUN_OS,
 	};
 
@@ -1076,15 +1083,16 @@ static const struct option long_options[] = {
 	{"help", no_argument, 0, 'h'},
 	{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMAGE},
 	{"k8s-worker-image", required_argument, 0, LONG_OPT_K8S_WORKER_IMAGE},
+	{"manager-name", required_argument, 0, 'M'},
 	{"master-name", required_argument, 0, 'M'},
 	{"max-workers", required_argument, 0, 'W'},
 	{"memory", required_argument,  0,  LONG_OPT_MEMORY},
-	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
+	{"mesos-manager", required_argument, 0, LONG_OPT_MESOS_MANAGER},
 	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 	{"min-workers", required_argument, 0, 'w'},
 	{"password", required_argument, 0, 'P'},
-	{"run-factory-as-master", no_argument, 0, LONG_OPT_RUN_AS_MASTER},
+	{"run-factory-as-manager", no_argument, 0, LONG_OPT_RUN_AS_MANAGER},
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{"scratch-dir", required_argument, 0, 'S' },
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
@@ -1100,14 +1108,14 @@ static const struct option long_options[] = {
 
 int main(int argc, char *argv[])
 {
-	char *mesos_master = NULL;
+	char *mesos_manager = NULL;
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
 	struct jx *wrapper_inputs = jx_array(NULL);
 
-	// --run-factory-as-master and -Twq should be used together.
-	int run_as_master = 0;
+	// --run-factory-as-manager and -Twq should be used together.
+	int run_as_manager = 0;
 
 	//Environment variable handling
 	char *ev = NULL;
@@ -1253,8 +1261,8 @@ int main(int argc, char *argv[])
 			case 'h':
 				show_help(argv[0]);
 				exit(EXIT_SUCCESS);
-			case LONG_OPT_MESOS_MASTER:
-				mesos_master = xxstrdup(optarg);
+			case LONG_OPT_MESOS_MANAGER:
+				mesos_manager = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MESOS_PATH:
 				mesos_path = xxstrdup(optarg);
@@ -1272,8 +1280,8 @@ int main(int argc, char *argv[])
 			case LONG_OPT_CATALOG:
 				catalog_host = xxstrdup(optarg);
 				break;
-			case LONG_OPT_RUN_AS_MASTER:
-				run_as_master = 1;
+			case LONG_OPT_RUN_AS_MANAGER:
+				run_as_manager = 1;
 				break;
 			case LONG_OPT_RUN_OS:
 				runos_os = xxstrdup(optarg);
@@ -1284,12 +1292,12 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE && !run_as_master) {
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE && !run_as_manager) {
 		fprintf(stderr, "work_queue_factory: batch system 'wq' specified, but you most likely want 'local'.\n");
-		fprintf(stderr, "work_queue_factory: use --run-factory-as-master if you know what you are doing.\n");
+		fprintf(stderr, "work_queue_factory: use --run-factory-as-manager if you know what you are doing.\n");
 		exit(EXIT_FAILURE);
-	} else if(batch_queue_type != BATCH_QUEUE_TYPE_WORK_QUEUE && run_as_master) {
-		fprintf(stderr, "work_queue_factory: --run-factory-as-master can only be used with -Twq.\n");
+	} else if(batch_queue_type != BATCH_QUEUE_TYPE_WORK_QUEUE && run_as_manager) {
+		fprintf(stderr, "work_queue_factory: --run-factory-as-manager can only be used with -Twq.\n");
 		fprintf(stderr, "work_queue_factory: you most likely want -Tlocal instead.\n");
 		exit(EXIT_FAILURE);
 	}
@@ -1309,8 +1317,8 @@ int main(int argc, char *argv[])
 	}
 
 	if((argc - optind) == 2) {
-		master_host = argv[optind];
-		master_port = atoi(argv[optind+1]);
+		manager_host = argv[optind];
+		manager_port = atoi(argv[optind+1]);
 	}
 
 	if(config_file) {
@@ -1320,13 +1328,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(!(master_host || config_file || project_regex)) {
-		fprintf(stderr,"work_queue_factory: You must either give a project name with the -M option or master-name option with a configuration file, or give the master's host and port.\n");
+	if(!(manager_host || config_file || project_regex)) {
+		fprintf(stderr,"work_queue_factory: You must either give a project name with the -M option or manager-name option with a configuration file, or give the manager's host and port.\n");
 		show_help(argv[0]);
 		exit(1);
 	}
 
-	if(master_host) {
+	if(manager_host) {
 		using_catalog = 0;
 	} else {
 		using_catalog = 1;
@@ -1458,7 +1466,7 @@ int main(int argc, char *argv[])
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
 		batch_queue_set_option(queue, "mesos-path", mesos_path);
-		batch_queue_set_option(queue, "mesos-master", mesos_master);
+		batch_queue_set_option(queue, "mesos-manager", mesos_manager);
 		batch_queue_set_option(queue, "mesos-preload", mesos_preload);
 		batch_queue_set_logfile(queue, "work_queue_factory.mesoslog");
 	}
