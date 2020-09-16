@@ -4,6 +4,8 @@
 #include "hash_table.h"
 #include "link.h"
 
+#include "dataswarm_worker_rep.h"
+
 struct dataswarm_manager {
 	struct hash_table *worker_table;
 	struct hash_table *client_table;
@@ -22,6 +24,10 @@ struct dataswarm_manager {
 	const char *project_name;
 };
 
-struct dataswarm_manager * dataswarm_manager_create();
+struct dataswarm_manager *dataswarm_manager_create();
+
+
+/* declares a blob in a worker so that it can be manipulated via blob rpcs. */
+struct dataswarm_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid);
 
 #endif

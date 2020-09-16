@@ -1,61 +1,168 @@
 
 #include "dataswarm_rpc.h"
 #include "dataswarm_message.h"
+#include "dataswarm_blob_rep.h"
 
-#include "jx.h"
 #include "debug.h"
+#include "itable.h"
 #include "stringtools.h"
+#include "json.h"
+#include "jx.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* Receive the response from a specific RPC.  If an asynchronous update is received instead, process that and then return to looking for the expected response. */
 
-dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, jx_int_t id )
+/* test read responses from workers. */
+dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct dataswarm_worker_rep *r)
 {
-	while(1) {
-		struct jx * msg = dataswarm_json_recv(w->link,time(0)+m->stall_timeout);
+    struct jx * msg = dataswarm_json_recv(r->link,time(0)+m->connect_timeout);
 
-		jx_int_t msgid = jx_lookup_integer(msg,"id");
-		if(msgid!=0) {
-			if(id==msgid) {
-				dataswarm_result_t result = jx_lookup_integer(msg,"result");
-				jx_delete(msg);
-				return result;
-			} else {
-				debug(D_NOTICE|D_DATASWARM,"out-of-order message from worker: %d",(int)msgid);
-				jx_delete(msg);
-				// keep going?
-			}
-		} else {
-			dataswarm_worker_rep_async_update(w,msg);
-			jx_delete(msg);
-		}
-	}
+    jx_int_t msgid = jx_lookup_integer(msg,"id");
+
+    if(msgid == 0) {
+        dataswarm_worker_rep_async_update(r,msg);
+        jx_delete(msg);
+        return -1;
+    }
+
+    dataswarm_result_t result = jx_lookup_integer(msg,"result");
+
+    struct dataswarm_blob_rep *b = (struct dataswarm_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
+
+    if(b) {
+        b->result = result;
+        if(b->result == DS_RESULT_SUCCESS) {
+            b->action = b->in_transition;
+        }
+    } else {
+        /* may be a task */
+    }
+
+    jx_delete(msg);
+
+    return result;
 }
 
 /*
-Perform a remote procedure call by sending a message, freeing it, and waiting for the matching response.
+Send a remote procedure call, freeing it, and returning the message id
+associated with the future response.
 */
 
-dataswarm_result_t dataswarm_rpc( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, char *msg )
+jx_int_t dataswarm_rpc( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, struct jx *rpc)
 {
-	dataswarm_message_send(w->link,msg,strlen(msg),time(0)+m->stall_timeout);
-	free(msg);
-	return dataswarm_rpc_get_response(m,w,m->message_id++);
+    jx_int_t msgid = m->message_id++;
+    jx_insert_integer(rpc, "id", msgid);
+
+	dataswarm_json_send(r->link,rpc,time(0)+m->stall_timeout);
+	jx_delete(rpc);
+
+	return msgid;
 }
 
-dataswarm_result_t dataswarm_rpc_blob_create( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, const char *blobid, int64_t size )
+jx_int_t dataswarm_rpc_for_blob( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, struct dataswarm_blob_rep *b, struct jx *rpc, dataswarm_blob_action_t in_transition )
 {
-	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-create\", \"params\" : {  \"blob-id\" : \"%s\", \"size\" : %lld, \"metadata\": {} } }",m->message_id,blobid,(long long)size);
-	return dataswarm_rpc(m,w,msg);
+
+    jx_int_t msgid = dataswarm_rpc(m, r, rpc);
+
+    b->in_transition = in_transition;
+    b->result = DS_RESULT_PENDING;;
+
+    itable_insert(r->blob_of_rpc, msgid, b);
+
+    return msgid;
 }
 
-dataswarm_result_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, const char *blobid, const char *filename )
+jx_int_t dataswarm_rpc_blob_create( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, int64_t size, struct jx *metadata )
+{
+    struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+    if(!b) {
+        fatal("No blob with id %s exist at the worker.", blobid);
+    }
+
+    //define method and params of blob-create.
+    //msg id will be added by dataswarm_rpc_blob_queue
+    struct jx *msg = jx_object(0);
+    jx_insert_string(msg, "method", "blob-create");
+
+    struct jx *params = jx_object(0);
+    jx_insert(msg, jx_string("params"), params);
+    jx_insert_string(params, "blob-id", blobid);
+    jx_insert_integer(params, "size", size);
+    if(metadata) {
+        jx_insert(msg, jx_string("metadata"), metadata);
+    }
+
+    return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_ACTION_CREATE);
+}
+
+jx_int_t dataswarm_rpc_blob_commit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
+{
+    struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+    if(!b) {
+        fatal("No blob with id %s exist at the worker.", blobid);
+    }
+
+    //define method and params of blob-commit.
+    //msg id will be added by dataswarm_rpc_blob_queue
+    struct jx *msg = jx_object(0);
+    jx_insert_string(msg, "method", "blob-commit");
+
+    struct jx *params = jx_object(0);
+    jx_insert(msg, jx_string("params"), params);
+    jx_insert_string(params, "blob-id", blobid);
+
+    return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_ACTION_COMMIT);
+}
+
+jx_int_t dataswarm_rpc_blob_delete( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
+{
+    struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+    if(!b) {
+        fatal("No blob with id %s exist at the worker.", blobid);
+    }
+
+    //define method and params of blob-delete.
+    //msg id will be added by dataswarm_rpc_blob_queue
+    struct jx *msg = jx_object(0);
+    jx_insert_string(msg, "method", "blob-delete");
+
+    struct jx *params = jx_object(0);
+    jx_insert(msg, jx_string("params"), params);
+    jx_insert_string(params, "blob-id", blobid);
+
+    return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_ACTION_DELETE);
+}
+
+jx_int_t dataswarm_rpc_blob_copy( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid_source, const char *blobid_target )
+{
+    struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid_target);
+    if(!b) {
+        fatal("No blob with id %s exist at the worker.", blobid_target);
+    }
+
+    //define method and params of blob-copy.
+    //msg id will be added by dataswarm_rpc_blob_queue
+    struct jx *msg = jx_object(0);
+    jx_insert_string(msg, "method", "blob-copy");
+
+    struct jx *params = jx_object(0);
+    jx_insert(msg, jx_string("params"), params);
+    jx_insert_string(params, "blob-id-source", blobid_source);
+    jx_insert_string(params, "blob-id", blobid_source);
+
+    return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_ACTION_COPY);
+}
+
+
+
+
+jx_int_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
 {
 	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-put\", \"params\" : {  \"blob-id\" : \"%s\" } }",m->message_id,blobid);
-	dataswarm_message_send(w->link,msg,strlen(msg),time(0)+m->stall_timeout);
+	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+m->stall_timeout);
 	free(msg);
 
 	FILE *file = fopen(filename,"r");
@@ -64,35 +171,37 @@ dataswarm_result_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct d
 	int64_t length = ftell(file);
 	fseek(file,0,SEEK_SET);
 	msg = string_format("%lld\n",(long long)length);
-	link_write(w->link,msg,strlen(msg),time(0)+m->stall_timeout);
-	link_stream_from_file(w->link,file,length,time(0)+m->stall_timeout);
+	link_write(r->link,msg,strlen(msg),time(0)+m->stall_timeout);
+	link_stream_from_file(r->link,file,length,time(0)+m->stall_timeout);
 	fclose(file);
 
-	return dataswarm_rpc_get_response(m,w,m->message_id++);
+	//return dataswarm_rpc_get_response(m,r,m->message_id++);
+	return dataswarm_rpc_get_response(m,r);
 }
 
-dataswarm_result_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, const char *blobid, const char *filename )
+jx_int_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
 {
 	dataswarm_result_t result;
 
-	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-get\", \"params\" : {  \"blob-id\" : \"%s\" } }",m->message_id,blobid);
-	result = dataswarm_rpc(m,w,msg);
+	//char *msg = string_format("{\"id\": %d, \"method\" : \"blob-get\", \"params\" : {  \"blob-id\" : \"%s\" } }",m->message_id,blobid);
+	//result = dataswarm_rpc(m,r,msg);
+    result = DS_RESULT_SUCCESS;
 	if(result!=DS_RESULT_SUCCESS) return result;
 
 	result = DS_RESULT_UNABLE;
 
 	int64_t actual;
 	char line[16];
-	actual = link_readline(w->link,line,sizeof(line),time(0)+m->stall_timeout);
+	actual = link_readline(r->link,line,sizeof(line),time(0)+m->stall_timeout);
 	if(actual>0) {
 		int64_t length = atoll(line);
 		FILE *file = fopen(filename,"w");
 		if(file) {
-			actual = link_stream_to_file(w->link,file,length,time(0)+m->stall_timeout);
+			actual = link_stream_to_file(r->link,file,length,time(0)+m->stall_timeout);
 			fclose(file);
 			if(actual==length) {
 				result = DS_RESULT_SUCCESS;
-			} 
+			}
 		}
 
 	}
@@ -100,33 +209,20 @@ dataswarm_result_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct d
 	return result;
 }
 
-dataswarm_result_t dataswarm_rpc_blob_commit( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, const char *blobid )
+jx_int_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskinfo )
 {
-	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-commit\", \"params\" : {  \"blob-id\" : \"%s\" } }",m->message_id,blobid);
-	return dataswarm_rpc(m,w,msg);
+	char *msg = string_format("{\"id\": %d, \"method\" : \"task-submit\", \"params\" : %s }",m->message_id++,taskinfo);
+
+	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+m->stall_timeout);
+    free(msg);
+
+    return m->message_id;
 }
 
-dataswarm_result_t dataswarm_rpc_blob_delete( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, const char *blobid )
+jx_int_t dataswarm_rpc_task_remove( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
 {
-	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-delete\", \"params\" : {  \"blob-id\" : \"%s\" } }",m->message_id,blobid);
-	return dataswarm_rpc(m,w,msg);
-}
+	char *msg = string_format("{\"id\": %d, \"method\" : \"task-remove\", \"params\" : {  \"task-id\" : \"%s\" } }",m->message_id++,taskid);
+	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+m->stall_timeout);
 
-dataswarm_result_t dataswarm_rpc_blob_copy( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, const char *blobid_source, const char *blobid_target )
-{
-	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-copy\", \"params\" : {  \"blob-id-source\" : \"%s\" \"blob-id\" : \"%s\" } }",m->message_id,blobid_source,blobid_target);
-	return dataswarm_rpc(m,w,msg);
+    return m->message_id;
 }
-
-dataswarm_result_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, const char *taskinfo )
-{
-	char *msg = string_format("{\"id\": %d, \"method\" : \"task-submit\", \"params\" : %s }",m->message_id,taskinfo);
-	return dataswarm_rpc(m,w,msg);
-}
-
-dataswarm_result_t dataswarm_rpc_task_remove( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, const char *taskid )
-{
-	char *msg = string_format("{\"id\": %d, \"method\" : \"task-remove\", \"params\" : {  \"task-id\" : \"%s\" } }",m->message_id,taskid);
-	return dataswarm_rpc(m,w,msg);
-}
-

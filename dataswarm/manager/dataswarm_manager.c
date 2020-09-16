@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "debug.h"
 #include "stringtools.h"
+#include "xxmalloc.h"
 #include "cctools.h"
 #include "hash_table.h"
 #include "username.h"
@@ -25,6 +26,7 @@ See the file COPYING for details.
 #include "dataswarm_message.h"
 #include "dataswarm_worker_rep.h"
 #include "dataswarm_client_rep.h"
+#include "dataswarm_blob_rep.h"
 #include "dataswarm_manager.h"
 #include "dataswarm_client_ops.h"
 
@@ -70,6 +72,27 @@ void process_files( struct dataswarm_manager *m )
 
 void process_tasks( struct dataswarm_manager *m )
 {
+}
+
+/* declares a blob in a worker so that it can be manipulated via blob rpcs. */
+struct dataswarm_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid) {
+    struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+    if(b) {
+        /* cannot create an already declared blob. This could only happen with
+         * a bug, as we have control of the create messages.*/
+        fatal("blob-id %s already created at worker.", blobid);
+    }
+
+    b = calloc(1,sizeof(struct dataswarm_blob_rep));
+    b->action = DS_BLOB_ACTION_NEW;
+	b->in_transition = b->action;
+	b->result = DS_RESULT_SUCCESS;
+
+	b->blobid = xxstrdup(blobid);
+
+    hash_table_insert(r->blobs, blobid, b);
+
+	return b;
 }
 
 void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
