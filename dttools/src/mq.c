@@ -53,6 +53,7 @@ struct mq_msg {
 	int pipefd;
 	bool buffering;
 	bool seen_initial;
+	bool hung_up;
 
 	/* Here be dragons!
 	 *
@@ -228,6 +229,12 @@ static int flush_send(struct mq *mq) {
 		if (snd->buffering) {
 			// make sure the cast below won't overflow
 			assert(snd->len < PTRDIFF_MAX);
+
+			if (snd->hung_up) {
+				snd->len = snd->buf_pos;
+				snd->type |= HDR_MSG_END;
+			}
+
 			if (snd->buf_pos < (ptrdiff_t) snd->len) {
 				ssize_t rc = read(snd->pipefd,
 					(char *) buffer_tostring(snd->buffer) + snd->buf_pos,
@@ -236,7 +243,6 @@ static int flush_send(struct mq *mq) {
 					return 0;
 				} else if (rc == 0) {
 					snd->len = snd->buf_pos;
-					snd->hdr_len = htonll(snd->len);
 				} else if (rc < 0) {
 					return -1;
 				}
@@ -246,6 +252,7 @@ static int flush_send(struct mq *mq) {
 				snd->buffering = false;
 				snd->buf_pos = 0;
 				snd->hdr_pos = 0;
+				snd->hdr_len = htonll(snd->len);
 				if (snd->len < MQ_PIPEBUF_SIZE) {
 					snd->type |= HDR_MSG_END;
 				}
@@ -354,6 +361,11 @@ static int flush_recv(struct mq *mq) {
 		if (rcv->storage == MQ_MSG_FD) {
 			// make sure the cast below won't overflow
 			assert(rcv->len < PTRDIFF_MAX);
+
+			if (rcv->hung_up) {
+				rcv->buf_pos = rcv->len;
+			}
+
 			if (rcv->buf_pos < (ptrdiff_t) rcv->len) {
 				ssize_t rc = write(rcv->pipefd,
 					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
@@ -378,29 +390,53 @@ static int flush_recv(struct mq *mq) {
 	return 0;
 }
 
-static short poll_events(struct mq *mq) {
+// pfd[0] is send, pfd[1] is recv
+static void poll_events(struct mq *mq, struct pollfd *pfd) {
 	assert(mq);
+	assert(pfd);
 
-	short out = 0;
+	pfd[0].fd = -1;
+	pfd[1].fd = -1;
+	pfd[0].events = 0;
+	pfd[1].events = 0;
 
 	switch (mq->state) {
 		case MQ_SOCKET_INPROGRESS:
-			out |= POLLOUT;
+			pfd[0].fd = link_fd(mq->link);
+			pfd[0].events |= POLLOUT;
 			break;
 		case MQ_SOCKET_CONNECTED:
-			if (mq->sending || list_length(mq->send)) {
-				out |= POLLOUT;
+			if (mq->sending && mq->sending->buffering) {
+				if (!mq->sending->hung_up) {
+					pfd[0].fd = mq->sending->pipefd;
+				}
+				pfd[0].events |= POLLIN;
+			} else if (mq->sending || list_length(mq->send)) {
+				pfd[0].fd = link_fd(mq->link);
+				pfd[0].events |= POLLOUT;
 			}
-			// falls through
+			if (mq->recving && mq->recving->buffering) {
+				if (!mq->recving->hung_up) {
+					pfd[1].fd = mq->recving->pipefd;
+				}
+				pfd[1].events |= POLLOUT;
+			} else if (!mq->recv) {
+				pfd[1].fd = link_fd(mq->link);
+				pfd[1].events |= POLLIN;
+			}
+			break;
 		case MQ_SOCKET_SERVER:
-			if (!mq->acc && !mq->recv) {
-				out |= POLLIN;
+			if (!mq->acc) {
+				pfd[1].fd = link_fd(mq->link);
+				pfd[1].events |= POLLIN;
 			}
 			break;
 		case MQ_SOCKET_ERROR:
 			break;
 	}
-	return out;
+
+	if (pfd[0].fd == -1) pfd[0].revents = 0;
+	if (pfd[1].fd == -1) pfd[1].revents = 0;
 }
 
 static void update_poll_group(struct mq *mq) {
@@ -418,7 +454,7 @@ static void update_poll_group(struct mq *mq) {
 	}
 }
 
-static int handle_revents(struct pollfd *pfd, struct mq *mq) {
+static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 	assert(pfd);
 	assert(mq);
 
@@ -430,7 +466,7 @@ static int handle_revents(struct pollfd *pfd, struct mq *mq) {
 		case MQ_SOCKET_ERROR:
 			break;
 		case MQ_SOCKET_INPROGRESS:
-			if (pfd->revents & POLLOUT) {
+			if (pfd[0].revents & POLLOUT) {
 				rc = getsockopt(link_fd(mq->link), SOL_SOCKET, SO_ERROR,
 						&err, &size);
 				assert(rc == 0);
@@ -442,23 +478,43 @@ static int handle_revents(struct pollfd *pfd, struct mq *mq) {
 			}
 			break;
 		case MQ_SOCKET_CONNECTED:
-			if (pfd->revents & POLLOUT) {
+			if (pfd[0].revents & (POLLERR | POLLHUP)) {
+				if (mq->sending && mq->sending->buffering) {
+					pfd[0].revents |= POLLIN;
+					mq->sending->hung_up = true;
+				} else {
+					mq_die(mq, ECONNRESET);
+					goto DONE;
+				}
+			}
+			if (pfd[1].revents & (POLLERR | POLLHUP)) {
+				if (mq->recving && mq->recving->buffering) {
+					pfd[1].revents |= POLLOUT;
+					mq->recving->hung_up = true;
+				} else {
+					mq_die(mq, ECONNRESET);
+					goto DONE;
+				}
+			}
+
+			if (pfd[0].revents & (POLLOUT | POLLIN)) {
 				rc = flush_send(mq);
+				if (rc == -1) {
+					mq_die(mq, errno);
+					goto DONE;
+				}
 			}
-			if (rc == -1) {
-				mq_die(mq, errno);
-				goto DONE;
-			}
-			if (pfd->revents & POLLIN) {
+
+			if (pfd[1].revents & (POLLOUT | POLLIN)) {
 				rc = flush_recv(mq);
-			}
-			if (rc == -1) {
-				mq_die(mq, errno);
-				goto DONE;
+				if (rc == -1) {
+					mq_die(mq, errno);
+					goto DONE;
+				}
 			}
 			break;
 		case MQ_SOCKET_SERVER:
-			if (pfd->revents & POLLIN) {
+			if (pfd[1].revents & POLLIN) {
 				struct link *link = link_accept(mq->link, LINK_NOWAIT);
 				// If the server socket polls readable,
 				// this should never block.
@@ -504,21 +560,21 @@ int mq_wait(struct mq *mq, time_t stoptime) {
 	assert(mq);
 
 	int rc;
-	struct pollfd pfd;
-	pfd.fd = link_fd(mq->link);
-	pfd.revents = 0;
+	struct pollfd pfd[2];
+	pfd[0].revents = 0;
+	pfd[1].revents = 0;
 
 	do {
 		// NB: we're using revents from the *previous* iteration
-		if (handle_revents(&pfd, mq) == -1) {
+		if (handle_revents(mq, (struct pollfd *) &pfd) == -1) {
 			return -1;
 		}
-		pfd.events = poll_events(mq);
+		poll_events(mq, (struct pollfd *) &pfd);
 
 		if (mq->recv || mq->acc) {
 			return 1;
 		}
-	} while ((rc = ppoll_compat(&pfd, 1, stoptime)) > 0);
+	} while ((rc = ppoll_compat((struct pollfd *) &pfd, 2, stoptime)) > 0);
 
 	if (rc == 0 || (rc == -1 && errno == EINTR)) {
 		return 0;
@@ -630,7 +686,7 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 
 	int rc;
 	int count = itable_size(p->members);
-	struct pollfd *pfds = xxcalloc(count, sizeof(*pfds));
+	struct pollfd *pfds = xxcalloc(2*count, sizeof(*pfds));
 
 	do {
 		uint64_t key;
@@ -639,17 +695,16 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 		itable_firstkey(p->members);
 		// This assumes that iterating over an itable does not
 		// change the order of the elements.
-		for (int i = 0; itable_nextkey(p->members, &key, &value); i++) {
+		for (int i = 0; itable_nextkey(p->members, &key, &value); i+=2) {
 			ptr = key;
 			struct mq *mq = (struct mq *) ptr;
-			pfds[i].fd = link_fd(mq->link);
 
 			// NB: we're using revents from the *previous* iteration
-			rc = handle_revents(&pfds[i], mq);
+			rc = handle_revents(mq, &pfds[i]);
 			if (rc == -1) {
 				goto DONE;
 			}
-			pfds[i].events = poll_events(mq);
+			poll_events(mq, &pfds[i]);
 		}
 
 		rc = 0;
@@ -657,7 +712,7 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 		rc += set_size(p->readable);
 		rc += set_size(p->error);
 		if (rc > 0) goto DONE;
-	} while ((rc = ppoll_compat(pfds, count, stoptime)) > 0);
+	} while ((rc = ppoll_compat(pfds, 2*count, stoptime)) > 0);
 
 DONE:
 	free(pfds);

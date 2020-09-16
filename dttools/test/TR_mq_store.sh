@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 . ../../dttools/test/test_runner_common.sh
 
@@ -13,7 +13,7 @@ prepare()
 
 run()
 {
-	$TESTCMD $TESTOUT1 $TESTOUT2 || return $?
+	$TESTCMD $TESTOUT1 $TESTOUT2 <(echo test; sleep 10; echo data) || return $?
 	cmp $TESTCMD $TESTOUT1 || return $?
 	cmp $TESTCMD $TESTOUT2 || return $?
 	return 0

@@ -95,6 +95,20 @@ int main (int argc, char *argv[]) {
 	rc = mq_recv(conn, NULL);
 	assert(rc == MQ_MSG_FD);
 
+	srcfd = open(argv[3], O_RDONLY);
+	assert(srcfd != -1);
+
+	rc = mq_send_fd(conn, srcfd);
+	assert(rc == 0);
+
+	rc = mq_poll_wait(p, time(NULL) + 15);
+	assert(rc == 1);
+	rc = mq_recv(client, &got);
+	assert(rc == MQ_MSG_NEWBUFFER);
+	assert(buffer_pos(got) == 10);
+
+	buffer_free(got);
+	free(got);
 	mq_poll_delete(p);
 	mq_close(client);
 	mq_close(conn);
