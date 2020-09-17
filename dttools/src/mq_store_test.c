@@ -57,9 +57,9 @@ int main (int argc, char *argv[]) {
 
 	struct mq_poll *p = mq_poll_create();
 	assert(p);
-	rc = mq_poll_add(p, conn, NULL);
+	rc = mq_poll_add(p, conn);
 	assert(rc == 0);
-	rc = mq_poll_add(p, client, NULL);
+	rc = mq_poll_add(p, client);
 	assert(rc == 0);
 
 	rc = mq_send_fd(conn, srcfd);

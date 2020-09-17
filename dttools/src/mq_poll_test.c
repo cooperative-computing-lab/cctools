@@ -32,7 +32,7 @@ int main (int argc, char *argv[]) {
 
 	struct mq_poll *p = mq_poll_create();
 	assert(p);
-	rc = mq_poll_add(p, server, NULL);
+	rc = mq_poll_add(p, server);
 	assert(rc == 0);
 
 	rc = mq_poll_wait(p, time(NULL) + 1);
@@ -41,7 +41,7 @@ int main (int argc, char *argv[]) {
 	struct mq *client = mq_connect("127.0.0.1", 65000);
 	assert(client);
 
-	rc = mq_poll_add(p, client, NULL);
+	rc = mq_poll_add(p, client);
 	assert(rc == 0);
 
 	rc = mq_poll_wait(p, time(NULL) + 1);
@@ -49,7 +49,7 @@ int main (int argc, char *argv[]) {
 
 	struct mq *conn = mq_accept(server);
 	assert(conn);
-	rc = mq_poll_add(p, conn, NULL);
+	rc = mq_poll_add(p, conn);
 	assert(rc == 0);
 
 	rc = mq_send_buffer(client, test1);

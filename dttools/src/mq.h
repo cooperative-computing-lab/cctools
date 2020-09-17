@@ -182,6 +182,24 @@ struct mq *mq_accept(struct mq *server);
  */
 int mq_wait(struct mq *mq, time_t stoptime);
 
+/** Set the tag associated with the given queue.
+ *
+ * The tag is not used by this module; it is intended to allow for finding the
+ * worker/connection associated with the given queue. This may be useful when
+ * using @ref mq_poll_readable and friends.
+ * @param mq The queue to use.
+ * @param tag The new tag to set.
+ */
+void mq_set_tag(struct mq *mq, void *tag);
+
+/** Get the tag associated with the given queue.
+ *
+ * See @ref mq_set_tag for details.
+ * @param mq The queue to check.
+ * @returns The tag previously associated with mq. Defaults to NULL.
+ */
+void *mq_get_tag(struct mq *mq);
+
 
 //------------Polling API-----------------//
 
@@ -205,18 +223,13 @@ void mq_poll_delete(struct mq_poll *p);
 
 /** Add a message queue to a polling group.
  *
- * The tag value is returned from @ref mq_poll_readable and friends.
- * This could be a pointer to some client/worker struct that
- * knows its own channel, or NULL to just use mq. Note that a
- * queue can only be added to a single polling group.
+ * Note that a queue can (currently) only be added to a single polling group.
  * @param p The polling group to add to.
  * @param mq The queue to add.
- * @param tag A pointer to identify the queue. If tag is NULL, mq will
- *  be used instead.
  * @returns 0 on success.
  * @returns -1 on error, with errno set appropriately.
  */
-int mq_poll_add(struct mq_poll *p, struct mq *mq, void *tag);
+int mq_poll_add(struct mq_poll *p, struct mq *mq);
 
 /** Remove a message queue from a polling group.
  *
@@ -246,41 +259,41 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime);
 
 /** Find a queue with messages waiting.
  *
- * Returns the tag of an arbitrary queue in the polling group, and may
+ * Returns the an arbitrary queue in the polling group, and may
  * return the same queue until its messages are popped. This is more
  * efficient than looping over a list of message queues and calling
  * @ref mq_recv on all of them, since the polling group keeps track of
  * queue states internally.
  * @param p The polling group to inspect.
- * @returns The tag associated with a queue with messages waiting.
+ * @returns A queue with messages waiting.
  * @returns NULL if no queues in the polling group have messages waiting.
  */
-void *mq_poll_readable(struct mq_poll *p);
+struct mq *mq_poll_readable(struct mq_poll *p);
 
 /** Find a server queue with connections waiting.
  *
- * Returns the tag of an arbitrary server queue in the polling group, and may
+ * Returns an arbitrary server queue in the polling group, and may
  * return the same queue until its connections are accepted. This is more
  * efficient than looping over a list of queues and calling @ref mq_accept
  * on all of them, since the polling group keeps track of queue states
  * internally.
  * @param p The polling group to inspect.
- * @returns The tag associated with a queue with connections waiting.
+ * @returns A queue with connections waiting.
  * @returns NULL if no queues in the polling group have connections waiting.
  */
-void *mq_poll_acceptable(struct mq_poll *p);
+struct mq *mq_poll_acceptable(struct mq_poll *p);
 
 /** Find a queue in the error state or closed socket.
  *
- * Returns the tag of an arbitrary queue in the polling group, and may
- * return the same queue until it it removed. This is more efficient than
+ * Returns an arbitrary queue in the polling group, and may
+ * return the same queue until it is removed. This is more efficient than
  * looping over a list of message queues and checking for errors on all
  * of them, since the polling group keeps track of queue states internally.
  * @param p The polling group to inspect.
- * @returns The tag of a queue in the error state or with closed socket.
+ * @returns A queue in the error state or with a closed socket.
  * @returns NULL if no queues in the polling group are in error.
  */
-void *mq_poll_error(struct mq_poll *p);
+struct mq *mq_poll_error(struct mq_poll *p);
 
 
 //------------Send/Recv-------------------//

@@ -93,10 +93,11 @@ struct mq {
 	struct mq_msg *sending;
 	struct mq_msg *recving;
 	struct mq_poll *poll_group;
+	void *tag;
 };
 
 struct mq_poll {
-	struct itable *members;
+	struct set *members;
 	struct set *acceptable;
 	struct set *readable;
 	struct set *error;
@@ -178,7 +179,7 @@ void mq_close(struct mq *mq) {
 
 	mq_die(mq, 0);
 	if (mq->poll_group) {
-		itable_remove(mq->poll_group->members, (uintptr_t) mq);
+		set_remove(mq->poll_group->members, mq);
 	}
 	link_close(mq->link);
 	list_delete(mq->send);
@@ -192,6 +193,16 @@ int mq_geterror(struct mq *mq) {
 	} else {
 		return mq->err;
 	}
+}
+
+void *mq_get_tag(struct mq *mq) {
+	assert(mq);
+	return mq->tag;
+}
+
+void mq_set_tag(struct mq *mq, void *tag) {
+	assert(mq);
+	mq->tag = tag;
 }
 
 static int validate_header(struct mq_msg *msg) {
@@ -585,7 +596,7 @@ int mq_wait(struct mq *mq, time_t stoptime) {
 
 struct mq_poll *mq_poll_create(void) {
 	struct mq_poll *out = xxcalloc(1, sizeof(*out));
-	out->members = itable_create(0);
+	out->members = set_create(0);
 	out->acceptable = set_create(0);
 	out->readable = set_create(0);
 	out->error = set_create(0);
@@ -595,23 +606,18 @@ struct mq_poll *mq_poll_create(void) {
 void mq_poll_delete(struct mq_poll *p) {
 	if (!p) return;
 
-	uint64_t key;
-	uintptr_t ptr;
-	void *value;
-	itable_firstkey(p->members);
-	while (itable_nextkey(p->members, &key, &value)) {
-		ptr = key;
-		struct mq *mq = (struct mq *) ptr;
+	set_first_element(p->members);
+	for (struct mq *mq; (mq = set_next_element(p->members));) {
 		mq->poll_group = NULL;
 	}
-	itable_delete(p->members);
+	set_delete(p->members);
 	set_delete(p->readable);
 	set_delete(p->acceptable);
 	set_delete(p->error);
 	free(p);
 }
 
-int mq_poll_add(struct mq_poll *p, struct mq *mq, void *tag) {
+int mq_poll_add(struct mq_poll *p, struct mq *mq) {
 	assert(p);
 	assert(mq);
 
@@ -624,9 +630,8 @@ int mq_poll_add(struct mq_poll *p, struct mq *mq, void *tag) {
 		return -1;
 	}
 
-	if (!tag) tag = mq;
 	mq->poll_group = p;
-	itable_insert(p->members, (uintptr_t) mq, tag);
+	set_insert(p->members, mq);
 
 	return 0;
 }
@@ -640,7 +645,7 @@ int mq_poll_rm(struct mq_poll *p, struct mq *mq) {
 		return -1;
 	}
 	mq->poll_group = NULL;
-	itable_remove(p->members, (uintptr_t) mq);
+	set_remove(p->members, mq);
 	set_remove(p->acceptable, mq);
 	set_remove(p->readable, mq);
 	set_remove(p->error, mq);
@@ -648,63 +653,48 @@ int mq_poll_rm(struct mq_poll *p, struct mq *mq) {
 	return 0;
 }
 
-void *mq_poll_acceptable(struct mq_poll *p) {
+struct mq *mq_poll_acceptable(struct mq_poll *p) {
 	assert(p);
 
 	set_first_element(p->acceptable);
-	struct mq *mq = set_next_element(p->acceptable);
-	assert(mq);
-	void *tag = itable_lookup(p->members, (uintptr_t) mq);
-	assert(tag);
-	return tag;
+	return set_next_element(p->acceptable);
 }
 
-void *mq_poll_readable(struct mq_poll *p) {
+struct mq *mq_poll_readable(struct mq_poll *p) {
 	assert(p);
 
 	set_first_element(p->readable);
-	struct mq *mq = set_next_element(p->readable);
-	assert(mq);
-	void *tag = itable_lookup(p->members, (uintptr_t) mq);
-	assert(tag);
-	return tag;
+	return set_next_element(p->readable);
 }
 
-void *mq_poll_error(struct mq_poll *p) {
+struct mq *mq_poll_error(struct mq_poll *p) {
 	assert(p);
 
 	set_first_element(p->error);
-	struct mq *mq = set_next_element(p->error);
-	assert(mq);
-	void *tag = itable_lookup(p->members, (uintptr_t) mq);
-	assert(tag);
-	return tag;
+	return set_next_element(p->error);
 }
 
 int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 	assert(p);
 
 	int rc;
-	int count = itable_size(p->members);
+	int count = set_size(p->members);
 	struct pollfd *pfds = xxcalloc(2*count, sizeof(*pfds));
+	int i;
 
 	do {
-		uint64_t key;
-		uintptr_t ptr;
-		void *value;
-		itable_firstkey(p->members);
-		// This assumes that iterating over an itable does not
+		// This assumes that iterating over a set does not
 		// change the order of the elements.
-		for (int i = 0; itable_nextkey(p->members, &key, &value); i+=2) {
-			ptr = key;
-			struct mq *mq = (struct mq *) ptr;
-
+		i = 0;
+		set_first_element(p->members);
+		for (struct mq *mq; (mq = set_next_element(p->members));) {
 			// NB: we're using revents from the *previous* iteration
 			rc = handle_revents(mq, &pfds[i]);
 			if (rc == -1) {
 				goto DONE;
 			}
 			poll_events(mq, &pfds[i]);
+			i += 2;
 		}
 
 		rc = 0;
