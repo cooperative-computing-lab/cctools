@@ -7,6 +7,8 @@ typedef enum {
     DS_BLOB_ACTION_NEW = 0,
     DS_BLOB_ACTION_CREATE,
     DS_BLOB_ACTION_PUT, DS_BLOB_ACTION_COPY,
+    DS_BLOB_ACTION_REQ_GET,
+    DS_BLOB_ACTION_GET,
     DS_BLOB_ACTION_COMMIT,
     DS_BLOB_ACTION_DELETE,
 } dataswarm_blob_action_t;
@@ -25,8 +27,18 @@ struct dataswarm_blob_rep {
      *    in_transition records the blob's lifetime stage that could not been
      *    reached because of the error in result.
      * 5) action and in_transition are strictly monotonically increasing
-     *    according to dataswarm_blob_action_t: new, create, put or copy. delete
-     *    may occur at any time after create.
+     *    according to DS_BLOB_ACTION_: NEW, CREATE, ((PUT or COPY), COMMIT) or
+     *    (REQ_GET, GET). delete may occur at any time after create.
+     *
+     * To get a blob there are two stages: REQ_GET which prompts the worker to
+     * start sending the blob. The manager is free to do other things while
+     * an in_transition REQ_GET has a result of DS_RESULT_PENDING. When it
+     * becomes DS_RESULT_SUCCESS, then the in_transition becomes GET.
+     *
+     * Note that GET does not really represent an rpc, but the inflight
+     * contents of the buffer. This is necessary, as the REQ_GET may succeed,
+     * but the overall transfer may fail.
+     *
      */
 
     dataswarm_blob_action_t action;

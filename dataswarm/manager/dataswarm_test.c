@@ -33,7 +33,7 @@ int wait_for_rpcs(struct dataswarm_manager *m, struct dataswarm_worker_rep *r, s
 
         if(done) break;
         dataswarm_rpc_get_response(m,r);
-        sleep(1);
+        //sleep(1);
     }
 
     return all_ok;
@@ -72,18 +72,32 @@ void dataswarm_test_script( struct dataswarm_manager *m, struct dataswarm_worker
     }
 
 	dataswarm_rpc_blob_commit(m,r,bloba);
-	dataswarm_rpc_blob_commit(m,r,blobb);
     if(!wait_for_rpcs(m, r, blob_reps)) {
         debug(D_DATASWARM, "There was an error with an rpc. Cannot continue.");
         return;
     }
 
+	/* Create a simple task that reads from bloba mounted as myinput and writes to blob mounted as stdout. */
+	char *taskinfo = string_format("{ \"task-id\": \"%s\",\"command\" : \"wc -l myinput\", \"namespace\" : { \"%s\" : {\"type\" : \"path\", \"path\" : \"myinput\", \"mode\" : \"R\" }, \"%s\" : {\"type\" : \"stdout\" } } }","t93",bloba,blobb);
+	dataswarm_rpc_task_submit(m,r,taskinfo);
+	free(taskinfo);
+
+	sleep(5);
+
+	dataswarm_rpc_blob_get(m,r,blobb,"/dev/stdout");
+    if(!wait_for_rpcs(m, r, blob_reps)) {
+        debug(D_DATASWARM, "There was an error with an the get rpc. Cleanup continues...");
+    }
+
+	dataswarm_rpc_task_remove(m,r,"t93");
+
 	dataswarm_rpc_blob_delete(m,r,bloba);
-	dataswarm_rpc_blob_delete(m,r,blobb);
+	//dataswarm_rpc_blob_delete(m,r,blobb);
     if(!wait_for_rpcs(m, r, blob_reps)) {
         debug(D_DATASWARM, "There was an error with an rpc. Cannot continue.");
         return;
     }
+
 
     debug(D_DATASWARM, "Done testing this worker.");
 }
@@ -102,7 +116,6 @@ void dataswarm_test_script_old_sync( struct dataswarm_manager *m, struct dataswa
 	dataswarm_rpc_blob_put(m,r,bloba,"/usr/share/dict/words");
 	dataswarm_rpc_blob_commit(m,r,bloba);
 
-	sleep(1);
 
 	dataswarm_rpc_blob_create(m,r,blobb,100000,NULL);
 

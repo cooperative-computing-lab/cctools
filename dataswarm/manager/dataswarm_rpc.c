@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* not an rpc, but its state behaves likes one. GETs a file for a corresponding REQ_GET get request. */
+dataswarm_result_t dataswarm_blob_get( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid );
 
 /* test read responses from workers. */
 dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct dataswarm_worker_rep *r)
@@ -37,6 +39,10 @@ dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, stru
         b->result = result;
         if(b->result == DS_RESULT_SUCCESS) {
             b->action = b->in_transition;
+            /* this get should not be here... */
+            if(b->action == DS_BLOB_ACTION_REQ_GET) {
+                result = dataswarm_blob_get(m,r,b->blobid);
+            }
         }
     } else {
         /* may be a task */
@@ -193,23 +199,46 @@ jx_int_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct dataswarm_w
 	return msgid;
 }
 
+/* not an rpc, but its state behaves likes one. GETs a file for a corresponding REQ_GET get request. */
 jx_int_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
 {
-	dataswarm_result_t result;
+    struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+    if(!b) {
+        fatal("No blob with id %s exist at the worker.", blobid);
+    }
 
-	//char *msg = string_format("{\"id\": %d, \"method\" : \"blob-get\", \"params\" : {  \"blob-id\" : \"%s\" } }",m->message_id,blobid);
-	//result = dataswarm_rpc(m,r,msg);
-    result = DS_RESULT_SUCCESS;
-	if(result!=DS_RESULT_SUCCESS) return result;
+    b->put_get_path = xxstrdup(filename);
 
-	result = DS_RESULT_UNABLE;
+    //define method and params of blob-put.
+    //msg id will be added by dataswarm_rpc_blob_queue
+    struct jx *msg = jx_object(0);
+    jx_insert_string(msg, "method", "blob-get");
+
+    struct jx *params = jx_object(0);
+    jx_insert(msg, jx_string("params"), params);
+    jx_insert_string(params, "blob-id", blobid);
+
+    return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_ACTION_REQ_GET);
+}
+
+dataswarm_result_t dataswarm_blob_get( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
+{
+    struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+    if(!b) {
+        fatal("No blob with id %s exist at the worker.", blobid);
+    }
+
+    b->in_transition = DS_BLOB_ACTION_GET;
+    b->result = DS_RESULT_PENDING;
+
+	dataswarm_result_t result = DS_RESULT_UNABLE;
 
 	int64_t actual;
 	char line[16];
 	actual = link_readline(r->link,line,sizeof(line),time(0)+m->stall_timeout);
 	if(actual>0) {
 		int64_t length = atoll(line);
-		FILE *file = fopen(filename,"w");
+		FILE *file = fopen(b->put_get_path,"w");
 		if(file) {
 			actual = link_stream_to_file(r->link,file,length,time(0)+m->stall_timeout);
 			fclose(file);
@@ -219,6 +248,11 @@ jx_int_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct dataswarm_w
 		}
 
 	}
+
+    b->result = result;
+    if(result == DS_RESULT_SUCCESS) {
+        b->action = b->in_transition;
+    }
 
 	return result;
 }
