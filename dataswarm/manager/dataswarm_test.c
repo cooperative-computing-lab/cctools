@@ -53,7 +53,6 @@ void dataswarm_test_script( struct dataswarm_manager *m, struct dataswarm_worker
 
 	dataswarm_rpc_blob_delete(m,r,bloba);
 	dataswarm_rpc_blob_delete(m,r,blobb);
-
     if(!wait_for_rpcs(m, r, blob_reps)) {
         debug(D_DATASWARM, "There was an error with rpc delete. But that may be ok.");
         return;
@@ -61,16 +60,19 @@ void dataswarm_test_script( struct dataswarm_manager *m, struct dataswarm_worker
 
 	dataswarm_rpc_blob_create(m,r,bloba,100000,NULL);
 	dataswarm_rpc_blob_create(m,r,blobb,100000,NULL);
-
     if(!wait_for_rpcs(m, r, blob_reps)) {
         debug(D_DATASWARM, "There was an error with an rpc. Cannot continue.");
         return;
     }
 
-	//dataswarm_rpc_blob_put(m,r,bloba,"/usr/share/dict/words");
+	dataswarm_rpc_blob_put(m,r,bloba,"/usr/share/dict/words");
+    if(!wait_for_rpcs(m, r, blob_reps)) {
+        debug(D_DATASWARM, "There was an error with an rpc. Cannot continue.");
+        return;
+    }
+
 	dataswarm_rpc_blob_commit(m,r,bloba);
 	dataswarm_rpc_blob_commit(m,r,blobb);
-
     if(!wait_for_rpcs(m, r, blob_reps)) {
         debug(D_DATASWARM, "There was an error with an rpc. Cannot continue.");
         return;
@@ -78,7 +80,6 @@ void dataswarm_test_script( struct dataswarm_manager *m, struct dataswarm_worker
 
 	dataswarm_rpc_blob_delete(m,r,bloba);
 	dataswarm_rpc_blob_delete(m,r,blobb);
-
     if(!wait_for_rpcs(m, r, blob_reps)) {
         debug(D_DATASWARM, "There was an error with an rpc. Cannot continue.");
         return;

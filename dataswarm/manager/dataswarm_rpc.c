@@ -6,6 +6,7 @@
 #include "debug.h"
 #include "itable.h"
 #include "stringtools.h"
+#include "xxmalloc.h"
 #include "json.h"
 #include "jx.h"
 
@@ -157,26 +158,39 @@ jx_int_t dataswarm_rpc_blob_copy( struct dataswarm_manager *m, struct dataswarm_
 }
 
 
-
-
 jx_int_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
 {
-	char *msg = string_format("{\"id\": %d, \"method\" : \"blob-put\", \"params\" : {  \"blob-id\" : \"%s\" } }",m->message_id,blobid);
-	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+m->stall_timeout);
-	free(msg);
+    struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+    if(!b) {
+        fatal("No blob with id %s exist at the worker.", blobid);
+    }
+
+    b->put_get_path = xxstrdup(filename);
+
+    //define method and params of blob-put.
+    //msg id will be added by dataswarm_rpc_blob_queue
+    struct jx *msg = jx_object(0);
+    jx_insert_string(msg, "method", "blob-put");
+
+    struct jx *params = jx_object(0);
+    jx_insert(msg, jx_string("params"), params);
+    jx_insert_string(params, "blob-id", blobid);
+
+    jx_int_t msgid = dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_ACTION_PUT);
+
 
 	FILE *file = fopen(filename,"r");
 
 	fseek(file,0,SEEK_END);
 	int64_t length = ftell(file);
 	fseek(file,0,SEEK_SET);
-	msg = string_format("%lld\n",(long long)length);
-	link_write(r->link,msg,strlen(msg),time(0)+m->stall_timeout);
+	char *filesize = string_format("%" PRId64 "\n",length);
+	link_write(r->link,filesize,strlen(filesize),time(0)+m->stall_timeout);
+    free(filesize);
 	link_stream_from_file(r->link,file,length,time(0)+m->stall_timeout);
 	fclose(file);
 
-	//return dataswarm_rpc_get_response(m,r,m->message_id++);
-	return dataswarm_rpc_get_response(m,r);
+	return msgid;
 }
 
 jx_int_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
