@@ -55,6 +55,7 @@ See the file COPYING for details.
  *	struct mq *mq = mq_connect("127.0.0.1", 1234);
  *	mq_send(mq, msg);
  *	while (true) {
+ *		mq_store_buffer(mq, &buf);
  *		switch (mq_wait(mq, time() + 30)) {
  *			case 0:
  *			// interrupted by timeout or signal
@@ -62,7 +63,7 @@ See the file COPYING for details.
  *			// error or closed socket, mq should be deleted
  *			default:
  *			// got some messages!
- *			mq_recv(mq, &buf);
+ *			mq_recv(mq, NULL);
  *			// process the result
  *			// make sure something breaks out of the loop!
  *		}
@@ -120,7 +121,6 @@ See the file COPYING for details.
 
 typedef enum {
 	MQ_MSG_NONE = 0,
-	MQ_MSG_NEWBUFFER,
 	MQ_MSG_BUFFER,
 	MQ_MSG_FD,
 } mq_msg_t;
@@ -173,7 +173,8 @@ struct mq *mq_accept(struct mq *server);
  * Blocks the current thread until a message/connection is received
  * (or until a signal or timeout interrupts). Sends are still carried
  * out while waiting. Note that all signals are unblocked for the
- * duration of this call.
+ * duration of this call. Before waiting, the storage for the next
+ * message MUST be specified with mq_store_* functions.
  * @param mq The queue to wait on.
  * @param stoptime The time at which to stop waiting.
  * @returns 1 if a message/connection is available.
@@ -249,6 +250,8 @@ int mq_poll_rm(struct mq_poll *p, struct mq *mq);
  * of the message queues in the polling group (or until a signal or
  * timeout interrupts). Sends are still carried out while waiting.
  * Note that all signals are unblocked for the duration of this call.
+ * Before waiting, the storage for the next message MUST be specified
+ * with mq_store_* functions.
  * @param p The polling group to wait on.
  * @param stoptime The time at which to stop waiting.
  * @returns The number of events available (or zero if interrupted by
@@ -334,22 +337,18 @@ int mq_send_fd(struct mq *mq, int fd);
 /** Pop a message from the receive queue.
  *
  * This is a non-blocking operation, and will return immediately if no
- * messages are available. This function supports two modes of operation:
- * allocating storage or using provided storage.
- * If no storage is provided, each message will be written to a newly-allocated
- * buffer, with a pointer stored in @ref out. The caller takes ownership of any such
- * buffers, and is responsible for deleting them. If a storage location was provided
- * (via mq_store_*), the return code will indicate that a complete message was
- * written there. @ref out will be ignored.
+ * messages are available. Once this functions indicated receipt of a message,
+ * the underlying storage can be used again. After receiving a message, be sure
+ * to use mq_store_* to specify the storage for the next message before
+ * waiting again.
  * @param mq The message queue.
- * @param out The location of a buffer_t pointer containing the message.
+ * @param length A pointer to store the total length in bytes of the message.
+ *  Can be NULL.
  * @returns MQ_MSG_NONE if no message is available.
- * @returns MQ_MSG_NEWBUFFER if a message was stored in a newly-allocated
- *  buffer (pointed to by out).
  * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided buffer.
  * @returns MQ_MSG_FD if a message has been written to a previously-provided fd.
  */
-mq_msg_t mq_recv(struct mq *mq, buffer_t **out);
+mq_msg_t mq_recv(struct mq *mq, size_t *length);
 
 /** Store the next message in the given buffer.
  *

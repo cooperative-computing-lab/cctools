@@ -19,13 +19,15 @@ int main (int argc, char *argv[]) {
 
 	buffer_t *test1 = xxmalloc(sizeof(*test1));
 	buffer_t *test2 = xxmalloc(sizeof(*test2));
+	buffer_t got_string;
 	buffer_init(test1);
 	buffer_init(test2);
+	buffer_init(&got_string);
 	buffer_putstring(test1, string1);
 	buffer_putstring(test2, string2);
 
 	int rc;
-	buffer_t *got_string;
+	size_t got_length;
 
 	struct mq *server = mq_serve("127.0.0.1", 65000);
 	assert(server);
@@ -52,6 +54,9 @@ int main (int argc, char *argv[]) {
 	rc = mq_poll_add(p, conn);
 	assert(rc == 0);
 
+	rc = mq_store_buffer(conn, &got_string);
+	assert(rc == 0);
+
 	rc = mq_send_buffer(client, test1);
 	assert(rc != -1);
 
@@ -61,27 +66,25 @@ int main (int argc, char *argv[]) {
 	rc = mq_poll_wait(p, time(NULL) + 5);
 	assert(rc == 1);
 
-	rc = mq_recv(conn, &got_string);
-	assert(rc == MQ_MSG_NEWBUFFER);
+	rc = mq_recv(conn, &got_length);
+	assert(rc == MQ_MSG_BUFFER);
+	assert(got_length == MSG_SIZE);
+	assert(!memcmp(string1, buffer_tostring(&got_string), MSG_SIZE));
 
-	assert(buffer_pos(got_string) == MSG_SIZE);
-	assert(!memcmp(string1, buffer_tostring(got_string), MSG_SIZE));
-	buffer_free(got_string);
-	free(got_string);
-
-	rc = mq_recv(conn, &got_string);
+	rc = mq_recv(conn, NULL);
 	assert(rc == MQ_MSG_NONE);
+
+	rc = mq_store_buffer(conn, &got_string);
+	assert(rc == 0);
 
 	rc = mq_poll_wait(p, time(NULL) + 1);
 	assert(rc == 1);
 
-	rc = mq_recv(conn, &got_string);
-	assert(rc == MQ_MSG_NEWBUFFER);
+	rc = mq_recv(conn, NULL);
+	assert(rc == MQ_MSG_BUFFER);
+	assert(!strcmp(string2, buffer_tostring(&got_string)));
 
-	assert(!strcmp(string2, buffer_tostring(got_string)));
-	buffer_free(got_string);
-	free(got_string);
-
+	buffer_free(&got_string);
 	mq_close(client);
 	mq_close(conn);
 	mq_close(server);
