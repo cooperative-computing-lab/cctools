@@ -334,31 +334,14 @@ int mq_send_buffer(struct mq *mq, buffer_t *buf);
  */
 int mq_send_fd(struct mq *mq, int fd);
 
-/** Pop a message from the receive queue.
- *
- * This is a non-blocking operation, and will return immediately if no
- * messages are available. Once this functions indicated receipt of a message,
- * the underlying storage can be used again. After receiving a message, be sure
- * to use mq_store_* to specify the storage for the next message before
- * waiting again.
- * @param mq The message queue.
- * @param length A pointer to store the total length in bytes of the message.
- *  Can be NULL.
- * @returns MQ_MSG_NONE if no message is available.
- * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided buffer.
- * @returns MQ_MSG_FD if a message has been written to a previously-provided fd.
- */
-mq_msg_t mq_recv(struct mq *mq, size_t *length);
-
 /** Store the next message in the given buffer.
  *
  * This function allows the caller to provide the storage space for the next
- * message to be received. This may be useful in avoiding heap allocations.
- * @ref buf must already be initialized. Any existing contents will be overwritten.
- * It is undefined behavior to inspect/modify @ref buf before getting MQ_MSG_BUFFER
- * from @ref mq_recv (the notable exception is deleting the buffer and *not*
- * calling *_wait() again). It is undefined behavior to call this if a message has
- * already been partially received. It is therefore only safe to call this before
+ * message to be received. @ref buf must already be initialized. Any existing
+ * contents will be overwritten. Callers MUST NOT inspect/modify/free buf until
+ * a successful call to @ref mq_recv indicates completed receipt of a message.
+ * It is undefined behavior to call this if a message has already been
+ * partially received. It is therefore only safe to call this before
  * calling *_wait() for the first time or immediately after receiving a message
  * from @ref mq_recv().
  * @param mq The message queue.
@@ -371,15 +354,30 @@ int mq_store_buffer(struct mq *mq, buffer_t *buf);
 /** Write the next message to the given file descriptor.
  *
  * This function operates in the same way as @ref mq_store_buffer, but takes a
- * file descriptor. Note that the queue takes ownership of fd and will
- * close it when the message is received, so callers MUST NOT use/close fd
- * after passing it in. This function will not seek fd, so it is possible to
- * write to arbitrary positions within a file.
+ * file descriptor. Callers MUST NOT use/close fd until a successful call to
+ * @ref mq_recv indicates completed receipt of a message. This function will not
+ * seek fd, so it is possible to write to arbitrary positions within a file.
  * @param mq The message queue.
  * @param fd Then file descriptor to write to.
  * @returns 0 on success.
  * @returns -1 on failure, with errno set appropriately.
  */
 int mq_store_fd(struct mq *mq, int fd);
+
+/** Pop a message from the receive queue.
+ *
+ * This is a non-blocking operation, and will return immediately if no
+ * messages are available. Once this function indicates receipt of a message,
+ * the caller takes back ownership of the underlying storage provided
+ * via mq_store_*. After receiving a message, be sure to use mq_store_*
+ * to specify the storage for the next message before waiting again.
+ * @param mq The message queue.
+ * @param length A pointer to store the total length in bytes of the message.
+ *  Can be NULL.
+ * @returns MQ_MSG_NONE if no message is available.
+ * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided buffer.
+ * @returns MQ_MSG_FD if a message has been written to a previously-provided fd.
+ */
+mq_msg_t mq_recv(struct mq *mq, size_t *length);
 
 #endif

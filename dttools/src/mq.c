@@ -52,6 +52,7 @@ struct mq_msg {
 	mq_msg_t storage;
 	buffer_t *buffer;
 	int pipefd;
+	int origfl;
 	bool buffering;
 	bool seen_initial;
 	bool hung_up;
@@ -104,13 +105,18 @@ struct mq_poll {
 	struct set *error;
 };
 
-static int set_nonblocking (int fd) {
-	int out = fcntl(fd, F_GETFL);
-	if (out < 0) return out;
-	out |= O_NONBLOCK;
-	out = fcntl(fd, F_SETFL, out);
-	if(out < 0) return out;
-	return 0;
+static int set_nonblocking (struct mq_msg *msg) {
+	assert(msg);
+	if (msg->pipefd < 0) return 0;
+	msg->origfl = fcntl(msg->pipefd, F_GETFL);
+	if (msg->origfl < 0) return msg->origfl;
+	return fcntl(msg->pipefd, F_SETFL, msg->origfl|O_NONBLOCK);
+}
+
+static int unset_nonblocking (struct mq_msg *msg) {
+	assert(msg);
+	if (msg->pipefd < 0) return 0;
+	return fcntl(msg->pipefd, F_SETFL, msg->origfl);
 }
 
 static struct mq_msg *msg_create (void) {
@@ -124,13 +130,10 @@ static struct mq_msg *msg_create (void) {
 
 static void mq_msg_delete(struct mq_msg *msg) {
 	if (!msg) return;
-	switch (msg->storage) {
-		case MQ_MSG_NONE:
-		case MQ_MSG_BUFFER:
-			break;
-		case MQ_MSG_FD:
-			if (msg->pipefd >= 0) close(msg->pipefd);
-			break;
+	if (msg->pipefd >= 0) close(msg->pipefd);
+	if (msg->buffer) {
+		buffer_free(msg->buffer);
+		free(msg->buffer);
 	}
 	free(msg);
 }
@@ -142,8 +145,8 @@ static void mq_die(struct mq *mq, int err) {
 
 	mq_close(mq->acc);
 	mq_msg_delete(mq->sending);
-	mq_msg_delete(mq->recving);
-	mq_msg_delete(mq->recv);
+	free(mq->recving);
+	free(mq->recv);
 
 	struct list_cursor *cur = list_cursor_create(mq->send);
 	list_seek(cur, 0);
@@ -294,8 +297,6 @@ static int flush_send(struct mq *mq) {
 			continue;
 		} else {
 			if (snd->type & HDR_MSG_END) {
-				buffer_free(snd->buffer);
-				free(snd->buffer);
 				mq_msg_delete(snd);
 				mq->sending = NULL;
 			} else {
@@ -738,8 +739,6 @@ int mq_send_fd(struct mq *mq, int fd) {
 	errno = mq_geterror(mq);
 	if (errno != 0) return -1;
 
-	if (set_nonblocking(fd) < 0) return -1;
-
 	struct mq_msg *msg = msg_create();
 	msg->storage = MQ_MSG_FD;
 	msg->buffering = true;
@@ -752,6 +751,10 @@ int mq_send_fd(struct mq *mq, int fd) {
 	msg->len = MQ_PIPEBUF_SIZE;
 	msg->hdr_len = htonll(msg->len);
 	list_push_tail(mq->send, msg);
+	if (set_nonblocking(msg) < 0) {
+		mq_msg_delete(msg);
+		return -1;
+	}
 
 	return 0;
 }
@@ -761,6 +764,7 @@ mq_msg_t mq_recv(struct mq *mq, size_t *length) {
 
 	if (!mq->recv) return MQ_MSG_NONE;
 	struct mq_msg *msg = mq->recv;
+	assert(msg->storage != MQ_MSG_NONE);
 	mq->recv = NULL;
 	mq_msg_t storage = msg->storage;
 	if (mq->poll_group) {
@@ -769,8 +773,12 @@ mq_msg_t mq_recv(struct mq *mq, size_t *length) {
 	if (length) {
 		*length = msg->total_len;
 	}
-	assert(msg->storage != MQ_MSG_NONE);
-	mq_msg_delete(msg);
+	if (storage == MQ_MSG_FD) {
+		buffer_free(msg->buffer);
+		free(msg->buffer);
+	}
+	unset_nonblocking(msg);
+	free(msg);
 	return storage;
 }
 
@@ -791,8 +799,6 @@ int mq_store_fd(struct mq *mq, int fd) {
 	assert(mq);
 	assert(fd >= 0);
 
-	if (set_nonblocking(fd) < 0) return -1;
-
 	assert(!mq->recving);
 	mq->recving = msg_create();
 	struct mq_msg *rcv = mq->recving;
@@ -801,6 +807,11 @@ int mq_store_fd(struct mq *mq, int fd) {
 	rcv->buffer = xxcalloc(1, sizeof(*rcv->buffer));
 	buffer_init(rcv->buffer);
 	buffer_abortonfailure(rcv->buffer, true);
+	if (set_nonblocking(rcv) < 0) {
+		mq_msg_delete(rcv);
+		mq->recving = NULL;
+		return -1;
+	}
 
 	return 0;
 }
