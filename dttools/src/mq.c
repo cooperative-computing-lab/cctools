@@ -373,10 +373,6 @@ static int flush_recv(struct mq *mq) {
 			// make sure the cast below won't overflow
 			assert(rcv->len < PTRDIFF_MAX);
 
-			if (rcv->hung_up) {
-				rcv->buf_pos = rcv->len;
-			}
-
 			if (rcv->buf_pos < (ptrdiff_t) rcv->len) {
 				ssize_t rc = write(rcv->pipefd,
 					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
@@ -427,9 +423,7 @@ static void poll_events(struct mq *mq, struct pollfd *pfd) {
 				pfd[0].events |= POLLOUT;
 			}
 			if (mq->recving && mq->recving->buffering) {
-				if (!mq->recving->hung_up) {
-					pfd[1].fd = mq->recving->pipefd;
-				}
+				pfd[1].fd = mq->recving->pipefd;
 				pfd[1].events |= POLLOUT;
 			} else if (!mq->recv) {
 				pfd[1].fd = link_fd(mq->link);
@@ -499,13 +493,8 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				}
 			}
 			if (pfd[1].revents & (POLLERR | POLLHUP)) {
-				if (mq->recving && mq->recving->buffering) {
-					pfd[1].revents |= POLLOUT;
-					mq->recving->hung_up = true;
-				} else {
-					mq_die(mq, ECONNRESET);
-					goto DONE;
-				}
+				mq_die(mq, ECONNRESET);
+				goto DONE;
 			}
 
 			if (pfd[0].revents & (POLLOUT | POLLIN)) {
