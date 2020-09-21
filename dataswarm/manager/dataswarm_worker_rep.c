@@ -29,9 +29,11 @@ struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l )
 	w->link = l;
 	link_address_remote(w->link,w->addr,&w->port);
 
-    w->blobs = hash_table_create(0,0);
-    w->blob_of_rpc = itable_create(0);
-    w->task_of_rpc = itable_create(0);
+	w->blobs = hash_table_create(0,0);
+	w->tasks = hash_table_create(0,0);
+
+	w->blob_of_rpc = itable_create(0);
+	w->task_of_rpc = itable_create(0);
 
 	return w;
 }

@@ -2,6 +2,7 @@
 #include "dataswarm_rpc.h"
 #include "dataswarm_message.h"
 #include "dataswarm_blob_rep.h"
+#include "dataswarm_task_rep.h"
 
 #include "debug.h"
 #include "itable.h"
@@ -33,7 +34,9 @@ dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, stru
 
     dataswarm_result_t result = jx_lookup_integer(msg,"result");
 
+    /* it could be an rpc for a blob or a task, but we don't know yet. */
     struct dataswarm_blob_rep *b = (struct dataswarm_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
+    struct dataswarm_task_rep *t = (struct dataswarm_task_rep *) itable_lookup(r->task_of_rpc, msgid);
 
     if(b) {
         b->result = result;
@@ -44,8 +47,14 @@ dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, stru
                 result = dataswarm_blob_get(m,r,b->blobid);
             }
         }
-    } else {
-        /* may be a task */
+        itable_remove(r->blob_of_rpc, msgid);
+    } else if(t) {
+        /* may be a response to a task */
+        t->result = result;
+        if(t->result == DS_RESULT_SUCCESS) {
+            t->action = t->in_transition;
+        }
+        itable_remove(r->task_of_rpc, msgid);
     }
 
     jx_delete(msg);
@@ -54,30 +63,41 @@ dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, stru
 }
 
 /*
-Send a remote procedure call, freeing it, and returning the message id
-associated with the future response.
-*/
+   Send a remote procedure call, freeing it, and returning the message id
+   associated with the future response.
+   */
 
 jx_int_t dataswarm_rpc( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, struct jx *rpc)
 {
     jx_int_t msgid = m->message_id++;
     jx_insert_integer(rpc, "id", msgid);
 
-	dataswarm_json_send(r->link,rpc,time(0)+m->stall_timeout);
-	jx_delete(rpc);
+    dataswarm_json_send(r->link,rpc,time(0)+m->stall_timeout);
+    jx_delete(rpc);
 
-	return msgid;
+    return msgid;
 }
 
 jx_int_t dataswarm_rpc_for_blob( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, struct dataswarm_blob_rep *b, struct jx *rpc, dataswarm_blob_action_t in_transition )
 {
-
     jx_int_t msgid = dataswarm_rpc(m, r, rpc);
 
     b->in_transition = in_transition;
     b->result = DS_RESULT_PENDING;;
 
     itable_insert(r->blob_of_rpc, msgid, b);
+
+    return msgid;
+}
+
+jx_int_t dataswarm_rpc_for_task( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, struct dataswarm_task_rep *t, struct jx *rpc, dataswarm_task_action_t in_transition )
+{
+    jx_int_t msgid = dataswarm_rpc(m, r, rpc);
+
+    t->in_transition = in_transition;
+    t->result = DS_RESULT_PENDING;;
+
+    itable_insert(r->task_of_rpc, msgid, t);
 
     return msgid;
 }
@@ -185,18 +205,18 @@ jx_int_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct dataswarm_w
     jx_int_t msgid = dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_ACTION_PUT);
 
 
-	FILE *file = fopen(filename,"r");
+    FILE *file = fopen(filename,"r");
 
-	fseek(file,0,SEEK_END);
-	int64_t length = ftell(file);
-	fseek(file,0,SEEK_SET);
-	char *filesize = string_format("%" PRId64 "\n",length);
-	link_write(r->link,filesize,strlen(filesize),time(0)+m->stall_timeout);
+    fseek(file,0,SEEK_END);
+    int64_t length = ftell(file);
+    fseek(file,0,SEEK_SET);
+    char *filesize = string_format("%" PRId64 "\n",length);
+    link_write(r->link,filesize,strlen(filesize),time(0)+m->stall_timeout);
     free(filesize);
-	link_stream_from_file(r->link,file,length,time(0)+m->stall_timeout);
-	fclose(file);
+    link_stream_from_file(r->link,file,length,time(0)+m->stall_timeout);
+    fclose(file);
 
-	return msgid;
+    return msgid;
 }
 
 /* not an rpc, but its state behaves likes one. GETs a file for a corresponding REQ_GET get request. */
@@ -231,46 +251,53 @@ dataswarm_result_t dataswarm_blob_get( struct dataswarm_manager *m, struct datas
     b->in_transition = DS_BLOB_ACTION_GET;
     b->result = DS_RESULT_PENDING;
 
-	dataswarm_result_t result = DS_RESULT_UNABLE;
+    dataswarm_result_t result = DS_RESULT_UNABLE;
 
-	int64_t actual;
-	char line[16];
-	actual = link_readline(r->link,line,sizeof(line),time(0)+m->stall_timeout);
-	if(actual>0) {
-		int64_t length = atoll(line);
-		FILE *file = fopen(b->put_get_path,"w");
-		if(file) {
-			actual = link_stream_to_file(r->link,file,length,time(0)+m->stall_timeout);
-			fclose(file);
-			if(actual==length) {
-				result = DS_RESULT_SUCCESS;
-			}
-		}
+    int64_t actual;
+    char line[16];
+    actual = link_readline(r->link,line,sizeof(line),time(0)+m->stall_timeout);
+    if(actual>0) {
+        int64_t length = atoll(line);
+        FILE *file = fopen(b->put_get_path,"w");
+        if(file) {
+            actual = link_stream_to_file(r->link,file,length,time(0)+m->stall_timeout);
+            fclose(file);
+            if(actual==length) {
+                result = DS_RESULT_SUCCESS;
+            }
+        }
 
-	}
+    }
 
     b->result = result;
     if(result == DS_RESULT_SUCCESS) {
         b->action = b->in_transition;
     }
 
-	return result;
+    return result;
 }
 
-jx_int_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskinfo )
+jx_int_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
 {
-	char *msg = string_format("{\"id\": %d, \"method\" : \"task-submit\", \"params\" : %s }",m->message_id++,taskinfo);
+    struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+    assert(t);
 
-	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+m->stall_timeout);
-    free(msg);
+    struct jx *rpc = jx_objectv("method", jx_string("task-submit"),
+            "params", jx_copy(t->description),
+            NULL);
 
-    return m->message_id;
+    return dataswarm_rpc_for_task(m, r, t, rpc, DS_TASK_ACTION_SUBMIT);
 }
 
 jx_int_t dataswarm_rpc_task_remove( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
 {
-	char *msg = string_format("{\"id\": %d, \"method\" : \"task-remove\", \"params\" : {  \"task-id\" : \"%s\" } }",m->message_id++,taskid);
-	dataswarm_message_send(r->link,msg,strlen(msg),time(0)+m->stall_timeout);
+    struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+    assert(t);
 
-    return m->message_id;
+    struct jx *rpc = jx_objectv("method", jx_string("task-remove"),
+            "params", jx_objectv("task-id", jx_string(taskid),
+                NULL),
+            NULL);
+
+    return dataswarm_rpc_for_task(m, r, t, rpc, DS_TASK_ACTION_REMOVE);
 }

@@ -16,8 +16,11 @@ struct dataswarm_worker_rep {
 	int port;
 	/* list of files and states */
 
-    /* map from blobid's to struct dataswarm_blob */
+    /* map from blobid's to struct dataswarm_blob_rep */
     struct hash_table *blobs;
+
+    /* map from tasksid's to struct dataswarm_task_rep */
+    struct hash_table *tasks;
 
     /* map from currently active rpc ids to the struct dataswarm_blob that is waiting for them, if any. */
     struct itable *blob_of_rpc;
