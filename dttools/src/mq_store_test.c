@@ -35,7 +35,7 @@ int main (int argc, char *argv[]) {
 	struct mq *client = mq_connect("127.0.0.1", 65000);
 	assert(client);
 
-	rc = mq_send_buffer(client, test1);
+	rc = mq_send_buffer(client, test1, 0);
 	assert(rc != -1);
 
 	rc = mq_wait(server, time(NULL) + 1);
@@ -62,7 +62,7 @@ int main (int argc, char *argv[]) {
 	rc = mq_poll_add(p, client);
 	assert(rc == 0);
 
-	rc = mq_send_fd(conn, srcfd);
+	rc = mq_send_fd(conn, srcfd, 0);
 	assert(rc == 0);
 	rc = mq_store_fd(client, dstfd);
 	assert(rc == 0);
@@ -77,7 +77,7 @@ int main (int argc, char *argv[]) {
 	dstfd = open(argv[2], O_WRONLY|O_CREAT|O_TRUNC, 0777);
 	assert(dstfd != -1);
 
-	rc = mq_send_fd(client, srcfd);
+	rc = mq_send_fd(client, srcfd, 0);
 	assert(rc == 0);
 	rc = mq_store_buffer(conn, got);
 	assert(rc == 0);
@@ -87,7 +87,7 @@ int main (int argc, char *argv[]) {
 	rc = mq_recv(conn, NULL);
 	assert(rc == MQ_MSG_BUFFER);
 
-	rc = mq_send_buffer(client, got);
+	rc = mq_send_buffer(client, got, 0);
 	assert(rc != -1);
 	rc = mq_store_fd(conn, dstfd);
 	assert(rc == 0);
@@ -100,7 +100,7 @@ int main (int argc, char *argv[]) {
 	srcfd = open(argv[3], O_RDONLY);
 	assert(srcfd != -1);
 
-	rc = mq_send_fd(conn, srcfd);
+	rc = mq_send_fd(conn, srcfd, 0);
 	assert(rc == 0);
 
 	rc = mq_store_buffer(client, &got_string);
@@ -111,6 +111,21 @@ int main (int argc, char *argv[]) {
 	rc = mq_recv(client, &got_len);
 	assert(rc == MQ_MSG_BUFFER);
 	assert(got_len == 10);
+
+	srcfd = open(argv[0], O_RDONLY);
+	assert(srcfd != -1);
+
+	rc = mq_send_fd(conn, srcfd, 256);
+	assert(rc == 0);
+
+	rc = mq_store_buffer(client, &got_string);
+	assert(rc == 0);
+
+	rc = mq_poll_wait(p, time(NULL) + 5);
+	assert(rc == 1);
+	rc = mq_recv(client, &got_len);
+	assert(rc == MQ_MSG_BUFFER);
+	assert(got_len == 256);
 
 	buffer_free(&got_string);
 	mq_poll_delete(p);

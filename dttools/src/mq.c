@@ -46,6 +46,7 @@ enum mq_socket {
 struct mq_msg {
 	size_t len;
 	size_t total_len;
+	size_t max_len;
 	bool parsed_header;
 	ptrdiff_t hdr_pos;
 	ptrdiff_t buf_pos;
@@ -104,6 +105,17 @@ struct mq_poll {
 	struct set *readable;
 	struct set *error;
 };
+
+static size_t checked_add(size_t a, size_t b) {
+	size_t out = a + b;
+	assert(out >= a);
+	return out;
+}
+
+static ptrdiff_t checked_cast(size_t s) {
+	assert(s < PTRDIFF_MAX);
+	return s;
+}
 
 static int set_nonblocking (struct mq_msg *msg) {
 	assert(msg);
@@ -238,15 +250,12 @@ static int flush_send(struct mq *mq) {
 		if (!snd) return 0;
 
 		if (snd->buffering) {
-			// make sure the cast below won't overflow
-			assert(snd->len < PTRDIFF_MAX);
-
 			if (snd->hung_up) {
 				snd->len = snd->buf_pos;
 				snd->type |= HDR_MSG_END;
 			}
 
-			if (snd->buf_pos < (ptrdiff_t) snd->len) {
+			if (snd->buf_pos < checked_cast(snd->len)) {
 				ssize_t rc = read(snd->pipefd,
 					(char *) buffer_tostring(snd->buffer) + snd->buf_pos,
 					snd->len - snd->buf_pos);
@@ -257,13 +266,12 @@ static int flush_send(struct mq *mq) {
 				} else if (rc < 0) {
 					return -1;
 				}
-				snd->buf_pos += rc;
+				snd->buf_pos = checked_add(snd->buf_pos, rc);
 				continue;
 			} else {
 				snd->buffering = false;
 				snd->buf_pos = 0;
 				snd->hdr_pos = 0;
-				snd->hdr_len = htonll(snd->len);
 				if (snd->len < MQ_PIPEBUF_SIZE) {
 					snd->type |= HDR_MSG_END;
 				}
@@ -271,10 +279,14 @@ static int flush_send(struct mq *mq) {
 			}
 		}
 
-		// make sure the cast below won't overflow
-		assert(HDR_SIZE < PTRDIFF_MAX);
-		assert(snd->len < PTRDIFF_MAX);
-		if (snd->hdr_pos < (ptrdiff_t) HDR_SIZE) {
+		if (snd->hdr_pos < checked_cast(HDR_SIZE)) {
+			assert(snd->max_len >= snd->total_len);
+			if (snd->len >= snd->max_len - snd->total_len) {
+				snd->len = snd->max_len - snd->total_len;
+				snd->type |= HDR_MSG_END;
+			}
+
+			snd->hdr_len = htonll(snd->len);
 			ssize_t rc = send(socket, &snd->magic + snd->hdr_pos,
 					HDR_SIZE - snd->hdr_pos, 0);
 			if (rc == -1 && errno_is_temporary(errno)) {
@@ -282,9 +294,9 @@ static int flush_send(struct mq *mq) {
 			} else if (rc <= 0) {
 				return -1;
 			}
-			snd->hdr_pos += rc;
+			snd->hdr_pos = checked_add(snd->hdr_pos, rc);
 			continue;
-		} else if (snd->buf_pos < (ptrdiff_t) snd->len) {
+		} else if (snd->buf_pos < checked_cast(snd->len)) {
 			ssize_t rc = send(socket,
 				buffer_tostring(snd->buffer) + snd->buf_pos,
 				snd->len - snd->buf_pos, 0);
@@ -293,7 +305,8 @@ static int flush_send(struct mq *mq) {
 			} else if (rc <= 0) {
 				return -1;
 			}
-			snd->buf_pos += rc;
+			snd->buf_pos = checked_add(snd->buf_pos, rc);
+			snd->total_len = checked_add(snd->total_len, rc);
 			continue;
 		} else {
 			if (snd->type & HDR_MSG_END) {
@@ -320,10 +333,7 @@ static int flush_recv(struct mq *mq) {
 		assert(rcv);
 
 		if (!rcv->buffering) {
-			// make sure the cast below won't overflow
-			assert(HDR_SIZE < PTRDIFF_MAX);
-			assert(rcv->len < PTRDIFF_MAX);
-			if (rcv->hdr_pos < (ptrdiff_t) HDR_SIZE) {
+			if (rcv->hdr_pos < checked_cast(HDR_SIZE)) {
 				ssize_t rc = recv(socket, &rcv->magic + rcv->hdr_pos,
 						HDR_SIZE - rcv->hdr_pos, 0);
 				if (rc == -1 && errno_is_temporary(errno)) {
@@ -331,14 +341,12 @@ static int flush_recv(struct mq *mq) {
 				} else if (rc <= 0) {
 					return -1;;
 				}
-				rcv->hdr_pos += rc;
+				rcv->hdr_pos = checked_add(rcv->hdr_pos, rc);
 				continue;
 			} else if (!rcv->parsed_header) {
 				rcv->buf_pos = rcv->len;
-				// check overflow
-				assert(rcv->len + ntohll(rcv->hdr_len) >= rcv->len);
-				rcv->len += ntohll(rcv->hdr_len);
-				rcv->total_len += ntohll(rcv->hdr_len);
+				rcv->len = checked_add(rcv->len, ntohll(rcv->hdr_len));
+				rcv->total_len = checked_add(rcv->total_len, ntohll(rcv->hdr_len));
 				if (validate_header(rcv) == -1) return -1;
 				int rc = buffer_seek(rcv->buffer, rcv->len);
 				if (rc < 0) {
@@ -347,7 +355,7 @@ static int flush_recv(struct mq *mq) {
 				}
 				rcv->parsed_header = true;
 				continue;
-			} else if (rcv->buf_pos < (ptrdiff_t) rcv->len) {
+			} else if (rcv->buf_pos < checked_cast(rcv->len)) {
 				ssize_t rc = recv(socket,
 					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos, 0);
@@ -357,7 +365,7 @@ static int flush_recv(struct mq *mq) {
 				} else if (rc <= 0) {
 					return -1;;
 				}
-				rcv->buf_pos += rc;
+				rcv->buf_pos = checked_add(rcv->buf_pos, rc);
 				continue;
 			} else {
 				rcv->seen_initial = true;
@@ -370,10 +378,7 @@ static int flush_recv(struct mq *mq) {
 		}
 
 		if (rcv->storage == MQ_MSG_FD) {
-			// make sure the cast below won't overflow
-			assert(rcv->len < PTRDIFF_MAX);
-
-			if (rcv->buf_pos < (ptrdiff_t) rcv->len) {
+			if (rcv->buf_pos < checked_cast(rcv->len)) {
 				ssize_t rc = write(rcv->pipefd,
 					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos);
@@ -382,7 +387,7 @@ static int flush_recv(struct mq *mq) {
 				} else if (rc <= 0) {
 					return -1;
 				}
-				rcv->buf_pos += rc;
+				rcv->buf_pos = checked_add(rcv->buf_pos, rc);
 				continue;
 			} else {
 				rcv->len = 0;
@@ -704,29 +709,37 @@ DONE:
 	}
 }
 
-int mq_send_buffer(struct mq *mq, buffer_t *buf) {
+int mq_send_buffer(struct mq *mq, buffer_t *buf, size_t maxlen) {
 	assert(mq);
 	assert(buf);
 
 	errno = mq_geterror(mq);
 	if (errno != 0) return -1;
 
+	if (maxlen == 0) {
+		maxlen = SIZE_MAX;
+	}
+
 	struct mq_msg *msg = msg_create();
 	msg->type = HDR_MSG_SINGLE;
 	msg->buffer = buf;
+	msg->max_len = maxlen;
 	buffer_tolstring(buf, &msg->len);
-	msg->hdr_len = htonll(msg->len);
 	list_push_tail(mq->send, msg);
 
 	return 0;
 }
 
-int mq_send_fd(struct mq *mq, int fd) {
+int mq_send_fd(struct mq *mq, int fd, size_t maxlen) {
 	assert(mq);
 	assert(fd >= 0);
 
 	errno = mq_geterror(mq);
 	if (errno != 0) return -1;
+
+	if (maxlen == 0) {
+		maxlen = SIZE_MAX;
+	}
 
 	struct mq_msg *msg = msg_create();
 	msg->storage = MQ_MSG_FD;
@@ -737,8 +750,8 @@ int mq_send_fd(struct mq *mq, int fd) {
 	buffer_grow(msg->buffer, MQ_PIPEBUF_SIZE);
 	msg->type = HDR_MSG_START;
 	msg->pipefd = fd;
+	msg->max_len = maxlen;
 	msg->len = MQ_PIPEBUF_SIZE;
-	msg->hdr_len = htonll(msg->len);
 	list_push_tail(mq->send, msg);
 	if (set_nonblocking(msg) < 0) {
 		mq_msg_delete(msg);

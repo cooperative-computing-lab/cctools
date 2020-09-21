@@ -312,11 +312,12 @@ struct mq *mq_poll_error(struct mq_poll *p);
  * Only use heap-allocated buffers here.
  * @param mq The message queue.
  * @param buf The message to send.
+ * @param maxlen Send at most maxlen bytes, or if 0 use the entire buffer.
  * @returns 0 on success. Note that this only indicates that the message was
  *  successfully queued. It gives no indication about delivery.
  * @returns -1 on failure.
  */
-int mq_send_buffer(struct mq *mq, buffer_t *buf);
+int mq_send_buffer(struct mq *mq, buffer_t *buf, size_t maxlen);
 
 /** Stream a file descriptor across the wire.
  *
@@ -328,11 +329,12 @@ int mq_send_buffer(struct mq *mq, buffer_t *buf);
  * slices from within files.
  * @param mq The message queue.
  * @param fd The file descriptor to read.
+ * @param maxlen Send at most maxlen bytes, or if 0 read to EOF.
  * @returns 0 on success. Note that this only indicates that the message was
  *  successfully queued. It gives no indication about delivery.
  * @returns -1 on failure.
  */
-int mq_send_fd(struct mq *mq, int fd);
+int mq_send_fd(struct mq *mq, int fd, size_t maxlen);
 
 /** Store the next message in the given buffer.
  *

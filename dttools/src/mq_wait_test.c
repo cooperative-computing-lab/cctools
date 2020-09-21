@@ -30,10 +30,10 @@ int main (int argc, char *argv[]) {
 	struct mq *conn = mq_accept(server);
 	assert(!conn);
 
-	rc = mq_send_buffer(client, test1);
+	rc = mq_send_buffer(client, test1, 0);
 	assert(rc != -1);
 
-	rc = mq_send_buffer(client, test2);
+	rc = mq_send_buffer(client, test2, 0);
 	assert(rc != -1);
 
 	rc = mq_wait(server, time(NULL) + 1);

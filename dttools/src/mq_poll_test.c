@@ -57,10 +57,10 @@ int main (int argc, char *argv[]) {
 	rc = mq_store_buffer(conn, &got_string);
 	assert(rc == 0);
 
-	rc = mq_send_buffer(client, test1);
+	rc = mq_send_buffer(client, test1, 0);
 	assert(rc != -1);
 
-	rc = mq_send_buffer(client, test2);
+	rc = mq_send_buffer(client, test2, 0);
 	assert(rc != -1);
 
 	rc = mq_poll_wait(p, time(NULL) + 5);
