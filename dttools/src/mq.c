@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "set.h"
 #include "link.h"
 #include "xxmalloc.h"
+#include "macros.h"
 #include "debug.h"
 #include "ppoll_compat.h"
 #include "cctools_endian.h"
@@ -32,9 +33,11 @@ See the file COPYING for details.
 #define HDR_MSG_CONT 0
 #define HDR_MSG_START (1<<0)
 #define HDR_MSG_END (1<<1)
-#define HDR_MSG_SINGLE (HDR_MSG_START | HDR_MSG_END)
 
-#define MQ_PIPEBUF_SIZE (1<<16)
+#define MQ_FRAME_WIDTH 16
+#define MQ_FRAME_MAX (1<<MQ_FRAME_WIDTH)
+#define FRAME_POS(p) (p & ((1<<MQ_FRAME_WIDTH) - 1))
+#define NEXT_FRAME(p) (((p>>MQ_FRAME_WIDTH) + 1)<<MQ_FRAME_WIDTH)
 
 enum mq_socket {
 	MQ_SOCKET_SERVER,
@@ -48,8 +51,8 @@ struct mq_msg {
 	size_t total_len;
 	size_t max_len;
 	bool parsed_header;
-	ptrdiff_t hdr_pos;
-	ptrdiff_t buf_pos;
+	size_t hdr_pos;
+	size_t buf_pos;
 	mq_msg_t storage;
 	buffer_t *buffer;
 	int pipefd;
@@ -110,11 +113,6 @@ static size_t checked_add(size_t a, size_t b) {
 	size_t out = a + b;
 	assert(out >= a);
 	return out;
-}
-
-static ptrdiff_t checked_cast(size_t s) {
-	assert(s < PTRDIFF_MAX);
-	return s;
 }
 
 static int set_nonblocking (struct mq_msg *msg) {
@@ -255,7 +253,7 @@ static int flush_send(struct mq *mq) {
 				snd->type |= HDR_MSG_END;
 			}
 
-			if (snd->buf_pos < checked_cast(snd->len)) {
+			if (snd->buf_pos < snd->len) {
 				ssize_t rc = read(snd->pipefd,
 					(char *) buffer_tostring(snd->buffer) + snd->buf_pos,
 					snd->len - snd->buf_pos);
@@ -271,22 +269,27 @@ static int flush_send(struct mq *mq) {
 			} else {
 				snd->buffering = false;
 				snd->buf_pos = 0;
-				snd->hdr_pos = 0;
-				if (snd->len < MQ_PIPEBUF_SIZE) {
-					snd->type |= HDR_MSG_END;
-				}
 				continue;
 			}
 		}
 
-		if (snd->hdr_pos < checked_cast(HDR_SIZE)) {
+		if (snd->hdr_pos < HDR_SIZE) {
 			assert(snd->max_len >= snd->total_len);
 			if (snd->len >= snd->max_len - snd->total_len) {
 				snd->len = snd->max_len - snd->total_len;
 				snd->type |= HDR_MSG_END;
 			}
 
-			snd->hdr_len = htonll(snd->len);
+			assert(FRAME_POS(snd->buf_pos) == 0);
+			size_t framelen = MIN(snd->len - snd->buf_pos, MQ_FRAME_MAX);
+			snd->hdr_len = htonll(framelen);
+			if (framelen < MQ_FRAME_MAX) {
+				snd->type |= HDR_MSG_END;
+			}
+			if (snd->storage == MQ_MSG_BUFFER && framelen + snd->buf_pos == snd->len) {
+				snd->type |= HDR_MSG_END;
+			}
+
 			ssize_t rc = send(socket, &snd->magic + snd->hdr_pos,
 					HDR_SIZE - snd->hdr_pos, 0);
 			if (rc == -1 && errno_is_temporary(errno)) {
@@ -296,10 +299,10 @@ static int flush_send(struct mq *mq) {
 			}
 			snd->hdr_pos = checked_add(snd->hdr_pos, rc);
 			continue;
-		} else if (snd->buf_pos < checked_cast(snd->len)) {
+		} else if (snd->buf_pos < snd->len) {
 			ssize_t rc = send(socket,
 				buffer_tostring(snd->buffer) + snd->buf_pos,
-				snd->len - snd->buf_pos, 0);
+				MIN(snd->len, NEXT_FRAME(snd->buf_pos)) - snd->buf_pos, 0);
 			if (rc == -1 && errno_is_temporary(errno)) {
 				return 0;
 			} else if (rc <= 0) {
@@ -307,14 +310,21 @@ static int flush_send(struct mq *mq) {
 			}
 			snd->buf_pos = checked_add(snd->buf_pos, rc);
 			snd->total_len = checked_add(snd->total_len, rc);
+
+			if (snd->buf_pos < snd->len && FRAME_POS(snd->buf_pos) == 0) {
+				snd->hdr_pos = 0;
+				snd->type = HDR_MSG_CONT;
+			}
 			continue;
 		} else {
 			if (snd->type & HDR_MSG_END) {
 				mq_msg_delete(snd);
 				mq->sending = NULL;
 			} else {
+				assert(snd->storage == MQ_MSG_FD);
 				snd->buffering = true;
 				snd->buf_pos = 0;
+				snd->hdr_pos = 0;
 				snd->type = HDR_MSG_CONT;
 			}
 			continue;
@@ -333,7 +343,7 @@ static int flush_recv(struct mq *mq) {
 		assert(rcv);
 
 		if (!rcv->buffering) {
-			if (rcv->hdr_pos < checked_cast(HDR_SIZE)) {
+			if (rcv->hdr_pos < HDR_SIZE) {
 				ssize_t rc = recv(socket, &rcv->magic + rcv->hdr_pos,
 						HDR_SIZE - rcv->hdr_pos, 0);
 				if (rc == -1 && errno_is_temporary(errno)) {
@@ -359,7 +369,7 @@ static int flush_recv(struct mq *mq) {
 				}
 				rcv->parsed_header = true;
 				continue;
-			} else if (rcv->buf_pos < checked_cast(rcv->len)) {
+			} else if (rcv->buf_pos < rcv->len) {
 				ssize_t rc = recv(socket,
 					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos, 0);
@@ -382,7 +392,7 @@ static int flush_recv(struct mq *mq) {
 		}
 
 		if (rcv->storage == MQ_MSG_FD) {
-			if (rcv->buf_pos < checked_cast(rcv->len)) {
+			if (rcv->buf_pos < rcv->len) {
 				ssize_t rc = write(rcv->pipefd,
 					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos);
@@ -730,7 +740,8 @@ int mq_send_buffer(struct mq *mq, buffer_t *buf, size_t maxlen) {
 	}
 
 	struct mq_msg *msg = msg_create();
-	msg->type = HDR_MSG_SINGLE;
+	msg->type = HDR_MSG_START;
+	msg->storage = MQ_MSG_BUFFER;
 	msg->buffer = buf;
 	msg->max_len = maxlen;
 	buffer_tolstring(buf, &msg->len);
@@ -756,11 +767,11 @@ int mq_send_fd(struct mq *mq, int fd, size_t maxlen) {
 	msg->buffer = xxcalloc(1, sizeof(*msg->buffer));
 	buffer_init(msg->buffer);
 	buffer_abortonfailure(msg->buffer, true);
-	buffer_grow(msg->buffer, MQ_PIPEBUF_SIZE);
+	buffer_grow(msg->buffer, MQ_FRAME_MAX);
 	msg->type = HDR_MSG_START;
 	msg->pipefd = fd;
 	msg->max_len = maxlen;
-	msg->len = MQ_PIPEBUF_SIZE;
+	msg->len = MQ_FRAME_MAX;
 	list_push_tail(mq->send, msg);
 	if (set_nonblocking(msg) < 0) {
 		mq_msg_delete(msg);
