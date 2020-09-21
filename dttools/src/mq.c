@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <fcntl.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include "mq.h"
 #include "buffer.h"
@@ -28,7 +29,7 @@ See the file COPYING for details.
 
 
 #define HDR_SIZE (sizeof(struct mq_msg) - offsetof(struct mq_msg, magic))
-#define HDR_MAGIC "MQmsg"
+#define HDR_MAGIC "MQ"
 
 #define HDR_MSG_CONT 0
 #define HDR_MSG_START (1<<0)
@@ -63,30 +64,29 @@ struct mq_msg {
 
 	/* Here be dragons!
 	 *
-	 * Since we need to be able allow send/recv to be interrupted at any time
-	 * (even in the middle of an int), we can't rely on reading/writing
-	 * multi-byte header fields all in one go. The following fields are
-	 * arranged to match the wire format of the header. DO NOT add additional
-	 * struct fields below here! (If you do change the header format, be sure
-	 * to update the sanity check in msg_create.) First is some padding
-	 * (void pointer is self-aligned) so we don't need to worry too much
-	 * about the alignment of the earlier fields. Then the actual header
-	 * follows. Note that the length in the header needs to be in network
+	 * Since we need to be able allow send/recv to be interrupted at any
+	 * time (even in the middle of an int), we can't rely on
+	 * reading/writing multi-byte header fields all in one go. The
+	 * following fields are arranged to match the wire format of the
+	 * header. DO NOT add additional struct fields below here!
+	 * (If you do change the header format, be sure to update the sanity
+	 * check in msg_create.) First is some padding (void pointer is
+	 * self-aligned) so we don't need to worry too much about the
+	 * alignment of the earlier fields. Then the actual header follows.
+	 * Note that the length in the header needs to be in network
 	 * byte order, so that gets stored separately.
 	 *
 	 *  0    1    2    3    4    5    6    7
 	 * +----+----+----+----+----+----+----+----+
-	 * |           magic        |   pad   |type|
-	 * +----+----+----+----+----+----+----+----+
-	 * |                 length                |
+	 * |  magic  |type| pad|      length       |
 	 * +----+----+----+----+----+----+----+----+
 	 */
 	void *pad1;
 
-	char magic[5];
-	char pad2[2]; // necessary for alignment, should be 0
+	char magic[2];
 	uint8_t type;
-	uint64_t hdr_len;
+	char pad2; // necessary for alignment, should be 0
+	uint32_t hdr_len;
 };
 
 struct mq {
@@ -131,7 +131,7 @@ static int unset_nonblocking (struct mq_msg *msg) {
 
 static struct mq_msg *msg_create (void) {
 	// sanity check
-	assert(HDR_SIZE == 16);
+	assert(HDR_SIZE == 8);
 	struct mq_msg *out = xxcalloc(1, sizeof(struct mq_msg));
 	memcpy(out->magic, HDR_MAGIC, sizeof(out->magic));
 	out->pipefd = -1;
@@ -222,7 +222,7 @@ static int validate_header(struct mq_msg *msg) {
 	if (memcmp(msg->magic, HDR_MAGIC, sizeof(msg->magic))) {
 		return -1;
 	}
-	if (memcmp(msg->pad2, "\x00\x00", sizeof(msg->pad2))) {
+	if (msg->pad2 != 0) {
 		return -1;
 	}
 	if (msg->type>>2) {
@@ -277,7 +277,8 @@ static int flush_send(struct mq *mq) {
 
 			assert(FRAME_POS(snd->buf_pos) == 0);
 			size_t framelen = MIN(snd->len - snd->buf_pos, MQ_FRAME_MAX);
-			snd->hdr_len = htonll(framelen);
+			assert(framelen <= UINT32_MAX);
+			snd->hdr_len = htonl(framelen);
 			if (framelen < MQ_FRAME_MAX) {
 				snd->type |= HDR_MSG_END;
 			}
@@ -350,8 +351,8 @@ static int flush_recv(struct mq *mq) {
 				continue;
 			} else if (!rcv->parsed_header) {
 				rcv->buf_pos = rcv->len;
-				rcv->len = checked_add(rcv->len, ntohll(rcv->hdr_len));
-				rcv->total_len = checked_add(rcv->total_len, ntohll(rcv->hdr_len));
+				rcv->len = checked_add(rcv->len, ntohl(rcv->hdr_len));
+				rcv->total_len = checked_add(rcv->total_len, ntohl(rcv->hdr_len));
 				if (rcv->total_len > rcv->max_len) {
 					errno = EMSGSIZE;
 					return -1;
