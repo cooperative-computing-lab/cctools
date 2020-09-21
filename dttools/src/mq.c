@@ -375,7 +375,10 @@ static int flush_recv(struct mq *mq) {
 
 				if (rc == -1 && errno_is_temporary(errno)) {
 					return 0;
-				} else if (rc <= 0) {
+				} else if (rc == 0) {
+					errno = ECONNRESET;
+					return -1;
+				} else if (rc < 0) {
 					return -1;;
 				}
 				rcv->buf_pos = checked_add(rcv->buf_pos, rc);
