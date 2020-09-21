@@ -124,6 +124,23 @@ struct jx * jx_object( struct jx_pair *pairs )
 	return j;
 }
 
+struct jx * jx_objectv( const char *key, struct jx *value, ... ) {
+	va_list args;
+	va_start(args,value);
+
+	struct jx *object = jx_object(0);
+
+	while(key) {
+		assert(value)
+		jx_insert(object,jx_string(xxstrdup(key)),value);
+		key = va_arg(args,char *);
+		value = va_arg(args,struct jx *);
+	}
+
+	va_end(args);
+	return object;
+}
+
 struct jx * jx_array( struct jx_item *items )
 {
 	struct jx *j = jx_create(JX_ARRAY);
