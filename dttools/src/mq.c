@@ -231,6 +231,9 @@ static int validate_header(struct mq_msg *msg) {
 	if (!!msg->seen_initial == !!(msg->type & HDR_MSG_START)) {
 		return -1;
 	}
+	if (ntohl(msg->hdr_len) > MQ_FRAME_MAX) {
+		return -1;
+	}
 
 	return 0;
 }
@@ -335,7 +338,7 @@ static int flush_recv(struct mq *mq) {
 
 	while (!mq->recv) {
 		struct mq_msg *rcv = mq->recving;
-		// Caller must have specified storage before waiting
+		// Caller had to specify storage before waiting
 		assert(rcv);
 
 		if (!rcv->buffering) {
@@ -350,6 +353,7 @@ static int flush_recv(struct mq *mq) {
 				rcv->hdr_pos = checked_add(rcv->hdr_pos, rc);
 				continue;
 			} else if (!rcv->parsed_header) {
+				if (validate_header(rcv) == -1) return -1;
 				rcv->buf_pos = rcv->len;
 				rcv->len = checked_add(rcv->len, ntohl(rcv->hdr_len));
 				rcv->total_len = checked_add(rcv->total_len, ntohl(rcv->hdr_len));
@@ -357,7 +361,6 @@ static int flush_recv(struct mq *mq) {
 					errno = EMSGSIZE;
 					return -1;
 				}
-				if (validate_header(rcv) == -1) return -1;
 				int rc = buffer_seek(rcv->buffer, rcv->len);
 				if (rc < 0) {
 					errno = ENOMEM;
