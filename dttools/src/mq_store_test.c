@@ -43,7 +43,7 @@ int main (int argc, char *argv[]) {
 	struct mq *conn = mq_accept(server);
 	assert(conn);
 
-	rc = mq_store_buffer(conn, &got_string);
+	rc = mq_store_buffer(conn, &got_string, 0);
 	assert(rc == 0);
 
 	rc = mq_wait(client, time(NULL) + 1);
@@ -64,7 +64,7 @@ int main (int argc, char *argv[]) {
 
 	rc = mq_send_fd(conn, srcfd, 0);
 	assert(rc == 0);
-	rc = mq_store_fd(client, dstfd);
+	rc = mq_store_fd(client, dstfd, 0);
 	assert(rc == 0);
 
 	rc = mq_poll_wait(p, time(NULL) + 5);
@@ -79,7 +79,7 @@ int main (int argc, char *argv[]) {
 
 	rc = mq_send_fd(client, srcfd, 0);
 	assert(rc == 0);
-	rc = mq_store_buffer(conn, got);
+	rc = mq_store_buffer(conn, got, 0);
 	assert(rc == 0);
 
 	rc = mq_poll_wait(p, time(NULL) + 5);
@@ -89,7 +89,7 @@ int main (int argc, char *argv[]) {
 
 	rc = mq_send_buffer(client, got, 0);
 	assert(rc != -1);
-	rc = mq_store_fd(conn, dstfd);
+	rc = mq_store_fd(conn, dstfd, 0);
 	assert(rc == 0);
 
 	rc = mq_poll_wait(p, time(NULL) + 5);
@@ -103,7 +103,7 @@ int main (int argc, char *argv[]) {
 	rc = mq_send_fd(conn, srcfd, 0);
 	assert(rc == 0);
 
-	rc = mq_store_buffer(client, &got_string);
+	rc = mq_store_buffer(client, &got_string, 0);
 	assert(rc == 0);
 
 	rc = mq_poll_wait(p, time(NULL) + 15);
@@ -118,7 +118,7 @@ int main (int argc, char *argv[]) {
 	rc = mq_send_fd(conn, srcfd, 256);
 	assert(rc == 0);
 
-	rc = mq_store_buffer(client, &got_string);
+	rc = mq_store_buffer(client, &got_string, 0);
 	assert(rc == 0);
 
 	rc = mq_poll_wait(p, time(NULL) + 5);

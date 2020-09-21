@@ -312,7 +312,7 @@ struct mq *mq_poll_error(struct mq_poll *p);
  * Only use heap-allocated buffers here.
  * @param mq The message queue.
  * @param buf The message to send.
- * @param maxlen Send at most maxlen bytes, or if 0 use the entire buffer.
+ * @param maxlen Maximum number of bytes to send, or 0 to use the entire buffer.
  * @returns 0 on success. Note that this only indicates that the message was
  *  successfully queued. It gives no indication about delivery.
  * @returns -1 on failure.
@@ -329,7 +329,7 @@ int mq_send_buffer(struct mq *mq, buffer_t *buf, size_t maxlen);
  * slices from within files.
  * @param mq The message queue.
  * @param fd The file descriptor to read.
- * @param maxlen Send at most maxlen bytes, or if 0 read to EOF.
+ * @param maxlen Maximum number of bytes to send, or 0 to read to EOF.
  * @returns 0 on success. Note that this only indicates that the message was
  *  successfully queued. It gives no indication about delivery.
  * @returns -1 on failure.
@@ -345,13 +345,15 @@ int mq_send_fd(struct mq *mq, int fd, size_t maxlen);
  * It is undefined behavior to call this if a message has already been
  * partially received. It is therefore only safe to call this before
  * calling *_wait() for the first time or immediately after receiving a message
- * from @ref mq_recv().
+ * from @ref mq_recv(). Note that if a message exceeds maxlen the connection
+ * will be killed, so use with caution.
  * @param mq The message queue.
  * @param buf The buffer to use to store the next message.
+ * @param maxlen Maximum bytes to accept, or 0 for no limit.
  * @returns 0 on success.
  * @returns -1 on failure, with errno set appropriately.
  */
-int mq_store_buffer(struct mq *mq, buffer_t *buf);
+int mq_store_buffer(struct mq *mq, buffer_t *buf, size_t maxlen);
 
 /** Write the next message to the given file descriptor.
  *
@@ -359,12 +361,15 @@ int mq_store_buffer(struct mq *mq, buffer_t *buf);
  * file descriptor. Callers MUST NOT use/close fd until a successful call to
  * @ref mq_recv indicates completed receipt of a message. This function will not
  * seek fd, so it is possible to write to arbitrary positions within a file.
+ * Note that if a message exceeds maxlen the connection will be killed,
+ * so use with caution.
  * @param mq The message queue.
  * @param fd Then file descriptor to write to.
+ * @param maxlen Maximum bytes to accept, or 0 for no limit.
  * @returns 0 on success.
  * @returns -1 on failure, with errno set appropriately.
  */
-int mq_store_fd(struct mq *mq, int fd);
+int mq_store_fd(struct mq *mq, int fd, size_t maxlen);
 
 /** Pop a message from the receive queue.
  *

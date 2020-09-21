@@ -219,7 +219,7 @@ void mq_set_tag(struct mq *mq, void *tag) {
 
 static int validate_header(struct mq_msg *msg) {
 	assert(msg);
-	errno = EBADF;
+	errno = EBADMSG;
 
 	if (memcmp(msg->magic, HDR_MAGIC, sizeof(msg->magic))) {
 		return -1;
@@ -347,6 +347,10 @@ static int flush_recv(struct mq *mq) {
 				rcv->buf_pos = rcv->len;
 				rcv->len = checked_add(rcv->len, ntohll(rcv->hdr_len));
 				rcv->total_len = checked_add(rcv->total_len, ntohll(rcv->hdr_len));
+				if (rcv->total_len > rcv->max_len) {
+					errno = EMSGSIZE;
+					return -1;
+				}
 				if (validate_header(rcv) == -1) return -1;
 				int rc = buffer_seek(rcv->buffer, rcv->len);
 				if (rc < 0) {
@@ -498,8 +502,13 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				}
 			}
 			if (pfd[1].revents & (POLLERR | POLLHUP)) {
-				mq_die(mq, ECONNRESET);
-				goto DONE;
+				if (mq->recving && mq->recving->buffering) {
+					mq_die(mq, EPIPE);
+					goto DONE;
+				} else {
+					mq_die(mq, ECONNRESET);
+					goto DONE;
+				}
 			}
 
 			if (pfd[0].revents & (POLLOUT | POLLIN)) {
@@ -784,28 +793,38 @@ mq_msg_t mq_recv(struct mq *mq, size_t *length) {
 	return storage;
 }
 
-int mq_store_buffer(struct mq *mq, buffer_t *buf) {
+int mq_store_buffer(struct mq *mq, buffer_t *buf, size_t maxlen) {
 	assert(mq);
 	assert(buf);
+
+	if (maxlen == 0) {
+		maxlen = SIZE_MAX;
+	}
 
 	assert(!mq->recving);
 	buffer_rewind(buf, 0);
 	mq->recving = msg_create();
 	mq->recving->buffer = buf;
 	mq->recving->storage = MQ_MSG_BUFFER;
+	mq->recving->max_len = maxlen;
 
 	return 0;
 }
 
-int mq_store_fd(struct mq *mq, int fd) {
+int mq_store_fd(struct mq *mq, int fd, size_t maxlen) {
 	assert(mq);
 	assert(fd >= 0);
+
+	if (maxlen == 0) {
+		maxlen = SIZE_MAX;
+	}
 
 	assert(!mq->recving);
 	mq->recving = msg_create();
 	struct mq_msg *rcv = mq->recving;
 	rcv->pipefd = fd;
 	rcv->storage = MQ_MSG_FD;
+	rcv->max_len = maxlen;
 	rcv->buffer = xxcalloc(1, sizeof(*rcv->buffer));
 	buffer_init(rcv->buffer);
 	buffer_abortonfailure(rcv->buffer, true);

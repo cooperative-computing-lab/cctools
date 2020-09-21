@@ -54,7 +54,7 @@ int main (int argc, char *argv[]) {
 	rc = mq_poll_add(p, conn);
 	assert(rc == 0);
 
-	rc = mq_store_buffer(conn, &got_string);
+	rc = mq_store_buffer(conn, &got_string, 0);
 	assert(rc == 0);
 
 	rc = mq_send_buffer(client, test1, 0);
@@ -74,7 +74,7 @@ int main (int argc, char *argv[]) {
 	rc = mq_recv(conn, NULL);
 	assert(rc == MQ_MSG_NONE);
 
-	rc = mq_store_buffer(conn, &got_string);
+	rc = mq_store_buffer(conn, &got_string, 0);
 	assert(rc == 0);
 
 	rc = mq_poll_wait(p, time(NULL) + 1);

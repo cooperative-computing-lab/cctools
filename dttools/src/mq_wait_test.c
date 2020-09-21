@@ -41,7 +41,7 @@ int main (int argc, char *argv[]) {
 	conn = mq_accept(server);
 	assert(conn);
 
-	rc = mq_store_buffer(conn, &got_string);
+	rc = mq_store_buffer(conn, &got_string, 0);
 	assert(rc == 0);
 
 	rc = mq_wait(client, time(NULL) + 1);
@@ -53,7 +53,7 @@ int main (int argc, char *argv[]) {
 	assert(rc == MQ_MSG_BUFFER);
 	assert(!strcmp(string1, buffer_tostring(&got_string)));
 
-	rc = mq_store_buffer(conn, &got_string);
+	rc = mq_store_buffer(conn, &got_string, 0);
 	assert(rc == 0);
 
 	rc = mq_recv(conn, NULL);
