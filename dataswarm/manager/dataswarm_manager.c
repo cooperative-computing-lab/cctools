@@ -85,8 +85,8 @@ struct dataswarm_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswar
 	}
 
 	b = calloc(1,sizeof(struct dataswarm_blob_rep));
-	b->action = DS_BLOB_ACTION_NEW;
-	b->in_transition = b->action;
+	b->state = DS_BLOB_WORKER_STATE_NEW;
+	b->in_transition = b->state;
 	b->result = DS_RESULT_SUCCESS;
 
 	b->blobid = xxstrdup(blobid);
@@ -114,8 +114,8 @@ struct dataswarm_task_rep *dataswarm_manager_add_task_to_worker( struct dataswar
 	}
 
 	t = calloc(1,sizeof(struct dataswarm_task_rep));
-	t->action = DS_BLOB_ACTION_NEW;
-	t->in_transition = t->action;
+	t->state = DS_TASK_WORKER_STATE_NEW;
+	t->in_transition = t->state;
 	t->result = DS_RESULT_SUCCESS;
 
 	t->taskid = xxstrdup(taskid);

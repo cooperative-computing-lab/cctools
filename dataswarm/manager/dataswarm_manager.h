@@ -40,3 +40,5 @@ struct dataswarm_task_rep *dataswarm_manager_add_task_to_worker( struct dataswar
 char *dataswarm_manager_submit_task( struct dataswarm_manager *m, struct jx *taskinfo );
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

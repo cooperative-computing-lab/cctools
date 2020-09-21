@@ -173,3 +173,4 @@ void dataswarm_test_script_old_sync( struct dataswarm_manager *m, struct dataswa
 
 }
 
+/* vim: set noexpandtab tabstop=4: */

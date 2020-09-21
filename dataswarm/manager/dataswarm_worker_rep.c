@@ -42,3 +42,6 @@ void dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct j
 {
 	/* do something with the message ! */
 }
+
+
+/* vim: set noexpandtab tabstop=4: */
