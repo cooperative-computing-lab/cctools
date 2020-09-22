@@ -249,8 +249,6 @@ struct dataswarm_worker *dataswarm_worker_create(const char *workspace)
 
 	mkdir("blob", 0777);
 	mkdir("blob/deleting", 0777);
-	mkdir("blob/ro", 0777);
-	mkdir("blob/rw", 0777);
 
 	return w;
 }

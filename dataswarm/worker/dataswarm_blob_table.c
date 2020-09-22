@@ -17,6 +17,100 @@
 #include <errno.h>
 #include <string.h>
 
+typedef enum {
+	DATASWARM_BLOB_RW,
+	DATASWARM_BLOB_RO,
+	DATASWARM_BLOB_DELETING,
+	DATASWARM_BLOB_DELETED
+} dataswarm_blob_state_t;
+
+struct dataswarm_blob {
+	char *blobid;
+	dataswarm_blob_state_t state;
+	int64_t size;
+	struct jx *meta;
+};
+
+struct dataswarm_blob * dataswarm_blob_create( const char *blobid, jx_int_t size, struct jx *meta)
+{
+	struct dataswarm_blob *b = malloc(sizeof(*b));
+	memset(b,0,sizeof(*b));
+	b->blobid = strdup(blobid);
+	b->state = DATASWARM_BLOB_RW;
+	b->size = size;
+	b->meta = meta;
+	return b;
+}
+
+void dataswarm_blob_delete( struct dataswarm_blob *b )
+{
+	if(!b) return;
+	if(b->meta) jx_delete(b->meta);
+	if(b->blobid) free(b->blobid);
+	free(b);
+}
+
+struct dataswarm_blob * dataswarm_blob_create_from_jx( struct jx *jblob )
+{
+	struct dataswarm_blob *b = malloc(sizeof(*b));
+	memset(b,0,sizeof(*b));
+	b->blobid = jx_lookup_string_dup(jblob,"blobid");
+	b->state = jx_lookup_integer(jblob,"state");
+	b->size = jx_lookup_integer(jblob,"size");
+	b->meta = jx_lookup(jblob,"meta");
+	if(b->meta) b->meta = jx_copy(b->meta);
+	return b;
+}
+
+struct dataswarm_blob * dataswarm_blob_create_from_file( const char *filename )
+{
+	FILE *file = fopen(filename,"r");
+	if(!file) return 0;
+
+	struct jx *jblob = jx_parse_stream(file);
+	if(!jblob) {
+		fclose(file);
+		return 0;
+	}
+
+	struct dataswarm_blob *b = dataswarm_blob_create_from_jx(jblob);
+
+	jx_delete(jblob);
+	fclose(file);
+
+	return b;
+}
+
+
+struct jx * dataswarm_blob_to_jx( struct dataswarm_blob *b )
+{
+	struct jx *jblob = jx_object(0);
+	jx_insert_string(jblob,"blobid",b->blobid);
+	jx_insert_integer(jblob,"state",b->state);
+	jx_insert_integer(jblob,"size",b->size);
+	if(b->meta) jx_insert(jblob,jx_string("meta"),jx_copy(b->meta));
+	return jblob;
+}
+
+int dataswarm_blob_to_file( struct dataswarm_blob *b, const char *filename )
+{
+	struct jx *jblob = dataswarm_blob_to_jx(b);
+	if(!jblob) return 0;
+
+	FILE *file = fopen(filename,"w");
+	if(!file) {
+		jx_delete(jblob);
+		return 0;
+	}
+
+	jx_print_stream(jblob,file);
+
+	jx_delete(jblob);
+	fclose(file);
+
+	return 1;
+}
+
 dataswarm_result_t dataswarm_blob_table_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
 {
 	if(!blobid || size < 1) {
@@ -25,32 +119,31 @@ dataswarm_result_t dataswarm_blob_table_create(struct dataswarm_worker *w, const
 	}
 	// XXX should here check for available space
 
-	char *blob_dir = string_format("%s/blob/rw/%s", w->workspace, blobid);
+	char *blob_dir = string_format("%s/blob/%s", w->workspace, blobid);
 	char *blob_meta = string_format("%s/meta", blob_dir);
 
-	if(mkdir(blob_dir, 0777)<0) {
+	dataswarm_result_t result = DS_RESULT_SUCCESS;
+
+	struct dataswarm_blob *b = dataswarm_blob_create(blobid,size,meta);
+
+	if(mkdir(blob_dir, 0777)==0) {
+		if(dataswarm_blob_to_file(b,blob_meta)) {
+			result = DS_RESULT_SUCCESS;
+		} else {
+			debug(D_DATASWARM, "couldn't write %s: %s", blob_meta, strerror(errno));
+			result = DS_RESULT_UNABLE;
+		}
+	} else {
 		debug(D_DATASWARM, "couldn't mkdir %s: %s", blob_dir, strerror(errno));
-		free(blob_dir);
-		free(blob_meta);
-		return DS_RESULT_UNABLE;
+		result = DS_RESULT_UNABLE;
 	}
 
-	if(meta) {
-		FILE *file = fopen(blob_meta, "w");
-		if(!file) {
-			debug(D_DATASWARM, "couldn't open %s: %s", blob_meta, strerror(errno));
-			free(blob_dir);
-			free(blob_meta);
-			return DS_RESULT_UNABLE;
-		}
-		jx_print_stream(meta, file);
-		fclose(file);
-	}
+	dataswarm_blob_delete(b);
 
 	free(blob_dir);
 	free(blob_meta);
 
-	return DS_RESULT_SUCCESS;
+	return result;
 }
 
 
@@ -61,7 +154,7 @@ dataswarm_result_t dataswarm_blob_table_put(struct dataswarm_worker *w, const ch
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_data = string_format("%s/blob/rw/%s/data", w->workspace, blobid);
+	char *blob_data = string_format("%s/blob/%s/data", w->workspace, blobid);
 
 	char line[32];
 
@@ -111,7 +204,7 @@ dataswarm_result_t dataswarm_blob_table_get(struct dataswarm_worker *w, const ch
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_data = string_format("%s/blob/rw/%s/data", w->workspace, blobid);
+	char *blob_data = string_format("%s/blob/%s/data", w->workspace, blobid);
 
 	struct stat info;
 	int status = stat(blob_data, &info);
@@ -166,19 +259,35 @@ dataswarm_result_t dataswarm_blob_table_commit(struct dataswarm_worker *w, const
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
-	char *rw_name = string_format("%s/blob/rw/%s", w->workspace, blobid);
+	char *blob_meta = string_format("%s/blob/%s/meta", w->workspace, blobid);
+	dataswarm_result_t result = DS_RESULT_UNABLE;
 
-	int status = rename(rw_name, ro_name);
-	free(ro_name);
-	free(rw_name);
+	struct dataswarm_blob *b = dataswarm_blob_create_from_file(blob_meta);
+	if(b) {
+		if(b->state==DATASWARM_BLOB_RW) {
+			b->state = DATASWARM_BLOB_RO;
+			// XXX need to measure,checksum,update here
+			if(dataswarm_blob_to_file(b,blob_meta)) {
+				result = DS_RESULT_SUCCESS;
+			} else {
+				debug(D_DATASWARM,"couldn't write %s: %s",blob_meta,strerror(errno));
+				result = DS_RESULT_UNABLE;
+			}
+		} else if(b->state==DATASWARM_BLOB_RO) {
+			// Already committed, not an error.
+			result = DS_RESULT_SUCCESS;
+		} else {
+			debug(D_DATASWARM,"couldn't commit blobid %s because it is in state %d",blobid,b->state);
+			result = DS_RESULT_UNABLE;
+		}
 
-	if(status == 0) {
-		return DS_RESULT_SUCCESS;
+		dataswarm_blob_delete(b);
 	} else {
-		debug(D_DATASWARM, "couldn't commit %s: %s", blobid, strerror(errno));
-		return DS_RESULT_UNABLE;
+		debug(D_DATASWARM,"couldn't read %s: %s",blob_meta,strerror(errno));
+		result = DS_RESULT_UNABLE;
 	}
+
+	return result;
 }
 
 /*
@@ -188,7 +297,6 @@ that the delete (logically) occurs atomically, so that if the delete
 fails or the worker crashes, all deleted blobs can be cleaned up on restart.
 */
 
-
 dataswarm_result_t dataswarm_blob_table_delete(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
@@ -196,30 +304,26 @@ dataswarm_result_t dataswarm_blob_table_delete(struct dataswarm_worker *w, const
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *ro_name = string_format("%s/blob/ro/%s", w->workspace, blobid);
-	char *rw_name = string_format("%s/blob/rw/%s", w->workspace, blobid);
+	char *blob_dir = string_format("%s/blob/%s", w->workspace, blobid);
 	char *deleting_name = string_format("%s/blob/deleting/%s", w->workspace,blobid);
 
 	dataswarm_result_t result = DS_RESULT_SUCCESS;
 
-	int status = rename(ro_name, deleting_name);
+	int status = rename(blob_dir,deleting_name);
 	if(status!=0) {
-		status = rename(rw_name,deleting_name);
-		if(status!=0) {
-			if(errno==ENOENT) {
-				// Never existed, so just fall through.
-				result = DS_RESULT_SUCCESS;
-			} else {
-				debug(D_DATASWARM, "couldn't delete blob %s: %s", blobid, strerror(errno));
-				result = DS_RESULT_UNABLE;
-			}
+		if(errno==ENOENT || errno==EEXIST) {
+			// If it was never there, that's a success.
+			// Also if already moved to deleted, that's ok too.
+			result = DS_RESULT_SUCCESS;
+		} else {
+			debug(D_DATASWARM, "couldn't delete blob %s: %s", blobid, strerror(errno));
+			result = DS_RESULT_UNABLE;
 		}
 	}
 
 	delete_dir(deleting_name);
 
-	free(ro_name);
-	free(rw_name);
+	free(blob_dir);
 	free(deleting_name);
 
 	return result;
