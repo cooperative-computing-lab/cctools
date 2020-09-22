@@ -9,6 +9,9 @@
 struct dataswarm_manager {
 	struct hash_table *worker_table;
 	struct hash_table *client_table;
+    struct hash_table *task_table;
+    struct hash_table *file_table;
+
 	struct link *manager_link;
 
 	int connect_timeout;

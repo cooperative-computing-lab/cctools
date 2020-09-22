@@ -30,6 +30,8 @@ See the file COPYING for details.
 #include "dataswarm_task_rep.h"
 #include "dataswarm_manager.h"
 #include "dataswarm_client_ops.h"
+#include "dataswarm_task.h"
+#include "dataswarm_file.h"
 
 #include "dataswarm_test.h"
 
@@ -437,6 +439,9 @@ struct dataswarm_manager * dataswarm_manager_create()
 	m->worker_table = hash_table_create(0,0);
 	m->client_table = hash_table_create(0,0);
 	m->task_table   = hash_table_create(0,0);
+
+    m->task_table = hash_table_create(0,0);
+    m->file_table = hash_table_create(0,0);
 
 	m->connect_timeout = 5;
 	m->stall_timeout = 30;
