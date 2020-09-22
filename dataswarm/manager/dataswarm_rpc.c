@@ -53,6 +53,8 @@ dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, stru
 			t->state = t->in_transition;
 		}
 		itable_remove(r->task_of_rpc, msgid);
+	} else {
+		debug(D_DATASWARM, "worker does not know about message id: %" PRId64, msgid);
 	}
 
 	jx_delete(msg);
