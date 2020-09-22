@@ -14,10 +14,9 @@ typedef enum {
     DS_RESULT_NO_SUCH_TASKID, /* requested taskid does not exist */
     DS_RESULT_NO_SUCH_BLOBID, /* requested blobid does not exist */
     DS_RESULT_TOO_FULL,       /* insufficient resources to complete request */
-    DS_RESULT_PERMISSION,     /* insufficient permission to complete request */
+    DS_RESULT_BAD_PERMISSION, /* insufficient privileges to complete request */
     DS_RESULT_UNABLE,         /* could not complete request for internal reason */
-    DS_RESULT_CANCELED,       /* request was automatically canceled because of previous rpc in a sequence failed. */
-    DS_RESULT_PENDING ,       /* rpc not completed yet. */
+    DS_RESULT_PENDING         /* rpc not completed yet. */
 } dataswarm_result_t;
 
 int         dataswarm_json_send( struct link *l, struct jx *j, time_t stoptime );

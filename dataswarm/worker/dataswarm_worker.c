@@ -155,7 +155,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 		//this will probably go away with Tim's library
 		time_t sleeptime = stoptime - time(0);
 		if(sleeptime > 0) {
-			// XXX make sure this is interrupted at the completion of a task. 
+			// XXX make sure this is interrupted at the completion of a task.
 			sleep(sleeptime);
 		}
 	}
