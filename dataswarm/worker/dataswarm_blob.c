@@ -97,6 +97,9 @@ dataswarm_result_t dataswarm_blob_put(struct dataswarm_worker *w, const char *bl
 	}
 
 	free(blob_data);
+
+    debug(D_DATASWARM, "finished putting %" PRId64 " bytes into %s", length, blob_data);
+
 	return DS_RESULT_SUCCESS;
 }
 
@@ -141,7 +144,9 @@ dataswarm_result_t dataswarm_blob_get(struct dataswarm_worker *w, const char *bl
 	if(bytes_transfered != length) {
 		debug(D_DATASWARM, "couldn't stream from %s: %s", blob_data, strerror(errno));
 		return DS_RESULT_UNABLE;
-	}
+	} else {
+        debug(D_DATASWARM, "finished reading %" PRId64 " bytes from %s", length, blob_data);
+    }
 
 	free(blob_data);
 	return DS_RESULT_SUCCESS;

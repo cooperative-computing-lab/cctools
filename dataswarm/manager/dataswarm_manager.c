@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "debug.h"
 #include "stringtools.h"
+#include "xxmalloc.h"
 #include "cctools.h"
 #include "hash_table.h"
 #include "username.h"
@@ -25,6 +26,8 @@ See the file COPYING for details.
 #include "dataswarm_message.h"
 #include "dataswarm_worker_rep.h"
 #include "dataswarm_client_rep.h"
+#include "dataswarm_blob_rep.h"
+#include "dataswarm_task_rep.h"
 #include "dataswarm_manager.h"
 #include "dataswarm_client_ops.h"
 
@@ -71,6 +74,71 @@ void process_files( struct dataswarm_manager *m )
 void process_tasks( struct dataswarm_manager *m )
 {
 }
+
+/* declares a blob in a worker so that it can be manipulated via blob rpcs. */
+struct dataswarm_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid) {
+	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+	if(b) {
+		/* cannot create an already declared blob. This could only happen with
+		 * a bug, as we have control of the create messages.*/
+		fatal("blob-id %s already created at worker.", blobid);
+	}
+
+	b = calloc(1,sizeof(struct dataswarm_blob_rep));
+	b->state = DS_BLOB_WORKER_STATE_NEW;
+	b->in_transition = b->state;
+	b->result = DS_RESULT_SUCCESS;
+
+	b->blobid = xxstrdup(blobid);
+
+	hash_table_insert(r->blobs, blobid, b);
+
+	return b;
+}
+
+/* declares a task in a worker so that it can be manipulated via task rpcs. */
+struct dataswarm_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid) {
+	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	if(t) {
+		/* cannot create an already declared task. This could only happen with
+		 * a bug, as we have control of the create messages.*/
+		fatal("task-id %s already created at worker.", taskid);
+	}
+
+	/* this should be a proper struct dataswarm_task. */
+	struct jx *description = hash_table_lookup(m->task_table, taskid);
+	if(!description) {
+		/* could not find task with taskid. This could only happen with a bug,
+		 * as we have control of the create messages.*/
+		fatal("task-id %s does not exist.", taskid);
+	}
+
+	t = calloc(1,sizeof(struct dataswarm_task_rep));
+	t->state = DS_TASK_WORKER_STATE_NEW;
+	t->in_transition = t->state;
+	t->result = DS_RESULT_SUCCESS;
+
+	t->taskid = xxstrdup(taskid);
+	t->description = description;
+
+	hash_table_insert(r->tasks, taskid, t);
+
+	return t;
+}
+
+char *dataswarm_manager_submit_task( struct dataswarm_manager *m, struct jx *description ) {
+	char *taskid = string_format("task-%d", m->task_id++);
+
+	/* do validation */
+	/* convert to proper struct dataswarm_task */
+
+	jx_insert_string(description, "task-id", taskid);
+
+	hash_table_insert(m->task_table, taskid, description);
+
+	return taskid;
+}
+
 
 void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 {
@@ -170,7 +238,7 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 		//dataswarm_copy_file();
 	} else if(!strcmp(method,"service-submit")) {
 		/* dataswarm_submit_service(); */
-    } else if(!strcmp(method,"service-delete")) {
+	} else if(!strcmp(method,"service-delete")) {
 		/* dataswarm_delete_service(); */
 	} else if(!strcmp(method,"project-create")) {
 		/* dataswarm_create_project(); */
@@ -316,7 +384,7 @@ int main(int argc, char *argv[])
 	struct dataswarm_manager * m = dataswarm_manager_create();
 
 	int c;
-        while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0))!=-1) {
+	while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0))!=-1) {
 
 		switch(c) {
 			case 'N':
@@ -332,7 +400,7 @@ int main(int argc, char *argv[])
 				m->server_port = atoi(optarg);
 				break;
 			case 'v':
-	                        cctools_version_print(stdout, argv[0]);
+				cctools_version_print(stdout, argv[0]);
 				return 0;
 				break;
 			default:
@@ -368,6 +436,7 @@ struct dataswarm_manager * dataswarm_manager_create()
 
 	m->worker_table = hash_table_create(0,0);
 	m->client_table = hash_table_create(0,0);
+	m->task_table   = hash_table_create(0,0);
 
 	m->connect_timeout = 5;
 	m->stall_timeout = 30;

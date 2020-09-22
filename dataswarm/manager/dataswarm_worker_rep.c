@@ -15,6 +15,7 @@
 #include "stringtools.h"
 #include "cctools.h"
 #include "hash_table.h"
+#include "itable.h"
 #include "username.h"
 #include "catalog_query.h"
 
@@ -27,6 +28,13 @@ struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l )
 	struct dataswarm_worker_rep *w = malloc(sizeof(*w));
 	w->link = l;
 	link_address_remote(w->link,w->addr,&w->port);
+
+	w->blobs = hash_table_create(0,0);
+	w->tasks = hash_table_create(0,0);
+
+	w->blob_of_rpc = itable_create(0);
+	w->task_of_rpc = itable_create(0);
+
 	return w;
 }
 
@@ -34,3 +42,6 @@ void dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct j
 {
 	/* do something with the message ! */
 }
+
+
+/* vim: set noexpandtab tabstop=4: */
