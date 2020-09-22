@@ -1,5 +1,5 @@
 #include "dataswarm_worker.h"
-#include "dataswarm_blob.h"
+#include "dataswarm_blob_table.h"
 
 #include "debug.h"
 #include "stringtools.h"
@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 
 	struct dataswarm_worker *w = dataswarm_worker_create(workspace_dir);
 
-	dataswarm_blob_purge(w);
+	dataswarm_blob_table_purge(w);
 
 	if(!w) {
 		fprintf(stderr, "%s: couldn't create workspace %s: %s\n", argv[0], workspace_dir, strerror(errno));

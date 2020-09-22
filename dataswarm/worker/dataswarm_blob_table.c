@@ -1,5 +1,5 @@
 
-#include "dataswarm_blob.h"
+#include "dataswarm_blob_table.h"
 #include "dataswarm_message.h"
 
 #include "stringtools.h"
@@ -17,7 +17,7 @@
 #include <errno.h>
 #include <string.h>
 
-dataswarm_result_t dataswarm_blob_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
+dataswarm_result_t dataswarm_blob_table_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
 {
 	if(!blobid || size < 1) {
 		// XXX return obj with incorrect parameters
@@ -54,7 +54,7 @@ dataswarm_result_t dataswarm_blob_create(struct dataswarm_worker *w, const char 
 }
 
 
-dataswarm_result_t dataswarm_blob_put(struct dataswarm_worker *w, const char *blobid, struct link *l)
+dataswarm_result_t dataswarm_blob_table_put(struct dataswarm_worker *w, const char *blobid, struct link *l)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -104,7 +104,7 @@ dataswarm_result_t dataswarm_blob_put(struct dataswarm_worker *w, const char *bl
 }
 
 
-dataswarm_result_t dataswarm_blob_get(struct dataswarm_worker *w, const char *blobid, struct link *l)
+dataswarm_result_t dataswarm_blob_table_get(struct dataswarm_worker *w, const char *blobid, struct link *l)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -154,12 +154,12 @@ dataswarm_result_t dataswarm_blob_get(struct dataswarm_worker *w, const char *bl
 
 
 /*
-dataswarm_blob_commit converts a read-write blob into
+dataswarm_blob_table_commit converts a read-write blob into
 a read-only blob, fixing its size and properties for all time,
 allowing the object to be duplicated to other nodes.
 */
 
-dataswarm_result_t dataswarm_blob_commit(struct dataswarm_worker *w, const char *blobid)
+dataswarm_result_t dataswarm_blob_table_commit(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -182,14 +182,14 @@ dataswarm_result_t dataswarm_blob_commit(struct dataswarm_worker *w, const char 
 }
 
 /*
-dataswarm_blob_delete moves the blob to the deleting
+dataswarm_blob_table_delete moves the blob to the deleting
 dir, and then also deletes the object synchronously.  This ensures
 that the delete (logically) occurs atomically, so that if the delete
 fails or the worker crashes, all deleted blobs can be cleaned up on restart.
 */
 
 
-dataswarm_result_t dataswarm_blob_delete(struct dataswarm_worker *w, const char *blobid)
+dataswarm_result_t dataswarm_blob_table_delete(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -227,11 +227,11 @@ dataswarm_result_t dataswarm_blob_delete(struct dataswarm_worker *w, const char 
 
 
 /*
-dataswarm_blob_copy message requests a blob to be duplicated. The new copy is
+dataswarm_blob_table_copy message requests a blob to be duplicated. The new copy is
 read-write with a new blob-id.
 */
 
-dataswarm_result_t dataswarm_blob_copy(struct dataswarm_worker *w, const char *blobid, const char *blobid_src)
+dataswarm_result_t dataswarm_blob_table_copy(struct dataswarm_worker *w, const char *blobid, const char *blobid_src)
 {
 	if(!blobid || !blobid_src) {
 		// XXX return obj with incorrect parameters
@@ -247,7 +247,7 @@ dataswarm_result_t dataswarm_blob_copy(struct dataswarm_worker *w, const char *b
 Delete all the stale objects currently in the deleting directory.
 */
 
-void dataswarm_blob_purge( struct dataswarm_worker *w )
+void dataswarm_blob_table_purge( struct dataswarm_worker *w )
 {
 	char *dirname = string_format("%s/blob/deleting",w->workspace);
 
