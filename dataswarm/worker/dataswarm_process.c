@@ -125,14 +125,9 @@ static int flags_to_unix_mode( dataswarm_flags_t flags )
 
 static int setup_mount( struct dataswarm_mount *m, struct dataswarm_process *p, struct dataswarm_worker *w )
 {
-	const char *mode;
-	if(m->flags&(DATASWARM_FLAGS_WRITE|DATASWARM_FLAGS_APPEND)) {
-		mode = "rw";
-	} else {
-		mode = "ro";
-	}
-
-	char *blobpath = string_format("%s/blob/%s/%s/data",w->workspace,mode,m->uuid);
+	// XXX Check for validity of blob modes here.
+	//
+	char *blobpath = string_format("%s/blob/%s/data",w->workspace,m->uuid);
 
 	if(m->type==DATASWARM_MOUNT_PATH) {
 		int r = symlink(blobpath,m->path);

@@ -1,11 +1,10 @@
 
+#include "dataswarm_blob.h"
 #include "dataswarm_blob_table.h"
 #include "dataswarm_message.h"
 
 #include "stringtools.h"
 #include "debug.h"
-#include "jx_print.h"
-#include "jx_parse.h"
 #include "jx.h"
 #include "delete_dir.h"
 #include "create_dir.h"
@@ -16,100 +15,6 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <string.h>
-
-typedef enum {
-	DATASWARM_BLOB_RW,
-	DATASWARM_BLOB_RO,
-	DATASWARM_BLOB_DELETING,
-	DATASWARM_BLOB_DELETED
-} dataswarm_blob_state_t;
-
-struct dataswarm_blob {
-	char *blobid;
-	dataswarm_blob_state_t state;
-	int64_t size;
-	struct jx *meta;
-};
-
-struct dataswarm_blob * dataswarm_blob_create( const char *blobid, jx_int_t size, struct jx *meta)
-{
-	struct dataswarm_blob *b = malloc(sizeof(*b));
-	memset(b,0,sizeof(*b));
-	b->blobid = strdup(blobid);
-	b->state = DATASWARM_BLOB_RW;
-	b->size = size;
-	b->meta = meta;
-	return b;
-}
-
-void dataswarm_blob_delete( struct dataswarm_blob *b )
-{
-	if(!b) return;
-	if(b->meta) jx_delete(b->meta);
-	if(b->blobid) free(b->blobid);
-	free(b);
-}
-
-struct dataswarm_blob * dataswarm_blob_create_from_jx( struct jx *jblob )
-{
-	struct dataswarm_blob *b = malloc(sizeof(*b));
-	memset(b,0,sizeof(*b));
-	b->blobid = jx_lookup_string_dup(jblob,"blobid");
-	b->state = jx_lookup_integer(jblob,"state");
-	b->size = jx_lookup_integer(jblob,"size");
-	b->meta = jx_lookup(jblob,"meta");
-	if(b->meta) b->meta = jx_copy(b->meta);
-	return b;
-}
-
-struct dataswarm_blob * dataswarm_blob_create_from_file( const char *filename )
-{
-	FILE *file = fopen(filename,"r");
-	if(!file) return 0;
-
-	struct jx *jblob = jx_parse_stream(file);
-	if(!jblob) {
-		fclose(file);
-		return 0;
-	}
-
-	struct dataswarm_blob *b = dataswarm_blob_create_from_jx(jblob);
-
-	jx_delete(jblob);
-	fclose(file);
-
-	return b;
-}
-
-
-struct jx * dataswarm_blob_to_jx( struct dataswarm_blob *b )
-{
-	struct jx *jblob = jx_object(0);
-	jx_insert_string(jblob,"blobid",b->blobid);
-	jx_insert_integer(jblob,"state",b->state);
-	jx_insert_integer(jblob,"size",b->size);
-	if(b->meta) jx_insert(jblob,jx_string("meta"),jx_copy(b->meta));
-	return jblob;
-}
-
-int dataswarm_blob_to_file( struct dataswarm_blob *b, const char *filename )
-{
-	struct jx *jblob = dataswarm_blob_to_jx(b);
-	if(!jblob) return 0;
-
-	FILE *file = fopen(filename,"w");
-	if(!file) {
-		jx_delete(jblob);
-		return 0;
-	}
-
-	jx_print_stream(jblob,file);
-
-	jx_delete(jblob);
-	fclose(file);
-
-	return 1;
-}
 
 dataswarm_result_t dataswarm_blob_table_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
 {
@@ -189,9 +94,9 @@ dataswarm_result_t dataswarm_blob_table_put(struct dataswarm_worker *w, const ch
 		return DS_RESULT_UNABLE;
 	}
 
-	free(blob_data);
-
     debug(D_DATASWARM, "finished putting %" PRId64 " bytes into %s", length, blob_data);
+
+	free(blob_data);
 
 	return DS_RESULT_SUCCESS;
 }
