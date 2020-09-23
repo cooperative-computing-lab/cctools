@@ -1,7 +1,7 @@
 #ifndef DS_TASK_TABLE_H
 #define DS_TASK_TABLE_H
 
-#include "comm/ds_message.h"
+#include "common/ds_message.h"
 #include "dataswarm_worker.h"
 #include "jx.h"
 

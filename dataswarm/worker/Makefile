@@ -4,9 +4,9 @@ include ../../rules.mk
 TARGETS=$(PROGRAMS)
 PROGRAMS=dataswarm_worker
 
-SOURCES=dataswarm_worker_main.c dataswarm_worker.c ds_task_table.c
+SOURCES=dataswarm_worker_main.c dataswarm_worker.c ds_task_table.c ds_blob_table.c
 OBJECTS=$(SOURCES:%.c=%.o)
-DS_OBJECTS=../comm/ds_message.o ../task/ds_process.o ../task/ds_resources.o ../task/ds_task.o ../task/ds_mount.o ../blob/ds_blob.o ../blob/ds_blob_table.o
+DS_OBJECTS=../common/ds_message.o ../common/ds_process.o ../common/ds_resources.o ../common/ds_task.o ../common/ds_mount.o ../common/ds_blob.o
 
 LOCAL_CCFLAGS = -I ..
 LOCAL_LINKAGE = -L ../../dttools/src -ldttools

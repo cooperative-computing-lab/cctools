@@ -1,19 +1,18 @@
 include ../config.mk
 include ../rules.mk
 
-PHONY_TARGETS ?= comm task blob manager worker
+PHONY_TARGETS ?= common manager worker
 TARGETS ?= $(PHONY_TARGETS)
 
 all: $(TARGETS)
 
-# modules that don't depend on any other:
-comm task blob:
+common:
 	@$(MAKE) -C $@
 
-manager: comm task blob
+manager: common
 	@$(MAKE) -C $@
 
-worker: comm task blob
+worker: common
 	@$(MAKE) -C $@
 
 CLEAN_TARGETS = $(TARGETS:%=clean-%)

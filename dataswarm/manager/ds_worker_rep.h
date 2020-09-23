@@ -10,7 +10,7 @@ of the actual client process that runs somewhere else.
 #include "jx.h"
 #include "hash_table.h"
 
-#include "comm/ds_message.h"
+#include "common/ds_message.h"
 
 struct ds_worker_rep {
 	struct link *link;

@@ -23,8 +23,8 @@ See the file COPYING for details.
 #include "username.h"
 #include "catalog_query.h"
 
-#include "comm/ds_message.h"
-#include "task/ds_task.h"
+#include "common/ds_message.h"
+#include "common/ds_task.h"
 #include "ds_worker_rep.h"
 #include "ds_client_rep.h"
 #include "ds_blob_rep.h"

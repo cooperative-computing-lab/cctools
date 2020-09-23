@@ -1,7 +1,7 @@
 #ifndef DS_RPC_H
 #define DS_RPC_H
 
-#include "comm/ds_message.h"
+#include "common/ds_message.h"
 #include "dataswarm_manager.h"
 #include "ds_worker_rep.h"
 

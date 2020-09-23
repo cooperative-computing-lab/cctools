@@ -1,9 +1,8 @@
 include ../../config.mk
 include ../../rules.mk
 
-SOURCES=ds_blob.c ds_blob_table.c
+SOURCES=ds_mount.c ds_process.c ds_resources.c ds_task.c ds_message.c ds_blob.c
 OBJECTS=$(SOURCES:%.c=%.o)
-LOCAL_CCFLAGS = -I ..
 LOCAL_LINKAGE = -L ../../dttools/src -ldttools
 
 all: $(OBJECTS)

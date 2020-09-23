@@ -1,7 +1,7 @@
 #include "ds_task_table.h"
 #include "dataswarm_worker.h"
-#include "task/ds_task.h"
-#include "comm/ds_message.h"
+#include "common/ds_task.h"
+#include "common/ds_message.h"
 
 #include "hash_table.h"
 #include "jx.h"

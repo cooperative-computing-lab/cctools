@@ -1,6 +1,6 @@
-#include "ds_blob.h"
+#include "common/ds_blob.h"
+#include "common/ds_message.h"
 #include "ds_blob_table.h"
-#include "comm/ds_message.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -15,7 +15,7 @@
 #include <errno.h>
 #include <string.h>
 
-ds_result_t ds_blob_table_create(const char *workspace, const char *blobid, jx_int_t size, struct jx *meta )
+ds_result_t ds_blob_table_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
 {
 	if(!blobid || size < 1) {
 		// XXX return obj with incorrect parameters
@@ -23,7 +23,7 @@ ds_result_t ds_blob_table_create(const char *workspace, const char *blobid, jx_i
 	}
 	// XXX should here check for available space
 
-	char *blob_dir = string_format("%s/blob/%s", workspace, blobid);
+	char *blob_dir = string_format("%s/blob/%s", w->workspace, blobid);
 	char *blob_meta = string_format("%s/meta", blob_dir);
 
 	ds_result_t result = DS_RESULT_SUCCESS;
@@ -51,21 +51,21 @@ ds_result_t ds_blob_table_create(const char *workspace, const char *blobid, jx_i
 }
 
 
-ds_result_t ds_blob_table_put(const char *workspace, const char *blobid, struct link *l)
+ds_result_t ds_blob_table_put(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_data = string_format("%s/blob/%s/data", workspace, blobid);
+	char *blob_data = string_format("%s/blob/%s/data", w->workspace, blobid);
 
 	char line[32];
 
 	// XXX should set timeout more appropriately
 	time_t stoptime = time(0) + 3600;
 
-	if(!link_readline(l, line, sizeof(line), stoptime)) {
+	if(!link_readline(w->manager_link, line, sizeof(line), stoptime)) {
 		debug(D_DATASWARM, "couldn't read file length: %s: %s", blob_data, strerror(errno));
 		free(blob_data);
 		return DS_RESULT_UNABLE;
@@ -84,7 +84,7 @@ ds_result_t ds_blob_table_put(const char *workspace, const char *blobid, struct 
 		return DS_RESULT_UNABLE;
 	}
 
-	int bytes_transfered = link_stream_to_file(l, file, length, stoptime);
+	int bytes_transfered = link_stream_to_file(w->manager_link, file, length, stoptime);
 	fclose(file);
 
 	if(bytes_transfered != length) {
@@ -102,7 +102,7 @@ ds_result_t ds_blob_table_put(const char *workspace, const char *blobid, struct 
 
 
 
-ds_result_t ds_blob_table_get(const char *workspace, const char *blobid, struct link *l, int64_t timeout, jx_int_t msgid, int *should_respond)
+ds_result_t ds_blob_table_get(struct dataswarm_worker *w, const char *blobid, jx_int_t msgid, int *should_respond)
 {
 
     *should_respond = 1;
@@ -111,7 +111,7 @@ ds_result_t ds_blob_table_get(const char *workspace, const char *blobid, struct 
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_data = string_format("%s/blob/%s/data", workspace, blobid);
+	char *blob_data = string_format("%s/blob/%s/data", w->workspace, blobid);
 
 	struct stat info;
 	int status = stat(blob_data, &info);
@@ -131,7 +131,7 @@ ds_result_t ds_blob_table_get(const char *workspace, const char *blobid, struct 
     //Here we construct the response and then send the file.
     *should_respond = 0;
     struct jx *response = ds_message_standard_response(msgid,DS_RESULT_SUCCESS,NULL);
-    ds_json_send(l, response, time(0) + timeout);
+    ds_json_send(w->manager_link, response, w->long_timeout);
 	jx_delete(response);
 
 	int64_t length = info.st_size;
@@ -139,12 +139,12 @@ ds_result_t ds_blob_table_get(const char *workspace, const char *blobid, struct 
 
 	// XXX should set timeout more appropriately
 	time_t stoptime = time(0) + 3600;
-	link_write(l, line, strlen(line), stoptime);
+	link_write(w->manager_link, line, strlen(line), stoptime);
 	free(line);
 
 	// XXX should handle directory transfers.
 
-	int bytes_transfered = link_stream_from_file(l, file, length, stoptime);
+	int bytes_transfered = link_stream_from_file(w->manager_link, file, length, stoptime);
 	fclose(file);
 
 	if(bytes_transfered != length) {
@@ -164,14 +164,14 @@ a read-only blob, fixing its size and properties for all time,
 allowing the object to be duplicated to other nodes.
 */
 
-ds_result_t ds_blob_table_commit(const char *workspace, const char *blobid)
+ds_result_t ds_blob_table_commit(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_meta = string_format("%s/blob/%s/meta", workspace, blobid);
+	char *blob_meta = string_format("%s/blob/%s/meta", w->workspace, blobid);
 	ds_result_t result = DS_RESULT_UNABLE;
 
 	struct ds_blob *b = ds_blob_create_from_file(blob_meta);
@@ -209,15 +209,15 @@ that the delete (logically) occurs atomically, so that if the delete
 fails or the worker crashes, all deleted blobs can be cleaned up on restart.
 */
 
-ds_result_t ds_blob_table_delete(const char *workspace, const char *blobid)
+ds_result_t ds_blob_table_delete(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_dir = string_format("%s/blob/%s", workspace, blobid);
-	char *deleting_name = string_format("%s/blob/deleting/%s", workspace,blobid);
+	char *blob_dir = string_format("%s/blob/%s", w->workspace, blobid);
+	char *deleting_name = string_format("%s/blob/deleting/%s", w->workspace,blobid);
 
 	ds_result_t result = DS_RESULT_SUCCESS;
 
@@ -247,7 +247,7 @@ ds_blob_table_copy message requests a blob to be duplicated. The new copy is
 read-write with a new blob-id.
 */
 
-ds_result_t ds_blob_table_copy(const char *workspace, const char *blobid, const char *blobid_src)
+ds_result_t ds_blob_table_copy(struct dataswarm_worker *w, const char *blobid, const char *blobid_src)
 {
 	if(!blobid || !blobid_src) {
 		// XXX return obj with incorrect parameters
@@ -263,9 +263,9 @@ ds_result_t ds_blob_table_copy(const char *workspace, const char *blobid, const 
 Delete all the stale objects currently in the deleting directory.
 */
 
-void ds_blob_table_purge( const char *workspace )
+void ds_blob_table_purge( struct dataswarm_worker *w )
 {
-	char *dirname = string_format("%s/blob/deleting",workspace);
+	char *dirname = string_format("%s/blob/deleting",w->workspace);
 
 	debug(D_DATASWARM,"checking %s for stale blobs to delete:",dirname);
 

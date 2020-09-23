@@ -19,7 +19,7 @@
 #include "username.h"
 #include "catalog_query.h"
 
-#include "comm/ds_message.h"
+#include "common/ds_message.h"
 #include "ds_worker_rep.h"
 #include "ds_task_rep.h"
 #include "dataswarm_manager.h"
