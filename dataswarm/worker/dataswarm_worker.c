@@ -27,7 +27,7 @@ See the file COPYING for details.
 #include "task/ds_task.h"
 #include "task/ds_process.h"
 #include "dataswarm_task_table.h"
-#include "dataswarm_blob_table.h"
+#include "blob/ds_blob_table.h"
 
 void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
 {
@@ -94,17 +94,17 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	} else if(!strcmp(method, "status-request")) {
 		result = DS_RESULT_SUCCESS;
 	} else if(!strcmp(method, "blob-create")) {
-		result = ds_blob_table_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
+		result = ds_blob_table_create(w->workspace,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
 	} else if(!strcmp(method, "blob-put")) {
-		result = ds_blob_table_put(w,blobid, w->manager_link);
+		result = ds_blob_table_put(w->workspace,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-get")) {
-		result = ds_blob_table_get(w,blobid,w->manager_link,id,&should_send_response);
+		result = ds_blob_table_get(w->workspace,blobid,w->manager_link,w->long_timeout,id,&should_send_response);
 	} else if(!strcmp(method, "blob-delete")) {
-		result = ds_blob_table_delete(w,blobid);
+		result = ds_blob_table_delete(w->workspace,blobid);
 	} else if(!strcmp(method, "blob-commit")) {
-		result = ds_blob_table_commit(w,blobid);
+		result = ds_blob_table_commit(w->workspace,blobid);
 	} else if(!strcmp(method, "blob-copy")) {
-		result = ds_blob_table_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
+		result = ds_blob_table_copy(w->workspace,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else {
 		result = DS_RESULT_BAD_METHOD;
 	}
