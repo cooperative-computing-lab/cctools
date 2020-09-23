@@ -8,6 +8,7 @@
 #include "jx.h"
 #include "stringtools.h"
 #include "debug.h"
+#include "delete_dir.h"
 
 #include <dirent.h>
 #include <string.h>
@@ -169,3 +170,28 @@ void dataswarm_task_table_recover( struct dataswarm_worker *w )
 	closedir(dir);
 	free(task_dir);
 }
+
+void dataswarm_task_table_purge( struct dataswarm_worker *w )
+{
+	char *dirname = string_format("%s/task/deleting",w->workspace);
+
+	debug(D_DATASWARM,"checking %s for stale tasks to delete:",dirname);
+
+	DIR *dir = opendir(dirname);
+	if(dir) {
+		struct dirent *d;
+		while((d=readdir(dir))) {
+			if(!strcmp(d->d_name,".")) continue;
+			if(!strcmp(d->d_name,"..")) continue;
+			char *taskname = string_format("%s/%s",dirname,d->d_name);
+			debug(D_DATASWARM,"deleting task: %s",taskname);
+			delete_dir(taskname);
+			free(taskname);
+		}
+	}
+
+	debug(D_DATASWARM,"done checking for stale tasks");
+
+	free(dirname);
+}
+

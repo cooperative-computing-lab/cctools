@@ -83,6 +83,8 @@ int main(int argc, char *argv[])
 	}
 
 	dataswarm_blob_table_purge(w);
+	dataswarm_task_table_purge(w);
+
 	dataswarm_task_table_recover(w);
 
 	if(manager_name) {
