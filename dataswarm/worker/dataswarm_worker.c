@@ -27,7 +27,7 @@ See the file COPYING for details.
 #include "dataswarm_task.h"
 #include "dataswarm_task_table.h"
 #include "dataswarm_process.h"
-#include "dataswarm_blob.h"
+#include "dataswarm_blob_table.h"
 
 void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
 {
@@ -89,17 +89,17 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	} else if(!strcmp(method, "status-request")) {
 		result = DS_RESULT_SUCCESS;
 	} else if(!strcmp(method, "blob-create")) {
-		result = dataswarm_blob_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
+		result = dataswarm_blob_table_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
 	} else if(!strcmp(method, "blob-put")) {
-		result = dataswarm_blob_put(w,blobid, w->manager_link);
+		result = dataswarm_blob_table_put(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-get")) {
-		result = dataswarm_blob_get(w,blobid, w->manager_link);
+		result = dataswarm_blob_table_get(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-delete")) {
-		result = dataswarm_blob_delete(w,blobid);
+		result = dataswarm_blob_table_delete(w,blobid);
 	} else if(!strcmp(method, "blob-commit")) {
-		result = dataswarm_blob_commit(w,blobid);
+		result = dataswarm_blob_table_commit(w,blobid);
 	} else if(!strcmp(method, "blob-copy")) {
-		result = dataswarm_blob_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
+		result = dataswarm_blob_table_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else {
 		result = DS_RESULT_BAD_METHOD;
 	}
@@ -249,8 +249,6 @@ struct dataswarm_worker *dataswarm_worker_create(const char *workspace)
 
 	mkdir("blob", 0777);
 	mkdir("blob/deleting", 0777);
-	mkdir("blob/ro", 0777);
-	mkdir("blob/rw", 0777);
 
 	return w;
 }

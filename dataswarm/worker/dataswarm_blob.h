@@ -1,20 +1,29 @@
 #ifndef DATASWARM_BLOB_H
 #define DATASWARM_BLOB_H
 
-#include "dataswarm_worker.h"
-#include "dataswarm_message.h"
-
 #include "jx.h"
-#include "link.h"
 
-dataswarm_result_t dataswarm_blob_create( struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta );
-dataswarm_result_t dataswarm_blob_put( struct dataswarm_worker *w, const char *blobid, struct link *l);
-dataswarm_result_t dataswarm_blob_get( struct dataswarm_worker *w, const char *blobid, struct link *l);
-dataswarm_result_t dataswarm_blob_delete( struct dataswarm_worker *w, const char *blobid);
-dataswarm_result_t dataswarm_blob_commit( struct dataswarm_worker *w, const char *blobid);
-dataswarm_result_t dataswarm_blob_copy( struct dataswarm_worker *w, const char *blobid, const char *blobid_src);
+typedef enum {
+	DATASWARM_BLOB_RW,
+	DATASWARM_BLOB_RO,
+	DATASWARM_BLOB_DELETING,
+	DATASWARM_BLOB_DELETED
+} dataswarm_blob_state_t;
 
-void dataswarm_blob_purge( struct dataswarm_worker *w );
+struct dataswarm_blob {
+	char *blobid;
+	dataswarm_blob_state_t state;
+	int64_t size;
+	struct jx *meta;
+};
 
+struct dataswarm_blob * dataswarm_blob_create( const char *blobid, jx_int_t size, struct jx *meta);
+struct dataswarm_blob * dataswarm_blob_create_from_jx( struct jx *jblob );
+struct dataswarm_blob * dataswarm_blob_create_from_file( const char *filename );
+
+struct jx * dataswarm_blob_to_jx( struct dataswarm_blob *b );
+int dataswarm_blob_to_file( struct dataswarm_blob *b, const char *filename );
+
+void dataswarm_blob_delete( struct dataswarm_blob *b );
 
 #endif
