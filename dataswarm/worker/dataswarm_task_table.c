@@ -7,6 +7,7 @@
 #include "hash_table.h"
 #include "jx.h"
 #include "stringtools.h"
+#include "debug.h"
 
 #include <dirent.h>
 #include <string.h>
@@ -136,6 +137,8 @@ void dataswarm_task_table_recover( struct dataswarm_worker *w )
 	DIR *dir;
 	struct dirent *d;
 
+	debug(D_DATASWARM,"checking %s for tasks to recover...",task_dir);
+
 	dir = opendir(task_dir);
 	if(!dir) return;
 
@@ -146,6 +149,8 @@ void dataswarm_task_table_recover( struct dataswarm_worker *w )
 
 		char * task_meta;
 		struct dataswarm_task *task;
+
+		debug(D_DATASWARM,"recovering task %s",d->d_name);
 
 		task_meta = string_format("%s/task/%s/meta",w->workspace,d->d_name);
 
@@ -158,8 +163,9 @@ void dataswarm_task_table_recover( struct dataswarm_worker *w )
 		}
 		free(task_meta);
 
-	  }
+	}
 
-	  closedir(dir);
-	  free(task_dir);
+	debug(D_DATASWARM,"done recovering tasks");
+	closedir(dir);
+	free(task_dir);
 }

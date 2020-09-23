@@ -275,5 +275,7 @@ void dataswarm_blob_table_purge( struct dataswarm_worker *w )
 		}
 	}
 
+	debug(D_DATASWARM,"done checking for stale blobs");
+
 	free(dirname);
 }
