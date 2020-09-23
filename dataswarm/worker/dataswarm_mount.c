@@ -50,6 +50,7 @@ dataswarm_flags_t dataswarm_flags_parse( const char *s )
 				debug(D_NOTICE|D_DATASWARM,"igoring invalid mount flag: %c\n",*s);
 				break;
 		}
+		s++;
 	}
 
 	return flags;
