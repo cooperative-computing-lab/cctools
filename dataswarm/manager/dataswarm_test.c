@@ -7,6 +7,7 @@
 
 #include "debug.h"
 #include "stringtools.h"
+#include "hash_table.h"
 #include "itable.h"
 
 #include <stdio.h>
@@ -44,9 +45,19 @@ int wait_for_rpcs(struct dataswarm_manager *m, struct dataswarm_worker_rep *r) {
 			}
 		}
 
+		/* check that all tasks are done */
+		char *taskid;
+		hash_table_firstkey(r->tasks);
+		while((hash_table_nextkey(r->tasks, &taskid, (void **) &t))) {
+			if(t->state == DS_TASK_WORKER_STATE_SUBMITTED) {
+				/* task has not reached completed state after submission */
+				done = 0;
+			}
+		}
+
 		if(done) break;
 		dataswarm_rpc_get_response(m,r);
-		//sleep(1);
+		sleep(1);
 	}
 
 	return all_ok;
@@ -109,9 +120,6 @@ void dataswarm_test_script( struct dataswarm_manager *m, struct dataswarm_worker
 	if(!wait_for_rpcs(m, r)) {
 		debug(D_DATASWARM, "There was an error sending task to worker.");
 	}
-
-	/* sleep while task is executed */
-	sleep(5);
 
 	dataswarm_rpc_blob_get(m,r,blobb,"/dev/stdout");
 	if(!wait_for_rpcs(m, r)) {

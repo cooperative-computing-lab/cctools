@@ -1,4 +1,3 @@
-
 #include "dataswarm_task_table.h"
 #include "dataswarm_worker.h"
 #include "dataswarm_task.h"
@@ -32,7 +31,7 @@ dataswarm_result_t dataswarm_task_table_submit( struct dataswarm_worker *w, cons
 		return DS_RESULT_BAD_PARAMS;
 	}
 }
-		
+
 dataswarm_result_t dataswarm_task_table_get( struct dataswarm_worker *w, const char *taskid, struct jx **jtask )
 {
 	struct dataswarm_task *task = hash_table_lookup(w->task_table, taskid);
@@ -43,7 +42,7 @@ dataswarm_result_t dataswarm_task_table_get( struct dataswarm_worker *w, const c
 		return DS_RESULT_NO_SUCH_TASKID;
 	}
 }
-		
+
 dataswarm_result_t dataswarm_task_table_remove( struct dataswarm_worker *w, const char *taskid )
 {
 	struct dataswarm_task *task = hash_table_lookup(w->task_table, taskid);

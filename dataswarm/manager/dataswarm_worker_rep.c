@@ -65,9 +65,8 @@ dataswarm_result_t dataswarm_worker_rep_update_task( struct dataswarm_worker_rep
 		t->state = t->in_transition;
 		t->result = DS_RESULT_SUCCESS;
 	} else if(!strcmp(state, "running")) {
-		t->in_transition = DS_TASK_WORKER_STATE_COMPLETED;
-		t->result = DS_RESULT_PENDING;
-	}
+		/* ... */
+	} // else if(...)
 
 	return DS_RESULT_SUCCESS;
 }
