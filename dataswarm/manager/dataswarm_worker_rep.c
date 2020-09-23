@@ -19,7 +19,7 @@
 #include "username.h"
 #include "catalog_query.h"
 
-#include "dataswarm_message.h"
+#include "comm/ds_message.h"
 #include "dataswarm_worker_rep.h"
 #include "dataswarm_task_rep.h"
 #include "dataswarm_manager.h"
@@ -39,7 +39,7 @@ struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l )
 	return w;
 }
 
-dataswarm_result_t dataswarm_worker_rep_update_task( struct dataswarm_worker_rep *r, struct jx *params ) {
+ds_result_t dataswarm_worker_rep_update_task( struct dataswarm_worker_rep *r, struct jx *params ) {
 	if(!params) {
 		debug(D_DATASWARM, "message does not contain any parameters. Ignoring task update.");
 		return DS_RESULT_BAD_PARAMS;
@@ -71,12 +71,12 @@ dataswarm_result_t dataswarm_worker_rep_update_task( struct dataswarm_worker_rep
 	return DS_RESULT_SUCCESS;
 }
 
-dataswarm_result_t dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg )
+ds_result_t dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg )
 {
 	const char *method = jx_lookup_string(msg, "method");
 	struct jx *params = jx_lookup(msg, "params");
 
-	dataswarm_result_t result;
+	ds_result_t result;
 	if(!method) {
 		result = DS_RESULT_BAD_METHOD;
 	} else if(!strcmp(method, "task-update")) {

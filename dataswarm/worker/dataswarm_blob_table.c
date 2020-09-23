@@ -1,7 +1,7 @@
 
 #include "dataswarm_blob.h"
 #include "dataswarm_blob_table.h"
-#include "dataswarm_message.h"
+#include "comm/ds_message.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <string.h>
 
-dataswarm_result_t dataswarm_blob_table_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
+ds_result_t dataswarm_blob_table_create(struct dataswarm_worker *w, const char *blobid, jx_int_t size, struct jx *meta )
 {
 	if(!blobid || size < 1) {
 		// XXX return obj with incorrect parameters
@@ -27,7 +27,7 @@ dataswarm_result_t dataswarm_blob_table_create(struct dataswarm_worker *w, const
 	char *blob_dir = string_format("%s/blob/%s", w->workspace, blobid);
 	char *blob_meta = string_format("%s/meta", blob_dir);
 
-	dataswarm_result_t result = DS_RESULT_SUCCESS;
+	ds_result_t result = DS_RESULT_SUCCESS;
 
 	struct dataswarm_blob *b = dataswarm_blob_create(blobid,size,meta);
 
@@ -52,7 +52,7 @@ dataswarm_result_t dataswarm_blob_table_create(struct dataswarm_worker *w, const
 }
 
 
-dataswarm_result_t dataswarm_blob_table_put(struct dataswarm_worker *w, const char *blobid, struct link *l)
+ds_result_t dataswarm_blob_table_put(struct dataswarm_worker *w, const char *blobid, struct link *l)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -74,7 +74,7 @@ dataswarm_result_t dataswarm_blob_table_put(struct dataswarm_worker *w, const ch
 
 	int64_t length = atoll(line);
 	// XXX should here check for available space
-	// return dataswarm_message_state_response("internal-failure", "no space available");
+	// return ds_message_state_response("internal-failure", "no space available");
 	//
 	// XXX should handle directory transfers.
 
@@ -103,7 +103,7 @@ dataswarm_result_t dataswarm_blob_table_put(struct dataswarm_worker *w, const ch
 
 
 
-dataswarm_result_t dataswarm_blob_table_get(struct dataswarm_worker *w, const char *blobid, struct link *l, jx_int_t msgid, int *should_respond)
+ds_result_t dataswarm_blob_table_get(struct dataswarm_worker *w, const char *blobid, struct link *l, jx_int_t msgid, int *should_respond)
 {
 
     *should_respond = 1;
@@ -131,8 +131,8 @@ dataswarm_result_t dataswarm_blob_table_get(struct dataswarm_worker *w, const ch
 
     //Here we construct the response and then send the file.
     *should_respond = 0;
-    struct jx *response = dataswarm_message_standard_response(msgid,DS_RESULT_SUCCESS,NULL);
-    dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
+    struct jx *response = ds_message_standard_response(msgid,DS_RESULT_SUCCESS,NULL);
+    ds_json_send(w->manager_link, response, time(0) + w->long_timeout);
 	jx_delete(response);
 
 	int64_t length = info.st_size;
@@ -165,7 +165,7 @@ a read-only blob, fixing its size and properties for all time,
 allowing the object to be duplicated to other nodes.
 */
 
-dataswarm_result_t dataswarm_blob_table_commit(struct dataswarm_worker *w, const char *blobid)
+ds_result_t dataswarm_blob_table_commit(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -173,7 +173,7 @@ dataswarm_result_t dataswarm_blob_table_commit(struct dataswarm_worker *w, const
 	}
 
 	char *blob_meta = string_format("%s/blob/%s/meta", w->workspace, blobid);
-	dataswarm_result_t result = DS_RESULT_UNABLE;
+	ds_result_t result = DS_RESULT_UNABLE;
 
 	struct dataswarm_blob *b = dataswarm_blob_create_from_file(blob_meta);
 	if(b) {
@@ -210,7 +210,7 @@ that the delete (logically) occurs atomically, so that if the delete
 fails or the worker crashes, all deleted blobs can be cleaned up on restart.
 */
 
-dataswarm_result_t dataswarm_blob_table_delete(struct dataswarm_worker *w, const char *blobid)
+ds_result_t dataswarm_blob_table_delete(struct dataswarm_worker *w, const char *blobid)
 {
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
@@ -220,7 +220,7 @@ dataswarm_result_t dataswarm_blob_table_delete(struct dataswarm_worker *w, const
 	char *blob_dir = string_format("%s/blob/%s", w->workspace, blobid);
 	char *deleting_name = string_format("%s/blob/deleting/%s", w->workspace,blobid);
 
-	dataswarm_result_t result = DS_RESULT_SUCCESS;
+	ds_result_t result = DS_RESULT_SUCCESS;
 
 	int status = rename(blob_dir,deleting_name);
 	if(status!=0) {
@@ -248,7 +248,7 @@ dataswarm_blob_table_copy message requests a blob to be duplicated. The new copy
 read-write with a new blob-id.
 */
 
-dataswarm_result_t dataswarm_blob_table_copy(struct dataswarm_worker *w, const char *blobid, const char *blobid_src)
+ds_result_t dataswarm_blob_table_copy(struct dataswarm_worker *w, const char *blobid, const char *blobid_src)
 {
 	if(!blobid || !blobid_src) {
 		// XXX return obj with incorrect parameters

@@ -17,16 +17,16 @@ typedef enum {
     DS_RESULT_BAD_PERMISSION, /* insufficient privileges to complete request */
     DS_RESULT_UNABLE,         /* could not complete request for internal reason */
     DS_RESULT_PENDING         /* rpc not completed yet. */
-} dataswarm_result_t;
+} ds_result_t;
 
-int         dataswarm_json_send( struct link *l, struct jx *j, time_t stoptime );
-struct jx *dataswarm_json_recv( struct link *l, time_t stoptime );
+int        ds_json_send( struct link *l, struct jx *j, time_t stoptime );
+struct jx *ds_json_recv( struct link *l, time_t stoptime );
 
-int    dataswarm_message_send( struct link *l, const char *str, int length, time_t stoptime );
-char *dataswarm_message_recv( struct link *l, time_t stoptime );
+int   ds_message_send( struct link *l, const char *str, int length, time_t stoptime );
+char *ds_message_recv( struct link *l, time_t stoptime );
 
-struct jx * dataswarm_message_standard_response( int64_t id, dataswarm_result_t code, struct jx *params );
-struct jx * dataswarm_message_task_update( const char *taskid, const char *state );
-struct jx * dataswarm_message_blob_update( const char *blobid, const char *state );
+struct jx * ds_message_standard_response( int64_t id, ds_result_t code, struct jx *params );
+struct jx * ds_message_task_update( const char *taskid, const char *state );
+struct jx * ds_message_blob_update( const char *blobid, const char *state );
 
 #endif

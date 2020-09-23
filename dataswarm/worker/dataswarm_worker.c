@@ -23,7 +23,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 
 #include "dataswarm_worker.h"
-#include "dataswarm_message.h"
+#include "comm/ds_message.h"
 #include "dataswarm_task.h"
 #include "dataswarm_task_table.h"
 #include "dataswarm_process.h"
@@ -38,7 +38,7 @@ void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
 	jx_insert(msg, jx_string("params"), params);
 	jx_insert_string(params, "hello", "manager");
 
-	dataswarm_json_send(w->manager_link, msg, stoptime);
+	ds_json_send(w->manager_link, msg, stoptime);
 
 	jx_delete(msg);
 }
@@ -63,7 +63,7 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	struct jx *params = jx_lookup(msg, "params");
 	int64_t id = jx_lookup_integer(msg, "id");
 
-	dataswarm_result_t result = DS_RESULT_SUCCESS;
+	ds_result_t result = DS_RESULT_SUCCESS;
 	struct jx *result_params = 0;
 
     /* Whether to send a response for the rpc. Used to turn off the blob-get
@@ -114,8 +114,8 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 
 done:
     if(should_send_response) {
-	    response = dataswarm_message_standard_response(id,result,result_params);
-	    dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
+	    response = ds_message_standard_response(id,result,result_params);
+	    ds_json_send(w->manager_link, response, time(0) + w->long_timeout);
     }
 	jx_delete(response);
 	jx_delete(result_params);
@@ -128,7 +128,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 
 		while(1) {
 			if(link_sleep(w->manager_link, stoptime, stoptime, 0)) {
-				struct jx *msg = dataswarm_json_recv(w->manager_link, stoptime + 60);
+				struct jx *msg = ds_json_recv(w->manager_link, stoptime + 60);
 				if(msg) {
 					dataswarm_worker_handle_message(w, msg);
 					jx_delete(msg);
@@ -177,7 +177,7 @@ void dataswarm_worker_connect_loop(struct dataswarm_worker *w, const char *manag
 		if(w->manager_link) {
 
 			struct jx *msg = dataswarm_worker_handshake(w);
-			dataswarm_json_send(w->manager_link, msg, time(0) + w->long_timeout);
+			ds_json_send(w->manager_link, msg, time(0) + w->long_timeout);
 			jx_delete(msg);
 
 			dataswarm_worker_main_loop(w);

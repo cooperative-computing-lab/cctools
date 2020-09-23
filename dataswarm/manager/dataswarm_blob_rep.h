@@ -1,7 +1,7 @@
 #ifndef DATASWARM_BLOB_REP_H
 #define DATASWARM_BLOB_REP_H
 
-#include "dataswarm_rpc.h"  /* needed for dataswarm_result_t */
+#include "dataswarm_rpc.h"  /* needed for ds_result_t */
 
 typedef enum {
 	DS_BLOB_WORKER_STATE_NEW = 0,
@@ -38,7 +38,7 @@ struct dataswarm_blob_rep {
 
 	dataswarm_blob_worker_state_t state;
 	dataswarm_blob_worker_state_t in_transition;
-	dataswarm_result_t result;
+	ds_result_t result;
 
 	/* this blob id */
 	char *blobid;

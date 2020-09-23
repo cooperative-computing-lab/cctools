@@ -1,6 +1,6 @@
 
 #include "dataswarm_rpc.h"
-#include "dataswarm_message.h"
+#include "comm/ds_message.h"
 #include "dataswarm_blob_rep.h"
 #include "dataswarm_task_rep.h"
 
@@ -17,12 +17,12 @@
 #include <string.h>
 
 /* not an rpc. writes the file to disk for a corresponding blob-get get request. */
-dataswarm_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid );
+ds_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid );
 
 /* test read responses from workers. */
-dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct dataswarm_worker_rep *r)
+ds_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct dataswarm_worker_rep *r)
 {
-	struct jx * msg = dataswarm_json_recv(r->link,time(0)+m->connect_timeout);
+	struct jx * msg = ds_json_recv(r->link,time(0)+m->connect_timeout);
 
 	jx_int_t msgid = jx_lookup_integer(msg,"id");
 
@@ -32,7 +32,7 @@ dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, stru
 		return -1;
 	}
 
-	dataswarm_result_t result = jx_lookup_integer(msg,"result");
+	ds_result_t result = jx_lookup_integer(msg,"result");
 
 	/* it could be an rpc for a blob or a task, but we don't know yet. */
 	struct dataswarm_blob_rep *b = (struct dataswarm_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
@@ -72,7 +72,7 @@ jx_int_t dataswarm_rpc( struct dataswarm_manager *m, struct dataswarm_worker_rep
 	jx_int_t msgid = m->message_id++;
 	jx_insert_integer(rpc, "id", msgid);
 
-	dataswarm_json_send(r->link,rpc,time(0)+m->stall_timeout);
+	ds_json_send(r->link,rpc,time(0)+m->stall_timeout);
 	jx_delete(rpc);
 
 	return msgid;
@@ -232,7 +232,7 @@ jx_int_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct dataswarm_w
 	return msgid;
 }
 
-dataswarm_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
+ds_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
 {
 	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
@@ -241,7 +241,7 @@ dataswarm_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_w
 
 	debug(D_DATASWARM, "Getting contents of blob: %s", blobid);
 
-	dataswarm_result_t result = DS_RESULT_UNABLE;
+	ds_result_t result = DS_RESULT_UNABLE;
 
 	int64_t actual;
 	char line[16];

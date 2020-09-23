@@ -1,12 +1,18 @@
 include ../config.mk
 include ../rules.mk
 
-PHONY_TARGETS ?= manager worker
+PHONY_TARGETS ?= comm manager worker
 TARGETS ?= $(PHONY_TARGETS)
 
 all: $(TARGETS)
 
-$(TARGETS):
+comm:
+	@$(MAKE) -C $@
+
+manager: comm
+	@$(MAKE) -C $@
+
+worker: comm
 	@$(MAKE) -C $@
 
 CLEAN_TARGETS = $(TARGETS:%=clean-%)

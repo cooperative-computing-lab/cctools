@@ -1,7 +1,7 @@
 #ifndef DATASWARM_TASK_REP_H
 #define DATASWARM_TASK_REP_H
 
-#include "dataswarm_rpc.h"  /* needed for dataswarm_result_t */
+#include "dataswarm_rpc.h"  /* needed for ds_result_t */
 
 typedef enum {
 	DS_TASK_WORKER_STATE_NEW = 0,
@@ -37,7 +37,7 @@ struct dataswarm_task_rep {
 
 	dataswarm_task_worker_state_t state;
 	dataswarm_task_worker_state_t in_transition;
-	dataswarm_result_t result;
+	ds_result_t result;
 
 	/* this task id */
 	char *taskid;

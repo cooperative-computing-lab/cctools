@@ -23,7 +23,7 @@ See the file COPYING for details.
 #include "username.h"
 #include "catalog_query.h"
 
-#include "dataswarm_message.h"
+#include "comm/ds_message.h"
 #include "dataswarm_worker_rep.h"
 #include "dataswarm_client_rep.h"
 #include "dataswarm_blob_rep.h"
@@ -147,7 +147,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 	struct link *l;
 
 	while((l = link_accept(m->manager_link,stoptime))) {
-		struct jx *msg = dataswarm_json_recv(l,stoptime);
+		struct jx *msg = ds_json_recv(l,stoptime);
 		if(!msg) {
 			link_close(l);
 			break;
@@ -162,20 +162,20 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 		struct jx *params = jx_lookup(msg,"params");
 
 		if(!method || !params) {
-			/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+			/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 			link_close(l);
 			break;
 		}
 
 		if(strcmp(method, "handshake")) {
-			/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
+			/* ds_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 			link_close(l);
 			break;
 		}
 
 		jx_int_t id = jx_lookup_integer(msg, "id");
 		if(id < 1) {
-			/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_ID, stoptime); */
+			/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_ID, stoptime); */
 			link_close(l);
 			break;
 		}
@@ -197,7 +197,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 			struct dataswarm_client_rep *c = dataswarm_client_rep_create(l);
 			hash_table_insert(m->client_table,manager_key,c);
 		} else {
-			/* dataswarm_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
+			/* ds_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
 			link_close(l);
 			break;
 		}
@@ -210,7 +210,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client_rep *c, time_t stoptime )
 {
-	struct jx *msg = dataswarm_json_recv(c->link,stoptime);
+	struct jx *msg = ds_json_recv(c->link,stoptime);
 	if(!msg) {
 		// handle disconnected client
 		return;
@@ -219,7 +219,7 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 	const char *method = jx_lookup_string(msg,"method");
 	struct jx *params = jx_lookup(msg,"params");
 	if(!method || !params) {
-		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+		/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 		/* should we disconnect the client on a message error? */
 		return;
 	}
@@ -253,13 +253,13 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 	} else if(!strcmp(method,"status")) {
 		/* dataswarm_status(); */
 	} else {
-		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
+		/* ds_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 	}
 }
 
 void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, time_t stoptime )
 {
-	struct jx *msg = dataswarm_json_recv(w->link,stoptime);
+	struct jx *msg = ds_json_recv(w->link,stoptime);
 	if(!msg) {
 		// handle disconnected client
 		return;
@@ -267,7 +267,7 @@ void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker
 	const char *method = jx_lookup_string(msg,"method");
 	const char *params = jx_lookup_string(msg,"params");
 	if(!method || !params) {
-		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+		/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 		/* disconnect worker */
 		return;
 	}
@@ -285,7 +285,7 @@ void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker
 	} else if(!strcmp(method,"status-report")) {
 		/* */
 	} else {
-		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
+		/* ds_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 	}
 
 }

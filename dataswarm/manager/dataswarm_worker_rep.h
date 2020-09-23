@@ -10,7 +10,7 @@ of the actual client process that runs somewhere else.
 #include "jx.h"
 #include "hash_table.h"
 
-#include "dataswarm_message.h"
+#include "comm/ds_message.h"
 
 struct dataswarm_worker_rep {
 	struct link *link;
@@ -33,6 +33,6 @@ struct dataswarm_worker_rep {
 
 struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l );
 
-dataswarm_result_t dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg );
+ds_result_t dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg );
 
 #endif
