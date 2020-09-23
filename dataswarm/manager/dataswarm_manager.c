@@ -31,7 +31,7 @@ See the file COPYING for details.
 #include "ds_task_rep.h"
 #include "dataswarm_manager.h"
 #include "dataswarm_client_ops.h"
-#include "dataswarm_file.h"
+#include "ds_file.h"
 
 #include "dataswarm_test.h"
 

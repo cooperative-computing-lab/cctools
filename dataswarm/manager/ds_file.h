@@ -11,11 +11,11 @@ typedef enum {
     DS_FILE_IMMUTABLE,
     DS_FILE_DELETING,
 	DS_FILE_DELETED
-} dataswarm_file_state_t;
+} ds_file_state_t;
 
-struct dataswarm_file {
+struct ds_file {
 	char *fileid;
-	dataswarm_file_state_t state;
+	ds_file_state_t state;
     int size;
     char *projectid;
     struct jx *metadata;
