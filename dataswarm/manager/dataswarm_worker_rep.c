@@ -53,7 +53,7 @@ ds_result_t dataswarm_worker_rep_update_task( struct dataswarm_worker_rep *r, st
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	if(!t) {
 		debug(D_DATASWARM, "morker does not know about taskid: %s", taskid);
 		return DS_RESULT_BAD_PARAMS;

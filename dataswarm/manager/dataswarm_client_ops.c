@@ -117,7 +117,7 @@ struct jx *dataswarm_commit_file(char *uuid){
     
     //TODO: change all blobs to RO
     for(i=0;i<length;i++){
-        dataswarm_blob_commit(blobid);
+        ds_blob_commit(blobid);
     }
 
     //TODO: change state to immutable 

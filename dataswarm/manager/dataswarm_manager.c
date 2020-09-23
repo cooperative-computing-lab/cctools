@@ -99,8 +99,8 @@ struct dataswarm_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswar
 }
 
 /* declares a task in a worker so that it can be manipulated via task rpcs. */
-struct ds_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid) {
-	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
+struct dataswarm_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid) {
+	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	if(t) {
 		/* cannot create an already declared task. This could only happen with
 		 * a bug, as we have control of the create messages.*/
@@ -115,7 +115,7 @@ struct ds_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manag
 		fatal("task-id %s does not exist.", taskid);
 	}
 
-	t = calloc(1,sizeof(struct ds_task_rep));
+	t = calloc(1,sizeof(struct dataswarm_task_rep));
 	t->state = DS_TASK_WORKER_STATE_NEW;
 	t->in_transition = t->state;
 	t->result = DS_RESULT_SUCCESS;

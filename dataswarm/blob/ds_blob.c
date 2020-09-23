@@ -1,5 +1,5 @@
 
-#include "dataswarm_blob.h"
+#include "ds_blob.h"
 
 #include "jx.h"
 #include "jx_print.h"
@@ -10,9 +10,9 @@
 #include <string.h>
 #include <stdio.h>
 
-struct dataswarm_blob * dataswarm_blob_create( const char *blobid, jx_int_t size, struct jx *meta)
+struct ds_blob * ds_blob_create( const char *blobid, jx_int_t size, struct jx *meta)
 {
-	struct dataswarm_blob *b = malloc(sizeof(*b));
+	struct ds_blob *b = malloc(sizeof(*b));
 	memset(b,0,sizeof(*b));
 	b->blobid = strdup(blobid);
 	b->state = DS_BLOB_RW;
@@ -21,7 +21,7 @@ struct dataswarm_blob * dataswarm_blob_create( const char *blobid, jx_int_t size
 	return b;
 }
 
-void dataswarm_blob_delete( struct dataswarm_blob *b )
+void ds_blob_delete( struct ds_blob *b )
 {
 	if(!b) return;
 	if(b->meta) jx_delete(b->meta);
@@ -29,9 +29,9 @@ void dataswarm_blob_delete( struct dataswarm_blob *b )
 	free(b);
 }
 
-struct dataswarm_blob * dataswarm_blob_create_from_jx( struct jx *jblob )
+struct ds_blob * ds_blob_create_from_jx( struct jx *jblob )
 {
-	struct dataswarm_blob *b = malloc(sizeof(*b));
+	struct ds_blob *b = malloc(sizeof(*b));
 	memset(b,0,sizeof(*b));
 	b->blobid = jx_lookup_string_dup(jblob,"blobid");
 	b->state = jx_lookup_integer(jblob,"state");
@@ -41,7 +41,7 @@ struct dataswarm_blob * dataswarm_blob_create_from_jx( struct jx *jblob )
 	return b;
 }
 
-struct dataswarm_blob * dataswarm_blob_create_from_file( const char *filename )
+struct ds_blob * ds_blob_create_from_file( const char *filename )
 {
 	FILE *file = fopen(filename,"r");
 	if(!file) return 0;
@@ -52,7 +52,7 @@ struct dataswarm_blob * dataswarm_blob_create_from_file( const char *filename )
 		return 0;
 	}
 
-	struct dataswarm_blob *b = dataswarm_blob_create_from_jx(jblob);
+	struct ds_blob *b = ds_blob_create_from_jx(jblob);
 
 	jx_delete(jblob);
 	fclose(file);
@@ -61,7 +61,7 @@ struct dataswarm_blob * dataswarm_blob_create_from_file( const char *filename )
 }
 
 
-struct jx * dataswarm_blob_to_jx( struct dataswarm_blob *b )
+struct jx * ds_blob_to_jx( struct ds_blob *b )
 {
 	struct jx *jblob = jx_object(0);
 	jx_insert_string(jblob,"blobid",b->blobid);
@@ -71,9 +71,9 @@ struct jx * dataswarm_blob_to_jx( struct dataswarm_blob *b )
 	return jblob;
 }
 
-int dataswarm_blob_to_file( struct dataswarm_blob *b, const char *filename )
+int ds_blob_to_file( struct ds_blob *b, const char *filename )
 {
-	struct jx *jblob = dataswarm_blob_to_jx(b);
+	struct jx *jblob = ds_blob_to_jx(b);
 	if(!jblob) return 0;
 
 	FILE *file = fopen(filename,"w");
