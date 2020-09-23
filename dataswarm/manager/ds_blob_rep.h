@@ -1,7 +1,7 @@
 #ifndef DS_BLOB_REP_H
 #define DS_BLOB_REP_H
 
-#include "dataswarm_rpc.h"  /* needed for ds_result_t */
+#include "ds_rpc.h"  /* needed for ds_result_t */
 
 typedef enum {
 	DS_BLOB_WORKER_STATE_NEW = 0,

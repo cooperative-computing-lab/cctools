@@ -4,7 +4,7 @@ include ../../rules.mk
 TARGETS=$(PROGRAMS)
 PROGRAMS=dataswarm_manager
 
-SOURCES=dataswarm_manager.c ds_client_rep.c ds_worker_rep.c dataswarm_rpc.c dataswarm_test.c
+SOURCES=dataswarm_manager.c ds_client_rep.c ds_worker_rep.c ds_rpc.c dataswarm_test.c
 OBJECTS=$(SOURCES:%.c=%.o)
 DS_OBJECTS=../comm/ds_message.o
 LOCAL_CCFLAGS = -I ..
