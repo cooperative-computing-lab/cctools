@@ -1,8 +1,8 @@
 
 #include "dataswarm_rpc.h"
 #include "comm/ds_message.h"
-#include "dataswarm_blob_rep.h"
-#include "dataswarm_task_rep.h"
+#include "ds_blob_rep.h"
+#include "ds_task_rep.h"
 
 #include "debug.h"
 #include "itable.h"
@@ -17,17 +17,17 @@
 #include <string.h>
 
 /* not an rpc. writes the file to disk for a corresponding blob-get get request. */
-ds_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid );
+ds_result_t blob_get_aux( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid );
 
 /* test read responses from workers. */
-ds_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct dataswarm_worker_rep *r)
+ds_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct ds_worker_rep *r)
 {
 	struct jx * msg = ds_json_recv(r->link,time(0)+m->connect_timeout);
 
 	jx_int_t msgid = jx_lookup_integer(msg,"id");
 
 	if(msgid == 0) {
-		dataswarm_worker_rep_async_update(r,msg);
+		ds_worker_rep_async_update(r,msg);
 		jx_delete(msg);
 		return -1;
 	}
@@ -35,8 +35,8 @@ ds_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct data
 	ds_result_t result = jx_lookup_integer(msg,"result");
 
 	/* it could be an rpc for a blob or a task, but we don't know yet. */
-	struct dataswarm_blob_rep *b = (struct dataswarm_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
-	struct dataswarm_task_rep *t = (struct dataswarm_task_rep *) itable_lookup(r->task_of_rpc, msgid);
+	struct ds_blob_rep *b = (struct ds_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
+	struct ds_task_rep *t = (struct ds_task_rep *) itable_lookup(r->task_of_rpc, msgid);
 
 	if(b) {
 		b->result = result;
@@ -67,7 +67,7 @@ ds_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct data
    associated with the future response.
    */
 
-jx_int_t dataswarm_rpc( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, struct jx *rpc)
+jx_int_t dataswarm_rpc( struct dataswarm_manager *m, struct ds_worker_rep *r, struct jx *rpc)
 {
 	jx_int_t msgid = m->message_id++;
 	jx_insert_integer(rpc, "id", msgid);
@@ -78,7 +78,7 @@ jx_int_t dataswarm_rpc( struct dataswarm_manager *m, struct dataswarm_worker_rep
 	return msgid;
 }
 
-jx_int_t dataswarm_rpc_for_blob( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, struct dataswarm_blob_rep *b, struct jx *rpc, ds_blob_worker_state_t in_transition )
+jx_int_t dataswarm_rpc_for_blob( struct dataswarm_manager *m, struct ds_worker_rep *r, struct ds_blob_rep *b, struct jx *rpc, ds_blob_worker_state_t in_transition )
 {
 	jx_int_t msgid = dataswarm_rpc(m, r, rpc);
 
@@ -90,7 +90,7 @@ jx_int_t dataswarm_rpc_for_blob( struct dataswarm_manager *m, struct dataswarm_w
 	return msgid;
 }
 
-jx_int_t dataswarm_rpc_for_task( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, struct dataswarm_task_rep *t, struct jx *rpc, ds_task_worker_state_t in_transition )
+jx_int_t dataswarm_rpc_for_task( struct dataswarm_manager *m, struct ds_worker_rep *r, struct ds_task_rep *t, struct jx *rpc, ds_task_worker_state_t in_transition )
 {
 	jx_int_t msgid = dataswarm_rpc(m, r, rpc);
 
@@ -102,9 +102,9 @@ jx_int_t dataswarm_rpc_for_task( struct dataswarm_manager *m, struct dataswarm_w
 	return msgid;
 }
 
-jx_int_t dataswarm_rpc_blob_create( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, int64_t size, struct jx *metadata )
+jx_int_t dataswarm_rpc_blob_create( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid, int64_t size, struct jx *metadata )
 {
-	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
 		fatal("No blob with id %s exist at the worker.", blobid);
 	}
@@ -121,9 +121,9 @@ jx_int_t dataswarm_rpc_blob_create( struct dataswarm_manager *m, struct dataswar
 	return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_CREATED);
 }
 
-jx_int_t dataswarm_rpc_blob_commit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
+jx_int_t dataswarm_rpc_blob_commit( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid )
 {
-	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
 		fatal("No blob with id %s exist at the worker.", blobid);
 	}
@@ -138,9 +138,9 @@ jx_int_t dataswarm_rpc_blob_commit( struct dataswarm_manager *m, struct dataswar
 	return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_COMMITTED);
 }
 
-jx_int_t dataswarm_rpc_blob_delete( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
+jx_int_t dataswarm_rpc_blob_delete( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid )
 {
-	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
 		fatal("No blob with id %s exist at the worker.", blobid);
 	}
@@ -155,9 +155,9 @@ jx_int_t dataswarm_rpc_blob_delete( struct dataswarm_manager *m, struct dataswar
 	return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_DELETED);
 }
 
-jx_int_t dataswarm_rpc_blob_copy( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid_source, const char *blobid_target )
+jx_int_t dataswarm_rpc_blob_copy( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid_source, const char *blobid_target )
 {
-	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid_target);
+	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid_target);
 	if(!b) {
 		fatal("No blob with id %s exist at the worker.", blobid_target);
 	}
@@ -174,9 +174,9 @@ jx_int_t dataswarm_rpc_blob_copy( struct dataswarm_manager *m, struct dataswarm_
 }
 
 
-jx_int_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
+jx_int_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid, const char *filename )
 {
-	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
 		fatal("No blob with id %s exist at the worker.", blobid);
 	}
@@ -208,9 +208,9 @@ jx_int_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct dataswarm_w
 }
 
 /* not an rpc, but its state behaves likes one. GETs a file for a corresponding REQ_GET get request. */
-jx_int_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid, const char *filename )
+jx_int_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid, const char *filename )
 {
-	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
 		fatal("No blob with id %s exist at the worker.", blobid);
 	}
@@ -232,9 +232,9 @@ jx_int_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct dataswarm_w
 	return msgid;
 }
 
-ds_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
+ds_result_t blob_get_aux( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid )
 {
-	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
 		fatal("No blob with id %s exist at the worker.", blobid);
 	}
@@ -262,9 +262,9 @@ ds_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_worker_r
 	return result;
 }
 
-jx_int_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
+jx_int_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *taskid )
 {
-	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	assert(t);
 
 	struct jx *rpc = jx_objectv("method", jx_string("task-submit"),
@@ -274,9 +274,9 @@ jx_int_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswar
 	return dataswarm_rpc_for_task(m, r, t, rpc, DS_TASK_WORKER_STATE_SUBMITTED);
 }
 
-jx_int_t dataswarm_rpc_task_remove( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
+jx_int_t dataswarm_rpc_task_remove( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *taskid )
 {
-	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	assert(t);
 
 	struct jx *rpc = jx_objectv("method", jx_string("task-remove"),

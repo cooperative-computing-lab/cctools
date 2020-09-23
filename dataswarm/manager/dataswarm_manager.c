@@ -25,10 +25,10 @@ See the file COPYING for details.
 
 #include "comm/ds_message.h"
 #include "task/ds_task.h"
-#include "dataswarm_worker_rep.h"
-#include "dataswarm_client_rep.h"
-#include "dataswarm_blob_rep.h"
-#include "dataswarm_task_rep.h"
+#include "ds_worker_rep.h"
+#include "ds_client_rep.h"
+#include "ds_blob_rep.h"
+#include "ds_task_rep.h"
 #include "dataswarm_manager.h"
 #include "dataswarm_client_ops.h"
 #include "dataswarm_file.h"
@@ -78,15 +78,15 @@ void process_tasks( struct dataswarm_manager *m )
 }
 
 /* declares a blob in a worker so that it can be manipulated via blob rpcs. */
-struct dataswarm_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid) {
-	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+struct ds_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid) {
+	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(b) {
 		/* cannot create an already declared blob. This could only happen with
 		 * a bug, as we have control of the create messages.*/
 		fatal("blob-id %s already created at worker.", blobid);
 	}
 
-	b = calloc(1,sizeof(struct dataswarm_blob_rep));
+	b = calloc(1,sizeof(struct ds_blob_rep));
 	b->state = DS_BLOB_WORKER_STATE_NEW;
 	b->in_transition = b->state;
 	b->result = DS_RESULT_SUCCESS;
@@ -99,8 +99,8 @@ struct dataswarm_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswar
 }
 
 /* declares a task in a worker so that it can be manipulated via task rpcs. */
-struct dataswarm_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid) {
-	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+struct ds_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *taskid) {
+	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	if(t) {
 		/* cannot create an already declared task. This could only happen with
 		 * a bug, as we have control of the create messages.*/
@@ -115,7 +115,7 @@ struct dataswarm_task_rep *dataswarm_manager_add_task_to_worker( struct dataswar
 		fatal("task-id %s does not exist.", taskid);
 	}
 
-	t = calloc(1,sizeof(struct dataswarm_task_rep));
+	t = calloc(1,sizeof(struct ds_task_rep));
 	t->state = DS_TASK_WORKER_STATE_NEW;
 	t->in_transition = t->state;
 	t->result = DS_RESULT_SUCCESS;
@@ -186,7 +186,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 		if(!strcmp(conn_type,"worker")) {
 			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
-			struct dataswarm_worker_rep *w = dataswarm_worker_rep_create(l);
+			struct ds_worker_rep *w = ds_worker_rep_create(l);
 			hash_table_insert(m->worker_table,manager_key,w);
 
 			// XXX This is a HACK to get some messages going for testing
@@ -194,7 +194,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 		} else if(!strcmp(conn_type,"client")) {
 			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
-			struct dataswarm_client_rep *c = dataswarm_client_rep_create(l);
+			struct ds_client_rep *c = ds_client_rep_create(l);
 			hash_table_insert(m->client_table,manager_key,c);
 		} else {
 			/* ds_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
@@ -208,7 +208,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 	}
 }
 
-void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client_rep *c, time_t stoptime )
+void handle_client_message( struct dataswarm_manager *m, struct ds_client_rep *c, time_t stoptime )
 {
 	struct jx *msg = ds_json_recv(c->link,stoptime);
 	if(!msg) {
@@ -257,7 +257,7 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 	}
 }
 
-void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, time_t stoptime )
+void handle_worker_message( struct dataswarm_manager *m, struct ds_worker_rep *w, time_t stoptime )
 {
 	struct jx *msg = ds_json_recv(w->link,stoptime);
 	if(!msg) {
@@ -301,8 +301,8 @@ int handle_messages( struct dataswarm_manager *m, int msec )
 	table[0].revents = 0;
 
 	char *key;
-	struct dataswarm_worker_rep *w;
-	struct dataswarm_client_rep *c;
+	struct ds_worker_rep *w;
+	struct ds_client_rep *c;
 
 	n = 1;
 

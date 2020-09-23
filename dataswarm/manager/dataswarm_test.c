@@ -1,8 +1,8 @@
 
 #include "dataswarm_manager.h"
-#include "dataswarm_worker_rep.h"
-#include "dataswarm_blob_rep.h"
-#include "dataswarm_task_rep.h"
+#include "ds_worker_rep.h"
+#include "ds_blob_rep.h"
+#include "ds_task_rep.h"
 #include "dataswarm_rpc.h"
 
 #include "debug.h"
@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int wait_for_rpcs(struct dataswarm_manager *m, struct dataswarm_worker_rep *r) {
+int wait_for_rpcs(struct dataswarm_manager *m, struct ds_worker_rep *r) {
 	int done   = 0;
 	int all_ok = 1;
 	uint64_t key;
@@ -23,7 +23,7 @@ int wait_for_rpcs(struct dataswarm_manager *m, struct dataswarm_worker_rep *r) {
 		done = 1;
 
 		/* check blob responses */
-		struct dataswarm_blob_rep *b;
+		struct ds_blob_rep *b;
 		itable_firstkey(r->blob_of_rpc);
 		while((itable_nextkey(r->blob_of_rpc, &key, (void **) &b))) {
 			if(b->result == DS_RESULT_PENDING) {
@@ -34,7 +34,7 @@ int wait_for_rpcs(struct dataswarm_manager *m, struct dataswarm_worker_rep *r) {
 			}
 		}
 
-		struct dataswarm_task_rep *t;
+		struct ds_task_rep *t;
 		itable_firstkey(r->task_of_rpc);
 		while((itable_nextkey(r->task_of_rpc, &key, (void **) &t))) {
 			if(t->result == DS_RESULT_PENDING) {
@@ -63,7 +63,7 @@ int wait_for_rpcs(struct dataswarm_manager *m, struct dataswarm_worker_rep *r) {
 	return all_ok;
 }
 
-void dataswarm_test_script( struct dataswarm_manager *m, struct dataswarm_worker_rep *r )
+void dataswarm_test_script( struct dataswarm_manager *m, struct ds_worker_rep *r )
 {
 	const char *bloba = "abc123";
 	const char *blobb = "xyz456";
@@ -140,7 +140,7 @@ void dataswarm_test_script( struct dataswarm_manager *m, struct dataswarm_worker
 	debug(D_DATASWARM, "Done testing this worker.");
 }
 
-void dataswarm_test_script_old_sync( struct dataswarm_manager *m, struct dataswarm_worker_rep *r )
+void dataswarm_test_script_old_sync( struct dataswarm_manager *m, struct ds_worker_rep *r )
 {
 	const char *bloba = "abc123";
 	const char *blobb = "xyz456";

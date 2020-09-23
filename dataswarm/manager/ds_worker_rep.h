@@ -2,7 +2,7 @@
 #define DS_WORKER_REP_H
 
 /*
-dataswarm_client_rep is the data structure representation
+ds_client_rep is the data structure representation
 of the actual client process that runs somewhere else.
 */
 
@@ -12,7 +12,7 @@ of the actual client process that runs somewhere else.
 
 #include "comm/ds_message.h"
 
-struct dataswarm_worker_rep {
+struct ds_worker_rep {
 	struct link *link;
 	char addr[LINK_ADDRESS_MAX];
 	int port;
@@ -31,8 +31,8 @@ struct dataswarm_worker_rep {
     struct itable *task_of_rpc;
 };
 
-struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l );
+struct ds_worker_rep * ds_worker_rep_create( struct link *l );
 
-ds_result_t dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg );
+ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, struct jx *msg );
 
 #endif

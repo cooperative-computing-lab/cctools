@@ -11,7 +11,7 @@ typedef enum {
 	DS_TASK_WORKER_STATE_REMOVED,
 } ds_task_worker_state_t;
 
-struct dataswarm_task_rep {
+struct ds_task_rep {
 	/* Records the lifetime of a task in a worker.
 	 *
 	 * As with blobs, state, in_transition, and result represent the state of

@@ -20,13 +20,13 @@
 #include "catalog_query.h"
 
 #include "comm/ds_message.h"
-#include "dataswarm_worker_rep.h"
-#include "dataswarm_task_rep.h"
+#include "ds_worker_rep.h"
+#include "ds_task_rep.h"
 #include "dataswarm_manager.h"
 
-struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l )
+struct ds_worker_rep * ds_worker_rep_create( struct link *l )
 {
-	struct dataswarm_worker_rep *w = malloc(sizeof(*w));
+	struct ds_worker_rep *w = malloc(sizeof(*w));
 	w->link = l;
 	link_address_remote(w->link,w->addr,&w->port);
 
@@ -39,7 +39,7 @@ struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l )
 	return w;
 }
 
-ds_result_t dataswarm_worker_rep_update_task( struct dataswarm_worker_rep *r, struct jx *params ) {
+ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *params ) {
 	if(!params) {
 		debug(D_DATASWARM, "message does not contain any parameters. Ignoring task update.");
 		return DS_RESULT_BAD_PARAMS;
@@ -53,7 +53,7 @@ ds_result_t dataswarm_worker_rep_update_task( struct dataswarm_worker_rep *r, st
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	if(!t) {
 		debug(D_DATASWARM, "morker does not know about taskid: %s", taskid);
 		return DS_RESULT_BAD_PARAMS;
@@ -71,7 +71,7 @@ ds_result_t dataswarm_worker_rep_update_task( struct dataswarm_worker_rep *r, st
 	return DS_RESULT_SUCCESS;
 }
 
-ds_result_t dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg )
+ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, struct jx *msg )
 {
 	const char *method = jx_lookup_string(msg, "method");
 	struct jx *params = jx_lookup(msg, "params");
@@ -80,7 +80,7 @@ ds_result_t dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, s
 	if(!method) {
 		result = DS_RESULT_BAD_METHOD;
 	} else if(!strcmp(method, "task-update")) {
-		result = dataswarm_worker_rep_update_task(w, params);
+		result = ds_worker_rep_update_task(w, params);
 	} else if(!strcmp(method, "status-report")) {
 		// update stats
 	} else {
