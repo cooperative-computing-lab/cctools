@@ -128,7 +128,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 
 		while(1) {
 			if(link_sleep(w->manager_link, stoptime, stoptime, 0)) {
-				struct jx *msg = dataswarm_json_recv(w->manager_link, stoptime);
+				struct jx *msg = dataswarm_json_recv(w->manager_link, stoptime + 60);
 				if(msg) {
 					dataswarm_worker_handle_message(w, msg);
 					jx_delete(msg);
@@ -155,7 +155,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 		//this will probably go away with Tim's library
 		time_t sleeptime = stoptime - time(0);
 		if(sleeptime > 0) {
-			// XXX make sure this is interrupted at the completion of a task. 
+			// XXX make sure this is interrupted at the completion of a task.
 			sleep(sleeptime);
 		}
 	}

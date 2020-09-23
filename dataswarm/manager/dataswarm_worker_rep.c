@@ -21,6 +21,7 @@
 
 #include "dataswarm_message.h"
 #include "dataswarm_worker_rep.h"
+#include "dataswarm_task_rep.h"
 #include "dataswarm_manager.h"
 
 struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l )
@@ -38,9 +39,55 @@ struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l )
 	return w;
 }
 
-void dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg )
+dataswarm_result_t dataswarm_worker_rep_update_task( struct dataswarm_worker_rep *r, struct jx *params ) {
+	if(!params) {
+		debug(D_DATASWARM, "message does not contain any parameters. Ignoring task update.");
+		return DS_RESULT_BAD_PARAMS;
+	}
+
+	const char *state  = jx_lookup_string(params, "state");
+	const char *taskid = jx_lookup_string(params, "task-id");
+
+	if(!state || !taskid) {
+		debug(D_DATASWARM, "message does not contain state or taskid. Ignoring task update.");
+		return DS_RESULT_BAD_PARAMS;
+	}
+
+	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	if(!t) {
+		debug(D_DATASWARM, "morker does not know about taskid: %s", taskid);
+		return DS_RESULT_BAD_PARAMS;
+	}
+
+	debug(D_DATASWARM, "task %s is %s at worker", taskid, state);
+	if(!strcmp(state, "done")) {
+		t->in_transition = DS_TASK_WORKER_STATE_COMPLETED;
+		t->state = t->in_transition;
+		t->result = DS_RESULT_SUCCESS;
+	} else if(!strcmp(state, "running")) {
+		/* ... */
+	} // else if(...)
+
+	return DS_RESULT_SUCCESS;
+}
+
+dataswarm_result_t dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg )
 {
-	/* do something with the message ! */
+	const char *method = jx_lookup_string(msg, "method");
+	struct jx *params = jx_lookup(msg, "params");
+
+	dataswarm_result_t result;
+	if(!method) {
+		result = DS_RESULT_BAD_METHOD;
+	} else if(!strcmp(method, "task-update")) {
+		result = dataswarm_worker_rep_update_task(w, params);
+	} else if(!strcmp(method, "status-report")) {
+		// update stats
+	} else {
+		result = DS_RESULT_BAD_METHOD;
+	}
+
+	return result;
 }
 
 

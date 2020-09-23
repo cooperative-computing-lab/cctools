@@ -53,6 +53,8 @@ dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, stru
 			t->state = t->in_transition;
 		}
 		itable_remove(r->task_of_rpc, msgid);
+	} else {
+		debug(D_DATASWARM, "worker does not know about message id: %" PRId64, msgid);
 	}
 
 	jx_delete(msg);
@@ -110,11 +112,11 @@ jx_int_t dataswarm_rpc_blob_create( struct dataswarm_manager *m, struct dataswar
 	//define method and params of blob-create.
 	//msg id will be added by dataswarm_rpc_blob_queue
 	struct jx *msg = jx_objectv("method", jx_string("blob-create"),
-			"params", jx_objectv("blob-id", jx_string(blobid),
-				"size",    jx_integer(size),
-				"metadata", metadata ? metadata : jx_null(),
-				NULL),
-			NULL);
+								"params", jx_objectv("blob-id", jx_string(blobid),
+													 "size",    jx_integer(size),
+													 "metadata", metadata ? metadata : jx_null(),
+													 NULL),
+								NULL);
 
 	return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_CREATED);
 }
@@ -129,9 +131,9 @@ jx_int_t dataswarm_rpc_blob_commit( struct dataswarm_manager *m, struct dataswar
 	//define method and params of blob-commit.
 	//msg id will be added by dataswarm_rpc_blob_queue
 	struct jx *msg = jx_objectv("method", jx_string("blob-commit"),
-			"params", jx_objectv("blob-id", jx_string(blobid),
-				NULL),
-			NULL);
+								"params", jx_objectv("blob-id", jx_string(blobid),
+													 NULL),
+								NULL);
 
 	return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_COMMITTED);
 }
@@ -146,9 +148,9 @@ jx_int_t dataswarm_rpc_blob_delete( struct dataswarm_manager *m, struct dataswar
 	//define method and params of blob-delete.
 	//msg id will be added by dataswarm_rpc_blob_queue
 	struct jx *msg = jx_objectv("method", jx_string("blob-delete"),
-			"params", jx_objectv("blob-id", jx_string(blobid),
-				NULL),
-			NULL);
+								"params", jx_objectv("blob-id", jx_string(blobid),
+													 NULL),
+								NULL);
 
 	return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_DELETED);
 }
@@ -163,10 +165,10 @@ jx_int_t dataswarm_rpc_blob_copy( struct dataswarm_manager *m, struct dataswarm_
 	//define method and params of blob-copy.
 	//msg id will be added by dataswarm_rpc_blob_queue
 	struct jx *msg = jx_objectv("method", jx_string("blob-copy"),
-			"params", jx_objectv("blob-id", jx_string(blobid_target),
-				"blob-id-source", jx_string(blobid_source),
-				NULL),
-			NULL);
+								"params", jx_objectv("blob-id", jx_string(blobid_target),
+													 "blob-id-source", jx_string(blobid_source),
+													 NULL),
+								NULL);
 
 	return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_COPIED);
 }
@@ -184,9 +186,9 @@ jx_int_t dataswarm_rpc_blob_put( struct dataswarm_manager *m, struct dataswarm_w
 	//define method and params of blob-put.
 	//msg id will be added by dataswarm_rpc_blob_queue
 	struct jx *msg = jx_objectv("method", jx_string("blob-put"),
-			"params", jx_objectv("blob-id", jx_string(blobid),
-				NULL),
-			NULL);
+								"params", jx_objectv("blob-id", jx_string(blobid),
+													 NULL),
+								NULL);
 
 
 	jx_int_t msgid = dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_PUT);
@@ -218,9 +220,9 @@ jx_int_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct dataswarm_w
 	//define method and params of blob-put.
 	//msg id will be added by dataswarm_rpc_blob_queue
 	struct jx *msg = jx_objectv("method", jx_string("blob-get"),
-			"params", jx_objectv("blob-id", jx_string(blobid),
-				NULL),
-			NULL);
+								"params", jx_objectv("blob-id", jx_string(blobid),
+													 NULL),
+								NULL);
 
 	jx_int_t msgid = dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_GET);
 
@@ -266,8 +268,8 @@ jx_int_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswar
 	assert(t);
 
 	struct jx *rpc = jx_objectv("method", jx_string("task-submit"),
-			"params", jx_copy(t->description),
-			NULL);
+								"params", jx_copy(t->description),
+								NULL);
 
 	return dataswarm_rpc_for_task(m, r, t, rpc, DS_TASK_WORKER_STATE_SUBMITTED);
 }
@@ -278,9 +280,9 @@ jx_int_t dataswarm_rpc_task_remove( struct dataswarm_manager *m, struct dataswar
 	assert(t);
 
 	struct jx *rpc = jx_objectv("method", jx_string("task-remove"),
-			"params", jx_objectv("task-id", jx_string(taskid),
-				NULL),
-			NULL);
+								"params", jx_objectv("task-id", jx_string(taskid),
+													 NULL),
+								NULL);
 
 	return dataswarm_rpc_for_task(m, r, t, rpc, DS_TASK_WORKER_STATE_REMOVED);
 }
