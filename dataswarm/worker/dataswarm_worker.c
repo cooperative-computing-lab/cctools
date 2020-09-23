@@ -66,6 +66,11 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	dataswarm_result_t result = DS_RESULT_SUCCESS;
 	struct jx *result_params = 0;
 
+    /* Whether to send a response for the rpc. Used to turn off the blob-get
+     * response in this function, as blob-get manages its own response when
+     * succesfully sending a file. */
+    int should_send_response = 1;
+
 	if(!method) {
 		result = DS_RESULT_BAD_METHOD;
 		goto done;
@@ -93,7 +98,7 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	} else if(!strcmp(method, "blob-put")) {
 		result = dataswarm_blob_table_put(w,blobid, w->manager_link);
 	} else if(!strcmp(method, "blob-get")) {
-		result = dataswarm_blob_table_get(w,blobid, w->manager_link);
+		result = dataswarm_blob_table_get(w,blobid,w->manager_link,id,&should_send_response);
 	} else if(!strcmp(method, "blob-delete")) {
 		result = dataswarm_blob_table_delete(w,blobid);
 	} else if(!strcmp(method, "blob-commit")) {
@@ -104,11 +109,14 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 		result = DS_RESULT_BAD_METHOD;
 	}
 
-	struct jx *response;
 
-	done:
-	response = dataswarm_message_standard_response(id,result,result_params);
-	dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
+	struct jx *response = NULL;
+
+done:
+    if(should_send_response) {
+	    response = dataswarm_message_standard_response(id,result,result_params);
+	    dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
+    }
 	jx_delete(response);
 	jx_delete(result_params);
 }

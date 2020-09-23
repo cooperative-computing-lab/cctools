@@ -19,8 +19,6 @@ struct dataswarm_manager {
 	int server_port;
 	int message_id;
 
-	/* maps taskid's to tasks */
-	struct hash_table *task_table;
 	int task_id;
 
 	int force_update;

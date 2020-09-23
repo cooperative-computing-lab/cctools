@@ -102,8 +102,11 @@ dataswarm_result_t dataswarm_blob_table_put(struct dataswarm_worker *w, const ch
 }
 
 
-dataswarm_result_t dataswarm_blob_table_get(struct dataswarm_worker *w, const char *blobid, struct link *l)
+
+dataswarm_result_t dataswarm_blob_table_get(struct dataswarm_worker *w, const char *blobid, struct link *l, jx_int_t msgid, int *should_respond)
 {
+
+    *should_respond = 1;
 	if(!blobid) {
 		// XXX return obj with incorrect parameters
 		return DS_RESULT_BAD_PARAMS;
@@ -126,6 +129,12 @@ dataswarm_result_t dataswarm_blob_table_get(struct dataswarm_worker *w, const ch
 		return DS_RESULT_UNABLE;
 	}
 
+    //Here we construct the response and then send the file.
+    *should_respond = 0;
+    struct jx *response = dataswarm_message_standard_response(msgid,DS_RESULT_SUCCESS,NULL);
+    dataswarm_json_send(w->manager_link, response, time(0) + w->long_timeout);
+	jx_delete(response);
+
 	int64_t length = info.st_size;
 	char *line = string_format("%lld\n", (long long) length);
 
@@ -141,7 +150,6 @@ dataswarm_result_t dataswarm_blob_table_get(struct dataswarm_worker *w, const ch
 
 	if(bytes_transfered != length) {
 		debug(D_DATASWARM, "couldn't stream from %s: %s", blob_data, strerror(errno));
-		return DS_RESULT_UNABLE;
 	} else {
         debug(D_DATASWARM, "finished reading %" PRId64 " bytes from %s", length, blob_data);
     }
