@@ -1,5 +1,6 @@
 #include "dataswarm_worker.h"
 #include "dataswarm_blob_table.h"
+#include "dataswarm_task_table.h"
 
 #include "debug.h"
 #include "stringtools.h"
@@ -76,13 +77,13 @@ int main(int argc, char *argv[])
 	}
 
 	struct dataswarm_worker *w = dataswarm_worker_create(workspace_dir);
-
-	dataswarm_blob_table_purge(w);
-
 	if(!w) {
 		fprintf(stderr, "%s: couldn't create workspace %s: %s\n", argv[0], workspace_dir, strerror(errno));
 		return 1;
 	}
+
+	dataswarm_blob_table_purge(w);
+	dataswarm_task_table_recover(w);
 
 	if(manager_name) {
 		dataswarm_worker_connect_by_name(w, manager_name);

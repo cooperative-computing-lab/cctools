@@ -10,5 +10,6 @@ dataswarm_result_t dataswarm_task_table_get( struct dataswarm_worker *w, const c
 dataswarm_result_t dataswarm_task_table_remove( struct dataswarm_worker *w, const char *taskid );
 
 void dataswarm_task_table_advance( struct dataswarm_worker *w );
+void dataswarm_task_table_recover( struct dataswarm_worker *w );
 
 #endif

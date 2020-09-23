@@ -8,24 +8,34 @@
 #include "jx.h"
 #include "stringtools.h"
 
+#include <dirent.h>
 #include <string.h>
 
 /*
-Every time a task changes state, send an async update message.
+Every time a task changes state, record the change on disk,
+and then send an async update message if requested.
 */
 
-static void update_task_state( struct dataswarm_worker *w, struct dataswarm_task *task, dataswarm_task_state_t state )
+static void update_task_state( struct dataswarm_worker *w, struct dataswarm_task *task, dataswarm_task_state_t state, int send_update_message )
 {
 	task->state = state;
-	struct jx *msg = dataswarm_message_task_update( task->taskid, dataswarm_task_state_string(state) );
-	dataswarm_json_send(w->manager_link,msg,time(0)+w->long_timeout);
-	free(msg);
+
+	char * task_meta = string_format("%s/task/%s/meta",w->workspace,task->taskid);
+	dataswarm_task_to_file(task,task_meta);
+	free(task_meta);
+
+	if(send_update_message) {
+		struct jx *msg = dataswarm_message_task_update( task->taskid, dataswarm_task_state_string(state) );
+		dataswarm_json_send(w->manager_link,msg,time(0)+w->long_timeout);
+		free(msg);
+	}
 }
 
 dataswarm_result_t dataswarm_task_table_submit( struct dataswarm_worker *w, const char *taskid, struct jx *jtask )
 {
-	struct dataswarm_task *task = dataswarm_task_create(jtask);
+	struct dataswarm_task *task = dataswarm_task_create_from_jx(jtask);
 	if(task) {
+		update_task_state(w,task,DATASWARM_TASK_READY,0);
 		hash_table_insert(w->task_table, taskid, task);
 		return DS_RESULT_SUCCESS;
 	} else {
@@ -48,7 +58,7 @@ dataswarm_result_t dataswarm_task_table_remove( struct dataswarm_worker *w, cons
 {
 	struct dataswarm_task *task = hash_table_lookup(w->task_table, taskid);
 	if(task) {
-		update_task_state(w,task,DATASWARM_TASK_DELETING);
+		update_task_state(w,task,DATASWARM_TASK_DELETING,0);
 		return DS_RESULT_SUCCESS;
 	} else {
 		return DS_RESULT_NO_SUCH_TASKID;
@@ -75,17 +85,17 @@ void dataswarm_task_table_advance( struct dataswarm_worker *w )
 				if(task->process) {
 					// XXX check for invalid mounts?
 					if(dataswarm_process_start(task->process,w)) {
-						update_task_state(w,task,DATASWARM_TASK_RUNNING);
+						update_task_state(w,task,DATASWARM_TASK_RUNNING,1);
 					} else {
-						update_task_state(w,task,DATASWARM_TASK_FAILED);
+						update_task_state(w,task,DATASWARM_TASK_FAILED,1);
 					}
 				} else {
-					update_task_state(w,task,DATASWARM_TASK_FAILED);
+					update_task_state(w,task,DATASWARM_TASK_FAILED,1);
 				}
 				break;
 			case DATASWARM_TASK_RUNNING:
 				if(dataswarm_process_isdone(task->process)) {
-					update_task_state(w,task,DATASWARM_TASK_DONE);
+					update_task_state(w,task,DATASWARM_TASK_DONE,1);
 				}
 				break;
 			case DATASWARM_TASK_DONE:
@@ -99,7 +109,7 @@ void dataswarm_task_table_advance( struct dataswarm_worker *w )
 				dataswarm_process_delete(task->process);
 				task->process = 0;
 				// Send the deleted message.
-				update_task_state(w,task,DATASWARM_TASK_DELETED);
+				update_task_state(w,task,DATASWARM_TASK_DELETED,1);
 				// Now actually remove it from the data structures.
 				hash_table_remove(w->task_table,taskid);
 				dataswarm_task_delete(task);
@@ -109,4 +119,47 @@ void dataswarm_task_table_advance( struct dataswarm_worker *w )
 		}
 	}
 
+}
+
+/*
+After a restart, scan the tasks on disk to recover the table,
+then cancel any tasks that were running and are now presumed dead.
+Note that we are not connected to the master at this point,
+so do not send any message.  A complete set up updates gets sent
+when we reconnect.
+*/
+
+void dataswarm_task_table_recover( struct dataswarm_worker *w )
+{
+	char * task_dir = string_format("%s/task",w->workspace);
+
+	DIR *dir;
+	struct dirent *d;
+
+	dir = opendir(task_dir);
+	if(!dir) return;
+
+	while((d=readdir(dir))) {
+		if(!strcmp(d->d_name,".")) continue;
+		if(!strcmp(d->d_name,"..")) continue;
+		if(!strcmp(d->d_name,"deleting")) continue;
+
+		char * task_meta;
+		struct dataswarm_task *task;
+
+		task_meta = string_format("%s/task/%s/meta",w->workspace,d->d_name);
+
+		task = dataswarm_task_create_from_file(task_meta);
+		if(task) {
+			hash_table_insert(w->task_table,task->taskid,task);
+			if(task->state==DATASWARM_TASK_RUNNING) {
+				update_task_state(w,task,DATASWARM_TASK_FAILED,0);
+			}
+		}
+		free(task_meta);
+
+	  }
+
+	  closedir(dir);
+	  free(task_dir);
 }
