@@ -6,6 +6,7 @@
 typedef enum {
 	DS_TASK_WORKER_STATE_NEW = 0,
 	DS_TASK_WORKER_STATE_SUBMITTED,
+	DS_TASK_WORKER_STATE_COMPLETED,
 	DS_TASK_WORKER_STATE_RETRIEVED,
 	DS_TASK_WORKER_STATE_REMOVED,
 } dataswarm_task_worker_state_t;
@@ -25,7 +26,7 @@ struct dataswarm_task_rep {
 	 *    in_transition records the task's lifetime stage that could not been
 	 *    reached because of the error in result.
 	 * 5) state and in_transition are strictly monotonically increasing
-	 *    according to DS_TASK_WORKER_STATE_: NEW, SUBMITTED, RETRIEVED, REMOVED
+	 *    according to DS_TASK_WORKER_STATE_: NEW, SUBMITTED, COMPLETED, RETRIEVED, REMOVED
 	 *    may occur at any time.
 	 *
 	 * Note that this simply records the lifetime in a worker. Any task

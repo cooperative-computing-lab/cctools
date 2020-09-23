@@ -10,6 +10,8 @@ of the actual client process that runs somewhere else.
 #include "jx.h"
 #include "hash_table.h"
 
+#include "dataswarm_message.h"
+
 struct dataswarm_worker_rep {
 	struct link *link;
 	char addr[LINK_ADDRESS_MAX];
@@ -31,6 +33,6 @@ struct dataswarm_worker_rep {
 
 struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l );
 
-void dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg );
+dataswarm_result_t dataswarm_worker_rep_async_update( struct dataswarm_worker_rep *w, struct jx *msg );
 
 #endif
