@@ -16,8 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* not an rpc, but its state behaves likes one. GETs a file for a corresponding REQ_GET get request. */
-dataswarm_result_t dataswarm_blob_get( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid );
+/* not an rpc. writes the file to disk for a corresponding blob-get get request. */
+dataswarm_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid );
 
 /* test read responses from workers. */
 dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct dataswarm_worker_rep *r)
@@ -41,10 +41,8 @@ dataswarm_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, stru
 	if(b) {
 		b->result = result;
 		if(b->result == DS_RESULT_SUCCESS) {
-			b->state = b->in_transition;
-			/* this get should not be here... */
 			if(b->state == DS_BLOB_WORKER_STATE_GET) {
-				result = dataswarm_blob_get(m,r,b->blobid);
+				b->result = blob_get_aux(m,r,b->blobid);
 			}
 		}
 		itable_remove(r->blob_of_rpc, msgid);
@@ -224,18 +222,22 @@ jx_int_t dataswarm_rpc_blob_get( struct dataswarm_manager *m, struct dataswarm_w
 				NULL),
 			NULL);
 
-	return dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_GET);
+	jx_int_t msgid = dataswarm_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_GET);
+
+	//This rpc does not modify the state of the blob at the worker:
+	b->state = b->in_transition;
+
+	return msgid;
 }
 
-dataswarm_result_t dataswarm_blob_get( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
+dataswarm_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid )
 {
 	struct dataswarm_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
 		fatal("No blob with id %s exist at the worker.", blobid);
 	}
 
-	b->in_transition = DS_BLOB_WORKER_STATE_RETRIEVED;
-	b->result = DS_RESULT_PENDING;
+	debug(D_DATASWARM, "Getting contents of blob: %s", blobid);
 
 	dataswarm_result_t result = DS_RESULT_UNABLE;
 
@@ -253,11 +255,6 @@ dataswarm_result_t dataswarm_blob_get( struct dataswarm_manager *m, struct datas
 			}
 		}
 
-	}
-
-	b->result = result;
-	if(result == DS_RESULT_SUCCESS) {
-		b->state = b->in_transition;
 	}
 
 	return result;
