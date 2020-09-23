@@ -1,5 +1,5 @@
-#ifndef DATASWARM_BLOB_REP_H
-#define DATASWARM_BLOB_REP_H
+#ifndef DS_BLOB_REP_H
+#define DS_BLOB_REP_H
 
 #include "dataswarm_rpc.h"  /* needed for ds_result_t */
 

@@ -1,8 +1,7 @@
-#ifndef DATASWARM_PROCESS_H
-#define DATASWARM_PROCESS_H
+#ifndef DS_PROCESS_H
+#define DS_PROCESS_H
 
-#include "dataswarm_task.h"
-#include "dataswarm_worker.h"
+#include "ds_task.h"
 #include "timestamp.h"
 
 #include <unistd.h>
@@ -10,22 +9,21 @@
 #include <sys/resource.h>
 
 /*
-dataswarm_process is a running instance of a dataswarm task.
-This object is private to the dataswarm_worker.
+ds_process is a running instance of a dataswarm task.
 */
 
 typedef enum {
-  DATASWARM_PROCESS_READY,
-  DATASWARM_PROCESS_RUNNING,
-  DATASWARM_PROCESS_DONE
-} dataswarm_process_state_t;
+  DS_PROCESS_READY,
+  DS_PROCESS_RUNNING,
+  DS_PROCESS_DONE
+} ds_process_state_t;
 
-struct dataswarm_process {
-	struct dataswarm_task *task;
+struct ds_process {
+	struct ds_task *task;
 
 	// The current state of the process, necessary to make sure that
 	// we don't accidentally repeat un-repeatable actions like wait().
-	dataswarm_process_state_t state;
+	ds_process_state_t state;
 
 	// The sandbox directory which serves as the working dir for the process.
 	char *sandbox;
@@ -51,18 +49,18 @@ struct dataswarm_process {
 };
 
 /* Create a new process for this task and set up the corresponding sandbox. */
-struct dataswarm_process * dataswarm_process_create( struct dataswarm_task *task, struct dataswarm_worker *w );
+struct ds_process * ds_process_create( struct ds_task *task, const char *workspace );
 
 /* Start the process running, return true on success. */
-int  dataswarm_process_start( struct dataswarm_process *p, struct dataswarm_worker *w );
+int  ds_process_start( struct ds_process *p, const char *workspace );
 
 /* Send a kill signal to a process (if still running).  After doing so, must call isdone() to collect the status. */
-void dataswarm_process_kill( struct dataswarm_process *p );
+void ds_process_kill( struct ds_process *p );
 
 /* Nonblocking check to see if a process is done.  Returns true if complete. */
-int  dataswarm_process_isdone( struct dataswarm_process *p );
+int  ds_process_isdone( struct ds_process *p );
 
 /* Delete a process object.  If necessary, will kill and wait for the process. */
-void dataswarm_process_delete( struct dataswarm_process *p );
+void ds_process_delete( struct ds_process *p );
 
 #endif

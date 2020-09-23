@@ -15,7 +15,7 @@ struct dataswarm_blob * dataswarm_blob_create( const char *blobid, jx_int_t size
 	struct dataswarm_blob *b = malloc(sizeof(*b));
 	memset(b,0,sizeof(*b));
 	b->blobid = strdup(blobid);
-	b->state = DATASWARM_BLOB_RW;
+	b->state = DS_BLOB_RW;
 	b->size = size;
 	b->meta = jx_copy(meta);
 	return b;

@@ -1,5 +1,5 @@
-#ifndef DATASWARM_WORKER_H
-#define DATASWARM_WORKER_H
+#ifndef DS_WORKER_H
+#define DS_WORKER_H
 
 #include <time.h>
 #include "hash_table.h"
@@ -9,7 +9,7 @@ struct dataswarm_worker {
 	// Network connection to the manager process.
 	struct link *manager_link;
 
-	// Table mapping taskids to dataswarm_task objects.
+	// Table mapping taskids to ds_task objects.
 	struct hash_table *task_table;
 
 	// Path to top of workspace containing tasks and blobs.

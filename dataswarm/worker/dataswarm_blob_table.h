@@ -1,5 +1,5 @@
-#ifndef DATASWARM_BLOB_TABLE_H
-#define DATASWARM_BLOB_TABLE_H
+#ifndef DS_BLOB_TABLE_H
+#define DS_BLOB_TABLE_H
 
 #include "dataswarm_worker.h"
 #include "comm/ds_message.h"

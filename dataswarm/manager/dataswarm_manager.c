@@ -24,13 +24,13 @@ See the file COPYING for details.
 #include "catalog_query.h"
 
 #include "comm/ds_message.h"
+#include "task/ds_task.h"
 #include "dataswarm_worker_rep.h"
 #include "dataswarm_client_rep.h"
 #include "dataswarm_blob_rep.h"
 #include "dataswarm_task_rep.h"
 #include "dataswarm_manager.h"
 #include "dataswarm_client_ops.h"
-#include "dataswarm_task.h"
 #include "dataswarm_file.h"
 
 #include "dataswarm_test.h"
@@ -99,15 +99,15 @@ struct dataswarm_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswar
 }
 
 /* declares a task in a worker so that it can be manipulated via task rpcs. */
-struct dataswarm_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid) {
-	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+struct ds_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid) {
+	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	if(t) {
 		/* cannot create an already declared task. This could only happen with
 		 * a bug, as we have control of the create messages.*/
 		fatal("task-id %s already created at worker.", taskid);
 	}
 
-	/* this should be a proper struct dataswarm_task. */
+	/* this should be a proper struct ds_task. */
 	struct jx *description = hash_table_lookup(m->task_table, taskid);
 	if(!description) {
 		/* could not find task with taskid. This could only happen with a bug,
@@ -115,7 +115,7 @@ struct dataswarm_task_rep *dataswarm_manager_add_task_to_worker( struct dataswar
 		fatal("task-id %s does not exist.", taskid);
 	}
 
-	t = calloc(1,sizeof(struct dataswarm_task_rep));
+	t = calloc(1,sizeof(struct ds_task_rep));
 	t->state = DS_TASK_WORKER_STATE_NEW;
 	t->in_transition = t->state;
 	t->result = DS_RESULT_SUCCESS;
@@ -132,7 +132,7 @@ char *dataswarm_manager_submit_task( struct dataswarm_manager *m, struct jx *des
 	char *taskid = string_format("task-%d", m->task_id++);
 
 	/* do validation */
-	/* convert to proper struct dataswarm_task */
+	/* convert to proper struct ds_task */
 
 	jx_insert_string(description, "task-id", taskid);
 

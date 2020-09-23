@@ -1,5 +1,5 @@
-#ifndef DATASWARM_RPC_H
-#define DATASWARM_RPC_H
+#ifndef DS_RPC_H
+#define DS_RPC_H
 
 #include "comm/ds_message.h"
 #include "dataswarm_manager.h"

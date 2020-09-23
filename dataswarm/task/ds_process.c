@@ -1,5 +1,5 @@
 
-#include "dataswarm_process.h"
+#include "ds_process.h"
 
 #include "debug.h"
 #include "errno.h"
@@ -28,16 +28,16 @@
 #include <sys/types.h>
 #include <stdlib.h>
 
-struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task, struct dataswarm_worker *w )
+struct ds_process *ds_process_create( struct ds_task *task, const char *workspace )
 {
-	struct dataswarm_process *p = malloc(sizeof(*p));
+	struct ds_process *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
 
 	p->task = task;
-	p->state = DATASWARM_PROCESS_READY;
+	p->state = DS_PROCESS_READY;
 
 	/* create a unique directory for this task */
-	p->sandbox = string_format("%s/task/%s/sandbox", w->workspace, p->task->taskid );
+	p->sandbox = string_format("%s/task/%s/sandbox", workspace, p->task->taskid );
 	if(!create_dir(p->sandbox, 0777)) goto failure;
 
 	/* inside the sandbox, make a unique tempdir for this task */
@@ -48,19 +48,19 @@ struct dataswarm_process *dataswarm_process_create( struct dataswarm_task *task,
 	return p;
 
 	failure:
-	dataswarm_process_delete(p);
+	ds_process_delete(p);
 	return 0;
 }
 
-void dataswarm_process_delete(struct dataswarm_process *p)
+void ds_process_delete(struct ds_process *p)
 {
 	if(!p) return;
 
 	// XXX move sandbox to deleting dir.
 
-	if(!dataswarm_process_isdone(p)) {
-		dataswarm_process_kill(p);
-		while(!dataswarm_process_isdone(p)) {
+	if(!ds_process_isdone(p)) {
+		ds_process_kill(p);
+		while(!ds_process_isdone(p)) {
 			sleep(1);
 		}
 	}
@@ -83,7 +83,7 @@ static void clear_environment() {
 	unsetenv("DISPLAY");
 }
 
-static void export_environment( struct dataswarm_process *p )
+static void export_environment( struct ds_process *p )
 {
 	if(p->task->environment) jx_export(p->task->environment);
 
@@ -96,14 +96,14 @@ static void export_environment( struct dataswarm_process *p )
 	}
 }
 
-static void specify_integer_env_var( struct dataswarm_process *p, const char *name, int64_t value)
+static void specify_integer_env_var( struct ds_process *p, const char *name, int64_t value)
 {
 	char *value_str = string_format("%" PRId64, value);
 	setenv(name,value_str,1);
 	free(value_str);
 }
 
-static void specify_resources_vars(struct dataswarm_process *p)
+static void specify_resources_vars(struct ds_process *p)
 {
 	if(p->task->resources->cores > 0) specify_integer_env_var(p, "CORES", p->task->resources->cores);
 	if(p->task->resources->memory > 0) specify_integer_env_var(p, "MEMORY", p->task->resources->memory);
@@ -112,24 +112,24 @@ static void specify_resources_vars(struct dataswarm_process *p)
 
 static int flags_to_unix_mode( dataswarm_flags_t flags )
 {
-	if(flags==DATASWARM_FLAGS_READ) {
+	if(flags==DS_FLAGS_READ) {
 		return O_RDONLY;
 	}
 
-	if(flags&DATASWARM_FLAGS_APPEND) {
+	if(flags&DS_FLAGS_APPEND) {
 		return O_RDWR | O_CREAT | O_APPEND;
 	} else {
 		return O_RDWR | O_CREAT | O_TRUNC;
 	}
 }
 
-static int setup_mount( struct dataswarm_mount *m, struct dataswarm_process *p, struct dataswarm_worker *w )
+static int setup_mount( struct ds_mount *m, struct ds_process *p, const char *workspace )
 {
 	// XXX Check for validity of blob modes here.
 	//
-	char *blobpath = string_format("%s/blob/%s/data",w->workspace,m->uuid);
+	char *blobpath = string_format("%s/blob/%s/data",workspace,m->uuid);
 
-	if(m->type==DATASWARM_MOUNT_PATH) {
+	if(m->type==DS_MOUNT_PATH) {
 		int r = symlink(blobpath,m->path);
 		if(r<0) {
 			debug(D_DATASWARM,"couldn't symlink %s -> %s: %s",m->path,blobpath,strerror(errno));
@@ -137,7 +137,7 @@ static int setup_mount( struct dataswarm_mount *m, struct dataswarm_process *p, 
 			return 0;
 		}
 		free(blobpath);
-	} else if(m->type==DATASWARM_MOUNT_FD) {
+	} else if(m->type==DS_MOUNT_FD) {
 		int fd = open(blobpath,flags_to_unix_mode(m->flags),0666);
 		if(fd<0) {
 			debug(D_DATASWARM,"couldn't open %s: %s",blobpath,strerror(errno));
@@ -155,18 +155,18 @@ static int setup_mount( struct dataswarm_mount *m, struct dataswarm_process *p, 
 	return 1;
 }
 
-static int setup_namespace( struct dataswarm_process *p, struct dataswarm_worker *w )
+static int setup_namespace( struct ds_process *p, const char *workspace )
 {
-	struct dataswarm_mount *m;
+	struct ds_mount *m;
 
 	for(m=p->task->mounts;m;m=m->next) {
-		if(!setup_mount(m,p,w)) return 0;
+		if(!setup_mount(m,p,workspace)) return 0;
 	}
 
 	return 1;
 }
 
-int dataswarm_process_start( struct dataswarm_process *p, struct dataswarm_worker *w )
+int ds_process_start( struct ds_process *p, const char *workspace )
 {
 	/*
 	Before forking a process, it is necessary to flush all standard I/O stream,
@@ -189,7 +189,7 @@ int dataswarm_process_start( struct dataswarm_process *p, struct dataswarm_worke
 		// This is currently used by kill_task().
 		setpgid(p->pid, 0);
 		debug(D_WQ, "started process %d: %s", p->pid, p->task->command);
-		p->state = DATASWARM_PROCESS_RUNNING;
+		p->state = DS_PROCESS_RUNNING;
 		return 1;
 
 	} else if(p->pid < 0) {
@@ -203,7 +203,7 @@ int dataswarm_process_start( struct dataswarm_process *p, struct dataswarm_worke
 		}
 
 		// Check errors on these.
-		setup_namespace(p,w);
+		setup_namespace(p,workspace);
 		clear_environment();
 		specify_resources_vars(p);
 		export_environment(p);
@@ -215,17 +215,17 @@ int dataswarm_process_start( struct dataswarm_process *p, struct dataswarm_worke
 	return 1;
 }
 
-int dataswarm_process_isdone( struct dataswarm_process *p )
+int ds_process_isdone( struct ds_process *p )
 {
-	if(p->state==DATASWARM_PROCESS_RUNNING) {
+	if(p->state==DS_PROCESS_RUNNING) {
 		// XXX get the rusage too
 		pid_t pid = waitpid(p->pid,&p->unix_status,WNOHANG);
 		if(pid==p->pid) {
-			p->state = DATASWARM_PROCESS_DONE;
+			p->state = DS_PROCESS_DONE;
 			p->execution_end = timestamp_get();
 			return 1;
 		}
-	} else if(p->state==DATASWARM_PROCESS_DONE) {
+	} else if(p->state==DS_PROCESS_DONE) {
 		return 1;
 	} else {
 		return 0;
@@ -235,9 +235,9 @@ int dataswarm_process_isdone( struct dataswarm_process *p )
 }
 
 
-void dataswarm_process_kill(struct dataswarm_process *p)
+void ds_process_kill(struct ds_process *p)
 {
-	if(p->state!=DATASWARM_PROCESS_RUNNING) return;
+	if(p->state!=DS_PROCESS_RUNNING) return;
 
 	//make sure a few seconds have passed since child process was created to avoid sending a signal
 	//before it has been fully initialized. Else, the signal sent to that process gets lost.

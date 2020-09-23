@@ -34,7 +34,7 @@ int wait_for_rpcs(struct dataswarm_manager *m, struct dataswarm_worker_rep *r) {
 			}
 		}
 
-		struct dataswarm_task_rep *t;
+		struct ds_task_rep *t;
 		itable_firstkey(r->task_of_rpc);
 		while((itable_nextkey(r->task_of_rpc, &key, (void **) &t))) {
 			if(t->result == DS_RESULT_PENDING) {

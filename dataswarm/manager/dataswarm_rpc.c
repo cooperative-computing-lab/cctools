@@ -36,7 +36,7 @@ ds_result_t dataswarm_rpc_get_response( struct dataswarm_manager *m, struct data
 
 	/* it could be an rpc for a blob or a task, but we don't know yet. */
 	struct dataswarm_blob_rep *b = (struct dataswarm_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
-	struct dataswarm_task_rep *t = (struct dataswarm_task_rep *) itable_lookup(r->task_of_rpc, msgid);
+	struct ds_task_rep *t = (struct ds_task_rep *) itable_lookup(r->task_of_rpc, msgid);
 
 	if(b) {
 		b->result = result;
@@ -90,7 +90,7 @@ jx_int_t dataswarm_rpc_for_blob( struct dataswarm_manager *m, struct dataswarm_w
 	return msgid;
 }
 
-jx_int_t dataswarm_rpc_for_task( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, struct dataswarm_task_rep *t, struct jx *rpc, dataswarm_task_worker_state_t in_transition )
+jx_int_t dataswarm_rpc_for_task( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, struct ds_task_rep *t, struct jx *rpc, ds_task_worker_state_t in_transition )
 {
 	jx_int_t msgid = dataswarm_rpc(m, r, rpc);
 
@@ -264,7 +264,7 @@ ds_result_t blob_get_aux( struct dataswarm_manager *m, struct dataswarm_worker_r
 
 jx_int_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
 {
-	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	assert(t);
 
 	struct jx *rpc = jx_objectv("method", jx_string("task-submit"),
@@ -276,7 +276,7 @@ jx_int_t dataswarm_rpc_task_submit( struct dataswarm_manager *m, struct dataswar
 
 jx_int_t dataswarm_rpc_task_remove( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid )
 {
-	struct dataswarm_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	assert(t);
 
 	struct jx *rpc = jx_objectv("method", jx_string("task-remove"),

@@ -1,5 +1,5 @@
-#ifndef DATASWARM_CLIENT_REP_H
-#define DATASWARM_CLIENT_REP_H
+#ifndef DS_CLIENT_REP_H
+#define DS_CLIENT_REP_H
 
 /*
 dataswarm_client_rep is the data structure representation

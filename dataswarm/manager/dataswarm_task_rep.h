@@ -1,5 +1,5 @@
-#ifndef DATASWARM_TASK_REP_H
-#define DATASWARM_TASK_REP_H
+#ifndef DS_TASK_REP_H
+#define DS_TASK_REP_H
 
 #include "dataswarm_rpc.h"  /* needed for ds_result_t */
 
@@ -9,9 +9,9 @@ typedef enum {
 	DS_TASK_WORKER_STATE_COMPLETED,
 	DS_TASK_WORKER_STATE_RETRIEVED,
 	DS_TASK_WORKER_STATE_REMOVED,
-} dataswarm_task_worker_state_t;
+} ds_task_worker_state_t;
 
-struct dataswarm_task_rep {
+struct ds_task_rep {
 	/* Records the lifetime of a task in a worker.
 	 *
 	 * As with blobs, state, in_transition, and result represent the state of
@@ -35,15 +35,15 @@ struct dataswarm_task_rep {
 	 *
 	 */
 
-	dataswarm_task_worker_state_t state;
-	dataswarm_task_worker_state_t in_transition;
+	ds_task_worker_state_t state;
+	ds_task_worker_state_t in_transition;
 	ds_result_t result;
 
 	/* this task id */
 	char *taskid;
 
 	/* for testing we use jx description. Should be replaced with a proper
-	 * struct dataswarm_task. */
+	 * struct ds_task. */
 	struct jx *description;
 };
 

@@ -1,5 +1,5 @@
-#ifndef DATASWARM_CLIENT_OPS_H
-#define DATASWARM_CLIENT_OPS_H
+#ifndef DS_CLIENT_OPS_H
+#define DS_CLIENT_OPS_H
 
 #include "jx.h"
 

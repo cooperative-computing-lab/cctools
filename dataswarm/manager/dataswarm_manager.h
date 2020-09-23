@@ -1,5 +1,5 @@
-#ifndef DATASWARM_MANAGER_H
-#define DATASWARM_MANAGER_H
+#ifndef DS_MANAGER_H
+#define DS_MANAGER_H
 
 #include "hash_table.h"
 #include "link.h"
@@ -36,7 +36,7 @@ struct dataswarm_manager *dataswarm_manager_create();
 struct dataswarm_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *blobid);
 
 /* declares a task in a worker so that it can be manipulated via blob rpcs. */
-struct dataswarm_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid);
+struct ds_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manager *m, struct dataswarm_worker_rep *r, const char *taskid);
 
 char *dataswarm_manager_submit_task( struct dataswarm_manager *m, struct jx *taskinfo );
 

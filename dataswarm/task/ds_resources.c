@@ -1,12 +1,12 @@
-#include "dataswarm_resources.h"
+#include "ds_resources.h"
 #include "jx.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-struct dataswarm_resources * dataswarm_resources_create( struct jx *jresources )
+struct ds_resources * ds_resources_create( struct jx *jresources )
 {
-	struct dataswarm_resources *r = malloc(sizeof(*r));
+	struct ds_resources *r = malloc(sizeof(*r));
 	memset(r,0,sizeof(*r));
 	r->cores = jx_lookup_integer(jresources,"cores");
 	r->memory = jx_lookup_integer(jresources,"memory");
@@ -14,7 +14,7 @@ struct dataswarm_resources * dataswarm_resources_create( struct jx *jresources )
 	return r;
 }
 
-struct jx * dataswarm_resources_to_jx( struct dataswarm_resources *r )
+struct jx * ds_resources_to_jx( struct ds_resources *r )
 {
 	struct jx *j = jx_object(0);
 	if(r->cores) jx_insert_integer(j,"cores",r->cores);
@@ -23,7 +23,7 @@ struct jx * dataswarm_resources_to_jx( struct dataswarm_resources *r )
 	return j;
 }
 
-void dataswarm_resources_delete( struct dataswarm_resources *r )
+void ds_resources_delete( struct ds_resources *r )
 {
 	free(r);
 }

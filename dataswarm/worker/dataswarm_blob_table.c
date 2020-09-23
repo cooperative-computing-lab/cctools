@@ -177,8 +177,8 @@ ds_result_t dataswarm_blob_table_commit(struct dataswarm_worker *w, const char *
 
 	struct dataswarm_blob *b = dataswarm_blob_create_from_file(blob_meta);
 	if(b) {
-		if(b->state==DATASWARM_BLOB_RW) {
-			b->state = DATASWARM_BLOB_RO;
+		if(b->state==DS_BLOB_RW) {
+			b->state = DS_BLOB_RO;
 			// XXX need to measure,checksum,update here
 			if(dataswarm_blob_to_file(b,blob_meta)) {
 				result = DS_RESULT_SUCCESS;
@@ -186,7 +186,7 @@ ds_result_t dataswarm_blob_table_commit(struct dataswarm_worker *w, const char *
 				debug(D_DATASWARM,"couldn't write %s: %s",blob_meta,strerror(errno));
 				result = DS_RESULT_UNABLE;
 			}
-		} else if(b->state==DATASWARM_BLOB_RO) {
+		} else if(b->state==DS_BLOB_RO) {
 			// Already committed, not an error.
 			result = DS_RESULT_SUCCESS;
 		} else {

@@ -1,5 +1,5 @@
-#ifndef DATASWARM_WORKER_REP_H
-#define DATASWARM_WORKER_REP_H
+#ifndef DS_WORKER_REP_H
+#define DS_WORKER_REP_H
 
 /*
 dataswarm_client_rep is the data structure representation
@@ -21,13 +21,13 @@ struct dataswarm_worker_rep {
     /* map from blobid's to struct dataswarm_blob_rep */
     struct hash_table *blobs;
 
-    /* map from tasksid's to struct dataswarm_task_rep */
+    /* map from tasksid's to struct ds_task_rep */
     struct hash_table *tasks;
 
     /* map from currently active rpc ids to the struct dataswarm_blob that is waiting for them, if any. */
     struct itable *blob_of_rpc;
 
-    /* map from currently active rpc ids to the struct dataswarm_task that is waiting for them, if any. */
+    /* map from currently active rpc ids to the struct ds_task that is waiting for them, if any. */
     struct itable *task_of_rpc;
 };
 

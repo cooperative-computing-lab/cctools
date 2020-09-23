@@ -1,13 +1,13 @@
-#ifndef DATASWARM_BLOB_H
-#define DATASWARM_BLOB_H
+#ifndef DS_BLOB_H
+#define DS_BLOB_H
 
 #include "jx.h"
 
 typedef enum {
-	DATASWARM_BLOB_RW,
-	DATASWARM_BLOB_RO,
-	DATASWARM_BLOB_DELETING,
-	DATASWARM_BLOB_DELETED
+	DS_BLOB_RW,
+	DS_BLOB_RO,
+	DS_BLOB_DELETING,
+	DS_BLOB_DELETED
 } dataswarm_blob_state_t;
 
 struct dataswarm_blob {

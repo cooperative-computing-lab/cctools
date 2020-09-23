@@ -24,9 +24,9 @@ See the file COPYING for details.
 
 #include "dataswarm_worker.h"
 #include "comm/ds_message.h"
-#include "dataswarm_task.h"
+#include "task/ds_task.h"
+#include "task/ds_process.h"
 #include "dataswarm_task_table.h"
-#include "dataswarm_process.h"
 #include "dataswarm_blob_table.h"
 
 void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
@@ -86,11 +86,11 @@ void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
 	const char *blobid = jx_lookup_string(params,"blob-id");
 
 	if(!strcmp(method, "task-submit")) {
-		result = dataswarm_task_table_submit(w,taskid,params);
+		result = ds_task_table_submit(w,taskid,params);
 	} else if(!strcmp(method, "task-get")) {
-		result = dataswarm_task_table_get(w,taskid,&result_params);
+		result = ds_task_table_get(w,taskid,&result_params);
 	} else if(!strcmp(method, "task-remove")) {
-		result = dataswarm_task_table_remove(w,taskid);
+		result = ds_task_table_remove(w,taskid);
 	} else if(!strcmp(method, "status-request")) {
 		result = DS_RESULT_SUCCESS;
 	} else if(!strcmp(method, "blob-create")) {
@@ -142,7 +142,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 		}
 
 		/* after processing all messages, work on tasks. */
-		dataswarm_task_table_advance(w);
+		ds_task_table_advance(w);
 
 		time_t current = time(0);
 

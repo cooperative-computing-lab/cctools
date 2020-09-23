@@ -1,7 +1,7 @@
 include ../config.mk
 include ../rules.mk
 
-PHONY_TARGETS ?= comm manager worker
+PHONY_TARGETS ?= comm task manager worker
 TARGETS ?= $(PHONY_TARGETS)
 
 all: $(TARGETS)
@@ -9,10 +9,10 @@ all: $(TARGETS)
 comm:
 	@$(MAKE) -C $@
 
-manager: comm
+manager: comm task
 	@$(MAKE) -C $@
 
-worker: comm
+worker: comm task
 	@$(MAKE) -C $@
 
 CLEAN_TARGETS = $(TARGETS:%=clean-%)
