@@ -26,7 +26,7 @@ See the file COPYING for details.
 #include "comm/ds_message.h"
 #include "task/ds_task.h"
 #include "task/ds_process.h"
-#include "dataswarm_task_table.h"
+#include "ds_task_table.h"
 #include "blob/ds_blob_table.h"
 
 void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)

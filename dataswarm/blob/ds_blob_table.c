@@ -1,5 +1,5 @@
-#include "blob/ds_blob.h"
-#include "blob/ds_blob_table.h"
+#include "ds_blob.h"
+#include "ds_blob_table.h"
 #include "comm/ds_message.h"
 
 #include "stringtools.h"
