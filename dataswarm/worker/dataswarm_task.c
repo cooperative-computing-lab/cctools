@@ -2,10 +2,13 @@
 #include "dataswarm_mount.h"
 #include "dataswarm_resources.h"
 
+#include "jx_print.h"
+#include "jx_parse.h"
+
 #include <stdlib.h>
 #include <string.h>
 
-struct dataswarm_task * dataswarm_task_create( struct jx *jtask )
+struct dataswarm_task * dataswarm_task_create_from_jx( struct jx *jtask )
 {
 	struct dataswarm_task *t = malloc(sizeof(*t));
 	memset(t,0,sizeof(*t));
@@ -21,6 +24,25 @@ struct dataswarm_task * dataswarm_task_create( struct jx *jtask )
 
 	return t;
 
+}
+
+struct dataswarm_task * dataswarm_task_create_from_file( const char *filename )
+{
+	FILE *file = fopen(filename,"r");
+	if(!file) return 0;
+
+	struct jx *jtask = jx_parse_stream(file);
+	if(!jtask) {
+		fclose(file);
+		return 0;
+	}
+
+	struct dataswarm_task *t = dataswarm_task_create_from_jx(jtask);
+
+	jx_delete(jtask);
+	fclose(file);
+
+	return t;
 }
 
 const char * dataswarm_task_state_string( dataswarm_task_state_t state )
@@ -47,6 +69,26 @@ struct jx * dataswarm_task_to_jx( struct dataswarm_task *t )
 	jx_insert_string(jtask,"state",dataswarm_task_state_string(t->state));
 	return jtask;
 }
+
+int dataswarm_task_to_file( struct dataswarm_task *t, const char *filename )
+{
+	struct jx *jtask = dataswarm_task_to_jx(t);
+	if(!jtask) return 0;
+
+	FILE *file = fopen(filename,"w");
+	if(!file) {
+		jx_delete(jtask);
+		return 0;
+	}
+
+	jx_print_stream(jtask,file);
+
+	jx_delete(jtask);
+	fclose(file);
+
+	return 1;
+}
+
 
 
 void dataswarm_task_delete( struct dataswarm_task *t )

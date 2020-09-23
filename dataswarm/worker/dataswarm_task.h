@@ -25,8 +25,12 @@ struct dataswarm_task {
 	struct dataswarm_process *process;
 };
 
-struct dataswarm_task * dataswarm_task_create( struct jx *jtask );
+struct dataswarm_task * dataswarm_task_create_from_jx( struct jx *jtask );
+struct dataswarm_task * dataswarm_task_create_from_file( const char *filename);
+
 struct jx * dataswarm_task_to_jx( struct dataswarm_task *task );
+int dataswarm_task_to_file( struct dataswarm_task *task, const char *filename );
+
 const char *dataswarm_task_state_string( dataswarm_task_state_t state );
 void dataswarm_task_delete( struct dataswarm_task *t );
 
