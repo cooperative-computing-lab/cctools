@@ -1,5 +1,5 @@
 #include "ds_task_table.h"
-#include "dataswarm_worker.h"
+#include "ds_worker.h"
 #include "common/ds_task.h"
 #include "common/ds_message.h"
 
@@ -13,7 +13,7 @@
 Every time a task changes state, send an async update message.
 */
 
-static void update_task_state( struct dataswarm_worker *w, struct ds_task *task, ds_task_state_t state )
+static void update_task_state( struct ds_worker *w, struct ds_task *task, ds_task_state_t state )
 {
 	task->state = state;
 	struct jx *msg = ds_message_task_update( task->taskid, ds_task_state_string(state) );
@@ -21,7 +21,7 @@ static void update_task_state( struct dataswarm_worker *w, struct ds_task *task,
 	free(msg);
 }
 
-ds_result_t ds_task_table_submit( struct dataswarm_worker *w, const char *taskid, struct jx *jtask )
+ds_result_t ds_task_table_submit( struct ds_worker *w, const char *taskid, struct jx *jtask )
 {
 	struct ds_task *task = ds_task_create(jtask);
 	if(task) {
@@ -32,7 +32,7 @@ ds_result_t ds_task_table_submit( struct dataswarm_worker *w, const char *taskid
 	}
 }
 
-ds_result_t ds_task_table_get( struct dataswarm_worker *w, const char *taskid, struct jx **jtask )
+ds_result_t ds_task_table_get( struct ds_worker *w, const char *taskid, struct jx **jtask )
 {
 	struct ds_task *task = hash_table_lookup(w->task_table, taskid);
 	if(task) {
@@ -43,7 +43,7 @@ ds_result_t ds_task_table_get( struct dataswarm_worker *w, const char *taskid, s
 	}
 }
 
-ds_result_t ds_task_table_remove( struct dataswarm_worker *w, const char *taskid )
+ds_result_t ds_task_table_remove( struct ds_worker *w, const char *taskid )
 {
 	struct ds_task *task = hash_table_lookup(w->task_table, taskid);
 	if(task) {
@@ -59,7 +59,7 @@ Consider each task currently in possession of the worker,
 and act according to it's current state.
 */
 
-void ds_task_table_advance( struct dataswarm_worker *w )
+void ds_task_table_advance( struct ds_worker *w )
 {
 	struct ds_task *task;
 	char *taskid;

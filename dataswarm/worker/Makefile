@@ -4,7 +4,7 @@ include ../../rules.mk
 TARGETS=$(PROGRAMS)
 PROGRAMS=dataswarm_worker
 
-SOURCES=dataswarm_worker_main.c dataswarm_worker.c ds_task_table.c ds_blob_table.c
+SOURCES=ds_worker_main.c ds_worker.c ds_task_table.c ds_blob_table.c
 OBJECTS=$(SOURCES:%.c=%.o)
 DS_OBJECTS=../common/ds_message.o ../common/ds_process.o ../common/ds_resources.o ../common/ds_task.o ../common/ds_mount.o ../common/ds_blob.o
 

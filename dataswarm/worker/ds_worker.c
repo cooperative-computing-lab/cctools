@@ -22,14 +22,14 @@ See the file COPYING for details.
 #include "create_dir.h"
 #include "hash_table.h"
 
-#include "dataswarm_worker.h"
+#include "ds_worker.h"
 #include "common/ds_message.h"
 #include "common/ds_task.h"
 #include "common/ds_process.h"
 #include "ds_task_table.h"
 #include "ds_blob_table.h"
 
-void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
+void ds_worker_status_report(struct ds_worker *w, time_t stoptime)
 {
 	struct jx *msg = jx_object(NULL);
 	struct jx *params = jx_object(NULL);
@@ -43,7 +43,7 @@ void dataswarm_worker_status_report(struct dataswarm_worker *w, time_t stoptime)
 	jx_delete(msg);
 }
 
-struct jx * dataswarm_worker_handshake( struct dataswarm_worker *w )
+struct jx * ds_worker_handshake( struct ds_worker *w )
 {
 	struct jx *msg = jx_object(NULL);
 	struct jx *params = jx_object(NULL);
@@ -57,7 +57,7 @@ struct jx * dataswarm_worker_handshake( struct dataswarm_worker *w )
 }
 
 
-void dataswarm_worker_handle_message(struct dataswarm_worker *w, struct jx *msg)
+void ds_worker_handle_message(struct ds_worker *w, struct jx *msg)
 {
 	const char *method = jx_lookup_string(msg, "method");
 	struct jx *params = jx_lookup(msg, "params");
@@ -121,7 +121,7 @@ done:
 	jx_delete(result_params);
 }
 
-int dataswarm_worker_main_loop(struct dataswarm_worker *w)
+int ds_worker_main_loop(struct ds_worker *w)
 {
 	while(1) {
 		time_t stoptime = time(0) + 5;	/* read messages for at most 5 seconds. remove with Tim's library. */
@@ -130,7 +130,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 			if(link_sleep(w->manager_link, stoptime, stoptime, 0)) {
 				struct jx *msg = ds_json_recv(w->manager_link, stoptime + 60);
 				if(msg) {
-					dataswarm_worker_handle_message(w, msg);
+					ds_worker_handle_message(w, msg);
 					jx_delete(msg);
 				} else {
 					/* handle manager disconnection */
@@ -148,7 +148,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 
 		if(current > (w->last_status_report+w->status_report_interval) ) {
 			w->last_status_report = current;
-			dataswarm_worker_status_report(w, stoptime);
+			ds_worker_status_report(w, stoptime);
 		}
 
 		//do not busy sleep more than stoptime
@@ -161,7 +161,7 @@ int dataswarm_worker_main_loop(struct dataswarm_worker *w)
 	}
 }
 
-void dataswarm_worker_connect_loop(struct dataswarm_worker *w, const char *manager_host, int manager_port)
+void ds_worker_connect_loop(struct ds_worker *w, const char *manager_host, int manager_port)
 {
 	char manager_addr[LINK_ADDRESS_MAX];
 	int sleeptime = w->min_connect_retry;
@@ -176,11 +176,11 @@ void dataswarm_worker_connect_loop(struct dataswarm_worker *w, const char *manag
 		w->manager_link = link_connect(manager_addr, manager_port, time(0) + sleeptime);
 		if(w->manager_link) {
 
-			struct jx *msg = dataswarm_worker_handshake(w);
+			struct jx *msg = ds_worker_handshake(w);
 			ds_json_send(w->manager_link, msg, time(0) + w->long_timeout);
 			jx_delete(msg);
 
-			dataswarm_worker_main_loop(w);
+			ds_worker_main_loop(w);
 			link_close(w->manager_link);
 			w->manager_link = 0;
 			sleeptime = w->min_connect_retry;
@@ -194,7 +194,7 @@ void dataswarm_worker_connect_loop(struct dataswarm_worker *w, const char *manag
 	printf("worker shutting down.\n");
 }
 
-void dataswarm_worker_connect_by_name(struct dataswarm_worker *w, const char *manager_name)
+void ds_worker_connect_by_name(struct ds_worker *w, const char *manager_name)
 {
 	char *expr = string_format("type==\"dataswarm_manager\" && project==\"%s\"", manager_name);
 	int sleeptime = w->min_connect_retry;
@@ -209,7 +209,7 @@ void dataswarm_worker_connect_by_name(struct dataswarm_worker *w, const char *ma
 			if(j) {
 				const char *host = jx_lookup_string(j, "name");
 				int port = jx_lookup_integer(j, "port");
-				dataswarm_worker_connect_loop(w, host, port);
+				ds_worker_connect_loop(w, host, port);
 				got_result = 1;
 			}
 			catalog_query_delete(query);
@@ -228,9 +228,9 @@ void dataswarm_worker_connect_by_name(struct dataswarm_worker *w, const char *ma
 	free(expr);
 }
 
-struct dataswarm_worker *dataswarm_worker_create(const char *workspace)
+struct ds_worker *ds_worker_create(const char *workspace)
 {
-	struct dataswarm_worker *w = malloc(sizeof(*w));
+	struct ds_worker *w = malloc(sizeof(*w));
 	memset(w, 0, sizeof(*w));
 
 	w->task_table = hash_table_create(0, 0);
@@ -246,7 +246,7 @@ struct dataswarm_worker *dataswarm_worker_create(const char *workspace)
 	w->status_report_interval = 60;
 
 	if(!create_dir(w->workspace, 0777)) {
-		dataswarm_worker_delete(w);
+		ds_worker_delete(w);
 		return 0;
 	}
 
@@ -261,7 +261,7 @@ struct dataswarm_worker *dataswarm_worker_create(const char *workspace)
 	return w;
 }
 
-void dataswarm_worker_delete(struct dataswarm_worker *w)
+void ds_worker_delete(struct ds_worker *w)
 {
 	if(!w)
 		return;

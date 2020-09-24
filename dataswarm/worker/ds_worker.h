@@ -5,7 +5,7 @@
 #include "hash_table.h"
 #include "link.h"
 
-struct dataswarm_worker {
+struct ds_worker {
 	// Network connection to the manager process.
 	struct link *manager_link;
 
@@ -16,7 +16,7 @@ struct dataswarm_worker {
 	char *workspace;
 
 	/***************************************************************/
-	/* Internal tuning parameters set in dataswarm_worker_create() */
+	/* Internal tuning parameters set in ds_worker_create() */
 	/***************************************************************/
 
 	// Give up and reconnect if no message received after this time.
@@ -44,12 +44,12 @@ struct dataswarm_worker {
 	int status_report_interval;
 };
 
-struct dataswarm_worker *dataswarm_worker_create();
+struct ds_worker *ds_worker_create();
 
-void dataswarm_worker_connect_by_name( struct dataswarm_worker *w, const char *manager_name );
-void dataswarm_worker_connect_loop( struct dataswarm_worker *w, const char *manager_host, int manager_port );
+void ds_worker_connect_by_name( struct ds_worker *w, const char *manager_name );
+void ds_worker_connect_loop( struct ds_worker *w, const char *manager_host, int manager_port );
 
-void dataswarm_worker_delete(struct dataswarm_worker *w);
+void ds_worker_delete(struct ds_worker *w);
 
 
 #endif

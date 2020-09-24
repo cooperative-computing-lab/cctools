@@ -1,4 +1,4 @@
-#include "dataswarm_worker.h"
+#include "ds_worker.h"
 #include "ds_blob_table.h"
 
 #include "debug.h"
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	struct dataswarm_worker *w = dataswarm_worker_create(workspace_dir);
+	struct ds_worker *w = ds_worker_create(workspace_dir);
 
 	ds_blob_table_purge(w);
 
@@ -85,14 +85,14 @@ int main(int argc, char *argv[])
 	}
 
 	if(manager_name) {
-		dataswarm_worker_connect_by_name(w, manager_name);
+		ds_worker_connect_by_name(w, manager_name);
 	} else if(manager_host && manager_port) {
-		dataswarm_worker_connect_loop(w, manager_host, manager_port);
+		ds_worker_connect_loop(w, manager_host, manager_port);
 	} else {
 		fprintf(stderr, "%s: must specify manager name (-N) or host (-m) and port (-p)\n", argv[0]);
 	}
 
-	dataswarm_worker_delete(w);
+	ds_worker_delete(w);
 
 	return 0;
 }
