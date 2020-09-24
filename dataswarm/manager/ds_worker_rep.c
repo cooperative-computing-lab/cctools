@@ -22,7 +22,7 @@
 #include "common/ds_message.h"
 #include "ds_worker_rep.h"
 #include "ds_task_rep.h"
-#include "dataswarm_manager.h"
+#include "ds_manager.h"
 
 struct ds_worker_rep * ds_worker_rep_create( struct link *l )
 {

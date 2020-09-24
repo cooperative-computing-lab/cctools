@@ -29,19 +29,19 @@ See the file COPYING for details.
 #include "ds_client_rep.h"
 #include "ds_blob_rep.h"
 #include "ds_task_rep.h"
-#include "dataswarm_manager.h"
+#include "ds_manager.h"
 #include "dataswarm_client_ops.h"
 #include "ds_file.h"
 
-#include "dataswarm_test.h"
+#include "ds_test.h"
 
-struct jx * manager_status_jx( struct dataswarm_manager *m )
+struct jx * manager_status_jx( struct ds_manager *m )
 {
 	char owner[USERNAME_MAX];
 	username_get(owner);
 
 	struct jx * j = jx_object(0);
-	jx_insert_string(j,"type","dataswarm_manager");
+	jx_insert_string(j,"type","ds_manager");
 	jx_insert_string(j,"project",m->project_name);
 	jx_insert_integer(j,"starttime",(m->start_time/1000000));
 	jx_insert_string(j,"owner",owner);
@@ -51,7 +51,7 @@ struct jx * manager_status_jx( struct dataswarm_manager *m )
 	return j;
 }
 
-void update_catalog( struct dataswarm_manager *m, int force_update )
+void update_catalog( struct ds_manager *m, int force_update )
 {
 	if(!m->force_update && (time(0) - m->catalog_last_update_time) < m->update_interval)
 		return;
@@ -69,16 +69,16 @@ void update_catalog( struct dataswarm_manager *m, int force_update )
 	m->catalog_last_update_time = time(0);
 }
 
-void process_files( struct dataswarm_manager *m )
+void process_files( struct ds_manager *m )
 {
 }
 
-void process_tasks( struct dataswarm_manager *m )
+void process_tasks( struct ds_manager *m )
 {
 }
 
 /* declares a blob in a worker so that it can be manipulated via blob rpcs. */
-struct ds_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid) {
+struct ds_blob_rep *ds_manager_add_blob_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid) {
 	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(b) {
 		/* cannot create an already declared blob. This could only happen with
@@ -99,7 +99,7 @@ struct ds_blob_rep *dataswarm_manager_add_blob_to_worker( struct dataswarm_manag
 }
 
 /* declares a task in a worker so that it can be manipulated via task rpcs. */
-struct ds_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *taskid) {
+struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid) {
 	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	if(t) {
 		/* cannot create an already declared task. This could only happen with
@@ -128,7 +128,7 @@ struct ds_task_rep *dataswarm_manager_add_task_to_worker( struct dataswarm_manag
 	return t;
 }
 
-char *dataswarm_manager_submit_task( struct dataswarm_manager *m, struct jx *description ) {
+char *ds_manager_submit_task( struct ds_manager *m, struct jx *description ) {
 	char *taskid = string_format("task-%d", m->task_id++);
 
 	/* do validation */
@@ -142,7 +142,7 @@ char *dataswarm_manager_submit_task( struct dataswarm_manager *m, struct jx *des
 }
 
 
-void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
+void handle_connect_message( struct ds_manager *m, time_t stoptime )
 {
 	struct link *l;
 
@@ -208,7 +208,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 	}
 }
 
-void handle_client_message( struct dataswarm_manager *m, struct ds_client_rep *c, time_t stoptime )
+void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_t stoptime )
 {
 	struct jx *msg = ds_json_recv(c->link,stoptime);
 	if(!msg) {
@@ -257,7 +257,7 @@ void handle_client_message( struct dataswarm_manager *m, struct ds_client_rep *c
 	}
 }
 
-void handle_worker_message( struct dataswarm_manager *m, struct ds_worker_rep *w, time_t stoptime )
+void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_t stoptime )
 {
 	struct jx *msg = ds_json_recv(w->link,stoptime);
 	if(!msg) {
@@ -290,7 +290,7 @@ void handle_worker_message( struct dataswarm_manager *m, struct ds_worker_rep *w
 
 }
 
-int handle_messages( struct dataswarm_manager *m, int msec )
+int handle_messages( struct ds_manager *m, int msec )
 {
 	int n = hash_table_size(m->client_table) + hash_table_size(m->worker_table) + 1;
 
@@ -348,7 +348,7 @@ int handle_messages( struct dataswarm_manager *m, int msec )
 	return n;
 }
 
-void server_main_loop( struct dataswarm_manager *m )
+void server_main_loop( struct ds_manager *m )
 {
 	while(1) {
 		update_catalog(m,0);
@@ -383,7 +383,7 @@ static void show_help( const char *cmd )
 
 int main(int argc, char *argv[])
 {
-	struct dataswarm_manager * m = dataswarm_manager_create();
+	struct ds_manager * m = ds_manager_create();
 
 	int c;
 	while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0))!=-1) {
@@ -430,9 +430,9 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-struct dataswarm_manager * dataswarm_manager_create()
+struct ds_manager * ds_manager_create()
 {
-	struct dataswarm_manager *m = malloc(sizeof(*m));
+	struct ds_manager *m = malloc(sizeof(*m));
 
 	memset(m,0,sizeof(*m));
 

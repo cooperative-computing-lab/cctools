@@ -1,5 +1,5 @@
 
-#include "dataswarm_manager.h"
+#include "ds_manager.h"
 #include "ds_worker_rep.h"
 #include "ds_blob_rep.h"
 #include "ds_task_rep.h"
@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int wait_for_rpcs(struct dataswarm_manager *m, struct ds_worker_rep *r) {
+int wait_for_rpcs(struct ds_manager *m, struct ds_worker_rep *r) {
 	int done   = 0;
 	int all_ok = 1;
 	uint64_t key;
@@ -63,13 +63,13 @@ int wait_for_rpcs(struct dataswarm_manager *m, struct ds_worker_rep *r) {
 	return all_ok;
 }
 
-void dataswarm_test_script( struct dataswarm_manager *m, struct ds_worker_rep *r )
+void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
 {
 	const char *bloba = "abc123";
 	const char *blobb = "xyz456";
 
-	dataswarm_manager_add_blob_to_worker(m, r, bloba),
-		dataswarm_manager_add_blob_to_worker(m, r, blobb),
+	ds_manager_add_blob_to_worker(m, r, bloba),
+		ds_manager_add_blob_to_worker(m, r, blobb),
 
 		ds_rpc_blob_delete(m,r,bloba);
 	ds_rpc_blob_delete(m,r,blobb);
@@ -110,10 +110,10 @@ void dataswarm_test_script( struct dataswarm_manager *m, struct ds_worker_rep *r
 
 
 	/* submit task to manager */
-	char *taskid = dataswarm_manager_submit_task(m, taskinfo);
+	char *taskid = ds_manager_submit_task(m, taskinfo);
 
 	/* declare task in worker */
-	dataswarm_manager_add_task_to_worker(m,r,taskid);
+	ds_manager_add_task_to_worker(m,r,taskid);
 
 	/* send task to worker */
 	ds_rpc_task_submit(m,r,taskid);
@@ -140,7 +140,7 @@ void dataswarm_test_script( struct dataswarm_manager *m, struct ds_worker_rep *r
 	debug(D_DATASWARM, "Done testing this worker.");
 }
 
-void dataswarm_test_script_old_sync( struct dataswarm_manager *m, struct ds_worker_rep *r )
+void dataswarm_test_script_old_sync( struct ds_manager *m, struct ds_worker_rep *r )
 {
 	const char *bloba = "abc123";
 	const char *blobb = "xyz456";

@@ -17,10 +17,10 @@
 #include <string.h>
 
 /* not an rpc. writes the file to disk for a corresponding blob-get get request. */
-ds_result_t blob_get_aux( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid );
+ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid );
 
 /* test read responses from workers. */
-ds_result_t ds_rpc_get_response( struct dataswarm_manager *m, struct ds_worker_rep *r)
+ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 {
 	struct jx * msg = ds_json_recv(r->link,time(0)+m->connect_timeout);
 
@@ -67,7 +67,7 @@ ds_result_t ds_rpc_get_response( struct dataswarm_manager *m, struct ds_worker_r
    associated with the future response.
    */
 
-jx_int_t ds_rpc( struct dataswarm_manager *m, struct ds_worker_rep *r, struct jx *rpc)
+jx_int_t ds_rpc( struct ds_manager *m, struct ds_worker_rep *r, struct jx *rpc)
 {
 	jx_int_t msgid = m->message_id++;
 	jx_insert_integer(rpc, "id", msgid);
@@ -78,7 +78,7 @@ jx_int_t ds_rpc( struct dataswarm_manager *m, struct ds_worker_rep *r, struct jx
 	return msgid;
 }
 
-jx_int_t ds_rpc_for_blob( struct dataswarm_manager *m, struct ds_worker_rep *r, struct ds_blob_rep *b, struct jx *rpc, ds_blob_worker_state_t in_transition )
+jx_int_t ds_rpc_for_blob( struct ds_manager *m, struct ds_worker_rep *r, struct ds_blob_rep *b, struct jx *rpc, ds_blob_worker_state_t in_transition )
 {
 	jx_int_t msgid = ds_rpc(m, r, rpc);
 
@@ -90,7 +90,7 @@ jx_int_t ds_rpc_for_blob( struct dataswarm_manager *m, struct ds_worker_rep *r, 
 	return msgid;
 }
 
-jx_int_t ds_rpc_for_task( struct dataswarm_manager *m, struct ds_worker_rep *r, struct ds_task_rep *t, struct jx *rpc, ds_task_worker_state_t in_transition )
+jx_int_t ds_rpc_for_task( struct ds_manager *m, struct ds_worker_rep *r, struct ds_task_rep *t, struct jx *rpc, ds_task_worker_state_t in_transition )
 {
 	jx_int_t msgid = ds_rpc(m, r, rpc);
 
@@ -102,7 +102,7 @@ jx_int_t ds_rpc_for_task( struct dataswarm_manager *m, struct ds_worker_rep *r, 
 	return msgid;
 }
 
-jx_int_t ds_rpc_blob_create( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid, int64_t size, struct jx *metadata )
+jx_int_t ds_rpc_blob_create( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid, int64_t size, struct jx *metadata )
 {
 	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
@@ -121,7 +121,7 @@ jx_int_t ds_rpc_blob_create( struct dataswarm_manager *m, struct ds_worker_rep *
 	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_CREATED);
 }
 
-jx_int_t ds_rpc_blob_commit( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid )
+jx_int_t ds_rpc_blob_commit( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid )
 {
 	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
@@ -138,7 +138,7 @@ jx_int_t ds_rpc_blob_commit( struct dataswarm_manager *m, struct ds_worker_rep *
 	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_COMMITTED);
 }
 
-jx_int_t ds_rpc_blob_delete( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid )
+jx_int_t ds_rpc_blob_delete( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid )
 {
 	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
@@ -155,7 +155,7 @@ jx_int_t ds_rpc_blob_delete( struct dataswarm_manager *m, struct ds_worker_rep *
 	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_DELETED);
 }
 
-jx_int_t ds_rpc_blob_copy( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid_source, const char *blobid_target )
+jx_int_t ds_rpc_blob_copy( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid_source, const char *blobid_target )
 {
 	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid_target);
 	if(!b) {
@@ -174,7 +174,7 @@ jx_int_t ds_rpc_blob_copy( struct dataswarm_manager *m, struct ds_worker_rep *r,
 }
 
 
-jx_int_t ds_rpc_blob_put( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid, const char *filename )
+jx_int_t ds_rpc_blob_put( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid, const char *filename )
 {
 	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
@@ -208,7 +208,7 @@ jx_int_t ds_rpc_blob_put( struct dataswarm_manager *m, struct ds_worker_rep *r, 
 }
 
 /* not an rpc, but its state behaves likes one. GETs a file for a corresponding REQ_GET get request. */
-jx_int_t ds_rpc_blob_get( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid, const char *filename )
+jx_int_t ds_rpc_blob_get( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid, const char *filename )
 {
 	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
@@ -232,7 +232,7 @@ jx_int_t ds_rpc_blob_get( struct dataswarm_manager *m, struct ds_worker_rep *r, 
 	return msgid;
 }
 
-ds_result_t blob_get_aux( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *blobid )
+ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid )
 {
 	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
 	if(!b) {
@@ -262,7 +262,7 @@ ds_result_t blob_get_aux( struct dataswarm_manager *m, struct ds_worker_rep *r, 
 	return result;
 }
 
-jx_int_t ds_rpc_task_submit( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *taskid )
+jx_int_t ds_rpc_task_submit( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid )
 {
 	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	assert(t);
@@ -274,7 +274,7 @@ jx_int_t ds_rpc_task_submit( struct dataswarm_manager *m, struct ds_worker_rep *
 	return ds_rpc_for_task(m, r, t, rpc, DS_TASK_WORKER_STATE_SUBMITTED);
 }
 
-jx_int_t ds_rpc_task_remove( struct dataswarm_manager *m, struct ds_worker_rep *r, const char *taskid )
+jx_int_t ds_rpc_task_remove( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid )
 {
 	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	assert(t);
