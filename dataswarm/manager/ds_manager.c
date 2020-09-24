@@ -30,7 +30,7 @@ See the file COPYING for details.
 #include "ds_blob_rep.h"
 #include "ds_task_rep.h"
 #include "ds_manager.h"
-#include "dataswarm_client_ops.h"
+#include "ds_client_ops.h"
 #include "ds_file.h"
 
 #include "ds_test.h"

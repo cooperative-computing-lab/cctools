@@ -1,15 +1,15 @@
-/*  
+/*
 Copyright (C) 2020- The University of Notre Dame
 This software is distributed under the GNU General Public License.
-See the file COPYING for details. 
+See the file COPYING for details.
 */
 
-#include "dataswarm_client_ops.h"
+#include "ds_client_ops.h"
 #include "helpers.h"
 
 #include <string.h>
 
-char *dataswarm_submit_task(struct jx *task){
+char *ds_submit_task(struct jx *task){
 
     if(validate_json(task, SUBMIT_TASK)){
         return NULL;
@@ -42,7 +42,7 @@ char *dataswarm_submit_task(struct jx *task){
 
 }
 
-struct jx *dataswarm_delete_task(char *uuid){
+struct jx *ds_delete_task(char *uuid){
 
     //TODO: get task data from mapping
 
@@ -50,7 +50,7 @@ struct jx *dataswarm_delete_task(char *uuid){
 
 }
 
-struct jx *dataswarm_retrieve_task(char *uuid){
+struct jx *ds_retrieve_task(char *uuid){
 
     //TODO: get task data from mapping
 
@@ -58,7 +58,7 @@ struct jx *dataswarm_retrieve_task(char *uuid){
 
 }
 
-char *dataswarm_declare_file(struct jx *file){
+char *ds_declare_file(struct jx *file){
     
     char *type = NULL;
     int project = 0;
@@ -108,7 +108,7 @@ char *dataswarm_declare_file(struct jx *file){
 
 }
 
-struct jx *dataswarm_commit_file(char *uuid){
+struct jx *ds_commit_file(char *uuid){
 
     int i;
     int length = 2;
@@ -124,7 +124,7 @@ struct jx *dataswarm_commit_file(char *uuid){
 
 }
 
-struct jx *dataswarm_delete_file(char *uuid){
+struct jx *ds_delete_file(char *uuid){
 
     //TODO: get file data from mapping
 
@@ -132,7 +132,7 @@ struct jx *dataswarm_delete_file(char *uuid){
 
 }
 
-struct jx *dataswarm_copy_file(char *uuid){
+struct jx *ds_copy_file(char *uuid){
 
     //TODO: get file data from mapping
 
@@ -140,7 +140,7 @@ struct jx *dataswarm_copy_file(char *uuid){
 
 }
 
-char *dataswarm_submit_service(struct jx *service){
+char *ds_submit_service(struct jx *service){
 
     if(validate_json(service, SUBMIT_SERVICE)){
         return NULL;
@@ -172,7 +172,7 @@ char *dataswarm_submit_service(struct jx *service){
 
 }
 
-struct jx *dataswarm_delete_service(char *uuid){
+struct jx *ds_delete_service(char *uuid){
 
     //TODO: get service data from mapping
 
@@ -180,7 +180,7 @@ struct jx *dataswarm_delete_service(char *uuid){
 
 }
 
-char *dataswarm_create_project(char *project_name){
+char *ds_create_project(char *project_name){
 
     // assign a UUID to the project
     cctools_uuid_t *uuid;
@@ -198,7 +198,7 @@ char *dataswarm_create_project(char *project_name){
 
 }
 
-struct jx *dataswarm_delete_project(char *uuid){
+struct jx *ds_delete_project(char *uuid){
 
     //TODO: get project data from mapping
 
@@ -206,13 +206,13 @@ struct jx *dataswarm_delete_project(char *uuid){
 
 }
 
-struct jx *dataswarm_wait(){
+struct jx *ds_wait(){
 
     //TODO: block until something happens     
 
 }
 
-bool dataswarm_queue_empty(){
+bool ds_queue_empty(){
 
     //TODO: return true if the queue of tasks is empty
 
@@ -220,7 +220,7 @@ bool dataswarm_queue_empty(){
 
 }
 
-struct jx *dataswarm_status(char *uuid){
+struct jx *ds_status(char *uuid){
 
 
 
