@@ -1,5 +1,5 @@
-#ifndef DS_TEST_H
-#define DS_TEST_H
+#ifndef DATASWARM_TEST_H
+#define DATASWARM_TEST_H
 
 #include "dataswarm_manager.h"
 #include "ds_worker_rep.h"

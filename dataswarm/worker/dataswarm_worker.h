@@ -1,5 +1,5 @@
-#ifndef DS_WORKER_H
-#define DS_WORKER_H
+#ifndef DATASWARM_WORKER_H
+#define DATASWARM_WORKER_H
 
 #include <time.h>
 #include "hash_table.h"

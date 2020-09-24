@@ -1,5 +1,5 @@
-#ifndef DS_BLOB_H
-#define DS_BLOB_H
+#ifndef DATASWARM_BLOB_H
+#define DATASWARM_BLOB_H
 
 #include "jx.h"
 

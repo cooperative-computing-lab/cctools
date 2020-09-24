@@ -1,5 +1,5 @@
-#ifndef DS_RESOURCES_H
-#define DS_RESOURCES_H
+#ifndef DATASWARM_RESOURCES_H
+#define DATASWARM_RESOURCES_H
 
 #include "jx.h"
 

@@ -1,5 +1,5 @@
-#ifndef DS_FILE_H
-#define DS_FILE_H
+#ifndef DATASWARM_FILE_H
+#define DATASWARM_FILE_H
 
 #include "jx.h"
 

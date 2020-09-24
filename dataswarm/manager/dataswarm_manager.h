@@ -1,5 +1,5 @@
-#ifndef DS_MANAGER_H
-#define DS_MANAGER_H
+#ifndef DATASWARM_MANAGER_H
+#define DATASWARM_MANAGER_H
 
 #include "hash_table.h"
 #include "link.h"

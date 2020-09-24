@@ -1,5 +1,5 @@
-#ifndef DS_BLOB_REP_H
-#define DS_BLOB_REP_H
+#ifndef DATASWARM_BLOB_REP_H
+#define DATASWARM_BLOB_REP_H
 
 #include "ds_rpc.h"  /* needed for ds_result_t */
 

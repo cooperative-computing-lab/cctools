@@ -1,5 +1,5 @@
-#ifndef DS_PROCESS_H
-#define DS_PROCESS_H
+#ifndef DATASWARM_PROCESS_H
+#define DATASWARM_PROCESS_H
 
 #include "ds_task.h"
 #include "timestamp.h"

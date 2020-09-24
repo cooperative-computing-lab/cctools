@@ -1,5 +1,5 @@
-#ifndef DS_TASK_H
-#define DS_TASK_H
+#ifndef DATASWARM_TASK_H
+#define DATASWARM_TASK_H
 
 #include "ds_mount.h"
 #include "ds_resources.h"

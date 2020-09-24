@@ -1,5 +1,5 @@
-#ifndef DS_MESSAGE_H
-#define DS_MESSAGE_H
+#ifndef DATASWARM_MESSAGE_H
+#define DATASWARM_MESSAGE_H
 
 #include "link.h"
 #include "jx.h"

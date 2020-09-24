@@ -1,5 +1,5 @@
-#ifndef DS_MOUNT_H
-#define DS_MOUNT_H
+#ifndef DATASWARM_MOUNT_H
+#define DATASWARM_MOUNT_H
 
 #include "jx.h"
 
