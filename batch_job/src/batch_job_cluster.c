@@ -298,6 +298,7 @@ static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct bat
 			char *statusfile = string_format("%s.status.%" PRIbjid, cluster_name, jobid);
 			FILE *file = fopen(statusfile, "r");
 			if(file) {
+				fseek(file, info->log_pos, SEEK_SET);
 				char line[BATCH_JOB_LINE_MAX];
 				while(fgets(line, sizeof(line), file)) {
 					if(sscanf(line, "start %d", &t)) {
@@ -315,6 +316,7 @@ static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct bat
 						info->exit_code = c;
 					}
 				}
+				info->log_pos = ftell(file);
 				fclose(file);
 
 				if(time(0) - info->heartbeat > heartbeat_max) {
