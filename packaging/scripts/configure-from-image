@@ -27,7 +27,7 @@ done
 
 cd ${CCTOOLS_SRC}
 
-if [[ -d /opt/vc3/cctools-deps ]]
+if [[ -d /opt/vc3/cctools-deps/musl ]]
 then
     # compile work_queue binaries statically
     [[ -f config.mk ]] && make clean
