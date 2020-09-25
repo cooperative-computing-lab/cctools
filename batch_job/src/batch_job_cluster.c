@@ -89,17 +89,20 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	// Each job writes out to its own log file.
 	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
 	fprintf(file, "starttime=`date +%%s`\n");
-	fprintf(file, "cat > $logfile <<EOF\n");
-	fprintf(file, "start $starttime\n");
-	fprintf(file, "EOF\n\n");
+	fprintf(file, "echo start $starttime > $logfile\n");
+
+	// Write a heartbeat to the log file, in case the batch system removes the job from under us.
+	fprintf(file, "(while true; do sleep 1; echo alive $(date +%%s) >> $logfile; done) &\n");
+	fprintf(file, "pid_heartbeat=$!\n");
+
 	// The command to run is taken from the environment.
 	fprintf(file, "eval \"$BATCH_JOB_COMMAND\"\n\n");
 
 	// When done, write the status and time to the logfile.
 	fprintf(file, "status=$?\n");
+	fprintf(file, "kill $pid_heartbeat\n");
 	fprintf(file, "stoptime=`date +%%s`\n");
-	fprintf(file, "cat >> $logfile <<EOF\n");
-	fprintf(file, "stop $status $stoptime\n");
+	fprintf(file, "echo stop $status $stoptime >> $logfile\n");
 	fprintf(file, "EOF\n");
 	fclose(file);
 
