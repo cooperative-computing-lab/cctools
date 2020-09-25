@@ -33,6 +33,9 @@ static char * cluster_jobname_var = NULL;
 
 int batch_job_verbose_jobnames = 0;
 
+int heartbeat_rate =  30;	//in seconds. rate at which hearbeats are written to the log.
+int heartbeat_max  = 120;	//in seconds. maximum wait for a heartbeat before gibing up on the job.
+
 /*
 Principle of operation:
 Each batch job that we submit uses a wrapper file.
@@ -92,7 +95,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	fprintf(file, "echo start $starttime > $logfile\n");
 
 	// Write a heartbeat to the log file, in case the batch system removes the job from under us.
-	fprintf(file, "(while true; do sleep 1; echo alive $(date +%%s) >> $logfile; done) &\n");
+	fprintf(file, "(while true; do sleep %d; echo alive $(date +%%s) >> $logfile; done) &\n", heartbeat_rate);
 	fprintf(file, "pid_heartbeat=$!\n");
 
 	// The command to run is taken from the environment.
@@ -301,6 +304,10 @@ static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct bat
 				while(fgets(line, sizeof(line), file)) {
 					if(sscanf(line, "start %d", &t)) {
 						info->started = t;
+						if(!info->heartbeat)
+							info->heartbeat = t;
+					} else if(sscanf(line, "alive %d", &t)) {
+						info->heartbeat = t;
 					} else if(sscanf(line, "stop %d %d", &c, &t) == 2) {
 						debug(D_BATCH, "job %" PRIbjid " complete", jobid);
 						if(!info->started)
@@ -311,6 +318,15 @@ static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct bat
 					}
 				}
 				fclose(file);
+
+				if(time(0) - info->heartbeat > heartbeat_max) {
+						warn(D_BATCH, "job %" PRIbjid " does not appear to be running anymore.", jobid);
+						if(!info->started)
+							info->started = info->heartbeat;
+						info->finished = info->heartbeat;
+						info->exited_normally = 0;
+						info->exit_signal = 1;  //same used as batch_job_cluster_remove
+				}
 
 				if(info->finished != 0) {
 					unlink(statusfile);
