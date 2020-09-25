@@ -231,8 +231,8 @@ $postinstall_for{centos}{7} = [
 ];
 
 $postinstall_for{centos}{8} = [
+	'ln -s /usr/bin/python3 /usr/bin/python',
 	@{$builder},
-	@{$musl},
 	@{$fuse},
 	@{$e2fsprogs},
 	@{$mysql},
