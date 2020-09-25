@@ -64,8 +64,6 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	char wrapperfile[PATH_MAX];
 	snprintf(wrapperfile, PATH_MAX, "%s.wrapper", sysname);
 
-	if(access(wrapperfile, R_OK | X_OK) == 0) return 1;
-
 	FILE *file = fopen(wrapperfile, "w");
 	if(!file) {
 		return 0;
