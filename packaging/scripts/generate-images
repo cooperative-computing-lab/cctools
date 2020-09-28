@@ -73,9 +73,12 @@ my $swig = [
 	'./vc3-builder --make-jobs=4 --require swig -- ln -s \$VC3_ROOT_SWIG /opt/vc3/cctools-deps/swig',
 ];
 
+my $uuid = [
+	'./vc3-builder --make-jobs=4 --require uuid -- ln -s \$VC3_ROOT_UUID /opt/vc3/cctools-deps/uuid',
+];
+
 my $cvmfs = [
 	'cd /opt/vc3/utils',
-	'./vc3-builder --make-jobs=4 --require uuid -- ln -s \$VC3_ROOT_UUID /opt/vc3/cctools-deps/uuid',
 	'./vc3-builder --make-jobs=4 --sys gettext:0.19=/usr --sys libffi:3.0=/usr --sys attr:2.4=/usr --require libcvmfs --install /opt/vc3 --distfiles /opt/vc3/distfiles -- ln -s \$VC3_ROOT_LIBCVMFS /opt/vc3/cctools-deps/cvmfs',
 ];
 
@@ -132,7 +135,7 @@ my %preinstall_for;
 # list of shell commands to execute post installation.
 my %postinstall_for;
 
-$versions_of{centos} = [ qw{ 7 6 } ];
+$versions_of{centos} = [ qw{ 8 7 } ];
 $command_for{centos} = 'yum install -y';
 
 $versions_of{fedora} = [ qw{ 30  } ];
@@ -167,7 +170,7 @@ gtar                     => 'tar',
 image_magick             => 'ImageMagick',
 libattr                  => 'libattr-devel',
 libffi                   => 'libffi',
-lsb_release              => 'lsb-release',
+lsb_release              => 'redhat-lsb-core',
 m4                       => 'm4',
 musl					 => [],             # from builder
 mysql                    => [],             # from builder
@@ -176,11 +179,11 @@ openssl                  => ['openssl', 'openssl-devel'],
 patch                    => 'patch',
 perl                     => ['perl-core', 'perl-devel'],
 pkg_config               => 'pkg-config',
-python                   => ['python-devel', 'python-setuptools', 'python-tools'],
-python3					 => [],				# from epel
+python                   => [],			    # native (7), or disabled (8)
+python3					 => [],				# from epel (7), or native (8)
 readline                 => 'readline-devel',
 strace                   => 'strace',
-swig                     => [],				# from builder
+swig                     => [],				# from builder (7), or native (8)
 troff                    => 'groff',
 unzip                    => 'unzip',
 valgrind                 => 'valgrind',
@@ -191,28 +194,51 @@ xrootd                   => [],             # from builder
 zlib                     => 'zlib-devel',
 };
 
-$package_for{centos}{6}{python3}            = ['python34-devel', 'python34-setuptools'];
-$package_for{centos}{7}{python3}            = ['python36-devel', 'python36-setuptools'];
+#$package_for{centos}{6}{python3} = ['python34-devel', 'python34-setuptools'];  centos6 end-of-life
+$package_for{centos}{7}{python}   = ['python', 'python-setuptools', 'python-tools'];
+$package_for{centos}{7}{python3}  = ['python36-devel', 'python36-setuptools'];
 
-$extras_for{centos}{default} = ['libc-devel'];
+$package_for{centos}{8}{python3}  = ['python38-devel', 'python38-setuptools'];
+$package_for{centos}{8}{swig}     = ['swig'];
+
+$extras_for{centos}{6} = ['libc-devel'];
+$extras_for{centos}{7} = ['libc-devel'];
+$extras_for{centos}{8} = ['glibc-devel'];
 
 $extras_for{centos}{6} = [
 	'nss', # certificate errors
 ];
 
 $preinstall_for{centos}{default} = [
-	'yum -y install epel-release'			# for python3
+	'yum -y install epel-release'
 ];
-		
-$postinstall_for{centos}{default} = [
+
+$preinstall_for{centos}{8} = [
+	'yum -y install epel-release',                    # for ImageMagick
+	'dnf install -y "dnf-command(config-manager)"',
+	'dnf config-manager -y --set-enabled PowerTools'  # for doxygen, and groff
+];
+
+$postinstall_for{centos}{7} = [
 	'yum -y clean all',
 	@{$builder},
 	@{$musl},
 	@{$fuse},
 	@{$e2fsprogs},
-	@{$cvmfs},
 	@{$mysql},
-	@{$xrootd},
+	@{$uuid},
+	@{$cvmfs},
+];
+
+$postinstall_for{centos}{8} = [
+	'ln -s /usr/bin/python3 /usr/bin/python',
+	@{$builder},
+	@{$fuse},
+	@{$e2fsprogs},
+	@{$mysql},
+	@{$uuid},
+	'yum -y install https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm',
+	'yum -y install cvmfs-devel'
 ];
 
 $postinstall_for{centos}{6} = [
