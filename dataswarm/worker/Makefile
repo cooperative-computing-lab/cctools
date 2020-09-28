@@ -2,7 +2,7 @@ include ../../config.mk
 include ../../rules.mk
 
 TARGETS=$(PROGRAMS)
-PROGRAMS=dataswarm_worker
+PROGRAMS=ds_worker
 
 SOURCES=ds_worker_main.c ds_worker.c ds_task_table.c ds_blob_table.c
 OBJECTS=$(SOURCES:%.c=%.o)
@@ -13,7 +13,7 @@ LOCAL_LINKAGE = -L ../../dttools/src -ldttools
 
 all: $(TARGETS)
 
-dataswarm_worker: $(OBJECTS) $(DS_OBJECTS)
+ds_worker: $(OBJECTS) $(DS_OBJECTS)
 
 clean:
 	rm -rf $(OBJECTS) $(PROGRAMS)
