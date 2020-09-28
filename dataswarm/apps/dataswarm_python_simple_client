@@ -16,6 +16,7 @@
 import os
 import sys
 import json
+import time
 
 from dataswarm import DataSwarm
 
@@ -24,45 +25,50 @@ def main():
         print("USAGE: dataswarm_test <ntasks>\n")
         sys.exit(0)
 
-    start = time()
+    ntasks = int(sys.argv[1])
 
-    ds = DataSwarm()
+    start = time.time()
 
-    # Connect to server
-    ds.connect('127.0.0.1', 1234)
+    ds = DataSwarm(host='127.0.0.1', port='1234')
 
     # Here, we are declaring tasks in WQ style.
     # Instead, we should declare and upload the shared input ile.
     # Then, declare each output file and task.
 
+    pending_tasks = []
     for i in range(ntasks):
         task = {}
-        task["command_line"] = "grep %c dict > output" % (chr(ord('a')+i,i)
+        task["command_line"] = "grep {} dict > output".format(chr(ord('a')))
 
         task["output_files"] = [
+            {
                 "local_name": "output",
                 "remote_name" : "output.%d" % i,
                 "flags" : { "cache":False, "watch":False }
+            }
         ]
 
         task["input_files"] = [
+            {
                 "local_name": "/usr/share/dict/words",
                 "remote_name" : "dict",
                 "flags" : { "cache":True, "watch":False }
+            }
         ]
 
         task["cores"] = 1
         task["memory"] = 1000
         task["disk"] = 1000
 
-        tasks.append(task)
+        pending_tasks.append(task)
 
-    for t in tasks:
+
+    for t in pending_tasks:
         t = json.dumps(t)
-        response = ds.submit(t)
+        response = ds.task_submit(t)
         print(response)
-        
-    while not ds.empty():
+
+    while len(pending_tasks) > 0:
         response = ds.wait(10)
         print(response)
 

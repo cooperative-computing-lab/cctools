@@ -8,37 +8,29 @@ import json
 from time import sleep
 
 class DataSwarm:
-
-    def __init__(self):
-        self.socket = socket.socket()
-        self.id = 1
+    def __init__(self, host='127.0.0.1', port=1234):
+        self.id = 0
         self.wq = None
 
-    # Handle sending and receiving messages
+        self.socket = socket.socket()
+        self.host = host
+        self.port = int(port)
+        self.connect()
 
+    # Handle sending and receiving messages
     def send_recv(self, request):
+        self.id += 1
+        request["id"] = self.id;
         request = json.dumps(request)
         self.send(request)
-
         response = self.recv()
-
-        self.id += 1
 
         return response
 
     def send(self, msg):
-        length = len(msg)
-
-        total = 0
-        sent = 0
-
-        self.socket.send("%d" % length)
-
-        while total < length:
-            sent = self.socket.send(msg[sent:])
-            if sent == 0:
-                print("connection closed")
-            total += sent
+        total = len(msg)
+        self.socket.send("{}\n".format(total).encode())
+        sent = self.socket.send(msg.encode())
 
     def recv(self):
         response = self.socket.recv(4096)
@@ -56,42 +48,42 @@ class DataSwarm:
                 response += self.socket.recv(4096)
         except:
             pass
-        
         return response
 
     # Handle connecting to and disconnecting from manager
-
-    def connect(self, address, port):
+    def connect(self):
         i = 1
         while True:
             try:
-                self.socket.connect(address,port)
+                self.socket.connect((self.host,self.port))
                 break
-            except:
+            except socket.timeout:
                 sleep(0.1*i)
                 i *= 2
+        return self.handshake()
+
+    def handshake(self):
+        msg = { "method": "handshake",
+               "params": { "type": "client" } }
+        return self.send(json.dumps(msg))
 
     def disconnect(self):
         self.socket.close()
-
-    # Task methods
 
     # t is a task description in JSON
     def task_submit(self, t):
         request = {
             "method" : "task-submit",
-            "id" : self.id,
             "params" : {
                 "task" : t
             }
         }
-
         return self.send_recv(request)
+
 
     def task_delete(self, taskid):
         request = {
             "method" : "task-delete",
-            "id" : self.id,
             "params" : {
                 "task_id" : taskid
             }
@@ -99,10 +91,10 @@ class DataSwarm:
 
         return self.send_recv(request)
 
+
     def task_retrieve(self, taskid):
         request = {
             "method" : "task-retrieve",
-            "id" : self.id,
             "params" : {
                 "task_id" : taskid
             }
@@ -116,7 +108,6 @@ class DataSwarm:
     def file_submit(self, f):
         request = {
             "method" : "file-submit",
-            "id" : self.id,
             "params" : {
                 "description" : f
             }
@@ -127,7 +118,6 @@ class DataSwarm:
     def file_commit(self, fileid):
         request = {
             "method" : "file-commit",
-            "id" : self.id,
             "params" : {
                 "uuid" : fileid
             }
@@ -138,7 +128,6 @@ class DataSwarm:
     def file_delete(self, fileid):
         request = {
             "method" : "file-delete",
-            "id" : self.id,
             "params" : {
                 "uuid" : fileid
             }
@@ -149,7 +138,6 @@ class DataSwarm:
     def file_copy(self, fileid):
         request = {
             "method" : "file-copy",
-            "id" : self.id,
             "params" : {
                 "uuid" : fileid
             }
@@ -163,7 +151,6 @@ class DataSwarm:
     def service_submit(self, s):
         request = {
             "method" : "service-submit",
-            "id" : self.id,
             "params" : {
                 "description" : s
             }
@@ -174,7 +161,6 @@ class DataSwarm:
     def service_delete(self, serviceid):
         request = {
             "method" : "service-delete",
-            "id" : self.id,
             "params" : {
                 "uuid" : serviceid
             }
@@ -188,7 +174,6 @@ class DataSwarm:
     def project_create(self, p):
         request = {
             "method" : "project-create",
-            "id" : self.id,
             "params" : {
                 "description" : p
             }
@@ -199,31 +184,25 @@ class DataSwarm:
     def project_delete(self, projectid):
         request = {
             "method" : "project-delete",
-            "id" : self.id,
             "params" : {
                 "uuid" : projectid
             }
         }
-
-        return self.send_recv(request)        
+        return self.send_recv(request)
 
     # Other methods
-
     def wait(self, timeout):
         request = {
             "method" : "wait",
-            "id" : self.id,
             "params" : {
                 "timeout" : timeout
             }
         }
-
         return self.send_recv(request)
 
     def queue_empty(self):
         request = {
             "method" : "queue-empty",
-            "id" : self.id,
             "params" : ""
         }
 
@@ -236,13 +215,11 @@ class DataSwarm:
         else:
             return True
 
-    # uuid is the id of the desired item (file, task, service, or project) 
+    # uuid is the id of the desired item (file, task, service, or project)
     # if no uuid is provided, give the status of everything (?)
     def status(self, uuid=None):
-
         request = {
             "method" : "status",
-            "id" : self.id,
             "params" : {
                 "uuid" : uuid
             }
