@@ -7,15 +7,28 @@ import socket
 import json
 from time import sleep
 
+import logging
+
 class DataSwarm:
-    def __init__(self, host='127.0.0.1', port=1234):
+    def __init__(self, host='127.0.0.1', port=1234, log_level=logging.DEBUG):
         self.id = 0
         self.wq = None
+
+        self.log = self._setup_logging(log_level)
 
         self.socket = socket.socket()
         self.host = host
         self.port = int(port)
         self.connect()
+
+    def _setup_logging(self, log_level):
+        log = logging.getLogger('DataSwarm')
+        log.setLevel(log_level)
+        ch = logging.StreamHandler()
+        fm = logging.Formatter('%(asctime)s:%(name)s:%(levelname)s:%(message)s')
+        ch.setFormatter(fm)
+        log.addHandler(ch)
+        return log
 
     # Handle sending and receiving messages
     def send_recv(self, request):
@@ -52,15 +65,22 @@ class DataSwarm:
 
     # Handle connecting to and disconnecting from manager
     def connect(self):
-        i = 1
-        while True:
+        for i in range(0,10):
+            last_exception = None
             try:
+                self.log.debug("Connecting to {}:{}...".format(self.host, self.port))
                 self.socket.connect((self.host,self.port))
                 break
-            except socket.timeout:
-                sleep(0.1*i)
-                i *= 2
-        return self.handshake()
+            except socket.timeout as e:
+                self.log.debug("Connection timed-out!")
+                sleep(0.1*(2**i)) # double wait time starting at 0.1 seconds
+            except Exception as e:
+                self.log.error("Timeout! Trying again in {} seconds.".format(wait))
+                last_exception = e
+        if last_exception:
+            raise last_exception
+        else:
+            return self.handshake()
 
     def handshake(self):
         msg = { "method": "handshake",
