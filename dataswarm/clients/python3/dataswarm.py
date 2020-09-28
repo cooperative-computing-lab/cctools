@@ -12,7 +12,6 @@ import logging
 class DataSwarm:
     def __init__(self, host='127.0.0.1', port=1234, log_level=logging.DEBUG):
         self.id = 0
-        self.wq = None
 
         self.log = self._setup_logging(log_level)
 
@@ -35,32 +34,37 @@ class DataSwarm:
         self.id += 1
         request["id"] = self.id;
         request = json.dumps(request)
-        self.send(request)
+        self.send_str(request)
         response = self.recv()
 
         return response
 
-    def send(self, msg):
+    def send_str(self, msg):
         total = len(msg)
         self.socket.send("{}\n".format(total).encode())
         sent = self.socket.send(msg.encode())
 
     def recv(self):
-        response = self.socket.recv(4096)
-        length = ''
-        for t in response:
-            if t != '{':
-                length += t
-            else:
-                break
+        # this only works if there is only one message in the socket!  rewrite
+        # when manager uses mq. Ideally, first 8 bytes with msg size.
+        length_spec = self.socket.recv(4096)
+        newline = length_spec.find(b'\n')
 
-        response = response[len(length):]
-        try:
-            length = int(length)
-            while len(response) < length:
-                response += self.socket.recv(4096)
-        except:
-            pass
+        if newline < 0:
+            raise Exception("No length of message found.")
+
+        length = int(length_spec[0:newline].decode())
+
+        response_first_part  = length_spec[newline+1:]
+
+        if len(response_first_part) < length:
+            response_second_part = self.socket.recv(length - len(response_first_part))
+            response = response_first_part + response_second_part
+        else:
+            response = response_first_part
+
+        response = json.loads(response)
+        self.log.debug("rx: {}".format(response))
         return response
 
     # Handle connecting to and disconnecting from manager
@@ -83,9 +87,9 @@ class DataSwarm:
             return self.handshake()
 
     def handshake(self):
-        msg = { "method": "handshake",
-               "params": { "type": "client" } }
-        return self.send(json.dumps(msg))
+        msg = {"method": "handshake",
+               "params": { "type": "client" }}
+        return self.send_recv(msg)
 
     def disconnect(self):
         self.socket.close()

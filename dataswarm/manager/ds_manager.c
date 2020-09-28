@@ -184,11 +184,12 @@ void handle_connect_message( struct ds_manager *m, time_t stoptime )
 		//const char *msg_key = jx_lookup_string(msg, "uuid");  /* todo: replace manager_key when msg_key not null */
 		const char *conn_type = jx_lookup_string(params, "type");
 
+		struct jx *response;
 		if(!strcmp(conn_type,"worker")) {
 			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
 			struct ds_worker_rep *w = ds_worker_rep_create(l);
 			hash_table_insert(m->worker_table,manager_key,w);
-
+			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, NULL);
 			// XXX This is a HACK to get some messages going for testing
 			dataswarm_test_script(m,w);
 
@@ -196,10 +197,17 @@ void handle_connect_message( struct ds_manager *m, time_t stoptime )
 			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
 			struct ds_client_rep *c = ds_client_rep_create(l);
 			hash_table_insert(m->client_table,manager_key,c);
+			response = ds_message_standard_response(id,DS_RESULT_SUCCESS,NULL);
 		} else {
 			/* ds_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
 			link_close(l);
 			break;
+		}
+
+		if(response) {
+			/* this response probably shouldn't be here */
+			ds_json_send(l, response, time(0) + m->stall_timeout);
+			jx_delete(response);
 		}
 
 		free(manager_key);
