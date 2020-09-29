@@ -3,7 +3,6 @@
 
 #include "ds_mount.h"
 #include "ds_resources.h"
-#include "ds_process.h"
 #include "jx.h"
 
 typedef enum {
@@ -22,7 +21,6 @@ struct ds_task {
 	struct ds_mount *mounts;
 	struct ds_resources *resources;
 	struct jx *environment;
-	struct ds_process *process;
 };
 
 struct ds_task * ds_task_create( struct jx *jtask );

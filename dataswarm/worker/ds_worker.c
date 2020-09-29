@@ -25,7 +25,7 @@ See the file COPYING for details.
 #include "ds_worker.h"
 #include "common/ds_message.h"
 #include "common/ds_task.h"
-#include "common/ds_process.h"
+#include "ds_process.h"
 #include "ds_task_table.h"
 #include "ds_blob_table.h"
 
@@ -234,6 +234,7 @@ struct ds_worker *ds_worker_create(const char *workspace)
 	memset(w, 0, sizeof(*w));
 
 	w->task_table = hash_table_create(0, 0);
+	w->process_table = hash_table_create(0,0);
 	w->workspace = strdup(workspace);
 
 	w->idle_timeout = 300;
@@ -266,6 +267,7 @@ void ds_worker_delete(struct ds_worker *w)
 	if(!w)
 		return;
 	hash_table_delete(w->task_table);
+	hash_table_delete(w->process_table);
 	free(w->workspace);
 	free(w);
 }
