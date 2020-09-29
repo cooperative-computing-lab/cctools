@@ -10,11 +10,11 @@ struct ds_file * ds_file_create( struct jx *jfile )
 
 	f->fileid = jx_lookup_string_dup(jfile,"file-id");
 	f->projectid = jx_lookup_string_dup(jfile,"project-id");
-    f->size = jx_lookup_integer_dup(jfile,"size");
+    f->size = jx_lookup_integer(jfile,"size");
 
 	f->metadata = jx_lookup(jfile,"metadata");
 	if(f->metadata) {
-        f->metadata = jx_copy(t->metadata);
+        f->metadata = jx_copy(f->metadata);
     }
 
 	return f;
@@ -40,8 +40,8 @@ struct jx * ds_file_to_jx( struct ds_file *f )
 	struct jx *jfile = jx_object(0);
 	if(f->fileid) jx_insert_string(jfile,"file-id",f->fileid);
 	if(f->projectid) jx_insert_string(jfile,"project-id",f->projectid);
-    if(f->metadata) jx_insert(jfile,jx_string("metadata"),jx_copy(t->metadata));
-    if(f->size) jx_insert(jfile,jx_string("size"),jx_integert(f->size));
+    if(f->metadata) jx_insert(jfile,jx_string("metadata"),jx_copy(f->metadata));
+    if(f->size) jx_insert(jfile,jx_string("size"),jx_integer(f->size));
     jx_insert_string(jfile,"state",ds_file_state_string(f->state));
 
 	return jfile;
@@ -53,8 +53,7 @@ void ds_file_delete( struct ds_file *f )
 	if(!f) return;
 	if(f->projectid) free(f->projectid);
 	if(f->fileid) free(f->fileid);
-    if(f->size) free(f->size);
-    if(f->metadata) free(f->metadata);
+	if(f->metadata) jx_delete(f->metadata);
 	free(f);
 }
 
