@@ -219,6 +219,9 @@ int mq_address_local(struct mq *mq, char *addr, int *port) {
     return link_address_local(mq->link, addr, port);
 }
 
+int mq_address_remote(struct mq *mq, char *addr, int *port) {
+    return link_address_remote(mq->link, addr, port);
+}
 
 static int validate_header(struct mq_msg *msg) {
 	assert(msg);
