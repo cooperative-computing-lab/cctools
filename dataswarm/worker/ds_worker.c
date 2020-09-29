@@ -91,6 +91,8 @@ void ds_worker_handle_message(struct ds_worker *w, struct jx *msg)
 		result = ds_task_table_get(w,taskid,&result_params);
 	} else if(!strcmp(method, "task-remove")) {
 		result = ds_task_table_remove(w,taskid);
+	} else if(!strcmp(method, "task-list")) {
+		result = ds_task_table_list(w,&result_params);
 	} else if(!strcmp(method, "status-request")) {
 		result = DS_RESULT_SUCCESS;
 	} else if(!strcmp(method, "blob-create")) {
@@ -105,6 +107,8 @@ void ds_worker_handle_message(struct ds_worker *w, struct jx *msg)
 		result = ds_blob_table_commit(w,blobid);
 	} else if(!strcmp(method, "blob-copy")) {
 		result = ds_blob_table_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
+	} else if(!strcmp(method, "blob-list")) {
+		result = ds_blob_table_list(w,&result_params);
 	} else {
 		result = DS_RESULT_BAD_METHOD;
 	}

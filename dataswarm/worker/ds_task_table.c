@@ -66,6 +66,21 @@ ds_result_t ds_task_table_remove( struct ds_worker *w, const char *taskid )
 	}
 }
 
+ds_result_t ds_task_table_list( struct ds_worker *w, struct jx **result )
+{
+	struct ds_task *task;
+	char *taskid;
+
+	*result = jx_object(0);
+
+	hash_table_firstkey(w->task_table);
+	while(hash_table_nextkey(w->task_table,&taskid,(void**)&task)) {
+		jx_insert(*result,jx_string(taskid),ds_task_to_jx(task));
+	}
+
+	return DS_RESULT_SUCCESS;	
+}
+
 /*
 Consider each task currently in possession of the worker,
 and act according to it's current state.
