@@ -288,4 +288,16 @@ jx_int_t ds_rpc_task_remove( struct ds_manager *m, struct ds_worker_rep *r, cons
 }
 
 
+jx_int_t ds_rpc_task_list( struct ds_manager *m, struct ds_worker_rep *r )
+{
+	struct jx *rpc = jx_objectv("method", jx_string("task-list"),"params",jx_object(0),0);
+	return ds_rpc(m, r, rpc);
+}
+
+jx_int_t ds_rpc_blob_list( struct ds_manager *m, struct ds_worker_rep *r )
+{
+	struct jx *rpc = jx_objectv("method", jx_string("blob-list"),"params",jx_object(0),0);
+	return ds_rpc(m, r, rpc);
+}
+
 /* vim: set noexpandtab tabstop=4: */
