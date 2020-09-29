@@ -228,6 +228,46 @@ void ds_worker_connect_by_name(struct ds_worker *w, const char *manager_name)
 	free(expr);
 }
 
+char * ds_worker_task_dir( struct ds_worker *w, const char *taskid )
+{
+	return string_format("%s/task/%s",w->workspace,taskid);
+}
+
+char * ds_worker_task_deleting( struct ds_worker *w )
+{
+	return string_format("%s/task/deleting",w->workspace);
+}
+
+char * ds_worker_task_sandbox( struct ds_worker *w, const char *taskid )
+{
+	return string_format("%s/task/%s/sandbox",w->workspace,taskid);
+}
+
+char * ds_worker_task_meta( struct ds_worker *w, const char *taskid )
+{
+	return string_format("%s/task/%s/meta",w->workspace,taskid);
+}
+
+char * ds_worker_blob_dir( struct ds_worker *w, const char *blobid )
+{
+	return string_format("%s/blob/%s",w->workspace,blobid);
+}
+
+char * ds_worker_blob_data( struct ds_worker *w, const char *blobid )
+{
+	return string_format("%s/blob/%s/data",w->workspace,blobid);
+}
+
+char * ds_worker_blob_meta( struct ds_worker *w, const char *blobid )
+{
+	return string_format("%s/blob/%s/meta",w->workspace,blobid);
+}
+
+char * ds_worker_blob_deleting( struct ds_worker *w )
+{
+	return string_format("%s/blob/deleting",w->workspace);
+}
+
 struct ds_worker *ds_worker_create(const char *workspace)
 {
 	struct ds_worker *w = malloc(sizeof(*w));
