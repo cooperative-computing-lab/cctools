@@ -66,13 +66,24 @@ void buffer_free(buffer_t * b)
 	}
 }
 
+int buffer_seek(buffer_t * b, size_t pos) {
+	assert(b);
+
+	if (pos >= inuse(b)) {
+		int rc = buffer_grow(b, pos - inuse(b) + 1);
+		if (rc < 0) return rc;
+		b->end = b->buf + pos;
+		b->end[0] = '\0';
+	} else {
+		buffer_rewind(b, pos);
+	}
+	return 0;
+}
+
 int buffer_grow(buffer_t * b, size_t n)
 {
 	size_t used = inuse(b);
 	size_t newlen = sizeof(b->initial); /* current buf is always at least as big as b->initial */
-
-	/* Keep using the initial buffer if possible */
-	if (used + n < newlen) return 0;
 
 	/* simple solution to find next power of 2 */
 	while (newlen < used+n) newlen <<= 1;
@@ -87,6 +98,9 @@ int buffer_grow(buffer_t * b, size_t n)
 			checkerror(b, 0, 0);
 		}
 	}
+
+	/* Keep using the initial buffer if possible */
+	if (newlen <= b->len) return 0;
 
 	if (b->buf == b->ubuf.buf || b->buf == b->initial) {
 		char *new = malloc(newlen);

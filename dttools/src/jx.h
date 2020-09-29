@@ -163,6 +163,15 @@ struct jx * jx_arrayv( struct jx *value, ... );
 /** Create a JX object.  @param pairs A linked list of @ref jx_pair key-value pairs.  @return a JX object. */
 struct jx * jx_object( struct jx_pair *pairs );
 
+/** Create a JX object.  @param pairs Args are alternating string key -- *jx values. Must be termianted with a null value.
+ * This is syntactic sugar for jx_object(jx_pair(jx_string(k), v, jx_pair(jx_string(k), v, jx_pair( etc.))));
+ *
+ * struct jx *j = jx_objectv("A", jx_integer(42),                  // key and value of A,
+ *                           "B", jx_objectv("C", jx_string("xyz") // key and value of B
+ *                           NULL));                               // terminating null value.
+ * @return a JX object*/
+struct jx * jx_objectv( const char *key, struct jx *value, ... );
+
 /** Create a JX binary expression, @param oper The kind of operator.  @param left The left side of the expression.  @param right The right side of the expression. */
 struct jx * jx_operator( jx_operator_t oper, struct jx *left, struct jx *right );
 

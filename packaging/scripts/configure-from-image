@@ -27,7 +27,7 @@ done
 
 cd ${CCTOOLS_SRC}
 
-if [[ -d /opt/vc3/cctools-deps ]]
+if [[ -d /opt/vc3/cctools-deps/musl ]]
 then
     # compile work_queue binaries statically
     [[ -f config.mk ]] && make clean
@@ -45,11 +45,18 @@ then
     perl_option='--with-perl-path no'
 fi
 
+# using rpm for centos8
+if [[ "${DOCKER_IMAGE}" = "cclnd/cctools-env:x86_64-centos8" ]]
+then
+    cvmfs_option='--with-cvmfs-path /usr'
+fi
+
 # compile everything
-./configure --debug --strict $DEP_ARGS ${perl_option} "$@"
+./configure --debug --strict $DEP_ARGS ${perl_option} ${cvmfs_option} "$@"
 [[ -f config.mk ]] && make clean
 echo === Contents of config.mk ===
 cat config.mk
+
 make
 
 if [[ "${STATIC_WORKER}" = 1 ]]
