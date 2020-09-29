@@ -22,7 +22,7 @@ static void update_task_state( struct ds_worker *w, struct ds_task *task, ds_tas
 {
 	task->state = state;
 
-	char * task_meta = string_format("%s/task/%s/meta",w->workspace,task->taskid);
+	char * task_meta = ds_worker_task_meta(w,task->taskid);
 	ds_task_to_file(task,task_meta);
 	free(task_meta);
 
@@ -83,11 +83,11 @@ void ds_task_table_advance( struct ds_worker *w )
 		switch(task->state) {
 			case DS_TASK_READY:
 				// XXX only start tasks when resources available.
-				process = ds_process_create(task,w->workspace);
+				process = ds_process_create(task,w);
 				if(process) {
 					hash_table_insert(w->process_table,taskid,process);
 					// XXX check for invalid mounts?
-					if(ds_process_start(process,w->workspace)) {
+					if(ds_process_start(process,w)) {
 						update_task_state(w,task,DS_TASK_RUNNING,1);
 					} else {
 						update_task_state(w,task,DS_TASK_FAILED,1);
@@ -169,7 +169,7 @@ void ds_task_table_recover( struct ds_worker *w )
 
 		debug(D_DATASWARM,"recovering task %s",d->d_name);
 
-		task_meta = string_format("%s/task/%s/meta",w->workspace,d->d_name);
+		task_meta = ds_worker_task_meta(w,d->d_name);
 
 		task = ds_task_create_from_file(task_meta);
 		if(task) {
