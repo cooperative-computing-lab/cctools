@@ -90,7 +90,7 @@ See the file COPYING for details.
  *
  *	struct mq_poll *M = mq_poll_create();
  *	struct mq *server = mq_serve(NULL, 1234);
- *	mq_poll_add(server, NULL);
+ *	mq_poll_add(M, server);
  *
  *	while (true) {
  *		switch (mq_poll_wait(M, time() + 30)) {
@@ -103,7 +103,7 @@ See the file COPYING for details.
  *				if ((mq = mq_poll_acceptable(M))) {
  *					// got a new connection
  *					struct mq *n = mq_accept(mq);
- *					mq_poll_add(n, NULL);
+ *					mq_poll_add(M, n);
  *					setup_client(n);
  *				}
  *				if ((mq = mq_poll_readable(M))) {
