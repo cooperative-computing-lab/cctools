@@ -3,59 +3,50 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
+#include "buffer.h"
 #include "debug.h"
 #include "jx_print.h"
 #include "jx_parse.h"
+#include "xxmalloc.h"
 
-int ds_message_send(struct link *l, const char *str, int length, time_t stoptime)
+int ds_message_send(struct mq *mq, const char *str, int length)
 {
-	char lenstr[16];
-	sprintf(lenstr, "%d\n", length);
-	int lenstrlen = strlen(lenstr);
-	int result = link_write(l, lenstr, lenstrlen, stoptime);
-	if(result != lenstrlen)
-		return 0;
-	debug(D_DATASWARM, "tx: %s", str);
-	result = link_write(l, str, length, stoptime);
-	return result == length;
-}
-
-char *ds_message_recv(struct link *l, time_t stoptime)
-{
-	char lenstr[16];
-	int result = link_readline(l, lenstr, sizeof(lenstr), stoptime);
-	if(!result)
-		return 0;
-
-	int length = atoi(lenstr);
-	char *str = malloc(length + 1);
-	result = link_read(l, str, length, stoptime);
-	if(result != length) {
-		free(str);
-		return 0;
+	debug(D_DATASWARM, "msg  tx: %s", str);
+	buffer_t *buf = xxmalloc(sizeof(*buf));
+	buffer_init(buf);
+	buffer_putlstring(buf, str, length);
+	int rc = mq_send_buffer(mq, buf, 0);
+	if (rc == -1) {
+		buffer_free(buf);
+		free(buf);
 	}
-	str[length] = 0;
-	debug(D_DATASWARM, "rx: %s", str);
-	return str;
+	return rc;
 }
 
-int ds_json_send(struct link *l, struct jx *j, time_t stoptime)
+int ds_json_send(struct mq *mq, struct jx *j)
 {
-	char *str = jx_print_string(j);
-	int result = ds_message_send(l, str, strlen(str), stoptime);
-	free(str);
-	return result;
+	debug(D_DATASWARM, "json tx: %p", j);
+	buffer_t *buf = xxmalloc(sizeof(*buf));
+	buffer_init(buf);
+	jx_print_buffer(j, buf);
+	int rc = mq_send_buffer(mq, buf, 0);
+	if (rc == -1) {
+		buffer_free(buf);
+		free(buf);
+	}
+	return rc;
 }
 
-struct jx *ds_json_recv(struct link *l, time_t stoptime)
+int ds_fd_send(struct mq *mq, int fd, size_t length)
 {
-	char *str = ds_message_recv(l, stoptime);
-	if(!str)
-		return 0;
-	struct jx *j = jx_parse_string(str);
-	free(str);
-	return j;
+	debug(D_DATASWARM, "fd   tx: %i", fd);
+	int rc = mq_send_fd(mq, fd, length);
+	if (rc == -1) {
+		close(fd);
+	}
+	return rc;
 }
 
 struct jx * ds_message_standard_response( int64_t id, ds_result_t code, struct jx *params )
@@ -104,3 +95,9 @@ struct jx * ds_message_blob_update( const char *blobid, const char *state )
 	return message;
 }
 
+struct jx *ds_parse_message(buffer_t *buf) {
+	assert(buf);
+	struct jx *out = jx_parse_string(buffer_tostring(buf));
+	buffer_rewind(buf, 0);
+	return out;
+}

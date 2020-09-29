@@ -6,16 +6,17 @@ ds_client_rep is the data structure representation
 of the actual client process that runs somewhere else.
 */
 
-#include "link.h"
+#include "mq.h"
 #include "jx.h"
 #include "hash_table.h"
+#include "buffer.h"
 
 #include "common/ds_message.h"
 
 struct ds_worker_rep {
-	struct link *link;
-	char addr[LINK_ADDRESS_MAX];
-	int port;
+	struct mq *connection;
+//	char addr[LINK_ADDRESS_MAX];
+//	int port;
 	/* list of files and states */
 
     /* map from blobid's to struct ds_blob_rep */
@@ -29,9 +30,11 @@ struct ds_worker_rep {
 
     /* map from currently active rpc ids to the struct ds_task that is waiting for them, if any. */
     struct itable *task_of_rpc;
+
+    buffer_t recv_buffer;
 };
 
-struct ds_worker_rep * ds_worker_rep_create( struct link *l );
+struct ds_worker_rep * ds_worker_rep_create( struct mq *conn );
 
 ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, struct jx *msg );
 

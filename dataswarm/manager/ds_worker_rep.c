@@ -7,7 +7,7 @@
 #include <getopt.h>
 #include <errno.h>
 
-#include "link.h"
+#include "mq.h"
 #include "jx.h"
 #include "jx_print.h"
 #include "jx_parse.h"
@@ -24,17 +24,20 @@
 #include "ds_task_rep.h"
 #include "ds_manager.h"
 
-struct ds_worker_rep * ds_worker_rep_create( struct link *l )
+struct ds_worker_rep * ds_worker_rep_create( struct mq *conn )
 {
 	struct ds_worker_rep *w = malloc(sizeof(*w));
-	w->link = l;
-	link_address_remote(w->link,w->addr,&w->port);
+	w->connection = conn;
+	//XXX add to mq API
+	//link_address_remote(w->link,w->addr,&w->port);
 
 	w->blobs = hash_table_create(0,0);
 	w->tasks = hash_table_create(0,0);
 
 	w->blob_of_rpc = itable_create(0);
 	w->task_of_rpc = itable_create(0);
+
+	buffer_init(&w->recv_buffer);
 
 	return w;
 }

@@ -10,8 +10,8 @@ See the file COPYING for details.
 #include <time.h>
 #include <getopt.h>
 #include <errno.h>
+#include <assert.h>
 
-#include "link.h"
 #include "jx.h"
 #include "jx_print.h"
 #include "jx_parse.h"
@@ -141,87 +141,97 @@ char *ds_manager_submit_task( struct ds_manager *m, struct jx *description ) {
 	return taskid;
 }
 
+int handle_handshake(struct ds_manager *m, struct mq *conn) {
+		buffer_t *buf = mq_get_tag(conn);
+		assert(buf);
+		mq_set_tag(conn, NULL);
 
-void handle_connect_message( struct ds_manager *m, time_t stoptime )
-{
-	struct link *l;
-
-	while((l = link_accept(m->manager_link,stoptime))) {
-		struct jx *msg = ds_json_recv(l,stoptime);
-		if(!msg) {
-			link_close(l);
-			break;
-		}
-
-		char addr[LINK_ADDRESS_MAX];
-		int port;
-		link_address_remote(l,addr,&port);
-		debug(D_DATASWARM,"new connection from %s:%d\n",addr,port);
-
+		char *manager_key = NULL;
+		struct jx *msg = ds_parse_message(buf);
+		buffer_free(buf);
+		free(buf);
 		const char *method = jx_lookup_string(msg,"method");
 		struct jx *params = jx_lookup(msg,"params");
 
 		if(!method || !params) {
 			/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
-			link_close(l);
-			break;
+			mq_close(conn);
+			goto DONE;
 		}
 
 		if(strcmp(method, "handshake")) {
 			/* ds_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
-			link_close(l);
-			break;
+			mq_close(conn);
+			goto DONE;
 		}
 
 		jx_int_t id = jx_lookup_integer(msg, "id");
 		if(id < 1) {
 			/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_ID, stoptime); */
-			link_close(l);
-			break;
+			mq_close(conn);
+			goto DONE;
 		}
 
-		char *manager_key = string_format("%p",l);
-		//const char *msg_key = jx_lookup_string(msg, "uuid");  /* todo: replace manager_key when msg_key not null */
+		manager_key = string_format("%p",conn);
+		//const char *msg_key = jx_lookup_string(msg, "uuid");
+		/* todo: replace manager_key when msg_key not null */
 		const char *conn_type = jx_lookup_string(params, "type");
 
-		struct jx *response;
+		struct jx *response = NULL;
 		if(!strcmp(conn_type,"worker")) {
-			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
-			struct ds_worker_rep *w = ds_worker_rep_create(l);
+			//XXX add to mq api
+			//debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
+			struct ds_worker_rep *w = ds_worker_rep_create(conn);
 			hash_table_insert(m->worker_table,manager_key,w);
 			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, NULL);
+			mq_store_buffer(conn, &w->recv_buffer, 0);
+
 			// XXX This is a HACK to get some messages going for testing
 			dataswarm_test_script(m,w);
 
 		} else if(!strcmp(conn_type,"client")) {
-			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
-			struct ds_client_rep *c = ds_client_rep_create(l);
+			//XXX add to mq api
+			//debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
+			struct ds_client_rep *c = ds_client_rep_create(conn);
 			hash_table_insert(m->client_table,manager_key,c);
 			response = ds_message_standard_response(id,DS_RESULT_SUCCESS,NULL);
+			mq_store_buffer(conn, &c->recv_buffer, 0);
 		} else {
 			/* ds_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
-			link_close(l);
-			break;
+			mq_close(conn);
 		}
 
+DONE:
 		if(response) {
 			/* this response probably shouldn't be here */
-			ds_json_send(l, response, time(0) + m->stall_timeout);
+			ds_json_send(conn, response);
 			jx_delete(response);
 		}
 
 		free(manager_key);
-		jx_delete(msg);
-
-	}
+		return 0;
 }
 
 void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_t stoptime )
 {
-	struct jx *msg = ds_json_recv(c->link,stoptime);
-	if(!msg) {
-		// handle disconnected client
-		return;
+	int set_storage = 0;
+	struct jx *msg;
+	switch (mq_recv(c->connection, NULL)) {
+		case MQ_MSG_NONE:
+			abort(); //XXX ??
+			break;
+		case MQ_MSG_FD:
+			//XXX handle received files
+			mq_store_buffer(c->connection, &c->recv_buffer, 0);
+			return;
+		case MQ_MSG_BUFFER:
+			msg = ds_parse_message(&c->recv_buffer);
+			break;
+	}
+
+	if (!msg) {
+		// malformed message
+		abort();
 	}
 
 	const char *method = jx_lookup_string(msg,"method");
@@ -242,6 +252,7 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 		ds_retrieve_task(uuid, m); 
 	} else if(!strcmp(method,"file-submit")) {
 		ds_declare_file(params, m);
+		set_storage = 1;
 	} else if(!strcmp(method,"file-commit")) {
         const char *uuid = jx_lookup_string(params, "file-id");
 		ds_commit_file(uuid, m);
@@ -268,15 +279,34 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 	} else {
 		/* ds_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 	}
+
+	if (!set_storage) {
+			mq_store_buffer(c->connection, &c->recv_buffer, 0);
+	}
 }
 
 void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_t stoptime )
 {
-	struct jx *msg = ds_json_recv(w->link,stoptime);
-	if(!msg) {
-		// handle disconnected client
-		return;
+	int set_storage = 0;
+	struct jx *msg;
+	switch (mq_recv(w->connection, NULL)) {
+		case MQ_MSG_NONE:
+			abort(); //XXX ??
+			break;
+		case MQ_MSG_FD:
+			//XXX handle received files
+			mq_store_buffer(w->connection, &w->recv_buffer, 0);
+			return;
+		case MQ_MSG_BUFFER:
+			msg = ds_parse_message(&w->recv_buffer);
+			break;
 	}
+
+	if (!msg) {
+		//XXX malformed message
+		abort();
+	}
+
 	const char *method = jx_lookup_string(msg,"method");
 	const char *params = jx_lookup_string(msg,"params");
 	if(!method || !params) {
@@ -285,10 +315,11 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 		return;
 	}
 
-	char addr[LINK_ADDRESS_MAX];
-	int port;
-	link_address_remote(w->link, addr, &port);
-	debug(D_DATASWARM, "worker %s:%d rx: %s", w->addr, w->port, method);
+	//XXX add to mq api
+	//char addr[LINK_ADDRESS_MAX];
+	//int port;
+	//link_address_remote(w->link, addr, &port);
+	//debug(D_DATASWARM, "worker %s:%d rx: %s", w->addr, w->port, method);
 
 
 	if(!strcmp(method,"task-change")) {
@@ -297,77 +328,87 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 		/* */
 	} else if(!strcmp(method,"status-report")) {
 		/* */
+	} else if(!strcmp(method,"blob-get")) {
+		/* */
+		set_storage = 1;
 	} else {
 		/* ds_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 	}
 
+	if (!set_storage) {
+		mq_store_buffer(w->connection, &w->recv_buffer, 0);
+	}
 }
 
-int handle_messages( struct ds_manager *m, int msec )
+int handle_messages( struct ds_manager *m )
 {
-	int n = hash_table_size(m->client_table) + hash_table_size(m->worker_table) + 1;
-
-	struct link_info *table = malloc(sizeof(struct link_info)*(n+1));
-
-	table[0].link = m->manager_link;
-	table[0].events = LINK_READ;
-	table[0].revents = 0;
-
-	char *key;
-	struct ds_worker_rep *w;
+	struct mq *conn;
 	struct ds_client_rep *c;
+	struct ds_worker_rep *w;
+	while ((conn = mq_poll_readable(m->polling_group))) {
+		char *key = string_format("%p", conn);
 
-	n = 1;
-
-	hash_table_firstkey(m->client_table);
-	while(hash_table_nextkey(m->client_table, &key, (void **) &c)) {
-		table[n].link = c->link;
-		table[n].events = LINK_READ;
-		table[n].revents = 0;
-		n++;
-	}
-
-	hash_table_firstkey(m->worker_table);
-	while(hash_table_nextkey(m->worker_table, &key, (void **) &w)) {
-		table[n].link = w->link;
-		table[n].events = LINK_READ;
-		table[n].revents = 0;
-		n++;
-	}
-
-	link_poll(table,n,msec);
-
-	int i;
-	for(i=0;i<n;i++) {
-		if(table[i].revents&LINK_READ) {
-
-			char *key = string_format("%p",table[i].link);
-
-			if(i==0) {
-				handle_connect_message(m,time(0)+m->connect_timeout);
-			} else if((c=hash_table_lookup(m->client_table,key))) {
-				handle_client_message(m,c,time(0)+m->stall_timeout);
-			} else if((w==hash_table_lookup(m->worker_table,key))) {
-				handle_worker_message(m,w,time(0)+m->stall_timeout);
-			}
-
-			free(key);
-
+		if((c=hash_table_lookup(m->client_table,key))) {
+			handle_client_message(m,c,time(0)+m->stall_timeout);
+		} else if((w=hash_table_lookup(m->worker_table,key))) {
+			handle_worker_message(m,w,time(0)+m->stall_timeout);
+		} else {
+			handle_handshake(m, conn);
 		}
+
+		free(key);
 	}
 
-	free(table);
+	return 0;
+}
 
-	return n;
+int handle_connections(struct ds_manager *m) {
+	for (struct mq *conn; (conn = mq_poll_acceptable(m->polling_group));) {
+		assert(conn == m->manager_socket);
+
+		conn = mq_accept(m->manager_socket);
+		assert(conn);
+
+		//XXX add to mq api
+		//char addr[LINK_ADDRESS_MAX];
+		//int port;
+		//link_address_remote(l,addr,&port);
+		//debug(D_DATASWARM,"new connection from %s:%d\n",addr,port);
+
+		mq_poll_add(m->polling_group, conn);
+
+		buffer_t *buf = xxmalloc(sizeof(*buf));
+		buffer_init(buf);
+		mq_set_tag(conn, buf);
+		mq_store_buffer(conn, buf, 0);
+	}
+
+	return 0;
+}
+
+int handle_errors(struct ds_manager *m) {
+		for (struct mq *conn; (conn = mq_poll_error(m->polling_group));) {
+			//XXX handle disconnects/errors
+			mq_close(conn);
+		}
+
+		return 0;
 }
 
 void server_main_loop( struct ds_manager *m )
 {
 	while(1) {
 		update_catalog(m,0);
-		handle_messages(m,100);
+		handle_connections(m);
+		handle_messages(m);
+		handle_errors(m);
 		process_files(m);
 		process_tasks(m);
+
+		if (mq_poll_wait(m->polling_group, time(0) + 300) == -1 && errno != EINTR) {
+				perror("server_main_loop");
+				break;
+		}
 	}
 }
 
@@ -426,14 +467,16 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	m->manager_link = link_serve(m->server_port);
-	if(!m->manager_link) {
+	m->manager_socket = mq_serve(NULL, m->server_port);
+	if(!m->manager_socket) {
 		printf("could not serve on port %d: %s\n", m->server_port,strerror(errno));
 		return 1;
 	}
+	mq_poll_add(m->polling_group, m->manager_socket);
 
-	char addr[LINK_ADDRESS_MAX];
-	link_address_local(m->manager_link,addr,&m->server_port);
+	//XXX add to mq API
+	//char addr[LINK_ADDRESS_MAX];
+	//link_address_local(m->manager_link,addr,&m->server_port);
 	debug(D_DATASWARM,"listening on port %d...\n",m->server_port);
 
 	server_main_loop(m);
@@ -455,6 +498,8 @@ struct ds_manager * ds_manager_create()
 
     m->task_table = hash_table_create(0,0);
     m->file_table = hash_table_create(0,0);
+
+	m->polling_group = mq_poll_create();
 
 	m->connect_timeout = 5;
 	m->stall_timeout = 30;
