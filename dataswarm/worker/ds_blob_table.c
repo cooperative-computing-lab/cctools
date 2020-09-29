@@ -275,7 +275,7 @@ void ds_blob_table_purge( struct ds_worker *w )
 		while((d=readdir(dir))) {
 			if(!strcmp(d->d_name,".")) continue;
 			if(!strcmp(d->d_name,"..")) continue;
-			char *blobname = string_format("%s/%s",dirname,blobname);
+			char *blobname = string_format("%s/%s",dirname,d->d_name);
 			debug(D_DATASWARM,"deleting blob: %s",blobname);
 			delete_dir(blobname);
 			free(blobname);
