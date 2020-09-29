@@ -229,37 +229,42 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 	if(!method || !params) {
 		/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 		/* should we disconnect the client on a message error? */
-		return;
+    	return;
 	}
 
 	if(!strcmp(method,"task-submit")) {
-		/* dataswarm_submit_task(); */
+		ds_submit_task(params, m); 
 	} else if(!strcmp(method,"task-delete")) {
-		/* dataswarm_delete_task(); */
+        const char *uuid = jx_lookup_string(params, "task-id");
+		ds_delete_task(uuid, m); 
 	} else if(!strcmp(method,"task-retrieve")) {
-		/* dataswarm_retrieve_task(); */
+        const char *uuid = jx_lookup_string(params, "task-id");
+		ds_retrieve_task(uuid, m); 
 	} else if(!strcmp(method,"file-submit")) {
-		//dataswarm_declare_file();
+		ds_declare_file(params, m);
 	} else if(!strcmp(method,"file-commit")) {
-		//dataswarm_commit_file();
+        const char *uuid = jx_lookup_string(params, "file-id");
+		ds_commit_file(uuid, m);
 	} else if(!strcmp(method,"file-delete")) {
-		//dataswarm_delete_file();
+        const char *uuid = jx_lookup_string(params, "file-id");
+		ds_delete_file(uuid, m);
 	} else if(!strcmp(method,"file-copy")) {
-		//dataswarm_copy_file();
+        const char *uuid = jx_lookup_string(params, "file-id");
+		ds_copy_file(uuid, m);
 	} else if(!strcmp(method,"service-submit")) {
-		/* dataswarm_submit_service(); */
+		/* ds_submit_service(); */
 	} else if(!strcmp(method,"service-delete")) {
-		/* dataswarm_delete_service(); */
+		/* ds_delete_service(); */
 	} else if(!strcmp(method,"project-create")) {
-		/* dataswarm_create_project(); */
+		/* ds_create_project(); */
 	} else if(!strcmp(method,"project-delete")) {
-		/* dataswarm_delete_project(); */
+		/* ds_delete_project(); */
 	} else if(!strcmp(method,"wait")) {
-		/* dataswarm_wait(); */
+		/* ds_wait(); */
 	} else if(!strcmp(method,"queue-empty")) {
-		/* dataswarm_queue_empty(); */
+		/* ds_queue_empty(); */
 	} else if(!strcmp(method,"status")) {
-		/* dataswarm_status(); */
+		/* ds_status(); */
 	} else {
 		/* ds_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 	}

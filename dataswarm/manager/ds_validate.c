@@ -1,9 +1,9 @@
 
-#include "helpers.h"
+#include "ds_validate.h"
 
 #include <string.h>
 
-static int is_in(const char *str, const char **array)
+int is_in(const char *str, const char **array)
 {
 
 	const char **ptr = array;
@@ -22,7 +22,7 @@ static int is_in(const char *str, const char **array)
 
 }
 
-static int validate_json(struct jx *json, const char **array)
+int validate_json(struct jx *json, const char **array)
 {
 
 	//iterate over the keys in a JX_OBJECT
@@ -43,7 +43,7 @@ static int validate_json(struct jx *json, const char **array)
 
 }
 
-static int check_values(struct jx* j)
+int check_values(struct jx* j)
 {
 
     /* this function checks the values in the structure to make sure

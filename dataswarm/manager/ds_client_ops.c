@@ -5,93 +5,59 @@ See the file COPYING for details.
 */
 
 #include "ds_client_ops.h"
-#include "helpers.h"
+#include "uuid.h"
+#include "ds_validate.h"
 
 #include <string.h>
 
-char *ds_submit_task(struct jx *task){
+char *ds_submit_task(struct jx *task, struct ds_manager *m){
 
     if(validate_json(task, SUBMIT_TASK)){
         return NULL;
     }
 
-    char *type = jx_lookup_string(task, "type");
-    char *service = jx_lookup_string(task, "service");
-    char *project = jx_lookup_string(task, "project");
-    struct jx *namespace = jx_lookup(task, "namespace");
-    struct jx *resources = jx_lookup(task, "resources");
-    struct jx *event = jx_lookup(task, "event");
-
-    //TODO: check values from above
-    //check_values(task)
-
     // assign a UUID to the task
-    cctools_uuid_t *uuid;
+    cctools_uuid_t *uuid = 0;
     cctools_uuid_create(uuid);
 
     char uuid_str[UUID_LEN+1];
     strcpy(uuid_str, uuid->str);
  
     //add state and uuid to task
-    jx_insert_string(task, "uuid", uuid_str);
+    jx_insert_string(task, "task-id", uuid_str);
 
-    //TODO: save UUID to file mapping in memory
+    struct ds_task *t = ds_task_create(task);
+
+    //save UUID to task mapping in memory
+    hash_table_insert(m->task_table, uuid_str, t);
    
     //return task UUID
     return uuid_str;
 
 }
 
-struct jx *ds_delete_task(char *uuid){
+struct ds_task *ds_delete_task(const char *uuid, struct ds_manager *m){
 
-    //TODO: get task data from mapping
-
-    //TODO: remove task data from mapping
+    return hash_table_remove(m->task_table, uuid);
 
 }
 
-struct jx *ds_retrieve_task(char *uuid){
+struct jx *ds_retrieve_task(const char *uuid, struct ds_manager *m){
 
-    //TODO: get task data from mapping
-
-    //TODO: return task data
+    struct ds_task *t = hash_table_lookup(m->task_table, uuid);   
+    return ds_task_to_jx(t);
 
 }
 
-char *ds_declare_file(struct jx *file){
-    
-    char *type = NULL;
-    int project = 0;
-    char *metadata = NULL;
+char *ds_declare_file(struct jx *file, struct ds_manager *m){
     
     //validate json
     if(validate_json(file, DECLARE_FILE)){
         return NULL;
     }
 
-    //get file info from jx struct --> type, project, metadata
-    void *i = NULL;
-    void *j = NULL;
-    const char *key = jx_iterate_keys(file, &j);
-    struct jx *value = jx_iterate_values(file, &i);
-
-    while(key != NULL){
-        
-        if(!strcmp(key, "type")){
-            type = value->u.string_value;
-        } else if(!strcmp(key, "project")){
-            project = value->u.integer_value;
-        } else if(!strcmp(key, "metadata")){
-            metadata = value->u.string_value;
-        }
-
-    }
-
-    //TODO:validate values of 'type' and 'project'
-    //check_values(file);
-
     // assign a UUID to the file
-    cctools_uuid_t *uuid;
+    cctools_uuid_t *uuid = 0;
     cctools_uuid_create(uuid);
 
     char uuid_str[UUID_LEN+1];
@@ -99,44 +65,44 @@ char *ds_declare_file(struct jx *file){
  
     //add state and uuid to json
     jx_insert_string(file, "uuid", uuid_str);
-    jx_insert_string(file, "state", "mutable");
 
-    //TODO: save UUID to file mapping in memory
-   
+    struct ds_file *f = ds_file_create(file);
+
+    //save UUID to file mapping in memory
+    hash_table_insert(m->file_table, uuid_str, f);
+
     //return file UUID
     return uuid_str;
 
 }
 
-struct jx *ds_commit_file(char *uuid){
+struct ds_file *ds_commit_file(const char *uuid, struct ds_manager *m){
 
-    int i;
-    int length = 2;
-
-    //TODO: get file metadata from mapping
+    //get file metadata from mapping
+    struct ds_file *f = hash_table_lookup(m->file_table, uuid);
     
     //TODO: change all blobs to RO
-    for(i=0;i<length;i++){
-        ds_blob_commit(blobid);
-    }
 
     //TODO: change state to immutable 
 
-}
-
-struct jx *ds_delete_file(char *uuid){
-
-    //TODO: get file data from mapping
-
-    //TODO: remove file data from mapping
+    return f;
 
 }
 
-struct jx *ds_copy_file(char *uuid){
+struct ds_file *ds_delete_file(const char *uuid, struct ds_manager *m){
 
-    //TODO: get file data from mapping
+    return hash_table_remove(m->file_table, uuid);
+
+}
+
+struct ds_file *ds_copy_file(const char *uuid, struct ds_manager *m){
+
+    //get file data from mapping
+    struct ds_file *f = hash_table_lookup(m->file_table, uuid);
 
     //TODO: replicate file data to mapping
+    
+    return f;
 
 }
 
@@ -146,17 +112,8 @@ char *ds_submit_service(struct jx *service){
         return NULL;
     }
 
-    char *type = jx_lookup_string(service, "type");
-    char *project = jx_lookup_string(service, "project");
-    struct jx *namespace = jx_lookup(service, "namespace");
-    struct jx *resources = jx_lookup(service, "resources");
-    struct jx *environment = jx_lookup(service, "environment");
-
-    //TODO: check values from above
-    //check_values(service)
-
     // assign a UUID to the service
-    cctools_uuid_t *uuid;
+    cctools_uuid_t *uuid = 0;
     cctools_uuid_create(uuid);
 
     char uuid_str[UUID_LEN+1];
@@ -177,13 +134,15 @@ struct jx *ds_delete_service(char *uuid){
     //TODO: get service data from mapping
 
     //TODO: remove service data from mapping
+    
+    return NULL;
 
 }
 
 char *ds_create_project(char *project_name){
 
     // assign a UUID to the project
-    cctools_uuid_t *uuid;
+    cctools_uuid_t *uuid = 0;
     cctools_uuid_create(uuid);
 
     char uuid_str[UUID_LEN+1];
@@ -203,6 +162,8 @@ struct jx *ds_delete_project(char *uuid){
     //TODO: get project data from mapping
 
     //TODO: remove project data from mapping
+    
+    return NULL;
 
 }
 
@@ -210,18 +171,20 @@ struct jx *ds_wait(){
 
     //TODO: block until something happens     
 
+    return NULL;
+
 }
 
-bool ds_queue_empty(){
+int ds_queue_empty(){
 
     //TODO: return true if the queue of tasks is empty
 
-    return false;
+    return 0;
 
 }
 
 struct jx *ds_status(char *uuid){
 
-
+    return NULL;
 
 }
