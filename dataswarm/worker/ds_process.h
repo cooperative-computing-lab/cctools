@@ -1,7 +1,7 @@
 #ifndef DATASWARM_PROCESS_H
 #define DATASWARM_PROCESS_H
 
-#include "ds_task.h"
+#include "../common/ds_task.h"
 #include "timestamp.h"
 
 #include <unistd.h>

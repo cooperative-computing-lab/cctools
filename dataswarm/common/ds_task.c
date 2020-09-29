@@ -96,7 +96,6 @@ void ds_task_delete( struct ds_task *t )
 	if(t->taskid) free(t->taskid);
 	ds_resources_delete(t->resources);
 	ds_mount_delete(t->mounts);
-	ds_process_delete(t->process);
 	free(t);
 }
 

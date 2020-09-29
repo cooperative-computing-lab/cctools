@@ -12,6 +12,9 @@ struct ds_worker {
 	// Table mapping taskids to ds_task objects.
 	struct hash_table *task_table;
 
+	// Table mapping taskids to ds_process objects representing running tasks.
+	struct hash_table *process_table;
+
 	// Path to top of workspace containing tasks and blobs.
 	char *workspace;
 

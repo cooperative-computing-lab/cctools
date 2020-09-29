@@ -1,5 +1,6 @@
 #include "ds_task_table.h"
 #include "ds_worker.h"
+#include "ds_process.h"
 #include "common/ds_task.h"
 #include "common/ds_message.h"
 
@@ -73,6 +74,7 @@ and act according to it's current state.
 void ds_task_table_advance( struct ds_worker *w )
 {
 	struct ds_task *task;
+	struct ds_process *process;
 	char *taskid;
 
 	hash_table_firstkey(w->task_table);
@@ -81,10 +83,11 @@ void ds_task_table_advance( struct ds_worker *w )
 		switch(task->state) {
 			case DS_TASK_READY:
 				// XXX only start tasks when resources available.
-				task->process = ds_process_create(task,w->workspace);
-				if(task->process) {
+				process = ds_process_create(task,w->workspace);
+				if(process) {
+					hash_table_insert(w->process_table,taskid,process);
 					// XXX check for invalid mounts?
-					if(ds_process_start(task->process,w->workspace)) {
+					if(ds_process_start(process,w->workspace)) {
 						update_task_state(w,task,DS_TASK_RUNNING,1);
 					} else {
 						update_task_state(w,task,DS_TASK_FAILED,1);
@@ -94,7 +97,8 @@ void ds_task_table_advance( struct ds_worker *w )
 				}
 				break;
 			case DS_TASK_RUNNING:
-				if(ds_process_isdone(task->process)) {
+				process = hash_table_lookup(w->process_table,taskid);
+				if(ds_process_isdone(process)) {
 					update_task_state(w,task,DS_TASK_DONE,1);
 				}
 				break;
@@ -106,8 +110,8 @@ void ds_task_table_advance( struct ds_worker *w )
 				break;
 			case DS_TASK_DELETING:
 				// Remove the local state assocated with the process.
-				ds_process_delete(task->process);
-				task->process = 0;
+				process = hash_table_remove(w->process_table,taskid);
+				if(process) ds_process_delete(process);
 				// Send the deleted message.
 				update_task_state(w,task,DS_TASK_DELETED,1);
 				// Now actually remove it from the data structures.
