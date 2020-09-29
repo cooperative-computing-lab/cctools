@@ -282,5 +282,7 @@ void ds_blob_table_purge( struct ds_worker *w )
 		}
 	}
 
+	debug(D_DATASWARM,"done checking for stale blobs");
+
 	free(dirname);
 }
