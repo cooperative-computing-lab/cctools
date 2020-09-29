@@ -32,17 +32,18 @@ ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int
 
 	if(mkdir(blob_dir, 0777) == 0) {
 		if(ds_blob_to_file(b, blob_meta)) {
+			hash_table_insert(w->blob_table,blobid,b);
 			result = DS_RESULT_SUCCESS;
 		} else {
 			debug(D_DATASWARM, "couldn't write %s: %s", blob_meta, strerror(errno));
 			result = DS_RESULT_UNABLE;
+			ds_blob_delete(b);
 		}
 	} else {
 		debug(D_DATASWARM, "couldn't mkdir %s: %s", blob_dir, strerror(errno));
 		result = DS_RESULT_UNABLE;
+		ds_blob_delete(b);
 	}
-
-	ds_blob_delete(b);
 
 	free(blob_dir);
 	free(blob_meta);
@@ -54,8 +55,14 @@ ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int
 ds_result_t ds_blob_table_put(struct ds_worker * w, const char *blobid)
 {
 	if(!blobid) {
-		// XXX return obj with incorrect parameters
 		return DS_RESULT_BAD_PARAMS;
+	}
+
+	struct ds_blob *blob = hash_table_lookup(w->blob_table,blobid);
+	if(!blob) {
+		return DS_RESULT_BAD_ID;
+	} else if(blob->state!=DS_BLOB_RW) {
+		return DS_RESULT_BAD_STATE;
 	}
 
 	char *blob_data = ds_worker_blob_data(w,blobid);
@@ -107,8 +114,14 @@ ds_result_t ds_blob_table_get(struct ds_worker * w, const char *blobid, jx_int_t
 
 	*should_respond = 1;
 	if(!blobid) {
-		// XXX return obj with incorrect parameters
 		return DS_RESULT_BAD_PARAMS;
+	}
+
+	struct ds_blob *blob = hash_table_lookup(w->blob_table,blobid);
+	if(!blob) {
+		return DS_RESULT_BAD_ID;
+	} else if(blob->state!=DS_BLOB_RW && blob->state!=DS_BLOB_RO) {
+		return DS_RESULT_BAD_STATE;
 	}
 
 	char *blob_data = ds_worker_blob_data(w,blobid);
@@ -166,78 +179,76 @@ allowing the object to be duplicated to other nodes.
 ds_result_t ds_blob_table_commit(struct ds_worker * w, const char *blobid)
 {
 	if(!blobid) {
-		// XXX return obj with incorrect parameters
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_meta = ds_worker_blob_meta(w,blobid);
 	ds_result_t result = DS_RESULT_UNABLE;
 
-	struct ds_blob *b = ds_blob_create_from_file(blob_meta);
+	struct ds_blob *b = hash_table_lookup(w->blob_table,blobid);
 	if(b) {
 		if(b->state == DS_BLOB_RW) {
 			b->state = DS_BLOB_RO;
 			// XXX need to measure,checksum,update here
+			char *blob_meta = ds_worker_blob_meta(w,blobid);
 			if(ds_blob_to_file(b, blob_meta)) {
 				result = DS_RESULT_SUCCESS;
 			} else {
 				debug(D_DATASWARM, "couldn't write %s: %s", blob_meta, strerror(errno));
 				result = DS_RESULT_UNABLE;
 			}
+			free(blob_meta);
 		} else if(b->state == DS_BLOB_RO) {
 			// Already committed, not an error.
 			result = DS_RESULT_SUCCESS;
 		} else {
 			debug(D_DATASWARM, "couldn't commit blobid %s because it is in state %d", blobid, b->state);
-			result = DS_RESULT_UNABLE;
+			result = DS_RESULT_BAD_STATE;
 		}
-
-		ds_blob_delete(b);
 	} else {
-		debug(D_DATASWARM, "couldn't read %s: %s", blob_meta, strerror(errno));
-		result = DS_RESULT_UNABLE;
+		result = DS_RESULT_BAD_ID;
 	}
 
 	return result;
 }
 
 /*
-ds_blob_table_delete moves the blob to the deleting
-dir, and then also deletes the object synchronously.  This ensures
-that the delete (logically) occurs atomically, so that if the delete
-fails or the worker crashes, all deleted blobs can be cleaned up on restart.
+ds_blob_table_delete updates the metadata to the 'deleting'
+state, and then starts to delete the actual data.  Note that
+this could potentially take a long time, so if the worker
+dies before completing the delete, the state is known and
+the blob will be deleted in ds_blob_table_recover.
 */
 
 ds_result_t ds_blob_table_delete(struct ds_worker * w, const char *blobid)
 {
-	if(!blobid) {
-		// XXX return obj with incorrect parameters
-		return DS_RESULT_BAD_PARAMS;
-	}
+	if(!blobid) return DS_RESULT_BAD_PARAMS;
+
+	struct ds_blob *blob = hash_table_lookup(w->blob_table,blobid);
+	if(!blob) return DS_RESULT_BAD_ID;
 
 	char *blob_dir = ds_worker_blob_dir(w,blobid);
-	char *deleting_name = ds_worker_blob_deleting(w);
+	char *blob_meta = ds_worker_blob_meta(w,blobid);
+	char *blob_data = ds_worker_blob_data(w,blobid);
 
-	ds_result_t result = DS_RESULT_SUCCESS;
+	// Record the deleting state in the metadata
+	blob->state = DS_BLOB_DELETING;
+	ds_blob_to_file(blob,blob_meta);
 
-	int status = rename(blob_dir, deleting_name);
-	if(status != 0) {
-		if(errno == ENOENT || errno == EEXIST) {
-			// If it was never there, that's a success.
-			// Also if already moved to deleted, that's ok too.
-			result = DS_RESULT_SUCCESS;
-		} else {
-			debug(D_DATASWARM, "couldn't delete blob %s: %s", blobid, strerror(errno));
-			result = DS_RESULT_UNABLE;
-		}
-	}
+	// First delete the data which may take some time.
+	delete_dir(blob_data);
 
-	delete_dir(deleting_name);
+	// Then delete the containing directory, which should be quick
+	delete_dir(blob_dir);
+
+	// Now free up the data structures.
+	hash_table_remove(w->blob_table,blobid);
+	ds_blob_delete(blob);
 
 	free(blob_dir);
-	free(deleting_name);
+	free(blob_meta);
+	free(blob_data);
 
-	return result;
+	return DS_RESULT_SUCCESS;
 }
 
 
@@ -255,35 +266,55 @@ ds_result_t ds_blob_table_copy(struct ds_worker * w, const char *blobid, const c
 
 	/* XXX do the copying */
 
-	return DS_RESULT_SUCCESS;
+	return DS_RESULT_UNABLE;
 }
 
 /*
-Delete all the stale objects currently in the deleting directory.
+After a restart, scan the blobs on disk to recover the table,
+then delete any blobs that didn't successfully delete before.
+Note that we are not connected to the master at this point,
+so do not send any message.  A complete set uf updates gets sent
+when we reconnect.
 */
 
-void ds_blob_table_purge(struct ds_worker *w)
+void ds_blob_table_recover( struct ds_worker *w )
 {
-	char *dirname = ds_worker_blob_deleting(w);
+	char * blob_dir = string_format("%s/blob",w->workspace);
 
-	debug(D_DATASWARM, "checking %s for stale blobs to delete:", dirname);
+	DIR *dir;
+	struct dirent *d;
 
-	DIR *dir = opendir(dirname);
-	if(dir) {
-		struct dirent *d;
-		while((d = readdir(dir))) {
-			if(!strcmp(d->d_name, "."))
-				continue;
-			if(!strcmp(d->d_name, ".."))
-				continue;
-			char *blobname = string_format("%s/%s", dirname, d->d_name);
-			debug(D_DATASWARM, "deleting blob: %s", blobname);
-			delete_dir(blobname);
-			free(blobname);
+	debug(D_DATASWARM,"checking %s for blobs to recover...",blob_dir);
+
+	dir = opendir(blob_dir);
+	if(!dir) return;
+
+	while((d=readdir(dir))) {
+		if(!strcmp(d->d_name,".")) continue;
+		if(!strcmp(d->d_name,"..")) continue;
+		if(!strcmp(d->d_name,"deleting")) continue;
+
+		char *blob_meta;
+		struct ds_blob *blob;
+
+		debug(D_DATASWARM,"recovering blob %s",d->d_name);
+
+		blob_meta = ds_worker_blob_meta(w,d->d_name);
+
+		blob = ds_blob_create_from_file(blob_meta);
+		if(blob) {
+			hash_table_insert(w->blob_table,blob->blobid,blob);
+			if(blob->state==DS_BLOB_DELETING) {
+				debug(D_DATASWARM, "deleting blob: %s",blob->blobid);
+				ds_blob_table_delete(w,blob->blobid);
+			}
 		}
+		free(blob_meta);
+
 	}
 
-	debug(D_DATASWARM, "done checking for stale blobs");
-
-	free(dirname);
+	debug(D_DATASWARM,"done recovering blobs");
+	closedir(dir);
+	free(blob_dir);
 }
+

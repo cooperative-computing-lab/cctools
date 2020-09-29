@@ -82,7 +82,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	ds_blob_table_purge(w);
+	/* Now load all saved task/blob state from disk. */
+	ds_blob_table_recover(w);
 	ds_task_table_purge(w);
 	ds_task_table_recover(w);
 
