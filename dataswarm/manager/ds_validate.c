@@ -52,5 +52,5 @@ int check_values(struct jx* j)
 
     /* this function checks the values in the structure to make sure
     * they are of the correct type */
-
+	return 1;
 }                                             
