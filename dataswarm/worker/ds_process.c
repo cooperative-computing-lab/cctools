@@ -56,8 +56,6 @@ void ds_process_delete(struct ds_process *p)
 {
 	if(!p) return;
 
-	// XXX move sandbox to deleting dir.
-
 	if(!ds_process_isdone(p)) {
 		ds_process_kill(p);
 		while(!ds_process_isdone(p)) {
@@ -67,9 +65,9 @@ void ds_process_delete(struct ds_process *p)
 
 	// don't free taskid, it's a circular link
 	if(p->sandbox) {
-		delete_dir(p->sandbox);
 		free(p->sandbox);
 	}
+
 	if(p->tmpdir) free(p->tmpdir);
 	free(p);
 }

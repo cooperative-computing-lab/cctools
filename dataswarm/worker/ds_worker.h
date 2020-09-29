@@ -58,7 +58,7 @@ void ds_worker_connect_loop( struct ds_worker *w, const char *manager_host, int 
 void ds_worker_delete(struct ds_worker *w);
 
 char * ds_worker_task_dir( struct ds_worker *w, const char *taskid );
-char * ds_worker_task_data( struct ds_worker *w, const char *taskid );
+char * ds_worker_task_sandbox( struct ds_worker *w, const char *taskid );
 char * ds_worker_task_meta( struct ds_worker *w, const char *taskid );
 char * ds_worker_task_deleting( struct ds_worker *w );
 

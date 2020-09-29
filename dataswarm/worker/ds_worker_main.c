@@ -84,7 +84,6 @@ int main(int argc, char *argv[])
 
 	/* Now load all saved task/blob state from disk. */
 	ds_blob_table_recover(w);
-	ds_task_table_purge(w);
 	ds_task_table_recover(w);
 
 	if(manager_name) {

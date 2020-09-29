@@ -109,14 +109,28 @@ void ds_task_table_advance( struct ds_worker *w )
 				// Do nothing until removed.
 				break;
 			case DS_TASK_DELETING:
-				// Remove the local state assocated with the process.
+				{
+				char *sandbox_dir = ds_worker_task_sandbox(w,task->taskid);
+				char *task_dir = ds_worker_task_dir(w,task->taskid);
+
+				// First delete the sandbox dir, which could be large and slow.
+				delete_dir(sandbox_dir);
+
+				// Now delete the task dir and metadata file, which should be quick.
+				delete_dir(task_dir);
+
+				free(sandbox_dir);
+				free(task_dir);
+			  
+				// Send the deleted message (need the task structure still)
+				update_task_state(w,task,DS_TASK_DELETED,1);
+
+				// Now remove and delete the process and task structures.
 				process = hash_table_remove(w->process_table,taskid);
 				if(process) ds_process_delete(process);
-				// Send the deleted message.
-				update_task_state(w,task,DS_TASK_DELETED,1);
-				// Now actually remove it from the data structures.
-				hash_table_remove(w->task_table,taskid);
-				ds_task_delete(task);
+				task = hash_table_remove(w->task_table,taskid);
+				if(task) ds_task_delete(task);
+				}
 				break;
 			case DS_TASK_DELETED:
 				break;
@@ -163,6 +177,7 @@ void ds_task_table_recover( struct ds_worker *w )
 			if(task->state==DS_TASK_RUNNING) {
 				update_task_state(w,task,DS_TASK_FAILED,0);
 			}
+			// Note that deleted tasks will be handled in task_advance.
 		}
 		free(task_meta);
 
@@ -172,29 +187,3 @@ void ds_task_table_recover( struct ds_worker *w )
 	closedir(dir);
 	free(task_dir);
 }
-
-void ds_task_table_purge( struct ds_worker *w )
-{
-	char *dirname = string_format("%s/task/deleting",w->workspace);
-
-	debug(D_DATASWARM,"checking %s for stale tasks to delete:",dirname);
-
-	DIR *dir = opendir(dirname);
-	if(dir) {
-		struct dirent *d;
-		while((d=readdir(dir))) {
-			if(!strcmp(d->d_name,".")) continue;
-			if(!strcmp(d->d_name,"..")) continue;
-			char *taskname = string_format("%s/%s",dirname,d->d_name);
-			debug(D_DATASWARM,"deleting task: %s",taskname);
-			delete_dir(taskname);
-			free(taskname);
-		}
-	}
-
-	debug(D_DATASWARM,"done checking for stale tasks");
-
-	free(dirname);
-}
-
-
