@@ -21,4 +21,9 @@ struct ds_file {
     struct jx *metadata;
 };
 
+struct ds_file * ds_file_create( struct jx *jfile );
+struct jx * ds_file_to_jx( struct ds_file *file );
+const char * ds_file_state_string( ds_file_state_t state );
+void ds_file_delete( struct ds_file *f );
+
 #endif
