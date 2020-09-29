@@ -4,9 +4,9 @@ include ../../rules.mk
 TARGETS=$(PROGRAMS)
 PROGRAMS=ds_manager
 
-SOURCES=ds_manager.c ds_client_rep.c ds_worker_rep.c ds_rpc.c ds_test.c ds_client_ops.c
+SOURCES=ds_manager.c ds_client_rep.c ds_worker_rep.c ds_rpc.c ds_test.c ds_client_ops.c ds_validate.c ds_file.c
 OBJECTS=$(SOURCES:%.c=%.o)
-DS_OBJECTS=../common/ds_message.o
+DS_OBJECTS=../common/ds_message.o ../common/ds_task.o ../common/ds_resources.o ../common/ds_mount.o
 LOCAL_CCFLAGS = -I ..
 LOCAL_LINKAGE = -L ../../dttools/src -ldttools
 
