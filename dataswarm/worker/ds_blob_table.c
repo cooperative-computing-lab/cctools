@@ -58,10 +58,10 @@ ds_result_t ds_blob_table_put(struct ds_worker * w, const char *blobid)
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	struct ds_blob *blob = hash_table_lookup(w->blob_table,blobid);
-	if(!blob) {
+	struct ds_blob *b = hash_table_lookup(w->blob_table,blobid);
+	if(!b) {
 		return DS_RESULT_BAD_ID;
-	} else if(blob->state!=DS_BLOB_RW) {
+	} else if(b->state!=DS_BLOB_RW) {
 		return DS_RESULT_BAD_STATE;
 	}
 
@@ -117,10 +117,10 @@ ds_result_t ds_blob_table_get(struct ds_worker * w, const char *blobid, jx_int_t
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	struct ds_blob *blob = hash_table_lookup(w->blob_table,blobid);
-	if(!blob) {
+	struct ds_blob *b = hash_table_lookup(w->blob_table,blobid);
+	if(!b) {
 		return DS_RESULT_BAD_ID;
-	} else if(blob->state!=DS_BLOB_RW && blob->state!=DS_BLOB_RO) {
+	} else if(b->state!=DS_BLOB_RW && b->state!=DS_BLOB_RO) {
 		return DS_RESULT_BAD_STATE;
 	}
 
@@ -223,16 +223,16 @@ ds_result_t ds_blob_table_delete(struct ds_worker * w, const char *blobid)
 {
 	if(!blobid) return DS_RESULT_BAD_PARAMS;
 
-	struct ds_blob *blob = hash_table_lookup(w->blob_table,blobid);
-	if(!blob) return DS_RESULT_BAD_ID;
+	struct ds_blob *b = hash_table_lookup(w->blob_table,blobid);
+	if(!b) return DS_RESULT_BAD_ID;
 
 	char *blob_dir = ds_worker_blob_dir(w,blobid);
 	char *blob_meta = ds_worker_blob_meta(w,blobid);
 	char *blob_data = ds_worker_blob_data(w,blobid);
 
 	// Record the deleting state in the metadata
-	blob->state = DS_BLOB_DELETING;
-	ds_blob_to_file(blob,blob_meta);
+	b->state = DS_BLOB_DELETING;
+	ds_blob_to_file(b,blob_meta);
 
 	// First delete the data which may take some time.
 	delete_dir(blob_data);
@@ -242,7 +242,7 @@ ds_result_t ds_blob_table_delete(struct ds_worker * w, const char *blobid)
 
 	// Now free up the data structures.
 	hash_table_remove(w->blob_table,blobid);
-	ds_blob_delete(blob);
+	ds_blob_delete(b);
 
 	free(blob_dir);
 	free(blob_meta);
@@ -295,18 +295,18 @@ void ds_blob_table_recover( struct ds_worker *w )
 		if(!strcmp(d->d_name,"deleting")) continue;
 
 		char *blob_meta;
-		struct ds_blob *blob;
+		struct ds_blob *b;
 
 		debug(D_DATASWARM,"recovering blob %s",d->d_name);
 
 		blob_meta = ds_worker_blob_meta(w,d->d_name);
 
-		blob = ds_blob_create_from_file(blob_meta);
-		if(blob) {
-			hash_table_insert(w->blob_table,blob->blobid,blob);
-			if(blob->state==DS_BLOB_DELETING) {
-				debug(D_DATASWARM, "deleting blob: %s",blob->blobid);
-				ds_blob_table_delete(w,blob->blobid);
+		b = ds_blob_create_from_file(blob_meta);
+		if(b) {
+			hash_table_insert(w->blob_table,b->blobid,b);
+			if(b->state==DS_BLOB_DELETING) {
+				debug(D_DATASWARM, "deleting blob %s",b->blobid);
+				ds_blob_table_delete(w,b->blobid);
 			}
 		}
 		free(blob_meta);
