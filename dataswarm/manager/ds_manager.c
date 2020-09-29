@@ -179,9 +179,9 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 
 		struct jx *response = NULL;
 		if(!strcmp(conn_type,"worker")) {
-			//XXX add to mq api
-			//debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
 			struct ds_worker_rep *w = ds_worker_rep_create(conn);
+			mq_address_remote(conn,w->addr,&w->port);
+			debug(D_DATASWARM,"new worker from %s:%d\n",w->addr,w->port);
 			hash_table_insert(m->worker_table,manager_key,w);
 			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, NULL);
 			mq_store_buffer(conn, &w->recv_buffer, 0);
@@ -190,9 +190,9 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 			dataswarm_test_script(m,w);
 
 		} else if(!strcmp(conn_type,"client")) {
-			//XXX add to mq api
-			//debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
 			struct ds_client_rep *c = ds_client_rep_create(conn);
+			mq_address_remote(conn,c->addr,&c->port);
+			debug(D_DATASWARM,"new client from %s:%d\n",c->addr,c->port);
 			hash_table_insert(m->client_table,manager_key,c);
 			response = ds_message_standard_response(id,DS_RESULT_SUCCESS,NULL);
 			mq_store_buffer(conn, &c->recv_buffer, 0);
@@ -315,11 +315,7 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 		return;
 	}
 
-	//XXX add to mq api
-	//char addr[LINK_ADDRESS_MAX];
-	//int port;
-	//link_address_remote(w->link, addr, &port);
-	//debug(D_DATASWARM, "worker %s:%d rx: %s", w->addr, w->port, method);
+	debug(D_DATASWARM, "worker %s:%d rx: %s", w->addr, w->port, method);
 
 
 	if(!strcmp(method,"task-change")) {
@@ -369,11 +365,10 @@ int handle_connections(struct ds_manager *m) {
 		conn = mq_accept(m->manager_socket);
 		assert(conn);
 
-		//XXX add to mq api
-		//char addr[LINK_ADDRESS_MAX];
-		//int port;
-		//link_address_remote(l,addr,&port);
-		//debug(D_DATASWARM,"new connection from %s:%d\n",addr,port);
+		char addr[LINK_ADDRESS_MAX];
+		int port;
+		mq_address_remote(conn,addr,&port);
+		debug(D_DATASWARM,"new connection from %s:%d\n",addr,port);
 
 		mq_poll_add(m->polling_group, conn);
 
@@ -474,9 +469,8 @@ int main(int argc, char *argv[])
 	}
 	mq_poll_add(m->polling_group, m->manager_socket);
 
-	//XXX add to mq API
-	//char addr[LINK_ADDRESS_MAX];
-	//link_address_local(m->manager_link,addr,&m->server_port);
+	char addr[LINK_ADDRESS_MAX];
+	mq_address_local(m->manager_socket,addr,&m->server_port);
 	debug(D_DATASWARM,"listening on port %d...\n",m->server_port);
 
 	server_main_loop(m);

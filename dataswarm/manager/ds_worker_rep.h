@@ -10,13 +10,14 @@ of the actual client process that runs somewhere else.
 #include "jx.h"
 #include "hash_table.h"
 #include "buffer.h"
+#include "link.h"
 
 #include "common/ds_message.h"
 
 struct ds_worker_rep {
 	struct mq *connection;
-//	char addr[LINK_ADDRESS_MAX];
-//	int port;
+	char addr[LINK_ADDRESS_MAX];
+	int port;
 	/* list of files and states */
 
     /* map from blobid's to struct ds_blob_rep */
