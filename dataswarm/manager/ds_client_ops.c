@@ -20,8 +20,7 @@ char *ds_submit_task(struct jx *task, struct ds_manager *m){
     cctools_uuid_t *uuid = 0;
     cctools_uuid_create(uuid);
 
-    char uuid_str[UUID_LEN+1];
-    strcpy(uuid_str, uuid->str);
+    char *uuid_str = strdup(uuid->str);
  
     //add state and uuid to task
     jx_insert_string(task, "task-id", uuid_str);
@@ -60,8 +59,7 @@ char *ds_declare_file(struct jx *file, struct ds_manager *m){
     cctools_uuid_t *uuid = 0;
     cctools_uuid_create(uuid);
 
-    char uuid_str[UUID_LEN+1];
-    strcpy(uuid_str, uuid->str);
+    char *uuid_str = strdup(uuid->str);
  
     //add state and uuid to json
     jx_insert_string(file, "uuid", uuid_str);
@@ -116,8 +114,7 @@ char *ds_submit_service(struct jx *service){
     cctools_uuid_t *uuid = 0;
     cctools_uuid_create(uuid);
 
-    char uuid_str[UUID_LEN+1];
-    strcpy(uuid_str, uuid->str);
+    char * uuid_str = strdup(uuid->str);
  
     //add state and uuid to service
     jx_insert_string(service, "uuid", uuid_str);
@@ -145,8 +142,7 @@ char *ds_create_project(char *project_name){
     cctools_uuid_t *uuid = 0;
     cctools_uuid_create(uuid);
 
-    char uuid_str[UUID_LEN+1];
-    strcpy(uuid_str, uuid->str);
+    char * uuid_str = strdup(uuid->str);
  
     //TODO: create jx with project_name and uuid
 
