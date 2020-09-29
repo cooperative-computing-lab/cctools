@@ -15,6 +15,9 @@ struct ds_worker {
 	// Table mapping taskids to ds_process objects representing running tasks.
 	struct hash_table *process_table;
 
+	// Table mapping blobids to ds_blob objects.
+	struct hash_table *blob_table;
+
 	// Path to top of workspace containing tasks and blobs.
 	char *workspace;
 
@@ -55,7 +58,7 @@ void ds_worker_connect_loop( struct ds_worker *w, const char *manager_host, int 
 void ds_worker_delete(struct ds_worker *w);
 
 char * ds_worker_task_dir( struct ds_worker *w, const char *taskid );
-char * ds_worker_task_data( struct ds_worker *w, const char *taskid );
+char * ds_worker_task_sandbox( struct ds_worker *w, const char *taskid );
 char * ds_worker_task_meta( struct ds_worker *w, const char *taskid );
 char * ds_worker_task_deleting( struct ds_worker *w );
 

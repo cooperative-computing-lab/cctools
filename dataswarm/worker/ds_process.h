@@ -2,6 +2,7 @@
 #define DATASWARM_PROCESS_H
 
 #include "../common/ds_task.h"
+#include "ds_worker.h"
 #include "timestamp.h"
 
 #include <unistd.h>
@@ -49,10 +50,10 @@ struct ds_process {
 };
 
 /* Create a new process for this task and set up the corresponding sandbox. */
-struct ds_process * ds_process_create( struct ds_task *task, const char *workspace );
+struct ds_process * ds_process_create( struct ds_task *task, struct ds_worker *worker );
 
 /* Start the process running, return true on success. */
-int  ds_process_start( struct ds_process *p, const char *workspace );
+int  ds_process_start( struct ds_process *p, struct ds_worker *w );
 
 /* Send a kill signal to a process (if still running).  After doing so, must call isdone() to collect the status. */
 void ds_process_kill( struct ds_process *p );

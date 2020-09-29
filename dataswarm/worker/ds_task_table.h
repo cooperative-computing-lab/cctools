@@ -15,7 +15,4 @@ void ds_task_table_advance( struct ds_worker *w );
 /* Load all existing tasks from disk. */
 void ds_task_table_recover( struct ds_worker *w );
 
-/* Remove all previously-deleted tasks on startup. */
-void ds_task_table_purge( struct ds_worker *w );
-
 #endif

@@ -14,7 +14,7 @@ ds_result_t ds_blob_table_delete( struct ds_worker *w, const char *blobid);
 ds_result_t ds_blob_table_commit( struct ds_worker *w, const char *blobid);
 ds_result_t ds_blob_table_copy( struct ds_worker *w, const char *blobid, const char *blobid_src);
 
-void ds_blob_table_purge( struct ds_worker *w );
+void ds_blob_table_recover( struct ds_worker *w );
 
 
 #endif

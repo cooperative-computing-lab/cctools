@@ -16,7 +16,8 @@ typedef enum {
     DS_RESULT_TOO_FULL,       /* insufficient resources to complete request */
     DS_RESULT_BAD_PERMISSION, /* insufficient privileges to complete request */
     DS_RESULT_UNABLE,         /* could not complete request for internal reason */
-    DS_RESULT_PENDING         /* rpc not completed yet. */
+    DS_RESULT_PENDING,        /* rpc not completed yet. */
+    DS_RESULT_BAD_STATE,      /* cannot take that action in this state. */
 } ds_result_t;
 
 int        ds_json_send( struct link *l, struct jx *j, time_t stoptime );

@@ -275,6 +275,7 @@ struct ds_worker *ds_worker_create(const char *workspace)
 
 	w->task_table = hash_table_create(0, 0);
 	w->process_table = hash_table_create(0,0);
+	w->blob_table = hash_table_create(0,0);
 	w->workspace = strdup(workspace);
 
 	w->idle_timeout = 300;
@@ -308,6 +309,7 @@ void ds_worker_delete(struct ds_worker *w)
 		return;
 	hash_table_delete(w->task_table);
 	hash_table_delete(w->process_table);
+	hash_table_delete(w->blob_table);
 	free(w->workspace);
 	free(w);
 }

@@ -1,5 +1,6 @@
 
 #include "ds_process.h"
+#include "ds_worker.h"
 
 #include "debug.h"
 #include "errno.h"
@@ -28,7 +29,7 @@
 #include <sys/types.h>
 #include <stdlib.h>
 
-struct ds_process *ds_process_create( struct ds_task *task, const char *workspace )
+struct ds_process *ds_process_create( struct ds_task *task, struct ds_worker *w )
 {
 	struct ds_process *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
@@ -37,7 +38,7 @@ struct ds_process *ds_process_create( struct ds_task *task, const char *workspac
 	p->state = DS_PROCESS_READY;
 
 	/* create a unique directory for this task */
-	p->sandbox = string_format("%s/task/%s/sandbox", workspace, p->task->taskid );
+	p->sandbox = ds_worker_task_sandbox(w,p->task->taskid);
 	if(!create_dir(p->sandbox, 0777)) goto failure;
 
 	/* inside the sandbox, make a unique tempdir for this task */
@@ -56,8 +57,6 @@ void ds_process_delete(struct ds_process *p)
 {
 	if(!p) return;
 
-	// XXX move sandbox to deleting dir.
-
 	if(!ds_process_isdone(p)) {
 		ds_process_kill(p);
 		while(!ds_process_isdone(p)) {
@@ -67,9 +66,9 @@ void ds_process_delete(struct ds_process *p)
 
 	// don't free taskid, it's a circular link
 	if(p->sandbox) {
-		delete_dir(p->sandbox);
 		free(p->sandbox);
 	}
+
 	if(p->tmpdir) free(p->tmpdir);
 	free(p);
 }
@@ -123,11 +122,11 @@ static int flags_to_unix_mode( dataswarm_flags_t flags )
 	}
 }
 
-static int setup_mount( struct ds_mount *m, struct ds_process *p, const char *workspace )
+static int setup_mount( struct ds_mount *m, struct ds_process *p, struct ds_worker *w )
 {
 	// XXX Check for validity of blob modes here.
 	//
-	char *blobpath = string_format("%s/blob/%s/data",workspace,m->uuid);
+	char *blobpath = ds_worker_blob_data(w,m->uuid);
 
 	if(m->type==DS_MOUNT_PATH) {
 		int r = symlink(blobpath,m->path);
@@ -155,18 +154,18 @@ static int setup_mount( struct ds_mount *m, struct ds_process *p, const char *wo
 	return 1;
 }
 
-static int setup_namespace( struct ds_process *p, const char *workspace )
+static int setup_namespace( struct ds_process *p, struct ds_worker *w )
 {
 	struct ds_mount *m;
 
 	for(m=p->task->mounts;m;m=m->next) {
-		if(!setup_mount(m,p,workspace)) return 0;
+		if(!setup_mount(m,p,w)) return 0;
 	}
 
 	return 1;
 }
 
-int ds_process_start( struct ds_process *p, const char *workspace )
+int ds_process_start( struct ds_process *p, struct ds_worker *w )
 {
 	/*
 	Before forking a process, it is necessary to flush all standard I/O stream,
@@ -203,7 +202,7 @@ int ds_process_start( struct ds_process *p, const char *workspace )
 		}
 
 		// Check errors on these.
-		setup_namespace(p,workspace);
+		setup_namespace(p,w);
 		clear_environment();
 		specify_resources_vars(p);
 		export_environment(p);
