@@ -2,6 +2,9 @@
 #include "ds_mount.h"
 #include "ds_resources.h"
 
+#include "jx_print.h"
+#include "jx_parse.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -21,6 +24,25 @@ struct ds_task * ds_task_create( struct jx *jtask )
 
 	return t;
 
+}
+
+struct ds_task * ds_task_create_from_file( const char *filename )
+{
+	FILE *file = fopen(filename,"r");
+	if(!file) return 0;
+
+	struct jx *jtask = jx_parse_stream(file);
+	if(!jtask) {
+		fclose(file);
+		return 0;
+	}
+
+	struct ds_task *t = ds_task_create(jtask);
+
+	jx_delete(jtask);
+	fclose(file);
+
+	return t;
 }
 
 const char * ds_task_state_string( ds_task_state_t state )
@@ -48,6 +70,24 @@ struct jx * ds_task_to_jx( struct ds_task *t )
 	return jtask;
 }
 
+int ds_task_to_file( struct ds_task *t, const char *filename )
+{
+	struct jx *jtask = ds_task_to_jx(t);
+	if(!jtask) return 0;
+
+	FILE *file = fopen(filename,"w");
+	if(!file) {
+		jx_delete(jtask);
+		return 0;
+	}
+
+	jx_print_stream(jtask,file);
+
+	jx_delete(jtask);
+	fclose(file);
+
+	return 1;
+}
 
 void ds_task_delete( struct ds_task *t )
 {

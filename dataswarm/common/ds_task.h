@@ -26,7 +26,11 @@ struct ds_task {
 };
 
 struct ds_task * ds_task_create( struct jx *jtask );
+struct ds_task * ds_task_create_from_file( const char *filename );
+
 struct jx * ds_task_to_jx( struct ds_task *task );
+int ds_task_to_file( struct ds_task *task, const char *filename );
+
 const char *ds_task_state_string( ds_task_state_t state );
 void ds_task_delete( struct ds_task *t );
 
