@@ -23,8 +23,8 @@ ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int
 	}
 	// XXX should here check for available space
 
-	char *blob_dir = string_format("%s/blob/%s", w->workspace, blobid);
-	char *blob_meta = string_format("%s/meta", blob_dir);
+	char *blob_dir = ds_worker_blob_dir(w,blobid);
+	char *blob_meta = ds_worker_blob_meta(w,blobid);
 
 	ds_result_t result = DS_RESULT_SUCCESS;
 
@@ -58,7 +58,7 @@ ds_result_t ds_blob_table_put(struct ds_worker *w, const char *blobid)
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_data = string_format("%s/blob/%s/data", w->workspace, blobid);
+	char *blob_data = ds_worker_blob_data(w,blobid);
 
 	char line[32];
 
@@ -111,7 +111,7 @@ ds_result_t ds_blob_table_get(struct ds_worker *w, const char *blobid, jx_int_t 
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_data = string_format("%s/blob/%s/data", w->workspace, blobid);
+	char *blob_data = ds_worker_blob_data(w,blobid);
 
 	struct stat info;
 	int status = stat(blob_data, &info);
@@ -171,7 +171,7 @@ ds_result_t ds_blob_table_commit(struct ds_worker *w, const char *blobid)
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_meta = string_format("%s/blob/%s/meta", w->workspace, blobid);
+	char *blob_meta = ds_worker_blob_meta(w,blobid);
 	ds_result_t result = DS_RESULT_UNABLE;
 
 	struct ds_blob *b = ds_blob_create_from_file(blob_meta);
@@ -216,8 +216,8 @@ ds_result_t ds_blob_table_delete(struct ds_worker *w, const char *blobid)
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	char *blob_dir = string_format("%s/blob/%s", w->workspace, blobid);
-	char *deleting_name = string_format("%s/blob/deleting/%s", w->workspace,blobid);
+	char *blob_dir = ds_worker_blob_dir(w,blobid);
+	char *deleting_name = ds_worker_blob_deleting(w);
 
 	ds_result_t result = DS_RESULT_SUCCESS;
 
@@ -265,7 +265,7 @@ Delete all the stale objects currently in the deleting directory.
 
 void ds_blob_table_purge( struct ds_worker *w )
 {
-	char *dirname = string_format("%s/blob/deleting",w->workspace);
+	char *dirname = ds_worker_blob_deleting(w);
 
 	debug(D_DATASWARM,"checking %s for stale blobs to delete:",dirname);
 
