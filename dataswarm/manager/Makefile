@@ -4,7 +4,7 @@ include ../../rules.mk
 TARGETS=$(PROGRAMS)
 PROGRAMS=ds_manager
 
-SOURCES=ds_manager.c ds_client_rep.c ds_worker_rep.c ds_rpc.c ds_test.c ds_client_ops.c
+SOURCES=ds_manager.c ds_client_rep.c ds_worker_rep.c ds_rpc.c ds_test.c ds_client_ops.c ds_validate.c
 OBJECTS=$(SOURCES:%.c=%.o)
 DS_OBJECTS=../common/ds_message.o
 LOCAL_CCFLAGS = -I ..
