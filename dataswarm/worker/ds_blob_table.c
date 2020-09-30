@@ -1,6 +1,7 @@
 #include "common/ds_blob.h"
 #include "common/ds_message.h"
 #include "ds_blob_table.h"
+#include "ds_hash.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -223,7 +224,24 @@ ds_result_t ds_blob_table_commit(struct ds_worker * w, const char *blobid)
 	if(b) {
 		if(b->state == DS_BLOB_RW) {
 			b->state = DS_BLOB_RO;
-			// XXX need to measure,checksum,update here
+
+			int64_t newsize;
+			char *blob_data = ds_worker_blob_data(w,blobid);
+			char *hash = ds_hash(blob_data,&newsize);
+
+			debug(D_DATASWARM,"blob %s measured %lld MB (created as %lld MB)",blobid,(long long)newsize,(long long)b->size);
+
+			// Update the storage used based on actual size
+			w->resources_inuse->disk += newsize - b->size;
+			b->size = newsize;
+
+			// XXX do something with the hash here.
+			// Need to update the blob structure to include the hash.
+
+			free(blob_data);
+			free(hash);
+
+			// Now store the new metadata in the filesystem.
 			char *blob_meta = ds_worker_blob_meta(w,blobid);
 			if(ds_blob_to_file(b, blob_meta)) {
 				result = DS_RESULT_SUCCESS;
