@@ -82,29 +82,40 @@ ds_result_t ds_task_table_list( struct ds_worker *w, struct jx **result )
 	return DS_RESULT_SUCCESS;	
 }
 
+/*
+Operations on task/worker resources.
+Perhaps these might be better places in ds_worker?
+*/
+
+/* Return true if the worker has enough resources to start the task. */
+
 int ds_task_resources_avail( struct ds_worker *w, struct ds_task *t )
 {
-	return t->resources->cores+w->cores_inuse <= w->cores_total
-		&& t->resources->memory + w->memory_inuse <= w->memory_total
-		&& t->resources->disk + w->disk_inuse <= w->disk_total;
+	return t->resources->cores+w->resources_inuse->cores <= w->resources_total->cores
+		&& t->resources->memory + w->resources_inuse->memory <= w->resources_total->memory
+		&& t->resources->disk + w->resources_inuse->disk <= w->resources_total->disk;
 }
+
+/* Allocate the resources needed for this task. */
 
 void ds_task_resources_alloc( struct ds_worker *w, struct ds_task *t )
 {
-	w->cores_inuse  += t->resources->cores;
-	w->memory_inuse += t->resources->memory;
-	w->disk_inuse   += t->resources->disk;
+	ds_resources_add(w->resources_inuse,t->resources);
 }
+
+/* When the task is done, free the resources, except disk */
 
 void ds_task_resources_free( struct ds_worker *w, struct ds_task *t )
 {
-	w->cores_inuse  -= t->resources->cores;
-	w->memory_inuse -= t->resources->memory;
+	ds_resources_sub(w->resources_inuse,t->resources);
+	w->resources_inuse->disk += t->resources->disk;
 }
+
+/* When the task is fully deleted, free the disk. */
 
 void ds_task_disk_free( struct ds_worker *w, struct ds_task *t )
 {
-	w->disk_inuse -= t->resources->disk;
+	w->resources_inuse->disk -= t->resources->disk;
 }
 
 /*

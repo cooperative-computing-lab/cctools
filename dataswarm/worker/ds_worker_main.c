@@ -1,6 +1,7 @@
 #include "ds_worker.h"
 #include "ds_blob_table.h"
 #include "ds_task_table.h"
+#include "common/ds_resources.h"
 
 #include "debug.h"
 #include "stringtools.h"
@@ -108,9 +109,9 @@ int main(int argc, char *argv[])
 	ds_worker_measure_resources(w);
 
 	/* Override with options, if necessary. */
-	if(manual_cores!=0)  w->cores_total = manual_cores;
-	if(manual_memory==0) w->memory_total = manual_memory;
-	if(manual_disk!=0)   w->disk_total = manual_disk;
+	if(manual_cores!=0)  w->resources_total->cores = manual_cores;
+	if(manual_memory==0) w->resources_total->memory = manual_memory;
+	if(manual_disk!=0)   w->resources_total->disk = manual_disk;
 
 	/* Now load all saved task/blob state from disk. */
 	ds_blob_table_recover(w);

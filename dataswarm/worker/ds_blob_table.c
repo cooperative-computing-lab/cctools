@@ -21,27 +21,27 @@
 
 int ds_disk_avail( struct ds_worker *w, int64_t size )
 {
-	if(size>(w->disk_total-w->disk_inuse)) {
+	if(size>(w->resources_total->disk-w->resources_inuse->disk)) {
 		debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB alloc)",
-			(long long)w->disk_inuse/MEGA,(long long)size/MEGA);
+			(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
 		return 1;
 	} else {
 		debug(D_DATASWARM,"disk inuse: %lld MB (not enough for %lld MB request)",
-			(long long)w->disk_inuse/MEGA,(long long)size/MEGA);
+			(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
 		return 0;
 	}
 }
 
 void ds_disk_alloc( struct ds_worker *w, int64_t size )
 {
-	w->disk_inuse += size;
+	w->resources_inuse->disk += size;
 }
 
 void ds_disk_free( struct ds_worker *w, int64_t size )
 {
-	w->disk_inuse -= size;
+	w->resources_inuse->disk -= size;
 	debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB freed)",
-		(long long)w->disk_inuse/MEGA,(long long)size/MEGA);
+		(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
 }
 
 ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int_t size, struct jx *meta)
@@ -380,14 +380,14 @@ void ds_blob_table_recover( struct ds_worker *w )
 	consumed, so add that into the total.
 	*/
 
-	w->disk_total += total_blob_size;
-	w->disk_inuse = total_blob_size;
+	w->resources_total->disk += total_blob_size;
+	w->resources_inuse->disk = total_blob_size;
 
 	debug(D_DATASWARM,"%d blobs, %lld MB inuse, %lld MB avail, %lld MB total",
 		hash_table_size(w->blob_table),
-		(long long) w->disk_inuse/MEGA,
-		(long long) (w->disk_total-w->disk_inuse)/MEGA,
-		(long long) w->disk_total/MEGA
+		(long long) w->resources_inuse->disk/MEGA,
+		(long long) (w->resources_total->disk-w->resources_inuse->disk)/MEGA,
+		(long long) w->resources_total->disk/MEGA
 	);
 
 }

@@ -4,6 +4,7 @@
 #include <time.h>
 #include "hash_table.h"
 #include "link.h"
+#include "common/ds_resources.h"
 
 struct ds_worker {
 	// Network connection to the manager process.
@@ -22,10 +23,10 @@ struct ds_worker {
 	char *workspace;
 
 	/* Current resources committed, in BYTES. */
-	int64_t cores_inuse, memory_inuse, disk_inuse;
+	struct ds_resources *resources_inuse;
 
 	/* Total resources available, in BYTES */
-	int64_t cores_total, memory_total, disk_total;
+	struct ds_resources *resources_total; 
 
 	/***************************************************************/
 	/* Internal tuning parameters set in ds_worker_create() */

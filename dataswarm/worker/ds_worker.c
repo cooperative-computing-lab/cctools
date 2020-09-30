@@ -25,9 +25,10 @@ See the file COPYING for details.
 #include "host_memory_info.h"
 #include "load_average.h"
 
-#include "ds_worker.h"
 #include "common/ds_message.h"
 #include "common/ds_task.h"
+#include "common/ds_resources.h"
+#include "ds_worker.h"
 #include "ds_process.h"
 #include "ds_task_table.h"
 #include "ds_blob_table.h"
@@ -240,7 +241,7 @@ void ds_worker_measure_resources( struct ds_worker *w )
 	uint64_t avail, total;
 
 	host_memory_info_get(&avail,&total);
-	w->memory_total = total;
+	w->resources_total->memory = total;
 
 	/*
 	Note the use of avail is deliberate here: the worker's total
@@ -249,9 +250,9 @@ void ds_worker_measure_resources( struct ds_worker *w )
 	*/
  
 	host_disk_info_get(w->workspace,&avail,&total);
-	w->disk_total = avail;
+	w->resources_total->disk = avail;
 
-	w->cores_total = load_average_get_cpus();
+	w->resources_total->cores = load_average_get_cpus();
 }
 
 char * ds_worker_task_dir( struct ds_worker *w, const char *taskid )
@@ -303,6 +304,9 @@ struct ds_worker *ds_worker_create(const char *workspace)
 	w->process_table = hash_table_create(0,0);
 	w->blob_table = hash_table_create(0,0);
 	w->workspace = strdup(workspace);
+
+	w->resources_total = ds_resources_create(0,0,0);
+	w->resources_inuse = ds_resources_create(0,0,0);
 
 	w->idle_timeout = 300;
 	w->long_timeout = 3600;
