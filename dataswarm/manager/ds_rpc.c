@@ -26,7 +26,19 @@ ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const c
 /* test read responses from workers. */
 ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 {
-	struct jx * msg = ds_parse_message(&r->recv_buffer);
+	struct jx *msg = NULL;
+	switch (mq_recv(r->connection, NULL)) {
+		case MQ_MSG_NONE:
+			return 0;
+		case MQ_MSG_FD:
+			//XXX allow fd transfers
+			abort();
+		case MQ_MSG_BUFFER:
+			msg = ds_parse_message(&r->recv_buffer);
+			assert(msg);
+			mq_store_buffer(r->connection, &r->recv_buffer, 0);
+			break;
+	}
 
 	jx_int_t msgid = jx_lookup_integer(msg,"id");
 
