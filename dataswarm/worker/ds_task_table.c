@@ -140,11 +140,13 @@ void ds_task_table_advance( struct ds_worker *w )
 				if(process) {
 					hash_table_insert(w->process_table,taskid,process);
 					// XXX check for invalid mounts?
+					ds_task_resources_alloc(w,task);
 					if(ds_process_start(process,w)) {
-						ds_task_resources_alloc(w,task);
 						update_task_state(w,task,DS_TASK_RUNNING,1);
 					} else {
 						update_task_state(w,task,DS_TASK_FAILED,1);
+						ds_task_resources_free(w,task);
+						// Note storage is not reclaimed until delete.
 					}
 				} else {
 					update_task_state(w,task,DS_TASK_FAILED,1);
@@ -211,6 +213,7 @@ void ds_task_table_recover( struct ds_worker *w )
 
 	DIR *dir;
 	struct dirent *d;
+	int64_t total_disk_used=0;
 
 	debug(D_DATASWARM,"checking %s for tasks to recover...",task_dir);
 
@@ -232,15 +235,26 @@ void ds_task_table_recover( struct ds_worker *w )
 		if(task) {
 			hash_table_insert(w->task_table,task->taskid,task);
 			if(task->state==DS_TASK_RUNNING) {
+				// If it was running, then it's not now.
 				update_task_state(w,task,DS_TASK_FAILED,0);
 			}
-			// Note that deleted tasks will be handled in task_advance.
+			if(task->state!=DS_TASK_READY) {
+				// If it got past running, then the storage was allocated
+				total_disk_used += task->resources->disk;
+			}
+			// Note that tasks still deleting will be handled in task_advance.
 		}
 		free(task_meta);
 
 	}
 
-	debug(D_DATASWARM,"done recovering tasks");
 	closedir(dir);
 	free(task_dir);
+
+	debug(D_DATASWARM,"done recovering tasks");
+	debug(D_DATASWARM,"%d tasks recovered using %lld MB disk",
+		hash_table_size(w->task_table),(long long)total_disk_used);
+
+	// Account for the total allocated size of task sandboxes.
+	w->resources_inuse->disk += total_disk_used;
 }
