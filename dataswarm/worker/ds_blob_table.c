@@ -348,7 +348,6 @@ void ds_blob_table_recover( struct ds_worker *w )
 	while((d=readdir(dir))) {
 		if(!strcmp(d->d_name,".")) continue;
 		if(!strcmp(d->d_name,"..")) continue;
-		if(!strcmp(d->d_name,"deleting")) continue;
 
 		char *blob_meta;
 		struct ds_blob *b;

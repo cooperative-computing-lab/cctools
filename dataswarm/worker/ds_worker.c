@@ -321,10 +321,7 @@ struct ds_worker *ds_worker_create(const char *workspace)
 	chdir(w->workspace);
 
 	mkdir("task", 0777);
-	mkdir("task/deleting", 0777);
-
 	mkdir("blob", 0777);
-	mkdir("blob/deleting", 0777);
 
 	return w;
 }
