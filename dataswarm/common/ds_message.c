@@ -13,10 +13,11 @@
 
 int ds_message_send(struct mq *mq, const char *str, int length)
 {
-	debug(D_DATASWARM, "msg  tx: %s", str);
 	buffer_t *buf = xxmalloc(sizeof(*buf));
 	buffer_init(buf);
 	buffer_putlstring(buf, str, length);
+	debug(D_DATASWARM, "msg  tx: %s", str);
+
 	int rc = mq_send_buffer(mq, buf, 0);
 	if (rc == -1) {
 		buffer_free(buf);
@@ -27,10 +28,11 @@ int ds_message_send(struct mq *mq, const char *str, int length)
 
 int ds_json_send(struct mq *mq, struct jx *j)
 {
-	debug(D_DATASWARM, "json tx: %p", j);
 	buffer_t *buf = xxmalloc(sizeof(*buf));
 	buffer_init(buf);
 	jx_print_buffer(j, buf);
+	debug(D_DATASWARM, "json tx: %s", buffer_tostring(buf));
+
 	int rc = mq_send_buffer(mq, buf, 0);
 	if (rc == -1) {
 		buffer_free(buf);
@@ -51,11 +53,11 @@ int ds_fd_send(struct mq *mq, int fd, size_t length)
 
 struct jx * ds_message_standard_response( int64_t id, ds_result_t code, struct jx *params )
 {
-	struct jx *message = jx_object(0);
-
-	jx_insert_string(message, "method", "response");
-	jx_insert_integer(message, "id", id );
-	jx_insert_integer(message, "result", code );
+	struct jx *message = jx_objectv(
+            "method", jx_string("response"),
+            "id",     jx_integer(id),
+            "result", jx_integer(code),
+            NULL);
 
 	if(code!=DS_RESULT_SUCCESS) {
 		// XXX send string instead?
@@ -97,7 +99,10 @@ struct jx * ds_message_blob_update( const char *blobid, const char *state )
 
 struct jx *ds_parse_message(buffer_t *buf) {
 	assert(buf);
-	struct jx *out = jx_parse_string(buffer_tostring(buf));
+    const char *contents = buffer_tostring(buf);
+	debug(D_DATASWARM, "rx: %s", contents);
+
+	struct jx *out = jx_parse_string(contents);
 	buffer_rewind(buf, 0);
 	return out;
 }

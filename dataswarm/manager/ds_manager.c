@@ -295,7 +295,6 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 	struct jx *msg = NULL;
 	switch (mq_recv(w->connection, NULL)) {
 		case MQ_MSG_NONE:
-			abort(); //XXX ??
 			break;
 		case MQ_MSG_FD:
 			//XXX handle received files
@@ -308,7 +307,7 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 
 	if (!msg) {
 		//XXX malformed message
-		abort();
+		debug(D_DATASWARM, "worker at %p went away?\n", w->connection); /* fix: handle disconnections */
 	}
 
 	const char *method = jx_lookup_string(msg,"method");
