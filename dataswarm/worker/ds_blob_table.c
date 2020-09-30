@@ -269,6 +269,21 @@ ds_result_t ds_blob_table_copy(struct ds_worker * w, const char *blobid, const c
 	return DS_RESULT_UNABLE;
 }
 
+ds_result_t ds_blob_table_list( struct ds_worker *w, struct jx **result )
+{
+	struct ds_blob *blob;
+	char *blobid;
+
+	*result = jx_object(0);
+
+	hash_table_firstkey(w->blob_table);
+	while(hash_table_nextkey(w->blob_table,&blobid,(void**)&blob)) {
+		jx_insert(*result,jx_string(blobid),ds_blob_to_jx(blob));
+	}
+
+	return DS_RESULT_SUCCESS;	
+}
+
 /*
 After a restart, scan the blobs on disk to recover the table,
 then delete any blobs that didn't successfully delete before.

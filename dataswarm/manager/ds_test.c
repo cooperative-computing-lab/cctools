@@ -68,11 +68,15 @@ void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
 	const char *bloba = "abc123";
 	const char *blobb = "xyz456";
 
-	ds_manager_add_blob_to_worker(m, r, bloba),
-		ds_manager_add_blob_to_worker(m, r, blobb),
+	ds_rpc_task_list(m,r);
+	ds_rpc_blob_list(m,r);
 
-		ds_rpc_blob_delete(m,r,bloba);
+	ds_manager_add_blob_to_worker(m, r, bloba),
+	ds_manager_add_blob_to_worker(m, r, blobb),
+
+	ds_rpc_blob_delete(m,r,bloba);
 	ds_rpc_blob_delete(m,r,blobb);
+
 	if(!wait_for_rpcs(m, r)) {
 		debug(D_DATASWARM, "There was an error with rpc delete. But that may be ok.");
 		return;
