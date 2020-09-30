@@ -7,6 +7,10 @@
 #include "jx.h"
 #include "delete_dir.h"
 #include "create_dir.h"
+#include "host_disk_info.h"
+#include "host_memory_info.h"
+#include "load_average.h"
+#include "macros.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,13 +19,40 @@
 #include <errno.h>
 #include <string.h>
 
+int ds_disk_avail( struct ds_worker *w, int64_t size )
+{
+	if(size>(w->disk_total-w->disk_inuse)) {
+		debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB alloc)",
+			(long long)w->disk_inuse/MEGA,(long long)size/MEGA);
+		return 1;
+	} else {
+		debug(D_DATASWARM,"disk inuse: %lld MB (not enough for %lld MB request)",
+			(long long)w->disk_inuse/MEGA,(long long)size/MEGA);
+		return 0;
+	}
+}
+
+void ds_disk_alloc( struct ds_worker *w, int64_t size )
+{
+	w->disk_inuse += size;
+}
+
+void ds_disk_free( struct ds_worker *w, int64_t size )
+{
+	w->disk_inuse -= size;
+	debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB freed)",
+		(long long)w->disk_inuse/MEGA,(long long)size/MEGA);
+}
+
 ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int_t size, struct jx *meta)
 {
-	if(!blobid || size < 1) {
-		// XXX return obj with incorrect parameters
+	if(!blobid || size<0) {
 		return DS_RESULT_BAD_PARAMS;
 	}
-	// XXX should here check for available space
+
+	if(!ds_disk_avail(w,size)) {
+		return DS_RESULT_TOO_FULL;
+	}
 
 	char *blob_dir = ds_worker_blob_dir(w,blobid);
 	char *blob_meta = ds_worker_blob_meta(w,blobid);
@@ -33,6 +64,8 @@ ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int
 	if(mkdir(blob_dir, 0777) == 0) {
 		if(ds_blob_to_file(b, blob_meta)) {
 			hash_table_insert(w->blob_table,blobid,b);
+			/* space is accounted for on creation before data arrives */
+			ds_disk_alloc(w,size);
 			result = DS_RESULT_SUCCESS;
 		} else {
 			debug(D_DATASWARM, "couldn't write %s: %s", blob_meta, strerror(errno));
@@ -64,6 +97,8 @@ ds_result_t ds_blob_table_put(struct ds_worker * w, const char *blobid)
 	} else if(b->state!=DS_BLOB_RW) {
 		return DS_RESULT_BAD_STATE;
 	}
+
+	// XXX reject a put if the data stream is larger than the allocated size
 
 	char *blob_data = ds_worker_blob_data(w,blobid);
 
@@ -240,6 +275,9 @@ ds_result_t ds_blob_table_delete(struct ds_worker * w, const char *blobid)
 	// Then delete the containing directory, which should be quick
 	delete_dir(blob_dir);
 
+	// Account for space only after the whole object is deleted
+	ds_disk_free(w,b->size);
+
 	// Now free up the data structures.
 	hash_table_remove(w->blob_table,blobid);
 	ds_blob_delete(b);
@@ -265,6 +303,8 @@ ds_result_t ds_blob_table_copy(struct ds_worker * w, const char *blobid, const c
 	}
 
 	/* XXX do the copying */
+
+	/* XXX account for for duplicate storage use. */
 
 	return DS_RESULT_UNABLE;
 }
@@ -298,6 +338,7 @@ void ds_blob_table_recover( struct ds_worker *w )
 
 	DIR *dir;
 	struct dirent *d;
+	int64_t total_blob_size = 0;
 
 	debug(D_DATASWARM,"checking %s for blobs to recover...",blob_dir);
 
@@ -318,6 +359,7 @@ void ds_blob_table_recover( struct ds_worker *w )
 
 		b = ds_blob_create_from_file(blob_meta);
 		if(b) {
+			total_blob_size += b->size;
 			hash_table_insert(w->blob_table,b->blobid,b);
 			if(b->state==DS_BLOB_DELETING) {
 				debug(D_DATASWARM, "deleting blob %s",b->blobid);
@@ -329,7 +371,25 @@ void ds_blob_table_recover( struct ds_worker *w )
 	}
 
 	debug(D_DATASWARM,"done recovering blobs");
+
 	closedir(dir);
 	free(blob_dir);
+
+	/*
+	This is a little strange because the initial disk available measurement
+	captures the available space, but doesn't know about the space already
+	consumed, so add that into the total.
+	*/
+
+	w->disk_total += total_blob_size;
+	w->disk_inuse = total_blob_size;
+
+	debug(D_DATASWARM,"%d blobs, %lld MB inuse, %lld MB avail, %lld MB total",
+		hash_table_size(w->blob_table),
+		(long long) w->disk_inuse/MEGA,
+		(long long) (w->disk_total-w->disk_inuse)/MEGA,
+		(long long) w->disk_total/MEGA
+	);
+
 }
 

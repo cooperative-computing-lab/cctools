@@ -21,6 +21,9 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "create_dir.h"
 #include "hash_table.h"
+#include "host_disk_info.h"
+#include "host_memory_info.h"
+#include "load_average.h"
 
 #include "ds_worker.h"
 #include "common/ds_message.h"
@@ -230,6 +233,25 @@ void ds_worker_connect_by_name(struct ds_worker *w, const char *manager_name)
 	}
 
 	free(expr);
+}
+
+void ds_worker_measure_resources( struct ds_worker *w )
+{
+	uint64_t avail, total;
+
+	host_memory_info_get(&avail,&total);
+	w->memory_total = total;
+
+	/*
+	Note the use of avail is deliberate here: the worker's total
+	space is the sum of what's free + the size of blobs already
+	stored, which we work out later in ds_blob_table_recover.
+	*/
+ 
+	host_disk_info_get(w->workspace,&avail,&total);
+	w->disk_total = avail;
+
+	w->cores_total = load_average_get_cpus();
 }
 
 char * ds_worker_task_dir( struct ds_worker *w, const char *taskid )

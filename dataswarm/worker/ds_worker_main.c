@@ -11,10 +11,19 @@
 #include <string.h>
 #include <errno.h>
 
+typedef enum {
+  LONG_OPTION_CORES=255,
+  LONG_OPTION_MEMORY,
+  LONG_OPTION_DISK
+} ds_worker_long_options_t;
+
 static const struct option long_options[] = {
 	{"manager-name", required_argument, 0, 'N'},
 	{"manager-host", required_argument, 0, 'm'},
 	{"manager-port", required_argument, 0, 'p'},
+	{"cores",required_argument, 0, LONG_OPTION_CORES},
+	{"memory",required_argument, 0, LONG_OPTION_MEMORY},
+	{"disk",required_argument, 0, LONG_OPTION_DISK},
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
 	{"help", no_argument, 0, 'h'},
@@ -40,6 +49,10 @@ int main(int argc, char *argv[])
 	const char *manager_name = 0;
 	const char *manager_host = 0;
 	int manager_port = 0;
+	uint64_t manual_cores = 0;
+	uint64_t manual_memory = 0;
+	uint64_t manual_disk = 0;
+
 	const char *workspace_dir = string_format("/tmp/dataswarm-worker-%d", getuid());
 
 	int c;
@@ -64,6 +77,15 @@ int main(int argc, char *argv[])
 		case 'p':
 			manager_port = atoi(optarg);
 			break;
+		case LONG_OPTION_CORES:
+			manual_cores = atoi(optarg);
+			break;
+		case LONG_OPTION_MEMORY:
+			manual_memory = string_metric_parse(optarg);
+			break;
+		case LONG_OPTION_DISK:
+			manual_disk = string_metric_parse(optarg);
+			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
 			return 0;
@@ -82,10 +104,19 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	/* Measure the local resources available. */
+	ds_worker_measure_resources(w);
+
+	/* Override with options, if necessary. */
+	if(manual_cores!=0)  w->cores_total = manual_cores;
+	if(manual_memory==0) w->memory_total = manual_memory;
+	if(manual_disk!=0)   w->disk_total = manual_disk;
+
 	/* Now load all saved task/blob state from disk. */
 	ds_blob_table_recover(w);
 	ds_task_table_recover(w);
 
+	/* Start up the main loop one way or the other. */
 	if(manager_name) {
 		ds_worker_connect_by_name(w, manager_name);
 	} else if(manager_host && manager_port) {

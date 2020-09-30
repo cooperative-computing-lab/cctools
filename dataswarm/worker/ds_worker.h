@@ -21,6 +21,12 @@ struct ds_worker {
 	// Path to top of workspace containing tasks and blobs.
 	char *workspace;
 
+	/* Current resources committed, in BYTES. */
+	int64_t cores_inuse, memory_inuse, disk_inuse;
+
+	/* Total resources available, in BYTES */
+	int64_t cores_total, memory_total, disk_total;
+
 	/***************************************************************/
 	/* Internal tuning parameters set in ds_worker_create() */
 	/***************************************************************/
@@ -54,6 +60,7 @@ struct ds_worker *ds_worker_create();
 
 void ds_worker_connect_by_name( struct ds_worker *w, const char *manager_name );
 void ds_worker_connect_loop( struct ds_worker *w, const char *manager_host, int manager_port );
+void ds_worker_measure_resources( struct ds_worker *w );
 
 void ds_worker_delete(struct ds_worker *w);
 
