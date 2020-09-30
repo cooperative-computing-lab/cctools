@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 int wait_for_rpcs(struct ds_manager *m, struct ds_worker_rep *r) {
 	int done   = 0;
@@ -56,8 +57,13 @@ int wait_for_rpcs(struct ds_manager *m, struct ds_worker_rep *r) {
 		}
 
 		if(done) break;
+
+		if (mq_poll_wait(m->polling_group, time(0) + 1) == -1 && errno != EINTR) {
+				perror("server_main_loop");
+				break;
+		}
+
 		ds_rpc_get_response(m,r);
-		sleep(1);
 	}
 
 	return all_ok;
