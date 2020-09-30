@@ -407,7 +407,7 @@ void server_main_loop( struct ds_manager *m )
 		process_files(m);
 		process_tasks(m);
 
-		if (mq_poll_wait(m->polling_group, time(0) + 300) == -1 && errno != EINTR) {
+		if (mq_poll_wait(m->polling_group, time(0) + 10) == -1 && errno != EINTR) {
 				perror("server_main_loop");
 				break;
 		}

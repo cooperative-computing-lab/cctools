@@ -170,7 +170,7 @@ int ds_worker_main_loop(struct ds_worker *w)
 			ds_worker_status_report(w);
 		}
 
-		if (mq_wait(w->manager_connection, time(0) + 300) == -1 && errno != EINTR) {
+		if (mq_wait(w->manager_connection, time(0) + 10) == -1 && errno != EINTR) {
 			break;
 		}
 	}
