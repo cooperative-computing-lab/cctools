@@ -124,7 +124,7 @@ static int set_nonblocking (struct mq_msg *msg) {
 }
 
 static int unset_nonblocking (struct mq_msg *msg) {
-	assert(msg);
+	if (!msg) return 0;
 	if (msg->pipefd < 0) return 0;
 	return fcntl(msg->pipefd, F_SETFL, msg->origfl);
 }
@@ -150,11 +150,17 @@ static void mq_msg_delete(struct mq_msg *msg) {
 
 static void mq_die(struct mq *mq, int err) {
 	assert(mq);
-	mq->state = MQ_SOCKET_ERROR;
 	mq->err = err;
 
+	if (mq->state == MQ_SOCKET_ERROR) {
+		return;
+	}
+
+	mq->state = MQ_SOCKET_ERROR;
 	mq_close(mq->acc);
 	mq_msg_delete(mq->sending);
+	unset_nonblocking(mq->recving);
+	unset_nonblocking(mq->recv);
 	free(mq->recving);
 	free(mq->recv);
 
@@ -190,6 +196,7 @@ void mq_close(struct mq *mq) {
 	mq_die(mq, 0);
 	if (mq->poll_group) {
 		set_remove(mq->poll_group->members, mq);
+		set_remove(mq->poll_group->error, mq);
 	}
 	link_close(mq->link);
 	list_delete(mq->send);
@@ -605,7 +612,7 @@ int mq_wait(struct mq *mq, time_t stoptime) {
 		}
 		poll_events(mq, (struct pollfd *) &pfd);
 
-		if (mq->recv || mq->acc) {
+		if (mq->recv || mq->acc || mq->state == MQ_SOCKET_ERROR) {
 			return 1;
 		}
 	} while ((rc = ppoll_compat((struct pollfd *) &pfd, 2, stoptime)) > 0);
