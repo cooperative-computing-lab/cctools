@@ -78,7 +78,7 @@ ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, struct jx *msg 
 	const char *method = jx_lookup_string(msg, "method");
 	struct jx *params = jx_lookup(msg, "params");
 
-	ds_result_t result;
+	ds_result_t result = DS_RESULT_SUCCESS;
 	if(!method) {
 		result = DS_RESULT_BAD_METHOD;
 	} else if(!strcmp(method, "task-update")) {

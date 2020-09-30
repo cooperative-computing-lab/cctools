@@ -160,6 +160,7 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 		free(buf);
 		const char *method = jx_lookup_string(msg,"method");
 		struct jx *params = jx_lookup(msg,"params");
+		struct jx *response = NULL;
 
 		if(!method || !params) {
 			/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
@@ -185,7 +186,6 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 		/* todo: replace manager_key when msg_key not null */
 		const char *conn_type = jx_lookup_string(params, "type");
 
-		struct jx *response = NULL;
 		if(!strcmp(conn_type,"worker")) {
 			struct ds_worker_rep *w = ds_worker_rep_create(conn);
 			mq_address_remote(conn,w->addr,&w->port);
@@ -219,7 +219,7 @@ DONE:
 void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_t stoptime )
 {
 	int set_storage = 0;
-	struct jx *msg;
+	struct jx *msg = NULL;
 	switch (mq_recv(c->connection, NULL)) {
 		case MQ_MSG_NONE:
 			abort(); //XXX ??
@@ -292,7 +292,7 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_t stoptime )
 {
 	int set_storage = 0;
-	struct jx *msg;
+	struct jx *msg = NULL;
 	switch (mq_recv(w->connection, NULL)) {
 		case MQ_MSG_NONE:
 			abort(); //XXX ??
