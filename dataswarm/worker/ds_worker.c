@@ -118,6 +118,9 @@ void ds_worker_handle_message(struct ds_worker *w)
 		result = ds_blob_table_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else if(!strcmp(method, "blob-list")) {
 		result = ds_blob_table_list(w,&result_params);
+	} else if(!strcmp(method, "response")) {
+        /* only from handshake */
+        should_send_response = 0;
 	} else {
 		result = DS_RESULT_BAD_METHOD;
 	}

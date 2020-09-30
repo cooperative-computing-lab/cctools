@@ -66,7 +66,9 @@ struct jx * ds_message_standard_response( int64_t id, ds_result_t code, struct j
 
 	if(params) {
 		jx_insert(message,jx_string("params"),jx_copy(params));
-	}
+	} else {
+		jx_insert(message,jx_string("params"),jx_object(0));
+    }
 
 	return message;
 }
