@@ -26,29 +26,29 @@ ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const c
 /* test read responses from workers. */
 ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 {
+	ds_result_t result = -1;
+	int set_storage = 0;
 	struct jx *msg = NULL;
 	switch (mq_recv(r->connection, NULL)) {
 		case MQ_MSG_NONE:
 			return 0;
-		case MQ_MSG_FD:
-			//XXX allow fd transfers
-			abort();
 		case MQ_MSG_BUFFER:
 			msg = ds_parse_message(&r->recv_buffer);
 			assert(msg);
-			mq_store_buffer(r->connection, &r->recv_buffer, 0);
 			break;
+		case MQ_MSG_FD:
+			mq_store_buffer(r->connection, &r->recv_buffer, 0);
+			return 0;
 	}
 
 	jx_int_t msgid = jx_lookup_integer(msg,"id");
 
 	if(msgid == 0) {
 		ds_worker_rep_async_update(r,msg);
-		jx_delete(msg);
-		return -1;
+		goto DONE;
 	}
 
-	ds_result_t result = jx_lookup_integer(msg,"result");
+	result = jx_lookup_integer(msg,"result");
 
 	/* it could be an rpc for a blob or a task, but we don't know yet. */
 	struct ds_blob_rep *b = (struct ds_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
@@ -59,6 +59,7 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 		if(b->result == DS_RESULT_SUCCESS) {
 			if(b->state == DS_BLOB_WORKER_STATE_GET) {
 				b->result = blob_get_aux(m,r,b->blobid);
+				set_storage = 1;
 			}
 		}
 		itable_remove(r->blob_of_rpc, msgid);
@@ -71,6 +72,11 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 		itable_remove(r->task_of_rpc, msgid);
 	} else {
 		debug(D_DATASWARM, "worker does not know about message id: %" PRId64, msgid);
+	}
+
+DONE:
+	if (!set_storage) {
+		mq_store_buffer(r->connection, &r->recv_buffer, 0);
 	}
 
 	jx_delete(msg);
@@ -256,7 +262,9 @@ ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const c
 	ds_result_t result = DS_RESULT_UNABLE;
 
 	int file = open(b->put_get_path, O_WRONLY|O_CREAT|O_EXCL, 0777);
-	if(file >= 0) {
+	if(file < 0) {
+		mq_store_buffer(r->connection, &r->recv_buffer, 0);
+	} else {
 		mq_store_fd(r->connection, file, 0);
 		result = DS_RESULT_SUCCESS;
 	}
