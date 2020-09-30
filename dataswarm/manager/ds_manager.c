@@ -311,7 +311,7 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 	}
 
 	const char *method = jx_lookup_string(msg,"method");
-	const char *params = jx_lookup_string(msg,"params");
+	struct jx  *params = jx_lookup(msg,"params");
 	if(!method || !params) {
 		/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 		/* disconnect worker */
