@@ -28,8 +28,7 @@ struct ds_worker_rep * ds_worker_rep_create( struct mq *conn )
 {
 	struct ds_worker_rep *w = malloc(sizeof(*w));
 	w->connection = conn;
-	//XXX add to mq API
-	//link_address_remote(w->link,w->addr,&w->port);
+	mq_address_remote(conn,w->addr,&w->port);
 
 	w->blobs = hash_table_create(0,0);
 	w->tasks = hash_table_create(0,0);

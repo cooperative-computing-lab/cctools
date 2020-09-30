@@ -142,6 +142,14 @@ char *ds_manager_submit_task( struct ds_manager *m, struct jx *description ) {
 }
 
 int handle_handshake(struct ds_manager *m, struct mq *conn) {
+		switch (mq_recv(conn, NULL)) {
+			case MQ_MSG_NONE:
+			case MQ_MSG_FD:
+				abort();
+			case MQ_MSG_BUFFER:
+				break;
+		}
+
 		buffer_t *buf = mq_get_tag(conn);
 		assert(buf);
 		mq_set_tag(conn, NULL);
@@ -185,10 +193,6 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 			hash_table_insert(m->worker_table,manager_key,w);
 			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, NULL);
 			mq_store_buffer(conn, &w->recv_buffer, 0);
-
-			// XXX This is a HACK to get some messages going for testing
-			dataswarm_test_script(m,w);
-
 		} else if(!strcmp(conn_type,"client")) {
 			struct ds_client_rep *c = ds_client_rep_create(conn);
 			mq_address_remote(conn,c->addr,&c->port);
@@ -312,6 +316,7 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 	if(!method || !params) {
 		/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 		/* disconnect worker */
+		mq_close(w->connection);
 		return;
 	}
 
@@ -383,8 +388,11 @@ int handle_connections(struct ds_manager *m) {
 
 int handle_errors(struct ds_manager *m) {
 		for (struct mq *conn; (conn = mq_poll_error(m->polling_group));) {
-			//XXX handle disconnects/errors
+			char *key = string_format("%p", conn);
+			//XXX handle disconnects/errors, clean up
 			mq_close(conn);
+			hash_table_remove(m->worker_table, key);
+			hash_table_remove(m->client_table, key);
 		}
 
 		return 0;

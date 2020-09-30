@@ -154,8 +154,6 @@ int ds_worker_main_loop(struct ds_worker *w)
 
 		errno = mq_geterror(w->manager_connection);
 		if (errno != 0) {
-			//XXX abort?
-			mq_close(w->manager_connection);
 			break;
 		}
 
@@ -192,6 +190,7 @@ void ds_worker_connect_loop(struct ds_worker *w, const char *manager_host, int m
 
 		w->manager_connection = mq_connect(manager_addr, manager_port);
 		struct jx *msg = ds_worker_handshake(w);
+		mq_store_buffer(w->manager_connection, &w->recv_buffer, 0);
 		ds_json_send(w->manager_connection, msg);
 		jx_delete(msg);
 
