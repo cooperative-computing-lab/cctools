@@ -193,6 +193,9 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 			hash_table_insert(m->worker_table,manager_key,w);
 			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, NULL);
 			mq_store_buffer(conn, &w->recv_buffer, 0);
+
+			// XXX This is a HACK to get some messages going for testing
+			dataswarm_test_script(m,w);
 		} else if(!strcmp(conn_type,"client")) {
 			struct ds_client_rep *c = ds_client_rep_create(conn);
 			mq_address_remote(conn,c->addr,&c->port);
