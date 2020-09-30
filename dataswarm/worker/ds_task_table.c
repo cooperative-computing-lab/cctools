@@ -9,6 +9,7 @@
 #include "stringtools.h"
 #include "debug.h"
 #include "delete_dir.h"
+#include "macros.h"
 
 #include <dirent.h>
 #include <string.h>
@@ -81,6 +82,31 @@ ds_result_t ds_task_table_list( struct ds_worker *w, struct jx **result )
 	return DS_RESULT_SUCCESS;	
 }
 
+int ds_task_resources_avail( struct ds_worker *w, struct ds_task *t )
+{
+	return t->resources->cores+w->cores_inuse <= w->cores_total
+		&& t->resources->memory + w->memory_inuse <= w->memory_total
+		&& t->resources->disk + w->disk_inuse <= w->disk_total;
+}
+
+void ds_task_resources_alloc( struct ds_worker *w, struct ds_task *t )
+{
+	w->cores_inuse  += t->resources->cores;
+	w->memory_inuse += t->resources->memory;
+	w->disk_inuse   += t->resources->disk;
+}
+
+void ds_task_resources_free( struct ds_worker *w, struct ds_task *t )
+{
+	w->cores_inuse  -= t->resources->cores;
+	w->memory_inuse -= t->resources->memory;
+}
+
+void ds_task_disk_free( struct ds_worker *w, struct ds_task *t )
+{
+	w->disk_inuse -= t->resources->disk;
+}
+
 /*
 Consider each task currently in possession of the worker,
 and act according to it's current state.
@@ -97,12 +123,14 @@ void ds_task_table_advance( struct ds_worker *w )
 
 		switch(task->state) {
 			case DS_TASK_READY:
-				// XXX only start tasks when resources available.
+				if(!ds_task_resources_avail(w,task)) break;
+
 				process = ds_process_create(task,w);
 				if(process) {
 					hash_table_insert(w->process_table,taskid,process);
 					// XXX check for invalid mounts?
 					if(ds_process_start(process,w)) {
+						ds_task_resources_alloc(w,task);
 						update_task_state(w,task,DS_TASK_RUNNING,1);
 					} else {
 						update_task_state(w,task,DS_TASK_FAILED,1);
@@ -114,6 +142,7 @@ void ds_task_table_advance( struct ds_worker *w )
 			case DS_TASK_RUNNING:
 				process = hash_table_lookup(w->process_table,taskid);
 				if(ds_process_isdone(process)) {
+					ds_task_resources_free(w,task);
 					update_task_state(w,task,DS_TASK_DONE,1);
 				}
 				break;
@@ -140,7 +169,10 @@ void ds_task_table_advance( struct ds_worker *w )
 				// Send the deleted message (need the task structure still)
 				update_task_state(w,task,DS_TASK_DELETED,1);
 
-				// Now remove and delete the process and task structures.
+				// Now note that the storage has been reclaimed.
+				ds_task_disk_free(w,task);
+
+				// Remove and delete the process and task structures.
 				process = hash_table_remove(w->process_table,taskid);
 				if(process) ds_process_delete(process);
 				task = hash_table_remove(w->task_table,taskid);
