@@ -30,6 +30,10 @@ ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int
 		return DS_RESULT_TOO_FULL;
 	}
 
+	if(hash_table_lookup(w->blob_table,blobid)) {
+		return DS_RESULT_BLOBID_EXISTS;
+	}
+
 	char *blob_dir = ds_worker_blob_dir(w,blobid);
 	char *blob_meta = ds_worker_blob_meta(w,blobid);
 
@@ -78,43 +82,20 @@ ds_result_t ds_blob_table_put(struct ds_worker * w, const char *blobid)
 
 	char *blob_data = ds_worker_blob_data(w,blobid);
 
-	char line[32];
-
-	// XXX should set timeout more appropriately
-	time_t stoptime = time(0) + 3600;
-
-	if(!link_readline(w->manager_link, line, sizeof(line), stoptime)) {
-		debug(D_DATASWARM, "couldn't read file length: %s: %s", blob_data, strerror(errno));
-		free(blob_data);
-		return DS_RESULT_UNABLE;
-	}
-
-	int64_t length = atoll(line);
 	// XXX should here check for available space
 	// return ds_message_state_response("internal-failure", "no space available");
-	//
+
 	// XXX should handle directory transfers.
 
-	FILE *file = fopen(blob_data, "w");
-	if(!file) {
+	int file = open(blob_data, O_WRONLY|O_CREAT|O_EXCL, 0777);
+	if(file < 0) {
 		debug(D_DATASWARM, "couldn't open %s: %s", blob_data, strerror(errno));
 		free(blob_data);
 		return DS_RESULT_UNABLE;
 	}
 
-	int bytes_transfered = link_stream_to_file(w->manager_link, file, length, stoptime);
-	fclose(file);
-
-	if(bytes_transfered != length) {
-		debug(D_DATASWARM, "couldn't stream to %s: %s", blob_data, strerror(errno));
-		free(blob_data);
-		return DS_RESULT_UNABLE;
-	}
-
-	debug(D_DATASWARM, "finished putting %" PRId64 " bytes into %s", length, blob_data);
-
+	mq_store_fd(w->manager_connection, file, 0);
 	free(blob_data);
-
 	return DS_RESULT_SUCCESS;
 }
 
@@ -122,7 +103,6 @@ ds_result_t ds_blob_table_put(struct ds_worker * w, const char *blobid)
 
 ds_result_t ds_blob_table_get(struct ds_worker * w, const char *blobid, jx_int_t msgid, int *should_respond)
 {
-
 	*should_respond = 1;
 	if(!blobid) {
 		return DS_RESULT_BAD_PARAMS;
@@ -145,36 +125,23 @@ ds_result_t ds_blob_table_get(struct ds_worker * w, const char *blobid, jx_int_t
 		return DS_RESULT_UNABLE;
 	}
 
-	FILE *file = fopen(blob_data, "r");
-	if(!file) {
+	int file = open(blob_data, O_RDONLY);
+	if(file < 0) {
 		debug(D_DATASWARM, "couldn't open %s: %s", blob_data, strerror(errno));
 		free(blob_data);
 		return DS_RESULT_UNABLE;
 	}
+
 	//Here we construct the response and then send the file.
 	*should_respond = 0;
 	struct jx *response = ds_message_standard_response(msgid, DS_RESULT_SUCCESS, NULL);
-	ds_json_send(w->manager_link, response, w->long_timeout);
+	ds_json_send(w->manager_connection, response);
+
 	jx_delete(response);
-
-	int64_t length = info.st_size;
-	char *line = string_format("%lld\n", (long long) length);
-
-	// XXX should set timeout more appropriately
-	time_t stoptime = time(0) + 3600;
-	link_write(w->manager_link, line, strlen(line), stoptime);
-	free(line);
 
 	// XXX should handle directory transfers.
 
-	int bytes_transfered = link_stream_from_file(w->manager_link, file, length, stoptime);
-	fclose(file);
-
-	if(bytes_transfered != length) {
-		debug(D_DATASWARM, "couldn't stream from %s: %s", blob_data, strerror(errno));
-	} else {
-		debug(D_DATASWARM, "finished reading %" PRId64 " bytes from %s", length, blob_data);
-	}
+	ds_fd_send(w->manager_connection, file, 0);
 
 	free(blob_data);
 	return DS_RESULT_SUCCESS;

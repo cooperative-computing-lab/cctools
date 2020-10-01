@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include <time.h>
 #include <errno.h>
 
-#include "link.h"
+#include "mq.h"
 #include "jx.h"
 #include "jx_print.h"
 #include "jx_parse.h"
@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "host_disk_info.h"
 #include "host_memory_info.h"
 #include "load_average.h"
+#include "xxmalloc.h"
 
 #include "common/ds_message.h"
 #include "common/ds_task.h"
@@ -33,7 +34,7 @@ See the file COPYING for details.
 #include "ds_task_table.h"
 #include "ds_blob_table.h"
 
-void ds_worker_status_report(struct ds_worker *w, time_t stoptime)
+void ds_worker_status_report(struct ds_worker *w)
 {
 	struct jx *msg = jx_object(NULL);
 	struct jx *params = jx_object(NULL);
@@ -42,7 +43,7 @@ void ds_worker_status_report(struct ds_worker *w, time_t stoptime)
 	jx_insert(msg, jx_string("params"), params);
 	jx_insert_string(params, "hello", "manager");
 
-	ds_json_send(w->manager_link, msg, stoptime);
+	ds_json_send(w->manager_connection, msg);
 
 	jx_delete(msg);
 }
@@ -61,8 +62,15 @@ struct jx * ds_worker_handshake( struct ds_worker *w )
 }
 
 
-void ds_worker_handle_message(struct ds_worker *w, struct jx *msg)
+void ds_worker_handle_message(struct ds_worker *w)
 {
+	int set_storage = 0;
+	struct jx *msg = ds_parse_message(&w->recv_buffer);
+	if (!msg) {
+		printf("malformed message!\n");
+		//XXX disconnect?
+		return;
+	}
 	const char *method = jx_lookup_string(msg, "method");
 	struct jx *params = jx_lookup(msg, "params");
 	int64_t id = jx_lookup_integer(msg, "id");
@@ -70,10 +78,10 @@ void ds_worker_handle_message(struct ds_worker *w, struct jx *msg)
 	ds_result_t result = DS_RESULT_SUCCESS;
 	struct jx *result_params = 0;
 
-    /* Whether to send a response for the rpc. Used to turn off the blob-get
-     * response in this function, as blob-get manages its own response when
-     * succesfully sending a file. */
-    int should_send_response = 1;
+	/* Whether to send a response for the rpc. Used to turn off the blob-get
+	 * response in this function, as blob-get manages its own response when
+	 * succesfully sending a file. */
+	int should_send_response = 1;
 
 	if(!method) {
 		result = DS_RESULT_BAD_METHOD;
@@ -103,6 +111,7 @@ void ds_worker_handle_message(struct ds_worker *w, struct jx *msg)
 		result = ds_blob_table_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
 	} else if(!strcmp(method, "blob-put")) {
 		result = ds_blob_table_put(w,blobid);
+		set_storage = 1;
 	} else if(!strcmp(method, "blob-get")) {
 		result = ds_blob_table_get(w,blobid,id,&should_send_response);
 	} else if(!strcmp(method, "blob-delete")) {
@@ -113,18 +122,24 @@ void ds_worker_handle_message(struct ds_worker *w, struct jx *msg)
 		result = ds_blob_table_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else if(!strcmp(method, "blob-list")) {
 		result = ds_blob_table_list(w,&result_params);
+	} else if(!strcmp(method, "response")) {
+        /* only from handshake */
+        should_send_response = 0;
 	} else {
 		result = DS_RESULT_BAD_METHOD;
 	}
 
-
 	struct jx *response = NULL;
 
 done:
-    if(should_send_response) {
-	    response = ds_message_standard_response(id,result,result_params);
-	    ds_json_send(w->manager_link, response, time(0) + w->long_timeout);
-    }
+	if (!set_storage) {
+		mq_store_buffer(w->manager_connection, &w->recv_buffer, 0);
+	}
+
+	if(should_send_response) {
+		response = ds_message_standard_response(id,result,result_params);
+		ds_json_send(w->manager_connection, response);
+	}
 	jx_delete(response);
 	jx_delete(result_params);
 }
@@ -132,41 +147,40 @@ done:
 int ds_worker_main_loop(struct ds_worker *w)
 {
 	while(1) {
-		time_t stoptime = time(0) + 5;	/* read messages for at most 5 seconds. remove with Tim's library. */
-
-		while(1) {
-			if(link_sleep(w->manager_link, stoptime, stoptime, 0)) {
-				struct jx *msg = ds_json_recv(w->manager_link, stoptime + 60);
-				if(msg) {
-					ds_worker_handle_message(w, msg);
-					jx_delete(msg);
-				} else {
-					/* handle manager disconnection */
-					return 0;
-				}
-			} else {
+		switch (mq_recv(w->manager_connection, NULL)) {
+			case MQ_MSG_NONE:
 				break;
-			}
+			case MQ_MSG_FD:
+				//XXX handle received files
+				mq_store_buffer(w->manager_connection, &w->recv_buffer, 0);
+				break;
+			case MQ_MSG_BUFFER:
+				ds_worker_handle_message(w);
+				break;
 		}
 
-		/* after processing all messages, work on tasks. */
+		errno = mq_geterror(w->manager_connection);
+		if (errno != 0) {
+			break;
+		}
+
+		/* after processing any messages, work on tasks. */
 		ds_task_table_advance(w);
 
 		time_t current = time(0);
 
 		if(current > (w->last_status_report+w->status_report_interval) ) {
 			w->last_status_report = current;
-			ds_worker_status_report(w, stoptime);
+			ds_worker_status_report(w);
 		}
 
-		//do not busy sleep more than stoptime
-		//this will probably go away with Tim's library
-		time_t sleeptime = stoptime - time(0);
-		if(sleeptime > 0) {
-			// XXX make sure this is interrupted at the completion of a task.
-			sleep(sleeptime);
+		if (mq_wait(w->manager_connection, time(0) + 10) == -1 && errno != EINTR) {
+			break;
 		}
 	}
+
+	perror("ds_worker_main_loop");
+	return -1;
 }
 
 void ds_worker_connect_loop(struct ds_worker *w, const char *manager_host, int manager_port)
@@ -181,21 +195,15 @@ void ds_worker_connect_loop(struct ds_worker *w, const char *manager_host, int m
 			break;
 		}
 
-		w->manager_link = link_connect(manager_addr, manager_port, time(0) + sleeptime);
-		if(w->manager_link) {
+		w->manager_connection = mq_connect(manager_addr, manager_port);
+		struct jx *msg = ds_worker_handshake(w);
+		mq_store_buffer(w->manager_connection, &w->recv_buffer, 0);
+		ds_json_send(w->manager_connection, msg);
+		jx_delete(msg);
 
-			struct jx *msg = ds_worker_handshake(w);
-			ds_json_send(w->manager_link, msg, time(0) + w->long_timeout);
-			jx_delete(msg);
-
-			ds_worker_main_loop(w);
-			link_close(w->manager_link);
-			w->manager_link = 0;
-			sleeptime = w->min_connect_retry;
-		} else {
-			printf("could not connect to %s:%d: %s\n", manager_host, manager_port, strerror(errno));
-			sleeptime = MIN(sleeptime * 2, w->max_connect_retry);
-		}
+		ds_worker_main_loop(w);
+		mq_close(w->manager_connection);
+		w->manager_connection = 0;
 		sleep(sleeptime);
 	}
 
@@ -350,9 +358,9 @@ char * ds_worker_blob_deleting( struct ds_worker *w )
 
 struct ds_worker *ds_worker_create(const char *workspace)
 {
-	struct ds_worker *w = malloc(sizeof(*w));
-	memset(w, 0, sizeof(*w));
+	struct ds_worker *w = xxcalloc(1, sizeof(*w));
 
+	buffer_init(&w->recv_buffer);
 	w->task_table = hash_table_create(0, 0);
 	w->process_table = hash_table_create(0,0);
 	w->blob_table = hash_table_create(0,0);
@@ -390,6 +398,7 @@ void ds_worker_delete(struct ds_worker *w)
 	hash_table_delete(w->task_table);
 	hash_table_delete(w->process_table);
 	hash_table_delete(w->blob_table);
+	buffer_free(&w->recv_buffer);
 	free(w->workspace);
 	free(w);
 }

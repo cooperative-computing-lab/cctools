@@ -34,14 +34,19 @@ static void update_task_state( struct ds_worker *w, struct ds_task *task, ds_tas
 
 	if(send_update_message) {
 		struct jx *msg = ds_message_task_update( task->taskid, ds_task_state_string(state) );
-		ds_json_send(w->manager_link,msg,time(0)+w->long_timeout);
+		ds_json_send(w->manager_connection,msg);
 		free(msg);
 	}
 }
 
 ds_result_t ds_task_table_submit( struct ds_worker *w, const char *taskid, struct jx *jtask )
 {
-	struct ds_task *task = ds_task_create(jtask);
+	struct ds_task *task = hash_table_lookup(w->task_table,taskid);
+	if(!task) {
+		return DS_RESULT_TASKID_EXISTS;
+	}
+
+	task = ds_task_create(jtask);
 	if(task) {
 		hash_table_insert(w->task_table, taskid, task);
 		debug(D_DATASWARM,"task %s created",taskid);
