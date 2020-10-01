@@ -2,7 +2,7 @@
 #define DATASWARM_MANAGER_H
 
 #include "hash_table.h"
-#include "link.h"
+#include "mq.h"
 
 #include "ds_worker_rep.h"
 
@@ -12,7 +12,8 @@ struct ds_manager {
     struct hash_table *task_table;
     struct hash_table *file_table;
 
-	struct link *manager_link;
+	struct mq *manager_socket;
+	struct mq_poll *polling_group;
 
 	int connect_timeout;
 	int stall_timeout;

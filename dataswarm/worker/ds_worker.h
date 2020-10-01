@@ -2,12 +2,13 @@
 #define DATASWARM_WORKER_H
 
 #include <time.h>
+#include "buffer.h"
 #include "hash_table.h"
-#include "link.h"
+#include "mq.h"
 
 struct ds_worker {
 	// Network connection to the manager process.
-	struct link *manager_link;
+	struct mq *manager_connection;
 
 	// Table mapping taskids to ds_task objects.
 	struct hash_table *task_table;
@@ -48,6 +49,9 @@ struct ds_worker {
 
 	// Seconds between updates.
 	int status_report_interval;
+
+	// Place to store messages
+	buffer_t recv_buffer;
 };
 
 struct ds_worker *ds_worker_create();

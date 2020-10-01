@@ -217,6 +217,18 @@ int mq_address_local(struct mq *mq, char *addr, int *port);
 */
 int mq_address_remote(struct mq *mq, char *addr, int *port);
 
+/** Check for errors on the connection.
+ *
+ * Since actual IO happens in the background, any errors are reported here.
+ * Once a connection is in the error state, further IO operations will fail.
+ * After handling any received messages, the connection must be closed.
+ * Socket disconnection is indicated by ECONNRESET.
+ * @param mq The queue to check.
+ * @returns 0 if mq is not in an error state.
+ * @returns The errno that put mq into an error state.
+ */
+int mq_geterror(struct mq *mq);
+
 //------------Polling API-----------------//
 
 /** Create a new (empty) polling group.

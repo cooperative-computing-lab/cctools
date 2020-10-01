@@ -15,6 +15,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 /* not an rpc. writes the file to disk for a corresponding blob-get get request. */
 ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid );
@@ -22,17 +26,29 @@ ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const c
 /* test read responses from workers. */
 ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 {
-	struct jx * msg = ds_json_recv(r->link,time(0)+m->connect_timeout);
+	ds_result_t result = -1;
+	int set_storage = 0;
+	struct jx *msg = NULL;
+	switch (mq_recv(r->connection, NULL)) {
+		case MQ_MSG_NONE:
+			return 0;
+		case MQ_MSG_BUFFER:
+			msg = ds_parse_message(&r->recv_buffer);
+			assert(msg);
+			break;
+		case MQ_MSG_FD:
+			mq_store_buffer(r->connection, &r->recv_buffer, 0);
+			return 0;
+	}
 
 	jx_int_t msgid = jx_lookup_integer(msg,"id");
 
 	if(msgid == 0) {
 		ds_worker_rep_async_update(r,msg);
-		jx_delete(msg);
-		return -1;
+		goto DONE;
 	}
 
-	ds_result_t result = jx_lookup_integer(msg,"result");
+	result = jx_lookup_integer(msg,"result");
 
 	/* it could be an rpc for a blob or a task, but we don't know yet. */
 	struct ds_blob_rep *b = (struct ds_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
@@ -43,6 +59,7 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 		if(b->result == DS_RESULT_SUCCESS) {
 			if(b->state == DS_BLOB_WORKER_STATE_GET) {
 				b->result = blob_get_aux(m,r,b->blobid);
+				set_storage = 1;
 			}
 		}
 		itable_remove(r->blob_of_rpc, msgid);
@@ -55,6 +72,11 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 		itable_remove(r->task_of_rpc, msgid);
 	} else {
 		debug(D_DATASWARM, "worker does not know about message id: %" PRId64, msgid);
+	}
+
+DONE:
+	if (!set_storage) {
+		mq_store_buffer(r->connection, &r->recv_buffer, 0);
 	}
 
 	jx_delete(msg);
@@ -72,7 +94,7 @@ jx_int_t ds_rpc( struct ds_manager *m, struct ds_worker_rep *r, struct jx *rpc)
 	jx_int_t msgid = m->message_id++;
 	jx_insert_integer(rpc, "id", msgid);
 
-	ds_json_send(r->link,rpc,time(0)+m->stall_timeout);
+	ds_json_send(r->connection,rpc);
 	jx_delete(rpc);
 
 	return msgid;
@@ -193,16 +215,12 @@ jx_int_t ds_rpc_blob_put( struct ds_manager *m, struct ds_worker_rep *r, const c
 
 	jx_int_t msgid = ds_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_PUT);
 
-	FILE *file = fopen(filename,"r");
+	int file = open(filename, O_RDONLY);
+	if (file < 0) {
+			fatal("couldd't open %s", filename);
+	}
 
-	fseek(file,0,SEEK_END);
-	int64_t length = ftell(file);
-	fseek(file,0,SEEK_SET);
-	char *filesize = string_format("%" PRId64 "\n",length);
-	link_write(r->link,filesize,strlen(filesize),time(0)+m->stall_timeout);
-	free(filesize);
-	link_stream_from_file(r->link,file,length,time(0)+m->stall_timeout);
-	fclose(file);
+	mq_send_fd(r->connection, file, 0);
 
 	return msgid;
 }
@@ -243,20 +261,12 @@ ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const c
 
 	ds_result_t result = DS_RESULT_UNABLE;
 
-	int64_t actual;
-	char line[16];
-	actual = link_readline(r->link,line,sizeof(line),time(0)+m->stall_timeout);
-	if(actual>0) {
-		int64_t length = atoll(line);
-		FILE *file = fopen(b->put_get_path,"w");
-		if(file) {
-			actual = link_stream_to_file(r->link,file,length,time(0)+m->stall_timeout);
-			fclose(file);
-			if(actual==length) {
-				result = DS_RESULT_SUCCESS;
-			}
-		}
-
+	int file = open(b->put_get_path, O_WRONLY|O_CREAT|O_EXCL, 0777);
+	if(file < 0) {
+		mq_store_buffer(r->connection, &r->recv_buffer, 0);
+	} else {
+		mq_store_fd(r->connection, file, 0);
+		result = DS_RESULT_SUCCESS;
 	}
 
 	return result;

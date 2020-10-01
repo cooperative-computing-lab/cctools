@@ -5,7 +5,6 @@
 #include "ds_worker.h"
 
 #include "jx.h"
-#include "link.h"
 
 ds_result_t ds_blob_table_create( struct ds_worker *w, const char *blobid, jx_int_t size, struct jx *meta );
 ds_result_t ds_blob_table_put( struct ds_worker *w, const char *blobid);

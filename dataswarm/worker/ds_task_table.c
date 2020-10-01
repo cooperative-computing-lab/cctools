@@ -28,7 +28,7 @@ static void update_task_state( struct ds_worker *w, struct ds_task *task, ds_tas
 
 	if(send_update_message) {
 		struct jx *msg = ds_message_task_update( task->taskid, ds_task_state_string(state) );
-		ds_json_send(w->manager_link,msg,time(0)+w->long_timeout);
+		ds_json_send(w->manager_connection,msg);
 		free(msg);
 	}
 }

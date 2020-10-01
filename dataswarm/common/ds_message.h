@@ -1,8 +1,9 @@
 #ifndef DATASWARM_MESSAGE_H
 #define DATASWARM_MESSAGE_H
 
-#include "link.h"
+#include "mq.h"
 #include "jx.h"
+#include "buffer.h"
 
 #include <time.h>
 
@@ -22,11 +23,11 @@ typedef enum {
     DS_RESULT_BLOBID_EXISTS,  /* attempt to create a task which already exists. */
 } ds_result_t;
 
-int        ds_json_send( struct link *l, struct jx *j, time_t stoptime );
-struct jx *ds_json_recv( struct link *l, time_t stoptime );
+int ds_json_send( struct mq *mq, struct jx *j );
+int ds_message_send( struct mq *mq, const char *str, int length );
+int ds_fd_send(struct mq *mq, int fd, size_t length);
 
-int   ds_message_send( struct link *l, const char *str, int length, time_t stoptime );
-char *ds_message_recv( struct link *l, time_t stoptime );
+struct jx *ds_parse_message(buffer_t *buf);
 
 struct jx * ds_message_standard_response( int64_t id, ds_result_t code, struct jx *params );
 struct jx * ds_message_task_update( const char *taskid, const char *state );
