@@ -3,6 +3,8 @@
 
 #include <inttypes.h>
 
-char * ds_hash( const char *path, int64_t *size );
+int64_t ds_hash_and_measure( const char *path, char *hash );
+
+int64_t ds_measure( const char *path );
 
 #endif

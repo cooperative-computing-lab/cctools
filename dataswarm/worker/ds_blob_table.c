@@ -225,21 +225,16 @@ ds_result_t ds_blob_table_commit(struct ds_worker * w, const char *blobid)
 		if(b->state == DS_BLOB_RW) {
 			b->state = DS_BLOB_RO;
 
-			int64_t newsize;
 			char *blob_data = ds_worker_blob_data(w,blobid);
-			char *hash = ds_hash(blob_data,&newsize);
 
-			debug(D_DATASWARM,"blob %s measured %lld MB (created as %lld MB)",blobid,(long long)newsize,(long long)b->size);
+			// Measure the actual size of the committed object.  (Could be slow)
+			int64_t newsize = ds_measure(blob_data);
+			int64_t difference = b->size-newsize;
+			debug(D_DATASWARM,"blob %s measured %lld MB (change of %lld MB)",blobid,(long long)newsize,(long long)difference);
 
-			// Update the storage used based on actual size
-			w->resources_inuse->disk += newsize - b->size;
+			// Update the storage allocation based on actual size
+			ds_disk_alloc(w,difference);
 			b->size = newsize;
-
-			// XXX do something with the hash here.
-			// Need to update the blob structure to include the hash.
-
-			free(blob_data);
-			free(hash);
 
 			// Now store the new metadata in the filesystem.
 			char *blob_meta = ds_worker_blob_meta(w,blobid);
