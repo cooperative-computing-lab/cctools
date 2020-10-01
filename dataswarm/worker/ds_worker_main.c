@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
 
 	/* Override with options, if necessary. */
 	if(manual_cores!=0)  w->resources_total->cores = manual_cores;
-	if(manual_memory==0) w->resources_total->memory = manual_memory;
+	if(manual_memory!=0) w->resources_total->memory = manual_memory;
 	if(manual_disk!=0)   w->resources_total->disk = manual_disk;
 
 	/* Now load all saved task/blob state from disk. */
