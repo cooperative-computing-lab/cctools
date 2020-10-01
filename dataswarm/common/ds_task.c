@@ -19,7 +19,7 @@ struct ds_task * ds_task_create( struct jx *jtask )
 	t->environment = jx_lookup(jtask,"environment");
 	if(t->environment) t->environment = jx_copy(t->environment);
 
-	t->resources = ds_resources_create(jx_lookup(jtask,"resources"));
+	t->resources = ds_resources_create_from_jx(jx_lookup(jtask,"resources"));
 	t->mounts = ds_mounts_create(jx_lookup(jtask,"namespace"));
 
 	return t;

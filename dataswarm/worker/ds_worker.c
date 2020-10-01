@@ -21,11 +21,15 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "create_dir.h"
 #include "hash_table.h"
+#include "host_disk_info.h"
+#include "host_memory_info.h"
+#include "load_average.h"
 #include "xxmalloc.h"
 
-#include "ds_worker.h"
 #include "common/ds_message.h"
 #include "common/ds_task.h"
+#include "common/ds_resources.h"
+#include "ds_worker.h"
 #include "ds_process.h"
 #include "ds_task_table.h"
 #include "ds_blob_table.h"
@@ -240,6 +244,78 @@ void ds_worker_connect_by_name(struct ds_worker *w, const char *manager_name)
 	free(expr);
 }
 
+void ds_worker_resources_debug( struct ds_worker *w )
+{
+	debug(D_DATASWARM,"inuse: %lld cores, %lld MB memory, %lld MB disk\n",
+		(long long) w->resources_inuse->cores,
+		(long long) w->resources_inuse->memory/MEGA,
+		(long long) w->resources_inuse->disk/MEGA
+	);
+}
+
+void ds_worker_measure_resources( struct ds_worker *w )
+{
+	uint64_t avail, total;
+
+	host_memory_info_get(&avail,&total);
+	w->resources_total->memory = total;
+
+	/*
+	Note the use of avail is deliberate here: the worker's total
+	space is the sum of what's free + the size of blobs already
+	stored, which we work out later in ds_blob_table_recover.
+	*/
+ 
+	host_disk_info_get(w->workspace,&avail,&total);
+	w->resources_total->disk = avail;
+
+	w->resources_total->cores = load_average_get_cpus();
+}
+
+/*
+ds_worker_resources_avail/alloc/free work on the resource triples
+of cores/memory/disk that are needed by tasks.  However, note that
+when tasks complete, they no longer need cores/memory, but they
+still occupy disk until deleted.
+*/
+
+int ds_worker_resources_avail( struct ds_worker *w, struct ds_resources *r )
+{
+	return r->cores+w->resources_inuse->cores <= w->resources_total->cores
+		&& r->memory + w->resources_inuse->memory <= w->resources_total->memory
+		&& r->disk + w->resources_inuse->disk <= w->resources_total->disk;
+}
+
+void ds_worker_resources_alloc( struct ds_worker *w, struct ds_resources *r )
+{
+	ds_resources_add(w->resources_inuse,r);
+	ds_worker_resources_debug(w);
+}
+
+void ds_worker_resources_free_except_disk( struct ds_worker *w, struct ds_resources *r )
+{
+	ds_resources_sub(w->resources_inuse,r);
+	w->resources_inuse->disk += r->disk;
+	ds_worker_resources_debug(w);
+}
+
+int ds_worker_disk_avail( struct ds_worker *w, int64_t size )
+{
+	return size<=(w->resources_total->disk-w->resources_inuse->disk);
+}
+
+void ds_worker_disk_alloc( struct ds_worker *w, int64_t size )
+{
+	w->resources_inuse->disk += size;
+	ds_worker_resources_debug(w);
+}
+
+void ds_worker_disk_free( struct ds_worker *w, int64_t size )
+{
+	w->resources_inuse->disk -= size;
+	ds_worker_resources_debug(w);
+}
+
 char * ds_worker_task_dir( struct ds_worker *w, const char *taskid )
 {
 	return string_format("%s/task/%s",w->workspace,taskid);
@@ -290,6 +366,9 @@ struct ds_worker *ds_worker_create(const char *workspace)
 	w->blob_table = hash_table_create(0,0);
 	w->workspace = strdup(workspace);
 
+	w->resources_total = ds_resources_create(0,0,0);
+	w->resources_inuse = ds_resources_create(0,0,0);
+
 	w->idle_timeout = 300;
 	w->long_timeout = 3600;
 	w->min_connect_retry = 1;
@@ -307,10 +386,7 @@ struct ds_worker *ds_worker_create(const char *workspace)
 	chdir(w->workspace);
 
 	mkdir("task", 0777);
-	mkdir("task/deleting", 0777);
-
 	mkdir("blob", 0777);
-	mkdir("blob/deleting", 0777);
 
 	return w;
 }

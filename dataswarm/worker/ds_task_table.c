@@ -9,6 +9,7 @@
 #include "stringtools.h"
 #include "debug.h"
 #include "delete_dir.h"
+#include "macros.h"
 
 #include <dirent.h>
 #include <string.h>
@@ -20,6 +21,11 @@ and then send an async update message if requested.
 
 static void update_task_state( struct ds_worker *w, struct ds_task *task, ds_task_state_t state, int send_update_message )
 {
+	debug(D_DATASWARM,"task %s %s -> %s",
+	      task->taskid,
+	      ds_task_state_string(task->state),
+	      ds_task_state_string(state));
+
 	task->state = state;
 
 	char * task_meta = ds_worker_task_meta(w,task->taskid);
@@ -43,6 +49,7 @@ ds_result_t ds_task_table_submit( struct ds_worker *w, const char *taskid, struc
 	task = ds_task_create(jtask);
 	if(task) {
 		hash_table_insert(w->task_table, taskid, task);
+		debug(D_DATASWARM,"task %s created",taskid);
 		return DS_RESULT_SUCCESS;
 	} else {
 		return DS_RESULT_BAD_PARAMS;
@@ -102,15 +109,19 @@ void ds_task_table_advance( struct ds_worker *w )
 
 		switch(task->state) {
 			case DS_TASK_READY:
-				// XXX only start tasks when resources available.
+				if(!ds_worker_resources_avail(w,task->resources)) break;
+
 				process = ds_process_create(task,w);
 				if(process) {
 					hash_table_insert(w->process_table,taskid,process);
 					// XXX check for invalid mounts?
 					if(ds_process_start(process,w)) {
 						update_task_state(w,task,DS_TASK_RUNNING,1);
+						ds_worker_resources_alloc(w,task->resources);
 					} else {
 						update_task_state(w,task,DS_TASK_FAILED,1);
+						// Mark disk as allocated to match free during delete.
+						ds_worker_disk_alloc(w,task->resources->disk);
 					}
 				} else {
 					update_task_state(w,task,DS_TASK_FAILED,1);
@@ -119,6 +130,7 @@ void ds_task_table_advance( struct ds_worker *w )
 			case DS_TASK_RUNNING:
 				process = hash_table_lookup(w->process_table,taskid);
 				if(ds_process_isdone(process)) {
+					ds_worker_resources_free_except_disk(w,task->resources);
 					update_task_state(w,task,DS_TASK_DONE,1);
 				}
 				break;
@@ -145,7 +157,10 @@ void ds_task_table_advance( struct ds_worker *w )
 				// Send the deleted message (need the task structure still)
 				update_task_state(w,task,DS_TASK_DELETED,1);
 
-				// Now remove and delete the process and task structures.
+				// Now note that the storage has been reclaimed.
+				ds_worker_disk_free(w,task->resources->disk);
+
+				// Remove and delete the process and task structures.
 				process = hash_table_remove(w->process_table,taskid);
 				if(process) ds_process_delete(process);
 				task = hash_table_remove(w->task_table,taskid);
@@ -173,6 +188,7 @@ void ds_task_table_recover( struct ds_worker *w )
 
 	DIR *dir;
 	struct dirent *d;
+	int64_t total_disk_used=0;
 
 	debug(D_DATASWARM,"checking %s for tasks to recover...",task_dir);
 
@@ -182,7 +198,6 @@ void ds_task_table_recover( struct ds_worker *w )
 	while((d=readdir(dir))) {
 		if(!strcmp(d->d_name,".")) continue;
 		if(!strcmp(d->d_name,"..")) continue;
-		if(!strcmp(d->d_name,"deleting")) continue;
 
 		char * task_meta;
 		struct ds_task *task;
@@ -195,15 +210,26 @@ void ds_task_table_recover( struct ds_worker *w )
 		if(task) {
 			hash_table_insert(w->task_table,task->taskid,task);
 			if(task->state==DS_TASK_RUNNING) {
+				// If it was running, then it's not now.
 				update_task_state(w,task,DS_TASK_FAILED,0);
 			}
-			// Note that deleted tasks will be handled in task_advance.
+			if(task->state!=DS_TASK_READY) {
+				// If it got past running, then the storage was allocated
+				total_disk_used += task->resources->disk;
+			}
+			// Note that tasks still deleting will be handled in task_advance.
 		}
 		free(task_meta);
 
 	}
 
-	debug(D_DATASWARM,"done recovering tasks");
 	closedir(dir);
 	free(task_dir);
+
+	debug(D_DATASWARM,"done recovering tasks");
+	debug(D_DATASWARM,"%d tasks recovered using %lld MB disk",
+		hash_table_size(w->task_table),(long long)total_disk_used);
+
+	// Account for the total allocated size of task sandboxes.
+	ds_worker_disk_alloc(w,total_disk_used);
 }

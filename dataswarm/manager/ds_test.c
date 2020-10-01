@@ -88,8 +88,8 @@ void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
 		return;
 	}
 
-	ds_rpc_blob_create(m,r,bloba,100000,NULL);
-	ds_rpc_blob_create(m,r,blobb,100000,NULL);
+	ds_rpc_blob_create(m,r,bloba,2000000,NULL);
+	ds_rpc_blob_create(m,r,blobb,4000000,NULL);
 	if(!wait_for_rpcs(m, r)) {
 		debug(D_DATASWARM, "There was an error with an rpc. Cannot continue.");
 		return;
@@ -116,6 +116,7 @@ void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
 				blobb, jx_objectv("type", jx_string("stdout"),
 					NULL),
 				NULL),
+				 "resources", jx_objectv("cores",jx_integer(1),"memory",jx_integer(4096000),"disk",jx_integer(16000000),NULL),
 			NULL);
 
 
