@@ -229,8 +229,8 @@ ds_result_t ds_blob_table_commit(struct ds_worker * w, const char *blobid)
 
 			// Measure the actual size of the committed object.  (Could be slow)
 			int64_t newsize = ds_measure(blob_data);
-			int64_t difference = b->size-newsize;
-			debug(D_DATASWARM,"blob %s measured %lld MB (change of %lld MB)",blobid,(long long)newsize,(long long)difference);
+			int64_t difference = newsize-b->size;
+			debug(D_DATASWARM,"blob %s measured %lld MB (change of %lld MB)",blobid,(long long)newsize/MEGA,(long long)difference/MEGA);
 
 			// Update the storage allocation based on actual size
 			ds_disk_alloc(w,difference);
