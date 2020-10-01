@@ -21,6 +21,11 @@ and then send an async update message if requested.
 
 static void update_task_state( struct ds_worker *w, struct ds_task *task, ds_task_state_t state, int send_update_message )
 {
+	debug(D_DATASWARM,"task %s %s -> %s",
+	      task->taskid,
+	      ds_task_state_string(task->state),
+	      ds_task_state_string(state));
+
 	task->state = state;
 
 	char * task_meta = ds_worker_task_meta(w,task->taskid);
@@ -39,6 +44,7 @@ ds_result_t ds_task_table_submit( struct ds_worker *w, const char *taskid, struc
 	struct ds_task *task = ds_task_create(jtask);
 	if(task) {
 		hash_table_insert(w->task_table, taskid, task);
+		debug(D_DATASWARM,"task %s created",taskid);
 		return DS_RESULT_SUCCESS;
 	} else {
 		return DS_RESULT_BAD_PARAMS;
