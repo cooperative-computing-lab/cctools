@@ -18,6 +18,8 @@ typedef enum {
     DS_RESULT_UNABLE,         /* could not complete request for internal reason */
     DS_RESULT_PENDING,        /* rpc not completed yet. */
     DS_RESULT_BAD_STATE,      /* cannot take that action in this state. */
+    DS_RESULT_TASKID_EXISTS,  /* attempt to create a task which already exists. */
+    DS_RESULT_BLOBID_EXISTS,  /* attempt to create a task which already exists. */
 } ds_result_t;
 
 int        ds_json_send( struct link *l, struct jx *j, time_t stoptime );
