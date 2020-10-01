@@ -58,12 +58,19 @@ struct ds_worker {
 };
 
 struct ds_worker *ds_worker_create();
+void ds_worker_delete(struct ds_worker *w);
 
 void ds_worker_connect_by_name( struct ds_worker *w, const char *manager_name );
 void ds_worker_connect_loop( struct ds_worker *w, const char *manager_host, int manager_port );
-void ds_worker_measure_resources( struct ds_worker *w );
 
-void ds_worker_delete(struct ds_worker *w);
+void ds_worker_measure_resources( struct ds_worker *w );
+int  ds_worker_resources_avail( struct ds_worker *w, struct ds_resources *r );
+void ds_worker_resources_alloc( struct ds_worker *w, struct ds_resources *r );
+void ds_worker_resources_free_except_disk( struct ds_worker *w, struct ds_resources *r );
+
+int  ds_worker_disk_avail( struct ds_worker *w, int64_t size );
+void ds_worker_disk_alloc( struct ds_worker *w, int64_t size );
+void ds_worker_disk_free( struct ds_worker *w, int64_t size );
 
 char * ds_worker_task_dir( struct ds_worker *w, const char *taskid );
 char * ds_worker_task_sandbox( struct ds_worker *w, const char *taskid );

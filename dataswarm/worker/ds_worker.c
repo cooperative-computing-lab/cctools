@@ -255,6 +255,56 @@ void ds_worker_measure_resources( struct ds_worker *w )
 	w->resources_total->cores = load_average_get_cpus();
 }
 
+/*
+ds_worker_resources_avail/alloc/free work on the resource triples
+of cores/memory/disk that are needed by tasks.  However, note that
+when tasks complete, they no longer need cores/memory, but they
+still occupy disk until deleted.
+*/
+
+int ds_worker_resources_avail( struct ds_worker *w, struct ds_resources *r )
+{
+	return r->cores+w->resources_inuse->cores <= w->resources_total->cores
+		&& r->memory + w->resources_inuse->memory <= w->resources_total->memory
+		&& r->disk + w->resources_inuse->disk <= w->resources_total->disk;
+}
+
+void ds_worker_resources_alloc( struct ds_worker *w, struct ds_resources *r )
+{
+	ds_resources_add(w->resources_inuse,r);
+}
+
+void ds_worker_resources_free_except_disk( struct ds_worker *w, struct ds_resources *r )
+{
+	ds_resources_sub(w->resources_inuse,r);
+	w->resources_inuse->disk += r->disk;
+}
+
+int ds_worker_disk_avail( struct ds_worker *w, int64_t size )
+{
+	if(size<=(w->resources_total->disk-w->resources_inuse->disk)) {
+		return 1;
+	} else {
+		debug(D_DATASWARM,"disk inuse: %lld MB (not enough for %lld MB request)",
+			(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
+		return 0;
+	}
+}
+
+void ds_worker_disk_alloc( struct ds_worker *w, int64_t size )
+{
+	w->resources_inuse->disk += size;
+	debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB alloc)",
+		(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
+}
+
+void ds_worker_disk_free( struct ds_worker *w, int64_t size )
+{
+	w->resources_inuse->disk -= size;
+	debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB freed)",
+		(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
+}
+
 char * ds_worker_task_dir( struct ds_worker *w, const char *taskid )
 {
 	return string_format("%s/task/%s",w->workspace,taskid);

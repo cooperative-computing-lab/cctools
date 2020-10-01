@@ -1,5 +1,5 @@
 
-#include "ds_hash.h"
+#include "ds_measure.h"
 
 #include "md5.h"
 #include "stringtools.h"
@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <errno.h>
 
-int64_t ds_hash_and_measure( const char *path, char *hash )
+int64_t ds_measure_and_hash( const char *path, char *hash )
 {
 	struct stat info;
 
@@ -36,7 +36,7 @@ int64_t ds_hash_and_measure( const char *path, char *hash )
 			char subhash[33];
 			char *subpath = string_format("%s/%s",path,d->d_name);
 
-			int64_t subsize = ds_hash_and_measure(subpath,subhash);
+			int64_t subsize = ds_measure_and_hash(subpath,subhash);
 			if(subsize<0) {
 				debug(D_DATASWARM,"couldn't measure %s: %s",subpath,strerror(errno));
 				totalsize = -1;

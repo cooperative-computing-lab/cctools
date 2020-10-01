@@ -83,42 +83,6 @@ ds_result_t ds_task_table_list( struct ds_worker *w, struct jx **result )
 }
 
 /*
-Operations on task/worker resources.
-Perhaps these might be better places in ds_worker?
-*/
-
-/* Return true if the worker has enough resources to start the task. */
-
-int ds_task_resources_avail( struct ds_worker *w, struct ds_task *t )
-{
-	return t->resources->cores+w->resources_inuse->cores <= w->resources_total->cores
-		&& t->resources->memory + w->resources_inuse->memory <= w->resources_total->memory
-		&& t->resources->disk + w->resources_inuse->disk <= w->resources_total->disk;
-}
-
-/* Allocate the resources needed for this task. */
-
-void ds_task_resources_alloc( struct ds_worker *w, struct ds_task *t )
-{
-	ds_resources_add(w->resources_inuse,t->resources);
-}
-
-/* When the task is done, free the resources, except disk */
-
-void ds_task_resources_free( struct ds_worker *w, struct ds_task *t )
-{
-	ds_resources_sub(w->resources_inuse,t->resources);
-	w->resources_inuse->disk += t->resources->disk;
-}
-
-/* When the task is fully deleted, free the disk. */
-
-void ds_task_disk_free( struct ds_worker *w, struct ds_task *t )
-{
-	w->resources_inuse->disk -= t->resources->disk;
-}
-
-/*
 Consider each task currently in possession of the worker,
 and act according to it's current state.
 */
@@ -134,19 +98,18 @@ void ds_task_table_advance( struct ds_worker *w )
 
 		switch(task->state) {
 			case DS_TASK_READY:
-				if(!ds_task_resources_avail(w,task)) break;
+				if(!ds_worker_resources_avail(w,task->resources)) break;
 
 				process = ds_process_create(task,w);
 				if(process) {
 					hash_table_insert(w->process_table,taskid,process);
 					// XXX check for invalid mounts?
-					ds_task_resources_alloc(w,task);
+					ds_worker_resources_alloc(w,task->resources);
 					if(ds_process_start(process,w)) {
 						update_task_state(w,task,DS_TASK_RUNNING,1);
 					} else {
 						update_task_state(w,task,DS_TASK_FAILED,1);
-						ds_task_resources_free(w,task);
-						// Note storage is not reclaimed until delete.
+						ds_worker_resources_free_except_disk(w,task->resources);
 					}
 				} else {
 					update_task_state(w,task,DS_TASK_FAILED,1);
@@ -155,7 +118,7 @@ void ds_task_table_advance( struct ds_worker *w )
 			case DS_TASK_RUNNING:
 				process = hash_table_lookup(w->process_table,taskid);
 				if(ds_process_isdone(process)) {
-					ds_task_resources_free(w,task);
+					ds_worker_resources_free_except_disk(w,task->resources);
 					update_task_state(w,task,DS_TASK_DONE,1);
 				}
 				break;
@@ -183,7 +146,7 @@ void ds_task_table_advance( struct ds_worker *w )
 				update_task_state(w,task,DS_TASK_DELETED,1);
 
 				// Now note that the storage has been reclaimed.
-				ds_task_disk_free(w,task);
+				ds_worker_disk_free(w,task->resources->disk);
 
 				// Remove and delete the process and task structures.
 				process = hash_table_remove(w->process_table,taskid);
@@ -256,5 +219,5 @@ void ds_task_table_recover( struct ds_worker *w )
 		hash_table_size(w->task_table),(long long)total_disk_used);
 
 	// Account for the total allocated size of task sandboxes.
-	w->resources_inuse->disk += total_disk_used;
+	ds_worker_disk_alloc(w,total_disk_used);
 }

@@ -1,7 +1,7 @@
 #include "common/ds_blob.h"
 #include "common/ds_message.h"
 #include "ds_blob_table.h"
-#include "ds_hash.h"
+#include "ds_measure.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -20,38 +20,13 @@
 #include <errno.h>
 #include <string.h>
 
-int ds_disk_avail( struct ds_worker *w, int64_t size )
-{
-	if(size<=(w->resources_total->disk-w->resources_inuse->disk)) {
-		return 1;
-	} else {
-		debug(D_DATASWARM,"disk inuse: %lld MB (not enough for %lld MB request)",
-			(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
-		return 0;
-	}
-}
-
-void ds_disk_alloc( struct ds_worker *w, int64_t size )
-{
-	w->resources_inuse->disk += size;
-	debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB alloc)",
-		(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
-}
-
-void ds_disk_free( struct ds_worker *w, int64_t size )
-{
-	w->resources_inuse->disk -= size;
-	debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB freed)",
-		(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
-}
-
 ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int_t size, struct jx *meta)
 {
 	if(!blobid || size<0) {
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	if(!ds_disk_avail(w,size)) {
+	if(!ds_worker_disk_avail(w,size)) {
 		return DS_RESULT_TOO_FULL;
 	}
 
@@ -66,7 +41,7 @@ ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int
 		if(ds_blob_to_file(b, blob_meta)) {
 			hash_table_insert(w->blob_table,blobid,b);
 			/* space is accounted for on creation before data arrives */
-			ds_disk_alloc(w,size);
+			ds_worker_disk_alloc(w,size);
 			result = DS_RESULT_SUCCESS;
 		} else {
 			debug(D_DATASWARM, "couldn't write %s: %s", blob_meta, strerror(errno));
@@ -233,7 +208,7 @@ ds_result_t ds_blob_table_commit(struct ds_worker * w, const char *blobid)
 			debug(D_DATASWARM,"blob %s measured %lld MB (change of %lld MB)",blobid,(long long)newsize/MEGA,(long long)difference/MEGA);
 
 			// Update the storage allocation based on actual size
-			ds_disk_alloc(w,difference);
+			ds_worker_disk_alloc(w,difference);
 			b->size = newsize;
 
 			// Now store the new metadata in the filesystem.
@@ -289,7 +264,7 @@ ds_result_t ds_blob_table_delete(struct ds_worker * w, const char *blobid)
 	delete_dir(blob_dir);
 
 	// Account for space only after the whole object is deleted
-	ds_disk_free(w,b->size);
+	ds_worker_disk_free(w,b->size);
 
 	// Now free up the data structures.
 	hash_table_remove(w->blob_table,blobid);
