@@ -2,7 +2,7 @@
 #include "ds_rpc.h"
 #include "ds_blob_rep.h"
 #include "ds_task_rep.h"
-#include "common/ds_message.h"
+#include "ds_message.h"
 
 #include "debug.h"
 #include "itable.h"

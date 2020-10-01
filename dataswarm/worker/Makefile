@@ -7,8 +7,8 @@ PROGRAMS=ds_worker
 SOURCES=ds_worker_main.c ds_worker.c ds_process.c ds_task_table.c ds_blob_table.c ds_measure.c
 OBJECTS=$(SOURCES:%.c=%.o)
 
-LOCAL_CCFLAGS = -I ..
-LOCAL_LINKAGE = -L ../../dttools/src -ldttools -L ../common -ldataswarm_common
+LOCAL_CCFLAGS = -I ../common
+LOCAL_LINKAGE = -L ../common -ldataswarm_common -L ../../dttools/src -ldttools
 
 all: $(TARGETS)
 

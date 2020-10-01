@@ -1,7 +1,7 @@
 #ifndef DATASWARM_RPC_H
 #define DATASWARM_RPC_H
 
-#include "common/ds_message.h"
+#include "ds_message.h"
 #include "ds_manager.h"
 #include "ds_worker_rep.h"
 

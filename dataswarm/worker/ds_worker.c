@@ -26,9 +26,9 @@ See the file COPYING for details.
 #include "load_average.h"
 #include "xxmalloc.h"
 
-#include "common/ds_message.h"
-#include "common/ds_task.h"
-#include "common/ds_resources.h"
+#include "ds_message.h"
+#include "ds_task.h"
+#include "ds_resources.h"
 #include "ds_worker.h"
 #include "ds_process.h"
 #include "ds_task_table.h"

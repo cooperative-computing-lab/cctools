@@ -1,7 +1,7 @@
 #include "ds_worker.h"
 #include "ds_blob_table.h"
 #include "ds_task_table.h"
-#include "common/ds_resources.h"
+#include "ds_resources.h"
 
 #include "debug.h"
 #include "stringtools.h"

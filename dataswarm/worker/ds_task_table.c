@@ -1,8 +1,8 @@
 #include "ds_task_table.h"
 #include "ds_worker.h"
 #include "ds_process.h"
-#include "common/ds_task.h"
-#include "common/ds_message.h"
+#include "ds_task.h"
+#include "ds_message.h"
 
 #include "hash_table.h"
 #include "jx.h"

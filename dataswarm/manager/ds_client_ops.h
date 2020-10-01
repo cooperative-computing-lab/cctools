@@ -1,11 +1,9 @@
 #ifndef DATASWARM_CLIENT_OPS_H
 #define DATASWARM_CLIENT_OPS_H
 
-#include "jx.h"
-#include "common/ds_task.h"
+#include "ds_task.h"
 #include "ds_file.h"
 #include "ds_manager.h"
-
 
 //task operations
 char *ds_submit_task(struct jx *task, struct ds_manager *m);

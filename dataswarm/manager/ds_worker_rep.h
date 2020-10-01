@@ -12,7 +12,7 @@ of the actual client process that runs somewhere else.
 #include "buffer.h"
 #include "link.h"
 
-#include "common/ds_message.h"
+#include "ds_message.h"
 
 struct ds_worker_rep {
 	struct mq *connection;
