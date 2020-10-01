@@ -104,12 +104,13 @@ void ds_task_table_advance( struct ds_worker *w )
 				if(process) {
 					hash_table_insert(w->process_table,taskid,process);
 					// XXX check for invalid mounts?
-					ds_worker_resources_alloc(w,task->resources);
 					if(ds_process_start(process,w)) {
 						update_task_state(w,task,DS_TASK_RUNNING,1);
+						ds_worker_resources_alloc(w,task->resources);
 					} else {
 						update_task_state(w,task,DS_TASK_FAILED,1);
-						ds_worker_resources_free_except_disk(w,task->resources);
+						// Mark disk as allocated to match free during delete.
+						ds_worker_disk_alloc(w,task->resources->disk);
 					}
 				} else {
 					update_task_state(w,task,DS_TASK_FAILED,1);
