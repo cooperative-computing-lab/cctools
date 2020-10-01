@@ -35,7 +35,12 @@ static void update_task_state( struct ds_worker *w, struct ds_task *task, ds_tas
 
 ds_result_t ds_task_table_submit( struct ds_worker *w, const char *taskid, struct jx *jtask )
 {
-	struct ds_task *task = ds_task_create(jtask);
+	struct ds_task *task = hash_table_lookup(w->task_table,taskid);
+	if(!task) {
+		return DS_RESULT_TASKID_EXISTS;
+	}
+
+	task = ds_task_create(jtask);
 	if(task) {
 		hash_table_insert(w->task_table, taskid, task);
 		return DS_RESULT_SUCCESS;

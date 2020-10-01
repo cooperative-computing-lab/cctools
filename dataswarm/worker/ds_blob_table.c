@@ -23,6 +23,10 @@ ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int
 	}
 	// XXX should here check for available space
 
+	if(hash_table_lookup(w->blob_table,blobid)) {
+		return DS_RESULT_BLOBID_EXISTS;
+	}
+
 	char *blob_dir = ds_worker_blob_dir(w,blobid);
 	char *blob_meta = ds_worker_blob_meta(w,blobid);
 
