@@ -11,7 +11,7 @@ libdataswarm_common.a: $(OBJECTS)
 	ar rv $@ $^
 
 clean:
-	rm -rf $(OBJECTS)
+	rm -rf $(OBJECTS) libdataswarm_common.a
 
 install:
 
