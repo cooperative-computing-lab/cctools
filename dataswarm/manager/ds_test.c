@@ -110,6 +110,7 @@ void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
 				blobb, jx_objectv("type", jx_string("stdout"),
 					NULL),
 				NULL),
+				 "resources", jx_objectv("cores",jx_integer(1),"memory",jx_integer(4096),"disk",jx_integer(16000),NULL),
 			NULL);
 
 
