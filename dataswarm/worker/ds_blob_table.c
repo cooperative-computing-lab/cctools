@@ -22,9 +22,7 @@
 
 int ds_disk_avail( struct ds_worker *w, int64_t size )
 {
-	if(size>(w->resources_total->disk-w->resources_inuse->disk)) {
-		debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB alloc)",
-			(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
+	if(size<=(w->resources_total->disk-w->resources_inuse->disk)) {
 		return 1;
 	} else {
 		debug(D_DATASWARM,"disk inuse: %lld MB (not enough for %lld MB request)",
@@ -36,6 +34,8 @@ int ds_disk_avail( struct ds_worker *w, int64_t size )
 void ds_disk_alloc( struct ds_worker *w, int64_t size )
 {
 	w->resources_inuse->disk += size;
+	debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB alloc)",
+		(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
 }
 
 void ds_disk_free( struct ds_worker *w, int64_t size )
