@@ -17,6 +17,7 @@ struct ds_blob * ds_blob_create( const char *blobid, jx_int_t size, struct jx *m
 	b->blobid = strdup(blobid);
 	b->state = DS_BLOB_RW;
 	b->size = size;
+	b->md5hash = 0;
 	b->meta = jx_copy(meta);
 	return b;
 }
@@ -26,6 +27,7 @@ void ds_blob_delete( struct ds_blob *b )
 	if(!b) return;
 	if(b->meta) jx_delete(b->meta);
 	if(b->blobid) free(b->blobid);
+	if(b->md5hash) free(b->md5hash);
 	free(b);
 }
 
@@ -36,6 +38,7 @@ struct ds_blob * ds_blob_create_from_jx( struct jx *jblob )
 	b->blobid = jx_lookup_string_dup(jblob,"blobid");
 	b->state = jx_lookup_integer(jblob,"state");
 	b->size = jx_lookup_integer(jblob,"size");
+	b->md5hash = jx_lookup_string_dup(jblob,"md5hash");
 	b->meta = jx_lookup(jblob,"meta");
 	if(b->meta) b->meta = jx_copy(b->meta);
 	return b;
@@ -67,6 +70,7 @@ struct jx * ds_blob_to_jx( struct ds_blob *b )
 	jx_insert_string(jblob,"blobid",b->blobid);
 	jx_insert_integer(jblob,"state",b->state);
 	jx_insert_integer(jblob,"size",b->size);
+	if(b->md5hash) jx_insert_string(jblob,"md5hash",b->md5hash);
 	if(b->meta) jx_insert(jblob,jx_string("meta"),jx_copy(b->meta));
 	return jblob;
 }

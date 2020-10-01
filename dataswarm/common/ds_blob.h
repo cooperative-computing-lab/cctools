@@ -14,6 +14,7 @@ struct ds_blob {
 	char *blobid;
 	ds_blob_state_t state;
 	int64_t size;
+	char *md5hash;
 	struct jx *meta;
 };
 
