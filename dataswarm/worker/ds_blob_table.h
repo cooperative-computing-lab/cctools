@@ -1,7 +1,7 @@
 #ifndef DATASWARM_BLOB_TABLE_H
 #define DATASWARM_BLOB_TABLE_H
 
-#include "common/ds_message.h"
+#include "ds_message.h"
 #include "ds_worker.h"
 
 #include "jx.h"

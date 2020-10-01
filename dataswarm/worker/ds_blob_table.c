@@ -1,5 +1,5 @@
-#include "common/ds_blob.h"
-#include "common/ds_message.h"
+#include "ds_blob.h"
+#include "ds_message.h"
 #include "ds_blob_table.h"
 #include "ds_measure.h"
 

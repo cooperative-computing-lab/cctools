@@ -7,7 +7,7 @@
 #include "link.h"
 #include "mq.h"
 
-#include "common/ds_resources.h"
+#include "ds_resources.h"
 
 struct ds_worker {
 	// Network connection to the manager process.
