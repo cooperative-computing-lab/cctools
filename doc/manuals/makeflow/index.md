@@ -122,6 +122,9 @@ To learn more about the various batch system options, see the Batch System
 Support section.
 
 
+!!! warning
+    You may have to slightly adapt the makeflow workflow file to work across different batch systems. This is because different batch systems have different expectations on whether the underlying filesystem is shared (e.g., slurm and torque), or not (e.g., condor and work queue). 
+
 ### JX Language
 
 The classic make language is easy to learn and suitable for many purposes, but
@@ -236,6 +239,16 @@ Makeflow supports a wide variety of batch systems. Use `makeflow --help` to
 see the current list supported. Generally speaking, simply run Makeflow with
 the `-T` option to select your desired batch system. If no option is given,
 then `-T local` is assumed.
+
+
+!!! warning
+    As mentioned before, different batch systems have different expectations on
+    whether the underlying filesystem is shared. For example, one workflow may
+    work with `-Tslurm`, but may fail with `-Tcondor`, etc. The most portable
+    workflows read and write files from the working directory of each rule. If
+    a rule depends on the creation of a directory, make this creation explicit,
+    as the directory may not be present for the intermidate results on the site
+    where the rule executes.
 
 If you need to pass additional parameters to your batch system, such as
 specifying a specific queue or machine category, use the `-B` option to
