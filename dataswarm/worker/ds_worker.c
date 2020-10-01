@@ -236,6 +236,15 @@ void ds_worker_connect_by_name(struct ds_worker *w, const char *manager_name)
 	free(expr);
 }
 
+void ds_worker_resources_debug( struct ds_worker *w )
+{
+	debug(D_DATASWARM,"inuse: %lld cores, %lld MB memory, %lld MB disk\n",
+		(long long) w->resources_inuse->cores,
+		(long long) w->resources_inuse->memory/MEGA,
+		(long long) w->resources_inuse->disk/MEGA
+	);
+}
+
 void ds_worker_measure_resources( struct ds_worker *w )
 {
 	uint64_t avail, total;
@@ -272,37 +281,31 @@ int ds_worker_resources_avail( struct ds_worker *w, struct ds_resources *r )
 void ds_worker_resources_alloc( struct ds_worker *w, struct ds_resources *r )
 {
 	ds_resources_add(w->resources_inuse,r);
+	ds_worker_resources_debug(w);
 }
 
 void ds_worker_resources_free_except_disk( struct ds_worker *w, struct ds_resources *r )
 {
 	ds_resources_sub(w->resources_inuse,r);
 	w->resources_inuse->disk += r->disk;
+	ds_worker_resources_debug(w);
 }
 
 int ds_worker_disk_avail( struct ds_worker *w, int64_t size )
 {
-	if(size<=(w->resources_total->disk-w->resources_inuse->disk)) {
-		return 1;
-	} else {
-		debug(D_DATASWARM,"disk inuse: %lld MB (not enough for %lld MB request)",
-			(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
-		return 0;
-	}
+	return size<=(w->resources_total->disk-w->resources_inuse->disk);
 }
 
 void ds_worker_disk_alloc( struct ds_worker *w, int64_t size )
 {
 	w->resources_inuse->disk += size;
-	debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB alloc)",
-		(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
+	ds_worker_resources_debug(w);
 }
 
 void ds_worker_disk_free( struct ds_worker *w, int64_t size )
 {
 	w->resources_inuse->disk -= size;
-	debug(D_DATASWARM,"disk inuse: %lld MB (%lld MB freed)",
-		(long long)w->resources_inuse->disk/MEGA,(long long)size/MEGA);
+	ds_worker_resources_debug(w);
 }
 
 char * ds_worker_task_dir( struct ds_worker *w, const char *taskid )
