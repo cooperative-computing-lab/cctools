@@ -3,9 +3,9 @@
 
 #include <string.h>
 
-const char *DECLARE_FILE[] = { "type", "project", "metadata" };
-const char *SUBMIT_TASK[] = { "type", "service", "project", "namespace", "resources", "event" };
-const char *SUBMIT_SERVICE[] = { "type", "project", "namespace", "resources", "environment" };
+const char *DECLARE_FILE[] = { "type", "project", "metadata", NULL };
+const char *SUBMIT_TASK[] = { "type", "service", "project", "namespace", "resources", "event", NULL };
+const char *SUBMIT_SERVICE[] = { "type", "project", "namespace", "resources", "environment", NULL };
 
 int is_in(const char *str, const char **array)
 {
