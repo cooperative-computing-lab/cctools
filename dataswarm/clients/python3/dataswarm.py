@@ -5,6 +5,7 @@
 import os
 import socket
 import json
+import struct
 from time import sleep
 
 import logging
@@ -15,10 +16,24 @@ class DataSwarm:
 
         self.log = self._setup_logging(log_level)
 
+        self.header_spec = '!2sBxL'
+        self.header_size = len(self._pack_header(0))
+
         self.socket = socket.socket()
         self.host = host
         self.port = int(port)
         self.connect()
+
+    def _pack_header(self, size):
+        return struct.pack(self.header_spec, b'MQ', 0b11, size)
+
+    def _unpack_header(self, header):
+        try:
+            components = struct.unpack(self.header_spec, header);
+        except struct.error as e:
+            self.log.error("Message has a malformed header: {}".format(e))
+            raise e
+        return components[-1]
 
     def _setup_logging(self, log_level):
         log = logging.getLogger('DataSwarm')
@@ -36,35 +51,22 @@ class DataSwarm:
         request = json.dumps(request)
         self.send_str(request)
         response = self.recv()
-
         return response
 
     def send_str(self, msg):
-        total = len(msg)
-        self.socket.send("{}\n".format(total).encode())
-        sent = self.socket.send(msg.encode())
+        msg = msg.encode()
+        size = len(msg)
+        hdr = self._pack_header(size)
+        self.socket.send(hdr)
+        self.socket.send(msg)
 
     def recv(self):
-        # this only works if there is only one message in the socket!  rewrite
-        # when manager uses mq. Ideally, first 8 bytes with msg size.
-        length_spec = self.socket.recv(4096)
-        newline = length_spec.find(b'\n')
-
-        if newline < 0:
-            raise Exception("No length of message found.")
-
-        length = int(length_spec[0:newline].decode())
-
-        response_first_part  = length_spec[newline+1:]
-
-        if len(response_first_part) < length:
-            response_second_part = self.socket.recv(length - len(response_first_part))
-            response = response_first_part + response_second_part
-        else:
-            response = response_first_part
-
+        header = self.socket.recv(self.header_size)
+        size   = self._unpack_header(header)
+        response = self.socket.recv(size)
         response = json.loads(response)
         self.log.debug("rx: {}".format(response))
+
         return response
 
     # Handle connecting to and disconnecting from manager
