@@ -53,7 +53,6 @@ struct dag_node {
 
 	const char *workflow_file;  /* Name of the sub-makeflow to run, if type is WORKFLOW */
 	struct jx *workflow_args;   /* Arguments to pass to the workflow. */
-	char *workflow_args_file;   /* Automatically generated temporary file to write workflow_args to disc. */
 	int workflow_is_jx;	    /* True is sub-workflow is jx, false otherwise. */
 
 	struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
@@ -107,6 +106,7 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, const ch
 void dag_node_add_target_file(struct dag_node *n, const char *filename, const char *remotename);
 
 void dag_node_set_command(struct dag_node *n, const char *cmd);
+const char *dag_node_nested_workflow_filename(struct dag_node *n, const char *which_file);
 void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx *args, int is_jx );
 void dag_node_insert(struct dag_node *n);
 

@@ -62,7 +62,6 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	// arguments for subworkflow nodes
 	n->workflow_args = NULL;
-	n->workflow_args_file = NULL;
 
 	return n;
 }
@@ -89,8 +88,6 @@ void dag_node_delete(struct dag_node *n)
 
 
 	jx_delete(n->workflow_args);
-	free(n->workflow_args_file);
-
 	free(n);
 }
 
@@ -104,6 +101,12 @@ void dag_node_set_command(struct dag_node *n, const char *cmd) {
 	n->command = xxstrdup(cmd);
 }
 
+const char *dag_node_nested_workflow_filename(struct dag_node *n, const char *which_file) {
+	static char filename[PATH_MAX];
+	snprintf(filename, PATH_MAX, "%s.%d.%s", n->workflow_file, n->nodeid, which_file);
+	return filename;
+}
+
 void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx * args, int is_jx )
 {
 	assert(n);
@@ -115,12 +118,12 @@ void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx * args
 	n->workflow_is_jx = is_jx;
 
 	n->workflow_args = jx_copy(args);
-	if(n->workflow_args) {
-		n->workflow_args_file = string_format("makeflow.jx.args.XXXXXX");
-		int fd = mkstemp(n->workflow_args_file);
-		FILE *argsfile = fdopen(fd,"w");
-		jx_print_stream(n->workflow_args,argsfile);
-		fclose(argsfile);
+
+	if(n->workflow_args) { 
+		const char *args_file = dag_node_nested_workflow_filename(n, "args");
+		FILE *file = fopen(args_file,"w");
+		jx_print_stream(n->workflow_args,file);
+		fclose(file);
 	}
 
 	/* Record a placeholder in the command field */
