@@ -281,54 +281,41 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 		batch_task_set_command(task, n->command);
 
 	} else if(n->type==DAG_NODE_TYPE_WORKFLOW) {
-
 		/* A sub-workflow must be expanded into a makeflow invocation */
+		buffer_t b;
+		buffer_init(&b);
+		buffer_printf(&b, "makeflow -T local %s", n->workflow_file);
 
-		char *cmd = string_format("makeflow -T local %s",n->workflow_file);
-		char *oldcmd = 0;
+		const char *log = dag_node_nested_workflow_filename(n, "makeflowlog");
+		buffer_printf(&b, " -l %s", log);
+		makeflow_hook_add_output_file(n->d,task,log,log,DAG_FILE_TYPE_TEMP);
 
 		/* Select the workflow language */
-
 		if(n->workflow_is_jx) {
-			oldcmd = cmd;
-			cmd = string_format("%s --jx",cmd);
-			free(oldcmd);
+			buffer_printf(&b, " --jx");
 		}
 
-		/* Generate the workflow arguments file */
-
+		/* Generate the filenames for nested workflows */
 		if(n->workflow_args) {
-			oldcmd = cmd;
-			cmd = string_format("%s --jx-args %s",cmd,n->workflow_args_file);
-			free(oldcmd);
-
-			/* Define this file as a temp so it is removed on completion. */
-			makeflow_hook_add_input_file(n->d,task,n->workflow_args_file,n->workflow_args_file,DAG_FILE_TYPE_TEMP);
+			const char *args_file = dag_node_nested_workflow_filename(n, "args");
+			buffer_printf(&b, " --jx-args %s", args_file);
+			makeflow_hook_add_input_file(n->d,task,args_file,args_file,DAG_FILE_TYPE_TEMP);
 		}
 
 		/* Add resource controls to the sub-workflow, if known. */
-
 		if(n->resources_requested->cores>0) {
-			oldcmd = cmd;
-			cmd = string_format("%s --local-cores %d",cmd,(int)n->resources_requested->cores);
-			free(oldcmd);
+			buffer_printf(&b, " --local-cores %" PRId64, n->resources_requested->cores);
 		}
-
 		if(n->resources_requested->memory>0) {
-			oldcmd = cmd;
-			cmd = string_format("%s --local-memory %d",cmd,(int)n->resources_requested->cores);
-			free(oldcmd);
+			buffer_printf(&b, " --local-memory %" PRId64, n->resources_requested->memory);
 		}
-
 		if(n->resources_requested->disk>0) {
-			oldcmd = cmd;
-			cmd = string_format("%s --local-disk %d",cmd,(int)n->resources_requested->cores);
-			free(oldcmd);
+			buffer_printf(&b, " --local-disk %" PRId64, n->resources_requested->disk);
 		}
 
-		batch_task_set_command(task, cmd);
 		batch_task_add_input_file(task,n->workflow_file,n->workflow_file);
-		free(cmd);
+		batch_task_set_command(task, buffer_tostring(&b));
+		buffer_free(&b);
 	} else {
 		fatal("invalid job type %d in dag node (%s)",n->type,n->command);
 	}
@@ -2520,15 +2507,15 @@ EXIT_WITH_FAILURE:
 		exit_value = EXIT_SUCCESS;
 	}
 
-	/* delete all jx args files. We do this here are some of these files may be created in clean mode. */
+	/* delete all files. We do this here are some of these files may be created in clean mode. */
 	{
 		struct dag_node *n;
 		uint64_t key;
 		itable_firstkey(d->node_table);
 		while(itable_nextkey(d->node_table, &key, (void **) &n)) {
-			if(n->workflow_args_file) {
-				debug(D_MAKEFLOW_RUN, "deleting tmp file: %s\n", n->workflow_args_file);
-				unlink(n->workflow_args_file);
+			if(n->workflow_args) {
+				debug(D_MAKEFLOW_RUN, "deleting tmp file: %s\n", dag_node_nested_workflow_filename(n, "args"));
+				unlink(dag_node_nested_workflow_filename(n, "args"));
 			}
 		}
 	}

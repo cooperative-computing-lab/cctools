@@ -60,6 +60,7 @@ run()
 clean()
 {
 	rm nested.jx nested2.jx nested.expected output.10
+    exit 0
 }
 
 dispatch "$@"
