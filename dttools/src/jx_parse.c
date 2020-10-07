@@ -1065,8 +1065,10 @@ struct jx * jx_parse_stream( FILE *file )
 struct jx * jx_parse_file( const char *name )
 {
 	FILE *file = fopen(name,"r");
-	if (!file)
+	if (!file) {
+		debug(D_JX, "Could not open jx file: %s", name);
 		return NULL;
+	}
 	struct jx *j = jx_parse_stream(file);
 	fclose(file);
 	return j;

@@ -218,6 +218,17 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 	struct dag_file *f;
 	char *name;
 
+	/*
+	Clean the node-specific state for workflow nodes.
+	*/
+	struct dag_node *n;
+	for(n = d->nodes; n; n = n->next) {
+		if(n->type==DAG_NODE_TYPE_WORKFLOW) {
+			makeflow_clean_node(d,queue,n);
+		}
+	}
+
+
 	hash_table_firstkey(d->files);
 	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 
@@ -253,18 +264,6 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 			return -1;
 		}
 		dag_mount_clean(d);
-	}
-
-	/*
-	Clean the node-specific state for workflow nodes.
-	Plain files have already been cleaned up at this point.
-	*/
-
-	struct dag_node *n;
-	for(n = d->nodes; n; n = n->next) {
-		if(n->type==DAG_NODE_TYPE_WORKFLOW) {
-			makeflow_clean_node(d,queue,n);
-		}
 	}
 
 	return 0;
