@@ -20,6 +20,26 @@
 #include <errno.h>
 #include <string.h>
 
+static void update_blob_state( struct ds_worker *w, struct ds_blob *blob, ds_blob_state_t state, int send_update_message )
+{
+	debug(D_DATASWARM,"blob %s %s -> %s",
+	      blob->blobid,
+	      ds_blob_state_string(blob->state),
+	      ds_blob_state_string(state));
+
+	blob->state = state;
+
+	char *blob_meta = ds_worker_blob_meta(w,blob->blobid);
+	ds_blob_to_file(blob,blob_meta);
+	free(blob_meta);
+
+	if(send_update_message) {
+		struct jx *msg = ds_message_blob_update( blob->blobid, state );
+		ds_json_send(w->manager_connection,msg);
+		free(msg);
+	}
+}
+
 ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int_t size, struct jx *meta)
 {
 	if(!blobid || size<0) {
