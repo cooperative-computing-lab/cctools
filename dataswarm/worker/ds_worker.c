@@ -115,7 +115,7 @@ void ds_worker_handle_message(struct ds_worker *w)
 	} else if(!strcmp(method, "blob-get")) {
 		result = ds_blob_table_get(w,blobid,id,&should_send_response);
 	} else if(!strcmp(method, "blob-delete")) {
-		result = ds_blob_table_delete(w,blobid);
+		result = ds_blob_table_deleting(w,blobid);
 	} else if(!strcmp(method, "blob-commit")) {
 		result = ds_blob_table_commit(w,blobid);
 	} else if(!strcmp(method, "blob-copy")) {

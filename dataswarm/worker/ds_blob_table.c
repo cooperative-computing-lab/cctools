@@ -221,28 +221,43 @@ ds_result_t ds_blob_table_commit(struct ds_worker * w, const char *blobid)
 	return result;
 }
 
-/*
-ds_blob_table_delete updates the metadata to the 'deleting'
-state, and then starts to delete the actual data.  Note that
-this could potentially take a long time, so if the worker
-dies before completing the delete, the state is known and
-the blob will be deleted in ds_blob_table_recover.
-*/
 
-ds_result_t ds_blob_table_delete(struct ds_worker * w, const char *blobid)
+/* ds_blob_table_deleting updates the metadata to the 'deleting'
+state, and then starts to delete the actual data.  Since deleting actual data
+may take this could potentially take a long time, if the worker dies before
+completing the delete, the state is known and the blob will be deleted in
+ds_blob_table_recover. */
+
+ds_result_t ds_blob_table_deleting(struct ds_worker *w, const char *blobid)
+{
+	if(!blobid) return DS_RESULT_BAD_PARAMS;
+
+	struct ds_blob *b = hash_table_lookup(w->blob_table,blobid);
+	char *blob_meta = ds_worker_blob_meta(w,blobid);
+
+	if(!b) return DS_RESULT_BAD_ID;
+
+	// Record the deleting state in the metadata
+	b->state = DS_BLOB_DELETING;
+	ds_blob_to_file(b,blob_meta);
+
+    return DS_RESULT_SUCCESS;
+}
+
+ds_result_t ds_blob_table_delete(struct ds_worker *w, const char *blobid)
 {
 	if(!blobid) return DS_RESULT_BAD_PARAMS;
 
 	struct ds_blob *b = hash_table_lookup(w->blob_table,blobid);
 	if(!b) return DS_RESULT_BAD_ID;
 
+    if(b->state != DS_BLOB_DELETING) {
+        ds_blob_table_deleting(w, blobid);
+    }
+
 	char *blob_dir = ds_worker_blob_dir(w,blobid);
 	char *blob_meta = ds_worker_blob_meta(w,blobid);
 	char *blob_data = ds_worker_blob_data(w,blobid);
-
-	// Record the deleting state in the metadata
-	b->state = DS_BLOB_DELETED;
-	ds_blob_to_file(b,blob_meta);
 
 	// First delete the data which may take some time.
 	delete_dir(blob_data);
@@ -335,7 +350,7 @@ void ds_blob_table_recover( struct ds_worker *w )
 		if(b) {
 			total_blob_size += b->size;
 			hash_table_insert(w->blob_table,b->blobid,b);
-			if(b->state==DS_BLOB_DELETED) {
+			if(b->state==DS_BLOB_DELETING) {
 				debug(D_DATASWARM, "deleting blob %s",b->blobid);
 				ds_blob_table_delete(w,b->blobid);
 			}
