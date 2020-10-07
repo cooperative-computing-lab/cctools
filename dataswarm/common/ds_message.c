@@ -86,11 +86,11 @@ struct jx * ds_message_task_update( const char *taskid, const char *state )
 	return message;
 }
 
-struct jx * ds_message_blob_update( const char *blobid, const char *state )
+struct jx * ds_message_blob_update( const char *blobid, ds_blob_state_t state )
 {
 	struct jx *params = jx_object(0);
 	jx_insert_string(params,"blob-id",blobid);
-	jx_insert_string(params,"state",state);
+	jx_insert_integer(params,"state",state);
 
 	struct jx *message = jx_object(0);
 	jx_insert_string(message, "method", "blob-update");

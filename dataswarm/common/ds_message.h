@@ -5,6 +5,9 @@
 #include "jx.h"
 #include "buffer.h"
 
+#include "ds_task.h"
+#include "ds_blob.h"
+
 #include <time.h>
 
 typedef enum {
@@ -31,6 +34,6 @@ struct jx *ds_parse_message(buffer_t *buf);
 
 struct jx * ds_message_standard_response( int64_t id, ds_result_t code, struct jx *params );
 struct jx * ds_message_task_update( const char *taskid, const char *state );
-struct jx * ds_message_blob_update( const char *blobid, const char *state );
+struct jx * ds_message_blob_update( const char *blobid, ds_blob_state_t state );
 
 #endif
