@@ -22,6 +22,7 @@
 #include "ds_message.h"
 #include "ds_worker_rep.h"
 #include "ds_task_rep.h"
+#include "ds_blob_rep.h"
 #include "ds_manager.h"
 
 struct ds_worker_rep * ds_worker_rep_create( struct mq *conn )
@@ -73,6 +74,38 @@ ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *param
 	return DS_RESULT_SUCCESS;
 }
 
+ds_result_t ds_worker_rep_update_blob( struct ds_worker_rep *r, struct jx *params ) {
+	if(!params) {
+		debug(D_DATASWARM, "message does not contain any parameters. Ignoring task update.");
+		return DS_RESULT_BAD_PARAMS;
+	}
+
+	ds_blob_state_t state  = jx_lookup_integer(params, "state");
+	const char *blobid = jx_lookup_string(params, "blob-id");
+
+	if(!state || !blobid) { //FIX: state may be 0
+		debug(D_DATASWARM, "message does not contain state or blob-id. Ignoring blob update.");
+		return DS_RESULT_BAD_PARAMS;
+	}
+
+	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+	if(!b) {
+		debug(D_DATASWARM, "worker does not know about blob-id: %s", blobid);
+		return DS_RESULT_BAD_PARAMS;
+	}
+
+	debug(D_DATASWARM, "blob %s is %s at worker", blobid, ds_blob_state_string(state));
+
+	if(state == DS_BLOB_DELETED) {
+		b->state = DS_BLOB_DELETED;
+	} else {
+		/* ... */
+	}
+
+	return DS_RESULT_SUCCESS;
+}
+
+
 ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, struct jx *msg )
 {
 	const char *method = jx_lookup_string(msg, "method");
@@ -83,6 +116,8 @@ ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, struct jx *msg 
 		result = DS_RESULT_BAD_METHOD;
 	} else if(!strcmp(method, "task-update")) {
 		result = ds_worker_rep_update_task(w, params);
+	} else if(!strcmp(method, "blob-update")) {
+		result = ds_worker_rep_update_blob(w, params);
 	} else if(!strcmp(method, "status-report")) {
 		// update stats
 	} else {
