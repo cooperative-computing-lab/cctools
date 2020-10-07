@@ -40,6 +40,29 @@ static void update_blob_state( struct ds_worker *w, struct ds_blob *blob, ds_blo
 	}
 }
 
+void ds_blob_table_advance( struct ds_worker *w )
+{
+	struct ds_blob *blob;
+	char *blobid;
+
+	hash_table_firstkey(w->blob_table);
+	while(hash_table_nextkey(w->blob_table,&blobid,(void**)&blob)) {
+        if(blob->state == DS_BLOB_DELETING) {
+            ds_blob_state_t result;
+            if((ds_blob_table_delete(w, blobid) == DS_RESULT_SUCCESS)) {
+                result = DS_BLOB_DELETED;
+            } else {
+                result = DS_BLOB_ERROR;
+            }
+
+            update_blob_state(w,blob,result,1);
+            hash_table_remove(w->blob_table,blobid);
+            ds_blob_delete(blob);
+        }
+    }
+}
+
+
 ds_result_t ds_blob_table_create(struct ds_worker *w, const char *blobid, jx_int_t size, struct jx *meta)
 {
 	if(!blobid || size<0) {
@@ -95,6 +118,7 @@ ds_result_t ds_blob_table_put(struct ds_worker * w, const char *blobid)
 	if(!b) {
 		return DS_RESULT_BAD_ID;
 	} else if(b->state!=DS_BLOB_RW) {
+        debug(D_DATASWARM, "blob %s expected state %s, but got %s", blobid, ds_blob_state_string(b->state), ds_blob_state_string(DS_BLOB_RW));
 		return DS_RESULT_BAD_STATE;
 	}
 
@@ -132,6 +156,7 @@ ds_result_t ds_blob_table_get(struct ds_worker * w, const char *blobid, jx_int_t
 	if(!b) {
 		return DS_RESULT_BAD_ID;
 	} else if(b->state!=DS_BLOB_RW && b->state!=DS_BLOB_RO) {
+        debug(D_DATASWARM, "cannot get blob %s in state %s", blobid, ds_blob_state_string(b->state));
 		return DS_RESULT_BAD_STATE;
 	}
 
@@ -211,7 +236,7 @@ ds_result_t ds_blob_table_commit(struct ds_worker * w, const char *blobid)
 			// Already committed, not an error.
 			result = DS_RESULT_SUCCESS;
 		} else {
-			debug(D_DATASWARM, "couldn't commit blobid %s because it is in state %d", blobid, b->state);
+			debug(D_DATASWARM, "couldn't commit blob-id %s because it is in state %d", blobid, b->state);
 			result = DS_RESULT_BAD_STATE;
 		}
 	} else {
@@ -268,13 +293,12 @@ ds_result_t ds_blob_table_delete(struct ds_worker *w, const char *blobid)
 	// Account for space only after the whole object is deleted
 	ds_worker_disk_free(w,b->size);
 
-	// Now free up the data structures.
-	hash_table_remove(w->blob_table,blobid);
-	ds_blob_delete(b);
-
 	free(blob_dir);
 	free(blob_meta);
 	free(blob_data);
+
+    //Freeing of blob structure is done on a succesful delete in ds_blob_table_advance
+	// Now free up the data structures.
 
 	return DS_RESULT_SUCCESS;
 }

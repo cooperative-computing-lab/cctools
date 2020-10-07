@@ -164,8 +164,12 @@ int ds_worker_main_loop(struct ds_worker *w)
 			break;
 		}
 
+
 		/* after processing any messages, work on tasks. */
 		ds_task_table_advance(w);
+
+		/* process any pending blob deletes, etc. */
+		ds_blob_table_advance(w);
 
 		time_t current = time(0);
 

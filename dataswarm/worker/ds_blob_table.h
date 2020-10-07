@@ -6,6 +6,7 @@
 
 #include "jx.h"
 
+void ds_blob_table_advance( struct ds_worker *w );
 ds_result_t ds_blob_table_create( struct ds_worker *w, const char *blobid, jx_int_t size, struct jx *meta );
 ds_result_t ds_blob_table_put( struct ds_worker *w, const char *blobid);
 ds_result_t ds_blob_table_get(struct ds_worker *w, const char *blobid, jx_int_t msgid, int *should_respond);
