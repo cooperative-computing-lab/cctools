@@ -221,7 +221,7 @@ ds_result_t ds_blob_table_delete(struct ds_worker * w, const char *blobid)
 	char *blob_data = ds_worker_blob_data(w,blobid);
 
 	// Record the deleting state in the metadata
-	b->state = DS_BLOB_DELETING;
+	b->state = DS_BLOB_DELETED;
 	ds_blob_to_file(b,blob_meta);
 
 	// First delete the data which may take some time.
@@ -315,7 +315,7 @@ void ds_blob_table_recover( struct ds_worker *w )
 		if(b) {
 			total_blob_size += b->size;
 			hash_table_insert(w->blob_table,b->blobid,b);
-			if(b->state==DS_BLOB_DELETING) {
+			if(b->state==DS_BLOB_DELETED) {
 				debug(D_DATASWARM, "deleting blob %s",b->blobid);
 				ds_blob_table_delete(w,b->blobid);
 			}
