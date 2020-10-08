@@ -661,7 +661,7 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 		}
 	}
 
-	/* If all makeflow checks pass for this node we will 
+	/* If all makeflow checks pass for this node we will
 	return the result of the hooks, which will be 1 if all pass
 	and 0 if any fail. */
 	int rc = makeflow_hook_node_check(n, makeflow_get_queue(n));
@@ -674,7 +674,6 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 int makeflow_nodes_local_waiting_count(const struct dag *d) {
 	int count = 0;
 
-	
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next) {
 		if(n->state == DAG_NODE_STATE_WAITING && is_local_job(n))

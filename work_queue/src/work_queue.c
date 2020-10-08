@@ -6861,16 +6861,17 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 		setvbuf(q->transactions_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
 		debug(D_WQ, "transactions log enabled and is being written to %s\n", logfile);
 
-		fprintf(q->transactions_logfile, "# time master-pid MASTER START|END\n");
-		fprintf(q->transactions_logfile, "# time master-pid WORKER worker-id host:port {CONNECTION|DISCONNECTION {UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT}}\n");
-		fprintf(q->transactions_logfile, "# time master-pid WORKER worker-id RESOURCES resources\n");
-		fprintf(q->transactions_logfile, "# time master-pid CATEGORY name MAX resources-max-per-task\n");
-		fprintf(q->transactions_logfile, "# time master-pid CATEGORY name MIN resources-min-per-task-per-worker\n");
-		fprintf(q->transactions_logfile, "# time master-pid CATEGORY name FIRST {FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT} resources-requested\n");
-		fprintf(q->transactions_logfile, "# time master-pid TASK taskid WAITING category-name {FIRST_RESOURCES|MAX_RESOURCES} resources-requested\n");
-		fprintf(q->transactions_logfile, "# time master-pid TASK taskid RUNNING worker-address {FIRST_RESOURCES|MAX_RESOURCES} resources-given\n");
-		fprintf(q->transactions_logfile, "# time master-pid TASK taskid WAITING_RETRIEVAL worker-address\n");
-		fprintf(q->transactions_logfile, "# time master-pid TASK taskid {RETRIEVED|DONE} {SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION} {exit-code} {limits-exceeded} {resources-measured}\n\n");
+		fprintf(q->transactions_logfile, "# time master_pid MASTER START|END\n");
+		fprintf(q->transactions_logfile, "# time master_pid WORKER worker_id host:port CONNECTION\n");
+		fprintf(q->transactions_logfile, "# time master_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT\n");
+		fprintf(q->transactions_logfile, "# time master_pid WORKER worker_id RESOURCES {resources}\n");
+		fprintf(q->transactions_logfile, "# time master_pid CATEGORY name MAX {resources_max_per_task}\n");
+		fprintf(q->transactions_logfile, "# time master_pid CATEGORY name MIN {resources_min_per_task_per_worker}\n");
+		fprintf(q->transactions_logfile, "# time master_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}\n");
+		fprintf(q->transactions_logfile, "# time master_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}\n");
+		fprintf(q->transactions_logfile, "# time master_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
+		fprintf(q->transactions_logfile, "# time master_pid TASK taskid WAITING_RETRIEVAL worker_address\n");
+		fprintf(q->transactions_logfile, "# time master_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n\n");
 
 		write_transaction(q, "MASTER START");
 		return 1;
