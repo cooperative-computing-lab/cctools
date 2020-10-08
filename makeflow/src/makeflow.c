@@ -293,7 +293,16 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 		/* A sub-workflow must be expanded into a makeflow invocation */
 		buffer_t b;
 		buffer_init(&b);
-		buffer_printf(&b, "makeflow -T local %s", n->workflow_file);
+
+		if (batch_queue_supports_feature(remote_queue, "remote_rename")) {
+			const char *basename = path_basename(makeflow_exe);
+			makeflow_hook_add_input_file(n->d,task,makeflow_exe,basename,DAG_FILE_TYPE_TEMP);
+			buffer_printf(&b, "./%s", basename);
+		} else {
+			buffer_printf(&b, "%s", makeflow_exe);
+		}
+
+		buffer_printf(&b, " -T local %s", n->workflow_file);
 
 		const char *log = dag_node_nested_workflow_filename(n, "makeflowlog");
 		buffer_printf(&b, " -l %s", log);
