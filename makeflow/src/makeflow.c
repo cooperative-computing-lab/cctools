@@ -98,7 +98,7 @@ an example.
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
 /*
-Flags to control the basic behavior of the Makeflow main loop. 
+Flags to control the basic behavior of the Makeflow main loop.
 */
 enum job_submit_status {
 	JOB_SUBMISSION_HOOK_FAILURE = -1,
@@ -130,6 +130,9 @@ static int makeflow_gc_count  = -1;
 static int makeflow_gc_barrier = 1;
 /* Determines next gc_barrier to make checks less frequent with large number of tasks */
 static double makeflow_gc_task_ratio = 0.05;
+
+/* Makeflow current executable*/
+static char makeflow_exe[PATH_MAX];
 
 /*
 Makeflow manages two queues of jobs.
@@ -1334,6 +1337,9 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_storage_allocation;
 	extern struct makeflow_hook makeflow_hook_umbrella;
 	extern struct makeflow_hook makeflow_hook_vc3_builder;
+
+	/* save the name of the makeflow executable */
+	path_absolute(argv[0], makeflow_exe, 1);
 
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
