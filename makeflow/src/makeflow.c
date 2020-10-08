@@ -2118,6 +2118,11 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 
+	/* If cleaning anything, assume local execution. This only really matters for nested workflows. */
+	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
+		batch_queue_type = batch_queue_type_from_string("local");
+	}
+
 	/* Perform initial MPI setup prior to creating the batch queue object. */
 	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
 		batch_job_mpi_setup(debug_file_name ? debug_file_name : "debug", mpi_cores,mpi_memory);
