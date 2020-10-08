@@ -294,7 +294,7 @@ We _could_ put all of those bits into a single rule, like this:
 
 That is correct, but it's rather hard to read. Instead, we can make things
 clearer by factoring out the definition of the list and the range to the
-`define` section of the workflow. Putting it all together, we have this: 
+`define` section of the workflow. Putting it all together, we have this:
 
 [gather.jx](gather.jx)
 ```json
@@ -370,7 +370,7 @@ arbitrary names. Also,both **memory** and **disk** are specified in megabytes
 The resource specifications are used in two ways:
 
   * To describe the batch jobs used to run a rule. Thus, `makeflow` is able to request the batch system for appropiate resources. 
-  * When makeflow is run using resource monitoring (`--monitor=...`), if the resource usage of a rule exceeds the resources declared, it is terminated and marked as failed rule. 
+  * When makeflow is run using resource monitoring (`--monitor=...`), if the resource usage of a rule exceeds the resources declared, it is terminated and marked as failed rule.
 
 When the resources used by a rule are not known, we recommend to set the
 resource specification to the largest resources available (e.g., the largest
@@ -380,4 +380,46 @@ computes efficient resource allocations to maximize throughput. If a rule
 fails because the computed allocation is too small, it is retried once using
 the maximum resources specified. With this scheme, even when some rules are
 retried, overall throughput is increased in most cases.
+
+
+## Nested workflows
+
+JX currently offers limited support for nesting workflows. When declaring a
+nested workflow, the workflow itself and its rules execute as local jobs.
+
+In the following example, note how we need to declare the inputs and outputs to
+the nested workflows as if they were a regular rule. Also note how `my_var` is
+set from the main workflow, and used inside the nested one:
+
+`FILE: main.jx`
+{
+    "rules": [
+    {
+        "workflow": "nested.jx",
+            "args": {"my_var": N},
+            "outputs": [
+            {
+                "output." + N
+            }
+            ]
+    } for N in range(5)
+    ]
+}
+
+`FILE: nested.jx`
+```
+{
+    "rules": [
+    {
+        "command": format("echo %d > output.%d", my_var, my_var),
+        "outputs": [ "output." + my_var ]
+    }
+    ]
+}
+```
+
+Run as:
+```sh
+$ makeflow -Tlocal -jx main.jx
+```
 
