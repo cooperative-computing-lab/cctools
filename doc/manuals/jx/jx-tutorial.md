@@ -384,8 +384,11 @@ retried, overall throughput is increased in most cases.
 
 ## Nested workflows
 
-JX currently offers limited support for nesting workflows. When declaring a
-nested workflow, the workflow itself and its rules execute as local jobs.
+JX currently offers support for nesting workflows. When declaring a
+nested workflow, the nested workflow itself is treated as any other rule, and
+its rules are ran **locally** to the execution site. This means that any
+initial inputs and final outputs of the nested workflow should be explictely
+specified in the main workflow.
 
 In the following example, note how we need to declare the inputs and outputs to
 the nested workflows as if they were a regular rule. Also note how `my_var` is
@@ -394,15 +397,16 @@ set from the main workflow, and used inside the nested one:
 `FILE: main.jx`
 {
     "rules": [
-    {
-        "workflow": "nested.jx",
+        {
+            "command": "echo hello world > my-common-input",
+            "outputs": [ "my-common-input" ]
+        },
+        {
+            "workflow": "nested.jx",
             "args": {"my_var": N},
-            "outputs": [
-            {
-                "output." + N
-            }
-            ]
-    } for N in range(5)
+            "inputs": [ "my-common-input" ],
+            "outputs": [ "output." + N ]
+        } for N in range(5)
     ]
 }
 
@@ -410,16 +414,11 @@ set from the main workflow, and used inside the nested one:
 ```
 {
     "rules": [
-    {
-        "command": format("echo %d > output.%d", my_var, my_var),
-        "outputs": [ "output." + my_var ]
-    }
+        {
+            "command": format("cp my-common-input output.%d", my_var),
+            "outputs": [ "output." + my_var ]
+        }
     ]
 }
-```
-
-Run as:
-```sh
-$ makeflow -Tlocal -jx main.jx
 ```
 

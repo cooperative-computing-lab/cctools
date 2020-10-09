@@ -98,7 +98,7 @@ an example.
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
 /*
-Flags to control the basic behavior of the Makeflow main loop. 
+Flags to control the basic behavior of the Makeflow main loop.
 */
 enum job_submit_status {
 	JOB_SUBMISSION_HOOK_FAILURE = -1,
@@ -130,6 +130,9 @@ static int makeflow_gc_count  = -1;
 static int makeflow_gc_barrier = 1;
 /* Determines next gc_barrier to make checks less frequent with large number of tasks */
 static double makeflow_gc_task_ratio = 0.05;
+
+/* Makeflow current executable*/
+static char makeflow_exe[PATH_MAX];
 
 /*
 Makeflow manages two queues of jobs.
@@ -290,7 +293,16 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 		/* A sub-workflow must be expanded into a makeflow invocation */
 		buffer_t b;
 		buffer_init(&b);
-		buffer_printf(&b, "makeflow -T local %s", n->workflow_file);
+
+		if (batch_queue_supports_feature(remote_queue, "remote_rename")) {
+			const char *basename = path_basename(makeflow_exe);
+			makeflow_hook_add_input_file(n->d,task,makeflow_exe,basename,DAG_FILE_TYPE_TEMP);
+			buffer_printf(&b, "./%s", basename);
+		} else {
+			buffer_printf(&b, "%s", makeflow_exe);
+		}
+
+		buffer_printf(&b, " -T local %s", n->workflow_file);
 
 		const char *log = dag_node_nested_workflow_filename(n, "makeflowlog");
 		buffer_printf(&b, " -l %s", log);
@@ -1335,6 +1347,9 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_umbrella;
 	extern struct makeflow_hook makeflow_hook_vc3_builder;
 
+	/* save the name of the makeflow executable */
+	path_absolute(argv[0], makeflow_exe, 1);
+
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
 #endif
@@ -2111,6 +2126,11 @@ int main(int argc, char *argv[])
 	}
 
 	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
+
+	/* If cleaning anything, assume local execution. This only really matters for nested workflows. */
+	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
+		batch_queue_type = batch_queue_type_from_string("local");
+	}
 
 	/* Perform initial MPI setup prior to creating the batch queue object. */
 	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
