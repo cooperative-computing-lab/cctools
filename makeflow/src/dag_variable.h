@@ -48,6 +48,9 @@ struct dag_variable_lookup_set {
 	struct hash_table *table;
 };
 
+/* Count the number of times the variable was defined */
+int dag_variable_count(const char *name, struct dag_variable_lookup_set *s);
+
 /* Look up a variable in multiple scopes and return the (constant) structure. */
 struct dag_variable_value *dag_variable_lookup(const char *name, struct dag_variable_lookup_set *s );
 
