@@ -1338,7 +1338,7 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_vc3_builder;
 
 	/* save the name of the makeflow executable */
-	path_absolute(argv[0], makeflow_exe, 1);
+	path_absolute(argv[0], makeflow_exe, 0);
 
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
