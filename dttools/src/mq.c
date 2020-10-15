@@ -117,16 +117,24 @@ static size_t checked_add(size_t a, size_t b) {
 
 static int set_nonblocking (struct mq_msg *msg) {
 	assert(msg);
+#ifndef MQ_BLOCKING_IO
 	if (msg->pipefd < 0) return 0;
 	msg->origfl = fcntl(msg->pipefd, F_GETFL);
 	if (msg->origfl < 0) return msg->origfl;
 	return fcntl(msg->pipefd, F_SETFL, msg->origfl|O_NONBLOCK);
+#else
+	return 0;
+#endif
 }
 
 static int unset_nonblocking (struct mq_msg *msg) {
 	if (!msg) return 0;
+#ifndef MQ_BLOCKING_IO
 	if (msg->pipefd < 0) return 0;
 	return fcntl(msg->pipefd, F_SETFL, msg->origfl);
+#else
+	return 0;
+#endif
 }
 
 static struct mq_msg *msg_create (void) {
@@ -585,6 +593,9 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				assert(rc == 0);
 				if (err == 0) {
 					mq->state = MQ_SOCKET_CONNECTED;
+#ifdef MQ_BLOCKING_IO
+					link_nonblocking(mq->link, 0);
+#endif
 				} else {
 					mq_die(mq, err);
 				}
@@ -644,6 +655,9 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				assert(!mq->acc);
 				struct mq *out = mq_create(MQ_SOCKET_CONNECTED, link);
 				mq->acc = out;
+#ifdef MQ_BLOCKING_IO
+				link_nonblocking(link, 0);
+#endif
 			}
 			break;
 	}
