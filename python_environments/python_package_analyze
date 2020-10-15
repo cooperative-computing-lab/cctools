@@ -107,7 +107,21 @@ def package_mappings():
         out.update(pip_packages(a))
     return out
 
-def choose_dep(pkg_mapping, overrides, conda_env, pip_env, conda_pkgs, pip_pkgs, pkg):
+def choose_dep(conda_env, pip_env, conda_pkgs, pip_pkgs, pkg, required=True):
+    for a in conda_env:
+        if a.startswith(pkg + '='):
+            conda_pkgs.add(a)
+            return True
+    for a in pip_env:
+        if a.startswith(pkg + '='):
+            pip_pkgs.add(a)
+            return True
+    if required:
+        raise ImportError("Couldn't match {} to a conda/pip package".format(pkg))
+    else:
+        return False
+
+def search_pkg(pkg_mapping, overrides, conda_env, pip_env, conda_pkgs, pip_pkgs, pkg):
     # Don't try to pack up standard modules.
     # This also throws exceptions for modules that can't be imported,
     # or those outside the Conda prefix.
@@ -115,37 +129,17 @@ def choose_dep(pkg_mapping, overrides, conda_env, pip_env, conda_pkgs, pip_pkgs,
         return
     # Check if the user provided a package name
     if pkg in overrides:
-        for a in conda_env:
-            if a.startswith(overrides[pkg] + '='):
-                conda_pkgs.add(a)
-                return
-        for a in pip_env:
-            if a.startswith(overrides[pkg] + '='):
-                pip_pkgs.add(a)
-                return
-    # Look for an installed package with the same name
-    for a in conda_env:
-        if a.startswith(pkg + '='):
-            conda_pkgs.add(a)
-            return
-    for a in pip_env:
-        if a.startswith(pkg + '='):
-            pip_pkgs.add(a)
-            return
+        pkg = overrides[pkg]
+        choose_dep(conda_env, pip_env, conda_pkgs, pip_pkgs, pkg)
+    # Look for an installed package with the same name first
+    if choose_dep(conda_env, pip_env, conda_pkgs, pip_pkgs, pkg, required=False):
+        return
     # Try to find another package that provides the module
     if pkg in pkg_mapping:
-        for a in conda_env:
-            if a.startswith(pkg_mapping[pkg] + '='):
-                conda_pkgs.add(a)
-                return
-        for a in pip_env:
-            if a.startswith(pkg_mapping[pkg] + '='):
-                pip_pkgs.add(a)
-                return
-    # Warn the user the package wasn't found
-    raise ImportError("Couldn't match {} to a conda/pip package".format(pkg))
+        pkg = pkg_mapping[pkg]
+    choose_dep(conda_env, pip_env, conda_pkgs, pip_pkgs, pkg)
 
-def export_env(pkg_mapping, overrides, imports):
+def export_env(pkg_mapping, overrides, imports, extra):
     imports = set(imports)
     env = json.loads(subprocess.check_output(['conda', 'env', 'export', '--json']))
     conda_env = env.pop('dependencies', [])
@@ -157,15 +151,14 @@ def export_env(pkg_mapping, overrides, imports):
     conda_pkgs = set()
     pip_pkgs = set()
     for pkg in imports:
-        choose_dep(pkg_mapping, overrides, conda_env, pip_env, conda_pkgs, pip_pkgs, pkg)
+        search_pkg(pkg_mapping, overrides, conda_env, pip_env, conda_pkgs, pip_pkgs, pkg)
+
+    for pkg in extra:
+        choose_dep(conda_env, pip_env, conda_pkgs, pip_pkgs, pkg)
 
     # Always include python and pip
-    for a in conda_env:
-        if a.startswith('python='):
-            conda_pkgs.add(a)
-    for a in conda_env:
-        if a.startswith('pip='):
-            conda_pkgs.add(a)
+    choose_dep(conda_env, pip_env, conda_pkgs, pip_pkgs, 'python', required=False)
+    choose_dep(conda_env, pip_env, conda_pkgs, pip_pkgs, 'pip', required=False)
 
     conda_pkgs = sorted(list(conda_pkgs))
     pip_pkgs = sorted(list(pip_pkgs))
@@ -189,6 +182,8 @@ if __name__ == '__main__':
         help='Only include imports in the given function.')
     parser.add_argument('--pkg-mapping', action='append', metavar='IMPORT=NAME', default=[],
         help='Specify that the module imported as IMPORT in the code is provided by the pip/conda package NAME.')
+    parser.add_argument('--extra-pkg', action='append', metavar='PKG', default=[],
+        help='Also include the pip/conda package PKG, even if it does not appear in the sources.')
     args = parser.parse_args()
 
     if len(args.source) == 0:
@@ -223,5 +218,5 @@ if __name__ == '__main__':
 
     pkg_mapping = package_mappings()
 
-    json.dump(export_env(pkg_mapping, overrides, imports), out, indent=4, sort_keys=True)
+    json.dump(export_env(pkg_mapping, overrides, imports, args.extra_pkg), out, indent=4, sort_keys=True)
     out.write('\n')
