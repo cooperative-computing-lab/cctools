@@ -179,7 +179,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description=HELPMSG)
     actions = parser.add_mutually_exclusive_group()
-    parser.add_argument('source',
+    parser.add_argument('source', nargs='*',
         help='Analyze the given Python source code, or - for stdin.')
     parser.add_argument('out',
         help='Path to write the JSON description, or - for stdout.')
@@ -187,17 +187,16 @@ if __name__ == '__main__':
         help='Only include imports at the top level of the script.')
     actions.add_argument('--function',
         help='Only include imports in the given function.')
-    actions.add_argument('--pkg-mapping', action='append', metavar='IMPORT=NAME', default=[],
+    parser.add_argument('--pkg-mapping', action='append', metavar='IMPORT=NAME', default=[],
         help='Specify that the module imported as IMPORT in the code is provided by the pip/conda package NAME.')
     args = parser.parse_args()
 
-    filename = '<stdin>'
-    source = sys.stdin
-    out = sys.stdout
-    if args.source != '-':
-        source = open(args.source, 'r')
-        filename = args.source
-    if args.out != '-':
+    if len(args.source) == 0:
+        args.source = ['-']
+
+    if args.out == '-':
+        out = sys.stdout
+    else:
         out = open(args.out, 'w')
 
     overrides = {}
@@ -205,13 +204,23 @@ if __name__ == '__main__':
         (i, n) = a.split('=')
         overrides[i] = n
 
-    code = ast.parse(source.read(), filename=filename)
-    if args.toplevel:
-        imports = analyze_toplevel(code)
-    elif args.function:
-        imports = analyze_function(code, args.function)
-    else:
-        imports = analyze_full(code)
+    imports = []
+    for s in args.source:
+        if s == '-':
+            source = sys.stdin
+            filename = '<stdin>'
+        else:
+            source = open(s, 'r')
+            filename = s
+
+        code = ast.parse(source.read(), filename=filename)
+        if args.toplevel:
+            imports += analyze_toplevel(code)
+        elif args.function:
+            imports += analyze_function(code, args.function)
+        else:
+            imports += analyze_full(code)
+
     pkg_mapping = package_mappings()
 
     json.dump(export_env(pkg_mapping, overrides, imports), out, indent=4, sort_keys=True)
