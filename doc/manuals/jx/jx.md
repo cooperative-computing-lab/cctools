@@ -163,6 +163,7 @@ Resources are encoded as a JSON object with the following keys:
     "disk" : <integer>,
     "gpus" : <integer>,
     "wall-time": <integer>
+    "mpi-processes": <integer>
 }
 ```
 
