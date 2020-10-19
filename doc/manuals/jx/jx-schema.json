@@ -1,0 +1,139 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "$id": "https://cctools.readthedocs.io/en/latest/jx/jx",
+
+    "definitions": {
+        "environment": {
+            "type": "object",
+            "patternProperties": {
+                "[A-z_][A-z0-9_]*": {
+                    "type": "string"
+                }
+            }
+        },
+
+        "resources": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "cores":  { "type": "integer" },
+                "memory": { "type": "integer" },
+                "disk":   { "type": "integer" },
+                "gpus":   { "type": "integer" },
+                "wall-time": { "type": "integer" },
+                "mpi-processes": { "type": "integer" }
+            }
+        },
+
+        "file": {
+            "anyOf": [
+                { "type": "string" },
+                {
+                    "type": "object",
+                    "required": ["dag_name"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "dag_name": { "type": "string" },
+                        "task_name": { "type": "string" }
+                    }
+                }
+            ]
+        },
+
+        "category": {
+            "type": "object",
+            "required": ["dag_name"],
+            "additionalProperties": false,
+            "properties": {
+                "environment": {
+                    "$ref": "#/definitions/environment"
+                },
+                "resources": {
+                    "$ref": "#/definitions/resources"
+                }
+            }
+        }
+    },
+
+    "type": "object",
+    "required": ["rules"],
+    "additionalProperties": false,
+
+    "properties": {
+        "rules": {
+            "type": "array", 
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "anyOf": [
+                    { "required": ["command"], "not": { "required": ["workflow"] } },
+                    { "required": ["workflow"], "not": { "required": ["command"] } }
+                ],
+                "dependencies": {
+                    "args": "workflow"
+                },
+                "properties": {
+                    "command": {
+                        "type": "string"
+                    },
+                    "workflow": {
+                        "type": "string"
+                    },
+                    "args": {
+                        "type": "object"
+                    },
+                    "local_job": {
+                        "type": "boolean"
+                    },
+                    "category": {
+                        "type": "string"
+                    },
+                    "allocation": {
+                        "type": "string",
+                        "regex": "(first|max|error)"
+                    },
+                    "environment": {
+                        "$ref": "#/definitions/environment"
+                    },
+                    "resources": {
+                        "$ref": "#/definitions/resources"
+                    },
+                    "inputs": {
+                        "type": "array", 
+                        "items": {
+                            "$ref": "#/definitions/file"
+                        }
+                    },
+                    "outputs": {
+                        "type": "array", 
+                        "items": {
+                            "$ref": "#/definitions/file"
+                        }
+                    }
+                }
+            }
+        },
+
+        "define": { 
+            "$ref": "#/definitions/environment"
+        },
+
+        "environment": {
+            "$ref": "#/definitions/environment"
+        },
+
+        "categories": {
+            "type": "object",
+            "patternProperties": {
+                ".+": {
+                    "$ref": "#/definitions/category"
+                }
+            }
+        },
+
+        "default_category": {
+            "type": "string"
+        }
+    }
+}
