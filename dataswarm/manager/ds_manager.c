@@ -87,7 +87,7 @@ struct ds_blob_rep *ds_manager_add_blob_to_worker( struct ds_manager *m, struct 
 	}
 
 	b = calloc(1,sizeof(struct ds_blob_rep));
-	b->state = DS_BLOB_WORKER_STATE_NEW;
+	b->state = DS_BLOB_NEW;
 	b->in_transition = b->state;
 	b->result = DS_RESULT_SUCCESS;
 

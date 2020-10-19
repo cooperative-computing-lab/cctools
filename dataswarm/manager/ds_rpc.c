@@ -57,7 +57,7 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 	if(b) {
 		b->result = result;
 		if(b->result == DS_RESULT_SUCCESS) {
-			if(b->state == DS_BLOB_WORKER_STATE_GET) {
+			if(b->state == DS_BLOB_GET) {
 				b->result = blob_get_aux(m,r,b->blobid);
 				set_storage = 1;
 			}
@@ -100,7 +100,7 @@ jx_int_t ds_rpc( struct ds_manager *m, struct ds_worker_rep *r, struct jx *rpc)
 	return msgid;
 }
 
-jx_int_t ds_rpc_for_blob( struct ds_manager *m, struct ds_worker_rep *r, struct ds_blob_rep *b, struct jx *rpc, ds_blob_worker_state_t in_transition )
+jx_int_t ds_rpc_for_blob( struct ds_manager *m, struct ds_worker_rep *r, struct ds_blob_rep *b, struct jx *rpc, ds_blob_state_t in_transition )
 {
 	jx_int_t msgid = ds_rpc(m, r, rpc);
 
@@ -140,7 +140,7 @@ jx_int_t ds_rpc_blob_create( struct ds_manager *m, struct ds_worker_rep *r, cons
 													 NULL),
 								NULL);
 
-	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_CREATED);
+	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_RO);
 }
 
 jx_int_t ds_rpc_blob_commit( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid )
@@ -157,7 +157,7 @@ jx_int_t ds_rpc_blob_commit( struct ds_manager *m, struct ds_worker_rep *r, cons
 													 NULL),
 								NULL);
 
-	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_COMMITTED);
+	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_RO);
 }
 
 jx_int_t ds_rpc_blob_delete( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid )
@@ -174,7 +174,7 @@ jx_int_t ds_rpc_blob_delete( struct ds_manager *m, struct ds_worker_rep *r, cons
 													 NULL),
 								NULL);
 
-	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_DELETED);
+	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_DELETING);
 }
 
 jx_int_t ds_rpc_blob_copy( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid_source, const char *blobid_target )
@@ -192,7 +192,7 @@ jx_int_t ds_rpc_blob_copy( struct ds_manager *m, struct ds_worker_rep *r, const 
 													 NULL),
 								NULL);
 
-	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_COPIED);
+	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_COPIED);
 }
 
 
@@ -213,7 +213,7 @@ jx_int_t ds_rpc_blob_put( struct ds_manager *m, struct ds_worker_rep *r, const c
 								NULL);
 
 
-	jx_int_t msgid = ds_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_PUT);
+	jx_int_t msgid = ds_rpc_for_blob(m, r, b, msg, DS_BLOB_PUT);
 
 	int file = open(filename, O_RDONLY);
 	if (file < 0) {
@@ -242,7 +242,7 @@ jx_int_t ds_rpc_blob_get( struct ds_manager *m, struct ds_worker_rep *r, const c
 													 NULL),
 								NULL);
 
-	jx_int_t msgid = ds_rpc_for_blob(m, r, b, msg, DS_BLOB_WORKER_STATE_GET);
+	jx_int_t msgid = ds_rpc_for_blob(m, r, b, msg, DS_BLOB_GET);
 
 	//This rpc does not modify the state of the blob at the worker:
 	b->state = b->in_transition;

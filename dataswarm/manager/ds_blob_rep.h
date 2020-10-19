@@ -2,15 +2,7 @@
 #define DATASWARM_BLOB_REP_H
 
 #include "ds_rpc.h"  /* needed for ds_result_t */
-
-typedef enum {
-	DS_BLOB_WORKER_STATE_NEW = 0,
-	DS_BLOB_WORKER_STATE_CREATED,
-	DS_BLOB_WORKER_STATE_PUT, DS_BLOB_WORKER_STATE_COPIED,
-	DS_BLOB_WORKER_STATE_COMMITTED,
-	DS_BLOB_WORKER_STATE_GET,
-	DS_BLOB_WORKER_STATE_DELETED,
-} ds_blob_worker_state_t;
+#include "ds_blob.h" /* needed for ds_blob_state_t */
 
 struct ds_blob_rep {
 	/* Records the lifetime of a blob in a worker.
@@ -26,8 +18,10 @@ struct ds_blob_rep {
 	 *    in_transition records the blob's lifetime stage that could not been
 	 *    reached because of the error in result.
 	 * 5) state and in_transition are strictly monotonically increasing
-	 *    according to DS_BLOB_WORKER_STATE: NEW, CREATED, ((PUT or COPIED), COMMITTED) or
-	 *    (COMMITTED, GET) or GET. DELETED may occur at any time after create.
+	 *    according to DS_BLOB_: NEW, RW, ((PUT or COPIED), RO))) or
+	 *    (RO, GET) or GET. DELETING may occur at any time after create. DELETE
+	 *    is never an in_transition as this state is set from an asynchronous
+	 *    update from the worker once deleting the blob is done.
 	 *
 	 * With GET, state and in_transition are immediately set to GET, as the
 	 * state of the blob in the worker does not change. result is set to
@@ -36,8 +30,8 @@ struct ds_blob_rep {
 	 *
 	 */
 
-	ds_blob_worker_state_t state;
-	ds_blob_worker_state_t in_transition;
+	ds_blob_state_t state;
+	ds_blob_state_t in_transition;
 	ds_result_t result;
 
 	/* this blob id */
