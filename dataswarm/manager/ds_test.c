@@ -50,7 +50,7 @@ int wait_for_rpcs(struct ds_manager *m, struct ds_worker_rep *r) {
 		char *taskid;
 		hash_table_firstkey(r->tasks);
 		while((hash_table_nextkey(r->tasks, &taskid, (void **) &t))) {
-			if(t->state == DS_TASK_WORKER_STATE_SUBMITTED) {
+			if(t->state == DS_TASK_DISPATCHED) {
 				/* task has not reached completed state after submission */
 				done = 0;
 			}

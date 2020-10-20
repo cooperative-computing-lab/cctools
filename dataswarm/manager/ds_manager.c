@@ -116,7 +116,7 @@ struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct 
 	}
 
 	t = calloc(1,sizeof(struct ds_task_rep));
-	t->state = DS_TASK_WORKER_STATE_NEW;
+	t->state = DS_TASK_READY;
 	t->in_transition = t->state;
 	t->result = DS_RESULT_SUCCESS;
 

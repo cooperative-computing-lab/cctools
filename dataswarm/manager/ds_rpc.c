@@ -112,7 +112,7 @@ jx_int_t ds_rpc_for_blob( struct ds_manager *m, struct ds_worker_rep *r, struct 
 	return msgid;
 }
 
-jx_int_t ds_rpc_for_task( struct ds_manager *m, struct ds_worker_rep *r, struct ds_task_rep *t, struct jx *rpc, ds_task_worker_state_t in_transition )
+jx_int_t ds_rpc_for_task( struct ds_manager *m, struct ds_worker_rep *r, struct ds_task_rep *t, struct jx *rpc, ds_task_state_t in_transition )
 {
 	jx_int_t msgid = ds_rpc(m, r, rpc);
 
@@ -281,7 +281,7 @@ jx_int_t ds_rpc_task_submit( struct ds_manager *m, struct ds_worker_rep *r, cons
 								"params", jx_copy(t->description),
 								NULL);
 
-	return ds_rpc_for_task(m, r, t, rpc, DS_TASK_WORKER_STATE_SUBMITTED);
+	return ds_rpc_for_task(m, r, t, rpc, DS_TASK_DISPATCHED);
 }
 
 jx_int_t ds_rpc_task_remove( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid )
@@ -294,7 +294,7 @@ jx_int_t ds_rpc_task_remove( struct ds_manager *m, struct ds_worker_rep *r, cons
 													 NULL),
 								NULL);
 
-	return ds_rpc_for_task(m, r, t, rpc, DS_TASK_WORKER_STATE_REMOVED);
+	return ds_rpc_for_task(m, r, t, rpc, DS_TASK_DELETING);
 }
 
 
