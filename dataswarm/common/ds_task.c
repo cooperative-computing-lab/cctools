@@ -22,6 +22,8 @@ struct ds_task * ds_task_create( struct jx *jtask )
 	t->resources = ds_resources_create_from_jx(jx_lookup(jtask,"resources"));
 	t->mounts = ds_mounts_create(jx_lookup(jtask,"namespace"));
 
+	t->state = DS_TASK_READY;
+
 	return t;
 
 }
@@ -49,11 +51,13 @@ const char * ds_task_state_string( ds_task_state_t state )
 {
 	switch(state) {
 		case DS_TASK_READY: return "ready";
+		case DS_TASK_DISPATCHED: return "dispatched";
 		case DS_TASK_RUNNING: return "running";
 		case DS_TASK_DONE: return "done";
-		case DS_TASK_FAILED: return "failed";
+		case DS_TASK_RETRIEVED: return "retrieved";
 		case DS_TASK_DELETING: return "deleting";
 		case DS_TASK_DELETED: return "deleted";
+		case DS_TASK_ERROR: return "error";
 		default: return "unknown";
 	}
 }

@@ -33,7 +33,7 @@ static void update_task_state( struct ds_worker *w, struct ds_task *task, ds_tas
 	free(task_meta);
 
 	if(send_update_message) {
-		struct jx *msg = ds_message_task_update( task->taskid, ds_task_state_string(state) );
+		struct jx *msg = ds_message_task_update( task->taskid, state );
 		ds_json_send(w->manager_connection,msg);
 		free(msg);
 	}
@@ -42,7 +42,7 @@ static void update_task_state( struct ds_worker *w, struct ds_task *task, ds_tas
 ds_result_t ds_task_table_submit( struct ds_worker *w, const char *taskid, struct jx *jtask )
 {
 	struct ds_task *task = hash_table_lookup(w->task_table,taskid);
-	if(!task) {
+	if(task) {
 		return DS_RESULT_TASKID_EXISTS;
 	}
 
@@ -119,12 +119,12 @@ void ds_task_table_advance( struct ds_worker *w )
 						update_task_state(w,task,DS_TASK_RUNNING,1);
 						ds_worker_resources_alloc(w,task->resources);
 					} else {
-						update_task_state(w,task,DS_TASK_FAILED,1);
+						update_task_state(w,task,DS_TASK_ERROR,1);
 						// Mark disk as allocated to match free during delete.
 						ds_worker_disk_alloc(w,task->resources->disk);
 					}
 				} else {
-					update_task_state(w,task,DS_TASK_FAILED,1);
+					update_task_state(w,task,DS_TASK_ERROR,1);
 				}
 				break;
 			case DS_TASK_RUNNING:
@@ -133,12 +133,6 @@ void ds_task_table_advance( struct ds_worker *w )
 					ds_worker_resources_free_except_disk(w,task->resources);
 					update_task_state(w,task,DS_TASK_DONE,1);
 				}
-				break;
-			case DS_TASK_DONE:
-				// Do nothing until removed.
-				break;
-			case DS_TASK_FAILED:
-				// Do nothing until removed.
 				break;
 			case DS_TASK_DELETING:
 				{
@@ -153,7 +147,7 @@ void ds_task_table_advance( struct ds_worker *w )
 
 				free(sandbox_dir);
 				free(task_dir);
-			  
+
 				// Send the deleted message (need the task structure still)
 				update_task_state(w,task,DS_TASK_DELETED,1);
 
@@ -168,6 +162,12 @@ void ds_task_table_advance( struct ds_worker *w )
 				}
 				break;
 			case DS_TASK_DELETED:
+				break;
+			case DS_TASK_DISPATCHED:
+			case DS_TASK_DONE:
+			case DS_TASK_RETRIEVED:
+			case DS_TASK_ERROR:
+                /* do nothing until removed */
 				break;
 		}
 	}
@@ -211,7 +211,7 @@ void ds_task_table_recover( struct ds_worker *w )
 			hash_table_insert(w->task_table,task->taskid,task);
 			if(task->state==DS_TASK_RUNNING) {
 				// If it was running, then it's not now.
-				update_task_state(w,task,DS_TASK_FAILED,0);
+				update_task_state(w,task,DS_TASK_ERROR,0);
 			}
 			if(task->state!=DS_TASK_READY) {
 				// If it got past running, then the storage was allocated

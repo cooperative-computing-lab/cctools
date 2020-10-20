@@ -48,28 +48,39 @@ ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *param
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	const char *state  = jx_lookup_string(params, "state");
+	jx_int_t    state  = jx_lookup_integer(params, "state");
 	const char *taskid = jx_lookup_string(params, "task-id");
 
-	if(!state || !taskid) {
+	if(!state || !taskid) { //FIX: state may be zero
 		debug(D_DATASWARM, "message does not contain state or taskid. Ignoring task update.");
 		return DS_RESULT_BAD_PARAMS;
 	}
 
 	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	if(!t) {
-		debug(D_DATASWARM, "morker does not know about taskid: %s", taskid);
+		debug(D_DATASWARM, "worker does not know about taskid: %s", taskid);
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	debug(D_DATASWARM, "task %s is %s at worker", taskid, state);
-	if(!strcmp(state, "done")) {
-		t->in_transition = DS_TASK_WORKER_STATE_COMPLETED;
-		t->state = t->in_transition;
-		t->result = DS_RESULT_SUCCESS;
-	} else if(!strcmp(state, "running")) {
-		/* ... */
-	} // else if(...)
+	debug(D_DATASWARM, "task %s is %s at worker", taskid, ds_task_state_string(state));
+
+	switch(state) {
+		case DS_TASK_DONE:
+			t->in_transition = DS_TASK_DONE;
+			t->state = t->in_transition;
+			t->result = DS_RESULT_SUCCESS;
+			break;
+		case DS_TASK_READY:
+		case DS_TASK_DISPATCHED:
+		case DS_TASK_RUNNING:
+		case DS_TASK_RETRIEVED:
+		case DS_TASK_DELETING:
+		case DS_TASK_DELETED:
+		case DS_TASK_ERROR:
+		default:
+				/* ... */
+				break;
+	}
 
 	return DS_RESULT_SUCCESS;
 }
