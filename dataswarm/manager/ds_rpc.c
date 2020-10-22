@@ -281,7 +281,7 @@ jx_int_t ds_rpc_task_submit( struct ds_manager *m, struct ds_worker_rep *r, cons
 								"params", jx_copy(t->description),
 								NULL);
 
-	return ds_rpc_for_task(m, r, t, rpc, DS_TASK_DISPATCHED);
+	return ds_rpc_for_task(m, r, t, rpc, DS_TASK_ACTIVE);
 }
 
 jx_int_t ds_rpc_task_remove( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid )
