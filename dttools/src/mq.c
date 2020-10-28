@@ -730,8 +730,9 @@ struct mq_poll *mq_poll_create(void) {
 void mq_poll_delete(struct mq_poll *p) {
 	if (!p) return;
 
+    struct mq *mq = NULL;
 	set_first_element(p->members);
-	for (struct mq *mq; (mq = set_next_element(p->members));) {
+    while((mq = set_next_element(p->members))) {
 		mq->poll_group = NULL;
 	}
 	set_delete(p->members);
@@ -811,7 +812,8 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 		// change the order of the elements.
 		i = 0;
 		set_first_element(p->members);
-		for (struct mq *mq; (mq = set_next_element(p->members));) {
+        struct mq *mq = NULL;
+        while((mq = set_next_element(p->members))) {
 			// NB: we're using revents from the *previous* iteration
 			rc = handle_revents(mq, &pfds[i]);
 			if (rc == -1) {
