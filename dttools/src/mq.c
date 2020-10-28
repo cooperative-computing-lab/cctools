@@ -406,9 +406,9 @@ static int flush_recv(struct mq *mq) {
 						HDR_SIZE - rcv->hdr_pos, 0);
 				if (rc == -1 && errno_is_temporary(errno)) {
 					return 0;
-                } else if (rc == 0) {
-                    /* socket orderly shutdown */
-					errno = EINTR;
+				} else if (rc == 0) {
+					/* socket orderly shutdown */
+					errno = ECONNRESET;
 					return -1;
 				} else if (rc < 0) {
 					return -1;
@@ -638,6 +638,7 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				rc = flush_send(mq);
 				if (rc == -1) {
 					mq_die(mq, errno);
+					rc = 0; // will not be polled again, treat as OK
 					goto DONE;
 				}
 			}
@@ -646,6 +647,7 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				rc = flush_recv(mq);
 				if (rc == -1) {
 					mq_die(mq, errno);
+					rc = 0; // will not be polled again, treat as OK
 					goto DONE;
 				}
 			}
