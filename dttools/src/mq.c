@@ -443,7 +443,8 @@ static int flush_recv(struct mq *mq) {
 					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos, 0);
 
-				if (rc == -1 && errno_is_temporary(errno)) {
+				if (rc == -1 && errno_is_temporary(errno) && errno != 0) {
+                    /* for write, rc == 0 is only an error if errno != 0. */
 					return 0;
 				} else if (rc == 0) {
 					errno = ECONNRESET;
