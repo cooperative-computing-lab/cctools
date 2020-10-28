@@ -406,8 +406,12 @@ static int flush_recv(struct mq *mq) {
 						HDR_SIZE - rcv->hdr_pos, 0);
 				if (rc == -1 && errno_is_temporary(errno)) {
 					return 0;
-				} else if (rc <= 0) {
-					return -1;;
+                } else if (rc == 0) {
+                    /* socket orderly shutdown */
+					errno = EINTR;
+					return -1;
+				} else if (rc < 0) {
+					return -1;
 				}
 				rcv->hdr_pos = checked_add(rcv->hdr_pos, rc);
 				continue;
