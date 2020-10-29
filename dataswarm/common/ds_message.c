@@ -73,15 +73,16 @@ struct jx * ds_message_standard_response( int64_t id, ds_result_t code, struct j
 	return message;
 }
 
-struct jx * ds_message_task_update( const char *taskid, ds_task_state_t state )
+struct jx * ds_message_task_update( const struct ds_task *t )
 {
-	struct jx *params = jx_object(0);
-	jx_insert_string(params,"task-id",taskid);
-	jx_insert_integer(params,"state",state);
-
-	struct jx *message = jx_object(0);
-	jx_insert_string(message, "method", "task-update");
-	jx_insert(message,jx_string("params"),params);
+	struct jx *message = jx_objectv(
+            "method", jx_string("task-update"),
+            "params", jx_objectv(
+                "task-id", jx_string(t->taskid),
+                "state", jx_integer(t->state),
+                "result", jx_integer(t->result),
+                0),
+            0);
 
 	return message;
 }

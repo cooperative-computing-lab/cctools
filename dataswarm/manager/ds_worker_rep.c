@@ -65,18 +65,23 @@ ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *param
 	debug(D_DATASWARM, "task %s is %s at worker", taskid, ds_task_state_string(state));
 
 	switch(state) {
+		case DS_TASK_ACTIVE:
+			/* can't really happen from an update from the worker. */
+			break;
 		case DS_TASK_DONE:
 			t->in_transition = DS_TASK_DONE;
 			t->state = t->in_transition;
 			t->result = DS_RESULT_SUCCESS;
 			break;
-		case DS_TASK_READY:
-		case DS_TASK_DISPATCHED:
 		case DS_TASK_RUNNING:
-		case DS_TASK_RETRIEVED:
+			/* task running is only a state for a task attempt, ignoring. */
+			break;
 		case DS_TASK_DELETING:
+			/* do nothing until task deleted at worker. */
+			break;
 		case DS_TASK_DELETED:
-		case DS_TASK_ERROR:
+			/* FIX: do some book-keeping now that the task is deleted. */ 
+			break;
 		default:
 				/* ... */
 				break;
