@@ -406,8 +406,12 @@ static int flush_recv(struct mq *mq) {
 						HDR_SIZE - rcv->hdr_pos, 0);
 				if (rc == -1 && errno_is_temporary(errno)) {
 					return 0;
-				} else if (rc <= 0) {
-					return -1;;
+				} else if (rc == 0) {
+					/* socket orderly shutdown */
+					errno = ECONNRESET;
+					return -1;
+				} else if (rc < 0) {
+					return -1;
 				}
 				rcv->hdr_pos = checked_add(rcv->hdr_pos, rc);
 				continue;
@@ -439,7 +443,8 @@ static int flush_recv(struct mq *mq) {
 					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos, 0);
 
-				if (rc == -1 && errno_is_temporary(errno)) {
+				if (rc == -1 && errno_is_temporary(errno) && errno != 0) {
+                    /* for write, rc == 0 is only an error if errno != 0. */
 					return 0;
 				} else if (rc == 0) {
 					errno = ECONNRESET;
@@ -633,6 +638,7 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				rc = flush_send(mq);
 				if (rc == -1) {
 					mq_die(mq, errno);
+					rc = 0; // will not be polled again, treat as OK
 					goto DONE;
 				}
 			}
@@ -641,6 +647,7 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				rc = flush_recv(mq);
 				if (rc == -1) {
 					mq_die(mq, errno);
+					rc = 0; // will not be polled again, treat as OK
 					goto DONE;
 				}
 			}
@@ -730,8 +737,9 @@ struct mq_poll *mq_poll_create(void) {
 void mq_poll_delete(struct mq_poll *p) {
 	if (!p) return;
 
+    struct mq *mq = NULL;
 	set_first_element(p->members);
-	for (struct mq *mq; (mq = set_next_element(p->members));) {
+    while((mq = set_next_element(p->members))) {
 		mq->poll_group = NULL;
 	}
 	set_delete(p->members);
@@ -811,7 +819,8 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 		// change the order of the elements.
 		i = 0;
 		set_first_element(p->members);
-		for (struct mq *mq; (mq = set_next_element(p->members));) {
+        struct mq *mq = NULL;
+        while((mq = set_next_element(p->members))) {
 			// NB: we're using revents from the *previous* iteration
 			rc = handle_revents(mq, &pfds[i]);
 			if (rc == -1) {
