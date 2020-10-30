@@ -34,6 +34,10 @@ matrix:
   - os: linux
     compiler: gcc
     env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-fedora30
+  - os: linux
+    compiler: gcc
+    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-ubuntu16.04
+
 deploy:
   provider: releases
   file: /tmp/cctools-*.tar.gz
