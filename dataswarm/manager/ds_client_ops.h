@@ -4,6 +4,8 @@
 #include "ds_task.h"
 #include "ds_file.h"
 #include "ds_manager.h"
+#include "ds_client_rep.h"
+#include "ds_worker_rep.h"
 
 //task operations
 char *ds_client_task_submit(struct ds_manager *m, struct jx *task);
@@ -12,6 +14,7 @@ struct jx *ds_client_task_retrieve(struct ds_manager *m, const char *uuid);
 
 //file operations
 struct ds_file *ds_client_file_declare(struct ds_manager *m, struct jx *file);
+ds_result_t ds_client_file_put(struct ds_manager *m, struct ds_client_rep *c, struct jx *params);
 struct ds_file *ds_client_file_commit(struct ds_manager *m, const char *uuid);
 struct ds_file *ds_client_file_delete(struct ds_manager *m, const char *uuid);
 struct ds_file *ds_client_file_copy(struct ds_manager *m, const char *uuid);

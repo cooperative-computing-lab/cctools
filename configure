@@ -94,7 +94,7 @@ ccompiler=${CC:-gcc}
 cxxcompiler=${CXX:-g++}
 linker="${ccompiler}"
 
-ccflags="${CFLAGS} -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -fPIC"
+ccflags="${CFLAGS} -O0 -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -fPIC"
 c_only_flags="-std=c99"
 
 config_zlib_path=yes
@@ -1419,6 +1419,8 @@ fi
 
 
 potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_dataswarm} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc}"
+
+potential_packages="dttools ${include_package_dataswarm}"
 
 echo "checking for all the things I know how to build..."
 for p in $potential_packages

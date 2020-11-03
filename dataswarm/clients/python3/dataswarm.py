@@ -11,27 +11,43 @@ from time import sleep
 import logging
 
 class DataSwarm:
+    frame_value = {
+            'whole': 0b11,
+            'start': 0b01,
+            'cont':  0b00,
+            'final': 0b10
+            }
+
     def __init__(self, host='127.0.0.1', port=1234, log_level=logging.DEBUG):
         self.id = 0
 
         self.log = self._setup_logging(log_level)
 
         self.header_spec = '!2sBxL'
-        self.header_size = len(self._pack_header(0))
-
+        self.header_size = len(self._pack_header(0, 1, 0, 0))
         self.socket = socket.socket()
         self.host = host
         self.port = int(port)
         self.connect()
 
-    def _pack_header(self, size):
-        return struct.pack(self.header_spec, b'MQ', 0b11, size)
+    def _compute_frame_type(self, total_size, step, start, end):
+        if total_size <= step:
+            return DataSwarm.frame_value['whole']
+        if end == total_size:
+            return DataSwarm.frame_value['final']
+        if start == 0:
+            return DataSwarm.frame_value['start']
+        return DataSwarm.frame_value['cont']
+
+    def _pack_header(self, total_size, step, start, end):
+        return struct.pack(self.header_spec, b'MQ', self._compute_frame_type(total_size, step, start, end), end - start)
 
     def _unpack_header(self, header):
         try:
             components = struct.unpack(self.header_spec, header);
         except struct.error as e:
             self.log.error("Message has a malformed header: {}".format(e))
+            self.log.error("Header: {}".format(header))
             raise e
         return components[-1]
 
@@ -44,21 +60,27 @@ class DataSwarm:
         log.addHandler(ch)
         return log
 
-    # Handle sending and receiving messages
-    def send_recv(self, request):
+    def send(self, request):
         self.id += 1
         request["id"] = self.id;
         request = json.dumps(request)
-        self.send_str(request)
-        response = self.recv()
-        return response
+        self.log.debug("tx: {}".format(request))
+        return self.send_bytes(request.encode())
 
-    def send_str(self, msg):
-        msg = msg.encode()
-        size = len(msg)
-        hdr = self._pack_header(size)
-        self.socket.send(hdr)
-        self.socket.send(msg)
+    def send_recv(self, request):
+        self.send(request)
+        return self.recv()
+
+    def send_bytes(self, msg):
+        step = 64000
+        total_size = len(msg)
+
+        for start in range(0, total_size, step):
+            end = min(start + step, total_size)
+            chunk=msg[start:end]
+            hdr = self._pack_header(total_size, step, start, end)
+            self.socket.send(hdr)
+            self.socket.send(chunk)
 
     def recv(self):
         header = self.socket.recv(self.header_size)
@@ -129,14 +151,30 @@ class DataSwarm:
         return self.send_recv(request)
 
     # File methods
+    def file_create(self, params):
+        request = {
+            "method" : "file-create",
+            "params" : params
+        }
 
-    # f is a file description in JSON
-    def file_submit(self, f):
+        return self.send_recv(request)
+
+    def file_put(self, fileid, data):
+        request = {
+                "method" : "file-put",
+                "params" : {
+                    "file_id": fileid,
+                    "size": len(data)
+                    }
+                }
+        self.send(request)
+        self.send_bytes(msg)
+        return self.recv()
+
+    def file_submit(self, params):
         request = {
             "method" : "file-submit",
-            "params" : {
-                "description" : f
-            }
+            "params" : params
         }
 
         return self.send_recv(request)
@@ -252,3 +290,26 @@ class DataSwarm:
         }
 
         return self.send_recv(request)
+
+
+if __name__ == "__main__":
+    ds = DataSwarm(port=1234)
+
+    #msg = "a".encode() * 1200000
+    msg = "a".encode() * 1200000
+
+    msg = "0".encode()
+    for l in "abcde":
+        msg += "{}".format(l).encode() * 32000
+
+    # file_params = {
+    #         "type": "input",
+    #         "project": "project-abc",
+    #         "size": len(msg)
+    #         }
+
+    # f = ds.file_create(file_params)
+    # f_id = f["params"]["file-id"]
+
+    f_id = "A6AEF6F6-1C19-4DC9-9C0F-C88BC77A1F40"
+    ds.file_put(f_id, msg)

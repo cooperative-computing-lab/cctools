@@ -4,11 +4,18 @@
    See the file COPYING for details.
    */
 
+#include "debug.h"
 #include "ds_client_ops.h"
 #include "uuid.h"
 #include "ds_validate.h"
+#include "stringtools.h"
+#include "create_dir.h"
 
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 
 char *ds_client_task_submit(struct ds_manager *m, struct jx *task) {
 
@@ -67,6 +74,27 @@ struct ds_file *ds_client_file_declare(struct ds_manager *m, struct jx *params) 
     hash_table_insert(m->file_table, uuid.str, f);
 
     return f;
+}
+
+ds_result_t ds_client_file_put(struct ds_manager *m, struct ds_client_rep *c, struct jx *params) {
+    const char *fileid = jx_lookup_string(params, "file_id");
+    jx_int_t size = jx_lookup_integer(params, "size");  //FIX: size should come from the previous file_create
+
+    char *filename = string_format("manager_cache/%s", fileid);
+
+    create_dir_parents(filename, 0777);
+
+    int file = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 0777);
+    if(file < 0) {
+        debug(D_DATASWARM, "couldn't open %s: %s", filename, strerror(errno));
+        free(filename);
+        return DS_RESULT_UNABLE;
+    }
+    free(filename);
+
+    mq_store_fd(c->connection, file, size);
+
+    return DS_RESULT_SUCCESS;
 }
 
 struct ds_file *ds_client_file_commit(struct ds_manager *m, const char *uuid) {

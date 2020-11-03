@@ -269,11 +269,9 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 			response = ds_message_standard_response(id, DS_RESULT_UNABLE, NULL);
 		}
 	} else if(!strcmp(method,"file-put")) {
-		/* fix */
+		ds_client_file_put(m, c, params);
 		set_storage = 1;
-	} else if(!strcmp(method,"file-submit")) {
-		ds_client_file_declare(m, params);
-		set_storage = 1;
+		response = ds_message_standard_response(id, DS_RESULT_SUCCESS, NULL);
 	} else if(!strcmp(method,"file-commit")) {
         const char *uuid = jx_lookup_string(params, "file-id");
 		ds_client_file_commit(m, uuid);
