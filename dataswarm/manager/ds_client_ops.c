@@ -1,8 +1,8 @@
 /*
-Copyright (C) 2020- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
+   Copyright (C) 2020- The University of Notre Dame
+   This software is distributed under the GNU General Public License.
+   See the file COPYING for details.
+   */
 
 #include "ds_client_ops.h"
 #include "uuid.h"
@@ -114,13 +114,11 @@ char *ds_client_service_submit(struct ds_manager *m, struct jx *service){
     jx_insert_string(service, "uuid", uuid_str);
 
     //TODO: save UUID to file mapping in memory
-    //
-    //return task UUID
-    return uuid_str;
 
+    return uuid_str;
 }
 
-struct jx *ds_client_service_delete(struct ds_manager *m, char *uuid){
+struct jx *ds_client_service_delete(struct ds_manager *m, struct jx *params) {
 
     //TODO: get service data from mapping
 
@@ -128,34 +126,34 @@ struct jx *ds_client_service_delete(struct ds_manager *m, char *uuid){
     return NULL;
 }
 
-char *ds_client_project_create(struct ds_manager *m, char *project_name){
+char *ds_client_project_create(struct ds_manager *m, struct jx *params) {
 
     // assign a UUID to the project
     cctools_uuid_t *uuid = 0;
     cctools_uuid_create(uuid);
 
     char * uuid_str = strdup(uuid->str);
- 
+
     //TODO: create jx with project_name and uuid
 
     //TODO: save UUID to file mapping in memory
-   
+
     //return task UUID
     return uuid_str;
 
 }
 
-struct jx *ds_client_project_delete(struct ds_manager *m, char *uuid){
+struct jx *ds_client_project_delete(struct ds_manager *m, struct jx *params) {
 
     //TODO: get project data from mapping
 
     //TODO: remove project data from mapping
-    
+
     return NULL;
 
 }
 
-struct jx *ds_client_wait(struct ds_manager *m) {
+struct jx *ds_client_wait(struct ds_manager *m, struct jx *params) {
 
     //TODO: block until something happens
 
@@ -163,7 +161,7 @@ struct jx *ds_client_wait(struct ds_manager *m) {
 
 }
 
-int ds_client_queue_empty(struct ds_manager *m) {
+int ds_client_queue_empty(struct ds_manager *m, struct jx *params) {
 
     //TODO: return true if the queue of tasks is empty
 
@@ -171,7 +169,7 @@ int ds_client_queue_empty(struct ds_manager *m) {
 
 }
 
-struct jx *ds_client_status(struct ds_manager *m, char *uuid) {
+struct jx *ds_client_status(struct ds_manager *m, struct jx *params) {
 
     return NULL;
 
