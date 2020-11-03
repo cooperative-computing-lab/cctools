@@ -18,15 +18,15 @@ struct ds_file *ds_client_file_copy(struct ds_manager *m, const char *uuid);
 
 //service operations
 char *ds_client_service_submit(struct ds_manager *m, struct jx *service);
-struct jx *ds_client_service_delete(struct ds_manager *m, char *uuid);
+struct jx *ds_client_service_delete(struct ds_manager *m, struct jx *service);
 
 //project operations
-char *ds_client_project_create(struct ds_manager *m, char *project_name);
-struct jx *ds_client_project_delete(struct ds_manager *m, char *uuid);
+char *ds_client_project_create(struct ds_manager *m, struct jx *project);
+struct jx *ds_client_project_delete(struct ds_manager *m, struct jx *project);
 
 //other operations
-struct jx *ds_client_wait(struct ds_manager *m);
-int ds_client_queue_empty(struct ds_manager *m);
-struct jx *ds_client_status(struct ds_manager *m, char *uuid);
+struct jx *ds_client_wait(struct ds_manager *m, struct jx *params);
+int ds_client_queue_empty(struct ds_manager *m, struct jx *params);
+struct jx *ds_client_status(struct ds_manager *m, struct jx *params);
 
 #endif

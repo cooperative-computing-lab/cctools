@@ -243,11 +243,15 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 
 	const char *method = jx_lookup_string(msg,"method");
 	struct jx *params = jx_lookup(msg,"params");
-	if(!method || !params) {
+	int64_t id = jx_lookup_integer(msg, "id");
+
+	if(!method || !params || !id) {
 		/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 		/* should we disconnect the client on a message error? */
     	return;
 	}
+
+	struct jx *response = NULL;
 
 	if(!strcmp(method,"task-submit")) {
 		ds_client_task_submit(m, params);
@@ -257,6 +261,16 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 	} else if(!strcmp(method,"task-retrieve")) {
         const char *uuid = jx_lookup_string(params, "task-id");
 		ds_client_task_retrieve(m, uuid);
+	} else if(!strcmp(method,"file-create")) {
+		struct ds_file *f = ds_client_file_declare(m, params);
+		if(f) {
+			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, "file-id", jx_string(f->fileid), NULL);
+		} else {
+			response = ds_message_standard_response(id, DS_RESULT_UNABLE, NULL);
+		}
+	} else if(!strcmp(method,"file-put")) {
+		/* fix */
+		set_storage = 1;
 	} else if(!strcmp(method,"file-submit")) {
 		ds_client_file_declare(m, params);
 		set_storage = 1;
@@ -270,25 +284,30 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
         const char *uuid = jx_lookup_string(params, "file-id");
 		ds_client_file_copy(m, uuid);
 	} else if(!strcmp(method,"service-submit")) {
-		/* ds_submit_service(); */
+		ds_client_service_submit(m, params);
 	} else if(!strcmp(method,"service-delete")) {
-		/* ds_delete_service(); */
+		ds_client_service_delete(m, params);
 	} else if(!strcmp(method,"project-create")) {
-		/* ds_create_project(); */
+		ds_client_project_create(m, params);
 	} else if(!strcmp(method,"project-delete")) {
-		/* ds_delete_project(); */
+		ds_client_project_delete(m, params);
 	} else if(!strcmp(method,"wait")) {
-		/* ds_wait(); */
+		ds_client_wait(m, params);
 	} else if(!strcmp(method,"queue-empty")) {
-		/* ds_queue_empty(); */
+		ds_client_queue_empty(m, params);
 	} else if(!strcmp(method,"status")) {
-		/* ds_status(); */
+		ds_client_status(m, params);
 	} else {
-		/* ds_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
+		response = ds_message_standard_response(id, DS_RESULT_BAD_METHOD, NULL);
 	}
 
 	if (!set_storage) {
-			mq_store_buffer(c->connection, &c->recv_buffer, 0);
+		mq_store_buffer(c->connection, &c->recv_buffer, 0);
+	}
+
+	if(response) {
+		ds_json_send(c->connection, response);
+		jx_delete(response);
 	}
 }
 

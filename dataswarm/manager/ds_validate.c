@@ -4,28 +4,24 @@
 #include "debug.h"
 
 #include <string.h>
+#include <debug.h>
 
-const char *DECLARE_FILE[] = { "type", "project", "metadata", NULL };
+const char *DECLARE_FILE[] = { "type", "project", "size", "metadata", NULL };
 const char *SUBMIT_TASK[] = { "type", "service", "project", "namespace", "resources", "event", NULL };
 const char *SUBMIT_SERVICE[] = { "type", "project", "namespace", "resources", "environment", NULL };
 
 int is_in(const char *str, const char **array)
 {
-
 	const char **ptr = array;
 
 	while(*ptr != 0) {
-
 		if(!strcmp(*ptr, str)) {
 			return 1;
 		}
-
 		ptr++;
-
 	}
 
 	return 0;
-
 }
 
 int validate_json(struct jx *json, const char **array)
@@ -55,4 +51,4 @@ int check_values(struct jx* j)
     /* this function checks the values in the structure to make sure
     * they are of the correct type */
 	return 1;
-}                                             
+}
