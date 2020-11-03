@@ -1,5 +1,7 @@
 
 #include "ds_validate.h"
+#include "jx_print.h"
+#include "debug.h"
 
 #include <string.h>
 
@@ -28,23 +30,23 @@ int is_in(const char *str, const char **array)
 
 int validate_json(struct jx *json, const char **array)
 {
+    //iterate over the keys in a JX_OBJECT
+    void *j = NULL;
+    const char *key = jx_iterate_keys(json, &j);
 
-	//iterate over the keys in a JX_OBJECT
-	void *j = NULL;
-	const char *key = jx_iterate_keys(json, &j);
+    while(key != NULL) {
 
-	while(key != NULL) {
+        if(!is_in(key, array)) {
+            char *jx_str = jx_print_string(json);
+            debug(D_DATASWARM, "unknown key \"%s\" in %s.", key, jx_str);
+            free(jx_str);
+            return 0;
+        }
 
-		if(!is_in(key, array)) {
-			return 1;
-		}
+        key = jx_iterate_keys(json, &j);
+    }
 
-		key = jx_iterate_keys(json, &j);
-
-	}
-
-	return 0;
-
+    return 1;
 }
 
 int check_values(struct jx* j)

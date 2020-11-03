@@ -12,7 +12,7 @@ See the file COPYING for details.
 
 char *ds_client_task_submit(struct ds_manager *m, struct jx *task) {
 
-    if(validate_json(task, SUBMIT_TASK)){
+    if(!validate_json(task, SUBMIT_TASK)){
         return NULL;
     }
 
@@ -49,7 +49,7 @@ struct jx *ds_client_task_retrieve(struct ds_manager *m, const char *uuid) {
 
 struct ds_file *ds_client_file_declare(struct ds_manager *m, struct jx *file) {
     //validate json
-    if(validate_json(file, DECLARE_FILE)){
+    if(!validate_json(file, DECLARE_FILE)){
         return NULL;
     }
 
@@ -95,13 +95,12 @@ struct ds_file *ds_client_file_copy(struct ds_manager *m, const char *uuid) {
     struct ds_file *f = hash_table_lookup(m->file_table, uuid);
 
     //TODO: replicate file data to mapping
-    //
     return f;
 }
 
 char *ds_client_service_submit(struct ds_manager *m, struct jx *service){
 
-    if(validate_json(service, SUBMIT_SERVICE)){
+    if(!validate_json(service, SUBMIT_SERVICE)){
         return NULL;
     }
 
