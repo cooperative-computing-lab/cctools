@@ -8,7 +8,6 @@
 #include "itable.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
-#include "json.h"
 #include "jx.h"
 
 #include <assert.h>
