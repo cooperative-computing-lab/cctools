@@ -1,24 +1,24 @@
 #include "ds_file.h"
+#include "stringtools.h"
+#include "xxmalloc.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-struct ds_file *ds_file_create(struct jx *jfile)
+struct ds_file *ds_file_create(const char *uuid, const char *projectid, jx_int_t size, struct jx *metadata)
 {
 	struct ds_file *f = malloc(sizeof(*f));
 	memset(f, 0, sizeof(*f));
 
-	f->fileid = jx_lookup_string_dup(jfile, "file-id");
-	f->projectid = jx_lookup_string_dup(jfile, "project-id");
-	f->size = jx_lookup_integer(jfile, "size");
+	f->fileid = xxstrdup(uuid);
+	f->projectid = xxstrdup(projectid);
+	f->size = size;
 
-	f->metadata = jx_lookup(jfile, "metadata");
-	if(f->metadata) {
-		f->metadata = jx_copy(f->metadata);
+	if(metadata) {
+		f->metadata = jx_copy(metadata);
 	}
 
 	return f;
-
 }
 
 const char *ds_file_state_string(ds_file_state_t state)

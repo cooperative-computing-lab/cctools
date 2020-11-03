@@ -13,15 +13,25 @@ typedef enum {
 	DS_FILE_DELETED
 } ds_file_state_t;
 
+typedef enum {
+	DS_FILE_TYPE_INPUT,
+	DS_FILE_TYPE_OUTPUT,
+	DS_FILE_TYPE_STDOUT,
+	DS_FILE_TYPE_STDERR
+} ds_file_type_t;
+
+
 struct ds_file {
 	char *fileid;
+	ds_file_type_t type;
 	ds_file_state_t state;
 	int size;
+
 	char *projectid;
 	struct jx *metadata;
 };
 
-struct ds_file *ds_file_create(struct jx *jfile);
+struct ds_file *ds_file_create(const char *uuid, const char *projectid, jx_int_t size, struct jx *metadata);
 struct jx *ds_file_to_jx(struct ds_file *file);
 const char *ds_file_state_string(ds_file_state_t state);
 void ds_file_delete(struct ds_file *f);

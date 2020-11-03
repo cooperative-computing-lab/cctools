@@ -261,6 +261,16 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 	} else if(!strcmp(method,"task-retrieve")) {
         const char *uuid = jx_lookup_string(params, "task-id");
 		ds_client_task_retrieve(m, uuid);
+	} else if(!strcmp(method,"file-create")) {
+		struct ds_file *f = ds_client_file_declare(m, params);
+		if(f) {
+			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, "file-id", jx_string(f->fileid), NULL);
+		} else {
+			response = ds_message_standard_response(id, DS_RESULT_UNABLE, NULL);
+		}
+	} else if(!strcmp(method,"file-put")) {
+		/* fix */
+		set_storage = 1;
 	} else if(!strcmp(method,"file-submit")) {
 		ds_client_file_declare(m, params);
 		set_storage = 1;

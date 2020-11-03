@@ -47,25 +47,24 @@ struct jx *ds_client_task_retrieve(struct ds_manager *m, const char *uuid) {
 
 }
 
-struct ds_file *ds_client_file_declare(struct ds_manager *m, struct jx *file) {
+struct ds_file *ds_client_file_declare(struct ds_manager *m, struct jx *params) {
     //validate json
-    if(!validate_json(file, DECLARE_FILE)){
+    if(!validate_json(params, DECLARE_FILE)){
         return NULL;
     }
 
     // assign a UUID to the file
-    cctools_uuid_t *uuid = 0;
-    cctools_uuid_create(uuid);
+    cctools_uuid_t uuid;
+    cctools_uuid_create(&uuid);
 
-    char *uuid_str = strdup(uuid->str);
-
-    //add state and uuid to json
-    jx_insert_string(file, "uuid", uuid_str);
-
-    struct ds_file *f = ds_file_create(file);
+    struct ds_file *f = ds_file_create(
+            uuid.str,
+            jx_lookup_string(params, "project"),
+            jx_lookup_integer(params, "size"),
+            jx_lookup(params, "metadata"));
 
     //save UUID to file mapping in memory
-    hash_table_insert(m->file_table, uuid_str, f);
+    hash_table_insert(m->file_table, uuid.str, f);
 
     return f;
 }
