@@ -51,23 +51,31 @@ int ds_fd_send(struct mq *mq, int fd, size_t length)
 	return rc;
 }
 
-struct jx * ds_message_standard_response( int64_t id, ds_result_t code, struct jx *params )
+struct jx * ds_message_standard_response(int64_t id, ds_result_t code, ...)
 {
+    va_list keys_values;
+    va_start(keys_values, code);
+
+    struct jx *params = jx_object(0);
+
 	struct jx *message = jx_objectv(
             "method", jx_string("response"),
             "id",     jx_integer(id),
             "result", jx_integer(code),
+            "params", params,
             NULL);
 
-	if(code!=DS_RESULT_SUCCESS) {
-		// XXX send string instead?
-		jx_insert_integer(message,"error",code);
-	}
+    char *key = va_arg(keys_values, char *);
+    while(key) {
+        struct jx *value = va_arg(keys_values, struct jx *);
+        assert(value);
+        jx_insert(params, jx_string(key), value);
+        key = va_arg(keys_values, char *);
+    }
 
-	if(params) {
-		jx_insert(message,jx_string("params"),jx_copy(params));
-	} else {
-		jx_insert(message,jx_string("params"),jx_object(0));
+    if(code!=DS_RESULT_SUCCESS) {
+        jx_insert_integer(message, "error", code);
+        jx_insert_string(message, "error_string", ds_message_result_string(code));
     }
 
 	return message;
@@ -109,3 +117,54 @@ struct jx *ds_parse_message(buffer_t *buf) {
 	buffer_rewind(buf, 0);
 	return out;
 }
+
+const char *ds_message_result_string(ds_result_t code) {
+
+    const char *result = NULL;
+    switch(code) {
+        case DS_RESULT_SUCCESS:
+            result = "success";
+            break;
+        case DS_RESULT_BAD_METHOD:
+            result = "method does not specify a known message in the given context";
+            break;
+        case DS_RESULT_BAD_ID:
+            result = "method that needs a reply is missing the id field";
+            break;
+        case DS_RESULT_BAD_PARAMS:
+            result = "params keys missing or of incorrect type";
+            break;
+        case DS_RESULT_NO_SUCH_TASKID:
+            result = "requested task-id does not exist";
+            break;
+        case DS_RESULT_NO_SUCH_BLOBID:
+            result = "requested blob-id does not exist";
+            break;
+        case DS_RESULT_TOO_FULL:
+            result = "insufficient resources to complete request";
+            break;
+        case DS_RESULT_BAD_PERMISSION:
+            result = "insufficient privileges to complete request";
+            break;
+        case DS_RESULT_UNABLE:
+            result = "could not complete request for internal reason";
+            break;
+        case DS_RESULT_PENDING:
+            result = "rpc not completed yet.";
+            break;
+        case DS_RESULT_BAD_STATE:
+            result = "cannot take that action in this state.";
+            break;
+        case DS_RESULT_TASKID_EXISTS:
+            result = "attempt to create a task which already exists.";
+            break;
+        case DS_RESULT_BLOBID_EXISTS:
+            result = "attempt to create a blob which already exists.";
+            break;
+        default:
+            result = "unknown result code";
+    }
+
+    return result;
+}
+
