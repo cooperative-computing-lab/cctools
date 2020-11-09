@@ -144,7 +144,7 @@ $command_for{fedora} = 'dnf install -y';
 $versions_of{debian} = [ qw{ 9.9 } ];
 $command_for{debian} = 'apt-get install -y';
 
-$versions_of{ubuntu} = [ qw{ 20.04 } ];
+$versions_of{ubuntu} = [ qw{ 16.04 20.04 } ];
 $command_for{ubuntu} = $command_for{debian};
 
 # e.g., $package_for{distro}{version}{dependency} == 'package'
@@ -324,7 +324,7 @@ $postinstall_for{debian}{default} = [
 	@{$fuse},
 	@{$uuid},
 
-	'apt-get install -y python-is-python3',
+	'apt-get install -y python-is-python3 || update-alternatives --install /usr/bin/python python /usr/bin/python3 10',
 
 	# install cvmfs-devel:
 	'apt-get install -y lsb-release',
@@ -342,7 +342,6 @@ $preinstall_for{ubuntu}{default} = $preinstall_for{debian}{default};
 
 $extras_for{ubuntu}{default} = $extras_for{debian}{default};
 $postinstall_for{ubuntu}{default} = $postinstall_for{debian}{default};
-
 
 ########## ALL ##########
 
