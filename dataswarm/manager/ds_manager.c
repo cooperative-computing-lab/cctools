@@ -251,6 +251,7 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
     	return;
 	}
 
+	ds_result_t result  = DS_RESULT_SUCCESS;
 	struct jx *response = NULL;
 
 	if(!strcmp(method,"task-submit")) {
@@ -269,15 +270,23 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 			response = ds_message_standard_response(id, DS_RESULT_UNABLE, NULL);
 		}
 	} else if(!strcmp(method,"file-put")) {
-		ds_client_file_put(m, c, params);
-		set_storage = 1;
-		response = ds_message_standard_response(id, DS_RESULT_SUCCESS, NULL);
+		result = ds_client_file_put(m, c, params);
+		if(result == DS_RESULT_SUCCESS) {
+			set_storage = 1;
+			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, NULL);
+		} else {
+			response = ds_message_standard_response(id, DS_RESULT_UNABLE, NULL);
+		}
 	} else if(!strcmp(method,"file-commit")) {
         const char *uuid = jx_lookup_string(params, "file-id");
 		ds_client_file_commit(m, uuid);
 	} else if(!strcmp(method,"file-delete")) {
-        const char *uuid = jx_lookup_string(params, "file-id");
-		ds_client_file_delete(m, uuid);
+		result = ds_client_file_delete(m, params);
+		if(result == DS_RESULT_SUCCESS) {
+			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, NULL);
+		} else {
+			response = ds_message_standard_response(id, DS_RESULT_UNABLE, NULL);
+		}
 	} else if(!strcmp(method,"file-copy")) {
         const char *uuid = jx_lookup_string(params, "file-id");
 		ds_client_file_copy(m, uuid);

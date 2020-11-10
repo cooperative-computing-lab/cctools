@@ -77,9 +77,16 @@ struct ds_file *ds_client_file_declare(struct ds_manager *m, struct jx *params) 
 }
 
 ds_result_t ds_client_file_put(struct ds_manager *m, struct ds_client_rep *c, struct jx *params) {
-    const char *fileid = jx_lookup_string(params, "file_id");
-    jx_int_t size = jx_lookup_integer(params, "size");  //FIX: size should come from the previous file_create
+    const char *fileid = jx_lookup_string(params, "file-id");
 
+    struct ds_file *f = hash_table_lookup(m->file_table, fileid);
+
+    if(!f) {
+        return DS_RESULT_UNABLE;
+    }
+
+
+    jx_int_t size = f->size;
     char *filename = string_format("manager_cache/%s", fileid);
 
     create_dir_parents(filename, 0777);
@@ -110,10 +117,21 @@ struct ds_file *ds_client_file_commit(struct ds_manager *m, const char *uuid) {
 
 }
 
-struct ds_file *ds_client_file_delete(struct ds_manager *m, const char *uuid) {
+ds_result_t ds_client_file_delete(struct ds_manager *m, struct jx *params) {
 
-    return hash_table_remove(m->file_table, uuid);
+    const char *fileid = jx_lookup_string(params, "file-id");
+    struct ds_file *f = hash_table_lookup(m->file_table, fileid);
 
+    if(!f) {
+        return DS_RESULT_UNABLE;
+    }
+
+    //TODO: Delete file from workers?
+
+    char *filename = string_format("manager_cache/%s", fileid);
+    unlink(filename);
+
+    return DS_RESULT_SUCCESS;
 }
 
 struct ds_file *ds_client_file_copy(struct ds_manager *m, const char *uuid) {
@@ -171,7 +189,6 @@ char *ds_client_project_create(struct ds_manager *m, struct jx *params) {
 }
 
 struct jx *ds_client_project_delete(struct ds_manager *m, struct jx *params) {
-
     //TODO: get project data from mapping
 
     //TODO: remove project data from mapping

@@ -156,14 +156,13 @@ class DataSwarm:
             "method" : "file-create",
             "params" : params
         }
-
         return self.send_recv(request)
 
     def file_put(self, fileid, data):
         request = {
                 "method" : "file-put",
                 "params" : {
-                    "file_id": fileid,
+                    "file-id": fileid,
                     "size": len(data)
                     }
                 }
@@ -183,7 +182,7 @@ class DataSwarm:
         request = {
             "method" : "file-commit",
             "params" : {
-                "uuid" : fileid
+                "fileid" : fileid
             }
         }
 
@@ -193,7 +192,7 @@ class DataSwarm:
         request = {
             "method" : "file-delete",
             "params" : {
-                "uuid" : fileid
+                "file-id" : fileid
             }
         }
 
@@ -295,21 +294,15 @@ class DataSwarm:
 if __name__ == "__main__":
     ds = DataSwarm(port=1234)
 
-    #msg = "a".encode() * 1200000
-    msg = "a".encode() * 1200000
+    msg = "hello".encode() * 1200000
+    file_params = {
+            "type": "input",
+            "project": "project-abc",
+            "size": len(msg)
+            }
 
-    msg = "0".encode()
-    for l in "abcde":
-        msg += "{}".format(l).encode() * 32000
-
-    # file_params = {
-    #         "type": "input",
-    #         "project": "project-abc",
-    #         "size": len(msg)
-    #         }
-
-    # f = ds.file_create(file_params)
-    # f_id = f["params"]["file-id"]
-
-    f_id = "A6AEF6F6-1C19-4DC9-9C0F-C88BC77A1F40"
+    f = ds.file_create(file_params)
+    f_id = f["params"]["file-id"]
     ds.file_put(f_id, msg)
+    ds.file_delete(f_id)
+
