@@ -225,7 +225,6 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 	struct jx *msg = NULL;
 	switch (mq_recv(c->connection, NULL)) {
 		case MQ_MSG_NONE:
-			abort(); //XXX ??
 			break;
 		case MQ_MSG_FD:
 			//XXX handle received files
@@ -236,9 +235,9 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 			break;
 	}
 
-	if (!msg) {
-		// malformed message
-		abort();
+	if (!jx_istype(msg, JX_OBJECT)) {
+		debug(D_DATASWARM, "malformed message from client %s:%d, disconnecting", c->addr, c->port);
+		goto ERROR;
 	}
 
 	const char *method = jx_lookup_string(msg,"method");
@@ -246,9 +245,8 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 	int64_t id = jx_lookup_integer(msg, "id");
 
 	if(!method || !params || !id) {
-		/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
-		/* should we disconnect the client on a message error? */
-    	return;
+		debug(D_DATASWARM, "invalid message from client %s:%d, disconnecting", c->addr, c->port);
+		goto ERROR;
 	}
 
 	struct jx *response = NULL;
@@ -309,6 +307,14 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 		ds_json_send(c->connection, response);
 		jx_delete(response);
 	}
+
+	return;
+
+ERROR:
+	ds_client_rep_disconnect(c);
+	char *key = string_format("%p", c->connection);
+	hash_table_remove(m->client_table, key);
+	free(key);
 }
 
 void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_t stoptime )
@@ -328,17 +334,15 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 	}
 
 	if (!msg) {
-		//XXX malformed message
-		debug(D_DATASWARM, "worker at %p went away?\n", w->connection); /* fix: handle disconnections */
+		debug(D_DATASWARM, "malformed message from worker %s:%d, disconnecting", w->addr, w->port);
+		goto ERROR;
 	}
 
 	const char *method = jx_lookup_string(msg,"method");
 	struct jx  *params = jx_lookup(msg,"params");
 	if(!method || !params) {
-		/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
-		/* disconnect worker */
-		mq_close(w->connection);
-		return;
+		debug(D_DATASWARM, "invalid message from worker %s:%d, disconnecting", w->addr, w->port);
+		goto ERROR;
 	}
 
 	debug(D_DATASWARM, "worker %s:%d rx: %s", w->addr, w->port, method);
@@ -360,6 +364,14 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 	if (!set_storage) {
 		mq_store_buffer(w->connection, &w->recv_buffer, 0);
 	}
+
+	return;
+
+ERROR:
+	ds_worker_rep_disconnect(w);
+	char *key = string_format("%p", w->connection);
+	hash_table_remove(m->worker_table, key);
+	free(key);
 }
 
 int handle_messages( struct ds_manager *m )
@@ -408,15 +420,25 @@ int handle_connections(struct ds_manager *m) {
 }
 
 int handle_errors(struct ds_manager *m) {
-		for (struct mq *conn; (conn = mq_poll_error(m->polling_group));) {
-			char *key = string_format("%p", conn);
-			//XXX handle disconnects/errors, clean up
-			mq_close(conn);
-			hash_table_remove(m->worker_table, key);
-			hash_table_remove(m->client_table, key);
-		}
+	for (struct mq *conn; (conn = mq_poll_error(m->polling_group));) {
+		char *key = string_format("%p", conn);
+		struct ds_worker_rep *w = hash_table_remove(m->worker_table, key);
+		struct ds_client_rep *c = hash_table_remove(m->client_table, key);
+		free(key);
+		assert(!(w && c));
 
-		return 0;
+		if (w) {
+			debug(D_DATASWARM, "worker disconnect (%s:%d): %s",
+				w->addr, w->port, strerror(mq_geterror(conn)));
+			ds_worker_rep_disconnect(w);
+		} else if (c) {
+			debug(D_DATASWARM, "client disconnect (%s:%d): %s",
+				c->addr, c->port, strerror(mq_geterror(conn)));
+			ds_client_rep_disconnect(c);
+		}
+	}
+
+	return 0;
 }
 
 void server_main_loop( struct ds_manager *m )

@@ -18,5 +18,6 @@ struct ds_client_rep {
 };
 
 struct ds_client_rep * ds_client_rep_create( struct mq *conn );
+void ds_client_rep_disconnect(struct ds_client_rep *c);
 
 #endif

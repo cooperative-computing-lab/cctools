@@ -11,3 +11,9 @@ struct ds_client_rep * ds_client_rep_create( struct mq *conn )
 	return c;
 }
 
+void ds_client_rep_disconnect(struct ds_client_rep *c) {
+	if (!c) return;
+	mq_close(c->connection);
+	buffer_free(&c->recv_buffer);
+	free(c);
+}
