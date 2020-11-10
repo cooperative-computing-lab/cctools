@@ -24,6 +24,9 @@ struct ds_task * ds_task_create( struct jx *jtask )
 
 	t->state = DS_TASK_ACTIVE;
 
+	t->worker = NULL;
+	t->attempts = NULL;
+
 	return t;
 
 }

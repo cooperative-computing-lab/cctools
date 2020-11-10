@@ -33,6 +33,10 @@ struct ds_task {
 	struct ds_mount *mounts;
 	struct ds_resources *resources;
 	struct jx *environment;
+
+	// only used on the manager
+	struct ds_task_rep *attempts;
+	char *worker;
 };
 
 struct ds_task * ds_task_create( struct jx *jtask );

@@ -84,10 +84,6 @@ static bool check_replicas(struct ds_file *f, ds_blob_state_t state) {
 	return true;
 }
 
-void process_tasks( struct ds_manager *m )
-{
-}
-
 static void process_files(struct ds_manager *m) {
 	char *key;
 	struct ds_file *f;
@@ -126,6 +122,94 @@ static void process_files(struct ds_manager *m) {
 	}
 }
 
+static void retry_task(struct ds_task *t) {
+	//XXX inspect task, check retry count, etc.
+	// for now, just switch to a hard failure
+	t->result = DS_TASK_RESULT_ERROR;
+}
+
+static void fix_task(struct ds_task *t) {
+	//XXX inspect task, check retry count, etc.
+	// for now, just switch to a hard failure
+	t->result = DS_TASK_RESULT_ERROR;
+}
+
+static void schedule_task(struct ds_manager *m, struct ds_task *t) {
+	//XXX do some matching of tasks to workers
+
+	int r = rand() % hash_table_size(m->worker_table);
+	char *key;
+	void *w;
+	hash_table_firstkey(m->worker_table);
+	while (r >= 0) {
+		hash_table_nextkey(m->worker_table, &key, &w);
+		r--;
+	}
+	t->worker = xxstrdup(key);
+}
+
+static void process_tasks(struct ds_manager *m) {
+	char *key;
+	struct ds_task *t;
+
+	hash_table_firstkey(m->task_table);
+	while (hash_table_nextkey(m->task_table, &key, (void **) &t)) {
+		switch (t->result) {
+			case DS_TASK_RESULT_SUCCESS:
+				break;
+			case DS_TASK_RESULT_ERROR:
+			case DS_TASK_RESULT_UNDEFINED:
+				// nothing to do
+				continue;
+			case DS_TASK_RESULT_FIX:
+				fix_task(t);
+				continue;
+			case DS_TASK_RESULT_AGAIN:
+				retry_task(t);
+				continue;
+		}
+
+		switch (t->state) {
+			case DS_TASK_ACTIVE:
+				// schedule/advance below
+				break;
+			case DS_TASK_DONE:
+			case DS_TASK_DELETED:
+				// nothing to do, wait for the client
+				continue;
+			case DS_TASK_RUNNING:
+			case DS_TASK_DELETING:
+				// nothing to do, wait for the worker
+				continue;
+		}
+
+		if (!t->worker) {
+			schedule_task(m, t);
+		}
+		if (!t->worker) {
+			// couldn't/didn't want to schedule the task this time around
+			return;
+		}
+		struct ds_worker_rep *w = hash_table_lookup(m->worker_table, t->worker);
+
+		for (struct ds_mount *u = t->mounts; u; u = u->next) {
+			struct ds_file *f = hash_table_lookup(m->file_table, u->uuid);
+			assert(f);
+			struct ds_blob_rep *b = hash_table_lookup(f->replicas, t->worker);
+			if (!b) {
+				char *blobid = string_format("blob-%d", m->blob_id++);
+				hash_table_insert(f->replicas, t->worker, ds_manager_add_blob_to_worker(m, w, blobid));
+				return;
+			}
+
+			//XXX match mount options to file/blob state
+			// or return if not ready
+		}
+
+		ds_manager_add_task_to_worker(m, w, key);
+	}
+}
+
 /* declares a blob in a worker so that it can be manipulated via blob rpcs. */
 struct ds_blob_rep *ds_manager_add_blob_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid) {
 	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
@@ -156,9 +240,8 @@ struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct 
 		fatal("task-id %s already created at worker.", taskid);
 	}
 
-	/* this should be a proper struct ds_task. */
-	struct jx *description = hash_table_lookup(m->task_table, taskid);
-	if(!description) {
+	struct ds_task *task = hash_table_lookup(m->task_table, taskid);
+	if(!task) {
 		/* could not find task with taskid. This could only happen with a bug,
 		 * as we have control of the create messages.*/
 		fatal("task-id %s does not exist.", taskid);
@@ -170,22 +253,29 @@ struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct 
 	t->result = DS_RESULT_SUCCESS;
 
 	t->taskid = xxstrdup(taskid);
-	t->description = description;
+	t->task = task;
+	t->worker = xxstrdup(task->worker);
 
 	hash_table_insert(r->tasks, taskid, t);
+	t->next = task->attempts;
+	task->attempts = t;
 
 	return t;
 }
 
 char *ds_manager_submit_task( struct ds_manager *m, struct jx *description ) {
 	char *taskid = string_format("task-%d", m->task_id++);
-
-	/* do validation */
-	/* convert to proper struct ds_task */
-
 	jx_insert_string(description, "task-id", taskid);
 
-	hash_table_insert(m->task_table, taskid, description);
+	struct ds_task *t = ds_task_create(description);
+	if (!t) {
+		//XXX task failed validation
+		struct jx *j = jx_string("task-id");
+		jx_remove(description, j);
+		jx_delete(j);
+		return NULL;
+	}
+	hash_table_insert(m->task_table, taskid, t);
 
 	return taskid;
 }
@@ -588,8 +678,6 @@ struct ds_manager * ds_manager_create()
 
 	m->worker_table = hash_table_create(0,0);
 	m->client_table = hash_table_create(0,0);
-	m->task_table   = hash_table_create(0,0);
-
     m->task_table = hash_table_create(0,0);
     m->file_table = hash_table_create(0,0);
 
