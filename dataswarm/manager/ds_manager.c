@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <time.h>
 #include <getopt.h>
@@ -69,12 +70,60 @@ void update_catalog( struct ds_manager *m, int force_update )
 	m->catalog_last_update_time = time(0);
 }
 
-void process_files( struct ds_manager *m )
-{
+//XXX change table setups?
+static bool check_replicas(struct ds_file *f, ds_blob_state_t state) {
+	char *key;
+	struct ds_blob_rep *b;
+
+	hash_table_firstkey(f->replicas);
+	while (hash_table_nextkey(f->replicas, &key, (void **) &b)) {
+		if (b->state != state) return false;
+		if (b->result != DS_RESULT_SUCCESS) return false;
+		assert(b->in_transition == b->state);
+	}
+	return true;
 }
 
 void process_tasks( struct ds_manager *m )
 {
+}
+
+static void process_files(struct ds_manager *m) {
+	char *key;
+	struct ds_file *f;
+
+	hash_table_firstkey(m->file_table);
+	while (hash_table_nextkey(m->file_table, &key, (void **) &f)) {
+		switch (f->state) {
+			case DS_FILE_ALLOCATING:
+				if (check_replicas(f, DS_BLOB_RW)) {
+					f->state = DS_FILE_MUTABLE;
+				} else {
+					//XXX talk to workers to advance replica states
+				}
+				break;
+			case DS_FILE_COMMITTING:
+				if (check_replicas(f, DS_BLOB_RO)) {
+					f->state = DS_FILE_IMMUTABLE;
+				} else {
+					//XXX talk to workers to advance replica states
+				}
+				break;
+			case DS_FILE_DELETING:
+				if (check_replicas(f, DS_BLOB_DELETED)) {
+					f->state = DS_FILE_DELETED;
+				} else {
+					//XXX talk to workers to advance replica states
+				}
+				break;
+			case DS_FILE_PENDING:
+			case DS_FILE_MUTABLE:
+			case DS_FILE_IMMUTABLE:
+			case DS_FILE_DELETED:
+				// nothing to do, wait for the client
+				break;
+		}
+	}
 }
 
 /* declares a blob in a worker so that it can be manipulated via blob rpcs. */
@@ -556,4 +605,4 @@ struct ds_manager * ds_manager_create()
 }
 
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=4 shiftwidth=4: */
