@@ -148,12 +148,46 @@ static void schedule_task(struct ds_manager *m, struct ds_task *t) {
 	t->worker = xxstrdup(key);
 }
 
+static bool prepare_worker(struct ds_manager *m, struct ds_task *t) {
+	struct ds_worker_rep *w = hash_table_lookup(m->worker_table, t->worker);
+
+	for (struct ds_mount *u = t->mounts; u; u = u->next) {
+		struct ds_file *f = hash_table_lookup(m->file_table, u->uuid);
+		assert(f);
+		struct ds_blob_rep *b = hash_table_lookup(f->replicas, t->worker);
+		if (!b) {
+			char *blobid = string_format("blob-%d", m->blob_id++);
+			hash_table_insert(f->replicas, t->worker, ds_manager_add_blob_to_worker(m, w, blobid));
+			return false;
+		}
+
+		//XXX match mount options to file/blob state
+		// or return if not ready
+	}
+
+	return true;
+}
+
 static void process_tasks(struct ds_manager *m) {
 	char *key;
 	struct ds_task *t;
 
 	hash_table_firstkey(m->task_table);
 	while (hash_table_nextkey(m->task_table, &key, (void **) &t)) {
+		switch (t->state) {
+			case DS_TASK_ACTIVE:
+				// schedule/advance below
+				break;
+			case DS_TASK_DONE:
+			case DS_TASK_DELETED:
+				// nothing to do, wait for the client
+				continue;
+			case DS_TASK_RUNNING:
+			case DS_TASK_DELETING:
+				// nothing to do, wait for the worker
+				continue;
+		}
+
 		switch (t->result) {
 			case DS_TASK_RESULT_SUCCESS:
 				break;
@@ -169,20 +203,6 @@ static void process_tasks(struct ds_manager *m) {
 				continue;
 		}
 
-		switch (t->state) {
-			case DS_TASK_ACTIVE:
-				// schedule/advance below
-				break;
-			case DS_TASK_DONE:
-			case DS_TASK_DELETED:
-				// nothing to do, wait for the client
-				continue;
-			case DS_TASK_RUNNING:
-			case DS_TASK_DELETING:
-				// nothing to do, wait for the worker
-				continue;
-		}
-
 		if (!t->worker) {
 			schedule_task(m, t);
 		}
@@ -190,22 +210,9 @@ static void process_tasks(struct ds_manager *m) {
 			// couldn't/didn't want to schedule the task this time around
 			return;
 		}
+
 		struct ds_worker_rep *w = hash_table_lookup(m->worker_table, t->worker);
-
-		for (struct ds_mount *u = t->mounts; u; u = u->next) {
-			struct ds_file *f = hash_table_lookup(m->file_table, u->uuid);
-			assert(f);
-			struct ds_blob_rep *b = hash_table_lookup(f->replicas, t->worker);
-			if (!b) {
-				char *blobid = string_format("blob-%d", m->blob_id++);
-				hash_table_insert(f->replicas, t->worker, ds_manager_add_blob_to_worker(m, w, blobid));
-				return;
-			}
-
-			//XXX match mount options to file/blob state
-			// or return if not ready
-		}
-
+		if (!prepare_worker(m, t)) return;
 		ds_manager_add_task_to_worker(m, w, key);
 	}
 }
