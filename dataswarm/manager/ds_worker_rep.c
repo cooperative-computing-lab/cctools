@@ -81,9 +81,6 @@ ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *param
 			t->state = t->in_transition;
 			t->result = DS_RESULT_SUCCESS;
 			break;
-		case DS_TASK_RUNNING:
-			/* task running is only a state for a task attempt, ignoring. */
-			break;
 		case DS_TASK_DELETING:
 			/* do nothing until task deleted at worker. */
 			break;

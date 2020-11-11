@@ -54,7 +54,6 @@ const char * ds_task_state_string( ds_task_state_t state )
 {
 	switch(state) {
 		case DS_TASK_ACTIVE: return "active";
-		case DS_TASK_RUNNING: return "running";
 		case DS_TASK_DONE: return "done";
 		case DS_TASK_DELETING: return "deleting";
 		case DS_TASK_DELETED: return "deleted";
@@ -71,6 +70,7 @@ struct jx * ds_task_to_jx( struct ds_task *t )
 	if(t->resources) jx_insert(jtask,jx_string("resources"),ds_resources_to_jx(t->resources));
 	if(t->mounts) jx_insert(jtask,jx_string("namespace"),ds_mounts_to_jx(t->mounts));
 	jx_insert_string(jtask,"state",ds_task_state_string(t->state));
+	jx_insert_integer(jtask,"try_state",t->try_state);
 	return jtask;
 }
 
