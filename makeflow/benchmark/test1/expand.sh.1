@@ -1,0 +1,8 @@
+#!/bin/bash
+
+for n in $(seq $scale); do
+cat <<EOF
+output.$n.txt: simulate.py
+	python ./simulate.py -n $n > output.$n.txt
+EOF
+done
