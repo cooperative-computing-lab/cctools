@@ -32,6 +32,7 @@ See the file COPYING for details.
 #include "ds_manager.h"
 #include "ds_client_ops.h"
 #include "ds_file.h"
+#include "ds_db.h"
 
 #include "ds_test.h"
 
@@ -440,6 +441,7 @@ static const struct option long_options[] =
 {
 	{"name", required_argument, 0, 'N'},
 	{"port", required_argument, 0, 'p'},
+	{"dbpath", required_argument, 0, 'b'},
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
 	{"help", no_argument, 0, 'h' },
@@ -453,6 +455,7 @@ static void show_help( const char *cmd )
 	printf("where options are:\n");
 	printf("-N --name=<name>          Set project name for catalog update.\n");
 	printf("-p,--port=<port>          Port number to listen on.\n");
+	printf("-b,--dbpath=<path>        Local path to database of files, tasks, etc.\n");
 	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
 	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
 	printf("-h,--help                 Show this help string\n");
@@ -464,7 +467,7 @@ int main(int argc, char *argv[])
 	struct ds_manager * m = ds_manager_create();
 
 	int c;
-	while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0))!=-1) {
+	while((c = getopt_long(argc, argv, "p:b:N:s:d:o:hv", long_options, 0))!=-1) {
 
 		switch(c) {
 			case 'N':
@@ -472,6 +475,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'd':
 				debug_flags_set(optarg);
+				break;
+			case 'b':
+				m->dbpath = strdup(optarg);
 				break;
 			case 'o':
 				debug_config_file(optarg);
@@ -491,6 +497,14 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	printf("dataswarm manager starting\n");
+
+	/* Use a default location if none was explicitly selected */
+	if(!m->dbpath) m->dbpath = string_format("/tmp/ds-manager-%d",getuid());
+
+	printf("recovering state from database: %s (--dbpath)\n",m->dbpath);
+	ds_db_recover_all(m);
+
 	m->manager_socket = mq_serve(NULL, m->server_port);
 	if(!m->manager_socket) {
 		printf("could not serve on port %d: %s\n", m->server_port,strerror(errno));
@@ -504,7 +518,7 @@ int main(int argc, char *argv[])
 
 	server_main_loop(m);
 
-	debug(D_DATASWARM,"server shutting down.\n");
+	debug(D_DATASWARM,"manager shutting down.\n");
 
 	return 0;
 }
@@ -517,10 +531,8 @@ struct ds_manager * ds_manager_create()
 
 	m->worker_table = hash_table_create(0,0);
 	m->client_table = hash_table_create(0,0);
-	m->task_table   = hash_table_create(0,0);
-
-    m->task_table = hash_table_create(0,0);
-    m->file_table = hash_table_create(0,0);
+	m->task_table = hash_table_create(0,0);
+	m->file_table = hash_table_create(0,0);
 
 	m->polling_group = mq_poll_create();
 

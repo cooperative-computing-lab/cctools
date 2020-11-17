@@ -32,7 +32,12 @@ struct ds_file {
 };
 
 struct ds_file *ds_file_create(const char *uuid, const char *projectid, jx_int_t size, struct jx *metadata);
+struct ds_file *ds_file_create_from_file( const char *filename );
+struct ds_file *ds_file_from_jx( struct jx *j );
+
 struct jx *ds_file_to_jx(struct ds_file *file);
+int        ds_file_to_file( struct ds_file *file, const char *filename );
+
 const char *ds_file_state_string(ds_file_state_t state);
 void ds_file_delete(struct ds_file *f);
 

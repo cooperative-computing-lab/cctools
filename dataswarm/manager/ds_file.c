@@ -2,8 +2,12 @@
 #include "stringtools.h"
 #include "xxmalloc.h"
 
+#include "jx_parse.h"
+#include "jx_print.h"
+
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 struct ds_file *ds_file_create(const char *uuid, const char *projectid, jx_int_t size, struct jx *metadata)
 {
@@ -18,6 +22,23 @@ struct ds_file *ds_file_create(const char *uuid, const char *projectid, jx_int_t
 		f->metadata = jx_copy(metadata);
 	}
 
+	return f;
+}
+
+struct ds_file *ds_file_create_from_file( const char *filename )
+{
+	FILE *file = fopen(filename,"r");
+	if(!file) return 0;
+
+	struct jx *j = jx_parse_stream(file);
+	if(!j) {
+		fclose(file);
+		return 0;
+	}
+
+	struct ds_file *f = ds_file_from_jx(j);
+	jx_delete(j);
+	fclose(file);
 	return f;
 }
 
@@ -54,11 +75,42 @@ struct jx *ds_file_to_jx(struct ds_file *f)
 		jx_insert(jfile, jx_string("metadata"), jx_copy(f->metadata));
 	if(f->size)
 		jx_insert(jfile, jx_string("size"), jx_integer(f->size));
-	jx_insert_string(jfile, "state", ds_file_state_string(f->state));
+
+	jx_insert_integer(jfile,"state",f->state);
 
 	return jfile;
 }
 
+int ds_file_to_file( struct ds_file *f, const char *filename )
+{
+	FILE *file = fopen(filename,"w");
+	if(!file) return 0;
+
+	struct jx *j = ds_file_to_jx(f);
+	if(!j) {
+		fclose(file);
+		return 0;
+	}
+
+	jx_print_stream(j,file);
+	jx_delete(j);
+	fclose(file);
+
+	return 0;
+}
+
+struct ds_file * ds_file_from_jx( struct jx *j )
+{
+	struct ds_file *f = malloc(sizeof(*f));
+
+	f->fileid = jx_lookup_string_dup(j,"file-id");
+	f->projectid = jx_lookup_string_dup(j,"project-id");
+	f->metadata = jx_lookup(j,"metadata");
+	f->size = jx_lookup_integer(j,"size");
+	f->state = jx_lookup_integer(j,"state");
+
+	return f;
+}
 
 void ds_file_delete(struct ds_file *f)
 {
