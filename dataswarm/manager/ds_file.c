@@ -36,9 +36,22 @@ struct ds_file *ds_file_create_from_file( const char *filename )
 		return 0;
 	}
 
-	struct ds_file *f = ds_file_from_jx(j);
+	struct ds_file *f = ds_file_create_from_jx(j);
 	jx_delete(j);
 	fclose(file);
+	return f;
+}
+
+struct ds_file * ds_file_create_from_jx( struct jx *j )
+{
+	struct ds_file *f = malloc(sizeof(*f));
+
+	f->fileid = jx_lookup_string_dup(j,"file-id");
+	f->projectid = jx_lookup_string_dup(j,"project-id");
+	f->metadata = jx_lookup(j,"metadata");
+	f->size = jx_lookup_integer(j,"size");
+	f->state = jx_lookup_integer(j,"state");
+
 	return f;
 }
 
@@ -97,19 +110,6 @@ int ds_file_to_file( struct ds_file *f, const char *filename )
 	fclose(file);
 
 	return 0;
-}
-
-struct ds_file * ds_file_from_jx( struct jx *j )
-{
-	struct ds_file *f = malloc(sizeof(*f));
-
-	f->fileid = jx_lookup_string_dup(j,"file-id");
-	f->projectid = jx_lookup_string_dup(j,"project-id");
-	f->metadata = jx_lookup(j,"metadata");
-	f->size = jx_lookup_integer(j,"size");
-	f->state = jx_lookup_integer(j,"state");
-
-	return f;
 }
 
 void ds_file_delete(struct ds_file *f)
