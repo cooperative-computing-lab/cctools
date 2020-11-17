@@ -144,7 +144,7 @@ $command_for{fedora} = 'dnf install -y';
 $versions_of{debian} = [ qw{ 9.9 } ];
 $command_for{debian} = 'apt-get install -y';
 
-$versions_of{ubuntu} = [ qw{ 16.04 } ];
+$versions_of{ubuntu} = [ qw{ 16.04 20.04 } ];
 $command_for{ubuntu} = $command_for{debian};
 
 # e.g., $package_for{distro}{version}{dependency} == 'package'
@@ -298,7 +298,7 @@ pkg_config               => 'pkg-config',
 python                   => ['python-dev', 'python-setuptools'],
 python3                  => ['python3-dev', 'python3-setuptools'],
 readline                 => 'libreadline-dev',
-swig                     => [],				# from builder
+swig                     => 'swig',
 strace                   => 'strace',
 troff                    => 'groff',
 unzip                    => 'unzip',
@@ -319,37 +319,29 @@ $preinstall_for{debian}{default} = [
 $postinstall_for{debian}{default} = [
 	'echo en_US.UTF-8 UTF-8 >> /etc/locale.gen',
 	'/usr/sbin/locale-gen',
-	'apt-get clean',
 
 	@{$builder},
-	@{$musl},
-	@{$swig},
 	@{$fuse},
-	@{$cvmfs},
-	# do not compile with g++6:
-	# @{$xrootd}
-];
+	@{$uuid},
 
+	'apt-get install -y python-is-python3 || update-alternatives --install /usr/bin/python python /usr/bin/python3 10',
+
+	# install cvmfs-devel:
+	'apt-get install -y lsb-release',
+	'wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb',
+	'dpkg -i cvmfs-release-latest_all.deb',
+	'rm -f cvmfs-release-latest_all.deb',
+	'apt-get update',
+	'apt-get install -y cvmfs-dev',
+	'apt-get clean',
+];
 
 ########## ubuntu ##########
 $package_for{ubuntu}{default} = $package_for{debian}{default};
 $preinstall_for{ubuntu}{default} = $preinstall_for{debian}{default};
 
 $extras_for{ubuntu}{default} = $extras_for{debian}{default};
-$postinstall_for{ubuntu}{default} = [
-	'echo en_US.UTF-8 UTF-8 >> /etc/locale.gen',
-	'/usr/sbin/locale-gen',
-	'apt-get clean',
-
-	@{$builder},
-	@{$musl},
-	@{$swig},
-	@{$fuse},
-	# @{$cvmfs},
-	# do not compile with g++6:
-	# @{$xrootd}
-];
-
+$postinstall_for{ubuntu}{default} = $postinstall_for{debian}{default};
 
 ########## ALL ##########
 
@@ -648,6 +640,7 @@ sub generate_docker_image {
 		qx(docker rmi "$tag");
 
 		#my $output = qx(sudo docker build  --tag="$tag" --no-cache=true --force-rm $context);
+		$ENV{DOCKER_BUILDKIT} = 1;
 		my $output = qx(docker build  --tag="$tag" --no-cache=true --force-rm $context);
 		$exit_status = $?;
 
@@ -683,6 +676,8 @@ sub dockerfile_for {
 #
 
 FROM $dist:$version
+ARG DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /
 RUN @{[join(' && ', @steps)]}
 

@@ -4,22 +4,17 @@ services: docker
 addons:
   homebrew:
     packages: swig
-
 script: "./packaging/travis/travis.sh"
-after_failure: "cat cctools.test.fail"
-
+after_failure: cat cctools.test.fail
 notifications:
   email:
     on_success: always
     on_failure: always
-
 matrix:
   include:
   - os: osx
     osx_image: xcode9.4
     compiler: clang
-  - os: linux
-    compiler: gcc
   - os: linux
     compiler: clang
   - os: linux
@@ -30,16 +25,10 @@ matrix:
     env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-centos7
   - os: linux
     compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-debian9.9
-  - os: linux
-    compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-fedora30
-  - os: linux
-    compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-ubuntu16.04
+    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-ubuntu20.04
 deploy:
   provider: releases
-  file: /tmp/cctools-*.tar.gz
+  file: "/tmp/cctools-*.tar.gz"
   file_glob: true
   overwrite: true
   skip_cleanup: true
@@ -48,3 +37,7 @@ deploy:
     tags: true
   api-key:
     secure: N2shk/iZkkpHC8pRZLKaVr/hJKfc0QzGwTwkvGLdLE0HvlMP/hI8AXuxB/qAIjFU1cw+Mx4Ke96VysrBzfPDUEsw8LT+yNYtLSmFlMbwD8WKpRRrwEdx49KdmOTw9mt1utv7+yEWB5iRMztS9I7Vr5eTgtWmLG/iHGJGjJPGVc8=
+global:
+  env:
+  - secure: JzlDhIIyHTtpB/uUukXuah+6amK1B8B1xMZeRNAtkFcCbk3rEKGUFQnHp6XE3xVRCNlRyx2UJlkw3kz5s2Dp/sfGZMQRRlytU8YcSbLsMGhW3N44CuGFAW/m9AYFH2JLPyb2IDoyDzkiOmEchZQRMMtsc/872FiPtC+2XJMX2Gs=
+  - secure: d9GrVm4wSMWMW7itbomGTSFiMCMBlyXGATQUN3juN6KLzuu1bvB2H9ommkkbVRHZlctwo9PhYMh3h2yNE7ybhw9aGQ6opWTU3w0bVWqcoNw5C+rSg3J2sxkoIbcIDIYFLIBEriI8m8VRunRqOoS2FEVBAtmoNWcmTe39ZxCNnS8=

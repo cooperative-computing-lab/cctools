@@ -6,27 +6,27 @@
 #include "ds_manager.h"
 
 //task operations
-char *ds_submit_task(struct jx *task, struct ds_manager *m);
-struct ds_task *ds_delete_task(const char *uuid, struct ds_manager *m);
-struct jx *ds_retrieve_task(const char *uuid, struct ds_manager *m);
+char *ds_client_task_submit(struct ds_manager *m, struct jx *task);
+struct ds_task *ds_client_task_delete(struct ds_manager *m, const char *uuid);
+struct jx *ds_client_task_retrieve(struct ds_manager *m, const char *uuid);
 
 //file operations
-char *ds_declare_file(struct jx *json, struct ds_manager *m);
-struct ds_file *ds_commit_file(const char *uuid, struct ds_manager *m);
-struct ds_file *ds_delete_file(const char *uuid, struct ds_manager *m);
-struct ds_file *ds_copy_file(const char *uuid, struct ds_manager *m);
+struct ds_file *ds_client_file_declare(struct ds_manager *m, struct jx *file);
+struct ds_file *ds_client_file_commit(struct ds_manager *m, const char *uuid);
+struct ds_file *ds_client_file_delete(struct ds_manager *m, const char *uuid);
+struct ds_file *ds_client_file_copy(struct ds_manager *m, const char *uuid);
 
 //service operations
-char *ds_submit_service(struct jx *service);
-struct jx *ds_delete_service(char *uuid);
+char *ds_client_service_submit(struct ds_manager *m, struct jx *service);
+struct jx *ds_client_service_delete(struct ds_manager *m, struct jx *service);
 
 //project operations
-char *ds_create_project(char *project_name);
-struct jx *ds_delete_project(char *uuid);
+char *ds_client_project_create(struct ds_manager *m, struct jx *project);
+struct jx *ds_client_project_delete(struct ds_manager *m, struct jx *project);
 
 //other operations
-struct jx *ds_wait();
-int ds_queue_empty();
-struct jx *ds_status(char *uuid);
+struct jx *ds_client_wait(struct ds_manager *m, struct jx *params);
+int ds_client_queue_empty(struct ds_manager *m, struct jx *params);
+struct jx *ds_client_status(struct ds_manager *m, struct jx *params);
 
 #endif

@@ -117,16 +117,24 @@ static size_t checked_add(size_t a, size_t b) {
 
 static int set_nonblocking (struct mq_msg *msg) {
 	assert(msg);
+#ifndef MQ_BLOCKING_IO
 	if (msg->pipefd < 0) return 0;
 	msg->origfl = fcntl(msg->pipefd, F_GETFL);
 	if (msg->origfl < 0) return msg->origfl;
 	return fcntl(msg->pipefd, F_SETFL, msg->origfl|O_NONBLOCK);
+#else
+	return 0;
+#endif
 }
 
 static int unset_nonblocking (struct mq_msg *msg) {
 	if (!msg) return 0;
+#ifndef MQ_BLOCKING_IO
 	if (msg->pipefd < 0) return 0;
 	return fcntl(msg->pipefd, F_SETFL, msg->origfl);
+#else
+	return 0;
+#endif
 }
 
 static struct mq_msg *msg_create (void) {
@@ -265,6 +273,17 @@ static int flush_send(struct mq *mq) {
 		struct mq_msg *snd = mq->sending;
 		if (!snd) return 0;
 
+		/* The logic here is a bit dense, since there are several modes of operation.
+		 * If a pipe/fd has been connected, we need to read some data in (of unknown
+		 * total length) and then spit that back out on the socket. It might be
+		 * possible to send and receive concurrently (sort of like a ring buffer,
+		 * need a start and end pointer), but things are complicated by the need to
+		 * figure out the length of the stream. It's thus simpler to alternate between
+		 * reading from the pipe and writing to the socket. This state is indicated by
+		 * the `buffering` flag. We do the usual non-blocking reads until hitting EOF,
+		 * then switches to sending mode. In this mode, we use the buffer as scratch
+		 * space between the pipe fd and the socket, otherwise it's the in-memory data.
+		 */
 		if (snd->buffering) {
 			if (snd->buf_pos < snd->len) {
 				ssize_t rc = read(snd->pipefd,
@@ -286,6 +305,12 @@ static int flush_send(struct mq *mq) {
 			}
 		}
 
+		/* Now for sending. Since we may get EWOULDBLOCK at any time, the send loop
+		 * needs to be able to remember where it left off and resume later. We therefore
+		 * use several variables to hold state: `hdr_pos` tells how much of the header
+		 * has been sent (done when it's the total length of the header), `buf_pos` tells
+		 * how much actual data has been sent.
+		 */
 		if (snd->hdr_pos < HDR_SIZE) {
 			assert(snd->max_len >= snd->total_len);
 			if (snd->len >= snd->max_len - snd->total_len) {
@@ -297,6 +322,13 @@ static int flush_send(struct mq *mq) {
 			size_t framelen = MIN(snd->len - snd->buf_pos, MQ_FRAME_MAX);
 			assert(framelen <= UINT32_MAX);
 			snd->hdr_len = htonl(framelen);
+
+			/* We infer the end of the stream from a short
+			 * frame (could be zero-length if the message is a multiple of the max frame size).
+			 * The loop above to read from the pipe always fills the buffer completely until
+			 * EOF, so we don't need an extra flag for that. We also check against the limits
+			 * specified, and might end the stream early.
+			 */
 			if (framelen < MQ_FRAME_MAX) {
 				snd->type |= HDR_MSG_END;
 			}
@@ -325,12 +357,21 @@ static int flush_send(struct mq *mq) {
 			snd->buf_pos = checked_add(snd->buf_pos, rc);
 			snd->total_len = checked_add(snd->total_len, rc);
 
+			/* Here we check if it's time for a new frame. If we're streaming from
+			 * a pipe/fd, the framing is handled elsewhere so we check if we've landed
+			 * on a frame boundary within a message (the send length above does some
+			 * fancy accounting to ensure that it never goes past the frame boundary).
+			 * If so, we indicate continuation and reset `hdr_pos` to send another header.
+			 */
 			if (snd->buf_pos < snd->len && FRAME_POS(snd->buf_pos) == 0) {
 				snd->hdr_pos = 0;
 				snd->type = HDR_MSG_CONT;
 			}
 			continue;
 		} else {
+			/* If we're streaming from a pipe/fd, reset evertyhing and read in another frame.
+			 * otherwise, we're done.
+			 */
 			if (snd->type & HDR_MSG_END) {
 				mq_msg_delete(snd);
 				mq->sending = NULL;
@@ -351,6 +392,9 @@ static int flush_recv(struct mq *mq) {
 
 	int socket = link_fd(mq->link);
 
+	/* The recv loop is similar to send, but in reverse order (recv into buffer, then
+	 * possibly write to fd).
+	 */
 	while (!mq->recv) {
 		struct mq_msg *rcv = mq->recving;
 		// Caller had to specify storage before waiting
@@ -362,12 +406,23 @@ static int flush_recv(struct mq *mq) {
 						HDR_SIZE - rcv->hdr_pos, 0);
 				if (rc == -1 && errno_is_temporary(errno)) {
 					return 0;
-				} else if (rc <= 0) {
-					return -1;;
+				} else if (rc == 0) {
+					/* socket orderly shutdown */
+					errno = ECONNRESET;
+					return -1;
+				} else if (rc < 0) {
+					return -1;
 				}
 				rcv->hdr_pos = checked_add(rcv->hdr_pos, rc);
 				continue;
 			} else if (!rcv->parsed_header) {
+				/* There's an additional step in the recv loop: we need to check a
+				 * possibly untrusted header to decide what to do. Note that the recv
+				 * limits plus storage setting can be used to avoid extreme allocations.
+				 * If recving to a pipe/fd, we'll only keep one frame at a time in memory.
+				 * If storing in a buffer, we'll need to keep the whole message in memory
+				 * at once, so a limit is necessary.
+				 */
 				if (validate_header(rcv) == -1) return -1;
 				rcv->buf_pos = rcv->len;
 				rcv->len = checked_add(rcv->len, ntohl(rcv->hdr_len));
@@ -388,7 +443,8 @@ static int flush_recv(struct mq *mq) {
 					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos, 0);
 
-				if (rc == -1 && errno_is_temporary(errno)) {
+				if (rc == -1 && errno_is_temporary(errno) && errno != 0) {
+                    /* for write, rc == 0 is only an error if errno != 0. */
 					return 0;
 				} else if (rc == 0) {
 					errno = ECONNRESET;
@@ -399,6 +455,8 @@ static int flush_recv(struct mq *mq) {
 				rcv->buf_pos = checked_add(rcv->buf_pos, rc);
 				continue;
 			} else {
+				/* Now reset everything and let the code below decide if we're done.
+				 */
 				rcv->seen_initial = true;
 				rcv->buffering = true;
 				rcv->buf_pos = 0;
@@ -408,6 +466,8 @@ static int flush_recv(struct mq *mq) {
 			}
 		}
 
+		/* Like in the send loop, flush the buffered frame to the pipe/fd.
+		 */
 		if (rcv->storage == MQ_MSG_FD) {
 			if (rcv->buf_pos < rcv->len) {
 				ssize_t rc = write(rcv->pipefd,
@@ -433,11 +493,22 @@ static int flush_recv(struct mq *mq) {
 	return 0;
 }
 
-// pfd[0] is send, pfd[1] is recv
+/* The interface to this function is a little weird: we operate on a pair of
+ * `struct pollfd`s. This is necessary because of the different modes:
+ * - Both send and recv are using in-memory buffers: 1 fd (the socket)
+ * - One direction is using a pipe: 2 fds (pipe and socket)
+ * - Both directions are buffering: 2 fds (pipe and pipe)
+ * Later on we'll poll an array of these, which would be complicated if the
+ * number of fds for each connection can vary. I considered a front/back buffer
+ * setup, but in the absence of measurements that this is a bottleneck, I just
+ * did the simple thing and always used 2 per connection. If only one socket
+ * is needed, the other is set to -1 (will be ignored by the kernel).
+ */
 static void poll_events(struct mq *mq, struct pollfd *pfd) {
 	assert(mq);
 	assert(pfd);
 
+	// pfd[0] is send, pfd[1] is recv
 	pfd[0].fd = -1;
 	pfd[1].fd = -1;
 	pfd[0].events = 0;
@@ -445,10 +516,16 @@ static void poll_events(struct mq *mq, struct pollfd *pfd) {
 
 	switch (mq->state) {
 		case MQ_SOCKET_INPROGRESS:
+			/* Socket connect has completed/failed if it polls writable.
+			 * Note that it will poll readable before it's done, so it's
+			 * important not to check that.
+			 */
 			pfd[0].fd = link_fd(mq->link);
 			pfd[0].events |= POLLOUT;
 			break;
 		case MQ_SOCKET_CONNECTED:
+			/* Ugly checks to figure out the state of the connection.
+			 */
 			if (mq->sending && mq->sending->buffering) {
 				if (!mq->sending->hung_up) {
 					pfd[0].fd = mq->sending->pipefd;
@@ -467,6 +544,9 @@ static void poll_events(struct mq *mq, struct pollfd *pfd) {
 			}
 			break;
 		case MQ_SOCKET_SERVER:
+			/* Server sockets poll readable when a connection
+			 * is ready to be accepted.
+			 */
 			if (!mq->acc) {
 				pfd[1].fd = link_fd(mq->link);
 				pfd[1].events |= POLLIN;
@@ -507,18 +587,34 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 		case MQ_SOCKET_ERROR:
 			break;
 		case MQ_SOCKET_INPROGRESS:
+			/* Once the connection attempt has a result, we can advance the state
+			 * to either connected or error. On ancient systems, some tricks may
+			 * be necessary (see https://cr.yp.to/docs/connect.html). We just do
+			 * the simple/modern thing here.
+			 */
 			if (pfd[0].revents & POLLOUT) {
 				rc = getsockopt(link_fd(mq->link), SOL_SOCKET, SO_ERROR,
 						&err, &size);
 				assert(rc == 0);
 				if (err == 0) {
 					mq->state = MQ_SOCKET_CONNECTED;
+#ifdef MQ_BLOCKING_IO
+					link_nonblocking(mq->link, 0);
+#endif
 				} else {
 					mq_die(mq, err);
 				}
 			}
 			break;
 		case MQ_SOCKET_CONNECTED:
+			/* If we got ERR or HUP on the source being sent, it indicates the
+			 * other end of the pipe exited or closed the fd. In this case, we
+			 * flush what's left in the buffer and let the send loop close the
+			 * socket. Gettin ERR or HUP on the socket in either direction is
+			 * a fatal error (not sure if this can really happen). We also kill
+			 * the connection if the pipe we're recving into dies, as we don't
+			 * have anywhere to store the data we recv.
+			 */
 			if (pfd[0].revents & (POLLERR | POLLHUP)) {
 				if (mq->sending && mq->sending->buffering) {
 					pfd[0].revents |= POLLIN;
@@ -542,6 +638,7 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				rc = flush_send(mq);
 				if (rc == -1) {
 					mq_die(mq, errno);
+					rc = 0; // will not be polled again, treat as OK
 					goto DONE;
 				}
 			}
@@ -550,6 +647,7 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				rc = flush_recv(mq);
 				if (rc == -1) {
 					mq_die(mq, errno);
+					rc = 0; // will not be polled again, treat as OK
 					goto DONE;
 				}
 			}
@@ -564,6 +662,9 @@ static int handle_revents(struct mq *mq, struct pollfd *pfd) {
 				assert(!mq->acc);
 				struct mq *out = mq_create(MQ_SOCKET_CONNECTED, link);
 				mq->acc = out;
+#ifdef MQ_BLOCKING_IO
+				link_nonblocking(link, 0);
+#endif
 			}
 			break;
 	}
@@ -636,8 +737,9 @@ struct mq_poll *mq_poll_create(void) {
 void mq_poll_delete(struct mq_poll *p) {
 	if (!p) return;
 
+    struct mq *mq = NULL;
 	set_first_element(p->members);
-	for (struct mq *mq; (mq = set_next_element(p->members));) {
+    while((mq = set_next_element(p->members))) {
 		mq->poll_group = NULL;
 	}
 	set_delete(p->members);
@@ -717,7 +819,8 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 		// change the order of the elements.
 		i = 0;
 		set_first_element(p->members);
-		for (struct mq *mq; (mq = set_next_element(p->members));) {
+        struct mq *mq = NULL;
+        while((mq = set_next_element(p->members))) {
 			// NB: we're using revents from the *previous* iteration
 			rc = handle_revents(mq, &pfds[i]);
 			if (rc == -1) {
