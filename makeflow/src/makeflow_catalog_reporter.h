@@ -23,5 +23,6 @@ See the file COPYING for details.
 int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type, timestamp_t start);
 
 
+int makeflow_file_summary(struct dag* d, char* name, batch_queue_type_t type, timestamp_t start);
 #endif /* MAKEFLOW_CATALOG_REPORTER_H */
 
