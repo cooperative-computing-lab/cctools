@@ -90,7 +90,10 @@ int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type,
 
 
 int makeflow_file_summary(struct dag* d, char* name, batch_queue_type_t type, timestamp_t start){
-    struct dag_node *n;
+    
+	printf("Starting to print status.html\n");
+	
+	struct dag_node *n;
     dag_node_state_t state;
     
     int tasks_completed = 0;
@@ -134,7 +137,7 @@ int makeflow_file_summary(struct dag* d, char* name, batch_queue_type_t type, ti
 	fprintf(fp, "<p>Completed: %d </p>\n", tasks_completed);	
 	fprintf(fp, "<p>Failed: %d </p>\n", tasks_failed);	
 	fprintf(fp, "<p>Project: %s </p>\n", name);	
-	fprintf(fp, "<p>Owner: %s </p>\n", user_name);	
+	fprintf(fp, "<p>Owner: %s </p>\n", username);	
     char* timestring = string_format("%" PRIu64 "", start);
 	fprintf(fp, "<p>Time started: %s </p>\n", timestring);
 	fprintf(fp, "<p>Batch type: %s </p>\n", batch_type);
@@ -166,5 +169,5 @@ int makeflow_file_summary(struct dag* d, char* name, batch_queue_type_t type, ti
     free(timestring);
     //jx_delete(j);
     fclose(fp);
-    return 0;//all good
+    return 1;//all good
 }

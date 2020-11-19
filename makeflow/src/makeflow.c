@@ -935,7 +935,7 @@ static int makeflow_check_files(struct dag *d)
 	int warnings = 0;
 
 	printf("checking files for unexpected changes...  (use --skip-file-check to skip this step)\n");
-
+	printf("If this doesn't work I don't know what will\n");
 	hash_table_firstkey(d->files);
 	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 
@@ -1030,11 +1030,15 @@ static void makeflow_run( struct dag *d )
 	timestamp_t start = timestamp_get();
 	// Last Report is created stall for first reporting.
 	timestamp_t last_time = start - (60 * 1000 * 1000);
-
+	
+	printf("Starting to dump things\n");
 	//reporting to catalog
 	if(catalog_reporting_on){
 		makeflow_catalog_summary(d, project, batch_queue_type, start);
+		makeflow_file_summary(d, project, batch_queue_type, start);
 	}
+	//test here
+	makeflow_file_summary(d, project, batch_queue_type, start);
 
 	while(!makeflow_abort_flag) {
 		makeflow_dispatch_ready_jobs(d);
@@ -1093,7 +1097,8 @@ static void makeflow_run( struct dag *d )
 		timestamp_t now = timestamp_get();
 		/* If in reporting mode and 1 min has transpired */
 		if(catalog_reporting_on && ((now-last_time) > (60 * 1000 * 1000))){ 
-			makeflow_catalog_summary(d, project,batch_queue_type,start);
+			makeflow_catalog_summary(d, project,batch_queue_type,start);	
+			makeflow_file_summary(d, project,batch_queue_type,start);
 			last_time = now;
 		}
 
@@ -1109,8 +1114,12 @@ static void makeflow_run( struct dag *d )
 
 	/* Always make final report to catalog when workflow ends. */
 	if(catalog_reporting_on){
-		makeflow_catalog_summary(d, project,batch_queue_type,start);
+		makeflow_catalog_summary(d, project,batch_queue_type,start); 
+		makeflow_file_summary(d, project,batch_queue_type,start);
 	}
+
+	//testing	
+	makeflow_file_summary(d, project, batch_queue_type, start);
 
 	if(makeflow_abort_flag) {
 		makeflow_abort_all(d);
