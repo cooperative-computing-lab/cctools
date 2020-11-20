@@ -21,6 +21,7 @@ struct ds_manager {
 	int message_id;
 
 	int task_id;
+	int blob_id;
 
 	int force_update;
 	time_t catalog_last_update_time;

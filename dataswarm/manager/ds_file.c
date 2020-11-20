@@ -10,6 +10,7 @@ struct ds_file *ds_file_create(const char *uuid, const char *projectid, jx_int_t
 	struct ds_file *f = malloc(sizeof(*f));
 	memset(f, 0, sizeof(*f));
 
+	f->replicas = hash_table_create(0, 0);
 	f->fileid = xxstrdup(uuid);
 	f->projectid = xxstrdup(projectid);
 	f->size = size;

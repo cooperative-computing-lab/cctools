@@ -31,9 +31,10 @@ struct ds_task_rep {
 	/* this task id */
 	char *taskid;
 
-	/* for testing we use jx description. Should be replaced with a proper
-	 * struct ds_task. */
-	struct jx *description;
+	char *worker;
+	struct ds_task *task;
+
+	struct ds_task_rep *next;
 };
 
 #endif

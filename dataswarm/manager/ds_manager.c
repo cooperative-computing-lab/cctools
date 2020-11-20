@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <time.h>
 #include <getopt.h>
@@ -69,12 +70,151 @@ void update_catalog( struct ds_manager *m, int force_update )
 	m->catalog_last_update_time = time(0);
 }
 
-void process_files( struct ds_manager *m )
-{
+//XXX change table setups?
+static bool check_replicas(struct ds_file *f, ds_blob_state_t state) {
+	char *key;
+	struct ds_blob_rep *b;
+
+	hash_table_firstkey(f->replicas);
+	while (hash_table_nextkey(f->replicas, &key, (void **) &b)) {
+		if (b->state != state) return false;
+		if (b->result != DS_RESULT_SUCCESS) return false;
+		assert(b->in_transition == b->state);
+	}
+	return true;
 }
 
-void process_tasks( struct ds_manager *m )
-{
+static void process_files(struct ds_manager *m) {
+	char *key;
+	struct ds_file *f;
+
+	hash_table_firstkey(m->file_table);
+	while (hash_table_nextkey(m->file_table, &key, (void **) &f)) {
+		switch (f->state) {
+			case DS_FILE_ALLOCATING:
+				if (check_replicas(f, DS_BLOB_RW)) {
+					f->state = DS_FILE_MUTABLE;
+				} else {
+					//XXX talk to workers to advance replica states
+				}
+				break;
+			case DS_FILE_COMMITTING:
+				if (check_replicas(f, DS_BLOB_RO)) {
+					f->state = DS_FILE_IMMUTABLE;
+				} else {
+					//XXX talk to workers to advance replica states
+				}
+				break;
+			case DS_FILE_DELETING:
+				if (check_replicas(f, DS_BLOB_DELETED)) {
+					f->state = DS_FILE_DELETED;
+				} else {
+					//XXX talk to workers to advance replica states
+				}
+				break;
+			case DS_FILE_PENDING:
+			case DS_FILE_MUTABLE:
+			case DS_FILE_IMMUTABLE:
+			case DS_FILE_DELETED:
+				// nothing to do, wait for the client
+				break;
+		}
+	}
+}
+
+static void retry_task(struct ds_task *t) {
+	//XXX inspect task, check retry count, etc.
+	// for now, just switch to a hard failure
+	t->result = DS_TASK_RESULT_ERROR;
+}
+
+static void fix_task(struct ds_task *t) {
+	//XXX inspect task, check retry count, etc.
+	// for now, just switch to a hard failure
+	t->result = DS_TASK_RESULT_ERROR;
+}
+
+static void schedule_task(struct ds_manager *m, struct ds_task *t) {
+	//XXX do some matching of tasks to workers
+
+	int r = rand() % hash_table_size(m->worker_table);
+	char *key;
+	void *w;
+	hash_table_firstkey(m->worker_table);
+	while (r >= 0) {
+		hash_table_nextkey(m->worker_table, &key, &w);
+		r--;
+	}
+	t->worker = xxstrdup(key);
+}
+
+static bool prepare_worker(struct ds_manager *m, struct ds_task *t) {
+	struct ds_worker_rep *w = hash_table_lookup(m->worker_table, t->worker);
+
+	for (struct ds_mount *u = t->mounts; u; u = u->next) {
+		struct ds_file *f = hash_table_lookup(m->file_table, u->uuid);
+		assert(f);
+		struct ds_blob_rep *b = hash_table_lookup(f->replicas, t->worker);
+		if (!b) {
+			char *blobid = string_format("blob-%d", m->blob_id++);
+			hash_table_insert(f->replicas, t->worker, ds_manager_add_blob_to_worker(m, w, blobid));
+			return false;
+		}
+
+		//XXX match mount options to file/blob state
+		// or return if not ready
+	}
+
+	return true;
+}
+
+static void process_tasks(struct ds_manager *m) {
+	char *key;
+	struct ds_task *t;
+
+	hash_table_firstkey(m->task_table);
+	while (hash_table_nextkey(m->task_table, &key, (void **) &t)) {
+		switch (t->state) {
+			case DS_TASK_ACTIVE:
+				// schedule/advance below
+				break;
+			case DS_TASK_DONE:
+			case DS_TASK_DELETED:
+				// nothing to do, wait for the client
+				continue;
+			case DS_TASK_RUNNING:
+			case DS_TASK_DELETING:
+				// nothing to do, wait for the worker
+				continue;
+		}
+
+		switch (t->result) {
+			case DS_TASK_RESULT_SUCCESS:
+				break;
+			case DS_TASK_RESULT_ERROR:
+			case DS_TASK_RESULT_UNDEFINED:
+				// nothing to do
+				continue;
+			case DS_TASK_RESULT_FIX:
+				fix_task(t);
+				continue;
+			case DS_TASK_RESULT_AGAIN:
+				retry_task(t);
+				continue;
+		}
+
+		if (!t->worker) {
+			schedule_task(m, t);
+		}
+		if (!t->worker) {
+			// couldn't/didn't want to schedule the task this time around
+			return;
+		}
+
+		struct ds_worker_rep *w = hash_table_lookup(m->worker_table, t->worker);
+		if (!prepare_worker(m, t)) return;
+		ds_manager_add_task_to_worker(m, w, key);
+	}
 }
 
 /* declares a blob in a worker so that it can be manipulated via blob rpcs. */
@@ -107,9 +247,8 @@ struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct 
 		fatal("task-id %s already created at worker.", taskid);
 	}
 
-	/* this should be a proper struct ds_task. */
-	struct jx *description = hash_table_lookup(m->task_table, taskid);
-	if(!description) {
+	struct ds_task *task = hash_table_lookup(m->task_table, taskid);
+	if(!task) {
 		/* could not find task with taskid. This could only happen with a bug,
 		 * as we have control of the create messages.*/
 		fatal("task-id %s does not exist.", taskid);
@@ -121,22 +260,29 @@ struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct 
 	t->result = DS_RESULT_SUCCESS;
 
 	t->taskid = xxstrdup(taskid);
-	t->description = description;
+	t->task = task;
+	t->worker = xxstrdup(task->worker);
 
 	hash_table_insert(r->tasks, taskid, t);
+	t->next = task->attempts;
+	task->attempts = t;
 
 	return t;
 }
 
 char *ds_manager_submit_task( struct ds_manager *m, struct jx *description ) {
 	char *taskid = string_format("task-%d", m->task_id++);
-
-	/* do validation */
-	/* convert to proper struct ds_task */
-
 	jx_insert_string(description, "task-id", taskid);
 
-	hash_table_insert(m->task_table, taskid, description);
+	struct ds_task *t = ds_task_create(description);
+	if (!t) {
+		//XXX task failed validation
+		struct jx *j = jx_string("task-id");
+		jx_remove(description, j);
+		jx_delete(j);
+		return NULL;
+	}
+	hash_table_insert(m->task_table, taskid, t);
 
 	return taskid;
 }
@@ -225,7 +371,6 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 	struct jx *msg = NULL;
 	switch (mq_recv(c->connection, NULL)) {
 		case MQ_MSG_NONE:
-			abort(); //XXX ??
 			break;
 		case MQ_MSG_FD:
 			//XXX handle received files
@@ -236,9 +381,9 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 			break;
 	}
 
-	if (!msg) {
-		// malformed message
-		abort();
+	if (!jx_istype(msg, JX_OBJECT)) {
+		debug(D_DATASWARM, "malformed message from client %s:%d, disconnecting", c->addr, c->port);
+		goto ERROR;
 	}
 
 	const char *method = jx_lookup_string(msg,"method");
@@ -246,9 +391,8 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 	int64_t id = jx_lookup_integer(msg, "id");
 
 	if(!method || !params || !id) {
-		/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
-		/* should we disconnect the client on a message error? */
-    	return;
+		debug(D_DATASWARM, "invalid message from client %s:%d, disconnecting", c->addr, c->port);
+		goto ERROR;
 	}
 
 	struct jx *response = NULL;
@@ -309,6 +453,14 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 		ds_json_send(c->connection, response);
 		jx_delete(response);
 	}
+
+	return;
+
+ERROR:
+	ds_client_rep_disconnect(c);
+	char *key = string_format("%p", c->connection);
+	hash_table_remove(m->client_table, key);
+	free(key);
 }
 
 void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_t stoptime )
@@ -328,17 +480,15 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 	}
 
 	if (!msg) {
-		//XXX malformed message
-		debug(D_DATASWARM, "worker at %p went away?\n", w->connection); /* fix: handle disconnections */
+		debug(D_DATASWARM, "malformed message from worker %s:%d, disconnecting", w->addr, w->port);
+		goto ERROR;
 	}
 
 	const char *method = jx_lookup_string(msg,"method");
 	struct jx  *params = jx_lookup(msg,"params");
 	if(!method || !params) {
-		/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
-		/* disconnect worker */
-		mq_close(w->connection);
-		return;
+		debug(D_DATASWARM, "invalid message from worker %s:%d, disconnecting", w->addr, w->port);
+		goto ERROR;
 	}
 
 	debug(D_DATASWARM, "worker %s:%d rx: %s", w->addr, w->port, method);
@@ -360,6 +510,14 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_
 	if (!set_storage) {
 		mq_store_buffer(w->connection, &w->recv_buffer, 0);
 	}
+
+	return;
+
+ERROR:
+	ds_worker_rep_disconnect(w);
+	char *key = string_format("%p", w->connection);
+	hash_table_remove(m->worker_table, key);
+	free(key);
 }
 
 int handle_messages( struct ds_manager *m )
@@ -408,15 +566,25 @@ int handle_connections(struct ds_manager *m) {
 }
 
 int handle_errors(struct ds_manager *m) {
-		for (struct mq *conn; (conn = mq_poll_error(m->polling_group));) {
-			char *key = string_format("%p", conn);
-			//XXX handle disconnects/errors, clean up
-			mq_close(conn);
-			hash_table_remove(m->worker_table, key);
-			hash_table_remove(m->client_table, key);
-		}
+	for (struct mq *conn; (conn = mq_poll_error(m->polling_group));) {
+		char *key = string_format("%p", conn);
+		struct ds_worker_rep *w = hash_table_remove(m->worker_table, key);
+		struct ds_client_rep *c = hash_table_remove(m->client_table, key);
+		free(key);
+		assert(!(w && c));
 
-		return 0;
+		if (w) {
+			debug(D_DATASWARM, "worker disconnect (%s:%d): %s",
+				w->addr, w->port, strerror(mq_geterror(conn)));
+			ds_worker_rep_disconnect(w);
+		} else if (c) {
+			debug(D_DATASWARM, "client disconnect (%s:%d): %s",
+				c->addr, c->port, strerror(mq_geterror(conn)));
+			ds_client_rep_disconnect(c);
+		}
+	}
+
+	return 0;
 }
 
 void server_main_loop( struct ds_manager *m )
@@ -517,8 +685,6 @@ struct ds_manager * ds_manager_create()
 
 	m->worker_table = hash_table_create(0,0);
 	m->client_table = hash_table_create(0,0);
-	m->task_table   = hash_table_create(0,0);
-
     m->task_table = hash_table_create(0,0);
     m->file_table = hash_table_create(0,0);
 
@@ -534,4 +700,4 @@ struct ds_manager * ds_manager_create()
 }
 
 
-/* vim: set noexpandtab tabstop=4: */
+/* vim: set noexpandtab tabstop=4 shiftwidth=4: */

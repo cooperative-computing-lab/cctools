@@ -42,6 +42,14 @@ struct ds_worker_rep * ds_worker_rep_create( struct mq *conn )
 	return w;
 }
 
+void ds_worker_rep_disconnect(struct ds_worker_rep *w) {
+	if (!w) return;
+	mq_close(w->connection);
+	buffer_free(&w->recv_buffer);
+	//XXX clean up tables
+	free(w);
+}
+
 ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *params ) {
 	if(!params) {
 		debug(D_DATASWARM, "message does not contain any parameters. Ignoring task update.");
