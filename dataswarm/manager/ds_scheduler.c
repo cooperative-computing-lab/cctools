@@ -28,8 +28,8 @@ static int blobs_in_state( struct ds_file *f, ds_blob_state_t state )
 	char *key;
 	struct ds_blob_rep *b;
 
-	hash_table_firstkey(f->replicas);
-	while (hash_table_nextkey(f->replicas, &key, (void **) &b)) {
+	hash_table_firstkey(f->blobs);
+	while (hash_table_nextkey(f->blobs, &key, (void **) &b)) {
 		if (b->state != state) return false;
 		if (b->result != DS_RESULT_SUCCESS) return false;
 		assert(b->in_transition == b->state);
@@ -99,10 +99,10 @@ static bool prepare_worker(struct ds_manager *m, struct ds_task *t) {
 	for (struct ds_mount *u = t->mounts; u; u = u->next) {
 		struct ds_file *f = hash_table_lookup(m->file_table, u->uuid);
 		assert(f);
-		struct ds_blob_rep *b = hash_table_lookup(f->replicas, t->worker);
+		struct ds_blob_rep *b = hash_table_lookup(f->blobs, t->worker);
 		if (!b) {
 			char *blobid = string_format("blob-%d", m->blob_id++);
-			hash_table_insert(f->replicas, t->worker, ds_manager_add_blob_to_worker(m, w, blobid));
+			hash_table_insert(f->blobs, t->worker, ds_manager_add_blob_to_worker(m, w, blobid));
 			return false;
 		}
 
