@@ -21,8 +21,6 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "cctools.h"
 #include "hash_table.h"
-#include "username.h"
-#include "catalog_query.h"
 
 #include "ds_message.h"
 #include "ds_task.h"
@@ -33,42 +31,9 @@ See the file COPYING for details.
 #include "ds_manager.h"
 #include "ds_client_ops.h"
 #include "ds_file.h"
+#include "ds_catalog_update.h"
 
 #include "ds_test.h"
-
-struct jx * manager_status_jx( struct ds_manager *m )
-{
-	char owner[USERNAME_MAX];
-	username_get(owner);
-
-	struct jx * j = jx_object(0);
-	jx_insert_string(j,"type","ds_manager");
-	jx_insert_string(j,"project",m->project_name);
-	jx_insert_integer(j,"starttime",(m->start_time/1000000));
-	jx_insert_string(j,"owner",owner);
-	jx_insert_string(j,"version",CCTOOLS_VERSION);
-	jx_insert_integer(j,"port",m->server_port);
-
-	return j;
-}
-
-void update_catalog( struct ds_manager *m, int force_update )
-{
-	if(!m->force_update && (time(0) - m->catalog_last_update_time) < m->update_interval)
-		return;
-
-	if(!m->catalog_hosts) m->catalog_hosts = strdup(CATALOG_HOST);
-
-	struct jx *j = manager_status_jx(m);
-	char *str = jx_print_string(j);
-
-	debug(D_DATASWARM, "advertising to the catalog server(s) at %s ...", m->catalog_hosts);
-	catalog_query_send_update_conditional(m->catalog_hosts, str);
-
-	free(str);
-	jx_delete(j);
-	m->catalog_last_update_time = time(0);
-}
 
 //XXX change table setups?
 static bool check_replicas(struct ds_file *f, ds_blob_state_t state) {
@@ -590,7 +555,7 @@ int handle_errors(struct ds_manager *m) {
 void server_main_loop( struct ds_manager *m )
 {
 	while(1) {
-		update_catalog(m,0);
+		ds_catalog_update(m,0);
 		handle_connections(m);
 		handle_messages(m);
 		handle_errors(m);
