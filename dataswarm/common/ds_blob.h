@@ -41,6 +41,6 @@ int ds_blob_to_file( struct ds_blob *b, const char *filename );
 
 void ds_blob_delete( struct ds_blob *b );
 
-char *ds_blob_state_string( ds_blob_state_t state );
+const char *ds_blob_state_string( ds_blob_state_t state );
 
 #endif

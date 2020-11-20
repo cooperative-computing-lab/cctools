@@ -9,11 +9,14 @@
 struct ds_manager {
 	struct hash_table *worker_table;
 	struct hash_table *client_table;
-    struct hash_table *task_table;
-    struct hash_table *file_table;
+	struct hash_table *task_table;
+	struct hash_table *file_table;
 
 	struct mq *manager_socket;
 	struct mq_poll *polling_group;
+
+	/* Path to local storage for tasks, files, etc. */
+	char *dbpath; 
 
 	int connect_timeout;
 	int stall_timeout;
@@ -31,7 +34,6 @@ struct ds_manager {
 };
 
 struct ds_manager *ds_manager_create();
-
 
 /* declares a blob in a worker so that it can be manipulated via blob rpcs. */
 struct ds_blob_rep *ds_manager_add_blob_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid);
