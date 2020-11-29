@@ -277,7 +277,7 @@ jx_int_t ds_rpc_task_submit( struct ds_manager *m, struct ds_worker_rep *r, cons
 	assert(t);
 
 	struct jx *rpc = jx_objectv("method", jx_string("task-submit"),
-								"params", jx_copy(t->description),
+								"params", ds_task_to_jx(t->task),
 								NULL);
 
 	return ds_rpc_for_task(m, r, t, rpc, DS_TASK_ACTIVE);

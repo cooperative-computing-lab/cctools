@@ -2,6 +2,7 @@
 #define DATASWARM_FILE_H
 
 #include "jx.h"
+#include "hash_table.h"
 
 typedef enum {
 	DS_FILE_PENDING,
@@ -29,6 +30,7 @@ struct ds_file {
 
 	char *projectid;
 	struct jx *metadata;
+	struct hash_table *replicas;
 };
 
 struct ds_file *ds_file_create(const char *uuid, const char *projectid, jx_int_t size, struct jx *metadata);
