@@ -564,7 +564,6 @@ struct jx_pair * jx_pair_copy( struct jx_pair *p )
 		*np = calloc(1, sizeof(struct jx_pair));
 		(*np)->key = jx_copy(p->key);
 		(*np)->value = jx_copy(p->value);
-		(*np)->next = jx_pair_copy(p->next);
 		(*np)->line = p->line;
 
 		np = &(*np)->next;
