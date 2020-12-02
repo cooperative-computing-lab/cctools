@@ -40,6 +40,7 @@ typedef enum {
 	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
 	BATCH_QUEUE_TYPE_MOAB,                /**< Batch jobs will be sent to the Moab Workload Manager. */
 	BATCH_QUEUE_TYPE_PBS,                 /**< Batch jobs will be send to the PBS Scheduler. */
+	BATCH_QUEUE_TYPE_LSF,		      /**< Batch jobs will be sent to LSF. */
 	BATCH_QUEUE_TYPE_TORQUE,              /**< Batch jobs will be send to the Torque Scheduler. */
 	BATCH_QUEUE_TYPE_BLUE_WATERS,         /**< Batch jobs will be send to the Torque Scheduler at Blue Waters. */
 	BATCH_QUEUE_TYPE_SLURM,               /**< Batch jobs will be send to the SLURM Scheduler. */
