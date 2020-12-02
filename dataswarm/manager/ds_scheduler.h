@@ -1,5 +1,5 @@
 #ifndef DS_SCHEDULER_H
-#define DS_SCHEDULER_h
+#define DS_SCHEDULER_H
 
 #include "ds_manager.h"
 
