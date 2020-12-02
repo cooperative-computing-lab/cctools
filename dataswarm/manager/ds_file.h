@@ -30,7 +30,7 @@ struct ds_file {
 
 	char *projectid;
 	struct jx *metadata;
-	struct hash_table *replicas;
+	struct hash_table *blobs;
 };
 
 struct ds_file *ds_file_create(const char *uuid, const char *projectid, jx_int_t size, struct jx *metadata);
