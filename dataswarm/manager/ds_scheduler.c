@@ -23,7 +23,7 @@
 #include "ds_client_ops.h"
 #include "ds_file.h"
 
-static int blobs_in_state( struct ds_file *f, ds_blob_state_t state )
+static int blobs_reached_state( struct ds_file *f, ds_blob_state_t state )
 {
 	char *key;
 	struct ds_blob_rep *b;
@@ -41,21 +41,21 @@ static void ds_schedule_file( struct ds_manager *m, struct ds_file *f )
 {
 	switch (f->state) {
 		case DS_FILE_ALLOCATING:
-			if (blobs_in_state(f, DS_BLOB_RW)) {
+			if (blobs_reached_state(f, DS_BLOB_RW)) {
 				f->state = DS_FILE_MUTABLE;
 			} else {
 				//XXX talk to workers to advance replica states
 			}
 			break;
 		case DS_FILE_COMMITTING:
-			if (blobs_in_state(f, DS_BLOB_RO)) {
+			if (blobs_reached_state(f, DS_BLOB_RO)) {
 				f->state = DS_FILE_IMMUTABLE;
 			} else {
 				//XXX talk to workers to advance replica states
 			}
 			break;
 		case DS_FILE_DELETING:
-			if (blobs_in_state(f, DS_BLOB_DELETED)) {
+			if (blobs_reached_state(f, DS_BLOB_DELETED)) {
 				f->state = DS_FILE_DELETED;
 			} else {
 				//XXX talk to workers to advance replica states
@@ -79,18 +79,6 @@ static void schedule_all_files( struct ds_manager *m )
 	while (hash_table_nextkey(m->file_table, &key, (void **) &f)) {
 		ds_schedule_file(m,f);
 	}
-}
-
-static void retry_task(struct ds_task *t) {
-	//XXX inspect task, check retry count, etc.
-	// for now, just switch to a hard failure
-	t->result = DS_TASK_RESULT_ERROR;
-}
-
-static void fix_task(struct ds_task *t) {
-	//XXX inspect task, check retry count, etc.
-	// for now, just switch to a hard failure
-	t->result = DS_TASK_RESULT_ERROR;
 }
 
 static bool prepare_worker(struct ds_manager *m, struct ds_task *t) {
@@ -134,27 +122,12 @@ static void schedule_task( struct ds_manager *m, struct ds_task *t )
 		case DS_TASK_ACTIVE:
 			// schedule/advance below
 			break;
-		case DS_TASK_DONE:
-		case DS_TASK_DELETED:
-			// nothing to do, wait for the client
-			return;
-		case DS_TASK_RUNNING:
 		case DS_TASK_DELETING:
 			// nothing to do, wait for the worker
 			return;
-	}
-
-	switch (t->result) {
-		case DS_TASK_RESULT_SUCCESS:
-			break;
-		case DS_TASK_RESULT_ERROR:
-		case DS_TASK_RESULT_UNDEFINED:
-			return;
-		case DS_TASK_RESULT_FIX:
-			fix_task(t);
-			return;
-		case DS_TASK_RESULT_AGAIN:
-			retry_task(t);
+		case DS_TASK_DONE:
+		case DS_TASK_DELETED:
+			// nothing to do, wait for the client
 			return;
 	}
 
@@ -188,4 +161,3 @@ void ds_scheduler( struct ds_manager *m )
 	schedule_all_tasks(m);
 	schedule_all_files(m);
 }
-
