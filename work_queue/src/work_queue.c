@@ -2296,7 +2296,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	char owner[USERNAME_MAX];
 	username_get(owner);
 
-	jx_insert_string(j,"type","wq_manager");
+	jx_insert_string(j,"type","wq_master");
 	if(q->name) jx_insert_string(j,"project",q->name);
 	jx_insert_integer(j,"starttime",(q->stats->time_when_started/1000000)); // catalog expects time_t not timestamp_t
 	jx_insert_string(j,"working_dir",q->workingdir);
@@ -2432,7 +2432,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 
 	//information regarding how to contact the manager
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
-	jx_insert_string(j,"type","wq_manager");
+	jx_insert_string(j,"type","wq_master");
 	jx_insert_integer(j,"port",work_queue_port(q));
 
 	char owner[USERNAME_MAX];

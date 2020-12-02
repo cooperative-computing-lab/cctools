@@ -7,7 +7,7 @@ Overview
 
  When servers report their status to the catalog server, a log file is created to track those reports. The servers are of different types and are allowed to report any values for any field name. In other words, there is no schema beyond the requirement that each reported item must contain a field and value. The catalog server also creates a daily checkpoint file with the current status of all servers still actively reporting. Samples of data from checkpoints and log files for different types of servers are shown further down in this document. The following scripts operate on this data for the creation of summary reports.
 deltadb_collect: Returns log data for the specified time period. The script takes three arguments. The first argument is a directory where the catalog history files are stored in sub-directories by year. The second argument specifies the start time as a timestamp, date or time in the format YYYY-MM-DD-HH-MM-SS. The third argument (optional) can be a timestamp, duration, or date and time of the same format YYYY-MM-DD-HH-MM-SS. The duration can be in seconds (+180 or s180), minutes (m45), hours (h8), days (d16), weeks (w3), or years (y2).
-deltadb_select_*: Filters streamed data (through standard input) and returns only the objects which satisfy the provided arguments. For example, type=wq_manager would only output objects with type wq_manager. There are two select tools: deltadb_select_static, deltadb_select_dynamic. The man pages describe the differences between these tools in more detail.
+deltadb_select_*: Filters streamed data (through standard input) and returns only the objects which satisfy the provided arguments. For example, type=wq_master would only output objects with type wq_master. There are two select tools: deltadb_select_static, deltadb_select_dynamic. The man pages describe the differences between these tools in more detail.
 deltadb_project: Defines desired attributes from a stream of delta logs (standard input), removing the remaining attributes, but no objects.
 deltadb_reduce_temporal Aggregates attribute values (from standard input) over a specified time span.
 deltadb_reduce_spatial Summarizes attribute values (from standard input) over all objects, returning a single object for each timestamp.
@@ -18,20 +18,20 @@ deltadb_pivot Transforms the data into a more plottable format.
 Invocation
  To list the total number of queues, workers, and tasks at 15 minute intervals over the course of one year, the following query can be performed from the command line:
 deltadb_collect /data/catalog.history 2013-02-1@00:00:00 d365 | \
-deltadb_select_static  type=wq_manager | \
+deltadb_select_static  type=wq_master | \
 deltadb_reduce_temporal m15 workers,MAX task_running,MAX tasks_running,MAX | \
 deltadb_reduce_spatial name,CNT workers.MAX,SUM task_running.MAX,SUM tasks_running.MAX,SUM | \
 deltadb_pivot name.CNT workers.MAX.SUM task_running.MAX.SUM tasks_running.MAX.SUM
  Or for each month of the year, to list each project run in that month, with the owner and number of tasks dispatched, you might run something like this:
 deltadb_collect /data/catalog.history 2013-02-1@00:00:00 d365 | \
-deltadb_select_static  type=wq_manager | \
+deltadb_select_static  type=wq_master | \
 deltadb_reduce_temporal d30 workers,MAX total_tasks_dispatched,MAX task_running,MAX tasks_running,MAX | \
 deltadb_pivot owner workers.MAX total_tasks_dispatched.MAX tasks_running.MAX task_running.MAX
 
 
 Sample Data
 
- For servers where type=wq_manager
+ For servers where type=wq_master
 
 #Some sample static fields: ['type', 'workers_by_pool', 'workers_init', 'workers', 'workers_busy', 'workers_ready', 'port', 'tasks_complete', 'start_time', 'project', 'address', 'tasks_waiting', 'lastheardfrom', 'version', 'capacity', 'name', 'owner', 'task_running', 'lifetime', 'priority', 'total_tasks_dispatched', 'disk_total', 'tasks_running', 'memory_total', 'starttime', 'cores_total', 'task_running0', 'my_master']
 
@@ -78,10 +78,10 @@ lastheardfrom 1376870394
 1376945475 U decision n/a
 1376945496 U decision cclosdci:0
 
- wq_manager sample
+ wq_master sample
 
 key 171.65.257.29:5147:not0rious5678.org
-type wq_manager
+type wq_master
 workers_by_pool unmanaged:9
 starttime 1376602306
 workers_init 0
@@ -130,7 +130,7 @@ total_tasks_dispatched 37
 1376898613 U tasks_running 10
 1376898613 U tasks_waiting 1
 1376898933 D
-1376934281 C type wq_manager
+1376934281 C type wq_master
 1376934281 C workers_by_pool n/a
 1376934281 C starttime 1376934226
 1376934281 C workers_init 0
