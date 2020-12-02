@@ -24,7 +24,7 @@ geography, and high energy physics all use Makeflow to compose workflows from
 existing applications.
 
 Makeflow can send your jobs to a wide variety of services, such as batch
-systems (HTCondor, SGE, PBS, Torque), cluster managers (Mesos and Kubernetes),
+systems (HTCondor, SGE, PBS, LSF, Torque), cluster managers (Mesos and Kubernetes),
 cloud services (Amazon EC2 or Lambda) and container environments like Docker
 and Singularity. Details for each of those systems are given in the Batch
 System Support section.
@@ -344,6 +344,22 @@ added onto `qsub` in this format:
 
 To remove resources specification at submission use the Makeflow option `--safe-submit-mode`.
 
+
+### LSF - Load Sharing Facility
+
+Use the `-T lsf` option to submit jobs to the [Load Sharing Facility](https://www.ibm.com/support/knowledgecenter/SSETD4/product_welcome_platform_lsf.html),
+known previously as "Platform LSF" and now "IBM Spectrum LSF".
+
+As above, Makeflow will automatically generate `bsub` commands to submit jobs.
+For example, to submit a job requiring 4 cores, 64MB of memory, and an expected
+runtime of 120 minutes, Makeflow will generate a command line like this:
+
+```sh
+bsub -J makeflow23 -n 4 -M 64MB -We 120 job.sh
+```
+
+If you have additional options peculiar to your local facility, use the `-B` option
+to makeflow or the `BATCH_OPTIONS` variable to specify additional submission options.
 
 ### Torque Batch System
 

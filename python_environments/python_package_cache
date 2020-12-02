@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import json
+import hashlib
+import tempfile
+import argparse
+import subprocess
+
+HELP = '''
+Prepare a packaged environment, caching/reusing previously build packages.
+The path to the environment package will be written to stdout.
+If the --approx option is specified, the returned image may contain additional (unrequested) packages.
+This mode reuses existing environments that contain a superset of the spec.
+If the --merge option is given, spec may be merged into an existing environment.
+The argument to --merge gives the maximum Jaccard distance at which to merge.
+'''
+
+TAR_EXT = '.tar.gz'
+CACHEDIR = os.path.join(tempfile.gettempdir(), 'python_package-{}'.format(os.geteuid()))
+SPECS = {}
+PKGSETS = {}
+
+def jaccard(a, b):
+    return 1 - float(len(a & b))/len(a | b)
+
+def deps_to_set(conda_deps, pip_deps):
+    return frozenset({'C' + x for x in conda_deps} | {'P' + x for x in pip_deps})
+
+def set_to_deps(s):
+    conda = []
+    pip = []
+    for x in s:
+        if x[0] == 'C':
+            conda.append(x[1:])
+        if x[0] == 'P':
+            pip.append(x[1:])
+    return conda, pip
+
+def extract_deps(spec):
+    conda_deps = spec['dependencies'][:]
+    pip_deps = []
+    for i in range(len(conda_deps)):
+        if isinstance(conda_deps[i], dict):
+            p = conda_deps.pop(i)
+            assert(len(p) == 1)
+            pip_deps = p['pip'][:]
+    return conda_deps, pip_deps
+
+def insert_deps(spec, conda_deps, pip_deps):
+    conda_deps.sort()
+    pip_deps.sort()
+    spec['dependencies'] = conda_deps[:]
+    if len(pip_deps) > 0:
+        spec['dependencies'].append({'pip': pip_deps[:]})
+
+def hash_spec(spec):
+    insert_deps(spec, *extract_deps(spec)) #sorts dep lists
+    return hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
+
+def compatible(a, b):
+    #TODO compare channel configs?
+    names_a = {x[1:x.index('=')]: x for x in a}
+    names_b = {x[1:x.index('=')]: x for x in b}
+    for x in set(names_a.keys()) & set(names_b.keys()):
+        if names_a[x] != names_b[x]:
+            return False
+    return True
+
+def load_cache():
+    os.makedirs(CACHEDIR, exist_ok=True)
+    for a in os.scandir(CACHEDIR):
+        name, ext = os.path.splitext(a.name)
+        if ext != '.json':
+            continue
+        with open(os.path.join(CACHEDIR, a.name)) as f:
+            s = json.load(f)
+        SPECS[name] = s
+        c, p = extract_deps(s)
+        PKGSETS[deps_to_set(c, p)] = name
+
+def find_exact(spec):
+    h = hash_spec(spec)
+    path = os.path.join(CACHEDIR, h + TAR_EXT)
+    if os.access(path, os.R_OK):
+        return path
+
+def find_matching(spec):
+    s = deps_to_set(*extract_deps(spec))
+    hits = [x for x in PKGSETS.keys() if s.issubset(x)]
+    hits.sort(key=lambda x: jaccard(s, x))
+    if len(hits) > 0:
+        return os.path.join(CACHEDIR, PKGSETS[hits[0]] + TAR_EXT)
+
+def insert(spec):
+    out = os.path.join(CACHEDIR, hash_spec(spec))
+
+    meta_fd, meta_path = tempfile.mkstemp(dir=CACHEDIR, suffix='.yml')
+    meta = os.fdopen(meta_fd, mode='w')
+    json.dump(spec, meta, indent=2)
+    meta.close()
+
+    tarball_fd, tarball_path = tempfile.mkstemp(dir=CACHEDIR, suffix=TAR_EXT)
+    os.close(tarball_fd)
+    subprocess.run(['python_package_create', meta_path, tarball_path],
+            check=True, stdout=sys.stderr)
+
+    os.replace(tarball_path, out + TAR_EXT)
+    os.replace(meta_path, out + '.json')
+
+    return out + TAR_EXT
+
+def merge(spec, alpha):
+    s = deps_to_set(*extract_deps(spec))
+    candidates = [x for x in PKGSETS.keys() if compatible(x, s) and jaccard(x, s) < alpha]
+    candidates.sort(key=lambda x: jaccard(s, x))
+    if len(candidates) == 0:
+        return
+
+    existing = SPECS[PKGSETS[candidates[0]]]
+    path = os.path.join(CACHEDIR, hash_spec(existing))
+    os.unlink(path + '.json')
+    os.unlink(path + TAR_EXT)
+    insert_deps(existing, *set_to_deps(s | candidates[0]))
+    return insert(existing)
+
+def get_env(spec, approx, alpha):
+    if approx or alpha > 0:
+        hit = find_matching(spec)
+        if hit:
+            return hit
+        merged = merge(spec, alpha)
+        if merged:
+            return merged
+    else:
+        hit = find_exact(spec)
+        if hit:
+            return hit
+
+    return insert(spec)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=HELP)
+    parser.add_argument('spec', help='Spec file, or - to read from stdin.')
+    parser.add_argument('--approx', action='store_true', help='Reuse environments containing a superset of spec')
+    parser.add_argument('--merge', type=float, default=0, help='Allow merging of similar environments. Implies --approx')
+    args = parser.parse_args()
+
+    spec_file = sys.stdin if args.spec == '-' else open(args.spec)
+    spec = json.load(spec_file)
+
+    load_cache()
+    print(get_env(spec, args.approx, args.merge))

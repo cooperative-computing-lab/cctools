@@ -78,8 +78,9 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 
 	if(q->type == BATCH_QUEUE_TYPE_SLURM){
 		fprintf(file, "[ -n \"${SLURM_JOB_ID}\" ] && JOB_ID=`echo ${SLURM_JOB_ID} | cut -d . -f 1`\n");
+	} else if(q->type == BATCH_QUEUE_TYPE_LSF) {
+		fprintf(file, "[ -n \"${LSB_JOBID}\" ] && JOB_ID=`echo ${LSB_JOBID} | cut -d . -f 1`\n");
 	} else {
-		// Some systems set PBS_JOBID, some set JOBID.
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
 	}
 
@@ -119,6 +120,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 	int ignore_mem  = batch_queue_option_is_yes(q, "ignore-mem-spec");
 	int ignore_disk = batch_queue_option_is_yes(q, "ignore-disk-spec");
 	int ignore_time = batch_queue_option_is_yes(q, "ignore-time-spec");
+	int ignore_core = batch_queue_option_is_yes(q, "ignore-core-spec");
 
 	buffer_t cluster_resources;
 	buffer_init(&cluster_resources);
@@ -163,6 +165,25 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		}
 
 		buffer_printf(&cluster_resources, " -pe smp %" PRId64, resources->cores>0 ? resources->cores : 1);
+	} else if(q->type==BATCH_QUEUE_TYPE_LSF) {
+		if(!ignore_mem && resources->memory>0) {
+			// resources->memory is in units of MB
+			buffer_printf(&cluster_resources,"-M %" PRId64"MB",resources->memory);
+		}
+
+		if(!ignore_core && resources->cores>0) {
+			// -n Gives the number of "tasks" in a job.
+			// Can be specified as a range: -n 4,8 indicates flexibility of 4 to 8 tasks.
+			// Not yet clear yet if this meaning differs for multi-thread versus MPI applications.
+			buffer_printf(&cluster_resources,"-n %" PRId64,resources->cores);
+		}
+
+		if(!ignore_time && resources->wall_time > 0 ) {
+			// -W puts a hard limit on run time.
+			// -We gives an estimated time for scheduling puporses.
+			// Both use minutes as the units.
+			buffer_printf(&cluster_resources,"-We %" PRId64,resources->wall_time/60);
+		}
 	}
 
 	buffer_printf(&cluster_resources, " ");
@@ -264,6 +285,7 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	while(fgets(line, sizeof(line), file)) {
 		if(sscanf(line, "Your job %" SCNbjid, &jobid) == 1
 		|| sscanf(line, "Submitted batch job %" SCNbjid, &jobid) == 1
+		|| sscanf(line, "Job <%" SCNbjid "> is submitted", &jobid) == 1
 		|| sscanf(line, "%" SCNbjid, &jobid) == 1 ) {
 			debug(D_BATCH, "job %" PRIbjid " submitted", jobid);
 			pclose(file);
@@ -417,6 +439,13 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 			cluster_options = strdup("-o /dev/null -j oe -V");
 			cluster_jobname_var = strdup("-N");
 			break;
+		case BATCH_QUEUE_TYPE_LSF:
+			cluster_name = strdup("lsf");
+			cluster_submit_cmd = strdup("bsub");
+			cluster_remove_cmd = strdup("bkill");
+			cluster_options = strdup("-o /dev/null -e /dev/null -env all");
+			cluster_jobname_var = strdup("-J");
+			break;
 		case BATCH_QUEUE_TYPE_TORQUE:
 			cluster_name = strdup("torque");
 			cluster_submit_cmd = strdup("qsub");
@@ -553,6 +582,32 @@ const struct batch_queue_module batch_queue_sge = {
 const struct batch_queue_module batch_queue_pbs = {
 	BATCH_QUEUE_TYPE_PBS,
 	"pbs",
+
+	batch_queue_cluster_create,
+	batch_queue_cluster_free,
+	batch_queue_cluster_port,
+	batch_queue_cluster_option_update,
+
+	{
+		batch_job_cluster_submit,
+		batch_job_cluster_wait,
+		batch_job_cluster_remove,
+	},
+
+	{
+		batch_fs_cluster_chdir,
+		batch_fs_cluster_getcwd,
+		batch_fs_cluster_mkdir,
+		batch_fs_cluster_putfile,
+		batch_fs_cluster_rename,
+		batch_fs_cluster_stat,
+		batch_fs_cluster_unlink,
+	},
+};
+
+const struct batch_queue_module batch_queue_lsf = {
+	BATCH_QUEUE_TYPE_LSF,
+	"lsf",
 
 	batch_queue_cluster_create,
 	batch_queue_cluster_free,

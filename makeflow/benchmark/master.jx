@@ -1,0 +1,33 @@
+{
+	"rules" : [
+		{
+			"command" : template("scale={x} ./harness.sh test1/ resource_output-{x}.summary resource_output_recovery-{x}.summary"),
+			"inputs" : [ "harness.sh", "test1" ],
+			"outputs" : [ template("resource_output-{x}.summary"),template("resource_output_recovery-{x}.summary")]
+		} for x in SCALES, 
+		
+		{
+			"command" : template("scale={x} python parsejson.py < resource_output{p}-{x}.summary > perfdata{p}-{x}.dat"),
+			"inputs" : [ template("resource_output{p}-{x}.summary"), "parsejson.py" ],
+			"outputs" : [ template("perfdata{p}-{x}.dat")]
+		} for x in SCALES for p in modes,
+		{
+			"command" : template("cat perfdata{p}-*.dat > perfdata{p}.dat"),
+			"inputs" : [ template("perfdata{p}-{x}.dat") for x in SCALES ],
+			"outputs" : [ template("perfdata{p}.dat")]
+		} for p in modes,
+		{
+			"command" : template("gnuplot perfdata-{t}.gnu"),
+			"inputs" : [ "perfdata.dat", "perfdata_recovery.dat" ],
+			"outputs" : [ template("perfdata-{t}.png")]
+		} for t in types
+	],
+	"define": {
+		"SCALES": [10, 100, 1000, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000, 65000, 70000, 75000, 80000, 85000, 90000, 95000, 100000],
+		"modes": ["", "_recovery"], 
+		"types": ["wall", "memory", "CPU", "read", "write"]
+	}
+
+}
+
+
