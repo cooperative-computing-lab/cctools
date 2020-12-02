@@ -33,6 +33,9 @@ static char * cluster_jobname_var = NULL;
 
 int batch_job_verbose_jobnames = 0;
 
+int heartbeat_rate =  30;	//in seconds. rate at which hearbeats are written to the log.
+int heartbeat_max  = 120;	//in seconds. maximum wait for a heartbeat before gibing up on the job.
+
 /*
 Principle of operation:
 Each batch job that we submit uses a wrapper file.
@@ -61,8 +64,6 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	char wrapperfile[PATH_MAX];
 	snprintf(wrapperfile, PATH_MAX, "%s.wrapper", sysname);
 
-	if(access(wrapperfile, R_OK | X_OK) == 0) return 1;
-
 	FILE *file = fopen(wrapperfile, "w");
 	if(!file) {
 		return 0;
@@ -77,8 +78,9 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 
 	if(q->type == BATCH_QUEUE_TYPE_SLURM){
 		fprintf(file, "[ -n \"${SLURM_JOB_ID}\" ] && JOB_ID=`echo ${SLURM_JOB_ID} | cut -d . -f 1`\n");
+	} else if(q->type == BATCH_QUEUE_TYPE_LSF) {
+		fprintf(file, "[ -n \"${LSB_JOBID}\" ] && JOB_ID=`echo ${LSB_JOBID} | cut -d . -f 1`\n");
 	} else {
-		// Some systems set PBS_JOBID, some set JOBID.
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
 	}
 
@@ -89,17 +91,20 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	// Each job writes out to its own log file.
 	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
 	fprintf(file, "starttime=`date +%%s`\n");
-	fprintf(file, "cat > $logfile <<EOF\n");
-	fprintf(file, "start $starttime\n");
-	fprintf(file, "EOF\n\n");
+	fprintf(file, "echo start $starttime > $logfile\n");
+
+	// Write a heartbeat to the log file, in case the batch system removes the job from under us.
+	fprintf(file, "(while true; do sleep %d; echo alive $(date +%%s) >> $logfile; done) &\n", heartbeat_rate);
+	fprintf(file, "pid_heartbeat=$!\n");
+
 	// The command to run is taken from the environment.
 	fprintf(file, "eval \"$BATCH_JOB_COMMAND\"\n\n");
 
 	// When done, write the status and time to the logfile.
 	fprintf(file, "status=$?\n");
+	fprintf(file, "kill $pid_heartbeat\n");
 	fprintf(file, "stoptime=`date +%%s`\n");
-	fprintf(file, "cat >> $logfile <<EOF\n");
-	fprintf(file, "stop $status $stoptime\n");
+	fprintf(file, "echo stop $status $stoptime >> $logfile\n");
 	fprintf(file, "EOF\n");
 	fclose(file);
 
@@ -115,6 +120,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 	int ignore_mem  = batch_queue_option_is_yes(q, "ignore-mem-spec");
 	int ignore_disk = batch_queue_option_is_yes(q, "ignore-disk-spec");
 	int ignore_time = batch_queue_option_is_yes(q, "ignore-time-spec");
+	int ignore_core = batch_queue_option_is_yes(q, "ignore-core-spec");
 
 	buffer_t cluster_resources;
 	buffer_init(&cluster_resources);
@@ -159,6 +165,25 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		}
 
 		buffer_printf(&cluster_resources, " -pe smp %" PRId64, resources->cores>0 ? resources->cores : 1);
+	} else if(q->type==BATCH_QUEUE_TYPE_LSF) {
+		if(!ignore_mem && resources->memory>0) {
+			// resources->memory is in units of MB
+			buffer_printf(&cluster_resources,"-M %" PRId64"MB",resources->memory);
+		}
+
+		if(!ignore_core && resources->cores>0) {
+			// -n Gives the number of "tasks" in a job.
+			// Can be specified as a range: -n 4,8 indicates flexibility of 4 to 8 tasks.
+			// Not yet clear yet if this meaning differs for multi-thread versus MPI applications.
+			buffer_printf(&cluster_resources,"-n %" PRId64,resources->cores);
+		}
+
+		if(!ignore_time && resources->wall_time > 0 ) {
+			// -W puts a hard limit on run time.
+			// -We gives an estimated time for scheduling puporses.
+			// Both use minutes as the units.
+			buffer_printf(&cluster_resources,"-We %" PRId64,resources->wall_time/60);
+		}
 	}
 
 	buffer_printf(&cluster_resources, " ");
@@ -260,6 +285,7 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	while(fgets(line, sizeof(line), file)) {
 		if(sscanf(line, "Your job %" SCNbjid, &jobid) == 1
 		|| sscanf(line, "Submitted batch job %" SCNbjid, &jobid) == 1
+		|| sscanf(line, "Job <%" SCNbjid "> is submitted", &jobid) == 1
 		|| sscanf(line, "%" SCNbjid, &jobid) == 1 ) {
 			debug(D_BATCH, "job %" PRIbjid " submitted", jobid);
 			pclose(file);
@@ -294,10 +320,15 @@ static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct bat
 			char *statusfile = string_format("%s.status.%" PRIbjid, cluster_name, jobid);
 			FILE *file = fopen(statusfile, "r");
 			if(file) {
+				fseek(file, info->log_pos, SEEK_SET);
 				char line[BATCH_JOB_LINE_MAX];
 				while(fgets(line, sizeof(line), file)) {
 					if(sscanf(line, "start %d", &t)) {
 						info->started = t;
+						if(!info->heartbeat)
+							info->heartbeat = t;
+					} else if(sscanf(line, "alive %d", &t)) {
+						info->heartbeat = t;
 					} else if(sscanf(line, "stop %d %d", &c, &t) == 2) {
 						debug(D_BATCH, "job %" PRIbjid " complete", jobid);
 						if(!info->started)
@@ -307,7 +338,17 @@ static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct bat
 						info->exit_code = c;
 					}
 				}
+				info->log_pos = ftell(file);
 				fclose(file);
+
+				if(time(0) - info->heartbeat > heartbeat_max) {
+						warn(D_BATCH, "job %" PRIbjid " does not appear to be running anymore.", jobid);
+						if(!info->started)
+							info->started = info->heartbeat;
+						info->finished = info->heartbeat;
+						info->exited_normally = 0;
+						info->exit_signal = 1;  //same used as batch_job_cluster_remove
+				}
 
 				if(info->finished != 0) {
 					unlink(statusfile);
@@ -397,6 +438,13 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 			cluster_remove_cmd = strdup("qdel");
 			cluster_options = strdup("-o /dev/null -j oe -V");
 			cluster_jobname_var = strdup("-N");
+			break;
+		case BATCH_QUEUE_TYPE_LSF:
+			cluster_name = strdup("lsf");
+			cluster_submit_cmd = strdup("bsub");
+			cluster_remove_cmd = strdup("bkill");
+			cluster_options = strdup("-o /dev/null -e /dev/null -env all");
+			cluster_jobname_var = strdup("-J");
 			break;
 		case BATCH_QUEUE_TYPE_TORQUE:
 			cluster_name = strdup("torque");
@@ -534,6 +582,32 @@ const struct batch_queue_module batch_queue_sge = {
 const struct batch_queue_module batch_queue_pbs = {
 	BATCH_QUEUE_TYPE_PBS,
 	"pbs",
+
+	batch_queue_cluster_create,
+	batch_queue_cluster_free,
+	batch_queue_cluster_port,
+	batch_queue_cluster_option_update,
+
+	{
+		batch_job_cluster_submit,
+		batch_job_cluster_wait,
+		batch_job_cluster_remove,
+	},
+
+	{
+		batch_fs_cluster_chdir,
+		batch_fs_cluster_getcwd,
+		batch_fs_cluster_mkdir,
+		batch_fs_cluster_putfile,
+		batch_fs_cluster_rename,
+		batch_fs_cluster_stat,
+		batch_fs_cluster_unlink,
+	},
+};
+
+const struct batch_queue_module batch_queue_lsf = {
+	BATCH_QUEUE_TYPE_LSF,
+	"lsf",
 
 	batch_queue_cluster_create,
 	batch_queue_cluster_free,

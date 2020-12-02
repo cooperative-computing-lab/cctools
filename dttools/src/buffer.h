@@ -179,6 +179,17 @@ size_t buffer_pos(buffer_t * b);
  */
 int buffer_grow(buffer_t * b, size_t n);
 
+/** Seek to a position.
+ *
+ * Similar to @ref buffer_rewind(), but allows seeking past the end of the buffer.
+ * Note that seeking beyond the currently allocated memory may result in a
+ * buffer filled with garbage data (but still null-terminated).
+ * @param b The buffer.
+ * @param n Absolute position to seek to.
+ * @returns -1 on error.
+ */
+int buffer_seek(buffer_t * b, size_t pos);
+
 /** Allocate a buffer named `name' on the stack of at most `size' bytes.
 	Does not abort on failure, but hits the max size and drops further bytes
 	written. You can turn on aborts on failure manually using

@@ -2,15 +2,17 @@ include ../../config.mk
 include ../../rules.mk
 
 TARGETS=$(PROGRAMS)
-PROGRAMS=dataswarm_worker
+PROGRAMS=ds_worker
 
-SOURCES=dataswarm_worker_main.c dataswarm_worker.c dataswarm_message.c dataswarm_blob.c dataswarm_process.c dataswarm_task.c dataswarm_task_table.c dataswarm_mount.c dataswarm_resources.c
+SOURCES=ds_worker_main.c ds_worker.c ds_process.c ds_task_table.c ds_blob_table.c ds_measure.c
 OBJECTS=$(SOURCES:%.c=%.o)
-LOCAL_LINKAGE = -L ../../dttools/src -ldttools
+
+LOCAL_CCFLAGS = -I ../common
+LOCAL_LINKAGE = -L ../common -ldataswarm_common -L ../../dttools/src -ldttools
 
 all: $(TARGETS)
 
-dataswarm_worker: $(OBJECTS)
+ds_worker: $(OBJECTS)
 
 clean:
 	rm -rf $(OBJECTS) $(PROGRAMS)

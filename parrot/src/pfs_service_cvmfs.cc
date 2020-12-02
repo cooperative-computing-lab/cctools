@@ -1177,7 +1177,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 
 					strncat(xpath->rest, link_target, PFS_PATH_MAX);
 					path_collapse(xpath->rest, path_relative, 1);
-					snprintf(link_target, PFS_PATH_MAX, "/cvmfs/%s%s",
+					string_nformat(link_target, PFS_PATH_MAX, "/cvmfs/%s%s",
 						 xpath->host, path_relative);
 				}
 			}
@@ -1190,8 +1190,8 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 				return false;
 			}
 
-			snprintf(xpath->rest, PFS_PATH_MAX, "%s%s", path_head, path_tail);
-			snprintf(xpath->path, PFS_PATH_MAX, "/cvmfs/%s%s", xpath->host, xpath->rest);
+			string_nformat(xpath->rest, PFS_PATH_MAX, "%s%s", path_head, path_tail);
+			string_nformat(xpath->path, PFS_PATH_MAX, "/cvmfs/%s%s", xpath->host, xpath->rest);
 			strcpy(xpath->logical_name, xpath->path);
 
 			debug(D_CVMFS, "expanding symlinks %s to %s\n", path->path, xpath->path);

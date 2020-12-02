@@ -162,7 +162,7 @@ Once MPI is in your path, configure CCTools to use MPI and then install. For exa
 
 ```sh
 $ cd ~/cctools
-$ ./configure --with-mpicc-path=`which mpicc`
+$ ./configure --with-mpi-path=`which mpicc`
 $ make && install `
 ```
 

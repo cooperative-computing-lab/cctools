@@ -24,7 +24,7 @@ geography, and high energy physics all use Makeflow to compose workflows from
 existing applications.
 
 Makeflow can send your jobs to a wide variety of services, such as batch
-systems (HTCondor, SGE, PBS, Torque), cluster managers (Mesos and Kubernetes),
+systems (HTCondor, SGE, PBS, LSF, Torque), cluster managers (Mesos and Kubernetes),
 cloud services (Amazon EC2 or Lambda) and container environments like Docker
 and Singularity. Details for each of those systems are given in the Batch
 System Support section.
@@ -121,6 +121,9 @@ $ makeflow -T amazon example.makeflow
 To learn more about the various batch system options, see the Batch System
 Support section.
 
+
+!!! warning
+    You may have to slightly adapt the makeflow workflow file to work across different batch systems. This is because different batch systems have different expectations on whether the underlying filesystem is shared (e.g., slurm and torque), or not (e.g., condor and work queue). 
 
 ### JX Language
 
@@ -237,6 +240,16 @@ see the current list supported. Generally speaking, simply run Makeflow with
 the `-T` option to select your desired batch system. If no option is given,
 then `-T local` is assumed.
 
+
+!!! warning
+    As mentioned before, different batch systems have different expectations on
+    whether the underlying filesystem is shared. For example, one workflow may
+    work with `-Tslurm`, but may fail with `-Tcondor`, etc. The most portable
+    workflows read and write files from the working directory of each rule. If
+    a rule depends on the creation of a directory, make this creation explicit,
+    as the directory may not be present for the intermidate results on the site
+    where the rule executes.
+
 If you need to pass additional parameters to your batch system, such as
 specifying a specific queue or machine category, use the `-B` option to
 Makeflow, or set the `BATCH_OPTIONS` variable in your Makeflow file. The
@@ -331,6 +344,22 @@ added onto `qsub` in this format:
 
 To remove resources specification at submission use the Makeflow option `--safe-submit-mode`.
 
+
+### LSF - Load Sharing Facility
+
+Use the `-T lsf` option to submit jobs to the [Load Sharing Facility](https://www.ibm.com/support/knowledgecenter/SSETD4/product_welcome_platform_lsf.html),
+known previously as "Platform LSF" and now "IBM Spectrum LSF".
+
+As above, Makeflow will automatically generate `bsub` commands to submit jobs.
+For example, to submit a job requiring 4 cores, 64MB of memory, and an expected
+runtime of 120 minutes, Makeflow will generate a command line like this:
+
+```sh
+bsub -J makeflow23 -n 4 -M 64MB -We 120 job.sh
+```
+
+If you have additional options peculiar to your local facility, use the `-B` option
+to makeflow or the `BATCH_OPTIONS` variable to specify additional submission options.
 
 ### Torque Batch System
 

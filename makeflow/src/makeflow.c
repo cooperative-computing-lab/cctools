@@ -98,7 +98,7 @@ an example.
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
 /*
-Flags to control the basic behavior of the Makeflow main loop. 
+Flags to control the basic behavior of the Makeflow main loop.
 */
 enum job_submit_status {
 	JOB_SUBMISSION_HOOK_FAILURE = -1,
@@ -130,6 +130,9 @@ static int makeflow_gc_count  = -1;
 static int makeflow_gc_barrier = 1;
 /* Determines next gc_barrier to make checks less frequent with large number of tasks */
 static double makeflow_gc_task_ratio = 0.05;
+
+/* Makeflow current executable*/
+static char makeflow_exe[PATH_MAX];
 
 /*
 Makeflow manages two queues of jobs.
@@ -287,54 +290,50 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 		batch_task_set_command(task, n->command);
 
 	} else if(n->type==DAG_NODE_TYPE_WORKFLOW) {
-
 		/* A sub-workflow must be expanded into a makeflow invocation */
+		buffer_t b;
+		buffer_init(&b);
 
-		char *cmd = string_format("makeflow -T local %s",n->workflow_file);
-		char *oldcmd = 0;
-
-		/* Select the workflow language */
-
-		if(n->workflow_is_jx) {
-			oldcmd = cmd;
-			cmd = string_format("%s --jx",cmd);
-			free(oldcmd);
+		if (batch_queue_supports_feature(remote_queue, "remote_rename")) {
+			const char *basename = path_basename(makeflow_exe);
+			makeflow_hook_add_input_file(n->d,task,makeflow_exe,basename,DAG_FILE_TYPE_TEMP);
+			buffer_printf(&b, "./%s", basename);
+		} else {
+			buffer_printf(&b, "%s", makeflow_exe);
 		}
 
-		/* Generate the workflow arguments file */
+		buffer_printf(&b, " -T local %s", n->workflow_file);
 
+		const char *log = dag_node_nested_workflow_filename(n, "makeflowlog");
+		buffer_printf(&b, " -l %s", log);
+		makeflow_hook_add_output_file(n->d,task,log,log,DAG_FILE_TYPE_TEMP);
+
+		/* Select the workflow language */
+		if(n->workflow_is_jx) {
+			buffer_printf(&b, " --jx");
+		}
+
+		/* Generate the filenames for nested workflows */
 		if(n->workflow_args) {
-			oldcmd = cmd;
-			cmd = string_format("%s --jx-args %s",cmd,n->workflow_args_file);
-			free(oldcmd);
-
-			/* Define this file as a temp so it is removed on completion. */
-			makeflow_hook_add_input_file(n->d,task,n->workflow_args_file,n->workflow_args_file,DAG_FILE_TYPE_TEMP);
+			const char *args_file = dag_node_nested_workflow_filename(n, "args");
+			buffer_printf(&b, " --jx-args %s", args_file);
+			makeflow_hook_add_input_file(n->d,task,args_file,args_file,DAG_FILE_TYPE_TEMP);
 		}
 
 		/* Add resource controls to the sub-workflow, if known. */
-
 		if(n->resources_requested->cores>0) {
-			oldcmd = cmd;
-			cmd = string_format("%s --local-cores %d",cmd,(int)n->resources_requested->cores);
-			free(oldcmd);
+			buffer_printf(&b, " --local-cores %" PRId64, n->resources_requested->cores);
 		}
-
 		if(n->resources_requested->memory>0) {
-			oldcmd = cmd;
-			cmd = string_format("%s --local-memory %d",cmd,(int)n->resources_requested->cores);
-			free(oldcmd);
+			buffer_printf(&b, " --local-memory %" PRId64, n->resources_requested->memory);
 		}
-
 		if(n->resources_requested->disk>0) {
-			oldcmd = cmd;
-			cmd = string_format("%s --local-disk %d",cmd,(int)n->resources_requested->cores);
-			free(oldcmd);
+			buffer_printf(&b, " --local-disk %" PRId64, n->resources_requested->disk);
 		}
 
-		batch_task_set_command(task, cmd);
 		batch_task_add_input_file(task,n->workflow_file,n->workflow_file);
-		free(cmd);
+		batch_task_set_command(task, buffer_tostring(&b));
+		buffer_free(&b);
 	} else {
 		fatal("invalid job type %d in dag node (%s)",n->type,n->command);
 	}
@@ -680,7 +679,7 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 		}
 	}
 
-	/* If all makeflow checks pass for this node we will 
+	/* If all makeflow checks pass for this node we will
 	return the result of the hooks, which will be 1 if all pass
 	and 0 if any fail. */
 	int rc = makeflow_hook_node_check(n, makeflow_get_queue(n));
@@ -693,7 +692,6 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 int makeflow_nodes_local_waiting_count(const struct dag *d) {
 	int count = 0;
 
-	
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next) {
 		if(n->state == DAG_NODE_STATE_WAITING && is_local_job(n))
@@ -1348,6 +1346,9 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_storage_allocation;
 	extern struct makeflow_hook makeflow_hook_umbrella;
 	extern struct makeflow_hook makeflow_hook_vc3_builder;
+
+	/* save the name of the makeflow executable */
+	path_absolute(argv[0], makeflow_exe, 0);
 
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
@@ -2127,6 +2128,11 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 
+	/* If cleaning anything, assume local execution. This only really matters for nested workflows. */
+	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
+		batch_queue_type = batch_queue_type_from_string("local");
+	}
+
 	/* Perform initial MPI setup prior to creating the batch queue object. */
 	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
 		batch_job_mpi_setup(debug_file_name ? debug_file_name : "debug", mpi_cores,mpi_memory);
@@ -2547,15 +2553,15 @@ EXIT_WITH_FAILURE:
 		exit_value = EXIT_SUCCESS;
 	}
 
-	/* delete all jx args files. We do this here are some of these files may be created in clean mode. */
+	/* delete all files. We do this here are some of these files may be created in clean mode. */
 	{
 		struct dag_node *n;
 		uint64_t key;
 		itable_firstkey(d->node_table);
 		while(itable_nextkey(d->node_table, &key, (void **) &n)) {
-			if(n->workflow_args_file) {
-				debug(D_MAKEFLOW_RUN, "deleting tmp file: %s\n", n->workflow_args_file);
-				unlink(n->workflow_args_file);
+			if(n->workflow_args) {
+				debug(D_MAKEFLOW_RUN, "deleting tmp file: %s\n", dag_node_nested_workflow_filename(n, "args"));
+				unlink(dag_node_nested_workflow_filename(n, "args"));
 			}
 		}
 	}

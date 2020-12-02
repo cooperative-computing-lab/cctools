@@ -79,8 +79,7 @@ To install from source, please follow the instructions [here](from-source.md).
 
 You will only need to install **CCTools** from source if you want to track our
 latest developments on our [github
-repository](https://github.com/cooperative-computing-lab/cctools
-cctools-source), to propose a bug fix, or if you need to add a driver support
+repository](https://github.com/cooperative-computing-lab/cctools), to propose a bug fix, or if you need to add a driver support
 to **parrot** not normally included in the **conda** installation, such as
 CVMFS, or iRODS.
 

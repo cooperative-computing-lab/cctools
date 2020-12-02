@@ -254,7 +254,7 @@ serial that Makeflow would have run. This shell script format may be useful
 for archival purposes, since it does not depend on Makeflow.
 
 ## MPI
-When cctools is built with --with-mpicc-path=which mpicc` configuration, Makeflow can be ran as an MPI program.
+When cctools is built with --with-mpi-path=which mpicc` configuration, Makeflow can be ran as an MPI program.
 To do so, run Makeflow as an argument to BOLD(mpirun)/BOLD(mpiexec) and set BOLD(-T) PARAM(mpi) as a Makeflow option.
 When submitting mpi, request one process per core. Makeflow will count up how many processes each node given to MPI
 has, and use that as the core count for the worker on that node. Makeflow will then share memory evenly amongst the cores
@@ -326,7 +326,7 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [Makeflow User Manual]("../makeflow.html")
-- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md) 
+- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md) [makeflow_ec2_estimate(1)](makeflow_ec2_estimate.md)
 
 
 CCTools 8.0.0 DEVELOPMENT released on 

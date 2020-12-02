@@ -725,7 +725,7 @@ public:
 
 		if (this->_stat(mysql_cxn, name, &buf) >= 0) {
 			const char *fileid, *replicaid;
-			char host[PFS_PATH_MAX], path[PFS_PATH_MAX], location[PFS_PATH_MAX];
+			char host[PFS_PATH_MAX], path[PFS_PATH_MAX];
 			struct bxgrid_virtual_folder *bvf;
 
 			if (S_ISDIR(buf.st_mode)) {
@@ -740,15 +740,17 @@ public:
 					fileid = path_basename(name->rest);
 					while ((replicaid = bxgrid_lookup_replicaid(mysql_cxn, fileid, nid++))) {
 						if (bxgrid_lookup_replica_location(mysql_cxn, replicaid, host, path) >= 0) {
-							snprintf(location, PFS_PATH_MAX, "%s:%s", host, path);
-							loc->append(location);
+							char *tmp = string_format("%s:%s", host, path);
+							loc->append(tmp);
+							free(tmp);
 						}
 					}
 				} else {
 					replicaid = path_basename(name->rest);
 					if (bxgrid_lookup_replica_location(mysql_cxn, replicaid, host, path) >= 0) {
-						snprintf(location, PFS_PATH_MAX, "%s:%s", host, path);
-						loc->append(location);
+						char *tmp = string_format("%s:%s", host, path);
+						loc->append(tmp);
+						free(tmp);
 					}
 				}
 			}

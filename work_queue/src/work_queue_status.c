@@ -488,12 +488,7 @@ int do_direct_query( const char *manager_host, int manager_port, time_t stoptime
 			}
 		}
 	} else {
-		if( query_mode == QUERY_QUEUE ) {
-			//if queue info, drop the array.
-			jx_print_stream(jarray->u.items->value,stdout);
-		} else {
-			jx_print_stream(jarray,stdout);
-		}
+		jx_print_stream(jarray,stdout);
 	}
 
 	jx_delete(jarray);

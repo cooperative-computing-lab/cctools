@@ -55,6 +55,7 @@ See the file COPYING for details.
  *	struct mq *mq = mq_connect("127.0.0.1", 1234);
  *	mq_send(mq, msg);
  *	while (true) {
+ *		mq_store_buffer(mq, &buf);
  *		switch (mq_wait(mq, time() + 30)) {
  *			case 0:
  *			// interrupted by timeout or signal
@@ -62,7 +63,7 @@ See the file COPYING for details.
  *			// error or closed socket, mq should be deleted
  *			default:
  *			// got some messages!
- *			mq_recv(mq, &buf);
+ *			mq_recv(mq, NULL);
  *			// process the result
  *			// make sure something breaks out of the loop!
  *		}
@@ -89,7 +90,7 @@ See the file COPYING for details.
  *
  *	struct mq_poll *M = mq_poll_create();
  *	struct mq *server = mq_serve(NULL, 1234);
- *	mq_poll_add(server, NULL);
+ *	mq_poll_add(M, server);
  *
  *	while (true) {
  *		switch (mq_poll_wait(M, time() + 30)) {
@@ -102,7 +103,7 @@ See the file COPYING for details.
  *				if ((mq = mq_poll_acceptable(M))) {
  *					// got a new connection
  *					struct mq *n = mq_accept(mq);
- *					mq_poll_add(n, NULL);
+ *					mq_poll_add(M, n);
  *					setup_client(n);
  *				}
  *				if ((mq = mq_poll_readable(M))) {
@@ -120,10 +121,8 @@ See the file COPYING for details.
 
 typedef enum {
 	MQ_MSG_NONE = 0,
-	MQ_MSG_NEWBUFFER,
 	MQ_MSG_BUFFER,
-	//MQ_MSG_FILE,
-	//MQ_MSG_PROCESS,
+	MQ_MSG_FD,
 } mq_msg_t;
 
 
@@ -174,7 +173,8 @@ struct mq *mq_accept(struct mq *server);
  * Blocks the current thread until a message/connection is received
  * (or until a signal or timeout interrupts). Sends are still carried
  * out while waiting. Note that all signals are unblocked for the
- * duration of this call.
+ * duration of this call. Before waiting, the storage for the next
+ * message MUST be specified with mq_store_* functions.
  * @param mq The queue to wait on.
  * @param stoptime The time at which to stop waiting.
  * @returns 1 if a message/connection is available.
@@ -183,6 +183,51 @@ struct mq *mq_accept(struct mq *server);
  */
 int mq_wait(struct mq *mq, time_t stoptime);
 
+/** Set the tag associated with the given queue.
+ *
+ * The tag is not used by this module; it is intended to allow for finding the
+ * worker/connection associated with the given queue. This may be useful when
+ * using @ref mq_poll_readable and friends.
+ * @param mq The queue to use.
+ * @param tag The new tag to set.
+ */
+void mq_set_tag(struct mq *mq, void *tag);
+
+/** Get the tag associated with the given queue.
+ *
+ * See @ref mq_set_tag for details.
+ * @param mq The queue to check.
+ * @returns The tag previously associated with mq. Defaults to NULL.
+ */
+void *mq_get_tag(struct mq *mq);
+
+/** Return the local address of the queue in text format.
+@param mq The queue to examine.
+@param addr Pointer to a string of at least @ref LINK_ADDRESS_MAX bytes, which will be filled with a text representation of the local IP address.
+@param port Pointer to an integer, which will be filled with the TCP port number.
+@return Positive on success, zero on failure.
+*/
+int mq_address_local(struct mq *mq, char *addr, int *port);
+
+/** Return the remote address of the queue in text format.
+@param mq The queue to examine.
+@param addr Pointer to a string of at least @ref LINK_ADDRESS_MAX bytes, which will be filled with a text representation of the remote IP address.
+@param port Pointer to an integer, which will be filled with the TCP port number.
+@return Positive on success, zero on failure.
+*/
+int mq_address_remote(struct mq *mq, char *addr, int *port);
+
+/** Check for errors on the connection.
+ *
+ * Since actual IO happens in the background, any errors are reported here.
+ * Once a connection is in the error state, further IO operations will fail.
+ * After handling any received messages, the connection must be closed.
+ * Socket disconnection is indicated by ECONNRESET.
+ * @param mq The queue to check.
+ * @returns 0 if mq is not in an error state.
+ * @returns The errno that put mq into an error state.
+ */
+int mq_geterror(struct mq *mq);
 
 //------------Polling API-----------------//
 
@@ -206,18 +251,13 @@ void mq_poll_delete(struct mq_poll *p);
 
 /** Add a message queue to a polling group.
  *
- * The tag value is returned from @ref mq_poll_readable and friends.
- * This could be a pointer to some client/worker struct that
- * knows its own channel, or NULL to just use mq. Note that a
- * queue can only be added to a single polling group.
+ * Note that a queue can (currently) only be added to a single polling group.
  * @param p The polling group to add to.
  * @param mq The queue to add.
- * @param tag A pointer to identify the queue. If tag is NULL, mq will
- *  be used instead.
  * @returns 0 on success.
  * @returns -1 on error, with errno set appropriately.
  */
-int mq_poll_add(struct mq_poll *p, struct mq *mq, void *tag);
+int mq_poll_add(struct mq_poll *p, struct mq *mq);
 
 /** Remove a message queue from a polling group.
  *
@@ -237,6 +277,8 @@ int mq_poll_rm(struct mq_poll *p, struct mq *mq);
  * of the message queues in the polling group (or until a signal or
  * timeout interrupts). Sends are still carried out while waiting.
  * Note that all signals are unblocked for the duration of this call.
+ * Before waiting, the storage for the next message MUST be specified
+ * with mq_store_* functions.
  * @param p The polling group to wait on.
  * @param stoptime The time at which to stop waiting.
  * @returns The number of events available (or zero if interrupted by
@@ -247,41 +289,41 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime);
 
 /** Find a queue with messages waiting.
  *
- * Returns the tag of an arbitrary queue in the polling group, and may
+ * Returns the an arbitrary queue in the polling group, and may
  * return the same queue until its messages are popped. This is more
  * efficient than looping over a list of message queues and calling
  * @ref mq_recv on all of them, since the polling group keeps track of
  * queue states internally.
  * @param p The polling group to inspect.
- * @returns The tag associated with a queue with messages waiting.
+ * @returns A queue with messages waiting.
  * @returns NULL if no queues in the polling group have messages waiting.
  */
-void *mq_poll_readable(struct mq_poll *p);
+struct mq *mq_poll_readable(struct mq_poll *p);
 
 /** Find a server queue with connections waiting.
  *
- * Returns the tag of an arbitrary server queue in the polling group, and may
+ * Returns an arbitrary server queue in the polling group, and may
  * return the same queue until its connections are accepted. This is more
  * efficient than looping over a list of queues and calling @ref mq_accept
  * on all of them, since the polling group keeps track of queue states
  * internally.
  * @param p The polling group to inspect.
- * @returns The tag associated with a queue with connections waiting.
+ * @returns A queue with connections waiting.
  * @returns NULL if no queues in the polling group have connections waiting.
  */
-void *mq_poll_acceptable(struct mq_poll *p);
+struct mq *mq_poll_acceptable(struct mq_poll *p);
 
 /** Find a queue in the error state or closed socket.
  *
- * Returns the tag of an arbitrary queue in the polling group, and may
- * return the same queue until it it removed. This is more efficient than
+ * Returns an arbitrary queue in the polling group, and may
+ * return the same queue until it is removed. This is more efficient than
  * looping over a list of message queues and checking for errors on all
  * of them, since the polling group keeps track of queue states internally.
  * @param p The polling group to inspect.
- * @returns The tag of a queue in the error state or with closed socket.
+ * @returns A queue in the error state or with a closed socket.
  * @returns NULL if no queues in the polling group are in error.
  */
-void *mq_poll_error(struct mq_poll *p);
+struct mq *mq_poll_error(struct mq_poll *p);
 
 
 //------------Send/Recv-------------------//
@@ -297,52 +339,79 @@ void *mq_poll_error(struct mq_poll *p);
  * Only use heap-allocated buffers here.
  * @param mq The message queue.
  * @param buf The message to send.
+ * @param maxlen Maximum number of bytes to send, or 0 to use the entire buffer.
  * @returns 0 on success. Note that this only indicates that the message was
  *  successfully queued. It gives no indication about delivery.
  * @returns -1 on failure.
  */
-int mq_send_buffer(struct mq *mq, buffer_t *buf);
+int mq_send_buffer(struct mq *mq, buffer_t *buf, size_t maxlen);
 
-/** Pop a message from the receive queue.
+/** Stream a file descriptor across the wire.
  *
- * This is a non-blocking operation, and will return immediately if no
- * messages are available. This function supports two modes of operation:
- * allocating storage or using provided storage.
- * If no storage is provided, each message will be written to a newly-allocated
- * buffer, with a pointer stored in @ref out. The caller takes ownership of any such
- * buffers, and is responsible for deleting them. If a storage location was provided
- * (via mq_store_*), the return code will indicate that a complete message was
- * written there. @ref out will be ignored.
+ * This operates in the same way as @ref mq_send_buffer, but takes
+ * a file descriptor. Note that the queue takes ownership of fd and will
+ * close it when the message is sent, so callers MUST NOT use/close fd
+ * after passing it in. This function will read from fd until reaching the
+ * end of the file. This function will not seek fd, so it's possible to send
+ * slices from within files.
  * @param mq The message queue.
- * @param out The location of a buffer_t pointer containing the message.
- * @returns MQ_MSG_NONE if no message is available.
- * @returns MQ_MSG_NEWBUFFER if a message was stored in a newly-allocated
- *  buffer (pointed to by out).
- * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided buffer.
- * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided file.
- * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided process.
+ * @param fd The file descriptor to read.
+ * @param maxlen Maximum number of bytes to send, or 0 to read to EOF.
+ * @returns 0 on success. Note that this only indicates that the message was
+ *  successfully queued. It gives no indication about delivery.
+ * @returns -1 on failure.
  */
-mq_msg_t mq_recv(struct mq *mq, buffer_t **out);
+int mq_send_fd(struct mq *mq, int fd, size_t maxlen);
 
 /** Store the next message in the given buffer.
  *
  * This function allows the caller to provide the storage space for the next
- * message to be received. This may be useful in avoiding heap allocations.
- * @ref buf must already be initialized. Any existing contents will be overwritten.
- * It is undefined behavior to inspect/modify @ref buf before getting MQ_MSG_BUFFER
- * from @ref mq_recv (the notable exception is deleting the buffer and *not*
- * calling *_wait() again). It is undefined behavior to call this if a message has
- * already been partially received. It is therefore only safe to call this before
+ * message to be received. @ref buf must already be initialized. Any existing
+ * contents will be overwritten. Callers MUST NOT inspect/modify/free buf until
+ * a successful call to @ref mq_recv indicates completed receipt of a message.
+ * It is undefined behavior to call this if a message has already been
+ * partially received. It is therefore only safe to call this before
  * calling *_wait() for the first time or immediately after receiving a message
- * from @ref mq_recv().
+ * from @ref mq_recv(). Note that if a message exceeds maxlen the connection
+ * will be killed, so use with caution.
  * @param mq The message queue.
  * @param buf The buffer to use to store the next message.
+ * @param maxlen Maximum bytes to accept, or 0 for no limit.
  * @returns 0 on success.
  * @returns -1 on failure, with errno set appropriately.
  */
-int mq_store_buffer(struct mq *mq, buffer_t *buf);
+int mq_store_buffer(struct mq *mq, buffer_t *buf, size_t maxlen);
 
-//int mq_store_file(struct mq *mq, ...);
-//int mq_store_process(struct mq *mq, ...);
+/** Write the next message to the given file descriptor.
+ *
+ * This function operates in the same way as @ref mq_store_buffer, but takes a
+ * file descriptor. Callers MUST NOT use/close fd until a successful call to
+ * @ref mq_recv indicates completed receipt of a message. This function will not
+ * seek fd, so it is possible to write to arbitrary positions within a file.
+ * Note that if a message exceeds maxlen the connection will be killed,
+ * so use with caution.
+ * @param mq The message queue.
+ * @param fd Then file descriptor to write to.
+ * @param maxlen Maximum bytes to accept, or 0 for no limit.
+ * @returns 0 on success.
+ * @returns -1 on failure, with errno set appropriately.
+ */
+int mq_store_fd(struct mq *mq, int fd, size_t maxlen);
+
+/** Pop a message from the receive queue.
+ *
+ * This is a non-blocking operation, and will return immediately if no
+ * messages are available. Once this function indicates receipt of a message,
+ * the caller takes back ownership of the underlying storage provided
+ * via mq_store_*. After receiving a message, be sure to use mq_store_*
+ * to specify the storage for the next message before waiting again.
+ * @param mq The message queue.
+ * @param length A pointer to store the total length in bytes of the message.
+ *  Can be NULL.
+ * @returns MQ_MSG_NONE if no message is available.
+ * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided buffer.
+ * @returns MQ_MSG_FD if a message has been written to a previously-provided fd.
+ */
+mq_msg_t mq_recv(struct mq *mq, size_t *length);
 
 #endif

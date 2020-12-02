@@ -727,7 +727,7 @@ const struct batch_queue_module batch_queue_mpi = {
 
 void batch_job_mpi_setup( const char *debug_file_name, int manual_cores, int manual_memory)
 {
-	fatal("makeflow: mpi support is not enabled: please reconfigure using --with-mpicc-path");
+	fatal("makeflow: mpi support is not enabled: please reconfigure using --with-mpi-path");
 }
 
 #endif

@@ -1,0 +1,703 @@
+/*
+Copyright (C) 2020- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <time.h>
+#include <getopt.h>
+#include <errno.h>
+#include <assert.h>
+
+#include "jx.h"
+#include "jx_print.h"
+#include "jx_parse.h"
+#include "debug.h"
+#include "stringtools.h"
+#include "xxmalloc.h"
+#include "cctools.h"
+#include "hash_table.h"
+#include "username.h"
+#include "catalog_query.h"
+
+#include "ds_message.h"
+#include "ds_task.h"
+#include "ds_worker_rep.h"
+#include "ds_client_rep.h"
+#include "ds_blob_rep.h"
+#include "ds_task_rep.h"
+#include "ds_manager.h"
+#include "ds_client_ops.h"
+#include "ds_file.h"
+
+#include "ds_test.h"
+
+struct jx * manager_status_jx( struct ds_manager *m )
+{
+	char owner[USERNAME_MAX];
+	username_get(owner);
+
+	struct jx * j = jx_object(0);
+	jx_insert_string(j,"type","ds_manager");
+	jx_insert_string(j,"project",m->project_name);
+	jx_insert_integer(j,"starttime",(m->start_time/1000000));
+	jx_insert_string(j,"owner",owner);
+	jx_insert_string(j,"version",CCTOOLS_VERSION);
+	jx_insert_integer(j,"port",m->server_port);
+
+	return j;
+}
+
+void update_catalog( struct ds_manager *m, int force_update )
+{
+	if(!m->force_update && (time(0) - m->catalog_last_update_time) < m->update_interval)
+		return;
+
+	if(!m->catalog_hosts) m->catalog_hosts = strdup(CATALOG_HOST);
+
+	struct jx *j = manager_status_jx(m);
+	char *str = jx_print_string(j);
+
+	debug(D_DATASWARM, "advertising to the catalog server(s) at %s ...", m->catalog_hosts);
+	catalog_query_send_update_conditional(m->catalog_hosts, str);
+
+	free(str);
+	jx_delete(j);
+	m->catalog_last_update_time = time(0);
+}
+
+//XXX change table setups?
+static bool check_replicas(struct ds_file *f, ds_blob_state_t state) {
+	char *key;
+	struct ds_blob_rep *b;
+
+	hash_table_firstkey(f->replicas);
+	while (hash_table_nextkey(f->replicas, &key, (void **) &b)) {
+		if (b->state != state) return false;
+		if (b->result != DS_RESULT_SUCCESS) return false;
+		assert(b->in_transition == b->state);
+	}
+	return true;
+}
+
+static void process_files(struct ds_manager *m) {
+	char *key;
+	struct ds_file *f;
+
+	hash_table_firstkey(m->file_table);
+	while (hash_table_nextkey(m->file_table, &key, (void **) &f)) {
+		switch (f->state) {
+			case DS_FILE_ALLOCATING:
+				if (check_replicas(f, DS_BLOB_RW)) {
+					f->state = DS_FILE_MUTABLE;
+				} else {
+					//XXX talk to workers to advance replica states
+				}
+				break;
+			case DS_FILE_COMMITTING:
+				if (check_replicas(f, DS_BLOB_RO)) {
+					f->state = DS_FILE_IMMUTABLE;
+				} else {
+					//XXX talk to workers to advance replica states
+				}
+				break;
+			case DS_FILE_DELETING:
+				if (check_replicas(f, DS_BLOB_DELETED)) {
+					f->state = DS_FILE_DELETED;
+				} else {
+					//XXX talk to workers to advance replica states
+				}
+				break;
+			case DS_FILE_PENDING:
+			case DS_FILE_MUTABLE:
+			case DS_FILE_IMMUTABLE:
+			case DS_FILE_DELETED:
+				// nothing to do, wait for the client
+				break;
+		}
+	}
+}
+
+static void retry_task(struct ds_task *t) {
+	//XXX inspect task, check retry count, etc.
+	// for now, just switch to a hard failure
+	t->result = DS_TASK_RESULT_ERROR;
+}
+
+static void fix_task(struct ds_task *t) {
+	//XXX inspect task, check retry count, etc.
+	// for now, just switch to a hard failure
+	t->result = DS_TASK_RESULT_ERROR;
+}
+
+static void schedule_task(struct ds_manager *m, struct ds_task *t) {
+	//XXX do some matching of tasks to workers
+
+	int r = rand() % hash_table_size(m->worker_table);
+	char *key;
+	void *w;
+	hash_table_firstkey(m->worker_table);
+	while (r >= 0) {
+		hash_table_nextkey(m->worker_table, &key, &w);
+		r--;
+	}
+	t->worker = xxstrdup(key);
+}
+
+static bool prepare_worker(struct ds_manager *m, struct ds_task *t) {
+	struct ds_worker_rep *w = hash_table_lookup(m->worker_table, t->worker);
+
+	for (struct ds_mount *u = t->mounts; u; u = u->next) {
+		struct ds_file *f = hash_table_lookup(m->file_table, u->uuid);
+		assert(f);
+		struct ds_blob_rep *b = hash_table_lookup(f->replicas, t->worker);
+		if (!b) {
+			char *blobid = string_format("blob-%d", m->blob_id++);
+			hash_table_insert(f->replicas, t->worker, ds_manager_add_blob_to_worker(m, w, blobid));
+			return false;
+		}
+
+		//XXX match mount options to file/blob state
+		// or return if not ready
+	}
+
+	return true;
+}
+
+static void process_tasks(struct ds_manager *m) {
+	char *key;
+	struct ds_task *t;
+
+	hash_table_firstkey(m->task_table);
+	while (hash_table_nextkey(m->task_table, &key, (void **) &t)) {
+		switch (t->state) {
+			case DS_TASK_ACTIVE:
+				// schedule/advance below
+				break;
+			case DS_TASK_DONE:
+			case DS_TASK_DELETED:
+				// nothing to do, wait for the client
+				continue;
+			case DS_TASK_RUNNING:
+			case DS_TASK_DELETING:
+				// nothing to do, wait for the worker
+				continue;
+		}
+
+		switch (t->result) {
+			case DS_TASK_RESULT_SUCCESS:
+				break;
+			case DS_TASK_RESULT_ERROR:
+			case DS_TASK_RESULT_UNDEFINED:
+				// nothing to do
+				continue;
+			case DS_TASK_RESULT_FIX:
+				fix_task(t);
+				continue;
+			case DS_TASK_RESULT_AGAIN:
+				retry_task(t);
+				continue;
+		}
+
+		if (!t->worker) {
+			schedule_task(m, t);
+		}
+		if (!t->worker) {
+			// couldn't/didn't want to schedule the task this time around
+			return;
+		}
+
+		struct ds_worker_rep *w = hash_table_lookup(m->worker_table, t->worker);
+		if (!prepare_worker(m, t)) return;
+		ds_manager_add_task_to_worker(m, w, key);
+	}
+}
+
+/* declares a blob in a worker so that it can be manipulated via blob rpcs. */
+struct ds_blob_rep *ds_manager_add_blob_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid) {
+	struct ds_blob_rep *b = hash_table_lookup(r->blobs, blobid);
+	if(b) {
+		/* cannot create an already declared blob. This could only happen with
+		 * a bug, as we have control of the create messages.*/
+		fatal("blob-id %s already created at worker.", blobid);
+	}
+
+	b = calloc(1,sizeof(struct ds_blob_rep));
+	b->state = DS_BLOB_NEW;
+	b->in_transition = b->state;
+	b->result = DS_RESULT_SUCCESS;
+
+	b->blobid = xxstrdup(blobid);
+
+	hash_table_insert(r->blobs, blobid, b);
+
+	return b;
+}
+
+/* declares a task in a worker so that it can be manipulated via task rpcs. */
+struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid) {
+	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	if(t) {
+		/* cannot create an already declared task. This could only happen with
+		 * a bug, as we have control of the create messages.*/
+		fatal("task-id %s already created at worker.", taskid);
+	}
+
+	struct ds_task *task = hash_table_lookup(m->task_table, taskid);
+	if(!task) {
+		/* could not find task with taskid. This could only happen with a bug,
+		 * as we have control of the create messages.*/
+		fatal("task-id %s does not exist.", taskid);
+	}
+
+	t = calloc(1,sizeof(struct ds_task_rep));
+	t->state = DS_TASK_ACTIVE;
+	t->in_transition = t->state;
+	t->result = DS_RESULT_SUCCESS;
+
+	t->taskid = xxstrdup(taskid);
+	t->task = task;
+	t->worker = xxstrdup(task->worker);
+
+	hash_table_insert(r->tasks, taskid, t);
+	t->next = task->attempts;
+	task->attempts = t;
+
+	return t;
+}
+
+char *ds_manager_submit_task( struct ds_manager *m, struct jx *description ) {
+	char *taskid = string_format("task-%d", m->task_id++);
+	jx_insert_string(description, "task-id", taskid);
+
+	struct ds_task *t = ds_task_create(description);
+	if (!t) {
+		//XXX task failed validation
+		struct jx *j = jx_string("task-id");
+		jx_remove(description, j);
+		jx_delete(j);
+		return NULL;
+	}
+	hash_table_insert(m->task_table, taskid, t);
+
+	return taskid;
+}
+
+int handle_handshake(struct ds_manager *m, struct mq *conn) {
+		switch (mq_recv(conn, NULL)) {
+			case MQ_MSG_NONE:
+			case MQ_MSG_FD:
+				abort();
+			case MQ_MSG_BUFFER:
+				break;
+		}
+
+		buffer_t *buf = mq_get_tag(conn);
+		assert(buf);
+		mq_set_tag(conn, NULL);
+
+		char *manager_key = NULL;
+		struct jx *msg = ds_parse_message(buf);
+		buffer_free(buf);
+		free(buf);
+		const char *method = jx_lookup_string(msg,"method");
+		struct jx *params = jx_lookup(msg,"params");
+		struct jx *response = NULL;
+
+		if(!method || !params) {
+			/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+			mq_close(conn);
+			goto DONE;
+		}
+
+		if(strcmp(method, "handshake")) {
+			/* ds_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
+			mq_close(conn);
+			goto DONE;
+		}
+
+		jx_int_t id = jx_lookup_integer(msg, "id");
+		if(id < 1) {
+			/* ds_json_send_error_result(l, msg, DS_MSG_MALFORMED_ID, stoptime); */
+			mq_close(conn);
+			goto DONE;
+		}
+
+		manager_key = string_format("%p",conn);
+		//const char *msg_key = jx_lookup_string(msg, "uuid");
+		/* todo: replace manager_key when msg_key not null */
+		const char *conn_type = jx_lookup_string(params, "type");
+
+		if(!strcmp(conn_type,"worker")) {
+			struct ds_worker_rep *w = ds_worker_rep_create(conn);
+			mq_address_remote(conn,w->addr,&w->port);
+			debug(D_DATASWARM,"new worker from %s:%d\n",w->addr,w->port);
+			hash_table_insert(m->worker_table,manager_key,w);
+			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, NULL);
+			mq_store_buffer(conn, &w->recv_buffer, 0);
+
+			// XXX This is a HACK to get some messages going for testing
+			dataswarm_test_script(m,w);
+		} else if(!strcmp(conn_type,"client")) {
+			struct ds_client_rep *c = ds_client_rep_create(conn);
+			mq_address_remote(conn,c->addr,&c->port);
+			debug(D_DATASWARM,"new client from %s:%d\n",c->addr,c->port);
+			hash_table_insert(m->client_table,manager_key,c);
+			response = ds_message_standard_response(id,DS_RESULT_SUCCESS,NULL);
+			mq_store_buffer(conn, &c->recv_buffer, 0);
+		} else {
+			/* ds_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
+			mq_close(conn);
+		}
+
+DONE:
+		if(response) {
+			/* this response probably shouldn't be here */
+			ds_json_send(conn, response);
+			jx_delete(response);
+		}
+
+		free(manager_key);
+		return 0;
+}
+
+void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_t stoptime )
+{
+	int set_storage = 0;
+	struct jx *msg = NULL;
+	switch (mq_recv(c->connection, NULL)) {
+		case MQ_MSG_NONE:
+			break;
+		case MQ_MSG_FD:
+			//XXX handle received files
+			mq_store_buffer(c->connection, &c->recv_buffer, 0);
+			return;
+		case MQ_MSG_BUFFER:
+			msg = ds_parse_message(&c->recv_buffer);
+			break;
+	}
+
+	if (!jx_istype(msg, JX_OBJECT)) {
+		debug(D_DATASWARM, "malformed message from client %s:%d, disconnecting", c->addr, c->port);
+		goto ERROR;
+	}
+
+	const char *method = jx_lookup_string(msg,"method");
+	struct jx *params = jx_lookup(msg,"params");
+	int64_t id = jx_lookup_integer(msg, "id");
+
+	if(!method || !params || !id) {
+		debug(D_DATASWARM, "invalid message from client %s:%d, disconnecting", c->addr, c->port);
+		goto ERROR;
+	}
+
+	struct jx *response = NULL;
+
+	if(!strcmp(method,"task-submit")) {
+		ds_client_task_submit(m, params);
+	} else if(!strcmp(method,"task-delete")) {
+        const char *uuid = jx_lookup_string(params, "task-id");
+		ds_client_task_delete(m, uuid);
+	} else if(!strcmp(method,"task-retrieve")) {
+        const char *uuid = jx_lookup_string(params, "task-id");
+		ds_client_task_retrieve(m, uuid);
+	} else if(!strcmp(method,"file-create")) {
+		struct ds_file *f = ds_client_file_declare(m, params);
+		if(f) {
+			response = ds_message_standard_response(id, DS_RESULT_SUCCESS, "file-id", jx_string(f->fileid), NULL);
+		} else {
+			response = ds_message_standard_response(id, DS_RESULT_UNABLE, NULL);
+		}
+	} else if(!strcmp(method,"file-put")) {
+		/* fix */
+		set_storage = 1;
+	} else if(!strcmp(method,"file-submit")) {
+		ds_client_file_declare(m, params);
+		set_storage = 1;
+	} else if(!strcmp(method,"file-commit")) {
+        const char *uuid = jx_lookup_string(params, "file-id");
+		ds_client_file_commit(m, uuid);
+	} else if(!strcmp(method,"file-delete")) {
+        const char *uuid = jx_lookup_string(params, "file-id");
+		ds_client_file_delete(m, uuid);
+	} else if(!strcmp(method,"file-copy")) {
+        const char *uuid = jx_lookup_string(params, "file-id");
+		ds_client_file_copy(m, uuid);
+	} else if(!strcmp(method,"service-submit")) {
+		ds_client_service_submit(m, params);
+	} else if(!strcmp(method,"service-delete")) {
+		ds_client_service_delete(m, params);
+	} else if(!strcmp(method,"project-create")) {
+		ds_client_project_create(m, params);
+	} else if(!strcmp(method,"project-delete")) {
+		ds_client_project_delete(m, params);
+	} else if(!strcmp(method,"wait")) {
+		ds_client_wait(m, params);
+	} else if(!strcmp(method,"queue-empty")) {
+		ds_client_queue_empty(m, params);
+	} else if(!strcmp(method,"status")) {
+		ds_client_status(m, params);
+	} else {
+		response = ds_message_standard_response(id, DS_RESULT_BAD_METHOD, NULL);
+	}
+
+	if (!set_storage) {
+		mq_store_buffer(c->connection, &c->recv_buffer, 0);
+	}
+
+	if(response) {
+		ds_json_send(c->connection, response);
+		jx_delete(response);
+	}
+
+	return;
+
+ERROR:
+	ds_client_rep_disconnect(c);
+	char *key = string_format("%p", c->connection);
+	hash_table_remove(m->client_table, key);
+	free(key);
+}
+
+void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_t stoptime )
+{
+	int set_storage = 0;
+	struct jx *msg = NULL;
+	switch (mq_recv(w->connection, NULL)) {
+		case MQ_MSG_NONE:
+			break;
+		case MQ_MSG_FD:
+			//XXX handle received files
+			mq_store_buffer(w->connection, &w->recv_buffer, 0);
+			return;
+		case MQ_MSG_BUFFER:
+			msg = ds_parse_message(&w->recv_buffer);
+			break;
+	}
+
+	if (!msg) {
+		debug(D_DATASWARM, "malformed message from worker %s:%d, disconnecting", w->addr, w->port);
+		goto ERROR;
+	}
+
+	const char *method = jx_lookup_string(msg,"method");
+	struct jx  *params = jx_lookup(msg,"params");
+	if(!method || !params) {
+		debug(D_DATASWARM, "invalid message from worker %s:%d, disconnecting", w->addr, w->port);
+		goto ERROR;
+	}
+
+	debug(D_DATASWARM, "worker %s:%d rx: %s", w->addr, w->port, method);
+
+
+	if(!strcmp(method,"task-change")) {
+		/* */
+	} else if(!strcmp(method,"blob-change")) {
+		/* */
+	} else if(!strcmp(method,"status-report")) {
+		/* */
+	} else if(!strcmp(method,"blob-get")) {
+		/* */
+		set_storage = 1;
+	} else {
+		/* ds_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
+	}
+
+	if (!set_storage) {
+		mq_store_buffer(w->connection, &w->recv_buffer, 0);
+	}
+
+	return;
+
+ERROR:
+	ds_worker_rep_disconnect(w);
+	char *key = string_format("%p", w->connection);
+	hash_table_remove(m->worker_table, key);
+	free(key);
+}
+
+int handle_messages( struct ds_manager *m )
+{
+	struct mq *conn;
+	struct ds_client_rep *c;
+	struct ds_worker_rep *w;
+	while ((conn = mq_poll_readable(m->polling_group))) {
+		char *key = string_format("%p", conn);
+
+		if((c=hash_table_lookup(m->client_table,key))) {
+			handle_client_message(m,c,time(0)+m->stall_timeout);
+		} else if((w=hash_table_lookup(m->worker_table,key))) {
+			handle_worker_message(m,w,time(0)+m->stall_timeout);
+		} else {
+			handle_handshake(m, conn);
+		}
+
+		free(key);
+	}
+
+	return 0;
+}
+
+int handle_connections(struct ds_manager *m) {
+	for (struct mq *conn; (conn = mq_poll_acceptable(m->polling_group));) {
+		assert(conn == m->manager_socket);
+
+		conn = mq_accept(m->manager_socket);
+		assert(conn);
+
+		char addr[LINK_ADDRESS_MAX];
+		int port;
+		mq_address_remote(conn,addr,&port);
+		debug(D_DATASWARM,"new connection from %s:%d\n",addr,port);
+
+		mq_poll_add(m->polling_group, conn);
+
+		buffer_t *buf = xxmalloc(sizeof(*buf));
+		buffer_init(buf);
+		mq_set_tag(conn, buf);
+		mq_store_buffer(conn, buf, 0);
+	}
+
+	return 0;
+}
+
+int handle_errors(struct ds_manager *m) {
+	for (struct mq *conn; (conn = mq_poll_error(m->polling_group));) {
+		char *key = string_format("%p", conn);
+		struct ds_worker_rep *w = hash_table_remove(m->worker_table, key);
+		struct ds_client_rep *c = hash_table_remove(m->client_table, key);
+		free(key);
+		assert(!(w && c));
+
+		if (w) {
+			debug(D_DATASWARM, "worker disconnect (%s:%d): %s",
+				w->addr, w->port, strerror(mq_geterror(conn)));
+			ds_worker_rep_disconnect(w);
+		} else if (c) {
+			debug(D_DATASWARM, "client disconnect (%s:%d): %s",
+				c->addr, c->port, strerror(mq_geterror(conn)));
+			ds_client_rep_disconnect(c);
+		}
+	}
+
+	return 0;
+}
+
+void server_main_loop( struct ds_manager *m )
+{
+	while(1) {
+		update_catalog(m,0);
+		handle_connections(m);
+		handle_messages(m);
+		handle_errors(m);
+		process_files(m);
+		process_tasks(m);
+
+		if (mq_poll_wait(m->polling_group, time(0) + 10) == -1 && errno != EINTR) {
+				perror("server_main_loop");
+				break;
+		}
+	}
+}
+
+static const struct option long_options[] =
+{
+	{"name", required_argument, 0, 'N'},
+	{"port", required_argument, 0, 'p'},
+	{"debug", required_argument, 0, 'd'},
+	{"debug-file", required_argument, 0, 'o'},
+	{"help", no_argument, 0, 'h' },
+	{"version", no_argument, 0, 'v' },
+	{0, 0, 0, 0}
+};
+
+static void show_help( const char *cmd )
+{
+	printf("use: %s [options]\n",cmd);
+	printf("where options are:\n");
+	printf("-N --name=<name>          Set project name for catalog update.\n");
+	printf("-p,--port=<port>          Port number to listen on.\n");
+	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
+	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
+	printf("-h,--help                 Show this help string\n");
+	printf("-v,--version              Show version string\n");
+}
+
+int main(int argc, char *argv[])
+{
+	struct ds_manager * m = ds_manager_create();
+
+	int c;
+	while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0))!=-1) {
+
+		switch(c) {
+			case 'N':
+				m->project_name = optarg;
+				break;
+			case 'd':
+				debug_flags_set(optarg);
+				break;
+			case 'o':
+				debug_config_file(optarg);
+				break;
+			case 'p':
+				m->server_port = atoi(optarg);
+				break;
+			case 'v':
+				cctools_version_print(stdout, argv[0]);
+				return 0;
+				break;
+			default:
+			case 'h':
+				show_help(argv[0]);
+				return 0;
+				break;
+		}
+	}
+
+	m->manager_socket = mq_serve(NULL, m->server_port);
+	if(!m->manager_socket) {
+		printf("could not serve on port %d: %s\n", m->server_port,strerror(errno));
+		return 1;
+	}
+	mq_poll_add(m->polling_group, m->manager_socket);
+
+	char addr[LINK_ADDRESS_MAX];
+	mq_address_local(m->manager_socket,addr,&m->server_port);
+	debug(D_DATASWARM,"listening on port %d...\n",m->server_port);
+
+	server_main_loop(m);
+
+	debug(D_DATASWARM,"server shutting down.\n");
+
+	return 0;
+}
+
+struct ds_manager * ds_manager_create()
+{
+	struct ds_manager *m = malloc(sizeof(*m));
+
+	memset(m,0,sizeof(*m));
+
+	m->worker_table = hash_table_create(0,0);
+	m->client_table = hash_table_create(0,0);
+    m->task_table = hash_table_create(0,0);
+    m->file_table = hash_table_create(0,0);
+
+	m->polling_group = mq_poll_create();
+
+	m->connect_timeout = 5;
+	m->stall_timeout = 30;
+	m->update_interval = 60;
+	m->message_id = 1000;
+	m->project_name = "dataswarm";
+
+	return m;
+}
+
+
+/* vim: set noexpandtab tabstop=4 shiftwidth=4: */

@@ -124,6 +124,23 @@ struct jx * jx_object( struct jx_pair *pairs )
 	return j;
 }
 
+struct jx * jx_objectv( const char *key, struct jx *value, ... ) {
+	va_list args;
+	va_start(args,value);
+
+	struct jx *object = jx_object(0);
+
+	while(key) {
+		assert(value);
+		jx_insert(object,jx_string(xxstrdup(key)),value);
+		key = va_arg(args,char *);
+		value = va_arg(args,struct jx *);
+	}
+
+	va_end(args);
+	return object;
+}
+
 struct jx * jx_array( struct jx_item *items )
 {
 	struct jx *j = jx_create(JX_ARRAY);
@@ -519,37 +536,59 @@ int jx_equals( struct jx *j, struct jx *k )
 	return 0;
 }
 
-struct jx_comprehension *jx_comprehension_copy(struct jx_comprehension *c) {
-	if (!c) return NULL;
-	struct jx_comprehension *comp = calloc(1, sizeof(*comp));
-	comp->line = c->line;
-	comp->variable = strdup(c->variable);
-	comp->elements = jx_copy(c->elements);
-	comp->condition = jx_copy(c->condition);
-	comp->next = jx_comprehension_copy(c->next);
-	return comp;
+struct jx_comprehension *jx_comprehension_copy(struct jx_comprehension *c)
+{
+	struct jx_comprehension *head = 0;
+	struct jx_comprehension **nc = &head;
+
+	while(c) {
+		*nc = calloc(1, sizeof(struct jx_comprehension));
+		(*nc)->line = c->line;
+		(*nc)->variable = strdup(c->variable);
+		(*nc)->elements = jx_copy(c->elements);
+		(*nc)->condition = jx_copy(c->condition);
+
+		nc = &(*nc)->next;
+		c = c->next;	
+	}
+
+	return head;
 }
 
 struct jx_pair * jx_pair_copy( struct jx_pair *p )
 {
-	if (!p) return NULL;
-	struct jx_pair *pair = calloc(1, sizeof(*pair));
-	pair->key = jx_copy(p->key);
-	pair->value = jx_copy(p->value);
-	pair->next = jx_pair_copy(p->next);
-	pair->line = p->line;
-	return pair;
+	struct jx_pair *head = 0;
+	struct jx_pair **np = &head;
+
+	while(p) {
+		*np = calloc(1, sizeof(struct jx_pair));
+		(*np)->key = jx_copy(p->key);
+		(*np)->value = jx_copy(p->value);
+		(*np)->line = p->line;
+
+		np = &(*np)->next;
+		p = p->next;
+	}
+
+	return head;
 }
 
 struct jx_item * jx_item_copy( struct jx_item *i )
 {
-	if (!i) return NULL;
-	struct jx_item *item = calloc(1, sizeof(*item));
-	item->line = i->line;
-	item->value = jx_copy(i->value);
-	item->comp = jx_comprehension_copy(i->comp);
-	item->next = jx_item_copy(i->next);
-	return item;
+	struct jx_item *head = 0;
+	struct jx_item **ni = &head;
+
+	while(i) {
+		*ni = calloc(1, sizeof(struct jx_item));
+		(*ni)->line = i->line;
+		(*ni)->value = jx_copy(i->value);
+		(*ni)->comp = jx_comprehension_copy(i->comp);
+
+		ni = &(*ni)->next;
+		i = i->next;
+	}
+
+	return head;
 }
 
 struct jx  *jx_copy( struct jx *j )
