@@ -9,6 +9,7 @@ See the file COPYING for details.
  * Author: Kyle D. Sweeney
  *
  * Created on July 20, 2016, 10:51 AM
+ * Modified on Nov 30, 2020, 04:46 PM by Thanh Son Phung
  */
 
 #ifndef MAKEFLOW_CATALOG_REPORTER_H
@@ -22,7 +23,14 @@ See the file COPYING for details.
  */
 int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type, timestamp_t start);
 
+/**
+ * Creates a summary of the status of makeflow and prints it out to a html file.
+ * @param d the DAG maintained by makeflow
+ * @param name the name of the project
+ * @return 1 if everything went well, 0 if not
+ */
 
-int makeflow_file_summary(struct dag* d, char* name, batch_queue_type_t type, timestamp_t start);
+int makeflow_file_summary(struct dag* d, char* name, batch_queue_type_t type, timestamp_t start, char *status_file_name);
+
 #endif /* MAKEFLOW_CATALOG_REPORTER_H */
 

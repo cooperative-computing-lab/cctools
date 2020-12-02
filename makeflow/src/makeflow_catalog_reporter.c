@@ -88,10 +88,13 @@ int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type,
     return resp;//all good
 }
 
+//print to file the status of makeflow, default to once per min, configurable time
 
-int makeflow_file_summary(struct dag* d, char* name, batch_queue_type_t type, timestamp_t start){
-    
-	printf("Starting to print status.html\n");
+// make sure to send: project name, owner, type
+
+// waiting means: input not ready, running means: took job and submitted
+
+int makeflow_file_summary(struct dag* d, char* name, batch_queue_type_t type, timestamp_t start, char* status_file_name){
 	
 	struct dag_node *n;
     dag_node_state_t state;
@@ -116,16 +119,13 @@ int makeflow_file_summary(struct dag* d, char* name, batch_queue_type_t type, ti
             tasks_waiting++;
     }
     
-    //transmit report here
-    //char* host = CATALOG_HOST;
-    
     char username[USERNAME_MAX];
     username_get(username);
     
     const char* batch_type = batch_queue_type_to_string(type);
     
     FILE *fp;
-    fp = fopen("status.html", "w");
+    fp = fopen(status_file_name, "w");
     fprintf(fp, "<!DOCTYPE html>\n");
   	fprintf(fp, "<html>\n");
 	fprintf(fp, "<body>\n");
@@ -143,31 +143,8 @@ int makeflow_file_summary(struct dag* d, char* name, batch_queue_type_t type, ti
 	fprintf(fp, "<p>Batch type: %s </p>\n", batch_type);
 	fprintf(fp, "</body>\n");
 	fprintf(fp, "</html>\n");	
-    //struct jx *j = jx_object(0);
-   
-    /*jx_insert_string(j,"type","makeflow");
-    jx_insert_integer(j,"total",itable_size(d->node_table));
-    jx_insert_integer(j,"running",tasks_running);
-    jx_insert_integer(j,"waiting",tasks_waiting);
-    jx_insert_integer(j,"aborted",tasks_aborted);
-    jx_insert_integer(j,"completed",tasks_completed);
-    jx_insert_integer(j,"failed",tasks_failed);
-    jx_insert_string(j,"project",name);
-    jx_insert_string(j,"owner",username);
-    char* timestring = string_format("%" PRIu64 "", start);
-    jx_insert_string(j,"time_started",timestring);
-    jx_insert_string(j,"batch_type",batch_type);
     
-        
-    
-    //creates memory
-    char* text = jx_print_string(j);
-    
-    int resp = catalog_query_send_update(host, text);
-    
-    free(text);*/
+	fclose(fp);
     free(timestring);
-    //jx_delete(j);
-    fclose(fp);
     return 1;//all good
 }
