@@ -22,7 +22,13 @@ class DataSwarm:
         self.socket = socket.socket()
         self.host = host
         self.port = int(port)
+
+    def __enter__(self):
         self.connect()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
+        return False
 
     def _pack_header(self, size):
         return struct.pack(self.header_spec, b'MQ', 0b11, size)
