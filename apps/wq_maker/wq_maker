@@ -85,7 +85,7 @@ Work Queue Options:
      -monitor <dir>           Enables monitoring and specifies the directory each tasks resource monitoring is placed.
      -monitor-full            Enables full monitoring that creates a time series of tasks, may be extremely large.
 
-     -stats <file>            Specifies the file were Work Queue master stats are written.
+     -stats <file>            Specifies the file were Work Queue manager stats are written.
 
      -dynamic_env             Configures maker EXE at work site. Only for use where maker -EXE correctly locates executables.
 ";

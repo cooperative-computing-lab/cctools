@@ -53,7 +53,7 @@ extern "C" {
 
 #define BXGRID_END	debug(D_BXGRID,"= %d %s",(int)result,((result>=0) ? "" : strerror(errno))); return result;
 
-extern int pfs_master_timeout;
+extern int pfs_main_timeout;
 
 static int bxgrid_timeout = BXGRID_TIMEOUT;
 
@@ -172,11 +172,11 @@ public:
 	}
 
 	virtual int close() {
-		return chirp_global_close(file,time(0)+pfs_master_timeout);
+		return chirp_global_close(file,time(0)+pfs_main_timeout);
 	}
 
 	virtual pfs_ssize_t read( void *data, pfs_size_t length, pfs_off_t offset ) {
-		return chirp_global_pread(file,data,length,offset,time(0)+pfs_master_timeout);
+		return chirp_global_pread(file,data,length,offset,time(0)+pfs_main_timeout);
 	}
 
 	virtual int fstat( struct pfs_stat *buf );
@@ -469,7 +469,7 @@ pfs_file *bxgrid_bvf_open( MYSQL *mysql_cxn, struct bxgrid_virtual_folder *bvf, 
 		} else {
 			replicaid = NULL;
 		}
-	} while (replicaid && time(0) - start_time < pfs_master_timeout);
+	} while (replicaid && time(0) - start_time < pfs_main_timeout);
 
 	return 0;
 }

@@ -47,7 +47,7 @@ OPTIONS_END
 
 SUBSECTION(Workflow Handling)
 OPTIONS_BEGIN
-OPTION_ITEM(`-a, --advertise')Advertise the master information to a catalog server.
+OPTION_ITEM(`-a, --advertise')Advertise the manager information to a catalog server.
 OPTION_TRIPLET(-l, makeflow-log, logfile)Use this file for the makeflow log. (default is X.makeflowlog)
 OPTION_TRIPLET(-L, batch-log, logfile)Use this file for the batch system log. (default is X.PARAM(type)log)
 OPTION_TRIPLET(-m, email, email)Email summary of workflow to address.
@@ -160,7 +160,7 @@ OPTIONS_END
 
 SUBSECTION(Mesos Options)
 OPTIONS_BEGIN
-OPTION_PAIR(--mesos-master, hostname) Indicate the host name of preferred mesos master.
+OPTION_PAIR(--mesos-master, hostname) Indicate the host name of preferred mesos manager.
 OPTION_PAIR(--mesos-path, filepath) Indicate the path to mesos python2 site-packages.
 OPTION_PAIR(--mesos-preload, library) Indicate the linking libraries for running mesos..
 

@@ -21,9 +21,9 @@ The default view for a catalog server is a human-readable HTML summary.
 Machine-readable data is also available as JSON, text, XML, or ClassAds. Many
 parts of cctools make use of a catalog server internally. Chirp servers send
 regular catalog updates indicating the host system's load, available disk
-space, cctools version, etc. Work Queue masters also advertise their projects
+space, cctools version, etc. Work Queue managers also advertise their projects
 through the catalog. When a worker starts, it can query the catalog to
-automatically discover a master to contact.
+automatically discover a manager to contact.
 
 ## Specifying Catalog Servers
 

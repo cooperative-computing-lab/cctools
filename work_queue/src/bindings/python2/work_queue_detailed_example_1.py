@@ -28,7 +28,7 @@ print wq.name
 
 wq.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
 #wq.specify_name('workqueue_example')
-#wq.specify_master_mode(WORK_QUEUE_MASTER_MODE_STANDALONE)
+#wq.specify_manager_mode(WORK_QUEUE_MASTER_MODE_STANDALONE)
 #wq.specify_worker_mode(WORK_QUEUE_WORKER_MODE_SHARED)
 wq.specify_task_order(WORK_QUEUE_TASK_ORDER_LIFO)
 

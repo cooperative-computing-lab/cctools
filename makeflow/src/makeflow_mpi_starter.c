@@ -198,14 +198,14 @@ int main(int argc, char** argv) {
     }
 
     if (mpi_rank == 0) { //we're makeflow
-        char* master_ipaddr = get_ipaddr();
-        unsigned mia_len = strlen(master_ipaddr);
+        char* manager_ipaddr = get_ipaddr();
+        unsigned mia_len = strlen(manager_ipaddr);
         long long value;
         char* key;
         hash_table_firstkey(comps);
         while (hash_table_nextkey(comps, &key, (void**) &value)) {
             MPI_Send(&mia_len, 1, MPI_UNSIGNED, value, 0, MPI_COMM_WORLD);
-            MPI_Send(master_ipaddr, mia_len, MPI_CHAR, value, 0, MPI_COMM_WORLD);
+            MPI_Send(manager_ipaddr, mia_len, MPI_CHAR, value, 0, MPI_COMM_WORLD);
         }
         //tell the remaining how big to make themselves
         hash_table_firstkey(sizes);
@@ -261,9 +261,9 @@ int main(int argc, char** argv) {
 
         unsigned len = 0;
         MPI_Recv(&len, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        char* master_ip = malloc(sizeof (char*)*len + 1);
-        memset(master_ip, '\0', sizeof (char)*len + 1);
-        MPI_Recv(master_ip, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        char* manager_ip = malloc(sizeof (char*)*len + 1);
+        memset(manager_ip, '\0', sizeof (char)*len + 1);
+        MPI_Recv(manager_ip, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         int cores;
         MPI_Recv(&cores, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -275,9 +275,9 @@ int main(int argc, char** argv) {
         host_memory_info_get(&memavail, &memtotal);
         int mem = ((memtotal / (1024 * 1024)) / cores_total) * cores; //gigabytes
 
-        char* sys_str = string_format("work_queue_worker --timeout=86400 --cores=%i --memory=%i %s %s %s", cores, mem, master_ip, port, workqueue_args);
+        char* sys_str = string_format("work_queue_worker --timeout=86400 --cores=%i --memory=%i %s %s %s", cores, mem, manager_ip, port, workqueue_args);
         if (debug_base != NULL) {
-            sys_str = string_format("work_queue_worker --timeout=86400 -d all -o %s.workqueue.%i --cores=%i --memory=%i %s %s %s", debug_base, mpi_rank, cores, mem, master_ip, port, workqueue_args);
+            sys_str = string_format("work_queue_worker --timeout=86400 -d all -o %s.workqueue.%i --cores=%i --memory=%i %s %s %s", debug_base, mpi_rank, cores, mem, manager_ip, port, workqueue_args);
         }
         int pid = fork();
         int k = 0;

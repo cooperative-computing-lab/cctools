@@ -86,7 +86,7 @@ run_local_worker()
 		log=worker.log
 	fi
 
-	echo "Waiting for master to be ready."
+	echo "Waiting for manager to be ready."
 	if wait_for_file_creation $port_file $timeout
 	then
 		echo "Master is ready on port `cat $port_file` "

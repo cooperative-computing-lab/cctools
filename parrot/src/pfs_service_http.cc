@@ -30,7 +30,7 @@ extern "C" {
 #define HTTP_PORT 80
 #define HTTP_FILE_MODE (S_IFREG | 0555)
 
-extern int pfs_master_timeout;
+extern int pfs_main_timeout;
 
 static struct link * http_fetch( pfs_name *name, const char *action, INT64_T *size )
 {
@@ -42,7 +42,7 @@ static struct link * http_fetch( pfs_name *name, const char *action, INT64_T *si
 	}
 
 	sprintf(url,"http://%s:%d%s",name->host,name->port,name->rest);
-	return http_query_size(url,action,size,time(0)+pfs_master_timeout,0);
+	return http_query_size(url,action,size,time(0)+pfs_main_timeout,0);
 }
 
 class pfs_file_http : public pfs_file

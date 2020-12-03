@@ -85,7 +85,7 @@ int linux_micro;
 
 int wait_barrier = 0;
 
-int pfs_master_timeout = 300;
+int pfs_main_timeout = 300;
 struct file_cache *pfs_file_cache = 0;
 struct password_cache *pfs_password_cache = 0;
 struct hash_table *available_services;
@@ -658,7 +658,7 @@ int main( int argc, char *argv[] )
 	install_handler(SIGTTOU,SIG_IGN);
 
 	if(!isatty(0)) {
-		pfs_master_timeout = 3600;
+		pfs_main_timeout = 3600;
 	}
 
 	pfs_uid = getuid();
@@ -736,7 +736,7 @@ int main( int argc, char *argv[] )
 	if(s) pfs_gid = atoi(s);
 
 	s = getenv("PARROT_TIMEOUT");
-	if(s) pfs_master_timeout = string_time_parse(s);
+	if(s) pfs_main_timeout = string_time_parse(s);
 
 	s = getenv("PARROT_FORCE_SYNC");
 	if(s) pfs_force_sync = 1;
@@ -1040,7 +1040,7 @@ int main( int argc, char *argv[] )
 			snprintf(pfs_temp_dir,sizeof(pfs_temp_dir),"%s",optarg);
 			break;
 		case 'T':
-			pfs_master_timeout = string_time_parse(optarg);
+			pfs_main_timeout = string_time_parse(optarg);
 			break;
 		case 'U':
 			pfs_uid = atoi(optarg);

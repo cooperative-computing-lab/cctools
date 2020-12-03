@@ -108,7 +108,7 @@ static char *logfilename = 0;
 /* Location of the history file. Default is in the current dir. */
 static const char * history_dir = "catalog.history";
 
-/* Settings for the master catalog that we will report *to* */
+/* Settings for the manager catalog that we will report *to* */
 static int outgoing_alarm = 0;
 static int outgoing_timeout = 300;
 static struct list *outgoing_host_list;

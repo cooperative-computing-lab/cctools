@@ -52,7 +52,7 @@ static struct internal_amazon_batch_amazon_ids{
 	char* aws_secret_access_key;
 	char* aws_region;
 	char* aws_email;
-	char* master_env_prefix;
+	char* env_prefix;
 }initialized_data;
 
 static unsigned int gen_guid(){
@@ -98,7 +98,7 @@ static struct list* extract_file_names_from_list(char* in){
 
 static int upload_input_files_to_s3(char* files,char* jobname){
 	int success = 1;
-	char* env_var = initialized_data.master_env_prefix;
+	char* env_var = initialized_data.env_prefix;
 	struct list* file_list = extract_file_names_from_list(files);
 	debug(D_BATCH,"extra input files list: %s, len: %i",files, list_size(file_list));
 	list_first_item(file_list);
@@ -188,12 +188,12 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 	initialized_data.aws_access_key_id = aws_access_key_id;
 	initialized_data.aws_secret_access_key = aws_secret_access_key;
 	initialized_data.aws_region=aws_region;
-	initialized_data.master_env_prefix = env_var;
+	initialized_data.env_prefix = env_var;
 	return initialized_data;
 }
 
 static char* generate_s3_cp_cmds(char* files, char* src, char* dst){
-	char* env_var = initialized_data.master_env_prefix;
+	char* env_var = initialized_data.env_prefix;
 	struct list* file_list = extract_file_names_from_list(files);
 	list_first_item(file_list);
 
@@ -241,7 +241,7 @@ static char* chmod_all(char* files){
 }
 
 static void upload_cmd_file(char* bucket_name, char* input_files, char* output_files, char* cmd, unsigned int jobid){
-	char* env_var = initialized_data.master_env_prefix;
+	char* env_var = initialized_data.env_prefix;
 	//Create command to pull files from s3 and into local space to work on
 	char* bucket = string_format("s3://%s",bucket_name);
 	char* cpy_in = generate_s3_cp_cmds(input_files,bucket,"./");
@@ -280,7 +280,7 @@ static void upload_cmd_file(char* bucket_name, char* input_files, char* output_f
 
 static char* aws_submit_job(char* job_name, char* properties_string){
 	char* queue = queue_name;
-	char* env_var = initialized_data.master_env_prefix;
+	char* env_var = initialized_data.env_prefix;
 	//submit the job-def
 	char* tmp = string_format("%s aws batch register-job-definition --job-definition-name %s_def --type container --container-properties \"%s\"",env_var,job_name, properties_string);
 	debug(D_BATCH,"Creating the Job Definition: %s",tmp);
@@ -399,7 +399,7 @@ static int del_job_def(char* jobdef){
 
 static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const char* cmd, const char* extra_input_files, const char* extra_output_files, struct jx* envlist, const struct rmsummary* resources){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
-	char* env_var = amazon_ids.master_env_prefix;
+	char* env_var = amazon_ids.env_prefix;
 
 	//so, we have the access keys, now we need to either set up the queues and exec environments, or add them.
 	unsigned int jobid = gen_guid();
@@ -456,7 +456,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
 	//succeeded check
 	int done  = 0;
-	char* env_var = amazon_ids.master_env_prefix;
+	char* env_var = amazon_ids.env_prefix;
 	itable_firstkey(amazon_job_ids);
 	char* jaid;
 	UINT64_T jobid;
@@ -542,7 +542,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 
 static int batch_job_amazon_batch_remove(struct batch_queue *q, batch_job_id_t jobid){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
-	char* env_var = amazon_ids.master_env_prefix; 
+	char* env_var = amazon_ids.env_prefix;
 	if(itable_lookup(done_jobs,jobid)==NULL){
 		char* name = string_format("%s_%i",queue_name,(int)jobid);
 		itable_insert(done_jobs,jobid+1,name);

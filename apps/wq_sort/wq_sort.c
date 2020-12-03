@@ -482,7 +482,7 @@ int get_optimal_runtimes(char *input_file, char *executable, int resources, unsi
 static void show_help(const char *cmd) {
 	fprintf(stdout, "Use: %s [options] <sort program> <infile>\n", cmd);
 	fprintf(stdout, "where options are:\n");
-	fprintf(stdout, " %-30s Specify a project name for the Work Queue master. (default = none)\n", "-N <string>");
+	fprintf(stdout, " %-30s Specify a project name for the Work Queue manager. (default = none)\n", "-N <string>");
 	fprintf(stdout, " %-30s Specify the number of partitions to create of the input data. (default = 20)\n", "-k <int>");
 	fprintf(stdout, " %-30s Specify the output file name for the sorted records. (default = <infile>.sorted)\n", "-o <string>");
 	fprintf(stdout, " %-30s Automatically determine the optimal partition size. (default = 20)\n", "-A");
@@ -643,7 +643,7 @@ int main(int argc, char *argv[])
 	fprintf(stdout, "listening on port %d...\n", work_queue_port(q));
 
 	if(proj_name){
-		work_queue_specify_master_mode(q, WORK_QUEUE_MASTER_MODE_CATALOG);
+		work_queue_specify_manager_mode(q, WORK_QUEUE_MANAGER_MODE_CATALOG);
 		work_queue_specify_name(q, proj_name);
 	}
 	work_queue_specify_keepalive_interval(q, keepalive_interval);

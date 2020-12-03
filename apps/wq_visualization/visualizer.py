@@ -1,10 +1,10 @@
 #Author: Ryan Boccabella for CCL, (C) University of Notre Dame 2015
 #A tool that reads in debug logs from work_queue and keeps the state of the work_queue
-#workers and their communications with the master in an image format, combining the
+#workers and their communications with the manager in an image format, combining the
 #images into a gif video for visual debugging of both a single run of work_queue, as
 #well as for looking for hiccups/areas of improvement to work_queue itself
 
-#This will work for all logs created after it is required that worker resource reports be handled all at once by the master, rather than one line at a time. It banks on the resource report arriving on consecutive lines so that the workers' size is representative of its resources.
+#This will work for all logs created after it is required that worker resource reports be handled all at once by the manager, rather than one line at a time. It banks on the resource report arriving on consecutive lines so that the workers' size is representative of its resources.
 
 
 import re
@@ -38,35 +38,35 @@ BASIC_MACHINE_SPACE = 3 * RESOURCE_ROW_HEIGHT
 FONT_FILE = "cour.ttf"  #sorry Prof Thain, but it'd be really odd to have this as a command line argument
 GIF_APPEND_THRESHOLD = 1000
 FRAME_DELAY = 1  #in ms. Probably the fastest that display tools will allow if they allow it to be this fast
-MASTER_CORE_SPACE = 2  #give the master 2 cores worth of height in addition to whatever row height it has
+MANAGER_CORE_SPACE = 2  #give the manager 2 cores worth of height in addition to whatever row height it has
 
 WHITE = (255,255,255)
 BLACK = (0,0,0)
 RED = (200, 0, 0)
 BLUE = (0,0,200)
 
-#master has some additional lines associated with it
-def add_master_flair(draw, master):
-	start_point = master.connection_point
+#manager has some additional lines associated with it
+def add_manager_flair(draw, manager):
+	start_point = manager.connection_point
 	#wide bar across the top for Connection lines to drop down from
 	draw.line( (start_point[0], start_point[1], GIF_WIDTH - LEGEND_WIDTH - BUFFER_SPACE, start_point[1]), BLACK, width = CONNECTION_WIDTH)
 
-	#color the machine and mark it with M for master
-	(text_x, text_y) = master.top_left_corner
+	#color the machine and mark it with M for manager
+	(text_x, text_y) = manager.top_left_corner
 	text_y = text_y + MACHINE_WIDTH/4
 	text_x = text_x + MACHINE_WIDTH/4
 	font = ImageFont.truetype(FONT_FILE, MACHINE_WIDTH/2)
 	draw.text((text_x, text_y), "M", font=font, fill=RED)
 
-#For changing the color of a connection between the master and the worker
-def color_connection(draw, master, worker, color):
-	m_location = master.connection_point
+#For changing the color of a connection between the manager and the worker
+def color_connection(draw, manager, worker, color):
+	m_location = manager.connection_point
 	w_location = worker.connection_point
 
 	#stub from worker machine to Connection Line
 	draw_connection_on_image(draw, w_location, color)
 
-	#connection has horizontal part from master and vertical part for Connectoin object
+	#connection has horizontal part from manager and vertical part for Connectoin object
 	vert_x = w_location[0] + BUFFER_SPACE
 	vert_y_1 = m_location[1]
 	vert_y_2 = w_location[1]
@@ -100,7 +100,7 @@ def get_file_from_line(line):
 	#the has of a file contains hex characters, but then there is a '-' and we capture the file name
 	f_hash_name = "file-[0-9a-fA-F]*-([^ ]*)"
 
-	pattern_action = [(": put "+f_hash_name, "getting needed (put)"), (": infile "+f_hash_name, "using as infile (infile)"), (": get " + f_hash_name, "master will be requesting file (get)"), ("Receiving file ([^ ]*)", "sending file to master (receiving)"), (": file "+f_hash_name, "master requesting file (file)"), (": outfile "+f_hash_name, "outfile request by master (outfile)")]
+	pattern_action = [(": put "+f_hash_name, "getting needed (put)"), (": infile "+f_hash_name, "using as infile (infile)"), (": get " + f_hash_name, "manager will be requesting file (get)"), ("Receiving file ([^ ]*)", "sending file to manager (receiving)"), (": file "+f_hash_name, "manager requesting file (file)"), (": outfile "+f_hash_name, "outfile request by manager (outfile)")]
 
 	fileInf = None
 	for item in pattern_action:
@@ -138,9 +138,9 @@ def draw_connection_on_image(draw, image_loc, color):
 
 #create machine, add it to image, and to image awareness (connections)
 def add_machine(draw, machine_type, ip, connections, workers, fileCount, legend=None, resources=None):
-	if(machine_type == "master"):
-		master_top_corner = (BUFFER_SPACE, BUFFER_SPACE)
-		this_machine = Machine("Master", "master", ip, master_top_corner, fileCount, draw, legend, MACHINE_WIDTH, MACHINE_WIDTH, resources)
+	if(machine_type == "manager"):
+		manager_top_corner = (BUFFER_SPACE, BUFFER_SPACE)
+		this_machine = Machine("Master", "manager", ip, manager_top_corner, fileCount, draw, legend, MACHINE_WIDTH, MACHINE_WIDTH, resources)
 
 	elif(machine_type == "worker"):
 		(top_left_corner, width, height) = connections.add(draw, resources)
@@ -418,8 +418,8 @@ class Machine_Task_Display(object):
 		if resources:
 			self.total_cores = resources.cores.largest
 		else:
-			#master won't have resources, but still relies on this for spacing and drawing
-			self.total_cores = MASTER_CORE_SPACE
+			#manager won't have resources, but still relies on this for spacing and drawing
+			self.total_cores = MANAGER_CORE_SPACE
 
 		self.tasks_to_cores = dict() #key is task no, value is list of cores task uses on this machine, 0-indexed
 		self.tasks_to_status = dict() #key is task no, value is "running" or "completed"
@@ -627,11 +627,11 @@ class Machine_File_Display(object):
 
 #Gives mapping of colors to most commonly referenced files
 class Legend(object):
-	def __init__(self, draw, fileCount, master_top_corner, font):
+	def __init__(self, draw, fileCount, manager_top_corner, font):
 		#find my space on  the image
 		self.x_min = GIF_WIDTH - LEGEND_WIDTH
 		self.x_max = GIF_WIDTH
-		self.y_min = master_top_corner[1] + BUFFER_SPACE + MACHINE_WIDTH / 2
+		self.y_min = manager_top_corner[1] + BUFFER_SPACE + MACHINE_WIDTH / 2
 		self.y_max = GIF_HEIGHT - BUFFER_SPACE - TEXT_HEIGHT
 
 		self.draw = draw
@@ -747,7 +747,7 @@ class Color_List(object):
 	def append(self, color):
 		self.colors.append(color)
 
-#Either a worker or a master machine
+#Either a worker or a manager machine
 class Machine(object):
 	def __init__(self, name, machine_type, ip, top_left_corner, fileCount, draw, legend, width, height, resources):
 		self.name = name
@@ -757,8 +757,8 @@ class Machine(object):
 		self.last_touched = None                   #last file I touched
 		self.fileCount = fileCount                 #for checking file colors, I need to pass this on to my Machine_File_Display
 		self.is_visible = False			   #whether or not I should be shown
-		self.machine_type = machine_type           #"master" or "worker"
-		self.pending_transfer_to_master = None     #keeping track of my current file transfers
+		self.machine_type = machine_type           #"manager" or "worker"
+		self.pending_transfer_to_manager = None     #keeping track of my current file transfers
 		self.pending_transfer_to_worker = None     #keeping track of my current file transfers
 		self.legend = legend                       #reference to the legend
 		self.draw = draw			   #reference to drawing
@@ -816,7 +816,7 @@ class Machine(object):
 		f_hash_name = "file-[0-9a-fA-F]*-([^ ]*)" #strip a file name out of the line
 
 		#regex pattern, action being preformed on file, direction of transfer
-		pattern_action_direction = [("needs file .* as "+f_hash_name, "(needs file)", "to_worker"), (": put "+f_hash_name, "put", "to_worker"), ("\) received", "received", "to_worker"), (": get " + f_hash_name, "get", "to_master"), (": file "+f_hash_name, "file", "to_master"), ("Receiving file ([^ ]*)", "receiving", "to master"), (": end", "end", "to master"), ("will try up to ([0-9]*) seconds to transfer", "set timeout", None)]
+		pattern_action_direction = [("needs file .* as "+f_hash_name, "(needs file)", "to_worker"), (": put "+f_hash_name, "put", "to_worker"), ("\) received", "received", "to_worker"), (": get " + f_hash_name, "get", "to_manager"), (": file "+f_hash_name, "file", "to_manager"), ("Receiving file ([^ ]*)", "receiving", "to manager"), (": end", "end", "to manager"), ("will try up to ([0-9]*) seconds to transfer", "set timeout", None)]
 		#TODO add looking for timeout into pattern_action_direction
 		timestamp = line.split(" ")[1]
 
@@ -830,9 +830,9 @@ class Machine(object):
 					ft_info = FT_Info(matched.group(1), item[1], item[2], None)
 
 				elif(item[1] == "set timeout"):
-					if(self.pending_transfer_to_master and not self.pending_transfer_to_worker):
+					if(self.pending_transfer_to_manager and not self.pending_transfer_to_worker):
 						ft_info = FT_Info(None, item[1], item[2], matched.group(1))
-					elif(self.pending_transfer_to_worker and not self.pending_transfer_to_master):
+					elif(self.pending_transfer_to_worker and not self.pending_transfer_to_manager):
 						ft_info = FT_Info(None, item[1], item[2], matched.group(1))
 				else:
 					ft_info = FT_Info(None, item[1], item[2], None)
@@ -841,8 +841,8 @@ class Machine(object):
 
 		if(ft_info):
 			self.last_touched = ft_info.fname
-			if(ft_info.direction == "to_master"):
-				#not worrying about transfers to master yet
+			if(ft_info.direction == "to_manager"):
+				#not worrying about transfers to manager yet
 				pass
 
 			if(ft_info.direction == "to_worker"):
@@ -1135,13 +1135,13 @@ def main():
 	fileCounter = dict() #key is filename, value is File_Distrib_Info
 	workers_needing_resource_reports = set() #workers not yet displayed because they've not yet told us their size
 
-	#put the master on the image
-	master = add_machine(draw, "master", "", connections, workers, fileCounter, None, None)
-	master.highlight(RED)
-	add_master_flair(draw, master)
+	#put the manager on the image
+	manager = add_machine(draw, "manager", "", connections, workers, fileCounter, None, None)
+	manager.highlight(RED)
+	add_manager_flair(draw, manager)
 
 	#create a legend
-	legend = Legend(draw, fileCounter, master.top_left_corner, FONT_FILE)
+	legend = Legend(draw, fileCounter, manager.top_left_corner, FONT_FILE)
 
 	#put the first frame in the gif and save it
 	currentImage.save(sys.argv[2]+".gif", "GIF")
@@ -1160,12 +1160,12 @@ def main():
 
 		ip = find_ip(line)
 
-		if(master.ip == "" and not ip):
-			#the first ip in the file is not a worker ip, it's the catalog ip, store in the master
+		if(manager.ip == "" and not ip):
+			#the first ip in the file is not a worker ip, it's the catalog ip, store in the manager
 			result = re.search("dns: ([^ ]*) is ([0-9\.]*)", line)
 			if(result):
-				master.name = result.group(1)
-				master.ip = result.group(2)
+				manager.name = result.group(1)
+				manager.ip = result.group(2)
 
 		if(ip not in workers and ip != None):
 			if ip in workers_needing_resource_reports:
@@ -1177,7 +1177,7 @@ def main():
 					this_worker = add_machine(draw, "worker", ip, connections, workers, fileCounter, legend, resources)
 					this_worker.highlight(BLACK)
 					this_worker.is_visible = True
-					color_connection(draw, master, this_worker, BLACK)
+					color_connection(draw, manager, this_worker, BLACK)
 			else:
 				#I'm a new ip and I just connected, I'll need a resource report
 				workers_needing_resource_reports.add(ip)
@@ -1205,7 +1205,7 @@ def main():
 				this_worker.bubble_files()
 
 				#this worker was used on this frame,
-				color_connection(draw, master, this_worker, RED)
+				color_connection(draw, manager, this_worker, RED)
 				this_worker.highlight(RED)
 
 				#show text with the line from the log
@@ -1233,7 +1233,7 @@ def main():
 				else:
 					this_worker.highlight(WHITE)
 
-				color_connection(draw, master, this_worker, BLACK)
+				color_connection(draw, manager, this_worker, BLACK)
 
 				clear_text_box(draw)
 
