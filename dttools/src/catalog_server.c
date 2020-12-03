@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_table.h"
 #include "jx_export.h"
+#include "jx_eval.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"
 #include "username.h"
@@ -28,6 +29,7 @@ See the file COPYING for details.
 #include "getopt_aux.h"
 #include "change_process_title.h"
 #include "zlib.h"
+#include "b64.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -396,6 +398,14 @@ static struct jx_table html_headers[] = {
 	{0,0,0,0,0}
 };
 
+int jx_eval_is_true( struct jx *expr, struct jx *context )
+{
+	struct jx *jresult = jx_eval(expr,context);
+	int result = jresult && jx_istrue(jresult);
+	jx_delete(jresult);
+	return result;
+}
+
 static void handle_query(struct link *query_link)
 {
 	FILE *stream;
@@ -482,6 +492,37 @@ static void handle_query(struct link *query_link)
 			if(i<(n-1)) fprintf(stream,",\n");
 		}
 		fprintf(stream,"\n]\n");
+	} else if(!strncmp(path, "/query/",7)) {
+
+		const char *strexpr = &path[7];
+		struct jx *expr = 0;
+
+		struct buffer buf;
+		buffer_init(&buf);
+		if(b64_decode(strexpr,&buf)) {
+			expr = jx_parse_string(buffer_tostring(&buf));
+			if(expr) {
+				fprintf(stream, "Content-type: text/plain\n\n");
+				fprintf(stream,"[\n");
+
+				int first = 1;
+				for(i = 0; i < n; i++) {
+					if(jx_eval_is_true(expr,array[i])) {
+						if(!first) fprintf(stream,",\n");
+						jx_print_stream(array[i],stream);
+						first = 0;
+					}
+				}
+				fprintf(stream,"\n]\n");
+			} else {
+				// return jx parse error
+			}
+		} else {
+			// return b64 parser error
+		}
+		buffer_free(&buf);
+
+
 	} else if(!strcmp(path, "/query.oldclassads")) {
 		fprintf(stream, "Content-type: text/plain\n\n");
 		for(i = 0; i < n; i++)
