@@ -73,16 +73,17 @@ struct jx *catalog_query_send_query( struct catalog_host *h, struct jx *expr, ti
 	b64_encode(expr_str,strlen(expr_str),&buf);
 
 	char * url = string_format("http://%s:%d/query/%s",h->host,h->port,buffer_tostring(&buf));
+	char * fallback_url = string_format("http://%s:%d/query.json",h->host,h->port);
 
 	struct link *link = http_query(url, "GET", stoptime);
+	if(!link) link = http_query(fallback_url, "GET", stoptime );
 
 	free(url);
+	free(fallback_url);
 	buffer_free(&buf);
 	free(expr_str);
 
-	if(!link) {
-		return NULL;
-	}
+	if(!link) return 0;
 
 	struct jx *j = jx_parse_link(link,stoptime);
 
