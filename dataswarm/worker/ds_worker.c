@@ -36,63 +36,42 @@ See the file COPYING for details.
 
 void ds_worker_status_report(struct ds_worker *w)
 {
-	struct jx *msg = jx_object(NULL);
 	struct jx *params = jx_object(NULL);
-
-	jx_insert_string(msg, "method", "status-report");
-	jx_insert(msg, jx_string("params"), params);
 	jx_insert_string(params, "hello", "manager");
-
+	struct jx *msg = ds_message_notification("status-report", params);
 	ds_json_send(w->manager_connection, msg);
-
 	jx_delete(msg);
 }
 
 struct jx * ds_worker_handshake( struct ds_worker *w )
 {
-	struct jx *msg = jx_object(NULL);
 	struct jx *params = jx_object(NULL);
-
-	jx_insert_string(msg, "method", "handshake");
-	jx_insert(msg, jx_string("params"), params);
 	jx_insert_string(params, "type", "worker");
-	jx_insert_integer(msg, "id", w->message_id++);	/* need function to register msgs and their ids */
-
-	return msg;
+	return ds_message_request("handshake", params);
 }
-
 
 void ds_worker_handle_message(struct ds_worker *w)
 {
 	int set_storage = 0;
 	struct jx *msg = ds_parse_message(&w->recv_buffer);
 	if (!msg) {
-		printf("malformed message!\n");
-		//XXX disconnect?
-		return;
+		fatal("malformed message!\n");
 	}
-	const char *method = jx_lookup_string(msg, "method");
-	struct jx *params = jx_lookup(msg, "params");
-	int64_t id = jx_lookup_integer(msg, "id");
+	const char *method = NULL;
+	struct jx *params = NULL;
+	jx_int_t id = 0;
 
-	ds_result_t result = DS_RESULT_SUCCESS;
+	ds_result_t result = ds_unpack_request(msg, &method, &id, &params);
+	if (result != DS_RESULT_SUCCESS) {
+		fatal("invalid request!\n");
+	}
+
 	struct jx *result_params = 0;
 
 	/* Whether to send a response for the rpc. Used to turn off the blob-get
 	 * response in this function, as blob-get manages its own response when
 	 * succesfully sending a file. */
 	int should_send_response = 1;
-
-	if(!method) {
-		result = DS_RESULT_BAD_METHOD;
-		goto done;
-	} else if(!id) {
-		result = DS_RESULT_BAD_ID;
-		goto done;
-	} else if(!params) {
-		result = DS_RESULT_BAD_PARAMS;
-		goto done;
-	}
 
 	const char *taskid = jx_lookup_string(params,"task-id");
 	const char *blobid = jx_lookup_string(params,"blob-id");
@@ -131,17 +110,15 @@ void ds_worker_handle_message(struct ds_worker *w)
 
 	struct jx *response = NULL;
 
-done:
 	if (!set_storage) {
 		mq_store_buffer(w->manager_connection, &w->recv_buffer, 0);
 	}
 
 	if(should_send_response) {
-		response = ds_message_standard_response(id,result,result_params);
+		response = ds_message_response(id,result,result_params);
 		ds_json_send(w->manager_connection, response);
 	}
 	jx_delete(response);
-	jx_delete(result_params);
 }
 
 int ds_worker_main_loop(struct ds_worker *w)
@@ -269,7 +246,7 @@ void ds_worker_measure_resources( struct ds_worker *w )
 	space is the sum of what's free + the size of blobs already
 	stored, which we work out later in ds_blob_table_recover.
 	*/
- 
+
 	host_disk_info_get(w->workspace,&avail,&total);
 	w->resources_total->disk = avail;
 
@@ -378,7 +355,6 @@ struct ds_worker *ds_worker_create(const char *workspace)
 	w->min_connect_retry = 1;
 	w->max_connect_retry = 60;
 	w->catalog_timeout = 60;
-	w->message_id = 1;
 	w->last_status_report = 0;
 	w->status_report_interval = 60;
 
@@ -406,4 +382,3 @@ void ds_worker_delete(struct ds_worker *w)
 	free(w->workspace);
 	free(w);
 }
-

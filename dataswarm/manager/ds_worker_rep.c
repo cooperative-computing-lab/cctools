@@ -85,7 +85,7 @@ ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *param
 			/* do nothing until task deleted at worker. */
 			break;
 		case DS_TASK_DELETED:
-			/* FIX: do some book-keeping now that the task is deleted. */ 
+			/* FIX: do some book-keeping now that the task is deleted. */
 			break;
 		default:
 				/* ... */
@@ -127,11 +127,8 @@ ds_result_t ds_worker_rep_update_blob( struct ds_worker_rep *r, struct jx *param
 }
 
 
-ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, struct jx *msg )
+ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, const char *method, struct jx *params )
 {
-	const char *method = jx_lookup_string(msg, "method");
-	struct jx *params = jx_lookup(msg, "params");
-
 	ds_result_t result = DS_RESULT_SUCCESS;
 	if(!method) {
 		result = DS_RESULT_BAD_METHOD;

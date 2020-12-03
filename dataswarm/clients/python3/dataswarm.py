@@ -53,7 +53,8 @@ class DataSwarm:
     # Handle sending and receiving messages
     def send_recv(self, request):
         self.id += 1
-        request["id"] = self.id;
+        request["id"] = self.id
+        request["jsonrpc"] = "2.0"
         request = json.dumps(request)
         self.send_str(request)
         response = self.recv()

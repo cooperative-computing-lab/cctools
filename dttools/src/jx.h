@@ -37,6 +37,7 @@ Will create the following output:
 */
 
 #include <stdint.h>
+#include <inttypes.h>
 
 /** JX atomic type.  */
 typedef enum {
@@ -53,6 +54,7 @@ typedef enum {
 } jx_type_t;
 
 typedef int64_t jx_int_t;
+#define PRIiJX PRIi64
 
 struct jx_comprehension {
 	unsigned line;

@@ -40,40 +40,54 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 			return 0;
 	}
 
-	jx_int_t msgid = jx_lookup_integer(msg,"id");
+	jx_int_t msgid = 0;
+	const char *method = NULL;
+	struct jx *params = NULL;
+	struct jx *data = NULL;
+	jx_int_t err_code = 0;
+	const char *err_message = NULL;
+	struct jx *err_data = NULL;
 
-	if(msgid == 0) {
-		ds_worker_rep_async_update(r,msg);
-		goto DONE;
-	}
+	if (ds_unpack_notification(msg, &method, &params) == DS_RESULT_SUCCESS) {
+		ds_worker_rep_async_update(r, method, params);
+	} else if (ds_unpack_result(msg, &msgid, &data) == DS_RESULT_SUCCESS) {
+		/* it could be an rpc for a blob or a task, but we don't know yet. */
+		struct ds_blob_rep *b = (struct ds_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
+		struct ds_task_rep *t = (struct ds_task_rep *) itable_lookup(r->task_of_rpc, msgid);
 
-	result = jx_lookup_integer(msg,"result");
-
-	/* it could be an rpc for a blob or a task, but we don't know yet. */
-	struct ds_blob_rep *b = (struct ds_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
-	struct ds_task_rep *t = (struct ds_task_rep *) itable_lookup(r->task_of_rpc, msgid);
-
-	if(b) {
-		b->result = result;
-		if(b->result == DS_RESULT_SUCCESS) {
+		if(b) {
+			b->result = DS_RESULT_SUCCESS;
 			if(b->state == DS_BLOB_GET) {
 				b->result = blob_get_aux(m,r,b->blobid);
 				set_storage = 1;
 			}
-		}
-		itable_remove(r->blob_of_rpc, msgid);
-	} else if(t) {
-		/* may be a response to a task */
-		t->result = result;
-		if(t->result == DS_RESULT_SUCCESS) {
+			itable_remove(r->blob_of_rpc, msgid);
+		} else if(t) {
+			/* may be a response to a task */
+			t->result = DS_RESULT_SUCCESS;
 			t->state = t->in_transition;
+			itable_remove(r->task_of_rpc, msgid);
+		} else {
+			debug(D_DATASWARM, "worker does not know about message id: %" PRId64, msgid);
 		}
-		itable_remove(r->task_of_rpc, msgid);
+	} else if (ds_unpack_error(msg, &msgid, &err_code, &err_message, &err_data) == DS_RESULT_SUCCESS) {
+		result = err_code;
+		struct ds_blob_rep *b = (struct ds_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
+		struct ds_task_rep *t = (struct ds_task_rep *) itable_lookup(r->task_of_rpc, msgid);
+
+		if(b) {
+			b->result = result;
+			itable_remove(r->blob_of_rpc, msgid);
+		} else if (t) {
+			t->result = result;
+			itable_remove(r->task_of_rpc, msgid);
+		} else {
+			debug(D_DATASWARM, "worker does not know about message id: %" PRId64, msgid);
+		}
 	} else {
-		debug(D_DATASWARM, "worker does not know about message id: %" PRId64, msgid);
+		abort();
 	}
 
-DONE:
 	if (!set_storage) {
 		mq_store_buffer(r->connection, &r->recv_buffer, 0);
 	}
@@ -90,8 +104,7 @@ DONE:
 
 jx_int_t ds_rpc( struct ds_manager *m, struct ds_worker_rep *r, struct jx *rpc)
 {
-	jx_int_t msgid = m->message_id++;
-	jx_insert_integer(rpc, "id", msgid);
+	jx_int_t msgid = jx_lookup_integer(rpc, "id");
 
 	ds_json_send(r->connection,rpc);
 	jx_delete(rpc);
@@ -132,12 +145,11 @@ jx_int_t ds_rpc_blob_create( struct ds_manager *m, struct ds_worker_rep *r, cons
 
 	//define method and params of blob-create.
 	//msg id will be added by ds_rpc_blob_queue
-	struct jx *msg = jx_objectv("method", jx_string("blob-create"),
-								"params", jx_objectv("blob-id", jx_string(blobid),
-													 "size",    jx_integer(size),
-													 "metadata", metadata ? metadata : jx_null(),
-													 NULL),
-								NULL);
+	struct jx *msg = ds_message_request("blob-create",
+								jx_objectv("blob-id", jx_string(blobid),
+											"size",    jx_integer(size),
+											"metadata", metadata ? metadata : jx_null(),
+											NULL));
 
 	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_RO);
 }
@@ -151,10 +163,9 @@ jx_int_t ds_rpc_blob_commit( struct ds_manager *m, struct ds_worker_rep *r, cons
 
 	//define method and params of blob-commit.
 	//msg id will be added by ds_rpc_blob_queue
-	struct jx *msg = jx_objectv("method", jx_string("blob-commit"),
-								"params", jx_objectv("blob-id", jx_string(blobid),
-													 NULL),
-								NULL);
+	struct jx *msg = ds_message_request("blob-commit",
+								jx_objectv("blob-id", jx_string(blobid),
+											NULL));
 
 	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_RO);
 }
@@ -168,10 +179,9 @@ jx_int_t ds_rpc_blob_delete( struct ds_manager *m, struct ds_worker_rep *r, cons
 
 	//define method and params of blob-delete.
 	//msg id will be added by ds_rpc_blob_queue
-	struct jx *msg = jx_objectv("method", jx_string("blob-delete"),
-								"params", jx_objectv("blob-id", jx_string(blobid),
-													 NULL),
-								NULL);
+	struct jx *msg = ds_message_request("blob-delete",
+								jx_objectv("blob-id", jx_string(blobid),
+											NULL));
 
 	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_DELETING);
 }
@@ -185,11 +195,10 @@ jx_int_t ds_rpc_blob_copy( struct ds_manager *m, struct ds_worker_rep *r, const 
 
 	//define method and params of blob-copy.
 	//msg id will be added by ds_rpc_blob_queue
-	struct jx *msg = jx_objectv("method", jx_string("blob-copy"),
-								"params", jx_objectv("blob-id", jx_string(blobid_target),
-													 "blob-id-source", jx_string(blobid_source),
-													 NULL),
-								NULL);
+	struct jx *msg = ds_message_request("blob-copy",
+								jx_objectv("blob-id", jx_string(blobid_target),
+											"blob-id-source", jx_string(blobid_source),
+											NULL));
 
 	return ds_rpc_for_blob(m, r, b, msg, DS_BLOB_COPIED);
 }
@@ -206,10 +215,9 @@ jx_int_t ds_rpc_blob_put( struct ds_manager *m, struct ds_worker_rep *r, const c
 
 	//define method and params of blob-put.
 	//msg id will be added by ds_rpc_blob_queue
-	struct jx *msg = jx_objectv("method", jx_string("blob-put"),
-								"params", jx_objectv("blob-id", jx_string(blobid),
-													 NULL),
-								NULL);
+	struct jx *msg = ds_message_request("blob-put",
+								jx_objectv("blob-id", jx_string(blobid),
+											NULL));
 
 
 	jx_int_t msgid = ds_rpc_for_blob(m, r, b, msg, DS_BLOB_PUT);
@@ -236,10 +244,9 @@ jx_int_t ds_rpc_blob_get( struct ds_manager *m, struct ds_worker_rep *r, const c
 
 	//define method and params of blob-put.
 	//msg id will be added by ds_rpc_blob_queue
-	struct jx *msg = jx_objectv("method", jx_string("blob-get"),
-								"params", jx_objectv("blob-id", jx_string(blobid),
-													 NULL),
-								NULL);
+	struct jx *msg = ds_message_request("blob-get",
+								jx_objectv("blob-id", jx_string(blobid),
+											NULL));
 
 	jx_int_t msgid = ds_rpc_for_blob(m, r, b, msg, DS_BLOB_GET);
 
@@ -276,9 +283,7 @@ jx_int_t ds_rpc_task_submit( struct ds_manager *m, struct ds_worker_rep *r, cons
 	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	assert(t);
 
-	struct jx *rpc = jx_objectv("method", jx_string("task-submit"),
-								"params", ds_task_to_jx(t->task),
-								NULL);
+	struct jx *rpc = ds_message_request("task-submit", ds_task_to_jx(t->task));
 
 	return ds_rpc_for_task(m, r, t, rpc, DS_TASK_ACTIVE);
 }
@@ -288,10 +293,9 @@ jx_int_t ds_rpc_task_remove( struct ds_manager *m, struct ds_worker_rep *r, cons
 	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	assert(t);
 
-	struct jx *rpc = jx_objectv("method", jx_string("task-remove"),
-								"params", jx_objectv("task-id", jx_string(taskid),
-													 NULL),
-								NULL);
+	struct jx *rpc = ds_message_request("task-remove",
+								jx_objectv("task-id", jx_string(taskid),
+											NULL));
 
 	return ds_rpc_for_task(m, r, t, rpc, DS_TASK_DELETING);
 }
@@ -299,13 +303,13 @@ jx_int_t ds_rpc_task_remove( struct ds_manager *m, struct ds_worker_rep *r, cons
 
 jx_int_t ds_rpc_task_list( struct ds_manager *m, struct ds_worker_rep *r )
 {
-	struct jx *rpc = jx_objectv("method", jx_string("task-list"),"params",jx_object(0),0);
+	struct jx *rpc = ds_message_request("task-list", NULL);
 	return ds_rpc(m, r, rpc);
 }
 
 jx_int_t ds_rpc_blob_list( struct ds_manager *m, struct ds_worker_rep *r )
 {
-	struct jx *rpc = jx_objectv("method", jx_string("blob-list"),"params",jx_object(0),0);
+	struct jx *rpc = ds_message_request("blob-list", NULL);
 	return ds_rpc(m, r, rpc);
 }
 

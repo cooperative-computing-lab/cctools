@@ -18,7 +18,6 @@ struct ds_manager {
 	int connect_timeout;
 	int stall_timeout;
 	int server_port;
-	int message_id;
 
 	int task_id;
 	int blob_id;

@@ -38,6 +38,6 @@ struct ds_worker_rep {
 struct ds_worker_rep * ds_worker_rep_create( struct mq *conn );
 void ds_worker_rep_disconnect(struct ds_worker_rep *w);
 
-ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, struct jx *msg );
+ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, const char *method, struct jx *params );
 
 #endif
