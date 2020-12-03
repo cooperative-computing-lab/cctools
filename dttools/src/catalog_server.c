@@ -565,7 +565,7 @@ static void handle_query(struct link *query_link)
 			fprintf(stream, "<h2>Unknown Item!</h2>\n");
 			fprintf(stream, "</center>\n");
 		}
-	} else {
+	} else if(!strcmp(path,"/")) {
 		char avail_line[LINE_MAX];
 		char total_line[LINE_MAX];
 		INT64_T sum_total = 0;
@@ -604,6 +604,8 @@ static void handle_query(struct link *query_link)
 		}
 		jx_export_html_footer(stream, html_headers);
 		fprintf(stream, "</center>\n");
+	} else {
+		send_http_response(stream,404,"Not Found","text/html");
 	}
 	fclose(stream);
 }
