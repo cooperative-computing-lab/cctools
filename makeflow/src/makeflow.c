@@ -1123,7 +1123,8 @@ static void makeflow_run( struct dag *d )
 		now = timestamp_get();
 		/* If status file mode is on and a time interval has transpired */
 		if(file_status_on && ((now-last_time) > (file_status_interval * 1000 * 1000))){
-			makeflow_file_summary(d, project, batch_queue_type, start, file_status_name); 
+			makeflow_file_summary(d, project, batch_queue_type, start, file_status_name);
+			last_time = now; 
 		}
 
 		/* Rather than try to garbage collect after each time in this
@@ -1139,6 +1140,11 @@ static void makeflow_run( struct dag *d )
 	/* Always make final report to catalog when workflow ends. */
 	if(catalog_reporting_on){
 		makeflow_catalog_summary(d, project,batch_queue_type,start); 
+	}
+	
+	/* Always make final status file when workflow ends. */
+	if(file_status_on){
+		makeflow_file_summary(d, project, batch_queue_type, start, file_status_name);
 	}
 
 	if(makeflow_abort_flag) {
@@ -1202,6 +1208,8 @@ static void show_help_run(const char *cmd)
 	printf("    --send-environment          Send local environment variables for execution.\n");
 	printf(" -S,--submission-timeout=<#>    Time to retry failed batch job submission.\n");
 	printf(" -f,--summary-log=<file>        Write summary of workflow to this file at end.\n");
+	printf("    --file-status=<file>        Write summary of workflow to file periodically.\n");
+	printf("    --file-status-interval=<file>	Set time interval for periodic workflow summary.\n");
 	        /********************************************************************************/
 	printf("\nData Handling:\n");
 	printf("    --archive                   Archive and retrieve archived jobs from archive.\n");
@@ -1619,8 +1627,8 @@ int main(int argc, char *argv[])
 		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
 		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
 		{"tlq", required_argument, 0, LONG_OPT_TLQ},
-		{"status-file", required_argument, 0, LONG_OPT_FILE_STATUS},
-		{"status-file-interval", required_argument, 0, LONG_OPT_FILE_STATUS_INTERVAL},
+		{"file-status", required_argument, 0, LONG_OPT_FILE_STATUS},
+		{"file-status-interval", required_argument, 0, LONG_OPT_FILE_STATUS_INTERVAL},
 		{0, 0, 0, 0}
 	};
 

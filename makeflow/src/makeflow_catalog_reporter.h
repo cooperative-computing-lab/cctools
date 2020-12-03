@@ -27,6 +27,8 @@ int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type,
  * Creates a summary of the status of makeflow and prints it out to a html file.
  * @param d the DAG maintained by makeflow
  * @param name the name of the project
+ * @param tpye the batch queue type
+ * @param status_file_name the name of the status file, user configured
  * @return 1 if everything went well, 0 if not
  */
 
