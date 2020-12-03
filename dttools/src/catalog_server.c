@@ -406,6 +406,17 @@ int jx_eval_is_true( struct jx *expr, struct jx *context )
 	return result;
 }
 
+void send_http_response( FILE *stream, int code, const char *message, const char *content_type )
+{
+	time_t current = time(0);
+	fprintf(stream, "HTTP/1.1 %d %s\n",code,message);
+	fprintf(stream, "Date: %s", ctime(&current));
+	fprintf(stream, "Server: catalog_server\n");
+	fprintf(stream, "Connection: close\n");
+	fprintf(stream, "Access-Control-Allow-Origin: *\n");
+	fprintf(stream, "Content-type: %s\n\n",content_type);
+}
+
 static void handle_query(struct link *query_link)
 {
 	FILE *stream;
@@ -418,7 +429,6 @@ static void handle_query(struct link *query_link)
 	char addr[LINK_ADDRESS_MAX];
 	char key[LINE_MAX];
 	int port;
-	time_t current;
 
 	char *hkey;
 	struct jx *j;
@@ -454,13 +464,6 @@ static void handle_query(struct link *query_link)
 	}
 	link_nonblocking(query_link, 0);
 
-	current = time(0);
-	fprintf(stream, "HTTP/1.1 200 OK\n");
-	fprintf(stream, "Date: %s", ctime(&current));
-	fprintf(stream, "Server: catalog_server\n");
-	fprintf(stream, "Connection: close\n");
-	fprintf(stream, "Access-Control-Allow-Origin: *\n");
-
 	if(sscanf(url, "http://%[^/]%s", hostport, path) == 2) {
 		// continue on
 	} else {
@@ -481,11 +484,11 @@ static void handle_query(struct link *query_link)
 	qsort(array, n, sizeof(struct jx *), compare_jx);
 
 	if(!strcmp(path, "/query.text")) {
-		fprintf(stream, "Content-type: text/plain\n\n");
+		send_http_response(stream,200,"OK","text/plain");
 		for(i = 0; i < n; i++)
 			jx_export_nvpair(array[i], stream);
 	} else if(!strcmp(path, "/query.json")) {
-		fprintf(stream, "Content-type: text/plain\n\n");
+		send_http_response(stream,200,"OK","text/plain");
 		fprintf(stream,"[\n");
 		for(i = 0; i < n; i++) {
 			jx_print_stream(array[i],stream);
@@ -504,6 +507,7 @@ static void handle_query(struct link *query_link)
 		if(b64_decode(strexpr,&buf)) {
 			expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
+				send_http_response(stream,200,"OK","text/plain");
 				fprintf(stream,"[\n");
 
 				int first = 1;
@@ -516,24 +520,26 @@ static void handle_query(struct link *query_link)
 				}
 				fprintf(stream,"\n]\n");
 			} else {
-				fprintf(stream,"\"invalid query\"\n");
+				send_http_response(stream,400,"Bad Request","text/plain");
+				fprintf(stream,"Invalid query text.\n");
 			}
 		} else {
-			fprintf(stream,"\"invalid url\"\n");
+			send_http_response(stream,400,"Bad Request","text/plain");
+			fprintf(stream,"Invalid base-64 encoding.\n");
 		}
 		buffer_free(&buf);
 
 
 	} else if(!strcmp(path, "/query.oldclassads")) {
-		fprintf(stream, "Content-type: text/plain\n\n");
+		send_http_response(stream,200,"OK","text/plain");
 		for(i = 0; i < n; i++)
 			jx_export_old_classads(array[i], stream);
 	} else if(!strcmp(path, "/query.newclassads")) {
-		fprintf(stream, "Content-type: text/plain\n\n");
+		send_http_response(stream,200,"OK","text/plain");
 		for(i = 0; i < n; i++)
 			jx_export_new_classads(array[i], stream);
 	} else if(!strcmp(path, "/query.xml")) {
-		fprintf(stream, "Content-type: text/xml\n\n");
+		send_http_response(stream,200,"OK","text/xml");
 		fprintf(stream, "<?xml version=\"1.0\" standalone=\"yes\"?>\n");
 		fprintf(stream, "<catalog>\n");
 		for(i = 0; i < n; i++)
@@ -541,7 +547,7 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "</catalog>\n");
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct jx *j;
-		fprintf(stream, "Content-type: text/html\n\n");
+		send_http_response(stream,200,"OK","text/html");
 		j = jx_database_lookup(table, key);
 		if(j) {
 			const char *name = jx_lookup_string(j, "name");
@@ -568,7 +574,7 @@ static void handle_query(struct link *query_link)
 		INT64_T sum_avail = 0;
 		INT64_T sum_devices = 0;
 
-		fprintf(stream, "Content-type: text/html\n\n");
+		send_http_response(stream,200,"OK","text/html");
 		fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
 		fprintf(stream, "<center>\n");
 		fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
