@@ -497,12 +497,13 @@ static void handle_query(struct link *query_link)
 		const char *strexpr = &path[7];
 		struct jx *expr = 0;
 
+		fprintf(stream, "Content-type: text/plain\n\n");
+
 		struct buffer buf;
 		buffer_init(&buf);
 		if(b64_decode(strexpr,&buf)) {
 			expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
-				fprintf(stream, "Content-type: text/plain\n\n");
 				fprintf(stream,"[\n");
 
 				int first = 1;
@@ -515,10 +516,10 @@ static void handle_query(struct link *query_link)
 				}
 				fprintf(stream,"\n]\n");
 			} else {
-				// return jx parse error
+				fprintf(stream,"\"invalid query\"\n");
 			}
 		} else {
-			// return b64 parser error
+			fprintf(stream,"\"invalid url\"\n");
 		}
 		buffer_free(&buf);
 
