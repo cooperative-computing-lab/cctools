@@ -500,11 +500,9 @@ static void handle_query(struct link *query_link)
 		const char *strexpr = &path[7];
 		struct jx *expr = 0;
 
-		fprintf(stream, "Content-type: text/plain\n\n");
-
 		struct buffer buf;
 		buffer_init(&buf);
-		if(b64_decode(strexpr,&buf)) {
+		if(b64_decode(strexpr,&buf)==0) {
 			expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
 				send_http_response(stream,200,"OK","text/plain");
