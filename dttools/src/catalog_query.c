@@ -66,7 +66,7 @@ const char *parse_hostlist(const char *hosts, char *host, int *port)
 
 struct jx *catalog_query_send_query( struct catalog_host *h, struct jx *expr, time_t stoptime )
 {
-	char *expr_str = jx_print_string(expr);
+	char *expr_str = expr ? jx_print_string(expr) : strdup("true");
 
 	buffer_t buf;
 	buffer_init(&buf);
