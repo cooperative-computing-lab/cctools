@@ -627,7 +627,7 @@ In addition to providing precise directory metadata, GROW offers two
 additional advantages over plain HTTP:
 
 * **Aggressive Caching.** GROW caches files in an on-disk cache, but unlike plain HTTP, does not need to issue up-to-date checks against the server. Using the cached directory metadata, it can tell if a file is up-to-date without any network communication. The directory is only checked for changes at the beginning of program execution, so changes become visible only to newly executed programs. 
-* **SHA-1 Integrity.** ` make_growfs` generates SHA-1 checksums on the directory and each file so that the integrity of the system can be verified at runtime. If a checksum fails, GROW will attempt to reload the file or directory listing in order to repair the error, trying until the master timeout (set by the -T option) expires. This will also occur if the underlying files have been modified and `make_growfs` has not yet been re-run. If necessary, checksums can be disabled by giving the `-k` option to either Parrot or `make_growfs`. 
+* **SHA-1 Integrity.** ` make_growfs` generates SHA-1 checksums on the directory and each file so that the integrity of the system can be verified at runtime. If a checksum fails, GROW will attempt to reload the file or directory listing in order to repair the error, trying until the main timeout (set by the -T option) expires. This will also occur if the underlying files have been modified and `make_growfs` has not yet been re-run. If necessary, checksums can be disabled by giving the `-k` option to either Parrot or `make_growfs`. 
 
 ### iRODS
 

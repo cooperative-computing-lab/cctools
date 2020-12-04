@@ -31,7 +31,7 @@ extern "C" {
 
 extern struct file_cache *pfs_file_cache;
 extern int pfs_session_cache;
-extern int pfs_master_timeout;
+extern int pfs_main_timeout;
 
 static struct hash_table * not_found_table = 0;
 
@@ -234,13 +234,13 @@ pfs_file * pfs_cache_open( pfs_name *name, int flags, mode_t mode )
 		if(copy_file_to_fd(rfile,fd)==0) {
 			if(rfile->close()<0) {
 				file_cache_abort(pfs_file_cache,name->path,txn);
-				if(sleep_time<pfs_master_timeout) {
+				if(sleep_time<pfs_main_timeout) {
 					debug(D_CACHE,"filesystem inconsistent, retrying in %d seconds\n",sleep_time);
 					sleep_for(sleep_time);
 					sleep_time *= 2;
 					goto retry;
 				} else {
-					fatal("filesystem inconsistent after retrying for %d seconds\n",pfs_master_timeout);
+					fatal("filesystem inconsistent after retrying for %d seconds\n",pfs_main_timeout);
 				}
 			} else {
 				/* Otherwise, update the local modification time, */

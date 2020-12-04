@@ -1,10 +1,10 @@
 #Author: Ryan Boccabella for CCL, (C) University of Notre Dame 2015
 #A tool that reads in debug logs from work_queue and keeps the state of the work_queue
-#workers and their communications with the master in an image format, combining the
+#workers and their communications with the manager in an image format, combining the
 #images into a gif video for visual debugging of both a single run of work_queue, as
 #well as for looking for hiccups/areas of improvement to work_queue itself
 
-#This will work for all logs created after it is required that worker resource reports be handled all at once by the master, rather than one line at a time. It banks on the resource report arriving on consecutive lines so that the workers' size is representative of its resources.
+#This will work for all logs created after it is required that worker resource reports be handled all at once by the manager, rather than one line at a time. It banks on the resource report arriving on consecutive lines so that the workers' size is representative of its resources.
 
 from PIL import Image, ImageDraw, ImageFont
 import re
@@ -45,7 +45,7 @@ BASIC_MACHINE_SPACE = 3 * RESOURCE_ROW_HEIGHT
 FONT_FILE = "cour.ttf"  #sorry Prof Thain, but it'd be really odd to have this as a command line argument
 GIF_APPEND_THRESHOLD = 1000
 FRAME_DELAY = 1  #in ms. Probably the fastest that displays will allow if they allow it to be this fast
-MASTER_CORE_SPACE = 2  #give the master 2 cores worth of height in addition to whatever row height it has
+MANAGER_CORE_SPACE = 2  #give the manager 2 cores worth of height in addition to whatever row height it has
 
 NUM_STARTING_COLORS = 100
 WHITE = (255,255,255)
@@ -56,17 +56,17 @@ GREEN = (0,200,0)
 PURPLE = (100,0,100)
 LIGHT_BLUE = (0, 0, 235)
 
-def add_master_flair(draw, master):
-	start_point = master.connection_point
+def add_manager_flair(draw, manager):
+	start_point = manager.connection_point
 	draw.line( (start_point[0], start_point[1], GIF_WIDTH - LEGEND_WIDTH - BUFFER_SPACE, start_point[1]), BLACK, width = CONNECTION_WIDTH)
-	(text_x, text_y) = master.top_left_corner
+	(text_x, text_y) = manager.top_left_corner
 	text_y = text_y + MACHINE_WIDTH/4
 	text_x = text_x + MACHINE_WIDTH/4
 	font = ImageFont.truetype(FONT_FILE, MACHINE_WIDTH/2)
 	draw.text((text_x, text_y), "M", font=font, fill=RED)
 
-def color_connection(draw, master, worker, color):
-	m_location = master.connection_point
+def color_connection(draw, manager, worker, color):
+	m_location = manager.connection_point
 	w_location = worker.connection_point
 
 	draw_connection_on_image(draw, w_location, color) #find_machine_connection_line_pixel(worker.grid_location), color)
@@ -98,7 +98,7 @@ def clear_text_box(draw):
 
 def get_file_from_line(line):
 	f_hash_name = "file-[0-9a-fA-F]*-([^ ]*)"
-	pattern_action = [(": put "+f_hash_name, "getting needed (put)"), (": infile "+f_hash_name, "using as infile (infile)"), (": get " + f_hash_name, "master will be requesting file (get)"), ("Receiving file ([^ ]*)", "sending file to master (receiving)"), (": file "+f_hash_name, "master requesting file (file)"), (": outfile "+f_hash_name, "outfile request by master (outfile)")]
+	pattern_action = [(": put "+f_hash_name, "getting needed (put)"), (": infile "+f_hash_name, "using as infile (infile)"), (": get " + f_hash_name, "manager will be requesting file (get)"), ("Receiving file ([^ ]*)", "sending file to manager (receiving)"), (": file "+f_hash_name, "manager requesting file (file)"), (": outfile "+f_hash_name, "outfile request by manager (outfile)")]
 
 	fileInf = None
 	for item in pattern_action:
@@ -133,9 +133,9 @@ def draw_connection_on_image(draw, image_loc, color):
 
 #create machine, add it to image, and to image awareness (connections)
 def add_machine(draw, machine_type, ip, connections, workers, fileCount, legend=None, resources=None):
-	if(machine_type == "master"):
-		master_top_corner = (BUFFER_SPACE, BUFFER_SPACE)
-		this_machine = Machine("Master", "master", ip, master_top_corner, fileCount, draw, legend, MACHINE_WIDTH, MACHINE_WIDTH, resources)
+	if(machine_type == "manager"):
+		manager_top_corner = (BUFFER_SPACE, BUFFER_SPACE)
+		this_machine = Machine("Master", "manager", ip, manager_top_corner, fileCount, draw, legend, MACHINE_WIDTH, MACHINE_WIDTH, resources)
 
 	elif(machine_type == "worker"):
 		(top_left_corner, width, height) = connections.add(draw, resources)
@@ -422,7 +422,7 @@ class Machine_Task_Display(object):
 		if resources:
 			self.total_cores = resources.cores.largest
 		else:
-			self.total_cores = MASTER_CORE_SPACE
+			self.total_cores = MANAGER_CORE_SPACE
 
 		self.tasks_to_cores = dict() #key is task no, value is list of cores task uses on this machine, 0-indexed
 		self.tasks_to_status = dict() #key is task no, value is "running" or "completed"
@@ -648,10 +648,10 @@ class Machine_File_Display(object):
 				i += 1
 
 class Legend(object):
-	def __init__(self, draw, fileCount, master_top_corner, font):
+	def __init__(self, draw, fileCount, manager_top_corner, font):
 		self.x_min = GIF_WIDTH - LEGEND_WIDTH
 		self.x_max = GIF_WIDTH
-		self.y_min = master_top_corner[1] + BUFFER_SPACE + MACHINE_WIDTH / 2
+		self.y_min = manager_top_corner[1] + BUFFER_SPACE + MACHINE_WIDTH / 2
 		self.y_max = GIF_HEIGHT - BUFFER_SPACE - TEXT_HEIGHT
 		self.font = ImageFont.truetype(FONT_FILE, int(3 * LEGEND_SLOT_HEIGHT/5))
 		#add a buffer on top, then each entry will take up height+buffer to include space after the last
@@ -779,7 +779,7 @@ class Machine(object):
 		self.fileCount = fileCount
 		self.is_visible = False
 		self.machine_type = machine_type
-		self.pending_transfer_to_master = None
+		self.pending_transfer_to_manager = None
 		self.pending_transfer_to_worker = None
 		self.legend = legend
 		self.draw = draw
@@ -833,7 +833,7 @@ class Machine(object):
 	def update_network_communications(self, line, color_list, fileCount):
 		f_hash_name = "file-[0-9a-fA-F]*-([^ ]*)"
 
-		pattern_action_direction = [("needs file .* as "+f_hash_name, "(needs file)", "to_worker"), (": put "+f_hash_name, "put", "to_worker"), ("\) received", "received", "to_worker"), (": get " + f_hash_name, "get", "to_master"), (": file "+f_hash_name, "file", "to_master"), ("Receiving file ([^ ]*)", "receiving", "to master"), (": end", "end", "to master"), ("will try up to ([0-9]*) seconds to transfer", "set timeout", None)] #add looking for timeout into this thing  #also need to add for returning output files because they're different
+		pattern_action_direction = [("needs file .* as "+f_hash_name, "(needs file)", "to_worker"), (": put "+f_hash_name, "put", "to_worker"), ("\) received", "received", "to_worker"), (": get " + f_hash_name, "get", "to_manager"), (": file "+f_hash_name, "file", "to_manager"), ("Receiving file ([^ ]*)", "receiving", "to manager"), (": end", "end", "to manager"), ("will try up to ([0-9]*) seconds to transfer", "set timeout", None)] #add looking for timeout into this thing  #also need to add for returning output files because they're different
 		timestamp = line.split(" ")[1]
 
 		#patterns catch any important things such as filename if present
@@ -846,9 +846,9 @@ class Machine(object):
 					ft_info = FT_Info(matched.group(1), item[1], item[2], None)
 
 				elif(item[1] == "set timeout"):
-					if(self.pending_transfer_to_master and not self.pending_transfer_to_worker):
+					if(self.pending_transfer_to_manager and not self.pending_transfer_to_worker):
 						ft_info = FT_Info(None, item[1], item[2], matched.group(1))
-					elif(self.pending_transfer_to_worker and not self.pending_transfer_to_master):
+					elif(self.pending_transfer_to_worker and not self.pending_transfer_to_manager):
 						ft_info = FT_Info(None, item[1], item[2], matched.group(1))
 				else:
 					ft_info = FT_Info(None, item[1], item[2], None)
@@ -857,7 +857,7 @@ class Machine(object):
 
 		if(ft_info):
 			self.last_touched = ft_info.fname
-			if(ft_info.direction == "to_master"):
+			if(ft_info.direction == "to_manager"):
 				pass
 
 			if(ft_info.direction == "to_worker"):
@@ -1141,11 +1141,11 @@ def main():
 	if "count_ips" in globals():
 		ips = set()
 
-	master = add_machine(draw, "master", "", connections, workers, fileCounter, None, None)
-	master.highlight(RED)
-	add_master_flair(draw, master)
+	manager = add_machine(draw, "manager", "", connections, workers, fileCounter, None, None)
+	manager.highlight(RED)
+	add_manager_flair(draw, manager)
 
-	legend = Legend(draw, fileCounter, master.top_left_corner, FONT_FILE)
+	legend = Legend(draw, fileCounter, manager.top_left_corner, FONT_FILE)
 
 	currentImage.save(sys.argv[2]+".gif", "GIF")
 	numFrames = numFrames + 1
@@ -1165,11 +1165,11 @@ def main():
 			ips.add(ip)
 			print("Length of ips is: " + str(len(ips)))
 
-		if(master.ip == "" and not ip):
+		if(manager.ip == "" and not ip):
 			result = re.search("dns: ([^ ]*) is ([0-9\.]*)", line)
 			if(result):
-				master.name = result.group(1)
-				master.ip = result.group(2)
+				manager.name = result.group(1)
+				manager.ip = result.group(2)
 
 		if(ip not in workers and ip != None):
 			if ip in workers_needing_resource_reports:
@@ -1185,7 +1185,7 @@ def main():
 					this_worker = add_machine(draw, "worker", ip, connections, workers, fileCounter, legend, resources)
 					this_worker.highlight(BLACK)
 					this_worker.is_visible = True
-					color_connection(draw, master, this_worker, BLACK)
+					color_connection(draw, manager, this_worker, BLACK)
 			else:
 				workers_needing_resource_reports.add(ip)
 
@@ -1214,7 +1214,7 @@ def main():
 				#referenced once in a useful way, bubble sort a single round
 				this_worker.bubble_files()
 
-				color_connection(draw, master, this_worker, RED)
+				color_connection(draw, manager, this_worker, RED)
 				this_worker.highlight(RED) #highlight_machine(draw, this_worker, RED)
 				fill_in_text(draw, font, line)
 				legend.update(this_worker.last_touched)
@@ -1239,7 +1239,7 @@ def main():
 						print("invisible worker in frame numFrames")
 					this_worker.highlight(WHITE)#highlight_machine(draw, this_worker, WHITE)
 
-				color_connection(draw, master, this_worker, BLACK)
+				color_connection(draw, manager, this_worker, BLACK)
 
 				clear_text_box(draw)
 			else:

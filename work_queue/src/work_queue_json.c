@@ -14,7 +14,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-static const char *work_queue_properties[] = { "name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "master_link",
+static const char *work_queue_properties[] = { "name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "manager_link",
 	"poll_table", "poll_table_size", "tasks", "task_state_map", "ready_list", "worker_table",
 	"worker_blacklist", "worker_task_map", "categories", "workers_with_available_results",
 	"stats", "stats_measure", "stats_disconnected_workers", "time_last_wait",
@@ -24,7 +24,7 @@ static const char *work_queue_properties[] = { "name", "port", "priority", "num_
 	"default_transfer_rate", "catalog_hosts", "catalog_last_update_time",
 	"resources_last_update_time", "busy_waiting_flag", "allocation_default_mode", "logfile",
 	"transactions_logfile", "keepalive_interval", "keepalive_timeout", "link_poll_end",
-	"master_preferred_connection", "monitor_mode", "monitor_file", "monitor_output_directory",
+	"manager_preferred_connection", "monitor_mode", "monitor_file", "monitor_output_directory",
 	"monitor_summary_filename", "monitor_exe", "measured_local_resources",
 	"current_max_worker", "password", "bandwidth", NULL
 };

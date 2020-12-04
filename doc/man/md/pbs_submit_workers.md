@@ -36,23 +36,23 @@ The number of **work_queue_worker** scheduled and run is given by the **num-work
 argument.
 
 The **servername** and **port** arguments specify the hostname and port number of the
-master for the work_queue_worker to connect. These two arguments become optional when the
+manager for the work_queue_worker to connect. These two arguments become optional when the
 auto mode option is specified for work_queue_worker.
 
 ## OPTIONS
 
-- **-M** Name of the preferred master for worker.
+- **-M** Name of the preferred manager for worker.
 - **-N name** Preferred project name for work_queue_worker to connect.
 - **-c cores** Set the number of cores each worker should use (0=auto). (default=1)
 - **-C catalog** Set catalog server for work_queue_worker to <catalog>. <catalog> format: HOSTNAME:PORT.
 - **-t seconds** Abort work_queue_worker after this amount of idle time (default=900s).
 - **-d subsystem** Enable debugging on worker for this subsystem (try -d all to start).
 - **-w size** Set TCP window size
-- **-i time** Set initial value for backoff interval when worker fails to connect to a master. (default=1s)
-- **-b time** Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)
+- **-i time** Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+- **-b time** Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
 - **-z size** Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
-- **-A arch** Set architecture string for the worker to report to master instead of the value in uname.
-- **-O os** Set operating system string for the worker to report to master instead of the value in uname.
+- **-A arch** Set architecture string for the worker to report to manager instead of the value in uname.
+- **-O os** Set operating system string for the worker to report to manager instead of the value in uname.
 - **-s path** Set the location for creating the working directory of the worker.
 - **-j ** Use job array to submit workers.
 - **-p parameters** PBS qsub parameters.
@@ -64,10 +64,10 @@ On success, returns zero. On failure, returns non-zero.
 
 ## EXAMPLES
 
-Submit 10 worker instances to run on PBS and connect to a specific master:
+Submit 10 worker instances to run on PBS and connect to a specific manager:
 
 ```
-pbs_submit_workers master.somewhere.edu 9123 10
+pbs_submit_workers manager.somewhere.edu 9123 10
 ```
 
 Submit 10 work_queue_worker instances to run on PBS in auto mode with their

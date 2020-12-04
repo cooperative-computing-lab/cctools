@@ -70,23 +70,23 @@ static void work_queue_resource_debug( struct work_queue_resource *r, const char
 }
 
 
-static void work_queue_resource_send( struct link *master, struct work_queue_resource *r, const char *name, time_t stoptime )
+static void work_queue_resource_send( struct link *manager, struct work_queue_resource *r, const char *name, time_t stoptime )
 {
 	work_queue_resource_debug(r, name);
-	link_putfstring(master, "resource %s %"PRId64" %"PRId64" %"PRId64"\n", stoptime, name, r->total, r->smallest, r->largest );
+	link_putfstring(manager, "resource %s %"PRId64" %"PRId64" %"PRId64"\n", stoptime, name, r->total, r->smallest, r->largest );
 }
 
-void work_queue_resources_send( struct link *master, struct work_queue_resources *r, time_t stoptime )
+void work_queue_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime )
 {
-	debug(D_WQ, "Sending resource description to master:");
-	work_queue_resource_send(master, &r->workers, "workers",stoptime);
-	work_queue_resource_send(master, &r->disk,    "disk",   stoptime);
-	work_queue_resource_send(master, &r->memory,  "memory", stoptime);
-	work_queue_resource_send(master, &r->gpus,    "gpus",   stoptime);
-	work_queue_resource_send(master, &r->cores,   "cores",  stoptime);
+	debug(D_WQ, "Sending resource description to manager:");
+	work_queue_resource_send(manager, &r->workers, "workers",stoptime);
+	work_queue_resource_send(manager, &r->disk,    "disk",   stoptime);
+	work_queue_resource_send(manager, &r->memory,  "memory", stoptime);
+	work_queue_resource_send(manager, &r->gpus,    "gpus",   stoptime);
+	work_queue_resource_send(manager, &r->cores,   "cores",  stoptime);
 
-	/* send the tag last, the master knows when the resource update is complete */
-	link_putfstring(master, "resource tag %"PRId64"\n", stoptime, r->tag);
+	/* send the tag last, the manager knows when the resource update is complete */
+	link_putfstring(manager, "resource tag %"PRId64"\n", stoptime, r->tag);
 }
 
 void work_queue_resources_debug( struct work_queue_resources *r )

@@ -1047,7 +1047,7 @@ Must be called only after the task completes execution.
 
 =head3 C<execute_cmd_finish>
 
-Get the time at which the task finished (discovered by the master).
+Get the time at which the task finished (discovered by the manager).
 
 Must be called only after the task completes execution.
 

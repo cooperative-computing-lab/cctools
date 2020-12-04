@@ -124,7 +124,7 @@ extern int pfs_fake_setgid;
 
 extern int wait_barrier;
 
-extern int pfs_master_timeout;
+extern int pfs_main_timeout;
 extern INT64_T pfs_syscall_count;
 extern INT64_T pfs_read_count;
 extern INT64_T pfs_write_count;
@@ -3658,7 +3658,7 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 		CATCHUNIX(rc);
 		assert(path[0]);
 		debug(D_DEBUG, "%s: %s PT_INTERP is %s", __func__, physical_name, path);
-		pfs_resolve_t res = pfs_resolve(path, ldso_resolved_path, R_OK|X_OK, time(0) + pfs_master_timeout);
+		pfs_resolve_t res = pfs_resolve(path, ldso_resolved_path, R_OK|X_OK, time(0) + pfs_main_timeout);
 		switch (res) {
 		case PFS_RESOLVE_DENIED:
 			debug(D_DEBUG, "%s: interpreter %s resolve denied", __func__, path);

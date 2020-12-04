@@ -32,7 +32,7 @@ typedef enum {
 											  or disk (either a user-label or category-label) and
 											  one of those resources is exceeded, the task fails.
 											  Otherwise it is retried until a large enough worker
-											  connects to the master, using the maximum values
+											  connects to the manager, using the maximum values
 											  specified, and the maximum values so far seen for
 											  resources not specified. */
 

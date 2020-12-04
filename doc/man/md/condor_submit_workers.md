@@ -34,7 +34,7 @@
 or
 
 ```
-****condor_submit_workers [options] --master-name <name> <num-workers>****
+****condor_submit_workers [options] --manager-name <name> <num-workers>****
 ```
 
 
@@ -45,24 +45,24 @@ The number of **work_queue_worker** scheduled and run is given by the **num-work
 argument.
 
 The **servername** and **port** arguments specify the hostname and port number of the
-master for the work_queue_worker to connect. Alternatively, this information can be obtained from
-the catalog server by specifying the name of the work queue using the --master-name parameter.
+manager for the work_queue_worker to connect. Alternatively, this information can be obtained from
+the catalog server by specifying the name of the work queue using the --manager-name parameter.
 
 ## OPTIONS
 
-- **-M --master-name <name>** Name of the preferred master for worker.
+- **-M --manager-name <name>** Name of the preferred manager for worker.
 - **-N --name <name>** Same as -M (backwards compatibility).
 - **-C --catalog <catalog>** Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT.
 - **-t --timeout <time>** Abort after this amount of idle time (default=900s).
 - **-d --debug <subsystem>** Enable debugging on worker for this subsystem (try -d all to start).
 - **-w --tcp-window-size <size>** Set TCP window size
-- **-i --min-backoff <time>** Set initial value for backoff interval when worker fails to connect to a master. (default=1s)
-- **-b --max-backoff <time>** Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)
+- **-i --min-backoff <time>** Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+- **-b --max-backoff <time>** Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
 - **-z --disk-threshold <size>** Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
-- **-A --arch <arch>** Set architecture string for the worker to report to master instead of the value in uname.
-- **-O --os <os>** Set operating system string for the worker to report to master instead of the value in uname.
+- **-A --arch <arch>** Set architecture string for the worker to report to manager instead of the value in uname.
+- **-O --os <os>** Set operating system string for the worker to report to manager instead of the value in uname.
 - **-s --workdir <path>** Set the location for creating the working directory of the worker.
-- **-P ----password <file>** Password file to authenticate workers to master.
+- **-P ----password <file>** Password file to authenticate workers to manager.
 - **--cores cores** Set the number of cores each worker should use (0=auto). (default=1)
 - **--memory size** Manually set the amonut of memory (in MB) reported by this worker.
 - **--disk size** Manually set the amount of disk (in MB) reported by this worker.
@@ -74,10 +74,10 @@ On success, returns zero. On failure, returns non-zero.
 
 ## EXAMPLES
 
-Submit 10 worker instances to run on Condor and connect to a specific master:
+Submit 10 worker instances to run on Condor and connect to a specific manager:
 
 ```
-condor_submit_workers master.somewhere.edu 9123 10
+condor_submit_workers manager.somewhere.edu 9123 10
 ```
 
 Submit 10 work_queue_worker instances to run on Condor in auto mode with their

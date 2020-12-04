@@ -2283,7 +2283,7 @@ int main(int argc, char *argv[])
 			gc_alarm = time(0) + GC_TIMEOUT;
 		}
 
-		/* Wait for action on one of two ports: the master TCP port, or the internal pipe. */
+		/* Wait for action on one of two ports: the main TCP port, or the internal pipe. */
 		/* If the limit of child procs has been reached, don't watch the TCP port. */
 
 		fd_set rfds;

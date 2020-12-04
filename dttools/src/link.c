@@ -435,23 +435,23 @@ struct link *link_serve_address(const char *addr, int port)
 	return 0;
 }
 
-struct link *link_accept(struct link *master, time_t stoptime)
+struct link *link_accept(struct link *parent, time_t stoptime)
 {
 	struct link *link = 0;
 	int fd = -1;
 
-	if(master->type == LINK_TYPE_FILE) {
+	if(parent->type == LINK_TYPE_FILE) {
 		return NULL;
 	}
 
 	do {
-		fd = accept(master->fd, 0, 0);
+		fd = accept(parent->fd, 0, 0);
 		if (fd >= 0) {
 			break;
 		} else if (stoptime == LINK_NOWAIT && errno_is_temporary(errno)) {
 				return NULL;
 		}
-		if(!link_sleep(master, stoptime, 1, 0)) {
+		if(!link_sleep(parent, stoptime, 1, 0)) {
 				goto failure;
 		}
 	} while(1);

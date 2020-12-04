@@ -28,30 +28,30 @@
 dispatched through Work Queue
 
 ## SYNOPSIS
-****work_queue_worker [options] <masterhost> <port>****
+****work_queue_worker [options] <managerhost> <port>****
 
-****work_queue_worker [options] <masterhost:port]>****
+****work_queue_worker [options] <managerhost:port]>****
 
-****work_queue_worker [options] "<masterhost:port;[masterhost:port;masterhost:port;...]>****"
+****work_queue_worker [options] "<managerhost:port;[managerhost:port;managerhost:port;...]>****"
 
 ****work_queue_worker [options] -M <projectname>****
 
 ## DESCRIPTION
 
 **work_queue_worker** is the worker process for executing tasks dispatched
-from a master application built using the **Work Queue** API. **work_queue_worker**
-connects to the master application, accepts, runs, and returns tasks dispatched to it.
+from a manager application built using the **Work Queue** API. **work_queue_worker**
+connects to the manager application, accepts, runs, and returns tasks dispatched to it.
 
 
 
-The **masterhost** and **port** arguments specify the hostname and port
-number of the master application for work_queue_worker to connect. Several
-masterhosts and ports may be specified, separated with a semicolon (;), with the
-worker connecting to any of the masters specified (When specifying multiple
-masters, remember to escape the ; from shell interpretation, for example, using
+The **managerhost** and **port** arguments specify the hostname and port
+number of the manager application for work_queue_worker to connect. Several
+managerhosts and ports may be specified, separated with a semicolon (;), with the
+worker connecting to any of the managers specified (When specifying multiple
+managers, remember to escape the ; from shell interpretation, for example, using
 quotes.)
 
-Alternatevely, the master may be specified by name, using the **-M** option.
+Alternatevely, the manager may be specified by name, using the **-M** option.
 
 
 
@@ -63,23 +63,23 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 
 - **-v** Show version string.
 - **-h** Show this help message.
-- **-N ---M <master-name>** Set the name of the project this worker should work for.  A worker can have multiple projects.
+- **-N ---M <manager-name>** Set the name of the project this worker should work for.  A worker can have multiple projects.
 - **-C --catalog <catalog>** Set catalog server to <catalog>. Format: HOSTNAME:PORT
 - **-d --debug <flag>** Enable debugging for the given subsystem. Try -d all as a start.
 - **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **--debug-max-rotate bytes** Set the maximum file size of the debug log.  If the log exceeds this size, it is renamed to "filename.old" and a new logfile is opened.  (default=10M. 0 disables)
-- **--debug-release-reset** Debug file will be closed, renamed, and a new one opened after being released from a master.
+- **--debug-release-reset** Debug file will be closed, renamed, and a new one opened after being released from a manager.
 - **--foreman** Enable foreman mode.
 - **-f --foreman-name <name>** Set the project name of this foreman to <project>. Implies --foreman.
 - **--foreman-port port[:highport]**  Set the port for the foreman to listen on.  If <highport> is specified the port is chosen from between <port> and <highport>. Implies --foreman.
 - **-Z --foreman-port-file <file>** Select port to listen to at random and write to this file.  Implies --foreman.
 - **-F --fast-abort <mult>** Set the fast abort multiplier for foreman (default=disabled).
 - **--specify-log logfile** Send statistics about foreman to this file.
-- **-P --password <pwfile>** Password file for authenticating to the master.
+- **-P --password <pwfile>** Password file for authenticating to the manager.
 - **-t --timeout <time>** Abort after this amount of idle time. (default=900s)
 - **-w --tcp-window-size <size>** Set TCP window size.
-- **-i --min-backoff <time>** Set initial value for backoff interval when worker fails to connect to a master. (default=1s)
-- **-b --max-backoff <time>** Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)
+- **-i --min-backoff <time>** Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+- **-b --max-backoff <time>** Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
 - **-z --disk-threshold <size>** Minimum free disk space in MB. When free disk space is less than this value, the worker will clean up and try to reconnect. (default=100MB)
 - **--memory-threshold size** Set available memory threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
 - **-A --arch <arch>** Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
@@ -101,8 +101,8 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 ## FOREMAN MODE
 
 **work_queue_worker** can also be run in **foreman** mode, in which it connects to a
-master as a worker while acting as a master itself.  Any tasks the foreman receives from
-its master are sent to its subordinate worker processes.
+manager as a worker while acting as a manager itself.  Any tasks the foreman receives from
+its manager are sent to its subordinate worker processes.
 
 
 
@@ -113,7 +113,7 @@ contact the foreman.
 
 ## CONTAINER MODE
 **work_queue_worker** can be run with container. Docker is the default management tool and docker deamon should be enabled
-in computing nodes. Tasks received from master can be run with container based on user specified docker image.
+in computing nodes. Tasks received from manager can be run with container based on user specified docker image.
 
 
 
@@ -128,13 +128,13 @@ On success, returns zero.  On failure, returns non-zero.
 
 ## EXAMPLES
 
-To run **work_queue_worker** to join a specific master process running on host **master.somewhere.edu** port 9123:
+To run **work_queue_worker** to join a specific manager process running on host **manager.somewhere.edu** port 9123:
 ```
-% work_queue_worker master.somewhere.edu 9123
+% work_queue_worker manager.somewhere.edu 9123
 ```
 
 To run **work_queue_worker** in auto mode with debugging turned on for all subsystems and
-to accept tasks only from a master application with project name set to project_A:
+to accept tasks only from a manager application with project name set to project_A:
 ```
 % work_queue_worker -a -d all -M project_A
 ```

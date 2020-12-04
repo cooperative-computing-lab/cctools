@@ -43,9 +43,9 @@ static const struct option long_options[] = {
 void print_help() {
     printf("usage: mpi_submitter [options]\n");
     printf(" -K,--makeflow                    Use Makeflow -T mpi instead of mpi_starter or mpi_worker\n");
-    printf(" -m,--makeflow-arguments          Options to pass to makeflow master\n");
+    printf(" -m,--makeflow-arguments          Options to pass to makeflow manager\n");
     printf(" -q,--workqueue-arguments         Options to pass to work_queue_workers\n");
-    printf(" -p,--makeflow-port               The port to set the makeflow master to use\n");
+    printf(" -p,--makeflow-port               The port to set the makeflow manager to use\n");
     printf(" -w,--slots                       How many Slots per-submission\n");
     printf(" -W,--max-submits                 Maximum number of submissions to do\n");
     printf(" -c,--cores-per-worker            How many cores per worker on each node submitted\n");

@@ -1,5 +1,5 @@
 {
-	"master-name": "my_masters.*",
+	"manager-name": "my_managers.*",
 	"max-workers": 400,
 	"min-workers": 1,
 	"cores":     8,
