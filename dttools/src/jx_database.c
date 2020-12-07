@@ -162,6 +162,9 @@ static void log_select( struct jx_database *db )
 		checkpoint_write(db,filename);
 	}
 
+	// Reset the time so that an absolute time record comes next.
+	db->last_log_time = 0;
+
 }
 
 /* If time has advanced since the last event, log a time record. */
@@ -169,10 +172,14 @@ static void log_select( struct jx_database *db )
 static void log_time( struct jx_database *db )
 {
 	time_t current = time(0);
-	if(db->last_log_time!=current) {
-		db->last_log_time = current;
+	if(db->last_log_time==0) {
 		fprintf(db->logfile,"T %lld\n",(long long)current);
+		db->last_log_time = current;
+	} else if(db->last_log_time!=current) {
+		fprintf(db->logfile,"t %lld\n",(long long)current-db->last_log_time);
+		db->last_log_time = current;
 	}
+
 }
 
 /* Log a complete message with time, a newline, then delete it. */
@@ -391,6 +398,15 @@ static int log_replay( struct jx_database *db, const char *filename, time_t snap
 				corrupt_data(filename,line);
 				continue;
 			}
+			if(current>snapshot) break;
+		} else if(line[0]=='t') {
+			long long change;
+			n = sscanf(line,"t %lld",&change);
+			if(n!=1) {
+				corrupt_data(filename,line);
+				continue;
+			}
+			current = current + change;
 			if(current>snapshot) break;
 		} else if(line[0]=='\n') {
 			continue;
