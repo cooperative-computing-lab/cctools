@@ -32,9 +32,11 @@ static char * cluster_options = NULL;
 static char * cluster_jobname_var = NULL;
 
 int batch_job_verbose_jobnames = 0;
+int batch_job_disable_heartbeat = 0;
 
-int heartbeat_rate =  30;	//in seconds. rate at which hearbeats are written to the log.
-int heartbeat_max  = 120;	//in seconds. maximum wait for a heartbeat before gibing up on the job.
+static int heartbeat_rate =  30;	//in seconds. rate at which hearbeats are written to the log.
+static int heartbeat_max  = 120;	//in seconds. maximum wait for a heartbeat before gibing up on the job.
+
 
 /*
 Principle of operation:
@@ -93,19 +95,23 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "echo start $starttime > $logfile\n");
 
-	// Write a heartbeat to the log file, in case the batch system removes the job from under us.
-	fprintf(file, "(while true; do sleep %d; echo alive $(date +%%s) >> $logfile; done) &\n", heartbeat_rate);
-	fprintf(file, "pid_heartbeat=$!\n");
+	if(!batch_job_disable_heartbeat) {
+		// Write a heartbeat to the log file, in case the batch system removes the job from under us.
+		fprintf(file, "(while true; do sleep %d; echo alive $(date +%%s) >> $logfile; done) &\n", heartbeat_rate);
+		fprintf(file, "pid_heartbeat=$!\n");
+	}
 
 	// The command to run is taken from the environment.
 	fprintf(file, "eval \"$BATCH_JOB_COMMAND\"\n\n");
 
 	// When done, write the status and time to the logfile.
 	fprintf(file, "status=$?\n");
-	fprintf(file, "kill $pid_heartbeat\n");
+	if(!batch_job_disable_heartbeat) {
+		fprintf(file, "kill $pid_heartbeat\n");
+	}
 	fprintf(file, "stoptime=`date +%%s`\n");
 	fprintf(file, "echo stop $status $stoptime >> $logfile\n");
-	fprintf(file, "EOF\n");
+	fprintf(file, "exit 0\n");
 	fclose(file);
 
 	return 1;
@@ -341,7 +347,7 @@ static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct bat
 				info->log_pos = ftell(file);
 				fclose(file);
 
-				if(time(0) - info->heartbeat > heartbeat_max) {
+				if(!batch_job_disable_heartbeat && (time(0) - info->heartbeat > heartbeat_max)) {
 						warn(D_BATCH, "job %" PRIbjid " does not appear to be running anymore.", jobid);
 						if(!info->started)
 							info->started = info->heartbeat;
