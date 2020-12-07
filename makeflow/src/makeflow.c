@@ -201,6 +201,12 @@ Would be better implemented as a batch system feature.
 
 extern int batch_job_verbose_jobnames;
 
+/**
+Hack: Disable batch job feature which generates and checks heartbeats.
+*/
+
+extern int batch_job_disable_heartbeat;
+
 /*
 Wait upto this many seconds for an output file of a succesfull task
 to appear on the local filesystem (e.g, to deal with NFS
@@ -1220,6 +1226,7 @@ static void show_help_run(const char *cmd)
 	printf("    --amazon-batch-img=<img>    Specify Amazon ECS Image(Used for amazon-batch)\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
+	printf("    --disable-heartbeat         Disable job heartbeat check.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
 	printf("    --local-memory=#            Max amount of local memory (MB) to use.\n");
 	printf("    --local-disk=#              Max amount of local disk (MB) to use.\n");
@@ -1469,6 +1476,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_MPI_CORES,
 		LONG_OPT_MPI_MEMORY,
 		LONG_OPT_TLQ,
+		LONG_OPT_DISABLE_HEARTBEAT
 	};
 
 	static const struct option long_options_run[] = {
@@ -1487,6 +1495,7 @@ int main(int argc, char *argv[])
 		{"debug-rotate-max", required_argument, 0, LONG_OPT_DEBUG_ROTATE_MAX},
 		{"disable-afs-check", no_argument, 0, 'A'},
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
+		{"disable-heartbeat", no_argument, 0, LONG_OPT_DISABLE_HEARTBEAT},
 		{"email", required_argument, 0, 'm'},
 		{"enable_hook_example", no_argument, 0, LONG_OPT_HOOK_EXAMPLE},
 		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
@@ -1827,6 +1836,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_DISABLE_BATCH_CACHE:
 				cache_mode = 0;
+				break;
+			case LONG_OPT_DISABLE_HEARTBEAT:
+				batch_job_disable_heartbeat = 1;
 				break;
 			case LONG_OPT_HOOK_EXAMPLE:
 				if (makeflow_hook_register(&makeflow_hook_example, &hook_args) == MAKEFLOW_HOOK_FAILURE)
