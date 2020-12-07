@@ -105,7 +105,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	fprintf(file, "kill $pid_heartbeat\n");
 	fprintf(file, "stoptime=`date +%%s`\n");
 	fprintf(file, "echo stop $status $stoptime >> $logfile\n");
-	fprintf(file, "EOF\n");
+	fprintf(file, "exit 0\n");
 	fclose(file);
 
 	return 1;
