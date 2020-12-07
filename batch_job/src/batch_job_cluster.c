@@ -84,7 +84,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
 	}
 
-	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
+	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS || q->type==BATCH_QUEUE_TYPE_LSF) {
 		fprintf(file, "cd %s\n", path);
 	}
 
