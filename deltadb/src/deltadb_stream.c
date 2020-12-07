@@ -114,6 +114,20 @@ int deltadb_process_stream( struct deltadb *db, FILE *stream, time_t starttime, 
 
 			if(stoptime && current>stoptime) return 0;
 
+		} else if(line[0]=='t') {
+			long long change;
+			n = sscanf(line,"t %lld",&change);
+			if(n!=1) {
+				corrupt_data(filename,line);
+				continue;
+			}
+
+			current += change;
+
+			if(!deltadb_time_event(db,starttime,stoptime,current)) break;
+
+			if(stoptime && current>stoptime) return 0;
+
 		} else if(line[0]=='\n') {
 			continue;
 		} else {
