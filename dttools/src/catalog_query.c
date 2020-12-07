@@ -64,6 +64,17 @@ const char *parse_hostlist(const char *hosts, char *host, int *port)
 	return next ? next + 1 : NULL;
 }
 
+/*
+This function is a bit complex for backwards compatibility.
+Ideally, we send the query string to /query/XXX, where XXX
+is the b64 encoded filter expression.
+
+However, we could be dealing with an old catalog server that
+does not understand this syntax.  In this case, it will respond
+to the query with non-JSON data.  If that happens, fall back
+to the old URL to see if it works.
+*/
+
 struct jx *catalog_query_send_query( struct catalog_host *h, struct jx *expr, time_t stoptime )
 {
 	char *expr_str = expr ? jx_print_string(expr) : strdup("true");
@@ -72,18 +83,12 @@ struct jx *catalog_query_send_query( struct catalog_host *h, struct jx *expr, ti
 	buffer_init(&buf);
 	b64_encode(expr_str,strlen(expr_str),&buf);
 
-	/*
-	In the near future, change this code to exploit the native
-	remote query on the catalog server.  Wait until the catalog
-	has been adequately deployed before changing the clients.
-	*/
-	// char * url = string_format("http://%s:%d/query/%s",h->host,h->port,buffer_tostring(&buf));
+	char *url = string_format("http://%s:%d/query/%s",h->host,h->port,buffer_tostring(&buf));
+	debug(D_DEBUG,"trying catalog query: %s",url);
 
-	char *url = string_format("http://%s:%d/query.json",h->host,h->port);
 	struct link *link = http_query(url, "GET", stoptime);
 
 	free(url);
-	//free(fallback_url);
 	buffer_free(&buf);
 	free(expr_str);
 
@@ -94,8 +99,20 @@ struct jx *catalog_query_send_query( struct catalog_host *h, struct jx *expr, ti
 	link_close(link);
 
 	if(!j) {
-		debug(D_DEBUG,"query result failed to parse as JSON");
-		return NULL;
+		url = string_format("http://%s:%d/query.json",h->host,h->port);
+		debug(D_DEBUG,"falling back to old query: %s",url);
+		link = http_query(url, "GET", stoptime);
+		free(url);
+		if(!link) return 0;
+
+		j = jx_parse_link(link,stoptime);
+		link_close(link);
+		if(!j) {
+			debug(D_DEBUG,"query result failed to parse as JSON");
+			return NULL;
+		}
+
+		// fall through here
 	}
 
 	if(!jx_istype(j,JX_ARRAY)) {
