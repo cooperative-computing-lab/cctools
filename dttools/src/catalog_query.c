@@ -72,14 +72,18 @@ struct jx *catalog_query_send_query( struct catalog_host *h, struct jx *expr, ti
 	buffer_init(&buf);
 	b64_encode(expr_str,strlen(expr_str),&buf);
 
-	char * url = string_format("http://%s:%d/query/%s",h->host,h->port,buffer_tostring(&buf));
-	char * fallback_url = string_format("http://%s:%d/query.json",h->host,h->port);
+	/*
+	In the near future, change this code to exploit the native
+	remote query on the catalog server.  Wait until the catalog
+	has been adequately deployed before changing the clients.
+	*/
+	// char * url = string_format("http://%s:%d/query/%s",h->host,h->port,buffer_tostring(&buf));
 
+	char *url = string_format("http://%s:%d/query.json",h->host,h->port);
 	struct link *link = http_query(url, "GET", stoptime);
-	if(!link) link = http_query(fallback_url, "GET", stoptime );
 
 	free(url);
-	free(fallback_url);
+	//free(fallback_url);
 	buffer_free(&buf);
 	free(expr_str);
 
