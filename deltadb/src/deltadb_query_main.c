@@ -257,6 +257,8 @@ int main( int argc, char *argv[] )
 		deltadb_query_execute_dir(query,dbdir,start_time,stop_time);
 	} else if(dbhost) {
 
+		if(!filter_expr) filter_expr = jx_boolean(1);
+
 		buffer_t buf;
 		buffer_init(&buf);
 		char *filter_str = jx_print_string(filter_expr);

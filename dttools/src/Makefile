@@ -61,7 +61,6 @@ SOURCES = \
 	itable.c \
 	jx.c \
 	jx_binary.c\
-	jx_database.c \
 	jx_getopt.c \
 	jx_match.c \
 	jx_parse.c \
@@ -179,7 +178,7 @@ endif
 OBJECTS = $(SOURCES:%.c=%.o)
 
 #separate, because catalog_query has a slightly different order of linking.
-MOST_PROGRAMS = catalog_update catalog_server watchdog disk_allocator jx2json jx2env env_replace
+MOST_PROGRAMS = catalog_update watchdog disk_allocator jx2json jx2env env_replace
 PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect

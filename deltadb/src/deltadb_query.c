@@ -9,7 +9,6 @@ See the file COPYING for details.
 #include "deltadb_query.h"
 
 #include "jx_eval.h"
-#include "jx_database.h"
 #include "jx_print.h"
 #include "jx_parse.h"
 
