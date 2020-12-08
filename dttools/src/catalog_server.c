@@ -638,6 +638,9 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "</center>\n");
 	} else {
 		send_http_response(stream,404,"Not Found","text/html");
+		fprintf(stream,"<p>Error 404: Invalid URL</p>");
+		fprintf(stream,"<pre>%s</pre>",url);
+		fprintf(stream,"<p><a href=/>Return to Index</a></p>");
 	}
 	fclose(stream);
 }
