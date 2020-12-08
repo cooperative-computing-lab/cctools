@@ -46,53 +46,53 @@ struct deltadb_query {
 
 struct deltadb_query * deltadb_query_create()
 {
-	struct deltadb_query *db = malloc(sizeof(*db));
-	memset(db,0,sizeof(*db));
-	db->table = hash_table_create(0,0);
-	db->output_stream = stdout;
-	db->output_exprs = list_create();
-	db->reduce_exprs = list_create();
-	return db;
+	struct deltadb_query *query = malloc(sizeof(*query));
+	memset(query,0,sizeof(*query));
+	query->table = hash_table_create(0,0);
+	query->output_stream = stdout;
+	query->output_exprs = list_create();
+	query->reduce_exprs = list_create();
+	return query;
 }
 
-void deltadb_query_set_output( struct deltadb_query *db, FILE *stream )
+void deltadb_query_set_output( struct deltadb_query *query, FILE *stream )
 {
-	db->output_stream = stream;
+	query->output_stream = stream;
 }
 
-void deltadb_query_set_display( struct deltadb_query *db, deltadb_display_mode_t mode )
+void deltadb_query_set_display( struct deltadb_query *query, deltadb_display_mode_t mode )
 {
-	db->display_mode = mode;
+	query->display_mode = mode;
 }
 
-void deltadb_query_set_filter( struct deltadb_query *db, struct jx *expr )
+void deltadb_query_set_filter( struct deltadb_query *query, struct jx *expr )
 {
-	db->filter_expr = expr;
+	query->filter_expr = expr;
 }
 
-void deltadb_query_set_where( struct deltadb_query *db, struct jx *expr )
+void deltadb_query_set_where( struct deltadb_query *query, struct jx *expr )
 {
-	db->where_expr = expr;
+	query->where_expr = expr;
 }
 
-void deltadb_query_set_epoch_mode( struct deltadb_query *db, int mode )
+void deltadb_query_set_epoch_mode( struct deltadb_query *query, int mode )
 {
-	db->epoch_mode = mode;
+	query->epoch_mode = mode;
 }
 
-void deltadb_query_set_interval( struct deltadb_query *db, int interval )
+void deltadb_query_set_interval( struct deltadb_query *query, int interval )
 {
-	db->display_every = interval;
+	query->display_every = interval;
 }
 
-void deltadb_query_add_output( struct deltadb_query *db, struct jx *expr )
+void deltadb_query_add_output( struct deltadb_query *query, struct jx *expr )
 {
-	list_push_tail(db->output_exprs,expr);
+	list_push_tail(query->output_exprs,expr);
 }
 
-void deltadb_query_add_reduction( struct deltadb_query *db, struct deltadb_reduction *r )
+void deltadb_query_add_reduction( struct deltadb_query *query, struct deltadb_reduction *r )
 {
-	list_push_tail(db->reduce_exprs,r);
+	list_push_tail(query->reduce_exprs,r);
 }
 
 static int deltadb_boolean_expr( struct jx *expr, struct jx *data )
@@ -109,7 +109,7 @@ static int deltadb_boolean_expr( struct jx *expr, struct jx *data )
 Read a checkpoint in the (deprecated) nvpair format.  This will allow for a seamless upgrade by permitting the new JX database to continue from an nvpair checkpoint.
 */
 
-static int compat_checkpoint_read( struct deltadb_query *db, const char *filename )
+static int compat_checkpoint_read( struct deltadb_query *query, const char *filename )
 {
 	FILE * file = fopen(filename,"r");
 	if(!file) return 0;
@@ -119,11 +119,11 @@ static int compat_checkpoint_read( struct deltadb_query *db, const char *filenam
 		if(nvpair_parse_stream(nv,file)) {
 			const char *key = nvpair_lookup_string(nv,"key");
 			if(key) {
-				nvpair_delete(hash_table_remove(db->table,key));
+				nvpair_delete(hash_table_remove(query->table,key));
 				struct jx *j = nvpair_to_jx(nv);
 				/* skip objects that don't match the filter */
-				if(deltadb_boolean_expr(db->filter_expr,j)) {
-					hash_table_insert(db->table,key,j);
+				if(deltadb_boolean_expr(query->filter_expr,j)) {
+					hash_table_insert(query->table,key,j);
 				} else {
 					jx_delete(j);
 				}
@@ -142,7 +142,7 @@ static int compat_checkpoint_read( struct deltadb_query *db, const char *filenam
 
 /* Get a complete checkpoint file and reconstitute the state of the table. */
 
-static int checkpoint_read( struct deltadb_query *db, const char *filename )
+static int checkpoint_read( struct deltadb_query *query, const char *filename )
 {
 	FILE * file = fopen(filename,"r");
 	if(!file) return 0;
@@ -154,7 +154,7 @@ static int checkpoint_read( struct deltadb_query *db, const char *filename )
 
 	if(!jcheckpoint || jcheckpoint->type!=JX_OBJECT) {
 		jx_delete(jcheckpoint);
-		return compat_checkpoint_read(db,filename);
+		return compat_checkpoint_read(query,filename);
 	}
 
 	/* For each key and value, move the value over to the hash table. */
@@ -164,8 +164,8 @@ static int checkpoint_read( struct deltadb_query *db, const char *filename )
 	struct jx_pair *p;
 	for(p=jcheckpoint->u.pairs;p;p=p->next) {
 		if(p->key->type!=JX_STRING) continue;
-		if(!deltadb_boolean_expr(db->filter_expr,p->value)) continue;
-		hash_table_insert(db->table,p->key->u.string_value,p->value);
+		if(!deltadb_boolean_expr(query->filter_expr,p->value)) continue;
+		hash_table_insert(query->table,p->key->u.string_value,p->value);
 		p->value = 0;
 	}
 
@@ -176,11 +176,11 @@ static int checkpoint_read( struct deltadb_query *db, const char *filename )
 	return 1;
 }
 
-static void display_reduce_exprs( struct deltadb_query *db, time_t current )
+static void display_reduce_exprs( struct deltadb_query *query, time_t current )
 {
 	/* Reset all reductions. */
-	list_first_item(db->reduce_exprs);
-	for(struct deltadb_reduction *r; (r = list_next_item(db->reduce_exprs));) {
+	list_first_item(query->reduce_exprs);
+	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
 		deltadb_reduction_reset(r);
 	}
 
@@ -188,15 +188,15 @@ static void display_reduce_exprs( struct deltadb_query *db, time_t current )
 
 	char *key;
 	struct jx *jobject;
-	hash_table_firstkey(db->table);
-	while(hash_table_nextkey(db->table,&key,(void**)&jobject)) {
+	hash_table_firstkey(query->table);
+	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
 
 		/* Skip if the where expression doesn't match */
-		if(!deltadb_boolean_expr(db->where_expr,jobject)) continue;
+		if(!deltadb_boolean_expr(query->where_expr,jobject)) continue;
 
 		/* Update each reduction with its value. */
-		list_first_item(db->reduce_exprs);
-		for(struct deltadb_reduction *r; (r = list_next_item(db->reduce_exprs));) {
+		list_first_item(query->reduce_exprs);
+		for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
 			struct jx *value = jx_eval(r->expr,jobject);
 			if(value && !jx_istype(value, JX_ERROR)) {
 				if(value->type==JX_INTEGER) {
@@ -215,58 +215,58 @@ static void display_reduce_exprs( struct deltadb_query *db, time_t current )
 
 	/* Emit the current time */
 
-	if(db->epoch_mode) {
-		fprintf(db->output_stream,"%lld\t",(long long) current);
+	if(query->epoch_mode) {
+		fprintf(query->output_stream,"%lld\t",(long long) current);
 	} else {
 		char str[32];
 		strftime(str,sizeof(str),"%F %T",localtime(&current));
-		fprintf(db->output_stream,"%s\t",str);
+		fprintf(query->output_stream,"%s\t",str);
 	}
 
 	/* For each reduction, display the final value. */
-	list_first_item(db->reduce_exprs);
-	for(struct deltadb_reduction *r; (r = list_next_item(db->reduce_exprs));) {
-		fprintf(db->output_stream,"%lf\t",deltadb_reduction_value(r));
+	list_first_item(query->reduce_exprs);
+	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
+		fprintf(query->output_stream,"%lf\t",deltadb_reduction_value(r));
 	}
 
-	fprintf(db->output_stream,"\n");
+	fprintf(query->output_stream,"\n");
 
 }
 
-static void display_output_exprs( struct deltadb_query *db, time_t current )
+static void display_output_exprs( struct deltadb_query *query, time_t current )
 {
 	/* For each item in the table... */
 
 	char *key;
 	struct jx *jobject;
-	hash_table_firstkey(db->table);
-	while(hash_table_nextkey(db->table,&key,(void**)&jobject)) {
+	hash_table_firstkey(query->table);
+	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
 
 		/* Skip if the where expression doesn't match */
 
-		if(!deltadb_boolean_expr(db->where_expr,jobject)) continue;
+		if(!deltadb_boolean_expr(query->where_expr,jobject)) continue;
 
 		/* Emit the current time */
 
-		if(db->epoch_mode) {
-			fprintf(db->output_stream,"%lld\t",(long long) current);
+		if(query->epoch_mode) {
+			fprintf(query->output_stream,"%lld\t",(long long) current);
 		} else {
 			char str[32];
 			strftime(str,sizeof(str),"%F %T",localtime(&current));
-			fprintf(db->output_stream,"%s\t",str);
+			fprintf(query->output_stream,"%s\t",str);
 		}
 
 		/* For each output expression, compute the value and print. */
 
-		list_first_item(db->output_exprs);
-		for(struct jx *j; (j = list_next_item(db->output_exprs));) {
+		list_first_item(query->output_exprs);
+		for(struct jx *j; (j = list_next_item(query->output_exprs));) {
 			struct jx *jvalue = jx_eval(j,jobject);
-			jx_print_stream(jvalue,db->output_stream);
-			fprintf(db->output_stream,"\t");
+			jx_print_stream(jvalue,query->output_stream);
+			fprintf(query->output_stream,"\t");
 			jx_delete(jvalue);
 		}
 
-		fprintf(db->output_stream,"\n");
+		fprintf(query->output_stream,"\n");
 	}
 }
 
@@ -276,42 +276,42 @@ we store incoming T records as "deferred time" and then only
 output if another record type intervenes.
 */
 
-static void display_deferred_time( struct deltadb_query *db )
+static void display_deferred_time( struct deltadb_query *query )
 {
-	if(db->deferred_time) {
-		fprintf(db->output_stream,"T %ld\n",db->deferred_time);
-		db->deferred_time = 0;
+	if(query->deferred_time) {
+		fprintf(query->output_stream,"T %ld\n",query->deferred_time);
+		query->deferred_time = 0;
 	}
 }
 
-int deltadb_create_event( struct deltadb_query *db, const char *key, struct jx *jobject )
+int deltadb_create_event( struct deltadb_query *query, const char *key, struct jx *jobject )
 {
-	if(!deltadb_boolean_expr(db->filter_expr,jobject)) {
+	if(!deltadb_boolean_expr(query->filter_expr,jobject)) {
 		jx_delete(jobject);
 		return 1;
 	}
 
-	hash_table_insert(db->table,key,jobject);
+	hash_table_insert(query->table,key,jobject);
 
-	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
-		display_deferred_time(db);
-		fprintf(db->output_stream,"C %s ",key);
-		jx_print_stream(jobject,db->output_stream);
-		fprintf(db->output_stream,"\n");
+	if(query->display_mode==DELTADB_DISPLAY_STREAM) {
+		display_deferred_time(query);
+		fprintf(query->output_stream,"C %s ",key);
+		jx_print_stream(jobject,query->output_stream);
+		fprintf(query->output_stream,"\n");
 	}
 	return 1;
 }
 
-int deltadb_delete_event( struct deltadb_query *db, const char *key )
+int deltadb_delete_event( struct deltadb_query *query, const char *key )
 {
-	struct jx *jobject = hash_table_remove(db->table,key);
+	struct jx *jobject = hash_table_remove(query->table,key);
 
 	if(jobject) {
 		jx_delete(jobject);
 
-		if(db->display_mode==DELTADB_DISPLAY_STREAM) {
-			display_deferred_time(db);
-			fprintf(db->output_stream,"D %s\n",key);
+		if(query->display_mode==DELTADB_DISPLAY_STREAM) {
+			display_deferred_time(query);
+			fprintf(query->output_stream,"D %s\n",key);
 		}
 	}
 	return 1;
@@ -343,19 +343,19 @@ static void jx_merge_into( struct jx *current, struct jx *update )
 	}
 }
 
-int deltadb_merge_event( struct deltadb_query *db, const char *key, struct jx *update )
+int deltadb_merge_event( struct deltadb_query *query, const char *key, struct jx *update )
 {
-	struct jx *current = hash_table_lookup(db->table,key);
+	struct jx *current = hash_table_lookup(query->table,key);
 	if(!current) {
 		/* If the key is not found, it was filtered out; skip the update. */
 		jx_delete(update);
 		return 1;
 	}
 
-	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
-		display_deferred_time(db);
+	if(query->display_mode==DELTADB_DISPLAY_STREAM) {
+		display_deferred_time(query);
 		char *str = jx_print_string(update);
-		fprintf(db->output_stream,"M %s %s\n",key,str);
+		fprintf(query->output_stream,"M %s %s\n",key,str);
 		free(str);
 	}
 
@@ -366,9 +366,9 @@ int deltadb_merge_event( struct deltadb_query *db, const char *key, struct jx *u
 	return 1;
 }
 
-int deltadb_update_event( struct deltadb_query *db, const char *key, const char *name, struct jx *jvalue )
+int deltadb_update_event( struct deltadb_query *query, const char *key, const char *name, struct jx *jvalue )
 {
-	struct jx * jobject = hash_table_lookup(db->table,key);
+	struct jx * jobject = hash_table_lookup(query->table,key);
 	if(!jobject) {
 		jx_delete(jvalue);
 		return 1;
@@ -378,55 +378,55 @@ int deltadb_update_event( struct deltadb_query *db, const char *key, const char 
 	jx_delete(jx_remove(jobject,jname));
 	jx_insert(jobject,jname,jvalue);
 
-	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
-		display_deferred_time(db);
+	if(query->display_mode==DELTADB_DISPLAY_STREAM) {
+		display_deferred_time(query);
 		char *str = jx_print_string(jvalue);
-		fprintf(db->output_stream,"U %s %s %s\n",key,name,str);
+		fprintf(query->output_stream,"U %s %s %s\n",key,name,str);
 		free(str);
 	}
 
 	return 1;
 }
 
-int deltadb_remove_event( struct deltadb_query *db, const char *key, const char *name )
+int deltadb_remove_event( struct deltadb_query *query, const char *key, const char *name )
 {
-	struct jx *jobject = hash_table_lookup(db->table,key);
+	struct jx *jobject = hash_table_lookup(query->table,key);
 	if(!jobject) return 1;
 
 	struct jx *jname = jx_string(name);
 	jx_delete(jx_remove(jobject,jname));
 	jx_delete(jname);
 
-	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
-		display_deferred_time(db);
-		fprintf(db->output_stream,"R %s %s\n",key,name);
+	if(query->display_mode==DELTADB_DISPLAY_STREAM) {
+		display_deferred_time(query);
+		fprintf(query->output_stream,"R %s %s\n",key,name);
 		return 1;
 	}
 
 	return 1;
 }
 
-int deltadb_time_event( struct deltadb_query *db, time_t starttime, time_t stoptime, time_t current )
+int deltadb_time_event( struct deltadb_query *query, time_t starttime, time_t stoptime, time_t current )
 {
 	if(current>stoptime) return 0;
 
-	if(current < (db->display_next)) return 1;
+	if(current < (query->display_next)) return 1;
 
-	db->display_next += db->display_every;
+	query->display_next += query->display_every;
 
-	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
-		db->deferred_time = current;
+	if(query->display_mode==DELTADB_DISPLAY_STREAM) {
+		query->deferred_time = current;
 		return 1;
-	} else if(db->display_mode==DELTADB_DISPLAY_OBJECT) {
-		display_output_exprs(db,current);
-	} else if(db->display_mode==DELTADB_DISPLAY_REDUCE) {
-		display_reduce_exprs(db,current);
+	} else if(query->display_mode==DELTADB_DISPLAY_OBJECT) {
+		display_output_exprs(query,current);
+	} else if(query->display_mode==DELTADB_DISPLAY_REDUCE) {
+		display_reduce_exprs(query,current);
 	}
 
 	return 1;
 }
 
-int deltadb_post_event( struct deltadb_query *db, const char *line )
+int deltadb_post_event( struct deltadb_query *query, const char *line )
 {
 	return 1;
 }
@@ -449,10 +449,10 @@ static int days_in_year( int y )
 Execute a query on a single data stream.
 */
 
-int deltadb_query_execute_stream( struct deltadb_query *db, FILE *stream, time_t starttime, time_t stoptime )
+int deltadb_query_execute_stream( struct deltadb_query *query, FILE *stream, time_t starttime, time_t stoptime )
 {
-	db->display_next = starttime;
-	return deltadb_process_stream(db,stream,starttime,stoptime);
+	query->display_next = starttime;
+	return deltadb_process_stream(query,stream,starttime,stoptime);
 }
 
 /*
@@ -461,11 +461,11 @@ Play the log from starttime to stoptime by opening the appropriate
 checkpoint file and working ahead in the various log files.
 */
 
-int deltadb_query_execute_dir( struct deltadb_query *db, const char *logdir, time_t starttime, time_t stoptime )
+int deltadb_query_execute_dir( struct deltadb_query *query, const char *logdir, time_t starttime, time_t stoptime )
 {
 	int file_errors = 0;
 
-	db->display_next = starttime;
+	query->display_next = starttime;
 
 	struct tm *starttm = localtime(&starttime);
 
@@ -478,7 +478,7 @@ int deltadb_query_execute_dir( struct deltadb_query *db, const char *logdir, tim
 	int stopday = stoptm->tm_yday;
 
 	char *filename = string_format("%s/%d/%d.ckpt",logdir,year,day);
-	checkpoint_read(db,filename);
+	checkpoint_read(query,filename);
 	free(filename);
 
 	while(1) {
@@ -493,7 +493,7 @@ int deltadb_query_execute_dir( struct deltadb_query *db, const char *logdir, tim
 
 		} else {
 			free(filename);
-			int keepgoing = deltadb_process_stream(db,file,starttime,stoptime);
+			int keepgoing = deltadb_process_stream(query,file,starttime,stoptime);
 			starttime = 0;
 
 			fclose(file);
