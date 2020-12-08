@@ -4,29 +4,31 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "deltadb_reduction.h"
 #include "hash_table.h"
 #include "jx.h"
 #include "list.h"
 
-typedef enum { MODE_STREAM, MODE_OBJECT, MODE_REDUCE } deltadb_display_mode_t;
+typedef enum {
+  DELTADB_DISPLAY_STREAM,
+  DELTADB_DISPLAY_OBJECT,
+  DELTADB_DISPLAY_REDUCE
+} deltadb_display_mode_t;
 
-struct deltadb {
-	struct hash_table *table;
-	const char *logdir;
-	FILE *logfile;
-	int epoch_mode;
-	struct jx *filter_expr;
-	struct jx *where_expr;
-	struct list * output_exprs;
-	struct list * reduce_exprs;
-	time_t display_every;
-	time_t display_next;
-	time_t deferred_time;
-	deltadb_display_mode_t display_mode;
-};
+struct deltadb * deltadb_create();
 
-struct deltadb * deltadb_create( const char *logdir );
+void deltadb_query_set_display( struct deltadb *db, deltadb_display_mode_t mode );
+void deltadb_query_set_filter( struct deltadb *db, struct jx *expr );
+void deltadb_query_set_where( struct deltadb *db, struct jx *expr );
+void deltadb_query_set_epoch_mode( struct deltadb *db, int mode );
+void deltadb_query_set_interval( struct deltadb *db, int interval );
 
-int deltadb_query_execute( struct deltadb *db, time_t starttime, time_t stoptime );
+void deltadb_query_add_output( struct deltadb *db, struct jx *expr );
+void deltadb_query_add_reduction( struct deltadb *db, struct deltadb_reduction *reduce );
+
+int deltadb_query_execute_dir( struct deltadb *db, const char *dir, time_t starttime, time_t stoptime );
+int deltadb_query_execute_stream( struct deltadb *db, FILE *stream, time_t starttime, time_t stoptime );
+
+void deltadb_query_delete( struct deltadb *db );
 
 #endif

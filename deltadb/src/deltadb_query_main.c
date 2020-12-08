@@ -118,14 +118,15 @@ int main( int argc, char *argv[] )
 	const char *dbfile=0;
 	const char *dbhost=0;
 
-	struct jx *where_expr = 0;
-	struct jx *filter_expr = 0;
-	struct list *output_exprs = list_create();
-	struct list *reduce_exprs = list_create();
+	struct jx *where_expr=0;
+	struct jx *filter_expr=0;
+
 	time_t start_time = 0;
 	time_t stop_time = 0;
 	int display_every = 0;
 	int epoch_mode = 0;
+	int nreduces = 0;
+	int noutputs = 0;
 
 	char reduce_name[1024];
 	char reduce_attr[1024];
@@ -133,6 +134,9 @@ int main( int argc, char *argv[] )
 	time_t current = time(0);
 
 	int c;
+
+	struct deltadb *query = deltadb_create();
+	deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
 
 	while((c=getopt_long(argc,argv,"D:L:o:w:f:F:T:e:tvh",long_options,0))!=-1) {
 		switch(c) {
@@ -160,14 +164,19 @@ int main( int argc, char *argv[] )
 					fprintf(stderr,"deltadb_query: invalid reduction: %s\n",reduce_name);
 					return 1;
 				}
-				list_push_tail(reduce_exprs,r);
+
+				deltadb_query_add_reduction(query,r);
+				deltadb_query_set_display(query,DELTADB_DISPLAY_REDUCE);
+				nreduces++;
 			} else {
 				struct jx *j = jx_parse_string(optarg);
 				if(!j) {
 					fprintf(stderr,"invalid expression: %s\n",optarg);
 					return 1;
 				}
-				list_push_tail(output_exprs,j);
+				deltadb_query_add_output(query,j);
+				deltadb_query_set_display(query,DELTADB_DISPLAY_OBJECT);
+				noutputs++;
 			}
 			break;
 		case 'w':
@@ -180,6 +189,7 @@ int main( int argc, char *argv[] )
 				fprintf(stderr,"invalid expression: %s\n",optarg);
 				return 1;
 			}
+			deltadb_query_set_where(query,where_expr);
 			break;
 		case 'f':
 			if(filter_expr) {
@@ -191,6 +201,7 @@ int main( int argc, char *argv[] )
 				fprintf(stderr,"invalid expression: %s\n",optarg);
 				return 1;
 			}
+			deltadb_query_set_filter(query,filter_expr);
 			break;
 		case 'F':
 			start_time = parse_time(optarg,current);
@@ -200,9 +211,11 @@ int main( int argc, char *argv[] )
 			break;
 		case 'e':
 			display_every = string_time_parse(optarg);
+			deltadb_query_set_interval(query,display_every);
 			break;
 		case 't':
 			epoch_mode = 1;
+			deltadb_query_set_epoch_mode(query,epoch_mode);
 			break;
 		case 'v':
 			cctools_version_print(stdout,"deltadb_query");
@@ -219,7 +232,7 @@ int main( int argc, char *argv[] )
 	}
 
 	if(start_time==0) {
-		fprintf(stderr,"deltadb_query: invalid --from time (must be \"YY-MM-DD\" or \"YY-MM-DD HH:MM:SS\")\n");
+		fprintf(stderr,"deltadb_query: invalid --from time (must be \"YYYY-MM-DD\" or \"YYYY-MM-DD HH:MM:SS\")\n");
 		return 1;
 	}
 
@@ -227,29 +240,9 @@ int main( int argc, char *argv[] )
 		stop_time = time(0);
 	}
 
-	struct deltadb *db = deltadb_create(dbdir);
-
-	db->where_expr = where_expr;
-	db->filter_expr = filter_expr;
-	db->epoch_mode = epoch_mode;
-	db->output_exprs = output_exprs;
-	db->reduce_exprs = reduce_exprs;
-	db->display_every = display_every;
-	db->display_next = start_time;
-
-	if(list_size(db->reduce_exprs) && list_size(db->output_exprs) ) {
-		struct deltadb_reduction *r = list_peek_head(db->reduce_exprs);
-		const char *name = jx_print_string(list_peek_head(db->output_exprs));
-		fprintf(stderr,"deltadb_query: cannot mix reductions like 'MAX(%s)' with plain outputs like '%s'\n",jx_print_string(r->expr),name);
+	if(nreduces>0 && noutputs>0) {
+		fprintf(stderr,"deltadb_query: cannot mix reductions and plain outputs.\n");
 		return 1;
-	}
-
-	if(list_size(db->reduce_exprs)) {
-		db->display_mode = MODE_REDUCE;
-	} else if(list_size(db->output_exprs)) {
-		db->display_mode = MODE_OBJECT;
-	} else {
-		db->display_mode = MODE_STREAM;
 	}
 
 	if(dbfile) {
@@ -258,15 +251,15 @@ int main( int argc, char *argv[] )
 			fprintf(stderr,"deltadb_query: couldn't open %s: %s\n",dbfile,strerror(errno));
 			return 1;
 		}
-		deltadb_process_stream(db,file,start_time,stop_time);
+		deltadb_query_execute_stream(query,file,start_time,stop_time);
 		fclose(file);
-	} else if(dbfile) {
-		deltadb_query_execute(db,start_time,stop_time);
+	} else if(dbdir) {
+		deltadb_query_execute_dir(query,dbdir,start_time,stop_time);
 	} else if(dbhost) {
 
 		buffer_t buf;
 		buffer_init(&buf);
-		char *filter_str = jx_print_string(db->filter_expr);
+		char *filter_str = jx_print_string(filter_expr);
 		b64_encode(filter_str,strlen(filter_str),&buf);
 		char *cmd = string_format("curl http://%s:9097/history/%ld/%ld/%s",dbhost,start_time,stop_time,buffer_tostring(&buf));
 		buffer_free(&buf);
@@ -277,7 +270,7 @@ int main( int argc, char *argv[] )
 			fprintf(stderr,"deltadb_query: couldn't execute '%s': %s\n",cmd,strerror(errno));
 			return 1;
 		}
-		deltadb_process_stream(db,file,start_time,stop_time);
+		deltadb_query_execute_stream(query,file,start_time,stop_time);
 		free(cmd);
 		pclose(file);
 	}

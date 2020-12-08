@@ -30,14 +30,60 @@ See the file COPYING for details.
 #include <stdarg.h>
 #include <ctype.h>
 
-struct deltadb * deltadb_create( const char *logdir )
+struct deltadb {
+	struct hash_table *table;
+	int epoch_mode;
+	struct jx *filter_expr;
+	struct jx *where_expr;
+	struct list * output_exprs;
+	struct list * reduce_exprs;
+	time_t display_every;
+	time_t display_next;
+	time_t deferred_time;
+	deltadb_display_mode_t display_mode;
+};
+
+struct deltadb * deltadb_create()
 {
 	struct deltadb *db = malloc(sizeof(*db));
 	memset(db,0,sizeof(*db));
 	db->table = hash_table_create(0,0);
-	db->logdir = logdir;
-	db->logfile = 0;
 	return db;
+}
+
+void deltadb_query_set_display( struct deltadb *db, deltadb_display_mode_t mode )
+{
+	db->display_mode = mode;
+}
+
+void deltadb_query_set_filter( struct deltadb *db, struct jx *expr )
+{
+	db->filter_expr = expr;
+}
+
+void deltadb_query_set_where( struct deltadb *db, struct jx *expr )
+{
+	db->where_expr = expr;
+}
+
+void deltadb_query_set_epoch_mode( struct deltadb *db, int mode )
+{
+	db->epoch_mode = mode;
+}
+
+void deltadb_query_set_interval( struct deltadb *db, int interval )
+{
+	db->display_every = interval;
+}
+
+void deltadb_query_add_output( struct deltadb *db, struct jx *expr )
+{
+	list_push_tail(db->output_exprs,expr);
+}
+
+void deltadb_query_add_reduction( struct deltadb *db, struct deltadb_reduction *r )
+{
+	list_push_tail(db->reduce_exprs,r);
 }
 
 static int deltadb_boolean_expr( struct jx *expr, struct jx *data )
@@ -238,7 +284,7 @@ int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobjec
 
 	hash_table_insert(db->table,key,jobject);
 
-	if(db->display_mode==MODE_STREAM) {
+	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 		display_deferred_time(db);
 		printf("C %s ",key);
 		jx_print_stream(jobject,stdout);
@@ -254,7 +300,7 @@ int deltadb_delete_event( struct deltadb *db, const char *key )
 	if(jobject) {
 		jx_delete(jobject);
 
-		if(db->display_mode==MODE_STREAM) {
+		if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 			display_deferred_time(db);
 			printf("D %s\n",key);
 		}
@@ -297,7 +343,7 @@ int deltadb_merge_event( struct deltadb *db, const char *key, struct jx *update 
 		return 1;
 	}
 
-	if(db->display_mode==MODE_STREAM) {
+	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 		display_deferred_time(db);
 		char *str = jx_print_string(update);
 		printf("M %s %s\n",key,str);
@@ -323,7 +369,7 @@ int deltadb_update_event( struct deltadb *db, const char *key, const char *name,
 	jx_delete(jx_remove(jobject,jname));
 	jx_insert(jobject,jname,jvalue);
 
-	if(db->display_mode==MODE_STREAM) {
+	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 		display_deferred_time(db);
 		char *str = jx_print_string(jvalue);
 		printf("U %s %s %s\n",key,name,str);
@@ -342,7 +388,7 @@ int deltadb_remove_event( struct deltadb *db, const char *key, const char *name 
 	jx_delete(jx_remove(jobject,jname));
 	jx_delete(jname);
 
-	if(db->display_mode==MODE_STREAM) {
+	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 		display_deferred_time(db);
 		printf("R %s %s\n",key,name);
 		return 1;
@@ -359,12 +405,12 @@ int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, t
 
 	db->display_next += db->display_every;
 
-	if(db->display_mode==MODE_STREAM) {
+	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 		db->deferred_time = current;
 		return 1;
-	} else if(db->display_mode==MODE_OBJECT) {
+	} else if(db->display_mode==DELTADB_DISPLAY_OBJECT) {
 		display_output_exprs(db,current);
-	} else if(db->display_mode==MODE_REDUCE) {
+	} else if(db->display_mode==DELTADB_DISPLAY_REDUCE) {
 		display_reduce_exprs(db,current);
 	}
 
@@ -391,13 +437,26 @@ static int days_in_year( int y )
 }
 
 /*
+Execute a query on a single data stream.
+*/
+
+int deltadb_query_execute_stream( struct deltadb *db, FILE *stream, time_t starttime, time_t stoptime )
+{
+	db->display_next = starttime;
+	return deltadb_process_stream(db,stream,starttime,stoptime);
+}
+
+/*
+Execute a query on a directory structure.
 Play the log from starttime to stoptime by opening the appropriate
 checkpoint file and working ahead in the various log files.
 */
 
-int deltadb_query_execute( struct deltadb *db, time_t starttime, time_t stoptime )
+int deltadb_query_execute_dir( struct deltadb *db, const char *logdir, time_t starttime, time_t stoptime )
 {
 	int file_errors = 0;
+
+	db->display_next = starttime;
 
 	struct tm *starttm = localtime(&starttime);
 
@@ -409,12 +468,12 @@ int deltadb_query_execute( struct deltadb *db, time_t starttime, time_t stoptime
 	int stopyear = stoptm->tm_year + 1900;
 	int stopday = stoptm->tm_yday;
 
-	char *filename = string_format("%s/%d/%d.ckpt",db->logdir,year,day);
+	char *filename = string_format("%s/%d/%d.ckpt",logdir,year,day);
 	checkpoint_read(db,filename);
 	free(filename);
 
 	while(1) {
-		char *filename = string_format("%s/%d/%d.log",db->logdir,year,day);
+		char *filename = string_format("%s/%d/%d.log",logdir,year,day);
 		FILE *file = fopen(filename,"r");
 		if(!file) {
 			file_errors += 1;
@@ -446,4 +505,5 @@ int deltadb_query_execute( struct deltadb *db, time_t starttime, time_t stoptime
 
 	return 1;
 }
+
 
