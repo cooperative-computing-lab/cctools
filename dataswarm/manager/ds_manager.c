@@ -80,7 +80,7 @@ struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct 
 
 	t->taskid = xxstrdup(taskid);
 	t->task = task;
-	t->worker = xxstrdup(task->worker);
+	t->worker = task->worker;
 
 	hash_table_insert(r->tasks, taskid, t);
 	t->next = task->attempts;
@@ -124,7 +124,6 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 		assert(buf);
 		mq_set_tag(conn, NULL);
 
-		char *manager_key = NULL;
 		struct jx *msg = ds_parse_message(buf);
 		buffer_free(buf);
 		free(buf);
@@ -148,16 +147,14 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 			goto DONE;
 		}
 
-		manager_key = string_format("%p",conn);
-		//const char *msg_key = jx_lookup_string(msg, "uuid");
-		/* todo: replace manager_key when msg_key not null */
 		const char *conn_type = jx_lookup_string(params, "type");
 
 		if (conn_type && !strcmp(conn_type, "worker")) {
 			struct ds_worker_rep *w = ds_worker_rep_create(conn);
 			mq_address_remote(conn,w->addr,&w->port);
 			debug(D_DATASWARM,"new worker from %s:%d\n",w->addr,w->port);
-			hash_table_insert(m->worker_table,manager_key,w);
+			set_insert(m->worker_table, w);
+			mq_set_tag(conn, w);
 			response = ds_message_response(id, DS_RESULT_SUCCESS, NULL);
 			mq_store_buffer(conn, &w->recv_buffer, 0);
 
@@ -167,7 +164,8 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 			struct ds_client_rep *c = ds_client_rep_create(conn);
 			mq_address_remote(conn,c->addr,&c->port);
 			debug(D_DATASWARM,"new client from %s:%d\n",c->addr,c->port);
-			hash_table_insert(m->client_table,manager_key,c);
+			set_insert(m->client_table, c);
+			mq_set_tag(conn, c);
 			response = ds_message_response(id,DS_RESULT_SUCCESS,NULL);
 			mq_store_buffer(conn, &c->recv_buffer, 0);
 		} else {
@@ -183,11 +181,10 @@ DONE:
 		}
 
 		jx_delete(msg);
-		free(manager_key);
 		return 0;
 }
 
-void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_t stoptime )
+void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
 {
 	int set_storage = 0;
 	struct jx *msg = NULL;
@@ -284,13 +281,11 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c, time_
 
 ERROR:
 	ds_client_rep_disconnect(c);
-	char *key = string_format("%p", c->connection);
-	hash_table_remove(m->client_table, key);
-	free(key);
+	set_remove(m->client_table, c);
 	jx_delete(msg);
 }
 
-void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w, time_t stoptime )
+void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w )
 {
 	int set_storage = 0;
 	struct jx *msg = NULL;
@@ -370,9 +365,7 @@ DONE:
 
 ERROR:
 	ds_worker_rep_disconnect(w);
-	char *key = string_format("%p", w->connection);
-	hash_table_remove(m->worker_table, key);
-	free(key);
+	set_remove(m->worker_table, w);
 	jx_delete(msg);
 	jx_delete(response);
 }
@@ -380,20 +373,15 @@ ERROR:
 int handle_messages( struct ds_manager *m )
 {
 	struct mq *conn;
-	struct ds_client_rep *c;
-	struct ds_worker_rep *w;
 	while ((conn = mq_poll_readable(m->polling_group))) {
-		char *key = string_format("%p", conn);
-
-		if((c=hash_table_lookup(m->client_table,key))) {
-			handle_client_message(m,c,time(0)+m->stall_timeout);
-		} else if((w=hash_table_lookup(m->worker_table,key))) {
-			handle_worker_message(m,w,time(0)+m->stall_timeout);
+		void *key = mq_get_tag(conn);
+		if (set_lookup(m->client_table, key)) {
+			handle_client_message(m, key);
+		} else if (set_lookup(m->worker_table, key)) {
+			handle_worker_message(m, key);
 		} else {
 			handle_handshake(m, conn);
 		}
-
-		free(key);
 	}
 
 	return 0;
@@ -424,20 +412,29 @@ int handle_connections(struct ds_manager *m) {
 
 int handle_errors(struct ds_manager *m) {
 	for (struct mq *conn; (conn = mq_poll_error(m->polling_group));) {
-		char *key = string_format("%p", conn);
-		struct ds_worker_rep *w = hash_table_remove(m->worker_table, key);
-		struct ds_client_rep *c = hash_table_remove(m->client_table, key);
-		free(key);
-		assert(!(w && c));
+		void *key = mq_get_tag(conn);
 
-		if (w) {
+		if (set_remove(m->worker_table, key)) {
+			struct ds_worker_rep *w = key;
 			debug(D_DATASWARM, "worker disconnect (%s:%d): %s",
 				w->addr, w->port, strerror(mq_geterror(conn)));
 			ds_worker_rep_disconnect(w);
-		} else if (c) {
+		} else if (set_remove(m->client_table, key)) {
+			struct ds_client_rep *c = key;
 			debug(D_DATASWARM, "client disconnect (%s:%d): %s",
 				c->addr, c->port, strerror(mq_geterror(conn)));
 			ds_client_rep_disconnect(c);
+		} else {
+			char addr[LINK_ADDRESS_MAX];
+			int port;
+			mq_address_remote(conn, addr, &port);
+			debug(D_DATASWARM, "disconnect (%s:%d): %s",
+				addr, port, strerror(mq_geterror(conn)));
+			buffer_t *buf = mq_get_tag(conn);
+			assert(buf);
+			buffer_free(buf);
+			free(buf);
+			mq_close(conn);
 		}
 	}
 
@@ -539,8 +536,8 @@ struct ds_manager * ds_manager_create()
 
 	memset(m,0,sizeof(*m));
 
-	m->worker_table = hash_table_create(0,0);
-	m->client_table = hash_table_create(0,0);
+	m->worker_table = set_create(0);
+	m->client_table = set_create(0);
     m->task_table = hash_table_create(0,0);
     m->file_table = hash_table_create(0,0);
 

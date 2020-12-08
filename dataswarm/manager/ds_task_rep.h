@@ -2,6 +2,7 @@
 #define DATASWARM_TASK_REP_H
 
 #include "ds_rpc.h"  /* needed for ds_result_t */
+#include "ds_worker_rep.h"
 
 struct ds_task_rep {
 	/* Records the lifetime of a task in a worker.
@@ -31,7 +32,7 @@ struct ds_task_rep {
 	/* this task id */
 	char *taskid;
 
-	char *worker;
+	struct ds_worker_rep *worker;
 	struct ds_task *task;
 
 	struct ds_task_rep *next;

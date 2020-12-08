@@ -25,11 +25,11 @@
 
 static int blobs_reached_state( struct ds_file *f, ds_blob_state_t state )
 {
-	char *key;
+	uint64_t key;
 	struct ds_blob_rep *b;
 
-	hash_table_firstkey(f->blobs);
-	while (hash_table_nextkey(f->blobs, &key, (void **) &b)) {
+	itable_firstkey(f->blobs);
+	while (itable_nextkey(f->blobs, &key, (void **) &b)) {
 		if (b->state != state) return false;
 		if (b->result != DS_RESULT_SUCCESS) return false;
 		assert(b->in_transition == b->state);
@@ -82,15 +82,13 @@ static void schedule_all_files( struct ds_manager *m )
 }
 
 static bool prepare_worker(struct ds_manager *m, struct ds_task *t) {
-	struct ds_worker_rep *w = hash_table_lookup(m->worker_table, t->worker);
-
 	for (struct ds_mount *u = t->mounts; u; u = u->next) {
 		struct ds_file *f = hash_table_lookup(m->file_table, u->uuid);
 		assert(f);
-		struct ds_blob_rep *b = hash_table_lookup(f->blobs, t->worker);
+		struct ds_blob_rep *b = itable_lookup(f->blobs, (uintptr_t) t->worker);
 		if (!b) {
 			char *blobid = string_format("blob-%d", m->blob_id++);
-			hash_table_insert(f->blobs, t->worker, ds_manager_add_blob_to_worker(m, w, blobid));
+			itable_insert(f->blobs, (uintptr_t) (void *) t->worker, ds_manager_add_blob_to_worker(m, t->worker, blobid));
 			return false;
 		}
 
@@ -101,19 +99,18 @@ static bool prepare_worker(struct ds_manager *m, struct ds_task *t) {
 	return true;
 }
 
-static char * choose_worker_for_task( struct ds_manager *m, struct ds_task *t )
+struct ds_worker_rep * choose_worker_for_task( struct ds_manager *m, struct ds_task *t )
 {
 	//XXX do some matching of tasks to workers
 
-	int r = rand() % hash_table_size(m->worker_table);
-	char *key;
-	void *w;
-	hash_table_firstkey(m->worker_table);
+	int r = rand() % set_size(m->worker_table);
+	struct ds_worker_rep *w;
+	set_first_element(m->worker_table);
 	while (r >= 0) {
-		hash_table_nextkey(m->worker_table, &key, &w);
+		w = set_next_element(m->worker_table);
 		r--;
 	}
-	return xxstrdup(key);
+	return w;
 }
 
 static void schedule_task( struct ds_manager *m, struct ds_task *t )
@@ -140,9 +137,8 @@ static void schedule_task( struct ds_manager *m, struct ds_task *t )
 		return;
 	}
 
-	struct ds_worker_rep *w = hash_table_lookup(m->worker_table, t->worker);
 	if (!prepare_worker(m, t)) return;
-	ds_manager_add_task_to_worker(m, w, t->taskid);
+	ds_manager_add_task_to_worker(m, t->worker, t->taskid);
 }
 
 static void schedule_all_tasks( struct ds_manager *m )

@@ -50,7 +50,7 @@ struct ds_task {
 
 	// only used on the manager
 	struct ds_task_rep *attempts;
-	char *worker;
+	struct ds_worker_rep *worker;
 };
 
 struct ds_task * ds_task_create( struct jx *jtask );

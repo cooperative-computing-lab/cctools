@@ -3,6 +3,7 @@
 
 #include "jx.h"
 #include "hash_table.h"
+#include "itable.h"
 
 typedef enum {
 	DS_FILE_PENDING,
@@ -30,7 +31,7 @@ struct ds_file {
 
 	char *projectid;
 	struct jx *metadata;
-	struct hash_table *blobs;
+	struct itable *blobs; // Map<struct ds_worker_rep* : struct ds_blob_rep *>
 };
 
 struct ds_file *ds_file_create(const char *uuid, const char *projectid, jx_int_t size, struct jx *metadata);

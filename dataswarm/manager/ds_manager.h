@@ -3,12 +3,13 @@
 
 #include "hash_table.h"
 #include "mq.h"
+#include "set.h"
 
 #include "ds_worker_rep.h"
 
 struct ds_manager {
-	struct hash_table *worker_table;
-	struct hash_table *client_table;
+	struct set *worker_table;
+	struct set *client_table;
     struct hash_table *task_table;
     struct hash_table *file_table;
 
