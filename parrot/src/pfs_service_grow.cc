@@ -32,7 +32,7 @@ This procedure is repeated with an exponentially repeating backoff
 until the filesystem becomes consistent.
 
 The integrity of the directory listing is ensured by fetching
-its checksum using https.  If the master checksum
+its checksum using https.  If the manager checksum
 and the directory listing are inconsistent, they are reloaded
 in the same way as files.
 
@@ -78,7 +78,7 @@ extern "C" {
 
 #define GROW_PORT 80
 
-extern int pfs_master_timeout;
+extern int pfs_main_timeout;
 extern int pfs_checksum_files;
 extern char pfs_temp_dir[];
 extern struct file_cache * pfs_file_cache;
@@ -166,7 +166,7 @@ struct grow_filesystem * grow_filesystem_create( const char *hostport, const cha
 	FILE * file;
 	struct link *link;
 	int sleep_time = 1;
-	time_t stoptime = time(0)+pfs_master_timeout;
+	time_t stoptime = time(0)+pfs_main_timeout;
 	int local_index = !strcmp(hostport, "local");
 
 	retry:
@@ -284,7 +284,7 @@ struct grow_filesystem * grow_filesystem_create( const char *hostport, const cha
 
 	sleep_retry:
 
-	if(sleep_time<pfs_master_timeout) {
+	if(sleep_time<pfs_main_timeout) {
 		if(sleep_time>1) {
 			debug(D_GROW,"directory and checksum are inconsistent, retry in %d seconds",sleep_time);
 			sleep_for(sleep_time);
@@ -292,7 +292,7 @@ struct grow_filesystem * grow_filesystem_create( const char *hostport, const cha
 		sleep_time*=2;
 		goto retry;
 	} else {
-		fatal("directory and checksum still inconsistent after %d seconds",pfs_master_timeout);
+		fatal("directory and checksum still inconsistent after %d seconds",pfs_main_timeout);
 		return 0;
 	}
 }
@@ -508,7 +508,7 @@ public:
 			return new pfs_file_grow(name, NULL, fd, d);
 		} else {
 			string_nformat(url, sizeof(url), "http://%s%s", name->hostport, name->rest);
-			struct link *link = http_query_no_cache(url, "GET", time(0) + pfs_master_timeout);
+			struct link *link = http_query_no_cache(url, "GET", time(0) + pfs_main_timeout);
 			if(link) {
 				debug(D_GROW, "open remote %s=%p", url, link);
 				return new pfs_file_grow(name, link, -1, d);

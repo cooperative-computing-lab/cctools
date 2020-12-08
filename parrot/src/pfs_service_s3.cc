@@ -42,7 +42,7 @@ extern "C" {
 #define HTTP_PORT 80
 #define MD5_STRING_LENGTH 33
 
-extern int pfs_master_timeout;
+extern int pfs_main_timeout;
 extern int pfs_checksum_files;
 extern char pfs_temp_dir[];
 extern struct file_cache * pfs_file_cache;

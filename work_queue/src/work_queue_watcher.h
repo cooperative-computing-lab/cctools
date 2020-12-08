@@ -16,6 +16,6 @@ void work_queue_watcher_delete( struct work_queue_watcher *w );
 void work_queue_watcher_add_process( struct work_queue_watcher *w, struct work_queue_process *p );
 void work_queue_watcher_remove_process( struct work_queue_watcher *w, struct work_queue_process *p );
 int work_queue_watcher_check( struct work_queue_watcher *w );
-int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *master, time_t stoptime );
+int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *manager, time_t stoptime );
 
 #endif

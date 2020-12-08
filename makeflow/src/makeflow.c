@@ -201,6 +201,12 @@ Would be better implemented as a batch system feature.
 
 extern int batch_job_verbose_jobnames;
 
+/**
+Hack: Disable batch job feature which generates and checks heartbeats.
+*/
+
+extern int batch_job_disable_heartbeat;
+
 /*
 Wait upto this many seconds for an output file of a succesfull task
 to appear on the local filesystem (e.g, to deal with NFS
@@ -221,6 +227,24 @@ server, viewable by the makeflow_status command.
 */
 
 static int catalog_reporting_on = 0;
+
+/*
+Create a status file about makeflow status
+*/ 
+
+static int file_status_on = 0;
+
+/*
+Store name of file detailing makeflow status.
+Default to status.html
+*/
+static char *file_status_name = "status.html";
+
+/*
+Store time interval for status file update.
+Default to 60s.
+*/
+static unsigned int file_status_interval = 60;
 
 /*
 Options related to the "mounting" of external data
@@ -1030,12 +1054,16 @@ static void makeflow_run( struct dag *d )
 	timestamp_t start = timestamp_get();
 	// Last Report is created stall for first reporting.
 	timestamp_t last_time = start - (60 * 1000 * 1000);
-
+	
 	//reporting to catalog
 	if(catalog_reporting_on){
 		makeflow_catalog_summary(d, project, batch_queue_type, start);
 	}
-
+	
+	if(file_status_on){
+		makeflow_file_summary(d, project, batch_queue_type, start, file_status_name);
+	}
+	
 	while(!makeflow_abort_flag) {
 		makeflow_dispatch_ready_jobs(d);
 		/*
@@ -1093,8 +1121,16 @@ static void makeflow_run( struct dag *d )
 		timestamp_t now = timestamp_get();
 		/* If in reporting mode and 1 min has transpired */
 		if(catalog_reporting_on && ((now-last_time) > (60 * 1000 * 1000))){ 
-			makeflow_catalog_summary(d, project,batch_queue_type,start);
+			makeflow_catalog_summary(d, project,batch_queue_type,start);	
 			last_time = now;
+		}
+
+		/* Create status file */
+		now = timestamp_get();
+		/* If status file mode is on and a time interval has transpired */
+		if(file_status_on && ((now-last_time) > (file_status_interval * 1000 * 1000))){
+			makeflow_file_summary(d, project, batch_queue_type, start, file_status_name);
+			last_time = now; 
 		}
 
 		/* Rather than try to garbage collect after each time in this
@@ -1109,7 +1145,12 @@ static void makeflow_run( struct dag *d )
 
 	/* Always make final report to catalog when workflow ends. */
 	if(catalog_reporting_on){
-		makeflow_catalog_summary(d, project,batch_queue_type,start);
+		makeflow_catalog_summary(d, project,batch_queue_type,start); 
+	}
+	
+	/* Always make final status file when workflow ends. */
+	if(file_status_on){
+		makeflow_file_summary(d, project, batch_queue_type, start, file_status_name);
 	}
 
 	if(makeflow_abort_flag) {
@@ -1173,6 +1214,8 @@ static void show_help_run(const char *cmd)
 	printf("    --send-environment          Send local environment variables for execution.\n");
 	printf(" -S,--submission-timeout=<#>    Time to retry failed batch job submission.\n");
 	printf(" -f,--summary-log=<file>        Write summary of workflow to this file at end.\n");
+	printf("    --file-status=<file>        Write summary of workflow to file periodically.\n");
+	printf("    --file-status-interval=<file>	Set time interval for periodic workflow summary.\n");
 	        /********************************************************************************/
 	printf("\nData Handling:\n");
 	printf("    --archive                   Archive and retrieve archived jobs from archive.\n");
@@ -1220,6 +1263,7 @@ static void show_help_run(const char *cmd)
 	printf("    --amazon-batch-img=<img>    Specify Amazon ECS Image(Used for amazon-batch)\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
+	printf("    --disable-heartbeat         Disable job heartbeat check.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
 	printf("    --local-memory=#            Max amount of local memory (MB) to use.\n");
 	printf("    --local-disk=#              Max amount of local disk (MB) to use.\n");
@@ -1248,7 +1292,7 @@ static void show_help_run(const char *cmd)
 	printf(" --enforcement                  Enforce access to only named inputs/outputs.\n");
 	printf(" --parrot-path=<path>           Path to parrot_run for --enforcement.\n");
 	printf(" --env-replace-path=<path>      Path to env_replace for --enforcement.\n");
-	printf(" --mesos-master=<hostname:port> Mesos master address and port\n");
+	printf(" --mesos-master=<hostname:port> Mesos manager address and port\n");
 	printf(" --mesos-path=<path>            Path to mesos python2 site-packages.\n");
 	printf(" --mesos-preload=<path>         Path to libraries needed by Mesos.\n");
 	printf(" --k8s-image=<path>             Container image used by kubernetes.\n");
@@ -1299,7 +1343,7 @@ int main(int argc, char *argv[])
 	timestamp_t time_completed = 0;
 	const char *work_queue_keepalive_interval = NULL;
 	const char *work_queue_keepalive_timeout = NULL;
-	const char *work_queue_master_mode = "standalone";
+	const char *work_queue_manager_mode = "standalone";
 	const char *work_queue_port_file = NULL;
 	double wq_option_fast_abort_multiplier = -1.0;
 	const char *amazon_config = NULL;
@@ -1320,7 +1364,7 @@ int main(int argc, char *argv[])
 	char *debug_file_name = 0;
 	char *batch_mem_type = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
-	char *mesos_master = "127.0.0.1:5050/";
+	char *mesos_manager = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
 
@@ -1371,9 +1415,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	s = getenv("WORK_QUEUE_MASTER_MODE");
+	s = getenv("WORK_QUEUE_MANAGER_MODE") ? getenv("WORK_QUEUE_MANAGER_MODE") : getenv("WORK_QUEUE_MASTER_MODE");
 	if(s) {
-		work_queue_master_mode = s;
+		work_queue_manager_mode = s;
 	}
 
 	s = getenv("WORK_QUEUE_NAME");
@@ -1460,7 +1504,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_ARCHIVE_DIR,
 		LONG_OPT_ARCHIVE_READ,
 		LONG_OPT_ARCHIVE_WRITE,
-		LONG_OPT_MESOS_MASTER,
+		LONG_OPT_MESOS_MANAGER,
 		LONG_OPT_MESOS_PATH,
 		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_SEND_ENVIRONMENT,
@@ -1469,6 +1513,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_MPI_CORES,
 		LONG_OPT_MPI_MEMORY,
 		LONG_OPT_TLQ,
+		LONG_OPT_FILE_STATUS,
+		LONG_OPT_FILE_STATUS_INTERVAL,
+		LONG_OPT_DISABLE_HEARTBEAT
 	};
 
 	static const struct option long_options_run[] = {
@@ -1487,6 +1534,7 @@ int main(int argc, char *argv[])
 		{"debug-rotate-max", required_argument, 0, LONG_OPT_DEBUG_ROTATE_MAX},
 		{"disable-afs-check", no_argument, 0, 'A'},
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
+		{"disable-heartbeat", no_argument, 0, LONG_OPT_DISABLE_HEARTBEAT},
 		{"email", required_argument, 0, 'm'},
 		{"enable_hook_example", no_argument, 0, LONG_OPT_HOOK_EXAMPLE},
 		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
@@ -1580,7 +1628,8 @@ int main(int argc, char *argv[])
 		{"archive-dir", required_argument, 0, LONG_OPT_ARCHIVE_DIR},
 		{"archive-read", no_argument, 0, LONG_OPT_ARCHIVE_READ},
 		{"archive-write", no_argument, 0, LONG_OPT_ARCHIVE_WRITE},
-		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
+		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MANAGER},
+		{"mesos-master",  required_argument, 0, LONG_OPT_MESOS_MANAGER}, //same as mesos-master
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
@@ -1588,6 +1637,8 @@ int main(int argc, char *argv[])
 		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
 		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
 		{"tlq", required_argument, 0, LONG_OPT_TLQ},
+		{"file-status", required_argument, 0, LONG_OPT_FILE_STATUS},
+		{"file-status-interval", required_argument, 0, LONG_OPT_FILE_STATUS_INTERVAL},
 		{0, 0, 0, 0}
 	};
 
@@ -1596,7 +1647,7 @@ int main(int argc, char *argv[])
 	while((c = jx_getopt(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
 			case 'a':
-				work_queue_master_mode = "catalog";
+				work_queue_manager_mode = "catalog";
 				break;
 			case 'A':
 				disable_afs_check = 1;
@@ -1755,7 +1806,7 @@ int main(int argc, char *argv[])
 			case 'N':
 				free(project);
 				project = xxstrdup(optarg);
-				work_queue_master_mode = "catalog";
+				work_queue_manager_mode = "catalog";
 				catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
@@ -1826,6 +1877,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_DISABLE_BATCH_CACHE:
 				cache_mode = 0;
+				break;
+			case LONG_OPT_DISABLE_HEARTBEAT:
+				batch_job_disable_heartbeat = 1;
 				break;
 			case LONG_OPT_HOOK_EXAMPLE:
 				if (makeflow_hook_register(&makeflow_hook_example, &hook_args) == MAKEFLOW_HOOK_FAILURE)
@@ -1968,8 +2022,8 @@ int main(int argc, char *argv[])
 					goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("umbrella_spec"), jx_string(optarg));
 				break;
-			case LONG_OPT_MESOS_MASTER:
-				mesos_master = xxstrdup(optarg);
+			case LONG_OPT_MESOS_MANAGER:
+				mesos_manager = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MESOS_PATH:
 				mesos_path = xxstrdup(optarg);
@@ -2119,6 +2173,14 @@ int main(int argc, char *argv[])
 			case LONG_OPT_TLQ:
 				tlq_port = atoi(optarg);
 				break;
+			case LONG_OPT_FILE_STATUS:
+				file_status_on = 1;
+				file_status_name = optarg;	
+				break;
+			case LONG_OPT_FILE_STATUS_INTERVAL:
+				file_status_on = 1;
+				file_status_interval = atoi(optarg);
+				break;			
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -2174,7 +2236,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		if(strcmp(work_queue_master_mode, "catalog") == 0 && project == NULL) {
+		if(strcmp(work_queue_manager_mode, "catalog") == 0 && project == NULL) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
 			fprintf(stderr, "makeflow: Run \"makeflow -h\" for help with options.\n");
 			return 1;
@@ -2182,7 +2244,7 @@ int main(int argc, char *argv[])
 		// Use Work Queue default port in standalone mode when port is not
 		// specified with -p option. In Work Queue catalog mode, Work Queue
 		// would choose an arbitrary port when port is not explicitly specified.
-		if(!port_set && strcmp(work_queue_master_mode, "standalone") == 0) {
+		if(!port_set && strcmp(work_queue_manager_mode, "standalone") == 0) {
 			port_set = 1;
 			port = WORK_QUEUE_DEFAULT_PORT;
 		}
@@ -2289,7 +2351,7 @@ int main(int argc, char *argv[])
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
 		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
-		batch_queue_set_option(remote_queue, "mesos-master", mesos_master);
+		batch_queue_set_option(remote_queue, "mesos-master", mesos_manager);
 		batch_queue_set_option(remote_queue, "mesos-preload", mesos_preload);
 	}
 
@@ -2317,7 +2379,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
 	batch_queue_set_option(remote_queue, "batch-options", batch_submit_options);
 	batch_queue_set_option(remote_queue, "password", work_queue_password);
-	batch_queue_set_option(remote_queue, "master-mode", work_queue_master_mode);
+	batch_queue_set_option(remote_queue, "manager-mode", work_queue_manager_mode);
 	batch_queue_set_option(remote_queue, "name", project);
 	batch_queue_set_option(remote_queue, "debug", debug_file_name);
 	batch_queue_set_option(remote_queue, "priority", priority);
@@ -2328,7 +2390,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
 	batch_queue_set_option(remote_queue, "lambda-config", lambda_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
-	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
+	batch_queue_set_option(remote_queue, "manager-preferred-connection", work_queue_preferred_connection);
 	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
 	batch_queue_set_option(remote_queue, "amazon-batch-img", amazon_batch_img);
 	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");

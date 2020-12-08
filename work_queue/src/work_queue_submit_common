@@ -2,7 +2,7 @@
 
 script_name=$0
 submit_dir=${USER}-workers
-use_master_name=0
+use_manager_name=0
 pwfile=""
 arguments=""
 
@@ -26,23 +26,23 @@ show_help_common()
 {
 	echo "Use: $script_name [worker options] [batch specific options] <servername> <port> <num-workers>"
 	echo "         or"
-	echo "     $script_name [worker options] --master-name <name> [batch specific options] <num-workers>"
+	echo "     $script_name [worker options] --manager-name <name> [batch specific options] <num-workers>"
 
 	echo "worker options:"
 
-	echo "  -M,--master-name <name>   Name of the preferred master for worker."
+	echo "  -M,--manager-name <name>  Name of the preferred master for worker."
 	echo "  -N,--name <name>          Same as -M (backwards compatibility)."
 	echo "  -C,--catalog <catalog>    Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT."
 	echo "  -t,--timeout <time>       Abort after this amount of idle time. (default=900s)."
 	echo "  -d,--debug <subsystem>    Enable debugging on worker for this subsystem (try -d all to start)."
-	echo "  -w,--tcp-window-size <siz e>  Set TCP window size."
-	echo "  -i,--min-backoff <time>   Set initial value for backoff interval when worker fails to connect to a master. (default=1s)"
-	echo "  -b,--max-backoff <time>   Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)"
+	echo "  -w,--tcp-window-size <size>  Set TCP window size."
+	echo "  -i,--min-backoff <time>   Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)"
+	echo "  -b,--max-backoff <time>   Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)"
 	echo "  -z,--disk-threshold <size >   Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)"
-	echo "  -A,--arch <arch>          Set architecture string for the worker to report to master instead of the value in uname."
-	echo "  -O,--os <os>              Set operating system string for the worker to report to master instead of the value in uname."
+	echo "  -A,--arch <arch>          Set architecture string for the worker to report to manager instead of the value in uname."
+	echo "  -O,--os <os>              Set operating system string for the worker to report to manager instead of the value in uname."
 	echo "  -s,--workdir <path>       Set the location for creating the working directory of the worker."
-	echo "  -P,--password <pwfile>    Password file to authenticate workers to master."
+	echo "  -P,--password <pwfile>    Password file to authenticate workers to manager."
 	echo "  --cores <num>             Set the number of cores each worker should use (0=auto). (default=1)"
 	echo "  --memory <size>           Manually set the amonut of memory (in MB) reported by this worker."
 	echo "  --disk <size>             Manually set the amount of disk (in MB) reported by this worker."
@@ -71,17 +71,17 @@ parse_arguments_common()
 			-a | --advertise)
 			# Leave here for backwards compatibility
 			arguments="$arguments -a"
-			use_master_name=1
+			use_manager_name=1
 			;;
-			-M | --master-name)
+			-M | --manager-name | --master-name)
 			shift
 			arguments="$arguments -M $1"
-			use_master_name=1
+			use_manager_name=1
 			;;
 			-N | --name)
 			shift
 			arguments="$arguments -M $1"
-			use_master_name=1
+			use_manager_name=1
 			;;
 			-C | --catalog)
 			shift
@@ -169,7 +169,7 @@ parse_arguments_common()
 
     shift $consumed
 
-	set_up_master_address $1 $2 $3 $4
+	set_up_manager_address $1 $2 $3 $4
 
 	if [ $specified_resources = 1 -a -n "$SGE_WARNING" ]
 	then
@@ -178,9 +178,9 @@ parse_arguments_common()
 }
 
 
-set_up_master_address()
+set_up_manager_address()
 {
-	if [ $use_master_name = 0 ]; then
+	if [ $use_manager_name = 0 ]; then
 		if [ $# -ne 3 ] ; then
 			echo "3 arguments (<servername> <port> <num-workers>), but found $#: \"$@\"." 1>&2
 			echo "To view the help message, type: $script_name -h" 1>&2

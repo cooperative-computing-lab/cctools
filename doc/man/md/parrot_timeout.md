@@ -24,14 +24,14 @@
 # parrot_timeout(1)
 
 ## NAME
-**parrot_timeout** - changes or resets the master timeout for the current **parrot** session
+**parrot_timeout** - changes or resets the main timeout for the current **parrot** session
 
 ## SYNOPSIS
 ****parrot_timeout <time>****
 
 ## DESCRIPTION
 
-**parrot_timeout** changes the master timeout for the current **parrot** session to
+**parrot_timeout** changes the main timeout for the current **parrot** session to
 <time>.  If <time> was not given, it resets it to the default value (5 minutes if
 an interactive session or 1 hour for a non-interactive session).
 
@@ -44,7 +44,7 @@ On success, returns zero.  On failure, returns non-zero.
 
 ## EXAMPLES
 
-To change the master timeout to 5 hours:
+To change the main timeout to 5 hours:
 
 ```
 % parrot_run tcsh

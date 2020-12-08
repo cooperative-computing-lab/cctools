@@ -37,11 +37,11 @@ run()
 	cd $TEST_DIR
 
 	export GOODBYE="goodbye makeflow"
-	../../src/makeflow -d all -T wq -Z master.port test.mf &
+	../../src/makeflow -d all -T wq -Z manager.port test.mf &
 
-	wait_for_file_creation master.port 5
+	wait_for_file_creation manager.port 5
 
-	run_local_worker master.port worker.log
+	run_local_worker manager.port worker.log
 
 	require_identical_files output.txt expected.txt
 

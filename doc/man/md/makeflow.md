@@ -69,7 +69,7 @@ execution engine.
 
 ### Workflow Handling
 
-- **-a, --advertise** Advertise the master information to a catalog server.
+- **-a, --advertise** Advertise the manager information to a catalog server.
 - **-l --makeflow-log <logfile>** Use this file for the makeflow log. (default is X.makeflowlog)
 - **-L --batch-log <logfile>** Use this file for the batch system log. (default is X.<type>log)
 - **-m --email <email>** Email summary of workflow to address.
@@ -182,7 +182,7 @@ OPTION_END
 
 ### Mesos Options
 
-- **--mesos-master hostname**  Indicate the host name of preferred mesos master.
+- **--mesos-master hostname**  Indicate the host name of preferred mesos manager.
 - **--mesos-path filepath**  Indicate the path to mesos python2 site-packages.
 - **--mesos-preload library**  Indicate the linking libraries for running mesos..
 

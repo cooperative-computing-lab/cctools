@@ -175,13 +175,13 @@ the script:
 
 `prune.execute( worker_type='work_queue', name='prune_census_example' )`
 
-Now, running the workflow script initiates a Work Queue master that will wait
+Now, running the workflow script initiates a Work Queue manager that will wait
 for workers to attach to it in order to execute the tasks.
 
 `python match_people.py`
 
 The following command line instruction is one way to assign 10 workers to the
-Work Queue master:
+Work Queue manager:
 
 `condor_submit_workers -N prune_census_example 10`
 
@@ -189,7 +189,7 @@ See the [Work Queue Manual](../work_queue) for more information on ways to
 assign workers to execute tasks in the workflow.
 
 (The hep.wq.py script, in the hep example folder, runs the HEP workflow using
-Work Queue after submitting workers to the Work Queue master with name
+Work Queue after submitting workers to the Work Queue manager with name
 'prune_hep_example' instead of 'prune_census_example'.)
 
 ## For More Information

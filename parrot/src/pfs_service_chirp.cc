@@ -31,7 +31,7 @@ extern "C" {
 #include <sys/statfs.h>
 
 
-extern int pfs_master_timeout;
+extern int pfs_main_timeout;
 extern int pfs_enable_small_file_optimizations;
 
 char chirp_rootpath[] = "/";
@@ -115,22 +115,22 @@ public:
 	}
 
 	virtual int close() {
-		return chirp_global_close(file,time(0)+pfs_master_timeout);
+		return chirp_global_close(file,time(0)+pfs_main_timeout);
 	}
 
 	virtual pfs_ssize_t read( void *data, pfs_size_t length, pfs_off_t offset ) {
-		return chirp_global_pread(file,data,length,offset,time(0)+pfs_master_timeout);
+		return chirp_global_pread(file,data,length,offset,time(0)+pfs_main_timeout);
 	}
 
 	virtual pfs_ssize_t write( const void *data, pfs_size_t length, pfs_off_t offset ) {
 		chirp_dircache_invalidate();
-		return chirp_global_pwrite(file,data,length,offset,time(0)+pfs_master_timeout);
+		return chirp_global_pwrite(file,data,length,offset,time(0)+pfs_main_timeout);
 	}
 
 	virtual int fstat( struct pfs_stat *buf ) {
 		int result;
 		struct chirp_stat cbuf;
-		result = chirp_global_fstat(file,&cbuf,time(0)+pfs_master_timeout);
+		result = chirp_global_fstat(file,&cbuf,time(0)+pfs_main_timeout);
 		if(result==0) {
 				COPY_CSTAT(cbuf,*buf);
 		}
@@ -140,7 +140,7 @@ public:
 	virtual int fstatfs( struct pfs_statfs *buf ) {
 		int result;
 		struct chirp_statfs cbuf;
-		result = chirp_global_fstatfs(file,&cbuf,time(0)+pfs_master_timeout);
+		result = chirp_global_fstatfs(file,&cbuf,time(0)+pfs_main_timeout);
 		if(result==0) {
 				COPY_STATFS(cbuf,*buf);
 		}
@@ -149,38 +149,38 @@ public:
 
 	virtual int ftruncate( pfs_size_t length ) {
 		chirp_dircache_invalidate();
-		return chirp_global_ftruncate(file,length,time(0)+pfs_master_timeout);
+		return chirp_global_ftruncate(file,length,time(0)+pfs_main_timeout);
 	}
 
 	virtual int fchmod( mode_t mode ) {
 		chirp_dircache_invalidate();
-		return chirp_global_fchmod(file,mode,time(0)+pfs_master_timeout);
+		return chirp_global_fchmod(file,mode,time(0)+pfs_main_timeout);
 	}
 
 	virtual int fchown( uid_t uid, gid_t gid ) {
 		chirp_dircache_invalidate();
-		return chirp_global_fchown(file,uid,gid,time(0)+pfs_master_timeout);
+		return chirp_global_fchown(file,uid,gid,time(0)+pfs_main_timeout);
 	}
 
 	virtual ssize_t fgetxattr( const char *name, void *data, size_t size ) {
-		return chirp_global_fgetxattr(file,name,data,size,time(0)+pfs_master_timeout);
+		return chirp_global_fgetxattr(file,name,data,size,time(0)+pfs_main_timeout);
 	}
 
 	virtual ssize_t flistxattr( char *list, size_t size ) {
-		return chirp_global_flistxattr(file,list,size,time(0)+pfs_master_timeout);
+		return chirp_global_flistxattr(file,list,size,time(0)+pfs_main_timeout);
 	}
 
 	virtual int fsetxattr( const char *name, const void *data, size_t size, int flags ) {
-		return chirp_global_fsetxattr(file,name,data,size,flags,time(0)+pfs_master_timeout);
+		return chirp_global_fsetxattr(file,name,data,size,flags,time(0)+pfs_main_timeout);
 	}
 
 	virtual int fremovexattr( const char *name ) {
-		return chirp_global_fremovexattr(file,name,time(0)+pfs_master_timeout);
+		return chirp_global_fremovexattr(file,name,time(0)+pfs_main_timeout);
 	}
 
 	virtual int fsync() {
 		chirp_dircache_invalidate();
-		return chirp_global_flush(file,time(0)+pfs_master_timeout)>=0 ? 0 : -1;
+		return chirp_global_flush(file,time(0)+pfs_main_timeout)>=0 ? 0 : -1;
 	}
 
 	virtual pfs_ssize_t get_size() {
@@ -205,7 +205,7 @@ public:
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
 		struct chirp_file *file;
 		chirp_dircache_invalidate();
-		file = chirp_global_open(name->hostport,name->rest,flags,mode,time(0)+pfs_master_timeout);
+		file = chirp_global_open(name->hostport,name->rest,flags,mode,time(0)+pfs_main_timeout);
 		if(file) {
 			return new pfs_file_chirp(name,file);
 		} else {
@@ -249,7 +249,7 @@ public:
 			sprintf(name->rest, "/");
 		}
 
-		CHIRP_SEARCH *s = chirp_reli_opensearch(name->hostport, name->rest, pattern, flags, time(0)+pfs_master_timeout);
+		CHIRP_SEARCH *s = chirp_reli_opensearch(name->hostport, name->rest, pattern, flags, time(0)+pfs_main_timeout);
 		if (!s)
 			return -1;
 
@@ -298,7 +298,7 @@ public:
 
 		if(pfs_enable_small_file_optimizations) {
 			chirp_dircache_begin(name->path);
-			result = chirp_global_getlongdir(name->hostport,name->rest,chirp_dircache_insert,dir,time(0)+pfs_master_timeout);
+			result = chirp_global_getlongdir(name->hostport,name->rest,chirp_dircache_insert,dir,time(0)+pfs_main_timeout);
 		} else {
 			result = -1;
 			errno = EINVAL;
@@ -306,7 +306,7 @@ public:
 
 		if(result<0 && (errno==EINVAL||errno==ENOSYS)) {
 			chirp_dircache_invalidate();
-			result = chirp_global_getdir(name->hostport,name->rest,add_to_dir,dir,time(0)+pfs_master_timeout);
+			result = chirp_global_getdir(name->hostport,name->rest,add_to_dir,dir,time(0)+pfs_main_timeout);
 		}
 
 		if(result>=0) {
@@ -320,7 +320,7 @@ public:
 	virtual int statfs( pfs_name *name, struct pfs_statfs *buf ) {
 		int result;
 		struct chirp_statfs cbuf;
-		result = chirp_global_statfs(name->hostport,name->rest,&cbuf,time(0)+pfs_master_timeout);
+		result = chirp_global_statfs(name->hostport,name->rest,&cbuf,time(0)+pfs_main_timeout);
 		if(result==0) {
 				COPY_STATFS(cbuf,*buf);
 		}
@@ -336,7 +336,7 @@ public:
 				return 0;
 			}
 		}
-		result = chirp_global_stat(name->hostport,name->rest,&cbuf,time(0)+pfs_master_timeout); /* BUG: was _lstat */
+		result = chirp_global_stat(name->hostport,name->rest,&cbuf,time(0)+pfs_main_timeout); /* BUG: was _lstat */
 		if(result==0){
 				COPY_CSTAT(cbuf,*buf);
 		}
@@ -350,7 +350,7 @@ public:
 			COPY_CSTAT(cbuf,*buf);
 			return 0;
 		}
-		result = chirp_global_lstat(name->hostport,name->rest,&cbuf,time(0)+pfs_master_timeout);
+		result = chirp_global_lstat(name->hostport,name->rest,&cbuf,time(0)+pfs_main_timeout);
 		if(result==0){
 				COPY_CSTAT(cbuf,*buf);
 		}
@@ -361,48 +361,48 @@ public:
 		int result;
 		chirp_dircache_invalidate();
 		if(pfs_enable_small_file_optimizations) {
-			result = chirp_global_rmall(name->hostport,name->rest,time(0)+pfs_master_timeout);
+			result = chirp_global_rmall(name->hostport,name->rest,time(0)+pfs_main_timeout);
 			if(result<0 && errno==ENOSYS) {
 				/* fall through */
 			} else {
 				return result;
 			}
 		}
-		return chirp_global_unlink(name->hostport,name->rest,time(0)+pfs_master_timeout);
+		return chirp_global_unlink(name->hostport,name->rest,time(0)+pfs_main_timeout);
 	}
 
 	virtual int access( pfs_name *name, mode_t mode ) {
 		struct chirp_stat info;
-		return chirp_global_stat(name->hostport,name->rest,&info,time(0)+pfs_master_timeout);
+		return chirp_global_stat(name->hostport,name->rest,&info,time(0)+pfs_main_timeout);
 	}
 
 	virtual int chmod( pfs_name *name, mode_t mode ) {
 		chirp_dircache_invalidate();
-		return chirp_global_chmod(name->hostport,name->rest,mode,time(0)+pfs_master_timeout);
+		return chirp_global_chmod(name->hostport,name->rest,mode,time(0)+pfs_main_timeout);
 	}
 
 	virtual int chown( pfs_name *name, uid_t uid, gid_t gid ) {
 		chirp_dircache_invalidate();
-		return chirp_global_chown(name->hostport,name->rest,uid,gid,time(0)+pfs_master_timeout);
+		return chirp_global_chown(name->hostport,name->rest,uid,gid,time(0)+pfs_main_timeout);
 	}
 
 	virtual int lchown( pfs_name *name, uid_t uid, gid_t gid ) {
 		chirp_dircache_invalidate();
-		return chirp_global_lchown(name->hostport,name->rest,uid,gid,time(0)+pfs_master_timeout);
+		return chirp_global_lchown(name->hostport,name->rest,uid,gid,time(0)+pfs_main_timeout);
 	}
 
 	virtual int truncate( pfs_name *name, pfs_off_t length ) {
 		chirp_dircache_invalidate();
-		return chirp_global_truncate(name->hostport,name->rest,length,time(0)+pfs_master_timeout);
+		return chirp_global_truncate(name->hostport,name->rest,length,time(0)+pfs_main_timeout);
 	}
 
 	virtual int utime( pfs_name *name, struct utimbuf *t ) {
-		return chirp_global_utime(name->hostport,name->rest,t->actime,t->modtime,time(0)+pfs_master_timeout);
+		return chirp_global_utime(name->hostport,name->rest,t->actime,t->modtime,time(0)+pfs_main_timeout);
 	}
 
 	virtual int rename( pfs_name *name, pfs_name *newname ) {
 		INT64_T result;
-		time_t stoptime = time(0) + pfs_master_timeout;
+		time_t stoptime = time(0) + pfs_main_timeout;
 
 		chirp_dircache_invalidate();
 
@@ -423,42 +423,42 @@ public:
 
 	virtual ssize_t getxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
 	{
-		return chirp_global_getxattr(name->hostport,name->rest,attrname,value,size,time(0)+pfs_master_timeout);
+		return chirp_global_getxattr(name->hostport,name->rest,attrname,value,size,time(0)+pfs_main_timeout);
 	}
 
 	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *value, size_t size )
 	{
-		return chirp_global_lgetxattr(name->hostport,name->rest,attrname,value,size,time(0)+pfs_master_timeout);
+		return chirp_global_lgetxattr(name->hostport,name->rest,attrname,value,size,time(0)+pfs_main_timeout);
 	}
 
 	virtual ssize_t listxattr ( pfs_name *name, char *attrlist, size_t size )
 	{
-		return chirp_global_listxattr(name->hostport,name->rest,attrlist,size,time(0)+pfs_master_timeout);
+		return chirp_global_listxattr(name->hostport,name->rest,attrlist,size,time(0)+pfs_main_timeout);
 	}
 
 	virtual ssize_t llistxattr ( pfs_name *name, char *attrlist, size_t size )
 	{
-		return chirp_global_llistxattr(name->hostport,name->rest,attrlist,size,time(0)+pfs_master_timeout);
+		return chirp_global_llistxattr(name->hostport,name->rest,attrlist,size,time(0)+pfs_main_timeout);
 	}
 
 	virtual int setxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
 	{
-		return chirp_global_setxattr(name->hostport,name->rest,attrname,value,size,flags,time(0)+pfs_master_timeout);
+		return chirp_global_setxattr(name->hostport,name->rest,attrname,value,size,flags,time(0)+pfs_main_timeout);
 	}
 
 	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *value, size_t size, int flags )
 	{
-		return chirp_global_lsetxattr(name->hostport,name->rest,attrname,value,size,flags,time(0)+pfs_master_timeout);
+		return chirp_global_lsetxattr(name->hostport,name->rest,attrname,value,size,flags,time(0)+pfs_main_timeout);
 	}
 
 	virtual int removexattr ( pfs_name *name, const char *attrname )
 	{
-		return chirp_global_removexattr(name->hostport,name->rest,attrname,time(0)+pfs_master_timeout);
+		return chirp_global_removexattr(name->hostport,name->rest,attrname,time(0)+pfs_main_timeout);
 	}
 
 	virtual int lremovexattr ( pfs_name *name, const char *attrname )
 	{
-		return chirp_global_lremovexattr(name->hostport,name->rest,attrname,time(0)+pfs_master_timeout);
+		return chirp_global_lremovexattr(name->hostport,name->rest,attrname,time(0)+pfs_main_timeout);
 	}
 
 	virtual int chdir( pfs_name *name, char *newname ) {
@@ -478,45 +478,45 @@ public:
 
 	virtual int link( pfs_name *name, pfs_name *newname ) {
 		chirp_dircache_invalidate();
-		return chirp_global_link(name->hostport,name->rest,newname->rest,time(0)+pfs_master_timeout);
+		return chirp_global_link(name->hostport,name->rest,newname->rest,time(0)+pfs_main_timeout);
 	}
 
 	virtual int symlink( const char *linkname, pfs_name *newname ) {
 		chirp_dircache_invalidate();
-		return chirp_global_symlink(newname->hostport,linkname,newname->rest,time(0)+pfs_master_timeout);
+		return chirp_global_symlink(newname->hostport,linkname,newname->rest,time(0)+pfs_main_timeout);
 	}
 
 	virtual int readlink( pfs_name *name, char *buf, pfs_size_t length ) {
-		return chirp_global_readlink(name->hostport,name->rest,buf,length,time(0)+pfs_master_timeout);
+		return chirp_global_readlink(name->hostport,name->rest,buf,length,time(0)+pfs_main_timeout);
 	}
 
 	virtual int mkdir( pfs_name *name, mode_t mode ) {
 		chirp_dircache_invalidate();
-		return chirp_global_mkdir(name->hostport,name->rest,mode,time(0)+pfs_master_timeout);
+		return chirp_global_mkdir(name->hostport,name->rest,mode,time(0)+pfs_main_timeout);
 	}
 
 	virtual int rmdir( pfs_name *name ) {
 		int result;
 		chirp_dircache_invalidate();
 		if(pfs_enable_small_file_optimizations) {
-			result = chirp_global_rmall(name->hostport,name->rest,time(0)+pfs_master_timeout);
+			result = chirp_global_rmall(name->hostport,name->rest,time(0)+pfs_main_timeout);
 			if(result<0 && errno==ENOSYS) {
 				/* fall through */
 			} else {
 				return result;
 			}
 		}
-		return chirp_global_rmdir(name->hostport,name->rest,time(0)+pfs_master_timeout);
+		return chirp_global_rmdir(name->hostport,name->rest,time(0)+pfs_main_timeout);
 	}
 
 	virtual int mkalloc( pfs_name *name, pfs_ssize_t size, mode_t mode ) {
 		chirp_dircache_invalidate();
-		return chirp_global_mkalloc(name->hostport,name->rest,size,mode,time(0)+pfs_master_timeout);
+		return chirp_global_mkalloc(name->hostport,name->rest,size,mode,time(0)+pfs_main_timeout);
 	}
 
 	virtual int lsalloc( pfs_name *name, char *alloc_name, pfs_ssize_t *size, pfs_ssize_t *inuse ) {
 		chirp_dircache_invalidate();
-		return chirp_global_lsalloc(name->hostport,name->rest,alloc_name,size,inuse,time(0)+pfs_master_timeout);
+		return chirp_global_lsalloc(name->hostport,name->rest,alloc_name,size,inuse,time(0)+pfs_main_timeout);
 	}
 
 	virtual pfs_ssize_t putfile( pfs_name *source, pfs_name *target )
@@ -537,7 +537,7 @@ public:
 			return -1;
 		}
 
-		result = chirp_global_putfile(target->hostport,target->rest,sourcefile,info.st_mode&0777,info.st_size,time(0)+pfs_master_timeout);
+		result = chirp_global_putfile(target->hostport,target->rest,sourcefile,info.st_mode&0777,info.st_size,time(0)+pfs_main_timeout);
 
 		fclose(sourcefile);
 
@@ -555,7 +555,7 @@ public:
 		targetfile = fopen(target->logical_name,"w");
 		if(!targetfile) return -1;
 
-		result = chirp_global_getfile(source->hostport,source->rest,targetfile,time(0)+pfs_master_timeout);
+		result = chirp_global_getfile(source->hostport,source->rest,targetfile,time(0)+pfs_main_timeout);
 		save_errno = errno;
 
 		fclose(targetfile);
@@ -571,7 +571,7 @@ public:
 
 		chirp_dircache_invalidate();
 
-		result = chirp_global_thirdput(source->hostport,source->rest,target->hostport,target->rest,time(0)+pfs_master_timeout);
+		result = chirp_global_thirdput(source->hostport,source->rest,target->hostport,target->rest,time(0)+pfs_main_timeout);
 		if(result>=0) {
 			return 0;
 		} else {
@@ -582,33 +582,33 @@ public:
 	virtual int md5( pfs_name *path, unsigned char *digest )
 	{
 		chirp_dircache_invalidate();
-		return chirp_global_md5(path->hostport,path->rest,digest,time(0)+pfs_master_timeout);
+		return chirp_global_md5(path->hostport,path->rest,digest,time(0)+pfs_main_timeout);
 	}
 
 	virtual int whoami( pfs_name *name, char *buf, int size ) {
 		chirp_dircache_invalidate();
-		return chirp_global_whoami(name->hostport,name->rest,buf,size,time(0)+pfs_master_timeout);
+		return chirp_global_whoami(name->hostport,name->rest,buf,size,time(0)+pfs_main_timeout);
 	}
 
 	virtual int getacl( pfs_name *name, char *buf, int size ) {
 		int result;
 		buf[0] = 0;
 		chirp_dircache_invalidate();
-		result = chirp_global_getacl(name->hostport,name->rest,add_to_acl,buf,time(0)+pfs_master_timeout);
+		result = chirp_global_getacl(name->hostport,name->rest,add_to_acl,buf,time(0)+pfs_main_timeout);
 		if(result==0) result = strlen(buf);
 		return result;
 	}
 
 	virtual int setacl( pfs_name *name, const char *subject, const char *rights ) {
 		chirp_dircache_invalidate();
-		return chirp_global_setacl(name->hostport,name->rest,subject,rights,time(0)+pfs_master_timeout);
+		return chirp_global_setacl(name->hostport,name->rest,subject,rights,time(0)+pfs_main_timeout);
 	}
 
 	virtual pfs_location* locate( pfs_name *name ) {
 		int result = -1;
 		pfs_location *loc = new pfs_location();
 
-		result = chirp_global_locate(name->host,name->path,add_to_loc,(void*)loc,time(0)+pfs_master_timeout);
+		result = chirp_global_locate(name->host,name->path,add_to_loc,(void*)loc,time(0)+pfs_main_timeout);
 
 		if(result>=0) {
 			return loc;

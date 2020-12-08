@@ -610,7 +610,7 @@ class Task(object):
         return self._task.time_execute_cmd_start
 
     ##
-    # Get the time at which the task finished (discovered by the master).
+    # Get the time at which the task finished (discovered by the manager).
     # Must be called only after the task completes execution.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
@@ -963,7 +963,7 @@ class WorkQueue(object):
     #                  specify_max_category_resources or @ref specify_memory),
     #                  and one of those resources is exceeded, the task fails.
     #                  Otherwise it is retried until a large enough worker
-    #                  connects to the master, using the maximum values
+    #                  connects to the manager, using the maximum values
     #                  specified, and the maximum values so far seen for
     #                  resources not specified. Use @ref specify_max_retries to
     #                  set a limit on the number of times work queue attemps
@@ -1096,19 +1096,24 @@ class WorkQueue(object):
     ##
     # Set the preference for using hostname over IP address to connect.
     # 'by_ip' uses IP address (standard behavior), or 'by_hostname' to use the
-    # hostname at the master.
+    # hostname at the manager.
     #
     # @param self   Reference to the current work queue object.
     # @param preferred_connection An string to indicate using 'by_ip' or a 'by_hostname'.
+    def specify_manager_preferred_connection(self, mode):
+        return work_queue_manager_preferred_connection(self._work_queue, mode)
+
+    ##
+    # See specify_manager_preferred_connection
     def specify_master_preferred_connection(self, mode):
-        return work_queue_master_preferred_connection(self._work_queue, mode)
+        return work_queue_manager_preferred_connection(self._work_queue, mode)
 
     ##
     # Set the minimum taskid of future submitted tasks.
     #
     # Further submitted tasks are guaranteed to have a taskid larger or equal
     # to minid.  This function is useful to make taskids consistent in a
-    # workflow that consists of sequential masters. (Note: This function is
+    # workflow that consists of sequential managers. (Note: This function is
     # rarely used).  If the minimum id provided is smaller than the last taskid
     # computed, the minimum id provided is ignored.
     #
@@ -1122,7 +1127,7 @@ class WorkQueue(object):
     # Change the project priority for the given queue.
     #
     # @param self       Reference to the current work queue object.
-    # @param priority   An integer that presents the priorty of this work queue master. The higher the value, the higher the priority.
+    # @param priority   An integer that presents the priorty of this work queue manager. The higher the value, the higher the priority.
     def specify_priority(self, priority):
         return work_queue_specify_priority(self._work_queue, priority)
 
@@ -1137,15 +1142,20 @@ class WorkQueue(object):
         return work_queue_specify_num_tasks_left(self._work_queue, ntasks)
 
     ##
-    # Specify the master mode for the given queue.
+    # Specify the manager mode for the given queue.
     #
     # @param self   Reference to the current work queue object.
     # @param mode   This may be one of the following values: @ref WORK_QUEUE_MASTER_MODE_STANDALONE or @ref WORK_QUEUE_MASTER_MODE_CATALOG.
-    def specify_master_mode(self, mode):
-        return work_queue_specify_master_mode(self._work_queue, mode)
+    def specify_manager_mode(self, mode):
+        return work_queue_specify_manager_mode(self._work_queue, mode)
 
     ##
-    # Specify the catalog server the master should report to.
+    # See specify_manager_mode
+    def specify_master_mode(self, mode):
+        return work_queue_specify_manager_mode(self._work_queue, mode)
+
+    ##
+    # Specify the catalog server the manager should report to.
     #
     # @param self       Reference to the current work queue object.
     # @param hostname   The hostname of the catalog server.
@@ -1326,38 +1336,52 @@ class WorkQueue(object):
         return work_queue_shut_down_workers(self._work_queue, n)
 
     ##
-    # Blacklist workers running on host.
+    # Block workers running on host from working for the manager.
     #
     # @param self   Reference to the current work queue object.
     # @param host   The hostname the host running the workers.
-    def blacklist(self, host):
-        return work_queue_blacklist_add(self._work_queue, host)
+    def block_host(self, host):
+        return work_queue_block_host(self._work_queue, host)
 
     ##
-    # Blacklist workers running on host for the duration of the given timeout.
+    # See @ref block
+    def blacklist(self, host):
+        return self.block_host(host)
+
+    ##
+    # Block workers running on host for the duration of the given timeout.
     #
     # @param self    Reference to the current work queue object.
     # @param host    The hostname the host running the workers.
-    # @param timeout How long this blacklist entry lasts (in seconds). If less than 1, blacklist indefinitely.
-    def blacklist_with_timeout(self, host, timeout):
-        return work_queue_blacklist_add_with_timeout(self._work_queue, host, timeout)
+    # @param timeout How long this block entry lasts (in seconds). If less than 1, block indefinitely.
+    def block_host_with_timeout(self, host, timeout):
+        return work_queue_block_host_with_timeout(self._work_queue, host, timeout)
 
     ##
-    # Remove host from blacklist. Clear all blacklist if host not provided.
+    # See @block_with_timeout
+    def blacklist_with_timeout(self, host, timeout):
+        return self.block_host_with_timeout(host, timeout)
+
+    ##
+    # Unblock given host, of all hosts if host not given
     #
     # @param self   Reference to the current work queue object.
     # @param host   The of the hostname the host.
-    def blacklist_clear(self, host=None):
+    def unblock_host(self, host=None):
         if host is None:
-            return work_queue_blacklist_clear(self._work_queue)
+            return work_queue_unblock_all(self._work_queue)
+        return work_queue_unblock_host(self._work_queue, host)
 
-        return work_queue_blacklist_remove(self._work_queue, host)
+    ##
+    # See @ref unblock_host
+    def blacklist_clear(self, host=None):
+        return self.unblock_host(host)
 
     ##
     # Delete file from workers's caches.
     #
     # @param self   Reference to the current work queue object.
-    # @param local_name   Name of the file as seen by the master.
+    # @param local_name   Name of the file as seen by the manager.
     def invalidate_cache_file(self, local_name):
         return work_queue_invalidate_cached_file(self._work_queue, local_name, WORK_QUEUE_FILE)
 
@@ -1380,7 +1404,7 @@ class WorkQueue(object):
         return work_queue_specify_keepalive_timeout(self._work_queue, timeout)
 
     ##
-    # Turn on master capacity measurements.
+    # Turn on manager capacity measurements.
     #
     # @param self     Reference to the current work queue object.
     #
@@ -1459,7 +1483,7 @@ class Factory(object):
             # submit some tasks
             workers.max_workers = 300
             # got a pile of tasks, allow more workers
-        # any additional cleanup steps on the master
+        # any additional cleanup steps on the manager
     """
 
     _command_line_options = [
@@ -1484,14 +1508,14 @@ class Factory(object):
         "k8s-image",
         "k8s-worker-image",
         "max-workers",
-        "master-name",
+        "manager-name",
         "memory",
         "mesos-master",
         "mesos-path",
         "mesos-preload",
         "min-workers",
         "password",
-        "run-factory-as-master",
+        "run-factory-as-manager",
         "runos",
         "scratch-dir",
         "tasks-per-worker",
@@ -1511,7 +1535,7 @@ class Factory(object):
         "disk",
         "factory-timeout",
         "foremen-name",
-        "master-name",
+        "manager-name",
         "max-workers",
         "memory",
         "min-workers",
@@ -1523,13 +1547,13 @@ class Factory(object):
 
     def __init__(
             self, batch_type,
-            master_name=None,
-            master_host_port=None,
+            manager_name=None,
+            manager_host_port=None,
             factory_binary=None, worker_binary=None,
             log_file=os.devnull):
         """
-        Create a factory for the given batch_type and master name.
-        master_name or, master_host_port should be specified.
+        Create a factory for the given batch_type and manager name.
+        manager_name or, manager_host_port should be specified.
         If factory_binary or worker_binary is not
         specified, $PATH will be searched.
         """
@@ -1540,29 +1564,29 @@ class Factory(object):
 
         self._opts = {}
 
-        self._set_master(master_name, master_host_port)
+        self._set_manager(manager_name, manager_host_port)
         self._opts['batch-type'] = batch_type
         self._opts['worker-binary'] = self._find_exe(worker_binary, 'work_queue_worker')
         self._factory_binary = self._find_exe(factory_binary, 'work_queue_factory')
 
-    def _set_master(self, master_name, master_host_port):
-        if not (master_name or master_host_port):
-            raise ValueError('Either master_name or, master_host_port should be specified.')
+    def _set_manager(self, manager_name, manager_host_port):
+        if not (manager_name or manager_host_port):
+            raise ValueError('Either manager_name or, manager_host_port should be specified.')
 
-        if master_name and master_host_port:
+        if manager_name and manager_host_port:
             raise ValueError('Master should be specified by a name, or by a host and port. Not both.')
 
-        if master_name:
-            self._opts['master-name'] = master_name
+        if manager_name:
+            self._opts['manager-name'] = manager_name
             return
 
-        if master_host_port:
+        if manager_host_port:
             try:
-                (host, port) = [x for x in master_host_port.split(':') if x]
-                self._opts['master-host'] = host
-                self._opts['master-port'] = port
+                (host, port) = [x for x in manager_host_port.split(':') if x]
+                self._opts['manager-host'] = host
+                self._opts['manager-port'] = port
             except (TypeError, ValueError):
-                raise ValueError('master_name is not of the form HOST:PORT')
+                raise ValueError('manager_name is not of the form HOST:PORT')
 
     def _find_exe(self, path, default):
         if path is None:
@@ -1633,8 +1657,8 @@ class Factory(object):
                  for opt in self._opts
                  if opt in Factory._command_line_options and opt not in Factory._config_file_options]
 
-        if 'master-host' in self._opts:
-            args += [self._opts['master-host'], self._opts['master-port']]
+        if 'manager-host' in self._opts:
+            args += [self._opts['manager-host'], self._opts['manager-port']]
 
         return args
 

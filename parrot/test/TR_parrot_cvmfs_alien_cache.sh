@@ -3,7 +3,7 @@
 . ../../dttools/test/test_runner_common.sh
 . ./parrot-test.sh
 
-tmp_dir_master=${PWD}/parrot_temp_dir
+tmp_dir_main=${PWD}/parrot_temp_dir
 tmp_dir_hitcher=${PWD}/parrot_temp_dir_hitcher
 
 test_file=/cvmfs/atlas.cern.ch/repo/conditions/logDir/lastUpdate
@@ -17,13 +17,13 @@ run()
 {
 	if parrot --check-driver cvmfs
 	then
-		parrot -t${tmp_dir_master} -- sh -c "head $test_file > /dev/null; sleep 10" &
-		pid_master=$!
+		parrot -t${tmp_dir_main} -- sh -c "head $test_file > /dev/null; sleep 10" &
+		pid_main=$!
 
-		parrot -t${tmp_dir_hitcher} --cvmfs-alien-cache=${tmp_dir_master}/cvmfs -- sh -c "stat $test_file"
+		parrot -t${tmp_dir_hitcher} --cvmfs-alien-cache=${tmp_dir_main}/cvmfs -- sh -c "stat $test_file"
 		status=$?
 
-		kill $pid_master
+		kill $pid_main
 
 		return $status
 	else
@@ -33,9 +33,9 @@ run()
 
 clean()
 {
-	if [ -n "${tmp_dir_master}" -a -d "${tmp_dir_master}" ]
+	if [ -n "${tmp_dir_main}" -a -d "${tmp_dir_main}" ]
 	then
-		rm -rf ${tmp_dir_master}
+		rm -rf ${tmp_dir_main}
 	fi
 
 	if [ -n "${tmp_dir_hitcher}" -a -d ${tmp_dir_hitcher} ]
