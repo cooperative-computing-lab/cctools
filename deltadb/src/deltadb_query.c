@@ -48,6 +48,8 @@ struct deltadb_query * deltadb_query_create()
 	struct deltadb_query *db = malloc(sizeof(*db));
 	memset(db,0,sizeof(*db));
 	db->table = hash_table_create(0,0);
+	db->output_exprs = list_create();
+	db->reduce_exprs = list_create();
 	return db;
 }
 
