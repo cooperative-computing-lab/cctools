@@ -1,0 +1,259 @@
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <time.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <stdarg.h>
+#include <ctype.h>
+
+#include "getopt.h"
+#include "cctools.h"
+#include "jx_parse.h"
+#include "jx_print.h"
+#include "stringtools.h"
+
+#include "deltadb_query.h"
+#include "deltadb_stream.h"
+#include "deltadb_reduction.h"
+
+int suffix_to_multiplier( char suffix )
+{
+	switch(tolower(suffix)) {
+	case 'y': return 60*60*24*365;
+	case 'w': return 60*60*24*7;
+	case 'd': return 60*60*24;
+	case 'h': return 60*60;
+	case 'm': return 60;
+	default: return 1;
+	}
+}
+
+time_t parse_time( const char *str, time_t current )
+{
+	struct tm t;
+	int count;
+	char suffix[2];
+	int n;
+
+	memset(&t,0,sizeof(t));
+
+	if(!strcmp(str,"now")) {
+		return current;
+	}
+
+	n = sscanf(str, "%d%[yYdDhHmMsS]", &count, suffix);
+	if(n==2) {
+		return current - count*suffix_to_multiplier(suffix[0]);
+	}
+
+	n = sscanf(str, "%d-%d-%d %d:%d:%d", &t.tm_year,&t.tm_mon,&t.tm_mday,&t.tm_hour,&t.tm_min,&t.tm_sec);
+	if(n==6) {
+		if (t.tm_hour>23)
+			t.tm_hour = 0;
+		if (t.tm_min>23)
+			t.tm_min = 0;
+		if (t.tm_sec>23)
+			t.tm_sec = 0;
+
+		t.tm_year -= 1900;
+		t.tm_mon -= 1;
+
+		return mktime(&t);
+	}
+
+	n = sscanf(str, "%d-%d-%d", &t.tm_year,&t.tm_mon,&t.tm_mday);
+	if(n==3) {
+		t.tm_year -= 1900;
+		t.tm_mon -= 1;
+
+		return mktime(&t);
+	}
+
+	return 0;
+}
+
+static struct option long_options[] =
+{
+	{"db", required_argument, 0, 'D'},
+	{"file", required_argument, 0, 'L'},
+	{"output", required_argument, 0, 'o'},
+	{"where", required_argument, 0,'w'},
+	{"filter", required_argument, 0,'f'},
+	{"from", required_argument, 0, 'F'},
+	{"to", required_argument, 0, 'T'},
+	{"at", required_argument, 0, 'A'},
+	{"every", required_argument, 0, 'e'},
+	{"epoch", no_argument, 0, 't'},
+	{"version", no_argument, 0, 'v'},
+	{"help", no_argument, 0, 'h'},
+	{0,0,0,0}
+};
+
+void show_help()
+{
+	printf("use: deltadb_query [options]\n");
+	printf("Where options are:\n");
+	printf("  --db <path>         Query this database directory.\n");
+	printf("  --file <path>       Query this raw data file.\n");
+	printf("  --output <expr>     Output this expression. (multiple)\n");
+	printf("  --where <expr>      Only output records matching this expression.\n");
+	printf("  --filter <expr>     Only process records matching this expression.\n");
+	printf("  --from <time>       Begin query at this absolute time. (required)\n");
+	printf("  --to <time>         End query at this absolute time.\n");
+	printf("  --every <interval>  Compute output at this time interval.\n");
+	printf("  --epoch             Display time column in Unix epoch format.\n");
+	printf("  --version           Show software version.\n");
+	printf("  --help              Show this help text.\n");
+}
+
+int main( int argc, char *argv[] )
+{
+	const char *dbdir=0;
+	const char *dbfile=0;
+	struct jx *where_expr = 0;
+	struct jx *filter_expr = 0;
+	struct list *output_exprs = list_create();
+	struct list *reduce_exprs = list_create();
+	time_t start_time = 0;
+	time_t stop_time = 0;
+	int display_every = 0;
+	int epoch_mode = 0;
+
+	char reduce_name[1024];
+	char reduce_attr[1024];
+
+	time_t current = time(0);
+
+	int c;
+
+	while((c=getopt_long(argc,argv,"D:L:o:w:f:F:T:e:tvh",long_options,0))!=-1) {
+		switch(c) {
+		case 'D':
+			dbdir = optarg;
+			break;
+		case 'L':
+			dbfile = optarg;
+			break;
+		case 'o':
+			if(2==sscanf(optarg,"%[^(](%[^)])",reduce_name,reduce_attr)) {
+
+				struct jx *reduce_expr = jx_parse_string(reduce_attr);
+				if(!reduce_expr) {
+					fprintf(stderr,"deltadb_query: invalid expression: %s\n",reduce_attr);
+					return 1;
+				}
+
+				struct deltadb_reduction *r = deltadb_reduction_create(reduce_name,reduce_expr);
+				if(!r) {
+					fprintf(stderr,"deltadb_query: invalid reduction: %s\n",reduce_name);
+					return 1;
+				}
+				list_push_tail(reduce_exprs,r);
+			} else {
+				struct jx *j = jx_parse_string(optarg);
+				if(!j) {
+					fprintf(stderr,"invalid expression: %s\n",optarg);
+					return 1;
+				}
+				list_push_tail(output_exprs,j);
+			}
+			break;
+		case 'w':
+			if(where_expr) {
+				fprintf(stderr,"Only one --where expression is allowed.  Try joining the expressions with the && (and) operator.");
+				return 1;
+			}
+			where_expr = jx_parse_string(optarg);
+			if(!where_expr) {
+				fprintf(stderr,"invalid expression: %s\n",optarg);
+				return 1;
+			}
+			break;
+		case 'f':
+			if(filter_expr) {
+				fprintf(stderr,"Only one --filter expression is allowed.  Try joining the expressions with the && (and) operator.");
+				return 1;
+			}
+			filter_expr = jx_parse_string(optarg);
+			if(!filter_expr) {
+				fprintf(stderr,"invalid expression: %s\n",optarg);
+				return 1;
+			}
+			break;
+		case 'F':
+			start_time = parse_time(optarg,current);
+			break;
+		case 'T':
+			stop_time = parse_time(optarg,current);
+			break;
+		case 'e':
+			display_every = string_time_parse(optarg);
+			break;
+		case 't':
+			epoch_mode = 1;
+			break;
+		case 'v':
+			cctools_version_print(stdout,"deltadb_query");
+			break;
+		case 'h':
+			show_help();
+			break;
+		}
+	}
+
+	if(!dbdir && !dbfile) {
+		fprintf(stderr,"deltadb_query: either --db or --file argument is required\n");
+		return 1;
+	}
+
+	if(start_time==0) {
+		fprintf(stderr,"deltadb_query: invalid --from time (must be \"YY-MM-DD\" or \"YY-MM-DD HH:MM:SS\")\n");
+		return 1;
+	}
+
+	if(stop_time==0) {
+		stop_time = time(0);
+	}
+
+	struct deltadb *db = deltadb_create(dbdir);
+
+	db->where_expr = where_expr;
+	db->filter_expr = filter_expr;
+	db->epoch_mode = epoch_mode;
+	db->output_exprs = output_exprs;
+	db->reduce_exprs = reduce_exprs;
+	db->display_every = display_every;
+	db->display_next = start_time;
+
+	if(list_size(db->reduce_exprs) && list_size(db->output_exprs) ) {
+		struct deltadb_reduction *r = list_peek_head(db->reduce_exprs);
+		const char *name = jx_print_string(list_peek_head(db->output_exprs));
+		fprintf(stderr,"deltadb_query: cannot mix reductions like 'MAX(%s)' with plain outputs like '%s'\n",jx_print_string(r->expr),name);
+		return 1;
+	}
+
+	if(list_size(db->reduce_exprs)) {
+		db->display_mode = MODE_REDUCE;
+	} else if(list_size(db->output_exprs)) {
+		db->display_mode = MODE_OBJECT;
+	} else {
+		db->display_mode = MODE_STREAM;
+	}
+
+	if(dbfile) {
+		FILE *file = fopen(dbfile,"r");
+		if(!file) {
+			fprintf(stderr,"deltadb_query: couldn't open %s: %s\n",dbfile,strerror(errno));
+			return 1;
+		}
+		deltadb_process_stream(db,file,start_time,stop_time);
+		fclose(file);
+	} else {
+		deltadb_query_execute(db,start_time,stop_time);
+	}
+
+	return 0;
+}
