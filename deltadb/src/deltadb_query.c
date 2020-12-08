@@ -32,6 +32,7 @@ See the file COPYING for details.
 
 struct deltadb_query {
 	struct hash_table *table;
+	FILE *output_stream;
 	int epoch_mode;
 	struct jx *filter_expr;
 	struct jx *where_expr;
@@ -48,9 +49,15 @@ struct deltadb_query * deltadb_query_create()
 	struct deltadb_query *db = malloc(sizeof(*db));
 	memset(db,0,sizeof(*db));
 	db->table = hash_table_create(0,0);
+	db->output_stream = stdout;
 	db->output_exprs = list_create();
 	db->reduce_exprs = list_create();
 	return db;
+}
+
+void deltadb_query_set_output( struct deltadb_query *db, FILE *stream )
+{
+	db->output_stream = stream;
 }
 
 void deltadb_query_set_display( struct deltadb_query *db, deltadb_display_mode_t mode )
@@ -209,20 +216,20 @@ static void display_reduce_exprs( struct deltadb_query *db, time_t current )
 	/* Emit the current time */
 
 	if(db->epoch_mode) {
-		printf("%lld\t",(long long) current);
+		fprintf(db->output_stream,"%lld\t",(long long) current);
 	} else {
 		char str[32];
 		strftime(str,sizeof(str),"%F %T",localtime(&current));
-		printf("%s\t",str);
+		fprintf(db->output_stream,"%s\t",str);
 	}
 
 	/* For each reduction, display the final value. */
 	list_first_item(db->reduce_exprs);
 	for(struct deltadb_reduction *r; (r = list_next_item(db->reduce_exprs));) {
-		printf("%lf\t",deltadb_reduction_value(r));
+		fprintf(db->output_stream,"%lf\t",deltadb_reduction_value(r));
 	}
 
-	printf("\n");
+	fprintf(db->output_stream,"\n");
 
 }
 
@@ -242,11 +249,11 @@ static void display_output_exprs( struct deltadb_query *db, time_t current )
 		/* Emit the current time */
 
 		if(db->epoch_mode) {
-			printf("%lld\t",(long long) current);
+			fprintf(db->output_stream,"%lld\t",(long long) current);
 		} else {
 			char str[32];
 			strftime(str,sizeof(str),"%F %T",localtime(&current));
-			printf("%s\t",str);
+			fprintf(db->output_stream,"%s\t",str);
 		}
 
 		/* For each output expression, compute the value and print. */
@@ -254,12 +261,12 @@ static void display_output_exprs( struct deltadb_query *db, time_t current )
 		list_first_item(db->output_exprs);
 		for(struct jx *j; (j = list_next_item(db->output_exprs));) {
 			struct jx *jvalue = jx_eval(j,jobject);
-			jx_print_stream(jvalue,stdout);
-			printf("\t");
+			jx_print_stream(jvalue,db->output_stream);
+			fprintf(db->output_stream,"\t");
 			jx_delete(jvalue);
 		}
 
-		printf("\n");
+		fprintf(db->output_stream,"\n");
 	}
 }
 
@@ -272,7 +279,7 @@ output if another record type intervenes.
 static void display_deferred_time( struct deltadb_query *db )
 {
 	if(db->deferred_time) {
-		printf("T %ld\n",db->deferred_time);
+		fprintf(db->output_stream,"T %ld\n",db->deferred_time);
 		db->deferred_time = 0;
 	}
 }
@@ -288,9 +295,9 @@ int deltadb_create_event( struct deltadb_query *db, const char *key, struct jx *
 
 	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 		display_deferred_time(db);
-		printf("C %s ",key);
-		jx_print_stream(jobject,stdout);
-		printf("\n");
+		fprintf(db->output_stream,"C %s ",key);
+		jx_print_stream(jobject,db->output_stream);
+		fprintf(db->output_stream,"\n");
 	}
 	return 1;
 }
@@ -304,7 +311,7 @@ int deltadb_delete_event( struct deltadb_query *db, const char *key )
 
 		if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 			display_deferred_time(db);
-			printf("D %s\n",key);
+			fprintf(db->output_stream,"D %s\n",key);
 		}
 	}
 	return 1;
@@ -348,7 +355,7 @@ int deltadb_merge_event( struct deltadb_query *db, const char *key, struct jx *u
 	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 		display_deferred_time(db);
 		char *str = jx_print_string(update);
-		printf("M %s %s\n",key,str);
+		fprintf(db->output_stream,"M %s %s\n",key,str);
 		free(str);
 	}
 
@@ -374,7 +381,7 @@ int deltadb_update_event( struct deltadb_query *db, const char *key, const char 
 	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 		display_deferred_time(db);
 		char *str = jx_print_string(jvalue);
-		printf("U %s %s %s\n",key,name,str);
+		fprintf(db->output_stream,"U %s %s %s\n",key,name,str);
 		free(str);
 	}
 
@@ -392,7 +399,7 @@ int deltadb_remove_event( struct deltadb_query *db, const char *key, const char 
 
 	if(db->display_mode==DELTADB_DISPLAY_STREAM) {
 		display_deferred_time(db);
-		printf("R %s %s\n",key,name);
+		fprintf(db->output_stream,"R %s %s\n",key,name);
 		return 1;
 	}
 

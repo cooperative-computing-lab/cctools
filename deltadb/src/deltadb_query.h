@@ -22,6 +22,7 @@ void deltadb_query_set_filter( struct deltadb_query *q, struct jx *expr );
 void deltadb_query_set_where( struct deltadb_query *q, struct jx *expr );
 void deltadb_query_set_epoch_mode( struct deltadb_query *q, int mode );
 void deltadb_query_set_interval( struct deltadb_query *q, int interval );
+void deltadb_query_set_output( struct deltadb_query *q, FILE *stream );
 
 void deltadb_query_add_output( struct deltadb_query *q, struct jx *expr );
 void deltadb_query_add_reduction( struct deltadb_query *q, struct deltadb_reduction *reduce );
