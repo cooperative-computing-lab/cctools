@@ -537,17 +537,12 @@ static void handle_query(struct link *query_link)
 		if(b64_decode(strexpr,&buf)==0) {
 			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
-				char *cmd = string_format("deltadb_query --db /tmp/history --where '%s' --from %ld --to %ld",jx_print_string(expr),time_start,time_stop);
-				FILE *file = popen(cmd,"r");
-				if(file) {
-					send_http_response(stream,200,"OK","text/plainx");
-					copy_stream_to_stream(file,stream);
-					pclose(file);
-				} else {
-					send_http_response(stream,500,"Internal Server Error","text/plain");
-					fprintf(stream,"Could not execute query process.\n");
-				}
-				free(cmd);
+				send_http_response(stream,200,"OK","text/plain");
+				deltadb_query_set_filter(query,expr);
+				deltadb_query_set_output(query,stream);
+				deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
+				deltadb_query_execute_dir(query,history_dir,time_start,time_stop);
+				deltadb_query_delete(query);
 				jx_delete(expr);
 			} else {
 				send_http_response(stream,400,"Bad Request","text/plain");
