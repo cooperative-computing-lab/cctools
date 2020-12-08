@@ -229,6 +229,24 @@ server, viewable by the makeflow_status command.
 static int catalog_reporting_on = 0;
 
 /*
+Create a status file about makeflow status
+*/ 
+
+static int file_status_on = 0;
+
+/*
+Store name of file detailing makeflow status.
+Default to status.html
+*/
+static char *file_status_name = "status.html";
+
+/*
+Store time interval for status file update.
+Default to 60s.
+*/
+static unsigned int file_status_interval = 60;
+
+/*
 Options related to the "mounting" of external data
 files at the DAG level.
 */
@@ -1036,12 +1054,16 @@ static void makeflow_run( struct dag *d )
 	timestamp_t start = timestamp_get();
 	// Last Report is created stall for first reporting.
 	timestamp_t last_time = start - (60 * 1000 * 1000);
-
+	
 	//reporting to catalog
 	if(catalog_reporting_on){
 		makeflow_catalog_summary(d, project, batch_queue_type, start);
 	}
-
+	
+	if(file_status_on){
+		makeflow_file_summary(d, project, batch_queue_type, start, file_status_name);
+	}
+	
 	while(!makeflow_abort_flag) {
 		makeflow_dispatch_ready_jobs(d);
 		/*
@@ -1099,8 +1121,16 @@ static void makeflow_run( struct dag *d )
 		timestamp_t now = timestamp_get();
 		/* If in reporting mode and 1 min has transpired */
 		if(catalog_reporting_on && ((now-last_time) > (60 * 1000 * 1000))){ 
-			makeflow_catalog_summary(d, project,batch_queue_type,start);
+			makeflow_catalog_summary(d, project,batch_queue_type,start);	
 			last_time = now;
+		}
+
+		/* Create status file */
+		now = timestamp_get();
+		/* If status file mode is on and a time interval has transpired */
+		if(file_status_on && ((now-last_time) > (file_status_interval * 1000 * 1000))){
+			makeflow_file_summary(d, project, batch_queue_type, start, file_status_name);
+			last_time = now; 
 		}
 
 		/* Rather than try to garbage collect after each time in this
@@ -1115,7 +1145,12 @@ static void makeflow_run( struct dag *d )
 
 	/* Always make final report to catalog when workflow ends. */
 	if(catalog_reporting_on){
-		makeflow_catalog_summary(d, project,batch_queue_type,start);
+		makeflow_catalog_summary(d, project,batch_queue_type,start); 
+	}
+	
+	/* Always make final status file when workflow ends. */
+	if(file_status_on){
+		makeflow_file_summary(d, project, batch_queue_type, start, file_status_name);
 	}
 
 	if(makeflow_abort_flag) {
@@ -1179,6 +1214,8 @@ static void show_help_run(const char *cmd)
 	printf("    --send-environment          Send local environment variables for execution.\n");
 	printf(" -S,--submission-timeout=<#>    Time to retry failed batch job submission.\n");
 	printf(" -f,--summary-log=<file>        Write summary of workflow to this file at end.\n");
+	printf("    --file-status=<file>        Write summary of workflow to file periodically.\n");
+	printf("    --file-status-interval=<file>	Set time interval for periodic workflow summary.\n");
 	        /********************************************************************************/
 	printf("\nData Handling:\n");
 	printf("    --archive                   Archive and retrieve archived jobs from archive.\n");
@@ -1476,6 +1513,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_MPI_CORES,
 		LONG_OPT_MPI_MEMORY,
 		LONG_OPT_TLQ,
+		LONG_OPT_FILE_STATUS,
+		LONG_OPT_FILE_STATUS_INTERVAL,
 		LONG_OPT_DISABLE_HEARTBEAT
 	};
 
@@ -1598,6 +1637,8 @@ int main(int argc, char *argv[])
 		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
 		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
 		{"tlq", required_argument, 0, LONG_OPT_TLQ},
+		{"file-status", required_argument, 0, LONG_OPT_FILE_STATUS},
+		{"file-status-interval", required_argument, 0, LONG_OPT_FILE_STATUS_INTERVAL},
 		{0, 0, 0, 0}
 	};
 
@@ -2132,6 +2173,14 @@ int main(int argc, char *argv[])
 			case LONG_OPT_TLQ:
 				tlq_port = atoi(optarg);
 				break;
+			case LONG_OPT_FILE_STATUS:
+				file_status_on = 1;
+				file_status_name = optarg;	
+				break;
+			case LONG_OPT_FILE_STATUS_INTERVAL:
+				file_status_on = 1;
+				file_status_interval = atoi(optarg);
+				break;			
 			default:
 				show_help_run(argv[0]);
 				return 1;
