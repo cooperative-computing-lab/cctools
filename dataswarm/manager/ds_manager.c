@@ -107,81 +107,82 @@ char *ds_manager_submit_task( struct ds_manager *m, struct jx *description ) {
 }
 
 int handle_handshake(struct ds_manager *m, struct mq *conn) {
-		switch (mq_recv(conn, NULL)) {
-			case MQ_MSG_NONE:
-				return 0;
-			case MQ_MSG_FD:
-				abort(); // should never happen
-			case MQ_MSG_BUFFER:
-				break;
-		}
+	char addr[LINK_ADDRESS_MAX];
+	int port;
 
-		char addr[LINK_ADDRESS_MAX];
-		int port;
-		mq_address_remote(conn, addr, &port);
+	const char *method = NULL;
+	struct jx *params = NULL;
+	jx_int_t id = 0;
+	struct jx *response = NULL;
 
-		buffer_t *buf = mq_get_tag(conn);
-		assert(buf);
-		mq_set_tag(conn, NULL);
+	switch (mq_recv(conn, NULL)) {
+		case MQ_MSG_NONE:
+			return 0;
+		case MQ_MSG_FD:
+			abort(); // should never happen
+		case MQ_MSG_BUFFER:
+			break;
+	}
 
-		struct jx *msg = ds_parse_message(buf);
-		buffer_free(buf);
-		free(buf);
+	mq_address_remote(conn, addr, &port);
 
-		if (!msg) {
-			debug(D_DATASWARM, "malformed handshake from %s:%d, disconnecting", addr, port);
-			mq_close(conn);
-			goto DONE;
-		}
+	buffer_t *buf = mq_get_tag(conn);
+	assert(buf);
+	mq_set_tag(conn, NULL);
 
-		const char *method = NULL;
-		struct jx *params = NULL;
-		jx_int_t id = 0;
-		struct jx *response = NULL;
+	struct jx *msg = ds_parse_message(buf);
+	buffer_free(buf);
+	free(buf);
 
-		if (ds_unpack_request(msg, &method, &id, &params) != DS_RESULT_SUCCESS
-				|| strcmp(method, "handshake")
-				|| !jx_istype(params, JX_OBJECT)) {
-			debug(D_DATASWARM, "invalid handshake from connection %s:%d, disconnecting", addr, port);
-			mq_close(conn);
-			goto DONE;
-		}
+	if (!msg) {
+		debug(D_DATASWARM, "malformed handshake from %s:%d, disconnecting", addr, port);
+		mq_close(conn);
+		goto DONE;
+	}
 
-		const char *conn_type = jx_lookup_string(params, "type");
+	if (ds_unpack_request(msg, &method, &id, &params) != DS_RESULT_SUCCESS
+			|| strcmp(method, "handshake")
+			|| !jx_istype(params, JX_OBJECT)) {
+		debug(D_DATASWARM, "invalid handshake from connection %s:%d, disconnecting", addr, port);
+		mq_close(conn);
+		goto DONE;
+	}
 
-		if (conn_type && !strcmp(conn_type, "worker")) {
-			struct ds_worker_rep *w = ds_worker_rep_create(conn);
-			mq_address_remote(conn,w->addr,&w->port);
-			debug(D_DATASWARM,"new worker from %s:%d\n",w->addr,w->port);
-			set_insert(m->worker_table, w);
-			mq_set_tag(conn, w);
-			response = ds_message_response(id, DS_RESULT_SUCCESS, NULL);
-			mq_store_buffer(conn, &w->recv_buffer, 0);
+	const char *conn_type = jx_lookup_string(params, "type");
 
-			// XXX This is a HACK to get some messages going for testing
-			dataswarm_test_script(m,w);
-		} else if (conn_type && !strcmp(conn_type,"client")) {
-			struct ds_client_rep *c = ds_client_rep_create(conn);
-			mq_address_remote(conn,c->addr,&c->port);
-			debug(D_DATASWARM,"new client from %s:%d\n",c->addr,c->port);
-			set_insert(m->client_table, c);
-			mq_set_tag(conn, c);
-			response = ds_message_response(id,DS_RESULT_SUCCESS,NULL);
-			mq_store_buffer(conn, &c->recv_buffer, 0);
-		} else {
-			debug(D_DATASWARM, "invalid handshake parameters from connection %s:%d, disconnecting", addr, port);
-			mq_close(conn);
-		}
+	if (conn_type && !strcmp(conn_type, "worker")) {
+		struct ds_worker_rep *w = ds_worker_rep_create(conn);
+		mq_address_remote(conn,w->addr,&w->port);
+		debug(D_DATASWARM,"new worker from %s:%d\n",w->addr,w->port);
+		set_insert(m->worker_table, w);
+		mq_set_tag(conn, w);
+		response = ds_message_response(id, DS_RESULT_SUCCESS, NULL);
+		mq_store_buffer(conn, &w->recv_buffer, 0);
+
+		// XXX This is a HACK to get some messages going for testing
+		dataswarm_test_script(m,w);
+	} else if (conn_type && !strcmp(conn_type,"client")) {
+		struct ds_client_rep *c = ds_client_rep_create(conn);
+		mq_address_remote(conn,c->addr,&c->port);
+		debug(D_DATASWARM,"new client from %s:%d\n",c->addr,c->port);
+		set_insert(m->client_table, c);
+		mq_set_tag(conn, c);
+		response = ds_message_response(id,DS_RESULT_SUCCESS,NULL);
+		mq_store_buffer(conn, &c->recv_buffer, 0);
+	} else {
+		debug(D_DATASWARM, "invalid handshake parameters from connection %s:%d, disconnecting", addr, port);
+		mq_close(conn);
+	}
 
 DONE:
-		if(response) {
-			/* this response probably shouldn't be here */
-			ds_json_send(conn, response);
-			jx_delete(response);
-		}
+	if(response) {
+		/* this response probably shouldn't be here */
+		ds_json_send(conn, response);
+		jx_delete(response);
+	}
 
-		jx_delete(msg);
-		return 0;
+	jx_delete(msg);
+	return 0;
 }
 
 void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
@@ -289,6 +290,15 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w )
 {
 	int set_storage = 0;
 	struct jx *msg = NULL;
+	struct jx *response = NULL;
+	const char *method = NULL;
+	struct jx  *params = NULL;
+	jx_int_t id = 0;
+	struct jx *result = NULL;
+	jx_int_t err_code = 0;
+	const char *err_message = NULL;
+	struct jx *err_data = NULL;
+
 	switch (mq_recv(w->connection, NULL)) {
 		case MQ_MSG_NONE:
 			return;
@@ -305,15 +315,6 @@ void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w )
 		debug(D_DATASWARM, "malformed message from worker %s:%d, disconnecting", w->addr, w->port);
 		goto ERROR;
 	}
-
-	struct jx *response = NULL;
-	const char *method = NULL;
-	struct jx  *params = NULL;
-	jx_int_t id = 0;
-	struct jx *result = NULL;
-	jx_int_t err_code = 0;
-	const char *err_message = NULL;
-	struct jx *err_data = NULL;
 
 	if (ds_unpack_request(msg, &method, &id, &params) == DS_RESULT_SUCCESS) {
 		debug(D_DATASWARM, "worker %s:%d rx: %s(%" PRIiJX ")", w->addr, w->port, method, id);
