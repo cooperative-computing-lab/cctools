@@ -55,6 +55,17 @@ struct deltadb_query * deltadb_query_create()
 	return query;
 }
 
+void deltadb_query_delete( struct deltadb_query *query )
+{
+	if(!query) return;
+	hash_table_delete(query->table);
+	jx_delete(query->filter_expr);
+	jx_delete(query->where_expr);
+	list_delete(query->output_exprs);
+	list_delete(query->reduce_exprs);
+	free(query);
+}
+
 void deltadb_query_set_output( struct deltadb_query *query, FILE *stream )
 {
 	query->output_stream = stream;

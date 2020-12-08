@@ -275,5 +275,7 @@ int main( int argc, char *argv[] )
 		pclose(file);
 	}
 
+	deltadb_query_delete(query);
+
 	return 0;
 }

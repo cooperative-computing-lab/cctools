@@ -17,6 +17,8 @@ typedef enum {
 
 struct deltadb_query * deltadb_query_create();
 
+void deltadb_query_delete( struct deltadb_query *q );
+
 void deltadb_query_set_display( struct deltadb_query *q, deltadb_display_mode_t mode );
 void deltadb_query_set_filter( struct deltadb_query *q, struct jx *expr );
 void deltadb_query_set_where( struct deltadb_query *q, struct jx *expr );
@@ -29,7 +31,5 @@ void deltadb_query_add_reduction( struct deltadb_query *q, struct deltadb_reduct
 
 int deltadb_query_execute_dir( struct deltadb_query *q, const char *dir, time_t starttime, time_t stoptime );
 int deltadb_query_execute_stream( struct deltadb_query *q, FILE *stream, time_t starttime, time_t stoptime );
-
-void deltadb_query_delete( struct deltadb_query *q );
 
 #endif
