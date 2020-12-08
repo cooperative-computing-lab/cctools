@@ -44,6 +44,7 @@ each one a json array in the following formats:
 
 <pre>
 T [time]               - Indicates the current time in Unix epoch format.
+t [secs]               - Indicates passage of time since last T or t. 
 C [key] [object]       - Create a new object with the given key.
 D [key] [object]       - Delete an object with the given key.
 U [key] [name] [value] - Update a named property with a new value.
