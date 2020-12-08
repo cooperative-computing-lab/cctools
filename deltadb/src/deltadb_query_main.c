@@ -14,6 +14,7 @@
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "stringtools.h"
+#include "b64.h"
 
 #include "deltadb_query.h"
 #include "deltadb_stream.h"
@@ -79,6 +80,7 @@ static struct option long_options[] =
 {
 	{"db", required_argument, 0, 'D'},
 	{"file", required_argument, 0, 'L'},
+	{"catalog", required_argument, 0, 'c'},
 	{"output", required_argument, 0, 'o'},
 	{"where", required_argument, 0,'w'},
 	{"filter", required_argument, 0,'f'},
@@ -98,6 +100,7 @@ void show_help()
 	printf("Where options are:\n");
 	printf("  --db <path>         Query this database directory.\n");
 	printf("  --file <path>       Query this raw data file.\n");
+	printf("  --catalog <host>    Query this catalog server.\n");
 	printf("  --output <expr>     Output this expression. (multiple)\n");
 	printf("  --where <expr>      Only output records matching this expression.\n");
 	printf("  --filter <expr>     Only process records matching this expression.\n");
@@ -113,6 +116,8 @@ int main( int argc, char *argv[] )
 {
 	const char *dbdir=0;
 	const char *dbfile=0;
+	const char *dbhost=0;
+
 	struct jx *where_expr = 0;
 	struct jx *filter_expr = 0;
 	struct list *output_exprs = list_create();
@@ -137,6 +142,10 @@ int main( int argc, char *argv[] )
 		case 'L':
 			dbfile = optarg;
 			break;
+		case 'c':
+			dbhost = optarg;
+			break;
+
 		case 'o':
 			if(2==sscanf(optarg,"%[^(](%[^)])",reduce_name,reduce_attr)) {
 
@@ -204,8 +213,8 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-	if(!dbdir && !dbfile) {
-		fprintf(stderr,"deltadb_query: either --db or --file argument is required\n");
+	if(!dbdir && !dbfile && !dbhost) {
+		fprintf(stderr,"deltadb_query: one of --db or --file or --catalog argument is required\n");
 		return 1;
 	}
 
@@ -251,8 +260,26 @@ int main( int argc, char *argv[] )
 		}
 		deltadb_process_stream(db,file,start_time,stop_time);
 		fclose(file);
-	} else {
+	} else if(dbfile) {
 		deltadb_query_execute(db,start_time,stop_time);
+	} else if(dbhost) {
+
+		buffer_t buf;
+		buffer_init(&buf);
+		char *filter_str = jx_print_string(db->filter_expr);
+		b64_encode(filter_str,strlen(filter_str),&buf);
+		char *cmd = string_format("curl http://%s:9097/history/%ld/%ld/%s",dbhost,start_time,stop_time,buffer_tostring(&buf));
+		buffer_free(&buf);
+		free(filter_str);
+
+		FILE *file = popen(cmd,"r");
+		if(!file) {
+			fprintf(stderr,"deltadb_query: couldn't execute '%s': %s\n",cmd,strerror(errno));
+			return 1;
+		}
+		deltadb_process_stream(db,file,start_time,stop_time);
+		free(cmd);
+		pclose(file);
 	}
 
 	return 0;
