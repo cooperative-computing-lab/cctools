@@ -28,6 +28,7 @@ See the file COPYING for details.
 #include "daemon.h"
 #include "getopt_aux.h"
 #include "change_process_title.h"
+#include "copy_stream.h"
 #include "zlib.h"
 #include "b64.h"
 
@@ -37,6 +38,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/wait.h>
 #include <sys/select.h>
 
@@ -428,7 +430,9 @@ static void handle_query(struct link *query_link)
 	char hostport[LINE_MAX];
 	char addr[LINK_ADDRESS_MAX];
 	char key[LINE_MAX];
+	char strexpr[LINE_MAX];
 	int port;
+	long time_start, time_stop;
 
 	char *hkey;
 	struct jx *j;
@@ -495,15 +499,12 @@ static void handle_query(struct link *query_link)
 			if(i<(n-1)) fprintf(stream,",\n");
 		}
 		fprintf(stream,"\n]\n");
-	} else if(!strncmp(path, "/query/",7)) {
-
-		const char *strexpr = &path[7];
-		struct jx *expr = 0;
+	} else if(1==sscanf(path, "/query/%[^/]",strexpr)) {
 
 		struct buffer buf;
 		buffer_init(&buf);
 		if(b64_decode(strexpr,&buf)==0) {
-			expr = jx_parse_string(buffer_tostring(&buf));
+			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
 				send_http_response(stream,200,"OK","text/plain");
 				fprintf(stream,"[\n");
@@ -517,6 +518,37 @@ static void handle_query(struct link *query_link)
 					}
 				}
 				fprintf(stream,"\n]\n");
+				jx_delete(expr);
+			} else {
+				send_http_response(stream,400,"Bad Request","text/plain");
+				fprintf(stream,"Invalid query text.\n");
+			}
+		} else {
+			send_http_response(stream,400,"Bad Request","text/plain");
+			fprintf(stream,"Invalid base-64 encoding.\n");
+		}
+		buffer_free(&buf);
+
+
+	} else if(3==sscanf(path, "/history/%ld/%ld/%[^/]",&time_start,&time_stop,strexpr)) {
+
+		struct buffer buf;
+		buffer_init(&buf);
+		if(b64_decode(strexpr,&buf)==0) {
+			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
+			if(expr) {
+				char *cmd = string_format("deltadb_query --db /tmp/history --where '%s' --from %ld --to %ld",jx_print_string(expr),time_start,time_stop);
+				FILE *file = popen(cmd,"r");
+				if(file) {
+					send_http_response(stream,200,"OK","text/plainx");
+					copy_stream_to_stream(file,stream);
+					pclose(file);
+				} else {
+					send_http_response(stream,500,"Internal Server Error","text/plain");
+					fprintf(stream,"Could not execute query process.\n");
+				}
+				free(cmd);
+				jx_delete(expr);
 			} else {
 				send_http_response(stream,400,"Bad Request","text/plain");
 				fprintf(stream,"Invalid query text.\n");
