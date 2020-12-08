@@ -30,7 +30,7 @@ See the file COPYING for details.
 #include <stdarg.h>
 #include <ctype.h>
 
-struct deltadb {
+struct deltadb_query {
 	struct hash_table *table;
 	int epoch_mode;
 	struct jx *filter_expr;
@@ -43,45 +43,45 @@ struct deltadb {
 	deltadb_display_mode_t display_mode;
 };
 
-struct deltadb * deltadb_create()
+struct deltadb_query * deltadb_query_create()
 {
-	struct deltadb *db = malloc(sizeof(*db));
+	struct deltadb_query *db = malloc(sizeof(*db));
 	memset(db,0,sizeof(*db));
 	db->table = hash_table_create(0,0);
 	return db;
 }
 
-void deltadb_query_set_display( struct deltadb *db, deltadb_display_mode_t mode )
+void deltadb_query_set_display( struct deltadb_query *db, deltadb_display_mode_t mode )
 {
 	db->display_mode = mode;
 }
 
-void deltadb_query_set_filter( struct deltadb *db, struct jx *expr )
+void deltadb_query_set_filter( struct deltadb_query *db, struct jx *expr )
 {
 	db->filter_expr = expr;
 }
 
-void deltadb_query_set_where( struct deltadb *db, struct jx *expr )
+void deltadb_query_set_where( struct deltadb_query *db, struct jx *expr )
 {
 	db->where_expr = expr;
 }
 
-void deltadb_query_set_epoch_mode( struct deltadb *db, int mode )
+void deltadb_query_set_epoch_mode( struct deltadb_query *db, int mode )
 {
 	db->epoch_mode = mode;
 }
 
-void deltadb_query_set_interval( struct deltadb *db, int interval )
+void deltadb_query_set_interval( struct deltadb_query *db, int interval )
 {
 	db->display_every = interval;
 }
 
-void deltadb_query_add_output( struct deltadb *db, struct jx *expr )
+void deltadb_query_add_output( struct deltadb_query *db, struct jx *expr )
 {
 	list_push_tail(db->output_exprs,expr);
 }
 
-void deltadb_query_add_reduction( struct deltadb *db, struct deltadb_reduction *r )
+void deltadb_query_add_reduction( struct deltadb_query *db, struct deltadb_reduction *r )
 {
 	list_push_tail(db->reduce_exprs,r);
 }
@@ -100,7 +100,7 @@ static int deltadb_boolean_expr( struct jx *expr, struct jx *data )
 Read a checkpoint in the (deprecated) nvpair format.  This will allow for a seamless upgrade by permitting the new JX database to continue from an nvpair checkpoint.
 */
 
-static int compat_checkpoint_read( struct deltadb *db, const char *filename )
+static int compat_checkpoint_read( struct deltadb_query *db, const char *filename )
 {
 	FILE * file = fopen(filename,"r");
 	if(!file) return 0;
@@ -133,7 +133,7 @@ static int compat_checkpoint_read( struct deltadb *db, const char *filename )
 
 /* Get a complete checkpoint file and reconstitute the state of the table. */
 
-static int checkpoint_read( struct deltadb *db, const char *filename )
+static int checkpoint_read( struct deltadb_query *db, const char *filename )
 {
 	FILE * file = fopen(filename,"r");
 	if(!file) return 0;
@@ -167,7 +167,7 @@ static int checkpoint_read( struct deltadb *db, const char *filename )
 	return 1;
 }
 
-static void display_reduce_exprs( struct deltadb *db, time_t current )
+static void display_reduce_exprs( struct deltadb_query *db, time_t current )
 {
 	/* Reset all reductions. */
 	list_first_item(db->reduce_exprs);
@@ -224,7 +224,7 @@ static void display_reduce_exprs( struct deltadb *db, time_t current )
 
 }
 
-static void display_output_exprs( struct deltadb *db, time_t current )
+static void display_output_exprs( struct deltadb_query *db, time_t current )
 {
 	/* For each item in the table... */
 
@@ -267,7 +267,7 @@ we store incoming T records as "deferred time" and then only
 output if another record type intervenes.
 */
 
-static void display_deferred_time( struct deltadb *db )
+static void display_deferred_time( struct deltadb_query *db )
 {
 	if(db->deferred_time) {
 		printf("T %ld\n",db->deferred_time);
@@ -275,7 +275,7 @@ static void display_deferred_time( struct deltadb *db )
 	}
 }
 
-int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobject )
+int deltadb_create_event( struct deltadb_query *db, const char *key, struct jx *jobject )
 {
 	if(!deltadb_boolean_expr(db->filter_expr,jobject)) {
 		jx_delete(jobject);
@@ -293,7 +293,7 @@ int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobjec
 	return 1;
 }
 
-int deltadb_delete_event( struct deltadb *db, const char *key )
+int deltadb_delete_event( struct deltadb_query *db, const char *key )
 {
 	struct jx *jobject = hash_table_remove(db->table,key);
 
@@ -334,7 +334,7 @@ static void jx_merge_into( struct jx *current, struct jx *update )
 	}
 }
 
-int deltadb_merge_event( struct deltadb *db, const char *key, struct jx *update )
+int deltadb_merge_event( struct deltadb_query *db, const char *key, struct jx *update )
 {
 	struct jx *current = hash_table_lookup(db->table,key);
 	if(!current) {
@@ -357,7 +357,7 @@ int deltadb_merge_event( struct deltadb *db, const char *key, struct jx *update 
 	return 1;
 }
 
-int deltadb_update_event( struct deltadb *db, const char *key, const char *name, struct jx *jvalue )
+int deltadb_update_event( struct deltadb_query *db, const char *key, const char *name, struct jx *jvalue )
 {
 	struct jx * jobject = hash_table_lookup(db->table,key);
 	if(!jobject) {
@@ -379,7 +379,7 @@ int deltadb_update_event( struct deltadb *db, const char *key, const char *name,
 	return 1;
 }
 
-int deltadb_remove_event( struct deltadb *db, const char *key, const char *name )
+int deltadb_remove_event( struct deltadb_query *db, const char *key, const char *name )
 {
 	struct jx *jobject = hash_table_lookup(db->table,key);
 	if(!jobject) return 1;
@@ -397,7 +397,7 @@ int deltadb_remove_event( struct deltadb *db, const char *key, const char *name 
 	return 1;
 }
 
-int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, time_t current )
+int deltadb_time_event( struct deltadb_query *db, time_t starttime, time_t stoptime, time_t current )
 {
 	if(current>stoptime) return 0;
 
@@ -417,7 +417,7 @@ int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, t
 	return 1;
 }
 
-int deltadb_post_event( struct deltadb *db, const char *line )
+int deltadb_post_event( struct deltadb_query *db, const char *line )
 {
 	return 1;
 }
@@ -440,7 +440,7 @@ static int days_in_year( int y )
 Execute a query on a single data stream.
 */
 
-int deltadb_query_execute_stream( struct deltadb *db, FILE *stream, time_t starttime, time_t stoptime )
+int deltadb_query_execute_stream( struct deltadb_query *db, FILE *stream, time_t starttime, time_t stoptime )
 {
 	db->display_next = starttime;
 	return deltadb_process_stream(db,stream,starttime,stoptime);
@@ -452,7 +452,7 @@ Play the log from starttime to stoptime by opening the appropriate
 checkpoint file and working ahead in the various log files.
 */
 
-int deltadb_query_execute_dir( struct deltadb *db, const char *logdir, time_t starttime, time_t stoptime )
+int deltadb_query_execute_dir( struct deltadb_query *db, const char *logdir, time_t starttime, time_t stoptime )
 {
 	int file_errors = 0;
 

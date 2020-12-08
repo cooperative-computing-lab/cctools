@@ -15,20 +15,20 @@ typedef enum {
   DELTADB_DISPLAY_REDUCE
 } deltadb_display_mode_t;
 
-struct deltadb * deltadb_create();
+struct deltadb_query * deltadb_query_create();
 
-void deltadb_query_set_display( struct deltadb *db, deltadb_display_mode_t mode );
-void deltadb_query_set_filter( struct deltadb *db, struct jx *expr );
-void deltadb_query_set_where( struct deltadb *db, struct jx *expr );
-void deltadb_query_set_epoch_mode( struct deltadb *db, int mode );
-void deltadb_query_set_interval( struct deltadb *db, int interval );
+void deltadb_query_set_display( struct deltadb_query *q, deltadb_display_mode_t mode );
+void deltadb_query_set_filter( struct deltadb_query *q, struct jx *expr );
+void deltadb_query_set_where( struct deltadb_query *q, struct jx *expr );
+void deltadb_query_set_epoch_mode( struct deltadb_query *q, int mode );
+void deltadb_query_set_interval( struct deltadb_query *q, int interval );
 
-void deltadb_query_add_output( struct deltadb *db, struct jx *expr );
-void deltadb_query_add_reduction( struct deltadb *db, struct deltadb_reduction *reduce );
+void deltadb_query_add_output( struct deltadb_query *q, struct jx *expr );
+void deltadb_query_add_reduction( struct deltadb_query *q, struct deltadb_reduction *reduce );
 
-int deltadb_query_execute_dir( struct deltadb *db, const char *dir, time_t starttime, time_t stoptime );
-int deltadb_query_execute_stream( struct deltadb *db, FILE *stream, time_t starttime, time_t stoptime );
+int deltadb_query_execute_dir( struct deltadb_query *q, const char *dir, time_t starttime, time_t stoptime );
+int deltadb_query_execute_stream( struct deltadb_query *q, FILE *stream, time_t starttime, time_t stoptime );
 
-void deltadb_query_delete( struct deltadb *db );
+void deltadb_query_delete( struct deltadb_query *q );
 
 #endif

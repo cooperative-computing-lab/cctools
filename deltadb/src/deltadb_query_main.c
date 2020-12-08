@@ -135,7 +135,7 @@ int main( int argc, char *argv[] )
 
 	int c;
 
-	struct deltadb *query = deltadb_create();
+	struct deltadb_query *query = deltadb_query_create();
 	deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
 
 	while((c=getopt_long(argc,argv,"D:L:o:w:f:F:T:e:tvh",long_options,0))!=-1) {

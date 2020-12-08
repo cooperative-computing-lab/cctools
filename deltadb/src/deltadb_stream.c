@@ -22,7 +22,7 @@ static void corrupt_data( const char *filename, const char *line )
 
 }
 
-int deltadb_process_stream( struct deltadb *db, FILE *stream, time_t starttime, time_t stoptime )
+int deltadb_process_stream( struct deltadb_query *db, FILE *stream, time_t starttime, time_t stoptime )
 {
 	char line[LOG_LINE_MAX];
 	char value[LOG_LINE_MAX];
