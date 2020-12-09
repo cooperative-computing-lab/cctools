@@ -35,17 +35,20 @@ sub DESTROY {
 }
 
 sub _determine_file_flags {
-	my ($flags, $cache) = @_;
+	my ($flags, $cache, $failure_only) = @_;
 
-	# flags overrides cache, always.
-	# cache by default if both undefined.
+	# flags overrides cache, and failure_only always.
 	return $flags if defined $flags;
 
-	return $WORK_QUEUE_CACHE unless defined $cache;
+    if($cache) {
+        $flags |= $WORK_QUEUE_CACHE;
+    }
 
-	return $WORK_QUEUE_CACHE if $cache;
+    if($failure_only) {
+        $flags |= $WORK_QUEUE_FAILURE_ONLY;
+    }
 
-	return $WORK_QUEUE_NOCACHE if $cache;
+	return $flags;
 }
 
 sub specify_tag {
@@ -96,7 +99,8 @@ sub specify_file {
 	$args{remote_name} //= $args{local_name};
 	$args{type}        //= $WORK_QUEUE_INPUT;
 	$args{cache}       //= 1;
-	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
+	$args{failure_only} //= 0;
+	$args{flags}         = _determine_file_flags($args{flags}, $args{cache}, $args{failure_only});
 
 	return work_queue_task_specify_file($self->{_task},
 					$args{local_name},
@@ -113,6 +117,7 @@ sub specify_file_command {
 
 	$args{type}        //= $WORK_QUEUE_INPUT;
 	$args{cache}       //= 1;
+	$args{failure_only} //= 0;
 	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
 
 	return work_queue_task_specify_file_command($self->{_task},
@@ -133,6 +138,7 @@ sub specify_file_piece {
 	$args{end_byte}    //= 0;
 	$args{type}        //= $WORK_QUEUE_INPUT;
 	$args{cache}       //= 1;
+	$args{failure_only} //= 0;
 	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
 
 	return work_queue_task_specify_file_piece($self->{_task},
@@ -153,7 +159,8 @@ sub specify_input_file {
 				   remote_name => $args{remote_name},
 				   type        => $WORK_QUEUE_INPUT,
 				   flags       => $args{flags},
-				   cache       => $args{cache});
+				   cache       => $args{cache},
+				   failure_only => 0);
 }
 
 sub specify_output_file {
@@ -166,7 +173,8 @@ sub specify_output_file {
 				   remote_name => $args{remote_name},
 				   type        => $WORK_QUEUE_OUTPUT,
 				   flags       => $args{flags},
-				   cache       => $args{cache});
+				   cache       => $args{cache},
+				   failure_only => $args{failure_only});
 }
 
 sub specify_directory {
@@ -179,7 +187,8 @@ sub specify_directory {
 	$args{recursive}   //= 0;
 
 	$args{cache}       //= 1;
-	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
+	$args{failure_only} //= 0;
+	$args{flags}         = _determine_file_flags($args{flags}, $args{cache}, $args{failure_only});
 
 	return work_queue_task_specify_directory($self->{_task},
 						 $args{local_name},
@@ -196,7 +205,8 @@ sub specify_buffer {
 	unless ($args{remote_name} and $args{buffer});
 
 	$args{cache}       //= 1;
-	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
+	$args{failure_only} //= 0;
+	$args{flags}         = _determine_file_flags($args{flags}, $args{cache}, $args{failure_only});
 
 	return work_queue_task_specify_buffer($self->{_task},
 					  $args{buffer},
@@ -597,11 +607,17 @@ May be zero to indicate no special handling, or any of the following or'd togeth
 
 =item $Work_Queue::WORK_QUEUE_WATCH
 
+=item $Work_Queue::WORK_QUEUE_FAILURE_ONLY
+
 =back
 
 =item cache
 
-Legacy parameter for setting file caching attribute.  By default this is enabled.
+Whether the file should be cached at workers. By default this is enabled.
+
+=item failure_only
+
+For output files only, whether the file should be retrieved only when the task fails. On successful executions the file will not be retrieved.
 
 =back
 
@@ -636,11 +652,17 @@ May be zero to indicate no special handling, or any of the following or'd togeth
 
 =item $Work_Queue::WORK_QUEUE_CACHE
 
+=item $Work_Queue::WORK_QUEUE_FAILURE_ONLY
+
 =back
 
 =item cache
 
-Legacy parameter for setting file caching attribute.  By default this is enabled.
+Whether the file should be cached at workers. By default this is enabled.
+
+=item failure_only
+
+For output files only, whether the file should be retrieved only when the task fails. On successful executions the file will not be retrieved.
 
 =back
 
@@ -680,7 +702,11 @@ or'd together. See Work_Queue::Task->specify_file
 
 =item cache
 
-Legacy parameter for setting file caching attribute.  By default this is enabled.
+Whether the file should be cached at workers. By default this is enabled.
+
+=item failure_only
+
+For output files only, whether the file should be retrieved only when the task fails. On successful executions the file will not be retrieved.
 
 =back
 
@@ -733,7 +759,11 @@ its contents (1) should be included.
 
 =item cache
 
-Legacy parameter for setting file caching attribute.  By default this is enabled.
+Whether the file should be cached at workers. By default this is enabled.
+
+=item failure_only
+
+For output files only, whether the file should be retrieved only when the task fails. On successful executions the file will not be retrieved.
 
 =back
 
@@ -761,7 +791,11 @@ May take the same values as Work_Queue::Task->specify_file.
 
 =item cache
 
-Legacy parameter for setting file caching attribute.  By default this is enabled.
+Whether the file should be cached at workers. By default this is enabled.
+
+=item failure_only
+
+For output files only, whether the file should be retrieved only when the task fails. On successful executions the file will not be retrieved.
 
 =back
 

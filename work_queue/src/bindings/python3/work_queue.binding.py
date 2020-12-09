@@ -61,8 +61,8 @@ class Task(object):
             work_queue_task_delete(self._task)
 
     @staticmethod
-    def _determine_file_flags(flags, cache):
-        # if flags is defined, use its value. Otherwise do not cache only if
+    def _determine_file_flags(flags, cache, failure_only):
+        # if flags is defined, use its value. Otherwise do not cache or failure_only only if
         # asked explicitely.
 
         if flags is None:
@@ -73,6 +73,12 @@ class Task(object):
                 flags = flags | WORK_QUEUE_CACHE
             else:
                 flags = flags & ~(WORK_QUEUE_CACHE)
+
+        if failure_only is not None:
+            if failure_only:
+                flags = flags | WORK_QUEUE_FAILURE_ONLY
+            else:
+                flags = flags & ~(WORK_QUEUE_FAILURE_ONLY)
 
         return flags
 
@@ -151,22 +157,24 @@ class Task(object):
     #                       - @ref WORK_QUEUE_NOCACHE (default)
     #                       - @ref WORK_QUEUE_CACHE
     #                       - @ref WORK_QUEUE_WATCH
-    # @param cache          Legacy parameter for setting file caching attribute. (True/False, deprecated, use the flags parameter.)
+    #                       - @ref WORK_QUEUE_FAILURE_ONLY
+    # @param cache         Whether the file should be cached at workers (True/False)
+    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     #
     # For example:
     # @code
     # # The following are equivalent
-    # >>> task.specify_file("/etc/hosts", type=WORK_QUEUE_INPUT, flags=WORK_QUEUE_CACHE)
-    # >>> task.specify_file("/etc/hosts", "hosts", type=WORK_QUEUE_INPUT)
+    # >>> task.specify_file("/etc/hosts", type=WORK_QUEUE_INPUT, cache = True)
+    # >>> task.specify_file("/etc/hosts", "hosts", type=WORK_QUEUE_INPUT, cache = True)
     # @endcode
-    def specify_file(self, local_name, remote_name=None, type=None, flags=None, cache=None):
+    def specify_file(self, local_name, remote_name=None, type=None, flags=None, cache=None, failure_only=None):
         if remote_name is None:
             remote_name = os.path.basename(local_name)
 
         if type is None:
             type = WORK_QUEUE_INPUT
 
-        flags = Task._determine_file_flags(flags, cache)
+        flags = Task._determine_file_flags(flags, cache, failure_only)
         return work_queue_task_specify_file(self._task, local_name, remote_name, type, flags)
 
     ##
@@ -183,18 +191,20 @@ class Task(object):
     #                       - @ref WORK_QUEUE_NOCACHE (default)
     #                       - @ref WORK_QUEUE_CACHE
     #                       - @ref WORK_QUEUE_WATCH
-    # @param cache          Legacy parameter for setting file caching attribute. (True/False, deprecated, use the flags parameter.)
+    #                       - @ref WORK_QUEUE_FAILURE_ONLY
+    # @param cache         Whether the file should be cached at workers (True/False)
+    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     #
     # For example:
     # @code
     # # The following are equivalent
     # >>> task.specify_file_command("my.result", "chirp_put %% chirp://somewhere/result.file", type=WORK_QUEUE_OUTPUT)
     # @endcode
-    def specify_file_command(self, remote_name, cmd, type=None, flags=None, cache=None):
+    def specify_file_command(self, remote_name, cmd, type=None, flags=None, cache=None, failure_only=None):
         if type is None:
             type = WORK_QUEUE_INPUT
 
-        flags = Task._determine_file_flags(flags, cache)
+        flags = Task._determine_file_flags(flags, cache, failure_only)
         return work_queue_task_specify_file_command(self._task, remote_name, cmd, type, flags)
 
     ##
@@ -210,15 +220,17 @@ class Task(object):
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE (default)
     #                       - @ref WORK_QUEUE_CACHE
-    # @param cache          Legacy parameter for setting file caching attribute. (True/False, deprecated, use the flags parameter.)
-    def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, type=None, flags=None, cache=None):
+    #                       - @ref WORK_QUEUE_FAILURE_ONLY
+    # @param cache         Whether the file should be cached at workers (True/False)
+    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
+    def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, type=None, flags=None, cache=None, failure_only=None):
         if remote_name is None:
             remote_name = os.path.basename(local_name)
 
         if type is None:
             type = WORK_QUEUE_INPUT
 
-        flags = Task._determine_file_flags(flags, cache)
+        flags = Task._determine_file_flags(flags, cache, failure_only)
         return work_queue_task_specify_file_piece(self._task, local_name, remote_name, start_byte, end_byte, type, flags)
 
     ##
@@ -226,14 +238,14 @@ class Task(object):
     #
     # This is just a wrapper for @ref specify_file with type set to @ref WORK_QUEUE_INPUT.
     def specify_input_file(self, local_name, remote_name=None, flags=None, cache=None):
-        return self.specify_file(local_name, remote_name, WORK_QUEUE_INPUT, flags, cache)
+        return self.specify_file(local_name, remote_name, WORK_QUEUE_INPUT, flags, cache, failure_only=None)
 
     ##
     # Add a output file to the task.
     #
     # This is just a wrapper for @ref specify_file with type set to @ref WORK_QUEUE_OUTPUT.
-    def specify_output_file(self, local_name, remote_name=None, flags=None, cache=None):
-        return self.specify_file(local_name, remote_name, WORK_QUEUE_OUTPUT, flags, cache)
+    def specify_output_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
+        return self.specify_file(local_name, remote_name, WORK_QUEUE_OUTPUT, flags, cache, failure_only)
 
     ##
     # Add a directory to the task.
@@ -246,16 +258,18 @@ class Task(object):
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
     # @param recursive      Indicates whether just the directory (False) or the directory and all of its contents (True) should be included.
-    # @param cache          Legacy parameter for setting file caching attribute. (True/False, deprecated, use the flags parameter.)
+    #                       - @ref WORK_QUEUE_FAILURE_ONLY
+    # @param cache         Whether the file should be cached at workers (True/False)
+    # @param failure_only  For output directories, whether the file should be retrieved only when the task fails (e.g., debug logs).
     # @return 1 if the task directory is successfully specified, 0 if either of @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
-    def specify_directory(self, local_name, remote_name=None, type=None, flags=None, recursive=False, cache=None):
+    def specify_directory(self, local_name, remote_name=None, type=None, flags=None, recursive=False, cache=None, failure_only=None):
         if remote_name is None:
             remote_name = os.path.basename(local_name)
 
         if type is None:
             type = WORK_QUEUE_INPUT
 
-        flags = Task._determine_file_flags(flags, cache)
+        flags = Task._determine_file_flags(flags, cache, failure_only)
         return work_queue_task_specify_directory(self._task, local_name, remote_name, type, flags, recursive)
 
     ##
@@ -265,7 +279,8 @@ class Task(object):
     # @param buffer         The contents of the buffer to pass as input.
     # @param remote_name    The name of the remote file to create.
     # @param flags          May take the same values as @ref specify_file.
-    # @param cache          Legacy parameter for setting buffer caching attribute. (True/False, deprecated, use the flags parameter.)
+    # @param cache          Whether the file should be cached at workers (True/False)
+    # @param failure_only   For output directories, whether the file should be retrieved only when the task fails (e.g., debug logs).
     def specify_buffer(self, buffer, remote_name, flags=None, cache=None):
         flags = Task._determine_file_flags(flags, cache)
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
