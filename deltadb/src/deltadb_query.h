@@ -1,5 +1,5 @@
 #ifndef DELTADB_QUERY_H
-#define DELTADB_QUERY_h
+#define DELTADB_QUERY_H
 
 #include <stdio.h>
 #include <time.h>
