@@ -237,8 +237,8 @@ class Task(object):
     # Add a input file to the task.
     #
     # This is just a wrapper for @ref specify_file with type set to @ref WORK_QUEUE_INPUT.
-    def specify_input_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
-        return self.specify_file(local_name, remote_name, WORK_QUEUE_INPUT, flags, cache, failure_only)
+    def specify_input_file(self, local_name, remote_name=None, flags=None, cache=None):
+        return self.specify_file(local_name, remote_name, WORK_QUEUE_INPUT, flags, cache, failure_only=None)
 
     ##
     # Add a output file to the task.
