@@ -267,7 +267,12 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	}
 	submit_id++;
 
-	char *command = string_format("%s %s %s %s %s %s %s.wrapper",
+	/*
+	Note that dot-slash is needed in front of the wrapper command
+	b/c some batch systems perform a PATH search on the executable.
+	*/
+
+	char *command = string_format("%s %s %s %s %s %s ./%s.wrapper",
 		cluster_submit_cmd,
 		cluster_resources,
 		cluster_options,
