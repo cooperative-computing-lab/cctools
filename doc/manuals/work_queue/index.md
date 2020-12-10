@@ -515,7 +515,7 @@ Configuarion file `factory.json`:
 work_queue_factory -Tcondor -Cfactory.json
 ```
 
-For further options, please refer to the work queue factory [manual](/man_pages/work_queue_factory).
+For further options, please refer to the work queue factory [manual](../man_pages/work_queue_factory.md).
 
 By default, the factory submits as many tasks that are waiting and running up
 to a specified maximum. To run more than one task in a worker, please refer
