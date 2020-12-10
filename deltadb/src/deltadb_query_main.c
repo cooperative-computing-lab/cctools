@@ -15,6 +15,7 @@
 #include "jx_print.h"
 #include "stringtools.h"
 #include "b64.h"
+#include "http_query.h"
 
 #include "deltadb_query.h"
 #include "deltadb_stream.h"
@@ -110,6 +111,20 @@ void show_help()
 	printf("  --epoch             Display time column in Unix epoch format.\n");
 	printf("  --version           Show software version.\n");
 	printf("  --help              Show this help text.\n");
+}
+
+struct link * catalog_query_history( const char *catalog_host, time_t start_time, time_t stop_time, struct jx *filter_expr, time_t stoptime )
+{
+	if(!filter_expr) filter_expr = jx_boolean(1);
+
+	buffer_t buf;
+	buffer_init(&buf);
+	char *filter_str = jx_print_string(filter_expr);
+	b64_encode(filter_str,strlen(filter_str),&buf);
+	char *url = string_format("http://%s:9097/history/%ld/%ld/%s",catalog_host,start_time,stop_time,buffer_tostring(&buf));
+	buffer_free(&buf);
+	free(filter_str);
+	return http_query(url,"GET",stoptime);
 }
 
 int main( int argc, char *argv[] )
@@ -256,25 +271,16 @@ int main( int argc, char *argv[] )
 	} else if(dbdir) {
 		deltadb_query_execute_dir(query,dbdir,start_time,stop_time);
 	} else if(dbhost) {
-
-		if(!filter_expr) filter_expr = jx_boolean(1);
-
-		buffer_t buf;
-		buffer_init(&buf);
-		char *filter_str = jx_print_string(filter_expr);
-		b64_encode(filter_str,strlen(filter_str),&buf);
-		char *cmd = string_format("curl -s http://%s:9097/history/%ld/%ld/%s",dbhost,start_time,stop_time,buffer_tostring(&buf));
-		buffer_free(&buf);
-		free(filter_str);
-
-		FILE *file = popen(cmd,"r");
-		if(!file) {
-			fprintf(stderr,"deltadb_query: couldn't execute '%s': %s\n",cmd,strerror(errno));
+		struct link *link = catalog_query_history(dbhost,start_time,stop_time,filter_expr,time(0)+60);
+		if(!link) {
+			fprintf(stderr,"deltadb_query: couldn't query catalog %s: %s\n",dbhost,strerror(errno));
 			return 1;
 		}
+
+		link_nonblocking(link,0);
+		FILE *file = fdopen(link_fd(link),"r");
 		deltadb_query_execute_stream(query,file,start_time,stop_time);
-		free(cmd);
-		pclose(file);
+		fclose(file);
 	}
 
 	deltadb_query_delete(query);
