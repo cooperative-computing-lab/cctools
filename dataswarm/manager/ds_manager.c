@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "cctools.h"
 #include "hash_table.h"
+#include "ppoll_compat.h"
 
 #include "ds_message.h"
 #include "ds_task.h"
@@ -502,6 +503,8 @@ int main(int argc, char *argv[])
 				break;
 		}
 	}
+
+	ppoll_compat_set_up_sigchld();
 
 	m->manager_socket = mq_serve(NULL, m->server_port);
 	if(!m->manager_socket) {

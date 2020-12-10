@@ -6,6 +6,7 @@
 #include "debug.h"
 #include "stringtools.h"
 #include "cctools.h"
+#include "ppoll_compat.h"
 
 #include <getopt.h>
 #include <stdio.h>
@@ -98,6 +99,8 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
+
+	ppoll_compat_set_up_sigchld();
 
 	struct ds_worker *w = ds_worker_create(workspace_dir);
 	if(!w) {
