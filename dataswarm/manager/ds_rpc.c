@@ -22,15 +22,140 @@
 /* not an rpc. writes the file to disk for a corresponding blob-get get request. */
 ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid );
 
-/* test read responses from workers. */
-ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
+static struct ds_blob_rep *find_rpc_blob(struct ds_worker_rep *w, struct jx *data) {
+	assert(jx_istype(data, JX_STRING));
+	const char *blobid = data->u.string_value;
+	struct ds_blob_rep *b = hash_table_lookup(w->blobs, blobid);
+	assert(b);
+	return b;
+}
+
+static struct ds_task_rep *find_rpc_task(struct ds_worker_rep *w, struct jx *data) {
+	assert(jx_istype(data, JX_STRING));
+	const char *taskid = data->u.string_value;
+	struct ds_task_rep *t = hash_table_lookup(w->tasks, taskid);
+	assert(t);
+	return t;
+}
+
+//XXX This is just a placeholder
+static ds_result_t handle_result_blob_(struct ds_manager *m, struct ds_worker_rep *w, struct jx *data)
+{
+	struct ds_blob_rep *b = find_rpc_blob(w, data);
+	b->result = DS_RESULT_SUCCESS;
+	return b->result;
+}
+
+//XXX This is just a placeholder
+static ds_result_t handle_result_task_(struct ds_manager *m, struct ds_worker_rep *w, struct jx *data)
+{
+	struct ds_task_rep *t = find_rpc_task(w, data);
+	t->result = DS_RESULT_SUCCESS;
+	t->state = t->in_transition;
+	return t->result;
+}
+
+static ds_result_t handle_result_blob_get(struct ds_manager *m, struct ds_worker_rep *w, struct jx *data, int *set_storage)
+{
+	struct ds_blob_rep *b = find_rpc_blob(w, data);
+
+	assert(b->state == DS_BLOB_GET);
+	b->result = blob_get_aux(m,w,b->blobid);
+	*set_storage = 1;
+	return b->result;
+}
+
+ds_result_t ds_rpc_handle_result( struct ds_manager *m, struct ds_worker_rep *w, jx_int_t msgid, struct jx *data )
+{
+	int set_storage = 0;
+	ds_result_t result = DS_RESULT_SUCCESS;
+
+	ds_rpc_op_t op = (uintptr_t) itable_remove(w->rpcs, msgid);
+	if (op == 0) {
+		fatal("result for unknown rpc %" PRIiJX, msgid);
+	}
+
+	switch (op) {
+		case DS_RPC_OP_TASK_SUBMIT:
+		result = handle_result_task_(m, w, data);
+		break;
+		case DS_RPC_OP_TASK_GET:
+		result = handle_result_task_(m, w, data);
+		break;
+		case DS_RPC_OP_TASK_REMOVE:
+		result = handle_result_task_(m, w, data);
+		break;
+		case DS_RPC_OP_TASK_LIST:
+		//TODO
+		break;
+		case DS_RPC_OP_BLOB_CREATE:
+		result = handle_result_blob_(m, w, data);
+		break;
+		case DS_RPC_OP_BLOB_PUT:
+		result = handle_result_blob_(m, w, data);
+		break;
+		case DS_RPC_OP_BLOB_GET:
+		result = handle_result_blob_get(m, w, data, &set_storage);
+		break;
+		case DS_RPC_OP_BLOB_DELETE:
+		result = handle_result_blob_(m, w, data);
+		break;
+		case DS_RPC_OP_BLOB_COMMIT:
+		result = handle_result_blob_(m, w, data);
+		break;
+		case DS_RPC_OP_BLOB_COPY:
+		result = handle_result_blob_(m, w, data);
+		break;
+		case DS_RPC_OP_BLOB_LIST:
+		//TODO
+		break;
+		default:
+		fatal("missing rpc handler!");
+	}
+
+	if (!set_storage) {
+		mq_store_buffer(w->connection, &w->recv_buffer, 0);
+	}
+	return result;
+}
+
+ds_result_t ds_rpc_handle_notification( struct ds_worker_rep *w, const char *method, struct jx *params )
 {
 	ds_result_t result = DS_RESULT_SUCCESS;
-	int set_storage = 0;
+	if(!method) {
+		result = DS_RESULT_BAD_METHOD;
+	} else if(!strcmp(method, "task-update")) {
+		result = ds_worker_rep_update_task(w, params);
+	} else if(!strcmp(method, "blob-update")) {
+		result = ds_worker_rep_update_blob(w, params);
+	} else if(!strcmp(method, "status-report")) {
+		// update stats
+	} else {
+		result = DS_RESULT_BAD_METHOD;
+	}
+
+	mq_store_buffer(w->connection, &w->recv_buffer, 0);
+	return result;
+}
+
+ds_result_t ds_rpc_handle_error(struct ds_worker_rep *w, jx_int_t msgid, jx_int_t code, const char *message, struct jx *data) {
+	ds_result_t result = code;
+
+	debug(D_DATASWARM, "rpc %" PRIiJX " failed with code %" PRIiJX ": %s", msgid, code, message);
+	itable_remove(w->rpcs, msgid);
+	//XXX do something about errors
+
+	mq_store_buffer(w->connection, &w->recv_buffer, 0);
+	return result;
+}
+
+ds_result_t ds_rpc_handle_message( struct ds_manager *m, struct ds_worker_rep *r)
+{
+	ds_result_t result = DS_RESULT_SUCCESS;
 	struct jx *msg = NULL;
 	switch (mq_recv(r->connection, NULL)) {
 		case MQ_MSG_NONE:
-			return 0;
+			return DS_RESULT_SUCCESS;
 		case MQ_MSG_BUFFER:
 			msg = ds_parse_message(&r->recv_buffer);
 			assert(msg);
@@ -49,56 +174,17 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 	struct jx *err_data = NULL;
 
 	if (ds_unpack_notification(msg, &method, &params) == DS_RESULT_SUCCESS) {
-		ds_worker_rep_async_update(r, method, params);
+		result = ds_rpc_handle_notification(r, method, params);
 	} else if (ds_unpack_result(msg, &msgid, &data) == DS_RESULT_SUCCESS) {
-		/* it could be an rpc for a blob or a task, but we don't know yet. */
-		struct ds_blob_rep *b = (struct ds_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
-		struct ds_task_rep *t = (struct ds_task_rep *) itable_lookup(r->task_of_rpc, msgid);
-
-		if(b) {
-			b->result = DS_RESULT_SUCCESS;
-			if(b->state == DS_BLOB_GET) {
-				b->result = blob_get_aux(m,r,b->blobid);
-				set_storage = 1;
-				result = b->result;
-			}
-			itable_remove(r->blob_of_rpc, msgid);
-		} else if(t) {
-			/* may be a response to a task */
-			t->result = DS_RESULT_SUCCESS;
-			t->state = t->in_transition;
-			itable_remove(r->task_of_rpc, msgid);
-		} else {
-			debug(D_DATASWARM, "worker does not know about message id: %" PRId64, msgid);
-		}
+		result = ds_rpc_handle_result(m, r, msgid, data);
 	} else if (ds_unpack_error(msg, &msgid, &err_code, &err_message, &err_data) == DS_RESULT_SUCCESS) {
-		result = err_code;
-		struct ds_blob_rep *b = (struct ds_blob_rep *) itable_lookup(r->blob_of_rpc, msgid);
-		struct ds_task_rep *t = (struct ds_task_rep *) itable_lookup(r->task_of_rpc, msgid);
-
-		if(b) {
-			b->result = result;
-			debug(D_DATASWARM, "blob rpc %" PRId64 " failed", msgid);
-			//XXX print detailed info, clean up, etc.
-			itable_remove(r->blob_of_rpc, msgid);
-		} else if (t) {
-			t->result = result;
-			debug(D_DATASWARM, "task rpc %" PRId64 " failed", msgid);
-			//XXX print detailed info, clean up, etc.
-			itable_remove(r->task_of_rpc, msgid);
-		} else {
-			debug(D_DATASWARM, "worker does not know about message id: %" PRId64, msgid);
-		}
+		result = ds_rpc_handle_error(r, msgid, err_code, err_message, err_data);
 	} else {
+		// workers should never issue requests
 		abort();
 	}
 
-	if (!set_storage) {
-		mq_store_buffer(r->connection, &r->recv_buffer, 0);
-	}
-
 	jx_delete(msg);
-
 	return result;
 }
 
@@ -109,37 +195,31 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 
 jx_int_t ds_rpc( struct ds_manager *m, struct ds_worker_rep *r, struct jx *rpc)
 {
-	assert(jx_lookup(rpc, "id"));
-	jx_int_t msgid = jx_lookup_integer(rpc, "id");
+	struct jx *i = jx_lookup(rpc, "id");
+	assert(jx_istype(i, JX_INTEGER));
+	jx_int_t msgid = i->u.integer_value;
 
+	itable_insert(r->rpcs, msgid, (void *) (uintptr_t) ds_rpc_opcode(jx_lookup_string(rpc, "method")));
 	ds_json_send(r->connection,rpc);
-	jx_delete(rpc);
 
+	jx_delete(rpc);
 	return msgid;
 }
 
 jx_int_t ds_rpc_for_blob( struct ds_manager *m, struct ds_worker_rep *r, struct ds_blob_rep *b, struct jx *rpc, ds_blob_state_t in_transition )
 {
-	jx_int_t msgid = ds_rpc(m, r, rpc);
-
 	b->in_transition = in_transition;
 	b->result = DS_RESULT_PENDING;;
 
-	itable_insert(r->blob_of_rpc, msgid, b);
-
-	return msgid;
+	return ds_rpc(m, r, rpc);;
 }
 
 jx_int_t ds_rpc_for_task( struct ds_manager *m, struct ds_worker_rep *r, struct ds_task_rep *t, struct jx *rpc, ds_task_state_t in_transition )
 {
-	jx_int_t msgid = ds_rpc(m, r, rpc);
-
 	t->in_transition = in_transition;
 	t->result = DS_RESULT_PENDING;;
 
-	itable_insert(r->task_of_rpc, msgid, t);
-
-	return msgid;
+	return ds_rpc(m, r, rpc);
 }
 
 jx_int_t ds_rpc_blob_create( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid, int64_t size, struct jx *metadata )
@@ -325,6 +405,35 @@ jx_int_t ds_rpc_blob_list( struct ds_manager *m, struct ds_worker_rep *r )
 {
 	struct jx *rpc = ds_message_request("blob-list", NULL);
 	return ds_rpc(m, r, rpc);
+}
+
+ds_rpc_op_t ds_rpc_opcode(const char *method) {
+	assert(method);
+	if (!strcmp(method, "task-submit")) {
+		return DS_RPC_OP_TASK_SUBMIT;
+	} else if (!strcmp(method, "task-get")) {
+		return DS_RPC_OP_TASK_GET;
+	} else if (!strcmp(method, "task-remove")) {
+		return DS_RPC_OP_TASK_REMOVE;
+	} else if (!strcmp(method, "task-list")) {
+		return DS_RPC_OP_TASK_LIST;
+	} else if (!strcmp(method, "blob-create")) {
+		return DS_RPC_OP_BLOB_CREATE;
+	} else if (!strcmp(method, "blob-put")) {
+		return DS_RPC_OP_BLOB_PUT;
+	} else if (!strcmp(method, "blob-get")) {
+		return DS_RPC_OP_BLOB_GET;
+	} else if (!strcmp(method, "blob-delete")) {
+		return DS_RPC_OP_BLOB_DELETE;
+	} else if (!strcmp(method, "blob-commit")) {
+		return DS_RPC_OP_BLOB_COMMIT;
+	} else if (!strcmp(method, "blob-copy")) {
+		return DS_RPC_OP_BLOB_COPY;
+	} else if (!strcmp(method, "blob-list")) {
+		return DS_RPC_OP_BLOB_LIST;
+	} else {
+		abort();
+	}
 }
 
 /* vim: set noexpandtab tabstop=4: */

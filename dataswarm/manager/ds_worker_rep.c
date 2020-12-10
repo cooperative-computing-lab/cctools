@@ -34,8 +34,7 @@ struct ds_worker_rep * ds_worker_rep_create( struct mq *conn )
 	w->blobs = hash_table_create(0,0);
 	w->tasks = hash_table_create(0,0);
 
-	w->blob_of_rpc = itable_create(0);
-	w->task_of_rpc = itable_create(0);
+	w->rpcs = itable_create(0);
 
 	buffer_init(&w->recv_buffer);
 
@@ -126,25 +125,5 @@ ds_result_t ds_worker_rep_update_blob( struct ds_worker_rep *r, struct jx *param
 
 	return DS_RESULT_SUCCESS;
 }
-
-
-ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, const char *method, struct jx *params )
-{
-	ds_result_t result = DS_RESULT_SUCCESS;
-	if(!method) {
-		result = DS_RESULT_BAD_METHOD;
-	} else if(!strcmp(method, "task-update")) {
-		result = ds_worker_rep_update_task(w, params);
-	} else if(!strcmp(method, "blob-update")) {
-		result = ds_worker_rep_update_blob(w, params);
-	} else if(!strcmp(method, "status-report")) {
-		// update stats
-	} else {
-		result = DS_RESULT_BAD_METHOD;
-	}
-
-	return result;
-}
-
 
 /* vim: set noexpandtab tabstop=4: */
