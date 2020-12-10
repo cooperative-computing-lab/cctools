@@ -47,7 +47,7 @@ struct jx * ds_worker_handshake( struct ds_worker *w )
 {
 	struct jx *params = jx_object(NULL);
 	jx_insert_string(params, "type", "worker");
-	return ds_message_request("handshake", params);
+	return ds_message_notification("handshake", params);
 }
 
 void ds_worker_handle_message(struct ds_worker *w)
@@ -101,9 +101,6 @@ void ds_worker_handle_message(struct ds_worker *w)
 		result = ds_blob_table_copy(w,blobid, jx_lookup_string(params, "blob-id-source"));
 	} else if(!strcmp(method, "blob-list")) {
 		result = ds_blob_table_list(w,&result_params);
-	} else if(!strcmp(method, "response")) {
-        /* only from handshake */
-        should_send_response = 0;
 	} else {
 		result = DS_RESULT_BAD_METHOD;
 	}

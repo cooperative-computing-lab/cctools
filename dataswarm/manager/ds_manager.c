@@ -112,8 +112,6 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 
 	const char *method = NULL;
 	struct jx *params = NULL;
-	jx_int_t id = 0;
-	struct jx *response = NULL;
 
 	switch (mq_recv(conn, NULL)) {
 		case MQ_MSG_NONE:
@@ -140,7 +138,7 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 		goto DONE;
 	}
 
-	if (ds_unpack_request(msg, &method, &id, &params) != DS_RESULT_SUCCESS
+	if (ds_unpack_notification(msg, &method, &params) != DS_RESULT_SUCCESS
 			|| strcmp(method, "handshake")
 			|| !jx_istype(params, JX_OBJECT)) {
 		debug(D_DATASWARM, "invalid handshake from connection %s:%d, disconnecting", addr, port);
@@ -156,7 +154,6 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 		debug(D_DATASWARM,"new worker from %s:%d\n",w->addr,w->port);
 		set_insert(m->worker_table, w);
 		mq_set_tag(conn, w);
-		response = ds_message_response(id, DS_RESULT_SUCCESS, NULL);
 		mq_store_buffer(conn, &w->recv_buffer, 0);
 
 		// XXX This is a HACK to get some messages going for testing
@@ -167,7 +164,6 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 		debug(D_DATASWARM,"new client from %s:%d\n",c->addr,c->port);
 		set_insert(m->client_table, c);
 		mq_set_tag(conn, c);
-		response = ds_message_response(id,DS_RESULT_SUCCESS,NULL);
 		mq_store_buffer(conn, &c->recv_buffer, 0);
 	} else {
 		debug(D_DATASWARM, "invalid handshake parameters from connection %s:%d, disconnecting", addr, port);
@@ -175,12 +171,6 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 	}
 
 DONE:
-	if(response) {
-		/* this response probably shouldn't be here */
-		ds_json_send(conn, response);
-		jx_delete(response);
-	}
-
 	jx_delete(msg);
 	return 0;
 }

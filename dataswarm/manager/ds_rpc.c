@@ -25,7 +25,7 @@ ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const c
 /* test read responses from workers. */
 ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 {
-	ds_result_t result = -1;
+	ds_result_t result = DS_RESULT_SUCCESS;
 	int set_storage = 0;
 	struct jx *msg = NULL;
 	switch (mq_recv(r->connection, NULL)) {
@@ -60,6 +60,7 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 			if(b->state == DS_BLOB_GET) {
 				b->result = blob_get_aux(m,r,b->blobid);
 				set_storage = 1;
+				result = b->result;
 			}
 			itable_remove(r->blob_of_rpc, msgid);
 		} else if(t) {
@@ -77,9 +78,13 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 
 		if(b) {
 			b->result = result;
+			debug(D_DATASWARM, "blob rpc %" PRId64 " failed", msgid);
+			//XXX print detailed info, clean up, etc.
 			itable_remove(r->blob_of_rpc, msgid);
 		} else if (t) {
 			t->result = result;
+			debug(D_DATASWARM, "task rpc %" PRId64 " failed", msgid);
+			//XXX print detailed info, clean up, etc.
 			itable_remove(r->task_of_rpc, msgid);
 		} else {
 			debug(D_DATASWARM, "worker does not know about message id: %" PRId64, msgid);
@@ -104,6 +109,7 @@ ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *r)
 
 jx_int_t ds_rpc( struct ds_manager *m, struct ds_worker_rep *r, struct jx *rpc)
 {
+	assert(jx_lookup(rpc, "id"));
 	jx_int_t msgid = jx_lookup_integer(rpc, "id");
 
 	ds_json_send(r->connection,rpc);
@@ -267,9 +273,17 @@ ds_result_t blob_get_aux( struct ds_manager *m, struct ds_worker_rep *r, const c
 
 	ds_result_t result = DS_RESULT_UNABLE;
 
-	int file = open(b->put_get_path, O_WRONLY|O_CREAT|O_EXCL, 0777);
+	//XXX use O_EXCL once we're past the test script
+	int file = open(b->put_get_path, O_WRONLY|O_CREAT, 0777);
 	if(file < 0) {
 		mq_store_buffer(r->connection, &r->recv_buffer, 0);
+		debug(D_DATASWARM, "unable to open %s to receive blob %s", b->put_get_path, b->blobid);
+		/* If this open fails, we don't have a way to stop the worker from
+		 * proceeding to send the file contents. The only thing we can do here
+		 * is close the connection.
+		 */
+		 //XXX we need a worker_die() function?
+		 mq_close(r->connection);
 	} else {
 		mq_store_fd(r->connection, file, 0);
 		result = DS_RESULT_SUCCESS;

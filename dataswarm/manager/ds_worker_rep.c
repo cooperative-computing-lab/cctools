@@ -56,13 +56,14 @@ ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *param
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	jx_int_t    state  = jx_lookup_integer(params, "state");
+	struct jx *s = jx_lookup(params, "state");
 	const char *taskid = jx_lookup_string(params, "task-id");
 
-	if(!state || !taskid) { //FIX: state may be zero
+	if(!jx_istype(s, JX_INTEGER) || !taskid) {
 		debug(D_DATASWARM, "message does not contain state or taskid. Ignoring task update.");
 		return DS_RESULT_BAD_PARAMS;
 	}
+	jx_int_t state = s->u.integer_value;
 
 	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
 	if(!t) {

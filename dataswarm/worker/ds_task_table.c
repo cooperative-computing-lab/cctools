@@ -94,7 +94,7 @@ ds_result_t ds_task_table_list( struct ds_worker *w, struct jx **result )
 		jx_insert(*result,jx_string(taskid),ds_task_to_jx(task));
 	}
 
-	return DS_RESULT_SUCCESS;	
+	return DS_RESULT_SUCCESS;
 }
 
 
@@ -111,6 +111,7 @@ void ds_task_try_advance(struct ds_worker *w, struct ds_task *task) {
                 // XXX check for invalid mounts?
                 if(ds_process_start(process,w)) {
                     update_task_state(w, task, DS_TASK_ACTIVE, DS_TASK_RESULT_UNDEFINED, 1);
+					task->try_state = DS_TASK_TRY_PENDING;
                     ds_worker_resources_alloc(w,task->resources);
                 } else {
                     update_task_state(w, task, DS_TASK_DONE, DS_TASK_RESULT_ERROR, 1);
