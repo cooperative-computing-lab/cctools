@@ -40,6 +40,7 @@ struct deltadb_query {
 	time_t display_every;
 	time_t display_next;
 	time_t deferred_time;
+	time_t last_output_time;
 	deltadb_display_mode_t display_mode;
 };
 
@@ -289,7 +290,12 @@ output if another record type intervenes.
 static void display_deferred_time( struct deltadb_query *query )
 {
 	if(query->deferred_time) {
-		fprintf(query->output_stream,"T %ld\n",query->deferred_time);
+		if(query->last_output_time) {
+			fprintf(query->output_stream,"t %ld\n",query->deferred_time-query->last_output_time);
+		} else {
+			fprintf(query->output_stream,"T %ld\n",query->deferred_time);
+		}
+		query->last_output_time = query->deferred_time;
 		query->deferred_time = 0;
 	}
 }
