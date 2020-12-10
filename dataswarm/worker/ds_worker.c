@@ -50,28 +50,24 @@ struct jx * ds_worker_handshake( struct ds_worker *w )
 	return ds_message_notification("handshake", params);
 }
 
-void ds_worker_handle_message(struct ds_worker *w)
-{
-	int set_storage = 0;
-	struct jx *msg = ds_parse_message(&w->recv_buffer);
-	if (!msg) {
-		fatal("malformed message!\n");
+void ds_worker_handle_notification(struct ds_worker *w, const char *method, struct jx *params) {
+	if(!strcmp(method, "status-request")) {
+		// do something
+	} else {
+		fatal("bad rpc!\n");
 	}
-	const char *method = NULL;
-	struct jx *params = NULL;
-	jx_int_t id = 0;
+	mq_store_buffer(w->manager_connection, &w->recv_buffer, 0);
+}
 
-	ds_result_t result = ds_unpack_request(msg, &method, &id, &params);
-	if (result != DS_RESULT_SUCCESS) {
-		fatal("invalid request!\n");
-	}
-
+void ds_worker_handle_request(struct ds_worker *w, const char *method, uint64_t id, struct jx *params) {
 	struct jx *result_params = 0;
+	ds_result_t result;
 
 	/* Whether to send a response for the rpc. Used to turn off the blob-get
 	 * response in this function, as blob-get manages its own response when
 	 * succesfully sending a file. */
 	int should_send_response = 1;
+	int set_storage = 0;
 
 	const char *taskid = jx_lookup_string(params,"task-id");
 	const char *blobid = jx_lookup_string(params,"blob-id");
@@ -84,8 +80,6 @@ void ds_worker_handle_message(struct ds_worker *w)
 		result = ds_task_table_remove(w,taskid);
 	} else if(!strcmp(method, "task-list")) {
 		result = ds_task_table_list(w,&result_params);
-	} else if(!strcmp(method, "status-request")) {
-		result = DS_RESULT_SUCCESS;
 	} else if(!strcmp(method, "blob-create")) {
 		result = ds_blob_table_create(w,blobid, jx_lookup_integer(params, "size"), jx_lookup(params, "metadata"));
 	} else if(!strcmp(method, "blob-put")) {
@@ -116,6 +110,28 @@ void ds_worker_handle_message(struct ds_worker *w)
 		ds_json_send(w->manager_connection, response);
 	}
 	jx_delete(response);
+}
+
+void ds_worker_handle_message(struct ds_worker *w)
+{
+	struct jx *msg = ds_parse_message(&w->recv_buffer);
+	if (!msg) {
+		fatal("malformed message!\n");
+	}
+
+	const char *method = NULL;
+	struct jx *params = NULL;
+	jx_int_t id = 0;
+
+	if (ds_unpack_request(msg, &method, &id, &params) == DS_RESULT_SUCCESS) {
+		ds_worker_handle_request(w, method, id, params);
+	} else if (ds_unpack_notification(msg, &method, &params) == DS_RESULT_SUCCESS) {
+		ds_worker_handle_notification(w, method, params);
+	} else {
+		fatal("invalid rpc!\n");
+	}
+
+	jx_delete(msg);
 }
 
 int ds_worker_main_loop(struct ds_worker *w)
