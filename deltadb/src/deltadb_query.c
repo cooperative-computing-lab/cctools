@@ -281,6 +281,37 @@ static void display_output_exprs( struct deltadb_query *query, time_t current )
 	}
 }
 
+static void display_output_objects( struct deltadb_query *query, time_t current )
+{
+	/* Emit the current time */
+	fprintf(query->output_stream,"[ %lld,\n[\n",(long long) current);
+
+	/* For each item in the table... */
+
+	int firstobject = 1;
+
+	char *key;
+	struct jx *jobject;
+	hash_table_firstkey(query->table);
+	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
+
+		/* Skip if the where expression doesn't match */
+		if(!deltadb_boolean_expr(query->where_expr,jobject)) continue;
+
+		if(!firstobject) {			
+			fprintf(query->output_stream,",\n");
+		} else {
+			firstobject = 0;
+		}
+
+		/* Display the object */
+		jx_print_stream(jobject,query->output_stream);
+		fprintf(query->output_stream,"\n");
+	}
+
+	fprintf(query->output_stream,"]\n]\n");
+}
+
 /*
 To eliminate unnecessary T record on the output in streaming mode,
 we store incoming T records as "deferred time" and then only
@@ -433,8 +464,10 @@ int deltadb_time_event( struct deltadb_query *query, time_t starttime, time_t st
 	if(query->display_mode==DELTADB_DISPLAY_STREAM) {
 		query->deferred_time = current;
 		return 1;
-	} else if(query->display_mode==DELTADB_DISPLAY_OBJECT) {
+	} else if(query->display_mode==DELTADB_DISPLAY_EXPRS) {
 		display_output_exprs(query,current);
+	} else if(query->display_mode==DELTADB_DISPLAY_OBJECTS) {
+		display_output_objects(query,current);
 	} else if(query->display_mode==DELTADB_DISPLAY_REDUCE) {
 		display_reduce_exprs(query,current);
 	}

@@ -88,6 +88,7 @@ static struct option long_options[] =
 	{"from", required_argument, 0, 'F'},
 	{"to", required_argument, 0, 'T'},
 	{"every", required_argument, 0, 'e'},
+	{"json", no_argument, 0, 'j' },
 	{"epoch", no_argument, 0, 't'},
 	{"version", no_argument, 0, 'v'},
 	{"help", no_argument, 0, 'h'},
@@ -108,6 +109,7 @@ void show_help()
 	printf("  --from <time>       Begin history query at this absolute time.\n");
 	printf("  --to <time>         End history query at this absolute time.\n");
 	printf("  --every <interval>  Compute output at this time interval.\n");
+	printf("  --json              Output raw JSON objects.\n");
 	printf("  --epoch             Display time column in Unix epoch format.\n");
 	printf("  --version           Show software version.\n");
 	printf("  --help              Show this help text.\n");
@@ -182,7 +184,7 @@ int main( int argc, char *argv[] )
 					return 1;
 				}
 				deltadb_query_add_output(query,j);
-				deltadb_query_set_display(query,DELTADB_DISPLAY_OBJECT);
+				deltadb_query_set_display(query,DELTADB_DISPLAY_EXPRS);
 				noutputs++;
 			}
 			break;
@@ -197,6 +199,9 @@ int main( int argc, char *argv[] )
 				return 1;
 			}
 			deltadb_query_set_where(query,where_expr);
+			break;
+		case 'j':
+			deltadb_query_set_display(query,DELTADB_DISPLAY_OBJECTS);
 			break;
 		case 'f':
 			if(filter_expr) {
