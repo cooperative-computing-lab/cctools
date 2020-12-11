@@ -84,9 +84,9 @@ static struct option long_options[] =
 	{"output", required_argument, 0, 'o'},
 	{"where", required_argument, 0,'w'},
 	{"filter", required_argument, 0,'f'},
+	{"at",required_argument,0,'a'},
 	{"from", required_argument, 0, 'F'},
 	{"to", required_argument, 0, 'T'},
-	{"at", required_argument, 0, 'A'},
 	{"every", required_argument, 0, 'e'},
 	{"epoch", no_argument, 0, 't'},
 	{"version", no_argument, 0, 'v'},
@@ -104,12 +104,19 @@ void show_help()
 	printf("  --output <expr>     Output this expression. (multiple)\n");
 	printf("  --where <expr>      Only output records matching this expression.\n");
 	printf("  --filter <expr>     Only process records matching this expression.\n");
-	printf("  --from <time>       Begin query at this absolute time. (required)\n");
-	printf("  --to <time>         End query at this absolute time.\n");
+	printf("  --at <time>         Query at this point in time.\n");
+	printf("  --from <time>       Begin history query at this absolute time.\n");
+	printf("  --to <time>         End history query at this absolute time.\n");
 	printf("  --every <interval>  Compute output at this time interval.\n");
 	printf("  --epoch             Display time column in Unix epoch format.\n");
 	printf("  --version           Show software version.\n");
 	printf("  --help              Show this help text.\n");
+}
+
+void time_error( const char *arg )
+{
+	fprintf(stderr,"deltadb_query: invalid %s time format (must be \"YYYY-MM-DD\" or \"YYYY-MM-DD HH:MM:SS\")\n",arg);
+	exit(1);
 }
 
 int main( int argc, char *argv[] )
@@ -203,11 +210,17 @@ int main( int argc, char *argv[] )
 			}
 			deltadb_query_set_filter(query,filter_expr);
 			break;
+		case 'a':
+			start_time = stop_time = parse_time(optarg,current);
+			if(!start_time) time_error("--at");
+			break;
 		case 'F':
 			start_time = parse_time(optarg,current);
+			if(!start_time) time_error("--from");
 			break;
 		case 'T':
 			stop_time = parse_time(optarg,current);
+			if(!start_time) time_error("--to");
 			break;
 		case 'e':
 			display_every = string_time_parse(optarg);
@@ -232,7 +245,7 @@ int main( int argc, char *argv[] )
 	}
 
 	if(start_time==0) {
-		fprintf(stderr,"deltadb_query: invalid --from time (must be \"YYYY-MM-DD\" or \"YYYY-MM-DD HH:MM:SS\")\n");
+		fprintf(stderr,"deltadb_query: one of --at or --from option is required.\n");
 		return 1;
 	}
 
