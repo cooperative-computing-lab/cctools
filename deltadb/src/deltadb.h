@@ -4,12 +4,12 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef JX_DATABASE_H
-#define JX_DATABASE_H
+#ifndef DELTADB_H
+#define DELTADB_H
 
-/** @file jx_database.h
+/** @file deltadb.h
 
-jx_database is a persistent database for keeping track of a set of
+deltadb is a persistent database for keeping track of a set of
 json objects, each indexed by a unique key and described by a set of
 arbitrary name value pairs.  The current state of the database
 is kept in memory for fast queries, while a history of all modifications
@@ -44,6 +44,7 @@ each one a json array in the following formats:
 
 <pre>
 T [time]               - Indicates the current time in Unix epoch format.
+t [secs]               - Indicates passage of time since last T or t. 
 C [key] [object]       - Create a new object with the given key.
 D [key] [object]       - Delete an object with the given key.
 U [key] [name] [value] - Update a named property with a new value.
@@ -66,7 +67,7 @@ totalling under 8GB data per year.
 @return A pointer to a newly created history table.
 */
 
-struct jx_database * jx_database_create( const char *logdir );
+struct deltadb * deltadb_create( const char *logdir );
 
 /** Insert or update an object into the database.
 If an object with the same primary key exists in the database, it will generate update (U) records in the log, otherwise a create (C) record is generated against the original object.
@@ -75,7 +76,7 @@ If an object with the same primary key exists in the database, it will generate 
 @param j The object in the form of an jx expression.
 */
 
-void jx_database_insert( struct jx_database *db, const char *key, struct jx *j );
+void deltadb_insert( struct deltadb *db, const char *key, struct jx *j );
 
 /** Look up an object in the database.
 @param db The database to access.
@@ -83,7 +84,7 @@ void jx_database_insert( struct jx_database *db, const char *key, struct jx *j )
 @return A pointer to the matching object, which should not be modified or deleted. Returns null if no match found.
 */
 
-struct jx * jx_database_lookup( struct jx_database *db, const char *key );
+struct jx * deltadb_lookup( struct deltadb *db, const char *key );
 
 /** Remove an object from the database.
 Causes a delete (D) record to be generated in the log.
@@ -92,16 +93,16 @@ Causes a delete (D) record to be generated in the log.
 @return A pointer to the matching object, which should be discarded with @ref jx_delete when done Returns null if no match found.
 */
 
-struct jx * jx_database_remove( struct jx_database *db, const char *key );
+struct jx * deltadb_remove( struct deltadb *db, const char *key );
 
 /** Begin iteration over all keys in the database.
 This function begins a new iteration over the database.
 allowing you to visit every primary key in the database.
-Next, invoke @ref jx_database_nextkey to retrieve each value in order.
+Next, invoke @ref deltadb_nextkey to retrieve each value in order.
 @param db The database to access.
 */
 
-void jx_database_firstkey( struct jx_database *db );
+void deltadb_firstkey( struct deltadb *db );
 
 /** Continue iteration over the database.
 This function returns the next primary key and object in the iteration.
@@ -111,6 +112,6 @@ This function returns the next primary key and object in the iteration.
 @return Zero if there are no more elements to visit, non-zero otherwise.
 */
 
-int  jx_database_nextkey( struct jx_database *db, char **key, struct jx **j );
+int deltadb_nextkey( struct deltadb *db, char **key, struct jx **j );
 
 #endif

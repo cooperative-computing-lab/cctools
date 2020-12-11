@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "jx.h"
 #include "jx_parse.h"
 #include "jx_eval.h"
+#include "jx_print.h"
 #include "xxmalloc.h"
 #include "stringtools.h"
 #include "debug.h"
@@ -24,6 +25,7 @@ See the file COPYING for details.
 #include "address.h"
 #include "zlib.h"
 #include "macros.h"
+#include "b64.h"
 
 struct catalog_query {
 	struct jx *data;
@@ -33,7 +35,7 @@ struct catalog_query {
 
 struct catalog_host {
 	char *host;
-	char *url;
+	int port;
 	int down;
 };
 
@@ -62,20 +64,55 @@ const char *parse_hostlist(const char *hosts, char *host, int *port)
 	return next ? next + 1 : NULL;
 }
 
-struct jx *catalog_query_send_query(const char *url, time_t stoptime) {
+/*
+This function is a bit complex for backwards compatibility.
+Ideally, we send the query string to /query/XXX, where XXX
+is the b64 encoded filter expression.
+
+However, we could be dealing with an old catalog server that
+does not understand this syntax.  In this case, it will respond
+to the query with non-JSON data.  If that happens, fall back
+to the old URL to see if it works.
+*/
+
+struct jx *catalog_query_send_query( struct catalog_host *h, struct jx *expr, time_t stoptime )
+{
+	char *expr_str = expr ? jx_print_string(expr) : strdup("true");
+
+	buffer_t buf;
+	buffer_init(&buf);
+	b64_encode(expr_str,strlen(expr_str),&buf);
+
+	char *url = string_format("http://%s:%d/query/%s",h->host,h->port,buffer_tostring(&buf));
+	debug(D_DEBUG,"trying catalog query: %s",url);
+
 	struct link *link = http_query(url, "GET", stoptime);
 
-	if(!link) {
-		return NULL;
-	}
+	free(url);
+	buffer_free(&buf);
+	free(expr_str);
+
+	if(!link) return 0;
 
 	struct jx *j = jx_parse_link(link,stoptime);
 
 	link_close(link);
 
 	if(!j) {
-		debug(D_DEBUG,"query result failed to parse as JSON");
-		return NULL;
+		url = string_format("http://%s:%d/query.json",h->host,h->port);
+		debug(D_DEBUG,"falling back to old query: %s",url);
+		link = http_query(url, "GET", stoptime);
+		free(url);
+		if(!link) return 0;
+
+		j = jx_parse_link(link,stoptime);
+		link_close(link);
+		if(!j) {
+			debug(D_DEBUG,"query result failed to parse as JSON");
+			return NULL;
+		}
+
+		// fall through here
 	}
 
 	if(!jx_istype(j,JX_ARRAY)) {
@@ -105,13 +142,14 @@ struct list *catalog_query_sort_hostlist(const char *hosts) {
 	}
 
 	do {
-		int port;
 		char host[DOMAIN_NAME_MAX];
+		int port;
+
 		h = xxmalloc(sizeof(*h));
 		next_host = parse_hostlist(next_host, host, &port);
 
 		h->host = xxstrdup(host);
-		h->url = string_format("http://%s:%d/query.json", host, port);
+		h->port = port;
 		h->down = 0;
 
 		set_first_element(down_hosts);
@@ -150,7 +188,7 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 
 			continue;
 		}
-		struct jx *j = catalog_query_send_query(h->url, time(NULL) + 5);
+		struct jx *j = catalog_query_send_query(h, filter_expr, time(NULL) + 5);
 
 		if(j) {
 			q = xxmalloc(sizeof(*q));
@@ -181,7 +219,6 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 	list_first_item(sorted_hosts);
 	while((h = list_next_item(sorted_hosts))) {
 		free(h->host);
-		free(h->url);
 		free(h);
 	}
 	list_delete(sorted_hosts);

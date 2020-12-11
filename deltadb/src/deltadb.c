@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "jx_database.h"
+#include "deltadb.h"
 #include "jx_print.h"
 #include "jx_parse.h"
 
@@ -22,7 +22,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <stdarg.h>
 
-struct jx_database {
+struct deltadb {
 	struct hash_table *table;
 	const char *logdir;
 	int logyear;
@@ -33,7 +33,7 @@ struct jx_database {
 
 /* Take the current state of the table and write it out verbatim to a checkpoint file. */
 
-static int checkpoint_write( struct jx_database *db, const char *filename )
+static int checkpoint_write( struct deltadb *db, const char *filename )
 {
 	char *key;
 	struct jx *jobject;
@@ -66,7 +66,7 @@ static int checkpoint_write( struct jx_database *db, const char *filename )
 Read a checkpoint in the (deprecated) nvpair format.  This will allow for a seamless upgrade by permitting the new JX database to continue from an nvpair checkpoint.
 */
 
-static int compat_checkpoint_read( struct jx_database *db, const char *filename )
+static int compat_checkpoint_read( struct deltadb *db, const char *filename )
 {
 	FILE * file = fopen(filename,"r");
 	if(!file) return 0;
@@ -94,7 +94,7 @@ static int compat_checkpoint_read( struct jx_database *db, const char *filename 
 
 /* Get a complete checkpoint file and reconstitute the state of the table. */
 
-static int checkpoint_read( struct jx_database *db, const char *filename )
+static int checkpoint_read( struct deltadb *db, const char *filename )
 {
 	FILE * file = fopen(filename,"r");
 	if(!file) return 0;
@@ -128,7 +128,7 @@ static int checkpoint_read( struct jx_database *db, const char *filename )
 
 /* Ensure that the history is writing to the correct log file for the current time. */
 
-static void log_select( struct jx_database *db )
+static void log_select( struct deltadb *db )
 {
 	time_t current = time(0);
 	struct tm *t = gmtime(&current);
@@ -162,22 +162,29 @@ static void log_select( struct jx_database *db )
 		checkpoint_write(db,filename);
 	}
 
+	// Reset the time so that an absolute time record comes next.
+	db->last_log_time = 0;
+
 }
 
 /* If time has advanced since the last event, log a time record. */
 
-static void log_time( struct jx_database *db )
+static void log_time( struct deltadb *db )
 {
 	time_t current = time(0);
-	if(db->last_log_time!=current) {
-		db->last_log_time = current;
+	if(db->last_log_time==0) {
 		fprintf(db->logfile,"T %lld\n",(long long)current);
+		db->last_log_time = current;
+	} else if(db->last_log_time!=current) {
+		fprintf(db->logfile,"t %lld\n",(long long)current-db->last_log_time);
+		db->last_log_time = current;
 	}
+
 }
 
 /* Log a complete message with time, a newline, then delete it. */
 
-static void log_message( struct jx_database *db, const char *fmt, ... )
+static void log_message( struct deltadb *db, const char *fmt, ... )
 {
 	va_list args;
 	va_start(args,fmt);
@@ -191,7 +198,7 @@ static void log_message( struct jx_database *db, const char *fmt, ... )
 
 /* Log an event indicating that an object was created, followed by object itself */
 
-static void log_create( struct jx_database *db, const char *key, struct jx *j )
+static void log_create( struct deltadb *db, const char *key, struct jx *j )
 {
 	char *str = jx_print_string(j);
 	log_message(db,"C %s %s\n",key,str);
@@ -200,7 +207,7 @@ static void log_create( struct jx_database *db, const char *key, struct jx *j )
 
 /* Log update events that indicate the difference between objects a (old) and b (new)*/
 
-static void log_updates( struct jx_database *db, const char *key, struct jx *a, struct jx *b )
+static void log_updates( struct deltadb *db, const char *key, struct jx *a, struct jx *b )
 {
 	// u is the object containing the update
 	struct jx *u = jx_object(0);
@@ -260,14 +267,14 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 
 /* Log an event indicating an entire object was deleted. */
 
-static void log_delete( struct jx_database *db, const char *key )
+static void log_delete( struct deltadb *db, const char *key )
 {
 	log_message(db,"D %s\n",key);
 }
 
 /* Push any buffered output out to the log. */
 
-static void log_flush( struct jx_database *db )
+static void log_flush( struct deltadb *db )
 {
 	if(db->logfile) fflush(db->logfile);
 }
@@ -283,7 +290,7 @@ static void corrupt_data( const char *filename, const char *line )
 /* Accept an update object and transfer its fields to a current item. */
 /* Note that if the current key does not exist, the update becomes the new value. */
 
-static void handle_merge( struct jx_database *db, const char *key, struct jx *update )
+static void handle_merge( struct deltadb *db, const char *key, struct jx *update )
 {
 	struct jx *current = hash_table_remove(db->table,key);
 	struct jx *merged = jx_merge(current, update, NULL);
@@ -301,7 +308,7 @@ Returns true if file could be open and played, false otherwise.
 
 #define LOG_LINE_MAX 65536
 
-static int log_replay( struct jx_database *db, const char *filename, time_t snapshot)
+static int log_replay( struct deltadb *db, const char *filename, time_t snapshot)
 {
 	char line[LOG_LINE_MAX];
 	char value[LOG_LINE_MAX];
@@ -392,6 +399,15 @@ static int log_replay( struct jx_database *db, const char *filename, time_t snap
 				continue;
 			}
 			if(current>snapshot) break;
+		} else if(line[0]=='t') {
+			long long change;
+			n = sscanf(line,"t %lld",&change);
+			if(n!=1) {
+				corrupt_data(filename,line);
+				continue;
+			}
+			current = current + change;
+			if(current>snapshot) break;
 		} else if(line[0]=='\n') {
 			continue;
 		} else {
@@ -410,7 +426,7 @@ file, then playing the corresponding log until the snapshot time is reached.
 Returns true if successful, false if files could not be played.
 */
 
-static int log_recover( struct jx_database *db, time_t snapshot )
+static int log_recover( struct deltadb *db, time_t snapshot )
 {
 	char filename[PATH_MAX];
 
@@ -428,14 +444,14 @@ static int log_recover( struct jx_database *db, time_t snapshot )
 	return 1;
 }
 
-struct jx_database * jx_database_create( const char *logdir )
+struct deltadb * deltadb_create( const char *logdir )
 {
 	if(logdir) {
 		int result = mkdir(logdir,0777);
 		if(result<0 && errno!=EEXIST) return 0;
 	}
 
-	struct jx_database *db = malloc(sizeof(*db));
+	struct deltadb *db = malloc(sizeof(*db));
 	db->table = hash_table_create(0,0);
 	db->logyear = 0;
 	db->logday = 0;
@@ -451,7 +467,7 @@ struct jx_database * jx_database_create( const char *logdir )
 	return db;
 }
 
-void jx_database_insert( struct jx_database *db, const char *key, struct jx *nv )
+void deltadb_insert( struct deltadb *db, const char *key, struct jx *nv )
 {
 	struct jx *old = hash_table_remove(db->table,key);
 
@@ -470,12 +486,12 @@ void jx_database_insert( struct jx_database *db, const char *key, struct jx *nv 
 	log_flush(db);
 }
 
-struct jx * jx_database_lookup( struct jx_database *db, const char *key )
+struct jx * deltadb_lookup( struct deltadb *db, const char *key )
 {
 	return hash_table_lookup(db->table,key);
 }
 
-struct jx * jx_database_remove( struct jx_database *db, const char *key )
+struct jx * deltadb_remove( struct deltadb *db, const char *key )
 {
 	const char *nkey = strdup(key);
 
@@ -487,12 +503,12 @@ struct jx * jx_database_remove( struct jx_database *db, const char *key )
 	return j;
 }
 
-void jx_database_firstkey( struct jx_database *db )
+void deltadb_firstkey( struct deltadb *db )
 {
 	hash_table_firstkey(db->table);
 }
 
-int  jx_database_nextkey( struct jx_database *db, char **key, struct jx **j )
+int  deltadb_nextkey( struct deltadb *db, char **key, struct jx **j )
 {
 	return hash_table_nextkey(db->table,key,(void**)j);
 }

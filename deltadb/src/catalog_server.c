@@ -7,17 +7,19 @@ See the file COPYING for details.
 
 #include "cctools.h"
 #include "catalog_query.h"
+#include "deltadb_query.h"
 #include "datagram.h"
 #include "link.h"
 #include "debug.h"
 #include "getopt.h"
 #include "nvpair.h"
 #include "nvpair_jx.h"
-#include "jx_database.h"
+#include "deltadb.h"
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "jx_table.h"
 #include "jx_export.h"
+#include "jx_eval.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"
 #include "username.h"
@@ -27,7 +29,9 @@ See the file COPYING for details.
 #include "daemon.h"
 #include "getopt_aux.h"
 #include "change_process_title.h"
+#include "copy_stream.h"
 #include "zlib.h"
+#include "b64.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,6 +39,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/wait.h>
 #include <sys/select.h>
 
@@ -54,7 +59,7 @@ See the file COPYING for details.
 #define TCP_PAYLOAD_MAX 1024*1024
 
 /* The table of record, hashed on address:port */
-static struct jx_database *table = 0;
+static struct deltadb *table = 0;
 
 /* An array of jxs used to sort for display */
 static struct jx *array[MAX_TABLE_SIZE];
@@ -167,8 +172,8 @@ static void remove_expired_records()
 	// Run for a minimum of lifetime seconds before cleaning anything up.
 	if((current-starttime)<lifetime ) return;
 
-	jx_database_firstkey(table);
-	while(jx_database_nextkey(table, &key, &j)) {
+	deltadb_firstkey(table);
+	while(deltadb_nextkey(table, &key, &j)) {
 		time_t lastheardfrom = jx_lookup_integer(j,"lastheardfrom");
 
 		int this_lifetime = jx_lookup_integer(j,"lifetime");
@@ -179,7 +184,7 @@ static void remove_expired_records()
 		}
 
 		if( (current-lastheardfrom) > this_lifetime ) {
-				j = jx_database_remove(table,key);
+				j = deltadb_remove(table,key);
 			if(j) jx_delete(j);
 		}
 	}
@@ -322,14 +327,14 @@ static void handle_update( const char *addr, int port, const char *raw_data, int
 		make_hash_key(j, key);
 
 		if(logfile) {
-			if(!jx_database_lookup(table,key)) {
+			if(!deltadb_lookup(table,key)) {
 				jx_print_stream(j,logfile);
 				fprintf(logfile,"\n");
 				fflush(logfile);
 			}
 		}
 
-		jx_database_insert(table, key, j);
+		deltadb_insert(table, key, j);
 
 		debug(D_DEBUG, "received %s update from %s",protocol,key);
 }
@@ -396,6 +401,25 @@ static struct jx_table html_headers[] = {
 	{0,0,0,0,0}
 };
 
+int jx_eval_is_true( struct jx *expr, struct jx *context )
+{
+	struct jx *jresult = jx_eval(expr,context);
+	int result = jresult && jx_istrue(jresult);
+	jx_delete(jresult);
+	return result;
+}
+
+void send_http_response( FILE *stream, int code, const char *message, const char *content_type )
+{
+	time_t current = time(0);
+	fprintf(stream, "HTTP/1.1 %d %s\n",code,message);
+	fprintf(stream, "Date: %s", ctime(&current));
+	fprintf(stream, "Server: catalog_server\n");
+	fprintf(stream, "Connection: close\n");
+	fprintf(stream, "Access-Control-Allow-Origin: *\n");
+	fprintf(stream, "Content-type: %s\n\n",content_type);
+}
+
 static void handle_query(struct link *query_link)
 {
 	FILE *stream;
@@ -407,8 +431,9 @@ static void handle_query(struct link *query_link)
 	char hostport[LINE_MAX];
 	char addr[LINK_ADDRESS_MAX];
 	char key[LINE_MAX];
+	char strexpr[LINE_MAX];
 	int port;
-	time_t current;
+	long time_start, time_stop;
 
 	char *hkey;
 	struct jx *j;
@@ -444,13 +469,6 @@ static void handle_query(struct link *query_link)
 	}
 	link_nonblocking(query_link, 0);
 
-	current = time(0);
-	fprintf(stream, "HTTP/1.1 200 OK\n");
-	fprintf(stream, "Date: %s", ctime(&current));
-	fprintf(stream, "Server: catalog_server\n");
-	fprintf(stream, "Connection: close\n");
-	fprintf(stream, "Access-Control-Allow-Origin: *\n");
-
 	if(sscanf(url, "http://%[^/]%s", hostport, path) == 2) {
 		// continue on
 	} else {
@@ -460,8 +478,8 @@ static void handle_query(struct link *query_link)
 	/* load the hash table entries into one big array */
 
 	n = 0;
-	jx_database_firstkey(table);
-	while(jx_database_nextkey(table, &hkey, &j)) {
+	deltadb_firstkey(table);
+	while(deltadb_nextkey(table, &hkey, &j)) {
 		array[n] = j;
 		n++;
 	}
@@ -471,27 +489,84 @@ static void handle_query(struct link *query_link)
 	qsort(array, n, sizeof(struct jx *), compare_jx);
 
 	if(!strcmp(path, "/query.text")) {
-		fprintf(stream, "Content-type: text/plain\n\n");
+		send_http_response(stream,200,"OK","text/plain");
 		for(i = 0; i < n; i++)
 			jx_export_nvpair(array[i], stream);
 	} else if(!strcmp(path, "/query.json")) {
-		fprintf(stream, "Content-type: text/plain\n\n");
+		send_http_response(stream,200,"OK","text/plain");
 		fprintf(stream,"[\n");
 		for(i = 0; i < n; i++) {
 			jx_print_stream(array[i],stream);
 			if(i<(n-1)) fprintf(stream,",\n");
 		}
 		fprintf(stream,"\n]\n");
+	} else if(1==sscanf(path, "/query/%[^/]",strexpr)) {
+
+		struct buffer buf;
+		buffer_init(&buf);
+		if(b64_decode(strexpr,&buf)==0) {
+			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
+			if(expr) {
+				send_http_response(stream,200,"OK","text/plain");
+				fprintf(stream,"[\n");
+
+				int first = 1;
+				for(i = 0; i < n; i++) {
+					if(jx_eval_is_true(expr,array[i])) {
+						if(!first) fprintf(stream,",\n");
+						jx_print_stream(array[i],stream);
+						first = 0;
+					}
+				}
+				fprintf(stream,"\n]\n");
+				jx_delete(expr);
+			} else {
+				send_http_response(stream,400,"Bad Request","text/plain");
+				fprintf(stream,"Invalid query text.\n");
+			}
+		} else {
+			send_http_response(stream,400,"Bad Request","text/plain");
+			fprintf(stream,"Invalid base-64 encoding.\n");
+		}
+		buffer_free(&buf);
+
+
+	} else if(3==sscanf(path, "/history/%ld/%ld/%[^/]",&time_start,&time_stop,strexpr)) {
+
+		struct buffer buf;
+		buffer_init(&buf);
+		if(b64_decode(strexpr,&buf)==0) {
+			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
+			if(expr) {
+				send_http_response(stream,200,"OK","text/plain");
+				struct deltadb_query *query = deltadb_query_create();
+				deltadb_query_set_filter(query,expr);
+				deltadb_query_set_output(query,stream);
+				deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
+				deltadb_query_execute_dir(query,history_dir,time_start,time_stop);
+				deltadb_query_delete(query);
+				jx_delete(expr);
+			} else {
+				send_http_response(stream,400,"Bad Request","text/plain");
+				fprintf(stream,"Invalid query text.\n");
+			}
+		} else {
+			send_http_response(stream,400,"Bad Request","text/plain");
+			fprintf(stream,"Invalid base-64 encoding.\n");
+		}
+		buffer_free(&buf);
+
+
 	} else if(!strcmp(path, "/query.oldclassads")) {
-		fprintf(stream, "Content-type: text/plain\n\n");
+		send_http_response(stream,200,"OK","text/plain");
 		for(i = 0; i < n; i++)
 			jx_export_old_classads(array[i], stream);
 	} else if(!strcmp(path, "/query.newclassads")) {
-		fprintf(stream, "Content-type: text/plain\n\n");
+		send_http_response(stream,200,"OK","text/plain");
 		for(i = 0; i < n; i++)
 			jx_export_new_classads(array[i], stream);
 	} else if(!strcmp(path, "/query.xml")) {
-		fprintf(stream, "Content-type: text/xml\n\n");
+		send_http_response(stream,200,"OK","text/xml");
 		fprintf(stream, "<?xml version=\"1.0\" standalone=\"yes\"?>\n");
 		fprintf(stream, "<catalog>\n");
 		for(i = 0; i < n; i++)
@@ -499,8 +574,8 @@ static void handle_query(struct link *query_link)
 		fprintf(stream, "</catalog>\n");
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct jx *j;
-		fprintf(stream, "Content-type: text/html\n\n");
-		j = jx_database_lookup(table, key);
+		send_http_response(stream,200,"OK","text/html");
+		j = deltadb_lookup(table, key);
 		if(j) {
 			const char *name = jx_lookup_string(j, "name");
 			if(!name)
@@ -519,14 +594,14 @@ static void handle_query(struct link *query_link)
 			fprintf(stream, "<h2>Unknown Item!</h2>\n");
 			fprintf(stream, "</center>\n");
 		}
-	} else {
+	} else if(!strcmp(path,"/")) {
 		char avail_line[LINE_MAX];
 		char total_line[LINE_MAX];
 		INT64_T sum_total = 0;
 		INT64_T sum_avail = 0;
 		INT64_T sum_devices = 0;
 
-		fprintf(stream, "Content-type: text/html\n\n");
+		send_http_response(stream,200,"OK","text/html");
 		fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
 		fprintf(stream, "<center>\n");
 		fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
@@ -558,6 +633,11 @@ static void handle_query(struct link *query_link)
 		}
 		jx_export_html_footer(stream, html_headers);
 		fprintf(stream, "</center>\n");
+	} else {
+		send_http_response(stream,404,"Not Found","text/html");
+		fprintf(stream,"<p>Error 404: Invalid URL</p>");
+		fprintf(stream,"<pre>%s</pre>",url);
+		fprintf(stream,"<p><a href=/>Return to Index</a></p>");
 	}
 	fclose(stream);
 }
@@ -738,7 +818,7 @@ int main(int argc, char *argv[])
 	username_get(owner);
 	starttime = time(0);
 
-	table = jx_database_create(history_dir);
+	table = deltadb_create(history_dir);
 	if(!table)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
