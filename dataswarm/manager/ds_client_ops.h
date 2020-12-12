@@ -6,7 +6,7 @@
 #include "ds_manager.h"
 
 //task operations
-char *ds_client_task_submit(struct ds_manager *m, struct jx *task);
+ds_result_t ds_client_task_submit(struct ds_manager *m, struct jx *task, struct jx **result);
 struct ds_task *ds_client_task_delete(struct ds_manager *m, const char *uuid);
 struct jx *ds_client_task_retrieve(struct ds_manager *m, const char *uuid);
 

@@ -19,7 +19,7 @@
 #include "ds_worker_rep.h"
 #include "ds_client_rep.h"
 #include "ds_blob_rep.h"
-#include "ds_task_rep.h"
+#include "ds_task_attempt.h"
 #include "ds_client_ops.h"
 #include "ds_file.h"
 
@@ -37,7 +37,7 @@ static int blobs_reached_state( struct ds_file *f, ds_blob_state_t state )
 	return true;
 }
 
-static void ds_schedule_file( struct ds_manager *m, struct ds_file *f )
+static void ds_advance_file( struct ds_manager *m, struct ds_file *f )
 {
 	switch (f->state) {
 		case DS_FILE_ALLOCATING:
@@ -70,14 +70,14 @@ static void ds_schedule_file( struct ds_manager *m, struct ds_file *f )
 	}
 }
 
-static void schedule_all_files( struct ds_manager *m )
+static void advance_all_files( struct ds_manager *m )
 {
 	char *key;
 	struct ds_file *f;
 
 	hash_table_firstkey(m->file_table);
 	while (hash_table_nextkey(m->file_table, &key, (void **) &f)) {
-		ds_schedule_file(m,f);
+		ds_advance_file(m,f);
 	}
 }
 
@@ -101,8 +101,12 @@ static bool prepare_worker(struct ds_manager *m, struct ds_task *t) {
 
 struct ds_worker_rep * choose_worker_for_task( struct ds_manager *m, struct ds_task *t )
 {
-	//XXX do some matching of tasks to workers
+	if (set_size(m->worker_table) == 0) {
+		debug(D_DATASWARM, "no workers available for task %s", t->taskid);
+		return NULL;
+	}
 
+	//XXX do some matching of tasks to workers
 	int r = rand() % set_size(m->worker_table);
 	struct ds_worker_rep *w;
 	set_first_element(m->worker_table);
@@ -115,33 +119,93 @@ struct ds_worker_rep * choose_worker_for_task( struct ds_manager *m, struct ds_t
 
 static void schedule_task( struct ds_manager *m, struct ds_task *t )
 {
-	switch (t->state) {
-		case DS_TASK_ACTIVE:
-			// schedule/advance below
-			break;
-		case DS_TASK_DELETING:
-			// nothing to do, wait for the worker
-			return;
-		case DS_TASK_DONE:
-		case DS_TASK_DELETED:
-			// nothing to do, wait for the client
-			return;
+	if (t->state != DS_TASK_ACTIVE) {
+		// nothing to do, we're either waiting on a client or worker message
+		return;
 	}
 
-	if (!t->worker) {
-		t->worker = choose_worker_for_task(m,t);
+	if (t->worker) {
+		return;
 	}
 
+	t->worker = choose_worker_for_task(m,t);
 	if (!t->worker) {
 		// couldn't/didn't want to schedule the task this time around
 		return;
 	}
 
-	if (!prepare_worker(m, t)) return;
+	//if (!prepare_worker(m, t)) return;
 	ds_manager_add_task_to_worker(m, t->worker, t->taskid);
 }
 
-static void schedule_all_tasks( struct ds_manager *m )
+static bool free_task_resources( struct ds_manager *m, struct ds_task *t )
+{
+	//XXX decrease refcount on files, etc.
+	return true;
+}
+
+static void attempt_task( struct ds_manager *m, struct ds_task *t )
+{
+	if (!t->worker) return;
+
+	if (!prepare_worker(m, t)) return;
+
+	if (!t->attempts) {
+		ds_manager_add_task_to_worker(m, t->worker, t->taskid);
+	}
+
+	struct ds_task_attempt *try = t->attempts;
+	if (try->state != try->in_transition) {
+		// waiting on RPC response from the worker
+		return;
+	}
+
+	switch (try->state) {
+		case DS_TASK_TRY_NEW:
+			// we already sent the task to a worker, this is a bug
+			abort();
+		case DS_TASK_TRY_PENDING:
+			// waiting for task to finish on worker
+			break;
+		case DS_TASK_TRY_SUCCESS:
+			assert(try->result == DS_RESULT_SUCCESS);
+			t->state = DS_TASK_DONE;
+			t->result = DS_TASK_RESULT_SUCCESS;
+			printf("inform the client!\n");
+			break;
+		case DS_TASK_TRY_FIX:
+		case DS_TASK_TRY_AGAIN:
+			//XXX do some reties, change resources, etc.
+			// falls through
+		case DS_TASK_TRY_ERROR:
+			t->state = DS_TASK_DONE;
+			t->result = DS_TASK_RESULT_ERROR;
+			// inform the client
+			break;
+		case DS_TASK_TRY_DELETED:
+			break;
+	}
+}
+
+static void advance_task( struct ds_manager *m, struct ds_task *t )
+{
+	switch (t->state) {
+		case DS_TASK_DONE:
+		case DS_TASK_DELETED:
+			// nothing to do
+			break;
+		case DS_TASK_DELETING:
+			if (free_task_resources(m, t)) {
+				t->state = DS_TASK_DELETED;
+			}
+			break;
+		case DS_TASK_ACTIVE:
+			attempt_task(m, t);
+			break;
+	}
+}
+
+static void advance_all_tasks( struct ds_manager *m )
 {
 	char *key;
 	struct ds_task *t;
@@ -149,11 +213,13 @@ static void schedule_all_tasks( struct ds_manager *m )
 	hash_table_firstkey(m->task_table);
 	while (hash_table_nextkey(m->task_table, &key, (void **) &t)) {
 		schedule_task(m,t);
+		advance_task(m, t);
+
 	}
 }
 
 void ds_scheduler( struct ds_manager *m )
 {
-	schedule_all_tasks(m);
-	schedule_all_files(m);
+	advance_all_tasks(m);
+	advance_all_files(m);
 }

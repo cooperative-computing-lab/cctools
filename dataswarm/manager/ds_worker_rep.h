@@ -23,11 +23,10 @@ struct ds_worker_rep {
 	/* map from blobid's to struct ds_blob_rep */
 	struct hash_table *blobs;
 
-	/* map from tasksid's to struct ds_task_rep */
+	/* map from tasksid's to struct ds_task_attempt */
 	struct hash_table *tasks;
 
-	/* map from currently active rpc ids to the operations in progress
-	note that the values are ds_rpc_op_t, *not* pointers
+	/* map from currently active rpc ids to (struct ds_rpc *)
 	 */
 	struct itable *rpcs;
 

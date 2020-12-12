@@ -21,7 +21,7 @@
 
 #include "ds_message.h"
 #include "ds_worker_rep.h"
-#include "ds_task_rep.h"
+#include "ds_task_attempt.h"
 #include "ds_blob_rep.h"
 #include "ds_manager.h"
 
@@ -64,7 +64,7 @@ ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *param
 	}
 	jx_int_t state = s->u.integer_value;
 
-	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	struct ds_task_attempt *t = hash_table_lookup(r->tasks, taskid);
 	if(!t) {
 		debug(D_DATASWARM, "worker does not know about taskid: %s", taskid);
 		return DS_RESULT_BAD_PARAMS;
@@ -77,7 +77,7 @@ ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *param
 			/* can't really happen from an update from the worker. */
 			break;
 		case DS_TASK_DONE:
-			t->in_transition = DS_TASK_DONE;
+			t->in_transition = DS_TASK_TRY_SUCCESS;
 			t->state = t->in_transition;
 			t->result = DS_RESULT_SUCCESS;
 			break;

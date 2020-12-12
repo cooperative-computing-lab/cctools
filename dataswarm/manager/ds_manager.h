@@ -38,9 +38,7 @@ struct ds_manager *ds_manager_create();
 struct ds_blob_rep *ds_manager_add_blob_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid);
 
 /* declares a task in a worker so that it can be manipulated via blob rpcs. */
-struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid);
-
-char *ds_manager_submit_task( struct ds_manager *m, struct jx *taskinfo );
+struct ds_task_attempt *ds_manager_add_task_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid);
 
 #endif
 

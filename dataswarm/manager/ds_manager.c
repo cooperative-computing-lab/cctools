@@ -28,7 +28,7 @@ See the file COPYING for details.
 #include "ds_worker_rep.h"
 #include "ds_client_rep.h"
 #include "ds_blob_rep.h"
-#include "ds_task_rep.h"
+#include "ds_task_attempt.h"
 #include "ds_manager.h"
 #include "ds_client_ops.h"
 #include "ds_file.h"
@@ -59,8 +59,8 @@ struct ds_blob_rep *ds_manager_add_blob_to_worker( struct ds_manager *m, struct 
 }
 
 /* declares a task in a worker so that it can be manipulated via task rpcs. */
-struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid) {
-	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
+struct ds_task_attempt *ds_manager_add_task_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid) {
+	struct ds_task_attempt *t = hash_table_lookup(r->tasks, taskid);
 	if(t) {
 		/* cannot create an already declared task. This could only happen with
 		 * a bug, as we have control of the create messages.*/
@@ -74,37 +74,14 @@ struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct 
 		fatal("task-id %s does not exist.", taskid);
 	}
 
-	t = calloc(1,sizeof(struct ds_task_rep));
-	t->state = DS_TASK_ACTIVE;
-	t->in_transition = t->state;
-	t->result = DS_RESULT_SUCCESS;
-
-	t->taskid = xxstrdup(taskid);
-	t->task = task;
+	t = ds_task_attempt_create(task);
 	t->worker = task->worker;
-
 	hash_table_insert(r->tasks, taskid, t);
-	t->next = task->attempts;
-	task->attempts = t;
+	t->in_transition = DS_TASK_TRY_PENDING;
+
+	ds_rpc_task_submit(m, r, taskid);
 
 	return t;
-}
-
-char *ds_manager_submit_task( struct ds_manager *m, struct jx *description ) {
-	char *taskid = string_format("task-%d", m->task_id++);
-	jx_insert_string(description, "task-id", taskid);
-
-	struct ds_task *t = ds_task_create(description);
-	if (!t) {
-		//XXX task failed validation
-		struct jx *j = jx_string("task-id");
-		jx_remove(description, j);
-		jx_delete(j);
-		return NULL;
-	}
-	hash_table_insert(m->task_table, taskid, t);
-
-	return taskid;
 }
 
 int handle_handshake(struct ds_manager *m, struct mq *conn) {
@@ -156,9 +133,6 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 		set_insert(m->worker_table, w);
 		mq_set_tag(conn, w);
 		mq_store_buffer(conn, &w->recv_buffer, 0);
-
-		// XXX This is a HACK to get some messages going for testing
-		dataswarm_test_script(m,w);
 	} else if (conn_type && !strcmp(conn_type,"client")) {
 		struct ds_client_rep *c = ds_client_rep_create(conn);
 		mq_address_remote(conn,c->addr,&c->port);
@@ -179,6 +153,7 @@ DONE:
 void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
 {
 	int set_storage = 0;
+	ds_result_t result = DS_RESULT_SUCCESS;
 	struct jx *msg = NULL;
 	switch (mq_recv(c->connection, NULL)) {
 		case MQ_MSG_NONE:
@@ -208,10 +183,10 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
 		goto ERROR;
 	}
 
-	struct jx *response = NULL;
+	struct jx *response_data = NULL;
 
 	if(!strcmp(method,"task-submit")) {
-		ds_client_task_submit(m, params);
+		result = ds_client_task_submit(m, params, &response_data);
 	} else if(!strcmp(method,"task-delete")) {
         const char *uuid = jx_lookup_string(params, "task-id");
 		ds_client_task_delete(m, uuid);
@@ -221,10 +196,9 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
 	} else if(!strcmp(method,"file-create")) {
 		struct ds_file *f = ds_client_file_declare(m, params);
 		if(f) {
-			response = ds_message_response(id, DS_RESULT_SUCCESS,
-				jx_objectv("file-id", jx_string(f->fileid), NULL));
+			response_data = jx_objectv("file-id", jx_string(f->fileid), NULL);
 		} else {
-			response = ds_message_response(id, DS_RESULT_UNABLE, NULL);
+			result = DS_RESULT_UNABLE;
 		}
 	} else if(!strcmp(method,"file-put")) {
 		/* fix */
@@ -256,18 +230,16 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
 	} else if(!strcmp(method,"status")) {
 		ds_client_status(m, params);
 	} else {
-		response = ds_message_response(id, DS_RESULT_BAD_METHOD, NULL);
+		result = DS_RESULT_BAD_METHOD;
 	}
 
 	if (!set_storage) {
 		mq_store_buffer(c->connection, &c->recv_buffer, 0);
 	}
 
-	if(response) {
-		ds_json_send(c->connection, response);
-		jx_delete(response);
-	}
-
+	struct jx *response = ds_message_response(id, result, response_data);
+	ds_json_send(c->connection, response);
+	jx_delete(response);
 	jx_delete(msg);
 	return;
 
@@ -275,91 +247,6 @@ ERROR:
 	ds_client_rep_disconnect(c);
 	set_remove(m->client_table, c);
 	jx_delete(msg);
-}
-
-void handle_worker_message( struct ds_manager *m, struct ds_worker_rep *w )
-{
-	int set_storage = 0;
-	struct jx *msg = NULL;
-	struct jx *response = NULL;
-	const char *method = NULL;
-	struct jx  *params = NULL;
-	jx_int_t id = 0;
-	struct jx *result = NULL;
-	jx_int_t err_code = 0;
-	const char *err_message = NULL;
-	struct jx *err_data = NULL;
-
-	switch (mq_recv(w->connection, NULL)) {
-		case MQ_MSG_NONE:
-			return;
-		case MQ_MSG_FD:
-			//XXX handle received files
-			mq_store_buffer(w->connection, &w->recv_buffer, 0);
-			return;
-		case MQ_MSG_BUFFER:
-			msg = ds_parse_message(&w->recv_buffer);
-			break;
-	}
-
-	if (!msg) {
-		debug(D_DATASWARM, "malformed message from worker %s:%d, disconnecting", w->addr, w->port);
-		goto ERROR;
-	}
-
-	if (ds_unpack_request(msg, &method, &id, &params) == DS_RESULT_SUCCESS) {
-		debug(D_DATASWARM, "worker %s:%d rx: %s(%" PRIiJX ")", w->addr, w->port, method, id);
-
-		if (!strcmp(method,"blob-get")) {
-			/* */
-			set_storage = 1;
-		} else {
-			debug(D_DATASWARM, "worker %s:%d rx: unknown method %s(%" PRIiJX ")", w->addr, w->port, method, id);
-			response = ds_message_response(id, DS_RESULT_BAD_METHOD, NULL);
-			goto DONE;
-		}
-	} else if (ds_unpack_notification(msg, &method, &params) == DS_RESULT_SUCCESS) {
-		debug(D_DATASWARM, "worker %s:%d rx: %s", w->addr, w->port, method);
-
-		if (!strcmp(method, "task-change")) {
-			/* */
-		} else if (!strcmp(method, "blob-change")) {
-			/* */
-		} else if (!strcmp(method, "status-report")) {
-			/* */
-		} else {
-			debug(D_DATASWARM, "worker %s:%d rx: unknown method %s", w->addr, w->port, method);
-			goto DONE;
-		}
-	} else if (ds_unpack_result(msg, &id, &result) == DS_RESULT_SUCCESS) {
-		debug(D_DATASWARM, "worker %s:%d rx: ok (%" PRIiJX ")", w->addr, w->port, id);
-		// update RPC table
-	} else if (ds_unpack_error(msg, &id, &err_code, &err_message, &err_data) == DS_RESULT_SUCCESS) {
-		debug(D_DATASWARM, "worker %s:%d rx: error (%" PRIiJX ") <%" PRIiJX ": %s>", w->addr, w->port, id, err_code, err_message);
-		// update RPC table
-	} else {
-		debug(D_DATASWARM, "invalid message from worker %s:%d, disconnecting", w->addr, w->port);
-		goto ERROR;
-	}
-
-DONE:
-	if (!set_storage) {
-		mq_store_buffer(w->connection, &w->recv_buffer, 0);
-	}
-
-	if (response) {
-		ds_json_send(w->connection, response);
-		jx_delete(response);
-	}
-
-	jx_delete(msg);
-	return;
-
-ERROR:
-	ds_worker_rep_disconnect(w);
-	set_remove(m->worker_table, w);
-	jx_delete(msg);
-	jx_delete(response);
 }
 
 int handle_messages( struct ds_manager *m )
@@ -370,7 +257,7 @@ int handle_messages( struct ds_manager *m )
 		if (set_lookup(m->client_table, key)) {
 			handle_client_message(m, key);
 		} else if (set_lookup(m->worker_table, key)) {
-			handle_worker_message(m, key);
+			ds_rpc_handle_message(m, key);
 		} else {
 			handle_handshake(m, conn);
 		}

@@ -19,7 +19,11 @@ typedef enum {
 	DS_RPC_OP_BLOB_LIST,
 } ds_rpc_op_t;
 
-ds_rpc_op_t ds_rpc_opcode(const char *method);
+struct ds_rpc {
+	ds_rpc_op_t operation;
+	struct ds_blob_rep *blob;
+	struct ds_task_attempt *task;
+};
 
 ds_result_t ds_rpc_handle_message( struct ds_manager *m, struct ds_worker_rep *w);
 

@@ -19,18 +19,6 @@ typedef enum {
 } ds_task_result_t;
 
 
-typedef enum {
-    DS_TASK_TRY_NEW,     /* Attempt has been defined, but it is not executing. */
-    DS_TASK_TRY_PENDING, /* Attempt is currently executing. */
-    DS_TASK_TRY_SUCCESS, /* Attempt executed to completion. */
-	DS_TASK_TRY_ERROR,   /* Attempt has a permanent error (e.g., missing inputs) */
-    DS_TASK_TRY_FIX,     /* Attempt could not be completed as defined, but can be fixed and retried with another attempt without
-                            user intervention. (e.g., increase resource allocation) */
-    DS_TASK_TRY_AGAIN    /* Attempt could not be completed for no fault of its own (e.g., graceful disconnection, change of worker
-                            resources) */
-} ds_task_try_result_t;
-
-
 struct ds_task {
 	char *command;
 	char *taskid;
@@ -38,18 +26,16 @@ struct ds_task {
 	ds_task_state_t state;
 	ds_task_result_t result;
 
-    /* 0 for task definitions, 1 for attempts at workers. */
-    int is_try;
-
-    /* valid only for is_try == 1 */
-	ds_task_try_result_t try_state;
+	/* 0 for task definitions, 1 for attempts at workers. */
+	int is_try;
 
 	struct ds_mount *mounts;
 	struct ds_resources *resources;
 	struct jx *environment;
 
+	struct ds_task_attempt *attempts;
+
 	// only used on the manager
-	struct ds_task_rep *attempts;
 	struct ds_worker_rep *worker;
 };
 

@@ -3,6 +3,7 @@
 #include "ds_process.h"
 #include "ds_task.h"
 #include "ds_message.h"
+#include "ds_task_attempt.h"
 
 #include "hash_table.h"
 #include "jx.h"
@@ -52,6 +53,7 @@ ds_result_t ds_task_table_submit( struct ds_worker *w, const char *taskid, struc
 
 	task = ds_task_create(jtask);
 	if(task) {
+		ds_task_attempt_create(task);
 		hash_table_insert(w->task_table, taskid, task);
 		debug(D_DATASWARM,"task %s created",taskid);
 		return DS_RESULT_SUCCESS;
@@ -101,7 +103,7 @@ ds_result_t ds_task_table_list( struct ds_worker *w, struct jx **result )
 void ds_task_try_advance(struct ds_worker *w, struct ds_task *task) {
     struct ds_process *process;
 
-    switch(task->try_state) {
+    switch(task->attempts->state) {
         case DS_TASK_TRY_NEW:
             if(!ds_worker_resources_avail(w,task->resources)) break;
 
@@ -111,7 +113,7 @@ void ds_task_try_advance(struct ds_worker *w, struct ds_task *task) {
                 // XXX check for invalid mounts?
                 if(ds_process_start(process,w)) {
                     update_task_state(w, task, DS_TASK_ACTIVE, DS_TASK_RESULT_UNDEFINED, 1);
-					task->try_state = DS_TASK_TRY_PENDING;
+					task->attempts->state = DS_TASK_TRY_PENDING;
                     ds_worker_resources_alloc(w,task->resources);
                 } else {
                     update_task_state(w, task, DS_TASK_DONE, DS_TASK_RESULT_ERROR, 1);
@@ -224,7 +226,7 @@ void ds_task_table_recover( struct ds_worker *w )
 		task = ds_task_create_from_file(task_meta);
 		if(task) {
 			hash_table_insert(w->task_table,task->taskid,task);
-			if(task->try_state==DS_TASK_TRY_PENDING) {
+			if(task->attempts->state==DS_TASK_TRY_PENDING) {
 				// If it was running, then it's not now.
 				update_task_state(w, task, DS_TASK_DONE, DS_TASK_RESULT_ERROR, 0);
 			}

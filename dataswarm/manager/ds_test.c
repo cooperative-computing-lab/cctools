@@ -2,7 +2,7 @@
 #include "ds_manager.h"
 #include "ds_worker_rep.h"
 #include "ds_blob_rep.h"
-#include "ds_task_rep.h"
+#include "ds_task_attempt.h"
 #include "ds_rpc.h"
 
 #include "debug.h"
@@ -41,18 +41,18 @@ int wait_for_rpcs(struct ds_manager *m, struct ds_worker_rep *r) {
 			}
 		}
 
-		struct ds_task_rep *t;
+		struct ds_task_attempt *t;
 		hash_table_firstkey(r->tasks);
 		while((hash_table_nextkey(r->tasks, &key, (void **) &t))) {
-			if(t->state == DS_TASK_ACTIVE) {
+			if(t->state == DS_TASK_TRY_PENDING) {
 				/* task has not reached completed state after submission */
 				done = 0;
 			}
 
 			if(t->result == DS_RESULT_PENDING) {
 				done = 0;
-			} else if (b->result != DS_RESULT_SUCCESS) {
-				debug(D_DATASWARM, "rpc for task %s failed with: %d", t->taskid, t->result);
+			} else if (t->result != DS_RESULT_SUCCESS) {
+				debug(D_DATASWARM, "rpc for task %s failed with: %d", t->task->taskid, t->result);
 				all_ok = 0;
 			}
 		}
@@ -66,6 +66,23 @@ int wait_for_rpcs(struct ds_manager *m, struct ds_worker_rep *r) {
 	}
 
 	return all_ok;
+}
+
+static char *submit_task( struct ds_manager *m, struct jx *description ) {
+	char *taskid = string_format("task-%d", m->task_id++);
+	jx_insert_string(description, "task-id", taskid);
+
+	struct ds_task *t = ds_task_create(description);
+	if (!t) {
+		//XXX task failed validation
+		struct jx *j = jx_string("task-id");
+		jx_remove(description, j);
+		jx_delete(j);
+		return NULL;
+	}
+	hash_table_insert(m->task_table, taskid, t);
+
+	return taskid;
 }
 
 void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
@@ -117,7 +134,7 @@ void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
 
 
 	/* submit task to manager */
-	char *taskid = ds_manager_submit_task(m, taskinfo);
+	char *taskid = submit_task(m, taskinfo);
 
 	/* declare task in worker */
 	ds_manager_add_task_to_worker(m,r,taskid);
