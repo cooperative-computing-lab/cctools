@@ -52,15 +52,3 @@ void ds_client_rep_flush_notifications(struct ds_client_rep *c) {
 	c->mailbox = NULL;
 	c->waiting = false;
 }
-
-void ds_task_notify( struct ds_task *t, struct jx *msg) {
-	assert(t);
-	assert(msg);
-
-	struct ds_client_rep *c;
-	set_first_element(t->subscribers);
-	while ((c = set_next_element(t->subscribers))) {
-		ds_client_rep_notify(c, jx_copy(msg));
-	}
-	jx_delete(msg);
-}

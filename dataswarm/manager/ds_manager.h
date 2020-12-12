@@ -40,6 +40,9 @@ struct ds_blob_rep *ds_manager_add_blob_to_worker( struct ds_manager *m, struct 
 /* declares a task in a worker so that it can be manipulated via blob rpcs. */
 struct ds_task_attempt *ds_manager_add_task_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid);
 
+/* notify all clients subscribed to the given task of an update */
+void ds_manager_task_notify( struct ds_manager *m, struct ds_task *t, struct jx *msg);
+
 #endif
 
 /* vim: set noexpandtab tabstop=4: */

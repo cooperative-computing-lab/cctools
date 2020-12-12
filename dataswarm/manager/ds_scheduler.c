@@ -171,7 +171,7 @@ static void attempt_task( struct ds_manager *m, struct ds_task *t )
 			assert(try->result == DS_RESULT_SUCCESS);
 			t->state = DS_TASK_DONE;
 			t->result = DS_TASK_RESULT_SUCCESS;
-			ds_task_notify(t, ds_message_task_update(t));
+			ds_manager_task_notify(m, t, ds_message_task_update(t));
 			break;
 		case DS_TASK_TRY_FIX:
 		case DS_TASK_TRY_AGAIN:
@@ -180,7 +180,7 @@ static void attempt_task( struct ds_manager *m, struct ds_task *t )
 		case DS_TASK_TRY_ERROR:
 			t->state = DS_TASK_DONE;
 			t->result = DS_TASK_RESULT_ERROR;
-			ds_task_notify(t, ds_message_task_update(t));
+			ds_manager_task_notify(m, t, ds_message_task_update(t));
 			break;
 		case DS_TASK_TRY_DELETED:
 			break;

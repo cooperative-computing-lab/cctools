@@ -29,7 +29,4 @@ void ds_client_rep_notify(struct ds_client_rep *c, struct jx *msg);
 void ds_client_rep_flush_notifications(struct ds_client_rep *c);
 void ds_client_rep_disconnect(struct ds_client_rep *c);
 
-//XXX awkward to define this here, but need to be able to link against ds_client_rep_notify
-void ds_task_notify( struct ds_task *t, struct jx *msg);
-
 #endif

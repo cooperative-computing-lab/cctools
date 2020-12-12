@@ -84,6 +84,31 @@ struct ds_task_attempt *ds_manager_add_task_to_worker( struct ds_manager *m, str
 	return t;
 }
 
+void ds_manager_task_notify( struct ds_manager *m, struct ds_task *t, struct jx *msg) {
+	assert(t);
+	assert(msg);
+
+	struct set *dead = set_create(0);
+
+	struct ds_client_rep *c;
+	set_first_element(t->subscribers);
+	while ((c = set_next_element(t->subscribers))) {
+		if (set_lookup(m->client_table, c)) {
+			ds_client_rep_notify(c, jx_copy(msg));
+		} else {
+			set_insert(dead, c);
+		}
+	}
+
+	jx_delete(msg);
+
+	set_first_element(dead);
+	while ((c = set_next_element(dead))) {
+		set_remove(t->subscribers, c);
+	}
+	set_delete(dead);
+}
+
 int handle_handshake(struct ds_manager *m, struct mq *conn) {
 	char addr[LINK_ADDRESS_MAX];
 	int port;
