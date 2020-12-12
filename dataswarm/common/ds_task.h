@@ -4,6 +4,7 @@
 #include "ds_mount.h"
 #include "ds_resources.h"
 #include "jx.h"
+#include "set.h"
 
 typedef enum {
 	DS_TASK_ACTIVE,     /* Task definition has been completed and task can be dispatched/executed. */
@@ -37,6 +38,7 @@ struct ds_task {
 
 	// only used on the manager
 	struct ds_worker_rep *worker;
+	struct set *subscribers; // set of struct (ds_client_rep *)
 };
 
 struct ds_task * ds_task_create( struct jx *jtask );

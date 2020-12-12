@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 struct ds_task * ds_task_create( struct jx *jtask )
 {
@@ -26,6 +27,8 @@ struct ds_task * ds_task_create( struct jx *jtask )
 
 	t->worker = NULL;
 	t->attempts = NULL;
+
+	t->subscribers = set_create(0);
 
 	return t;
 
@@ -99,5 +102,6 @@ void ds_task_delete( struct ds_task *t )
 	if(t->taskid) free(t->taskid);
 	ds_resources_delete(t->resources);
 	ds_mount_delete(t->mounts);
+	set_delete(t->subscribers);
 	free(t);
 }

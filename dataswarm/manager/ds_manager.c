@@ -153,6 +153,7 @@ DONE:
 void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
 {
 	int set_storage = 0;
+	int should_send_response = 1;
 	ds_result_t result = DS_RESULT_SUCCESS;
 	struct jx *msg = NULL;
 	switch (mq_recv(c->connection, NULL)) {
@@ -186,7 +187,7 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
 	struct jx *response_data = NULL;
 
 	if(!strcmp(method,"task-submit")) {
-		result = ds_client_task_submit(m, params, &response_data);
+		result = ds_client_task_submit(m, c, params, &response_data);
 	} else if(!strcmp(method,"task-delete")) {
         const char *uuid = jx_lookup_string(params, "task-id");
 		ds_client_task_delete(m, uuid);
@@ -224,7 +225,8 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
 	} else if(!strcmp(method,"project-delete")) {
 		ds_client_project_delete(m, params);
 	} else if(!strcmp(method,"wait")) {
-		ds_client_wait(m, params);
+		should_send_response = 0;
+		ds_client_wait(m, c, id, params);
 	} else if(!strcmp(method,"queue-empty")) {
 		ds_client_queue_empty(m, params);
 	} else if(!strcmp(method,"status")) {
@@ -237,9 +239,12 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
 		mq_store_buffer(c->connection, &c->recv_buffer, 0);
 	}
 
-	struct jx *response = ds_message_response(id, result, response_data);
-	ds_json_send(c->connection, response);
-	jx_delete(response);
+	if (should_send_response) {
+		struct jx *response = ds_message_response(id, result, response_data);
+		ds_json_send(c->connection, response);
+		jx_delete(response);
+	}
+
 	jx_delete(msg);
 	return;
 
