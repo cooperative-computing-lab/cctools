@@ -135,6 +135,7 @@ int handle_handshake(struct ds_manager *m, struct mq *conn) {
 		mq_store_buffer(conn, &w->recv_buffer, 0);
 	} else if (conn_type && !strcmp(conn_type,"client")) {
 		struct ds_client_rep *c = ds_client_rep_create(conn);
+		c->nowait = jx_lookup_boolean(params, "nowait");
 		mq_address_remote(conn,c->addr,&c->port);
 		debug(D_DATASWARM,"new client from %s:%d\n",c->addr,c->port);
 		set_insert(m->client_table, c);
@@ -225,8 +226,12 @@ void handle_client_message( struct ds_manager *m, struct ds_client_rep *c )
 	} else if(!strcmp(method,"project-delete")) {
 		ds_client_project_delete(m, params);
 	} else if(!strcmp(method,"wait")) {
-		should_send_response = 0;
-		ds_client_wait(m, c, id, params);
+		if (c->nowait) {
+			result = DS_RESULT_BAD_METHOD;
+		} else {
+			should_send_response = 0;
+			ds_client_wait(m, c, id, params);
+		}
 	} else if(!strcmp(method,"queue-empty")) {
 		ds_client_queue_empty(m, params);
 	} else if(!strcmp(method,"status")) {

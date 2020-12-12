@@ -23,6 +23,13 @@ void ds_client_rep_disconnect(struct ds_client_rep *c) {
 void ds_client_rep_notify(struct ds_client_rep *c, struct jx *msg) {
 	assert(c);
 	assert(msg);
+
+	if (c->nowait) {
+		ds_json_send(c->connection, msg);
+		jx_delete(msg);
+		return;
+	}
+
 	if (!c->mailbox) {
 		c->mailbox = jx_array(NULL);
 	}
@@ -34,6 +41,7 @@ void ds_client_rep_notify(struct ds_client_rep *c, struct jx *msg) {
 
 void ds_client_rep_flush_notifications(struct ds_client_rep *c) {
 	assert(c);
+	assert(!c->nowait);
 	if (!c->waiting) return;
 	if (!c->mailbox) return;
 

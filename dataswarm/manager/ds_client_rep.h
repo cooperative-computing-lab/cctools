@@ -21,6 +21,7 @@ struct ds_client_rep {
 	struct jx *mailbox;
 	bool waiting;
 	jx_int_t wait_id;
+	bool nowait;
 };
 
 struct ds_client_rep * ds_client_rep_create( struct mq *conn );
