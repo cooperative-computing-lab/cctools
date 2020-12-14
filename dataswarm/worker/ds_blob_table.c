@@ -116,7 +116,7 @@ ds_result_t ds_blob_table_put(struct ds_worker * w, const char *blobid)
 
 	struct ds_blob *b = hash_table_lookup(w->blob_table,blobid);
 	if(!b) {
-		return DS_RESULT_BAD_ID;
+		return DS_RESULT_NO_SUCH_BLOBID;
 	} else if(b->state!=DS_BLOB_RW) {
         debug(D_DATASWARM, "blob %s expected state %s, but got %s", blobid, ds_blob_state_string(b->state), ds_blob_state_string(DS_BLOB_RW));
 		return DS_RESULT_BAD_STATE;
@@ -154,7 +154,7 @@ ds_result_t ds_blob_table_get(struct ds_worker * w, const char *blobid, jx_int_t
 
 	struct ds_blob *b = hash_table_lookup(w->blob_table,blobid);
 	if(!b) {
-		return DS_RESULT_BAD_ID;
+		return DS_RESULT_NO_SUCH_BLOBID;
 	} else if(b->state!=DS_BLOB_RW && b->state!=DS_BLOB_RO) {
         debug(D_DATASWARM, "cannot get blob %s in state %s", blobid, ds_blob_state_string(b->state));
 		return DS_RESULT_BAD_STATE;
@@ -179,7 +179,7 @@ ds_result_t ds_blob_table_get(struct ds_worker * w, const char *blobid, jx_int_t
 
 	//Here we construct the response and then send the file.
 	*should_respond = 0;
-	struct jx *response = ds_message_standard_response(msgid, DS_RESULT_SUCCESS, NULL);
+	struct jx *response = ds_message_response(msgid, DS_RESULT_SUCCESS, NULL);
 	ds_json_send(w->manager_connection, response);
 
 	jx_delete(response);
@@ -240,7 +240,7 @@ ds_result_t ds_blob_table_commit(struct ds_worker * w, const char *blobid)
 			result = DS_RESULT_BAD_STATE;
 		}
 	} else {
-		result = DS_RESULT_BAD_ID;
+		result = DS_RESULT_NO_SUCH_BLOBID;
 	}
 
 	return result;
@@ -260,7 +260,7 @@ ds_result_t ds_blob_table_deleting(struct ds_worker *w, const char *blobid)
 	struct ds_blob *b = hash_table_lookup(w->blob_table,blobid);
 	char *blob_meta = ds_worker_blob_meta(w,blobid);
 
-	if(!b) return DS_RESULT_BAD_ID;
+	if(!b) return DS_RESULT_NO_SUCH_BLOBID;
 
 	// Record the deleting state in the metadata
 	b->state = DS_BLOB_DELETING;
@@ -274,7 +274,7 @@ ds_result_t ds_blob_table_delete(struct ds_worker *w, const char *blobid)
 	if(!blobid) return DS_RESULT_BAD_PARAMS;
 
 	struct ds_blob *b = hash_table_lookup(w->blob_table,blobid);
-	if(!b) return DS_RESULT_BAD_ID;
+	if(!b) return DS_RESULT_NO_SUCH_BLOBID;
 
     if(b->state != DS_BLOB_DELETING) {
         ds_blob_table_deleting(w, blobid);
@@ -335,7 +335,7 @@ ds_result_t ds_blob_table_list( struct ds_worker *w, struct jx **result )
 		jx_insert(*result,jx_string(blobid),ds_blob_to_jx(blob));
 	}
 
-	return DS_RESULT_SUCCESS;	
+	return DS_RESULT_SUCCESS;
 }
 
 /*
@@ -405,4 +405,3 @@ void ds_blob_table_recover( struct ds_worker *w )
 	);
 
 }
-

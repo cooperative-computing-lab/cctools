@@ -3,6 +3,7 @@
 #include "ds_process.h"
 #include "ds_task.h"
 #include "ds_message.h"
+#include "ds_task_attempt.h"
 
 #include "hash_table.h"
 #include "jx.h"
@@ -52,6 +53,7 @@ ds_result_t ds_task_table_submit( struct ds_worker *w, const char *taskid, struc
 
 	task = ds_task_create(jtask);
 	if(task) {
+		ds_task_attempt_create(task);
 		hash_table_insert(w->task_table, taskid, task);
 		debug(D_DATASWARM,"task %s created",taskid);
 		return DS_RESULT_SUCCESS;
@@ -94,7 +96,44 @@ ds_result_t ds_task_table_list( struct ds_worker *w, struct jx **result )
 		jx_insert(*result,jx_string(taskid),ds_task_to_jx(task));
 	}
 
-	return DS_RESULT_SUCCESS;	
+	return DS_RESULT_SUCCESS;
+}
+
+
+void ds_task_try_advance(struct ds_worker *w, struct ds_task *task) {
+    struct ds_process *process;
+
+    switch(task->attempts->state) {
+        case DS_TASK_TRY_NEW:
+            if(!ds_worker_resources_avail(w,task->resources)) break;
+
+            process = ds_process_create(task,w);
+            if(process) {
+                hash_table_insert(w->process_table,task->taskid,process);
+                // XXX check for invalid mounts?
+                if(ds_process_start(process,w)) {
+                    update_task_state(w, task, DS_TASK_ACTIVE, DS_TASK_RESULT_UNDEFINED, 1);
+					task->attempts->state = DS_TASK_TRY_PENDING;
+                    ds_worker_resources_alloc(w,task->resources);
+                } else {
+                    update_task_state(w, task, DS_TASK_DONE, DS_TASK_RESULT_ERROR, 1);
+                    // Mark disk as allocated to match free during delete.
+                    ds_worker_disk_alloc(w,task->resources->disk);
+                }
+            } else {
+                update_task_state(w, task, DS_TASK_DONE, DS_TASK_RESULT_ERROR, 1);
+            }
+            break;
+        case DS_TASK_TRY_PENDING:
+            process = hash_table_lookup(w->process_table,task->taskid);
+            if(ds_process_isdone(process)) {
+                ds_worker_resources_free_except_disk(w,task->resources);
+                update_task_state(w, task, DS_TASK_DONE, DS_TASK_RESULT_SUCCESS, 1);
+            }
+            break;
+        default:
+            break;
+    }
 }
 
 /*
@@ -105,39 +144,16 @@ and act according to it's current state.
 void ds_task_table_advance( struct ds_worker *w )
 {
 	struct ds_task *task;
-	struct ds_process *process;
 	char *taskid;
+    struct ds_process *process;
 
 	hash_table_firstkey(w->task_table);
 	while(hash_table_nextkey(w->task_table,&taskid,(void**)&task)) {
 
 		switch(task->state) {
-			case DS_TASK_ACTIVE:
-				if(!ds_worker_resources_avail(w,task->resources)) break;
-
-				process = ds_process_create(task,w);
-				if(process) {
-					hash_table_insert(w->process_table,taskid,process);
-					// XXX check for invalid mounts?
-					if(ds_process_start(process,w)) {
-						update_task_state(w, task, DS_TASK_RUNNING, DS_TASK_RESULT_UNDEFINED, 1);
-						ds_worker_resources_alloc(w,task->resources);
-					} else {
-						update_task_state(w, task, DS_TASK_DONE, DS_TASK_RESULT_ERROR, 1);
-						// Mark disk as allocated to match free during delete.
-						ds_worker_disk_alloc(w,task->resources->disk);
-					}
-				} else {
-					update_task_state(w, task, DS_TASK_DONE, DS_TASK_RESULT_ERROR, 1);
-				}
-				break;
-			case DS_TASK_RUNNING:
-				process = hash_table_lookup(w->process_table,taskid);
-				if(ds_process_isdone(process)) {
-					ds_worker_resources_free_except_disk(w,task->resources);
-					update_task_state(w, task, DS_TASK_DONE, DS_TASK_RESULT_SUCCESS, 1);
-				}
-				break;
+            case DS_TASK_ACTIVE:
+                ds_task_try_advance(w, task);
+                break;
 			case DS_TASK_DELETING:
 				{
 				char *sandbox_dir = ds_worker_task_sandbox(w,task->taskid);
@@ -210,7 +226,7 @@ void ds_task_table_recover( struct ds_worker *w )
 		task = ds_task_create_from_file(task_meta);
 		if(task) {
 			hash_table_insert(w->task_table,task->taskid,task);
-			if(task->state==DS_TASK_RUNNING) {
+			if(task->attempts->state==DS_TASK_TRY_PENDING) {
 				// If it was running, then it's not now.
 				update_task_state(w, task, DS_TASK_DONE, DS_TASK_RESULT_ERROR, 0);
 			}

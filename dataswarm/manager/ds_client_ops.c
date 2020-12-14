@@ -8,30 +8,33 @@
 #include "uuid.h"
 #include "ds_validate.h"
 
+#include <assert.h>
 #include <string.h>
 
-char *ds_client_task_submit(struct ds_manager *m, struct jx *task) {
-
+ds_result_t ds_client_task_submit(struct ds_manager *m, struct ds_client_rep *c, struct jx *task, struct jx **result) {
+    /*
     if(!validate_json(task, SUBMIT_TASK)){
-        return NULL;
+        return DS_RESULT_BAD_PARAMS;
     }
+    */
 
     // assign a UUID to the task
-    cctools_uuid_t *uuid = 0;
-    cctools_uuid_create(uuid);
+    cctools_uuid_t uuid;
+    cctools_uuid_create(&uuid);
 
-    char *uuid_str = strdup(uuid->str);
+    char *uuid_str = strdup(uuid.str);
+    *result = jx_string(uuid_str);
 
     //add state and uuid to task
     jx_insert_string(task, "task-id", uuid_str);
 
     struct ds_task *t = ds_task_create(task);
+    set_insert(t->subscribers, c);
 
     //save UUID to task mapping in memory
     hash_table_insert(m->task_table, uuid_str, t);
 
-    //return task UUID
-    return uuid_str;
+    return DS_RESULT_SUCCESS;
 }
 
 struct ds_task *ds_client_task_delete(struct ds_manager *m, const char *uuid) {
@@ -152,12 +155,11 @@ struct jx *ds_client_project_delete(struct ds_manager *m, struct jx *params) {
 
 }
 
-struct jx *ds_client_wait(struct ds_manager *m, struct jx *params) {
-
-    //TODO: block until something happens
-
-    return NULL;
-
+void ds_client_wait(struct ds_manager *m, struct ds_client_rep *c, jx_int_t msgid, struct jx *params) {
+    assert(!c->waiting); // not sure what to do here??
+    c->waiting = true;
+    c->wait_id = msgid;
+    ds_client_rep_flush_notifications(c);
 }
 
 int ds_client_queue_empty(struct ds_manager *m, struct jx *params) {

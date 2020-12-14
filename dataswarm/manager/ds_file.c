@@ -10,7 +10,7 @@ struct ds_file *ds_file_create(const char *uuid, const char *projectid, jx_int_t
 	struct ds_file *f = malloc(sizeof(*f));
 	memset(f, 0, sizeof(*f));
 
-	f->blobs = hash_table_create(0, 0);
+	f->blobs = itable_create(0);
 	f->fileid = xxstrdup(uuid);
 	f->projectid = xxstrdup(projectid);
 	f->size = size;
@@ -63,13 +63,10 @@ struct jx *ds_file_to_jx(struct ds_file *f)
 
 void ds_file_delete(struct ds_file *f)
 {
-	if(!f)
-		return;
-	if(f->projectid)
-		free(f->projectid);
-	if(f->fileid)
-		free(f->fileid);
-	if(f->metadata)
-		jx_delete(f->metadata);
+	if(!f) return;
+	free(f->projectid);
+	free(f->fileid);
+	jx_delete(f->metadata);
+	itable_delete(f->blobs);
 	free(f);
 }

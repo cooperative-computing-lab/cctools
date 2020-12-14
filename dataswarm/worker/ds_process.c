@@ -44,7 +44,7 @@ struct ds_process *ds_process_create( struct ds_task *task, struct ds_worker *w 
 	/* inside the sandbox, make a unique tempdir for this task */
 	p->tmpdir = string_format("%s/cctools-temp.XXXXXX", p->sandbox);
 	if(mkdtemp(p->tmpdir) == NULL) goto failure;
-	if(chmod(p->tmpdir, 0777) != 0) goto failure;
+	if(chmod(p->tmpdir, 0777) != 0) goto failure; //XXX bad idea to have a world-writable directory
 
 	return p;
 
@@ -206,7 +206,7 @@ int ds_process_start( struct ds_process *p, struct ds_worker *w )
 		clear_environment();
 		specify_resources_vars(p);
 		export_environment(p);
-
+sleep(1);
 		execl("/bin/sh", "sh", "-c", p->task->command, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}

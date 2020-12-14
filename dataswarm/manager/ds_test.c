@@ -2,7 +2,7 @@
 #include "ds_manager.h"
 #include "ds_worker_rep.h"
 #include "ds_blob_rep.h"
-#include "ds_task_rep.h"
+#include "ds_task_attempt.h"
 #include "ds_rpc.h"
 
 #include "debug.h"
@@ -18,15 +18,21 @@
 int wait_for_rpcs(struct ds_manager *m, struct ds_worker_rep *r) {
 	int done   = 0;
 	int all_ok = 1;
-	uint64_t key;
+	char *key;
 
 	while(1) {
+		ds_rpc_handle_message(m,r);
+
 		done = 1;
+
+		if (itable_size(r->rpcs) > 0) {
+			done = 0;
+		}
 
 		/* check blob responses */
 		struct ds_blob_rep *b;
-		itable_firstkey(r->blob_of_rpc);
-		while((itable_nextkey(r->blob_of_rpc, &key, (void **) &b))) {
+		hash_table_firstkey(r->blobs);
+		while((hash_table_nextkey(r->blobs, &key, (void **) &b))) {
 			if(b->result == DS_RESULT_PENDING) {
 				done = 0;
 			} else if (b->result != DS_RESULT_SUCCESS) {
@@ -35,24 +41,19 @@ int wait_for_rpcs(struct ds_manager *m, struct ds_worker_rep *r) {
 			}
 		}
 
-		struct ds_task_rep *t;
-		itable_firstkey(r->task_of_rpc);
-		while((itable_nextkey(r->task_of_rpc, &key, (void **) &t))) {
-			if(t->result == DS_RESULT_PENDING) {
-				done = 0;
-			} else if (b->result != DS_RESULT_SUCCESS) {
-				debug(D_DATASWARM, "rpc for task %s failed with: %d", t->taskid, t->result);
-				all_ok = 0;
-			}
-		}
-
-		/* check that all tasks are done */
-		char *taskid;
+		struct ds_task_attempt *t;
 		hash_table_firstkey(r->tasks);
-		while((hash_table_nextkey(r->tasks, &taskid, (void **) &t))) {
-			if(t->state == DS_TASK_ACTIVE) {
+		while((hash_table_nextkey(r->tasks, &key, (void **) &t))) {
+			if(t->state == DS_TASK_TRY_PENDING) {
 				/* task has not reached completed state after submission */
 				done = 0;
+			}
+
+			if(t->result == DS_RESULT_PENDING) {
+				done = 0;
+			} else if (t->result != DS_RESULT_SUCCESS) {
+				debug(D_DATASWARM, "rpc for task %s failed with: %d", t->task->taskid, t->result);
+				all_ok = 0;
 			}
 		}
 
@@ -62,11 +63,26 @@ int wait_for_rpcs(struct ds_manager *m, struct ds_worker_rep *r) {
 				perror("server_main_loop");
 				break;
 		}
-
-		ds_rpc_get_response(m,r);
 	}
 
 	return all_ok;
+}
+
+static char *submit_task( struct ds_manager *m, struct jx *description ) {
+	char *taskid = string_format("task-%d", m->task_id++);
+	jx_insert_string(description, "task-id", taskid);
+
+	struct ds_task *t = ds_task_create(description);
+	if (!t) {
+		//XXX task failed validation
+		struct jx *j = jx_string("task-id");
+		jx_remove(description, j);
+		jx_delete(j);
+		return NULL;
+	}
+	hash_table_insert(m->task_table, taskid, t);
+
+	return taskid;
 }
 
 void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
@@ -77,16 +93,13 @@ void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
 	ds_rpc_task_list(m,r);
 	ds_rpc_blob_list(m,r);
 
-	ds_manager_add_blob_to_worker(m, r, bloba),
-	ds_manager_add_blob_to_worker(m, r, blobb),
-
-	ds_rpc_blob_delete(m,r,bloba);
-	ds_rpc_blob_delete(m,r,blobb);
-
 	if(!wait_for_rpcs(m, r)) {
-		debug(D_DATASWARM, "There was an error with rpc delete. But that may be ok.");
+		debug(D_DATASWARM, "There was an error with getting blobs/tasks.");
 		return;
 	}
+
+	ds_manager_add_blob_to_worker(m, r, bloba);
+	ds_manager_add_blob_to_worker(m, r, blobb);
 
 	ds_rpc_blob_create(m,r,bloba,2000000,NULL);
 	ds_rpc_blob_create(m,r,blobb,4000000,NULL);
@@ -121,7 +134,7 @@ void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
 
 
 	/* submit task to manager */
-	char *taskid = ds_manager_submit_task(m, taskinfo);
+	char *taskid = submit_task(m, taskinfo);
 
 	/* declare task in worker */
 	ds_manager_add_task_to_worker(m,r,taskid);
@@ -130,11 +143,13 @@ void dataswarm_test_script( struct ds_manager *m, struct ds_worker_rep *r )
 	ds_rpc_task_submit(m,r,taskid);
 	if(!wait_for_rpcs(m, r)) {
 		debug(D_DATASWARM, "There was an error sending task to worker.");
+		return;
 	}
 
 	ds_rpc_blob_get(m,r,blobb,"/dev/stdout");
 	if(!wait_for_rpcs(m, r)) {
-		debug(D_DATASWARM, "There was an error with an the get rpc. Cleanup continues...");
+		debug(D_DATASWARM, "There was an error with an the get rpc.");
+		return;
 	}
 
 	ds_rpc_task_remove(m,r,taskid);

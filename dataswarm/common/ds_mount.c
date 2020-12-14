@@ -11,10 +11,12 @@ struct ds_mount * ds_mounts_create( struct jx *jmounts )
 	struct jx_pair *p;
 	struct ds_mount *head = 0;
 
+	if (!jmounts) return NULL;
+
 	for(p=jmounts->u.pairs;p;p=p->next) {
 		const char *key = p->key->u.string_value;
 		struct jx *value = p->value;
-		struct ds_mount *m; 
+		struct ds_mount *m;
 		m = ds_mount_create(key,value);
 		m->next = head;
 		head = m;
@@ -60,12 +62,12 @@ struct jx * dataswarm_flags_to_jx( dataswarm_flags_t flags )
 {
 	static char str[4];
 	str[0] = 0;
-	
+
 	if(flags&DS_FLAGS_READ) strcat(str,"R");
 	if(flags&DS_FLAGS_WRITE) strcat(str,"W");
 	if(flags&DS_FLAGS_APPEND) strcat(str,"A");
 
-	return jx_string(str);	
+	return jx_string(str);
 }
 
 struct ds_mount * ds_mount_create( const char *uuid, struct jx *jmount )
@@ -121,11 +123,11 @@ struct jx * ds_mount_to_jx( struct ds_mount *m )
 {
 	struct jx *j = jx_object(0);
 	if(m->type==DS_MOUNT_PATH) {
-		jx_insert_string(j,"type","path");	
+		jx_insert_string(j,"type","path");
 		jx_insert_string(j,"path",m->path);
 		jx_insert(j,jx_string("flags"),dataswarm_flags_to_jx(m->flags));
 	} else if(m->type==DS_MOUNT_FD) {
-		jx_insert_string(j,"type","fd");	
+		jx_insert_string(j,"type","fd");
 		jx_insert_integer(j,"fd",m->fd);
 		jx_insert(j,jx_string("flags"),dataswarm_flags_to_jx(m->flags));
 	}
@@ -140,5 +142,3 @@ void ds_mount_delete( struct ds_mount *m )
 	free(m->path);
        	free(m);
 }
-
-

@@ -22,7 +22,14 @@ class DataSwarm:
         self.socket = socket.socket()
         self.host = host
         self.port = int(port)
+
+    def __enter__(self):
         self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
+        return False
 
     def _pack_header(self, size):
         return struct.pack(self.header_spec, b'MQ', 0b11, size)
@@ -45,11 +52,15 @@ class DataSwarm:
         return log
 
     # Handle sending and receiving messages
-    def send_recv(self, request):
-        self.id += 1
-        request["id"] = self.id;
+    def send(self, request):
+        request["jsonrpc"] = "2.0"
         request = json.dumps(request)
         self.send_str(request)
+
+    def send_recv(self, request):
+        self.id += 1
+        request["id"] = self.id
+        self.send(request)
         response = self.recv()
         return response
 
@@ -91,7 +102,7 @@ class DataSwarm:
     def handshake(self):
         msg = {"method": "handshake",
                "params": { "type": "client" }}
-        return self.send_recv(msg)
+        return self.send(msg)
 
     def disconnect(self):
         self.socket.close()
@@ -100,9 +111,7 @@ class DataSwarm:
     def task_submit(self, t):
         request = {
             "method" : "task-submit",
-            "params" : {
-                "task" : t
-            }
+            "params" : t
         }
         return self.send_recv(request)
 

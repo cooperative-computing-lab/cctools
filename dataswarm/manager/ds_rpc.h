@@ -5,10 +5,27 @@
 #include "ds_manager.h"
 #include "ds_worker_rep.h"
 
-ds_result_t ds_rpc_blob_result( struct ds_manager *m, struct ds_worker_rep *r, jx_int_t msg_id );
+typedef enum {
+	DS_RPC_OP_TASK_SUBMIT = 1,
+	DS_RPC_OP_TASK_GET,
+	DS_RPC_OP_TASK_REMOVE,
+	DS_RPC_OP_TASK_LIST,
+	DS_RPC_OP_BLOB_CREATE,
+	DS_RPC_OP_BLOB_PUT,
+	DS_RPC_OP_BLOB_GET,
+	DS_RPC_OP_BLOB_DELETE,
+	DS_RPC_OP_BLOB_COMMIT,
+	DS_RPC_OP_BLOB_COPY,
+	DS_RPC_OP_BLOB_LIST,
+} ds_rpc_op_t;
 
-void ds_rpc_blob_dispatch( struct ds_manager *m, struct ds_worker_rep *r);
-ds_result_t ds_rpc_get_response( struct ds_manager *m, struct ds_worker_rep *w);
+struct ds_rpc {
+	ds_rpc_op_t operation;
+	struct ds_blob_rep *blob;
+	struct ds_task_attempt *task;
+};
+
+ds_result_t ds_rpc_handle_message( struct ds_manager *m, struct ds_worker_rep *w);
 
 /* rpcs return their msg ids */
 jx_int_t ds_rpc_blob_create( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid, int64_t size, struct jx *metadata );

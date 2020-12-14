@@ -29,7 +29,7 @@ struct ds_worker {
 	struct ds_resources *resources_inuse;
 
 	/* Total resources available, in BYTES */
-	struct ds_resources *resources_total; 
+	struct ds_resources *resources_total;
 
 	/***************************************************************/
 	/* Internal tuning parameters set in ds_worker_create() */
@@ -49,9 +49,6 @@ struct ds_worker {
 
 	// Maximum time to wait for a catalog query
 	int catalog_timeout;
-
-	// id msg counter
-	int message_id;
 
 	// Time last status update was sent to manager.
 	time_t last_status_report;

@@ -3,12 +3,13 @@
 
 #include "hash_table.h"
 #include "mq.h"
+#include "set.h"
 
 #include "ds_worker_rep.h"
 
 struct ds_manager {
-	struct hash_table *worker_table;
-	struct hash_table *client_table;
+	struct set *worker_table;
+	struct set *client_table;
     struct hash_table *task_table;
     struct hash_table *file_table;
 
@@ -18,7 +19,6 @@ struct ds_manager {
 	int connect_timeout;
 	int stall_timeout;
 	int server_port;
-	int message_id;
 
 	int task_id;
 	int blob_id;
@@ -38,9 +38,10 @@ struct ds_manager *ds_manager_create();
 struct ds_blob_rep *ds_manager_add_blob_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *blobid);
 
 /* declares a task in a worker so that it can be manipulated via blob rpcs. */
-struct ds_task_rep *ds_manager_add_task_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid);
+struct ds_task_attempt *ds_manager_add_task_to_worker( struct ds_manager *m, struct ds_worker_rep *r, const char *taskid);
 
-char *ds_manager_submit_task( struct ds_manager *m, struct jx *taskinfo );
+/* notify all clients subscribed to the given task of an update */
+void ds_manager_task_notify( struct ds_manager *m, struct ds_task *t, struct jx *msg);
 
 #endif
 

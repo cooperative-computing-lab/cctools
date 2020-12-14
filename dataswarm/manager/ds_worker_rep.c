@@ -21,7 +21,7 @@
 
 #include "ds_message.h"
 #include "ds_worker_rep.h"
-#include "ds_task_rep.h"
+#include "ds_task_attempt.h"
 #include "ds_blob_rep.h"
 #include "ds_manager.h"
 
@@ -34,8 +34,7 @@ struct ds_worker_rep * ds_worker_rep_create( struct mq *conn )
 	w->blobs = hash_table_create(0,0);
 	w->tasks = hash_table_create(0,0);
 
-	w->blob_of_rpc = itable_create(0);
-	w->task_of_rpc = itable_create(0);
+	w->rpcs = itable_create(0);
 
 	buffer_init(&w->recv_buffer);
 
@@ -56,15 +55,16 @@ ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *param
 		return DS_RESULT_BAD_PARAMS;
 	}
 
-	jx_int_t    state  = jx_lookup_integer(params, "state");
+	struct jx *s = jx_lookup(params, "state");
 	const char *taskid = jx_lookup_string(params, "task-id");
 
-	if(!state || !taskid) { //FIX: state may be zero
+	if(!jx_istype(s, JX_INTEGER) || !taskid) {
 		debug(D_DATASWARM, "message does not contain state or taskid. Ignoring task update.");
 		return DS_RESULT_BAD_PARAMS;
 	}
+	jx_int_t state = s->u.integer_value;
 
-	struct ds_task_rep *t = hash_table_lookup(r->tasks, taskid);
+	struct ds_task_attempt *t = hash_table_lookup(r->tasks, taskid);
 	if(!t) {
 		debug(D_DATASWARM, "worker does not know about taskid: %s", taskid);
 		return DS_RESULT_BAD_PARAMS;
@@ -77,18 +77,15 @@ ds_result_t ds_worker_rep_update_task( struct ds_worker_rep *r, struct jx *param
 			/* can't really happen from an update from the worker. */
 			break;
 		case DS_TASK_DONE:
-			t->in_transition = DS_TASK_DONE;
+			t->in_transition = DS_TASK_TRY_SUCCESS;
 			t->state = t->in_transition;
 			t->result = DS_RESULT_SUCCESS;
-			break;
-		case DS_TASK_RUNNING:
-			/* task running is only a state for a task attempt, ignoring. */
 			break;
 		case DS_TASK_DELETING:
 			/* do nothing until task deleted at worker. */
 			break;
 		case DS_TASK_DELETED:
-			/* FIX: do some book-keeping now that the task is deleted. */ 
+			/* FIX: do some book-keeping now that the task is deleted. */
 			break;
 		default:
 				/* ... */
@@ -128,28 +125,5 @@ ds_result_t ds_worker_rep_update_blob( struct ds_worker_rep *r, struct jx *param
 
 	return DS_RESULT_SUCCESS;
 }
-
-
-ds_result_t ds_worker_rep_async_update( struct ds_worker_rep *w, struct jx *msg )
-{
-	const char *method = jx_lookup_string(msg, "method");
-	struct jx *params = jx_lookup(msg, "params");
-
-	ds_result_t result = DS_RESULT_SUCCESS;
-	if(!method) {
-		result = DS_RESULT_BAD_METHOD;
-	} else if(!strcmp(method, "task-update")) {
-		result = ds_worker_rep_update_task(w, params);
-	} else if(!strcmp(method, "blob-update")) {
-		result = ds_worker_rep_update_blob(w, params);
-	} else if(!strcmp(method, "status-report")) {
-		// update stats
-	} else {
-		result = DS_RESULT_BAD_METHOD;
-	}
-
-	return result;
-}
-
 
 /* vim: set noexpandtab tabstop=4: */

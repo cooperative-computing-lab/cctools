@@ -33,4 +33,8 @@ See the file COPYING for details.
  */
 int ppoll_compat(struct pollfd fds[], nfds_t nfds, int stoptime);
 
+/** Set up signal handling to ensure that SIGCHLD will interrupt ppoll_compat()
+ */
+void ppoll_compat_set_up_sigchld(void);
+
 #endif

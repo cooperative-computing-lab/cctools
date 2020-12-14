@@ -27,10 +27,6 @@ def main():
 
     ntasks = int(sys.argv[1])
 
-    start = time.time()
-
-    ds = DataSwarm(host='127.0.0.1', port='1234')
-
     # Here, we are declaring tasks in WQ style.
     # Instead, we should declare and upload the shared input ile.
     # Then, declare each output file and task.
@@ -62,17 +58,17 @@ def main():
 
         pending_tasks.append(task)
 
+    start = time.time()
 
-    for t in pending_tasks:
-        t = json.dumps(t)
-        response = ds.task_submit(t)
-        print(response)
+    with DataSwarm(host='127.0.0.1', port='1234') as ds:
+        for t in pending_tasks:
+            t = json.dumps(t)
+            response = ds.task_submit(t)
+            print(response)
 
-    while len(pending_tasks) > 0:
-        response = ds.wait(10)
-        print(response)
-
-    ds.disconnect()
+        while len(pending_tasks) > 0:
+            response = ds.wait(10)
+            print(response)
 
     end = time()
 
