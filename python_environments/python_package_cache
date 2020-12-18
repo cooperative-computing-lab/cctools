@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import sys
 import json
+import shutil
 import hashlib
 import tempfile
 import argparse
@@ -182,13 +184,46 @@ def get_env(spec, approx, alpha):
 
     return insert(spec)
 
+def check_context(ctx):
+    if not re.match(r'^[-a-zA-Z0-9_]+$', ctx):
+        raise ValueError('contexts must consist of alphanumerics, underscores, and dashes')
+
+def keep(path, ctx):
+    check_context(ctx)
+    prefix = os.path.join(CACHEDIR, ctx)
+    saved = os.path.join(prefix, os.path.basename(path))
+    os.makedirs(prefix, exist_ok=True)
+    try:
+        os.link(path, saved)
+    except FileExistsError:
+        pass
+    return saved
+
+def free_ctx(ctx):
+    check_context(ctx)
+    try:
+        shutil.rmtree(os.path.join(CACHEDIR, ctx))
+    except FileNotFoundError:
+        pass
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=HELP)
-    parser.add_argument('spec', help='Spec file, or - to read from stdin.')
+    parser.add_argument('spec', help='Spec file, or - to read from stdin.', nargs='?')
     parser.add_argument('--approx', action='store_true', help='Reuse environments containing a superset of spec')
     parser.add_argument('--merge', type=float, default=0, help='Allow merging of similar environments. Implies --approx')
     parser.add_argument('--capacity', type=int, help='Limit on cache size in bytes')
+    parser.add_argument('--keep', metavar='CTX', help='Protect the returned environment until the context is freed')
+    parser.add_argument('--free', metavar='CTX', help='Allow environments in the given context to be cleaned up')
     args = parser.parse_args()
+
+    if args.free:
+        if args.spec:
+            parser.error('--free must be used by itself')
+        free_ctx(args.free)
+        sys.exit(0)
+
+    if not args.spec:
+        parser.error('spec is required')
 
     spec_file = sys.stdin if args.spec == '-' else open(args.spec)
     spec = json.load(spec_file)
@@ -197,4 +232,9 @@ if __name__ == '__main__':
     if args.capacity:
         shrink_cache(args.capacity)
         load_cache()
-    print(get_env(spec, args.approx, args.merge))
+
+    out = get_env(spec, args.approx, args.merge)
+    if args.keep:
+        print(keep(out, args.keep))
+    else:
+        print(out)
