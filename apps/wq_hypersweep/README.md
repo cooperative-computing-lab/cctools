@@ -43,9 +43,9 @@ python resnet.py
 rm results.csv
 ```
 
-6. Create and pack a `conda` environment to allow wq_hypersweep to run when distributed with Work Queue using the packaging scripts provided by CCTools.
+6. Create and pack a `conda` environment to allow wq_hypersweep to run when distributed with Work Queue using the packaging scripts provided by CCTools. (This might not work, use conda-pack)
 ```bash
-python_package_anaylze resnet.py env.yaml
+python_package_analyze resnet.py env.yaml
 python_package_create env.yaml env.tar.gz
 rm env.yaml
 ```
@@ -66,7 +66,10 @@ README.md   - README provided by distribution
 resnet.py   - Python script to build/train/validate one ResNet model
 script.sh   - Pilot script used by test.py to unpack a conda environment at a remote worker and execute resnet.py
 sweep.sh    - Sample bash script that performs a local hyperparameter sweep
-test.py     - Work Queue manager program used to distribute training tasks to remote workers  
+test.py     - Work Queue manager program used to distribute training tasks to remote workers
+plot_resources.py     	- Plot resources and hyperparameters of Resnet
+plot_resources_100.py  	- Plot resources and 4 hyperparameters of Resnet
+read_summary_log.py		- Read summmary log from running dist_sweep.py and write to resources_all.txtread_summary_log_100.py - Read summary log from running dist_sweep_100.py and write to resources_all_100.txt   
 ```
 
 ## Run:
@@ -77,19 +80,20 @@ Run `python resnet.py` to execute a single instance of the program at it's defau
 Run `./sweep.sh` to perform a pairwise hyperparameter sweep over wq_hypersweep's default hyperparameter values. Specifically, this will execute 90 instances of `resnet.py` sequentially, varying dropout rate between 0.1 to 0.9 at 0.1 increments and number of epochs between 1 and 10 at 1 epoch increments. The results of all 90 executions are collated into `results.png` and a heatmap of the resulting sweep is produced as `sweep_output.png`.
 
 ### Distributed, Sweep, Work Queue on Condor:
-Run `python test.py` to perform a pairwise hyperparameter optimization sweep over wq_hypersweep's default hyperparameter values using Work Queue over Condor. Specifically, this will generate 400 instances of `resnet.py` varying dropout rate between 0.05 to 1 at 0.05 increments and number of residual blocks between 1 and 20 at 1 block increments.
+Run `python dist_sweep.py` to perform a pairwise hyperparameter optimization sweep over wq_hypersweep's default hyperparameter values using Work Queue over Condor. Specifically, this will generate 400 instances of `resnet.py` varying dropout rate between 0.05 to 0.95 at 0.05 increments and number of residual blocks between 1 and 20 at 1 block increments.
 
 In a second terminal, run the following command to create workers to complete the Work Queue tasks created by the previous command:
 ```bash
-condor_submit_workers $HOSTNAME 9123 400
+condor_submit_workers $HOSTNAME 9213 400
 ```
 The results of all 400 executions are reported back to the Work Queue manager un-collated. To collate these results for plotting, run:
 ```bash
 echo "loss, accuracy, batch_size, num_res_net_blocks, dropout_rate, epochs, steps_per_epoch, validation_steps" > output.csv
 awk 'FNR==2{print $0 >> "output.csv"}' results*.csv
 ```
-Finally, run `python plot.py`. This which will produce a heatmap reporting model accuracy as a function of dropout rate and number or residual blocks.
+For a visualization using heatmap, run `python plot.py`. This which will produce a heatmap reporting model accuracy as a function of dropout rate and number or residual blocks.
 
+To collect resources usage from running dist_sweep.py and dist_sweep_100.py, run respectively `python read_summary_log.py; python plot_resources.py` and `python read_summary_log_100.py; python plot_resources_100.py`. These commands will collect resources usage into resources_all.txt and resources_all_100.txt, and save 8 graphs plotting the resources usage and hyperparameters variations.
 ## Further Info:
 For listing the command-line options, run: python resnet.py -h
 ```
