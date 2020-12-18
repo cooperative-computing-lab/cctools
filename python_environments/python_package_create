@@ -19,7 +19,10 @@ def pack_env(spec, out):
         print('Creating temporary environment in {}'.format(env_dir))
         subprocess.check_call(['conda', 'env', 'create', '--prefix', env_dir,
             '--file', spec])
-        conda_pack.pack(prefix=env_dir, output=out, force=True)
+        # Bug breaks bundling common packages (e.g. python).
+        # ignore_missing_files may be safe to remove in the future.
+        # https://github.com/conda/conda-pack/issues/145
+        conda_pack.pack(prefix=env_dir, output=out, force=True, ignore_missing_files=True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

@@ -95,6 +95,14 @@ def search_pkg(overrides, conda_env, pip_env, conda_pkgs, pip_pkgs, pkg):
         choose_dep(conda_env, pip_env, conda_pkgs, pip_pkgs, overrides[pkg])
         return
 
+    # If there's a conda/pip package with the exact name, that's
+    # probably what we want
+    try:
+        choose_dep(conda_env, pip_env, conda_pkgs, pip_pkgs, pkg)
+        return
+    except ImportError:
+        pass
+
     # See who provides the file, falling back to the literal name
     lookup = PKG_MAP.get(importlib.import_module(pkg).__file__, pkg)
     choose_dep(conda_env, pip_env, conda_pkgs, pip_pkgs, lookup)
