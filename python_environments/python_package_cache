@@ -21,6 +21,8 @@ TAR_EXT = '.tar.gz'
 CACHEDIR = os.path.join(tempfile.gettempdir(), 'python_package-{}'.format(os.geteuid()))
 SPECS = {}
 PKGSETS = {}
+PKGSIZE = {}
+PKGMTIME = {}
 
 def jaccard(a, b):
     return 1 - float(len(a & b))/len(a | b)
@@ -71,25 +73,36 @@ def compatible(a, b):
 def load_cache():
     os.makedirs(CACHEDIR, exist_ok=True)
     for a in os.scandir(CACHEDIR):
-        name, ext = os.path.splitext(a.name)
-        if ext != '.json':
-            continue
-        with open(os.path.join(CACHEDIR, a.name)) as f:
-            s = json.load(f)
-        SPECS[name] = s
-        c, p = extract_deps(s)
-        PKGSETS[deps_to_set(c, p)] = name
+        if a.is_dir():
+            pass
+        elif a.is_file():
+            name, ext = os.path.splitext(a.name)
+            if ext != '.json':
+                continue
+            with open(os.path.join(CACHEDIR, a.name)) as f:
+                s = json.load(f)
+            SPECS[name] = s
+            c, p = extract_deps(s)
+            PKGSETS[deps_to_set(c, p)] = name
+            s = os.stat(os.path.join(CACHEDIR, a.name) + TAR_EXT)
+            PKGSIZE[name] = s.st_size
+            PKGMTIME[name] = s.st_mtime
+    sys.stderr.write(
+            'package cache contains {} env(s) totalling {} bytes\n'.format(
+                    len(SPECS), sum(PKGSIZE.values())))
 
 def find_exact(spec):
     h = hash_spec(spec)
     path = os.path.join(CACHEDIR, h + TAR_EXT)
     if os.access(path, os.R_OK):
+        sys.stderr.write('found exact match\n')
         return path
 
 def find_matching(spec):
     s = deps_to_set(*extract_deps(spec))
     hits = [x for x in PKGSETS.keys() if s.issubset(x)]
     hits.sort(key=lambda x: jaccard(s, x))
+    sys.stderr.write('found {} env(s) that satisfy requirements\n'.format(len(hits)))
     if len(hits) > 0:
         return os.path.join(CACHEDIR, PKGSETS[hits[0]] + TAR_EXT)
 
@@ -102,6 +115,7 @@ def insert(spec):
     meta.close()
 
     tarball_fd, tarball_path = tempfile.mkstemp(dir=CACHEDIR, suffix=TAR_EXT)
+    sys.stderr.write('creating new env at {}\n'.format(tarball_path))
     os.close(tarball_fd)
     subprocess.run(['python_package_create', meta_path, tarball_path],
             check=True, stdout=sys.stderr)
@@ -116,7 +130,10 @@ def merge(spec, alpha):
     candidates = [x for x in PKGSETS.keys() if compatible(x, s) and jaccard(x, s) < alpha]
     candidates.sort(key=lambda x: jaccard(s, x))
     if len(candidates) == 0:
+        sys.stderr.write('no similar envs found (max distance={})\n'.format(alpha))
         return
+    sys.stderr.write('merging with similar env (distance={})'.format(
+            jaccard(s, candidates[0])))
 
     existing = SPECS[PKGSETS[candidates[0]]]
     path = os.path.join(CACHEDIR, hash_spec(existing))
