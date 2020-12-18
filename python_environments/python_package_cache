@@ -71,6 +71,10 @@ def compatible(a, b):
     return True
 
 def load_cache():
+    SPECS.clear()
+    PKGSETS.clear()
+    PKGSIZE.clear()
+    PKGMTIME.clear()
     os.makedirs(CACHEDIR, exist_ok=True)
     for a in os.scandir(CACHEDIR):
         if a.is_dir():
@@ -84,11 +88,10 @@ def load_cache():
             SPECS[name] = s
             c, p = extract_deps(s)
             PKGSETS[deps_to_set(c, p)] = name
-            s = os.stat(os.path.join(CACHEDIR, a.name) + TAR_EXT)
-            PKGSIZE[name] = s.st_size
-            PKGMTIME[name] = s.st_mtime
+            PKGSIZE[name] = os.stat(os.path.join(CACHEDIR, name) + TAR_EXT).st_size
+            PKGMTIME[name] = a.stat().st_mtime
     sys.stderr.write(
-            'package cache contains {} env(s) totalling {} bytes\n'.format(
+            'package cache contains {} env(s) totalling {} byte(s)\n'.format(
                     len(SPECS), sum(PKGSIZE.values())))
 
 def find_exact(spec):
@@ -145,23 +148,21 @@ def merge(spec, alpha):
     return insert(existing)
 
 def delete(env):
+    sys.stderr.write('deleting {}\n'.format(env))
     prefix = os.path.join(CACHEDIR, env)
     os.unlink(prefix + '.json')
     os.unlink(prefix + TAR_EXT)
-    SPECS.pop(env)
-    PKGSETS.pop(env)
     PKGMTIME.pop(env)
-    return PKGSIZE.pop(env)
+    return PKGSIZE[env]
 
 def shrink_cache(capacity):
-    if not capacity:
-        return
-    s = sum(PKGSIZE.keys())
+    sys.stdout.write('cleaning cache\n')
+    s = sum(PKGSIZE.values())
     deleted = 0
     if s > capacity:
         sys.stderr.write('clearing {} byte(s) from the cache\n'.format(s - capacity))
     while s > capacity:
-        s -= delete(min(PKGSIZE, key=PKGMTIME.get))
+        s -= delete(min(PKGMTIME, key=PKGMTIME.get))
         deleted += 1
     if deleted > 0:
         sys.stderr.write('deleted {} env(s)\n'.format(deleted))
@@ -193,5 +194,7 @@ if __name__ == '__main__':
     spec = json.load(spec_file)
 
     load_cache()
-    shrink_cache(args.capacity)
+    if args.capacity:
+        shrink_cache(args.capacity)
+        load_cache()
     print(get_env(spec, args.approx, args.merge))
