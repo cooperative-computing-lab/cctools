@@ -3468,7 +3468,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 			q->stats->capacity_weighted = (int) ceil((alpha * (float) capacity_instantaneous) + ((1.0 - alpha) * q->stats->capacity_weighted));
 			time_t ts;
 			time(&ts);
-			debug(D_WQ, "capacity: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->manager_time, q->stats->capacity_weighted, s->tasks_done, s->workers_connected);
+			//debug(D_WQ, "capacity: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->manager_time, q->stats->capacity_weighted, s->tasks_done, s->workers_connected);
 		}
 	}
 
@@ -3476,9 +3476,9 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	capacity->exec_time     = MAX(1, capacity->exec_time);
 	capacity->manager_time   = MAX(1, capacity->manager_time);
 
-	debug(D_WQ, "capacity.exec_time: %lld", (long long) capacity->exec_time);
-	debug(D_WQ, "capacity.transfer_time: %lld", (long long) capacity->transfer_time);
-	debug(D_WQ, "capacity.manager_time: %lld", (long long) capacity->manager_time);
+	//debug(D_WQ, "capacity.exec_time: %lld", (long long) capacity->exec_time);
+	//debug(D_WQ, "capacity.transfer_time: %lld", (long long) capacity->transfer_time);
+	//debug(D_WQ, "capacity.manager_time: %lld", (long long) capacity->manager_time);
 
 	// Never go below the default capacity
 	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->manager_time)));
