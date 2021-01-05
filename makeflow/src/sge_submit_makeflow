@@ -5,24 +5,31 @@ max_num_of_workers=100
 show_help()
 {
 	echo "Use: sge_submit_makeflow [options] <project-name> <makeflow-script>"
-	echo "Note, this script has only been tested in the Notre Dame SGE environment. Also, it requires a catalog server to work properly."
+    echo "If using -T wq, it requires a catalog server to work properly."
 	echo "options:"
-	echo "  -p <parameters>  SGE qsub parameters."
-	echo "  -w <number>      Submit <number> workers."
-	echo "  -h               Show this help message."
-	exit 1
+	echo "  -p <parameters>     SGE qsub parameters. May be used several times."
+	echo "  -E <parameters>     Extra options for makeflow. May be used several times."
+    echo "  -T <batch-for-jobs> One of sge or wq. Default is wq."
+    echo "                         With sge, there will be one batch job per task."
+    echo "                         With wq, there will be one batch job per worker (see -w)."
+    echo "  -w <number>         Submit <number> workers. (Only used for -T wq.)"
+	echo "  -h                  Show this help message."
 }
 
 parameters=""
+makeflow_ops=""
+batch_system="wq"
 num_of_workers=0
 
-while getopts p:w:h opt
+while getopts E:p:T:w:h opt
 do
 	case "$opt" in
+		E)  makeflow_ops="$makeflow_ops $OPTARG";;
 		p)  parameters="$parameters $OPTARG";;
+		T)  batch_system="$OPTARG";;
 		w)  num_of_workers=$OPTARG;;
-		h)  show_help;;
-		\?) show_help;;
+		h)  show_help; exit 0;;
+		\?) show_help; exit 0;;
 	esac
 done
 
@@ -33,7 +40,18 @@ if [ $# = 2 ]; then
 	makeflow_script=$2
 else
 	show_help
+    exit 1
 fi
+
+
+case "$batch_system" in
+    wq)  job_parameters="";;
+    sge) job_parameters="-B '$parameters'";;
+    *)   echo "Batch system for jobs should be one of wq or sge."
+         show_help
+         exit 1
+         ;;
+esac
 
 
 makeflow=`which makeflow 2>/dev/null`
@@ -53,28 +71,31 @@ if [ ! -e $makeflow_script ]; then
 	exit 1
 fi
 
-if [ $num_of_workers -ne 0 ]; then
-	sge_submit_workers=`which sge_submit_workers 2>/dev/null`
-	if [ $? != 0 ]; then
-		echo "$0: please add 'sge_submit_workers' to your PATH."
-		exit 1
-	else
-		if [ $num_of_workers -gt $max_num_of_workers ]; then
-			$num_of_workers = $max_num_of_workers
-		fi
-		sge_submit_workers -a -N $project_name $num_of_workers
-	fi
+if [ "$batch_system" = "wq" ]; then
+    if [ $num_of_workers -ne 0 ]; then
+        sge_submit_workers=`which sge_submit_workers 2>/dev/null`
+        if [ $? != 0 ]; then
+            echo "$0: please add 'sge_submit_workers' to your PATH."
+            exit 1
+        else
+            if [ $num_of_workers -gt $max_num_of_workers ]; then
+                $num_of_workers = $max_num_of_workers
+            fi
+            sge_submit_workers -a -N $project_name $num_of_workers
+        fi
+    fi
+    echo $num_of_workers workers have been submitted to SGE.
 fi
 
-echo $num_of_workers workers have been submitted to SGE.
 
 cp $makeflow .
 
 cat >sge_submit.sh <<EOF
 #!/bin/sh
-./makeflow -T wq -a -e -N $project_name $makeflow_ops $makeflow_script
+./makeflow -a -T $batch_system $makeflow_ops $job_parameters -M "$project_name" $makeflow_script
 EOF
 
 chmod 755 sge_submit.sh
 
-qsub $parameters sge_submit.sh
+echo qsub $parameters sge_submit.sh
+./sge_submit.sh
