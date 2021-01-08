@@ -109,6 +109,10 @@ void jx_table_print( struct jx_table *t, struct jx *j, FILE * f, int columns_max
 			line = malloc(10);
 			string_metric(jx_lookup_integer(j,t->name), -1, line);
 			strcat(line, "B");
+		}
+		else if(t->mode == JX_TABLE_MODE_MEGABYTES) {
+			line = malloc(10);
+			string_metric(jx_lookup_integer(j,t->name), -1, line);
 		} else {
 			int found;
 			struct jx *v = jx_lookup_guard(j,t->name,&found);

@@ -95,12 +95,12 @@ static struct jx_table workers_able_headers[] = {
 
 static struct jx_table manager_resource_headers[] = {
 {"project",				"MANAGER", 		JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 30},
-{"cores_total", 		"CORES",  		JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-{"tasks_total_cores",	"TASKS_CORES", 	JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 15},
-{"memory_total",		"MEMORY", 		JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_LEFT, 15},
-{"tasks_total_memory",	"TASKS_MEMORY", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_LEFT, 15},
-{"disk_total",  		"DISK",   		JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_LEFT, 20},
-{"tasks_total_disk", 	"TASKS_DISK", 	JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_LEFT, 20},
+{"cores_total", 		"CORES",  		JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 15},
+{"tasks_total_cores",	"TASKS_CORES", 	JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 15},
+{"memory_total",		"MEMORY", 		JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 15},
+{"tasks_total_memory",	"TASKS_MEMORY", JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 15},
+{"disk_total",  		"DISK",   		JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 15},
+{"tasks_total_disk", 	"TASKS_DISK", 	JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 15},
 {NULL,NULL,0,0,0}
 };
 
