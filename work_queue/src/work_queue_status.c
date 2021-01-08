@@ -98,6 +98,9 @@ static struct jx_table manager_resource_headers[] = {
 {"cores_total", "CORES",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
 {"memory_total","MEMORY", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 15},
 {"disk_total",  "DISK",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 20},
+{"tasks_total_cores", "TASKS_CORES", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 15},
+{"tasks_total_memory", "TASKS_MEMORY", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 15},
+{"tasks_total_disk", "TASKS_DISK", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 20},
 {NULL,NULL,0,0,0}
 };
 
