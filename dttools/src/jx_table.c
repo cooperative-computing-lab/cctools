@@ -112,7 +112,13 @@ void jx_table_print( struct jx_table *t, struct jx *j, FILE * f, int columns_max
 		}
 		else if(t->mode == JX_TABLE_MODE_MEGABYTES) {
 			line = malloc(10);
-			string_metric(jx_lookup_integer(j,t->name), -1, line);
+			string_metric(jx_lookup_integer(j,t->name), 0, line);
+			for (int i = 0; line[i] != '\0'; i++){
+				if (line[i] == '.'){
+					line[i] = '\0';
+					break;
+				}				
+			}
 		} else {
 			int found;
 			struct jx *v = jx_lookup_guard(j,t->name,&found);
