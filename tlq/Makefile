@@ -1,16 +1,10 @@
-JX = client/jx_test
-
-$(JX): ../dttools/src/jx_test
-	cd ../dttools && make
-	cp ../dttools/src/jx_test ./client/
-
-all: $(JX)
+all:
 
 clean:
 	@echo Cleaning TLQ installation.
 	cd client && rm -rf .tlq_session.log deposits.log jx_test
 
-install: $(JX)
+install:
 
 .PHONY: all clean install
 
