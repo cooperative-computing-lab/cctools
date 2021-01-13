@@ -110,9 +110,9 @@ void jx_table_print( struct jx_table *t, struct jx *j, FILE * f, int columns_max
 			string_metric(jx_lookup_integer(j,t->name), -1, line);
 			strcat(line, "B");
 		}
-		else if(t->mode == JX_TABLE_MODE_MEGABYTES) {
+		else if(t->mode == JX_TABLE_MODE_GIGABYTES) {
 			line = malloc(10);
-			string_metric(jx_lookup_integer(j,t->name), 0, line);
+			string_metric(jx_lookup_integer(j,t->name), 1, line);
 			for (int i = 0; line[i] != '\0'; i++){
 				if (line[i] == '.'){
 					line[i] = '\0';

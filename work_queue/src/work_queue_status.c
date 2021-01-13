@@ -94,13 +94,13 @@ static struct jx_table workers_able_headers[] = {
 };
 
 static struct jx_table manager_resource_headers[] = {
-{"project",			"MANAGER", 		JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 30},
-{"cores_total",		"TOTAL_CORES",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 20},
-{"cores_inuse",		"CORES_USED", 	JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 20},
-{"memory_total",	"TOTAL_MEMORY (MB)", JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 20},
-{"memory_inuse",	"MEMORY_USED (MB)", 	JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 20},
-{"disk_total",  	"TOTAL_DISK (MB)",  	JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 20},
-{"disk_inuse",		"DISK_USED (MB)", 	JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 20},
+{"project",			"MANAGER", 		JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -19},
+{"cores_total",		"CORES",        JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 6},
+{"cores_inuse",		"INUSE", 	    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 6},
+{"memory_total",	"MEM(GB)",     JX_TABLE_MODE_GIGABYTES, JX_TABLE_ALIGN_RIGHT, 8},
+{"memory_inuse",	"INUSE", 	JX_TABLE_MODE_GIGABYTES, JX_TABLE_ALIGN_RIGHT, 8},
+{"disk_total",  	"DISK(GB)",  	JX_TABLE_MODE_GIGABYTES, JX_TABLE_ALIGN_RIGHT, 9},
+{"disk_inuse",		"INUSE", 	JX_TABLE_MODE_GIGABYTES, JX_TABLE_ALIGN_RIGHT, 9},
 {NULL,NULL,0,0,0}
 };
 
