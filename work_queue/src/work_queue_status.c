@@ -94,10 +94,13 @@ static struct jx_table workers_able_headers[] = {
 };
 
 static struct jx_table manager_resource_headers[] = {
-{"project",     "MANAGER", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 30},
-{"cores_total", "CORES",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-{"memory_total","MEMORY", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 15},
-{"disk_total",  "DISK",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 20},
+{"project",			"MANAGER", 		JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 30},
+{"cores_total",		"TOTAL_CORES",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 20},
+{"cores_inuse",		"CORES_USED", 	JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 20},
+{"memory_total",	"TOTAL_MEMORY (MB)", JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 20},
+{"memory_inuse",	"MEMORY_USED (MB)", 	JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 20},
+{"disk_total",  	"TOTAL_DISK (MB)",  	JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 20},
+{"disk_inuse",		"DISK_USED (MB)", 	JX_TABLE_MODE_MEGABYTES, JX_TABLE_ALIGN_RIGHT, 20},
 {NULL,NULL,0,0,0}
 };
 

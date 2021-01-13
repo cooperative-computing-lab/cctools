@@ -7,6 +7,7 @@
 typedef enum {
 	JX_TABLE_MODE_PLAIN,
 	JX_TABLE_MODE_METRIC,
+	JX_TABLE_MODE_MEGABYTES,
 	JX_TABLE_MODE_URL
 } jx_table_mode_t;
 
