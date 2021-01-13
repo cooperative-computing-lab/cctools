@@ -1,0 +1,294 @@
+#! /usr/bin/env perl
+
+use Data::Dumper;
+use Error qw(:try);
+use Error::Simple;
+use Getopt::Long qw(:config no_ignore_case);
+use JSON;
+use LWP::UserAgent;
+use sigtrap qw/handler signal_handler INT TERM/;
+use Sys::Hostname;
+use Term::ReadLine;
+use Time::HiRes qw(time);
+use URI::Encode;
+
+use strict;
+
+#Silent phone home log URL receiver
+{
+    package WebServer;
+    use HTTP::Server::Simple::CGI;
+    use base qw(HTTP::Server::Simple::CGI);
+    my %dispatch = ("/deposit" => \&get_deposit, "/query" => \&do_query);
+
+    sub get_deposit {
+        my ($cgi) = @_;
+        my @contents = $cgi->param("DEPOSIT");
+        open(DEPOSIT, ">>", "deposits.log");
+        foreach my $content (@contents) { print(DEPOSIT "$content\n"); }
+        close(DEPOSIT);
+        return 0;
+    }
+
+    sub do_query {
+        my ($cgi) = @_;
+        my $query = $cgi->param("PUTDATA");
+        my $result = "PLACEHOLDER";
+        print(STDOUT $result);
+        return 0;
+    }
+
+    sub handle_request {
+        my ($self, $cgi) = @_;
+        my $path = $cgi->path_info();
+        my $handler = $dispatch{$path};
+        if(ref($handler) eq "CODE") { $handler->($cgi); }
+        return 0;
+    }
+}
+
+my $timing = 0;
+my $usage = "TLQ Log Querying Client Options:
+
+Required:
+
+Optional:
+    --log,-l    <path>      Enables logging of all sent requests and received output.
+    --port,-p   <integer>   Attempt to use selected port for phone home receiver.
+                            Default: 9001.
+    --session,-s            Enables logging of user input history for next session.
+    --time,-t               Captures timing data for benchmarking.
+
+    --help                  Display this message.
+
+Example Usage:
+
+    perl tlq_client --log output.log --port 9001 --session
+
+";
+
+my $command_usage = "Available commands:
+  EXIT
+  HTTP  <URL>
+  JX
+  LIST  [URL]
+  QUERY <URL> <STRING>
+";
+
+my %OPT;
+try {
+    GetOptions(
+        "log=s" => \$OPT{log},
+        "port=s" => \$OPT{port},
+        "session|?" => \$OPT{session},
+        "time|?" => sub { $timing = 1;  },
+        "help|?" => sub { print $usage; exit(0); },
+    );
+}
+catch Error::Simple with {
+    my $E = shift;
+    print STDERR $E->{-text};
+    die "Failed to parse command line options.\n";
+};
+
+my $port = $OPT{port};
+if(!$port) { $port = 9001; }
+my $host = hostname();
+my $spid = WebServer->new($port)->background();
+print(STDERR "$!\n");
+if($spid) { print(STDOUT "Phone home server established at $host:$port with PID $spid.\n\n"); }
+else {
+    print(STDERR "Could not establish phone home server at $host:$port.\n");
+    exit(1);
+}
+my $total_data = 0;
+my $total_request = 0;
+sleep(1);
+
+my $client = 0;
+my $server = "";
+my $log = $OPT{log};
+my $session = $OPT{session};
+
+my %logs = ();
+my $prompt = " \$ ";
+my $term = Term::ReadLine->new("tlq");
+$client = LWP::UserAgent->new(
+    protocols_allowed => ["http", "https"],
+    timeout => 10
+);
+$client->env_proxy;
+if($session) {
+    open(HISTORY, ">>", ".tlq_session.log") or die "Could not open .tlq_session.log for writing.\n";
+    open(READHIST, ".tlq_session.log");
+    while(my $line = <READHIST>) {
+        chomp($line);
+        $term->add_history($line);
+    }
+    close(READHIST);
+}
+print(STDOUT $command_usage);
+while(defined(my $input = $term->readline($prompt))) {
+    get_info("deposits.log");
+    my $currdata = 0;
+    foreach my $file (<*>) {
+        if(-f $file) {
+            my $fsize = (stat($file))[7];
+            $currdata += $fsize;
+        }
+    }
+    if($currdata > $total_data) { $total_data = $currdata; }
+    my @parts = split(' ', $input);
+    my $action = uc($parts[0]);
+    my $url = $parts[1];
+    my $query = $parts[2];
+    my $result = "";
+    $input = uc($action) . " $url $query";
+    $input =~ s/\s+$//;
+    $term->add_history($input) if /\S/;
+    if($session) { print(HISTORY "$input\n"); }
+    if(uc($input) eq "QUIT" or uc($input) eq "EXIT") {
+        kill(9, $spid);
+        exit(0);
+    } 
+    if($action eq "JX") {
+        my $request_start = time();
+        if(!-e "./jx_test") { system("cp ../cctools-source/dttools/src/jx_test ."); }
+        $result = system("./jx_test");
+        print(STDOUT "$result\n");
+        my $request_end = time();
+        if($timing) { $total_request += $request_end - $request_start; }
+        print_result("JX", $result);
+        next; 
+    }
+
+    if($action ne "LIST" and !$url) { print_command_help(); }
+    elsif($action eq "HTTP" and $url) {
+        my $request_start = time();
+        $result = URI::Encode->new( { encode_reserved => 0 } )->decode(request("HTTP", $url, 0));
+        my $request_end = time();
+        if($timing) { $total_request += $request_end - $request_start; }
+        print_result("HTTP $url", $result);
+        next;
+    }
+    elsif($action eq "LIST") {
+        my $request_start = time();
+        if($url) {
+            $result = URI::Encode->new( { encode_reserved => 0 } )->decode(request("LIST", $url, 0));
+            my $request_end = time();
+            if($timing) { $total_request += $request_end - $request_start; }
+            print_result("LIST $url", $result);
+        }
+        else {
+            foreach my $l (keys(%logs)) { $result = $result . "$l =>\n  command: $logs{$l}{command},\n  host: $logs{$l}{host},\n  json: $logs{$l}{json},\n  jx: $logs{$l}{jx},\n  log: $logs{$l}{log},\n  rm: $logs{$l}{rm},\n  query: $logs{$l}{query}\n\n"; }
+            my $request_end = time();
+            if($timing) { $total_request += $request_end - $request_start; }
+            print_result("LIST local", $result);
+        }
+        next;
+    }
+    elsif($action eq "QUERY" and $query) {
+        my $request_start = time();
+        my $i = 3;
+        while(scalar(@parts) > $i) {
+            $query = $query . " $parts[$i]";
+            $i++;
+        }
+        $result = URI::Encode->new( { encode_reserved => 0 } )->decode(request("QUERY", $url, request_to_json($query)));
+        my $request_end = time();
+        if($timing) { $total_request += $request_end - $request_start; }
+        print_result("QUERY $url $query", $result);
+        next;
+    }
+    else { print_command_help(); } 
+}
+
+if($session) { close(HISTORY); }
+kill(9, $spid);
+exit(0);
+
+sub get_info {
+    my ($file) = @_;
+    open(FILE, $file);
+    while(my $line = <FILE>) {
+        if($line =~ m/^(?<command>.+) created log (?<log>\S+) queryable at (?<url>\S+).$/) {
+            my $log = $+{log};
+            my $command = $+{command};
+            my $url = $+{url};
+            my $host = "";
+            my $uuid = "";
+            if(!exists $logs{$url}) {
+                if($url =~ m/(?<host>https?:\/\/[^\/]+)\/<ACTION>\/(?<uuid>\S+-\S+-\S+-\S+-\S+)/) {
+                    $host = $+{host};
+                    $uuid = $+{uuid};
+                    $logs{$url} = {};
+                    $logs{$url}{log} = "$host/pull/$uuid.log";
+                    $logs{$url}{json} = "$host/pull/$uuid.json";
+                    $logs{$url}{command} = $command;
+                    $logs{$url}{url} = $url;
+                    $logs{$url}{host} = $host;
+                    $logs{$url}{jx} = "$host/jx/$uuid.json";
+                    $logs{$url}{rm} = "$host/rm/$uuid.log";
+                    $logs{$url}{query} = "$host/query/$uuid.log";
+                    $logs{$url}{path} = $log;
+                }
+            }
+        }
+    }
+    close(FILE);
+    return 0;
+}
+
+sub print_result {
+    my ($input, $result) = @_;
+    chomp($result);
+    print(STDOUT "$result\n");
+    if($log) {
+        open(LOG, ">>", $log) or die "Could not open $log for log writing.\n";
+        print(LOG "$input =>\n$result\n");
+        if($timing) {
+            print(LOG "Total request time: $total_request seconds.\n");
+            print(LOG "Total data usage: $total_data\B.\n");
+        }
+        close(LOG);
+    }
+}
+
+sub request_to_json {
+    my ($request) = @_;
+    my %object;
+    $object{request} = $request;
+    my $json = JSON->new->utf8->encode(\%object);
+    $json = URI::Encode->new( { encode_reserved => 0 } )->encode($json);
+    return $json;
+}
+
+sub request {
+    my ($action, $url, $content) = @_;
+    my $http = $url;
+    my $response = 0;
+    if($action eq "HTTP") { $response = $client->put($http); }
+    elsif($action eq "LIST") { $response = $client->put($http); }
+    elsif($action eq "QUERY") { $response = $client->put($http, "Content-Type" => "text/plain", Content => $content); }
+    else { return "Request type $action not supported."; }
+    if($response->is_success) { return $response->decoded_content; }
+    else { return $response->status_line; }
+}
+
+sub signal_handler {
+    print(STDERR "\nCaught '$!' signal. Terminating process.\n");
+    kill(9, $spid);
+    exit(1);
+}
+
+sub print_help {
+    print(STDERR $usage);
+    exit(1);
+}
+
+sub print_command_help {
+    print(STDERR "Incorrect command syntax used. Missing field(s).\n\n");
+    print(STDERR $command_usage);
+}
+
+# vim: tabstop=8 shiftwidth=4 softtabstop=4 expandtab shiftround autoindent

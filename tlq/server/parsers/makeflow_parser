@@ -1,0 +1,69 @@
+#! /usr/bin/env perl
+
+use Error qw(:try);
+use Error::Simple;
+use Getopt::Long qw(:config no_ignore_case);
+use JSON;
+use strict;
+
+my $usage = "Makeflow Record Type Log Parser Options:
+
+Required:
+    <log>	    Sets the path to the log file.
+    <uuid>          Sets the component UUID for the log.
+
+Example Usage:
+    makeflow_parser makeflow.debug ABC-123
+
+";
+
+if(@ARGV != 2) {
+    print(STDERR $usage);
+    exit 1;
+}
+my ($log, $uuid) = @ARGV;
+
+my %makeflow;
+#$makeflow{failures} = 0;
+$makeflow{type} = "makeflow";
+$makeflow{log} = $log;
+$makeflow{uuid} = $uuid;
+$makeflow{links} = ();
+my @msgs;
+my $linenum = 1;
+
+open(LOG, $log);
+while(my $line = <LOG>) {
+    #[22171] dns: finding my hostname: uname = disc01.crc.nd.edu, address = 129.74.128.103, hostname = disc01.crc.nd.edu
+    if($line =~ m/\S+\[(?<pid>\d+)\] dns: finding my hostname: uname = \S+, address = (?<ip>\S+), hostname = (?<address>\S+)/) {
+        $makeflow{address} = $+{address};
+        $makeflow{ip} = $+{ip};
+        $makeflow{pid} = $+{pid};
+    }
+    #2020/07/14 14:58:25.35 makeflow[22171] tcp: listening on port 9000
+    elsif($line =~ m/tcp: listening on port (?<port>\d+)/) { $makeflow{port} = $+{port}; }
+
+    #2020/07/13 16:10:56.03 work_queue_worker[24553] debug: work_queue_worker version 8.0.0 DEVELOPMENT (released 2020-06-30 12:58:58 -0400)
+    if($line =~ m/(?<date>\d+\/\d+\/\d+)\s+(?<timestamp>\d+:\d+:\d+\.\d+)\s+\S+\[(?<pid>\d+)\]\s+(?<stream>\S+):\s+(?<message>.+)/) {
+        my %logline;
+        $logline{date} = $+{date};
+        $logline{timestamp} = $+{timestamp};
+        $logline{output_stream} = $+{stream};
+        $logline{message} = $+{message};
+        $logline{linenum} = $linenum;
+        push(@msgs, \%logline);
+    }
+    $linenum++;
+}
+close(LOG);
+
+$makeflow{messages} = \@msgs;
+my $json = JSON->new->utf8->pretty->encode(\%makeflow);
+print(STDOUT "$json\n");
+exit(0);
+
+sub print_help {
+    print $usage;
+    exit(1);
+}
+# vim: tabstop=8 shiftwidth=4 softtabstop=4 expandtab shiftround autoindent

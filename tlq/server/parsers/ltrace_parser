@@ -1,0 +1,162 @@
+#! /usr/bin/env perl
+
+use strict;
+use DateTime;
+use JSON;
+use List::MoreUtils qw(uniq);
+my $usage = "Log Parser for ltrace Options:
+
+Required:
+    <log>	    Sets the path to the log file.
+    <uuid>          Sets the component UUID for the log.
+
+Example Usage:
+    ltrace_parser ltrace.log ABC-123
+
+";
+
+if(@ARGV != 2) {
+    print(STDERR $usage);
+    exit 1;
+}
+my ($log, $uuid) = @ARGV;
+my (%env_vars, %processes);
+my ($cmd, $host, $cmdpid, $cmdppid);
+
+my %ltrace;
+$ltrace{type} = "ltrace";
+$ltrace{log} = $log;
+$ltrace{uuid} = $uuid;
+$ltrace{command} = "DID NOT RUN COMMAND SUCCESSFULLY";
+$ltrace{pid} = "";
+$ltrace{ppid} = "COULD NOT SET PPID";
+$ltrace{address} = "COULD NOT FIND HOST ADDRESS";
+$ltrace{exit} = "DID NOT EXIT NORMALLY";
+my @links;
+my @msgs;
+my @files;
+my $linenum = 1;
+
+open(LOG, $log) or die "Could not open specified log file.\n";
+while(my $line = <LOG>) {
+    #Wrote an ltrace for command: "dd if=in.dat of=out.dat bs=4096 count=2500" with PID 12539 from PPID 12538 on host.lab.edu with result 0
+    if($line =~ m/Wrote an ltrace for command: \"(?<cmd>.*)\" with PID (?<pid>\d+) from PPID (?<ppid>\d+) on (?<host>\S+) with result (?<exited>\S+)$/) {
+        $ltrace{command} = $+{cmd};
+        $ltrace{pid} = int($+{pid});
+        $ltrace{ppid} = int($+{ppid});
+        $ltrace{address} = $+{host};
+        $ltrace{exit} = int($+{exited});
+    }
+
+    #19381   0.000000 libjli.so->getenv("_JAVA_LAUNCHER_DEBUG") = nil
+    if($line =~ m/(?<pid>\d+)\s+(?<timestamp>\d+\.\d+)\s+(?<message>.+)/) {
+        $ltrace{runtime} = int($+{timestamp});
+        if(!$ltrace{pid}) { $ltrace{pid} = int($+{pid}); }
+        my %logline;
+        $logline{pid} = int($+{pid});
+        $logline{timestamp} = $+{timestamp};
+        $logline{message} = $+{message};
+        $logline{linenum} = $linenum;
+        push(@msgs, \%logline);
+    }
+
+    #ENVIRONMENT VARIABLES
+    #20546   0.001356 libSDL-1.2.so.0->getenv("SDL_VIDEODRIVER") = nil
+    if($line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+(?<prog>\S+)->getenv\d*\(\"(?<name>\S+)\"\)\s+=\s+(?<result>\S+)$/) {
+        if(!$ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}) {
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{values} = $+{result};
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{uses} = int(1);
+        }
+        else {
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{values} = $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{values} . ":-:" . $+{result};
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{uses}++;
+        }
+    }
+    #20546   0.001356 libSDL-1.2.so.0->setenv("SDL_VIDEODRIVER", "testval", 1) = nil
+    elsif($line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+(?<prog>\S+)->setenv\d*\(\"(?<name>\S+)\", \"(?<value>(\S+\s*)*)\", \d+\)\s+=\s+(?<result>\S+)$/) {
+        if(!$ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}) {
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{values} = $+{value};
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{uses} = int(1);
+        }
+        else {
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{values} = $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{values} . ":-:" . $+{value};
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{uses}++;
+        }
+    }
+    #20546   0.001356 libSDL-1.2.so.0->unsetenv("SDL_VIDEODRIVER") = nil
+    elsif($line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+(?<prog>\S+)->unsetenv\d*\(\"(?<name>\S+)\"\)\s+=\s+(?<result>\S+)$/) {
+        if(!$ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}) {
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{values} = "";
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{uses} = int(1);
+        }
+        else {
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{values} = $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{values} . ":-:" . "";
+            $ltrace{processes}{$+{pid}}{environment_variables}{$+{name}}{uses}++;
+        }
+    }
+    #_CONDOR_ANCESTOR_24525=24530:1594671055:2748281650
+    elsif($line =~ m/(?<name>\S+)=(?<value>.+)$/) { $ltrace{environment}{$+{name}} = $+{value}; }
+
+    #FILES
+    #16226   0.000550 fscheck->open("in.dat", 0, 00)  = 3
+    #3111   0.000672 libpython2.7.so.1.0->fopen64("test.txt", "a+")  = 0x8b22a0
+    #12396   0.000368 fscheck->__xstat(1, "/disk/", 0x7ffd931d20d0) = 0
+    if($line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+(?<prog>\S+)->open\d*\(\"(?<file>\S+)\", \d+, \d+\)\s+=\s+(?<result>\S+)$/ or
+    $line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+(?<prog>\S+)->fopen\d*\(\"(?<file>\S+)\", \S+\)\s+=\s+(?<result>\S+)$/ or
+    $line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+(?<prog>\S+)->__xstat\(\d+, \"(?<file>\S+)\", \S+\)\s+=\s+(?<result>\S+)$/) { 
+        if(!$ltrace{processes}{$+{pid}}{files}{$+{file}}) {
+            $ltrace{processes}{$+{pid}}{files}{$+{file}}{uses} = int(1);
+            push(@files, $+{file});
+        }
+        else { $ltrace{processes}{$+{pid}}{environment_variables}{$+{file}}{uses}++; }
+    }
+
+    #PROCESSES
+    #27851   0.000684 sh->fork()    = 27852
+    if($line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+(?<call>\S+->fork)\(.*\)\s+=\s+(?<child>\S+)$/ or
+    $line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+(?<call>\S+->clone)\(.*\)\s+=\s+(?<child>\S+)$/) {
+        my $child = int($+{child});
+        if(!$ltrace{processes}{$+{pid}}{children}) { $ltrace{processes}{$+{pid}}{children} = $child; }
+        else { $ltrace{processes}{$+{pid}}{children} = $ltrace{processes}{$+{pid}}{children} . ":-:" . $child; }
+    }
+    #31849   0.068299 libpthread.so.0->__clone(0x2b0619359de0, 0x2b061c221d40, 0x3d0f00, 0x2b061c222700) = 0x7c6b
+    elsif($line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+(?<call>\S+->__clone)\(.*\)\s+=\s+(?<child>\S+)$/) {
+        my $child = hex($+{child});
+        if(!$ltrace{processes}{$+{pid}}{children}) { $ltrace{processes}{$+{pid}}{children} = $child; }
+        else { $ltrace{processes}{$+{pid}}{children} = $ltrace{processes}{$+{pid}}{children} . ":-:" . $child; }
+    }
+    #19382   3.439469 --- SIGSEGV (Segmentation fault) ---
+    elsif($line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+\-\-\-\s+(?<signal>SIG\S+)\s+\((?<sigmsg>.+)\)\s+\-\-\-$/) { $ltrace{processes}{$+{pid}}{signal} = $+{signal}; }
+    #31988   1.226661 +++ exited (status 0) +++
+    elsif($line =~ m/(?<pid>\d+)\s+(?<access>\S+)\s+\+\+\+\s+exited\s+\(status\s+(?<exited>\S+)\)\s+\+\+\+$/) { $ltrace{processes}{$+{pid}}{exit} = $+{exited}; }
+    $linenum++;
+}
+
+my %procs = %{$ltrace{processes}};
+foreach my $p (keys(%procs)) {
+    if(!$ltrace{processes}{$p}{children}) { $ltrace{processes}{$p}{children} = ""; }
+    if(!$ltrace{processes}{$p}{environment_variables}) { $ltrace{processes}{$p}{environment_variables} = ""; }
+    if($ltrace{processes}{$p}{environment_variables} ne "") {
+        my %envs = %{$ltrace{processes}{$p}{environment_variables}};
+        foreach my $e (keys(%envs)) {
+            if($ltrace{processes}{$p}{environment_variables} eq "") { next; }
+            my @newprocs = split(":-:", $ltrace{processes}{$p}{environment_variables}{$e}{values});
+            $ltrace{processes}{$p}{environment_variables}{$e}{values} = \@newprocs;
+        }
+    }
+    if($ltrace{processes}{$p}{children} ne "") {
+        my @newarr = split(":-:", $ltrace{processes}{$p}{children});
+        $ltrace{processes}{$p}{children} = \@newarr;
+    }
+}
+$ltrace{links} = \@links;
+$ltrace{messages} = \@msgs;
+$ltrace{files} = \@files;
+my $json = JSON->new->utf8->pretty->encode(\%ltrace);
+print(STDOUT "$json\n");
+
+sub print_help {
+    print $usage;
+    exit(1);
+}
+# vim: tabstop=8 shiftwidth=4 softtabstop=4 expandtab shiftround autoindent

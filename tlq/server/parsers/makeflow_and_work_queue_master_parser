@@ -1,0 +1,151 @@
+#! /usr/bin/env perl
+
+use Error qw(:try);
+use Error::Simple;
+use Getopt::Long qw(:config no_ignore_case);
+use JSON;
+use strict;
+
+my $usage = "Work Queue Master Record Type Log Parser Options:
+
+Required:
+    <log>	    Sets the path to the log file.
+    <uuid>          Sets the component UUID for the log.
+
+Example Usage:
+    work_queue_master_parser master.debug ABC-123
+
+";
+
+if(@ARGV != 2) {
+    print(STDERR $usage);
+    exit 1;
+}
+my ($log, $uuid) = @ARGV;
+
+my %master;
+#$master{failures} = 0;
+$master{type} = "work_queue_master";
+$master{log} = $log;
+$master{uuid} = $uuid;
+my %makeflow;
+$makeflow{type} = "makeflow";
+$makeflow{log} = $log;
+$makeflow{uuid} = $uuid;
+my @msgs;
+my @links;
+my $linenum = 1;
+my $currtask = 0;
+my $cmdflag = 0;
+
+open(LOG, $log);
+while(my $line = <LOG>) {
+    #[22171] dns: finding my hostname: uname = disc01.crc.nd.edu, address = 129.74.128.103, hostname = disc01.crc.nd.edu
+    if($line =~ m/\S+\[(?<pid>\d+)\] dns: finding my hostname: uname = \S+, address = (?<ip>\S+), hostname = (?<address>\S+)/) {
+        $master{address} = $+{address};
+        $master{ip} = $+{ip};
+        $master{pid} = $+{pid};
+        $makeflow{address} = $+{address};
+        $makeflow{ip} = $+{ip};
+        $makeflow{pid} = $+{pid};
+    }
+    #2020/07/14 14:58:25.35 makeflow[22171] tcp: listening on port 9000
+    elsif($line =~ m/tcp: listening on port (?<port>\d+)/) { $master{port} = $+{port}; }
+
+    #2020/07/13 16:10:56.03 work_queue_worker[24553] debug: work_queue_worker version 8.0.0 DEVELOPMENT (released 2020-06-30 12:58:58 -0400)
+    if($line =~ m/(?<date>\d+\/\d+\/\d+)\s+(?<timestamp>\d+:\d+:\d+\.\d+)\s+\S+\[(?<pid>\d+)\]\s+(?<stream>\S+):\s+(?<message>.+)/) {
+        $master{pid} = $+{pid};
+        my %logline;
+        $logline{date} = $+{date};
+        $logline{timestamp} = $+{timestamp};
+        $logline{output_stream} = $+{stream};
+        $logline{message} = $+{message};
+        $logline{linenum} = $linenum;
+        push(@msgs, \%logline);
+    }
+
+    #wq: disc25.crc.nd.edu (10.32.74.188:37590) running CCTools version 8.0.0 on Linux (operating system) with architecture x86_64 is ready
+    if($line =~ m/wq: (?<address>\S+) \((?<ip>\S+):(?<port>\d+)\) running CCTools version/) {
+        my $workeraddr = $+{ip} . ":" . $+{port};
+        $master{workers}{$workeraddr}{address} = $+{address};
+        $master{workers}{$workeraddr}{ip} = $+{ip};
+        $master{workers}{$workeraddr}{port} = $+{port};
+    }
+    #wq: Task 1 state change: UNKNOWN (0) to WAITING (1)
+    elsif($line =~ m/wq: Task (?<taskid>\d+) state change: \S+ \(\d+\) to (?<state>\S+ \(\d+\))/) {
+        $master{tasks}{$+{taskid}}{state} = $+{state};
+        $master{tasks}{$+{taskid}}{taskid} = $+{taskid};
+    }
+
+    #wq: tx to disc25.crc.nd.edu (10.32.74.188:37590): task 5
+    if($line =~ m/wq: tx to \S+ \((?<worker>\S+)\): task (?<taskid>\d+)/) {
+        $currtask = $+{taskid};
+        $master{tasks}{$+{taskid}}{worker} = $+{worker};
+    }
+    #wq: tx to disc25.crc.nd.edu (10.32.74.188:37590): cmd 225
+    elsif($line =~ m/wq: tx to \S+ \(\S+\): cmd \d+/) { $cmdflag = 1; }
+    #wq: sh log-define disc01.crc.nd.edu 9001 /disk/d11/tlq /disk/d11/tlq/shakespeare.ltrace.henry_iv_part_1.log ltrace -- ./ltrace-wrapper /disk/d11/tlq/shakespeare.ltrace.henry_iv_part_1.log perl text_analyzer.pl henry_iv_part_1.txt
+    elsif($line =~ m/wq: (?<cmd>.+)/ and $currtask and $cmdflag) {
+        $cmdflag = 0;
+        $master{tasks}{$currtask}{command} = $+{cmd};
+    }
+    #wq: tx to disc25.crc.nd.edu (10.32.74.188:37590): category default
+    elsif($line =~ m/wq: tx to \S+ \(\S+\): category (?<category>\S+)/ and $currtask) { $master{tasks}{$currtask}{category} = $+{category}; }
+    #wq: tx to disc25.crc.nd.edu (10.32.74.188:37590): cores 4
+    elsif($line =~ m/wq: tx to \S+ \(\S+\): cores (?<cores>\S+)/ and $currtask) { $master{tasks}{$currtask}{cores} = $+{cores}; }
+    #wq: tx to disc25.crc.nd.edu (10.32.74.188:37590): memory 15899
+    elsif($line =~ m/wq: tx to \S+ \(\S+\): memory (?<memory>\S+)/ and $currtask) { $master{tasks}{$currtask}{memory} = $+{memory}; }
+    #wq: tx to disc25.crc.nd.edu (10.32.74.188:37590): disk 916727
+    elsif($line =~ m/wq: tx to \S+ \(\S+\): disk (?<disk>\S+)/ and $currtask) { $master{tasks}{$currtask}{disk} = $+{disk}; }
+    #wq: tx to disc25.crc.nd.edu (10.32.74.188:37590): gpus 0
+    elsif($line =~ m/wq: tx to \S+ \(\S+\): gpus (?<gpus>\S+)/ and $currtask) { $master{tasks}{$currtask}{gpus} = $+{gpus}; }
+    #wq: tx to disc25.crc.nd.edu (10.32.74.188:37590): end_time 18446744073709551615
+    elsif($line =~ m/wq: tx to \S+ \(\S+\): end_time (?<end>\S+)/ and $currtask) { $master{tasks}{$currtask}{end_time} = $+{end}; }
+    #wq: tx to disc25.crc.nd.edu (10.32.74.188:37590): wall_time 18446744073709551615
+    elsif($line =~ m/wq: tx to \S+ \(\S+\): wall_time (?<wall>\S+)/ and $currtask) { $master{tasks}{$currtask}{wall_time} = $+{wall}; }
+    #wq: tx to disc25.crc.nd.edu (10.32.74.188:37590): end
+    elsif($line =~ m/wq: tx to \S+ \(\S+\): end/ and $currtask) { $currtask = 0; }
+    
+
+    #tlq: set master TLQ URL: http://disc01.crc.nd.edu:11855/jx/37bd779f-95d8-4c2c-80e3-f5eb4e28aacc.json
+    if($line =~ m/tlq: set master TLQ URL: http:\/\/(?<address>\S+)\/jx\/(?<uuid>\S+).json/) {
+        my $url = "http://" . $+{address} . "/jx/" . $+{uuid} . ".json";
+        $master{url} = $url;
+        my %link1;
+        $link1{type} = "work_queue_master";
+        $link1{url} = $url;
+        push(@links, \%link1);
+        my %link2;
+        $link2{type} = "makeflow";
+        $link2{url} = $url;
+        push(@links, \%link2);
+    }
+    #tlq: received worker (10.32.74.188:36598) TLQ URL http://disc25.crc.nd.edu:11855/jx/6ca6187d-95bc-4934-ada5-6c34796787c8.json
+    elsif($line =~ m/tlq: received worker \((?<ip>\S+):(?<port>\d+)\) TLQ URL http:\/\/(?<address>\S+)\/jx\/(?<uuid>\S+).json/) {
+        my $workeraddr = $+{ip} . ":" . $+{port};
+        my $url = "http://" . $+{address} . "/jx/" . $+{uuid} . ".json";
+        $master{workers}{$workeraddr}{url} = $url;
+        my %link;
+        $link{type} = "work_queue_worker";
+        $link{url} = $url;
+        push(@links, \%link);
+    }
+    $linenum++;
+}
+close(LOG);
+
+$master{messages} = \@msgs;
+$master{links} = \@links;
+$makeflow{links} = \@links;
+my %combined;
+$combined{"work_queue_master"} = \%master;
+$combined{makeflow} = \%makeflow;
+my $json = JSON->new->utf8->pretty->encode(\%combined);
+print(STDOUT "$json\n");
+exit(0);
+
+sub print_help {
+    print $usage;
+    exit(1);
+}
+# vim: tabstop=8 shiftwidth=4 softtabstop=4 expandtab shiftround autoindent
