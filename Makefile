@@ -18,6 +18,7 @@ batch_job parrot: chirp
 batch_job chirp deltadb ftp_lite makeflow makeflow_linker parrot resource_monitor work_queue grow: dttools
 parrot: ftp_lite grow
 batch_job makeflow: work_queue
+tlq: dttools
 
 $(CCTOOLS_PACKAGES): config.mk
 	@$(MAKE) -C $@
