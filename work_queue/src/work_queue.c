@@ -6184,17 +6184,55 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 int work_queue_hungry(struct work_queue *q)
 {
-	int ready = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
-	if(q->stats->tasks_dispatched < 100)
-		return MAX(100 - ready, 0);
+	//int ready = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
+	//if(q->stats->tasks_dispatched < 100)
+	//	return MAX(100 - ready, 0);
 
-	//BUG: fix this so that it actually looks at the number of cores available.
+	struct work_queue_task *t;
+	
+	//get total available resources consumption (cores, memory, disk) of all workers of this manager
+	//available = total (all) - committed (actual in use)
+	int64_t workers_total_avail_cores;
+	int64_t workers_total_avail_memory;
+	int64_t workers_total_avail_disk;
 
+	workers_total_avail_cores = q->stats->total_cores - q->stats->committed_cores;
+	workers_total_avail_memory = q->stats->total_memory - q->stats->committed_memory;
+	workers_total_avail_disk = q->stats->total_disk - q->stats->committed_disk;
+
+	//get total required resources (cores, memory, disk) of the waiting tasks
+	int64_t ready_tasks_total_cores;
+	int64_t ready_tasks_total_memory;
+	int64_t ready_tasks_total_disk;
+
+	ready_tasks_total_cores = 0;
+	ready_tasks_total_memory = 0;
+	ready_tasks_total_disk = 0;
+
+	list_first_item(q->ready_list);
+	while ((t = list_next_item(q->ready_list))){
+		ready_tasks_total_cores += t->resources_allocated->cores;
+		ready_tasks_total_memory += t->resources_allocated->memory;
+		ready_tasks_total_disk += t->resources_allocated->disk;
+	}
+	
+	//Check limiting factors (expand features later?)
+	if (ready_tasks_total_cores > workers_total_avail_cores){
+		return 0;
+	}
+ 	if (ready_tasks_total_memory > workers_total_avail_memory){
+		return 0;
+	}
+	if (ready_tasks_total_disk > workers_total_avail_disk){
+		return 0;
+	}
+
+	return 1;	//all good
 	//i = 1.1 * number of current workers
 	//i-ready = # of tasks to queue to re-reach the status quo.
-	int i = 1.1 * count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN);
+	//int i = 1.1 * count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN);
 
-	return MAX(i - ready, 0);
+	//return MAX(i - ready, 0);
 }
 
 int work_queue_shut_down_workers(struct work_queue *q, int n)
