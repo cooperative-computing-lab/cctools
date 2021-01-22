@@ -1348,10 +1348,17 @@ static work_queue_result_code_t get_output_files( struct work_queue *q, struct w
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((f = list_next_item(t->output_files))) {
-			// skip failure-only files if task succeeded
-			if(f->flags&WORK_QUEUE_FAILURE_ONLY && t->result==WORK_QUEUE_RESULT_SUCCESS && t->return_status==0) continue;
+			int task_succeeded = (t->result==WORK_QUEUE_RESULT_SUCCESS && t->return_status==0);
+
+			// skip failure-only files on success 
+			if(f->flags&WORK_QUEUE_FAILURE_ONLY && task_succeeded) continue;
+
+ 			// skip success-only files on failure
+			if(f->flags&WORK_QUEUE_SUCCESS_ONLY && !task_succeeded) continue;
+
 			// otherwise, get the file.
 			result = get_output_file(q,w,t,f);
+
 			//if success or app-level failure, continue to get other files.
 			//if worker failure, return.
 			if(result == WQ_WORKER_FAILURE) {
