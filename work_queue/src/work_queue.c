@@ -6197,13 +6197,8 @@ int work_queue_hungry(struct work_queue *q)
 	}
 	
 	//check if there's any workers joined from start
-	//if there's none, wait for 5 seconds for workers to join and return true
+	//if there's none, return true
 	if (q->stats->workers_joined == 0){
-		time_t cur_time = time(NULL);
-		time_t cont_time = cur_time + 5;
-		while (cont_time > cur_time){
-			cur_time = time(NULL);
-		}
 		return 1;
 	}
 	
@@ -6231,7 +6226,7 @@ int work_queue_hungry(struct work_queue *q)
 		ready_tasks_total_disk += t->resources_allocated->disk;
 	}
 	
-	//Check limiting factors (expand features later?)
+	//Check limiting factors
 	if (ready_tasks_total_cores > workers_total_avail_cores){
 		return 0;
 	}
