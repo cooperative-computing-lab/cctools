@@ -137,16 +137,19 @@ int manager_workers_capacity(struct jx *j) {
 	int capacity_cores   = jx_lookup_integer(j, "capacity_cores");
 	int capacity_memory  = jx_lookup_integer(j, "capacity_memory");
 	int capacity_disk    = jx_lookup_integer(j, "capacity_disk");
+	int capacity_gpus    = jx_lookup_integer(j, "capacity_gpus");
 	int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
 
 	const int cores = resources->cores;
 	const int memory = resources->memory;
 	const int disk = resources->disk;
+	const int gpus = resources->gpus;
 
 	debug(D_WQ, "capacity_tasks: %d", capacity_tasks);
 	debug(D_WQ, "capacity_cores: %d", capacity_cores);
 	debug(D_WQ, "capacity_memory: %d", capacity_memory);
 	debug(D_WQ, "capacity_disk: %d", capacity_disk);
+	debug(D_WQ, "capacity_gpus: %d", capacity_gpus);
 
 	// first, assume one task per worker
 	int capacity = capacity_tasks;
@@ -171,6 +174,10 @@ int manager_workers_capacity(struct jx *j) {
 
 	if(disk > 0 && capacity_disk > 0) {
 		capacity = MIN(capacity, DIV_INT_ROUND_UP(capacity_disk, disk));
+	}
+
+	if(gpus > 0 && capacity_gpus > 0) {
+		capacity = MIN(capacity, DIV_INT_ROUND_UP(capacity_gpus, gpus));
 	}
 
 	return capacity;
