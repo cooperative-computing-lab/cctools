@@ -2419,6 +2419,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"tasks_total_cores",total->cores);
 	jx_insert_integer(j,"tasks_total_memory",total->memory);
 	jx_insert_integer(j,"tasks_total_disk",total->disk);
+	jx_insert_integer(j,"tasks_total_gpus",total->gpus);
 
 	return j;
 }
@@ -2482,6 +2483,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_integer(j,"tasks_total_cores",total->cores);
 	jx_insert_integer(j,"tasks_total_memory",total->memory);
 	jx_insert_integer(j,"tasks_total_disk",total->disk);
+	jx_insert_integer(j,"tasks_total_gpus",total->gpus);
 
 	//worker information for general work_queue_status report
 	jx_insert_integer(j,"workers",info.workers_connected);
