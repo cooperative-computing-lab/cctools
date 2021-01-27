@@ -180,10 +180,12 @@ int manager_workers_needed_by_resource(struct jx *j) {
 	int tasks_total_cores  = jx_lookup_integer(j, "tasks_total_cores");
 	int tasks_total_memory = jx_lookup_integer(j, "tasks_total_memory");
 	int tasks_total_disk   = jx_lookup_integer(j, "tasks_total_disk");
+	int tasks_total_gpus   = jx_lookup_integer(j, "tasks_total_gpus");
 
 	const int cores = resources->cores;
 	const int memory = resources->memory;
 	const int disk = resources->disk;
+	const int gpus = resources->gpus;
 
 	int needed = 0;
 
@@ -197,6 +199,10 @@ int manager_workers_needed_by_resource(struct jx *j) {
 
 	if(disk > 0  && tasks_total_disk > 0) {
 		needed = MAX(needed, DIV_INT_ROUND_UP(tasks_total_disk, disk));
+	}
+
+	if(gpus > 0 && tasks_total_gpus > 0) {
+		needed = MAX(needed, DIV_INT_ROUND_UP(tasks_total_gpus, gpus));
 	}
 
 	return needed;
@@ -334,6 +340,10 @@ static void set_worker_resources_options( struct batch_queue *queue )
 
 		if(resources->disk > -1) {
 			buffer_printf(&b, " --disk=%" PRId64, resources->disk);
+		}
+
+		if(resources->gpus > -1) {
+			buffer_printf(&b, " --gpus=%" PRId64, resources->gpus);
 		}
 	}
 
