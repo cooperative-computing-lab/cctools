@@ -248,6 +248,7 @@ struct work_queue_stats {
 	int capacity_cores;     /**< The estimated number of workers' cores that this manager can effectively support.*/
 	int capacity_memory;    /**< The estimated number of workers' MB of RAM that this manager can effectively support.*/
 	int capacity_disk;      /**< The estimated number of workers' MB of disk that this manager can effectively support.*/
+	int capacity_gpus;      /**< The estimated number of workers' GPUs that this manager can effectively support.*/
 	int capacity_instantaneous;      /**< The estimated number of tasks that this manager can support considering only the most recently completed task. */
 	int capacity_weighted;  /**< The estimated number of tasks that this manager can support placing greater weight on the most recently completed task. */
 
