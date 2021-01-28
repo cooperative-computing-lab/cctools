@@ -6182,6 +6182,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	return t;
 }
 
+//check if workers' resources are available to execute more tasks
+//queue should have at least 10 ready tasks
+//@param: 	struct work_queue* - pointer to queue
+//@return: 	boolean - whether queue is "hungry"
 int work_queue_hungry(struct work_queue *q)
 {
 	//check if queue is initialized
@@ -6196,22 +6200,24 @@ int work_queue_hungry(struct work_queue *q)
 		return 0;
 	}
 	
+	//update statistics of queue
+	struct work_queue_stats qstats;
+	work_queue_get_stats(q, &qstats);
+
 	//check if there's any workers joined from start
 	//if there's none, limit the number of ready tasks in queue to 10
-	//ready = submitted - dispatched
 	//10 is chosen to be the default number of ready tasks in queue to keep queue efficient
 	if (q->stats->workers_joined == 0){
-		if (q->stats->tasks_submitted - q->stats->tasks_dispatched < 10){
-			return 4;
-		}
+		if (qstats.tasks_waiting < 10){
+			return 1;
+		}  
 		return 0;
 	}
 	
 	//if number of ready tasks is less than 10, return true for more tasks in queue 
-	//ready = submitted - dispatched
 	//10 is chosen to be the default number of ready tasks in queue to keep queue efficient
-	if (q->stats->tasks_submitted - q->stats->tasks_dispatched < 10){
-		return 2;
+	if (qstats.tasks_waiting < 10){
+		return 1;
 	}
 	
 	//get total available resources consumption (cores, memory, disk) of all workers of this manager
@@ -6250,7 +6256,7 @@ int work_queue_hungry(struct work_queue *q)
 		return 0;
 	}
 
-	return 3;	//all good
+	return 1;	//all good
 }
 
 int work_queue_shut_down_workers(struct work_queue *q, int n)
