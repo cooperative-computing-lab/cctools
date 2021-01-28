@@ -6220,20 +6220,23 @@ int work_queue_hungry(struct work_queue *q)
 		return 1;
 	}
 	
-	//get total available resources consumption (cores, memory, disk) of all workers of this manager
+	//get total available resources consumption (cores, memory, disk, gpus) of all workers of this manager
 	//available = total (all) - committed (actual in use)
 	int64_t workers_total_avail_cores 	= 0;
 	int64_t workers_total_avail_memory 	= 0;
 	int64_t workers_total_avail_disk 	= 0;
+	int64_t workers_total_avail_gpus 	= 0;
 	
 	workers_total_avail_cores 	= q->stats->total_cores - q->stats->committed_cores;
 	workers_total_avail_memory 	= q->stats->total_memory - q->stats->committed_memory;
 	workers_total_avail_disk 	= q->stats->total_disk - q->stats->committed_disk;
+	workers_total_avail_gpus	= q->stats->total_gpus - q->stats->committed_gpus;
 
-	//get required resources (cores, memory, disk) of one waiting task
+	//get required resources (cores, memory, disk, gpus) of one waiting task
 	int64_t ready_task_cores 	= 0;
 	int64_t ready_task_memory 	= 0;
 	int64_t ready_task_disk 	= 0;
+	int64_t ready_task_gpus		= 0;
 
 	struct work_queue_task *t;
 	
@@ -6243,7 +6246,8 @@ int work_queue_hungry(struct work_queue *q)
 	ready_task_cores 	+= t->resources_allocated->cores;
 	ready_task_memory 	+= t->resources_allocated->memory;
 	ready_task_disk 	+= t->resources_allocated->disk;
-	
+	ready_task_gpus 	+= t->resources_allocated->gpus;	
+
 	//check possible limiting factors
 	//return false if required resources exceed available resources
 	if (ready_task_cores > workers_total_avail_cores){
@@ -6253,6 +6257,9 @@ int work_queue_hungry(struct work_queue *q)
 		return 0;
 	}
 	if (ready_task_disk > workers_total_avail_disk){
+		return 0;
+	}
+	if (ready_task_gpus > workers_total_avail_gpus){
 		return 0;
 	}
 
