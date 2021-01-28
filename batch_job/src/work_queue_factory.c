@@ -702,8 +702,9 @@ int read_config_file(const char *config_file) {
 	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, JX_INTEGER, integer_value)
 
 	assign_new_value(new_num_cores_option, resources->cores, cores,    int, JX_INTEGER, integer_value)
-	assign_new_value(new_num_disk_option,  resources->disk, disk,      int, JX_INTEGER, integer_value)
 	assign_new_value(new_num_memory_option, resources->memory, memory, int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_disk_option,  resources->disk, disk,      int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_gpus_option, resources->gpus, gpus,       int, JX_INTEGER, integer_value)
 
 	assign_new_value(new_autosize_option, autosize, autosize, int, JX_INTEGER, integer_value)
 
@@ -767,6 +768,7 @@ int read_config_file(const char *config_file) {
 	resources->cores  = new_num_cores_option;
 	resources->memory = new_num_memory_option;
 	resources->disk   = new_num_disk_option;
+	resources->gpus   = new_num_gpus_option;
 
 	if(tasks_per_worker < 1) {
 		tasks_per_worker = resources->cores > 0 ? resources->cores : 1;
@@ -821,6 +823,10 @@ int read_config_file(const char *config_file) {
 
 	if(resources->disk > -1) {
 		fprintf(stdout, "disk: %" PRId64 " MB\n", resources->disk);
+	}
+
+	if(resources->gpus > -1) {
+		fprintf(stdout, "gpus: %" PRId64 "\n", resources->gpus);
 	}
 
 	if(extra_worker_args) {
