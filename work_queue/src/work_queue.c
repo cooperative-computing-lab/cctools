@@ -2382,6 +2382,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_cores",info.capacity_cores);
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
+	jx_insert_integer(j,"capacity_gpus",info.capacity_gpus);
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 	jx_insert_integer(j,"manager_load",info.manager_load);
@@ -2419,6 +2420,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"tasks_total_cores",total->cores);
 	jx_insert_integer(j,"tasks_total_memory",total->memory);
 	jx_insert_integer(j,"tasks_total_disk",total->disk);
+	jx_insert_integer(j,"tasks_total_gpus",total->gpus);
 
 	return j;
 }
@@ -2474,6 +2476,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_integer(j,"capacity_cores",info.capacity_cores);
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
+	jx_insert_integer(j,"capacity_gpus",info.capacity_gpus);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 	jx_insert_double(j,"manager_load",info.manager_load);
 
@@ -2482,6 +2485,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_integer(j,"tasks_total_cores",total->cores);
 	jx_insert_integer(j,"tasks_total_memory",total->memory);
 	jx_insert_integer(j,"tasks_total_disk",total->disk);
+	jx_insert_integer(j,"tasks_total_gpus",total->gpus);
 
 	//worker information for general work_queue_status report
 	jx_insert_integer(j,"workers",info.workers_connected);
@@ -3446,6 +3450,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		capacity->resources->cores  = 1;
 		capacity->resources->memory = 512;
 		capacity->resources->disk   = 1024;
+		capacity->resources->gpus   = 0;
 
 		capacity->exec_time     = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
 		capacity->transfer_time = 1;
@@ -3466,6 +3471,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 				capacity->resources->cores  += tr->resources ? tr->resources->cores  : 1;
 				capacity->resources->memory += tr->resources ? tr->resources->memory : 512;
 				capacity->resources->disk   += tr->resources ? tr->resources->disk   : 1024;
+				capacity->resources->gpus   += tr->resources ? tr->resources->gpus   : 0;
 			}
 		}
 
@@ -3494,6 +3500,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	q->stats->capacity_cores  = DIV_INT_ROUND_UP(capacity->resources->cores  * ratio, count);
 	q->stats->capacity_memory = DIV_INT_ROUND_UP(capacity->resources->memory * ratio, count);
 	q->stats->capacity_disk   = DIV_INT_ROUND_UP(capacity->resources->disk   * ratio, count);
+	q->stats->capacity_gpus   = DIV_INT_ROUND_UP(capacity->resources->gpus   * ratio, count);
 	q->stats->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
 
 	task_report_delete(capacity);

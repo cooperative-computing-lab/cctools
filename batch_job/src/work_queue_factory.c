@@ -137,16 +137,19 @@ int manager_workers_capacity(struct jx *j) {
 	int capacity_cores   = jx_lookup_integer(j, "capacity_cores");
 	int capacity_memory  = jx_lookup_integer(j, "capacity_memory");
 	int capacity_disk    = jx_lookup_integer(j, "capacity_disk");
+	int capacity_gpus    = jx_lookup_integer(j, "capacity_gpus");
 	int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
 
 	const int cores = resources->cores;
 	const int memory = resources->memory;
 	const int disk = resources->disk;
+	const int gpus = resources->gpus;
 
 	debug(D_WQ, "capacity_tasks: %d", capacity_tasks);
 	debug(D_WQ, "capacity_cores: %d", capacity_cores);
 	debug(D_WQ, "capacity_memory: %d", capacity_memory);
 	debug(D_WQ, "capacity_disk: %d", capacity_disk);
+	debug(D_WQ, "capacity_gpus: %d", capacity_gpus);
 
 	// first, assume one task per worker
 	int capacity = capacity_tasks;
@@ -173,6 +176,10 @@ int manager_workers_capacity(struct jx *j) {
 		capacity = MIN(capacity, DIV_INT_ROUND_UP(capacity_disk, disk));
 	}
 
+	if(gpus > 0 && capacity_gpus > 0) {
+		capacity = MIN(capacity, DIV_INT_ROUND_UP(capacity_gpus, gpus));
+	}
+
 	return capacity;
 }
 
@@ -180,10 +187,12 @@ int manager_workers_needed_by_resource(struct jx *j) {
 	int tasks_total_cores  = jx_lookup_integer(j, "tasks_total_cores");
 	int tasks_total_memory = jx_lookup_integer(j, "tasks_total_memory");
 	int tasks_total_disk   = jx_lookup_integer(j, "tasks_total_disk");
+	int tasks_total_gpus   = jx_lookup_integer(j, "tasks_total_gpus");
 
 	const int cores = resources->cores;
 	const int memory = resources->memory;
 	const int disk = resources->disk;
+	const int gpus = resources->gpus;
 
 	int needed = 0;
 
@@ -197,6 +206,10 @@ int manager_workers_needed_by_resource(struct jx *j) {
 
 	if(disk > 0  && tasks_total_disk > 0) {
 		needed = MAX(needed, DIV_INT_ROUND_UP(tasks_total_disk, disk));
+	}
+
+	if(gpus > 0 && tasks_total_gpus > 0) {
+		needed = MAX(needed, DIV_INT_ROUND_UP(tasks_total_gpus, gpus));
 	}
 
 	return needed;
@@ -334,6 +347,10 @@ static void set_worker_resources_options( struct batch_queue *queue )
 
 		if(resources->disk > -1) {
 			buffer_printf(&b, " --disk=%" PRId64, resources->disk);
+		}
+
+		if(resources->gpus > -1) {
+			buffer_printf(&b, " --gpus=%" PRId64, resources->gpus);
 		}
 	}
 
@@ -685,8 +702,9 @@ int read_config_file(const char *config_file) {
 	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, JX_INTEGER, integer_value)
 
 	assign_new_value(new_num_cores_option, resources->cores, cores,    int, JX_INTEGER, integer_value)
-	assign_new_value(new_num_disk_option,  resources->disk, disk,      int, JX_INTEGER, integer_value)
 	assign_new_value(new_num_memory_option, resources->memory, memory, int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_disk_option,  resources->disk, disk,      int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_gpus_option, resources->gpus, gpus,       int, JX_INTEGER, integer_value)
 
 	assign_new_value(new_autosize_option, autosize, autosize, int, JX_INTEGER, integer_value)
 
@@ -750,6 +768,7 @@ int read_config_file(const char *config_file) {
 	resources->cores  = new_num_cores_option;
 	resources->memory = new_num_memory_option;
 	resources->disk   = new_num_disk_option;
+	resources->gpus   = new_num_gpus_option;
 
 	if(tasks_per_worker < 1) {
 		tasks_per_worker = resources->cores > 0 ? resources->cores : 1;
@@ -804,6 +823,10 @@ int read_config_file(const char *config_file) {
 
 	if(resources->disk > -1) {
 		fprintf(stdout, "disk: %" PRId64 " MB\n", resources->disk);
+	}
+
+	if(resources->gpus > -1) {
+		fprintf(stdout, "gpus: %" PRId64 "\n", resources->gpus);
 	}
 
 	if(extra_worker_args) {
