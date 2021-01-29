@@ -6194,20 +6194,13 @@ int work_queue_hungry(struct work_queue *q)
 		return 0;
 	}
 
-	//check if queue's statistics are initialized
-	//return false if not
-	if (q->stats == NULL){
-		return 0;
-	}
-	
-	//update statistics of queue
 	struct work_queue_stats qstats;
 	work_queue_get_stats(q, &qstats);
 
 	//check if there's any workers joined from start
 	//if there's none, limit the number of ready tasks in queue to 10
 	//10 is chosen to be the default number of ready tasks in queue to keep queue efficient
-	if (q->stats->workers_joined == 0){
+	if (qstats.workers_joined == 0){
 		if (qstats.tasks_waiting < 10){
 			return 1;
 		}  
