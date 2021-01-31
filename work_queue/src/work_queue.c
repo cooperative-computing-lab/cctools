@@ -2526,19 +2526,22 @@ struct jx * worker_to_jx( struct work_queue *q, struct work_queue_worker *w )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
-
+	
+	if(strcmp(w->hostname, "QUEUE_STATUS") == 0){
+		return 0;
+	}
+	
 	jx_insert_string(j,"hostname",w->hostname);
 	jx_insert_string(j,"os",w->os);
 	jx_insert_string(j,"arch",w->arch);
 	jx_insert_string(j,"address_port",w->addrport);
-	jx_insert_integer(j,"ncpus",w->resources->cores.total);
+	jx_insert_integer(j,"npcus",w->resources->cores.total);
 	jx_insert_integer(j,"total_tasks_complete",w->total_tasks_complete);
 	jx_insert_integer(j,"total_tasks_running",itable_size(w->current_tasks));
 	jx_insert_integer(j,"total_bytes_transferred",w->total_bytes_transferred);
 	jx_insert_integer(j,"total_transfer_time",w->total_transfer_time);
 	jx_insert_integer(j,"start_time",w->start_time);
 	jx_insert_integer(j,"current_time",timestamp_get());
-
 
 	work_queue_resources_add_to_jx(w->resources,j);
 
@@ -2577,7 +2580,10 @@ struct jx * task_to_jx( struct work_queue_task *t, const char *state, const char
 	if(t->category) jx_insert_string(j,"category",t->category);
 	jx_insert_string(j,"command",t->command_line);
 	if(host) jx_insert_string(j,"host",host);
-
+	jx_insert_integer(j,"cores",t->resources_requested->cores);
+	jx_insert_integer(j,"memory",t->resources_requested->memory);
+	jx_insert_integer(j,"disk",t->resources_requested->disk);
+	jx_insert_integer(j,"gpus",t->resources_requested->gpus);
 	priority_add_to_jx(j, t->priority);
 
 

@@ -71,6 +71,10 @@ static struct jx_table task_headers[] = {
 {"priority",     "PRIORITY",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
 {"host",         "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -24},
 {"command",      "COMMAND", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -30},
+{"cores",		 "CORES",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"memory",		 "MEMORY",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"disk",		 "DISK",   	JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"gpus",		 "GPUS",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
 {NULL,NULL,0,0,0}
 };
 
@@ -79,6 +83,14 @@ static struct jx_table worker_headers[] = {
 {"address_port",        "ADDRESS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,16},
 {"total_tasks_complete","COMPLETED",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 9},
 {"total_tasks_running", "RUNNING",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,8},
+{"cores_inuse",			"CORES_USE",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"cores_total",			"CORES_ALL",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"memory_inuse",		"MEMORY_USE",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"memory_total",		"MEMORY_ALL",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"disk_inuse",			"DISK_USE",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"disk_total",			"DISK_ALL",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"gpus_inuse",			"GPUS_USE",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"gpus_total",			"GPUS_ALL",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
 {NULL,NULL,0,0,0}
 };
 
