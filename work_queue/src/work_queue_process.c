@@ -180,6 +180,7 @@ static void specify_integer_env_var( struct work_queue_process *p, const char *n
 static void specify_resources_vars(struct work_queue_process *p) {
 	if(p->task->resources_requested->cores > 0) {
 		specify_integer_env_var(p, "CORES", p->task->resources_requested->cores);
+		specify_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
 	}
 
 	if(p->task->resources_requested->memory > 0) {
