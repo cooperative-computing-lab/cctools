@@ -3331,8 +3331,12 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 
 	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
 	if(q->monitor_mode == MON_DISABLED) {
-		send_worker_msg(q,w, "end_time %"PRIu64"\n",  limits->end);
-		send_worker_msg(q,w, "wall_time %"PRIu64"\n", limits->wall_time);
+		if(limits->end > 0) {
+			send_worker_msg(q,w, "end_time %"PRIu64"\n",  limits->end);
+		}
+		if(limits->wall_time > 0) {
+			send_worker_msg(q,w, "wall_time %"PRIu64"\n", limits->wall_time);
+		}
 	}
 
 	itable_insert(w->current_tasks_boxes, t->taskid, limits);
@@ -4402,6 +4406,7 @@ void work_queue_task_specify_resources(struct work_queue_task *t, const struct r
 	work_queue_task_specify_cores(t,        rm->cores);
 	work_queue_task_specify_memory(t,       rm->memory);
 	work_queue_task_specify_disk(t,         rm->disk);
+	work_queue_task_specify_gpus(t,         rm->gpus);
 	work_queue_task_specify_running_time(t, rm->wall_time);
 	work_queue_task_specify_end_time(t,     rm->end);
 }
