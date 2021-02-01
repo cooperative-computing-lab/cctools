@@ -107,7 +107,7 @@ static int resources_from_jx(struct hash_table *h, struct jx *j, int nodeid)
 				debug(D_MAKEFLOW_PARSER, "%d memory", memory);
 				dag_variable_add_value(RESOURCES_MEMORY, h, nodeid, string_format("%d", memory));
 			}
-		} else if(!strcmp(key, "memory")) {
+		} else if(!strcmp(key, "gpus")) {
 			int gpus = jx_lookup_integer(j, "gpus");
 			if(gpus) {
 				debug(D_MAKEFLOW_PARSER, "%d gpus", gpus);
