@@ -27,11 +27,12 @@ void work_queue_gpus_debug()
 {
 	buffer_t b;
 	buffer_init(&b);
-	buffer_putfstring(&b,"GPUs Assigned: ");
+	buffer_putfstring(&b,"GPUs Assigned to Tasks: [ ");
 	int i;
 	for(i=0;i<total_resources->gpus.total;i++) {
-		buffer_putfstring(&b,"GPU %d: Task %d ",i,gpu_to_task[i]);
+		buffer_putfstring(&b,"%d ",gpu_to_task[i]);
 	}
+	buffer_putfstring(&b," ]");
 	debug(D_WQ,"%s",buffer_tostring(&b));
 	buffer_free(&b);
 }
