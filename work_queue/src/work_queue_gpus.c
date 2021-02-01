@@ -87,12 +87,12 @@ char *work_queue_gpus_to_string( int taskid )
 	buffer_init(&b);
 	for(i=0;i<total_resources->gpus.total;i++) {
 		if(gpu_to_task[i]==taskid) {
-			buffer_putfstring(&b,"%d",i);
 			if(first) {
 				first = 0;
 			} else {
 				buffer_putfstring(&b,",");
 			}
+			buffer_putfstring(&b,"%d",i);
 		}
 	}
 	char *str = strdup(buffer_tostring(&b));
