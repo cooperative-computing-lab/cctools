@@ -388,6 +388,7 @@ int rmonitor_get_ctxsw_usage(pid_t pid, struct rmonitor_ctxsw_info *switches)
 	switches->delta       = accum  - switches->accumulated;
 	switches->accumulated = accum;
 
+	fclose(fstat);
 	return notfound;
 }
 
