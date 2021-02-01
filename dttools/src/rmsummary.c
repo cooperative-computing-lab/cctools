@@ -71,6 +71,7 @@ void initialize_units() {
 	rmsummary_add_conversion_field("bytes_received",           "B",       "MB",     "B",       MEGABYTE, 1,             1);
 	rmsummary_add_conversion_field("bytes_sent",               "B",       "MB",     "B",       MEGABYTE, 1,             1);
 	rmsummary_add_conversion_field("bandwidth",                "bps",     "Mbps",   "bps",     1000000,  1,             1);
+	rmsummary_add_conversion_field("gpus",                     "gpus",    "gpus",   "gpus",    1,        1,             0);
 	rmsummary_add_conversion_field("cores",                    "cores",   "cores",  "cores",   1,        1,             0);
 	rmsummary_add_conversion_field("cores_avg",                "mcores",  "cores",  "cores",   1000,     1/1000.0,      1);
 	rmsummary_add_conversion_field("machine_cpus",             "cores",   "cores",  "cores",   1,        1,             0);
@@ -600,6 +601,7 @@ struct jx *peak_times_to_json(struct rmsummary *s) {
 	peak_time_to_json(output, cf, s, memory);
 	peak_time_to_json(output, cf, s, total_processes);
 	peak_time_to_json(output, cf, s, max_concurrent_processes);
+	peak_time_to_json(output, cf, s, gpus);
 	peak_time_to_json(output, cf, s, cores);
 	peak_time_to_json(output, cf, s, cpu_time);
 	peak_time_to_json(output, cf, s, machine_cpus);
@@ -653,6 +655,7 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 	field_to_json(output, s, max_concurrent_processes);
 	field_to_json(output, s, cpu_time);
 	field_to_json(output, s, wall_time);
+	field_to_json(output, s, gpus);
 	field_to_json(output, s, cores);
 	field_to_json(output, s, cores_avg);
 	field_to_json(output, s, context_switches);
@@ -977,6 +980,8 @@ void rmsummary_read_env_vars(struct rmsummary *s)
 		s->memory = atoi(value);
 	if((value = getenv( RESOURCES_DISK )))
 		s->disk   = atoi(value);
+	if((value = getenv( RESOURCES_GPUS )))
+		s->gpus   = atoi(value);
 }
 
 #define rmsummary_apply_op(dest, src, fn, field) (dest)->field = fn((dest)->field, (src)->field)
@@ -1006,6 +1011,7 @@ void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bi
 	rmsummary_apply_op(dest, src, fn, total_files);
 	rmsummary_apply_op(dest, src, fn, disk);
 	rmsummary_apply_op(dest, src, fn, fs_nodes);
+	rmsummary_apply_op(dest, src, fn, gpus);
 	rmsummary_apply_op(dest, src, fn, cores);
 	rmsummary_apply_op(dest, src, fn, cores_avg);
 	rmsummary_apply_op(dest, src, fn, context_switches);
@@ -1103,6 +1109,7 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 	merge_limit(dest, src, bandwidth);
 	merge_limit(dest, src, total_files);
 	merge_limit(dest, src, disk);
+	merge_limit(dest, src, gpus);
 	merge_limit(dest, src, cores);
 	merge_limit(dest, src, cores_avg);
 	merge_limit(dest, src, context_switches);
@@ -1184,6 +1191,7 @@ void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *
 	max_op_w_time(dest, src, bandwidth);
 	max_op_w_time(dest, src, total_files);
 	max_op_w_time(dest, src, disk);
+	max_op_w_time(dest, src, gpus);
 	max_op_w_time(dest, src, cores);
 	max_op_w_time(dest, src, context_switches);
 	max_op_w_time(dest, src, machine_cpus);
@@ -1273,6 +1281,10 @@ void rmsummary_debug_report(const struct rmsummary *s)
 size_t rmsummary_field_offset(const char *key) {
 	if(!key) {
 		fatal("A field name was not given.");
+	}
+
+	if(!strcmp(key, "gpus")) {
+		return offsetof(struct rmsummary, gpus);
 	}
 
 	if(!strcmp(key, "cores")) {
@@ -1393,6 +1405,7 @@ int rmsummary_check_limits(struct rmsummary *measured, struct rmsummary *limits)
 	over_limit_check(measured, limits, start);
 	over_limit_check(measured, limits, end);
 	over_limit_check(measured, limits, cores);
+	over_limit_check(measured, limits, gpus);
 	over_limit_check(measured, limits, wall_time);
 	over_limit_check(measured, limits, cpu_time);
 	over_limit_check(measured, limits, max_concurrent_processes);
