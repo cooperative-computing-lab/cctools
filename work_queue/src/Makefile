@@ -13,7 +13,8 @@ SOURCES_LIBRARY = \
 
 SOURCES_WORKER = \
 	work_queue_process.o \
-	work_queue_watcher.o
+	work_queue_watcher.o \
+	work_queue_gpus.o
 
 PUBLIC_HEADERS = work_queue.h
 
@@ -39,7 +40,7 @@ $(PROGRAMS) $(TEST_PROGRAMS): libwork_queue.a $(EXTERNAL_DEPENDENCIES)
 
 bindings: libwork_queue.a work_queue.i $(EXTERNAL_DEPENDENCIES)
 	@$(MAKE) -C bindings
-	
+
 sge_submit_workers: sge_submit_workers_common
 	sed -e "s/SGE_CUSTOM_PARAMETERS/${CCTOOLS_SGE_PARAMETERS}/" $< > $@
 	chmod 755 $@

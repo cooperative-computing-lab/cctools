@@ -2,6 +2,7 @@
 #include "work_queue_process.h"
 #include "work_queue.h"
 #include "work_queue_internal.h"
+#include "work_queue_gpus.h"
 
 #include "debug.h"
 #include "errno.h"
@@ -31,8 +32,7 @@
 
 #define SMALL_BUFFER_SIZE 256
 #define MAX_BUFFER_SIZE 4096
-#define DEFAULT_WORK_DIR "/home/worker"
-#define CONVERT_IMG "ubuntu/mf_wq"
+#define DOCKER_WORK_DIR "/home/worker"
 #define TMP_SCRIPT "tmp.sh"
 #define DEFAULT_EXE_APP "#!/bin/sh"
 
@@ -192,6 +192,9 @@ static void specify_resources_vars(struct work_queue_process *p) {
 
 	if(p->task->resources_requested->gpus > 0) {
 		specify_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
+		char *str = work_queue_gpus_to_string(p->task->taskid);
+		work_queue_task_specify_environment_variable(p,"CUDA_VISIBLE_DEVICES",str);
+		free(str);
 	}
 }
 
@@ -309,12 +312,12 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 				va_end(arg_lst);
 
 				char mnt_flg_val[MAX_BUFFER_SIZE];
-				string_nformat(mnt_flg_val, sizeof(mnt_flg_val), "%s:%s", curr_wrk_dir, DEFAULT_WORK_DIR);
+				string_nformat(mnt_flg_val, sizeof(mnt_flg_val), "%s:%s", curr_wrk_dir, DOCKER_WORK_DIR);
 				// cmd for running the shell script
 				char run_cmd[SMALL_BUFFER_SIZE];
 				string_nformat(run_cmd, sizeof(run_cmd), "./%s", TMP_SCRIPT);
 
-				execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, "-m", "1g", img_name, run_cmd, (char *) 0);
+				execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", mnt_flg_val, "-w", DOCKER_WORK_DIR, "-u", uid_str, "-m", "1g", img_name, run_cmd, (char *) 0);
 				_exit(127);	// Failed to execute the cmd.
 
 			} else {

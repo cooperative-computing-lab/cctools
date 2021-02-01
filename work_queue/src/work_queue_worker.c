@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "work_queue_process.h"
 #include "work_queue_catalog.h"
 #include "work_queue_watcher.h"
+#include "work_queue_gpus.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -160,8 +161,8 @@ static time_t worker_start_time = 0;
 static struct work_queue_watcher * watcher = 0;
 
 static struct work_queue_resources * local_resources = 0;
-static struct work_queue_resources * total_resources = 0;
-static struct work_queue_resources * total_resources_last = 0;
+struct work_queue_resources * total_resources = 0;
+struct work_queue_resources * total_resources_last = 0;
 
 static int64_t last_task_received  = 0;
 static int64_t manual_cores_option = 0;
@@ -338,6 +339,8 @@ void measure_worker_resources()
 		/* in a regular worker, total and local resources are the same. */
 		memcpy(total_resources, r, sizeof(struct work_queue_resources));
 	}
+
+	work_queue_gpus_init(r->gpus.total);
 
 	last_resources_measurement = time(0);
 }
@@ -580,8 +583,18 @@ accounting for the resources as necessary.
 
 static int start_process( struct work_queue_process *p )
 {
-
 	pid_t pid;
+
+	struct work_queue_task *t = p->task;
+
+	cores_allocated += t->resources_requested->cores;
+	memory_allocated += t->resources_requested->memory;
+	disk_allocated += t->resources_requested->disk;
+	gpus_allocated += t->resources_requested->gpus;
+
+	if(t->resources_requested->gpus>0) {
+		work_queue_gpus_allocate(t->resources_requested->gpus,t->taskid);
+	}
 
 	if (container_mode == CONTAINER_MODE_DOCKER)
 		pid = work_queue_process_execute(p, container_mode, img_name);
@@ -593,13 +606,6 @@ static int start_process( struct work_queue_process *p )
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
 	itable_insert(procs_running,pid,p);
-
-	struct work_queue_task *t = p->task;
-
-	cores_allocated += t->resources_requested->cores;
-	memory_allocated += t->resources_requested->memory;
-	disk_allocated += t->resources_requested->disk;
-	gpus_allocated += t->resources_requested->gpus;
 
 	return 1;
 }
@@ -745,6 +751,8 @@ static int handle_tasks(struct link *manager)
 			memory_allocated -= p->task->resources_requested->memory;
 			disk_allocated   -= p->task->resources_requested->disk;
 			gpus_allocated   -= p->task->resources_requested->gpus;
+
+			work_queue_gpus_free(p->task->taskid);
 
 			itable_remove(procs_running, p->pid);
 			itable_firstkey(procs_running);
@@ -1447,6 +1455,7 @@ static int do_kill(int taskid)
 			memory_allocated -= p->task->resources_requested->memory;
 			disk_allocated -= p->task->resources_requested->disk;
 			gpus_allocated -= p->task->resources_requested->gpus;
+			work_queue_gpus_free(taskid);
 		}
 	}
 
