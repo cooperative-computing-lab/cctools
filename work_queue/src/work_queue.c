@@ -2537,7 +2537,10 @@ struct jx * worker_to_jx( struct work_queue *q, struct work_queue_worker *w )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
-
+	
+	if(strcmp(w->hostname, "QUEUE_STATUS") == 0){
+		return 0;
+	}
 	jx_insert_string(j,"hostname",w->hostname);
 	jx_insert_string(j,"os",w->os);
 	jx_insert_string(j,"arch",w->arch);
@@ -2588,7 +2591,10 @@ struct jx * task_to_jx( struct work_queue_task *t, const char *state, const char
 	if(t->category) jx_insert_string(j,"category",t->category);
 	jx_insert_string(j,"command",t->command_line);
 	if(host) jx_insert_string(j,"host",host);
-
+	jx_insert_integer(j,"cores",t->resources_requested->cores);
+	jx_insert_integer(j,"gpus",t->resources_requested->gpus);
+	jx_insert_integer(j,"memory",t->resources_requested->memory);
+	jx_insert_integer(j,"disk",t->resources_requested->disk);
 	priority_add_to_jx(j, t->priority);
 
 
