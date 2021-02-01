@@ -194,7 +194,7 @@ static void specify_resources_vars(struct work_queue_process *p) {
 	if(p->task->resources_requested->gpus > 0) {
 		specify_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
 		char *str = work_queue_gpus_to_string(p->task->taskid);
-		work_queue_task_specify_environment_variable(p,"CUDA_VISIBLE_DEVICES",str);
+		work_queue_task_specify_environment_variable(p->task,"CUDA_VISIBLE_DEVICES",str);
 		free(str);
 	}
 }
