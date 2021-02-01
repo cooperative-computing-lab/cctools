@@ -4402,6 +4402,7 @@ void work_queue_task_specify_resources(struct work_queue_task *t, const struct r
 	work_queue_task_specify_cores(t,        rm->cores);
 	work_queue_task_specify_memory(t,       rm->memory);
 	work_queue_task_specify_disk(t,         rm->disk);
+	work_queue_task_specify_gpus(t,         rm->gpus);
 	work_queue_task_specify_running_time(t, rm->wall_time);
 	work_queue_task_specify_end_time(t,     rm->end);
 }
