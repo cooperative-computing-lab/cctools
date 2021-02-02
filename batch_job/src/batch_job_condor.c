@@ -169,13 +169,17 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 		fprintf(file, "request_cpus   = ifThenElse(%" PRId64 " > TotalSlotCpus, %" PRId64 ", TotalSlotCpus)\n", cores, cores);
 		fprintf(file, "request_memory = ifThenElse(%" PRId64 " > TotalSlotMemory, %" PRId64 ", TotalSlotMemory)\n", memory, memory);
 		fprintf(file, "request_disk   = ifThenElse((%" PRId64 ") > TotalSlotDisk, (%" PRId64 "), TotalSlotDisk)\n", disk, disk);
-		fprintf(file, "request_gpus   = ifThenElse((%" PRId64 ") > TotalSlotGpus, (%" PRId64 "), TotalSlotGpus)\n", gpus, gpus);
+		if(gpus>0) {
+			fprintf(file, "request_gpus   = ifThenElse((%" PRId64 ") > TotalSlotGpus, (%" PRId64 "), TotalSlotGpus)\n", gpus, gpus);
+		}
 	}
 	else {
 			fprintf(file, "request_cpus = %" PRId64 "\n", cores);
 			fprintf(file, "request_memory = %" PRId64 "\n", memory);
 			fprintf(file, "request_disk = %" PRId64 "\n", disk);
-			fprintf(file, "request_gpus = %" PRId64 "\n", gpus);
+			if(gpus>0) {
+				fprintf(file, "request_gpus = %" PRId64 "\n", gpus);
+			}
 	}
 
 	if(options) {
