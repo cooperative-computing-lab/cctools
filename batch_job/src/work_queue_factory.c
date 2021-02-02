@@ -1044,7 +1044,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Automatically size a worker to an available slot (Condor, Mesos, and Kubernetes).\n", "--autosize");
 	printf(" %-30s Set requirements for the workers as Condor jobs. May be specified several times with expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Exit after no manager has been seen in <n> seconds.\n", "--factory-timeout");
-	printf(" %-30s Use this scratch dir for temporary files (default is /tmp/wq-pool-$uid).\n","-S,--scratch-dir");
+	printf(" %-30s Use this scratch dir for temporary files (default is /tmp/wq-factory-$uid).\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by managers.\n","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Specify Amazon config file (for use with -T amazon).\n", "--amazon-config");
@@ -1403,9 +1403,9 @@ int main(int argc, char *argv[])
 
 	if(!scratch_dir) {
 		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-			scratch_dir = string_format("/tmp/wq-pool-%d",getuid());
+			scratch_dir = string_format("/tmp/wq-factory-%d",getuid());
 		} else {
-			scratch_dir = string_format("wq-pool-%d",getuid());
+			scratch_dir = string_format("wq-factory-%d",getuid());
 		}
 	}
 
