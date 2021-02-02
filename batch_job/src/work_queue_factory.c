@@ -335,7 +335,9 @@ static void set_worker_resources_options( struct batch_queue *queue )
 	buffer_init(&b);
 
 	if(batch_queue_get_type(queue) == BATCH_QUEUE_TYPE_CONDOR) {
-		buffer_printf(&b, " --cores=$$([TARGET.Cpus]) --memory=$$([TARGET.Memory]) --disk=$$([TARGET.Disk/1024])");
+		// HTCondor has the ability to fill in, at placement time
+		// Doing it this way enables the --autosize feature, making the worker fit the selected slot
+		buffer_printf(&b, " --cores=$$([TARGET.Cpus]) --memory=$$([TARGET.Memory]) --disk=$$([TARGET.Disk/1024]) --gpus==$$([TARGET.GPUs])");
 	} else {
 		if(resources->cores > -1) {
 			buffer_printf(&b, " --cores=%" PRId64, resources->cores);
