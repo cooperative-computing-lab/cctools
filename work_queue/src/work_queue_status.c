@@ -66,19 +66,31 @@ static struct jx_table queue_headers[] = {
 };
 
 static struct jx_table task_headers[] = {
-{"taskid",       "ID",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
+{"taskid",       "ID",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 4},
 {"state",        "STATE",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  8},
 {"priority",     "PRIORITY",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
-{"host",         "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -24},
-{"command",      "COMMAND", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -30},
+{"host",         "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -10},
+{"command",      "COMMAND", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -18},
+{"cores",        "CORES",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
+{"memory",       "MEMORY",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
+{"disk",         "DISK",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
+{"gpus",         "GPUS",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
 {NULL,NULL,0,0,0}
 };
 
 static struct jx_table worker_headers[] = {
-{"hostname",            "HOST",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -24},
-{"address_port",        "ADDRESS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,16},
-{"total_tasks_complete","COMPLETED",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 9},
-{"total_tasks_running", "RUNNING",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,8},
+{"hostname",            "HOST",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,-10},
+{"address_port",        "ADDRESS",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,-15},
+{"total_tasks_complete","COMPLETED", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT,9},
+{"total_tasks_running", "RUNNING",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,7},
+{"cores_inuse",         "CORE_USE",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,-6},
+{"cores_total",         "CORE_ALL",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,-6},
+{"memory_inuse",        "MEM_USE",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,-5},
+{"memory_total",        "MEM_ALL",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,-5},
+{"disk_inuse",          "DISK_USE",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,-6},
+{"disk_total",          "DISK_ALL",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,-6},
+{"gpus_inuse",          "GPUS_USE",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,-6},
+{"gpus_total",          "GPUS_ALL",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,-6},
 {NULL,NULL,0,0,0}
 };
 
