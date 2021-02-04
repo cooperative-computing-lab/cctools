@@ -362,6 +362,11 @@ class Task(object):
         return work_queue_task_specify_disk(self._task, disk)
 
     ##
+    # Indicate the number of GPUs required by this task.
+    def specify_gpus(self, gpus):
+        return work_queue_task_specify_gpus(self._task, gpus)
+
+    ##
     # Indicate the the priority of this task (larger means better priority, default is 0).
     def specify_priority(self, priority):
         return work_queue_task_specify_priority(self._task, priority)
