@@ -185,7 +185,7 @@ int buffer_grow(buffer_t * b, size_t n);
  * Note that seeking beyond the currently allocated memory may result in a
  * buffer filled with garbage data (but still null-terminated).
  * @param b The buffer.
- * @param n Absolute position to seek to.
+ * @param pos Absolute position to seek to.
  * @returns -1 on error.
  */
 int buffer_seek(buffer_t * b, size_t pos);

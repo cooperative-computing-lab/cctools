@@ -93,6 +93,32 @@ typedef enum {
 } work_queue_file_t;
 
 
+/** Here we repeat the category_mode_t declaration but with work_queue names.
+ * This is needed to generate uniform names in the API and bindings. */
+#define	WORK_QUEUE_ALLOCATION_MODE_FIXED          CATEGORY_ALLOCATION_MODE_FIXED
+#define	WORK_QUEUE_ALLOCATION_MODE_MAX            CATEGORY_ALLOCATION_MODE_MAX
+#define	WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE      CATEGORY_ALLOCATION_MODE_MIN_WASTE
+#define	WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
+
+// typedef enum {
+// /**< When monitoring is disabled, all tasks run as
+//   WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
+//   exhaustion occurs: */
+// 	WORK_QUEUE_ALLOCATION_MODE_FIXED = 0,   /**< Task fails. (default) */
+// 	WORK_QUEUE_ALLOCATION_MODE_MAX,         /**< If maximum values are specified for cores, memory,
+// 											  or disk (either a user-label or category-label) and
+// 											  one of those resources is exceeded, the task fails.
+// 											  Otherwise it is retried until a large enough worker
+// 											  connects to the manager, using the maximum values
+// 											  specified, and the maximum values so far seen for
+// 											  resources not specified. */
+// 
+// 	WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE,   /**< As above, but tasks are tried with an automatically
+// 											  computed first-allocation to minimize resource waste. */
+// 	WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT /**< As above, but maximizing throughput. */
+// } wq_category_mode_t;
+
+
 extern int wq_option_scheduler;	               /**< Initial setting for algorithm to assign tasks to
 												 workers upon creating queue . Change prior to
 												 calling work_queue_create, after queue is created
@@ -395,7 +421,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, work_queue_file_flags_t);
+int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, int length, const char *remote_name, work_queue_file_flags_t flags);
 
 /** Add a directory to a task.
 @param t A task object.
@@ -410,7 +436,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 @param recursive indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
 @return 1 if the task directory is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t, int recursive);
+int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags, int recursive);
 
 /** Gets/puts file at remote_name using cmd at worker.
 @param t A task object.
@@ -435,7 +461,7 @@ void work_queue_task_specify_max_retries( struct work_queue_task *t, int64_t max
 
 /** Specify the amount of disk space required by a task.
 @param t A task object.
-@param disk The amount of disk space required by the task, in megabytes.
+@param memory The amount of disk space required by the task, in megabytes.
 */
 
 void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory );
@@ -465,7 +491,7 @@ void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus );
  * Epoch). If less than 1, then no end time is specified (this is the default).
 This is useful, for example, when the task uses certificates that expire.
 @param t A task object.
-@param seconds Number of seconds since the Epoch.
+@param useconds Number of useconds since the Epoch.
 */
 
 void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t useconds );
@@ -474,7 +500,7 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t usecon
  * worker. This time is accounted since the the moment the task starts to run
  * in a worker.  If less than 1, then no maximum time is specified (this is the default).
 @param t A task object.
-@param seconds Maximum number of seconds the task may run in a worker.
+@param useconds Maximum number of seconds the task may run in a worker.
 */
 
 void work_queue_task_specify_running_time( struct work_queue_task *t, int64_t useconds );
@@ -489,16 +515,14 @@ void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag);
 
 /** Label the task with the given category. It is expected that tasks with the same category
 have similar resources requirements (e.g. for fast abort).
-@param q A work queue object.
 @param t A task object.
 @param category The name of the category to use.
 */
 void work_queue_task_specify_category(struct work_queue_task *t, const char *category);
 
 /** Label the task with a user-defined feature. The task will only run on a worker that provides (--feature option) such feature.
-@param q A work queue object.
 @param t A task object.
-@param feature The name of the feature.
+@param name The name of the feature.
 */
 void work_queue_task_specify_feature(struct work_queue_task *t, const char *name);
 
@@ -623,7 +647,7 @@ summaries into a single. If monitor_output_dirname is NULL, work_queue_task is
 updated with the resources measured, and no summary file is kept unless
 explicitely given by work_queue_task's monitor_output_file.
 @param q A work queue object.
-@param monitor_output_dirname The name of the output directory. If NULL,
+@param monitor_output_directory The name of the output directory. If NULL,
 summaries are kept only when monitor_output_directory is specify per task, but
 resources_measured from work_queue_task is updated.  @return 1 on success, 0 if
 @param watchdog if not 0, kill tasks that exhaust declared resources.
@@ -636,7 +660,7 @@ As @ref work_queue_enable_monitoring, but it generates a time series and a
 monitor debug file (WARNING: for long running tasks these files may reach
 gigabyte sizes. This function is mostly used for debugging.) @param q A work
 queue object.
-@param monitor_output_dirname The name of the output directory.
+@param monitor_output_directory The name of the output directory.
 @param watchdog if not 0, kill tasks that exhaust declared resources.
 @return 1 on success, 0 if monitoring was not enabled.
 */
@@ -830,11 +854,12 @@ int work_queue_activate_fast_abort_category(struct work_queue *q, const char *ca
     If drain_flag is not 1, no new tasks are dispatched to workers at hostname,
     and if empty they are shutdown.
   @param q A work queue object.
+  @param hostname The hostname running the worker.
   @param drain_flag Draining mode.
   */
 int work_queue_specify_draining_by_hostname(struct work_queue *q, const char *hostname, int drain_flag);
 
-/** Turn on or off first-allocation labeling for a given category. By default, only cores, memory, and disk are labeled. Turn on/off other specific resources use @ref work_queue_specify_category_autolabel_resource.
+/** Turn on or off first-allocation labeling for a given category. By default, only cores, memory, and disk are labeled. Turn on/off other specific resources use @ref work_queue_enable_category_resource
 @param q A work queue object.
 @param category A category name.
 @param mode     One of @ref category_mode_t.
@@ -872,13 +897,13 @@ void work_queue_specify_name(struct work_queue *q, const char *name);
 
 /** Change the debug log path for a given queue (used by TLQ).
 @param q A work queue object.
-@param name The debug log path.
+@param path The debug log path.
 */
 void work_queue_specify_debug_path(struct work_queue *q, const char *path);
 
 /** Change the home host and port for a given queue (used by TLQ).
 @param q A work queue object.
-@param flag Indicates whether manager should look up its TLQ URL locally.
+@param port New local port for the TLQ URL.
 */
 void work_queue_specify_tlq_port(struct work_queue *q, int port);
 
@@ -927,7 +952,7 @@ struct work_queue_task *work_queue_cancel_by_tasktag(struct work_queue *q, const
 
 /** Cancel all submitted tasks and remove them from the queue.
 @param q A work queue object.
-@return A @ref list of all of the tasks submitted to q.  Each task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
+@return A struct list of all of the tasks canceled.  Each task must be deleted with @ref work_queue_task_delete or resubmitted with @ref work_queue_submit.
 */
 struct list * work_queue_cancel_all_tasks(struct work_queue *q);
 
@@ -1014,42 +1039,42 @@ int work_queue_tune(struct work_queue *q, const char *name, double value);
 /** Sets the maximum resources a task without an explicit category ("default" category).
 rm specifies the maximum resources a task in the default category may use.
 @param q  Reference to the current work queue object.
-@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+@param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
 void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsummary *rm);
 
 /** Sets the minimum resources a task without an explicit category ("default" category).
 rm specifies the maximum resources a task in the default category may use.
 @param q  Reference to the current work queue object.
-@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+@param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
 void work_queue_specify_min_resources(struct work_queue *q,  const struct rmsummary *rm);
 
 /** Sets the maximum resources a task in the category may use.
 @param q         Reference to the current work queue object.
 @param category  Name of the category.
-@param rm Structure indicating minimum values. See @rmsummary for possible fields.
+@param rm Structure indicating minimum values. See @ref rmsummary for possible fields.
 */
 void work_queue_specify_category_max_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm);
 
 /** Sets the minimum resources a task in the category may use.
 @param q         Reference to the current work queue object.
 @param category  Name of the category.
-@param rm Structure indicating minimum values. See @rmsummary for possible fields.
+@param rm Structure indicating minimum values. See @ref rmsummary for possible fields.
 */
 void work_queue_specify_category_min_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm);
 
 /** Set the initial guess for resource autolabeling for the given category.
 @param q         Reference to the current work queue object.
 @param category  Name of the category.
-@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+@param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
 void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  const char *category, const struct rmsummary *rm);
 
 /** Initialize first value of categories
 @param q     Reference to the current work queue object.
-@param rm Structure indicating maximum overall values. See @rmsummary for possible fields.
-@param filename JSON file with resource summaries.
+@param max Structure indicating maximum overall values. See @ref rmsummary for possible fields.
+@param summaries_file JSON file with resource summaries.
 */
 void work_queue_initialize_categories(struct work_queue *q, struct rmsummary *max, const char *summaries_file);
 
@@ -1139,7 +1164,8 @@ int work_queue_task_specify_output_file(struct work_queue_task *t, const char *r
 int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname);
 
 /** Generate a worker-level unique filename to indicate a disk allocation being full.
- @param p The process for which we generate a unique disk allocation filename.
+ @param pwd Base pathname.
+ @param taskid id of the task to generate the filename.
  @return The string corresponding to the filename.
 */
 char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid);

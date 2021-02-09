@@ -275,7 +275,6 @@ def _watchman(results_queue, limits, callback, interval, function, args, kwargs)
 
 def _resources_to_dict(resources):
     d = resources.to_dict()
-
     try:
         if d['wall_time'] > 0:
             d['cores_avg'] = float(d['cpu_time']) / float(d['wall_time'])
@@ -327,7 +326,7 @@ class Categories:
 
     ##
     # Returns a lists of the category categories.  List sorted lexicographicaly,
-    # with the exception of @ref self.all_categories_name, which it is always
+    # with the exception of self.all_categories_name, which it is always
     # the last entry.
     # @param self                Reference to the current object.
     def category_names(self):

@@ -191,9 +191,9 @@ int jx_match_symbol(struct jx *j, char **v) __wur;
  * This function accepts an arbitrary number of positional specifications
  * to attempt to match. Each specification is of the form
  *
- *     <address>, <jx type>
+ *     `<address>`, `<jx type>`
  *
- * where <jx type> is JX_INTEGER, JX_ANY, etc. and <address> is the address
+ * where `<jx type>` is JX_INTEGER, JX_ANY, etc. and `<address>` is the address
  * to store the matched value. The last argument must be NULL to mark the
  * end of the specifications. The specifications will be matched
  * in the order given, and matching ends on the first failure. If the JX

@@ -38,7 +38,7 @@ static inline size_t b64_size (size_t bloblen)
  * @param b64 The output base64 encoded blob.
  * @return 0 on success, -1+errno on error.
  */
-int b64_encode(const void *blob, size_t bloblen, buffer_t *Bb64);
+int b64_encode(const void *blob, size_t bloblen, buffer_t *b64);
 
 /** Decode a base64 encoded blob.
  *
@@ -47,10 +47,9 @@ int b64_encode(const void *blob, size_t bloblen, buffer_t *Bb64);
  *
  * @param b64 The input base64 encoded blob.
  * @param blob The output binary blob.
- * @param bloblen The output length of the binary blob.
  * @return 0 on success, -1+errno on error.
  */
-int b64_decode(const char *b64, buffer_t *Bblob);
+int b64_decode(const char *b64, buffer_t *blob);
 
 #endif /* B64_H */
 

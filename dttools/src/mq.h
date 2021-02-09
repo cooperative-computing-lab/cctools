@@ -27,21 +27,16 @@ See the file COPYING for details.
  * Pushing a message onto the send queue is a constant-time operation,
  * since nothing is actually sent over the network. To trigger real
  * network communication, it is necessary regularly call
- * @ref mq_flush_send and @ref mq_flush_recv. These are non-blocking
- * operations guaranteed to return quickly, but they only transfer as
- * much as the socket buffers allow. It may take many flush calls to
- * complete a large transfer. Socket connect and accept are non-blocking
- * as well. Thus a server will probably call @ref mq_accept() as part
- * of its main loop. The only blocking operations are @ref mq_wait
- * and @ref mq_poll_wait, which block until waiting message(s)/connection(s)
- * become available (or a signal handler or timeout interrupts).
+ * @ref mq_wait or @ref mq_poll_wait. These block until waiting
+ * message(s)/connection(s) become available (or a signal handler or timeout
+ * interrupts).
  *
  * The polling interface loosely approximates the Linux epoll interface.
  * First, a set of message queues are added to a polling group with
  * @ref mq_poll_add. Then a call to @ref mq_poll_wait blocks until
  * at least one of the queues in the group has message(s)/connection(s)
- * ready. @ref mq_poll_wait calls @ref mq_flush_send and
- * @ref mq_flush_receive internally, so the event loop does not need to.
+ * ready. @ref mq_poll_wait calls mq_flush_send and
+ * mq_flush_receive internally, so the event loop does not need to.
  * Send buffers will be flushed as much as possible while waiting for
  * messages/connections. Helper functions (@ref mq_poll_readable,
  * @ref mq_poll_acceptable, @ref mq_poll_error) are available to
@@ -141,14 +136,13 @@ struct mq *mq_connect(const char *addr, int port);
 
 /** Prepare to accept connections.
  *
- * The server socket will listen on the first available port between
- * low and high. Use @ref mq_accept to get client connections.
+ * The server socket will listen on the given port.
+ * Use @ref mq_accept to get client connections.
  * @param addr IP address of the network interface,
  *  or NULL to accept connections on any interface.
- * @param low The low port in a range to listen on (inclusive).
- * @param high The high port in a range to listen on (inclusive).
- * @returns A server queue that can be passed to @ref mq_accept.
- * @returns NULL on failure, with errno set appropriately.
+ * @param port Port for the service.
+ * @returns A server queue that can be passed to @ref mq_accept,
+ * or NULL on failure, with errno set appropriately.
  */
 struct mq *mq_serve(const char *addr, int port);
 
@@ -168,7 +162,7 @@ void mq_close(struct mq *mq);
  */
 struct mq *mq_accept(struct mq *server);
 
-/* Wait for a message or connection.
+/** Wait for a message or connection.
  *
  * Blocks the current thread until a message/connection is received
  * (or until a signal or timeout interrupts). Sends are still carried

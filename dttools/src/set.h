@@ -113,7 +113,7 @@ This call will return 1 if all elements of list exist or are added to the set.
 Also note that you cannot insert a null list into the set.
 NOTE: This does not duplicated the element pointers, beware of double frees.
 @param s A pointer to a set.
-@param s2 A pointer to a list to be inserted.
+@param l A pointer to a list to be inserted.
 @return Number of items added to set.
 */
 

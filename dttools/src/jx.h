@@ -165,12 +165,15 @@ struct jx * jx_arrayv( struct jx *value, ... );
 /** Create a JX object.  @param pairs A linked list of @ref jx_pair key-value pairs.  @return a JX object. */
 struct jx * jx_object( struct jx_pair *pairs );
 
-/** Create a JX object.  @param pairs Args are alternating string key -- *jx values. Must be termianted with a null value.
+/** Create a JX object. Arguments are alternating string key -- *jx values. Must be termianted with a null value.
  * This is syntactic sugar for jx_object(jx_pair(jx_string(k), v, jx_pair(jx_string(k), v, jx_pair( etc.))));
  *
  * struct jx *j = jx_objectv("A", jx_integer(42),                  // key and value of A,
  *                           "B", jx_objectv("C", jx_string("xyz") // key and value of B
  *                           NULL));                               // terminating null value.
+ * @param key Name of the first property
+ * @param value Value for the first property
+ * @param ...  Alternating key-value pairs
  * @return a JX object*/
 struct jx * jx_objectv( const char *key, struct jx *value, ... );
 
@@ -229,7 +232,7 @@ void jx_pair_delete( struct jx_pair *p );
 /** Delete an array item.  @param i The array item to delete. */
 void jx_item_delete( struct jx_item *i );
 
-/** Delete a comprehension. @param c The comprehension to delete. */
+/** Delete a comprehension. @param comp The comprehension to delete. */
 void jx_comprehension_delete(struct jx_comprehension *comp);
 
 /** Remove a key-value pair from an object.  @param object The object.  @param key The key. @return The corresponding value, or null if it is not present. */
@@ -238,7 +241,7 @@ struct jx * jx_remove( struct jx *object, struct jx *key );
 /** Insert a key-value pair into an object.  @param object The object.  @param key The key.  @param value The value. @return True on success, false on failure.  Failure can only occur if the object is not a @ref JX_OBJECT. */
 int jx_insert( struct jx *object, struct jx *key, struct jx *value );
 
-/** Insert a key-value pair into an object, unless the value is an empty collection, in which case delete the key and value.  @param key The key.  @param value The value. @return 1 on success, -1 on empty value, 0 on failure.  Failure can only occur if the object is not a @ref JX_OBJECT. */
+/** Insert a key-value pair into an object, unless the value is an empty collection, in which case delete the key and value.  @param object The target object. @param key The key.  @param value The value. @return 1 on success, -1 on empty value, 0 on failure.  Failure can only occur if the object is not a @ref JX_OBJECT. */
 int jx_insert_unless_empty( struct jx *object, struct jx *key, struct jx *value );
 
 /** Insert a boolean value into an object @param object The object @param key The key represented as a C string  @param value The boolean value. */
@@ -281,7 +284,7 @@ void jx_array_insert( struct jx *array, struct jx *value );
 void jx_array_append( struct jx *array, struct jx *value );
 
 /** Get the nth item in an array.  @param array The array to search.  @param nth The index of the desired value. @return The nth element, or NULL if the index is out of bounds. */
-struct jx * jx_array_index( struct jx *j, int nth );
+struct jx * jx_array_index( struct jx *array, int nth );
 
 /** Concatenate the given arrays into a single array. The passed arrays are consumed. @param array An array to concatenate. The list of arrays must be terminated by NULL. */
 struct jx *jx_array_concat( struct jx *array, ...);
