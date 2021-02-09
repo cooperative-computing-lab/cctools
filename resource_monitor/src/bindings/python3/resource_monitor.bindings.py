@@ -297,6 +297,13 @@ def __monitor_function(limits, callback, interval, return_resources, function, *
 
     results['resources'] = _resources_to_dict(results['resources'])
 
+    # hack: add value of gpus limits as the value measured:
+    try:
+        if limits:
+            results['resources']['gpus'] = limits['gpus']
+    except KeyError:
+        pass
+
     if results['resource_exhaustion']:
         raise ResourceExhaustion(results['resources'], function, args, kwargs)
 
