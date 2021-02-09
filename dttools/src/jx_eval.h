@@ -9,6 +9,9 @@ See the file COPYING for details.
 
 #include "jx.h"
 
+/** @file jx_eval.h Implements evaluation of JX expressions.
+*/
+
 /** Evaluate an expression.
 Traverses the expression, evaluates all operators and evalutes
 unbound symbols by looking for matches in the context object.

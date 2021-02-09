@@ -39,6 +39,8 @@ def specify_port_range(low_port, high_port):
 cctools_debug_config('work_queue_python')
 
 ##
+# \class Task
+#
 # Python Task object
 #
 # This class is used to create a task specification.
@@ -280,7 +282,6 @@ class Task(object):
     # @param remote_name    The name of the remote file to create.
     # @param flags          May take the same values as @ref specify_file.
     # @param cache          Whether the file should be cached at workers (True/False)
-    # @param failure_only   For output directories, whether the file should be retrieved only when the task fails (e.g., debug logs).
     def specify_buffer(self, buffer, remote_name, flags=None, cache=None):
         flags = Task._determine_file_flags(flags, cache)
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
@@ -791,7 +792,7 @@ class Task(object):
         return self._task.resources_measured
 
     ##
-    # Get the resources the task exceeded. For valid field see @resources_measured.
+    # Get the resources the task exceeded. For valid field see @ref resources_measured.
     #
     @property
     def limits_exceeded(self):
@@ -806,7 +807,7 @@ class Task(object):
 
     ##
     # Get the resources the task requested to run. For valid fields see
-    # @resources_measured.
+    # @ref resources_measured.
     #
     @property
     def resources_requested(self):
@@ -816,7 +817,7 @@ class Task(object):
 
     ##
     # Get the resources allocated to the task in its latest attempt. For valid
-    # fields see @resources_measured.
+    # fields see @ref resources_measured.
     #
     @property
     def resources_allocated(self):
@@ -976,16 +977,16 @@ class WorkQueue(object):
     # @param self Reference to the current work queue object.
     # @param category A category name. If None, sets the mode by default for
     # newly created categories.
-    # @param mode One of @ref category_mode_t:
+    # @param mode One of:
     #                  - WORK_QUEUE_ALLOCATION_MODE_FIXED Task fails (default).
     #                  - WORK_QUEUE_ALLOCATION_MODE_MAX If maximum values are
     #                  specified for cores, memory, or disk (e.g. via @ref
-    #                  specify_max_category_resources or @ref specify_memory),
+    #                  specify_category_max_resources or @ref Task.specify_memory),
     #                  and one of those resources is exceeded, the task fails.
     #                  Otherwise it is retried until a large enough worker
     #                  connects to the manager, using the maximum values
     #                  specified, and the maximum values so far seen for
-    #                  resources not specified. Use @ref specify_max_retries to
+    #                  resources not specified. Use @ref Task.specify_max_retries to
     #                  set a limit on the number of times work queue attemps
     #                  to complete the task.
     #                  - WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE As above, but
@@ -999,7 +1000,7 @@ class WorkQueue(object):
     # Turn on or off first-allocation labeling for a given category and
     # resource. This function should be use to fine-tune the defaults from @ref
     # specify_category_mode.
-    # @param q A work queue object.
+    # @param self 	Reference to the current work queue object.
     # @param category A category name.
     # @param resource A resource name.
     # @param autolabel True/False for on/off.
@@ -1053,7 +1054,7 @@ class WorkQueue(object):
     #
     # @param self       Reference to the current work queue object.
     # @param name       Name of the category.
-    # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref fast_abort)
+    # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref activate_fast_abort)
     def activate_fast_abort_category(self, name, multiplier):
         return work_queue_activate_fast_abort_category(self._work_queue, name, multiplier)
 
@@ -1061,7 +1062,7 @@ class WorkQueue(object):
     # Turn on or off draining mode for workers at hostname.
     #
     # @param self       Reference to the current work queue object.
-    # @param host       The hostname the host running the workers.
+    # @param hostname   The hostname the host running the workers.
     # @param drain_mode If True, no new tasks are dispatched to workers at hostname, and empty workers are shutdown. Else, workers works as usual.
     def specify_draining_by_hostname(self, hostname, drain_mode=True):
         return work_queue_specify_draining_by_hostname(self._work_queue, hostname, drain_mode)
@@ -1118,8 +1119,8 @@ class WorkQueue(object):
     # 'by_ip' uses IP address (standard behavior), or 'by_hostname' to use the
     # hostname at the manager.
     #
-    # @param self   Reference to the current work queue object.
-    # @param preferred_connection An string to indicate using 'by_ip' or a 'by_hostname'.
+    # @param self Reference to the current work queue object.
+    # @param mode An string to indicate using 'by_ip' or a 'by_hostname'.
     def specify_manager_preferred_connection(self, mode):
         return work_queue_manager_preferred_connection(self._work_queue, mode)
 
@@ -1156,16 +1157,17 @@ class WorkQueue(object):
     # If not specified, it defaults to 0.
     # work_queue_factory considers the number of tasks as:
     # num tasks left + num tasks running + num tasks read.
-    # @param q A work queue object.
+    # @param self   Reference to the current work queue object.
     # @param ntasks Number of tasks yet to be submitted.
     def specify_num_tasks_left(self, ntasks):
         return work_queue_specify_num_tasks_left(self._work_queue, ntasks)
 
     ##
     # Specify the manager mode for the given queue.
+    # (Kept for compatibility. It is no-op.)
     #
     # @param self   Reference to the current work queue object.
-    # @param mode   This may be one of the following values: @ref WORK_QUEUE_MASTER_MODE_STANDALONE or @ref WORK_QUEUE_MASTER_MODE_CATALOG.
+    # @param mode   This may be one of the following values: WORK_QUEUE_MASTER_MODE_STANDALONE or WORK_QUEUE_MASTER_MODE_CATALOG.
     def specify_manager_mode(self, mode):
         return work_queue_specify_manager_mode(self._work_queue, mode)
 
@@ -1220,7 +1222,7 @@ class WorkQueue(object):
     #
     # Specifies the maximum resources allowed for the default category.
     # @param self      Reference to the current work queue object.
-    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # @param rmd       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A maximum of 4 cores is found on any worker:
@@ -1240,7 +1242,7 @@ class WorkQueue(object):
     #
     # Specifies the minimum resources allowed for the default category.
     # @param self      Reference to the current work queue object.
-    # @param rm        Dictionary indicating minimum values. See @resources_measured for possible fields.
+    # @param rmd       Dictionary indicating minimum values. See @ref Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
@@ -1261,7 +1263,7 @@ class WorkQueue(object):
     #
     # @param self      Reference to the current work queue object.
     # @param category  Name of the category.
-    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # @param rmd       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A maximum of 4 cores may be used by a task in the category:
@@ -1282,7 +1284,7 @@ class WorkQueue(object):
     #
     # @param self      Reference to the current work queue object.
     # @param category  Name of the category.
-    # @param rm        Dictionary indicating minimum values. See @resources_measured for possible fields.
+    # @param rmd       Dictionary indicating minimum values. See @ref Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
@@ -1303,7 +1305,7 @@ class WorkQueue(object):
     #
     # @param self      Reference to the current work queue object.
     # @param category  Name of the category.
-    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # @param rmd       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
     # For example:
     # @code
     # >>> # Tasks are first tried with 4 cores:
@@ -1323,7 +1325,7 @@ class WorkQueue(object):
     # Initialize first value of categories
     #
     # @param self     Reference to the current work queue object.
-    # @param rm       Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # @param rm       Dictionary indicating maximum values. See @ref Task.resources_measured for possible fields.
     # @param filename JSON file with resource summaries.
 
     def initialize_categories(self, filename, rm):
@@ -1364,7 +1366,7 @@ class WorkQueue(object):
         return work_queue_block_host(self._work_queue, host)
 
     ##
-    # See @ref block
+    # Replaced by @ref block_host
     def blacklist(self, host):
         return self.block_host(host)
 
@@ -1378,7 +1380,7 @@ class WorkQueue(object):
         return work_queue_block_host_with_timeout(self._work_queue, host, timeout)
 
     ##
-    # See @block_with_timeout
+    # See @ref block_host_with_timeout
     def blacklist_with_timeout(self, host, timeout):
         return self.block_host_with_timeout(host, timeout)
 

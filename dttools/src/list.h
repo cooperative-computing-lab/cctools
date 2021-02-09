@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-/** @file list_core.h Robust, reentrant linked list structure.
+/** @file list.h Robust, reentrant linked list structure.
  *
  * Aside from list create and delete operations, most functionality
  * is based on cursors on a list. A cursor is a

@@ -182,7 +182,7 @@ system.
 */
 void batch_queue_set_feature(struct batch_queue *q, const char *what, const char *value);
 
-/** As @batch_queue_set_option, but allowing an integer argument.
+/** As @ref batch_queue_set_option, but allowing an integer argument.
 @param q The batch queue to adjust.
 @param what The key for option.
 @param value The value of the option.

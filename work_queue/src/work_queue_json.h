@@ -18,10 +18,7 @@ See the file COPYING for details.
 #include "work_queue.h"
 
 /** Create a new work_queue object.
-@param port The port number to listen on. If zero is specified, then the
-port stored in <b>WORK_QUEUE_PORT</b> is used if available. If it isn't, or
--1 is specified, the first unused port between <b>WORK_QUEUE_LOW_PORT</b>
-and <b>WORK_QUEUE_HIGH_PORT</b> (1024 and 32767 by default) is chosen.
+@param str A json document with properties to configure a new queue. Allowed properties are port, name, and priority.
 @return A new work queue, or null if it could not be created.
  */
 struct work_queue *work_queue_json_create(const char *str);

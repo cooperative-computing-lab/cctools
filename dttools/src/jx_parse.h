@@ -34,7 +34,7 @@ struct jx * jx_parse_stream( FILE *file );
 /** Parse a file to a JX expression.  @param name The name of a file containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
 struct jx * jx_parse_file( const char *name );
 
-/** Parse a network link to a JX expression. @param l A @ref link object.  @param stoptime The absolute time at which to stop.   @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
+/** Parse a network link to a JX expression. @param l A link pointer (opaque struct).  @param stoptime The absolute time at which to stop.   @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
 struct jx * jx_parse_link( struct link *l, time_t stoptime );
 
 /** Parse a jx argument file from a commandline option.
@@ -63,7 +63,7 @@ void jx_parser_read_stream( struct jx_parser *p, FILE *file );
 /** Attach parser to a string.  @param p A parser object.  @param str A JSON string to parse. */
 void jx_parser_read_string( struct jx_parser *p, const char *str );
 
-/** Attach parser to a link.  @param p A parser object.  @param l A @ref link object.  @param stoptime The absolute time at which to stop. */
+/** Attach parser to a link.  @param p A parser object.  @param l A link object.  @param stoptime The absolute time at which to stop. */
 void jx_parser_read_link( struct jx_parser *p, struct link *l, time_t stoptime );
 
 /** Parse and return a single value. This function is useful for streaming multiple independent values from a single source. @param p A parser object @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */

@@ -15,6 +15,7 @@ import time
 import json
 
 ##
+# \class Chirp.Client
 # Python Client object
 #
 # This class is used to create a chirp client
@@ -27,6 +28,7 @@ class Client(object):
     # @param hostport          The host:port of the server.
     # @param timeout           The time to wait for a server response on every request.
     # @param authentication    A list of prefered authentications. E.g., ['tickets', 'unix']
+    # @param tickets           A list of ticket filenames.
     # @param debug             Generate client debug output.
     def __init__(self, hostport, timeout=60, authentication=None, tickets=None, debug=False):
         self.hostport = hostport
@@ -422,7 +424,7 @@ class Client(object):
     ##
     # Waits waiting_time seconds for the job_id to terminate. Return value is
     # the same as job_status. If the call timesout, an empty string is
-    # returned. If job_id is missing, C<<job_wait>> waits for any of the user's job.
+    # returned. If job_id is missing, `<job_wait>` waits for any of the user's job.
     #
     # @param waiting_time maximum number of seconds to wait for a job to finish.
     # @param job_id id of the job to wait.
