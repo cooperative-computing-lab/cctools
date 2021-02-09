@@ -1003,6 +1003,11 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 
 	tr->machine_load = p->load.last_minute;
 	tr->machine_cpus = p->load.cpus;
+
+	// hack: set gpu limit as the measured gpus:
+	if(resources_limits->gpus > 0) {
+		tr->gpus = resources_limits->gpus;
+	}
 }
 
 void rmonitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
