@@ -6913,16 +6913,16 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 	const char *mode;
 
 	switch(c->allocation_mode) {
-		case WORK_QUEUE_ALLOCATION_MODE_MAX:
+		case CATEGORY_ALLOCATION_MODE_MAX:
 			mode = "MAX";
 			break;
-		case WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE:
+		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
 			mode = "MIN_WASTE";
 			break;
-		case WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT:
+		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
 			mode = "MAX_THROUGHPUT";
 			break;
-		case WORK_QUEUE_ALLOCATION_MODE_FIXED:
+		case CATEGORY_ALLOCATION_MODE_FIXED:
 		default:
 			mode = "FIXED";
 			break;
@@ -7120,10 +7120,10 @@ void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  c
 int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_mode_t mode) {
 
 	switch(mode) {
-		case WORK_QUEUE_ALLOCATION_MODE_FIXED:
-		case WORK_QUEUE_ALLOCATION_MODE_MAX:
-		case WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE:
-		case WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT:
+		case CATEGORY_ALLOCATION_MODE_FIXED:
+		case CATEGORY_ALLOCATION_MODE_MAX:
+		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
+		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
 			break;
 		default:
 			notice(D_WQ, "Unknown category mode specified.");
