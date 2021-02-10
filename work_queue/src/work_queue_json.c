@@ -181,7 +181,7 @@ static struct work_queue_task *create_task(const char *str)
 	struct jx *input_files = NULL;
 	struct jx *output_files = NULL;
 	struct jx *environment = NULL;
-	int cores, memory, disk;
+	int cores = 0, memory = 0, disk = 0;
 
 	struct jx *json = jx_parse_string(str);
 	if(!json) {
