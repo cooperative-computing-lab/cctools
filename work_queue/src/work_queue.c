@@ -4234,6 +4234,9 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->resources_measured  = rmsummary_create(-1);
 	t->resources_allocated = rmsummary_create(-1);
 
+	/* Default gpus are 0, rather than whole workers: */
+	t->resources_requested->gpus = 0;
+
 	t->category = xxstrdup("default");
 
 	return t;
@@ -7159,16 +7162,17 @@ const struct rmsummary *task_min_resources(struct work_queue *q, struct work_que
 
 	const struct rmsummary *s = category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);
 
-	if(t->resources_requested != CATEGORY_ALLOCATION_FIRST || !q->current_max_worker) {
+	if(t->resource_request != CATEGORY_ALLOCATION_FIRST || !q->current_max_worker) {
 		return s;
 	}
 
 	// If this task is being tried for the first time, we take the minimum as
-	// the minimum between we have observed and the largest worker. This is to
-	// eliminate observed outliers that would prevent new tasks to run.
+	// the minimum between what we have observed and the largest worker. This
+	// is to eliminate observed outliers that would prevent new tasks to run.
 	if((q->current_max_worker->cores > 0 && q->current_max_worker->cores < s->cores)
 			|| (q->current_max_worker->memory > 0 && q->current_max_worker->memory < s->memory)
-			|| (q->current_max_worker->disk   > 0 && q->current_max_worker->disk   < s->disk)) {
+			|| (q->current_max_worker->disk > 0 && q->current_max_worker->disk < s->disk)
+			|| (q->current_max_worker->gpus > 0 && q->current_max_worker->gpus < s->gpus)) {
 
 		struct rmsummary *r = rmsummary_create(-1);
 

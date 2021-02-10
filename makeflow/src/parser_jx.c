@@ -109,7 +109,7 @@ static int resources_from_jx(struct hash_table *h, struct jx *j, int nodeid)
 			}
 		} else if(!strcmp(key, "gpus")) {
 			int gpus = jx_lookup_integer(j, "gpus");
-			if(gpus) {
+			if(gpus > -1) {  // Note that when "gpus" is missing, this defaults to 0
 				debug(D_MAKEFLOW_PARSER, "%d gpus", gpus);
 				dag_variable_add_value(RESOURCES_GPUS, h, nodeid, string_format("%d", gpus));
 			}

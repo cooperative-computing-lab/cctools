@@ -1198,7 +1198,7 @@ struct jx *resources_to_json(struct rmsummary *r) {
 	if(r->memory > 0) {
 		jx_insert(result, jx_string("memory"), jx_integer(r->memory));
 	}
-	if(r->gpus > 0) {
+	if(r->gpus > -1) {
 		jx_insert(result, jx_string("gpus"), jx_integer(r->gpus));
 	}
 	return result;
