@@ -4,15 +4,11 @@ include ../../config.mk
 include ../../rules.mk
 
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) librminimonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
-OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o rmonitor_file_watch.o
+OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o rmonitor_helper.o rmonitor_file_watch.o
 
 LOCAL_LINKAGE = ../../dttools/src/libdttools.a
 
 PROGRAMS = resource_monitor piggybacker rmonitor_poll_example rmonitor_snapshot
-
-ifneq ($(CCTOOLS_STATIC),1)
-PROGRAMS += resource_monitor_histograms
-endif
 
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
@@ -28,13 +24,6 @@ piggybacker: piggybacker.o
 
 rmonitor_piggyback.h: librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) piggybacker
 	./piggybacker rmonitor_piggyback.h librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
-
-resource_monitor_histograms: resource_monitor_histograms.o resource_monitor_tools.o
-ifeq ($(CCTOOLS_STATIC),1)
-	@echo "resource_monitor_histograms cannot be built statically"
-else
-	$(CCTOOLS_LD) -O3 -fopenmp -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
-endif
 
 resource_monitor.o: resource_monitor.c rmonitor_piggyback.h
 
