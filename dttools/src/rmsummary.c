@@ -256,7 +256,7 @@ int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *valu
 	return 0;
 }
 
-int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
+int64_t rmsummary_get_int_field(const struct rmsummary *s, const char *key) {
 	if(strcmp(key, "start") == 0) {
 		return s->start;
 	}
@@ -367,7 +367,7 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 	return 0;
 }
 
-const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
+const char *rmsummary_get_char_field(const struct rmsummary *s, const char *key) {
 	if(strcmp(key, "category") == 0) {
 		return s->category;
 	}

@@ -61,22 +61,7 @@ struct category {
 	/* if 1, use first allocations. 0, use max fixed (if given) */
 	struct rmsummary *autolabel_resource;
 
-	struct histogram *cores_histogram;
-	struct histogram *cores_avg_histogram;
-	struct histogram *wall_time_histogram;
-	struct histogram *cpu_time_histogram;
-	struct histogram *max_concurrent_processes_histogram;
-	struct histogram *total_processes_histogram;
-	struct histogram *memory_histogram;
-	struct histogram *swap_memory_histogram;
-	struct histogram *virtual_memory_histogram;
-	struct histogram *bytes_read_histogram;
-	struct histogram *bytes_written_histogram;
-	struct histogram *bytes_received_histogram;
-	struct histogram *bytes_sent_histogram;
-	struct histogram *bandwidth_histogram;
-	struct histogram *total_files_histogram;
-	struct histogram *disk_histogram;
+	struct hash_table *histograms;
 
 	int64_t total_tasks;
 

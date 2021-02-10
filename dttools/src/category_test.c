@@ -9,13 +9,14 @@
 
 #include "category_internal.h"
 #include "rmsummary.h"
+#include "hash_table.h"
 #include "debug.h"
 
 const char *category = "test";
 
 
 void print_times(struct category *c) {
-    struct histogram *h = c->disk_histogram;
+    struct histogram *h = hash_table_lookup(c->histograms, "disk");
     int64_t n = histogram_size(h);
 
     double *keys = histogram_buckets(h);

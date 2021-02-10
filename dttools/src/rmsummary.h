@@ -95,8 +95,8 @@ const char *rmsummary_unit_of(const char *key);
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value);
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);
 
-int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key);
-const char *rmsummary_get_char_field(struct rmsummary *s, const char *key);
+int64_t rmsummary_get_int_field(const struct rmsummary *s, const char *key);
+const char *rmsummary_get_char_field(const struct rmsummary *s, const char *key);
 
 /**  Reads a single summary file from filename **/
 struct rmsummary *rmsummary_parse_file_single(const char *filename);
