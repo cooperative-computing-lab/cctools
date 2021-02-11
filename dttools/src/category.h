@@ -65,12 +65,8 @@ struct category {
 
 	int64_t total_tasks;
 
-	/* assume that peak usage is independent of wall time */
-	int time_peak_independece;
-
 	/* completions since last time first-allocation was updated. */
 	int64_t completions_since_last_reset;
-
 
 	/* category is somewhat confident of the maximum seen value. */
 	int steady_state;

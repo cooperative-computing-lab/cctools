@@ -49,8 +49,6 @@ struct category *category_create(const char *name) {
 	c->min_allocation      = rmsummary_create(-1);
 	c->autolabel_resource  = rmsummary_create(0);
 
-    c->time_peak_independece = 0;
-
 	c->max_resources_seen = rmsummary_create(-1);
 
     c->histograms = hash_table_create(0,0);
@@ -288,7 +286,7 @@ void category_first_allocation_accum_times(struct histogram *h, double *keys, do
 	free(times_values);
 }
 
-int64_t category_first_allocation_min_waste(struct histogram *h, int assume_independence, int64_t top_resource) {
+int64_t category_first_allocation_min_waste(struct histogram *h, int64_t top_resource) {
 	/* Automatically labeling for resource is not activated. */
 	if(top_resource < 0) {
 		return -1;
@@ -320,14 +318,7 @@ int64_t category_first_allocation_min_waste(struct histogram *h, int assume_inde
 			continue;
 		}
 
-		double Pa = 1 - (counts_accum[i]/counts_accum[n-1]);
-
-		if(assume_independence) {
-			Ea = a + a_m*Pa;
-			Ea *= tau_mean;
-		} else {
-			Ea = a*tau_mean + a_m*times_accum[i];
-		}
+        Ea = a*tau_mean + a_m*times_accum[i];
 
 		if(Ea < Ea_1) {
 			Ea_1 = Ea;
@@ -416,13 +407,13 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 	return a_1;
 }
 
-int64_t category_first_allocation(struct histogram *h, int assume_independence, category_mode_t mode,  int64_t top_resource) {
+int64_t category_first_allocation(struct histogram *h, category_mode_t mode,  int64_t top_resource) {
 
 	int64_t alloc;
 
 	switch(mode) {
 		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
-			alloc = category_first_allocation_min_waste(h, assume_independence, top_resource);
+			alloc = category_first_allocation_min_waste(h, top_resource);
 			break;
 		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
 			alloc = category_first_allocation_max_throughput(h, top_resource);
@@ -473,7 +464,7 @@ int category_update_first_allocation(struct category *c, const struct rmsummary 
             assert(h);
 
             int64_t top_value = rmsummary_get_int_field(top, r);
-            int64_t new_value = category_first_allocation(h, /* assume time independence */ 1, c->allocation_mode, top_value);
+            int64_t new_value = category_first_allocation(h, c->allocation_mode, top_value);
 
             rmsummary_assign_int_field(c->first_allocation, r, new_value);
         }
