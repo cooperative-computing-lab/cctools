@@ -535,7 +535,7 @@ Get the tasks statistics from the particular category.
 =head3 C<specify_category_mode>
 
 Turn on or off first-allocation labeling for a given category. By default, only
-cores, memory, and disk resources are labeled. Turn on/off specific resources
+cores, memory, and disk resources are labeled, and gpus are unlabeled. Turn on/off specific resources
 with C<specify_category_autolabel_resource>.  NOTE: autolabeling is only
 meaningfull when task monitoring is enabled (C<enable_monitoring>). When
 monitoring is enabled and a task exhausts resources in a worker, mode dictates
@@ -561,7 +561,7 @@ Task fails (default).
 
 =item $Work_Queue::WORK_QUEUE_ALLOCATION_MODE_MAX
 
-If maximum values are specified for cores, memory, or disk (e.g. via C<specify_max_category_resources> or C<specify_memory>), and one of those
+If maximum values are specified for cores, memory, disk, or gpus (e.g. via C<specify_max_category_resources> or C<specify_memory>), and one of those
 resources is exceeded, the task fails.  Otherwise it is retried until a large
 enough worker connects to the manager, using the maximum values specified, and
 the maximum values so far seen for resources not specified. Use

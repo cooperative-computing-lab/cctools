@@ -757,6 +757,8 @@ class Task(object):
     #
     # cores_avg:                 number of cores computed as cpu_time/wall_time
     #
+    # gpus:                      peak number of gpus used
+    #
     # max_concurrent_processes:  the maximum number of processes running concurrently
     #
     # total_processes:           count of all of the processes created
@@ -968,8 +970,7 @@ class WorkQueue(object):
 
     ##
     # Turn on or off first-allocation labeling for a given category. By
-    # default, only cores, memory, and disk are labeled. Turn on/off other
-    # specific resources with @ref specify_category_autolabel_resource.
+    # default, only cores, memory, and disk are labeled, and gpus are unlabeled.
     # NOTE: autolabeling is only meaningfull when task monitoring is enabled
     # (@ref enable_monitoring). When monitoring is enabled and a task exhausts
     # resources in a worker, mode dictates how work queue handles the
@@ -980,7 +981,7 @@ class WorkQueue(object):
     # @param mode One of:
     #                  - WORK_QUEUE_ALLOCATION_MODE_FIXED Task fails (default).
     #                  - WORK_QUEUE_ALLOCATION_MODE_MAX If maximum values are
-    #                  specified for cores, memory, or disk (e.g. via @ref
+    #                  specified for cores, memory, disk, and gpus (e.g. via @ref
     #                  specify_category_max_resources or @ref Task.specify_memory),
     #                  and one of those resources is exceeded, the task fails.
     #                  Otherwise it is retried until a large enough worker
