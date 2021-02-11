@@ -195,6 +195,8 @@ static void category_delete_histograms(struct category *c) {
 
         histogram_delete(h);
     }
+
+    hash_table_delete(c->histograms);
 }
 
 void category_delete(struct hash_table *categories, const char *name) {
