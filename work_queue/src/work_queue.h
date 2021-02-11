@@ -108,7 +108,7 @@ enum {
 //   exhaustion occurs: */
 // 	WORK_QUEUE_ALLOCATION_MODE_FIXED = 0,   /**< Task fails. (default) */
 // 	WORK_QUEUE_ALLOCATION_MODE_MAX,         /**< If maximum values are specified for cores, memory,
-// 											  or disk (either a user-label or category-label) and
+// 											  disk or gpus (either a user-label or category-label) and
 // 											  one of those resources is exceeded, the task fails.
 // 											  Otherwise it is retried until a large enough worker
 // 											  connects to the manager, using the maximum values
@@ -861,7 +861,7 @@ int work_queue_activate_fast_abort_category(struct work_queue *q, const char *ca
   */
 int work_queue_specify_draining_by_hostname(struct work_queue *q, const char *hostname, int drain_flag);
 
-/** Turn on or off first-allocation labeling for a given category. By default, only cores, memory, and disk are labeled. Turn on/off other specific resources use @ref work_queue_enable_category_resource
+/** Turn on or off first-allocation labeling for a given category. By default, cores, memory, and disk are labeled, and gpus are unlabeled. Turn on/off other specific resources use @ref work_queue_enable_category_resource
 @param q A work queue object.
 @param category A category name.
 @param mode     One of @ref category_mode_t.
@@ -1069,13 +1069,13 @@ void work_queue_specify_category_min_resources(struct work_queue *q,  const char
 /** Set the initial guess for resource autolabeling for the given category.
 @param q         Reference to the current work queue object.
 @param category  Name of the category.
-@param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
+@param rm Structure indicating maximum values. Autolabeling available for cores, memory, disk, and gpus
 */
 void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  const char *category, const struct rmsummary *rm);
 
 /** Initialize first value of categories
 @param q     Reference to the current work queue object.
-@param max Structure indicating maximum overall values. See @ref rmsummary for possible fields.
+@param max Structure indicating maximum values. Autolabeling available for cores, memory, disk, and gpus
 @param summaries_file JSON file with resource summaries.
 */
 void work_queue_initialize_categories(struct work_queue *q, struct rmsummary *max, const char *summaries_file);

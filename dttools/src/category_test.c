@@ -9,13 +9,14 @@
 
 #include "category_internal.h"
 #include "rmsummary.h"
+#include "hash_table.h"
 #include "debug.h"
 
 const char *category = "test";
 
 
 void print_times(struct category *c) {
-    struct histogram *h = c->disk_histogram;
+    struct histogram *h = hash_table_lookup(c->histograms, "disk");
     int64_t n = histogram_size(h);
 
     double *keys = histogram_buckets(h);
@@ -24,9 +25,9 @@ void print_times(struct category *c) {
     double *counts_cdp  = malloc(n*sizeof(double));
     double *times_accum = malloc(n*sizeof(double));
 
-    category_first_allocation_accum_times(h, keys, &tau_mean, counts_cdp, times_accum);    
+    category_first_allocation_accum_times(h, keys, &tau_mean, counts_cdp, times_accum);
 
-    fprintf(stdout, "%-6s %-8s %-8s %-16s %-16s %-16s\n", "alloc", "count", "cdp", "times_acc", "W (min best)", "T (max best)");
+    fprintf(stdout, "%6s %8s %8s %12s %12s %12s\n", "alloc", "count", "cdp", "times_acc", "Waste (min*)", "Throughput (max*)");
 
     int i;
     for(i = 0; i < n; i++) {
@@ -46,7 +47,7 @@ void print_times(struct category *c) {
 
         double  Ta = numerator/denominator;
 
-        fprintf(stdout, "%6.0lf %8d %8.5lf %16.6lf %16.6lf %12.6lf \n", a, count, counts_cdp[i], times_accum[i], Ea, Ta);
+        fprintf(stdout, "%6.0lf %8d %8.0lf %12.2lf %12.2lf %12.2lf \n", a, count, counts_cdp[i], times_accum[i], Ea, Ta);
     }
 
     return;
@@ -69,8 +70,6 @@ int main(int argc, char **argv) {
     struct hash_table *cs = hash_table_create(0, 0);
     struct category *c = category_lookup_or_create(cs, category);
 
-    category_specify_allocation_mode(c, CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT);
-
     while(fscanf(input_f, "%s %s %lf %d", id, state, &wall_time, &disk) == 4) {
         struct rmsummary *s = rmsummary_create(-1);
 
@@ -86,11 +85,18 @@ int main(int argc, char **argv) {
         category_accumulate_summary(c, s, NULL);
     }
 
-    category_update_first_allocation(c, NULL);
+    print_times(c);
 
-    if(c->first_allocation) {
-        print_times(c);
-        fprintf(stdout, "%" PRId64 "\n", c->first_allocation->disk);
-    }
+    category_specify_allocation_mode(c, CATEGORY_ALLOCATION_MODE_MAX);
+    category_update_first_allocation(c, NULL);
+    fprintf(stdout, "max seen:    %" PRId64 "\n", c->first_allocation->disk);
+
+    category_specify_allocation_mode(c, CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT);
+    category_update_first_allocation(c, NULL);
+    fprintf(stdout, "min waste:   %" PRId64 "\n", c->first_allocation->disk);
+
+    category_specify_allocation_mode(c, CATEGORY_ALLOCATION_MODE_MIN_WASTE);
+    category_update_first_allocation(c, NULL);
+    fprintf(stdout, "max through: %" PRId64 "\n", c->first_allocation->disk);
 }
 
