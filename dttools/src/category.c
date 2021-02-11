@@ -428,8 +428,6 @@ int64_t category_first_allocation(struct histogram *h, category_mode_t mode,  in
 	return alloc;
 }
 
-#define update_first_allocation_field(c, top, independence, field)\
-	}
 
 int category_update_first_allocation(struct category *c, const struct rmsummary *max_worker) {
 	/* buffer used only for debug output. */
