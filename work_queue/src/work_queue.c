@@ -659,6 +659,8 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 
 	debug(D_WQ, "rx from %s (%s): %s", w->hostname, w->addrport, line);
 
+	char path[length];
+
 	// Check for status updates that can be consumed here.
 	if(string_prefix_is(line, "alive")) {
 		result = MSG_PROCESSED;
@@ -685,6 +687,9 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = process_info(q, w, line);
 	} else if (string_prefix_is(line, "tlq")) {
 		result = advertise_tlq_url(q, w, line);
+	} else if( sscanf(line,"GET %s HTTP/%*d.%*d",path)==1) {
+		send_worker_msg(q,w,"HTTP/1.1 200 OK\nConnection: close\nContent-type: text/plain\n\n");
+		process_queue_status(q, w, &path[1], stoptime );
 	} else {
 		// Message is not a status update: return it to the user.
 		result = MSG_NOT_PROCESSED;
@@ -2684,7 +2689,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	jx_print_link(a,l,stoptime);
 	jx_delete(a);
 
-	remove_worker(q, target, WORKER_DISCONNECT_STATUS_WORKER);
+	//remove_worker(q, target, WORKER_DISCONNECT_STATUS_WORKER);
 
 	return MSG_PROCESSED;
 }
