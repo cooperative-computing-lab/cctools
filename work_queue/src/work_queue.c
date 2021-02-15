@@ -2657,7 +2657,8 @@ static work_queue_msg_code_t process_http_request( struct work_queue *q, struct 
 		process_queue_status(q, w, &path[1], stoptime );
 	}
 
-	return MSG_PROCESSED;
+	// Returning failure here causes a disconnect upon return.
+	return MSG_FAILURE;
 }
 
 /*
@@ -2737,6 +2738,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 		}
 	} else {
 		debug(D_WQ, "Unknown status request: '%s'", line);
+		jx_delete(a);
 		return MSG_FAILURE;
 	}
 
