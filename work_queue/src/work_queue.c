@@ -294,6 +294,8 @@ static work_queue_result_code_t get_available_results(struct work_queue *q, stru
 
 static int update_task_result(struct work_queue_task *t, work_queue_result_t new_result);
 
+static void process_data_index( struct work_queue *q, struct work_queue_worker *w, time_t stoptime );
+static work_queue_msg_code_t process_http_request( struct work_queue *q, struct work_queue_worker *w, const char *path, time_t stoptime );
 static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_msg_code_t process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
@@ -688,8 +690,7 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 	} else if (string_prefix_is(line, "tlq")) {
 		result = advertise_tlq_url(q, w, line);
 	} else if( sscanf(line,"GET %s HTTP/%*d.%*d",path)==1) {
-		send_worker_msg(q,w,"HTTP/1.1 200 OK\nConnection: close\nContent-type: text/plain\n\n");
-		process_queue_status(q, w, &path[1], stoptime );
+	        result = process_http_request(q,w,path,stoptime);
 	} else {
 		// Message is not a status update: return it to the user.
 		result = MSG_NOT_PROCESSED;
@@ -2606,9 +2607,66 @@ struct jx * task_to_jx( struct work_queue_task *t, const char *state, const char
 	return j;
 }
 
+/*
+Send a brief human-readable index listing the data
+types that can be queried via this API.
+*/
+
+static void process_data_index( struct work_queue *q, struct work_queue_worker *w, time_t stoptime )
+{
+	buffer_t buf;
+	buffer_init(&buf);
+
+	buffer_printf(&buf,"<h1>Work Queue Data API</h1>");
+        buffer_printf(&buf,"<ul>\n");
+	buffer_printf(&buf,"<li> <a href=\"/queue_status\">Queue Status</a>\n");
+	buffer_printf(&buf,"<li> <a href=\"/task_status\">Task Status</a>\n");
+	buffer_printf(&buf,"<li> <a href=\"/worker_status\">Worker Status</a>\n");
+	buffer_printf(&buf,"<li> <a href=\"/resources_status\">Resources Status</a>\n");
+        buffer_printf(&buf,"</ul>\n");
+
+	send_worker_msg(q,w,buffer_tostring(&buf),buffer_pos(&buf),stoptime);
+
+	buffer_free(&buf);
+
+}
+
+/*
+Process an HTTP request that comes in via a worker port.
+This represents a web browser that connected directly
+to the manager to fetch status data.
+*/
+
+static work_queue_msg_code_t process_http_request( struct work_queue *q, struct work_queue_worker *w, const char *path, time_t stoptime )
+{
+	char line[WORK_QUEUE_LINE_MAX];
+
+	// Consume (and ignore) the remainder of the headers.
+	while(link_readline(w->link,line,WORK_QUEUE_LINE_MAX,stoptime)) {
+		if(line[0]==0) break;
+	}
+
+	send_worker_msg(q,w,"HTTP/1.1 200 OK\nConnection: close\n");
+	if(!strcmp(path,"/")) {
+	        // Requests to root get a simple human readable index.
+		send_worker_msg(q,w,"Content-type: text/html\n\n");
+		process_data_index(q, w, stoptime );
+	} else {
+	        // Other requests get raw JSON data.
+		send_worker_msg(q,w,"Content-type: text/plain\n\n");
+		process_queue_status(q, w, &path[1], stoptime );
+	}
+
+	return MSG_PROCESSED;
+}
+
+/*
+Process a queue status request which returns raw JSON.
+This could come via the HTTP interface, or via a plain request.
+*/
+
 static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct work_queue_worker *target, const char *line, time_t stoptime )
 {
-	char request[WORK_QUEUE_LINE_MAX];
 	struct link *l = target->link;
 
 	struct jx *a = jx_array(NULL);
@@ -2618,16 +2676,12 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
-	if(sscanf(line, "%[^_]_status", request) != 1) {
-		return MSG_FAILURE;
-	}
-
-	if(!strcmp(request, "queue")) {
+	if(!strcmp(line, "queue_status")) {
 		struct jx *j = queue_to_jx( q, 0 );
 		if(j) {
 			jx_array_insert(a, j);
 		}
-	} else if(!strcmp(request, "task")) {
+	} else if(!strcmp(line, "task_status")) {
 		struct work_queue_task *t;
 		struct work_queue_worker *w;
 		struct jx *j;
@@ -2659,7 +2713,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 				}
 			}
 		}
-	} else if(!strcmp(request, "worker")) {
+	} else if(!strcmp(line, "worker_status")) {
 		struct work_queue_worker *w;
 		struct jx *j;
 		char *key;
@@ -2673,16 +2727,16 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 				jx_array_insert(a, j);
 			}
 		}
-	} else if(!strcmp(request, "wable")) {
+	} else if(!strcmp(line, "wable_status")) {
 		jx_delete(a);
 		a = categories_to_jx(q);
-	} else if(!strcmp(request, "resources")) {
+	} else if(!strcmp(line, "resources_status")) {
 		struct jx *j = queue_to_jx( q, 0 );
 		if(j) {
 			jx_array_insert(a, j);
 		}
 	} else {
-		debug(D_WQ, "Unknown status request: '%s'", request);
+		debug(D_WQ, "Unknown status request: '%s'", line);
 		return MSG_FAILURE;
 	}
 
