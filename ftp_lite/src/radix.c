@@ -77,8 +77,8 @@ int ftp_lite_radix_decode( const unsigned char *inbuf, unsigned char *outbuf, in
 {
 	int i;
 	int j;
-	int D;
-	char *p;
+	int D = 0;
+	char *p = NULL;
 
 	for (i=0,j=0; inbuf[i] && inbuf[i] != pad; i++)
 	{
