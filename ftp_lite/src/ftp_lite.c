@@ -57,7 +57,7 @@ static int ftp_lite_send_command_raw( struct ftp_lite_server *s, const char *lin
 {
 	char buf[FTP_LITE_LINE_MAX];
 	int length;
-	length = sprintf(buf,"%s\r\n",line);
+	length = snprintf(buf,FTP_LITE_LINE_MAX,"%s\r\n",line);
 	return(full_fwrite(s->command,buf,length)==length);
 }
 

@@ -309,7 +309,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 			if(container_mode == DOCKER) {
 				va_start(arg_lst, container_mode);
 				char img_name[MAX_BUFFER_SIZE];
-				strncpy(img_name, va_arg(arg_lst, const char *), MAX_BUFFER_SIZE);
+				strncpy(img_name, va_arg(arg_lst, const char *), MAX_BUFFER_SIZE - 1);
 				va_end(arg_lst);
 
 				char mnt_flg_val[MAX_BUFFER_SIZE];
@@ -325,7 +325,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 				// DOCKER_PRESERVE mode
 				va_start(arg_lst, container_mode);
 				char container_name[MAX_BUFFER_SIZE];
-				strncpy(container_name, va_arg(arg_lst, const char *), MAX_BUFFER_SIZE);
+				strncpy(container_name, va_arg(arg_lst, const char *), MAX_BUFFER_SIZE - 1);
 				va_end(arg_lst);
 
 				char sub_proc_sh_fn[MAX_BUFFER_SIZE];
