@@ -79,7 +79,10 @@ static void make_challenge_path(char *path)
 	int result;
 
 	while(1) {
-		sprintf(path, "%s/challenge.%d.%d", challenge_dir, (int) getpid(), rand());
+		char *tmp_path = string_format("%s/challenge.%d.%d", challenge_dir, (int) getpid(), rand());
+		strncpy(path, tmp_path, AUTH_LINE_MAX-1);
+		path[AUTH_LINE_MAX-1] = '\0';
+
 		result = unlink(path);
 		if(result == 0) {
 			break;

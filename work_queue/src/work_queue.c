@@ -73,7 +73,7 @@ See the file COPYING for details.
 // Seconds between measurement of manager local resources
 #define WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL 30
 
-#define WORKER_ADDRPORT_MAX 32
+#define WORKER_ADDRPORT_MAX 64
 #define WORKER_HASHKEY_MAX 32
 
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
@@ -1958,7 +1958,8 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 			//overwrite the last few bytes of buffer to signal truncated stdout.
 			char *truncate_msg = string_format("\n>>>>>> WORK QUEUE HAS TRUNCATED THE STDOUT AFTER THIS POINT.\n>>>>>> MAXIMUM OF %d BYTES REACHED, %" PRId64 " BYTES TRUNCATED.", MAX_TASK_STDOUT_STORAGE, output_length - retrieved_output_length);
-			strncpy(t->output+MAX_TASK_STDOUT_STORAGE-strlen(truncate_msg), truncate_msg, strlen(truncate_msg));
+			memcpy(t->output + MAX_TASK_STDOUT_STORAGE - strlen(truncate_msg) - 1, truncate_msg, strlen(truncate_msg));
+			*(t->output + MAX_TASK_STDOUT_STORAGE - 1) = '\0';
 			free(truncate_msg);
 		}
 

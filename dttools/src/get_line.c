@@ -36,8 +36,9 @@ char *get_line(FILE * fp)
 				other = NULL;
 				return NULL;
 			} else {
-				if(!other)
-					strncpy(tmp, buffer, strlen(buffer));
+				if(!other) {
+					strncpy(tmp, buffer, LARGE_LINE_MAX);
+				}
 
 				other = tmp;
 			}

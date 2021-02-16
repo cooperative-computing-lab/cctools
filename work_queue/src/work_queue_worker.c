@@ -2341,7 +2341,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 		if(result) {
 			free(last_addr);
 			last_addr = calloc(1,sizeof(*last_addr));
-			strncpy(last_addr->host, addr, DOMAIN_NAME_MAX);
+			strncpy(last_addr->host, addr, DOMAIN_NAME_MAX - 1);
 			last_addr->port = port;
 		}
 
