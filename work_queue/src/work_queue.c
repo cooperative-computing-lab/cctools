@@ -92,9 +92,10 @@ typedef enum {
 } work_queue_result_code_t;
 
 typedef enum {
-	MSG_PROCESSED = 0,
-	MSG_NOT_PROCESSED,
-	MSG_FAILURE
+	MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */  
+	MSG_PROCESSED_DISCONNECT, /* Message was processed and disconnect now expected. */
+	MSG_NOT_PROCESSED,        /* Message was not processed, waiting to be consumed. */
+	MSG_FAILURE               /* Message not received, connection failure. */
 } work_queue_msg_code_t;
 
 typedef enum {
@@ -1144,7 +1145,9 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 		tmp_remote_path = NULL;
 		length_str      = NULL;
 
-		if(recv_worker_msg_retry(q, w, line, sizeof(line)) == MSG_FAILURE) {
+		work_queue_msg_code_t mcode;
+		mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
+		if(mcode!=MSG_NOT_PROCESSED) {
 			result = WQ_WORKER_FAILURE;
 			break;
 		}
@@ -1278,8 +1281,11 @@ static int do_thirdput( struct work_queue *q, struct work_queue_worker *w,  cons
 
 	send_worker_msg(q,w,"thirdput %d %s %s\n",command,cached_name,payload);
 
-	if(recv_worker_msg_retry(q, w, line, WORK_QUEUE_LINE_MAX) == MSG_FAILURE)
+	work_queue_msg_code_t mcode;
+	mcode = recv_worker_msg_retry(q, w, line, WORK_QUEUE_LINE_MAX);
+	if(mcode!=MSG_NOT_PROCESSED) {
 		return WQ_WORKER_FAILURE;
+	}
 
 	if(sscanf(line, "thirdput-complete %d", &result)) {
 		return result;
@@ -2013,7 +2019,9 @@ static work_queue_result_code_t get_available_results(struct work_queue *q, stru
 	work_queue_result_code_t result = WQ_SUCCESS; //return success unless something fails below.
 
 	while(1) {
-		if(recv_worker_msg_retry(q, w, line, sizeof(line)) == MSG_FAILURE) {
+		work_queue_msg_code_t mcode;
+		mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
+		if(mcode!=MSG_NOT_PROCESSED) {
 			result = WQ_WORKER_FAILURE;
 			break;
 		}
@@ -2826,22 +2834,34 @@ static work_queue_result_code_t handle_worker(struct work_queue *q, struct link 
 	link_to_hash_key(l, key);
 	w = hash_table_lookup(q->worker_table, key);
 
-	int worker_failure = 0;
-	work_queue_msg_code_t result = recv_worker_msg(q, w, line, sizeof(line));
+	work_queue_msg_code_t mcode;
+	mcode = recv_worker_msg(q, w, line, sizeof(line));
 
-	//we only expect status messages from above. If the last message is left to be processed, we fail.
-	if(result == MSG_NOT_PROCESSED) {
-		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		worker_failure = 1;
-	} else if(result == MSG_FAILURE){
-		debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
-		q->stats->workers_lost++;
-		worker_failure = 1;
-	} // otherwise do nothing..message was consumed and processed in recv_worker_msg()
+	// We only expect asynchronous status queries and updates here.
 
-	if(worker_failure) {
-		handle_worker_failure(q, w);
-		return WQ_WORKER_FAILURE;
+	switch(mcode) {
+		case MSG_PROCESSED:
+			// A status message was received and processed.
+			return WQ_SUCCESS;
+			break;
+
+		case MSG_PROCESSED_DISCONNECT:
+			// A status query was received and processed, so disconnect.
+			remove_worker(q, w, WORKER_DISCONNECT_STATUS_WORKER);
+			return WQ_SUCCESS;
+
+		case MSG_NOT_PROCESSED:
+			debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+			q->stats->workers_lost++;
+			remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
+			return WQ_WORKER_FAILURE;
+			break;
+
+		case MSG_FAILURE:
+			debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
+			q->stats->workers_lost++;
+			remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
+			return WQ_WORKER_FAILURE;
 	}
 
 	return WQ_SUCCESS;
