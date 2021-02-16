@@ -2665,8 +2665,8 @@ static work_queue_msg_code_t process_http_request( struct work_queue *q, struct 
 		process_queue_status(q, w, &path[1], stoptime );
 	}
 
-	// Returning failure here causes a disconnect upon return.
-	return MSG_FAILURE;
+	// Return success but require a disconnect now.
+	return MSG_PROCESSED_DISCONNECT;
 }
 
 /*
@@ -2752,8 +2752,6 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 
 	jx_print_link(a,l,stoptime);
 	jx_delete(a);
-
-	//remove_worker(q, target, WORKER_DISCONNECT_STATUS_WORKER);
 
 	return MSG_PROCESSED;
 }
