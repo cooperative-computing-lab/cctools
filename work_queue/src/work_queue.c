@@ -2753,7 +2753,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	jx_print_link(a,l,stoptime);
 	jx_delete(a);
 
-	return MSG_PROCESSED;
+	return MSG_PROCESSED_DISCONNECT;
 }
 
 static work_queue_msg_code_t process_resource( struct work_queue *q, struct work_queue_worker *w, const char *line )
