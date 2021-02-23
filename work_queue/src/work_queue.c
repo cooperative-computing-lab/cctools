@@ -1451,7 +1451,7 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 	t->resources_measured = rmsummary_parse_file_single(summary);
 
 	if(t->resources_measured) {
-		rmsummary_assign_char_field(t->resources_measured, "category", t->category);
+		t->resources_measured->category = xxstrdup(t->category);
 		t->return_status = t->resources_measured->exit_status;
 	} else {
 		/* if no resources were measured, then we don't overwrite the return
@@ -2195,26 +2195,26 @@ sent to the catalog.
 
 void category_jx_insert_max(struct jx *j, struct category *c, const char *field, struct rmsummary *largest) {
 
-	int64_t l = rmsummary_get_int_field(largest, field);
-	int64_t m = rmsummary_get_int_field(c->max_resources_seen, field);
-	int64_t e = -1;
+	double l = rmsummary_get(largest, field);
+	double m = rmsummary_get(c->max_resources_seen, field);
+	double e = -1;
 
 	if(c->max_resources_seen->limits_exceeded) {
-		e = rmsummary_get_int_field(c->max_resources_seen->limits_exceeded, field);
+		e = rmsummary_get(c->max_resources_seen->limits_exceeded, field);
 	}
 
 	char *field_str = string_format("max_%s", field);
 
 	if(l > -1){
-		char *max_str = string_format("%" PRId64, l);
+		char *max_str = string_format("%s", rmsummary_resource_to_str(field, l, 0));
 		jx_insert_string(j, field_str, max_str);
 		free(max_str);
 	} else if(!category_in_steady_state(c) && e > -1) {
-		char *max_str = string_format(">%" PRId64, m - 1);
+		char *max_str = string_format(">%s", rmsummary_resource_to_str(field, m - 1, 0));
 		jx_insert_string(j, field_str, max_str);
 		free(max_str);
 	} else if(m > -1) {
-		char *max_str = string_format("~%" PRId64, m);
+		char *max_str = string_format("~%s", rmsummary_resource_to_str(field, m, 0));
 		jx_insert_string(j, field_str, max_str);
 		free(max_str);
 	}
@@ -3331,18 +3331,18 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 
 	send_worker_msg(q,w, "category %s\n", t->category);
 
-	send_worker_msg(q,w, "cores %"PRId64"\n",  limits->cores);
-	send_worker_msg(q,w, "memory %"PRId64"\n", limits->memory);
-	send_worker_msg(q,w, "disk %"PRId64"\n",   limits->disk);
-	send_worker_msg(q,w, "gpus %"PRId64"\n",   limits->gpus);
+	send_worker_msg(q,w, "cores %s\n",  rmsummary_resource_to_str("cores", limits->cores, 0));
+	send_worker_msg(q,w, "gpus %s\n",   rmsummary_resource_to_str("gpus", limits->gpus, 0));
+	send_worker_msg(q,w, "memory %s\n", rmsummary_resource_to_str("memory", limits->memory, 0));
+	send_worker_msg(q,w, "disk %s\n",   rmsummary_resource_to_str("disk", limits->disk, 0));
 
 	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
 	if(q->monitor_mode == MON_DISABLED) {
 		if(limits->end > 0) {
-			send_worker_msg(q,w, "end_time %"PRIu64"\n",  limits->end);
+			send_worker_msg(q,w, "end_time %s\n",  rmsummary_resource_to_str("end", limits->end, 0));
 		}
 		if(limits->wall_time > 0) {
-			send_worker_msg(q,w, "wall_time %"PRIu64"\n", limits->wall_time);
+			send_worker_msg(q,w, "wall_time %s\n", rmsummary_resource_to_str("wall_time", limits->wall_time, 0));
 		}
 	}
 
@@ -3424,8 +3424,8 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 
 	tr->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
 	tr->exec_time     = t->time_workers_execute_last;
-	tr->manager_time   = (((t->time_when_done - t->time_when_commit_start) - tr->transfer_time) - tr->exec_time);
-	tr->resources     = rmsummary_copy(t->resources_allocated);
+	tr->manager_time  = (((t->time_when_done - t->time_when_commit_start) - tr->transfer_time) - tr->exec_time);
+	tr->resources     = rmsummary_copy(t->resources_allocated, 0);
 
 	list_push_tail(q->task_reports, tr);
 
@@ -4276,15 +4276,15 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   new->env_list     = work_queue_task_env_list_clone(task->env_list);
 
   if(task->resources_requested) {
-	  new->resources_requested = rmsummary_copy(task->resources_requested);
+	  new->resources_requested = rmsummary_copy(task->resources_requested, 0);
   }
 
   if(task->resources_measured) {
-	  new->resources_measured = rmsummary_copy(task->resources_measured);
+	  new->resources_measured = rmsummary_copy(task->resources_measured, 0);
   }
 
   if(task->resources_allocated) {
-	  new->resources_allocated = rmsummary_copy(task->resources_allocated);
+	  new->resources_allocated = rmsummary_copy(task->resources_allocated, 0);
   }
 
   if(task->monitor_output_directory) {
