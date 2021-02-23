@@ -406,10 +406,7 @@ int rmonitor_get_loadavg(struct rmonitor_load_info *load)
 		last_minute = -1;
 	}
 
-	int64_t tmp_output;
-	rmsummary_to_internal_unit("machine_load", last_minute, &tmp_output, "procs");
-
-	load->last_minute = tmp_output;
+	load->last_minute = last_minute;
 	load->cpus        = load_average_get_cpus();
 
 	return 0;
@@ -831,46 +828,49 @@ char *rmonitor_get_command_line(pid_t pid)
 
 void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f, uint64_t start_time)
 {
-	tr->start        = start_time;
-	tr->end          = usecs_since_epoch();
-	tr->wall_time    = tr->end - tr->start;
-	tr->cpu_time     = p->cpu.accumulated;
-	tr->cores        = 0;
-	tr->cores_avg    = 0;
+	tr->start = ((double) start_time) / ONE_SECOND;
+	tr->end = ((double) usecs_since_epoch()) / ONE_SECOND;
 
+	tr->wall_time = tr->end - tr->start;
+	tr->cpu_time = ((double) p->cpu.accumulated) / ONE_SECOND;
+
+	tr->cores = 0;
+	tr->cores_avg = 0;
+
+	/* set both cores and cores_avg to avg, as info does not come from time windows. */
 	if(tr->wall_time > 0) {
-
-		int64_t tmp_output;
-		rmsummary_to_internal_unit("cores", ((double) tr->cpu_time)/tr->wall_time, &tmp_output, "cores");
-		tr->cores = tmp_output;
-
-		rmsummary_to_internal_unit("cores_avg", ((double) tr->cpu_time)/tr->wall_time, &tmp_output, "cores");
-		tr->cores_avg = tmp_output;
+		// set cores = cpu_time/wall_time;
+		tr->cores = DIV_INT_ROUND_UP(tr->cpu_time, tr->wall_time);
+		tr->cores_avg = tr->cores;
 	}
 
 	tr->context_switches = p->ctx.accumulated;
-
 	tr->max_concurrent_processes = -1;
-	tr->total_processes          = -1;
+	tr->total_processes = -1;
 
-	tr->virtual_memory = (int64_t) p->mem.virtual;
-	tr->memory         = (int64_t) p->mem.resident;
-	tr->swap_memory    = (int64_t) p->mem.swap;
+	tr->virtual_memory = p->mem.virtual;
+	tr->memory =         p->mem.resident;
+	tr->swap_memory =    p->mem.virtual;
 
-	tr->bytes_read        = (int64_t)  p->io.chars_read;
-	tr->bytes_written     = (int64_t)  p->io.chars_written;
+	// assigning values read/written in MB
+	tr->bytes_read = ((double) (p->io.chars_read + p->io.bytes_faulted)) / ONE_MEGABYTE;
+	tr->bytes_written = ((double) p->io.chars_written) / ONE_MEGABYTE;
 
-	tr->total_files = -1;
-	tr->disk = -1;
+	tr->machine_load = p->load.last_minute;
+	tr->machine_cpus = p->load.cpus;
 
 	if(d) {
-		tr->total_files = (int64_t) (d->files);
-		tr->disk        = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
+		tr->total_files = d->files;
+		tr->disk = ((double) d->byte_count) / ONE_MEGABYTE;
+	} else {
+		tr->total_files = -1;
+		tr->disk = -1;
 	}
 
-	tr->fs_nodes = -1;
 	if(f) {
-		tr->fs_nodes          = (int64_t) f->disk.f_ffree;
+		tr->fs_nodes = f->disk.f_ffree;
+	} else {
+		tr->fs_nodes = -1;
 	}
 
 	tr->machine_load = p->load.last_minute;
@@ -944,11 +944,12 @@ struct rmsummary *rmonitor_measure_host(char *path) {
 
 	if(path) {
 		path_disk_size_info_get(path, &total_disk, &file_count);
-		tr->disk = total_disk / MEGABYTE;
+		tr->disk = ((double) total_disk) / ONE_MEGABYTE;
 		tr->total_files = file_count;
 	}
+
 	host_memory_info_get(&free_mem, &total_mem);
-	tr->memory = total_mem / MEGABYTE;
+	tr->memory = ((double) total_mem) / ONE_MEGABYTE;
 	tr->cores = load_average_get_cpus();
 	rmsummary_read_env_vars(tr);
 
@@ -958,46 +959,48 @@ struct rmsummary *rmonitor_measure_host(char *path) {
 struct rmsummary *rmonitor_collate_minimonitor(uint64_t start_time, int current_ps, int total_processes, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d) {
 	struct rmsummary *tr = rmsummary_create(-1);
 
-	tr->wall_time  = usecs_since_epoch() - start_time;
-	tr->cpu_time   = p->cpu.accumulated;
+	tr->start = ((double) start_time) / ONE_SECOND;
+	tr->end = ((double) usecs_since_epoch()) / ONE_SECOND;
 
-	tr->start = start_time;
-	tr->end   = usecs_since_epoch();
+	tr->wall_time = tr->end - tr->start;
+	tr->cpu_time = ((double) p->cpu.accumulated) / ONE_SECOND;
 
 	tr->cores = 0;
 
 	if(tr->wall_time > 0) {
+		// set cores = cpu_time/wall_time
 		tr->cores = DIV_INT_ROUND_UP(tr->cpu_time, tr->wall_time);
 	}
 
-	tr->max_concurrent_processes = (int64_t) current_ps;
-	tr->total_processes          = (int64_t) total_processes;
+	tr->context_switches = p->ctx.accumulated;
+	tr->max_concurrent_processes = current_ps;
+	tr->total_processes = total_processes;
 
 	/* we use max here, as /proc/pid/smaps that fills *m is not always
 	 * available. This causes /proc/pid/status to become a conservative
 	 * fallback. */
 	if(m->resident > 0) {
-		tr->virtual_memory    = (int64_t) m->virtual;
-		tr->memory            = (int64_t) m->resident;
-		tr->swap_memory       = (int64_t) m->swap;
+		tr->virtual_memory = m->virtual;
+		tr->memory =         m->resident;
+		tr->swap_memory =    m->virtual;
 	}
 	else {
-		tr->virtual_memory    = (int64_t) p->mem.virtual;
-		tr->memory            = (int64_t) p->mem.resident;
-		tr->swap_memory       = (int64_t) p->mem.swap;
+		tr->virtual_memory = p->mem.virtual;
+		tr->memory =         p->mem.resident;
+		tr->swap_memory =    p->mem.virtual;
 	}
 
-	tr->bytes_read        = (int64_t) p->io.chars_read;
-	tr->bytes_read       += (int64_t) p->io.bytes_faulted;
-	tr->bytes_written     = (int64_t) p->io.chars_written;
+	// assigning values read/written in MB
+	tr->bytes_read = ((double) (p->io.chars_read + p->io.bytes_faulted)) / ONE_MEGABYTE;
+	tr->bytes_written = ((double) p->io.chars_written) / ONE_MEGABYTE;
 
 	// set in resource_monitor.c from messages of the helper
 	// tr->bytes_received = total_bytes_rx;
 	// tr->bytes_sent     = total_bytes_tx;
 	// tr->bandwidth = average_bandwidth(1);
 
-	tr->total_files = (int64_t) d->files;
-	tr->disk        = (int64_t) DIV_INT_ROUND_UP(d->byte_count, ONE_MEGABYTE);
+	tr->total_files = d->files;
+	tr->disk = ((double) d->byte_count) / ONE_MEGABYTE;
 
 	tr->machine_load = p->load.last_minute;
 	tr->machine_cpus = p->load.cpus;
