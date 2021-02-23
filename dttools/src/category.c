@@ -8,10 +8,12 @@ See the file COPYING for details.
 #include <math.h>
 #include <errno.h>
 #include <float.h>
+#include <stddef.h>
 
 #include "assert.h"
 #include "buffer.h"
 #include "debug.h"
+#include "itable.h"
 #include "list.h"
 #include "macros.h"
 #include "rmsummary.h"
@@ -28,7 +30,13 @@ struct peak_count_time {
 
 static int64_t first_allocation_every_n_tasks = 25; /* tasks */
 
-static const char *resources[] = {"cores", "memory", "disk", "gpus", NULL};
+static const size_t labeled_resources[] = {
+    offsetof(struct rmsummary, cores),
+    offsetof(struct rmsummary, gpus),
+    offsetof(struct rmsummary, memory),
+    offsetof(struct rmsummary, disk),
+    0
+};
 
 /* map from resoure name to int bucket size. Initialized in category_create first time it is called. */
 static struct rmsummary *bucket_sizes = NULL;
@@ -51,24 +59,24 @@ struct category *category_create(const char *name) {
 
 	c->max_resources_seen = rmsummary_create(-1);
 
-    c->histograms = hash_table_create(0,0);
+    c->histograms = itable_create(0);
 
     if(!bucket_sizes) {
         bucket_sizes = rmsummary_create(-1);
-        bucket_sizes->cores = 1;
-        bucket_sizes->gpus  = 1;
-        bucket_sizes->memory = 250;   /* 250 MB */
-        bucket_sizes->disk = 250;     /* 250 MB */
+        bucket_sizes->cores  = 1;
+        bucket_sizes->gpus   = 1;
+        bucket_sizes->memory = 250; /* 250 MB */
+        bucket_sizes->disk   = 250; /* 250 MB */
     }
 
     size_t i;
-    for(i = 0; resources[i]; i++) {
-        const char *r = resources[i];
+    for(i = 0; labeled_resources[i]; i++) {
+        const size_t o = labeled_resources[i];
 
-        int64_t bucket_size = rmsummary_get_int_field(bucket_sizes, r);
+        int64_t bucket_size = rmsummary_get_by_offset(bucket_sizes, o);
         assert(bucket_size > 0);
 
-        hash_table_insert(c->histograms, r, histogram_create(bucket_size));
+        itable_insert(c->histograms, o, histogram_create(bucket_size));
     }
 
 	c->steady_state = 0;
@@ -127,8 +135,6 @@ void category_specify_first_allocation_guess(struct category *c, const struct rm
 
 /* set autoallocation mode for cores, memory, and disk.  See category_enable_auto_resource to disable per resource. */
 void category_specify_allocation_mode(struct category *c, int mode) {
-	struct rmsummary *r = c->autolabel_resource;
-
 	c->allocation_mode = mode;
 
 	int autolabel = 1;
@@ -136,15 +142,15 @@ void category_specify_allocation_mode(struct category *c, int mode) {
 		autolabel = 0;
 	}
 
-	r->cores     = autolabel;
-	r->memory    = autolabel;
-	r->disk      = autolabel;
-    r->gpus      = 0;
+    c->autolabel_resource->cores  = autolabel;
+    c->autolabel_resource->memory = autolabel;
+    c->autolabel_resource->disk   = autolabel;
+    c->autolabel_resource->gpus   = 0;
 }
 
 /* set autolabel per resource. */
 int category_enable_auto_resource(struct category *c, const char *resource_name, int autolabel) {
-	return rmsummary_assign_int_field(c->autolabel_resource, resource_name, autolabel);
+	return rmsummary_set(c->autolabel_resource, resource_name, autolabel);
 }
 
 static void category_clear_histogram(struct histogram *h) {
@@ -168,10 +174,10 @@ static void category_clear_histograms(struct category *c) {
 		return;
 
     size_t i;
-    for(i = 0; resources[i]; i++) {
-        const char *r = resources[i];
+    for(i = 0; labeled_resources[i]; i++) {
+        const size_t o = labeled_resources[i];
 
-        struct histogram *h = hash_table_lookup(c->histograms, r);
+        struct histogram *h = itable_lookup(c->histograms, o);
         assert(h);
 
         category_clear_histogram(h);
@@ -185,16 +191,16 @@ static void category_delete_histograms(struct category *c) {
 	category_clear_histograms(c);
 
     size_t i;
-    for(i = 0; resources[i]; i++) {
-        const char *r = resources[i];
+    for(i = 0; labeled_resources[i]; i++) {
+        const size_t o = labeled_resources[i];
 
-        struct histogram *h = hash_table_lookup(c->histograms, r);
+        struct histogram *h = itable_lookup(c->histograms, o);
         assert(h);
 
         histogram_delete(h);
     }
 
-    hash_table_delete(c->histograms);
+    itable_delete(c->histograms);
 }
 
 void category_delete(struct hash_table *categories, const char *name) {
@@ -453,18 +459,18 @@ int category_update_first_allocation(struct category *c, const struct rmsummary 
 	}
 
     size_t i;
-    for(i = 0; resources[i]; i++) {
-        const char *r = resources[i];
+    for(i = 0; labeled_resources[i]; i++) {
+        const size_t o = labeled_resources[i];
+        int64_t should_update = rmsummary_get_by_offset(c->autolabel_resource, o);
 
-        int64_t should_update = rmsummary_get_int_field(c->autolabel_resource, r);
         if(should_update) {
-            struct histogram *h = hash_table_lookup(c->histograms, r);
+            struct histogram *h = itable_lookup(c->histograms, o);
             assert(h);
 
-            int64_t top_value = rmsummary_get_int_field(top, r);
+            int64_t top_value = rmsummary_get_by_offset(top, o);
             int64_t new_value = category_first_allocation(h, c->allocation_mode, top_value);
 
-            rmsummary_assign_int_field(c->first_allocation, r, new_value);
+            rmsummary_set_by_offset(c->first_allocation, o, new_value);
         }
     }
 
@@ -499,19 +505,32 @@ int category_update_first_allocation(struct category *c, const struct rmsummary 
 int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker) {
 	int update = 0;
 
+    if(!rs) {
+        return update;
+    }
+
 	const struct rmsummary *max  = c->max_allocation;
 	const struct rmsummary *seen = c->max_resources_seen;
 
     int new_maximum = 0;
-    if(rs && (max->cores  > 0 || rs->cores  <= seen->cores)
-          && (max->memory > 0 || rs->memory <= seen->memory)
-          && (max->disk > 0 || rs->disk <= seen->disk)
-          && (max->gpus   > 0 || rs->gpus   <= seen->gpus)) {
-        new_maximum = 0;
-    } else {
-        if(c->steady_state) {
-            /* count new maximums only in steady state. */
-            new_maximum = 1;
+    if(!c->steady_state) {
+        /* count new maximums only in steady state. */
+        size_t i;
+        for(i = 0; labeled_resources[i]; i++) {
+            const size_t o = labeled_resources[i];
+
+            if(rmsummary_get_by_offset(max, o) > 0) {
+                // an explicit maximum was given, so this resource r cannot
+                // trigger a new maximum
+                continue;
+            }
+
+            if(rmsummary_get_by_offset(rs, o) > rmsummary_get_by_offset(seen, o)) {
+                // the measured is larger than what we have seen, thus we need
+                // to reset the first allocation.
+                new_maximum = 1;
+                break;
+            }
         }
     }
 
@@ -528,14 +547,14 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 	rmsummary_merge_max(c->max_resources_seen, rs);
 	if(rs && (!rs->exit_type || !strcmp(rs->exit_type, "normal"))) {
         size_t i;
-        for(i = 0; resources[i]; i++) {
-            const char *r = resources[i];
+        for(i = 0; labeled_resources[i]; i++) {
+            const size_t o = labeled_resources[i];
 
-            struct histogram *h = hash_table_lookup(c->histograms, r);
+            struct histogram *h = itable_lookup(c->histograms, o);
             assert(h);
 
-            double value = rmsummary_get_int_field(rs, r);
-            double wall_time = rmsummary_get_int_field(rs, "wall_time");
+            double value = rmsummary_get_by_offset(rs, o);
+            double wall_time = rs->wall_time;
 
             category_inc_histogram_count(h, value, wall_time);
         }
@@ -605,17 +624,17 @@ category_allocation_t category_next_label(struct category *c, category_allocatio
 		int over = 0;
         if(measured) {
             size_t i;
-            for(i = 0; resources[i]; i++) {
-                const char *r = resources[i];
+            for(i = 0; labeled_resources[i]; i++) {
+                const size_t o = labeled_resources[i];
                 if(!over) {
-                    int64_t meas_value = rmsummary_get_int_field(measured, r);
+                    int64_t meas_value = rmsummary_get_by_offset(measured, o);
                     if(user) {
-                        int64_t user_value = rmsummary_get_int_field(user, r);
+                        int64_t user_value = rmsummary_get_by_offset(user, o);
                         if(user_value > -1 && meas_value > user_value) {
                             over = 1;
                         }
                     } else if(c->max_allocation) {
-                        int64_t max_value = rmsummary_get_int_field(c->max_allocation, r);
+                        int64_t max_value = rmsummary_get_by_offset(c->max_allocation, o);
                         if(max_value > -1 && meas_value > max_value) {
                             over = 1;
                         }
@@ -648,9 +667,12 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 	struct rmsummary *seen  = c->max_resources_seen;
 
 	if(c->steady_state && c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED) {
-		internal->cores  = seen->cores;
-		internal->memory = seen->memory;
-		internal->disk   = seen->disk;
+        size_t i;
+        for(i = 0; labeled_resources[i]; i++) {
+            const size_t o = labeled_resources[i];
+            /* set internal to seen value */
+            rmsummary_set_by_offset(internal, o, rmsummary_get_by_offset(seen, o));
+        }
 	}
 
 	/* load max values */
@@ -668,9 +690,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 }
 
 const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
-
 	static struct rmsummary *internal = NULL;
-
 	const struct rmsummary *allocation = category_dynamic_task_max_resources(c, user, request);
 
 	if(internal) {
@@ -683,9 +703,12 @@ const struct rmsummary *category_dynamic_task_min_resources(struct category *c, 
 	struct rmsummary *seen = c->max_resources_seen;
 
 	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED) {
-			internal->cores  = seen->cores;
-			internal->memory = seen->memory;
-			internal->disk   = seen->disk;
+        size_t i;
+        for(i = 0; labeled_resources[i]; i++) {
+            const size_t o = labeled_resources[i];
+            /* set internal to seen value */
+            rmsummary_set_by_offset(internal, o, rmsummary_get_by_offset(seen, o));
+        }
 	}
 
     /* prefer first allocation (if available) to maximum seen. */
@@ -705,7 +728,7 @@ void category_tune_bucket_size(const char *resource, int64_t size) {
     if(strcmp(resource, "category-steady-n-tasks") == 0) {
         first_allocation_every_n_tasks = size;
     } else {
-        rmsummary_assign_int_field(bucket_sizes, resource, size);
+        rmsummary_set(bucket_sizes, resource, size);
     }
 }
 
@@ -713,6 +736,6 @@ int64_t category_get_bucket_size(const char *resource) {
     if(strcmp(resource, "category-steady-n-tasks") == 0) {
         return first_allocation_every_n_tasks;
     } else {
-        return rmsummary_get_int_field(bucket_sizes, resource);
+        return rmsummary_get(bucket_sizes, resource);
     }
 }
