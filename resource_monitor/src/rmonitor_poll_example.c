@@ -20,14 +20,11 @@ int main(int argc, char **argv) {
 	fprintf(stdout, "command: %s, ",
 			resources->command);
 
-	fprintf(stdout, "wall time used (s): %3.0lf, ",
-			resources->wall_time/1000000.0);
+	fprintf(stdout, "wall time used (s): %3.0f, ", resources->wall_time);
 
-	fprintf(stdout, "total memory used (MB): %" PRId64 ", ",
-			resources->memory + resources->swap_memory);
+	fprintf(stdout, "total memory used (MB): %f, ", resources->memory + resources->swap_memory);
 
-	fprintf(stdout, "total cores used: %" PRId64 "\n",
-			resources->cores);
+	fprintf(stdout, "total cores used: %f\n", resources->cores);
 
 	fprintf(stdout, "\n\njson output:\n");
 	rmsummary_print(stdout, resources, /* pprint */ 1, /* extra fields */ 0);

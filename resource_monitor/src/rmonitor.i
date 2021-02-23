@@ -5,6 +5,8 @@
  * details. */
 
 %module resource_monitor
+%include carrays.i
+%array_functions(char *, strArray);
 
 %begin %{
 	#define SWIG_PYTHON_2_UNICODE
@@ -33,16 +35,19 @@
     }
 
 %pythoncode %{
+    _resources = None
+    def list_resources():
+        if not rmsummary._resources:
+            n = rmsummary_num_resources()
+            r = rmsummary_list_resources()
+            rmsummary._resources = []
+            for i in range(0, n):
+                rmsummary._resources.append(strArray_getitem(r, i))
+        return rmsummary._resources
+
     def to_dict(self):
         d = {}
-        for k in ['category', 'command', 'taskid',
-                'start', 'end',
-                'exit_type', 'signal', 'exit_status', 'last_error',
-                'wall_time', 'total_processes', 'max_concurrent_processes', 'cpu_time',
-                'virtual_memory', 'memory', 'swap_memory',
-                'bytes_read', 'bytes_written', 'bytes_sent', 'bytes_received', 'bandwidth',
-                'total_files', 'disk',
-                'cores', 'cores_avg', 'gpus', 'machine_load', 'machine_cpus']:
+        for k in ['category', 'command', 'taskid', 'exit_type', 'signal', 'exit_status', 'last_error'] + rmsummary.list_resources():
             v = getattr(self, k)
             if v is None or (isinstance(v, int) and v < 0):
                 continue
@@ -61,8 +66,6 @@
             v = pairs[k]
             if k in ['limits_exceeded', 'peak_times']:
                 v = rmsummary.from_dict(v)
-            elif isinstance(v, float):
-                v = int(v)
             try:
                 setattr(rm, k, v)
             except KeyError:
@@ -76,8 +79,8 @@
         oth = rmsummary.from_dict(pairs)
         self.__init__()
         rmsummary_merge_max(self, oth)
-        setattr(self, 'limits_exceeded', rmsummary_copy(oth.limits_exceeded))
-        setattr(self, 'peak_times', rmsummary_copy(oth.limits_exceeded))
+        setattr(self, 'limits_exceeded', rmsummary_copy(oth.limits_exceeded, 0))
+        setattr(self, 'peak_times', rmsummary_copy(oth.limits_exceeded, 0))
 %}
 }
 

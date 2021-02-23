@@ -83,8 +83,9 @@ The summary is JSON encoded and includes the following fields:
 |end                      | time at end of execution, since the epoch. |
 |exit_type                | one of `normal`, `signal` or `limit` (a string). |
 |signal                   | number of the signal that terminated the process. Only present if exit_type is signal. |
-|cores                    | maximum number of cores used. |
+|cores                    | maximum number of cores used in a small time window. |
 |cores_avg                | number of cores as cpu_time/wall_time. |
+|gpus                     | maximum number of gpus used. |
 |exit_status              | final status of the parent process. |
 |max_concurrent_processes | the maximum number of processes running concurrently. |
 |total_processes          | count of all of the processes created. |
@@ -93,11 +94,11 @@ The summary is JSON encoded and includes the following fields:
 |virtual_memory           | maximum virtual memory across all processes. |
 |memory                   | maximum resident size across all processes. |
 |swap_memory              | maximum swap usage across all processes |
-|bytes_read               | amount of data read from disk. |
-|bytes_written            | amount of data written to disk. |
-|bytes_received           | amount of data read from network interfaces. |
-|bytes_sent               | amount of data written to network interfaces. |
-|bandwidth                | maximum bandwidth used. |
+|bytes_read               | amount of data read from disk. (in MB)|
+|bytes_written            | amount of data written to disk. (in MB)|
+|bytes_received           | amount of data read from network interfaces. (in MB)|
+|bytes_sent               | amount of data written to network interfaces. (in MB)|
+|bandwidth                | maximum bandwidth used. (in Mbps) |
 |total_files              | total maximum number of files and directories of all the working directories in the tree. |
 |disk                     | size of all working directories in the tree. |
 |limits_exceeded          | resources over the limit with -l, -L options (JSON object). |
