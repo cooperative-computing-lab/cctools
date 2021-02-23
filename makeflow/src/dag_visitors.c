@@ -790,9 +790,10 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 			if(with_details) {
 				printf("subgraph cluster_S%d { \n", condense_display ? t->id : n->nodeid);
 				printf("\tstyle=unfilled;\n\tcolor=red\n");
-				printf("\tcores%d [style=filled, color=white, label=\"Cores: %"PRId64"\"]\n", condense_display ? t->id : n->nodeid, n->resources_requested->cores);
-				printf("\tresMem%d [style=filled, color=white, label=\"Memory: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources_requested->memory);
-				printf("\tworkDirFtprnt%d [style=filled, color=white, label=\"Footprint: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources_requested->disk);
+				printf("\tcores%d [style=filled, color=white, label=\"cores: %s\"]\n", condense_display ? t->id : n->nodeid, rmsummary_resource_to_str("cores", n->resources_requested->cores, 0));
+				printf("\tgpus%d [style=filled, color=white, label=\"gpus: %s\"]\n", condense_display ? t->id : n->nodeid, rmsummary_resource_to_str("gpus", n->resources_requested->cores, 0));
+				printf("\tresMem%d [style=filled, color=white, label=\"memory: %s\"]\n", condense_display ? t->id : n->nodeid, rmsummary_resource_to_str("memory", n->resources_requested->memory, 1));
+				printf("\tworkDirFtprnt%d [style=filled, color=white, label=\"footprint: %s\"]\n", condense_display ? t->id : n->nodeid, rmsummary_resource_to_str("disk", n->resources_requested->disk, 1));
 				printf("\tcores%d -> resMem%d -> workDirFtprnt%d [color=white]", condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid);
 
 				//Source Files
