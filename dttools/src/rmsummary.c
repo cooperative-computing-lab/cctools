@@ -35,188 +35,104 @@
 #include "xxmalloc.h"
 #include "hash_table.h"
 
-static int units_initialized = 0;
-struct hash_table *conversion_fields = NULL;
-
-struct conversion_field {
-	char *name;
-	char  *internal_unit;
-	char  *external_unit;
-	char  *base_unit;
-	double external_to_internal; // internal = external * this factor.
-	double internal_to_base;     // base     = internal * this factor.
-	int  float_flag;
+struct resource_info {
+	const char *name;
+    const char *units;
+    int decimals;
+	size_t offset;
 };
 
-struct multiplier {
-	double val;
-};
+    //name                       units decimals   offset
+static const struct resource_info resources_info[] = {
+    { "start",                    "s",        6,  offsetof(struct rmsummary, start)},
+	{ "end",                      "s",        6,  offsetof(struct rmsummary, end)},
+	{ "wall_time",                "s",        6,  offsetof(struct rmsummary, wall_time)},
+	{ "cpu_time",                 "s",        6,  offsetof(struct rmsummary, cpu_time)},
+	{ "memory",                   "MB",       0,  offsetof(struct rmsummary, memory)},
+	{ "virtual_memory",           "MB",       0,  offsetof(struct rmsummary, virtual_memory)},
+	{ "swap_memory",              "MB",       0,  offsetof(struct rmsummary, swap_memory)},
+	{ "disk",                     "MB",       0,  offsetof(struct rmsummary, disk)},
+	{ "bytes_read",               "MB",       0,  offsetof(struct rmsummary, bytes_read)},
+	{ "bytes_written",            "MB",       0,  offsetof(struct rmsummary, bytes_written)},
+	{ "bytes_received",           "MB",       0,  offsetof(struct rmsummary, bytes_received)},
+	{ "bytes_sent",               "MB",       0,  offsetof(struct rmsummary, bytes_sent)},
+	{ "bandwidth",                "Mbps",     3,  offsetof(struct rmsummary, bandwidth)},
+	{ "gpus",                     "gpus",     0,  offsetof(struct rmsummary, gpus)},
+	{ "cores",                    "cores",    0,  offsetof(struct rmsummary, cores)},
+	{ "cores_avg",                "cores",    3,  offsetof(struct rmsummary, cores_avg)},
+	{ "machine_cpus",             "cores",    3,  offsetof(struct rmsummary, machine_cpus)},
+	{ "machine_load",             "procs",    0,  offsetof(struct rmsummary, machine_load)},
+	{ "context_switches",         "switches", 0,  offsetof(struct rmsummary, context_switches)},
+	{ "max_concurrent_processes", "procs",    0,  offsetof(struct rmsummary, max_concurrent_processes)},
+	{ "total_processes",          "procs",    0,  offsetof(struct rmsummary, total_processes)},
+	{ "total_files",              "files",    0,  offsetof(struct rmsummary, total_files)},
+	{ "fs_nodes",                 "nodes",    0,  offsetof(struct rmsummary, fs_nodes)}};
 
-void initialize_units() {
-	units_initialized = 1;
+static char **resources_names = NULL;
 
-	conversion_fields = hash_table_create(32, 0);
+/* reverse map for resource_info. Lookup by resource name rather than
+ * sequential access. Use to print resources with the correct number of
+ * decimals. */
+struct hash_table *info_of_resource_table = NULL;
 
-                                   // name                 internal  external      base       exttoint     inttobase    is-external-float?
-	rmsummary_add_conversion_field("wall_time",                "us",      "s",      "s",       USECOND,  1.0/USECOND,   1);
-	rmsummary_add_conversion_field("cpu_time",                 "us",      "s",      "s",       USECOND,  1.0/USECOND,   1);
-	rmsummary_add_conversion_field("start",                    "us",      "us",     "s",       1,        1.0/USECOND,   0);
-	rmsummary_add_conversion_field("end",                      "us",      "us",     "s",       1,        1.0/USECOND,   0);
-	rmsummary_add_conversion_field("memory",                   "MB",      "MB",     "B",       1,        MEGABYTE,      0);
-	rmsummary_add_conversion_field("virtual_memory",           "MB",      "MB",     "B",       1,        MEGABYTE,      0);
-	rmsummary_add_conversion_field("swap_memory",              "MB",      "MB",     "B",       1,        MEGABYTE,      0);
-	rmsummary_add_conversion_field("disk",                     "MB",      "MB",     "B",       1,        MEGABYTE,      0);
-	rmsummary_add_conversion_field("bytes_read",               "B",       "MB",     "B",       MEGABYTE, 1,             1);
-	rmsummary_add_conversion_field("bytes_written",            "B",       "MB",     "B",       MEGABYTE, 1,             1);
-	rmsummary_add_conversion_field("bytes_received",           "B",       "MB",     "B",       MEGABYTE, 1,             1);
-	rmsummary_add_conversion_field("bytes_sent",               "B",       "MB",     "B",       MEGABYTE, 1,             1);
-	rmsummary_add_conversion_field("bandwidth",                "bps",     "Mbps",   "bps",     1000000,  1,             1);
-	rmsummary_add_conversion_field("gpus",                     "gpus",    "gpus",   "gpus",    1,        1,             0);
-	rmsummary_add_conversion_field("cores",                    "cores",   "cores",  "cores",   1,        1,             0);
-	rmsummary_add_conversion_field("cores_avg",                "mcores",  "cores",  "cores",   1000,     1/1000.0,      1);
-	rmsummary_add_conversion_field("machine_cpus",             "cores",   "cores",  "cores",   1,        1,             0);
-	rmsummary_add_conversion_field("machine_load",             "mprocs",  "procs",  "procs",   1000,     1/1000.0,      1);
-	rmsummary_add_conversion_field("context_switches",         "switches","switches","switches", 1,      1,             0);
-	rmsummary_add_conversion_field("max_concurrent_processes", "procs",   "procs",  "procs",   1,        1,             0);
-	rmsummary_add_conversion_field("total_processes",          "procs",   "procs",  "procs",   1,        1,             0);
-	rmsummary_add_conversion_field("total_files",              "files",   "files",  "files",   1,        1,             0);
+
+/* Using this very cheap hash function, as we only use it for the small set of
+ * resources */
+unsigned hash_fn(const char *key) {
+	return (key[0] << 8) + strlen(key);
 }
 
-void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, const char *base, double exttoint, double inttobase, int float_flag) {
-
-	if(!units_initialized) {
-		initialize_units();
-	}
-
-	struct conversion_field *c = hash_table_lookup(conversion_fields, name);
-	if(c) {
-		free(c->name);
-		free(c->internal_unit);
-		free(c->external_unit);
-		free(c->base_unit);
-	}
-	else {
-		c = malloc(sizeof(struct conversion_field));
-	}
-
-	c->name                 = xxstrdup(name);
-	c->internal_unit        = xxstrdup(internal);
-	c->external_unit        = xxstrdup(external);
-	c->base_unit            = xxstrdup(base);
-	c->external_to_internal = exttoint;
-	c->internal_to_base     = inttobase;
-	c->float_flag           = float_flag;
-
-	hash_table_insert(conversion_fields, name, (void *) c);
-}
-
-int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *external_unit) {
-
-	if(!units_initialized) {
-		initialize_units();
-	}
-
-	double factor = 1;
-
-	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
-
-	if(!cf || strcmp(cf->internal_unit, external_unit) == 0) {
-		factor = 1;
-	} else if(strcmp(cf->external_unit, external_unit) == 0 || strcmp("external", external_unit) == 0) {
-		factor = cf->external_to_internal;
-	} else {
-		fatal("Expected units of '%s', but got '%s' for '%s'", cf->external_unit, external_unit, field);
-	}
-
-	if(strcmp(field, "cores") == 0) {
-		/* hack to eliminate noise. we do not round up unless more than %10 of
-		 * the additional core is used. */
-
-		double raw   = MAX(1.0, input_number);
-		double floor = trunc(raw);
-
-		if(raw - floor < 0.1) {
-			input_number = floor;
+static const struct resource_info *info_of_resource(const char *resource_name) {
+	if(!info_of_resource_table) {
+		info_of_resource_table = hash_table_create(0,0);
+		size_t i;
+		for(i = 0; i < rmsummary_num_resources(); i++) {
+			hash_table_insert(info_of_resource_table, resources_info[i].name, (void *) &resources_info[i]);
 		}
 	}
 
-	*output_number = (int64_t) ceil(input_number * factor);
-
-	return 1;
+	return hash_table_lookup(info_of_resource_table, resource_name);
 }
 
-double rmsummary_to_external_unit(const char *field, int64_t n) {
+const char *rmsummary_resource_units(const char *resource_name) {
+	const struct resource_info *info = info_of_resource(resource_name);
 
-	if(!units_initialized) {
-		initialize_units();
+	if(!info) {
+		return NULL;
 	}
 
-	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
-
-	const char *to_unit   = cf->external_unit;
-	const char *from_unit = cf->internal_unit;
-
-	if(from_unit && to_unit && (strcmp(from_unit, to_unit) == 0)) {
-		return (double) n;
-	}
-
-	double nd = ((double) n) / cf->external_to_internal;
-
-	return nd;
+	return info->units;
 }
 
-double rmsummary_to_base_unit(const char *field, int64_t n) {
+int rmsummary_resource_decimals(const char *resource_name) {
+	const struct resource_info *info = info_of_resource(resource_name);
 
-	if(!units_initialized) {
-		initialize_units();
+	if(!info) {
+		return 0;
 	}
 
-	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
-
-	const char *to_unit   = cf->base_unit;
-	const char *from_unit = cf->internal_unit;
-
-	if(from_unit && to_unit && (strcmp(from_unit, to_unit) == 0)) {
-		return (double) n;
-	}
-
-	double nd = ((double) n) * cf->internal_to_base;
-
-	return nd;
+	return info->decimals;
 }
 
-const char *rmsummary_unit_of(const char *key) {
+size_t rmsummary_resource_offset(const char *resource_name) {
+	const struct resource_info *info = info_of_resource(resource_name);
 
-	if(!units_initialized) {
-		initialize_units();
+	if(!info) {
+		fatal("No such resource.");
 	}
 
-	struct conversion_field *cf = hash_table_lookup(conversion_fields, key);
-
-	if(!cf) {
-		fatal("There is not a resource named '%s'.", key);
-	}
-
-	return cf->external_unit;
+	return info->offset;
 }
 
-int rmsummary_field_is_float(const char *key) {
-
-	if(!units_initialized) {
-		initialize_units();
-	}
-
-	struct conversion_field *cf = hash_table_lookup(conversion_fields, key);
-
-	if(!cf) {
-		fatal("There is not a resource named '%s'.", key);
-	}
-
-	return cf->float_flag;
+double rmsummary_get_by_offset(const struct rmsummary *s, size_t offset) {
+	return (*((double *) ((char *) s + offset)));
 }
 
+void rmsummary_set_by_offset(struct rmsummary *s, size_t offset, double value) {
+	*((double *) ((char *) s + offset)) = value;
+}
 
-int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value) {
+static int set_meta_char_field(struct rmsummary *s, const char *key, char *value) {
 	if(strcmp(key, "category") == 0) {
 		free(s->category);
 		s->category = xxstrdup(value);
@@ -253,167 +169,12 @@ int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *valu
 		return 1;
 	}
 
-	return 0;
-}
-
-int64_t rmsummary_get_int_field(const struct rmsummary *s, const char *key) {
-	if(strcmp(key, "start") == 0) {
-		return s->start;
-	}
-
-	if(strcmp(key, "end") == 0) {
-		return s->end;
-	}
-
-	if(strcmp(key, "wall_time") == 0) {
-		return s->wall_time;
-	}
-
-	if(strcmp(key, "cpu_time") == 0) {
-		return s->cpu_time;
-	}
-
-	if(strcmp(key, "signal") == 0) {
-		return s->signal;
-	}
-
-	if(strcmp(key, "exit_status") == 0) {
-		return s->exit_status;
-	}
-
-	if(strcmp(key, "last_error") == 0) {
-		return s->last_error;
-	}
-
-	if(strcmp(key, "max_concurrent_processes") == 0) {
-		return s->max_concurrent_processes;
-	}
-
-	if(strcmp(key, "total_processes") == 0) {
-		return s->total_processes;
-	}
-
-	if(strcmp(key, "virtual_memory") == 0) {
-		return s->virtual_memory;
-	}
-
-	if(strcmp(key, "memory") == 0) {
-		return s->memory;
-	}
-
-	if(strcmp(key, "swap_memory") == 0) {
-		return s->swap_memory;
-	}
-
-	if(strcmp(key, "bytes_read") == 0) {
-		return s->bytes_read;
-	}
-
-	if(strcmp(key, "bytes_written") == 0) {
-		return s->bytes_written;
-	}
-
-	if(strcmp(key, "bytes_received") == 0) {
-		return s->bytes_received;
-	}
-
-	if(strcmp(key, "bytes_sent") == 0) {
-		return s->bytes_sent;
-	}
-
-	if(strcmp(key, "bandwidth") == 0) {
-		return s->bandwidth;
-	}
-
-	if(strcmp(key, "total_files") == 0) {
-		return s->total_files;
-	}
-
-	if(strcmp(key, "disk") == 0) {
-		return s->disk;
-	}
-
-	if(strcmp(key, "cores") == 0) {
-		return s->cores;
-	}
-
-	if(strcmp(key, "cores_avg") == 0) {
-		return s->cores_avg;
-	}
-
-	if(strcmp(key, "context_switches") == 0) {
-		return s->context_switches;
-	}
-
-	if(strcmp(key, "gpus") == 0) {
-		return s->gpus;
-	}
-
-	if(strcmp(key, "machine_cpus") == 0) {
-		return s->machine_cpus;
-	}
-
-	if(strcmp(key, "machine_load") == 0) {
-		return s->machine_load;
-	}
-
-	if(strcmp(key, "snapshots_count") == 0) {
-		return s->snapshots_count;
-	}
-
-	fatal("There is not a resource named '%s'.", key);
-
+	notice(D_RMON, "There is not a field named '%s'.", key);
 
 	return 0;
 }
 
-const char *rmsummary_get_char_field(const struct rmsummary *s, const char *key) {
-	if(strcmp(key, "category") == 0) {
-		return s->category;
-	}
-
-	if(strcmp(key, "command") == 0) {
-		return s->command;
-	}
-
-	if(strcmp(key, "exit_type") == 0) {
-		return s->exit_type;
-	}
-
-	if(strcmp(key, "taskid") == 0) {
-		return s->taskid;
-	}
-
-	if(strcmp(key, "snapshot_name") == 0) {
-		return s->taskid;
-	}
-
-	fatal("There is not a resource named '%s'.", key);
-
-	return NULL;
-}
-
-int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value) {
-	if(strcmp(key, "start") == 0) {
-		s->start = value;
-		return 1;
-	}
-
-	if(strcmp(key, "end") == 0) {
-		s->end = value;
-		return 1;
-	}
-
-	if(strcmp(key, "wall_time") == 0) {
-		s->wall_time = value;
-		return 1;
-	}
-
-	if(strcmp(key, "cpu_time") == 0) {
-		s->cpu_time = value;
-		return 1;
-	}
-
+static int set_meta_int_field(struct rmsummary *s, const char *key, int64_t value) {
 	if(strcmp(key, "signal") == 0) {
 		s->signal = value;
 		return 1;
@@ -429,104 +190,40 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
-	if(strcmp(key, "max_concurrent_processes") == 0) {
-		s->max_concurrent_processes = value;
-		return 1;
-	}
-
-	if(strcmp(key, "total_processes") == 0) {
-		s->total_processes = value;
-		return 1;
-	}
-
-	if(strcmp(key, "virtual_memory") == 0) {
-		s->virtual_memory = value;
-		return 1;
-	}
-
-	if(strcmp(key, "memory") == 0) {
-		s->memory = value;
-		return 1;
-	}
-
-	if(strcmp(key, "swap_memory") == 0) {
-		s->swap_memory = value;
-		return 1;
-	}
-
-	if(strcmp(key, "bytes_read") == 0) {
-		s->bytes_read = value;
-		return 1;
-	}
-
-	if(strcmp(key, "bytes_written") == 0) {
-		s->bytes_written = value;
-		return 1;
-	}
-
-	if(strcmp(key, "bytes_received") == 0) {
-		s->bytes_received = value;
-		return 1;
-	}
-
-	if(strcmp(key, "bytes_sent") == 0) {
-		s->bytes_sent = value;
-		return 1;
-	}
-
-	if(strcmp(key, "bandwidth") == 0) {
-		s->bandwidth = value;
-		return 1;
-	}
-
-	if(strcmp(key, "total_files") == 0) {
-		s->total_files = value;
-		return 1;
-	}
-
-	if(strcmp(key, "disk") == 0) {
-		s->disk = value;
-		return 1;
-	}
-
-	if(strcmp(key, "cores") == 0) {
-		s->cores = value;
-		return 1;
-	}
-
-	if(strcmp(key, "cores_avg") == 0) {
-		s->cores_avg = value;
-		return 1;
-	}
-
-	if(strcmp(key, "context_switches") == 0) {
-		s->context_switches = value;
-		return 1;
-	}
-
-	if(strcmp(key, "machine_cpus") == 0) {
-		s->machine_cpus = value;
-		return 1;
-	}
-
-	if(strcmp(key, "machine_load") == 0) {
-		s->machine_load = value;
-		return 1;
-	}
-
-	if(strcmp(key, "gpus") == 0) {
-		s->gpus = value;
-		return 1;
-	}
-
 	if(strcmp(key, "snapshots_count") == 0) {
 		s->snapshots_count = value;
 		return 1;
 	}
 
-	fatal("There is not a resource named '%s'.", key);
+	notice(D_RMON, "There is not a field named '%s'.", key);
 
 	return 0;
+}
+
+size_t rmsummary_num_resources() {
+	return sizeof(resources_info)/sizeof(resources_info[0]);
+}
+
+double rmsummary_get(const struct rmsummary *s, const char *resource) {
+	const struct resource_info *info = info_of_resource(resource);
+	if(!info) {
+		notice(D_RMON, "There is not a resource named '%s'.", resource);
+		return -1;
+	}
+
+	return rmsummary_get_by_offset(s, info->offset);
+}
+
+int rmsummary_set(struct rmsummary *s, const char *resource, double value) {
+	const struct resource_info *info = info_of_resource(resource);
+	if(!info) {
+		notice(D_RMON, "There is not a resource named '%s'.", resource);
+		return -1;
+	}
+
+	rmsummary_set_by_offset(s, info->offset, value);
+
+	return 1;
 }
 
 void rmsummary_add_snapshots(struct rmsummary *s, struct jx *array) {
@@ -574,62 +271,42 @@ int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *va
 	return 0;
 }
 
-#define peak_time_to_json(o, u, s, f)\
-	if((s)->f > -1) {\
-		jx_insert(o, jx_string(#f), u->float_flag ? jx_double(rmsummary_to_external_unit("wall_time", (s)->f)) : jx_integer(rmsummary_to_external_unit("wall_time", (s)->f)));\
+/* truncate to specified number of decimals */
+struct jx *value_to_jx_number(double value, int decimals) {
+	if(decimals == 0) {
+		return jx_integer((jx_int_t) value);
 	}
+
+	double factor = pow(10, decimals);
+	int64_t scaled = (jx_int_t) ((value * factor) + 0.5);
+
+	return jx_double(scaled/factor);
+}
 
 struct jx *peak_times_to_json(struct rmsummary *s) {
-
-	if(!units_initialized) {
-		initialize_units();
-	}
-
 	struct jx *output = jx_object(NULL);
 
-	struct conversion_field *cf = hash_table_lookup(conversion_fields, "wall_time");
+	size_t i;
+	for(i = 0; i < rmsummary_num_resources(); i++) {
+		const struct resource_info *info = &resources_info[i];
 
-	peak_time_to_json(output, cf, s, disk);
-	peak_time_to_json(output, cf, s, total_files);
-	peak_time_to_json(output, cf, s, bandwidth);
-	peak_time_to_json(output, cf, s, bytes_sent);
-	peak_time_to_json(output, cf, s, bytes_received);
-	peak_time_to_json(output, cf, s, bytes_written);
-	peak_time_to_json(output, cf, s, bytes_read);
-	peak_time_to_json(output, cf, s, swap_memory);
-	peak_time_to_json(output, cf, s, virtual_memory);
-	peak_time_to_json(output, cf, s, memory);
-	peak_time_to_json(output, cf, s, total_processes);
-	peak_time_to_json(output, cf, s, max_concurrent_processes);
-	peak_time_to_json(output, cf, s, gpus);
-	peak_time_to_json(output, cf, s, cores);
-	peak_time_to_json(output, cf, s, cpu_time);
-	peak_time_to_json(output, cf, s, machine_cpus);
-	peak_time_to_json(output, cf, s, machine_load);
+		const char *r = info->name;
+		size_t offset = info->offset;
 
-	jx_insert(output, jx_string("units"), jx_string(cf->external_unit));
+		double value = rmsummary_get_by_offset(s, offset);
+
+		if(value < 0) {
+			continue;
+		}
+
+		jx_insert(output, jx_string(r), jx_arrayv(value_to_jx_number(value, 3), jx_string("s"), NULL));
+	}
 
 	return output;
 }
 
 
-#define field_to_json(o, s, f)\
-	if((s)->f > -1) {\
-		struct conversion_field *cf = hash_table_lookup(conversion_fields, #f);\
-		if(cf) {\
-			struct jx *array = jx_arrayv(\
-					cf->float_flag ? jx_double(rmsummary_to_external_unit(#f, (s)->f)) : jx_integer(rmsummary_to_external_unit(#f, (s)->f))\
-					, jx_string(cf->external_unit), NULL);\
-			jx_insert(o, jx_string(#f), array);\
-		}\
-	}
-
 struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
-
-	if(!units_initialized) {
-		initialize_units();
-	}
-
 	struct jx *output = jx_object(NULL);
 
 	if(!only_resources) {
@@ -639,28 +316,23 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 		}
 	}
 
-	field_to_json(output, s, machine_load);
-	field_to_json(output, s, machine_cpus);
-	field_to_json(output, s, disk);
-	field_to_json(output, s, total_files);
-	field_to_json(output, s, bandwidth);
-	field_to_json(output, s, bytes_sent);
-	field_to_json(output, s, bytes_received);
-	field_to_json(output, s, bytes_written);
-	field_to_json(output, s, bytes_read);
-	field_to_json(output, s, swap_memory);
-	field_to_json(output, s, virtual_memory);
-	field_to_json(output, s, memory);
-	field_to_json(output, s, total_processes);
-	field_to_json(output, s, max_concurrent_processes);
-	field_to_json(output, s, cpu_time);
-	field_to_json(output, s, wall_time);
-	field_to_json(output, s, gpus);
-	field_to_json(output, s, cores);
-	field_to_json(output, s, cores_avg);
-	field_to_json(output, s, context_switches);
-	field_to_json(output, s, end);
-	field_to_json(output, s, start);
+	size_t i;
+	for(i = 0; i < rmsummary_num_resources(); i++) {
+		/* inserting fields in reverse order, as it looks better */
+		const struct resource_info *info = &resources_info[rmsummary_num_resources() - i - 1];
+		const char *r = info->name;
+		const char *units = info->units;
+		int decimals = info->decimals;
+		double value = rmsummary_get_by_offset(s, info->offset);
+
+		/* do not output undefined values */
+		if(value < 0) {
+			continue;
+		}
+
+		struct jx *value_with_units = jx_arrayv(value_to_jx_number(value, decimals), jx_string(units), NULL);
+		jx_insert(output, jx_string(r), value_with_units);
+	}
 
 	if(!only_resources) {
 		if(s->exit_type)
@@ -679,52 +351,46 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 			}
 		}
 
-		if(s->last_error)
+		if(s->last_error) {
 			jx_insert_integer(output, "last_error", s->last_error);
+		}
 
 		jx_insert_integer(output, "exit_status", s->exit_status);
 
-		if(s->command)
+		if(s->command) {
 			jx_insert_string(output, "command",   s->command);
+		}
 
-		if(s->taskid)
+		if(s->taskid) {
 			jx_insert_string(output, "taskid",  s->taskid);
+		}
 
-		if(s->category)
+		if(s->category) {
 			jx_insert_string(output, "category",  s->category);
+		}
 	}
 
 	return output;
 }
 
-static int json_number_of_array(struct jx *array, char *field, int64_t *result) {
+static double json_number_of_array(struct jx *array) {
 
 	struct jx_item *first = array->u.items;
-
-	if(!first)
-		return 0;
+	if(!first) {
+		/* return undefined if array is empty */
+		return -1;
+	}
 
 	double number;
-
 	if(jx_istype(first->value, JX_DOUBLE)) {
 		number = first->value->u.double_value;
 	} else if(jx_istype(first->value, JX_INTEGER)) {
 		number = (double) first->value->u.integer_value;
 	} else {
-		return 0;
+		number = -1;
 	}
 
-	struct jx_item *second = first->next;
-
-	if(!second)
-		return 0;
-
-	if(!jx_istype(second->value, JX_STRING))
-		return 0;
-
-	char *unit = second->value->u.string_value;
-
-	return rmsummary_to_internal_unit(field, number, result, unit);
+	return number;
 }
 
 struct rmsummary *json_to_rmsummary(struct jx *j) {
@@ -742,20 +408,15 @@ struct rmsummary *json_to_rmsummary(struct jx *j) {
 		struct jx *value = head->value;
 
 		if(jx_istype(value, JX_STRING)) {
-			rmsummary_assign_char_field(s, key, value->u.string_value);
+			set_meta_char_field(s, key, value->u.string_value);
 		} else if(jx_istype(value, JX_INTEGER)) {
-			int64_t num;
-			rmsummary_to_internal_unit(key, value->u.integer_value, &num, "external");
-			rmsummary_assign_int_field(s, key, num);
+			set_meta_int_field(s, key, value->u.integer_value);
+		} else if(jx_istype(value, JX_ARRAY) && strcmp(key, "snapshots") == 0) {
+			rmsummary_add_snapshots(s, value);
 		} else if(jx_istype(value, JX_ARRAY)) {
-			int64_t number;
-			int status = json_number_of_array(value, key, &number);
-			if(status) {
-				rmsummary_assign_int_field(s, key, number);
-			}
-			if(strcmp(key, "snapshots") == 0) {
-				rmsummary_add_snapshots(s, value);
-			}
+			/* finally we get to resources... */
+			double number = json_number_of_array(value);
+			rmsummary_set(s, key, number);
 		} else if(jx_istype(value, JX_OBJECT)) {
 			rmsummary_assign_summary_field(s, key, value);
 		}
@@ -763,11 +424,11 @@ struct rmsummary *json_to_rmsummary(struct jx *j) {
 		head = head->next;
 	}
 
-	if(s->wall_time > 0 && s->cpu_time > 0) {
-		//in millicores
-		int64_t tmp_output;
-		rmsummary_to_internal_unit("cores_avg", ((double) s->cpu_time)/s->wall_time, &tmp_output, "cores"); 
-		s->cores_avg = tmp_output;
+	//compute avg cores
+	double wall_time = rmsummary_get(s, "wall_time");
+	double cpu_time = rmsummary_get(s, "cpu_time");
+	if(wall_time > 0 && cpu_time >= 0) {
+		rmsummary_set(s, "cores_avg", cpu_time/wall_time);
 	}
 
 	return s;
@@ -919,7 +580,7 @@ char *rmsummary_print_string(const struct rmsummary *s, int only_resources) {
 
 /* Create summary filling all numeric fields with default_value, and
 all string fields with NULL. Usual values are 0, or -1. */
-struct rmsummary *rmsummary_create(signed char default_value)
+struct rmsummary *rmsummary_create(double default_value)
 {
 	struct rmsummary *s = malloc(sizeof(struct rmsummary));
 	memset(s, default_value, sizeof(struct rmsummary));
@@ -939,6 +600,11 @@ struct rmsummary *rmsummary_create(signed char default_value)
 	s->snapshots_count = 0;
 	s->snapshots       = NULL;
 
+	size_t i;
+	for(i = 0; i < rmsummary_num_resources(); i++) {
+		size_t offset = resources_info[i].offset;
+		rmsummary_set_by_offset(s, offset, default_value);
+	}
 	return s;
 }
 
@@ -962,7 +628,7 @@ void rmsummary_delete(struct rmsummary *s)
 	rmsummary_delete(s->limits_exceeded);
 	rmsummary_delete(s->peak_times);
 
-	int i;
+	size_t i;
 	for(i = 0; i < s->snapshots_count; i++) {
 		rmsummary_delete(s->snapshots[i]);
 	}
@@ -974,54 +640,54 @@ void rmsummary_delete(struct rmsummary *s)
 void rmsummary_read_env_vars(struct rmsummary *s)
 {
 	char *value;
-	if((value = getenv( RESOURCES_CORES  )))
-		s->cores  = atoi(value);
-	if((value = getenv( RESOURCES_MEMORY )))
-		s->memory = atoi(value);
-	if((value = getenv( RESOURCES_DISK )))
-		s->disk   = atoi(value);
-	if((value = getenv( RESOURCES_GPUS )))
-		s->gpus   = atoi(value);
+	value = getenv(RESOURCES_CORES);
+	if(value) {
+		rmsummary_set(s, "cores", atoi(value));
+	}
+
+	value = getenv(RESOURCES_MEMORY);
+	if(value) {
+		rmsummary_set(s, "memory", atoi(value));
+	}
+
+	value = getenv(RESOURCES_DISK);
+	if(value) {
+		rmsummary_set(s, "disk", atoi(value));
+	}
+
+	value = getenv(RESOURCES_GPUS);
+	if(value) {
+		rmsummary_set(s, "gpus", atoi(value));
+	}
+
+	value = getenv(RESOURCES_WALL_TIME);
+	if(value) {
+		rmsummary_set(s, "wall_time", atoi(value));
+	}
 }
 
-#define rmsummary_apply_op(dest, src, fn, field) (dest)->field = fn((dest)->field, (src)->field)
 
-typedef int64_t (*rm_bin_op)(int64_t, int64_t);
+typedef double (*rm_bin_op)(double, double);
 void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bin_op fn)
 {
 	if(!src || !dest)
 		return;
 
-	rmsummary_apply_op(dest, src, fn, start);
-	rmsummary_apply_op(dest, src, fn, end);
-	rmsummary_apply_op(dest, src, fn, exit_status);
-	rmsummary_apply_op(dest, src, fn, last_error);
-	rmsummary_apply_op(dest, src, fn, wall_time);
-	rmsummary_apply_op(dest, src, fn, max_concurrent_processes);
-	rmsummary_apply_op(dest, src, fn, total_processes);
-	rmsummary_apply_op(dest, src, fn, cpu_time);
-	rmsummary_apply_op(dest, src, fn, virtual_memory);
-	rmsummary_apply_op(dest, src, fn, memory);
-	rmsummary_apply_op(dest, src, fn, swap_memory);
-	rmsummary_apply_op(dest, src, fn, bytes_read);
-	rmsummary_apply_op(dest, src, fn, bytes_written);
-	rmsummary_apply_op(dest, src, fn, bytes_sent);
-	rmsummary_apply_op(dest, src, fn, bytes_received);
-	rmsummary_apply_op(dest, src, fn, bandwidth);
-	rmsummary_apply_op(dest, src, fn, total_files);
-	rmsummary_apply_op(dest, src, fn, disk);
-	rmsummary_apply_op(dest, src, fn, fs_nodes);
-	rmsummary_apply_op(dest, src, fn, gpus);
-	rmsummary_apply_op(dest, src, fn, cores);
-	rmsummary_apply_op(dest, src, fn, cores_avg);
-	rmsummary_apply_op(dest, src, fn, context_switches);
-	rmsummary_apply_op(dest, src, fn, machine_cpus);
-	rmsummary_apply_op(dest, src, fn, machine_load);
+	size_t i;
+	for(i = 0; i < rmsummary_num_resources(); i++) {
+		const struct resource_info *info = &resources_info[i];
 
+		double dest_value = rmsummary_get_by_offset(dest, info->offset);
+		double src_value  = rmsummary_get_by_offset(src , info->offset);
+
+		// apply fn(dest, src) per resource
+		double result = fn(dest_value, src_value);
+		rmsummary_set_by_offset(dest, info->offset, result);
+	}
 }
 
 /* Copy the value for all the fields in src > -1 to dest */
-static int64_t override_field(int64_t d, int64_t s)
+static double override_field(double d, double s)
 {
 	return (s > -1) ? s : d;
 }
@@ -1035,13 +701,23 @@ void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *sr
 	rmsummary_bin_op(dest, src, override_field);
 }
 
-struct rmsummary *rmsummary_copy(const struct rmsummary *src)
+struct rmsummary *rmsummary_copy(const struct rmsummary *src, int deep_copy)
 {
 	struct rmsummary *dest = rmsummary_create(-1);
 
-	if(src) {
-		memcpy(dest, src, sizeof(*dest));
+	if(!src) {
+		return dest;
+	}
 
+	size_t i;
+	for(i = 0; i < rmsummary_num_resources(); i++) {
+		//copy resource values
+		size_t offset = resources_info[i].offset;
+		rmsummary_set_by_offset(dest, offset, rmsummary_get_by_offset(src, offset));
+	}
+
+	if(deep_copy) {
+		//copy other data only for deep copies
 		if(src->command) {
 			dest->command = xxstrdup(src->command);
 		}
@@ -1055,36 +731,29 @@ struct rmsummary *rmsummary_copy(const struct rmsummary *src)
 		}
 
 		if(src->limits_exceeded) {
-			dest->limits_exceeded = rmsummary_copy(src->limits_exceeded);
+			dest->limits_exceeded = rmsummary_copy(src->limits_exceeded, 0);
 		}
 
 		if(src->peak_times) {
-			dest->peak_times = rmsummary_copy(src->peak_times);
+			dest->peak_times = rmsummary_copy(src->peak_times, 0);
+		}
+
+		if(src->snapshot_name) {
+			dest->snapshot_name = xxstrdup(src->snapshot_name);
+		}
+
+		if(src->snapshots_count > 0) {
+			dest->snapshots = malloc(sizeof(struct rmsummary *) * src->snapshots_count);
+			size_t i;
+			for(i = 0; i < src->snapshots_count; i++) {
+				dest->snapshots[i] = rmsummary_copy(src->snapshots[i], 1);
+			}
 		}
 	}
 
 	return dest;
 }
 
-/* only update limit when new field value is larger than old, regardless of old
- * limits. */
-#define merge_limit(d, s, field)\
-{\
-	int64_t df = d->field;\
-	int64_t sf = s->field;\
-	int64_t dl = -1;\
-	int64_t sl = -1;\
-	if(d->limits_exceeded) { dl = d->limits_exceeded->field; }\
-	if(s->limits_exceeded) { sl = s->limits_exceeded->field; }\
-	if(sf >= df) {\
-		if(sf > -1) {\
-			if(!d->limits_exceeded) {\
-				d->limits_exceeded = rmsummary_create(-1);\
-			}\
-			d->limits_exceeded->field = sl < 0 ? -1 : MAX(sl, dl);\
-		}\
-	}\
-}
 
 static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 {
@@ -1096,38 +765,36 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 		return;
 	}
 
-	merge_limit(dest, src, max_concurrent_processes);
-	merge_limit(dest, src, total_processes);
-	merge_limit(dest, src, cpu_time);
-	merge_limit(dest, src, virtual_memory);
-	merge_limit(dest, src, memory);
-	merge_limit(dest, src, swap_memory);
-	merge_limit(dest, src, bytes_read);
-	merge_limit(dest, src, bytes_written);
-	merge_limit(dest, src, bytes_sent);
-	merge_limit(dest, src, bytes_received);
-	merge_limit(dest, src, bandwidth);
-	merge_limit(dest, src, total_files);
-	merge_limit(dest, src, disk);
-	merge_limit(dest, src, gpus);
-	merge_limit(dest, src, cores);
-	merge_limit(dest, src, cores_avg);
-	merge_limit(dest, src, context_switches);
-	merge_limit(dest, src, machine_load);
-	merge_limit(dest, src, fs_nodes);
+	size_t i;
+	for(i = 0; i < rmsummary_num_resources(); i++) {
+		size_t o = resources_info[i].offset;
 
+		double src_value = rmsummary_get_by_offset(src, o);
+		double dest_value = rmsummary_get_by_offset(dest, o);
+
+		/* only update limit when new field value is larger than old, regardless of old
+		 * limits. */
+		if(src_value >= dest_value && src_value > -1) {
+			if(!dest->limits_exceeded) {
+				dest->limits_exceeded = rmsummary_create(-1);
+			}
+
+			double src_lim  = src->limits_exceeded ? rmsummary_get_by_offset(src->limits_exceeded, o) : -1;
+			double dest_lim = dest->limits_exceeded ? rmsummary_get_by_offset(dest->limits_exceeded, o) : -1;
+
+			rmsummary_set_by_offset(dest->limits_exceeded, o, src_lim < 0 ? -1 : MAX(src_lim, dest_lim));
+		}
+	}
 }
 
-
-
 /* Select the max of the fields */
-static int64_t max_field(int64_t d, int64_t s)
+static double max_field(double d, double s)
 {
 	return (d > s) ? d : s;
 }
 
 /* Select the min of the fields, ignoring negative numbers */
-static int64_t min_field(int64_t d, int64_t s)
+static double min_field(double d, double s)
 {
 	if(d < 0 || s < 0) {
 		return MAX(-1, MAX(s, d)); /* return at least -1. treat -1 as undefined.*/
@@ -1153,50 +820,34 @@ void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src)
 	}
 }
 
-#define max_op_w_time(dest, src, field)\
-	if((dest)->field < (src)->field) {\
-		printf("%s, %" PRId64 "  %" PRId64 "\n", #field, (dest)->field, (src)->field);\
-		(dest)->field = (src)->field;\
-		(dest)->peak_times->field = (dest)->wall_time;\
-	}\
-	if((dest)->field > -1 && (dest)->peak_times->field < 0) {\
-		(dest)->peak_times->field = 0;\
-	}
 
 void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *src)
 {
 	if(!src || !dest)
 		return;
 
-	if(!dest->peak_times)
+	if(!dest->peak_times) {
 		dest->peak_times = rmsummary_create(-1);
+	}
 
-	rmsummary_apply_op(dest, src, min_field, start);
-	dest->peak_times->start = dest->start;
+	size_t i;
+	for(i = 0; i < rmsummary_num_resources(); i++) {
+		const struct resource_info *info = &resources_info[i];
+		size_t offset = info->offset;
 
-	rmsummary_apply_op(dest, src, max_field, end);
-	dest->peak_times->end = dest->end;
+		double dest_value = rmsummary_get_by_offset(dest, offset);
+		double src_value = rmsummary_get_by_offset(src, offset);
 
-	max_op_w_time(dest, src, wall_time);
-	max_op_w_time(dest, src, max_concurrent_processes);
-	max_op_w_time(dest, src, total_processes);
-	max_op_w_time(dest, src, cpu_time);
-	max_op_w_time(dest, src, virtual_memory);
-	max_op_w_time(dest, src, memory);
-	max_op_w_time(dest, src, swap_memory);
-	max_op_w_time(dest, src, bytes_read);
-	max_op_w_time(dest, src, bytes_written);
-	max_op_w_time(dest, src, bytes_sent);
-	max_op_w_time(dest, src, bytes_received);
-	max_op_w_time(dest, src, bandwidth);
-	max_op_w_time(dest, src, total_files);
-	max_op_w_time(dest, src, disk);
-	max_op_w_time(dest, src, gpus);
-	max_op_w_time(dest, src, cores);
-	max_op_w_time(dest, src, context_switches);
-	max_op_w_time(dest, src, machine_cpus);
-	max_op_w_time(dest, src, machine_load);
-	max_op_w_time(dest, src, fs_nodes);
+		/* if dest < src, then dest is updated with a new peak */
+		if(dest_value < src_value) {
+			rmsummary_set_by_offset(dest, offset, src_value);
+			rmsummary_set_by_offset(dest->peak_times, offset, dest->wall_time);
+		}
+	}
+
+	/* update peak times of start and end special cases */
+	dest->peak_times->start = 0;
+	dest->peak_times->end   = dest->wall_time;
 }
 
 void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src)
@@ -1216,7 +867,7 @@ void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src)
 }
 
 /* Add summaries together, ignoring negative numbers */
-static int64_t plus(int64_t d, int64_t s)
+static double plus(double d, double s)
 {
 	if(d < 0 || s < 0) {
 		return MAX(0, MAX(s, d)); /* return at least 0 */
@@ -1238,155 +889,29 @@ void rmsummary_debug_report(const struct rmsummary *s)
 	if(!s)
 		return;
 
-	if(s->cores != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "cores", s->cores);
-	if(s->start != -1)
-		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "start", ((double) s->start / 1000000));
-	if(s->end != -1)
-		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "end",   ((double) s->end   / 1000000));
-	if(s->wall_time != -1)
-		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "wall_time", ((double) s->wall_time / 1000000));
-	if(s->max_concurrent_processes != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "max_processes_processes", s->max_concurrent_processes);
-	if(s->total_processes != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "total_processes", s->total_processes);
-	if(s->cpu_time != -1)
-		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "cpu_time",  ((double) s->cpu_time  / 1000000));
-	if(s->virtual_memory != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "virtual_memory", s->virtual_memory);
-	if(s->memory != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "memory", s->memory);
-	if(s->swap_memory != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "swap_memory", s->swap_memory);
-	if(s->bytes_read != -1)
-		debug(D_DEBUG, "max resource %-18s B: %" PRId64 "\n", "bytes_read", s->bytes_read);
-	if(s->bytes_written != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "bytes_written", s->bytes_written);
-	if(s->bytes_received != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "bytes_received", s->bytes_received);
-	if(s->bytes_sent != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "bytes_sent", s->bytes_sent);
-	if(s->bandwidth != -1)
-		debug(D_DEBUG, "max resource %-18s bps: %" PRId64 "\n", "bandwidth", s->bandwidth);
-	if(s->total_files != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "total_files", s->total_files);
-	if(s->disk != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "disk", s->disk);
-	if(s->machine_load != -1)
-		debug(D_DEBUG, "max resource %-18s mprocs: %" PRId64 "\n", "machine_load", s->machine_load);
-	if(s->machine_cpus != -1)
-		debug(D_DEBUG, "max resource %-18s cores: %" PRId64 "\n", "machine_cpus", s->machine_cpus);
+	size_t i;
+	for(i = 0; i < rmsummary_num_resources(); i++) {
+		const struct resource_info *info = &resources_info[i];
+
+		const char *r = info->name;
+		const char *units = info->units;
+		int decimals = info->decimals;
+		double value = rmsummary_get_by_offset(s, info->offset);
+
+		if(value > -1) {
+			debug(D_DEBUG, "max resource %-18s   : %.*f %s\n", r, decimals, value, units);
+		}
+	}
 }
 
-size_t rmsummary_field_offset(const char *key) {
-	if(!key) {
-		fatal("A field name was not given.");
-	}
-
-	if(!strcmp(key, "gpus")) {
-		return offsetof(struct rmsummary, gpus);
-	}
-
-	if(!strcmp(key, "cores")) {
-		return offsetof(struct rmsummary, cores);
-	}
-
-	if(!strcmp(key, "cores_avg")) {
-		return offsetof(struct rmsummary, cores_avg);
-	}
-
-	if(!strcmp(key, "context_switches")) {
-		return offsetof(struct rmsummary, context_switches);
-	}
-
-	if(!strcmp(key, "disk")) {
-		return offsetof(struct rmsummary, disk);
-	}
-
-	if(!strcmp(key, "memory")) {
-		return offsetof(struct rmsummary, memory);
-	}
-
-	if(!strcmp(key, "virtual_memory")) {
-		return offsetof(struct rmsummary, virtual_memory);
-	}
-
-	if(!strcmp(key, "swap_memory")) {
-		return offsetof(struct rmsummary, swap_memory);
-	}
-
-	if(!strcmp(key, "wall_time")) {
-		return offsetof(struct rmsummary, wall_time);
-	}
-
-	if(!strcmp(key, "cpu_time")) {
-		return offsetof(struct rmsummary, cpu_time);
-	}
-
-	if(!strcmp(key, "bytes_read")) {
-		return offsetof(struct rmsummary, bytes_read);
-	}
-
-	if(!strcmp(key, "bytes_written")) {
-		return offsetof(struct rmsummary, bytes_written);
-	}
-
-	if(!strcmp(key, "bytes_received")) {
-		return offsetof(struct rmsummary, bytes_received);
-	}
-
-	if(!strcmp(key, "bytes_sent")) {
-		return offsetof(struct rmsummary, bytes_sent);
-	}
-
-	if(!strcmp(key, "bandwidth")) {
-		return offsetof(struct rmsummary, bandwidth);
-	}
-
-	if(!strcmp(key, "total_files")) {
-		return offsetof(struct rmsummary, total_files);
-	}
-
-	if(!strcmp(key, "total_processes")) {
-		return offsetof(struct rmsummary, total_processes);
-	}
-
-	if(!strcmp(key, "max_concurrent_processes")) {
-		return offsetof(struct rmsummary, max_concurrent_processes);
-	}
-
-	if(!strcmp(key, "machine_load")) {
-		return offsetof(struct rmsummary, machine_load);
-	}
-
-	if(!strcmp(key, "machine_cpus")) {
-		return offsetof(struct rmsummary, machine_cpus);
-	}
-
-	fatal("Field '%s' was not found.");
-
-	return 0;
-}
-
-int64_t rmsummary_get_int_field_by_offset(const struct rmsummary *s, size_t offset) {
-	return (*((int64_t *) ((char *) s + offset)));
-}
-
-struct rmsummary *rmsummary_get_snapshot(const struct rmsummary *s, int i) {
-	if(!s || i < 0 || i > s->snapshots_count) {
+struct rmsummary *rmsummary_get_snapshot(const struct rmsummary *s, size_t i) {
+	if(!s || i > s->snapshots_count) {
 		return NULL;
 	}
 
 	return s->snapshots[i];
 }
 
-#define over_limit_check(measured, limits, fld)\
-	if((limits)->fld > -1 && (measured)->fld > 0 && (limits)->fld - (measured)->fld < 0)\
-	{\
-		debug(D_DEBUG, "Limit " #fld " broken: %" PRId64 " > %" PRId64 "\n", (measured)->fld, (limits)->fld);\
-		if(!(measured)->limits_exceeded) { (measured)->limits_exceeded = rmsummary_create(-1); }\
-		(measured)->limits_exceeded->fld = limits->fld;\
-	}
 
 /* return 0 means above limit, 1 means limist ok */
 int rmsummary_check_limits(struct rmsummary *measured, struct rmsummary *limits)
@@ -1402,23 +927,24 @@ int rmsummary_check_limits(struct rmsummary *measured, struct rmsummary *limits)
 		return 1;
 	}
 
-	over_limit_check(measured, limits, start);
-	over_limit_check(measured, limits, end);
-	over_limit_check(measured, limits, cores);
-	over_limit_check(measured, limits, gpus);
-	over_limit_check(measured, limits, wall_time);
-	over_limit_check(measured, limits, cpu_time);
-	over_limit_check(measured, limits, max_concurrent_processes);
-	over_limit_check(measured, limits, total_processes);
-	over_limit_check(measured, limits, virtual_memory);
-	over_limit_check(measured, limits, memory);
-	over_limit_check(measured, limits, swap_memory);
-	over_limit_check(measured, limits, bytes_read);
-	over_limit_check(measured, limits, bytes_written);
-	over_limit_check(measured, limits, bytes_received);
-	over_limit_check(measured, limits, bytes_sent);
-	over_limit_check(measured, limits, total_files);
-	over_limit_check(measured, limits, disk);
+	size_t i;
+	for(i = 0; i < rmsummary_num_resources(); i++) {
+		const struct resource_info *info = &resources_info[i];
+
+		double l = rmsummary_get_by_offset(limits, info->offset);
+		double m = rmsummary_get_by_offset(measured, info->offset);
+
+		// if there is a limit, and the resource was measured, and the
+		// measurement is larger than the limit, report the broken limit.
+		if(l > -1 && m > 0 && l < m) {
+			debug(D_DEBUG, "Limit %s broken: %.*f > %.*f %s\n", info->name, info->decimals, m, info->decimals, l, info->units);
+
+			if(!measured->limits_exceeded) {
+				measured->limits_exceeded = rmsummary_create(-1);
+			}
+			rmsummary_set_by_offset(measured->limits_exceeded, info->offset, l);
+		}
+	}
 
 	if(measured->limits_exceeded) {
 		return 0;
@@ -1428,7 +954,41 @@ int rmsummary_check_limits(struct rmsummary *measured, struct rmsummary *limits)
 	}
 }
 
+const char **rmsummary_list_resources() {
+	if(!resources_names) {
+		resources_names = calloc(rmsummary_num_resources() + 1, sizeof(char *));
 
+		size_t i;
+		for(i = 0; i < rmsummary_num_resources(); i++) {
+			resources_names[i] = xxstrdup(resources_info[i].name);
+		}
+	}
+
+	return (const char **) resources_names;
+}
+
+const char *rmsummary_resource_to_str(const char *resource, double value, int include_units) {
+	static char output[256];
+
+	int decimals = rmsummary_resource_decimals(resource);
+	const char *units = rmsummary_resource_units(resource);
+
+	if(!units) {
+		notice(D_RMON, "There is not such a resource: %s", resource);
+		return NULL;
+	}
+
+	char *tmp = string_format("%.*f%s%s",
+			decimals,
+			value,
+			include_units ? " " : "",
+			include_units ? units : "");
+
+	strncpy(output, tmp, 256);
+	free(tmp);
+
+	return output;
+}
 
 
 /* vim: set noexpandtab tabstop=4: */
