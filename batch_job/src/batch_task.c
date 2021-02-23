@@ -111,7 +111,7 @@ void batch_task_wrap_command(struct batch_task *t, const char *command)
 void batch_task_set_resources(struct batch_task *t, const struct rmsummary *resources)
 {
 	rmsummary_delete(t->resources);
-	t->resources = rmsummary_copy(resources);
+	t->resources = rmsummary_copy(resources, 0);
 }
 
 /** Sets the envlist of batch_task.

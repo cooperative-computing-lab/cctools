@@ -132,25 +132,26 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 	buffer_init(&cluster_resources);
 
 	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
-		buffer_printf(&cluster_resources, " -l nodes=1:ppn=%" PRId64, resources->cores > 0 ? resources->cores : 1);
+		buffer_printf(&cluster_resources, " -l nodes=1:ppn=%.0f", MAX(1, DIV_INT_ROUND_UP(resources->cores, 1)));
 		if(!ignore_mem && resources->memory > 0) {
-			buffer_printf(&cluster_resources, ",mem=%" PRId64 "mb", resources->memory);
+			buffer_printf(&cluster_resources, ",mem=%.0f mb", DIV_INT_ROUND_UP(resources->memory, 1));
 		}
 		if(!ignore_disk && resources->disk > 0) {
-			buffer_printf(&cluster_resources, ",file=%" PRId64 "mb", resources->disk);
+			buffer_printf(&cluster_resources, ",file=%.0f mb", DIV_INT_ROUND_UP(resources->disk, 1));
 		}
 	} else if(q->type == BATCH_QUEUE_TYPE_SLURM){
 		if(!ignore_mem && resources->memory > 0) {
-			buffer_printf(&cluster_resources, " --mem=%" PRId64 "M", resources->memory);
+			buffer_printf(&cluster_resources, " --mem=%.0f M", DIV_INT_ROUND_UP(resources->memory, 1));
 		}
 		if(!ignore_time && resources->wall_time > 0) {
-			buffer_printf(&cluster_resources, " --time=%" PRId64, DIV_INT_ROUND_UP(resources->wall_time, 60*1000000));
+			// expected in minutes, not seconds
+			buffer_printf(&cluster_resources, " --time=%.0f", DIV_INT_ROUND_UP(resources->wall_time, 60));
 		}
 
 		/* The value of max_concurrent_processes is set by the .MAKEFLOW MPI_PROCESSES.
 		 * If set, the number of cores should be divisible by max_concurrent_processes. */
-		int64_t procs = resources->max_concurrent_processes > 0 ? resources->max_concurrent_processes : 1;
-		int64_t cores = resources->cores > 0 ? resources->cores : 1;
+		int procs = resources->max_concurrent_processes > 0 ? (int) DIV_INT_ROUND_UP(resources->max_concurrent_processes, 1) : 1;
+		int cores = resources->cores > 0 ? (int) DIV_INT_ROUND_UP(resources->cores, 1) : 1;
 
 		if(procs > 1) {
 			cores = cores / procs;
@@ -160,35 +161,35 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 			}
 		}
 
-		buffer_printf(&cluster_resources, " -N 1 -n %" PRId64 " -c %" PRId64, procs, cores);
+		buffer_printf(&cluster_resources, " -N 1 -n %d -c %d", procs, cores);
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE){
 		if(!ignore_mem && resources->memory > 0) {
 			const char *mem_type = batch_queue_get_option(q, "mem-type");
-			buffer_printf(&cluster_resources, " -l %s=%" PRId64 "M", mem_type ? mem_type : "h_vmem", resources->memory);
+			buffer_printf(&cluster_resources, " -l %s=%.0f M", mem_type ? mem_type : "h_vmem", resources->memory);
 		}
 		if(!ignore_time && resources->wall_time > 0) {
-			buffer_printf(&cluster_resources, " -l h_rt=00:%" PRId64 ":00", DIV_INT_ROUND_UP(resources->wall_time, 60*1000000));
+			buffer_printf(&cluster_resources, " -l h_rt=00:%.0f:00", DIV_INT_ROUND_UP(resources->wall_time, 60));
 		}
 
-		buffer_printf(&cluster_resources, " -pe smp %" PRId64, resources->cores>0 ? resources->cores : 1);
+		buffer_printf(&cluster_resources, " -pe smp %0.f", resources->cores > 0 ? DIV_INT_ROUND_UP(resources->cores, 1) : 1);
 	} else if(q->type==BATCH_QUEUE_TYPE_LSF) {
 		if(!ignore_mem && resources->memory>0) {
 			// resources->memory is in units of MB
-			buffer_printf(&cluster_resources,"-M %" PRId64"MB",resources->memory);
+			buffer_printf(&cluster_resources,"-M %.0fMB",resources->memory);
 		}
 
 		if(!ignore_core && resources->cores>0) {
 			// -n Gives the number of "tasks" in a job.
 			// Can be specified as a range: -n 4,8 indicates flexibility of 4 to 8 tasks.
 			// Not yet clear yet if this meaning differs for multi-thread versus MPI applications.
-			buffer_printf(&cluster_resources,"-n %" PRId64,resources->cores);
+			buffer_printf(&cluster_resources,"-n %.0f", DIV_INT_ROUND_UP(resources->cores, 1));
 		}
 
 		if(!ignore_time && resources->wall_time > 0 ) {
 			// -W puts a hard limit on run time.
 			// -We gives an estimated time for scheduling puporses.
 			// Both use minutes as the units.
-			buffer_printf(&cluster_resources,"-We %" PRId64,resources->wall_time/60);
+			buffer_printf(&cluster_resources,"-We %.0f", DIV_INT_ROUND_UP(resources->wall_time, 60));
 		}
 	}
 
