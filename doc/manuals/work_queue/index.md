@@ -27,12 +27,17 @@ status page](http://ccl.cse.nd.edu/software/workqueue/status).
 
 ### Installing
 
-See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
+See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  We recommend that first time users
+install via Conda:
 
-The documentation for the full set of features of the Work Queue
-API can be viewed from either within the CCTools package or
-[here](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html) and
-[here](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePython.html).
+```
+conda install -c conda-forge ndcctools
+```
+
+The full documentation for the Work Queue API can be found here:
+- [Work Queue Python API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePython.html).
+- [Work Queue Perl API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePerl.html)
+- [Work Queue C API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html) and
 
 ## Building a Work Queue Application
 
@@ -40,19 +45,16 @@ We begin by running a simple but complete example of a Work Queue application.
 After trying it out, we will then show how to write a Work Queue application
 from scratch.
 
-We assume that you have downloaded and installed the cctools package in your
-home directory under `$HOME/cctools`. Next, download the example file for the
-language of your choice:
+First, download the example file for the language of your choice:
 
   * Python: [work_queue_example.py](examples/work_queue_example.py)
   * Perl: [work_queue_example.pl](examples/work_queue_example.pl)
   * C: [work_queue_example.c](examples/work_queue_example.c)
 
-If you are using the Python example, set `PYTHONPATH` to include the Python
-modules in cctools: (You may need to adjust the version number to match your
-Python.)
+If you are using the Python example and did *not* install via Conda, then set `PYTHONPATH` to include the Python modules in cctools:
     
 ```sh
+# Note: This is only needed if not using Conda:
 $ PYVER=$(python -c 'import sys; print("%s.%s" % sys.version_info[:2])')
 $ export PYTHONPATH=${PYTHONPATH}:${HOME}/cctools/lib/python${PYVER}/site-packages
 ```
@@ -64,13 +66,12 @@ cctools:
 $ export PERL5LIB=${PERL5LIB}:${HOME}/cctools/lib/perl5/site_perl
 ```
 
-
 If you are using the C example, compile it like this:
 
 ```sh
 $ gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -lwork_queue -ldttools -lm -lz
 ```
-    
+   
     
 
 ## Running a Work Queue Application
@@ -81,17 +82,17 @@ transmitted to a remote worker, compressed, and then sent back to the Work
 Queue manager. To compress files `a`, `b`, and `c` with this example
 application, run it as:
 
+
 ```sh
 # Python:
 $ ./work_queue_example.py a b c
-
+ 
 # Perl:
 $ ./work_queue_example.pl a b c
-
+ 
 # C
 $ ./work_queue_example a b c
 ```
-    
 
 You will see this right away:
 
@@ -163,7 +164,7 @@ or `qdel` as appropriate. If you forget to remove them, they will exit
 automatically after fifteen minutes. (This can be adjusted with the `-t`
 option to `worker`.)
 
-## Writing a Work Queue Master Program
+## Writing a Work Queue Manager Program
 
 The easiest way to start writing your own program using WorkQueue is to modify
 with one of the examples in [Python](examples/work_queue_example.py),
@@ -521,7 +522,9 @@ By default, the factory submits as many tasks that are waiting and running up
 to a specified maximum. To run more than one task in a worker, please refer
 to the following section on describing [task resources](#task-resources) and [worker resources](#work-queue-factory-and-resources).
 
-## Task Resources
+## Managing Resources
+
+### Task Resources
 
 Unless otherwise specified, Work Queue assumes that a single task runs on a
 single worker at a time, and a single worker occupies an entire machine.
@@ -532,17 +535,8 @@ example, if you have a 8-core machine, then you might want to run four 2-core
 tasks on a single worker at once, being careful not to exceed the available
 memory and disk.
 
-By default a worker tries to use all the resources of the machine it is
-running.  You can specify the exact number of cores, memory, and disk to use
-like this:
-    
-```sh
-$ work_queue_worker --cores 8  --memory 1000 --disk 8000 -M myproject
-```
-    
-To run several task in a worker, every task must have a description of the
-resources it uses, in terms of cores, memory, and disk:
-
+To run several tasks in a worker, every task should describe the resources
+that it uses, for example:
 
 #### Python
 
@@ -550,6 +544,7 @@ resources it uses, in terms of cores, memory, and disk:
 t.specify_cores(2)    #needs 2 cores
 t.specify_memory(100) #needs 100 MB memory
 t.specify_disk(1000)  #needs 1 GB disk
+t.specify_gpus(0)     #does not need a GPU
 ```
 
 #### Perl
@@ -558,6 +553,7 @@ t.specify_disk(1000)  #needs 1 GB disk
 $t->specify_cores(2);    #needs 2 cores
 $t->specify_memory(100); #needs 100 MB memory
 $t->specify_disk(1000);  #needs 1 GB disk
+$t->specify_gpus(0);     #does not need a GPU
 ```
 
 #### C
@@ -566,6 +562,7 @@ $t->specify_disk(1000);  #needs 1 GB disk
 work_queue_task_specify_cores(t, 2);    //needs 2 cores
 work_queue_task_specify_memory(t, 100); //needs 100 MB memory
 work_queue_task_specify_disk(t, 1000);  //needs 1 GB disk
+work_queue_task_specify_gpu(t, 0);      //does not need a GPU
 ```
 
 Note that if no requirements are specified, a task consumes an entire worker.
@@ -577,10 +574,28 @@ requirements for a task, Work Queue can schedule two such tasks to a two- task
 worker, assuming it has the available memory and disk requirements for each
 individual task.
 
-You may also use the `--cores`, `--memory`, and `--disk` options when using
+### Worker Resources
+
+By default, a worker tries to use all the resources of the machine it is
+running.  The resources detected are displayed when the worker starts up,
+for example:
+
+```
+work_queue_worker: creating workspace /tmp/worker-102744-8066
+work_queue_worker: using 16 cores, 15843 MB memory, 61291 MB disk, 1 gpus
+```
+
+You can manually adjust the resources managed by a worker like this:
+
+    
+```sh
+$ work_queue_worker --cores 8  --memory 1000 --disk 8000 --gpus 1
+```
+    
+You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options when using
 batch submission scripts such as `condor_submit_workers` or
 `slurm_submit_workers`, and the script will correctly ask the batch system for
-an appropiate node.
+a node of the desired size.
 
 The only caveat is when using `sge_submit_workers`, as there are many
 differences across systems that the script cannot manage. For `
@@ -614,10 +629,10 @@ $ sge_submit_workers --cores 4 MACHINENAME 9123
 The variables `$cores `, `$memory `, and `$disk `, have the values of the
 options passed to `--cores`, `--memory`, `--disk. `
 
-### Work Queue Factory and Resources
+### Factory Resources
 
-The `work_queue_factory` accepts the arguments `--cores`, `--memory`, and
-`--disk` to specify the size of the desired workers. Resources may also be
+The `work_queue_factory` accepts the arguments `--cores`, `--memory`,
+`--disk`, and `--gpus` to specify the size of the desired workers. Resources may also be
 specified in the configuration file as follows:
 
 ```json
@@ -627,7 +642,8 @@ specified in the configuration file as follows:
     "min-workers": 1,
     "cores": 4,
     "memory": 4096,
-    "disk": 4096
+    "disk": 4096,
+    "gpus": 1
 }
 ```
 
@@ -1116,7 +1132,7 @@ The statistics available are:
 | tasks_cancelled;            | Total number of tasks cancelled.
 | tasks_exhausted_attempts;   | Total number of task executions that failed given resource exhaustion.
 | 
-| - | **Master time statistics (in microseconds)**
+| - | **Manager time statistics (in microseconds)**
 | time_when_started;  | Absolute time at which the manager started.
 | time_send;          | Total time spent in sending tasks to workers (tasks descriptions, and input files.).
 | time_receive;       | Total time spent in receiving results from workers (output files.).
