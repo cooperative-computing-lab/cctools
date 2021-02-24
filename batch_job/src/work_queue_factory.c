@@ -343,19 +343,19 @@ static void set_worker_resources_options( struct batch_queue *queue )
 		}
 	} else {
 		if(resources->cores > -1) {
-			buffer_printf(&b, " --cores=%" PRId64, resources->cores);
+			buffer_printf(&b, " --cores=%s", rmsummary_resource_to_str("cores", resources->cores, 0));
 		}
 
 		if(resources->memory > -1) {
-			buffer_printf(&b, " --memory=%" PRId64, resources->memory);
+			buffer_printf(&b, " --memory=%s", rmsummary_resource_to_str("memory", resources->memory, 0));
 		}
 
 		if(resources->disk > -1) {
-			buffer_printf(&b, " --disk=%" PRId64, resources->disk);
+			buffer_printf(&b, " --disk=%s", rmsummary_resource_to_str("disk", resources->disk, 0));
 		}
 
 		if(resources->gpus > -1) {
-			buffer_printf(&b, " --gpus=%" PRId64, resources->gpus);
+			buffer_printf(&b, " --gpus=%s", rmsummary_resource_to_str("gpus", resources->gpus, 0));
 		}
 	}
 
@@ -810,9 +810,9 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "min-workers: %d\n", workers_min);
 	fprintf(stdout, "workers-per-cycle: %d\n", workers_per_cycle);
 
-	fprintf(stdout, "tasks-per-worker: %" PRId64 "\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? resources->cores : 1));
+	fprintf(stdout, "tasks-per-worker: %d\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? (int) resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
-	fprintf(stdout, "cores: %" PRId64 "\n", resources->cores > 0 ? resources->cores : 1);
+	fprintf(stdout, "cores: %s\n", rmsummary_resource_to_str("cores", resources->cores > 0 ? resources->cores : 1, 0));
 
 	if(condor_requirements) {
 		fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
@@ -823,15 +823,15 @@ int read_config_file(const char *config_file) {
 	}
 
 	if(resources->memory > -1) {
-		fprintf(stdout, "memory: %" PRId64 " MB\n", resources->memory);
+		fprintf(stdout, "memory: %s\n", rmsummary_resource_to_str("memory", resources->memory, 1));
 	}
 
 	if(resources->disk > -1) {
-		fprintf(stdout, "disk: %" PRId64 " MB\n", resources->disk);
+		fprintf(stdout, "disk: %s\n", rmsummary_resource_to_str("disk", resources->disk, 1));
 	}
 
 	if(resources->gpus > -1) {
-		fprintf(stdout, "gpus: %" PRId64 "\n", resources->gpus);
+		fprintf(stdout, "gpus: %s\n", rmsummary_resource_to_str("gpus", resources->gpus, 0));
 	}
 
 	if(extra_worker_args) {

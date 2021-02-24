@@ -120,7 +120,7 @@ char *resource_monitor_write_command(const char *monitor_path, const char *templ
 
 	//useful when debugging (uncomment):
 	//buffer_printf(&cmd_builder, "valgrind  --leak-check=full -- ");
-	
+
 	buffer_printf(&cmd_builder, "%s --no-pprint", monitor_path);
 
 	buffer_printf(&cmd_builder, " --with-output-files=%s", template_filename);
@@ -138,44 +138,14 @@ char *resource_monitor_write_command(const char *monitor_path, const char *templ
 		buffer_printf(&cmd_builder, " --measure-dir %s", measure_dir);
 
 	if(limits) {
-		if(limits->end > -1)
-			buffer_printf(&cmd_builder, " -L 'end: %lf'", limits->end/1000000e0);
-
-		if(limits->wall_time > -1)
-			buffer_printf(&cmd_builder, " -L 'wall_time: %lf'", limits->wall_time/1000000e0);
-
-		if(limits->cpu_time > -1)
-			buffer_printf(&cmd_builder, " -L 'cpu_time: %lf'", limits->cpu_time/1000000e0);
-
-		if(limits->cores > -1)
-			buffer_printf(&cmd_builder, " -L 'cores: %" PRId64 "'", limits->cores);
-
-		if(limits->max_concurrent_processes > -1)
-			buffer_printf(&cmd_builder, " -L 'max_concurrent_processes: %" PRId64 "'", limits->max_concurrent_processes);
-
-		if(limits->total_processes > -1)
-			buffer_printf(&cmd_builder, " -L 'total_processes: %" PRId64 "'", limits->total_processes);
-
-		if(limits->virtual_memory > -1)
-			buffer_printf(&cmd_builder, " -L 'virtual_memory: %" PRId64 "'", limits->virtual_memory);
-
-		if(limits->memory > -1)
-			buffer_printf(&cmd_builder, " -L 'memory: %" PRId64 "'", limits->memory);
-
-		if(limits->swap_memory > -1)
-			buffer_printf(&cmd_builder, " -L 'swap_memory: %" PRId64 "'", limits->swap_memory);
-
-		if(limits->bytes_read > -1)
-			buffer_printf(&cmd_builder, " -L 'bytes_read: %" PRId64 "'", limits->bytes_read);
-
-		if(limits->bytes_written > -1)
-			buffer_printf(&cmd_builder, " -L 'bytes_written: %" PRId64 "'", limits->bytes_written);
-
-		if(limits->total_files > -1)
-			buffer_printf(&cmd_builder, " -L 'total_files: %" PRId64 "'", limits->total_files);
-
-		if(limits->disk > -1)
-			buffer_printf(&cmd_builder, " -L 'disk: %" PRId64 "'", limits->disk);
+		const char **resources = rmsummary_list_resources();
+		const char *r;
+		for(r = resources[0]; r; r++) {
+			double v = rmsummary_get(limits, r);
+			if(v > -1) {
+				buffer_printf(&cmd_builder, " -L '%s: %s'", r, rmsummary_resource_to_str(r, v, 0));
+			}
+		}
 	}
 
 	if(extra_monitor_options)

@@ -169,8 +169,8 @@ void set_resources_from_env(struct rmsummary *rs, struct dag_variable_lookup_set
 	if(val) {
 		rs->cores = atoll(val->value);
         if(c && dag_variable_count(RESOURCES_CORES, &s) > 1) {
-            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %" PRId64,
-                    RESOURCES_CORES, c->name, rs->cores);
+            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %s",
+                    RESOURCES_CORES, c->name, rmsummary_resource_to_str("cores", rs->cores, 0));
         }
 	}
 
@@ -178,8 +178,8 @@ void set_resources_from_env(struct rmsummary *rs, struct dag_variable_lookup_set
 	if(val) {
 		rs->disk = atoll(val->value);
         if(c && dag_variable_count(RESOURCES_DISK, &s) > 1) {
-            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %" PRId64,
-                    RESOURCES_DISK, c->name, rs->disk);
+            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %s",
+                    RESOURCES_DISK, c->name, rmsummary_resource_to_str("disk", rs->disk, 0));
         }
 	}
 
@@ -187,8 +187,8 @@ void set_resources_from_env(struct rmsummary *rs, struct dag_variable_lookup_set
 	if(val) {
 		rs->memory = atoll(val->value);
         if(c && dag_variable_count(RESOURCES_MEMORY, &s) > 1) {
-            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %" PRId64,
-                    RESOURCES_MEMORY, c->name, rs->memory);
+            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %s",
+                    RESOURCES_MEMORY, c->name, rmsummary_resource_to_str("memory", rs->memory, 0));
         }
 	}
 
@@ -196,8 +196,8 @@ void set_resources_from_env(struct rmsummary *rs, struct dag_variable_lookup_set
 	if(val) {
 		rs->gpus = atoll(val->value);
         if(c && dag_variable_count(RESOURCES_GPUS, &s) > 1) {
-            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %" PRId64,
-                    RESOURCES_GPUS, c->name, rs->gpus);
+            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %s",
+                    RESOURCES_GPUS, c->name, rmsummary_resource_to_str("gpus", rs->gpus, 0));
         }
 	}
 
@@ -205,8 +205,8 @@ void set_resources_from_env(struct rmsummary *rs, struct dag_variable_lookup_set
 	if(val) {
 		rs->max_concurrent_processes = atoll(val->value);
         if(c && dag_variable_count(RESOURCES_MPI_PROCESSES, &s) > 1) {
-            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %" PRId64,
-                    RESOURCES_MPI_PROCESSES, c->name, rs->max_concurrent_processes);
+            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %s",
+                    RESOURCES_MPI_PROCESSES, c->name, rmsummary_resource_to_str("max_concurrent_processes", rs->max_concurrent_processes, 0));
         }
 	}
 
@@ -214,8 +214,8 @@ void set_resources_from_env(struct rmsummary *rs, struct dag_variable_lookup_set
 	if(val) {
 		rs->wall_time = atoll(val->value);
         if(c && dag_variable_count(RESOURCES_WALL_TIME, &s) > 1) {
-            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %" PRId64,
-                    RESOURCES_WALL_TIME, c->name, rs->wall_time);
+            debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %s",
+                    RESOURCES_WALL_TIME, c->name, rmsummary_resource_to_str("wall_time", rs->wall_time, 0));
         }
 
         /* value in RESOURCES_WALL_TIME is in seconds. struct rmsummary expects it in useconds. */

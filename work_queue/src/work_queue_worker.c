@@ -1532,7 +1532,10 @@ static int enforce_process_limits(struct work_queue_process *p) {
 
 	work_queue_process_measure_disk(p, max_time_on_measurement);
 	if(p->sandbox_size > p->task->resources_requested->disk) {
-		debug(D_WQ,"Task %d went over its disk size limit: %" PRId64 " MB > %" PRIu64 " MB\n", p->task->taskid, p->sandbox_size, p->task->resources_requested->disk);
+		debug(D_WQ,"Task %d went over its disk size limit: %s > %s\n",
+				p->task->taskid,
+				rmsummary_resource_to_str(p->sandbox_size, /* with units */ 1),
+				rmsummary_resource_to_str(p->task->resources_requested->disk, 1));
 		return 0;
 	}
 
@@ -1587,7 +1590,10 @@ static void enforce_processes_max_running_time() {
 			continue;
 
 		if(now < p->execution_start + p->task->resources_requested->wall_time) {
-			debug(D_WQ,"Task %d went over its running time limit: %" PRId64 " us > %" PRIu64 " us\n", p->task->taskid, now - p->execution_start, p->task->resources_requested->wall_time);
+			debug(D_WQ,"Task %d went over its running time limit: %s > %s\n",
+					p->task->taskid,
+					rmsummary_resource_to_str("wall_time", now - p->execution_start, 1),
+					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
 			p->task_status = WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME;
 			kill(pid, SIGKILL);
 		}

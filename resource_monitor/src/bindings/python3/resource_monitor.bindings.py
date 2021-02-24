@@ -38,8 +38,8 @@ cctools_debug_config('resource_monitor')
 # It can be used as a decorator, or called by itself.
 #
 # @param limits     Dictionary of resource limits to set. Available limits are:
-# - wall_time:                 time spent during execution (microseconds)
-# - cpu_time:                  user + system time of the execution (microseconds)
+# - wall_time:                 time spent during execution (seconds)
+# - cpu_time:                  user + system time of the execution (seconds)
 # - cores:                     peak number of cores used
 # - cores_avg:                 number of cores computed as cpu_time/wall_time
 # - max_concurrent_processes:  the maximum number of processes running concurrently
@@ -126,19 +126,24 @@ class ResourceExhaustion(Exception):
     # @param self                Reference to the current object.
     # @param resources           Dictionary of the resources measured at the time of the exhaustion.
     # @param function            Function that caused the exhaustion.
-    # @param args                List of positional arguments to function that caused the exhaustion.
-    # @param kwargs              Dictionary of keyword arguments to function that caused the exhaustion.
-    def __init__(self, resources, function, args=None, kwargs=None):
+    # @param fn_args             List of positional arguments to function that caused the exhaustion.
+    # @param fn_kwargs           Dictionary of keyword arguments to function that caused the exhaustion.
+    def __init__(self, resources, function, fn_args=None, fn_kwargs=None):
         r = resources
         l = resources['limits_exceeded']
-        ls = ["{limit}: {value}".format(limit=k, value=l[k]) for k in list(l.keys()) if (l[k] > -1 and l[k] < r[k])]
+        ls = ["{limit}: {value}".format(limit=k, value=l[k]) for k in rmsummary.list_resources() if l[k] > -1]
+
         message = 'Limits broken: {limits}'.format(limits=','.join(ls))
-        super(ResourceExhaustion, self).__init__(message)
+        super(ResourceExhaustion, self).__init__(resources, function, fn_args, fn_kwargs)
 
         self.resources = resources
         self.function = function
-        self.args = args
-        self.kwargs = kwargs
+        self.fn_args = fn_args
+        self.fn_kwargs = fn_kwargs
+        self.message = message
+
+    def __str__(self):
+        return self.message
 
 class ResourceInternalError(Exception):
     pass
@@ -223,7 +228,7 @@ def _watchman(results_queue, limits, callback, interval, function, args, kwargs)
 
         # resources_now keeps instantaneous measurements, resources_max keeps the maximum seen
         resources_now = rmonitor_minimonitor(MINIMONITOR_MEASURE, 0)
-        resources_max = rmsummary_copy(resources_now)
+        resources_max = rmsummary_copy(resources_now, 0)
 
         try:
             step = 0
@@ -256,7 +261,7 @@ def _watchman(results_queue, limits, callback, interval, function, args, kwargs)
             try:
                 (fun_result, resources_measured_end) = local_results.get(True, 5)
             except Exception as e:
-                e = ResourceInternalError("No result generated.")
+                e = ResourceInternalError("No result generated: %s", e)
                 cctools_debug(D_RMON, "{}".format(e))
                 raise e
 

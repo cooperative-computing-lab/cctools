@@ -11,6 +11,7 @@ See the file COPYING for details.
 */
 
 #include "hash_table.h"
+#include "itable.h"
 #include "histogram.h"
 #include "timestamp.h"
 
@@ -61,7 +62,7 @@ struct category {
 	/* if 1, use first allocations. 0, use max fixed (if given) */
 	struct rmsummary *autolabel_resource;
 
-	struct hash_table *histograms;
+	struct itable *histograms;
 
 	int64_t total_tasks;
 

@@ -16,7 +16,7 @@ const char *category = "test";
 
 
 void print_times(struct category *c) {
-    struct histogram *h = hash_table_lookup(c->histograms, "disk");
+    struct histogram *h = itable_lookup(c->histograms, rmsummary_resource_offset("disk"));
     int64_t n = histogram_size(h);
 
     double *keys = histogram_buckets(h);
@@ -89,14 +89,14 @@ int main(int argc, char **argv) {
 
     category_specify_allocation_mode(c, CATEGORY_ALLOCATION_MODE_MAX);
     category_update_first_allocation(c, NULL);
-    fprintf(stdout, "max seen:    %" PRId64 "\n", c->first_allocation->disk);
+    fprintf(stdout, "max seen:    %.0f\n", c->first_allocation->disk);
 
     category_specify_allocation_mode(c, CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT);
     category_update_first_allocation(c, NULL);
-    fprintf(stdout, "min waste:   %" PRId64 "\n", c->first_allocation->disk);
+    fprintf(stdout, "min waste:   %.0f\n", c->first_allocation->disk);
 
     category_specify_allocation_mode(c, CATEGORY_ALLOCATION_MODE_MIN_WASTE);
     category_update_first_allocation(c, NULL);
-    fprintf(stdout, "max through: %" PRId64 "\n", c->first_allocation->disk);
+    fprintf(stdout, "max through: %.0f\n", c->first_allocation->disk);
 }
 

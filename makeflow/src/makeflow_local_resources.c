@@ -9,12 +9,18 @@
 
 void makeflow_local_resources_print( struct rmsummary *r )
 {
-	printf("local resources: %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk\n",r->cores,r->memory,r->disk);
+	printf("local resources: %s, %s memory, %s disk\n",
+            rmsummary_resource_to_str("cores", r->cores, 1),
+            rmsummary_resource_to_str("memory", r->memory, 1),
+            rmsummary_resource_to_str("disk", r->disk, 1));
 }
 
 void makeflow_local_resources_debug( struct rmsummary *r )
 {
-	debug(D_MAKEFLOW,"local resources: %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk\n",r->cores,r->memory,r->disk);
+    debug(D_MAKEFLOW, "local resources: %s, %s memory, %s disk\n",
+            rmsummary_resource_to_str("cores", r->cores, 1),
+            rmsummary_resource_to_str("memory", r->memory, 1),
+            rmsummary_resource_to_str("disk", r->disk, 1));
 }
 
 void makeflow_local_resources_measure( struct rmsummary *r )

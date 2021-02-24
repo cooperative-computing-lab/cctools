@@ -339,13 +339,13 @@ void dag_node_print_debug_resources(struct dag_node *n)
 		return;
 
 	if( r->cores > -1 )
-		debug(D_MAKEFLOW_RUN, "cores:  %"PRId64".\n",      r->cores);
+		debug(D_MAKEFLOW_RUN, "cores:  %s\n", rmsummary_resource_to_str("cores", r->cores, 0));
 	if( r->memory > -1 )
-		debug(D_MAKEFLOW_RUN, "memory:   %"PRId64" MB.\n", r->memory);
+		debug(D_MAKEFLOW_RUN, "memory: %s\n", rmsummary_resource_to_str("memory", r->memory, 1));
 	if( r->disk > -1 )
-		debug(D_MAKEFLOW_RUN, "disk:     %"PRId64" MB.\n", r->disk);
+		debug(D_MAKEFLOW_RUN, "disk:   %s\n", rmsummary_resource_to_str("disk", r->disk, 0));
 	if( r->gpus > -1 )
-		debug(D_MAKEFLOW_RUN, "gpus:  %"PRId64".\n",       r->gpus);
+		debug(D_MAKEFLOW_RUN, "gpus:   %s\n", rmsummary_resource_to_str("gpus", r->gpus, 1));
 }
 
 void dag_node_add_local_environment(struct jx *j) {
