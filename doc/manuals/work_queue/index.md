@@ -112,7 +112,7 @@ one worker on the same machine by opening a new shell and running:
 
     
 ```sh
-# Substitute the name of your machine for MACHINENAME.
+# Substitute the IP or name of your machine for MACHINENAME.
 $ work_queue_worker MACHINENAME 9123
 ```
 
@@ -524,55 +524,15 @@ to the following section on describing [task resources](#task-resources) and [wo
 
 ## Managing Resources
 
-### Task Resources
-
 Unless otherwise specified, Work Queue assumes that a single task runs on a
 single worker at a time, and a single worker occupies an entire machine.
 
-However, if you have large multi-core machines and multi-threaded tasks, you
-will want one worker to manage multiple tasks running on a machine. For
+However, if the resources at a machine are larger than what you know a task
+requires, you most likely you will want one worker to manage multiple tasks
+running on that machine. For
 example, if you have a 8-core machine, then you might want to run four 2-core
 tasks on a single worker at once, being careful not to exceed the available
 memory and disk.
-
-To run several tasks in a worker, every task should describe the resources
-that it uses, for example:
-
-#### Python
-
-```python
-t.specify_cores(2)    #needs 2 cores
-t.specify_memory(100) #needs 100 MB memory
-t.specify_disk(1000)  #needs 1 GB disk
-t.specify_gpus(0)     #does not need a GPU
-```
-
-#### Perl
-
-```perl
-$t->specify_cores(2);    #needs 2 cores
-$t->specify_memory(100); #needs 100 MB memory
-$t->specify_disk(1000);  #needs 1 GB disk
-$t->specify_gpus(0);     #does not need a GPU
-```
-
-#### C
-
-```C
-work_queue_task_specify_cores(t, 2);    //needs 2 cores
-work_queue_task_specify_memory(t, 100); //needs 100 MB memory
-work_queue_task_specify_disk(t, 1000);  //needs 1 GB disk
-work_queue_task_specify_gpu(t, 0);      //does not need a GPU
-```
-
-Note that if no requirements are specified, a task consumes an entire worker.
-**All resource requirements must be specified in order to run multiple tasks on
-a single worker.** For example, if you annotate a task as using 1 core, but
-don't specify its memory or disk requirments, Work Queue will only schedule one
-task to a two-core worker. However, if you annotate the core, memory, and disc
-requirements for a task, Work Queue can schedule two such tasks to a two- task
-worker, assuming it has the available memory and disk requirements for each
-individual task.
 
 ### Worker Resources
 
@@ -582,7 +542,7 @@ for example:
 
 ```
 work_queue_worker: creating workspace /tmp/worker-102744-8066
-work_queue_worker: using 16 cores, 15843 MB memory, 61291 MB disk, 1 gpus
+work_queue_worker: using 16 cores, 15843 MB memory, 61291 MB disk, 0 gpus
 ```
 
 You can manually adjust the resources managed by a worker like this:
@@ -649,6 +609,87 @@ specified in the configuration file as follows:
 
 Both memory and disk are specified in `MB`.
  
+
+### Specifying Task Resources
+
+To run several task in a worker, every task must have a description of the
+resources it uses, in terms of cores, memory, and disk:
+
+#### Python
+
+```python
+t.specify_cores(2)    #needs 2 cores
+t.specify_memory(100) #needs 100 MB memory
+t.specify_disk(1000)  #needs 1 GB disk
+```
+
+#### Perl
+
+```perl
+$t->specify_cores(2);    #needs 2 cores
+$t->specify_memory(100); #needs 100 MB memory
+$t->specify_disk(1000);  #needs 1 GB disk
+```
+
+#### C
+
+```C
+work_queue_task_specify_cores(t, 2);    //needs 2 cores
+work_queue_task_specify_memory(t, 100); //needs 100 MB memory
+work_queue_task_specify_disk(t, 1000);  //needs 1 GB disk
+```
+
+!!! warning
+    Note that if no requirements are specified, a task consumes an entire worker.
+
+When a task only specifies some of the resources, then the rest get a default
+proportional in the worker the task will be executed, rounding up. Thus, for
+example, if task specifies that it will use two cores, but does not specify
+memory or disk, it will be allocated %50 of memory and disk in 4-core workers,
+or %25 in 8-core workers. When more than one resource is specified, the default
+uses the largest proportion.
+
+Proportions are round up. The current Work Queue implementation only accepts
+whole integers for its resources, which means that no worker can concurrently
+execute more tasks than its number of cores. This will likely change in the
+future.
+
+!!! warning
+    It is an error for all specified resources to be `0`. At least one of the
+    specified resources should be larger than 0.
+
+
+### Specifying GPUs
+
+Unlike other resources, the default value for gpus in both tasks and workers is
+0. You can use the command line option `--gpus` to declare how many gpus are
+available at a worker.
+
+For tasks, you can specify the number of gpus needed similar to other
+resources:
+
+#### Python
+
+```python
+t.specify_gpus(1)     #needs 1 gpu
+```
+
+#### Perl
+
+```perl
+$t->specify_gpus(1);     #needs 1 gpu
+```
+
+#### C
+
+```C
+work_queue_task_specify_gpus(t, 1);  //needs 1 gpu
+```
+
+For tasks that specify gpus but do not specify cores, the number of cores
+allocated is 0. If memory or disk are not specified, the task is allocated a
+value proportional to the number of gpus used at the worker the task executes,
+as it is done for cores.
 
 
 ## Recommended Practices
