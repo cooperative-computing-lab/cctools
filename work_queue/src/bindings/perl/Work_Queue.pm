@@ -1145,11 +1145,11 @@ Hash reference indicating minimum values. See @resources_measured for possible f
 
 A minimum of 2 cores is found on any worker:
 
-		q->specify_min_resources({'cores' => 2});
+		$q->specify_min_resources({'cores' => 2});
 
 A minimum of 4 cores, 1GB of memory, and 10GB disk are found on any worker:
 
-		q->specify_min_resources({'cores' => 4, 'memory' => 1024, 'disk' => 10240});
+		$q->specify_min_resources({'cores' => 4, 'memory' => 1024, 'disk' => 10240});
 
 
 =head3 C<specify_category_max_resources>
@@ -1168,11 +1168,11 @@ Hash reference indicating maximum values. See @resources_measured for possible f
 
 A maximum of 4 cores is found on any worker:
 
-		q->specify_category_max_resources('my_category', {'cores' => 4});
+		$q->specify_category_max_resources('my_category', {'cores' => 4});
 
 A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
 
-		q->specify_category_max_resources('my_category', {'cores' => 8, 'memory' => 1024, 'disk' => 10240});
+		$q->specify_category_max_resources('my_category', {'cores' => 8, 'memory' => 1024, 'disk' => 10240});
 
 
 =head3 C<specify_category_min_resources>

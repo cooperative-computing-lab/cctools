@@ -551,6 +551,10 @@ You can manually adjust the resources managed by a worker like this:
 ```sh
 $ work_queue_worker --cores 8  --memory 1000 --disk 8000 --gpus 1
 ```
+
+Unlike other resources, the default value for gpus is 0. You can use the
+command line option `--gpus` to declare how many gpus are available at a
+worker.
     
 You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options when using
 batch submission scripts such as `condor_submit_workers` or
@@ -613,83 +617,208 @@ Both memory and disk are specified in `MB`.
 ### Specifying Task Resources
 
 To run several task in a worker, every task must have a description of the
-resources it uses, in terms of cores, memory, and disk:
+resources it uses, in terms of cores, memory, disk, and gpus. Several tasks
+usually share the same resource description, and to this end, Work Queue allows
+you to tasks into groups called **categories**. You can attach resource
+descriptions to each category, and then label a task to set it as part of a
+category.
+
+We can create some categories with their resource description as follows:
 
 #### Python
 
 ```python
-t.specify_cores(2)    #needs 2 cores
-t.specify_memory(100) #needs 100 MB memory
-t.specify_disk(1000)  #needs 1 GB disk
+# memory and disk values in MB.
+q.specify_category_max_resources('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
+q.specify_category_max_resources('my-category-b', {'cores': 1})
+q.specify_category_max_resources('my-category-c', {})
 ```
-
-#### Perl
 
 ```perl
-$t->specify_cores(2);    #needs 2 cores
-$t->specify_memory(100); #needs 100 MB memory
-$t->specify_disk(1000);  #needs 1 GB disk
+# memory and disk values in MB.
+$q->specify_category_max_resources('my-category-a', {'cores' => 2, 'memory' => 1024, 'disk' => 2048, 'gpus' => 0})
+$q->specify_category_max_resources('my-category-b', {'cores' => 1})
+$q->specify_category_max_resources('my-category-c', {})
 ```
 
-#### C
-
-```C
-work_queue_task_specify_cores(t, 2);    //needs 2 cores
-work_queue_task_specify_memory(t, 100); //needs 100 MB memory
-work_queue_task_specify_disk(t, 1000);  //needs 1 GB disk
-```
-
-!!! warning
-    Note that if no requirements are specified, a task consumes an entire worker.
-
-When a task only specifies some of the resources, then the rest get a default
-proportional in the worker the task will be executed, rounding up. Thus, for
-example, if task specifies that it will use two cores, but does not specify
-memory or disk, it will be allocated %50 of memory and disk in 4-core workers,
-or %25 in 8-core workers. When more than one resource is specified, the default
-uses the largest proportion.
-
-Proportions are round up. The current Work Queue implementation only accepts
-whole integers for its resources, which means that no worker can concurrently
-execute more tasks than its number of cores. This will likely change in the
-future.
-
-!!! warning
-    It is an error for all specified resources to be `0`. At least one of the
-    specified resources should be larger than 0.
-
-
-### Specifying GPUs
-
-Unlike other resources, the default value for gpus in both tasks and workers is
-0. You can use the command line option `--gpus` to declare how many gpus are
-available at a worker.
-
-For tasks, you can specify the number of gpus needed similar to other
-resources:
-
-#### Python
+In the previous examples, we created three categories. Note that it is not
+necessary to specify all the resources, as Work Queue can be directed to
+compute some efficient defaults. To assign a task to a category:
 
 ```python
-t.specify_gpus(1)     #needs 1 gpu
+t.specify_category('my-category-a')
 ```
-
-#### Perl
 
 ```perl
-$t->specify_gpus(1);     #needs 1 gpu
+$t->specify_category('my-category-a')
 ```
 
-#### C
+When all cores, memory, and disk are specified, Work Queue will simply fit as
+many tasks as possible without going above the resources available at a
+particular worker.
 
-```C
-work_queue_task_specify_gpus(t, 1);  //needs 1 gpu
+When a category leaves some resource unspecified, then Work Queue tries to find
+some reasonable defaults as follows:
+
+- Unspecified gpus are always zero.
+- If a task specifies gpus, then the default cores is zero.
+- If no resources are specified, then a single task from the category will consume a **whole worker**.
+- Unspecified cores, memory and disk will get a default according to the
+  proportion the specified resources will use at a worker, rounding-up. Thus,
+  if task specifies that it will use two cores, but does not specify memory or
+  disk, it will be allocated %50 of memory and disk in 4-core workers, or %25
+  in 8-core workers. When more than one resource is specified, the default uses
+  the largest proportion.
+- It is an error to specify all resources to 0.
+
+The current Work Queue implementation only accepts whole integers for its
+resources, which means that no worker can concurrently execute more tasks than
+its number of cores. (This will likely change in the future.)
+
+When the resources used by a task are unknown, Work Queue can measure and
+compute efficient resource values to maximize throughput or minimize waste, as
+we explain in the following sections. 
+
+### Monitoring and Enforcement
+
+So far we have used resources values simply as hints to Work Queue to schedule
+concurrent tasks at workers. By default, Work Queue does not monitor or enforce
+these limits. You can enable monitoring and enforcement as follows:
+
+
+```python
+# Measure the resources used by tasks, and terminate tasks that go above their
+# resources:
+q.enable_monitoring()
+
+# Measure the resources used by tasks, but do not terminate tasks that go above
+# declared resources:
+q.enable_monitoring(watchdog=False)
 ```
 
-For tasks that specify gpus but do not specify cores, the number of cores
-allocated is 0. If memory or disk are not specified, the task is allocated a
-value proportional to the number of gpus used at the worker the task executes,
-as it is done for cores.
+```perl
+# Measure the resources used by tasks, and terminate tasks that go above their
+# resources:
+$q->enable_monitoring()
+
+# Measure the resources used by tasks, but do not terminate tasks that go above
+# declared resources:
+$q->enable_monitoring(watchdog => 0)
+```
+
+When monitoring is enabled, you can explore the resources measured when a task
+returns:
+
+```python
+t = q.wait()
+if t:
+    print("Task used {} cores, {} MB memory, {} MB disk",
+        t.resources_measured.cores,
+        t.resources_measured.memory,
+        t.resources_measured.disk)
+    print("Task was allocated {} cores, {} MB memory, {} MB disk",
+        t.resources_requested.cores,
+        t.resources_requested.memory,
+        t.resources_requested.disk)
+    if t.limits_exceeded and t.limits_exceeded.cores > -1:
+        print("Task exceeded its cores allocation.")
+```
+
+```perl
+my $t = $q=>wait()
+if($t) {
+    say("Task used %f cores, %f MB memory, %f MB disk",
+        $t->resources_measured->{cores},
+        $t->resources_measured->{memory},
+        $t->resources_measured->{disk})
+    say("Task was allocated %f cores, %f MB memory, %f MB disk",
+        t.resources_requested->{cores},
+        t.resources_requested->{memory},
+        t.resources_requested->{disk})
+    if($t->limits_exceeded and $t->limits_exceeded{cores} > -1) {
+        say("Task exceeded its cores allocation.")
+    }
+}
+```
+
+Work Queue also measures other resources, such as peak `bandwidth`,
+`bytes_read`, `bytes_written`, `bytes_sent`, `bytes_received`,
+`total_files`, `cpu_time`, and `wall_time`.
+
+
+### Automatic Management of Task Resources
+
+If the resources a category uses are unknown, then Work Queue can be directed
+to find efficient resource values to maximize throughput or minimize resources
+wasted. In these modes, if a value for a resource is specified with
+`specify_max_resources`, then it is used as a theoretical maximum.
+
+When automatically computing resources, if any of cores, memory or disk are
+left unspecified in `specify_max_resources`, then Work Queue will run some
+tasks using whole workers to collect some resource usage statistics. If all
+cores, memory, and disk are specified, then Work Queue uses these maximum
+values instead of using whole workers. As before, unspecified gpus default to 0.
+
+Once some statistics are available, further tasks may run with smaller
+allocations if such a change would increase throughput. Should a task exhaust
+its resources, it will be retried using the values of `specify_max_resources`,
+or a whole worker, as explained before.
+
+Automatic resource management is enabled per category as follows:
+
+```python
+q.enable_monitoring()
+q.specify_category_max_resources('my-category-a', {})
+q.specify_category_mode('my-category-a', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+
+q.specify_category_max_resources('my-category-b', {'cores': 2})
+q.specify_category_mode('my-category-b', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+```
+
+```perl
+$q->enable_monitoring()
+$q->specify_category_max_resources('my-category-a', {})
+$q->specify_category_mode('my-category', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+
+$q->specify_category_max_resources('my-category-b', {'cores' => 2})
+$q->specify_category_mode('my-category', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+```
+
+In the previous examples, tasks in 'my-category-b' will never use more than two
+cores, while tasks in 'my-category-a' are free to use as many cores as the
+largest worker available if needed.
+
+You can set a limit on the minimum resource value a category can use. The
+automatic resource computation will never go below the values specified:
+
+```python
+q.specify_category_min_resources('my-category-a', {'memory': 512})
+```
+
+```perl
+$q->specify_category_min_resources('my-category-a', {'memory' => 512})
+```
+
+You can enquire about the resources computed per category with
+`work_queue_status`:
+
+
+```
+$ work_queue_status -A  IP-OF-MACHINE-HOSTING-WQ PORT-OF-WQ
+CATEGORY        RUNNING    WAITING  FIT-WORKERS  MAX-CORES MAX-MEMORY   MAX-DISK
+analysis            216        784           54          4      ~1011      ~3502
+merge                20         92           30         ~1      ~4021      21318
+default               1         25           54         >1       ~503       >243
+```
+
+In the above, we have three categories, with RUNNING and WAITING tasks. The
+column FIT-WORKERS shows the count of workers that can fit at least one task in
+that category using the maximum resources either set or found. Values for max
+cores, memory and disk have modifiers `~` and `>` as follows:
+
+- No modifier: The maximum resource usage set with `specify_category_max_resources`.
+- ~: The maximum resource usage so far seen when resource is left unspecified in `specify_category_max_resources`. All tasks so far have run with no more than this resource value allocated.
+- >: The maximum resource usage that has caused a resource exhaustion. If this value is larger than then one specified with `specify_category_max_resources`, then tasks that exhaust resources are not retried. Otherwise, if a maximum was not set, the tasks will be retried in larger workers as workers become available.
 
 
 ## Recommended Practices
