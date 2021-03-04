@@ -80,8 +80,6 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 - **-w --tcp-window-size <size>** Set TCP window size.
 - **-i --min-backoff <time>** Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
 - **-b --max-backoff <time>** Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
-- **-z --disk-threshold <size>** Minimum free disk space in MB. When free disk space is less than this value, the worker will clean up and try to reconnect. (default=100MB)
-- **--memory-threshold size** Set available memory threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
 - **-A --arch <arch>** Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
 - **-O --os <os>** Set the operating system string the worker reports to its supervisor. (default=the value reported by uname)
 - **-s --workdir <path>** Set the location where the worker should create its working directory. (default=/tmp)

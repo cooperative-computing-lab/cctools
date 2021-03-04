@@ -126,10 +126,6 @@ static int abort_signal_received = 0;
 // Flag used to indicate a child must be waited for.
 static int sigchld_received_flag = 0;
 
-// Threshold for available memory, and disk space (MB) beyond which clean up and quit.
-static int64_t disk_avail_threshold = 100;
-static int64_t memory_avail_threshold = 100;
-
 // Password shared between manager and worker.
 char *password = 0;
 
@@ -370,16 +366,16 @@ static void send_resource_update(struct link *manager)
 	time_t stoptime = time(0) + active_timeout;
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
-		total_resources->disk.total = local_resources->disk.total - disk_avail_threshold;
+		total_resources->disk.total = local_resources->disk.total;
 		total_resources->disk.inuse = local_resources->disk.inuse;
 	} else {
-		total_resources->memory.total    = MAX(0, local_resources->memory.total    - memory_avail_threshold);
-		total_resources->memory.largest  = MAX(0, local_resources->memory.largest  - memory_avail_threshold);
-		total_resources->memory.smallest = MAX(0, local_resources->memory.smallest - memory_avail_threshold);
+		total_resources->memory.total    = MAX(0, local_resources->memory.total);
+		total_resources->memory.largest  = MAX(0, local_resources->memory.largest);
+		total_resources->memory.smallest = MAX(0, local_resources->memory.smallest);
 
-		total_resources->disk.total    = MAX(0, local_resources->disk.total    - disk_avail_threshold);
-		total_resources->disk.largest  = MAX(0, local_resources->disk.largest  - disk_avail_threshold);
-		total_resources->disk.smallest = MAX(0, local_resources->disk.smallest - disk_avail_threshold);
+		total_resources->disk.total    = MAX(0, local_resources->disk.total);
+		total_resources->disk.largest  = MAX(0, local_resources->disk.largest);
+		total_resources->disk.smallest = MAX(0, local_resources->disk.smallest);
 	}
 
 	work_queue_resources_send(manager,total_resources,stoptime);
@@ -1100,7 +1096,7 @@ name for validity.
 
 static int do_put_file_internal( struct link *manager, char *filename, int64_t length, int mode )
 {
-	if(!check_disk_space_for_filesize(".", length, disk_avail_threshold)) {
+	if(!check_disk_space_for_filesize(".", length, 0)) {
 		debug(D_WQ, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
@@ -1769,8 +1765,8 @@ static int enforce_worker_limits(struct link *manager) {
 		return 0;
 	}
 
-	if( manual_disk_option > 0 && local_resources->disk.inuse > (manual_disk_option - disk_avail_threshold/2) ) {
-		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - --disk-threshold < disk used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", workspace, manual_disk_option, disk_avail_threshold, local_resources->disk.inuse);
+	if( manual_disk_option > 0 && local_resources->disk.inuse > manual_disk_option ) {
+		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
 
 		if(manager) {
 			send_manager_message(manager, "info disk_exhausted %lld\n", (long long) local_resources->disk.inuse);
@@ -1779,8 +1775,8 @@ static int enforce_worker_limits(struct link *manager) {
 		return 0;
 	}
 
-	if( manual_memory_option > 0 && local_resources->memory.inuse > (manual_memory_option - memory_avail_threshold/2) ) {
-		fprintf(stderr,"work_queue_worker: used more than declared memory (--memory - --memory-threshold < memory used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", manual_memory_option, memory_avail_threshold, local_resources->memory.inuse);
+	if(manual_memory_option > 0 && local_resources->memory.inuse > manual_memory_option) {
+		fprintf(stderr,"work_queue_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.inuse);
 
 		if(manager) {
 			send_manager_message(manager, "info memory_exhausted %lld\n", (long long) local_resources->memory.inuse);
@@ -2458,10 +2454,6 @@ static void show_help(const char *cmd)
 	printf( " %-30s to a manager. (default=%ds)\n", "", init_backoff_interval);
 	printf( " %-30s Set maximum value for backoff interval when worker fails to connect\n", "-b,--max-backoff=<time>");
 	printf( " %-30s to a manager. (default=%ds)\n", "", max_backoff_interval);
-	printf( " %-30s Minimum free disk space in MB. When free disk space is less than this value, the\n", "-z,--disk-threshold=<size>");
-	printf( " %-30s worker will clean up and try to reconnect. (default=%" PRIu64 "MB)\n", "", disk_avail_threshold);
-	printf( " %-30s Set available memory size threshold (in MB). When exceeded worker will\n", "--memory-threshold=<size>");
-	printf( " %-30s clean up and reconnect. (default=%" PRIu64 "MB)\n", "", memory_avail_threshold);
 	printf( " %-30s Set architecture string for the worker to report to manager instead\n", "-A,--arch=<arch>");
 	printf( " %-30s of the value in uname (%s).\n", "", arch_name);
 	printf( " %-30s Set operating system string for the worker to report to manager instead\n", "-O,--os=<os>");
@@ -2652,10 +2644,10 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'z':
-			disk_avail_threshold = atoll(optarg) * MEGA;
+			/* deprecated */
 			break;
 		case LONG_OPT_MEMORY_THRESHOLD:
-			memory_avail_threshold = atoll(optarg);
+			/* deprecated */
 			break;
 		case 'A':
 			free(arch_name); //free the arch string obtained from uname
@@ -2799,16 +2791,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	//checks disk options make sense
-	if(manual_disk_option > 0 &&  manual_disk_option <= disk_avail_threshold) {
-		fatal("Disk space specified (%" PRId64 " MB) is less than minimum threshold (%"PRId64 " MB).\n See --disk and --disk-threshold options.", manual_disk_option, disk_avail_threshold);
-	}
-
-	//checks memory options make sense
-	if(manual_memory_option > 0 &&  manual_memory_option <= memory_avail_threshold) {
-		fatal("Memory specified (%" PRId64 " MB) is less than minimum threshold (%"PRId64 " MB).\n See --memory and --memory-threshold options.", manual_memory_option, memory_avail_threshold);
-	}
-
 	if(!project_regex) {
 		if((argc - optind) < 1 || (argc - optind) > 2) {
 			show_help(argv[0]);
@@ -2938,11 +2920,6 @@ int main(int argc, char *argv[])
 	procs_complete = itable_create(0);
 
 	watcher = work_queue_watcher_create();
-
-	if(!check_disk_space_for_filesize(".", 0, disk_avail_threshold)) {
-		fprintf(stderr,"work_queue_worker: %s has less than minimum disk space %"PRIu64" MB\n",workspace,disk_avail_threshold);
-		return 1;
-	}
 
 	local_resources = work_queue_resources_create();
 	total_resources = work_queue_resources_create();
