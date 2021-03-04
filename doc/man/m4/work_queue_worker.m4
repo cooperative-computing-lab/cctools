@@ -58,8 +58,6 @@ OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time. (default=
 OPTION_TRIPLET(-w, tcp-window-size, size)Set TCP window size.
 OPTION_TRIPLET(-i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
 OPTION_TRIPLET(-b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
-OPTION_TRIPLET(-z, disk-threshold, size)Minimum free disk space in MB. When free disk space is less than this value, the worker will clean up and try to reconnect. (default=100MB)
-OPTION_PAIR(--memory-threshold, size)Set available memory threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
 OPTION_TRIPLET(-A, arch, arch)Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
 OPTION_TRIPLET(-O, os, os)Set the operating system string the worker reports to its supervisor. (default=the value reported by uname)
 OPTION_TRIPLET(-s, workdir, path)Set the location where the worker should create its working directory. (default=/tmp)
