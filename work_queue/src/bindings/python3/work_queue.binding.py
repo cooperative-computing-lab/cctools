@@ -283,7 +283,7 @@ class Task(object):
     # @param flags          May take the same values as @ref specify_file.
     # @param cache          Whether the file should be cached at workers (True/False)
     def specify_buffer(self, buffer, remote_name, flags=None, cache=None):
-        flags = Task._determine_file_flags(flags, cache)
+        flags = Task._determine_file_flags(flags, cache, None)
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     # When monitoring, indicates a json-encoded file that instructs the monitor
