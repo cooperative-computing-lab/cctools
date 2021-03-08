@@ -449,8 +449,8 @@ class Stat(object):
     ##
     # Target path.
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.path
     # @endcode
@@ -461,8 +461,8 @@ class Stat(object):
     ##
     # ID of device containing file.
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.device
     # @endcode
@@ -473,8 +473,8 @@ class Stat(object):
     ##
     # inode number
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.inode
     # @endcode
@@ -485,8 +485,8 @@ class Stat(object):
     ##
     # file mode permissions
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.mode
     # @endcode
@@ -497,8 +497,8 @@ class Stat(object):
     ##
     # number of hard links
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.nlink
     # @endcode
@@ -509,8 +509,8 @@ class Stat(object):
     ##
     # user ID of owner
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.uid
     # @endcode
@@ -521,8 +521,8 @@ class Stat(object):
     ##
     # group ID of owner
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.gid
     # @endcode
@@ -533,8 +533,8 @@ class Stat(object):
     ##
     # device ID if special file
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.rdev
     # @endcode
@@ -545,8 +545,8 @@ class Stat(object):
     ##
     # total size, in bytes
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.size
     # @endcode
@@ -557,8 +557,8 @@ class Stat(object):
     ##
     # block size for file system I/O
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.block_size
     # @endcode
@@ -569,8 +569,8 @@ class Stat(object):
     ##
     # number of 512B blocks allocated
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.blocks
     # @endcode
@@ -581,8 +581,8 @@ class Stat(object):
     ##
     # number of seconds since epoch since last access
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.atime
     # @endcode
@@ -593,8 +593,8 @@ class Stat(object):
     ##
     # number of seconds since epoch since last modification
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.mtime
     # @endcode
@@ -605,8 +605,8 @@ class Stat(object):
     ##
     # number of seconds since epoch since last status change
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # @a Note: This is defined using property decorator. So it must be called
+    # without parentheses (). For example:
     # @code
     # >>> print s.ctime
     # @endcode
