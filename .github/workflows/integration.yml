@@ -1,0 +1,31 @@
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'release/*'
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DOCKER_IMAGE: ${{ matrix.docker-image }}
+      OS_NAME: linux
+    strategy: 
+      matrix:
+        docker-image: ['cclnd/cctools-env:x86_64-centos7', 'cclnd/cctools-env:x86_64-centos8', 'cclnd/cctools-env:x86_64-ubuntu20.04']
+    container: ${{ matrix.docker-image }}
+    steps:
+      - name: checkout CCTools repo
+        uses: actions/checkout@v2
+      - name: build
+        run: ${GITHUB_WORKSPACE}/packaging/scripts/build.sh
+      - name: release tagged
+        if: startsWith(${{ github.ref }}, 'refs/tags/')
+        run: echo "tag ${{ github.ref }} to be deployed from /tmp/cctools-*.tar.gz"
+
