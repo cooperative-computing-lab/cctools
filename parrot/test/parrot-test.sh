@@ -1,3 +1,13 @@
+check_needed()
+{
+	if [ "${PARROT_SKIP_TEST}" = yes ]
+	then
+		return 1
+	else
+		return 0
+	fi
+}
+
 parrot() {
 	export PARROT_HELPER=$(readlink -e ../src/libparrot_helper.so)
 	parrot_tmp_debug=$(mktemp ./parrot.debug.XXXXXX)
