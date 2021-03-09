@@ -38,12 +38,8 @@ then
     STATIC_WORKER=1
 fi
 
-# disable perl bindings in osx (to compile as we do in conda)
-perl_option=''
-if [[ "${TRAVIS_OS_NAME}" = osx ]]
-then
-    perl_option='--with-perl-path no'
-fi
+# disable perl bindings (to compile as we do in conda)
+perl_option='--with-perl-path no'
 
 # using rpm for centos8
 if [[ "${DOCKER_IMAGE}" = "cclnd/cctools-env:x86_64-centos8" ]]
