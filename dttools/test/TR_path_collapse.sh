@@ -6,10 +6,11 @@ exe="path_collapse.test"
 
 prepare()
 {
-	${CC} -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none ../src/libdttools.a -lm <<EOF
+	${CC} -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none -I ../src ../src/libdttools.a -lm <<EOF
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "path.h"
 
 void test (const char *in, const char *expected, int dots)
 {

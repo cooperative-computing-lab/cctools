@@ -11,7 +11,6 @@ prepare()
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "path.h"
 
 void test (const char *in, const char *expected)
