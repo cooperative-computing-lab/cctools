@@ -5,6 +5,7 @@ set -ex
 . ../../dttools/test/test_runner_common.sh
 . ./parrot-test.sh
 
+
 prepare()
 {
 	echo '#!/bin/sh' > target.sh
