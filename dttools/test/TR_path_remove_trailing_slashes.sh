@@ -6,11 +6,12 @@ exe="path_remove_trailing_slashes.test"
 
 prepare()
 {
-	${CC} -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none ../src/libdttools.a -lm <<EOF
+	${CC} -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none -I ../src ../src/libdttools.a -lm <<EOF
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "path.h"
 
 void test (const char *in, const char *expected)
 {
