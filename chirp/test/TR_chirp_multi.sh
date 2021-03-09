@@ -11,6 +11,16 @@ c2="./hostport.2.$PPID"
 VOLUME="tank"
 VOLUME_KEY="b63ae12fe3c8708ecae4d3cba504f5705af1440e" # `echo -n "$VOLUME" | sha1sum | awk '{print $1}'`
 
+check_needed()
+{
+	if [ "${PARROT_SKIP_TEST}" = yes ]
+	then
+		return 1
+	else
+		return 0
+	fi
+}
+
 prepare()
 {
 	chirp_start local
