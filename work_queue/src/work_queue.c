@@ -2663,6 +2663,7 @@ static work_queue_msg_code_t process_http_request( struct work_queue *q, struct 
 	} else {
 	        // Other requests get raw JSON data.
 		send_worker_msg(q,w,"Content-type: text/plain\n\n");
+		send_worker_msg(q,w,"Access-Control-Allow-Origin: *\n\n");
 		process_queue_status(q, w, &path[1], stoptime );
 	}
 
