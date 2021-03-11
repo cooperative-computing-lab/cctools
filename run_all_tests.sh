@@ -5,12 +5,6 @@ if [ ! -r config.mk ]; then
 	exit 1
 fi
 
-if [ "$(id -u)" -eq 0 ]; then
-	echo "Running tests as root is not supported."
-	exit 0
-fi
-
-
 if [ -z "$CCTOOLS_PACKAGES_TEST" ]
 then
 	CCTOOLS_PACKAGES_TEST=$(grep CCTOOLS_PACKAGES config.mk | cut -d = -f 2)
