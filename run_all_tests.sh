@@ -72,12 +72,11 @@ for package in ${CCTOOLS_PACKAGES_TEST}; do
 						echo "======== ${script} PREPARE ========"
 						"./${script}" prepare
 						result=$?
-						if [ $result -ne 0 ]; then
-							exit $result
+						if [ $result = 0 ]; then
+							echo "======== ${script} RUN ========"
+							"./${script}" run
+							result=$?
 						fi
-						echo "======== ${script} RUN ========"
-						"./${script}" run
-						result=$?
 						echo "======== ${script} CLEAN ========"
 						"./${script}" clean
 						exit $result
