@@ -16,25 +16,36 @@ chirp_server() {
 }
 
 chirp_start() {
-	acl=`mktemp ./chirp.acl.XXXXXX`
-	debug=`mktemp ./chirp.debug.XXXXXX`
-	pid=`mktemp ./chirp.pid.XXXXXX`
-	port=`mktemp ./chirp.port.XXXXXX`
-	transient=`mktemp -d ./chirp.transient.XXXXXX`
+	if [ "$(id -u)" -eq 0 ]; then
+		test_dir=`mktemp -d /tmp/chirp.test_dir.XXXXXX`
+	else
+		test_dir=`mktemp -d chirp.test_dir.XXXXXX`
+	fi
+
+	echo $test_dir
+
 	if [ "$1" = local ]; then
-		root=`mktemp -d ./chirp.root.XXXXXX`
-		if [ "$(id -u)" -eq 0 ]; then
-			verbose chown 9999 "$root"
-		fi
+		root="$test_dir/chirp.root"
+		mkdir -p "$root"
 	else
 		root="$1"
 	fi
+
+	acl="$test_dir/chirp.acl"
+	debug="$test_dir/chirp.debug"
+	pid="$test_dir/chirp.pid"
+	port="$test_dir/chirp.port"
+	transient="$test_dir/chirp.transient"
+	touch "$acl" "$debug" "$pid" "$port"
+	mkdir -p "$transient"
 	shift
+
 	if [ "$(id -u)" -eq 0 ]; then
+		echo "$acl"
 		cat >> "$acl" <<EOF
 unix:root rwlda
 EOF
-		verbose chown 9999 "$acl" "$debug" "$pid" "$transient"
+		verbose chown -R 9999 "$test_dir"
 		chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --default-acl="$acl" --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" --user=9999 "$@"
 	else
 		chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"
@@ -67,14 +78,18 @@ EOF
 }
 
 chirp_clean() {
-	for pid in ./chirp.pid.*; do
-		pid=$(cat "$pid")
-		echo kill $pid
-		if ! kill $pid; then
-			echo could not kill $pid
+	set +e
+	for pid in ./chirp.test_dir.*/chirp.pid /tmp/chirp.test_dir.*/chirp.pid; do
+		if [ -e "$pid" ]
+		then
+			pid=$(cat "$pid")
+			echo kill $pid
+			if ! kill $pid; then
+				echo could not kill $pid
+			fi
 		fi
 	done
-	verbose rm -rf ./chirp.acl.* ./chirp.debug.* ./chirp.pid.* ./chirp.port.* ./chirp.transient.* ./chirp.root.*
+	verbose rm -rf ./chirp.test_dir.* /tmp/chirp.test_dir.*
 	return 0
 }
 
