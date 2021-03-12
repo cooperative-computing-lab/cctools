@@ -14,7 +14,7 @@ fi
 if [ -z "$CCTOOLS_PACKAGES_TEST" ]
 then
 	CCTOOLS_PACKAGES_TEST=$(grep CCTOOLS_PACKAGES config.mk | cut -d = -f 2)
-	if [ "${GITHUB_DOCKER}" = yes ]
+	if [ "${CCTOOLS_DOCKER_GITHUB}" = yes ]
 	then
 		if ! parrot/src/parrot_run /bin/ls
 		then
