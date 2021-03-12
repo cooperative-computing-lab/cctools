@@ -3,6 +3,7 @@
 set -e
 
 . ../../dttools/test/test_runner_common.sh
+
 . ./chirp-common.sh
 
 c="./hostport.$PPID"
@@ -12,9 +13,11 @@ prepare()
 {
 	cat > default.acl <<EOF
 unix:$(whoami) rwlda
+unix:root rwlda
 address:127.0.0.1 rl
 EOF
-	chirp_start local --auth=address --default-acl=default.acl --inherit-default-acl
+	DEFAULT_ACL=default.acl
+	chirp_start local --auth=address
 	echo "$hostport" > "$c"
 	echo "$root" > "$cr"
 	return 0
