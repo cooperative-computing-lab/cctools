@@ -1,3 +1,5 @@
+#! /bin/sh
+
 verbose() {
 	printf '%s\n' "$*" >&2
 	"$@"
@@ -41,15 +43,23 @@ chirp_start() {
 	shift
 
 	if [ "$(id -u)" -eq 0 ]; then
-		echo "$acl"
-		cat >> "$acl" <<EOF
-unix:root rwlda
-EOF
 		verbose chown -R 9999 "$test_dir"
-		chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --default-acl="$acl" --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" --user=9999 "$@"
-	else
-		chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" "$@"
+		user_opt="--user=9999"
 	fi
+
+	if [ -n "${DEFAULT_ACL}" ]
+	then
+		# cat instead of cp to preserve set permissions
+		cat "${DEFAULT_ACL}" >> "$acl"
+	else
+		cat >> "$acl" <<EOF
+unix:$(whoami) rwlda
+unix:root rwlda
+address:127.0.0.1 rl
+EOF
+	fi
+
+	chirp_server --advertise=localhost --auth=unix --background --debug=all --debug-file="$debug" --debug-rotate-max=0 --default-acl="$acl" --inherit-default-acl --interface=127.0.0.1 --pid-file="$pid" --port-file="$port" --root="$root" --transient="$transient" ${user_opt} "$@"
 	result=$?
 	if [ "$result" -eq 0 ]; then
 		i=0

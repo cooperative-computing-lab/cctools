@@ -12,9 +12,11 @@ prepare()
 {
 	cat > default.acl <<EOF
 unix:$(whoami) rwlda
+unix:root rwlda
 address:127.0.0.1 rlv(rwlda)
 EOF
-	chirp_start local --auth=address --default-acl=default.acl --inherit-default-acl
+	DEFAULT_ACL=default.acl
+	chirp_start local --auth=address
 	echo "$hostport" > "$c"
 	echo "$root" > "$cr"
 	return 0
