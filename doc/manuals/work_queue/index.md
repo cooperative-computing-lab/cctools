@@ -617,52 +617,34 @@ Both memory and disk are specified in `MB`.
 ### Specifying Task Resources
 
 To run several task in a worker, every task must have a description of the
-resources it uses, in terms of cores, memory, disk, and gpus. Several tasks
-usually share the same resource description, and to this end, Work Queue allows
-you to tasks into groups called **categories**. You can attach resource
-descriptions to each category, and then label a task to set it as part of a
-category.
-
-We can create some categories with their resource description as follows:
-
-#### Python
+resources it uses, in terms of cores, memory, disk, and gpus. These resources
+can be specified as in the following example:
 
 ```python
-# memory and disk values in MB.
-q.specify_category_max_resources('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
-q.specify_category_max_resources('my-category-b', {'cores': 1})
-q.specify_category_max_resources('my-category-c', {})
+t.specify_cores(1)      # task needs one core
+t.specify_memory(1024)  # task needs 1024 MB of memory
+t.specify_disk(4096)    # task needs 4096 MB of disk space
+t.specify_gpus(0)       # task does not need a gpu
 ```
 
 ```perl
-# memory and disk values in MB.
-$q->specify_category_max_resources('my-category-a', {'cores' => 2, 'memory' => 1024, 'disk' => 2048, 'gpus' => 0})
-$q->specify_category_max_resources('my-category-b', {'cores' => 1})
-$q->specify_category_max_resources('my-category-c', {})
-```
-
-In the previous examples, we created three categories. Note that it is not
-necessary to specify all the resources, as Work Queue can be directed to
-compute some efficient defaults. To assign a task to a category:
-
-```python
-t.specify_category('my-category-a')
-```
-
-```perl
-$t->specify_category('my-category-a')
+$t->specify_cores(1)      # task needs one core
+$t->specify_memory(1024)  # task needs 1024 MB of memory
+$t->specify_disk(4096)    # task needs 4096 MB of disk space
+$t->specify_gpus(0)       # task does not need a gpu
 ```
 
 When all cores, memory, and disk are specified, Work Queue will simply fit as
 many tasks as possible without going above the resources available at a
 particular worker.
 
-When a category leaves some resource unspecified, then Work Queue tries to find
+When some of the resources are left unspecified, then Work Queue tries to find
 some reasonable defaults as follows:
 
+- If no resources are specified, then a single task from the category will
+  consume a **whole worker**.
 - Unspecified gpus are always zero.
 - If a task specifies gpus, then the default cores is zero.
-- If no resources are specified, then a single task from the category will consume a **whole worker**.
 - Unspecified cores, memory and disk will get a default according to the
   proportion the specified resources will use at a worker, rounding-up. Thus,
   if task specifies that it will use two cores, but does not specify memory or
@@ -675,9 +657,11 @@ The current Work Queue implementation only accepts whole integers for its
 resources, which means that no worker can concurrently execute more tasks than
 its number of cores. (This will likely change in the future.)
 
-When the resources used by a task are unknown, Work Queue can measure and
-compute efficient resource values to maximize throughput or minimize waste, as
-we explain in the following sections. 
+When you would like to run several tasks in a worker, but you are not sure
+about the resources each task needs, Work Queue can automatically find values
+of resources that maximize throughput, or minimize waste. This is discussed in
+the section (below)[#grouping-tasks-with-similar-resources-needs].
+
 
 ### Monitoring and Enforcement
 
@@ -741,12 +725,82 @@ if($t) {
 }
 ```
 
+Alternatively, when you declare a task (i.e., before submitting it), you can
+declare a directory to which a report of the resources will be written. The
+report format is JSON, as its filename has the form
+`wq-PID_OF_MANAGER-task-TASK_ID.summary`.
+
+```python
+t = wq.Task(...)
+t.specify_monitor_output("my-resources-output")
+...
+q.submit(t)
+```
+
+```perl
+$t = WorkQueue::Task->new(...)
+$t->specify_monitor_output("my-resources-output")
+...
+$q->submit($t)
+```
+
 Work Queue also measures other resources, such as peak `bandwidth`,
 `bytes_read`, `bytes_written`, `bytes_sent`, `bytes_received`,
 `total_files`, `cpu_time`, and `wall_time`.
 
 
-### Automatic Management of Task Resources
+### Grouping Tasks with Similar Resources Needs
+
+Several tasks usually share the same resource description, and to this end,
+Work Queue allows you to tasks into groups called **categories**. You can
+attach resource descriptions to each category, and then label a task to set it
+as part of a category.
+
+We can create some categories with their resource description as follows:
+
+#### Python
+
+```python
+# memory and disk values in MB.
+q.specify_category_max_resources('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
+q.specify_category_max_resources('my-category-b', {'cores': 1})
+q.specify_category_max_resources('my-category-c', {})
+```
+
+```perl
+# memory and disk values in MB.
+$q->specify_category_max_resources('my-category-a', {'cores' => 2, 'memory' => 1024, 'disk' => 2048, 'gpus' => 0})
+$q->specify_category_max_resources('my-category-b', {'cores' => 1})
+$q->specify_category_max_resources('my-category-c', {})
+```
+
+In the previous examples, we created three categories. Note that it is not
+necessary to specify all the resources, as Work Queue can be directed to
+compute some efficient defaults. To assign a task to a category:
+
+```python
+t.specify_category('my-category-a')
+```
+
+```perl
+$t->specify_category('my-category-a')
+```
+
+When a category leaves some resource unspecified, then Work Queue tries to find
+some reasonable defaults in the same way described before in the section
+(Specifying Task Resources)[#specifying-task-resources].
+
+!!! warning
+    When a task is declared as part of a category, and also has resources
+    specified directly with calls such as `t.specify_cores`, the resources
+    directly specified take precedence over the category declaration for that
+    task
+
+When the resources used by a task are unknown, Work Queue can measure and
+compute efficient resource values to maximize throughput or minimize waste, as
+we explain in the following sections. 
+
+#### Automatic Management of Task Resources in a Category
 
 If the resources a category uses are unknown, then Work Queue can be directed
 to find efficient resource values to maximize throughput or minimize resources
@@ -816,10 +870,15 @@ column FIT-WORKERS shows the count of workers that can fit at least one task in
 that category using the maximum resources either set or found. Values for max
 cores, memory and disk have modifiers `~` and `>` as follows:
 
-- No modifier: The maximum resource usage set with `specify_category_max_resources`.
+- No modifier: The maximum resource usage set with `specify_category_max_resources`, or set for any task in the category via calls such as `specify_cores`.
 - ~: The maximum resource usage so far seen when resource is left unspecified in `specify_category_max_resources`. All tasks so far have run with no more than this resource value allocated.
 - >: The maximum resource usage that has caused a resource exhaustion. If this value is larger than then one specified with `specify_category_max_resources`, then tasks that exhaust resources are not retried. Otherwise, if a maximum was not set, the tasks will be retried in larger workers as workers become available.
 
+
+!!! warning
+    When resources are specified directly to the task with calls such as
+    `t.specify_cores`, such resources are fixed for the task and are not
+    modified when more efficient values are found.
 
 ## Recommended Practices
 
