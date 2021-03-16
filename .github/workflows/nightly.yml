@@ -21,6 +21,10 @@ jobs:
     steps:
       - name: checkout CCTools from main head
         uses: actions/checkout@v2
+      - name: Get sha of HEAD
+        id: vars
+        shell: bash
+        run: echo "::set-output name=tag_sha::$(git rev-parse --short HEAD)"
       - name: update nightly tag
         run: |
           git tag -f nightly
@@ -39,6 +43,6 @@ jobs:
           omitBodyDuringUpdate: true
           prerelease: true
           replacesArtifacts: true
-          commit: HEAD
+          commit: ${{ steps.vars.output.tag_sha }}
           tag: nightly
 
