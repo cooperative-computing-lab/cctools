@@ -21,6 +21,10 @@ jobs:
     steps:
       - name: checkout CCTools from main head
         uses: actions/checkout@v2
+      - name: update nightly tag
+        run: |
+          git tag -f nightly
+          git push -f origin nightly
       - name: build
         run: ${GITHUB_WORKSPACE}/packaging/scripts/build.sh
       - name: deploy
@@ -36,5 +40,5 @@ jobs:
           prerelease: true
           replacesArtifacts: true
           commit: HEAD
-          tag: nightly-build
+          tag: nightly
 
