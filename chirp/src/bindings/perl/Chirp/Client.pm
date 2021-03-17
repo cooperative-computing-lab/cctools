@@ -17,7 +17,7 @@ use POSIX qw(strerror);
 use Errno qw(:POSIX);
 use Carp  qw(croak);
 
-use CChirp;
+use Chirp;
 use Chirp::Stat;
 
 
