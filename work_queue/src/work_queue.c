@@ -183,7 +183,7 @@ struct work_queue {
 	time_t resources_last_update_time;
 	int    busy_waiting_flag;
 
-	category_mode_t allocation_default_mode;
+	work_queue_category_mode_t allocation_default_mode;
 
 	FILE *logfile;
 	FILE *transactions_logfile;
@@ -7198,7 +7198,7 @@ void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  c
 	category_specify_first_allocation_guess(c, rm);
 }
 
-int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_mode_t mode) {
+int work_queue_specify_category_mode(struct work_queue *q, const char *category, work_queue_category_mode_t mode) {
 
 	switch(mode) {
 		case CATEGORY_ALLOCATION_MODE_FIXED:
@@ -7217,7 +7217,7 @@ int work_queue_specify_category_mode(struct work_queue *q, const char *category,
 	}
 	else {
 		struct category *c = work_queue_category_lookup_or_create(q, category);
-		category_specify_allocation_mode(c, mode);
+		category_specify_allocation_mode(c, (category_mode_t) mode);
 		write_transaction_category(q, c);
 	}
 
@@ -7272,7 +7272,7 @@ struct category *work_queue_category_lookup_or_create(struct work_queue *q, cons
 
 	if(!c->wq_stats) {
 		c->wq_stats = calloc(1, sizeof(struct work_queue_stats));
-		category_specify_allocation_mode(c, q->allocation_default_mode);
+		category_specify_allocation_mode(c, (category_mode_t) q->allocation_default_mode);
 	}
 
 	return c;
