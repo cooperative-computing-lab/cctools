@@ -41,11 +41,8 @@ fi
 # disable perl bindings (to compile as we do in conda)
 perl_option='--with-perl-path no'
 
-# using rpm for centos8
-if [[ "${DOCKER_IMAGE}" = "cclnd/cctools-env:x86_64-centos8" ]]
-then
-    cvmfs_option='--with-cvmfs-path /usr'
-fi
+# using rpm/deb for cvmfs
+cvmfs_option='--with-cvmfs-path /usr'
 
 # compile everything
 ./configure --debug --strict $DEP_ARGS ${perl_option} ${cvmfs_option} "$@"
