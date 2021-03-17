@@ -210,24 +210,25 @@ $extras_for{centos}{6} = [
 ];
 
 $preinstall_for{centos}{default} = [
-	'yum -y install epel-release'
+	'yum -y install epel-release',
+	'yum -y install https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm'
 ];
 
 $preinstall_for{centos}{8} = [
-	'yum -y install epel-release',                    # for ImageMagick
 	'dnf install -y "dnf-command(config-manager)"',
-	'dnf config-manager -y --set-enabled PowerTools'  # for doxygen, and groff
+	'dnf config-manager -y --set-enabled powertools'  # for doxygen, and groff
 ];
 
 $postinstall_for{centos}{7} = [
-	'yum -y clean all',
 	@{$builder},
-	@{$musl},
 	@{$fuse},
 	@{$e2fsprogs},
 	@{$mysql},
 	@{$uuid},
-	@{$cvmfs},
+	'yum -y install cvmfs-devel',
+	'ln -sf /usr/bin/python3.6 /usr/bin/python3',
+	'ln -sf /usr/bin/python3.6-config /usr/bin/python3-config',
+	'yum -y clean all',
 ];
 
 $postinstall_for{centos}{8} = [
@@ -237,19 +238,16 @@ $postinstall_for{centos}{8} = [
 	@{$e2fsprogs},
 	@{$mysql},
 	@{$uuid},
-	'yum -y install https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm',
-	'yum -y install cvmfs-devel'
+	'yum -y install cvmfs-devel',
+	'yum -y clean all',
 ];
 
-$postinstall_for{centos}{6} = [
-	'ln -sf /usr/bin/python3.4 /usr/bin/python3',
-	'ln -sf /usr/bin/python3.4-config /usr/bin/python3-config'
-];
+# end-of-life
+#$postinstall_for{centos}{6} = [
+#	'ln -sf /usr/bin/python3.4 /usr/bin/python3',
+#	'ln -sf /usr/bin/python3.4-config /usr/bin/python3-config'
+#];
 
-$postinstall_for{centos}{7} = [
-	'ln -sf /usr/bin/python3.6 /usr/bin/python3',
-	'ln -sf /usr/bin/python3.6-config /usr/bin/python3-config'
-];
 
 ########## FEDORA ##########
 $package_for{fedora}{default}     = { %{$package_for{centos}{default}} };
@@ -331,7 +329,7 @@ $postinstall_for{debian}{default} = [
 	'wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb',
 	'dpkg -i cvmfs-release-latest_all.deb',
 	'rm -f cvmfs-release-latest_all.deb',
-	'apt-get update',
+	'apt-get update --allow-unauthenticated',
 	'apt-get install -y cvmfs-dev',
 	'apt-get clean',
 ];
@@ -561,21 +559,15 @@ sub spec_preamble_file_for {
 	}
 
 	my @steps;
-	if($preinstall_for{$dist}) {
-		my $pres = $preinstall_for{$dist}{$version} || $preinstall_for{$dist}{default};
-		if($pres) { 
-			push @steps, @{$pres};
-		}
-	}
+	push @steps, @{$preinstall_for{$dist}{default} || []};
+	push @steps, @{$preinstall_for{$dist}{$version} || []};
 
 	@packages = map { ref($_) eq 'ARRAY' ? @{$_} : $_ } grep { $_ } @packages;
 
 	push @steps, "$command_for{$dist} @packages";
 
-	if($postinstall_for{$dist}) {
-		push @steps, @{$postinstall_for{$dist}{default} || []};
-		push @steps, @{$postinstall_for{$dist}{$version} || []};
-	}
+	push @steps, @{$postinstall_for{$dist}{default} || []};
+	push @steps, @{$postinstall_for{$dist}{$version} || []};
 
 	push @steps, @{$epilogue};
 
