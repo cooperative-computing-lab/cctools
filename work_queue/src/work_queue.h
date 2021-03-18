@@ -95,30 +95,22 @@ typedef enum {
 
 /** Here we repeat the category_mode_t declaration but with work_queue names.
  * This is needed to generate uniform names in the API and bindings. */
-enum {
+typedef enum {
+/**< When monitoring is disabled, all tasks run as
+  WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
+  exhaustion occurs: */
     WORK_QUEUE_ALLOCATION_MODE_FIXED          = CATEGORY_ALLOCATION_MODE_FIXED,
+/**< If maximum values are specified for cores, memory,
+disk or gpus (either a user-label or category-label) and one of those resources
+is exceeded, the task fails.  Otherwise it is retried until a large enough
+worker connects to the manager, using the maximum values specified, and the
+maximum values so far seen for resources not specified. */
     WORK_QUEUE_ALLOCATION_MODE_MAX            = CATEGORY_ALLOCATION_MODE_MAX,
+/**< As above, but tasks are tried with an automatically computed first-allocation to minimize resource waste. */
     WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE      = CATEGORY_ALLOCATION_MODE_MIN_WASTE,
+/**< As above, but maximizing throughput. */
     WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
-};
-
-// typedef enum {
-// /**< When monitoring is disabled, all tasks run as
-//   WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
-//   exhaustion occurs: */
-// 	WORK_QUEUE_ALLOCATION_MODE_FIXED = 0,   /**< Task fails. (default) */
-// 	WORK_QUEUE_ALLOCATION_MODE_MAX,         /**< If maximum values are specified for cores, memory,
-// 											  disk or gpus (either a user-label or category-label) and
-// 											  one of those resources is exceeded, the task fails.
-// 											  Otherwise it is retried until a large enough worker
-// 											  connects to the manager, using the maximum values
-// 											  specified, and the maximum values so far seen for
-// 											  resources not specified. */
-// 
-// 	WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE,   /**< As above, but tasks are tried with an automatically
-// 											  computed first-allocation to minimize resource waste. */
-// 	WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT /**< As above, but maximizing throughput. */
-// } wq_category_mode_t;
+} work_queue_category_mode_t;
 
 
 extern int wq_option_scheduler;	               /**< Initial setting for algorithm to assign tasks to
@@ -864,10 +856,10 @@ int work_queue_specify_draining_by_hostname(struct work_queue *q, const char *ho
 /** Turn on or off first-allocation labeling for a given category. By default, cores, memory, and disk are labeled, and gpus are unlabeled. Turn on/off other specific resources use @ref work_queue_enable_category_resource
 @param q A work queue object.
 @param category A category name.
-@param mode     One of @ref category_mode_t.
+@param mode     One of @ref work_queue_category_mode_t.
 @returns 1 if mode is valid, 0 otherwise.
 */
-int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_mode_t mode);
+int work_queue_specify_category_mode(struct work_queue *q, const char *category, work_queue_category_mode_t mode);
 
 /** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref work_queue_specify_category_mode.
 @param q A work queue object.
