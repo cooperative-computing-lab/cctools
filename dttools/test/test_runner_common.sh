@@ -95,7 +95,7 @@ run_local_worker()
 		exit 1
 	fi
 	echo "Running worker."
-	if ! "$WORK_QUEUE_WORKER" --single-shot --timeout=10s --cores 1 --memory 250 --disk 250 --debug=all --debug-file="$log" localhost $(cat "$port_file"); then
+	if ! "$WORK_QUEUE_WORKER" --single-shot --timeout=10s --cores ${cores:-1} --memory ${memory:-250} --disk ${disk:-250} --gpus ${gpus:-0} --debug=all --debug-file="$log" localhost $(cat "$port_file"); then
 		echo "ERROR: could not start worker"
 		exit 1
 	fi
