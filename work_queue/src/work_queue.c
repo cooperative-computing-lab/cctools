@@ -4315,9 +4315,6 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->resources_measured  = rmsummary_create(-1);
 	t->resources_allocated = rmsummary_create(-1);
 
-	/* Default gpus are 0, rather than whole workers: */
-	t->resources_requested->gpus = 0;
-
 	t->category = xxstrdup("default");
 
 	return t;
