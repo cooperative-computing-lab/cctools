@@ -10,6 +10,7 @@
 #
 # - @ref work_queue::WorkQueue
 # - @ref work_queue::Task
+# - @ref work_queue::Factory
 
 import copy
 import os
@@ -1487,28 +1488,28 @@ class WorkQueue(object):
         return None
 
 
+##
+# \class Factory
+# Launch a Work Queue factory.
+#
+# The command line arguments for `work_queue_factory` can be set for a
+# factory object (with dashes replaced with underscores). Creating a factory
+# object does not immediately launch it, so this is a good time to configure
+# the resources, number of workers, etc. Factory objects function as Python
+# context managers, so to indicate that a set of commands should be run with
+# a factory running, wrap them in a `with` statement. The factory will be
+# cleaned up automtically at the end of the block. You can also make
+# config changes to the factory while it is running. As an example,
+#
+#     # normal WQ setup stuff
+#     workers = work_queue.Factory("sge", "myproject")
+#     workers.cores = 4
+#     with workers:
+#         # submit some tasks
+#         workers.max_workers = 300
+#         # got a pile of tasks, allow more workers
+#     # any additional cleanup steps on the manager
 class Factory(object):
-    """Launch a Work Queue factory.
-
-    The command line arguments for `work_queue_factory` can be set for a
-    factory object (with dashes replaced with underscores). Creating a factory
-    object does not immediately launch it, so this is a good time to configure
-    the resources, number of workers, etc. Factory objects function as Python
-    context managers, so to indicate that a set of commands should be run with
-    a factory running, wrap them in a `with` statement. The factory will be
-    cleaned up automtically at the end of the block. You can also make
-    config changes to the factory while it is running. As an example,
-
-        # normal WQ setup stuff
-        workers = work_queue.Factory("sge", "myproject") 
-        workers.cores = 4
-        with workers:
-            # submit some tasks
-            workers.max_workers = 300
-            # got a pile of tasks, allow more workers
-        # any additional cleanup steps on the manager
-    """
-
     _command_line_options = [
         "amazon-config",
         "autosize",
@@ -1568,18 +1569,18 @@ class Factory(object):
         "condor-requirements",
     ]
 
+    ##
+    # Create a factory for the given batch_type and manager name.
+    #
+    # `manager_name` or, `manager_host_port` should be specified.
+    # If factory_binary or worker_binary is not
+    # specified, $PATH will be searched.
     def __init__(
             self, batch_type,
             manager_name=None,
             manager_host_port=None,
             factory_binary=None, worker_binary=None,
             log_file=os.devnull):
-        """
-        Create a factory for the given batch_type and manager name.
-        manager_name or, manager_host_port should be specified.
-        If factory_binary or worker_binary is not
-        specified, $PATH will be searched.
-        """
 
         self._config_file = None
         self._factory_proc = None
@@ -1685,7 +1686,15 @@ class Factory(object):
 
         return args
 
-    def __enter__(self):
+
+    ##
+    # Start a factory process.
+    #
+    # It's best to use a context manager (`with` statement) to automatically
+    # handle factory startup and tear-down. If another mechanism will ensure
+    # cleanup (e.g. running inside a container), manually starting the factory
+    # may be useful to provision workers from inside a Jupyter notebook.
+    def start(self):
         if self._factory_proc is not None:
             raise RuntimeError('Factory was already started')
         (tmp, self._config_file) = tempfile.mkstemp(
@@ -1709,7 +1718,10 @@ class Factory(object):
 
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+
+    ##
+    # Stop the factory process.
+    def stop(self):
         if self._factory_proc is None:
             raise RuntimeError('Factory not yet started')
         self._factory_proc.terminate()
@@ -1717,6 +1729,20 @@ class Factory(object):
         self._factory_proc = None
         os.unlink(self._config_file)
         self._config_file = None
+
+
+    def __enter__(self):
+         return self.start()
+
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.stop()
+
+
+    def __del__(self):
+        if self._factory_proc is not None:
+            self.stop()
+
 
     def _write_config(self):
         if self._config_file is None:
