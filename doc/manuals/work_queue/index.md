@@ -641,8 +641,8 @@ particular worker.
 When some of the resources are left unspecified, then Work Queue tries to find
 some reasonable defaults as follows:
 
-- If no resources are specified, then a single task from the category will
-  consume a **whole worker**.
+- If no resources are specified, or all resources are specified to be 0, then a
+  single task from the category will consume a **whole worker**.
 - Unspecified gpus are always zero.
 - If a task specifies gpus, then the default cores is zero.
 - Unspecified cores, memory and disk will get a default according to the
@@ -651,7 +651,6 @@ some reasonable defaults as follows:
   disk, it will be allocated %50 of memory and disk in 4-core workers, or %25
   in 8-core workers. When more than one resource is specified, the default uses
   the largest proportion.
-- It is an error to specify all resources to 0.
 
 The current Work Queue implementation only accepts whole integers for its
 resources, which means that no worker can concurrently execute more tasks than
