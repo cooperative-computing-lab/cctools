@@ -169,8 +169,6 @@ static int set_meta_char_field(struct rmsummary *s, const char *key, char *value
 		return 1;
 	}
 
-	notice(D_RMON, "There is not a field named '%s'.", key);
-
 	return 0;
 }
 
@@ -194,8 +192,6 @@ static int set_meta_int_field(struct rmsummary *s, const char *key, int64_t valu
 		s->snapshots_count = value;
 		return 1;
 	}
-
-	notice(D_RMON, "There is not a field named '%s'.", key);
 
 	return 0;
 }
