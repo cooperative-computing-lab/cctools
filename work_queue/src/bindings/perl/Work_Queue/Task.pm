@@ -315,6 +315,11 @@ sub result {
 	return $self->{_task}->{result};
 }
 
+sub result_str {
+	my ($self) = @_;
+	return work_queuec::work_queue_result_str($self->{_task}->{result});
+}
+
 sub total_submissions {
 	my ($self) = @_;
 	return $self->{_task}->{total_submissions};
@@ -1017,9 +1022,13 @@ after the task completes execution.
 
 =head3 C<result>
 
-Get the result of the task (successful, failed return_status, missing input file, missing output file).
+Get the result of the task as in integer (successful, failed return_status, missing input file, missing output file).
 
 Must be called only after the task completes execution.
+
+=head3 C<result_str>
+
+Returns a string that explains the result of a task. (SUCCESS, INPUT_MISS, OUTPUT_MISS, etc.)
 
 =head3 C<total_submissions>
 
