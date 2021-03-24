@@ -279,7 +279,6 @@ static void push_task_to_ready_list( struct work_queue *q, struct work_queue_tas
 static work_queue_task_state_t change_task_state( struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state);
 
 const char *task_state_str(work_queue_task_state_t state);
-const char *task_result_str(work_queue_result_t result);
 
 /* 1, 0 whether t is in state */
 static int task_state_is( struct work_queue *q, uint64_t taskid, work_queue_task_state_t state);
@@ -5775,7 +5774,7 @@ static int task_in_terminal_state(struct work_queue *q, struct work_queue_task *
 	return 0;
 }
 
-const char *task_result_str(work_queue_result_t result) {
+const char *work_queue_result_str(work_queue_result_t result) {
 	const char *str;
 
 	switch(result) {
@@ -6930,7 +6929,7 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 	} else if(state == WORK_QUEUE_TASK_CANCELED) {
 			/* do not add any info */
 	} else if(state == WORK_QUEUE_TASK_RETRIEVED || state == WORK_QUEUE_TASK_DONE) {
-		buffer_printf(&B, " %s ", task_result_str(t->result));
+		buffer_printf(&B, " %s ", work_queue_result_str(t->result));
 		buffer_printf(&B, " %d ", t->return_status);
 
 		if(t->resources_measured) {

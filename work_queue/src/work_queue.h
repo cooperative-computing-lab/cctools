@@ -1073,6 +1073,12 @@ void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  c
 void work_queue_initialize_categories(struct work_queue *q, struct rmsummary *max, const char *summaries_file);
 
 
+/** Explain result codes from tasks.
+@param result Result from a task returned by @ref work_queue_wait.
+@return String representation of task result code.
+*/
+const char *work_queue_result_str(work_queue_result_t result);
+
 //@}
 
 /** @name Functions - Deprecated */
