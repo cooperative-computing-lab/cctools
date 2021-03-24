@@ -21,45 +21,6 @@ def cleanup():
     shutil.rmtree(test_dir)
 atexit.register(cleanup)
 
-def result_to_string(result):
-    if result == wq.WORK_QUEUE_RESULT_SUCCESS:
-        return 'success'
-
-    if result == wq.WORK_QUEUE_RESULT_INPUT_MISSING:
-        return 'input missing'
-
-    if result == wq.WORK_QUEUE_RESULT_OUTPUT_MISSING:
-        return 'output missing'
-
-    if result == wq.WORK_QUEUE_RESULT_SIGNAL:
-        return 'signal'
-
-    if result == wq.WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION:
-        return 'resource exhaustion'
-
-    if result == wq.WORK_QUEUE_RESULT_TASK_TIMEOUT:
-        return 'resource exhaustion'
-
-    if result == wq.WORK_QUEUE_RESULT_UNKNOWN:
-        return 'unknown'
-
-    if result == wq.WORK_QUEUE_RESULT_FORSAKEN:
-        return 'forsaken'
-
-    if result == wq.WORK_QUEUE_RESULT_MAX_RETRIES:
-        return 'maximum retries'
-
-    if result == wq.WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:
-        return 'maximum runtime'
-
-    if result == wq.WORK_QUEUE_RESULT_DISK_ALLOC_FULL:
-        return 'disk allocation full'
-
-    if result == wq.WORK_QUEUE_RESULT_RMONITOR_ERROR:
-        return 'resource monitor error'
-
-    return 'invalid result'
-
 def report_task(task, expected_result, expected_exit_code, expected_outpus=None):
     error = False
     print("\nTask '{command}' report:".format(command=t.command))
@@ -67,13 +28,13 @@ def report_task(task, expected_result, expected_exit_code, expected_outpus=None)
         error = True
         print("It was not completed by a worker.")
     else:
-        print("result: {result}".format(result=result_to_string(t.result)))
+        print("result: {as_str} {as_int}".format(as_str=t.result_str, as_int=t.result))
         print("exit code: {status}".format(status=t.return_status))
         if t.output:
             print("stderr:\n+++\n{stderr}---".format(stderr=t.output))
         if task.result != expected_result:
             error = True
-            print("Should have finished with result '{result}', but got '{real}'.".format(result=result_to_string(expected_result), real=result_to_string(task.result)))
+            print("Should have finished with result '{result}', but got '{real}'.".format(result=expected_result, real=task.result))
         elif task.return_status != expected_exit_code:
             error = True
             print("Should have finished with exit_code {status}, but got {real}.".format(status=str(expected_exit_code), real=str(task.return_status)))
