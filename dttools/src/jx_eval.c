@@ -630,10 +630,21 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 
 struct jx * jx_eval_with_defines( struct jx *j, struct jx *context )
 {
+    int free_defines = 0;
+    int free_context = 0;
+
 	// Find the define clause in j, if it exists.
 	struct jx *defines = jx_lookup(j,"define");
-	if(!defines) defines = jx_object(0);
-	if(!context) context = jx_object(0);
+
+	if(!defines) {
+        free_defines = 1;
+        defines = jx_object(0);
+    }
+
+	if(!context) {
+        free_context = 1;
+        context = jx_object(0);
+    }
 
 	// Merge the context and defines into mcontext.
 	struct jx *mcontext = jx_merge(defines,context,0);
@@ -642,6 +653,14 @@ struct jx * jx_eval_with_defines( struct jx *j, struct jx *context )
 	struct jx * result = jx_eval(j,mcontext);
 
 	jx_delete(mcontext);
+
+    if(free_defines) {
+        jx_delete(defines);
+    }
+
+    if(free_context) {
+        jx_delete(context);
+    }
 	return result;
 }
 
