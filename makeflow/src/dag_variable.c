@@ -198,7 +198,7 @@ int dag_variable_count(const char *name, struct dag_variable_lookup_set *s )
 
 struct dag_variable_value *dag_variable_lookup(const char *name, struct dag_variable_lookup_set *s )
 {
-	struct dag_variable_value *v;
+	struct dag_variable_value *v = NULL;
 
 	if(!s)
 		return NULL;
@@ -237,10 +237,12 @@ struct dag_variable_value *dag_variable_lookup(const char *name, struct dag_vari
 		return v;
 	}
 
-	/* Try the environment last. */
-	char *value = getenv(name);
+	/* Try the environment last. If found, add it to the default dag variables table.*/
+	const char *value = getenv(name);
 	if(value) {
-		return dag_variable_value_create(value);
+		s->table = s->dag->default_category->mf_variables;
+		dag_variable_add_value(name, s->table, 0, value);
+		return dag_variable_lookup(name, s);
 	}
 
 	return NULL;
