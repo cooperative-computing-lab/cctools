@@ -197,8 +197,12 @@ static void specify_resources_vars(struct work_queue_process *p) {
 		work_queue_task_specify_environment_variable(p->task,"CUDA_VISIBLE_DEVICES",str);
 		free(str);
 	} else {
-		// If the task is not assigned to any GPUs, then inhibit GPU use.
-		specify_integer_env_var(p,"CUDA_VISIBLE_DEVICES",-1);
+		// If the task is not assigned to any GPUs, then inhibit GPU use, but
+		// only if the worker is running in an environment where gpus have not
+		// been manually assigned.
+		if(!getenv("CUDA_VISIBLE_DEVICES")) {
+			specify_integer_env_var(p,"CUDA_VISIBLE_DEVICES",-1);
+		}
 	}
 }
 
