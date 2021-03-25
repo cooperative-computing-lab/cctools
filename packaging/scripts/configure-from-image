@@ -42,7 +42,9 @@ fi
 perl_option='--with-perl-path no'
 
 # using rpm/deb for cvmfs
-cvmfs_option='--with-cvmfs-path /usr'
+if [[ -n "${CCTOOLS_DOCKER_GITHUB}" ]]
+    cvmfs_option='--with-cvmfs-path /usr'
+fi
 
 # compile everything
 ./configure --debug --strict $DEP_ARGS ${perl_option} ${cvmfs_option} "$@"
