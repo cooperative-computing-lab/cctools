@@ -43,6 +43,7 @@ perl_option='--with-perl-path no'
 
 # using rpm/deb for cvmfs
 if [[ -n "${CCTOOLS_DOCKER_GITHUB}" ]]
+then
     cvmfs_option='--with-cvmfs-path /usr'
 fi
 
