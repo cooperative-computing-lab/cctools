@@ -257,7 +257,8 @@ void dag_close_over_categories(struct dag *d) {
 		debug(D_MAKEFLOW_PARSER, "Category %s defined as: %s", name, resources);
 		free(resources);
 
-		c->max_allocation = rs;
+        category_specify_max_allocation(c, rs);
+        rmsummary_delete(rs);
 	}
 }
 
