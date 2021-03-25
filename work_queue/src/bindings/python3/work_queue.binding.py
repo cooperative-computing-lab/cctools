@@ -488,17 +488,31 @@ class Task(object):
         return self._task.return_status
 
     ##
-    # Get the result of the task, such as successful, missing file, etc.
+    # Get the result of the task as an integer code, such as successful, missing file, etc.
     # See @ref work_queue_result_t for possible values.  Must be called only
     # after the task completes execution.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
     # >>> print t.result
+    # 0
     # @endcode
     @property
     def result(self):
         return self._task.result
+
+    ##
+    # Return a string that explains the result of a task.
+    # Must be called only after the task completes execution.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.result_str
+    # 'SUCCESS'
+    # @endcode
+    @property
+    def result_str(self):
+        return work_queue_result_str(self._task.result)
 
     ##
     # Get the number of times the task has been resubmitted internally.
