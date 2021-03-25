@@ -2,7 +2,7 @@
 set -ex
 
 CCTOOLS_OUTPUT="${CCTOOLS_OUTPUT:-cctools-x86_64.tar.gz}"
-D="/tmp/${CCTOOLS_OUTPUT}-dir"
+D="/tmp/${CCTOOLS_OUTPUT%%.tar.gz}"
 
 rm -rf ${D}
 
