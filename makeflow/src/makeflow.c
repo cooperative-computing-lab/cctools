@@ -1373,8 +1373,9 @@ int main(int argc, char *argv[])
 
 	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
 	struct jx *jx_args = jx_object(NULL);
-	
-	struct jx *hook_args = jx_object(NULL);
+	struct jx *base_hook_args = jx_object(NULL);
+	struct jx *hook_args = base_hook_args;
+
 	char *k8s_image = NULL;
 	extern struct makeflow_hook makeflow_hook_basic_wrapper;
 	extern struct makeflow_hook makeflow_hook_docker;
