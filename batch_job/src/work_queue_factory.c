@@ -1275,7 +1275,10 @@ int main(int argc, char *argv[])
 				consider_capacity = 1;
 				break;
 			case 'd':
-				debug_flags_set(optarg);
+				if (!debug_flags_set(optarg)) {
+					fprintf(stderr, "Unknown debug flag: %s\n", optarg);
+					exit(EXIT_FAILURE);
+				}
 				break;
 			case 'o':
 				debug_config_file(optarg);
