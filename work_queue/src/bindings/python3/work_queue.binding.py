@@ -1690,6 +1690,7 @@ class Factory(object):
 
     def _construct_command_line(self):
         args = [self._factory_binary]
+        args += ['--parent-death']
         args += ['--config-file', self._config_file]
         args += ["--{}={}".format(opt, self._opts[opt])
                  for opt in self._opts
