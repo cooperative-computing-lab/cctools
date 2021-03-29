@@ -24,6 +24,5 @@ with open(output_name, 'w') as fout:
         else:
             current_position -= 1
 
-        time.sleep(0.1)
         fout.write("{}\n".format(current_position))
 
