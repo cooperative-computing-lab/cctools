@@ -91,6 +91,7 @@ int using_catalog = 0;
 static char *extra_worker_args=0;
 static char *resource_args=0;
 static int abort_flag = 0;
+static pid_t initial_ppid = 0;
 static const char *scratch_dir = 0;
 static const char *password_file = 0;
 static char *config_file = 0;
@@ -862,6 +863,11 @@ static void mainloop( struct batch_queue *queue )
 	int64_t factory_timeout_start = time(0);
 
 	while(!abort_flag) {
+		if (initial_ppid != 0 && getppid() != initial_ppid) {
+			printf("parent process exited, shutting down\n");
+			abort_flag = 1;
+			break;
+		}
 
 		if(config_file && !read_config_file(config_file)) {
 			debug(D_NOTICE, "Error re-reading '%s'. Using previous values.", config_file);
@@ -1060,6 +1066,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.\n","--runos=<img>");
 	printf(" %-30s Force factory to run itself as a work queue manager.\n","--run-factory-as-manager");
+	fprintf(stdout, " %-30s Exit if parent process dies.\n", "--parent-death");
 	printf(" %-30s Show the version string.\n", "-v,--version");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
@@ -1087,6 +1094,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_ENVIRONMENT_VARIABLE,
 		LONG_OPT_RUN_AS_MANAGER,
 		LONG_OPT_RUN_OS,
+		LONG_OPT_PARENT_DEATH,
 	};
 
 static const struct option long_options[] = {
@@ -1119,6 +1127,7 @@ static const struct option long_options[] = {
 	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 	{"min-workers", required_argument, 0, 'w'},
+	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 	{"password", required_argument, 0, 'P'},
 	{"run-factory-as-manager", no_argument, 0, LONG_OPT_RUN_AS_MANAGER},
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
@@ -1275,7 +1284,10 @@ int main(int argc, char *argv[])
 				consider_capacity = 1;
 				break;
 			case 'd':
-				debug_flags_set(optarg);
+				if (!debug_flags_set(optarg)) {
+					fprintf(stderr, "Unknown debug flag: %s\n", optarg);
+					exit(EXIT_FAILURE);
+				}
 				break;
 			case 'o':
 				debug_config_file(optarg);
@@ -1313,6 +1325,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_RUN_OS:
 				runos_os = xxstrdup(optarg);
+				break;
+			case LONG_OPT_PARENT_DEATH:
+				initial_ppid = getppid();
 				break;
 			default:
 				show_help(argv[0]);
