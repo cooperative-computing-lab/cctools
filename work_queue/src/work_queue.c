@@ -880,12 +880,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		}
 
 		clean_task_state(t);
-		if(t->max_retries > 0 && (t->try_count >= t->max_retries)) {
-			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
-			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
-		} else {
-			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
-		}
+		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
 
 		itable_firstkey(w->current_tasks);
 	}
@@ -1666,19 +1661,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	return;
 }
 
-/*
-Expire tasks in the ready list.
-*/
-static void expire_waiting_task(struct work_queue *q, struct work_queue_task *t)
-{
-	update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
-
-	//add the task to complete list so it is given back to the application.
-	change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
-
-	return;
-}
-
 static int expire_waiting_tasks(struct work_queue *q)
 {
 	struct work_queue_task *t;
@@ -1696,11 +1678,14 @@ static int expire_waiting_tasks(struct work_queue *q)
 
 		if(t->resources_requested->end > 0 && (uint64_t) t->resources_requested->end <= current_time)
 		{
-			expire_waiting_task(q, t);
+			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
+			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
 			expired++;
-		}
-		else
-		{
+		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
+			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
+			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
+			expired++;
+		} else {
 			list_push_tail(q->ready_list, t);
 		}
 	}
