@@ -4174,7 +4174,7 @@ static int abort_slow_workers(struct work_queue *q)
 			continue;
 		}
 
-		c->average_task_time = (stats->time_workers_execute_good + stats->time_send_good + stats->time_receive_good) / c->total_tasks;
+		c->average_task_time = (stats->time_workers_execute + stats->time_send + stats->time_receive) / c->total_tasks;
 
 		if(c->fast_abort > 0)
 			fast_abort_flag = 1;
