@@ -223,6 +223,9 @@ struct work_queue_worker {
 
 	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
 
+	int  fast_abort_alarm;                    // if 1, no task has finished since a task triggered fast abort.
+	                                          // 0 otherwise. A 2nd task triggering fast abort will cause the worker to disconnect
+
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
 	struct hash_table           *features;
@@ -1590,6 +1593,11 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	w->finished_tasks--;
 	w->total_tasks_complete++;
+
+	// At least one task has finished without triggering fast abort, thus we
+	// now have evidence that worker is not slow (e.g., it was probably the
+	// previous task that was slow).
+	w->fast_abort_alarm = 0;
 
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 		if(t->resources_measured && t->resources_measured->limits_exceeded) {
@@ -4148,18 +4156,18 @@ static int abort_slow_workers(struct work_queue *q)
 
 	hash_table_firstkey(q->categories);
 	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
-		if(c->total_tasks < 10) {
-			c->average_task_time = 0;
-			continue;
-		}
-
 		struct work_queue_stats *stats = c->wq_stats;
 		if(!stats) {
 			/* no stats have been computed yet */
 			continue;
 		}
 
-		c->average_task_time = (stats->time_workers_execute + stats->time_send + stats->time_receive) / c->total_tasks;
+		if(stats->tasks_done < 10) {
+			c->average_task_time = 0;
+			continue;
+		}
+
+		c->average_task_time = (stats->time_workers_execute_good + stats->time_send_good + stats->time_receive_good) / stats->tasks_done;
 
 		if(c->fast_abort > 0)
 			fast_abort_flag = 1;
@@ -4174,7 +4182,6 @@ static int abort_slow_workers(struct work_queue *q)
 
 	itable_firstkey(q->tasks);
 	while(itable_nextkey(q->tasks, &taskid, (void **) &t)) {
-
 		c = work_queue_category_lookup_or_create(q, t->category);
 		/* Fast abort deactivated for this category */
 		if(c->fast_abort == 0)
@@ -4200,16 +4207,33 @@ static int abort_slow_workers(struct work_queue *q)
 			continue;
 		}
 
-		if(runtime >= (average_task_time * multiplier)) {
+		if(runtime >= (average_task_time * (multiplier + t->fast_abort_count))) {
 			w = itable_lookup(q->worker_task_map, t->taskid);
 			if(w && (w->type == WORKER_TYPE_WORKER))
 			{
-				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
-				work_queue_block_host_with_timeout(q, w->hostname, wq_option_blocklist_slow_workers_timeout);
-				remove_worker(q, w, WORKER_DISCONNECT_FAST_ABORT);
+				debug(D_WQ, "Task %d is taking too long. Removing from worker.", t->taskid);
+				cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+				t->fast_abort_count++;
 
-				q->stats->workers_fast_aborted++;
-				removed++;
+				/* a task cannot mark two different workers as suspect */
+				if(t->fast_abort_count > 1) {
+					continue;
+				}
+
+				if(w->fast_abort_alarm > 0) {
+					/* this is the second task in a row that triggered fast
+					 * abort, therefore we have evidence that this a slow
+					 * worker (rather than a task) */
+
+					debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
+					work_queue_block_host_with_timeout(q, w->hostname, wq_option_blocklist_slow_workers_timeout);
+					remove_worker(q, w, WORKER_DISCONNECT_FAST_ABORT);
+
+					q->stats->workers_fast_aborted++;
+					removed++;
+				}
+
+				w->fast_abort_alarm = 1;
 			}
 		}
 	}

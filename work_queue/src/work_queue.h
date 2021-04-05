@@ -146,6 +146,7 @@ struct work_queue_task {
 
 	int try_count;          /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref WORK_QUEUE_RESULT_MAX_RETRIES. */
 	int exhausted_attempts; /**< Number of times the task failed given exhausted resources. */
+	int fast_abort_count; /**< Number of times this task has been terminated for running too long. */
 
 	/* All times in microseconds */
 	/* A time_when_* refers to an instant in time, otherwise it refers to a length of time. */
