@@ -1089,11 +1089,43 @@ or very large scales. Each feature is described briefly here, and more details
 may be found in the [Work Queue
 API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
 
+### Maximum retries
+
+When a task cannot be completed because a worker disconnection or because it
+exhausted some intermediate resource allocation, it is automatically retried.
+By default, there is no limit on the number of retries. However, you can set a
+limit on the number of retries:
+
+```python
+t.specify_max_retries(5)   # Task will be try at most 6 times (5 retries).
+```
+
+```perl
+$t->specify_max_retries(5)   # Task will be try at most 6 times (5 retries).
+```
+
+```C
+work_queue_specify_max_retries(t, 5)
+```
+
+When a task cannot be completed in the specified number of tries, it is
+returned with the result `WORK_QUEUE_RESULT_MAX_RETRIES`. In python this would
+look like:
+
+```python
+import work_queue as wq
+t = q.wait(5)
+if t:
+    if t.result == wq.WORK_QUEUE_RESULT_MAX_RETRIES:
+        print("Task could not be completed in the specified number of attempts.")
+```
+
+
 ### Pipelined Submission.
 
 If you have a **very** large number of tasks to run, it may not be possible to
 submit all of the tasks, and then wait for all of them. Instead, submit a
-small number of tasks, then alternate waiting and submiting to keep a constant
+small number of tasks, then alternate waiting and submitting to keep a constant
 number in the queue. The `hungry` will tell you if more submission are
 warranted:
 
@@ -1153,24 +1185,30 @@ proactively aborts tasks that are statistical outliers:
 
 #### Python
 ```python
-# Kill workers that are executing tasks twice as slow as compared to the
+# Disconnect workers that are executing tasks twice as slow as compared to the
 # average.
 q.activate_fast_abort(2)
 ```
 
 #### Perl
 ```perl
-# Kill workers that are executing tasks twice as slow as compared to the
+# Disconnect workers that are executing tasks twice as slow as compared to the
 # average.
 $q->activate_fast_abort(2);
 ```
 
 #### C
 ```C
-// Kill workers that are executing tasks twice as slow as compared to the
+// Disconnect workers that are executing tasks twice as slow as compared to the
 // average.
 work_queue_activate_fast_abort(q, 2);
 ```
+
+Tasks that trigger fast abort are automatically retried in some other worker.
+Each retry allows the task to run for longer and longer times until a
+completion is reached. You can set an upper bound in the number of retries with
+[Maximum retries](#maximum-retries).
+
 
 ### String Interpolation
 
