@@ -195,7 +195,7 @@ zlib                     => 'zlib-devel',
 };
 
 #$package_for{centos}{6}{python3} = ['python34-devel', 'python34-setuptools'];  centos6 end-of-life
-$package_for{centos}{7}{python}   = ['python', 'python-setuptools', 'python-tools'];
+$package_for{centos}{7}{python}   = ['python', 'python-devel', 'python-setuptools', 'python-tools'];
 $package_for{centos}{7}{python3}  = ['python36-devel', 'python36-setuptools'];
 
 $package_for{centos}{8}{python3}  = ['python38-devel', 'python38-setuptools'];
