@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 30
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
-      CCTOOLS_DOCKER_GITHUB: yes
+      CCTOOLS_DOCKER_GITHUB: ${{ matrix.os-name }}
     strategy: 
       matrix:
         os-name: ['centos7', 'centos8', 'ubuntu20.04']
