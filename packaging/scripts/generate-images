@@ -225,6 +225,7 @@ $postinstall_for{centos}{7} = [
 	@{$e2fsprogs},
 	@{$mysql},
 	@{$uuid},
+	@{$swig},
 	'yum -y install cvmfs-devel',
 	'ln -sf /usr/bin/python3.6 /usr/bin/python3',
 	'ln -sf /usr/bin/python3.6-config /usr/bin/python3-config',
