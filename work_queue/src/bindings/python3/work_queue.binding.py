@@ -1692,6 +1692,10 @@ class Factory(object):
         args = [self._factory_binary]
         args += ['--parent-death']
         args += ['--config-file', self._config_file]
+
+        if self._opts['batch-type'] == 'local':
+            self._opts['extra-options'] = self._opts.get('extra-options', '') + ' --parent-death'
+
         args += ["--{}={}".format(opt, self._opts[opt])
                  for opt in self._opts
                  if opt in Factory._command_line_options and opt not in Factory._config_file_options]
