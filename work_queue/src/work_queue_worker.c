@@ -135,6 +135,10 @@ static int symlinks_enabled = 1;
 // Worker id. A unique id for this worker instance.
 static char *worker_id;
 
+// pid of the worker's parent process. If different from zero, worker will be
+// terminated when its parent process changes.
+static pid_t initial_ppid = 0;
+
 static worker_mode_t worker_mode = WORKER_MODE_WORKER;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
@@ -1840,6 +1844,11 @@ static void work_for_manager(struct link *manager) {
 			}
 		}
 
+		if (initial_ppid != 0 && getppid() != initial_ppid) {
+			debug(D_NOTICE, "parent process exited, shutting down\n");
+			break;
+		}
+
 		/*
 		link_usleep will cause the worker to sleep for a time until
 		interrupted by a SIGCHILD signal.  However, the signal could
@@ -2449,6 +2458,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
 	printf( " %-30s Disconnect after this time if manager sends no work. (default=%ds)\n", "   --idle-timeout=<time>", idle_timeout);
 	printf( " %-30s Abort after this time if no managers are available. (default=%ds)\n", "   --connect-timeout=<time>", idle_timeout);
+	printf( " %-30s Exit if parent process dies.\n", "--parent-death");
 	printf( " %-30s Set TCP window size.\n", "-w,--tcp-window-size=<size>");
 	printf( " %-30s Set initial value for backoff interval when worker fails to connect\n", "-i,--min-backoff=<time>");
 	printf( " %-30s to a manager. (default=%ds)\n", "", init_backoff_interval);
@@ -2482,7 +2492,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
 	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
-	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ};
+	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2529,6 +2539,7 @@ static const struct option long_options[] = {
 	{"docker-tar",          required_argument,  0,  LONG_OPT_BUILD_FROM_TAR},
 	{"feature",             required_argument,  0,  LONG_OPT_FEATURE},
 	{"tlq",					required_argument,	0,  LONG_OPT_TLQ},
+	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
 	{0,0,0,0}
 };
 
@@ -2769,6 +2780,9 @@ int main(int argc, char *argv[])
 		case LONG_OPT_TLQ:
 			tlq_port = atoi(optarg);
 			break;
+		case LONG_OPT_PARENT_DEATH:
+			initial_ppid = getppid();
+			break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -2941,6 +2955,11 @@ int main(int argc, char *argv[])
 
 	while(1) {
 		int result = 0;
+
+		if (initial_ppid != 0 && getppid() != initial_ppid) {
+			debug(D_NOTICE, "parent process exited, shutting down\n");
+			break;
+		}
 
 		measure_worker_resources();
 		if(!enforce_worker_promises(NULL)) {

@@ -77,6 +77,7 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 - **--specify-log logfile** Send statistics about foreman to this file.
 - **-P --password <pwfile>** Password file for authenticating to the manager.
 - **-t --timeout <time>** Abort after this amount of idle time. (default=900s)
+- **--parent-death** Exit if parent process dies.
 - **-w --tcp-window-size <size>** Set TCP window size.
 - **-i --min-backoff <time>** Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
 - **-b --max-backoff <time>** Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)

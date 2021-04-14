@@ -55,6 +55,7 @@ OPTION_TRIPLET(-F, fast-abort, mult)Set the fast abort multiplier for foreman (d
 OPTION_PAIR(--specify-log, logfile)Send statistics about foreman to this file.
 OPTION_TRIPLET(-P, password, pwfile)Password file for authenticating to the manager.
 OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time. (default=900s)
+OPTION_ITEM(--parent-death)Exit if parent process dies.
 OPTION_TRIPLET(-w, tcp-window-size, size)Set TCP window size.
 OPTION_TRIPLET(-i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
 OPTION_TRIPLET(-b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
