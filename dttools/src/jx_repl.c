@@ -14,9 +14,7 @@ The program exits once EOF is reached or after `quit` command
 #include "jx.h"
 #include "jx_eval.h"
 #include "jx_parse.h"
-#include "jx_print.h"
 #include "jx_pretty_print.h"
-#include "jx_match.h"
 
 #include <stdio.h>
 #include <errno.h>
@@ -35,8 +33,8 @@ void insert_constants(struct jx *context) {
 int main( int argc, char *argv[] )
 {
     // standard JX parser
-	struct jx_parser *p = jx_parser_create(0);
-	jx_parser_read_stream(p, stdin);
+    struct jx_parser *p = jx_parser_create(0);
+    jx_parser_read_stream(p, stdin);
 
     struct jx *context = jx_object(0);
 
@@ -44,21 +42,21 @@ int main( int argc, char *argv[] )
     struct jx *out = jx_array(0);
     jx_insert(context, jx_string("Out"), out);
 
-    // insert helper constants
+    // helper constants
     insert_constants(context);
-
-	for (unsigned int i=0; ; i++) {
+    
+    for (unsigned int i=0; ; i++) {
         if (i > 0) {
             printf("--------------------\n");
         }
 
         printf("In [%d]: ", i);
 
-		struct jx *j = jx_parse(p);
+        struct jx *j = jx_parse(p);
 
-		if(!j && !jx_parser_errors(p)) {
-			// end of file
-			break;
+        if(!j && !jx_parser_errors(p)) {
+            // end of file
+            break;
         }
 
         if (jx_parser_errors(p)) {
@@ -96,15 +94,14 @@ int main( int argc, char *argv[] )
             jx_pretty_print_stream(res, stdout);
             printf("\n");
 
-            // append result to results
             jx_array_append(out, res);
         }
 
-		jx_delete(j);
-	}
+        jx_delete(j);
+    }
 
-	jx_delete(context);
-	jx_parser_delete(p);
+    jx_delete(context);
+    jx_parser_delete(p);
 
-	return 0;
+    return 0;
 }
