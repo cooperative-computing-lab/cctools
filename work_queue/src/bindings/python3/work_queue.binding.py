@@ -171,7 +171,14 @@ class Task(object):
     # >>> task.specify_file("/etc/hosts", "hosts", type=WORK_QUEUE_INPUT, cache = True)
     # @endcode
     def specify_file(self, local_name, remote_name=None, type=None, flags=None, cache=None, failure_only=None):
-        if remote_name is None:
+
+        # swig expects strings:
+        if local_name:
+            local_name = str(local_name)
+
+        if remote_name:
+            remote_name = str(remote_name)
+        else:
             remote_name = os.path.basename(local_name)
 
         if type is None:
@@ -207,6 +214,10 @@ class Task(object):
         if type is None:
             type = WORK_QUEUE_INPUT
 
+        # swig expects strings
+        if remote_name:
+            remote_name = str(remote_name)
+
         flags = Task._determine_file_flags(flags, cache, failure_only)
         return work_queue_task_specify_file_command(self._task, remote_name, cmd, type, flags)
 
@@ -227,7 +238,13 @@ class Task(object):
     # @param cache         Whether the file should be cached at workers (True/False)
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, type=None, flags=None, cache=None, failure_only=None):
-        if remote_name is None:
+
+        if local_name:
+            local_name = str(local_name)
+
+        if remote_name:
+            remote_name = str(remote_name)
+        else:
             remote_name = os.path.basename(local_name)
 
         if type is None:
@@ -266,7 +283,12 @@ class Task(object):
     # @param failure_only  For output directories, whether the file should be retrieved only when the task fails (e.g., debug logs).
     # @return 1 if the task directory is successfully specified, 0 if either of @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
     def specify_directory(self, local_name, remote_name=None, type=None, flags=None, recursive=False, cache=None, failure_only=None):
-        if remote_name is None:
+        if local_name:
+            local_name = str(local_name)
+
+        if remote_name:
+            remote_name = str(remote_name)
+        else:
             remote_name = os.path.basename(local_name)
 
         if type is None:
@@ -284,6 +306,8 @@ class Task(object):
     # @param flags          May take the same values as @ref specify_file.
     # @param cache          Whether the file should be cached at workers (True/False)
     def specify_buffer(self, buffer, remote_name, flags=None, cache=None):
+        if remote_name:
+            remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, None)
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
@@ -1421,6 +1445,8 @@ class WorkQueue(object):
     # @param self   Reference to the current work queue object.
     # @param local_name   Name of the file as seen by the manager.
     def invalidate_cache_file(self, local_name):
+        if local_name:
+            local_name = str(local_name)
         return work_queue_invalidate_cached_file(self._work_queue, local_name, WORK_QUEUE_FILE)
 
     ##
