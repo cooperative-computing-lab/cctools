@@ -159,7 +159,6 @@ int main(int argc, char *argv[]) {
         jx_insert(context, jx_string(in), jx_string(expr_str));
         free(expr_str);
 
-
         struct jx *res = jx_eval(parsed, context);
 
         if (!res) {
