@@ -126,20 +126,23 @@ int main(int argc, char *argv[]) {
 
     printf(MSG_WELCOME);
     
+    char in[14];
+    char out[14];
+
+    char *line;
+    size_t len = 0;
+
     for (unsigned int i=0; ; i++) {
         if (i > 0) {
             printf("--------------------\n");
         }
 
-        char in[14];
-        char out[14];
-
         sprintf(in, "in_%d", i);
         sprintf(out, "out_%d", i);
 
         printf("%s  : ", in);
-        char *line;
-        size_t len = 0;
+
+        line = NULL; // requirement for MacOS
         getline(&line, &len, stdin);
 
         if (!line) {
