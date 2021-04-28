@@ -19,8 +19,6 @@ The program exits once EOF is reached or after the user enters the `quit` comman
 #include "jx_pretty_print.h"
 
 #include <stdio.h>
-#include <readline/readline.h>
-#include <readline/history.h>
 
 
 #define CATALOG_URL "http://catalog.cse.nd.edu:9097/query.json" 
@@ -135,14 +133,14 @@ int main(int argc, char *argv[]) {
 
         char in[14];
         char out[14];
-        char prompt[20];
 
         sprintf(in, "in_%d", i);
         sprintf(out, "out_%d", i);
-        sprintf(prompt, "%s  : ", in);
 
-        char *line = readline(prompt);
-        add_history(line);
+        printf("%s  : ", in);
+        char *line;
+        size_t len = 0;
+        getline(&line, &len, stdin);
 
         if (!line) {
             // EOF

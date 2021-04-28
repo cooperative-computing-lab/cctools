@@ -10,11 +10,7 @@ See the file COPYING for details.
 #include <string.h>
 
 
-#include <stdio.h>
-#include "jx_pretty_print.h"
-
-
-static struct jx * jx_sub_call(struct jx *func, struct jx *args, struct jx *ctx) {
+static struct jx * jx_sub_call( struct jx *func, struct jx *args, struct jx *ctx) {
 	assert(func);
 	assert(args);
 	assert(jx_istype(args, JX_ARRAY));
@@ -54,26 +50,19 @@ static struct jx * jx_sub_call(struct jx *func, struct jx *args, struct jx *ctx)
 	           !strcmp(func->u.symbol_name, "project")) {
 
         // only sub objlist
-        printf("getting val\n");
         struct jx *val = jx_array_index(args, 0);
-        printf("getting objlist\n");
         struct jx *objlist = jx_array_index(args, 1);
 
         struct jx *new_val = jx_copy(val);
-        printf("subbing objlist\n");
         struct jx *new_objlist = jx_sub(objlist, ctx);
 
         // add back to array
-        struct jx *right = jx_array(0);
+        right = jx_array(0);
         jx_array_append(right, new_val);
         jx_array_append(right, new_objlist);
 
-        printf("new objlist: ");
-        jx_pretty_print_stream(right, stdout);
-
 	} else {
         jx_delete(left);
-        jx_delete(right);
 
 		return jx_error(jx_format(
 			"on line %d, unknown function: %s",
@@ -108,7 +97,7 @@ static struct jx * jx_sub_operator( struct jx_operator *o, struct jx *context )
 	return jx_operator(o->type, left, right);
 }
 
-static struct jx_item *jx_sub_comprehension(struct jx *body, struct jx_comprehension *comp, struct jx *context) {
+static struct jx_item *jx_sub_comprehension( struct jx *body, struct jx_comprehension *comp, struct jx *context) {
 	assert(comp);
 
     // for item
@@ -176,7 +165,7 @@ static struct jx_item *jx_sub_comprehension(struct jx *body, struct jx_comprehen
 	return result;
 }
 
-static struct jx_pair *jx_sub_pair(struct jx_pair *pair, struct jx *context) {
+static struct jx_pair *jx_sub_pair( struct jx_pair *pair, struct jx *context) {
 	if (!pair) return 0;
 
 	return jx_pair(
@@ -185,7 +174,7 @@ static struct jx_pair *jx_sub_pair(struct jx_pair *pair, struct jx *context) {
 		jx_sub_pair(pair->next, context));
 }
 
-static struct jx_item *jx_sub_item(struct jx_item *item, struct jx *context) {
+static struct jx_item *jx_sub_item( struct jx_item *item, struct jx *context) {
 	if (!item) return NULL;
 
 	if (item->comp) {
