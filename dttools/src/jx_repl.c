@@ -7,8 +7,8 @@ See the file COPYING for details.
 /*
 This is a program to explore the jx library.
 It reads in a JX expression, evaluates it, prints out the result, then saves it to the context.
-Thus, previous expressions can be referenced via the `out_%d` symbol 
-The program exits once EOF is reached or after the user enters the `quit` command
+Results of previous expressions can be referenced via the `out_%d` symbol, and their query via `in_%d`
+The program exits once EOF is reached or after the user enters the `quit` or `exit` command
 */
 
 #include "jx.h"
@@ -19,60 +19,72 @@ The program exits once EOF is reached or after the user enters the `quit` comman
 #include "jx_pretty_print.h"
 
 #include <stdio.h>
+#include <string.h>
 
+#ifdef HAS_LIBREADLINE
+#include "readline/readline.h"
+#include "readline/history.h"
+#endif
 
 #define CATALOG_URL "http://catalog.cse.nd.edu:9097/query.json" 
+#define MAX_LINE 200
 
-#define MSG_WELCOME \
-    "Welcome to the JX Language Explorer.\n"\
-    "\n"\
-    "Type 'help' for help\n"\
+
+const char * MSG_WELCOME =
+    "Welcome to the JX Language Explorer.\n"
     "\n"
-#define MSG_HELP \
-    "\n"\
-    "  help          display this message\n"\
-    "  functions     display a list of functions supported by the JX language\n"\
-    "  values        display a list of values supported by the JX language\n"\
-    "  operators     display a list of operators supported by the JX language\n"\
-    "  out           array of previous output\n"\
-    "  catalog       alias to fetch catalog data\n"\
-    "  quit|exit     exit program\n"\
+    "Type 'help' for help\n"
+    "\n";
+
+const char * MSG_HELP =
     "\n"
-#define MSG_FUNCTIONS \
-    "\n"\
-    "  format( \"str: %%s int: %%d float: %%f\", \"hello\", 42, 3.14159 )\n"\
-    "  join( array, delim )\n"\
-    "  range( start, stop, step )\n"\
-    "  ceil( value )\n"\
-    "  floor( value )\n"\
-    "  basename( path )\n"\
-    "  dirname( path )\n"\
-    "  escape( string )\n"\
-    "  len( array )\n"\
-    "  fetch( URL/path )\n"\
-    "  select( boolean, array )\n"\
-    "  project( expression, array )\n"\
-    "  schema( object )\n"\
-    "  like( string, object )\n"\
+    "  help          display this message\n"
+    "  functions     display a list of functions supported by the JX language\n"
+    "  values        display a list of values supported by the JX language\n"
+    "  operators     display a list of operators supported by the JX language\n"
+    "  in_#          the #'th input query\n"
+    "  out_#         result of in_#\n"
+    "  catalog       alias to fetch catalog data\n"
+    "  quit|exit     exit program\n"
+    "\n";
+
+const char * MSG_FUNCTIONS =
     "\n"
-#define MSG_VALUES \
-    "\n"\
-    "  string       \"string\"\n"\
-    "  integer      42\n"\
-    "  float        3.14159\n"\
-    "  boolean      true | false\n"\
-    "  array        [ 1, 2, 3 ]\n"\
-    "  objects      { \"temp\": 32, \"name\": \"fred\" }\n"\
+    "  format( \"str: %%s int: %%d float: %%f\", \"hello\", 42, 3.14159 )\n"
+    "  join( array, delim )\n"
+    "  range( start, stop, step )\n"
+    "  ceil( value )\n"
+    "  floor( value )\n"
+    "  basename( path )\n"
+    "  dirname( path )\n"
+    "  escape( string )\n"
+    "  len( array )\n"
+    "  fetch( URL/path )\n"
+    "  select( boolean, array )\n"
+    "  project( expression, array )\n"
+    "  schema( object )\n"
+    "  like( string, object )\n"
+    "\n";
+
+const char * MSG_VALUES =
     "\n"
-#define MSG_OPERATORS \
-    "\n"\
-    "  lookup           obj[\"a\"], arr[0], arr[0:10]\n"\
-    "  concatenation    \"abc\" + \"def\" -> \"abcdef\"\n"\
-    "  arithmetic       * / + - %%\n"\
-    "  logic            and or not\n"\
-    "  comparison       ==  !=  <  <=  >  >=\n"\
-    "  comprehensions   expr for x in [1,2,3], [x*x for x in range(10) if x %% 2 == 0]\n"\
+    "  string       \"string\"\n"
+    "  integer      42\n"
+    "  float        3.14159\n"
+    "  boolean      true | false\n"
+    "  array        [ 1, 2, 3 ]\n"
+    "  objects      { \"temp\": 32, \"name\": \"fred\" }\n"
+    "\n";
+
+const char * MSG_OPERATORS =
     "\n"
+    "  lookup           obj[\"a\"], arr[0], arr[0:10]\n"
+    "  concatenation    \"abc\" + \"def\" -> \"abcdef\"\n"
+    "  arithmetic       * / + - %\n"
+    "  logic            and or not\n"
+    "  comparison       ==  !=  <  <=  >  >=\n"
+    "  comprehensions   expr for x in [1,2,3], [x*x for x in range(10) if x % 2 == 0]\n"
+    "\n";
 
 
 void insert_constants(struct jx *context) {
@@ -84,6 +96,7 @@ void insert_constants(struct jx *context) {
     jx_insert(context, jx_string("quit"), jx_string("exit"));
     jx_insert(context, jx_string("exit"), jx_string("exit"));
 }
+
 
 char *sub_to_string(struct jx *j, struct jx *context) {
     // expand symbols
@@ -97,13 +110,13 @@ char *sub_to_string(struct jx *j, struct jx *context) {
     return str;
 }
 
+
 struct jx * parse_line(char *line) {
     struct jx_parser *p = jx_parser_create(false);
     jx_parser_read_string(p, line);
     struct jx *j = jx_parse(p);
 
     if(jx_parser_errors(p)) {
-        // failed parse
         printf("jx parse error: %s\n", jx_parser_error_string(p));
 
         jx_delete(j);
@@ -119,18 +132,15 @@ struct jx * parse_line(char *line) {
 
 
 int main(int argc, char *argv[]) {
-    struct jx *context = jx_object(0);
-
-    // helper constants
-    insert_constants(context);
-
-    printf(MSG_WELCOME);
-    
     char in[14];
     char out[14];
+    char prompt[18];
+    char line[MAX_LINE];
 
-    char *line;
-    size_t len = 0;
+    struct jx *context = jx_object(0);
+    insert_constants(context);
+
+    printf("%s", MSG_WELCOME);
 
     for (unsigned int i=0; ; i++) {
         if (i > 0) {
@@ -139,19 +149,29 @@ int main(int argc, char *argv[]) {
 
         sprintf(in, "in_%d", i);
         sprintf(out, "out_%d", i);
+        sprintf(prompt, "%s  : ", in);
 
-        printf("%s  : ", in);
+#ifdef HAS_LIBREADLINE
+		char *temp = readline(prompt);
 
-        line = NULL; // requirement for MacOS
-        getline(&line, &len, stdin);
+		if(!temp)
+			break;
 
-        if (!line) {
-            // EOF
-            break;
+        if (*temp) {
+            add_history(temp);
         }
 
+		strcpy(line, temp);
+		free(temp);
+#else
+		printf("%s", prompt);
+		fflush(stdout);
+
+		if(!fgets(line, MAX_LINE, stdin))
+			break;
+#endif
+
         struct jx *parsed = parse_line(line);
-        free(line);
 
         if (!parsed) {
             continue;
@@ -168,26 +188,26 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        if (res->type == JX_ERROR) {
+        if (jx_istype(res, JX_ERROR)) {
             printf("error %s\n", res->u.err->u.string_value);
             jx_delete(res);
             continue;
         }
 
-        if (res->type == JX_STRING) {
+        if (jx_istype(res, JX_STRING)) {
             if (strcmp(res->u.string_value, "exit") == 0) {
                 jx_delete(res);
                 break;
             } else if (strcmp(res->u.string_value, "help") == 0) {
-                printf(MSG_HELP);
+                printf("%s", MSG_HELP);
             } else if (strcmp(res->u.string_value, "functions") == 0) {
-                printf(MSG_FUNCTIONS);
+                printf("%s", MSG_FUNCTIONS);
             } else if (strcmp(res->u.string_value, "operators") == 0) {
-                printf(MSG_OPERATORS);
+                printf("%s", MSG_OPERATORS);
             } else if (strcmp(res->u.string_value, "values") == 0) {
-                printf(MSG_VALUES);
+                printf("%s", MSG_VALUES);
             } else if (strcmp(res->u.string_value, "help") == 0) {
-                printf(MSG_HELP);
+                printf("%s", MSG_HELP);
             } else {
                 printf("%s : %s\n", out, res->u.string_value);
             }
