@@ -380,6 +380,14 @@ static void send_resource_update(struct link *manager)
 		total_resources->disk.total    = MAX(0, local_resources->disk.total);
 		total_resources->disk.largest  = MAX(0, local_resources->disk.largest);
 		total_resources->disk.smallest = MAX(0, local_resources->disk.smallest);
+		
+		//if workers are set to expire at some time, send the amount of time left to manager
+		if(manual_wall_time_option != 0) {
+			total_resources->time_left = worker_start_time + manual_wall_time_option - time(0);
+		}
+		else {
+			total_resources->time_left = -1;
+		}
 	}
 
 	work_queue_resources_send(manager,total_resources,stoptime);

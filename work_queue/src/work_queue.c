@@ -3719,6 +3719,11 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	if(w->resources->gpus.inuse + limits->gpus > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
 		ok = 0;
 	}
+		
+	//if the wall time for the worker is specified and there's not enough time for the task, then not ok
+	if(w->resources->time_left != -1 && w->resources->time_left < t->resources_requested->wall_time){
+		ok = 0;
+	}
 
 	rmsummary_delete(limits);
 
