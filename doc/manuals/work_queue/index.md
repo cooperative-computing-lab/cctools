@@ -541,10 +541,12 @@ that it uses, for example:
 #### Python
 
 ```python
-t.specify_cores(2)    #needs 2 cores
-t.specify_memory(100) #needs 100 MB memory
-t.specify_disk(1000)  #needs 1 GB disk
-t.specify_gpus(0)     #does not need a GPU
+t.specify_cores(2)                #needs 2 cores
+t.specify_memory(100)             #needs 100 MB memory
+t.specify_disk(1000)              #needs 1 GB disk
+t.specify_gpus(0)                 #does not need a GPU
+t.specify_running_time_max(100)   # task cannot run longer than 100 seconds
+t.specify_running_time_min(10)    # task needs at least 10 seconds to run
 ```
 
 #### Perl
@@ -649,7 +651,6 @@ specified in the configuration file as follows:
 
 Both memory and disk are specified in `MB`.
  
-
 
 ## Recommended Practices
 

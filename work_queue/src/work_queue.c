@@ -241,6 +241,7 @@ struct work_queue_worker {
 	timestamp_t start_time;
 	timestamp_t last_msg_recv_time;
 	timestamp_t last_update_msg_time;
+	int64_t end_time;
 };
 
 struct work_queue_task_report {
@@ -631,6 +632,8 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 		free(w->workerid);
 		w->workerid = xxstrdup(value);
 		write_transaction_worker(q, w, 0, 0);
+	} else if(string_prefix_is(field, "worker-end-time")) {
+		w->end_time = MAX(0, atoll(value));
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -1034,6 +1037,7 @@ static void add_worker(struct work_queue *q)
 	w->current_tasks_boxes = itable_create(0);
 	w->finished_tasks = 0;
 	w->start_time = timestamp_get();
+	w->end_time = -1;
 
 	w->last_update_msg_time = w->start_time;
 
@@ -3652,6 +3656,24 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		ok = 0;
 	}
 
+	//if worker's end time has not been received
+	if(w->end_time < 0){
+		ok = 0;
+	}
+
+	//if wall time for worker is specified and there's not enough time for task, then not ok
+	if(w->end_time > 0){
+		if(t->resources_requested->wall_time > 0 && ((uint64_t) w->end_time) < timestamp_get() + t->resources_requested->wall_time){
+			ok = 0;
+		}
+		if(t->resources_requested->end > 0 && ((uint64_t) w->end_time) < t->resources_requested->end) {
+			ok = 0;
+		}
+		if(t->min_running_time > 0 && ((uint64_t) w->end_time) < timestamp_get() + t->min_running_time){
+			ok = 0;
+		}
+	}
+
 	rmsummary_delete(limits);
 
 	if(t->features) {
@@ -4488,6 +4510,23 @@ void work_queue_task_specify_running_time( struct work_queue_task *t, int64_t us
 	}
 }
 
+void work_queue_task_specify_running_time_max( struct work_queue_task *t, int64_t seconds )
+{
+	work_queue_task_specify_running_time(t, 1000000*seconds); 	//convert to useconds for backward compat
+}
+
+void work_queue_task_specify_running_time_min( struct work_queue_task *t, int64_t seconds )
+{
+	if(seconds < 1)
+	{
+		t->min_running_time = -1;
+	}
+	else
+	{
+		t->min_running_time = 1000000*seconds;					//convert to useconds for backward compat
+	}	
+}
+
 void work_queue_task_specify_resources(struct work_queue_task *t, const struct rmsummary *rm) {
 	if(!rm)
 		return;
@@ -4497,6 +4536,8 @@ void work_queue_task_specify_resources(struct work_queue_task *t, const struct r
 	work_queue_task_specify_disk(t,         rm->disk);
 	work_queue_task_specify_gpus(t,         rm->gpus);
 	work_queue_task_specify_running_time(t, rm->wall_time);
+	work_queue_task_specify_running_time_max(t, rm->wall_time);
+	work_queue_task_specify_running_time_min(t, t->min_running_time);
 	work_queue_task_specify_end_time(t,     rm->end);
 }
 
