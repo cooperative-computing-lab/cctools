@@ -179,7 +179,7 @@ endif
 OBJECTS = $(SOURCES:%.c=%.o)
 
 #separate, because catalog_query has a slightly different order of linking.
-MOST_PROGRAMS = catalog_update watchdog disk_allocator jx2json jx2env env_replace jx_repl
+MOST_PROGRAMS = catalog_update watchdog disk_allocator jx2json jx2env jx_repl env_replace
 PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect
@@ -191,6 +191,9 @@ all: $(TARGETS) catalog_query
 libdttools.a: $(OBJECTS)
 
 $(MOST_PROGRAMS) $(TEST_PROGRAMS): libdttools.a
+
+jx_repl: jx_repl.o libdttools.a
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE) $(CCTOOLS_READLINE_LDFLAGS)
 
 catalog_query: catalog_query.o catalog_query_tool.o libdttools.a
 

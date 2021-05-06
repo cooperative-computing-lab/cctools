@@ -14,7 +14,7 @@ See the file COPYING for details.
 
 /** Substitute symbols from context.
 Traverses the expression, searching for symbols 
-Unbound symbols by looking for matches in the context object.
+Unbounds symbols by looking for matches in the context object.
 @param j The expression whose symbols will be substituted.
 @param context An object in which values will be found.
 @return A newly created result expression, which must be deleted with @ref jx_delete.

@@ -27,7 +27,7 @@ The program exits once EOF is reached or after the user enters the `quit` or `ex
 #endif
 
 #define CATALOG_URL "http://catalog.cse.nd.edu:9097/query.json" 
-#define MAX_LINE 200
+#define MAX_LINE 4096
 
 
 const char * MSG_WELCOME =
@@ -50,7 +50,7 @@ const char * MSG_HELP =
 
 const char * MSG_FUNCTIONS =
     "\n"
-    "  format( \"str: %%s int: %%d float: %%f\", \"hello\", 42, 3.14159 )\n"
+    "  format( \"str: %s int: %d float: %f\", \"hello\", 42, 3.14159 )\n"
     "  join( array, delim )\n"
     "  range( start, stop, step )\n"
     "  ceil( value )\n"
@@ -134,7 +134,8 @@ struct jx * parse_line(char *line) {
 int main(int argc, char *argv[]) {
     char in[14];
     char out[14];
-    char prompt[18];
+    char in_prompt[18];
+    char out_prompt[18];
     char line[MAX_LINE];
 
     struct jx *context = jx_object(0);
@@ -149,26 +150,28 @@ int main(int argc, char *argv[]) {
 
         sprintf(in, "in_%d", i);
         sprintf(out, "out_%d", i);
-        sprintf(prompt, "%s  : ", in);
+
+        sprintf(in_prompt, "%s  >>> ", in);
+        sprintf(out_prompt, "%s <<< ", out);
 
 #ifdef HAS_LIBREADLINE
-		char *temp = readline(prompt);
+        char *temp = readline(in_prompt);
 
-		if(!temp)
-			break;
+        if(!temp)
+            break;
 
         if (*temp) {
             add_history(temp);
         }
 
-		strcpy(line, temp);
-		free(temp);
+        strcpy(line, temp);
+        free(temp);
 #else
-		printf("%s", prompt);
-		fflush(stdout);
+        printf("%s", in_prompt);
+        fflush(stdout);
 
-		if(!fgets(line, MAX_LINE, stdin))
-			break;
+        if(!fgets(line, MAX_LINE, stdin))
+            break;
 #endif
 
         struct jx *parsed = parse_line(line);
@@ -177,7 +180,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // insert fully-expanded expression to context
+        // insert fully-expanded expression into context
         char *expr_str = sub_to_string(parsed, context);
         jx_insert(context, jx_string(in), jx_string(expr_str));
         free(expr_str);
@@ -209,11 +212,11 @@ int main(int argc, char *argv[]) {
             } else if (strcmp(res->u.string_value, "help") == 0) {
                 printf("%s", MSG_HELP);
             } else {
-                printf("%s : %s\n", out, res->u.string_value);
+                printf("%s%s\n", out_prompt, res->u.string_value);
             }
 
         } else {
-            printf("%s : ", out);
+            printf("%s", out_prompt);
             jx_pretty_print_stream(res, stdout);
             printf("\n");
         }
