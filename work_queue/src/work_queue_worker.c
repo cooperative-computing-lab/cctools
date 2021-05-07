@@ -113,6 +113,9 @@ static int init_backoff_interval = 1;
 // Maximum value for backoff interval (in seconds) when worker fails to connect to a manager.
 static int max_backoff_interval = 60;
 
+// Absolute end time for worker, worker is killed after this point.
+static time_t end_time = 0;
+
 // Chance that a worker will decide to shut down each minute without warning, to simulate failure.
 static double worker_volatility = 0.0;
 
@@ -381,12 +384,12 @@ static void send_resource_update(struct link *manager)
 		total_resources->disk.largest  = MAX(0, local_resources->disk.largest);
 		total_resources->disk.smallest = MAX(0, local_resources->disk.smallest);
 		
-		//if workers are set to expire at some time, send the amount of time left to manager
-		if(manual_wall_time_option != 0) {
-			total_resources->time_left = worker_start_time + manual_wall_time_option - time(0);
+		//if workers are set to expire in some time, send the expiration time to manager
+		if(manual_wall_time_option > 0) {
+			end_time = worker_start_time + manual_wall_time_option;
 		}
 		else {
-			total_resources->time_left = -1;
+			end_time = 0;
 		}
 	}
 
@@ -506,6 +509,7 @@ static void report_worker_ready( struct link *manager )
 	send_features(manager);
 	send_tlq_config(manager);
 	send_keepalive(manager, 1);
+	send_manager_message(manager, "info worker-end-time %lld\n", (long long int)end_time);
 }
 
 

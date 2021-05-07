@@ -244,6 +244,7 @@ struct work_queue_worker {
 	timestamp_t start_time;
 	timestamp_t last_msg_recv_time;
 	timestamp_t last_update_msg_time;
+	long long int end_time;
 };
 
 struct work_queue_task_report {
@@ -634,6 +635,8 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 		free(w->workerid);
 		w->workerid = xxstrdup(value);
 		write_transaction_worker(q, w, 0, 0);
+	} else if(string_prefix_is(field, "worker-end-time")) {
+		w->end_time = atoll(value);	
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -3721,7 +3724,17 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	}
 		
 	//if the wall time for the worker is specified and there's not enough time for the task, then not ok
-	if(w->resources->time_left != -1 && w->resources->time_left < t->resources_requested->wall_time){
+	if(w->end_time){
+		if(t->resources_requested->wall_time > 0){
+			if(w->end_time - time(0) > t->resources_requested->wall_time) {
+				ok = 1;
+			}
+			else{
+				ok = 0;
+			}
+		}
+	} 
+	else if(w->end_time < t->resources_requested->end){
 		ok = 0;
 	}
 
