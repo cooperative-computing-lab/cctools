@@ -114,7 +114,7 @@ static int init_backoff_interval = 1;
 static int max_backoff_interval = 60;
 
 // Absolute end time for worker, worker is killed after this point.
-static time_t end_time = 0;
+static time_t end_time = -1;
 
 // Chance that a worker will decide to shut down each minute without warning, to simulate failure.
 static double worker_volatility = 0.0;
@@ -387,9 +387,6 @@ static void send_resource_update(struct link *manager)
 		//if workers are set to expire in some time, send the expiration time to manager
 		if(manual_wall_time_option > 0) {
 			end_time = worker_start_time + manual_wall_time_option;
-		}
-		else {
-			end_time = 0;
 		}
 	}
 
