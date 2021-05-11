@@ -3723,13 +3723,10 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		ok = 0;
 	}
 		
-	//if the wall time for the worker is specified and there's not enough time for the task, then not ok
-	if(w->end_time){
+	//if wall time for worker is specified and there's not enough time for task, then not ok
+	if(w->end_time > 0){
 		if(t->resources_requested->wall_time > 0){
-			if(w->end_time - time(0) > t->resources_requested->wall_time) {
-				ok = 1;
-			}
-			else{
+			if(w->end_time < time(0) + t->resources_requested->wall_time) {
 				ok = 0;
 			}
 		}
