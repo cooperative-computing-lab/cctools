@@ -3723,22 +3723,21 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	if(w->resources->gpus.inuse + limits->gpus > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
 		ok = 0;
 	}
-	
-	//if worker's end time is unreceived(= 0)
-	if(w->end_time == 0){
+
+	//if worker's end time has not been received
+	if(w->end_time < 0){
 		ok = 0;
 	}
-		
+
 	//if wall time for worker is specified and there's not enough time for task, then not ok
 	if(w->end_time > 0){
-		//wall time of task is in micro-seconds, so must be divided by 1000000
-		if(t->resources_requested->wall_time > 0 && w->end_time < time(0) + t->resources_requested->wall_time/1000000){
+		if(t->resources_requested->wall_time > 0 && w->end_time < timestamp_get() + t->resources_requested->wall_time){
 			ok = 0;
 		}
 		if(t->resources_requested->end > 0 && w->end_time < t->resources_requested->end) {
 			ok = 0;
 		}
-	} 
+	}
 
 	rmsummary_delete(limits);
 

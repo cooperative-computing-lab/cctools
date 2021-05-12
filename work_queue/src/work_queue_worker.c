@@ -159,7 +159,7 @@ static char *workspace;
 static char *os_name = NULL;
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
-static time_t worker_start_time = 0;
+static timestamp_t worker_start_time = 0;
 
 static struct work_queue_watcher * watcher = 0;
 
@@ -386,7 +386,7 @@ static void send_resource_update(struct link *manager)
 
 		//if workers are set to expire in some time, send the expiration time to manager
 		if(manual_wall_time_option > 0) {
-			end_time = worker_start_time + manual_wall_time_option;
+			end_time = worker_start_time + (manual_wall_time_option * 1e6);
 		}
 	}
 
@@ -1803,7 +1803,7 @@ static int enforce_worker_limits(struct link *manager) {
 If 0, the worker has less resources than promised. 1 otherwise.
 */
 static int enforce_worker_promises(struct link *manager) {
-	if(end_time > 0 && time(0) > end_time) {
+	if(end_time > 0 && timestamp_get() > end_time) {
 		warn(D_NOTICE, "work_queue_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t) manual_wall_time_option);
 		if(manager) {
 			send_manager_message(manager, "info wall_time_exhausted %"PRIu64"\n", (uint64_t) manual_wall_time_option);
@@ -2573,7 +2573,7 @@ int main(int argc, char *argv[])
 
 	features = hash_table_create(4, 0);
 
-	worker_start_time = time(0);
+	worker_start_time = timestamp_get();
 
 	set_worker_id();
 
