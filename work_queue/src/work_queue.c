@@ -244,7 +244,7 @@ struct work_queue_worker {
 	timestamp_t start_time;
 	timestamp_t last_msg_recv_time;
 	timestamp_t last_update_msg_time;
-	long long int end_time;
+	int64_t end_time;
 };
 
 struct work_queue_task_report {
@@ -636,7 +636,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 		w->workerid = xxstrdup(value);
 		write_transaction_worker(q, w, 0, 0);
 	} else if(string_prefix_is(field, "worker-end-time")) {
-		w->end_time = atoll(value);	
+		w->end_time = MAX(0, atoll(value));
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -1035,6 +1035,7 @@ static void add_worker(struct work_queue *q)
 	w->current_tasks_boxes = itable_create(0);
 	w->finished_tasks = 0;
 	w->start_time = timestamp_get();
+	w->end_time = -1;
 
 	w->last_update_msg_time = w->start_time;
 
