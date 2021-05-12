@@ -383,7 +383,7 @@ static void send_resource_update(struct link *manager)
 		total_resources->disk.total    = MAX(0, local_resources->disk.total);
 		total_resources->disk.largest  = MAX(0, local_resources->disk.largest);
 		total_resources->disk.smallest = MAX(0, local_resources->disk.smallest);
-		
+
 		//if workers are set to expire in some time, send the expiration time to manager
 		if(manual_wall_time_option > 0) {
 			end_time = worker_start_time + manual_wall_time_option;
@@ -2743,6 +2743,10 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_WALL_TIME:
 			manual_wall_time_option = atoi(optarg);
+			if(manual_wall_time_option < 1) {
+				manual_wall_time_option = 0;
+				warn(D_NOTICE, "Ignoring --wall-time, a positive integer is expected.");
+			}
 			break;
 		case LONG_OPT_DISABLE_SYMLINKS:
 			symlinks_enabled = 0;
