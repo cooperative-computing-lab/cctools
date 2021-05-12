@@ -114,7 +114,7 @@ static int init_backoff_interval = 1;
 static int max_backoff_interval = 60;
 
 // Absolute end time for worker, worker is killed after this point.
-static time_t end_time = -1;
+static timestamp_t end_time = 0;
 
 // Chance that a worker will decide to shut down each minute without warning, to simulate failure.
 static double worker_volatility = 0.0;
@@ -1803,7 +1803,7 @@ static int enforce_worker_limits(struct link *manager) {
 If 0, the worker has less resources than promised. 1 otherwise.
 */
 static int enforce_worker_promises(struct link *manager) {
-	if(end_time > 0 && timestamp_get() > end_time) {
+	if(end_time > 0 && timestamp_get() > ((uint64_t) end_time)) {
 		warn(D_NOTICE, "work_queue_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t) manual_wall_time_option);
 		if(manager) {
 			send_manager_message(manager, "info wall_time_exhausted %"PRIu64"\n", (uint64_t) manual_wall_time_option);
