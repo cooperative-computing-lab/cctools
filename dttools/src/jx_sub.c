@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "jx_sub.h"
+#include "jx_function.h"
 
 #include <assert.h>
 #include <string.h>
@@ -17,52 +18,7 @@ static struct jx * jx_sub_call( struct jx *func, struct jx *args, struct jx *ctx
     assert(jx_istype(func, JX_SYMBOL));
 
     struct jx *left  = jx_copy(func);
-    struct jx *right = NULL;
-
-    if (!strcmp(func->u.symbol_name, "range")    ||
-        !strcmp(func->u.symbol_name, "format")   ||
-        !strcmp(func->u.symbol_name, "join")     ||
-        !strcmp(func->u.symbol_name, "ceil")     ||
-        !strcmp(func->u.symbol_name, "floor")    ||
-        !strcmp(func->u.symbol_name, "basename") ||
-        !strcmp(func->u.symbol_name, "dirname")  ||
-        !strcmp(func->u.symbol_name, "listdir")  ||
-        !strcmp(func->u.symbol_name, "escape")   ||
-        !strcmp(func->u.symbol_name, "template") ||
-        !strcmp(func->u.symbol_name, "len")      ||
-        !strcmp(func->u.symbol_name, "fetch")    ||
-        !strcmp(func->u.symbol_name, "schema")   ||
-        !strcmp(func->u.symbol_name, "like")     ||
-        !strcmp(func->u.symbol_name, "keys")     ||
-        !strcmp(func->u.symbol_name, "values")   ||
-        !strcmp(func->u.symbol_name, "items")) {
-        
-        right = jx_sub(args, ctx);
-
-    } else if (!strcmp(func->u.symbol_name, "select") ||
-               !strcmp(func->u.symbol_name, "project")) {
-
-        // only sub objlist (ignoring select's boolean and project's expression)
-        struct jx *val = jx_array_index(args, 0);
-        struct jx *objlist = jx_array_index(args, 1);
-
-        struct jx *new_val = jx_copy(val);
-        struct jx *new_objlist = jx_sub(objlist, ctx);
-
-        // add back to args 
-        right = jx_array(0);
-        jx_array_append(right, new_val);
-        jx_array_append(right, new_objlist);
-
-    } else {
-        jx_delete(left);
-
-        return jx_error(jx_format(
-            "on line %d, unknown function: %s",
-            func->line,
-            func->u.symbol_name
-        ));
-    }
+    struct jx *right = jx_function_sub(func->u.symbol_name, args, ctx);
     
     return jx_operator(JX_OP_CALL, left, right);
 }

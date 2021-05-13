@@ -10,8 +10,9 @@ See the file COPYING for details.
 #include "jx.h"
 #include <stdio.h>
 
-struct jx *jx_function_call(const char *funcname, struct jx *args, struct jx *ctx);
-void jx_function_help(FILE *file);
+struct jx *jx_function_eval(const char *funcname, struct jx *args, struct jx *ctx);
+struct jx *jx_function_sub(const char *funcname, struct jx *args, struct jx *ctx);
+void       jx_function_help(FILE *file);
 
 struct jx *jx_function_range(struct jx *args);
 struct jx *jx_function_format(struct jx *args);

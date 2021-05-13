@@ -189,7 +189,7 @@ static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx)
 	assert(jx_istype(args, JX_ARRAY));
 	assert(jx_istype(func, JX_SYMBOL));
 
-    return jx_function_call(func->u.symbol_name, args, ctx);
+    return jx_function_eval(func->u.symbol_name, args, ctx);
 }
 
 static struct jx *jx_eval_slice(struct jx *array, struct jx *slice) {
