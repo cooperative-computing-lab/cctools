@@ -14,6 +14,7 @@ The program exits once EOF is reached or after the user enters the `quit` or `ex
 #include "jx.h"
 #include "jx_sub.h"
 #include "jx_eval.h"
+#include "jx_function.h"
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "jx_pretty_print.h"
@@ -46,24 +47,6 @@ const char * MSG_HELP =
     "  out_#         result of in_#\n"
     "  catalog       alias to fetch catalog data\n"
     "  quit|exit     exit program\n"
-    "\n";
-
-const char * MSG_FUNCTIONS =
-    "\n"
-    "  format( \"str: %s int: %d float: %f\", \"hello\", 42, 3.14159 )\n"
-    "  join( array, delim )\n"
-    "  range( start, stop, step )\n"
-    "  ceil( value )\n"
-    "  floor( value )\n"
-    "  basename( path )\n"
-    "  dirname( path )\n"
-    "  escape( string )\n"
-    "  len( array )\n"
-    "  fetch( URL/path )\n"
-    "  select( boolean, array )\n"
-    "  project( expression, array )\n"
-    "  schema( object )\n"
-    "  like( string, object )\n"
     "\n";
 
 const char * MSG_VALUES =
@@ -133,7 +116,7 @@ struct jx * parse_line(char *line) {
 
 int main(int argc, char *argv[]) {
     char in[14];
-    char out[14];
+    char out[15];
     char in_prompt[18];
     char out_prompt[18];
     char line[MAX_LINE];
@@ -151,8 +134,8 @@ int main(int argc, char *argv[]) {
         sprintf(in, "in_%d", i);
         sprintf(out, "out_%d", i);
 
-        sprintf(in_prompt, "%s  >>> ", in);
-        sprintf(out_prompt, "%s <<< ", out);
+        sprintf(in_prompt, "%s  : ", in);
+        sprintf(out_prompt, "%s : ", out);
 
 #ifdef HAS_LIBREADLINE
         char *temp = readline(in_prompt);
@@ -204,7 +187,7 @@ int main(int argc, char *argv[]) {
             } else if (strcmp(res->u.string_value, "help") == 0) {
                 printf("%s", MSG_HELP);
             } else if (strcmp(res->u.string_value, "functions") == 0) {
-                printf("%s", MSG_FUNCTIONS);
+                jx_function_help(stdout);
             } else if (strcmp(res->u.string_value, "operators") == 0) {
                 printf("%s", MSG_OPERATORS);
             } else if (strcmp(res->u.string_value, "values") == 0) {

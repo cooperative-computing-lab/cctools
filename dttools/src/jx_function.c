@@ -28,6 +28,53 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "buffer.h"
 
+#include "jx_function.h"
+
+
+typedef enum {
+    SINGLE_ARG,
+    DOUBLE_ARG,
+    DEFERRED_EVAL
+} jx_function_type;
+
+typedef union {
+    struct jx * (*single_arg)(struct jx *args);
+    struct jx * (*double_arg)(struct jx *args, struct jx *ctx);
+    struct jx * (*deferred_eval)(struct jx *args, struct jx *ctx);
+} jx_function_pointer;
+
+
+struct jx_function_info {
+    const char *name;
+    const char *help_text;
+    jx_function_type type;
+    jx_function_pointer function_pointer;
+};
+
+const struct jx_function_info jx_functions[] = {
+    { "range", "range( start, stop, step )", SINGLE_ARG, { .single_arg = jx_function_range }},
+    { "format", "format( str: %s int: %d float: %f\", \"hello\", 42, 3.14159 )", SINGLE_ARG, { .single_arg = jx_function_format }},
+    { "join", "join( array, delim )", SINGLE_ARG, { .single_arg = jx_function_join }},
+    { "ceil", "ceil( value )", SINGLE_ARG, { .single_arg = jx_function_ceil }},
+    { "floor", "floor( value )", SINGLE_ARG, { .single_arg = jx_function_floor }},
+    { "basename", "basename( path )", SINGLE_ARG, { .single_arg = jx_function_basename }},
+    { "dirname", "dirname( path )", SINGLE_ARG, { .single_arg = jx_function_dirname }},
+    { "listdir", "listdir( path )", SINGLE_ARG, { .single_arg = jx_function_listdir }},
+    { "escape", "escape( string )", SINGLE_ARG, { .single_arg = jx_function_escape }},
+    { "len", "len( array )", SINGLE_ARG, { .single_arg = jx_function_len }},
+    { "fetch", "fetch( URL/path )", SINGLE_ARG, { .single_arg = jx_function_fetch }},
+    { "schema", "schema( object )", SINGLE_ARG, { .single_arg = jx_function_schema }},
+    { "like", "like( string, object )", SINGLE_ARG, { .single_arg = jx_function_like }},
+    { "keys", "keys( object )", SINGLE_ARG, { .single_arg = jx_function_keys }},
+    { "values", "values( object )", SINGLE_ARG, { .single_arg = jx_function_values }},
+    { "items", "items( object )", SINGLE_ARG, { .single_arg = jx_function_items}},
+    { "template", "template( string [,object] )", DOUBLE_ARG, { .double_arg = jx_function_template }},
+    { "select", "select( boolean, array )", DEFERRED_EVAL, { .deferred_eval = jx_function_select }},
+    { "project", "project( expression, array )", DEFERRED_EVAL, { .deferred_eval = jx_function_project }},
+    { 0, 0, 0, {0} }
+};
+
+
 static struct jx *make_error(const char *funcname, struct jx *args, const char *fmt, ...) {
 	assert(funcname);
 	assert(args);
@@ -47,6 +94,39 @@ static struct jx *make_error(const char *funcname, struct jx *args, const char *
 	buffer_free(&buf);
 	return err;
 }
+
+struct jx * jx_function_call(const char *funcname, struct jx *args, struct jx *ctx) {
+    int i = 0;
+    struct jx_function_info info;
+
+    while ((info = jx_functions[i++]).name != NULL) {
+        if (strcmp(info.name, funcname) != 0) {
+            continue;
+        }
+
+        if (info.type == SINGLE_ARG) {
+            return (*info.function_pointer.single_arg)(jx_eval(args, ctx));
+        } else if (info.type == DOUBLE_ARG) {
+            return (*info.function_pointer.double_arg)(jx_eval(args, ctx), ctx);
+        } else {
+            return (*info.function_pointer.deferred_eval)(jx_copy(args), ctx);
+        }
+    }
+
+    return make_error(funcname, args, "invalid function name");
+}
+
+void jx_function_help(FILE *file) {
+    int i = 0;
+    struct jx_function_info info;
+
+    fprintf(file, "\n");
+    while ((info = jx_functions[i++]).name != NULL) {
+        fprintf(file, "  %s\n", info.help_text);
+    }
+    fprintf(file, "\n");
+}
+
 
 static char *jx_function_format_value(char spec, struct jx *args) {
 	if (spec == '%') return xxstrdup("%");

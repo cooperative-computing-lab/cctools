@@ -189,59 +189,7 @@ static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx)
 	assert(jx_istype(args, JX_ARRAY));
 	assert(jx_istype(func, JX_SYMBOL));
 
-	if (!strcmp(func->u.symbol_name, "range")) {
-		return jx_function_range(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "format")) {
-		return jx_function_format(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "join")) {
-		return jx_function_join(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "ceil")) {
-		return jx_function_ceil(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "floor")) {
-		return jx_function_floor(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "basename")) {
-		return jx_function_basename(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "dirname")) {
-		return jx_function_dirname(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "listdir")) {
-		return jx_function_listdir(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "escape")) {
-		return jx_function_escape(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "template")) {
-		return jx_function_template(jx_eval(args, ctx), ctx);
-	} else if (!strcmp(func->u.symbol_name, "len")) {
-		return jx_function_len(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "fetch")) {
-		return jx_function_fetch(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "schema")) {
-		return jx_function_schema(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "like")) {
-		return jx_function_like(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "keys")) {
-		return jx_function_keys(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "values")) {
-		return jx_function_values(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "items")) {
-		return jx_function_items(jx_eval(args, ctx));
-
-	/* select() and project() differ from the other functions in
-	 * that they need deferred eval for specific arguments.
-	 * We therefore just give them a copy of the args, and let
-	 * them do the eval themselves.
-	 *
-	 * When adding new functions, you probably don't want to do this
-	 */
-	} else if (!strcmp(func->u.symbol_name, "select")) {
-		return jx_function_select(jx_copy(args), ctx);
-	} else if (!strcmp(func->u.symbol_name, "project")) {
-		return jx_function_project(jx_copy(args), ctx);
-	} else {
-		return jx_error(jx_format(
-			"on line %d, unknown function: %s",
-			func->line,
-			func->u.symbol_name
-		));
-	}
+    return jx_function_call(func->u.symbol_name, args, ctx);
 }
 
 static struct jx *jx_eval_slice(struct jx *array, struct jx *slice) {
