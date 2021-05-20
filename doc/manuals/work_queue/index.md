@@ -616,15 +616,19 @@ Both memory and disk are specified in `MB`.
 
 ### Specifying Task Resources
 
-To run several task in a worker, every task must have a description of the
-resources it uses, in terms of cores, memory, disk, and gpus. These resources
-can be specified as in the following example:
+To run several tasks in a worker, every task must have a description of the
+resources it uses, in terms of cores, memory, disk, and gpus. While time is 
+not exactly a type of resource, specifying the running time of tasks can 
+often be helpful to map tasks to workers. These resources can be specified 
+as in the following example:
 
 ```python
-t.specify_cores(1)      # task needs one core
-t.specify_memory(1024)  # task needs 1024 MB of memory
-t.specify_disk(4096)    # task needs 4096 MB of disk space
-t.specify_gpus(0)       # task does not need a gpu
+t.specify_cores(1)                     # task needs one core
+t.specify_memory(1024)                 # task needs 1024 MB of memory
+t.specify_disk(4096)                   # task needs 4096 MB of disk space
+t.specify_gpus(0)                      # task does not need a gpu
+t.specify_running_time_max(100000000)  # task is allowed to run in 100 seconds
+t.specify_running_time_min(10000000)   # task needs at least 10 seconds to run
 ```
 
 ```perl
@@ -632,11 +636,17 @@ $t->specify_cores(1)      # task needs one core
 $t->specify_memory(1024)  # task needs 1024 MB of memory
 $t->specify_disk(4096)    # task needs 4096 MB of disk space
 $t->specify_gpus(0)       # task does not need a gpu
+#specifying running time is not yet supported in perl
 ```
 
 When all cores, memory, and disk are specified, Work Queue will simply fit as
 many tasks as possible without going above the resources available at a
-particular worker.
+particular worker. When the maximum running time is specified, Work Queue will
+kill any task that has its running time is higher than the maximum running 
+time. The minimum running time, if specified, helps Work Queue decide which 
+worker best fits which task. Specifying tasks' running time is especially 
+helpful in clusters where workers may have a hard threshold of their running 
+time.
 
 When some of the resources are left unspecified, then Work Queue tries to find
 some reasonable defaults as follows:

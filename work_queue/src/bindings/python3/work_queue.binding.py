@@ -409,6 +409,19 @@ class Task(object):
     def specify_running_time(self, useconds):
         return work_queue_task_specify_running_time(self._task, int(useconds))
 
+    # Indicate the maximum running time for a task in a worker (relative to
+    # when the task starts to run).  If less than 1, or not specified, no limit
+    # is imposed.
+    # Note: same effect as specify_running_time for backwards compatibility
+    def specify_running_time_max(self, useconds):
+        return work_queue_task_specify_running_time_max(self._task, int(useconds))
+
+    # Indicate the minimum running time for a task in a worker (relative to
+    # when the task starts to run).  If less than 1, or not specified, no limit
+    # is imposed.
+    def specify_running_time_min(self, useconds):
+        return work_queue_task_specify_running_time_min(self._task, int(useconds))
+
     ##
     # Set this environment variable before running the task.
     # If value is None, then variable is unset.
