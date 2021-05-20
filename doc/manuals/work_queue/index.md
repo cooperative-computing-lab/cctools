@@ -642,11 +642,10 @@ $t->specify_gpus(0)       # task does not need a gpu
 When all cores, memory, and disk are specified, Work Queue will simply fit as
 many tasks as possible without going above the resources available at a
 particular worker. When the maximum running time is specified, Work Queue will
-kill any task that has its running time is higher than the maximum running 
-time. The minimum running time, if specified, helps Work Queue decide which 
-worker best fits which task. Specifying tasks' running time is especially 
-helpful in clusters where workers may have a hard threshold of their running 
-time.
+kill any task that exceeds their maximum running time. The minimum running time, 
+if specified, helps Work Queue decide which worker best fits which task. 
+Specifying tasks' running time is especially helpful in clusters where workers 
+may have a hard threshold of their running time.
 
 When some of the resources are left unspecified, then Work Queue tries to find
 some reasonable defaults as follows:
