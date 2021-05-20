@@ -3737,6 +3737,9 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		if(t->resources_requested->end > 0 && ((uint64_t) w->end_time) < t->resources_requested->end) {
 			ok = 0;
 		}
+		if(t->min_running_time > 0 && ((uint64_t) w->end_time) < timestamp_get() + t->min_running_time){
+			ok = 0;
+		}
 	}
 
 	rmsummary_delete(limits);
@@ -4588,6 +4591,23 @@ void work_queue_task_specify_running_time( struct work_queue_task *t, int64_t us
 	}
 }
 
+void work_queue_task_specify_running_time_max( struct work_queue_task *t, int64_t useconds )
+{
+	work_queue_task_specify_running_time(t, useconds);
+}
+
+void work_queue_task_specify_running_time_min( struct work_queue_task *t, int64_t useconds )
+{
+	if(useconds < 1)
+	{
+		t->min_running_time = -1;
+	}
+	else
+	{
+		t->min_running_time = useconds;
+	}	
+}
+
 void work_queue_task_specify_resources(struct work_queue_task *t, const struct rmsummary *rm) {
 	if(!rm)
 		return;
@@ -4597,6 +4617,8 @@ void work_queue_task_specify_resources(struct work_queue_task *t, const struct r
 	work_queue_task_specify_disk(t,         rm->disk);
 	work_queue_task_specify_gpus(t,         rm->gpus);
 	work_queue_task_specify_running_time(t, rm->wall_time);
+	work_queue_task_specify_running_time_max(t, rm->wall_time);
+	work_queue_task_specify_running_time_min(t, t->min_running_time);
 	work_queue_task_specify_end_time(t,     rm->end);
 }
 
