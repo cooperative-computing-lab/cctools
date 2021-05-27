@@ -4591,20 +4591,20 @@ void work_queue_task_specify_running_time( struct work_queue_task *t, int64_t us
 	}
 }
 
-void work_queue_task_specify_running_time_max( struct work_queue_task *t, int64_t useconds )
+void work_queue_task_specify_running_time_max( struct work_queue_task *t, int64_t seconds )
 {
-	work_queue_task_specify_running_time(t, useconds);
+	work_queue_task_specify_running_time(t, 1000000*seconds); 	//convert to useconds for backward compat
 }
 
-void work_queue_task_specify_running_time_min( struct work_queue_task *t, int64_t useconds )
+void work_queue_task_specify_running_time_min( struct work_queue_task *t, int64_t seconds )
 {
-	if(useconds < 1)
+	if(seconds < 1)
 	{
 		t->min_running_time = -1;
 	}
 	else
 	{
-		t->min_running_time = useconds;
+		t->min_running_time = 1000000*seconds;					//convert to useconds for backward compat
 	}	
 }
 

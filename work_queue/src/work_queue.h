@@ -503,22 +503,22 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t usecon
 
 void work_queue_task_specify_running_time( struct work_queue_task *t, int64_t useconds );
 
-/** Specify the maximum time (in microseconds) the task is allowed to run in a worker.
+/** Specify the maximum time (in seconds) the task is allowed to run in a worker.
  * This time is accounted since the moment the task starts to run in a worker.
  * If less than 1, then no maximum time is specified (this is the default).
  * Note: same effect as work_queue_task_specify_running_time.
 @param t A task object.
-@param useconds Maximum number of seconds the task may run in a worker.
+@param seconds Maximum number of seconds the task may run in a worker.
 */
-void work_queue_task_specify_running_time_max( struct work_queue_task *t, int64_t useconds );
+void work_queue_task_specify_running_time_max( struct work_queue_task *t, int64_t seconds );
 
-/** Specify the minimum time (in microseconds) the task is expected to run in a worker.
+/** Specify the minimum time (in seconds) the task is expected to run in a worker.
  * This time is accounted since the moment the task starts to run in a worker.
  * If less than 1, then no minimum time is specified (this is the default).
 @param t A task object.
-@param useconds Minimum number of seconds the task may run in a worker.
+@param seconds Minimum number of seconds the task may run in a worker.
 */
-void work_queue_task_specify_running_time_min( struct work_queue_task *t, int64_t useconds );
+void work_queue_task_specify_running_time_min( struct work_queue_task *t, int64_t seconds );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the work queue, but is provided for the user's convenience
