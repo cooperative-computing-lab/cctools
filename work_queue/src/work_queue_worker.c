@@ -113,6 +113,9 @@ static int init_backoff_interval = 1;
 // Maximum value for backoff interval (in seconds) when worker fails to connect to a manager.
 static int max_backoff_interval = 60;
 
+// Absolute end time for worker, worker is killed after this point.
+static timestamp_t end_time = 0;
+
 // Chance that a worker will decide to shut down each minute without warning, to simulate failure.
 static double worker_volatility = 0.0;
 
@@ -156,7 +159,7 @@ static char *workspace;
 static char *os_name = NULL;
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
-static time_t worker_start_time = 0;
+static timestamp_t worker_start_time = 0;
 
 static struct work_queue_watcher * watcher = 0;
 
@@ -380,6 +383,11 @@ static void send_resource_update(struct link *manager)
 		total_resources->disk.total    = MAX(0, local_resources->disk.total);
 		total_resources->disk.largest  = MAX(0, local_resources->disk.largest);
 		total_resources->disk.smallest = MAX(0, local_resources->disk.smallest);
+
+		//if workers are set to expire in some time, send the expiration time to manager
+		if(manual_wall_time_option > 0) {
+			end_time = worker_start_time + (manual_wall_time_option * 1e6);
+		}
 	}
 
 	work_queue_resources_send(manager,total_resources,stoptime);
@@ -498,6 +506,7 @@ static void report_worker_ready( struct link *manager )
 	send_features(manager);
 	send_tlq_config(manager);
 	send_keepalive(manager, 1);
+	send_manager_message(manager, "info worker-end-time %lld\n", (long long int)end_time);
 }
 
 
@@ -1589,7 +1598,7 @@ static void enforce_processes_max_running_time() {
 		if(p->task->resources_requested->wall_time < 1)
 			continue;
 
-		if(now < p->execution_start + p->task->resources_requested->wall_time) {
+		if(now > p->execution_start + p->task->resources_requested->wall_time) {
 			debug(D_WQ,"Task %d went over its running time limit: %s > %s\n",
 					p->task->taskid,
 					rmsummary_resource_to_str("wall_time", now - p->execution_start, 1),
@@ -1767,14 +1776,6 @@ void forsake_waiting_process(struct link *manager, struct work_queue_process *p)
 If 0, the worker is using more resources than promised. 1 if resource usage holds that promise.
 */
 static int enforce_worker_limits(struct link *manager) {
-	if( manual_wall_time_option > 0 && (time(0) - worker_start_time) > manual_wall_time_option) {
-		fprintf(stderr,"work_queue_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t)manual_wall_time_option);
-		if(manager) {
-			send_manager_message(manager, "info wall_time_exhausted %"PRIu64"\n", (uint64_t)manual_wall_time_option);
-		}
-		return 0;
-	}
-
 	if( manual_disk_option > 0 && local_resources->disk.inuse > manual_disk_option ) {
 		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
 
@@ -1802,6 +1803,13 @@ static int enforce_worker_limits(struct link *manager) {
 If 0, the worker has less resources than promised. 1 otherwise.
 */
 static int enforce_worker_promises(struct link *manager) {
+	if(end_time > 0 && timestamp_get() > ((uint64_t) end_time)) {
+		warn(D_NOTICE, "work_queue_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t) manual_wall_time_option);
+		if(manager) {
+			send_manager_message(manager, "info wall_time_exhausted %"PRIu64"\n", (uint64_t) manual_wall_time_option);
+		}
+		return 0;
+	}
 
 	if( manual_disk_option > 0 && local_resources->disk.total < manual_disk_option) {
 		fprintf(stderr,"work_queue_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
@@ -1889,6 +1897,7 @@ static void work_for_manager(struct link *manager) {
 		measure_worker_resources();
 
 		if(!enforce_worker_promises(manager)) {
+			finish_running_tasks(WORK_QUEUE_RESULT_FORSAKEN);
 			abort_flag = 1;
 			break;
 		}
@@ -2564,7 +2573,7 @@ int main(int argc, char *argv[])
 
 	features = hash_table_create(4, 0);
 
-	worker_start_time = time(0);
+	worker_start_time = timestamp_get();
 
 	set_worker_id();
 
@@ -2734,6 +2743,10 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_WALL_TIME:
 			manual_wall_time_option = atoi(optarg);
+			if(manual_wall_time_option < 1) {
+				manual_wall_time_option = 0;
+				warn(D_NOTICE, "Ignoring --wall-time, a positive integer is expected.");
+			}
 			break;
 		case LONG_OPT_DISABLE_SYMLINKS:
 			symlinks_enabled = 0;

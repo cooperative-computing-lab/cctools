@@ -10,6 +10,7 @@ import os
 import os.path as path
 import shutil
 import stat
+import time
 
 import work_queue as wq
 
@@ -146,4 +147,31 @@ q.submit(t)
 t = q.wait(5)
 report_task(t, wq.WORK_QUEUE_RESULT_OUTPUT_MISSING, 0)
 
+# should succeed in the alloted time
+t = wq.Task("/bin/sleep 1")
+t.specify_running_time(10 * 1e6)
+q.submit(t)
+t = q.wait(5)
+report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0)
+
+# should fail in the alloted time
+t = wq.Task("/bin/sleep 10")
+t.specify_running_time(1 * 1e6)
+q.submit(t)
+t = q.wait(20)
+report_task(t, wq.WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME, 9)
+
+# should run in the alloted absolute time
+t = wq.Task("/bin/sleep 1")
+t.specify_end_time((time.time() + 5) * 1e6)
+q.submit(t)
+t = q.wait(5)
+report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0)
+
+# should fail in the alloted absolute time
+t = wq.Task("/bin/sleep 10")
+t.specify_end_time((time.time() + 2) * 1e6)
+q.submit(t)
+t = q.wait(20)
+report_task(t, wq.WORK_QUEUE_RESULT_TASK_TIMEOUT, 9)
 
