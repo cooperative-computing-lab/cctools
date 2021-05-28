@@ -149,14 +149,14 @@ report_task(t, wq.WORK_QUEUE_RESULT_OUTPUT_MISSING, 0)
 
 # should succeed in the alloted time
 t = wq.Task("/bin/sleep 1")
-t.specify_running_time(10 * 1e6)
+t.specify_running_time_max(10)
 q.submit(t)
 t = q.wait(5)
 report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0)
 
 # should fail in the alloted time
 t = wq.Task("/bin/sleep 10")
-t.specify_running_time(1 * 1e6)
+t.specify_running_time_max(1)
 q.submit(t)
 t = q.wait(20)
 report_task(t, wq.WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME, 9)
