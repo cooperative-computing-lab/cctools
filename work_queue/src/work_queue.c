@@ -3731,13 +3731,14 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 
 	//if wall time for worker is specified and there's not enough time for task, then not ok
 	if(w->end_time > 0){
-		if(t->resources_requested->wall_time > 0 && w->end_time - (int64_t) timestamp_get() < t->resources_requested->wall_time){
+		double current_time = timestamp_get() / ONE_SECOND;
+		if(t->resources_requested->wall_time > 0 && w->end_time - current_time < t->resources_requested->wall_time){
 			ok = 0;
 		}
 		if(t->resources_requested->end > 0 && w->end_time < t->resources_requested->end) {
 			ok = 0;
 		}
-		if(t->min_running_time > 0 && w->end_time - (int64_t) timestamp_get() < t->min_running_time){
+		if(t->min_running_time > 0 && w->end_time - current_time < t->min_running_time){
 			ok = 0;
 		}
 	}
@@ -4604,7 +4605,7 @@ void work_queue_task_specify_running_time_min( struct work_queue_task *t, int64_
 	}
 	else
 	{
-		t->min_running_time = 1000000*seconds;					//convert to useconds for backward compat
+		t->min_running_time = seconds;
 	}
 }
 
