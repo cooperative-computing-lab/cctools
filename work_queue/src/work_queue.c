@@ -244,7 +244,8 @@ struct work_queue_worker {
 	timestamp_t start_time;
 	timestamp_t last_msg_recv_time;
 	timestamp_t last_update_msg_time;
-	int64_t end_time;
+	int64_t end_time;                   // epoch time (in seconds) at which the worker terminates
+										// If -1, means the worker has not reported in. If 0, means no limit.
 };
 
 struct work_queue_task_report {
@@ -1679,7 +1680,7 @@ static int expire_waiting_tasks(struct work_queue *q)
 	int expired = 0;
 	int count;
 
-	timestamp_t current_time = timestamp_get();
+	double current_time = timestamp_get() / ONE_SECOND;
 	count = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
 
 	while(count > 0)
@@ -1688,7 +1689,7 @@ static int expire_waiting_tasks(struct work_queue *q)
 
 		t = list_pop_head(q->ready_list);
 
-		if(t->resources_requested->end > 0 && (uint64_t) t->resources_requested->end <= current_time)
+		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time)
 		{
 			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
 			change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
@@ -4576,7 +4577,7 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t usecon
 	}
 	else
 	{
-		t->resources_requested->end = useconds;
+		t->resources_requested->end = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
 	}
 }
 
