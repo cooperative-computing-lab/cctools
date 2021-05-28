@@ -547,15 +547,26 @@ work_queue_worker: using 16 cores, 15843 MB memory, 61291 MB disk, 0 gpus
 
 You can manually adjust the resources managed by a worker like this:
 
-    
+
 ```sh
-$ work_queue_worker --cores 8  --memory 1000 --disk 8000 --gpus 1
+$ work_queue_worker --cores 8  --memory 1000 --disk 8000 --gpus 1 ...other options...
 ```
 
 Unlike other resources, the default value for gpus is 0. You can use the
 command line option `--gpus` to declare how many gpus are available at a
 worker.
-    
+
+When the lifetime of the worker is known, for example, the end of life of a
+lease, this information can be communicated to the worker as follows. For
+example, if the worker will be terminated in one hour:
+
+```sh
+$ work_queue_worker --wall-time 3600 ...other options...
+```
+
+In combination with the worker option `--wall-time`, tasks can request a
+minimum time to execute with `specify_running_time_min`, as explained (below)[#specifying-task-resources].
+
 You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options when using
 batch submission scripts such as `condor_submit_workers` or
 `slurm_submit_workers`, and the script will correctly ask the batch system for
@@ -582,14 +593,14 @@ automatically set the number of cores as follows:
 ```sh
 $ ./configure  --sge-parameter '-pe smp $cores'
 ```
-    
+
 
 So that we can simply call:
 
 ```sh
 $ sge_submit_workers --cores 4 MACHINENAME 9123
 ```
-    
+
 The variables `$cores `, `$memory `, and `$disk `, have the values of the
 options passed to `--cores`, `--memory`, `--disk. `
 
@@ -612,14 +623,14 @@ specified in the configuration file as follows:
 ```
 
 Both memory and disk are specified in `MB`.
- 
+
 
 ### Specifying Task Resources
 
 To run several tasks in a worker, every task must have a description of the
-resources it uses, in terms of cores, memory, disk, and gpus. While time is 
-not exactly a type of resource, specifying the running time of tasks can 
-often be helpful to map tasks to workers. These resources can be specified 
+resources it uses, in terms of cores, memory, disk, and gpus. While time is
+not exactly a type of resource, specifying the running time of tasks can
+often be helpful to map tasks to workers. These resources can be specified
 as in the following example:
 
 ```python
@@ -628,7 +639,7 @@ t.specify_memory(1024)                 # task needs 1024 MB of memory
 t.specify_disk(4096)                   # task needs 4096 MB of disk space
 t.specify_gpus(0)                      # task does not need a gpu
 t.specify_running_time_max(100)        # task is allowed to run in 100 seconds
-t.specify_running_time_min(10)         # task needs at least 10 seconds to run
+t.specify_running_time_min(10)         # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
 ```
 
 ```perl
@@ -637,15 +648,15 @@ $t->specify_memory(1024)  # task needs 1024 MB of memory
 $t->specify_disk(4096)    # task needs 4096 MB of disk space
 $t->specify_gpus(0)       # task does not need a gpu
 $t->specify_running_time_max(100)  # task is allowed to run in 100 seconds
-$t->specify_running_time_min(10)   # task needs at least 10 seconds to run
+$t->specify_running_time_min(10)   # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
 ```
 
 When all cores, memory, and disk are specified, Work Queue will simply fit as
 many tasks as possible without going above the resources available at a
 particular worker. When the maximum running time is specified, Work Queue will
-kill any task that exceeds its maximum running time. The minimum running time, 
-if specified, helps Work Queue decide which worker best fits which task. 
-Specifying tasks' running time is especially helpful in clusters where workers 
+kill any task that exceeds its maximum running time. The minimum running time,
+if specified, helps Work Queue decide which worker best fits which task.
+Specifying tasks' running time is especially helpful in clusters where workers
 may have a hard threshold of their running time.
 
 When some of the resources are left unspecified, then Work Queue tries to find
