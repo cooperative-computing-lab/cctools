@@ -153,7 +153,7 @@ struct work_queue_task {
 	timestamp_t time_when_done;         /**< The time at which the task is mark as retrieved, after transfering output files and other final processing. */
 
 	int disk_allocation_exhausted;                        /**< Non-zero if a task filled its loop device allocation, zero otherwise. */
-	
+
 	int64_t min_running_time;
 
 	timestamp_t time_when_commit_start; /**< The time when the task starts to be transfered to a worker. */
