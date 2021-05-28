@@ -259,6 +259,15 @@ sub specify_running_time {
 	return work_queue_task_specify_running_time($self->{_task}, $useconds);
 }
 
+sub specify_running_time_max {
+	my ($self, $seconds) = @_;
+	return work_queue_task_specify_running_time_max($self->{_task}, $seconds);
+}
+
+sub specify_running_time_min {
+	my ($self, $seconds) = @_;
+	return work_queue_task_specify_running_time_min($self->{_task}, $seconds);
+}
 sub specify_priority {
 	my ($self, $priority) = @_;
 	return work_queue_task_specify_priority($self->{_task}, $priority);
@@ -937,14 +946,44 @@ Number of microseconds.
 
 =head3 C<specify_running_time>
 
-Indicate the maximum running time for a task in a worker (relative to when the
-task starts to run).  If less than 1, or not specified, no limit is imposed.
+Indicate the maximum running time (in microseconds) for a task in a worker
+(relative to when the task starts to run).  If less than 1, or not specified,
+no limit is imposed.
+Note: Same as specify_running_time_max, but specified in microseconds. Kept for
+backwards compatibility.
 
 =over 12
 
 =item useconds
 
 Number of microseconds.
+
+=back
+
+=head3 C<specify_running_time_max>
+
+Indicate the maximum running time (in seconds) for a task in a worker (relative to when the
+task starts to run).  If less than 1, or not specified, no limit is imposed.
+
+=over 12
+
+=item seconds
+
+Number of seconds.
+
+=back
+
+
+=head3 C<specify_running_time_min>
+
+Indicate the minimum running time (in seconds) the task needs (relative to when the
+task starts to run).  If less than 1, or not specified, no minimum time is defined.
+
+=over 12
+
+=item seconds
+
+Number of seconds.
 
 =back
 
