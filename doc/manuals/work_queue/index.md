@@ -636,7 +636,8 @@ $t->specify_cores(1)      # task needs one core
 $t->specify_memory(1024)  # task needs 1024 MB of memory
 $t->specify_disk(4096)    # task needs 4096 MB of disk space
 $t->specify_gpus(0)       # task does not need a gpu
-#specifying running time is not yet supported in perl
+$t->specify_running_time_max(100)  # task is allowed to run in 100 seconds
+$t->specify_running_time_min(10)   # task needs at least 10 seconds to run
 ```
 
 When all cores, memory, and disk are specified, Work Queue will simply fit as
