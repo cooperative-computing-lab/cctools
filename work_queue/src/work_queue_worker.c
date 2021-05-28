@@ -506,7 +506,7 @@ static void report_worker_ready( struct link *manager )
 	send_features(manager);
 	send_tlq_config(manager);
 	send_keepalive(manager, 1);
-	send_manager_message(manager, "info worker-end-time %lld\n", DIV_INT_ROUND_UP(end_time, ONE_SECOND));
+	send_manager_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 }
 
 
@@ -700,7 +700,7 @@ static void expire_procs_running() {
 	struct work_queue_process *p;
 	uint64_t pid;
 
-	double current_time = timestamp_get() / ONE_SECOND;
+	double current_time = timestamp_get() / USECOND;
 
 	itable_firstkey(procs_running);
 	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
@@ -1008,7 +1008,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 		} else if(sscanf(line,"gpus %" PRId64,&n)) {
 			work_queue_task_specify_gpus(task, n);
 		} else if(sscanf(line,"wall_time %" PRIu64,&nt)) {
-			work_queue_task_specify_running_time(task, nt);
+			work_queue_task_specify_running_time_max(task, nt);
 		} else if(sscanf(line,"end_time %" PRIu64,&nt)) {
 			work_queue_task_specify_end_time(task, nt * USECOND); //end_time needs it usecs
 		} else if(sscanf(line,"env %d",&length)==1) {
@@ -1598,10 +1598,10 @@ static void enforce_processes_max_running_time() {
 		if(p->task->resources_requested->wall_time < 1)
 			continue;
 
-		if(now > p->execution_start + p->task->resources_requested->wall_time) {
+		if(now > p->execution_start + (1e6 * p->task->resources_requested->wall_time)) {
 			debug(D_WQ,"Task %d went over its running time limit: %s > %s\n",
 					p->task->taskid,
-					rmsummary_resource_to_str("wall_time", now - p->execution_start, 1),
+					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
 			p->task_status = WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME;
 			kill(pid, SIGKILL);

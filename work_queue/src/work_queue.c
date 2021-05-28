@@ -4589,13 +4589,13 @@ void work_queue_task_specify_running_time( struct work_queue_task *t, int64_t us
 	}
 	else
 	{
-		t->resources_requested->wall_time = useconds;
+		t->resources_requested->wall_time = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
 	}
 }
 
 void work_queue_task_specify_running_time_max( struct work_queue_task *t, int64_t seconds )
 {
-	work_queue_task_specify_running_time(t, 1000000*seconds); 	//convert to useconds for backward compat
+	work_queue_task_specify_running_time(t, seconds);
 }
 
 void work_queue_task_specify_running_time_min( struct work_queue_task *t, int64_t seconds )
