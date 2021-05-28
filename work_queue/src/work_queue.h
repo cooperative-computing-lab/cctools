@@ -155,8 +155,9 @@ struct work_queue_task {
 
 	int disk_allocation_exhausted;                        /**< Non-zero if a task filled its loop device allocation, zero otherwise. */
 
-	int64_t min_running_time;
+	int64_t min_running_time;           /**< Minimum time (in seconds) the task needs to run. (see work_queue_worker --wall-time)*/
 
+    /**< All fields of the form time_* in microseconds. */
 	timestamp_t time_when_commit_start; /**< The time when the task starts to be transfered to a worker. */
 	timestamp_t time_when_commit_end;   /**< The time when the task is completely transfered to a worker. */
 
