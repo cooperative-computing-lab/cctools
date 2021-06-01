@@ -61,7 +61,7 @@ On success, returns zero.  On failure, returns non-zero.
 
 SECTION(EXAMPLES)
 
-To conenct to a Chirp server using BOLD(chirp):
+To connect to a Chirp server using BOLD(chirp):
 
 LONGCODE_BEGIN
 % chirp server1.somewhere.edu
