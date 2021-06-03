@@ -83,7 +83,7 @@ On success, returns zero.  On failure, returns non-zero.
 
 ## EXAMPLES
 
-To conenct to a Chirp server using **chirp**:
+To connect to a Chirp server using **chirp**:
 
 ```
 % chirp server1.somewhere.edu
