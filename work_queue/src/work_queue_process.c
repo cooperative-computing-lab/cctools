@@ -30,12 +30,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define SMALL_BUFFER_SIZE 256
-#define MAX_BUFFER_SIZE 4096
-#define DOCKER_WORK_DIR "/home/worker"
-#define TMP_SCRIPT "tmp.sh"
-#define DEFAULT_EXE_APP "#!/bin/sh"
-
 // return 0 on error, 1 otherwise
 static int create_task_directories(struct work_queue_process *p) {
 	char tmpdir_template[1024];
@@ -201,7 +195,7 @@ static void specify_resources_vars(struct work_queue_process *p) {
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
-pid_t work_queue_process_execute(struct work_queue_process *p, int container_mode, ...)
+pid_t work_queue_process_execute(struct work_queue_process *p )
 {
 	// make warning
 
@@ -272,79 +266,9 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 
 		export_environment(p);
 
-		va_list arg_lst;
-		if(container_mode == NONE) {
-			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *) 0);
-			_exit(127);	// Failed to execute the cmd.
+		execl("/bin/sh", "sh", "-c", p->task->command_line, (char *) 0);
+		_exit(127);	// Failed to execute the cmd.
 
-		} else if(container_mode == UMBRELLA) {
-			fatal("UMBRELLA mode have not been implemented\n");
-
-		} else {
-			// Write task command into a shell script
-			char *tmp_ptr = p->task->command_line;
-			int cmd_line_size = 0;
-			while(*(++tmp_ptr) != '\0')
-				cmd_line_size++;
-
-			FILE *script_fn = fopen(TMP_SCRIPT, "w");
-			fprintf(script_fn, "%s\n%s", DEFAULT_EXE_APP, p->task->command_line);
-			fclose(script_fn);
-			chmod(TMP_SCRIPT, 0755);
-
-			uid_t uid = getuid();
-			char uid_str[MAX_BUFFER_SIZE];
-			string_nformat(uid_str, sizeof(uid_str), "%d", uid);
-
-			// Get path to sandbox
-			char curr_wrk_dir[MAX_BUFFER_SIZE];
-			char *wrk_space;
-
-			if((wrk_space = getenv("WORK_QUEUE_SANDBOX")) != NULL) {
-				string_nformat(curr_wrk_dir, sizeof(curr_wrk_dir), "%s/%s", wrk_space, p->sandbox);
-			} else {
-				perror("getenv() error");
-			}
-
-			if(container_mode == DOCKER) {
-				va_start(arg_lst, container_mode);
-				char img_name[MAX_BUFFER_SIZE];
-				strncpy(img_name, va_arg(arg_lst, const char *), MAX_BUFFER_SIZE - 1);
-				va_end(arg_lst);
-
-				char mnt_flg_val[MAX_BUFFER_SIZE];
-				string_nformat(mnt_flg_val, sizeof(mnt_flg_val), "%s:%s", curr_wrk_dir, DOCKER_WORK_DIR);
-				// cmd for running the shell script
-				char run_cmd[SMALL_BUFFER_SIZE];
-				string_nformat(run_cmd, sizeof(run_cmd), "./%s", TMP_SCRIPT);
-
-				execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", mnt_flg_val, "-w", DOCKER_WORK_DIR, "-u", uid_str, "-m", "1g", img_name, run_cmd, (char *) 0);
-				_exit(127);	// Failed to execute the cmd.
-
-			} else {
-				// DOCKER_PRESERVE mode
-				va_start(arg_lst, container_mode);
-				char container_name[MAX_BUFFER_SIZE];
-				strncpy(container_name, va_arg(arg_lst, const char *), MAX_BUFFER_SIZE - 1);
-				va_end(arg_lst);
-
-				char sub_proc_sh_fn[MAX_BUFFER_SIZE];
-				char sub_proc_sh_fn_path[MAX_BUFFER_SIZE];
-				string_nformat(sub_proc_sh_fn, sizeof(sub_proc_sh_fn), "tmp_%s.sh", p->sandbox);
-				string_nformat(sub_proc_sh_fn_path, sizeof(sub_proc_sh_fn_path), "%s/%s", wrk_space, sub_proc_sh_fn);
-
-				FILE *sub_proc_script_fn = fopen(sub_proc_sh_fn_path, "w");
-				fprintf(sub_proc_script_fn, "%s\ncd %s\n./%s", DEFAULT_EXE_APP, p->sandbox, TMP_SCRIPT);
-				fclose(sub_proc_script_fn);
-				chmod(sub_proc_sh_fn_path, 0755);
-
-				char run_sh_fn[MAX_BUFFER_SIZE];
-				string_nformat(run_sh_fn, sizeof(run_sh_fn), "./%s", sub_proc_sh_fn);
-
-				execl("/usr/bin/docker", "/usr/bin/docker", "exec", container_name, run_sh_fn, (char *) 0);
-				_exit(127);	// Failed to execute the cmd.
-			}
-		}
 	}
 	return 0;
 }

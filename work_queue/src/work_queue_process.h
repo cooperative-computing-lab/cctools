@@ -9,11 +9,6 @@
 #include <sys/types.h>
 #include <sys/resource.h>
 
-#define NONE 0
-#define DOCKER 1
-#define DOCKER_PRESERVE 2
-#define UMBRELLA 3
-
 #define MAX_BUFFER_SIZE 4096
 
 /*
@@ -48,13 +43,10 @@ struct work_queue_process {
 
 	/* state between complete disk measurements. */
 	struct path_disk_size_info *disk_measurement_state;
-
-	char container_id[MAX_BUFFER_SIZE];
 };
 
 struct work_queue_process * work_queue_process_create( struct work_queue_task *task, int disk_allocation );
-pid_t work_queue_process_execute( struct work_queue_process *p, int container_mode, ... );
-// lunching process with container, arg_3 can be either img_name or container_name, depending on container_mode
+pid_t work_queue_process_execute( struct work_queue_process *p );
 void  work_queue_process_kill( struct work_queue_process *p );
 void  work_queue_process_delete( struct work_queue_process *p );
 void  work_queue_process_compute_disk_needed( struct work_queue_process *p );
