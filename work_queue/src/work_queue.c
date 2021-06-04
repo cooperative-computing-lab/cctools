@@ -7416,4 +7416,61 @@ int work_queue_specify_min_taskid(struct work_queue *q, int minid) {
 	return q->next_taskid;
 }
 
+void display_work_queue_worker_summary(struct work_queue_wsummary *data)
+{
+	int i = 0;
+	for (i = 0; i < data->length; i++)
+	{
+		printf( "There %s %d %s with %d %s, %dmb memory, and %d %s\n",
+				(data->count[i] == 1) ? "is" : "are",
+				data->count[i], (data->count[i] == 1) ? "worker" : "workers",
+				data->cores[i], (data->cores[i] == 1) ? "core" : "cores",
+				data->memory[i], data->gpus[i], (data->gpus[i] == 1) ? "gpu" : "gpus");
+	}
+}
+
+void compare_to_wsummary(struct work_queue_wsummary *data, struct work_queue_worker *w)
+{
+	if (data->length == 0)
+	{
+		data->count[0] = 1;
+		data->cores[0] = w->resources->cores.total;
+		data->memory[0] = w->resources->memory.total;
+		data->gpus[0] = w->resources->gpus.total;
+		data->length++;
+		return;
+	}
+	for (int i = 0; i < data->length; i++)
+	{
+		if (	(int)w->resources->cores.total == data->cores[i]
+			&&  (int)w->resources->memory.total == data->memory[i]
+			&&  (int)w->resources->gpus.total == data->gpus[i] )
+			{
+				data->count[i]++;
+				return;
+			}
+	}
+	data->count[data->length] = 1;
+	data->cores[data->length] = w->resources->cores.total;
+	data->memory[data->length] = w->resources->memory.total;
+	data->gpus[data->length] = w->resources->gpus.total;
+	data->length++;
+	return;
+}
+
+int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary *data)
+{
+	data->length = 0;
+	struct work_queue_worker *w;
+	hash_table_firstkey(q->worker_table);
+	char *id;
+	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+			compare_to_wsummary(data, w);	
+			//printf("Worker %s %" PRId64 "cores ", id, w->resources->cores.total);
+			//printf("%" PRId64 "memory", w->resources->memory.total);
+			//printf("%" PRId64 "gpus\n", w->resources->gpus.total);
+	}
+	return 0;
+}
+
 /* vim: set noexpandtab tabstop=4: */
