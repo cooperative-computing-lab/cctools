@@ -7415,59 +7415,141 @@ int work_queue_specify_min_taskid(struct work_queue *q, int minid) {
 
 	return q->next_taskid;
 }
-
-void display_work_queue_worker_summary(struct work_queue_wsummary *data)
+// function used by other functions
+void sort_work_queue_worker_summary(struct work_queue_wsummary *data, struct work_queue_wsummary *sorted, int field)
 {
+	sorted->length = data->length;
+	for (int i = 0; i < data->length; i++)
+	{
+		sorted->count[i] = data->count[i];	
+		sorted->cores[i] = data->cores[i];	
+		sorted->memory[i] = data->memory[i];	
+		sorted->gpus[i] = data->gpus[i];	
+		sorted->disk[i] = data->disk[i];	
+	}
+	int has_sorted = 1;
+	int to_sort = 0;
+	while (has_sorted)
+	{
+		has_sorted = 0;
+		for (int i = 0; i < sorted->length - 1; i++)
+		{
+				switch (field)
+				{
+					case 1: // sort by gpu count
+						if (sorted->gpus[i] < sorted->gpus[i + 1])
+						{	
+							to_sort = 1;
+						}
+						break;
+					case 2: // sort by worker count
+						if (sorted->count[i] < sorted->count[i + 1])
+						{	
+							to_sort = 1;
+						}
+						break;
+					case 3: // sort by disk space
+						if (sorted->disk[i] < sorted->disk[i + 1])
+						{	
+							to_sort = 1;
+						}
+						break;
+
+				}
+				if (to_sort) 
+				{
+					int temp = sorted->gpus[i];
+					sorted->gpus[i] = sorted->gpus[i + 1];
+					sorted->gpus[i + 1] = temp;
+					temp = sorted->count[i];
+					sorted->count[i] = sorted->count[i + 1];
+					sorted->count[i + 1] = temp;
+					temp = sorted->cores[i];
+					sorted->cores[i] = sorted->cores[i + 1];
+					sorted->cores[i + 1] = temp;
+					temp = sorted->memory[i];
+					sorted->memory[i] = sorted->memory[i + 1];
+					sorted->memory[i + 1] = temp;
+					temp = sorted->disk[i];
+					sorted->disk[i] = sorted->disk[i + 1];
+					sorted->disk[i + 1] = temp;
+					has_sorted = 1;
+				}
+				to_sort = 0;
+		}
+	}
+}
+// sorts and displays data summary of worker resources
+// call this function with "gpu" "count" or "disk" in the sortby argument to sort the output by those aspects
+void display_work_queue_worker_summary(struct work_queue_wsummary *data, char *sortby)
+{
+	struct work_queue_wsummary sorted;
+	if (strcmp(sortby, "") == 0) // no sorting
+	{
+		sort_work_queue_worker_summary(data, &sorted, 0);
+	}
+	if (strcmp(sortby, "gpu") == 0)
+	{
+		sort_work_queue_worker_summary(data, &sorted, 1);
+	}
+	if (strcmp(sortby, "count") == 0)
+	{
+		sort_work_queue_worker_summary(data, &sorted, 2);
+	}
+	if (strcmp(sortby, "disk") == 0)
+	{
+		sort_work_queue_worker_summary(data, &sorted, 3);
+	}
 	int i = 0;
 	for (i = 0; i < data->length; i++)
 	{
 		printf( "There %s %d %s with %d %s, %dmb memory, at least %dmb disk space, and %d %s\n",
-				(data->count[i] == 1) ? "is" : "are",
-				data->count[i], (data->count[i] == 1) ? "worker" : "workers",
-				data->cores[i], (data->cores[i] == 1) ? "core" : "cores",
-				data->memory[i], data->disk[i],
-				data->gpus[i], (data->gpus[i] == 1) ? "gpu" : "gpus");
+				(sorted.count[i] == 1) ? "is" : "are",
+				sorted.count[i], (sorted.count[i] == 1) ? "worker" : "workers",
+				sorted.cores[i], (sorted.cores[i] == 1) ? "core" : "cores",
+				sorted.memory[i], sorted.disk[i],
+				sorted.gpus[i], (sorted.gpus[i] == 1) ? "gpu" : "gpus");
 	}
 }
-
+// creates the buckets of workers and then sorts workers into those buckets
 void compare_to_wsummary(struct work_queue_wsummary *data, struct work_queue_worker *w)
 {
-	if (data->length == 0)
+	if (data->length == 0) // if this is the first worker, create the first bucket based on that worker's properties
 	{
 		data->count[0] = 1;
 		data->cores[0] = w->resources->cores.total;
-		data->disk[0] = w->resources->disk.total;
+		data->disk[0] = w->resources->disk.total - (w->resources->disk.total % 100);
 		data->memory[0] = w->resources->memory.total;
 		data->gpus[0] = w->resources->gpus.total;
 		data->length++;
 		return;
 	}
-	for (int i = 0; i < data->length; i++)
+	for (int i = 0; i < data->length; i++) // compares worker to every bucket. If the bucket has the same amount of cpu cores, memory, and gpus, enter this scope, otherwise move on
 	{
 		if (	(int)w->resources->cores.total == data->cores[i]
 			&&  (int)w->resources->memory.total == data->memory[i]
 			&&  (int)w->resources->gpus.total == data->gpus[i] )
 			{
-				if (   (int)w->resources->disk.total <= data->disk[i] 
+				if (   (int)w->resources->disk.total <= data->disk[i] // if the amount of disk is less by less than 1000, then we can lower the bucket in order to include the new worker
 					&& ((data->disk[i])- ((int)w->resources->disk.total)) < 1000) 
 				{
 					data->count[i]++;
-					data->disk[i] = (int)w->resources->disk.total;
+					data->disk[i] = (int)w->resources->disk.total-(w->resources->disk.total % 100);
 					return;
 				}				
-				if (   (int)w->resources->disk.total >= data->disk[i] 
+				if (   (int)w->resources->disk.total >= data->disk[i] // if the worker is not more than 1000 above the bucket amount, add it into the bucket
 					&& (int)w->resources->disk.total < (data->disk[i] + 1000))
 				{
 					data->count[i]++;
 					return;
 				} 
 			}
-	}
+	} // otherwise, if it fits in no bucket, create a new bucket based on the worker's resources
 	data->count[data->length] = 1;
 	data->cores[data->length] = w->resources->cores.total;
 	data->memory[data->length] = w->resources->memory.total;
 	data->gpus[data->length] = w->resources->gpus.total;
-	data->disk[data->length] = w->resources->disk.total;
+	data->disk[data->length] = w->resources->disk.total - (w->resources->disk.total % 100);
 	data->length++;
 	return;
 }
@@ -7478,11 +7560,12 @@ int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	char *id;
-	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-			compare_to_wsummary(data, w);	
-			printf("Worker %s %" PRId64 "cores ", id, w->resources->cores.total);
-			printf("%" PRId64 "memory", w->resources->memory.total);
-			printf("%" PRId64 "disk", w->resources->disk.total);
+	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) { // loop through all workers in the queue
+			if (w->resources->cores.total == 0) continue; // sometimes returns a worker with all resources values being 0: ignore the worker in this case
+			compare_to_wsummary(data, w);	// add it to a bucket
+			printf("Worker ID: %s, %" PRId64 " Number of cores, ", id, w->resources->cores.total);
+			printf("%" PRId64 "memory, ", w->resources->memory.total);
+			printf("%" PRId64 "disk, ", w->resources->disk.total);
 			printf("%" PRId64 "gpus\n", w->resources->gpus.total);
 	}
 	return 0;
