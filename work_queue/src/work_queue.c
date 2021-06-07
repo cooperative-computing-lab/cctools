@@ -7421,11 +7421,12 @@ void display_work_queue_worker_summary(struct work_queue_wsummary *data)
 	int i = 0;
 	for (i = 0; i < data->length; i++)
 	{
-		printf( "There %s %d %s with %d %s, %dmb memory, and %d %s\n",
+		printf( "There %s %d %s with %d %s, %dmb memory, at least %dmb disk space, and %d %s\n",
 				(data->count[i] == 1) ? "is" : "are",
 				data->count[i], (data->count[i] == 1) ? "worker" : "workers",
 				data->cores[i], (data->cores[i] == 1) ? "core" : "cores",
-				data->memory[i], data->gpus[i], (data->gpus[i] == 1) ? "gpu" : "gpus");
+				data->memory[i], data->disk[i],
+				data->gpus[i], (data->gpus[i] == 1) ? "gpu" : "gpus");
 	}
 }
 
@@ -7435,6 +7436,7 @@ void compare_to_wsummary(struct work_queue_wsummary *data, struct work_queue_wor
 	{
 		data->count[0] = 1;
 		data->cores[0] = w->resources->cores.total;
+		data->disk[0] = w->resources->disk.total;
 		data->memory[0] = w->resources->memory.total;
 		data->gpus[0] = w->resources->gpus.total;
 		data->length++;
@@ -7446,14 +7448,26 @@ void compare_to_wsummary(struct work_queue_wsummary *data, struct work_queue_wor
 			&&  (int)w->resources->memory.total == data->memory[i]
 			&&  (int)w->resources->gpus.total == data->gpus[i] )
 			{
-				data->count[i]++;
-				return;
+				if (   (int)w->resources->disk.total <= data->disk[i] 
+					&& ((data->disk[i])- ((int)w->resources->disk.total)) < 1000) 
+				{
+					data->count[i]++;
+					data->disk[i] = (int)w->resources->disk.total;
+					return;
+				}				
+				if (   (int)w->resources->disk.total >= data->disk[i] 
+					&& (int)w->resources->disk.total < (data->disk[i] + 1000))
+				{
+					data->count[i]++;
+					return;
+				} 
 			}
 	}
 	data->count[data->length] = 1;
 	data->cores[data->length] = w->resources->cores.total;
 	data->memory[data->length] = w->resources->memory.total;
 	data->gpus[data->length] = w->resources->gpus.total;
+	data->disk[data->length] = w->resources->disk.total;
 	data->length++;
 	return;
 }
@@ -7466,9 +7480,10 @@ int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary
 	char *id;
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 			compare_to_wsummary(data, w);	
-			//printf("Worker %s %" PRId64 "cores ", id, w->resources->cores.total);
-			//printf("%" PRId64 "memory", w->resources->memory.total);
-			//printf("%" PRId64 "gpus\n", w->resources->gpus.total);
+			printf("Worker %s %" PRId64 "cores ", id, w->resources->cores.total);
+			printf("%" PRId64 "memory", w->resources->memory.total);
+			printf("%" PRId64 "disk", w->resources->disk.total);
+			printf("%" PRId64 "gpus\n", w->resources->gpus.total);
 	}
 	return 0;
 }
