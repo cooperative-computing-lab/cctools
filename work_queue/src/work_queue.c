@@ -6435,20 +6435,20 @@ int work_queue_hungry(struct work_queue *q)
 		}  
 		return 0;
 	}
-	
+
 	//if number of ready tasks is less than 10, return true for more tasks in queue 
 	//10 is chosen to be the default number of ready tasks in queue to keep queue efficient
 	if (qstats.tasks_waiting < 10){
 		return 1;
 	}
-	
+
 	//get total available resources consumption (cores, memory, disk, gpus) of all workers of this manager
 	//available = total (all) - committed (actual in use)
 	int64_t workers_total_avail_cores 	= 0;
 	int64_t workers_total_avail_memory 	= 0;
 	int64_t workers_total_avail_disk 	= 0;
 	int64_t workers_total_avail_gpus 	= 0;
-	
+
 	workers_total_avail_cores 	= q->stats->total_cores - q->stats->committed_cores;
 	workers_total_avail_memory 	= q->stats->total_memory - q->stats->committed_memory;
 	workers_total_avail_disk 	= q->stats->total_disk - q->stats->committed_disk;
@@ -6461,7 +6461,7 @@ int work_queue_hungry(struct work_queue *q)
 	int64_t ready_task_gpus		= 0;
 
 	struct work_queue_task *t;
-	
+
 	list_first_item(q->ready_list); 
 	t = list_next_item(q->ready_list);
 
@@ -6475,7 +6475,7 @@ int work_queue_hungry(struct work_queue *q)
 	if (ready_task_cores > workers_total_avail_cores){
 		return 0;
 	}
- 	if (ready_task_memory > workers_total_avail_memory){
+	if (ready_task_memory > workers_total_avail_memory){
 		return 0;
 	}
 	if (ready_task_disk > workers_total_avail_disk){
