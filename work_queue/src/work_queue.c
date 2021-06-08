@@ -6426,16 +6426,6 @@ int work_queue_hungry(struct work_queue *q)
 	struct work_queue_stats qstats;
 	work_queue_get_stats(q, &qstats);
 
-	//check if there's any workers joined from start
-	//if there's none, limit the number of ready tasks in queue to 10
-	//10 is chosen to be the default number of ready tasks in queue to keep queue efficient
-	if (qstats.workers_joined == 0){
-		if (qstats.tasks_waiting < 10){
-			return 1;
-		}
-		return 0;
-	}
-
 	//if number of ready tasks is less than 10, return true for more tasks in queue
 	//10 is chosen to be the default number of ready tasks in queue to keep queue efficient
 	if (qstats.tasks_waiting < 10){
