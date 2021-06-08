@@ -6469,7 +6469,7 @@ int work_queue_hungry(struct work_queue *q)
 		count--;
 		t = list_pop_head(q->ready_list);
 
-		ready_task_cores  += t->resources_requested->cores;
+		ready_task_cores  += MAX(1,t->resources_requested->cores);
 		ready_task_memory += t->resources_requested->memory;
 		ready_task_disk   += t->resources_requested->disk;
 		ready_task_gpus   += t->resources_requested->gpus;
