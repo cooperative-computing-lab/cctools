@@ -6462,13 +6462,20 @@ int work_queue_hungry(struct work_queue *q)
 
 	struct work_queue_task *t;
 
-	list_first_item(q->ready_list);
-	t = list_next_item(q->ready_list);
+	int count = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
 
-	ready_task_cores 	+= t->resources_allocated->cores;
-	ready_task_memory 	+= t->resources_allocated->memory;
-	ready_task_disk 	+= t->resources_allocated->disk;
-	ready_task_gpus 	+= t->resources_allocated->gpus;
+	while(count > 0)
+	{
+		count--;
+		t = list_pop_head(q->ready_list);
+
+		ready_task_cores  += t->resources_allocated->cores;
+		ready_task_memory += t->resources_allocated->memory;
+		ready_task_disk   += t->resources_allocated->disk;
+		ready_task_gpus   += t->resources_allocated->gpus;
+
+		list_push_tail(q->ready_list, t);
+	}
 
 	//check possible limiting factors
 	//return false if required resources exceed available resources
