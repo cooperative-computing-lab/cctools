@@ -6432,11 +6432,11 @@ int work_queue_hungry(struct work_queue *q)
 	if (qstats.workers_joined == 0){
 		if (qstats.tasks_waiting < 10){
 			return 1;
-		}  
+		}
 		return 0;
 	}
 
-	//if number of ready tasks is less than 10, return true for more tasks in queue 
+	//if number of ready tasks is less than 10, return true for more tasks in queue
 	//10 is chosen to be the default number of ready tasks in queue to keep queue efficient
 	if (qstats.tasks_waiting < 10){
 		return 1;
@@ -6462,13 +6462,13 @@ int work_queue_hungry(struct work_queue *q)
 
 	struct work_queue_task *t;
 
-	list_first_item(q->ready_list); 
+	list_first_item(q->ready_list);
 	t = list_next_item(q->ready_list);
 
 	ready_task_cores 	+= t->resources_allocated->cores;
 	ready_task_memory 	+= t->resources_allocated->memory;
 	ready_task_disk 	+= t->resources_allocated->disk;
-	ready_task_gpus 	+= t->resources_allocated->gpus;	
+	ready_task_gpus 	+= t->resources_allocated->gpus;
 
 	//check possible limiting factors
 	//return false if required resources exceed available resources
