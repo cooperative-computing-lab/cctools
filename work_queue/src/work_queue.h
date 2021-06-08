@@ -357,6 +357,14 @@ struct work_queue_wsummary {
     int length;       /**< number of types stored */
 };
 
+struct work_queue_bucket{
+	int count;
+	int cores;
+	int memory;
+	int disk; 
+	int gpus;
+};
+
 /* Forward declare the queue's structure. This structure is opaque and defined in work_queue.c */
 struct work_queue;
 
@@ -1213,6 +1221,9 @@ int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary
 
 /** displays the above functions output */
 void display_work_queue_worker_summary(struct work_queue_wsummary *data, char *sortby);
+
+void display_hash_table(struct hash_table *test);
+void add_workers_to_hash(struct work_queue *q, struct hash_table *work_queue_summary);
 
 //@}
 

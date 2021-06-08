@@ -95,7 +95,9 @@ int main(int argc, char *argv[])
 	printf("waiting for tasks to complete...\n");
 
 	while(!work_queue_empty(q)) {
-
+		struct work_queue_wsummary data;
+		work_queue_worker_summmary(q, &data);
+		display_work_queue_worker_summary(&data);
 		/* Application specific code goes here ... */
 
 		/* work_queue_wait waits at most 5 seconds for some task to return. */
