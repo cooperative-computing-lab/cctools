@@ -62,11 +62,21 @@ the catalog server by specifying the name of the work queue using the --manager-
 - **-A --arch <arch>** Set architecture string for the worker to report to manager instead of the value in uname.
 - **-O --os <os>** Set operating system string for the worker to report to manager instead of the value in uname.
 - **-s --workdir <path>** Set the location for creating the working directory of the worker.
-- **-P ----password <file>** Password file to authenticate workers to manager.
+- **-P --password <file>** Password file to authenticate workers to manager.
+- **-E --worker-options <<str>>** Extra options passed to work_queue_worker
+
 - **--cores cores** Set the number of cores each worker should use (0=auto). (default=1)
 - **--memory size** Manually set the amonut of memory (in MB) reported by this worker.
 - **--disk size** Manually set the amount of disk (in MB) reported by this worker.
+
+- **-r --requirements <<reqs>>** Condor requirements expression.
+- **--class-ad <ad>** Extra condor class ad. May be specified multiple times.
+- **--autosize** Condor will automatically size the worker to the slot.
+- **--docker-universe <image>** Run worker inside <image> using condor's docker universe
+
 - **-h,--help** Show help message.
+
+
 
 
 ## EXIT STATUS
