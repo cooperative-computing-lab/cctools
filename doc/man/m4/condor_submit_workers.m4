@@ -40,11 +40,21 @@ OPTION_TRIPLET(-z, disk-threshold, size)Set available disk space threshold (in M
 OPTION_TRIPLET(-A, arch, arch)Set architecture string for the worker to report to manager instead of the value in uname.
 OPTION_TRIPLET(-O, os, os)Set operating system string for the worker to report to manager instead of the value in uname.
 OPTION_TRIPLET(-s, workdir, path)Set the location for creating the working directory of the worker.
-OPTION_TRIPLET(-P,--password, file)Password file to authenticate workers to manager.
+OPTION_TRIPLET(-P, password, file)Password file to authenticate workers to manager.
+OPTION_TRIPLET(-E, worker-options, <str>)Extra options passed to work_queue_worker
+
 OPTION_PAIR(--cores, cores)Set the number of cores each worker should use (0=auto). (default=1)
 OPTION_PAIR(--memory, size)Manually set the amonut of memory (in MB) reported by this worker.
 OPTION_PAIR(--disk, size)Manually set the amount of disk (in MB) reported by this worker.
+
+OPTION_TRIPLET(-r,requirements,<reqs>)Condor requirements expression.
+OPTION_PAIR(--class-ad,<ad>)Extra condor class ad. May be specified multiple times.
+OPTION_ITEM(`--autosize')Condor will automatically size the worker to the slot.
+OPTION_PAIR(--docker-universe,<image>)Run worker inside <image> using condor's docker universe
+
 OPTION_ITEM(`-h,--help')Show help message.
+
+
 OPTIONS_END
 
 SECTION(EXIT STATUS)
