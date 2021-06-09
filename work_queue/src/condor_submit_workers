@@ -13,6 +13,7 @@ fi
 show_help()
 {
 	echo "  -r,--requirements <reqs>  Condor requirements expression."
+	echo "  --class-ad <ad>           Extra condor class ad. May be specified multiple times."
 	echo "  --autosize                Condor will automatically size the worker to the slot."
     echo "  --docker-universe <image> Run worker inside <image> using condor's docker universe"
 }
@@ -22,6 +23,7 @@ show_help()
 # The user can still add their own expression via the -r option.
 
 requirements=""
+class_ads=""
 transfer_input_files="work_queue_worker, cctools_gpu_autodetect"
 
 parse_arguments()
@@ -42,6 +44,11 @@ parse_arguments()
 			-r|--requirements)
 			shift
 			requirements="$requirements $1"
+			;;
+
+			--class-ad)
+			shift
+			class_ads="$class_ads\n$1"
 			;;
 
 			--autosize)
@@ -103,6 +110,8 @@ output = worker.\$(PROCESS).output
 error = worker.\$(PROCESS).error
 log = workers.log
 +JobMaxSuspendTime = 0
+
+$(printf ${class_ads})
 
 # Some programs assume some variables are set, like HOME, so we export the
 # environment variables with the job.  Comment the next line if you do not want
