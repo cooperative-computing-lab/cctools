@@ -1220,11 +1220,10 @@ void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, con
 int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary *data);
 
 /** displays the above functions output */
-void display_work_queue_worker_summary(struct work_queue_wsummary *data, char *sortby);
+void display_work_queue_worker_summary(struct work_queue_wsummary *data);
 
 void display_hash_table(struct hash_table *test);
 void add_workers_to_hash(struct work_queue *q, struct hash_table *work_queue_summary);
-
 //@}
 
 // Renames for backwards compatibility
