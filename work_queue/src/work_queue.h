@@ -1222,7 +1222,6 @@ int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary
 /** displays the above functions output */
 void display_work_queue_worker_summary(struct work_queue_wsummary *data, char *sortby);
 
-
 //@}
 
 // Renames for backwards compatibility
