@@ -7510,31 +7510,36 @@ void display_work_queue_worker_summary(struct work_queue_wsummary *data, char *s
 // creates the buckets of workers and then sorts workers into those buckets
 void add_worker_to_wsummary(struct work_queue_wsummary *data, struct work_queue_worker *w)
 {
+	// the following four variables are resources for the worker passed to this function
+	int cores = w->resources->cores.total;
+	int memory = w->resources->memory.total;
+	int disk = w->resources->disk.total - (w->resources->disk.total % 100);
+	int gpus = w->resources->gpus.total;
 	if (data->length == 0) // if this is the first worker, create the first bucket based on that worker's properties
 	{
 		data->count[0] = 1;
-		data->cores[0] = w->resources->cores.total;
-		data->disk[0] = w->resources->disk.total - (w->resources->disk.total % 100);
-		data->memory[0] = w->resources->memory.total;
-		data->gpus[0] = w->resources->gpus.total;
-		data->length++;
+		data->cores[0] = cores;
+		data->disk[0] = disk;
+		data->memory[0] = memory;
+		data->gpus[0] = gpus;
+		data->length = 1;
 		return;
 	}
 	for (int i = 0; i < data->length; i++) // compares worker to every bucket. If the bucket has the same amount of cpu cores, memory, and gpus, enter this scope, otherwise move on
 	{
-		if (	(int)w->resources->cores.total == data->cores[i]
-			&&  (int)w->resources->memory.total == data->memory[i]
-			&&  (int)w->resources->gpus.total == data->gpus[i] )
+		if (	cores == data->cores[i]
+			&&  memory == data->memory[i]
+			&&  gpus == data->gpus[i] )
 			{
-				if (   (int)w->resources->disk.total <= data->disk[i] // if the amount of disk is less by less than 1000, then we can lower the bucket in order to include the new worker
-					&& ((data->disk[i])- ((int)w->resources->disk.total)) < 1000) 
+				if (   disk <= data->disk[i] // if the amount of disk is less by less than 1000, then we can lower the bucket in order to include the new worker
+					&& (data->disk[i]) - (disk) < 1000) 
 				{
 					data->count[i]++;
-					data->disk[i] = (int)w->resources->disk.total-(w->resources->disk.total % 100);
+					data->disk[i] = disk;
 					return;
 				}				
-				if (   (int)w->resources->disk.total >= data->disk[i] // if the worker is not more than 1000 above the bucket amount, add it into the bucket
-					&& (int)w->resources->disk.total < (data->disk[i] + 1000))
+				if (   disk >= data->disk[i] // if the worker is not more than 1000 above the bucket amount, add it into the bucket
+					&& disk < (data->disk[i] + 1000))
 				{
 					data->count[i]++;
 					return;
@@ -7542,10 +7547,10 @@ void add_worker_to_wsummary(struct work_queue_wsummary *data, struct work_queue_
 			}
 	} // otherwise, if it fits in no bucket, create a new bucket based on the worker's resources
 	data->count[data->length] = 1;
-	data->cores[data->length] = w->resources->cores.total;
-	data->memory[data->length] = w->resources->memory.total;
-	data->gpus[data->length] = w->resources->gpus.total;
-	data->disk[data->length] = w->resources->disk.total - (w->resources->disk.total % 100);
+	data->cores[data->length] = cores;
+	data->memory[data->length] = memory;
+	data->gpus[data->length] = gpus;
+	data->disk[data->length] = disk;
 	data->length++;
 	return;
 }
