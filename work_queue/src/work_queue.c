@@ -954,7 +954,6 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 	itable_delete(w->current_tasks_boxes);
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
-
 	free(w->workerid);
 
 	if(w->features)
@@ -7416,6 +7415,7 @@ int work_queue_specify_min_taskid(struct work_queue *q, int minid) {
 	return q->next_taskid;
 }
 
+//the functions below are used by qsort in order to sort the work_queue_wsummary data
 int comparecount(const void *a, const void *b)
 {
 	return ( ((struct work_queue_bucket *)b)->count - ((struct work_queue_bucket *)a)->count );
@@ -7446,7 +7446,7 @@ int comparegpus(const void *a, const void *b)
 }
 
 // function used by other functions
-void sort_work_queue_worker_summary(struct work_queue_wsummary *data, int sortby)
+void sort_work_queue_worker_summary(struct work_queue_wsummary *data, wsummary_sort_category sortby)
 {
 	struct work_queue_bucket *bucket_list = malloc(sizeof(struct work_queue_bucket) * data->length);
 	for (int i = 0; i < data->length; i++)
@@ -7459,20 +7459,22 @@ void sort_work_queue_worker_summary(struct work_queue_wsummary *data, int sortby
 	}
 	switch(sortby)
 	{
-		case 1:
+		case COUNT:
 			qsort(bucket_list, data->length, sizeof(struct work_queue_bucket), comparecount);
 			break;
-		case 2:
+		case CORES:
 			qsort(bucket_list, data->length, sizeof(struct work_queue_bucket), comparecores);
 			break;
-		case 3:
+		case MEMORY:
 			qsort(bucket_list, data->length, sizeof(struct work_queue_bucket), comparememory);
 			break;
-		case 4:
+		case DISK:
 			qsort(bucket_list, data->length, sizeof(struct work_queue_bucket), comparedisk);
 			break;
-		case 5:
+		case GPUS:
 			qsort(bucket_list, data->length, sizeof(struct work_queue_bucket), comparegpus);
+			break;
+		case NONE:
 			break;
 	}
 	for (int i = 0; i < data->length; i++)
@@ -7485,16 +7487,191 @@ void sort_work_queue_worker_summary(struct work_queue_wsummary *data, int sortby
 	}
 	free(bucket_list);
 }
+
+void convert_wsummary_to_log_scale(struct work_queue_wsummary *data)
+{
+	if (data->length <= 1) return;
+	sort_work_queue_worker_summary(data, MEMORY);
+	//printf("%d %d\n", data->memory[0], data->memory[data->length - 1]); // 0 highest
+	int index1, index2;
+	int scale_values[4];
+	for (int i = 20; i > 0; i--)
+	{
+		if (pow(2.0, i) <= (double)data->memory[0])
+		{
+			index1 = i;
+			break;
+		}
+	}
+	for (int i = 0; i < 20; i++)
+	{
+		if (pow(2.0, i) >= (double)data->memory[data->length - 1])
+		{
+			index2 = i - 1;
+			break;
+		}
+	}
+	if (index1 - index2 == 2)
+	{
+		scale_values[0] = pow(2.0, index1);
+		scale_values[1] = pow(2.0, index1 + 1);
+		scale_values[2] = pow(2.0, index1 + 2);
+		scale_values[3] = -1;
+	}
+	else if (index1 - index2 == 1)
+	{
+		scale_values[0] = pow(2.0, index1);
+		scale_values[1] = pow(2.0, index1 + 1);
+		scale_values[2] = -1;
+		scale_values[3] = -1;
+	}
+	else if (index1 == index2)
+	{
+		scale_values[0] = pow(2.0, index1);
+		scale_values[1] = -1;
+		scale_values[2] = -1;
+		scale_values[3] = -1;
+	}
+	else 
+	{
+		double scalar = (index1 - index2) / 3.0;
+		scale_values[0] = pow(2, (int)(index2 + scalar * 3.0));
+		scale_values[1] = pow(2, (int)(index2 + scalar * 2.0));
+		scale_values[2] = pow(2, (int)(index2 + scalar * 1.0));
+		scale_values[3] = pow(2, (int)(index2 + scalar * 0.0));
+	}
+	int counter = 0;
+	for (int i = 0; i < 4; i++)
+	{
+		if ((scale_values[i] > 0))
+		{
+			while (data->memory[counter] > scale_values[i])
+			{
+				data->memory[counter] = scale_values[i];
+				counter++;
+			}
+		}
+	}
+
+	sort_work_queue_worker_summary(data, DISK);
+	int disk1, disk2;
+	int disk_values[4];
+	for (int i = 25; i > 0; i--)
+	{
+		if (pow(2.0, i) <= (double)data->disk[0])
+		{
+			disk1 = i;
+			break;
+		}
+	}
+	for (int i = 0; i < 25; i++)
+	{
+		if (pow(2.0, i) >= (double)data->disk[data->length - 1])
+		{
+			disk2 = i - 1;
+			break;
+		}
+	}
+	
+	if (disk1 - disk2 == 2)
+	{
+		disk_values[0] = pow(2.0, disk1);
+		disk_values[1] = pow(2.0, disk1 + 1);
+		disk_values[2] = pow(2.0, disk1 + 2);
+		disk_values[3] = -1;
+	}
+	else if (disk1 - disk2 == 1)
+	{
+		disk_values[0] = pow(2.0, disk1);
+		disk_values[1] = pow(2.0, disk1 + 1);
+		disk_values[2] = -1;
+		disk_values[3] = -1;
+	}
+	else if (disk1 == disk2)
+	{
+		disk_values[0] = pow(2.0, disk1);
+		disk_values[1] = -1;
+		disk_values[2] = -1;
+		disk_values[3] = -1;
+	}
+	else 
+	{
+		double scalar = (disk1 - disk2) / 3.0;
+		disk_values[0] = pow(2, (int)(disk2 + scalar * 3.0));
+		disk_values[1] = pow(2, (int)(disk2 + scalar * 2.0));
+		disk_values[2] = pow(2, (int)(disk2 + scalar * 1.0));
+		disk_values[3] = pow(2, (int)(disk2 + scalar * 0.0));
+	}
+	
+	
+	int count = 0;
+	for (int i = 0; i < 4; i++)
+	{
+		if ((disk_values[i] > 0))
+		{
+			while (data->disk[count] > disk_values[i])
+			{
+				data->disk[count] = disk_values[i];
+				count++;
+			}
+		}
+	}
+	struct work_queue_wsummary temp;
+	temp.count[0] = data->count[0];
+	temp.cores[0] = data->cores[0];
+	temp.memory[0] = data->memory[0];
+	temp.disk[0] = data->disk[0];
+	temp.gpus[0] = data->gpus[0];
+	temp.length = 1;
+	int addnew = 1;
+	for (int i = 1; i < data->length; i++)
+	{
+		addnew = 1;
+		for (int j = 0; j < temp.length; j++)
+		{
+			if (   temp.cores[j] == data->cores[i]
+				&& temp.memory[j] == data->memory[i]
+				&& temp.disk[j] == data->disk[i]
+				&& temp.gpus[j] == data->gpus[i])
+			{
+				temp.count[j] += data->count[i];
+				data->count[i] = 0;
+				addnew = 0;
+				break;
+			}
+		}
+		if (addnew)
+		{
+			temp.count[temp.length] = data->count[i];
+			temp.cores[temp.length] = data->cores[i];
+			temp.memory[temp.length] = data->memory[i];
+			temp.disk[temp.length] = data->disk[i];
+			temp.gpus[temp.length] = data->gpus[i];
+			temp.length++;
+		}
+	}
+	for (int i = 0; i < temp.length; i++)
+	{
+		data->count[i] = temp.count[i];
+		data->cores[i] = temp.cores[i];
+		data->memory[i] = temp.memory[i];
+		data->disk[i] = temp.disk[i];
+		data->gpus[i] = temp.gpus[i];
+	}
+	data->length = temp.length;
+}
+
 // sorts and displays data summary of worker resources
 // call this function with "gpu" "count" or "disk" in the sortby argument to sort the output by those aspects
 void display_work_queue_worker_summary(struct work_queue_wsummary *data, char *sortby)
 {
-	int sort_field = 0;
-	if (strcmp(sortby, "count") == 0) sort_field = 1;
-	if (strcmp(sortby, "cores") == 0) sort_field = 2;
-	if (strcmp(sortby, "memory") == 0) sort_field = 3;
-	if (strcmp(sortby, "disk") == 0) sort_field = 4;
-	if (strcmp(sortby, "gpus") == 0) sort_field = 5;
+	convert_wsummary_to_log_scale(data);
+	wsummary_sort_category sort_field = NONE;
+	if (strcmp(sortby, "count") == 0) sort_field = COUNT;
+	if (strcmp(sortby, "cores") == 0) sort_field = CORES;
+	if (strcmp(sortby, "memory") == 0) sort_field = MEMORY;
+	if (strcmp(sortby, "disk") == 0) sort_field = DISK;
+	if (strcmp(sortby, "gpus") == 0) sort_field = GPUS;
 	sort_work_queue_worker_summary(data, sort_field);
 	int i = 0;
 	for (i = 0; i < data->length; i++)
@@ -7507,6 +7684,7 @@ void display_work_queue_worker_summary(struct work_queue_wsummary *data, char *s
 				data->gpus[i], (data->gpus[i] == 1) ? "gpu" : "gpus");
 	}
 }
+
 // creates the buckets of workers and then sorts workers into those buckets
 void add_worker_to_wsummary(struct work_queue_wsummary *data, struct work_queue_worker *w)
 {
@@ -7529,21 +7707,11 @@ void add_worker_to_wsummary(struct work_queue_wsummary *data, struct work_queue_
 	{
 		if (	cores == data->cores[i]
 			&&  memory == data->memory[i]
-			&&  gpus == data->gpus[i] )
+			&&  gpus == data->gpus[i] 
+			&&  disk == data->disk[i])
 			{
-				if (   disk <= data->disk[i] // if the amount of disk is less by less than 1000, then we can lower the bucket in order to include the new worker
-					&& (data->disk[i]) - (disk) < 1000) 
-				{
-					data->count[i]++;
-					data->disk[i] = disk;
-					return;
-				}				
-				if (   disk >= data->disk[i] // if the worker is not more than 1000 above the bucket amount, add it into the bucket
-					&& disk < (data->disk[i] + 1000))
-				{
-					data->count[i]++;
-					return;
-				} 
+				data->count[i]++;
+				return;
 			}
 	} // otherwise, if it fits in no bucket, create a new bucket based on the worker's resources
 	data->count[data->length] = 1;
@@ -7561,6 +7729,7 @@ int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	char *id;
+	printf("TABLE SIZE%d\n", hash_table_size(q->worker_table));
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) { // loop through all workers in the queue
 			if (w->resources->cores.total == 0) continue; // sometimes returns a worker with all resources values being 0: ignore the worker in this case
 			add_worker_to_wsummary(data, w);	// add it to a bucket
@@ -7570,6 +7739,118 @@ int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary
 			//printf("%" PRId64 "gpus\n", w->resources->gpus.total);
 	}
 	return 0;
+}
+
+void display_sorted_work_queue_summary(struct hash_table *work_queue_summary, char *sortby)
+{
+	int hash_size = hash_table_size(work_queue_summary);
+	struct work_queue_bucket *bucket_array = malloc(hash_size * sizeof(struct work_queue_bucket));
+	struct work_queue_bucket *w;
+	hash_table_firstkey(work_queue_summary);
+	char *id;
+	int index = 0;
+	while(hash_table_nextkey(work_queue_summary, &id, (void**)&w)) {
+		///printf("%d %d %d %d %d\n", w->count, w->cores, w->memory, w->disk, w->gpus);
+		if (w->count == 0) continue;
+		bucket_array[index].count = w->count;
+		bucket_array[index].cores = w->cores;
+		bucket_array[index].memory = w->memory;
+		bucket_array[index].disk = w->disk;
+		bucket_array[index].gpus = w->gpus;
+		index++;
+	}
+	if (strcmp(sortby, "count") == 0) qsort(bucket_array, hash_size, sizeof(struct work_queue_bucket), comparecount);
+	if (strcmp(sortby, "cores") == 0) qsort(bucket_array, hash_size, sizeof(struct work_queue_bucket), comparecores);
+	if (strcmp(sortby, "memory") == 0) qsort(bucket_array, hash_size, sizeof(struct work_queue_bucket), comparememory);
+	if (strcmp(sortby, "disk") == 0) qsort(bucket_array, hash_size, sizeof(struct work_queue_bucket), comparedisk);
+	if (strcmp(sortby, "gpus") == 0) qsort(bucket_array, hash_size, sizeof(struct work_queue_bucket), comparegpus);
+	for (int i = 0; i < hash_size; i++)
+	{
+		printf("Workers: %d, Cores: %d, Memory: %d, Disk: %d, GPU: %d\n", bucket_array[i].count, bucket_array[i].cores, bucket_array[i].memory ,bucket_array[i].disk ,bucket_array[i].gpus);
+	}
+	free(bucket_array);
+}
+
+void add_worker_to_buckets(struct hash_table *work_queue_summary, struct work_queue_worker *w)
+{
+	char *hashkey;
+	int cores = w->resources->cores.total;
+	int memory = w->resources->memory.total;
+	int disk = w->resources->disk.total;
+	int gpus = w->resources->gpus.total;
+	if (cores == 0) return;
+	struct work_queue_bucket *bucket = malloc(sizeof(struct work_queue_bucket));
+	bucket->count = 1;
+	bucket->cores = cores;
+	bucket->memory = memory;
+	bucket->disk = disk;
+	bucket->gpus = gpus;
+	hashkey = string_format("%d__%d__%d__%d", cores, memory, disk, gpus);
+	if (hash_table_size(work_queue_summary) == 0)
+	{
+		hash_table_insert(work_queue_summary, hashkey, bucket);
+		free(hashkey);
+		return;
+	}
+	struct work_queue_bucket *buck;
+	char *id;
+	hash_table_firstkey(work_queue_summary);
+	while(hash_table_nextkey(work_queue_summary, &id, (void**)&buck))
+	{
+		int storedcores, storedmemory, storedgpus, storeddisk;
+		sscanf(id, "%d__%d__%d__%d", &storedcores, &storedmemory, &storeddisk, &storedgpus);
+		if (storedcores == cores && storedmemory == memory && storedgpus == gpus)
+		{
+			if (disk >= storeddisk && disk < (storeddisk + 2000))
+			{
+				buck->count++;
+				free(hashkey);
+				free(bucket);
+				return;
+			}
+		}
+	}
+	hash_table_insert(work_queue_summary, hashkey, bucket);
+	free(hashkey);
+}
+
+void add_workers_to_hash(struct work_queue *q, struct hash_table *work_queue_summary)
+{
+	struct work_queue_worker *w;
+	char *hash_key;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &hash_key, (void**)&w)) {
+		add_worker_to_buckets(work_queue_summary, w);
+		printf("Worker Hash: %s, %d Number of cores, ", hash_key, w->resources->cores.total);
+		printf("%d memory, ", w->resources->memory.total);
+		printf("%d disk, ", w->resources->disk.total);
+		printf("%d gpus\n", w->resources->gpus.total);
+	}
+}
+
+void display_hash_table(struct hash_table *test)
+{
+	struct work_queue_bucket *w;
+	char *hash_key;
+
+	hash_table_firstkey(test);
+	while(hash_table_nextkey(test, &hash_key, (void**)&w)) { // loop through all workers in the queue
+			printf("Workers: %d, Cores: %d, Memory: %d, Disk: %d, GPUs: %d\n",
+			w->count, w->cores, w->memory, w->disk, w->gpus);
+	}
+}
+
+void clear_hash_table(struct hash_table *work_queue_summary)
+{
+	struct work_queue_bucket *w;
+	char *hash_key;
+
+	hash_table_firstkey(work_queue_summary);
+	while(hash_table_nextkey(work_queue_summary, &hash_key, (void**)&w)) {
+		free(w);
+	}
+	hash_table_clear(work_queue_summary);
 }
 
 /* vim: set noexpandtab tabstop=4: */

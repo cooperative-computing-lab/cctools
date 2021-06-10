@@ -365,6 +365,15 @@ struct work_queue_bucket{
 	int gpus;
 };
 
+typedef enum {
+	NONE = 0,
+	COUNT = 1,
+	CORES,
+	MEMORY,
+	DISK,
+	GPUS
+} wsummary_sort_category;
+
 /* Forward declare the queue's structure. This structure is opaque and defined in work_queue.c */
 struct work_queue;
 
@@ -1221,6 +1230,14 @@ int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary
 
 /** displays the above functions output */
 void display_work_queue_worker_summary(struct work_queue_wsummary *data, char *sortby);
+
+void display_hash_table(struct hash_table *test);
+
+void add_workers_to_hash(struct work_queue *q, struct hash_table *work_queue_summary);
+
+void clear_hash_table(struct hash_table *work_queue_summary);
+
+void display_sorted_work_queue_summary(struct hash_table *work_queue_summary, char *sortby);
 
 //@}
 

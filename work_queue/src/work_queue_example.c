@@ -11,7 +11,6 @@
  * */
 
 #include "work_queue.h"
-#include "hash_table.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,9 +41,9 @@ int main(int argc, char *argv[])
 	   library), and test the path for execution (X_OK) and reading (R_OK)
 	   permissions.
 	 */
-	gzip_path = "/bin/sleep";
+	gzip_path = "/bin/gzip";
 	if(access(gzip_path, X_OK | R_OK) != 0) {
-		gzip_path = "/usr/bin/sleep";
+		gzip_path = "/usr/bin/gzip";
 		if(access(gzip_path, X_OK | R_OK) != 0) {
 			fprintf(stderr, "gzip was not found. Please modify the gzip_path variable accordingly. To determine the location of gzip, from the terminal type: which gzip (usual locations are /bin/gzip and /usr/bin/gzip)\n");
 			exit(1);
@@ -62,16 +61,16 @@ int main(int argc, char *argv[])
 	printf("listening on port %d...\n", work_queue_port(q));
 
 	/* We create and dispatch a task for each filename given in the argument list */
-	for(i = 1; i < 500; i++) {
+	for(i = 1; i < argc; i++) {
 
 		char infile[256], outfile[256], command[1024];
 
-		//sprintf(infile, "%s", argv[i]);
-		//sprintf(outfile, "%s.gz", argv[i]);
+		sprintf(infile, "%s", argv[i]);
+		sprintf(outfile, "%s.gz", argv[i]);
 
 		/* Note that we write ./gzip here, to guarantee that the gzip version
 		 * we are using is the one being sent to the workers. */
-		sprintf(command, "./sleep 30s");
+		sprintf(command, "./gzip < %s > %s", infile, outfile);
 
 		t = work_queue_task_create(command);
 
@@ -79,13 +78,13 @@ int main(int argc, char *argv[])
 		 * workers. Note that when specifying a file, we have to name its local
 		 * name (e.g. gzip_path), and its remote name (e.g. "gzip"). Unlike the
 		 * following line, more often than not these are the same. */
-		work_queue_task_specify_file(t, gzip_path, "sleep", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+		work_queue_task_specify_file(t, gzip_path, "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 
 		/* files to be compressed are different across all tasks, so we do not
 		 * cache them. This is, of course, application specific. Sometimes you
 		 * may want to cache an output file if is the input of a later task.*/
-		//work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
-		//work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+		work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
+		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 
 		/* Once all files has been specified, we are ready to submit the task to the queue. */
 		taskid = work_queue_submit(q, t);
@@ -94,42 +93,9 @@ int main(int argc, char *argv[])
 	}
 
 	printf("waiting for tasks to complete...\n");
-	
-	
-	
+
 	while(!work_queue_empty(q)) {
-		//struct hash_table *work_queue_summary;
-		//work_queue_summary = hash_table_create(0, 0);
-		struct work_queue_wsummary data;
-		//add_workers_to_hash(q, work_queue_summary);
-		
-		
-		work_queue_worker_summmary(q, &data);
-		display_work_queue_worker_summary(&data, "count");
-		printf("\n");
-		display_work_queue_worker_summary(&data, "cores");
-		printf("\n");
-		display_work_queue_worker_summary(&data, "gpus");
-		printf("\n");
-		display_work_queue_worker_summary(&data, "memory");
-		printf("\n");
-		display_work_queue_worker_summary(&data, "disk");
-		printf("\n");
-		
-		/*
-		display_sorted_work_queue_summary(work_queue_summary, "count");
-		printf("\n\n");
-		display_sorted_work_queue_summary(work_queue_summary, "cores");
-		printf("\n\n");
-		display_sorted_work_queue_summary(work_queue_summary, "memory");
-		printf("\n\n");
-		display_sorted_work_queue_summary(work_queue_summary, "disk");
-		printf("\n\n");
-		display_sorted_work_queue_summary(work_queue_summary, "gpus");
-		printf("\n\n");
-		clear_hash_table(work_queue_summary);
-		*/
-		
+
 		/* Application specific code goes here ... */
 
 		/* work_queue_wait waits at most 5 seconds for some task to return. */
