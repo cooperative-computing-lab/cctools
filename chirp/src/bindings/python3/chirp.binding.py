@@ -452,7 +452,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.path
+    # >>> print(s.path)
     # @endcode
     @property
     def path(self):
@@ -464,7 +464,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.device
+    # >>> print(s.device)
     # @endcode
     @property
     def device(self):
@@ -476,7 +476,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.inode
+    # >>> print(s.inode)
     # @endcode
     @property
     def inode(self):
@@ -488,7 +488,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.mode
+    # >>> print(s.mode)
     # @endcode
     @property
     def mode(self):
@@ -500,7 +500,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.nlink
+    # >>> print(s.nlink)
     # @endcode
     @property
     def nlink(self):
@@ -512,7 +512,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.uid
+    # >>> print(s.uid)
     # @endcode
     @property
     def uid(self):
@@ -524,7 +524,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.gid
+    # >>> print(s.gid)
     # @endcode
     @property
     def gid(self):
@@ -536,7 +536,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.rdev
+    # >>> print(s.rdev)
     # @endcode
     @property
     def rdev(self):
@@ -548,7 +548,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.size
+    # >>> print(s.size)
     # @endcode
     @property
     def size(self):
@@ -560,7 +560,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.block_size
+    # >>> print(s.block_size)
     # @endcode
     @property
     def block_size(self):
@@ -572,7 +572,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.blocks
+    # >>> print(s.blocks)
     # @endcode
     @property
     def blocks(self):
@@ -584,7 +584,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.atime
+    # >>> print(s.atime)
     # @endcode
     @property
     def atime(self):
@@ -596,7 +596,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.mtime
+    # >>> print(s.mtime)
     # @endcode
     @property
     def mtime(self):
@@ -608,7 +608,7 @@ class Stat(object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print s.ctime
+    # >>> print(s.ctime)
     # @endcode
     @property
     def ctime(self):
