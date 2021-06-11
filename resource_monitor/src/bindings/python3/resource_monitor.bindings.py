@@ -317,7 +317,7 @@ def __monitor_function(limits, callback, interval, return_resources, function, *
 # @code
 # cs = Categories()
 # cs.accumulate_summary( { 'category': 'some_category', 'wall_time': 60, 'cores': 1, ... } )
-# print cs.first_allocation(mode = 'throughput', category = 'some_category')
+# print(cs.first_allocation(mode = 'throughput', category = 'some_category'))
 # @endcode
 #
 class Categories:
@@ -355,9 +355,9 @@ class Categories:
     # @code
     # cs = Categories()
     # fa = cs.first_allocation(mode = 'throughput, category = 'some_category')
-    # print fa['cores']
-    # print fa['memory']
-    # print fa['disk']
+    # print(fa['cores'])
+    # print(fa['memory'])
+    # print(fa['disk'])
     # @endcode
     def first_allocation(self, mode, category):
         c = self._category(category)
@@ -372,9 +372,9 @@ class Categories:
     # @code
     # cs = Categories()
     # fa = cs.maximum_seen('some_category')
-    # print fa['cores']
-    # print fa['memory']
-    # print fa['disk']
+    # print(fa['cores'])
+    # print(fa['memory'])
+    # print(fa['disk'])
     # @endcode
     def maximum_seen(self, category):
         c = self._category(category)

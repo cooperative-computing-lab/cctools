@@ -437,10 +437,8 @@ class Task(object):
     ##
     # Get the user-defined logical name for the task.
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.tag
+    # >>> print(t.tag)
     # @endcode
     @property
     def tag(self):
@@ -449,10 +447,8 @@ class Task(object):
     ##
     # Get the category name for the task.
     #
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.category
+    # >>> print(t.category)
     # @endcode
     @property
     def category(self):
@@ -460,10 +456,8 @@ class Task(object):
 
     ##
     # Get the shell command executed by the task.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.command
+    # >>> print(t.command)
     # @endcode
     @property
     def command(self):
@@ -471,10 +465,8 @@ class Task(object):
 
     ##
     # Get the priority of the task.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.priority
+    # >>> print(t.priority)
     # @endcode
     @property
     def priority(self):
@@ -482,10 +474,8 @@ class Task(object):
 
     ##
     # Get the algorithm for choosing worker to run the task.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.algorithm
+    # >>> print(t.algorithm)
     # @endcode
     @property
     def algorithm(self):
@@ -493,11 +483,9 @@ class Task(object):
 
     ##
     # Get the standard output of the task. Must be called only after the task
-	# completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # completes execution.
     # @code
-    # >>> print t.output
+    # >>> print(t.output)
     # @endcode
     @property
     def output(self):
@@ -505,10 +493,8 @@ class Task(object):
 
     ##
     # Get the task id number. Must be called only after the task was submitted.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.id
+    # >>> print(t.id)
     # @endcode
     @property
     def id(self):
@@ -516,11 +502,9 @@ class Task(object):
 
     ##
     # Get the exit code of the command executed by the task. Must be called only
-	# after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # after the task completes execution.
     # @code
-    # >>> print t.return_status
+    # >>> print(t.return_status)
     # @endcode
     @property
     def return_status(self):
@@ -530,10 +514,8 @@ class Task(object):
     # Get the result of the task as an integer code, such as successful, missing file, etc.
     # See @ref work_queue_result_t for possible values.  Must be called only
     # after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.result
+    # >>> print(t.result)
     # 0
     # @endcode
     @property
@@ -543,10 +525,8 @@ class Task(object):
     ##
     # Return a string that explains the result of a task.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.result_str
+    # >>> print(t.result_str)
     # 'SUCCESS'
     # @endcode
     @property
@@ -556,10 +536,8 @@ class Task(object):
     ##
     # Get the number of times the task has been resubmitted internally.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.total_submissions
+    # >>> print(t.total_submissions)
     # @endcode
     @property
     def total_submissions(self):
@@ -567,10 +545,8 @@ class Task(object):
 
     ##
     # Get the number of times the task has been failed given resource exhaustion.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.exhausted_attempts
+    # >>> print(t.exhausted_attempts)
     # @endcode
     @property
     def exhausted_attempts(self):
@@ -579,10 +555,8 @@ class Task(object):
     ##
     # Get the address and port of the host on which the task ran.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.host
+    # >>> print(t.host)
     # @endcode
     @property
     def host(self):
@@ -590,11 +564,9 @@ class Task(object):
 
     ##
     # Get the name of the host on which the task ran.
-	# Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # Must be called only after the task completes execution.
     # @code
-    # >>> print t.hostname
+    # >>> print(t.hostname)
     # @endcode
     @property
     def hostname(self):
@@ -603,10 +575,8 @@ class Task(object):
     ##
     # Get the time at which this task was submitted.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.submit_time
+    # >>> print(t.submit_time)
     # @endcode
     @property
     def submit_time(self):
@@ -615,10 +585,8 @@ class Task(object):
     ##
     # Get the time at which this task was finished.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.finish_time
+    # >>> print(t.finish_time)
     # @endcode
     @property
     def finish_time(self):
@@ -626,10 +594,8 @@ class Task(object):
 
     ##
     # Get the total time the task executed and failed given resource exhaustion.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.total_cmd_exhausted_execute_time
+    # >>> print(t.total_cmd_exhausted_execute_time)
     # @endcode
     @property
     def total_cmd_exhausted_execute_time(self):
@@ -638,10 +604,8 @@ class Task(object):
     ##
     # Get the time spent in upper-level application (outside of work_queue_wait).
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.app_delay
+    # >>> print(t.app_delay)
     # @endcode
     @property
     def app_delay(self):
@@ -650,10 +614,8 @@ class Task(object):
     ##
     # Get the time at which the task started to transfer input files.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.send_input_start
+    # >>> print(t.send_input_start)
     # @endcode
     @property
     def send_input_start(self):
@@ -662,10 +624,8 @@ class Task(object):
     ##
     # Get the time at which the task finished transferring input files.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.send_input_finish
+    # >>> print(t.send_input_finish)
     # @endcode
     @property
     def send_input_finish(self):
@@ -674,10 +634,8 @@ class Task(object):
     ##
     # The time at which the task began.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.execute_cmd_start
+    # >>> print(t.execute_cmd_start)
     # @endcode
     @property
     def execute_cmd_start(self):
@@ -686,22 +644,18 @@ class Task(object):
     ##
     # Get the time at which the task finished (discovered by the manager).
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.execute_cmd_finish
+    # >>> print(t.execute_cmd_finish)
     # @endcode
     @property
     def execute_cmd_finish(self):
         return self._task.time_execute_cmd_finish
 
     ##
-	# Get the time at which the task started to transfer output files.
+    # Get the time at which the task started to transfer output files.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.receive_output_start
+    # >>> print(t.receive_output_start)
     # @endcode
     @property
     def receive_output_start(self):
@@ -710,10 +664,8 @@ class Task(object):
     ##
     # Get the time at which the task finished transferring output files.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.receive_output_finish
+    # >>> print(t.receive_output_finish)
     # @endcode
     @property
     def receive_output_finish(self):
@@ -722,10 +674,8 @@ class Task(object):
     ##
     # Get the number of bytes received since task started receiving input data.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.total_bytes_received
+    # >>> print(t.total_bytes_received)
     # @endcode
     @property
     def total_bytes_received(self):
@@ -734,10 +684,8 @@ class Task(object):
     ##
     # Get the number of bytes sent since task started sending input data.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.total_bytes_sent
+    # >>> print(t.total_bytes_sent)
     # @endcode
     @property
     def total_bytes_sent(self):
@@ -746,10 +694,8 @@ class Task(object):
     ##
     # Get the number of bytes transferred since task started transferring input data.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.total_bytes_transferred
+    # >>> print(t.total_bytes_transferred)
     # @endcode
     @property
     def total_bytes_transferred(self):
@@ -757,11 +703,9 @@ class Task(object):
 
     ##
     # Get the time comsumed in microseconds for transferring total_bytes_transferred.
-	# Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
+    # Must be called only after the task completes execution.
     # @code
-    # >>> print t.total_transfer_time
+    # >>> print(t.total_transfer_time)
     # @endcode
     @property
     def total_transfer_time(self):
@@ -770,10 +714,8 @@ class Task(object):
     ##
     # Time spent in microseconds for executing the command until completion on a single worker.
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.cmd_execution_time
+    # >>> print(t.cmd_execution_time)
     # @endcode
     @property
     def cmd_execution_time(self):
@@ -785,10 +727,8 @@ class Task(object):
     # running on workers that disconnected).
     #
     # Must be called only after the task completes execution.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print t.total_cmd_execution_time
+    # >>> print(t.total_cmd_execution_time)
     # @endcode
     @property
     def total_cmd_execution_time(self):
@@ -837,7 +777,7 @@ class Task(object):
     # disk:                      size in MB of all working directories in the tree
     #
     # @code
-    # >>> print t.resources_measured.memory
+    # >>> print(t.resources_measured.memory)
     # @endcode
     @property
     def resources_measured(self):
@@ -950,10 +890,8 @@ class WorkQueue(object):
 
     ##
     # Get the project name of the queue.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print q.name
+    # >>> print(q.name)
     # @endcode
     @property
     def name(self):
@@ -961,10 +899,8 @@ class WorkQueue(object):
 
     ##
     # Get the listening port of the queue.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print q.port
+    # >>> print(q.port)
     # @endcode
     @property
     def port(self):
@@ -972,14 +908,12 @@ class WorkQueue(object):
 
     ##
     # Get queue statistics.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print q.stats
+    # >>> print(q.stats)
     # @endcode
     # The fields in @ref stats can also be individually accessed through this call. For example:
     # @code
-    # >>> print q.stats.workers_busy
+    # >>> print(q.stats.workers_busy)
     # @endcode
     @property
     def stats(self):
@@ -988,14 +922,12 @@ class WorkQueue(object):
 
     ##
     # Get worker hierarchy statistics.
-    # @a Note: This is defined using property decorator. So it must be called without parentheses
-    # (). For example:
     # @code
-    # >>> print q.stats_hierarchy
+    # >>> print(q.stats_hierarchy)
     # @endcode
     # The fields in @ref stats_hierarchy can also be individually accessed through this call. For example:
     # @code
-    # >>> print q.stats_hierarchy.workers_busy
+    # >>> print(q.stats_hierarchy.workers_busy)
     # @endcode
     @property
     def stats_hierarchy(self):
@@ -1005,16 +937,16 @@ class WorkQueue(object):
     ##
     # Get the task statistics for the given category.
     #
-    # @param self 	Reference to the current work queue object.
+    # @param self   Reference to the current work queue object.
     # @param category   A category name.
     # For example:
     # @code
     # s = q.stats_category("my_category")
-    # >>> print s
+    # >>> print(s)
     # @endcode
     # The fields in @ref work_queue_stats can also be individually accessed through this call. For example:
     # @code
-    # >>> print s.tasks_waiting
+    # >>> print(s.tasks_waiting)
     # @endcode
     def stats_category(self, category):
         stats = work_queue_stats()
@@ -1054,7 +986,7 @@ class WorkQueue(object):
     # Turn on or off first-allocation labeling for a given category and
     # resource. This function should be use to fine-tune the defaults from @ref
     # specify_category_mode.
-    # @param self 	Reference to the current work queue object.
+    # @param self   Reference to the current work queue object.
     # @param category A category name.
     # @param resource A resource name.
     # @param autolabel True/False for on/off.
@@ -1065,7 +997,7 @@ class WorkQueue(object):
     ##
     # Get current task state. See @ref work_queue_task_state_t for possible values.
     # @code
-    # >>> print q.task_state(taskid)
+    # >>> print(q.task_state(taskid))
     # @endcode
     def task_state(self, taskid):
         return work_queue_task_state(self._work_queue, taskid)
@@ -1076,7 +1008,7 @@ class WorkQueue(object):
     #
     #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
-    # @param self 	Reference to the current work queue object.
+    # @param self   Reference to the current work queue object.
     # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
     def enable_monitoring(self, dirname=None, watchdog=True):
@@ -1087,7 +1019,7 @@ class WorkQueue(object):
     #
     #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
-    # @param self 	Reference to the current work queue object.
+    # @param self   Reference to the current work queue object.
     # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
     def enable_monitoring_full(self, dirname=None, watchdog=True):
@@ -1153,8 +1085,8 @@ class WorkQueue(object):
     # Set the order for dispatching submitted tasks in the queue.
     #
     # @param self       Reference to the current work queue object.
-    # @param order  	One of the following algorithms to use in dispatching
-	# 					submitted tasks to workers:
+    # @param order      One of the following algorithms to use in dispatching
+    #                   submitted tasks to workers:
     #                   - @ref WORK_QUEUE_TASK_ORDER_FIFO
     #                   - @ref WORK_QUEUE_TASK_ORDER_LIFO
     def specify_task_order(self, order):
