@@ -36,7 +36,11 @@ run()
 	chirp -d all -a unix "$hostport" ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` / write
 
 	base=$(pwd)/../src/bindings/${python_dir}/
-	PYTHONPATH=${base} ${python} ${base}/chirp_python_example.py $hostport $ticket
+	set +e
+	if ! PYTHONPATH=${base} ${python} ${base}/chirp_python_example.py $hostport $ticket
+		cat ${base}/Chirp.py
+		return 1
+	fi
 
 
 	return 0

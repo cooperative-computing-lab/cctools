@@ -33,7 +33,11 @@ run()
 
 	base=$(pwd)/../src/bindings/${python_dir}
 
-	PYTHONPATH=${base} ${python} ${base}/chirp_jobs_python_example.py $hostport ${base}/my_script.sh
+	set +e
+	if ! ${python} ${base}/chirp_python_example.py $hostport $ticket PYTHONPATH=${base} ${python} ${base}/chirp_jobs_python_example.py $hostport ${base}/my_script.sh
+		cat ${base}/Chirp.py
+		return 1
+	fi
 
 	return 0
 }

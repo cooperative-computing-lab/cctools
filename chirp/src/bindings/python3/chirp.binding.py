@@ -410,7 +410,7 @@ class Client(object):
     # Obtains the current status for each job id. The value returned is a
     # list which contains a dictionary reference per job id.
     #
-    # @param job_ids Job ids of the chirp jobs to be reaped.
+    # @param job_ids Job ids of the chirp jobs.
     #
     def job_status(self, *job_ids):
         ids_str = json.dumps(job_ids)
