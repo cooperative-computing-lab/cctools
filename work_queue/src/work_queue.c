@@ -7729,7 +7729,7 @@ int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	char *id;
-	printf("TABLE SIZE%d\n", hash_table_size(q->worker_table));
+	//printf("TABLE SIZE%d\n", hash_table_size(q->worker_table));
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) { // loop through all workers in the queue
 			if (w->resources->cores.total == 0) continue; // sometimes returns a worker with all resources values being 0: ignore the worker in this case
 			add_worker_to_wsummary(data, w);	// add it to a bucket
@@ -7822,10 +7822,10 @@ void add_workers_to_hash(struct work_queue *q, struct hash_table *work_queue_sum
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &hash_key, (void**)&w)) {
 		add_worker_to_buckets(work_queue_summary, w);
-		printf("Worker Hash: %s, %d Number of cores, ", hash_key, w->resources->cores.total);
-		printf("%d memory, ", w->resources->memory.total);
-		printf("%d disk, ", w->resources->disk.total);
-		printf("%d gpus\n", w->resources->gpus.total);
+		//printf("Worker Hash: %s, %d Number of cores, ", hash_key, w->resources->cores.total);
+		//printf("%d memory, ", w->resources->memory.total);
+		//printf("%d disk, ", w->resources->disk.total);
+		//printf("%d gpus\n", w->resources->gpus.total);
 	}
 }
 
