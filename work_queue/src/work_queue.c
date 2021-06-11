@@ -7492,8 +7492,8 @@ void convert_wsummary_to_log_scale(struct work_queue_wsummary *data)
 {
 	if (data->length <= 1) return;
 	sort_work_queue_worker_summary(data, MEMORY);
-	//printf("%d %d\n", data->memory[0], data->memory[data->length - 1]); // 0 highest
-	int index1, index2;
+	int index1 = 0;
+	int index2 = 0;
 	int scale_values[4];
 	for (int i = 20; i > 0; i--)
 	{
@@ -7554,7 +7554,8 @@ void convert_wsummary_to_log_scale(struct work_queue_wsummary *data)
 	}
 
 	sort_work_queue_worker_summary(data, DISK);
-	int disk1, disk2;
+	int disk1 = 0;
+	int disk2 = 0;
 	int disk_values[4];
 	for (int i = 25; i > 0; i--)
 	{
