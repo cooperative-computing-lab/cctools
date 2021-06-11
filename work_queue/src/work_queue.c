@@ -7503,7 +7503,7 @@ void convert_wsummary_to_log_scale(struct work_queue_wsummary *worker_data)
 	sort_work_queue_worker_summary(worker_data, MEMORY);
 	int power_index1 = 0; // stores index for highest power of two
 	int power_index2 = 0; // stores index for lowest power of two
-	int power_of_two_values[4]; // stores all 4 indicies used for rounding
+	
 	for (int i = MAX_POWER_OF_TWO; i > 0; i--)
 	{
 		if (pow(2.0, i) <= (double)worker_data->memory[0])
@@ -7520,53 +7520,30 @@ void convert_wsummary_to_log_scale(struct work_queue_wsummary *worker_data)
 			break;
 		}
 	}
-	if (power_index1 - power_index2 == 2) // if the values only differ by 3 powers of 2, set those 3 powers of two as the values
+	int *power_of_two_values = malloc(sizeof(int) * (power_index1 - power_index2 + 1) * POWER_OF_TWO_DIVISIONS); // stores all 4 indicies used for rounding
+	for (int i = 0; i < (power_index1 - power_index2 + 1); i++)
 	{
-		power_of_two_values[0] = pow(2.0, power_index1);
-		power_of_two_values[1] = pow(2.0, power_index1 + 1);
-		power_of_two_values[2] = pow(2.0, power_index1 + 2);
-		power_of_two_values[3] = -1;
-	}
-	else if (power_index1 - power_index2 == 1) // ditto for only 2 powers of 2
-	{
-		power_of_two_values[0] = pow(2.0, power_index1);
-		power_of_two_values[1] = pow(2.0, power_index1 + 1);
-		power_of_two_values[2] = -1;
-		power_of_two_values[3] = -1;
-	}
-	else if (power_index1 == power_index2) // only use one if there is only 1 memory value
-	{
-		power_of_two_values[0] = pow(2.0, power_index1);
-		power_of_two_values[1] = -1;
-		power_of_two_values[2] = -1;
-		power_of_two_values[3] = -1;
-	}
-	else  // otherwise interoplate between the two indicies of powers of two
-	{
-		double interpolator = (power_index1 - power_index2) / 3.0;
-		power_of_two_values[0] = pow(2, (int)(power_index2 + interpolator * 3.0));
-		power_of_two_values[1] = pow(2, (int)(power_index2 + interpolator * 2.0));
-		power_of_two_values[2] = pow(2, (int)(power_index2 + interpolator * 1.0));
-		power_of_two_values[3] = pow(2, (int)(power_index2 + interpolator * 0.0));
-	}
-	int worker_index = 0;
-	for (int i = 0; i < 4; i++)
-	{
-		if ((power_of_two_values[i] > 0)) // skip if the index doesnt exist
+		for (int j = 0; j < POWER_OF_TWO_DIVISIONS; j++)
 		{
-			while (worker_data->memory[worker_index] > power_of_two_values[i]) // if the value is higher than the roundoff value, round the memory value
-			{
-				memory_losses += worker_data->memory[worker_index] - power_of_two_values[i];
-				worker_data->memory[worker_index] = power_of_two_values[i];
-				worker_index++;
-			}
+			power_of_two_values[i * POWER_OF_TWO_DIVISIONS + j] = pow(2.0, power_index1 - i) - pow(2.0, power_index1 - 4.0 - i) * j;
 		}
 	}
+
+	int worker_index = 0;
+	for (int i = 0; i < (power_index1 - power_index2 + 1) * POWER_OF_TWO_DIVISIONS; i++)
+	{
+		while (worker_data->memory[worker_index] > power_of_two_values[i]) // if the value is higher than the roundoff value, round the memory value
+		{
+			if (worker_data->memory[worker_index] > 0) memory_losses += worker_data->memory[worker_index] - power_of_two_values[i];
+			worker_data->memory[worker_index] = power_of_two_values[i];
+			worker_index++;
+		}
+	}
+	free(power_of_two_values);
 	// the rounding off for disk space works the exact same as for memory seen above
 	sort_work_queue_worker_summary(worker_data, DISK);
 	int disk_index1 = 0;
 	int disk_index2 = 0;
-	int disk_index_values[4];
 	for (int i = MAX_POWER_OF_TWO; i > 0; i--)
 	{
 		if (pow(2.0, i) <= (double)worker_data->disk[0])
@@ -7583,52 +7560,26 @@ void convert_wsummary_to_log_scale(struct work_queue_wsummary *worker_data)
 			break;
 		}
 	}
-	
-	if (disk_index1 - disk_index2 == 2)
+	int *disk_two_values = malloc(sizeof(int) * (disk_index1 - disk_index2 + 1) * POWER_OF_TWO_DIVISIONS); // stores all 4 indicies used for rounding
+	for (int i = 0; i < (disk_index1 - disk_index2 + 1); i++)
 	{
-		disk_index_values[0] = pow(2.0, disk_index1);
-		disk_index_values[1] = pow(2.0, disk_index1 + 1);
-		disk_index_values[2] = pow(2.0, disk_index1 + 2);
-		disk_index_values[3] = -1;
-	}
-	else if (disk_index1 - disk_index2 == 1)
-	{
-		disk_index_values[0] = pow(2.0, disk_index1);
-		disk_index_values[1] = pow(2.0, disk_index1 + 1);
-		disk_index_values[2] = -1;
-		disk_index_values[3] = -1;
-	}
-	else if (disk_index1 == disk_index2)
-	{
-		disk_index_values[0] = pow(2.0, disk_index1);
-		disk_index_values[1] = -1;
-		disk_index_values[2] = -1;
-		disk_index_values[3] = -1;
-	}
-	else 
-	{
-		double interpolator = (disk_index1 - disk_index2) / 3.0;
-		disk_index_values[0] = pow(2, (int)(disk_index2 + interpolator * 3.0));
-		disk_index_values[1] = pow(2, (int)(disk_index2 + interpolator * 2.0));
-		disk_index_values[2] = pow(2, (int)(disk_index2 + interpolator * 1.0));
-		disk_index_values[3] = pow(2, (int)(disk_index2 + interpolator * 0.0));
-	}
-	
-	
-	int worker_data_index = 0;
-	for (int i = 0; i < 4; i++)
-	{
-		if ((disk_index_values[i] > 0))
+		for (int j = 0; j < POWER_OF_TWO_DIVISIONS; j++)
 		{
-			while (worker_data->disk[worker_data_index] > disk_index_values[i])
-			{
-				disk_losses += worker_data->disk[worker_data_index] - disk_index_values[i];
-				worker_data->disk[worker_data_index] = disk_index_values[i];
-				worker_data_index++;
-			}
+			disk_two_values[i * POWER_OF_TWO_DIVISIONS + j] = pow(2.0, disk_index1 - i) - pow(2.0, disk_index1 - 4.0 - i) * j;
 		}
 	}
-
+	
+	int worker_data_index = 0;
+	for (int i = 0; i < (disk_index1 - disk_index2 + 1) * POWER_OF_TWO_DIVISIONS; i++)
+	{
+		while (worker_data->disk[worker_data_index] > disk_two_values[i])
+		{
+			if (worker_data->disk[worker_data_index] > 0) disk_losses += worker_data->disk[worker_data_index] - disk_two_values[i];
+			worker_data->disk[worker_data_index] = disk_two_values[i];
+			worker_data_index++;
+		}
+	}
+	free(disk_two_values);
 	struct work_queue_wsummary temp; // create temporary data structure to sort
 	temp.count[0] = worker_data->count[0];
 	temp.cores[0] = worker_data->cores[0];

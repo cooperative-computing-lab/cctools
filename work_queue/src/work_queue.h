@@ -376,6 +376,7 @@ typedef enum {
 } wsummary_sort_category;
 
 static const int MAX_POWER_OF_TWO = 25; // used for snapping memory and disk values to logarithmic scale
+static const int POWER_OF_TWO_DIVISIONS = 8;
 
 /* Forward declare the queue's structure. This structure is opaque and defined in work_queue.c */
 struct work_queue;
