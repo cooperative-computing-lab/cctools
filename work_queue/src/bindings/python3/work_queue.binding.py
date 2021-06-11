@@ -483,7 +483,7 @@ class Task(object):
 
     ##
     # Get the standard output of the task. Must be called only after the task
-	# completes execution.
+    # completes execution.
     # @code
     # >>> print(t.output)
     # @endcode
@@ -502,7 +502,7 @@ class Task(object):
 
     ##
     # Get the exit code of the command executed by the task. Must be called only
-	# after the task completes execution.
+    # after the task completes execution.
     # @code
     # >>> print(t.return_status)
     # @endcode
@@ -564,7 +564,7 @@ class Task(object):
 
     ##
     # Get the name of the host on which the task ran.
-	# Must be called only after the task completes execution.
+    # Must be called only after the task completes execution.
     # @code
     # >>> print(t.hostname)
     # @endcode
@@ -652,7 +652,7 @@ class Task(object):
         return self._task.time_execute_cmd_finish
 
     ##
-	# Get the time at which the task started to transfer output files.
+    # Get the time at which the task started to transfer output files.
     # Must be called only after the task completes execution.
     # @code
     # >>> print(t.receive_output_start)
@@ -937,7 +937,7 @@ class WorkQueue(object):
     ##
     # Get the task statistics for the given category.
     #
-    # @param self 	Reference to the current work queue object.
+    # @param self   Reference to the current work queue object.
     # @param category   A category name.
     # For example:
     # @code
@@ -986,7 +986,7 @@ class WorkQueue(object):
     # Turn on or off first-allocation labeling for a given category and
     # resource. This function should be use to fine-tune the defaults from @ref
     # specify_category_mode.
-    # @param self 	Reference to the current work queue object.
+    # @param self   Reference to the current work queue object.
     # @param category A category name.
     # @param resource A resource name.
     # @param autolabel True/False for on/off.
@@ -1008,7 +1008,7 @@ class WorkQueue(object):
     #
     #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
-    # @param self 	Reference to the current work queue object.
+    # @param self   Reference to the current work queue object.
     # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
     def enable_monitoring(self, dirname=None, watchdog=True):
@@ -1019,7 +1019,7 @@ class WorkQueue(object):
     #
     #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
-    # @param self 	Reference to the current work queue object.
+    # @param self   Reference to the current work queue object.
     # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
     def enable_monitoring_full(self, dirname=None, watchdog=True):
@@ -1085,8 +1085,8 @@ class WorkQueue(object):
     # Set the order for dispatching submitted tasks in the queue.
     #
     # @param self       Reference to the current work queue object.
-    # @param order  	One of the following algorithms to use in dispatching
-	# 					submitted tasks to workers:
+    # @param order      One of the following algorithms to use in dispatching
+    #                   submitted tasks to workers:
     #                   - @ref WORK_QUEUE_TASK_ORDER_FIFO
     #                   - @ref WORK_QUEUE_TASK_ORDER_LIFO
     def specify_task_order(self, order):
