@@ -349,14 +349,15 @@ struct work_queue_stats {
 /** Statistics describing the workers in a work queue. Workers are grouped by index. For example, count[0] contains the number of workers of type 0, cores[0] contains the number of cores each of those workers has, memory[0] displays the memory of those workers, etc**/
 
 struct work_queue_wsummary {
-    int count[255];    /**< Number of workers of a certain type */
-    int cores[255];   /**< Number of cores of the workers */
-    int memory[255];  /**< Amount of memory of the workers */
-    int disk[255];    /**< Disk available to the workers */
-    int gpus[255];    /**< GPUs available to the workers */
+    int count[512];    /**< Number of workers of a certain type */
+    int cores[512];   /**< Number of cores of the workers */
+    int memory[512];  /**< Amount of memory of the workers */
+    int disk[512];    /**< Disk available to the workers */
+    int gpus[512];    /**< GPUs available to the workers */
     int length;       /**< number of types stored */
 };
 
+// used for sorting
 struct work_queue_bucket{
 	int count;
 	int cores;
@@ -373,6 +374,8 @@ typedef enum {
 	DISK,
 	GPUS
 } wsummary_sort_category;
+
+static const int MAX_POWER_OF_TWO = 25; // used for snapping memory and disk values to logarithmic scale
 
 /* Forward declare the queue's structure. This structure is opaque and defined in work_queue.c */
 struct work_queue;
@@ -1226,18 +1229,10 @@ char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid);
 void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value );
 
 /** Returns summary data for all workers in wsummary buffer */
-int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary *data);
+int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary *worker_data);
 
 /** displays the above functions output */
-void display_work_queue_worker_summary(struct work_queue_wsummary *data, char *sortby);
-
-void display_hash_table(struct hash_table *test);
-
-void add_workers_to_hash(struct work_queue *q, struct hash_table *work_queue_summary);
-
-void clear_hash_table(struct hash_table *work_queue_summary);
-
-void display_sorted_work_queue_summary(struct hash_table *work_queue_summary, char *sortby);
+void display_work_queue_worker_summary(struct work_queue_wsummary *worker_data, char *sortby);
 
 //@}
 
