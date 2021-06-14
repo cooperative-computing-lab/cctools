@@ -7664,8 +7664,8 @@ int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) { // loop through all workers in the queue
 			if (w->resources->cores.total == 0) continue; // sometimes returns a worker with all resources values being 0: ignore the worker in this case
-			if (current_length >= length) break; // so that array does not go out of bounds
-			add_worker_to_wsummary(worker_data, w, &current_length);	// add it to a bucket
+			if (current_length >= length) break; // check that that array does not go out of bounds
+			add_worker_to_wsummary(worker_data, w, &current_length);	// otherwise add it to a bucket
 	}
 	return current_length;
 }
