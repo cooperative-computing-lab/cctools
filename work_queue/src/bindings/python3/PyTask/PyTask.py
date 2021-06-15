@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+
+# copyright (C) 2021- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
 import work_queue as wq
 import dill
 import os
@@ -5,31 +11,40 @@ import sys
 import tempfile
 import uuid
 import traceback
+import shutil
+import textwrap
 
 
-class PyTask(object):
+class PyTask(wq.Task):
 	
 	p_tasks = []
 
 	def __init__(self, func, *args):
+		
 		self._id = str(uuid.uuid4())
-		self._tmpdir = 'tmp/'
-		self._task = self.python_function_command(func, *args)
+		self._tmpdir = tempfile.mkdtemp()
+
+		self._func_file = os.path.join(self._tmpdir, 'function_{}.p'.format(self._id))
+		self._args_file = os.path.join(self._tmpdir, 'args_{}.p'.format(self._id))
+		self._out_file = os.path.join(self._tmpdir, 'out_{}.p'.format(self._id))
+		self._wrapper = os.path.join(self._tmpdir, 'pytask_wrapper.py'.format(self._id))
+		#self._package_file = os.path.join(self._tmpdir, 'dep.yml')
+		self._tar_file  = 'venv.tar.gz'
+		self._pp_run = shutil.which('python_package_run')		
+
+		self._command = self.python_function_command(func, *args)
+		self.create_wrapper()
+
+		super(PyTask, self).__init__(self._command)
+		
+		self.specify_IO_files()
+		
+
 		PyTask.p_tasks.append(self)
 		
 	
-	def task(self):
-		return self._task
-	
 	def python_function_command(self, func, *args):
 			
-		func_file = os.path.join(self._tmpdir, 'function_{}.p'.format(self._id))
-		args_file = os.path.join(self._tmpdir, 'args_{}.p'.format(self._id))
-		out_file = os.path.join(self._tmpdir, 'out_{}.p'.format(self._id))
-		package_file = os.path.join(self._tmpdir, 'dep.yml')
-		tar_file = os.path.join(self._tmpdir, 'venv.tar.gz')
-		pp_run = '/afs/crc.nd.edu/user/b/bslydelg/cctools/python_environments/src/python_package_run'		
-
 	
 		tb = traceback.extract_stack()
 		tb_list = traceback.format_list(tb)
@@ -38,70 +53,73 @@ class PyTask(object):
 		caller = caller.replace(',', '')
 
 
-		if not os.path.exists(tar_file):
-			os.system('python_package_analyze ' + caller + ' ' + package_file)
-			os.system('python_package_create ' + package_file + ' ' + tar_file)
+	#	if not os.path.exists(tar_file):
+	#		os.system('python_package_analyze ' + caller + ' ' + package_file)
+
+	#	os.system('python_package_create x.yml ' + self._tar_file)
 			
 		
-		with open(func_file, 'wb') as wf:
+		with open(self._func_file, 'wb') as wf:
 			dill.dump(func, wf)
 		
-		with open(args_file, 'wb') as wf:
+		with open(self._args_file, 'wb') as wf:
 			dill.dump([*args], wf)
 		
-		command = "./python_package_run -e {tar} python py_wrapper.py {function} {args} {out}".format(
-			tar=os.path.basename(tar_file),
-			function=os.path.basename(func_file),
-			args=os.path.basename(args_file),
-			out=os.path.basename(out_file))
+		#command = "python {wrapper} {function} {args} {out}".format(
+		command = "./{pprun} -e {tar} python {wrapper} {function} {args} {out}".format(
+			pprun=os.path.basename(self._pp_run),
+			tar=os.path.basename(self._tar_file),
+			wrapper=os.path.basename(self._wrapper),
+			function=os.path.basename(self._func_file),
+			args=os.path.basename(self._args_file),
+			out=os.path.basename(self._out_file))
 
-		task = wq.Task(command)
 
-		task.specify_input_file('py_wrapper.py', cache=True)
-		task.specify_input_file(pp_run, cache=False)
-		task.specify_input_file(tar_file, cache=False)
-		task.specify_input_file(func_file, cache=False)
-		task.specify_input_file(args_file, cache=False)
-		task.specify_output_file(out_file, cache=False)
+		return command
 
-		return task
+	def specify_IO_files(self):
 
+		self.specify_input_file(self._wrapper, cache=True)
+		self.specify_input_file(self._pp_run, cache=True)
+		self.specify_input_file(self._tar_file, cache=False)
+		self.specify_input_file(self._func_file, cache=False)
+		self.specify_input_file(self._args_file, cache=False)
+		self.specify_output_file(self._out_file, cache=False)
+
+	def create_wrapper(self):
+		
+		with open(self._wrapper, 'w') as f:
+			f.write(textwrap.dedent('''\
+				import sys
+				import dill
+				(fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
+				with open (fn , 'rb') as f:
+					exec_function = dill.load(f)
+				with open(args, 'rb') as f:
+					exec_args = dill.load(f)
+				try:
+					exec_out = exec_function(*exec_args)
+
+				except Exception as e:
+					exec_out = e
+
+				with open(out, 'wb') as f:
+					dill.dump(exec_out, f)
+
+				print(exec_out)'''))
+			 
+				
 	@staticmethod
 	def python_result(task):		
-		
-		for t in PyTask.p_tasks:
-			if t._task is task:
-				p_task = t	
-		
-		if p_task._task.result == wq.WORK_QUEUE_RESULT_SUCCESS:
+		if task.result == wq.WORK_QUEUE_RESULT_SUCCESS:
 			try:
-				with open(os.path.join(p_task._tmpdir, 'out_{}.p'.format(p_task._id)), 'rb') as f:
+				with open(os.path.join(task._tmpdir, 'out_{}.p'.format(task._id)), 'rb') as f:
 					func_result = dill.load(f)
 			except Exception as e:
 				func_result = e
 		else:
-			print('no reusly for task {}, error code {} {}'.format(p_task._task.tag, p_task._task.result, P_task._task.result_str))
-			func_result = NoResult()
+			print('no reuslt for task {}, error code {} {}'.format(task.tag, task.result, task.result_str))
+			func_result = 'no result'
 		
 		return func_result
 
-def divide(dividend, divisor):
-	return dividend/divisor
-
-def main():
-	
-	p_tasks  = []
-	
-	q = wq.WorkQueue(9123)	
-	for i in range(1, 16):
-		p_task = PyTask(divide, 1, i**2)
-		q.submit(p_task.task())
-	
-	sum = 0
-	while not q.empty():
-		t = q.wait(5)
-		if t:
-			x = PyTask.python_result(t)
-			sum += x
-
-		print(sum)		
