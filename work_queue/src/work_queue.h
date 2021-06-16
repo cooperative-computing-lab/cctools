@@ -356,18 +356,6 @@ struct work_queue_wsummary {
     int gpus;    /**< GPUs available to the workers */
 };
 
-typedef enum {
-	NONE = 0,
-	COUNT = 1,
-	CORES,
-	MEMORY,
-	DISK,
-	GPUS
-} wsummary_sort_category;
-
-static const int MAX_POWER_OF_TWO = 25; // used for snapping memory and disk values to logarithmic scale
-static const int POWER_OF_TWO_DIVISIONS = 8;
-
 /* Forward declare the queue's structure. This structure is opaque and defined in work_queue.c */
 struct work_queue;
 
@@ -1223,7 +1211,7 @@ void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, con
 int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary worker_data[], int length);
 
 /** Conver the memory and disk values of the workers into nice number beteen values of 2 */
-void convert_wsummary_to_log_scale(struct work_queue_wsummary worker_data[], int *length);
+void work_queue_wsummary_compact(struct work_queue_wsummary worker_data[], int *length);
 
 
 //@}
