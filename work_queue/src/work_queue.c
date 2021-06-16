@@ -7415,19 +7415,6 @@ int work_queue_specify_min_taskid(struct work_queue *q, int minid) {
 	return q->next_taskid;
 }
 
-// Used when sorting the wsummary worker summary
-typedef enum {
-	NONE = 0,
-	COUNT = 1,
-	CORES,
-	MEMORY,
-	DISK,
-	GPUS
-} wsummary_sort_category;
-
-static const int MAX_POWER_OF_TWO = 25; // used for snapping memory and disk values to logarithmic scale
-static const int POWER_OF_TWO_DIVISIONS = 8; // used to track the number of divisons to make between powers of two for memory and disk
-
 //the functions below are used by qsort in order to sort the work_queue_wsummary data
 static int comparecount(const void *a, const void *b)
 {
@@ -7458,6 +7445,16 @@ static int comparegpus(const void *a, const void *b)
 	return  ((x->gpus - y->gpus) == 0) ? 
 			(x->count - y->count) : (x->gpus - y->gpus);
 }
+
+// Used when sorting the wsummary worker summary
+typedef enum {
+	NONE = 0,
+	COUNT = 1,
+	CORES,
+	MEMORY,
+	DISK,
+	GPUS
+} wsummary_sort_category;
 
 // function used by other functions
 static void sort_work_queue_worker_summary(struct work_queue_wsummary data[], wsummary_sort_category sortby, int current_length)
@@ -7501,6 +7498,9 @@ static void sort_work_queue_worker_summary(struct work_queue_wsummary data[], ws
 	}
 	free(list_of_buckets);
 }
+
+static const int MAX_POWER_OF_TWO = 25; // used for snapping memory and disk values to logarithmic scale
+static const int POWER_OF_TWO_DIVISIONS = 8; // used to track the number of divisons to make between powers of two for memory and disk
 
 void work_queue_wsummary_compact(struct work_queue_wsummary worker_data[], int *current_length)
 {
