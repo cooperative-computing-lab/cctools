@@ -14,7 +14,6 @@ import traceback
 import shutil
 import textwrap
 
-
 class PyTask(wq.Task):
 	
 	p_tasks = []
@@ -65,9 +64,9 @@ class PyTask(wq.Task):
 		with open(self._args_file, 'wb') as wf:
 			dill.dump([*args], wf)
 		
-		#command = "python {wrapper} {function} {args} {out}".format(
-		command = "./{pprun} -e {tar} python {wrapper} {function} {args} {out}".format(
+		command = './{pprun} -e {tar} --unpack-to "$WORK_QUEUE_SANDBOX"/{unpack}-env python {wrapper} {function} {args} {out}'.format(
 			pprun=os.path.basename(self._pp_run),
+			unpack=os.path.basename(self._tar_file),
 			tar=os.path.basename(self._tar_file),
 			wrapper=os.path.basename(self._wrapper),
 			function=os.path.basename(self._func_file),
@@ -109,17 +108,17 @@ class PyTask(wq.Task):
 				print(exec_out)'''))
 			 
 				
-	@staticmethod
-	def python_result(task):		
-		if task.result == wq.WORK_QUEUE_RESULT_SUCCESS:
+	def python_result(self):		
+		if self.result == wq.WORK_QUEUE_RESULT_SUCCESS:
 			try:
-				with open(os.path.join(task._tmpdir, 'out_{}.p'.format(task._id)), 'rb') as f:
+				with open(os.path.join(self._tmpdir, 'out_{}.p'.format(self._id)), 'rb') as f:
 					func_result = dill.load(f)
 			except Exception as e:
 				func_result = e
 		else:
-			print('no reuslt for task {}, error code {} {}'.format(task.tag, task.result, task.result_str))
-			func_result = 'no result'
+			func_result = PyTaskNoResult()
 		
 		return func_result
 
+class PyTaskNoResult(Exception):
+	pass
