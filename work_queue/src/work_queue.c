@@ -5644,7 +5644,7 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 		buffer_printf(&b, " --snapshot-events %s", RESOURCE_MONITOR_REMOTE_NAME_EVENTS);
 	}
 
-	if(q->monitor_mode & MON_WATCHDOG) {
+	if(!(q->monitor_mode & MON_WATCHDOG)) {
 		buffer_printf(&b, " --measure-only");
 	}
 
