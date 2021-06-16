@@ -15,9 +15,10 @@ def main():
 	while not q.empty():
 		t = q.wait(5)
 		if t:
-			x = pt.PyTask.python_result(t)
+			x = t.python_result()
 			sum += x
 
 		print(sum)		
+
 if __name__ == '__main__':
 	main()
