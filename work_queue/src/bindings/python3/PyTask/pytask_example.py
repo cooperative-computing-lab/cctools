@@ -2,7 +2,8 @@ import PyTask as pt
 import work_queue
 
 def divide(dividend, divisor):
-	return dividend/divisor
+	import math
+	return dividend/math.sqrt(divisor)
 
 def main():
 	

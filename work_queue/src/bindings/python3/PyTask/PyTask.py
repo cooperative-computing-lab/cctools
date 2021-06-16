@@ -14,10 +14,21 @@ import traceback
 import shutil
 import textwrap
 
+##
+# \class PyTask
+#
+# Python PyTask object
+#
+# this class is used to create a python task
 class PyTask(wq.Task):
 	
 	p_tasks = []
-
+	##
+	# Creates a new python task
+	#
+	# @param self 	Reference to the current python task object
+	# @param func	python function to be executed by task
+	# @param args	arguments used in function to be executed by task
 	def __init__(self, func, *args):
 		
 		self._id = str(uuid.uuid4())
@@ -41,7 +52,12 @@ class PyTask(wq.Task):
 
 		PyTask.p_tasks.append(self)
 		
-	
+	##
+	# Cretes the command to be executed by task. pickles function and arguments.
+	#
+	# @param self	reference to the current python task object
+	# @param func 	function to be executed by the task
+	# @param args	arguments used in function to be executed by task
 	def python_function_command(self, func, *args):
 			
 	
@@ -54,8 +70,7 @@ class PyTask(wq.Task):
 
 	#	if not os.path.exists(tar_file):
 	#		os.system('python_package_analyze ' + caller + ' ' + package_file)
-
-	#	os.system('python_package_create x.yml ' + self._tar_file)
+	#		os.system('python_package_create x.yml ' + self._tar_file)
 			
 		
 		with open(self._func_file, 'wb') as wf:
@@ -75,7 +90,11 @@ class PyTask(wq.Task):
 
 
 		return command
-
+	
+	##
+	# specifies input and output files needed to execute the task.
+	#
+	# @param self	reference to the current python task object
 	def specify_IO_files(self):
 
 		self.specify_input_file(self._wrapper, cache=True)
@@ -85,6 +104,10 @@ class PyTask(wq.Task):
 		self.specify_input_file(self._args_file, cache=False)
 		self.specify_output_file(self._out_file, cache=False)
 
+	##
+	# creates the wrapper script which will execute the function. pickles output.
+	#
+	# @param self	reference to the current python task object
 	def create_wrapper(self):
 		
 		with open(self._wrapper, 'w') as f:
@@ -108,6 +131,10 @@ class PyTask(wq.Task):
 				print(exec_out)'''))
 			 
 				
+	##
+	# returns the result of a python task as a python variable
+	#
+	# @param self	reference to the current python task object
 	def python_result(self):		
 		if self.result == wq.WORK_QUEUE_RESULT_SUCCESS:
 			try:
