@@ -54,7 +54,7 @@ class PyTask(wq.Task):
 
 	def __del__(self):
 
-		if self._tmpdir:
+		if self._tmpdir and os.path.exists(self._tmpdir):
 			shutil.rmtree(self._tmpdir)
 				
 	##
