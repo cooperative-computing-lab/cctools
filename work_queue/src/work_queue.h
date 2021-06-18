@@ -347,7 +347,6 @@ struct work_queue_stats {
 };
 
 /** Description of the resources of an individual worker bucket **/
-
 struct work_queue_wsummary {
     int count;    /**< Number of workers of a certain type */
     int cores;   /**< Number of cores of the workers */

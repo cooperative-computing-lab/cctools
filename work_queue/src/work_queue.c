@@ -7459,44 +7459,26 @@ typedef enum {
 // function used by other functions
 static void sort_work_queue_worker_summary(struct work_queue_wsummary data[], wsummary_sort_category sortby, int current_length)
 {
-	struct work_queue_wsummary *list_of_buckets = malloc(sizeof(struct work_queue_wsummary) * current_length); // create temporary data structure to sort list
-	for (int i = 0; i < current_length; i++)
-	{
-		list_of_buckets[i].count = data[i].count;	
-		list_of_buckets[i].cores = data[i].cores;	
-		list_of_buckets[i].memory = data[i].memory;	
-		list_of_buckets[i].gpus = data[i].gpus;		
-		list_of_buckets[i].disk = data[i].disk;	
-	}
 	switch(sortby)
 	{
 		case COUNT:
-			qsort(list_of_buckets, current_length, sizeof(struct work_queue_wsummary), comparecount);
+			qsort(data, current_length, sizeof(struct work_queue_wsummary), comparecount);
 			break;
 		case CORES:
-			qsort(list_of_buckets, current_length, sizeof(struct work_queue_wsummary), comparecores);
+			qsort(data, current_length, sizeof(struct work_queue_wsummary), comparecores);
 			break;
 		case MEMORY:
-			qsort(list_of_buckets, current_length, sizeof(struct work_queue_wsummary), comparememory);
+			qsort(data, current_length, sizeof(struct work_queue_wsummary), comparememory);
 			break;
 		case DISK:
-			qsort(list_of_buckets, current_length, sizeof(struct work_queue_wsummary), comparedisk);
+			qsort(data, current_length, sizeof(struct work_queue_wsummary), comparedisk);
 			break;
 		case GPUS:
-			qsort(list_of_buckets, current_length, sizeof(struct work_queue_wsummary), comparegpus);
+			qsort(data, current_length, sizeof(struct work_queue_wsummary), comparegpus);
 			break;
 		case NONE:
 			break;
 	}
-	for (int i = 0; i < current_length; i++) // copy back sorted data
-	{
-		data[i].count = list_of_buckets[i].count;
-		data[i].cores = list_of_buckets[i].cores;
-		data[i].memory = list_of_buckets[i].memory;	
-		data[i].gpus = list_of_buckets[i].gpus;
-		data[i].disk = list_of_buckets[i].disk;	
-	}
-	free(list_of_buckets);
 }
 
 static const int MAX_POWER_OF_TWO = 25; // used for snapping memory and disk values to logarithmic scale
@@ -7508,7 +7490,7 @@ void work_queue_wsummary_compact(struct work_queue_wsummary worker_data[], int *
 	sort_work_queue_worker_summary(worker_data, MEMORY, *current_length);
 	int power_index1 = 0; // stores index for highest power of two
 	int power_index2 = 0; // stores index for lowest power of two
-	
+
 	for (int i = MAX_POWER_OF_TWO; i > 0; i--)
 	{
 		if (pow(2.0, i) <= (double)worker_data[0].memory)
