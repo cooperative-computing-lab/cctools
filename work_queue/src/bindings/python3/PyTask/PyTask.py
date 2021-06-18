@@ -51,7 +51,12 @@ class PyTask(wq.Task):
 		
 
 		PyTask.p_tasks.append(self)
-		
+
+	def __del__(self):
+
+		if self._tmpdir:
+			shutil.rmtree(self._tmpdir)
+				
 	##
 	# Cretes the command to be executed by task. pickles function and arguments.
 	#
