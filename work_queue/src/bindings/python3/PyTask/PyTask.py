@@ -53,9 +53,14 @@ class PyTask(wq.Task):
 		PyTask.p_tasks.append(self)
 
 	def __del__(self):
+		
+		try:
+			if self._tmpdir and os.path.exists(self._tmpdir):
+				shutil.rmtree(self._tmpdir)
 
-		if self._tmpdir and os.path.exists(self._tmpdir):
-			shutil.rmtree(self._tmpdir)
+		except Exception as e:
+			sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
+			
 				
 	##
 	# Cretes the command to be executed by task. pickles function and arguments.
