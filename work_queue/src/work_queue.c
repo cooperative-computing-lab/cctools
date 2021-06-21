@@ -7415,33 +7415,33 @@ int work_queue_specify_min_taskid(struct work_queue *q, int minid) {
 	return q->next_taskid;
 }
 
-//the functions below are used by qsort in order to sort the work_queue_wsummary data
+//the functions below are used by qsort in order to sort the rmsummary data
 static int comparecount(const void *a, const void *b)
 {
-	const struct work_queue_wsummary *x = b, *y = a;
+	const struct rmsummary *x = b, *y = a;
 	return x->count - y->count;
 }
 static int comparecores(const void *a, const void *b)
 {
-	const struct work_queue_wsummary *x = b, *y = a;
+	const struct rmsummary *x = b, *y = a;
 	return  ((x->cores - y->cores) == 0) ? 
 			(x->count - y->count) : (x->cores - y->cores);
 }
 static int comparememory(const void *a, const void *b)
 {
-	const struct work_queue_wsummary *x = b, *y = a;
+	const struct rmsummary *x = b, *y = a;
 	return  ((x->memory - y->memory) == 0) ? 
 			(x->count - y->count) : (x->memory - y->memory);
 }
 static int comparedisk(const void *a, const void *b)
 {
-	const struct work_queue_wsummary *x = b, *y = a;
+	const struct rmsummary *x = b, *y = a;
 	return  ((x->disk - y->disk) == 0) ? 
 			(x->count - y->count) : (x->disk - y->disk);
 }
 static int comparegpus(const void *a, const void *b)
 {
-	const struct work_queue_wsummary *x = b, *y = a;
+	const struct rmsummary *x = b, *y = a;
 	return  ((x->gpus - y->gpus) == 0) ? 
 			(x->count - y->count) : (x->gpus - y->gpus);
 }
@@ -7457,24 +7457,24 @@ typedef enum {
 } wsummary_sort_category;
 
 // function used by other functions
-static void sort_work_queue_worker_summary(struct work_queue_wsummary data[], wsummary_sort_category sortby, int current_length)
+static void sort_work_queue_worker_summary(struct rmsummary data[], wsummary_sort_category sortby, int current_length)
 {
 	switch(sortby)
 	{
 		case COUNT:
-			qsort(data, current_length, sizeof(struct work_queue_wsummary), comparecount);
+			qsort(data, current_length, sizeof(struct rmsummary), comparecount);
 			break;
 		case CORES:
-			qsort(data, current_length, sizeof(struct work_queue_wsummary), comparecores);
+			qsort(data, current_length, sizeof(struct rmsummary), comparecores);
 			break;
 		case MEMORY:
-			qsort(data, current_length, sizeof(struct work_queue_wsummary), comparememory);
+			qsort(data, current_length, sizeof(struct rmsummary), comparememory);
 			break;
 		case DISK:
-			qsort(data, current_length, sizeof(struct work_queue_wsummary), comparedisk);
+			qsort(data, current_length, sizeof(struct rmsummary), comparedisk);
 			break;
 		case GPUS:
-			qsort(data, current_length, sizeof(struct work_queue_wsummary), comparegpus);
+			qsort(data, current_length, sizeof(struct rmsummary), comparegpus);
 			break;
 		case NONE:
 			break;
@@ -7484,7 +7484,7 @@ static void sort_work_queue_worker_summary(struct work_queue_wsummary data[], ws
 static const int MAX_POWER_OF_TWO = 25; // used for snapping memory and disk values to logarithmic scale
 static const int POWER_OF_TWO_DIVISIONS = 8; // used to track the number of divisons to make between powers of two for memory and disk
 
-void work_queue_wsummary_compact(struct work_queue_wsummary worker_data[], int *current_length)
+void rmsummary_compact(struct rmsummary worker_data[], int *current_length)
 {
 	if (*current_length == 0) return; // don't round if there is not at least 1 worker
 	sort_work_queue_worker_summary(worker_data, MEMORY, *current_length);
@@ -7566,8 +7566,8 @@ void work_queue_wsummary_compact(struct work_queue_wsummary worker_data[], int *
 		}
 	}
 	free(disk_two_values);
-	struct work_queue_wsummary *temp = malloc(sizeof(struct work_queue_wsummary) * (*current_length)); // create temporary data structure to sort
-	temp[0].count = worker_data[0].count;
+	struct rmsummary *temp = malloc(sizeof(struct rmsummary) * (*current_length)); // create temporary data structure to sort
+	temp[0].workers = worker_data[0].workers;
 	temp[0].cores = worker_data[0].cores;
 	temp[0].memory = worker_data[0].memory;
 	temp[0].disk = worker_data[0].disk;
@@ -7584,15 +7584,15 @@ void work_queue_wsummary_compact(struct work_queue_wsummary worker_data[], int *
 				&& temp[j].disk == worker_data[i].disk
 				&& temp[j].gpus == worker_data[i].gpus)
 			{
-				temp[j].count += worker_data[i].count;
-				worker_data[i].count = 0;
+				temp[j].workers += worker_data[i].workers;
+				worker_data[i].workers = 0;
 				should_add_entry = 0;
 				break;
 			}
 		}
 		if (should_add_entry) // otherwise make a new entry
 		{
-			temp[temp_length].count = worker_data[i].count;
+			temp[temp_length].workers = worker_data[i].workers;
 			temp[temp_length].cores = worker_data[i].cores;
 			temp[temp_length].memory = worker_data[i].memory;
 			temp[temp_length].disk = worker_data[i].disk;
@@ -7602,7 +7602,7 @@ void work_queue_wsummary_compact(struct work_queue_wsummary worker_data[], int *
 	}
 	for (int i = 0; i < temp_length; i++) // copy the temp storage back into the wsummary variable
 	{
-		worker_data[i].count = temp[i].count;
+		worker_data[i].workers = temp[i].workers;
 		worker_data[i].cores = temp[i].cores;
 		worker_data[i].memory = temp[i].memory;
 		worker_data[i].disk = temp[i].disk;
@@ -7614,7 +7614,7 @@ void work_queue_wsummary_compact(struct work_queue_wsummary worker_data[], int *
 }
 
 // creates the buckets of workers and then sorts workers into those buckets
-static void add_worker_to_wsummary(struct work_queue_wsummary worker_data[], struct work_queue_worker *w, int *current_length)
+static void add_worker_to_wsummary(struct rmsummary worker_data[], struct work_queue_worker *w, int *current_length)
 {
 	// the following four variables are resources for the worker passed to this function
 	int cores = w->resources->cores.total;
@@ -7623,7 +7623,7 @@ static void add_worker_to_wsummary(struct work_queue_wsummary worker_data[], str
 	int gpus = w->resources->gpus.total;
 	if (*current_length == 0) // if this is the first worker, create the first bucket based on that worker's properties
 	{
-		worker_data[0].count = 1;
+		worker_data[0].workers = 1;
 		worker_data[0].cores = cores;
 		worker_data[0].disk = disk;
 		worker_data[0].memory = memory;
@@ -7638,11 +7638,11 @@ static void add_worker_to_wsummary(struct work_queue_wsummary worker_data[], str
 			&&  gpus == worker_data[i].gpus 
 			&&  disk == worker_data[i].disk)
 			{
-				worker_data[i].count++;
+				worker_data[i].workers++;
 				return;
 			}
 	} // otherwise, if it fits in no bucket, create a new bucket based on the worker's resources
-	worker_data[*current_length].count = 1;
+	worker_data[*current_length].workers = 1;
 	worker_data[*current_length].cores = cores;
 	worker_data[*current_length].memory = memory;
 	worker_data[*current_length].gpus = gpus;
@@ -7651,7 +7651,7 @@ static void add_worker_to_wsummary(struct work_queue_wsummary worker_data[], str
 	return;
 }
 
-int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary worker_data[], int length)
+int work_queue_worker_summmary( struct work_queue *q, struct rmsummary worker_data[], int length)
 {
 	int current_length = 0;
 	struct work_queue_worker *w;

@@ -346,14 +346,6 @@ struct work_queue_stats {
 	int workers_blacklisted;         /**< @deprecated Use workers_blocked instead. */
 };
 
-/** Description of the resources of an individual worker bucket **/
-struct work_queue_wsummary {
-    int count;    /**< Number of workers of a certain type */
-    int cores;   /**< Number of cores of the workers */
-    int memory;  /**< Amount of memory of the workers */
-    int disk;    /**< Disk available to the workers */
-    int gpus;    /**< GPUs available to the workers */
-};
 
 /* Forward declare the queue's structure. This structure is opaque and defined in work_queue.c */
 struct work_queue;
