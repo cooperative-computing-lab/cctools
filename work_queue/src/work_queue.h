@@ -1199,10 +1199,10 @@ char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid);
 void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value );
 
 /** Returns summary data for all workers in wsummary buffer */
-int work_queue_worker_summmary( struct work_queue *q, struct work_queue_wsummary worker_data[], int length);
+int work_queue_worker_summmary( struct work_queue *q, struct rmsummary *worker_data, int length);
 
-/** Conver the memory and disk values of the workers into nice number beteen values of 2 */
-void work_queue_wsummary_compact(struct work_queue_wsummary worker_data[], int *length);
+/** Convert the memory and disk values of the workers into nice number beteen values of 2 */
+void work_queue_wsummary_compact(struct rmsummary *work_queue_data, int *length);
 
 
 //@}

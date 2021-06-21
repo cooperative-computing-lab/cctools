@@ -7415,79 +7415,60 @@ int work_queue_specify_min_taskid(struct work_queue *q, int minid) {
 	return q->next_taskid;
 }
 
-//the functions below are used by qsort in order to sort the rmsummary data
-static int comparecount(const void *a, const void *b)
+//the functions below are used by qsort in order to sort the workers summary data
+size_t sort_work_queue_worker_summary_offset = 0;
+int sort_work_queue_worker_cmp(const void *a, const void *b)
 {
-	const struct rmsummary *x = b, *y = a;
-	return x->count - y->count;
-}
-static int comparecores(const void *a, const void *b)
-{
-	const struct rmsummary *x = b, *y = a;
-	return  ((x->cores - y->cores) == 0) ? 
-			(x->count - y->count) : (x->cores - y->cores);
-}
-static int comparememory(const void *a, const void *b)
-{
-	const struct rmsummary *x = b, *y = a;
-	return  ((x->memory - y->memory) == 0) ? 
-			(x->count - y->count) : (x->memory - y->memory);
-}
-static int comparedisk(const void *a, const void *b)
-{
-	const struct rmsummary *x = b, *y = a;
-	return  ((x->disk - y->disk) == 0) ? 
-			(x->count - y->count) : (x->disk - y->disk);
-}
-static int comparegpus(const void *a, const void *b)
-{
-	const struct rmsummary *x = b, *y = a;
-	return  ((x->gpus - y->gpus) == 0) ? 
-			(x->count - y->count) : (x->gpus - y->gpus);
-}
+	const struct rmsummary *x = *((const struct rmsummary **) a);
+	const struct rmsummary *y = *((const struct rmsummary **) b);
 
-// Used when sorting the wsummary worker summary
-typedef enum {
-	NONE = 0,
-	COUNT = 1,
-	CORES,
-	MEMORY,
-	DISK,
-	GPUS
-} wsummary_sort_category;
+	double count_x = x->workers;
+	double count_y = y->workers;
 
-// function used by other functions
-static void sort_work_queue_worker_summary(struct rmsummary data[], wsummary_sort_category sortby, int current_length)
-{
-	switch(sortby)
-	{
-		case COUNT:
-			qsort(data, current_length, sizeof(struct rmsummary), comparecount);
-			break;
-		case CORES:
-			qsort(data, current_length, sizeof(struct rmsummary), comparecores);
-			break;
-		case MEMORY:
-			qsort(data, current_length, sizeof(struct rmsummary), comparememory);
-			break;
-		case DISK:
-			qsort(data, current_length, sizeof(struct rmsummary), comparedisk);
-			break;
-		case GPUS:
-			qsort(data, current_length, sizeof(struct rmsummary), comparegpus);
-			break;
-		case NONE:
-			break;
+	double res_x = rmsummary_get_by_offset(x, sort_work_queue_worker_summary_offset);
+	double res_y = rmsummary_get_by_offset(y, sort_work_queue_worker_summary_offset);
+
+
+	if(res_x == res_y) {
+		return count_y - count_x;
+	}
+	else {
+		return res_y - res_x;
 	}
 }
+
+
+// function used by other functions
+void sort_work_queue_worker_summary(struct rmsummary *worker_data, int current_length, const char *sortby)
+{
+	size_t offset = offsetof(struct rmsummary, memory);
+	if(!strcmp(sortby, "cores")) {
+		offset = offsetof(struct rmsummary, cores);
+	} else if(!strcmp(sortby, "memory")) {
+		offset = offsetof(struct rmsummary, memory);
+	} else if(!strcmp(sortby, "disk")) {
+		offset = offsetof(struct rmsummary, disk);
+	} else if(!strcmp(sortby, "gpus")) {
+		offset = offsetof(struct rmsummary, gpus);
+	} else if(!strcmp(sortby, "workers")) {
+		offset = offsetof(struct rmsummary, workers);
+	} else {
+		debug(D_NOTICE, "Invalid field to sort worker summaries. Valid fields are: cores, memory, disk, gpus, and workers.");
+		offset = offsetof(struct rmsummary, memory);
+	}
+
+	qsort_r(worker_data, current_length, sizeof(struct rmsummary), sort_work_queue_worker_cmp, (void *) offset);
+}
+
 
 static const int MAX_POWER_OF_TWO = 25; // used for snapping memory and disk values to logarithmic scale
 static const int POWER_OF_TWO_DIVISIONS = 8; // used to track the number of divisons to make between powers of two for memory and disk
 
-void rmsummary_compact(struct rmsummary worker_data[], int *current_length)
+void work_queue_worker_summary_compact(struct rmsummary worker_data[], int *current_length)
 {
-	if (*current_length == 0) return; // don't round if there is not at least 1 worker
-	sort_work_queue_worker_summary(worker_data, MEMORY, *current_length);
+	if (*current_length == 0)return; // don't round if there is not at least 1 worker
+	sort_work_queue_worker_summary(worker_data, *current_length, "memory");
+
 	int power_index1 = 0; // stores index for highest power of two
 	int power_index2 = 0; // stores index for lowest power of two
 
@@ -7527,7 +7508,7 @@ void rmsummary_compact(struct rmsummary worker_data[], int *current_length)
 	}
 	free(power_of_two_values);
 	// the rounding off for disk space works the exact same as for memory seen above
-	sort_work_queue_worker_summary(worker_data, DISK, *current_length);
+	sort_work_queue_worker_summary(worker_data, *current_length, "disk");
 	int disk_index1 = 0;
 	int disk_index2 = 0;
 	for (int i = MAX_POWER_OF_TWO; i > 0; i--)
@@ -7609,7 +7590,7 @@ void rmsummary_compact(struct rmsummary worker_data[], int *current_length)
 		worker_data[i].gpus = temp[i].gpus;
 	}
 	*current_length = temp_length;
-	sort_work_queue_worker_summary(worker_data, COUNT, *current_length);
+	sort_work_queue_worker_summary(worker_data, *current_length, "workers");
 	free(temp);
 }
 
