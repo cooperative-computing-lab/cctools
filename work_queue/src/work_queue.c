@@ -7441,157 +7441,36 @@ int sort_work_queue_worker_cmp(const void *a, const void *b)
 // function used by other functions
 static void sort_work_queue_worker_summary(struct rmsummary *worker_data, int current_length, const char *sortby)
 {
-	size_t offset = offsetof(struct rmsummary, memory);
 	if(!strcmp(sortby, "cores")) {
-		offset = offsetof(struct rmsummary, cores);
+		sort_work_queue_worker_summary_offset = offsetof(struct rmsummary, cores);
 	} else if(!strcmp(sortby, "memory")) {
-		offset = offsetof(struct rmsummary, memory);
+		sort_work_queue_worker_summary_offset = offsetof(struct rmsummary, memory);
 	} else if(!strcmp(sortby, "disk")) {
-		offset = offsetof(struct rmsummary, disk);
+		sort_work_queue_worker_summary_offset = offsetof(struct rmsummary, disk);
 	} else if(!strcmp(sortby, "gpus")) {
-		offset = offsetof(struct rmsummary, gpus);
+		sort_work_queue_worker_summary_offset = offsetof(struct rmsummary, gpus);
 	} else if(!strcmp(sortby, "workers")) {
-		offset = offsetof(struct rmsummary, workers);
+		sort_work_queue_worker_summary_offset = offsetof(struct rmsummary, workers);
 	} else {
 		debug(D_NOTICE, "Invalid field to sort worker summaries. Valid fields are: cores, memory, disk, gpus, and workers.");
-		offset = offsetof(struct rmsummary, memory);
+		sort_work_queue_worker_summary_offset = offsetof(struct rmsummary, memory);
 	}
 
-	qsort_r(worker_data, current_length, sizeof(struct rmsummary), sort_work_queue_worker_cmp, (void *) offset);
+	qsort(&worker_data[0], count, sizeof(struct rmsummary *), sort_work_queue_worker_cmp);
 }
 
 
-static const int MAX_POWER_OF_TWO = 25; // used for snapping memory and disk values to logarithmic scale
-static const int POWER_OF_TWO_DIVISIONS = 8; // used to track the number of divisons to make between powers of two for memory and disk
+// round to powers of two log scale with 1/n divisions
+static double round_to_nice_power_of_2(double value, int n) {
+	double exp_org = log2(value);
+	double below = pow(2, floor(exp_org));
 
-void work_queue_worker_summary_compact(struct rmsummary worker_data[], int *current_length)
-{
-	if (*current_length == 0)return; // don't round if there is not at least 1 worker
-	sort_work_queue_worker_summary(worker_data, *current_length, "memory");
+	double rest = value - below;
+	double fact = below/n;
 
-	int power_index1 = 0; // stores index for highest power of two
-	int power_index2 = 0; // stores index for lowest power of two
+	double rounded = below + floor(rest/fact) * fact;
 
-	for (int i = MAX_POWER_OF_TWO; i > 0; i--)
-	{
-		if (pow(2.0, i) <= (double)worker_data[0].memory)
-		{
-			power_index1 = i + 2; // find the highest power of 2 smaller than the largest memory value
-			break;
-		}
-	}
-	for (int i = 0; i < MAX_POWER_OF_TWO; i++)
-	{
-		if (pow(2.0, i) >= (double)worker_data[(*current_length) - 1].memory)
-		{
-			power_index2 = i - 1; // find the smallest power of 2 smaller than the smallest memory value
-			break;
-		}
-	}
-	int *power_of_two_values = malloc(sizeof(int) * (power_index1 - power_index2 + 1) * POWER_OF_TWO_DIVISIONS); // stores all 4 indicies used for rounding
-	for (int i = 0; i < (power_index1 - power_index2 + 1); i++)
-	{
-		for (int j = 0; j < POWER_OF_TWO_DIVISIONS; j++)
-		{
-			power_of_two_values[i * POWER_OF_TWO_DIVISIONS + j] = pow(2.0, power_index1 - i) - pow(2.0, power_index1 - 4.0 - i) * j;
-		}
-	}
-
-	int worker_index = 0;
-	for (int i = 0; i < (power_index1 - power_index2 + 1) * POWER_OF_TWO_DIVISIONS; i++)
-	{
-		while (worker_data[worker_index].memory > power_of_two_values[i]) // if the value is higher than the roundoff value, round the memory value
-		{
-			worker_data[worker_index].memory = power_of_two_values[i];
-			worker_index++;
-		}
-	}
-	free(power_of_two_values);
-	// the rounding off for disk space works the exact same as for memory seen above
-	sort_work_queue_worker_summary(worker_data, *current_length, "disk");
-	int disk_index1 = 0;
-	int disk_index2 = 0;
-	for (int i = MAX_POWER_OF_TWO; i > 0; i--)
-	{
-		if (pow(2.0, i) <= (double)worker_data[0].disk)
-		{
-			disk_index1 = i + 1;
-			break;
-		}
-	}
-	for (int i = 0; i < MAX_POWER_OF_TWO; i++)
-	{
-		if (pow(2.0, i) >= (double)worker_data[(*current_length) - 1].disk)
-		{
-			disk_index2 = i - 1;
-			break;
-		}
-	}
-
-	int *disk_two_values = malloc(sizeof(int) * (disk_index1 - disk_index2 + 1) * POWER_OF_TWO_DIVISIONS / 2); // stores all 4 indicies used for rounding
-	for (int i = 0; i < (disk_index1 - disk_index2 + 1); i++)
-	{
-		for (int j = 0; j < POWER_OF_TWO_DIVISIONS / 2; j++)
-		{
-			disk_two_values[i * POWER_OF_TWO_DIVISIONS / 2 + j] = pow(2.0, disk_index1 - i) - pow(2.0, disk_index1 - 4.0 - i) * j;
-		}
-	}
-
-	int worker_data_index = 0;
-	for (int i = 0; i < (disk_index1 - disk_index2 + 1) * POWER_OF_TWO_DIVISIONS / 2; i++)
-	{
-		while (worker_data[worker_data_index].disk > disk_two_values[i])
-		{
-			worker_data[worker_data_index].disk = disk_two_values[i];
-			worker_data_index++;
-		}
-	}
-	free(disk_two_values);
-	struct rmsummary *temp = malloc(sizeof(struct rmsummary) * (*current_length)); // create temporary data structure to sort
-	temp[0].workers = worker_data[0].workers;
-	temp[0].cores = worker_data[0].cores;
-	temp[0].memory = worker_data[0].memory;
-	temp[0].disk = worker_data[0].disk;
-	temp[0].gpus = worker_data[0].gpus;
-	int temp_length = 1;
-	int should_add_entry = 1;
-	for (int i = 1; i < *current_length; i++)
-	{
-		should_add_entry = 1; // flag used if a new entry needs to be made
-		for (int j = 0; j < temp_length; j++)
-		{
-			if (   temp[j].cores == worker_data[i].cores // otherwise if one of the buckets is the same add it into the temp storage
-				&& temp[j].memory == worker_data[i].memory
-				&& temp[j].disk == worker_data[i].disk
-				&& temp[j].gpus == worker_data[i].gpus)
-			{
-				temp[j].workers += worker_data[i].workers;
-				worker_data[i].workers = 0;
-				should_add_entry = 0;
-				break;
-			}
-		}
-		if (should_add_entry) // otherwise make a new entry
-		{
-			temp[temp_length].workers = worker_data[i].workers;
-			temp[temp_length].cores = worker_data[i].cores;
-			temp[temp_length].memory = worker_data[i].memory;
-			temp[temp_length].disk = worker_data[i].disk;
-			temp[temp_length].gpus = worker_data[i].gpus;
-			temp_length++;
-		}
-	}
-	for (int i = 0; i < temp_length; i++) // copy the temp storage back into the wsummary variable
-	{
-		worker_data[i].workers = temp[i].workers;
-		worker_data[i].cores = temp[i].cores;
-		worker_data[i].memory = temp[i].memory;
-		worker_data[i].disk = temp[i].disk;
-		worker_data[i].gpus = temp[i].gpus;
-	}
-	*current_length = temp_length;
-	sort_work_queue_worker_summary(worker_data, *current_length, "workers");
-	free(temp);
+	return rounded;
 }
 
 
@@ -7613,8 +7492,8 @@ int work_queue_worker_summmary( struct work_queue *q, struct rmsummary worker_da
 		}
 
 		int cores = w->resources->cores.total;
-		int memory = w->resources->memory.total;
-		int disk = w->resources->disk.total;
+		int memory = round_to_nice_power_of_2(w->resources->memory.total, 8);
+		int disk = round_to_nice_power_of_2(w->resources->disk.total, 8);
 		int gpus = w->resources->gpus.total;
 
 		char *resources_key = string_format("%d_%d_%d_%d", cores, memory, disk, gpus);
@@ -7645,6 +7524,10 @@ int work_queue_worker_summmary( struct work_queue *q, struct rmsummary worker_da
 
 	hash_table_delete(workers_count);
 
+	sort_work_queue_worker_summary(worker_data, *length, "disk");
+	sort_work_queue_worker_summary(worker_data, *length, "memory");
+	sort_work_queue_worker_summary(worker_data, *length, "gpus");
+	sort_work_queue_worker_summary(worker_data, *length, "cores");
 	sort_work_queue_worker_summary(worker_data, *length, "workers");
 
 	return *length;
