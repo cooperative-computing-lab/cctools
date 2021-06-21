@@ -7439,7 +7439,7 @@ int sort_work_queue_worker_cmp(const void *a, const void *b)
 
 
 // function used by other functions
-static void sort_work_queue_worker_summary(struct rmsummary *worker_data, int current_length, const char *sortby)
+static void sort_work_queue_worker_summary(struct rmsummary **worker_data, int count, const char *sortby)
 {
 	if(!strcmp(sortby, "cores")) {
 		sort_work_queue_worker_summary_offset = offsetof(struct rmsummary, cores);
@@ -7474,8 +7474,7 @@ static double round_to_nice_power_of_2(double value, int n) {
 }
 
 
-int work_queue_worker_summmary( struct work_queue *q, struct rmsummary worker_data[], int *length)
-{
+struct rmsummary **work_queue_worker_summmary(struct work_queue *q) {
 	struct work_queue_worker *w;
 	struct rmsummary *s;
 	char *id;
@@ -7513,8 +7512,8 @@ int work_queue_worker_summmary( struct work_queue *q, struct rmsummary worker_da
 		s->workers++;
 	}
 
-	*length = 0;
-	worker_data = malloc(hash_table_size(workers_count) * sizeof(struct rmsummary));
+	int count = 0;
+	struct rmsummary **worker_data = (struct rmsummary **) malloc((hash_table_size(workers_count) + 1) * sizeof(struct rmsummary *));
 
 	hash_table_firstkey(workers_count);
 	while(hash_table_nextkey(workers_count, &resources_key, (void**) &s)) {
@@ -7522,15 +7521,17 @@ int work_queue_worker_summmary( struct work_queue *q, struct rmsummary worker_da
 		count++;
 	}
 
+	worker_data[count] = NULL;
+
 	hash_table_delete(workers_count);
 
-	sort_work_queue_worker_summary(worker_data, *length, "disk");
-	sort_work_queue_worker_summary(worker_data, *length, "memory");
-	sort_work_queue_worker_summary(worker_data, *length, "gpus");
-	sort_work_queue_worker_summary(worker_data, *length, "cores");
-	sort_work_queue_worker_summary(worker_data, *length, "workers");
+	sort_work_queue_worker_summary(worker_data, count, "disk");
+	sort_work_queue_worker_summary(worker_data, count, "memory");
+	sort_work_queue_worker_summary(worker_data, count, "gpus");
+	sort_work_queue_worker_summary(worker_data, count, "cores");
+	sort_work_queue_worker_summary(worker_data, count, "workers");
 
-	return *length;
+	return worker_data;
 }
 
 /* vim: set noexpandtab tabstop=4: */

@@ -1198,8 +1198,8 @@ char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid);
  */
 void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value );
 
-/** Returns summary data for all workers in wsummary buffer */
-int work_queue_worker_summmary( struct work_queue *q, struct rmsummary *worker_data, int *length);
+/** Return summary data for all workers in buffer */
+struct rmsummary **work_queue_worker_summmary(struct work_queue *q);
 
 //@}
 
