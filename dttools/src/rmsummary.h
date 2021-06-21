@@ -66,6 +66,8 @@ struct rmsummary
 	double total_files;
 	double fs_nodes;
 
+    double workers;
+
 	struct rmsummary *limits_exceeded;
 	struct rmsummary *peak_times; /* from start, in usecs */
 
