@@ -7439,7 +7439,7 @@ int sort_work_queue_worker_cmp(const void *a, const void *b)
 
 
 // function used by other functions
-void sort_work_queue_worker_summary(struct rmsummary *worker_data, int current_length, const char *sortby)
+static void sort_work_queue_worker_summary(struct rmsummary *worker_data, int current_length, const char *sortby)
 {
 	size_t offset = offsetof(struct rmsummary, memory);
 	if(!strcmp(sortby, "cores")) {
@@ -7536,7 +7536,7 @@ void work_queue_worker_summary_compact(struct rmsummary worker_data[], int *curr
 			disk_two_values[i * POWER_OF_TWO_DIVISIONS / 2 + j] = pow(2.0, disk_index1 - i) - pow(2.0, disk_index1 - 4.0 - i) * j;
 		}
 	}
-	
+
 	int worker_data_index = 0;
 	for (int i = 0; i < (disk_index1 - disk_index2 + 1) * POWER_OF_TWO_DIVISIONS / 2; i++)
 	{
@@ -7594,56 +7594,60 @@ void work_queue_worker_summary_compact(struct rmsummary worker_data[], int *curr
 	free(temp);
 }
 
-// creates the buckets of workers and then sorts workers into those buckets
-static void add_worker_to_wsummary(struct rmsummary worker_data[], struct work_queue_worker *w, int *current_length)
-{
-	// the following four variables are resources for the worker passed to this function
-	int cores = w->resources->cores.total;
-	int memory = w->resources->memory.total;
-	int disk = w->resources->disk.total - (w->resources->disk.total % 100);
-	int gpus = w->resources->gpus.total;
-	if (*current_length == 0) // if this is the first worker, create the first bucket based on that worker's properties
-	{
-		worker_data[0].workers = 1;
-		worker_data[0].cores = cores;
-		worker_data[0].disk = disk;
-		worker_data[0].memory = memory;
-		worker_data[0].gpus = gpus;
-		*current_length = 1;
-		return;
-	}
-	for (int i = 0; i < *current_length; i++) // compares worker to every bucket. If the bucket has the same amount of cpu cores, memory, and gpus, enter this scope, otherwise move on
-	{
-		if (	cores == worker_data[i].cores
-			&&  memory == worker_data[i].memory
-			&&  gpus == worker_data[i].gpus 
-			&&  disk == worker_data[i].disk)
-			{
-				worker_data[i].workers++;
-				return;
-			}
-	} // otherwise, if it fits in no bucket, create a new bucket based on the worker's resources
-	worker_data[*current_length].workers = 1;
-	worker_data[*current_length].cores = cores;
-	worker_data[*current_length].memory = memory;
-	worker_data[*current_length].gpus = gpus;
-	worker_data[*current_length].disk = disk;
-	*current_length += 1;
-	return;
-}
 
-int work_queue_worker_summmary( struct work_queue *q, struct rmsummary worker_data[], int length)
+int work_queue_worker_summmary( struct work_queue *q, struct rmsummary worker_data[], int *length)
 {
-	int current_length = 0;
 	struct work_queue_worker *w;
+	struct rmsummary *s;
 	char *id;
+	char *resources_key;
+
+
+	struct hash_table *workers_count = hash_table_create(0, 0);
+
 	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) { // loop through all workers in the queue
-			if (w->resources->cores.total == 0) continue; // sometimes returns a worker with all resources values being 0: ignore the worker in this case
-			if (current_length >= length) break; // check that that array does not go out of bounds
-			add_worker_to_wsummary(worker_data, w, &current_length);	// otherwise add it to a bucket
+	while(hash_table_nextkey(q->worker_table, &id, (void**) &w)) {
+		if (w->resources->tag < 0) {
+			// worker has not yet declared resources
+			continue;
+		}
+
+		int cores = w->resources->cores.total;
+		int memory = w->resources->memory.total;
+		int disk = w->resources->disk.total;
+		int gpus = w->resources->gpus.total;
+
+		char *resources_key = string_format("%d_%d_%d_%d", cores, memory, disk, gpus);
+
+		struct rmsummary *s = hash_table_lookup(workers_count, resources_key);
+		if(!s) {
+			s = rmsummary_create(-1);
+			s->cores = cores;
+			s->memory = memory;
+			s->disk = disk;
+			s->gpus = gpus;
+			s->workers = 0;
+
+			hash_table_insert(workers_count, resources_key, (void *) s);
+		}
+
+		s->workers++;
 	}
-	return current_length;
+
+	*length = 0;
+	worker_data = malloc(hash_table_size(workers_count) * sizeof(struct rmsummary));
+
+	hash_table_firstkey(workers_count);
+	while(hash_table_nextkey(workers_count, &resources_key, (void**) &s)) {
+		worker_data[count] = s;
+		count++;
+	}
+
+	hash_table_delete(workers_count);
+
+	sort_work_queue_worker_summary(worker_data, *length, "workers");
+
+	return *length;
 }
 
 /* vim: set noexpandtab tabstop=4: */
