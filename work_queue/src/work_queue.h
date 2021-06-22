@@ -815,6 +815,12 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 void work_queue_get_stats_category(struct work_queue *q, const char *c, struct work_queue_stats *s);
 
 
+/** Summary data for all workers in buffer.
+@param q A work queue object.
+@return A null terminated array of struct rmsummary. Each summary s indicates the number of s->workers with a certain number of s->cores, s->memory, and s->disk. The array and summaries need to be freed after use to avoid memory leaks.
+*/
+struct rmsummary **work_queue_worker_summmary(struct work_queue *q);
+
 /** Get the current state of the task.
 @param q A work queue object.
 @param taskid The taskid of the task.
@@ -1197,9 +1203,6 @@ char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid);
 /** Same as work_queue_task_specify_environment_variable, but with a typo in environment
  */
 void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value );
-
-/** Return summary data for all workers in buffer */
-struct rmsummary **work_queue_worker_summmary(struct work_queue *q);
 
 //@}
 
