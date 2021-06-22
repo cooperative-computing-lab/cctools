@@ -20,7 +20,6 @@ import errno
 import tempfile
 import subprocess
 import distutils.spawn
-import dill
 import uuid
 import traceback
 import textwrap
@@ -845,6 +844,12 @@ class Task(object):
 # Python PythonTask object
 #
 # this class is used to create a python task
+try:
+    import dill
+    pythontask_available = True
+except ModuleNotFoundError:
+    pythontask_available = False
+
 class PythonTask(Task):
     ##
     # Creates a new python task
@@ -855,6 +860,9 @@ class PythonTask(Task):
     def __init__(self, func, *args):
         self._id = str(uuid.uuid4())
         self._tmpdir = tempfile.mkdtemp()
+
+        if not pythontask_available:
+            raise RuntimeError("PythonTask is not available. The dill module is missing.")
 
         self._func_file = os.path.join(self._tmpdir, 'function_{}.p'.format(self._id))
         self._args_file = os.path.join(self._tmpdir, 'args_{}.p'.format(self._id))
