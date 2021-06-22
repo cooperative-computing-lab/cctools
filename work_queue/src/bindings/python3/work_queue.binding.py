@@ -1022,6 +1022,37 @@ class WorkQueue(object):
         return stats
 
     ##
+    # Get resource statistics of workers connected.
+    #
+    # @param self 	Reference to the current work queue object.
+    # @return A list of dictionaries that indicate how many .workers
+    # connected with a certain number of .cores, .memory, and disk.
+    # For example:
+    # @code
+    # workers = q.worker_summary()
+    # >>> for w in workers:
+    # >>>    print("{} workers with: {} cores, {} MB memory, {} MB disk".format(w.workers, w.cores, w.memory, w.disk)
+    # @endcode
+    def workers_summary(self):
+        from_c = work_queue_workers_summary(self._work_queue)
+
+        count = 0
+        workers = []
+        while True:
+            s = rmsummayArray_getitem(from_c, count)
+            if not s:
+                break
+            workers.append({
+                'workers': int(s.workers),
+                'cores': int(s.cores),
+                'gpus': int(s.gpus),
+                'memory': int(s.memory),
+                'disk': int(s.disk)})
+            count += 1
+        delete_rmsummayArray(from_c)
+        return workers
+
+    ##
     # Turn on or off first-allocation labeling for a given category. By
     # default, only cores, memory, and disk are labeled, and gpus are unlabeled.
     # NOTE: autolabeling is only meaningfull when task monitoring is enabled

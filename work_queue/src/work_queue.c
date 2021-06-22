@@ -7474,7 +7474,7 @@ static double round_to_nice_power_of_2(double value, int n) {
 }
 
 
-struct rmsummary **work_queue_worker_summmary(struct work_queue *q) {
+struct rmsummary **work_queue_workers_summary(struct work_queue *q) {
 	struct work_queue_worker *w;
 	struct rmsummary *s;
 	char *id;

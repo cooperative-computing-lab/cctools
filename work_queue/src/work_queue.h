@@ -819,7 +819,7 @@ void work_queue_get_stats_category(struct work_queue *q, const char *c, struct w
 @param q A work queue object.
 @return A null terminated array of struct rmsummary. Each summary s indicates the number of s->workers with a certain number of s->cores, s->memory, and s->disk. The array and summaries need to be freed after use to avoid memory leaks.
 */
-struct rmsummary **work_queue_worker_summmary(struct work_queue *q);
+struct rmsummary **work_queue_workers_summary(struct work_queue *q);
 
 /** Get the current state of the task.
 @param q A work queue object.
