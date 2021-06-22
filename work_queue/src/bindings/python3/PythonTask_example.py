@@ -10,7 +10,7 @@
 # utilizing a wrapper script to execut the function. the output of the executed
 # function is then written to a file as an output file and read when neccesary
 # allowing the user to get the result as a python variable during runtime and
-# manipulated ;ater.
+# manipulated later.
 
 # A PythonTask object is created as `p_task = PyTask.PyTask(func, args)` where
 # `func` is the name of the function and args are the arguments needed to
