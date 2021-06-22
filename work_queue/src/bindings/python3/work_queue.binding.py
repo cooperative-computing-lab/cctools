@@ -942,7 +942,7 @@ class PythonTask(Task):
     def _create_wrapper(self):
         with open(self._wrapper, 'w') as f:
             f.write(textwrap.dedent('''\
-                    import sys
+                import sys
                 import dill
                 (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
                 with open (fn , 'rb') as f:
