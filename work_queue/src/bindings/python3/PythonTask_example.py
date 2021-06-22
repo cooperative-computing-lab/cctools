@@ -20,6 +20,19 @@
 # When a has completed, the resulting python value can be retrieved by calling
 # the output method, such as: `x  = t.output` where t is the task retuned by
 # `t = q.wait()`.
+#
+# By default, the task will run assuming that the worker is executing inside an
+# appropiate  python environment. If this is not the case, an environment file
+# can be specified with: `t.specify_environment("env.tar.gz")`, in which
+# env.tar.gz is created with the conda-pack module, and has at least a python
+# installation, the dill module, and the conda module.
+#
+# A minimal conda environment 'my-minimal-env.tar.gz' can be created with:
+#
+# conda create -y -p my-minimal-env python=3.8 dill conda
+# conda install -y -p my-minimal-env -c conda-forge conda-pack
+# conda install -y -p my-minimal-env pip and conda install other modules, etc.
+# conda run -p my-minimal-env conda-pack
 
 
 import work_queue as wq
@@ -32,6 +45,10 @@ def main():
     q = wq.WorkQueue(9123)
     for i in range(1, 16):
         p_task = wq.PythonTask(divide, 1, i**2)
+
+        # if python environment is missing at worker...
+        #p_task.specify_environment("env.tar.gz")
+
         q.submit(p_task)
 
     sum = 0
