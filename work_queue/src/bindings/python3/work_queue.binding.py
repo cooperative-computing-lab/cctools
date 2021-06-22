@@ -872,6 +872,8 @@ class PythonTask(Task):
         self._pp_run = shutil.which('python_package_run')
 
         self._command = self._python_function_command(func, *args)
+
+        self._serialize_python_function(self, func, *args)
         self._create_wrapper()
 
         self._output_loaded = False
