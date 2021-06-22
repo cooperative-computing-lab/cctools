@@ -21,7 +21,6 @@ import tempfile
 import subprocess
 import distutils.spawn
 import uuid
-import traceback
 import textwrap
 import shutil
 
@@ -868,13 +867,14 @@ class PythonTask(Task):
         self._args_file = os.path.join(self._tmpdir, 'args_{}.p'.format(self._id))
         self._out_file = os.path.join(self._tmpdir, 'out_{}.p'.format(self._id))
         self._wrapper = os.path.join(self._tmpdir, 'pytask_wrapper.py'.format(self._id))
-        self._tar_file  = 'venv.tar.gz'
-        self._pp_run = shutil.which('python_package_run')
 
-        self._command = self._python_function_command(func, *args)
+        self._pp_run = None
+        self._env_file  = None
 
-        self._serialize_python_function(self, func, *args)
+        self._serialize_python_function(func, *args)
         self._create_wrapper()
+
+        self._command = self._python_function_command()
 
         self._output_loaded = False
         self._output = None
@@ -897,7 +897,24 @@ class PythonTask(Task):
                     self._output = e
             else:
                 self._output = PythonTaskNoResult()
+                print(self.std_output)
+            self._output_loaded = True
         return self._output
+
+
+    def specify_environment(self, env_file):
+        if env_file:
+            self._env_file = env_file
+            self._pp_run = shutil.which('python_package_run')
+
+            if not self._pp_run:
+                raise RuntimeError("Could not find python_package_run in PATH.")
+
+            self._command = self._python_function_command()
+            work_queue_task_specify_command(self._task, self._command)
+
+            self.specify_input_file(self._env_file, cache=True)
+            self.specify_input_file(self._pp_run, cache=True)
 
 
     def __del__(self):
@@ -909,39 +926,32 @@ class PythonTask(Task):
             sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
 
 
-    ##
-    # Cretes the command to be executed by task. pickles function and arguments.
-    # func 	function to be executed by the task
-    # args	arguments used in function to be executed by task
-    def _python_function_command(self, func, *args):
-        tb = traceback.extract_stack()
-        tb_list = traceback.format_list(tb)
-        caller = tb_list[len(tb_list)-3].split()[1]
-        caller = caller.replace('"', '')
-        caller = caller.replace(',', '')
-
+    def _serialize_python_function(self, func, *args):
         with open(self._func_file, 'wb') as wf:
             dill.dump(func, wf)
         with open(self._args_file, 'wb') as wf:
             dill.dump([*args], wf)
 
-        command = './{pprun} -e {tar} --unpack-to "$WORK_QUEUE_SANDBOX"/{unpack}-env python {wrapper} {function} {args} {out}'.format(
-                pprun=os.path.basename(self._pp_run),
-                unpack=os.path.basename(self._tar_file),
-                tar=os.path.basename(self._tar_file),
+
+    def _python_function_command(self):
+        command = 'python {wrapper} {function} {args} {out}'.format(
                 wrapper=os.path.basename(self._wrapper),
                 function=os.path.basename(self._func_file),
                 args=os.path.basename(self._args_file),
                 out=os.path.basename(self._out_file))
 
+        if self._env_file:
+            command = './{pprun} -e {tar} --unpack-to "$WORK_QUEUE_SANDBOX"/{unpack}-env {cmd}'.format(
+                pprun=os.path.basename(self._pp_run),
+                unpack=os.path.basename(self._env_file),
+                tar=os.path.basename(self._env_file),
+                cmd=command)
 
         return command
 
 
     def _specify_IO_files(self):
         self.specify_input_file(self._wrapper, cache=True)
-        self.specify_input_file(self._pp_run, cache=True)
-        self.specify_input_file(self._tar_file, cache=False)
         self.specify_input_file(self._func_file, cache=False)
         self.specify_input_file(self._args_file, cache=False)
         self.specify_output_file(self._out_file, cache=False)
