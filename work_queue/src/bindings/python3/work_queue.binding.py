@@ -1048,6 +1048,7 @@ class WorkQueue(object):
                 'gpus': int(s.gpus),
                 'memory': int(s.memory),
                 'disk': int(s.disk)})
+            rmsummary_delete(s)
             count += 1
         delete_rmsummayArray(from_c)
         return workers

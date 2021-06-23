@@ -7508,6 +7508,7 @@ struct rmsummary **work_queue_workers_summary(struct work_queue *q) {
 
 			hash_table_insert(workers_count, resources_key, (void *) s);
 		}
+		free(resources_key);
 
 		s->workers++;
 	}
