@@ -66,7 +66,8 @@ static const struct resource_info resources_info[] = {
 	{ "max_concurrent_processes", "procs",    0,  offsetof(struct rmsummary, max_concurrent_processes)},
 	{ "total_processes",          "procs",    0,  offsetof(struct rmsummary, total_processes)},
 	{ "total_files",              "files",    0,  offsetof(struct rmsummary, total_files)},
-	{ "fs_nodes",                 "nodes",    0,  offsetof(struct rmsummary, fs_nodes)}};
+	{ "fs_nodes",                 "nodes",    0,  offsetof(struct rmsummary, fs_nodes)},
+	{ "workers",                  "workers",  0,  offsetof(struct rmsummary, workers)}};
 
 static char **resources_names = NULL;
 
