@@ -101,6 +101,8 @@ static char *batch_submit_options = NULL;
 
 static char *wrapper_command = 0;
 static char *wrapper_input = 0;
+struct jx   *wrapper_inputs = 0;
+
 static char *worker_command = 0;
 
 static char *runos_os = 0;
@@ -1024,6 +1026,31 @@ static void mainloop( struct batch_queue *queue )
 	itable_delete(job_table);
 }
 
+/* Add a wrapper command around the worker executable. */
+/* Note that multiple wrappers can be nested. */
+
+void add_wrapper_command( const char *cmd )
+{
+	if(!wrapper_command) {
+		wrapper_command = strdup(cmd);
+	} else {
+		wrapper_command = string_format("%s %s",cmd,wrapper_command);
+	}
+}
+
+/* Add an additional input file to be consumed by the wrapper. */
+
+void add_wrapper_input( const char *filename )
+{
+	if(!wrapper_input) {
+		wrapper_input = strdup(filename);
+	} else {
+		wrapper_input = string_format("%s,%s",wrapper_input,filename);
+	}
+	struct jx *file = jx_string(filename);
+	jx_array_append(wrapper_inputs, file);
+}
+
 static void show_help(const char *cmd)
 {
 	printf("Use: work_queue_factory [options] <managerhost> <port>\nor\n     work_queue_factory [options] -M projectname\n");
@@ -1056,6 +1083,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify Amazon config file (for use with -T amazon).\n", "--amazon-config");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
+	printf(" %-30s Run each worker using this python package.\n","--python-package");
 	printf(" %-30s Specify the host name to mesos manager node (for use with -T mesos).\n", "--mesos-master");
 	printf(" %-30s Specify path to mesos python library (for use with -T mesos).\n", "--mesos-path");
 	printf(" %-30s Specify the linking libraries for running mesos (for use with -T mesos).\n", "--mesos-preload");
@@ -1095,6 +1123,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_RUN_AS_MANAGER,
 		LONG_OPT_RUN_OS,
 		LONG_OPT_PARENT_DEATH,
+		LONG_OPT_PYTHON_PACKAGE,
 	};
 
 static const struct option long_options[] = {
@@ -1129,6 +1158,7 @@ static const struct option long_options[] = {
 	{"min-workers", required_argument, 0, 'w'},
 	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 	{"password", required_argument, 0, 'P'},
+	{"python-package", required_argument, 0, LONG_OPT_PYTHON_PACKAGE},
 	{"run-factory-as-manager", no_argument, 0, LONG_OPT_RUN_AS_MANAGER},
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{"scratch-dir", required_argument, 0, 'S' },
@@ -1149,7 +1179,8 @@ int main(int argc, char *argv[])
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
-	struct jx *wrapper_inputs = jx_array(NULL);
+
+	wrapper_inputs = jx_array(NULL);
 
 	// --run-factory-as-manager and -Twq should be used together.
 	int run_as_manager = 0;
@@ -1259,17 +1290,24 @@ int main(int argc, char *argv[])
 					condor_requirements = string_format("(%s)", optarg);
 				}
 				break;
+			case LONG_OPT_PYTHON_PACKAGE:
+				{
+				// --package X is the equivalent of --wrapper "python_package_run X" --wrapper-input X
+				add_wrapper_command( string_format("./python_package_run -e %s --",optarg) );
+				char *fullpath = path_which("python_package_run");
+				if(!fullpath) {
+					fprintf(stderr,"work_queue_factory: could not find python_package_run in PATH");
+					return 1;
+				}
+				add_wrapper_input(fullpath);
+				add_wrapper_input(optarg);
+				break;
+				}
 			case LONG_OPT_WRAPPER:
-				wrapper_command = optarg;
+				add_wrapper_command(optarg);
 				break;
 			case LONG_OPT_WRAPPER_INPUT:
-				if(!wrapper_input) {
-					wrapper_input = strdup(optarg);
-				} else {
-					wrapper_input = string_format("%s,%s",wrapper_input,optarg);
-				}
-				struct jx *file = jx_string(optarg);
-				jx_array_append(wrapper_inputs, file);
+				add_wrapper_input(optarg);
 				break;
 			case LONG_OPT_WORKER_BINARY:
 				worker_command = xxstrdup(optarg);
@@ -1430,13 +1468,14 @@ int main(int argc, char *argv[])
 	}
 
 	if(wrapper_input) {
-		struct jx *item;
-		for(void *i = NULL; (item = jx_iterate_array(wrapper_inputs, &i));) {
+		struct jx *item=0;
+		for( void *i=0; (item=jx_iterate_array(wrapper_inputs,&i)); ) {
 			const char *value = item->u.string_value;
 			const char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(value));
 			int result = copy_direntry(value, file_at_scratch_dir); 
 			if(result < 0) {
-				debug(D_NOTICE, "Cannot copy wrapper input file %s to factory scratch directory", value);
+				fprintf(stderr,"work_queue_factory: Cannot copy wrapper input file %s to factory scratch directory\n", value);
+				exit(EXIT_FAILURE);
 			}
 		}
 	}
@@ -1445,7 +1484,7 @@ int main(int argc, char *argv[])
 	if(worker_command != NULL){
 		cmd = string_format("cp '%s' '%s'",worker_command,scratch_dir);
 		if(system(cmd)){
-			fprintf(stderr, "work_queue_factory: Could not Access specified worker binary.\n");
+			fprintf(stderr,"work_queue_factory: Could not Access specified worker binary.\n");
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
