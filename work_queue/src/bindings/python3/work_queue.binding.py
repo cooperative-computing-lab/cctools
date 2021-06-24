@@ -23,8 +23,7 @@ import distutils.spawn
 import uuid
 import textwrap
 import shutil
-
-
+import atexit
 
 def set_debug_flag(*flags):
     for flag in flags:
@@ -43,6 +42,17 @@ def specify_port_range(low_port, high_port):
     os.environ['TCP_HIGH_PORT'] = str(high_port)
 
 cctools_debug_config('work_queue_python')
+
+
+staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-')
+def cleanup_staging_directory():
+    try:
+        shutil.rmtree(staging_directory)
+    except Exception as e:
+        sys.stderr.write('could not delete {}: {}\n'.format(staging_directory, e))
+
+atexit.register(cleanup_staging_directory)
+
 
 ##
 # \class Task
@@ -858,7 +868,7 @@ class PythonTask(Task):
     # @param args	arguments used in function to be executed by task
     def __init__(self, func, *args):
         self._id = str(uuid.uuid4())
-        self._tmpdir = tempfile.mkdtemp()
+        self._tmpdir = tempfile.mkdtemp(dir=staging_directory)
 
         if not pythontask_available:
             raise RuntimeError("PythonTask is not available. The dill module is missing.")
@@ -1043,7 +1053,8 @@ class WorkQueue(object):
         except Exception as e:
             raise Exception('Unable to create internal Work Queue structure: %s' % e)
 
-    def __free_queue(self):
+
+    def _free_queue(self):
         if self._work_queue:
             if self._shutdown:
                 self.shutdown_workers(0)
@@ -1051,7 +1062,7 @@ class WorkQueue(object):
             self._work_queue = None
 
     def __del__(self):
-        self.__free_queue()
+        self._free_queue()
 
     ##
     # Get the project name of the queue.
@@ -1854,8 +1865,9 @@ class Factory(object):
         if self._factory_proc is not None:
             raise RuntimeError('Factory was already started')
         (tmp, self._config_file) = tempfile.mkstemp(
-            prefix='wq-factory-config-',
-            suffix='.json')
+                dir=staging_directory,
+                prefix='wq-factory-config-',
+                suffix='.json')
         os.close(tmp)
         self._write_config()
         logfd = open(self._log_file, 'a')
