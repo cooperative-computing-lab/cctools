@@ -1034,7 +1034,9 @@ void add_wrapper_command( const char *cmd )
 	if(!wrapper_command) {
 		wrapper_command = strdup(cmd);
 	} else {
-		wrapper_command = string_format("%s %s",cmd,wrapper_command);
+		char *tmp = string_format("%s %s",cmd,wrapper_command);
+		free(wrapper_command);
+		wrapper_command = tmp;
 	}
 }
 
@@ -1045,7 +1047,9 @@ void add_wrapper_input( const char *filename )
 	if(!wrapper_input) {
 		wrapper_input = strdup(filename);
 	} else {
-		wrapper_input = string_format("%s,%s",wrapper_input,filename);
+		char *tmp = string_format("%s,%s",wrapper_input,filename);
+		free(wrapper_command);
+		wrapper_command = tmp;
 	}
 	struct jx *file = jx_string(filename);
 	jx_array_append(wrapper_inputs, file);
