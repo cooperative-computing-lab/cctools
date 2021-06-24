@@ -1411,7 +1411,6 @@ int main(int argc, char *argv[])
 
 	if(!(manager_host || config_file || project_regex)) {
 		fprintf(stderr,"work_queue_factory: You must either give a project name with the -M option or manager-name option with a configuration file, or give the manager's host and port.\n");
-		show_help(argv[0]);
 		exit(1);
 	}
 
