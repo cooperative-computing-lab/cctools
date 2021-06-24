@@ -91,9 +91,6 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 - **--disk mb** Manually set the amount of disk space (in MB) reported by this worker.
 - **--wall-time s** Set the maximum number of seconds the worker may be active.
 - **--feature feature** Specifies a user-defined feature the worker provides (option can be repeated).
-- **--docker image**  Enable the worker to run each task with a container based on this image.
-- **--docker-preserve image**  Enable the worker to run all tasks with a shared container based on this image.
-- **--docker-tar tarball**  Load docker image from this tarball.
 - **--volatility chance** Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).
 
 
@@ -109,18 +106,6 @@ its manager are sent to its subordinate worker processes.
 setting the mode directly with the **--foreman** option.  The foreman can be directed to advertise its
 presence on the [catalog_server()](catalog_server.md) with the **-N <project name>** flag, which other workers can use to
 contact the foreman.
-
-## CONTAINER MODE
-**work_queue_worker** can be run with container. Docker is the default management tool and docker deamon should be enabled
-in computing nodes. Tasks received from manager can be run with container based on user specified docker image.
-
-
-
-**Container** mode is enable by either specifying a image name using the **--docker <image>** option, which enable workers
-running each tasks with an independent container or by using the **--docker-preserve <image>** option, which enable workers
-running all tasks with a shared container. The default way to manage the image is using docker hub, which means user
-has to push the container image into the docker hub in advance. If the image is saved in a tarball and cached in the
-computing node, **--docker-tar <tarball>** option can be adopted to load the image from the tarball.
 
 ## EXIT STATUS
 On success, returns zero.  On failure, returns non-zero.
