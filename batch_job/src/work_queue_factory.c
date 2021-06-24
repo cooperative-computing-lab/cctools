@@ -738,20 +738,22 @@ int read_config_file(const char *config_file) {
 		}
 	}
 
-	if(new_workers_min > new_workers_max) {
-		debug(D_NOTICE, "%s: min workers (%d) is greater than max workers (%d)\n", config_file, new_workers_min, new_workers_max);
-		error_found = 1;
-	}
-
 	if(new_workers_min < 0) {
 		debug(D_NOTICE, "%s: min workers (%d) is less than zero.\n", config_file, new_workers_min);
 		error_found = 1;
 	}
 
-	if(new_workers_max < 0) {
-		debug(D_NOTICE, "%s: max workers (%d) is less than zero.\n", config_file, new_workers_max);
+	if(new_workers_max < 1) {
+		debug(D_NOTICE, "%s: max workers (%d) is less than one.\n", config_file, new_workers_max);
 		error_found = 1;
 	}
+
+	if(new_workers_min > new_workers_max) {
+		debug(D_NOTICE, "%s: min workers (%d) is greater than max workers (%d)\n", config_file, new_workers_min, new_workers_max);
+		debug(D_NOTICE, "setting min workers and max workers to %d\n", new_workers_max);
+		new_workers_min = new_workers_max;
+	}
+
 
 	if(new_factory_timeout_option < 0) {
 		debug(D_NOTICE, "%s: factory timeout (%d) is less than zero.\n", config_file, new_factory_timeout_option);
