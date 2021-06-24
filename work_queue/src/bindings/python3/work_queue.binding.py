@@ -24,6 +24,7 @@ import uuid
 import textwrap
 import shutil
 import atexit
+import time
 
 def set_debug_flag(*flags):
     for flag in flags:
@@ -1748,6 +1749,11 @@ class Factory(object):
         self._factory_proc = None
         self._log_file = log_file
 
+        (tmp, self._error_file) = tempfile.mkstemp(
+                dir=staging_directory,
+                prefix='wq-factory-err-')
+        os.close(tmp)
+
         self._opts = {}
 
         self._set_manager(manager_name, manager_host_port)
@@ -1871,18 +1877,25 @@ class Factory(object):
         os.close(tmp)
         self._write_config()
         logfd = open(self._log_file, 'a')
+        errfd = open(self._error_file, 'w')
         devnull = open(os.devnull, 'w')
         self._factory_proc = subprocess.Popen(
             self._construct_command_line(),
             stdin=devnull,
             stdout=logfd,
-            stderr=logfd)
+            stderr=errfd)
         devnull.close()
         logfd.close()
+        errfd.close()
+
+        # ugly... give factory time to read configuration file
+        time.sleep(1)
 
         status = self._factory_proc.poll()
         if status:
-            raise RuntimeError('Could not execute work_queue_factory. Exited with status: {}'.format(str(status)))
+            with open(self._error_file) as error_f:
+                error_log = error_f.read()
+                raise RuntimeError('Could not execute work_queue_factory. Exited with status: {}\n{}'.format(str(status), error_log))
         return self
 
 
@@ -1895,6 +1908,7 @@ class Factory(object):
         self._factory_proc.wait()
         self._factory_proc = None
         os.unlink(self._config_file)
+        os.unlink(self._error_file)
         self._config_file = None
 
 
