@@ -1054,49 +1054,58 @@ void add_wrapper_input( const char *filename )
 static void show_help(const char *cmd)
 {
 	printf("Use: work_queue_factory [options] <managerhost> <port>\nor\n     work_queue_factory [options] -M projectname\n");
-	printf("where options are:\n");
+	printf("General factory options:\n");
+	printf(" %-30s Batch system type (required). One of:\n", "-T,--batch-type=<type>");
+	printf(" %-30s Use configuration file <file>.\n","-C,--config-file=<file>");
 	printf(" %-30s Project name of managers to serve, can be a regular expression.\n", "-M,-N,--manager-name=<project>");\
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
 	printf(" %-30s Catalog server to query for managers (default: %s:%d).\n", "--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
-	printf(" %-30s Batch system type (required). One of:\n", "-T,--batch-type=<type>");
 	printf(" %-30s %s\n","",batch_queue_type_string());
-	printf(" %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	printf(" %-30s Password file for workers to authenticate to manager.\n","-P,--password");
-	printf(" %-30s Use configuration file <file>.\n","-C,--config-file=<file>");
+	printf(" %-30s Use this scratch dir for temporary files (default is /tmp/wq-factory-$uid).\n","-S,--scratch-dir");
+	printf(" %-30s Force factory to run itself as a work queue manager.\n","--run-factory-as-manager");
+	printf(" %-30s Exit if parent process dies.\n", "--parent-death");
+	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
+	printf(" %-30s Send debugging to this file (can also be :stderr, or :stdout).\n", "-o,--debug-file=<file>");
+	printf(" %-30s Specify the size of the debug file (must use with -o option).\n", "-O,--debug-file-size=<mb>");
+	printf(" %-30s Show the version string.\n", "-v,--version");
+	printf(" %-30s Show this screen.\n", "-h,--help");
+
+	printf("\nConcurrency control options:\n");
 	printf(" %-30s Minimum workers running (default=%d).\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running (default=%d).\n", "-W,--max-workers", workers_max);
 	printf(" %-30s Maximum number of new workers per %d s (less than 1 disables limit, default=%d).\n", "--workers-per-cycle", factory_period, workers_per_cycle);
-	printf(" %-30s Average tasks per worker (default=one task per core).\n", "--tasks-per-worker");
 	printf(" %-30s Workers abort after this amount of idle time (default=%d).\n", "-t,--timeout=<time>",worker_timeout);
-	printf(" %-30s Environment variable that should be added to the worker (May be specified multiple times).\n", "--env=<variable=value>");
-	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
+	printf(" %-30s Exit after no manager has been seen in <n> seconds.\n", "--factory-timeout");
+	printf(" %-30s Average tasks per worker (default=one task per core).\n", "--tasks-per-worker");
+	printf(" %-30s Use worker capacity reported by managers.\n","-c,--capacity");
+
+	printf("\nResource management options:\n");
 	printf(" %-30s Set the number of cores requested per worker.\n", "--cores=<n>");
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
 	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
 	printf(" %-30s Automatically size a worker to an available slot (Condor, Mesos, and Kubernetes).\n", "--autosize");
-	printf(" %-30s Set requirements for the workers as Condor jobs. May be specified several times with expresions and-ed together (Condor only).\n", "--condor-requirements");
-	printf(" %-30s Exit after no manager has been seen in <n> seconds.\n", "--factory-timeout");
-	printf(" %-30s Use this scratch dir for temporary files (default is /tmp/wq-factory-$uid).\n","-S,--scratch-dir");
-	printf(" %-30s Use worker capacity reported by managers.\n","-c,--capacity");
-	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-	printf(" %-30s Specify Amazon config file (for use with -T amazon).\n", "--amazon-config");
+
+	printf("\nWorker environment options:\n");
+	printf(" %-30s Environment variable that should be added to the worker (May be specified multiple times).\n", "--env=<variable=value>");
+	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
+	printf(" %-30s Alternate binary instead of work_queue_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
-	printf(" %-30s Run each worker using this python package.\n","--python-package");
+	printf(" %-30s Use runos tool to create worker environment (Notre Dame specific).\n","--runos=<img>");
+	printf(" %-30s Run each worker inside this python package.\n","--python-package");
+
+	printf("\nOptions specific to batch systems:\n");
+	printf(" %-30s Batch system options:\n", "-B,--batch-options=<options>");
+	printf(" %-30s Specify Amazon config file (for use with -T amazon).\n", "--amazon-config");
+	printf(" %-30s Set requirements for the workers as Condor jobs. May be specified several times with expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Specify the host name to mesos manager node (for use with -T mesos).\n", "--mesos-master");
 	printf(" %-30s Specify path to mesos python library (for use with -T mesos).\n", "--mesos-path");
 	printf(" %-30s Specify the linking libraries for running mesos (for use with -T mesos).\n", "--mesos-preload");
 	printf(" %-30s Specify the container image for using Kubernetes (for use with -T k8s).\n", "--k8s-image");
 	printf(" %-30s Specify the container image that contains work_queue_worker availabe for using Kubernetes (for use with -T k8s).\n", "--k8s-worker-image");
-	printf(" %-30s Send debugging to this file (can also be :stderr, or :stdout).\n", "-o,--debug-file=<file>");
-	printf(" %-30s Specify the size of the debug file (must use with -o option).\n", "-O,--debug-file-size=<mb>");
-	printf(" %-30s Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.\n", "--worker-binary=<file>");
-	printf(" %-30s Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.\n","--runos=<img>");
-	printf(" %-30s Force factory to run itself as a work queue manager.\n","--run-factory-as-manager");
-	fprintf(stdout, " %-30s Exit if parent process dies.\n", "--parent-death");
-	printf(" %-30s Show the version string.\n", "-v,--version");
-	printf(" %-30s Show this screen.\n", "-h,--help");
+
 }
 
 enum{   LONG_OPT_CORES = 255,
