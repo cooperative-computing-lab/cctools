@@ -1017,7 +1017,14 @@ static void mainloop( struct batch_queue *queue )
 		delete_projects_list(managers_list);
 		delete_projects_list(foremen_list);
 
-		sleep(factory_period);
+		int sleep_seconds = 0;
+		while(sleep_seconds < factory_period) {
+			if(abort_flag) {
+				break;
+			}
+			sleep_seconds += 1;
+			sleep(1);
+		}
 	}
 
 	printf("removing %d workers...\n",itable_size(job_table));
