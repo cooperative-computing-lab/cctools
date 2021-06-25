@@ -159,6 +159,7 @@ struct work_queue {
 	struct work_queue_stats *stats_measure;
 	struct work_queue_stats *stats_disconnected_workers;
 	timestamp_t time_last_wait;
+	timestamp_t time_last_log_stats;
 
 	int worker_selection_algorithm;
 	int task_ordering;
@@ -413,19 +414,25 @@ static int workers_with_tasks(struct work_queue *q) {
 	return workers_with_tasks;
 }
 
-static void log_queue_stats(struct work_queue *q)
+static void log_queue_stats(struct work_queue *q, int force)
 {
 	struct work_queue_stats s;
 
-	work_queue_get_stats(q, &s);
+	timestamp_t now = timestamp_get();
+	if(!force && (now - q->time_last_log_stats < ONE_SECOND)) {
+		return;
+	}
 
+	work_queue_get_stats(q, &s);
 	debug(D_WQ, "workers connections -- known: %d, connecting: %d, available: %d.",
 			s.workers_connected,
 			s.workers_init,
 			available_workers(q));
 
-	if(!q->logfile)
+	q->time_last_log_stats = now;
+	if(!q->logfile) {
 		return;
+	}
 
 	buffer_t B;
 	buffer_init(&B);
@@ -5260,6 +5267,7 @@ struct work_queue *work_queue_create(int port)
 	q->task_reports = list_create();
 
 	q->time_last_wait = 0;
+	q->time_last_log_stats = 0;
 
 	q->catalog_hosts = 0;
 
@@ -5298,7 +5306,7 @@ struct work_queue *work_queue_create(int port)
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	//
 
-	log_queue_stats(q);
+	log_queue_stats(q, 1);
 
 	q->time_last_wait = timestamp_get();
 
@@ -5525,7 +5533,7 @@ void work_queue_delete(struct work_queue *q)
 			hash_table_firstkey(q->worker_table);
 		}
 
-		log_queue_stats(q);
+		log_queue_stats(q, 1);
 
 		if(q->name) {
 			update_catalog(q, NULL, 1);
@@ -5810,8 +5818,8 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 			/* do nothing */
 			break;
 	}
-	
-	log_queue_stats(q);
+
+	log_queue_stats(q, 0);
 	write_transaction_task(q, t);
 
 	return old_state;
@@ -6379,7 +6387,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	}
 
 	if(events > 0) {
-		log_queue_stats(q);
+		log_queue_stats(q, 1);
 	}
 
 	q->time_last_wait = timestamp_get();
@@ -6969,7 +6977,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// end with a newline
 			"\n"
 			);
-		log_queue_stats(q);
+		log_queue_stats(q, 1);
 		debug(D_WQ, "log enabled and is being written to %s\n", logfile);
 		return 1;
 	} else {
