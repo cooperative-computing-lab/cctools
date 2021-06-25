@@ -44,47 +44,110 @@ remove all running workers before exiting.
 
 SECTION(OPTIONS)
 
-SUBSECTION(Batch Options)
+General options:
+
 OPTIONS_BEGIN
-OPTION_TRIPLET(-M,manager-name,project)Project name of managers to serve, can be a regular expression.
-OPTION_TRIPLET(-F,foremen-name,project)Foremen to serve, can be a regular expression.
-OPTION_PAIR(--catalog, catalog)Catalog server to query for managers (default: catalog.cse.nd.edu,backup-catalog.cse.nd.edu:9097).
-OPTION_TRIPLET(-T,batch-type,type)Batch system type (required). One of: local, wq, condor, sge, torque, mesos, k8s, moab, slurm, chirp, amazon, lambda, dryrun, amazon-batch
-OPTION_TRIPLET(-B,batch-options,options)Add these options to all batch submit files.
-OPTION_TRIPLET(-P,password,file)Password file for workers to authenticate to manager.
-OPTION_TRIPLET(-C,config-file,file)Use the configuration file <file>.
-OPTION_TRIPLET(-w,min-workers,workers)Minimum workers running.  (default=5)
-OPTION_TRIPLET(-W,max-workers,workers)Maximum workers running.  (default=100)
-OPTION_PAIR(--workers-per-cycle,workers)Maximum number of new workers per 30 seconds.  ( less than 1 disables limit, default=5)
-OPTION_PAIR(--tasks-per-worker,workers)Average tasks per worker (default=one task per core).
-OPTION_TRIPLET(-t,timeout,time)Workers abort after this amount of idle time (default=300).
-OPTION_PAIR(--env,variable=value)Environment variable that should be added to the worker (May be specified multiple times).
-OPTION_TRIPLET(-E,extra-options,options)Extra options that should be added to the worker.
-OPTION_PAIR(--cores,n)Set the number of cores requested per worker.
-OPTION_PAIR(--gpus,n)Set the number of GPUs requested per worker.
-OPTION_PAIR(--memory,mb)Set the amount of memory (in MB) requested per worker.
-OPTION_PAIR(--disk,mb)Set the amount of disk (in MB) requested per worker.
-OPTION_ITEM(--autosize)Automatically size a worker to an available slot (Condor, Mesos, and Kubernetes).
-OPTION_ITEM(--condor-requirements)Set requirements for the workers as Condor jobs. May be specified several times with expresions and-ed together (Condor only).
-OPTION_PAIR(--factory-timeout,n)Exit after no manager has been seen in <n> seconds.
-OPTION_TRIPLET(-S,scratch-dir,file)Use this scratch dir for temporary files (default is /tmp/wq-pool-$uid).
-OPTION_ITEM(`-c, --capacity')Use worker capacity reported by managers.
-OPTION_TRIPLET(-d,debug,subsystem)Enable debugging for this subsystem.
-OPTION_ITEM(--amazon-config)Specify Amazon config file (for use with -T amazon).
-OPTION_ITEM(--wrapper)Wrap factory with this command prefix.
-OPTION_ITEM(--wrapper-input)Add this input file needed by the wrapper.
-OPTION_PAIR(--mesos-master,hostname)Specify the host name to mesos manager node (for use with -T mesos).
-OPTION_PAIR(--mesos-path,filepath)Specify path to mesos python library (for use with -T mesos).
-OPTION_PAIR(--mesos-preload,library)Specify the linking libraries for running mesos (for use with -T mesos).
-OPTION_ITEM(--k8s-image)Specify the container image for using Kubernetes (for use with -T k8s).
-OPTION_ITEM(--k8s-worker-image)Specify the container image that contains work_queue_worker availabe for using Kubernetes (for use with -T k8s).
-OPTION_TRIPLET(-o,debug-file,file)Send debugging to this file (can also be :stderr, or :stdout).
-OPTION_TRIPLET(-O,debug-file-size,mb)Specify the size of the debug file (must use with -o option).
-OPTION_PAIR(--worker-binary,file)Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.
-OPTION_PAIR(--runos,img)Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.
-OPTION_ITEM(--run-factory-as-manager)Force factory to run itself as a work queue manager.
-OPTION_ITEM(`-v, --version')Show the version string.
-OPTION_ITEM(`-h, --help')Show this screen.
+OPTION_ITEM(-T,--batch-type=<type>)
+Batch system type (required). One of: local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun
+OPTION_ITEM(-C,--config-file=<file>)
+ Use configuration file <file>.
+OPTION_ITEM(-M,-N,--manager-name=<project>)
+ Project name of managers to server, can be regex
+OPTION_ITEM(-F,--foremen-name=<project>)
+ Foremen to serve, can be a regular expression.
+OPTION_ITEM(--catalog=<host:port>)
+ Catalog server to query for managers.
+OPTION_ITEM(-P,--password)
+ Password file for workers to authenticate.
+OPTION_ITEM(-S,--scratch-dir)
+ Use this scratch dir for factory.
+OPTION_ITEM((default:)
+ /tmp/wq-factory-$uid).
+OPTION_ITEM(--run-factory-as-manager)
+ Force factory to run itself as a manager.
+OPTION_ITEM(--parent-death)
+ Exit if parent process dies.
+OPTION_ITEM(-d,--debug=<subsystem>)
+ Enable debugging for this subsystem.
+OPTION_ITEM(-o,--debug-file=<file>)
+ Send debugging to this file.
+OPTION_ITEM(-O,--debug-file-size=<mb>)
+ Specify the size of the debug file.
+OPTION_ITEM(-v,--version)
+ Show the version string.
+OPTION_ITEM(-h,--help)
+ Show this screen.
+OPTIONS_END
+
+Concurrent control options:
+
+OPTIONS_BEGIN
+OPTION_ITEM(-w,--min-workers)
+ Minimum workers running (default=5).
+OPTION_ITEM(-W,--max-workers)
+ Maximum workers running (default=100).
+OPTION_ITEM(--workers-per-cycle)
+ Max number of new workers per 30s (default=5)
+OPTION_ITEM(-t,--timeout=<time>)
+ Workers abort after idle time (default=300).
+OPTION_ITEM(--factory-timeout)
+ Exit after no manager seen in <n> seconds.
+OPTION_ITEM(--tasks-per-worker)
+ Average tasks per worker (default=one per core).
+OPTION_ITEM(-c,--capacity)
+ Use worker capacity reported by managers.
+OPTIONS_END
+
+Resource management options:
+OPTIONS_BEGIN
+OPTION_ITEM(--cores=<n>)
+ Set the number of cores requested per worker.
+OPTION_ITEM(--gpus=<n>)
+ Set the number of GPUs requested per worker.
+OPTION_ITEM(--memory=<mb>)
+ Set the amount of memory (in MB) per worker.
+OPTION_ITEM(--disk=<mb>)
+ Set the amount of disk (in MB) per worker.
+OPTION_ITEM(--autosize)
+ Autosize worker to slot (Condor, Mesos, K8S).
+OPTIONS_END
+
+Worker environment options:
+OPTIONS_BEGIN
+OPTION_ITEM(--env=<variable=value>)
+ Environment variable to add to worker.
+OPTION_ITEM(-E,--extra-options=<options>)
+ Extra options to give to worker.
+OPTION_ITEM(--worker-binary=<file>)
+ Alternate binary instead of work_queue_worker.
+OPTION_ITEM(--wrapper)
+ Wrap factory with this command prefix.
+OPTION_ITEM(--wrapper-input)
+ Add this input file needed by the wrapper.
+OPTION_ITEM(--runos=<img>)
+ Use runos tool to create environment (ND only).
+OPTION_ITEM(--python-package)
+ Run each worker inside this python package.
+OPTIONS_END
+
+Options  specific to batch systems:
+OPTIONS_BEGIN
+OPTION_ITEM(-B,--batch-options=<options>)
+ Generic batch system options.
+OPTION_ITEM(--amazon-config)
+ Specify Amazon config file.
+OPTION_ITEM(--condor-requirements)
+ Set requirements for the workers as Condor jobs.
+OPTION_ITEM(--mesos-master)
+ Host name of mesos manager node..
+OPTION_ITEM(--mesos-path)
+ Path to mesos python library..
+OPTION_ITEM(--mesos-preload)
+ Libraries for running mesos.
+OPTION_ITEM(--k8s-image)
+ Container image for Kubernetes.
+OPTION_ITEM(--k8s-worker-image)
+ Container image with worker for Kubernetes.
 OPTIONS_END
 
 SECTION(EXIT STATUS)
