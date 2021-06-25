@@ -590,7 +590,7 @@ void list_push_priority(struct list *list, list_priority_t p, void *item) {
 	void *i = NULL;
 	struct list_cursor *cur = list_cursor_create(list);
 	for (list_seek(cur, 0); list_get(cur, &i); list_next(cur)) {
-			if (p(i) < p(item)) {
+			if (p(i) <= p(item)) {
 				list_insert(cur, item);
 				break;
 			}
