@@ -5609,12 +5609,9 @@ void work_queue_delete(struct work_queue *q)
 			fclose(q->transactions_logfile);
 		}
 
-
-		if(q->measured_local_resources)
-			rmsummary_delete(q->measured_local_resources);
-
-		if(q->current_max_worker)
-			rmsummary_delete(q->current_max_worker);
+		rmsummary_delete(q->measured_local_resources);
+		rmsummary_delete(q->current_max_worker);
+		rmsummary_delete(q->max_task_resources_requested);
 
 		free(q);
 	}
