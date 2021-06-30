@@ -199,11 +199,11 @@ my $q = Work_Queue->new(9123);
 
 ```C
 #include "work_queue.h"
-    
+
 # create a new queue listening on port 9123
 struct work_queue *q = work_queue_create(9123);
 ```
-    
+
 The manager then creates tasks to submit to the queue. Each task consists of a
 command line to run and a statement of what data is needed, and what data will
 be produced by the command. Input data can be provided in the form of a file
@@ -419,6 +419,55 @@ work_queue_delete(q);
 
 Full details of all of the Work Queue functions can be found in the [Work Queue API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
 
+## Running python functions as Work Queue tasks
+
+The `work_queue` python module provides `PythonTask`, which extends
+`work_queue.Task` to better integrate with python code. In particular,
+`PythonTask` is not defined with a command line to execute, but with a python
+function and its arguments, such as:
+
+```python
+import work_queue as wq
+
+def my_sum(x, y):
+    return x+y
+
+# task to execute x = my_sum(1, 2)
+t = wq.PythonTask(my_sum, 1, 2)
+
+while not q.empty():
+    t = q.wait(5)
+    if t:
+        x = t.output
+        if isinstance(x, wq.PythonTaskNoResult):
+            print("Error executing the function: {}".format(t.std_output))
+        print("Result is: {}".format(x))
+```
+
+Note that the output of the task is retrieved as python object
+with `t.output`.
+
+In the previous example, it is assumed that the python interpreter available at
+the worker correspond to the appropiate python environment for the task. If
+this is not the case, an environment file can be provided with
+t.specify_environment:
+
+```python
+t = wq.PythonTask(my_sum, 1, 2)
+t.specify_environment("my-env.tar.gz")
+```
+
+The file `my-env.tar.gz` is a
+[conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html)
+environment created with [conda-pack](https://conda.github.io/conda-pack/).  A
+minimal environment can be created a follows:
+
+```sh
+conda create -y -p my-env python=3.8 dill conda
+conda install -y -p my-env -c conda-forge conda-pack
+# conda install -y -p my-env pip and conda install other modules, etc.
+conda run -p my-env conda-pack
+```
 
 ## Project Names and the Catalog Server
 

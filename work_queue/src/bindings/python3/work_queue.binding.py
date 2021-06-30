@@ -14,12 +14,17 @@
 
 import copy
 import os
+import sys
 import json
 import errno
 import tempfile
 import subprocess
 import distutils.spawn
-
+import uuid
+import textwrap
+import shutil
+import atexit
+import time
 
 def set_debug_flag(*flags):
     for flag in flags:
@@ -38,6 +43,17 @@ def specify_port_range(low_port, high_port):
     os.environ['TCP_HIGH_PORT'] = str(high_port)
 
 cctools_debug_config('work_queue_python')
+
+
+staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-')
+def cleanup_staging_directory():
+    try:
+        shutil.rmtree(staging_directory)
+    except Exception as e:
+        sys.stderr.write('could not delete {}: {}\n'.format(staging_directory, e))
+
+atexit.register(cleanup_staging_directory)
+
 
 ##
 # \class Task
@@ -481,9 +497,20 @@ class Task(object):
     def algorithm(self):
         return self._task.worker_selection_algorithm
 
+
     ##
     # Get the standard output of the task. Must be called only after the task
     # completes execution.
+    # @code
+    # >>> print(t.std_output)
+    # @endcode
+    @property
+    def std_output(self):
+        return self._task.output  # note we use .output, see below.)
+
+    ##
+    # Get the standard output of the task. (Same as t.std_output for regular
+    # work queue tasks) Must be called only after the task completes execution.
     # @code
     # >>> print(t.output)
     # @endcode
@@ -822,6 +849,155 @@ class Task(object):
 
 
 ##
+# \class PythonTask
+#
+# Python PythonTask object
+#
+# this class is used to create a python task
+try:
+    import dill
+    pythontask_available = True
+except ModuleNotFoundError:
+    pythontask_available = False
+
+class PythonTask(Task):
+    ##
+    # Creates a new python task
+    #
+    # @param self 	Reference to the current python task object
+    # @param func	python function to be executed by task
+    # @param args	arguments used in function to be executed by task
+    def __init__(self, func, *args):
+        self._id = str(uuid.uuid4())
+        self._tmpdir = tempfile.mkdtemp(dir=staging_directory)
+
+        if not pythontask_available:
+            raise RuntimeError("PythonTask is not available. The dill module is missing.")
+
+        self._func_file = os.path.join(self._tmpdir, 'function_{}.p'.format(self._id))
+        self._args_file = os.path.join(self._tmpdir, 'args_{}.p'.format(self._id))
+        self._out_file = os.path.join(self._tmpdir, 'out_{}.p'.format(self._id))
+        self._wrapper = os.path.join(self._tmpdir, 'pytask_wrapper.py'.format(self._id))
+
+        self._pp_run = None
+        self._env_file  = None
+
+        self._serialize_python_function(func, *args)
+        self._create_wrapper()
+
+        self._command = self._python_function_command()
+
+        self._output_loaded = False
+        self._output = None
+
+        super(PythonTask, self).__init__(self._command)
+        self._specify_IO_files()
+
+    ##
+    # returns the result of a python task as a python variable
+    #
+    # @param self	reference to the current python task object
+    @property
+    def output(self):
+        if not self._output_loaded:
+            if self.result == WORK_QUEUE_RESULT_SUCCESS:
+                try:
+                    with open(os.path.join(self._tmpdir, 'out_{}.p'.format(self._id)), 'rb') as f:
+                        self._output = dill.load(f)
+                except Exception as e:
+                    self._output = e
+            else:
+                self._output = PythonTaskNoResult()
+                print(self.std_output)
+            self._output_loaded = True
+        return self._output
+
+
+    def specify_environment(self, env_file):
+        if env_file:
+            self._env_file = env_file
+            self._pp_run = shutil.which('python_package_run')
+
+            if not self._pp_run:
+                raise RuntimeError("Could not find python_package_run in PATH.")
+
+            self._command = self._python_function_command()
+            work_queue_task_specify_command(self._task, self._command)
+
+            self.specify_input_file(self._env_file, cache=True)
+            self.specify_input_file(self._pp_run, cache=True)
+
+
+    def __del__(self):
+        try:
+            if self._tmpdir and os.path.exists(self._tmpdir):
+                shutil.rmtree(self._tmpdir)
+
+        except Exception as e:
+            sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
+
+
+    def _serialize_python_function(self, func, *args):
+        with open(self._func_file, 'wb') as wf:
+            dill.dump(func, wf)
+        with open(self._args_file, 'wb') as wf:
+            dill.dump([*args], wf)
+
+
+    def _python_function_command(self):
+        command = 'python {wrapper} {function} {args} {out}'.format(
+                wrapper=os.path.basename(self._wrapper),
+                function=os.path.basename(self._func_file),
+                args=os.path.basename(self._args_file),
+                out=os.path.basename(self._out_file))
+
+        if self._env_file:
+            command = './{pprun} -e {tar} --unpack-to "$WORK_QUEUE_SANDBOX"/{unpack}-env {cmd}'.format(
+                pprun=os.path.basename(self._pp_run),
+                unpack=os.path.basename(self._env_file),
+                tar=os.path.basename(self._env_file),
+                cmd=command)
+
+        return command
+
+
+    def _specify_IO_files(self):
+        self.specify_input_file(self._wrapper, cache=True)
+        self.specify_input_file(self._func_file, cache=False)
+        self.specify_input_file(self._args_file, cache=False)
+        self.specify_output_file(self._out_file, cache=False)
+
+
+    ##
+    # creates the wrapper script which will execute the function. pickles output.
+    def _create_wrapper(self):
+        with open(self._wrapper, 'w') as f:
+            f.write(textwrap.dedent('''\
+                import sys
+                import dill
+                (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
+                with open (fn , 'rb') as f:
+                    exec_function = dill.load(f)
+                with open(args, 'rb') as f:
+                    exec_args = dill.load(f)
+                try:
+                    exec_out = exec_function(*exec_args)
+
+                except Exception as e:
+                    exec_out = e
+
+                with open(out, 'wb') as f:
+                    dill.dump(exec_out, f)
+
+                print(exec_out)'''))
+
+
+
+
+class PythonTaskNoResult(Exception):
+    pass
+
+##
 # Python Work Queue object
 #
 # This class uses a dictionary to map between the task pointer objects and the
@@ -878,7 +1054,8 @@ class WorkQueue(object):
         except Exception as e:
             raise Exception('Unable to create internal Work Queue structure: %s' % e)
 
-    def __free_queue(self):
+
+    def _free_queue(self):
         if self._work_queue:
             if self._shutdown:
                 self.shutdown_workers(0)
@@ -886,7 +1063,7 @@ class WorkQueue(object):
             self._work_queue = None
 
     def __del__(self):
-        self.__free_queue()
+        self._free_queue()
 
     ##
     # Get the project name of the queue.
@@ -1572,6 +1749,11 @@ class Factory(object):
         self._factory_proc = None
         self._log_file = log_file
 
+        (tmp, self._error_file) = tempfile.mkstemp(
+                dir=staging_directory,
+                prefix='wq-factory-err-')
+        os.close(tmp)
+
         self._opts = {}
 
         self._set_manager(manager_name, manager_host_port)
@@ -1689,24 +1871,31 @@ class Factory(object):
         if self._factory_proc is not None:
             raise RuntimeError('Factory was already started')
         (tmp, self._config_file) = tempfile.mkstemp(
-            prefix='wq-factory-config-',
-            suffix='.json')
+                dir=staging_directory,
+                prefix='wq-factory-config-',
+                suffix='.json')
         os.close(tmp)
         self._write_config()
         logfd = open(self._log_file, 'a')
+        errfd = open(self._error_file, 'w')
         devnull = open(os.devnull, 'w')
         self._factory_proc = subprocess.Popen(
             self._construct_command_line(),
             stdin=devnull,
             stdout=logfd,
-            stderr=logfd)
+            stderr=errfd)
         devnull.close()
         logfd.close()
+        errfd.close()
+
+        # ugly... give factory time to read configuration file
+        time.sleep(1)
 
         status = self._factory_proc.poll()
         if status:
-            raise RuntimeError('Could not execute work_queue_factory. Exited with status: {}'.format(str(status)))
-
+            with open(self._error_file) as error_f:
+                error_log = error_f.read()
+                raise RuntimeError('Could not execute work_queue_factory. Exited with status: {}\n{}'.format(str(status), error_log))
         return self
 
 
@@ -1719,6 +1908,7 @@ class Factory(object):
         self._factory_proc.wait()
         self._factory_proc = None
         os.unlink(self._config_file)
+        os.unlink(self._error_file)
         self._config_file = None
 
 
