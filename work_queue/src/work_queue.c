@@ -6102,9 +6102,9 @@ static void print_password_warning( struct work_queue *q )
 
 	if(did_password_warning) return;
 
-		if(!q->password && q->name) {
-			fprintf(stderr,"warning: this work queue manager is visible to the public.\n");
-			fprintf(stderr,"warning: you should set a password with the --password option.\n");
+	if(!q->password && q->name) {
+		debug(D_NOTICE|D_WQ, "warning: this work queue manager is visible to the public.\n");
+		debug(D_NOTICE|D_WQ, "warning: you should set a password with the --password option.\n");
 		did_password_warning = 1;
 	}
 }
