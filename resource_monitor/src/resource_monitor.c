@@ -899,7 +899,7 @@ struct peak_cores_sample {
 double peak_cores(int64_t wall_time, int64_t cpu_time) {
 	static struct list *samples = NULL;
 
-	int64_t max_separation = (60 + 2*interval)*USECOND; /* at least one minute and a complete interval */
+	int64_t max_separation = (180 + 2*interval)*USECOND; /* at least three minutes and a complete interval */
 
 	if(!samples) {
 		samples = list_create();
@@ -1524,7 +1524,6 @@ struct rmsummary *rmonitor_final_usage_tree(void)
 
 	/* we do not use peak_cores here, as we may have missed some threads which
 	 * make cpu_time quite jumpy. */
-	
 	if(tr_usg->wall_time > 0) {
 		int64_t tmp_output;
 		rmsummary_to_internal_unit("cores", ((double) tr_usg->cpu_time)/tr_usg->wall_time, &tmp_output, "cores");
