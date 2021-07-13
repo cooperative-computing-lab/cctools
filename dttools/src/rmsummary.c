@@ -129,13 +129,13 @@ int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *
 	}
 
 	if(strcmp(field, "cores") == 0) {
-		/* hack to eliminate noise. we do not round up unless more than %10 of
+		/* hack to eliminate noise. we do not round up unless more than %25 of
 		 * the additional core is used. */
 
 		double raw   = MAX(1.0, input_number);
 		double floor = trunc(raw);
 
-		if(raw - floor < 0.1) {
+		if(raw - floor < 0.25) {
 			input_number = floor;
 		}
 	}
