@@ -936,14 +936,15 @@ double peak_cores(int64_t wall_time, int64_t cpu_time) {
 	int64_t diff_cpu  = tail->cpu_time  - head->cpu_time;
 
 
-	if(diff_wall < 60) {
-		/* hack to elimiate noise. if diff_wall < 60s, we return 1. If command runs
-		 * for more than 60s, the average cpu/wall serves as a fallback in the
-		 * final summary. */
-		return 1;
-	} else {
-		return ((double) diff_cpu) / diff_wall;
+	if(tail->wall_time - summary->start < max_separation) {
+		/* hack to elimiate noise. if we have not collected enough samples,
+		 * use max_separation as the wall_time. This eliminates short noisy
+		 * burst at the beginning of the execution, but also triggers limits
+		 * checks for extreme offenders. */
+		diff_wall = max_separation;
 	}
+
+	return ((double) diff_cpu) / diff_wall;
 }
 
 void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
@@ -1029,7 +1030,7 @@ void rmonitor_log_row(struct rmsummary *tr)
 	{
 		fprintf(log_series,  "%" PRId64, tr->wall_time + summary->start);
 		fprintf(log_series, " %" PRId64, tr->cpu_time);
-		fprintf(log_series, " %" PRId64, tr->cores);
+		fprintf(log_series, " %" PRId64, MAX(tr->cores, tr->cores_avg));
 		fprintf(log_series, " %" PRId64, tr->max_concurrent_processes);
 		fprintf(log_series, " %" PRId64, tr->virtual_memory);
 		fprintf(log_series, " %" PRId64, tr->memory);
