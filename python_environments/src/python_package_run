@@ -189,7 +189,6 @@ then
 fi
 
 # unpacking environment if needed...
-LOCKFILE="${UNPACK_TO}/.unpacking_python_package_run_lock"
 mkdir -p "${UNPACK_TO}"
 
 UNTAR_SCRIPT=$(mktemp python_package_run.XXXXXX)
@@ -209,6 +208,7 @@ then
         exit 1
     fi
     /bin/touch "${UNPACK_TO}"/.python_package_run_expanded
+    sync
 else
     if [[ "${PYTHON_PACKAGE_RUN_DEBUG}" = yes ]]
     then
@@ -221,7 +221,7 @@ EOF
 if [[ "${ENV_NAME_IS_DIR}" = no ]]
 then
     logmsg expanding environment file
-    flock -w ${LOCK_WAIT} ${LOCKFILE} -c "/bin/bash ${UNTAR_SCRIPT}"
+    flock -w ${LOCK_WAIT} ${UNPACK_TO} -c "/bin/bash ${UNTAR_SCRIPT}"
     if [ "$?" != 0 ]
     then
         errmsg "could not untar environment: ${ENV_NAME}"
