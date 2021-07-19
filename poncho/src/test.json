@@ -1,0 +1,26 @@
+{
+	"conda": [
+		"defaults::python=3.9",
+		"conda-forge::numpy",
+        	"defaults::pip",
+		"conda-forge::ndcctools"
+	],
+	"pip": [
+		"dill"
+	],
+
+	"git": {
+		"DATA_DIR": {
+			"remote": "https://github.com/BarrySlyDelgado/poncho_test_data.git",
+			"ref": "abcd1234...."
+		}
+	},
+	
+	"http": {
+		"CCTOOLS": {
+			"type": "tar",
+			"compression": "gzip",
+			"url": "https://ccl.cse.nd.edu/software/files/cctools-7.2.13-source.tar.gz"
+		}
+	}
+}
