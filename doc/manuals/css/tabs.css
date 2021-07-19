@@ -7,6 +7,8 @@ https://facelessuser.github.io/pymdown-extensions/extensions/tabbed/#styling-wit
   display: flex;
   position: relative;
   flex-wrap: wrap;
+  background: #ddd;
+  margin: 1em 0 1em 0;
 }
 
 .tabbed-set .highlight {
@@ -23,7 +25,7 @@ https://facelessuser.github.io/pymdown-extensions/extensions/tabbed/#styling-wit
   width: auto;
   margin: 0 0.5em;
   padding: 0.25em;
-  font-size: 120%;
+  font-size: 100%;
   cursor: pointer;
 }
 
@@ -33,11 +35,12 @@ https://facelessuser.github.io/pymdown-extensions/extensions/tabbed/#styling-wit
 }
 
 .tabbed-set input:nth-child(n+1) {
-  color: #333333;
+    color: #333333;
 }
 
 .tabbed-set input:nth-child(n+1):checked + label {
     color: #FF5252;
+    font-weight: bold;
 }
 
 .tabbed-set input:nth-child(n+1):checked + label + .tabbed-content {
