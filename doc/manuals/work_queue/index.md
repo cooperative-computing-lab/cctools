@@ -23,23 +23,113 @@ mining, and other fields. It can also be used as an execution system for the
 some of the Work Queue applications running right now, view the [real time
 status page](http://ccl.cse.nd.edu/software/workqueue/status).
 
-## Getting Started
+## Quick Start in Python
 
-### Installing
+There are a variety of ways to install Work Queue, depending on your local environment.
+In most cases, installing via `conda` is the easiest method.
+Please see our [full installation instructions](../install) for other options.
 
-See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  We recommend that first time users
-install via Conda:
+First, [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html) if you haven't done so before.
+Then, open a terminal and install `ndcctools` like this:
 
 ```
 conda install -c conda-forge ndcctools
 ```
 
-The full documentation for the Work Queue API can be found here:
-- [Work Queue Python API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePython.html).
-- [Work Queue Perl API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePerl.html)
-- [Work Queue C API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html) and
+Using a text editor, create a manager program called `manager.py` like this:
 
-## Building a Work Queue Application
+```
+# Quick Start Example of Work Queue with Python Functions
+
+# Import the Work Queue library.
+import work_queue as wq
+
+# Define a function to invoke remotely.
+def my_sum(x, y):
+    import math
+    return x+y
+
+# Create a new queue, listening on port 9123:
+queue = wq.WorkQueue(9123)
+print("listening on port {}".format(queue.port))
+
+# Submit several tasks for execution:
+print("submitting tasks...")
+for value in [10,20,30]:
+    task = wq.PythonTask(my_sum, value, value)
+    queue.submit(task)
+
+# As they complete, display the results:
+print("waiting for tasks to complete...")
+while not queue.empty():
+    task = queue.wait(5)
+    if task:
+	print("task {} completed with result {}".format(task.id,task.output))
+
+print("all done.")
+```
+
+Run the manager program at the command line like this:
+
+```
+python manager.py
+```
+
+It should display output like this:
+```
+listening on port 9123
+submitting tasks...
+waiting for tasks to complete...
+```
+
+The manager is now waiting for workers to connect and begin
+requesting work. (Without any workers, it will wait forever.) You can start
+one worker on the same machine by opening a new shell and running:
+
+```
+work_queue_worker localhost 9123
+```
+
+The manager will send tasks to the worker for execution.  As they complete, you will see output like this:
+```
+task 1 exited with output 10
+task 2 exited with output 20
+...
+all done.
+```
+
+Congrads! You have now run a simple manager application that runs tasks on one local worker.
+Read on to learn how to build more complex applications and run large numbers of workers at scale.
+
+## Principle of Operation
+
+A Work Queue application is a large parallel application consisting of a **manager** and multiple **workers**.
+The manager defines a large number of **tasks**, each of which is a discrete unit
+of work that can be executed in parallel.  Each task is submitted to a **queue**, which makes
+it available for a worker to execute.  Each worker connects to the manager, receives tasks
+to execute, and returns results back to the manager. The manager receives results in the order that
+they complete, and may submit further tasks as needed. Commonly used files are cached
+at each worker to speed up execution.
+
+Tasks come in two types:
+
+- A **basic task** is a single Unix command line to execute, along with its needed input files.  Upon completion, it will produce one or more output files to be returned to the manager.
+- A **PythonTask** is a single Python function to execute, along with its needed arguments.  Upon completion, it will produce a Python value (or an exception) as a result to return to the master.
+
+Both types of tasks share a common set of options.  Each task can be labelled with the **resources**
+(CPU cores, GPU devices, memory, disk space) that it needs to execute.  This allows each worker to pack the appropriate
+number of tasks.  For example, a worker running on a 64-core machine could run 32 dual-core tasks, 16 four-core tasks,
+or any other combination that adds up to 64 cores.  If you don't know the resources needed, you can enable
+a **resource monitor** to track and report what each task uses.
+
+To run a large application at scale, you must start a number of Workers in parallel.
+If you are using a university cluster or HPC system, then you will likely be submitting
+the workers to a batch system such as HTCondor, SLURM, or SGE.  If you are using a commercial
+cloud, then you can run your workers inside of virtual machines.  We provide a number of
+scripts to facilitate starting workers this way, or you can arrange things yourself to
+simply run the `work_queue_worker` executable.
+
+## Running a Work Queue Application
 
 We begin by running a simple but complete example of a Work Queue application.
 After trying it out, we will then show how to write a Work Queue application
@@ -56,14 +146,13 @@ If you are using the Python example and did *not* install via Conda, then set `P
 ```sh
 # Note: This is only needed if not using Conda:
 $ PYVER=$(python -c 'import sys; print("%s.%s" % sys.version_info[:2])')
-$ export PYTHONPATH=${PYTHONPATH}:${HOME}/cctools/lib/python${PYVER}/site-packages
+$ export PYTHONPATH=${HOME}/cctools/lib/python${PYVER}/site-packages:${PYTHONPATH}
 ```
 
-If you are using the Perl example, set `PERL5LIB` to include the Perl modules in
-cctools:
+When running a Perl application, you must set `PERL5LIB` to point to the Perl modules in cctools, like this:
 
 ```sh
-$ export PERL5LIB=${PERL5LIB}:${HOME}/cctools/lib/perl5/site_perl
+$ export PERL5LIB=${HOME}/cctools/lib/perl5/site_perl:${PERL5LIB}
 ```
 
 If you are using the C example, compile it like this:
@@ -72,10 +161,6 @@ If you are using the C example, compile it like this:
 $ gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -lwork_queue -ldttools -lm -lz
 ```
    
-    
-
-## Running a Work Queue Application
-
 The example application simply compresses a bunch of files in parallel. The
 files to be compressed must be listed on the command line. Each will be
 transmitted to a remote worker, compressed, and then sent back to the Work
@@ -116,13 +201,14 @@ one worker on the same machine by opening a new shell and running:
 $ work_queue_worker MACHINENAME 9123
 ```
 
+
 If you have access to other machines, you can `ssh` there and run workers as
 well. In general, the more you start, the faster the work gets done. If a
 worker should fail, the work queue infrastructure will retry the work
 elsewhere, so it is safe to submit many workers to an unreliable system.
 
-If you have access to a Condor pool, you can use this shortcut to submit ten
-workers at once via Condor:
+If you have access to a HTCondor pool, you can use this shortcut to submit ten
+workers at once via HTCondor:
 
 ```sh
 $ condor_submit_workers MACHINENAME 9123 10
@@ -131,30 +217,14 @@ Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 ```
-    
-
-Or, if you have access to an SGE cluster, do this:
-
-```sh
-$ sge_submit_workers MACHINENAME 9123 10
-
-Your job 153083 ("worker.sh") has been submitted
-Your job 153084 ("worker.sh") has been submitted
-Your job 153085 ("worker.sh") has been submitted
-...
-```
-    
 
 Similar scripts are available for other common batch systems:
 
 ```sh
-$ pbs_submit_workers MACHINENAME 9123 10
-
-$ torque_submit_workers MACHINENAME 9123 10
-
 $ slurm_submit_workers MACHINENAME 9123 10
-
-$ ec2_submit_workers MACHINENAME 9123 10
+$ sge_submit_workers MACHINENAME 9123 10
+$ pbs_submit_workers MACHINENAME 9123 10
+$ torque_submit_workers MACHINENAME 9123 10
 ```
 
 When the manager completes, if the workers were not shut down in the manager,
@@ -164,10 +234,17 @@ or `qdel` as appropriate. If you forget to remove them, they will exit
 automatically after fifteen minutes. (This can be adjusted with the `-t`
 option to `worker`.)
 
-## Writing a Work Queue Manager Program
+## Writing a Manager Program
+
+The full documentation for the Work Queue API can be found here:
+
+- [Work Queue Python API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePython.html).
+- [Work Queue Perl API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePerl.html)
+- [Work Queue C API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html) and
 
 The easiest way to start writing your own program using WorkQueue is to modify
-with one of the examples in [Python](examples/work_queue_example.py),
+with one of the examples in
+[Python](examples/work_queue_example.py),
 [Perl](examples/work_queue_example.pl), or [C](examples/work_queue_example.c).
 The basic outline of a WorkQueue manager is:
 
@@ -204,12 +281,21 @@ my $q = Work_Queue->new(9123);
 struct work_queue *q = work_queue_create(9123);
 ```
 
-The manager then creates tasks to submit to the queue. Each task consists of a
+The manager then creates tasks to submit to the queue. A task can take one of two forms:
+
+- A standard task consists of a Unix
 command line to run and a statement of what data is needed, and what data will
 be produced by the command. Input data can be provided in the form of a file
 or a local memory buffer. Output data can be provided in the form of a file or
 the standard output of the program. It is also required to specify whether the
 data, input or output, need to be cached at the worker site for later use.
+Standard tasks are available in any language. 
+
+- A `PythonTask` consists of a Python function to execute and the arguments
+to pass to that function.  Work Queue will send the function and arguments
+to a remote worker, execute the function there, and bring the result back
+to the manager program. A `PythonTask` can only be used from Python.
+
 
 In the example, we specify a command `./gzip` that takes a single input file
 `my-file` and produces a single output file `my-file.gz`. We then create a task
@@ -419,12 +505,12 @@ work_queue_delete(q);
 
 Full details of all of the Work Queue functions can be found in the [Work Queue API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
 
-## Running python functions as Work Queue tasks
+## Running Python Functions as PythonTasks
 
-The `work_queue` python module provides `PythonTask`, which extends
+The `work_queue` python module also provides `PythonTask`, which extends
 `work_queue.Task` to better integrate with python code. In particular,
-`PythonTask` is not defined with a command line to execute, but with a python
-function and its arguments, such as:
+`PythonTask` is not defined with a command line to execute, but with a Python
+function and its arguments, like this:
 
 ```python
 import work_queue as wq
@@ -444,13 +530,15 @@ while not q.empty():
         print("Result is: {}".format(x))
 ```
 
-Note that the output of the task is retrieved as python object
-with `t.output`.
+Note that the result of the function is retrieved as `t.output`, which is a native Python value.
 
-In the previous example, it is assumed that the python interpreter available at
-the worker correspond to the appropiate python environment for the task. If
-this is not the case, an environment file can be provided with
-t.specify_environment:
+A `PythonTask` is derived from `Task` and so all other methods for
+controlling scheduling, managing resources, and setting performance options
+all apply to `PythonTask` as well.
+
+When running a Python function remotely, it is assumed that the Python interpreter
+and libraries available at the worker correspond to the appropiate python environment for the task.
+If this is not the case, an environment file can be provided with t.specify_environment:
 
 ```python
 t = wq.PythonTask(my_sum, 1, 2)
