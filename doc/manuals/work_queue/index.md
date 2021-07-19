@@ -1284,7 +1284,7 @@ limit on the number of retries:
 === "Python"
     ```python
     t.specify_max_retries(5)   # Task will be try at most 6 times (5 retries).
-   ```
+    ```
 
 === "Perl"
     ```perl
@@ -1296,19 +1296,8 @@ limit on the number of retries:
     work_queue_specify_max_retries(t, 5)
     ```
 
-When a task cannot be completed in the specified number of tries, it is
-returned with the result `WORK_QUEUE_RESULT_MAX_RETRIES`. In python this would
-look like:
-
-=== "Python"
-    ```python
-    import work_queue as wq
-    t = q.wait(5)
-    if t:
-        if t.result == wq.WORK_QUEUE_RESULT_MAX_RETRIES:
-            print("Task could not be completed in the specified number of attempts.")
-    ```
-
+When a task cannot be completed in the specified number of tries,
+then the task result is set to  `WORK_QUEUE_RESULT_MAX_RETRIES`:
 
 ### Pipelined Submission.
 
