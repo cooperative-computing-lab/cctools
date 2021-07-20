@@ -468,17 +468,27 @@ conda run -p my-env conda-pack
 
 ## Running Managers and Workers
 
-We begin by running a simple but complete example of a Work Queue application.
-After trying it out, we will then show how to write a Work Queue application
-from scratch.
+This section makes use of a simple but complete exmample of a Work
+Queue manager application to demonstrate various features.
 
-First, download the example file for the language of your choice:
+Donload the example file for the language of your choice:
 
   * Python: [work_queue_example.py](examples/work_queue_example.py)
   * Perl: [work_queue_example.pl](examples/work_queue_example.pl)
   * C: [work_queue_example.c](examples/work_queue_example.c)
 
-If you are using the Python example and did *not* install via Conda, then set `PYTHONPATH` to include the Python modules in cctools:
+### Language Specific Setup
+
+Before running the ication, you may need some
+additional setup, depending on the language in use:
+
+#### Python Setup
+
+If you installed via Conda, then no further setup is needed.
+
+If you are running a Python application and did *not* install via Conda,
+then you will need to set the `PYTHONPATH` to point to the cctools
+installation, like this:
     
 ```sh
 # Note: This is only needed if not using Conda:
@@ -486,18 +496,23 @@ $ PYVER=$(python -c 'import sys; print("%s.%s" % sys.version_info[:2])')
 $ export PYTHONPATH=${HOME}/cctools/lib/python${PYVER}/site-packages:${PYTHONPATH}
 ```
 
-When running a Perl application, you must set `PERL5LIB` to point to the Perl modules in cctools, like this:
+#### Perl Setup
 
+If you are running a Perl application,  you must set `PERL5LIB` to point to the Perl modules in cctools:
 ```sh
 $ export PERL5LIB=${HOME}/cctools/lib/perl5/site_perl:${PERL5LIB}
 ```
 
-If you are using the C example, compile it like this:
+#### C Language Setup
+
+If you are writing a Work Queue application in C, you should compile it into an executable like this:
 
 ```sh
 $ gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -lwork_queue -ldttools -lm -lz
 ```
    
+### Running a Manager Program
+
 The example application simply compresses a bunch of files in parallel. The
 files to be compressed must be listed on the command line. Each will be
 transmitted to a remote worker, compressed, and then sent back to the Work
@@ -527,7 +542,6 @@ submitted task: /usr/bin/gzip < c > c.gz
 waiting for tasks to complete...
 ```
     
-
 The Work Queue manager is now waiting for workers to connect and begin
 requesting work. (Without any workers, it will wait forever.) You can start
 one worker on the same machine by opening a new shell and running:
@@ -538,11 +552,11 @@ one worker on the same machine by opening a new shell and running:
 $ work_queue_worker MACHINENAME 9123
 ```
 
-
-If you have access to other machines, you can `ssh` there and run workers as
-well. In general, the more you start, the faster the work gets done. If a
+If you have access to other machines, you can simply `ssh` there and run workers as well. In general, the more you start, the faster the work gets done. If a
 worker should fail, the work queue infrastructure will retry the work
 elsewhere, so it is safe to submit many workers to an unreliable system.
+
+### Submitting Workers to a Batch System
 
 If you have access to a HTCondor pool, you can use this shortcut to submit ten
 workers at once via HTCondor:
@@ -555,6 +569,10 @@ Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 ```
 
+This will cause HTCondor to schedule worker jobs on remote machines.
+When they begin to run, they will call home to the indicated machine
+and port number, and begin to service the manager application.
+
 Similar scripts are available for other common batch systems:
 
 ```sh
@@ -564,29 +582,26 @@ $ pbs_submit_workers MACHINENAME 9123 10
 $ torque_submit_workers MACHINENAME 9123 10
 ```
 
-When the manager completes, if the workers were not shut down in the manager,
-your workers will still be available, so you can either run another manager
+When the manager completes, if the workers were not otherwise shut down,
+they will still be available, so you can either run another manager
 with the same workers, or you can remove the workers with `kill`, `condor_rm`,
 or `qdel` as appropriate. If you forget to remove them, they will exit
 automatically after fifteen minutes. (This can be adjusted with the `-t`
 option to `worker`.)
 
-## Project Names and the Catalog Server
+### Project Names and the Catalog Server
 
 Keeping track of the manager's hostname and port can get cumbersome, especially
-if there are multiple managers. To help with difficulty, we provide the project
-name feature to identify a Work Queue manager with a more recognizable project
-name. Work Queue workers can then be started for their managers by providing
-the project names.
+if there are multiple managers. To help with this, a **project name** can be used to identify a Work Queue manager with a human-readable name.
+Work Queue workers can then be started for their managers by providing
+the project name instead of a host an port number.
 
-The project name feature uses the **catalog server** to maintain and track the
+The project name feature uses the [Catalog Server](../catalog) to maintain and track the
 project names of managers and their respective locations. It works as follows:
 the manager advertises its project name along with its hostname and port to the
 catalog server. Work Queue workers that are provided with the manager's project
 name query the catalog server to find the hostname and port of the manager with
-the given project name. So, to utilize this feature, the manager must be
-specified to run in the `WORK_QUEUE_MANAGER_MODE_CATALOG`. See [Catalog
-Servers](../catalog) for details on specifying catalog servers.
+the given project name.
 
 For example, to have a Work Queue manager advertise its project name as
 `myproject`, add the following code snippet after creating the queue:
@@ -605,9 +620,7 @@ For example, to have a Work Queue manager advertise its project name as
     ```C
     work_queue_specify_name(q, "myproject");
     ```
-    
-
-    
+        
 To start a worker for this manager, specify the project name (`myproject`) to
 connect in the `-M` option:
 
@@ -636,9 +649,30 @@ Your job 153099 ("worker.sh") has been submitted
 ...
 ```
 
-Project names are particularly useful when automatically maintaining a pool of workers with the **work queue factory**, as explained next.
+### Work Queue Status Display
 
-### Work Queue Factory
+An additional benefit of using a project name is that you can
+now use the [work_queue_status](../man_pages/work_queue_status) command
+to display the progress of your application.  This shows the name,
+location, and statistics of each application that reports itself to the
+catalog server.  (Note that this information is updated about once
+per minute.).  For example:
+
+```sh
+% work_queue_status
+PROJECT               HOST                      PORT WAITING RUNNING COMPLETE WORKERS 
+molsim-c2h2           home.cse.nd.edu           8999     793      64      791      16 
+freds-model-search    mars.indiana.edu          9123     100     700     1372     350 
+yang-analysis-355     login.crc.nd.edu          9100    8932    4873    10007    4873  
+```
+
+The same information is available in a more graphical form online
+at the [Work Queue Status Display](http://ccl.cse.nd.edu/software/workqueue/status),
+which looks like this:
+
+<img src=examples/work-queue-status-example.png>
+
+### Managing Workers with the Work Queue Factory
 
 Instead of launching each worker manually from the command line, the utility
 **work_queue_factory** may be used to launch workers are needed. The factory
