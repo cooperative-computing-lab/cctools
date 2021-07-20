@@ -57,6 +57,7 @@ print("listening on port {}".format(queue.port))
 print("submitting tasks...")
 for value in [10,20,30]:
     task = wq.PythonTask(my_sum, value, value)
+    task.specify_cores(1)
     queue.submit(task)
 
 # As they complete, display the results:
@@ -64,7 +65,7 @@ print("waiting for tasks to complete...")
 while not queue.empty():
     task = queue.wait(5)
     if task:
-	print("task {} completed with result {}".format(task.id,task.output))
+        print("task {} completed with result {}".format(task.id,task.output))
 
 print("all done.")
 ```
