@@ -276,9 +276,9 @@ In addition to describing the input and output files, you may optionally
 specify additional details about the task that will assist Work Queue in
 making good scheduling decisions.
 
-If you are able, describe the resources needed by each task -- `cores`, `gpus`,
-`memory`, `disk` -- so that the worker can pack as many concurrent tasks.
-This is described in greater detail under :ref:`Managing Resources` 
+If you are able, describe the resources needed by each task (cores, gpus,
+memory, disk) so that the worker can pack as many concurrent tasks.
+This is described in greater detail under [Managing Resources](#managing-resources).
 
 You may also attach a `tag` to a task, which is just an user-defined string
 that describes the purpose of the taask.  The tag is available as `t.tag`
