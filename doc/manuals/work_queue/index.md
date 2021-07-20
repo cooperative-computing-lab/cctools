@@ -1004,7 +1004,7 @@ When the resources used by a task are unknown, Work Queue can measure and
 compute efficient resource values to maximize throughput or minimize waste, as
 we explain in the following sections. 
 
-#### Automatic Management of Task Resources in a Category
+### Automatic Resource Management
 
 If the resources a category uses are unknown, then Work Queue can be directed
 to find efficient resource values to maximize throughput or minimize resources
@@ -1084,7 +1084,12 @@ cores, memory and disk have modifiers `~` and `>` as follows:
     `t.specify_cores`, such resources are fixed for the task and are not
     modified when more efficient values are found.
 
-## Recommended Practices
+## Advanced Techniques
+
+A variety of advanced features are available for programs with unusual needs
+or very large scales. Each feature is described briefly here, and more details
+may be found in the [Work Queue
+API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
 
 ### Security
 
@@ -1130,157 +1135,6 @@ With this option enabled, both the manager and the workers will verify that the
 other has the matching password before proceeding. The password is not sent in
 the clear, but is securely verified through a SHA1-based challenge-response
 protocol.
-
-## Logging facilities
-
-We can observe the lifetime of the queue through three different logs:
-
-
-### Debug Log
-
-The debug log prints unstructured messages as the queue transfers files and
-tasks, workers connect and report resources, etc. This is specially useful to
-find failures, bugs, and other errors. To activate debug output:
-
-=== "Python"
-    ```python
-    q = wq.WorkQueue(debug_log = "my.debug.log")
-    ```
-
-=== "Perl"
-    ```perl
-    my $q = Work_Queue->new(debug_log => "my.debug.log");
-    ```
-
-=== "C"
-    ```C
-    #include "debug.h"
-    cctools_debug_flags_set("all");
-    cctools_debug_config_file("my.debug.log");
-    ```
-    
-The `all` flag causes debug messages from every subsystem called by Work Queue
-to be printed. More information about the debug flags are
-[here](http://ccl.cse.nd.edu/software/manuals/api/html/debug_8h.html).
-
-
-To enable debugging at the worker, set the `-d` option:
-
-    
-```sh
-$ work_queue_worker -d all -o worker.debug -M myproject
-```
-
-### Statistics Log
-
-The statistics logs contains a time series of the statistics collected by Work
-Queue, such as number of tasks waiting and completed, number of workers busy,
-total number of cores available, etc. The log is activated as follows:
-
-=== "Python"
-    ```python
-    q = wq.WorkQueue(stats_log = "my.statslog")
-    ```
-
-=== "Perl"
-    ```perl
-    my $q = Work_Queue->new(stats_log => "my.stats.log");
-    ```
-
-=== "C"
-    ```C
-    work_queue_specify_log(q, "my.stats.log");
-    ```
-
-The time series are presented in columns, with the leftmost column as a
-timestamp in microseconds. The first row always contains the name of the
-columns. Here is an example of the first few rows and columns.
-
-```text
-# timestamp workers_connected workers_init workers_idle workers_busy workers_...
-1602165237833411 0 0 0 0 0 0 0 0 0 0 0 0 5 0 0 0 5 0 0 0 0 0 1602165237827668 ...
-1602165335687547 1 0 0 1 1 1 0 0 0 0 0 0 4 1 0 0 5 0 0 0 0 0 1602165237827668 ...
-1602165335689677 1 0 0 1 1 1 0 0 0 0 0 0 4 1 1 1 5 1 0 0 0 0 1602165237827668 ...
-...
-```
-
-The script `work_queue_graph_log` is a wrapper for `gnuplot`, and with it you
-can plot some of the statistics, such as total time spent transfering tasks,
-number of tasks running, and workers connected:
-
-```sh
-$ work_queue_graph_log -o myplots my.stats.log
-$ ls *.png
-$ ... my.stats.log.tasks.png my.stats.log.tasks-log.png my.stats.log.time.png my.stats.log.time-log.png ...
-```
-
-We find it very helpful to plot these statistics when diagnosing a problem with
-work queue applications.
-
-### Transactions Log
-
-Finally, the transactions log records the lifetime of tasks and workers. It is
-specially useful for tracking the resources requested, allocated, and used by
-tasks. It is activated as follows:
-
-=== "Python"
-    ```python
-    q = wq.WorkQueue(transactions_log = "my.tr.log")
-    ```
-
-=== "Perl"
-    ```perl
-    my $q = Work_Queue->new(transactions_log => "my.tr.log");
-    ```
-
-=== "C"
-    ```C
-   work_queue_specify_transactions_log(q, "my.tr.log");
-   ```
-
-The first few lines of the log document the possible log records:
-
-```text
-# time master_pid MASTER START|END
-# time master_pid WORKER worker_id host:port CONNECTION
-# time master_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)
-# time master_pid WORKER worker_id RESOURCES {resources}
-# time master_pid CATEGORY name MAX {resources_max_per_task}
-# time master_pid CATEGORY name MIN {resources_min_per_task_per_worker}
-# time master_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
-# time master_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}
-# time master_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
-# time master_pid TASK taskid WAITING_RETRIEVAL worker_address
-# time master_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
-```
-
-Lowercase words indicate values, and uppercase indicate constants. A bar (|) inside parentheses indicate a choice of possible constants. Variables encased in braces {} indicate a JSON dictionary. Here is an example of the first few records of a transactions log:
-
-```
-1599244364466426 16444 MASTER START
-1599244364466668 16444 TASK 1 WAITING default FIRST_RESOURCES {"cores":[1,"cores"],"memory":[800,"MB"],"disk":[500,"MB"]}
-1599244364466754 16444 TASK 2 WAITING default FIRST_RESOURCES {"cores":[1,"cores"],"memory":[800,"MB"],"disk":[500,"MB"]}
-...
-```
-
-With the transactions log, it is easy to track the lifetime of a task. For example, to print the lifetime of the task with id 1, we can simply do:
-
-```
-$ grep 'TASK \<1\>' my.tr.log
-1599244364466668 16444 TASK 1 WAITING default FIRST_RESOURCES {"cores":[1,"cores"],"memory":[800,"MB"],"disk":[500,"MB"]}
-1599244400311044 16444 TASK 1 RUNNING 10.32.79.143:48268  FIRST_RESOURCES {"cores":[4,"cores"],"memory":[4100,"MB"],...}
-1599244539953798 16444 TASK 1 WAITING_RETRIEVAL 10.32.79.143:48268
-1599244540075173 16444 TASK 1 RETRIEVED SUCCESS  0  {} {"cores":[1,"cores"],"wall_time":[123.137485,"s"],...}
-1599244540083820 16444 TASK 1 DONE SUCCESS  0  {} {"cores":[1,"cores"],"wall_time":[123.137485,"s"],...}
-```
-
-
-## Advanced Topics
-
-A variety of advanced features are available for programs with unusual needs
-or very large scales. Each feature is described briefly here, and more details
-may be found in the [Work Queue
-API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
 
 ### Maximum retries
 
@@ -1542,6 +1396,149 @@ to make a progress bar or other user-visible information:
     work_queue_get_stats(q, &stats);
     printf("%d\n", stats->workers_connected);
     ```
+
+## Logging facilities
+
+We can observe the lifetime of the queue through three different logs:
+
+
+### Debug Log
+
+The debug log prints unstructured messages as the queue transfers files and
+tasks, workers connect and report resources, etc. This is specially useful to
+find failures, bugs, and other errors. To activate debug output:
+
+=== "Python"
+    ```python
+    q = wq.WorkQueue(debug_log = "my.debug.log")
+    ```
+
+=== "Perl"
+    ```perl
+    my $q = Work_Queue->new(debug_log => "my.debug.log");
+    ```
+
+=== "C"
+    ```C
+    #include "debug.h"
+    cctools_debug_flags_set("all");
+    cctools_debug_config_file("my.debug.log");
+    ```
+    
+The `all` flag causes debug messages from every subsystem called by Work Queue
+to be printed. More information about the debug flags are
+[here](http://ccl.cse.nd.edu/software/manuals/api/html/debug_8h.html).
+
+
+To enable debugging at the worker, set the `-d` option:
+
+    
+```sh
+$ work_queue_worker -d all -o worker.debug -M myproject
+```
+
+### Statistics Log
+
+The statistics logs contains a time series of the statistics collected by Work
+Queue, such as number of tasks waiting and completed, number of workers busy,
+total number of cores available, etc. The log is activated as follows:
+
+=== "Python"
+    ```python
+    q = wq.WorkQueue(stats_log = "my.statslog")
+    ```
+
+=== "Perl"
+    ```perl
+    my $q = Work_Queue->new(stats_log => "my.stats.log");
+    ```
+
+=== "C"
+    ```C
+    work_queue_specify_log(q, "my.stats.log");
+    ```
+
+The time series are presented in columns, with the leftmost column as a
+timestamp in microseconds. The first row always contains the name of the
+columns. Here is an example of the first few rows and columns.
+
+```text
+# timestamp workers_connected workers_init workers_idle workers_busy workers_...
+1602165237833411 0 0 0 0 0 0 0 0 0 0 0 0 5 0 0 0 5 0 0 0 0 0 1602165237827668 ...
+1602165335687547 1 0 0 1 1 1 0 0 0 0 0 0 4 1 0 0 5 0 0 0 0 0 1602165237827668 ...
+1602165335689677 1 0 0 1 1 1 0 0 0 0 0 0 4 1 1 1 5 1 0 0 0 0 1602165237827668 ...
+...
+```
+
+The script `work_queue_graph_log` is a wrapper for `gnuplot`, and with it you
+can plot some of the statistics, such as total time spent transfering tasks,
+number of tasks running, and workers connected:
+
+```sh
+$ work_queue_graph_log -o myplots my.stats.log
+$ ls *.png
+$ ... my.stats.log.tasks.png my.stats.log.tasks-log.png my.stats.log.time.png my.stats.log.time-log.png ...
+```
+
+We find it very helpful to plot these statistics when diagnosing a problem with
+work queue applications.
+
+### Transactions Log
+
+Finally, the transactions log records the lifetime of tasks and workers. It is
+specially useful for tracking the resources requested, allocated, and used by
+tasks. It is activated as follows:
+
+=== "Python"
+    ```python
+    q = wq.WorkQueue(transactions_log = "my.tr.log")
+    ```
+
+=== "Perl"
+    ```perl
+    my $q = Work_Queue->new(transactions_log => "my.tr.log");
+    ```
+
+=== "C"
+    ```C
+   work_queue_specify_transactions_log(q, "my.tr.log");
+   ```
+
+The first few lines of the log document the possible log records:
+
+```text
+# time master_pid MASTER START|END
+# time master_pid WORKER worker_id host:port CONNECTION
+# time master_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)
+# time master_pid WORKER worker_id RESOURCES {resources}
+# time master_pid CATEGORY name MAX {resources_max_per_task}
+# time master_pid CATEGORY name MIN {resources_min_per_task_per_worker}
+# time master_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
+# time master_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}
+# time master_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
+# time master_pid TASK taskid WAITING_RETRIEVAL worker_address
+# time master_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
+```
+
+Lowercase words indicate values, and uppercase indicate constants. A bar (|) inside parentheses indicate a choice of possible constants. Variables encased in braces {} indicate a JSON dictionary. Here is an example of the first few records of a transactions log:
+
+```
+1599244364466426 16444 MASTER START
+1599244364466668 16444 TASK 1 WAITING default FIRST_RESOURCES {"cores":[1,"cores"],"memory":[800,"MB"],"disk":[500,"MB"]}
+1599244364466754 16444 TASK 2 WAITING default FIRST_RESOURCES {"cores":[1,"cores"],"memory":[800,"MB"],"disk":[500,"MB"]}
+...
+```
+
+With the transactions log, it is easy to track the lifetime of a task. For example, to print the lifetime of the task with id 1, we can simply do:
+
+```
+$ grep 'TASK \<1\>' my.tr.log
+1599244364466668 16444 TASK 1 WAITING default FIRST_RESOURCES {"cores":[1,"cores"],"memory":[800,"MB"],"disk":[500,"MB"]}
+1599244400311044 16444 TASK 1 RUNNING 10.32.79.143:48268  FIRST_RESOURCES {"cores":[4,"cores"],"memory":[4100,"MB"],...}
+1599244539953798 16444 TASK 1 WAITING_RETRIEVAL 10.32.79.143:48268
+1599244540075173 16444 TASK 1 RETRIEVED SUCCESS  0  {} {"cores":[1,"cores"],"wall_time":[123.137485,"s"],...}
+1599244540083820 16444 TASK 1 DONE SUCCESS  0  {} {"cores":[1,"cores"],"wall_time":[123.137485,"s"],...}
+```
 
 The statistics available are:
 
