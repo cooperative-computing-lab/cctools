@@ -23,58 +23,495 @@ mining, and other fields. It can also be used as an execution system for the
 some of the Work Queue applications running right now, view the [real time
 status page](http://ccl.cse.nd.edu/software/workqueue/status).
 
-## Getting Started
+## Quick Start in Python
 
-### Installing
+There are a variety of ways to install Work Queue, depending on your local environment.
+In most cases, installing via `conda` is the easiest method.
+Please see our [full installation instructions](../install) for other options.
 
-See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  We recommend that first time users
-install via Conda:
+First, [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html) if you haven't done so before.
+Then, open a terminal and install `ndcctools` like this:
 
 ```
 conda install -c conda-forge ndcctools
 ```
 
-The full documentation for the Work Queue API can be found here:
-- [Work Queue Python API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePython.html).
+
+Using a text editor, create a manager program called `manager.py` like this:
+
+```
+--8<-- "work_queue/examples/work_queue_function_example.py"
+```
+
+Run the manager program at the command line like this:
+
+```
+python manager.py
+```
+
+It should display output like this:
+```
+listening on port 9123
+submitting tasks...
+waiting for tasks to complete...
+```
+
+The manager is now waiting for workers to connect and begin
+requesting work. (Without any workers, it will wait forever.) You can start
+one worker on the same machine by opening a new shell and running:
+
+```
+work_queue_worker localhost 9123
+```
+
+The manager will send tasks to the worker for execution.  As they complete, you will see output like this:
+```
+task 1 exited with output 10
+task 2 exited with output 20
+...
+all done.
+```
+
+Congrads! You have now run a simple manager application that runs tasks on one local worker.
+Read on to learn how to build more complex applications and run large numbers of workers at scale.
+
+## Principle of Operation
+
+A Work Queue application is a large parallel application consisting of a **manager** and multiple **workers**.
+The manager defines a large number of **tasks**, each of which is a discrete unit
+of work that can be executed in parallel.  Each task is submitted to a **queue**, which makes
+it available for a worker to execute.  Each worker connects to the manager, receives tasks
+to execute, and returns results back to the manager. The manager receives results in the order that
+they complete, and may submit further tasks as needed. Commonly used files are cached
+at each worker to speed up execution.
+
+Tasks come in two types:
+
+- A **basic task** is a single Unix command line to execute, along with its needed input files.  Upon completion, it will produce one or more output files to be returned to the manager.
+- A **PythonTask** is a single Python function to execute, along with its needed arguments.  Upon completion, it will produce a Python value (or an exception) as a result to return to the master.
+
+Both types of tasks share a common set of options.  Each task can be labelled with the **resources**
+(CPU cores, GPU devices, memory, disk space) that it needs to execute.  This allows each worker to pack the appropriate
+number of tasks.  For example, a worker running on a 64-core machine could run 32 dual-core tasks, 16 four-core tasks,
+or any other combination that adds up to 64 cores.  If you don't know the resources needed, you can enable
+a **resource monitor** to track and report what each task uses.
+
+To run a large application at scale, you must start a number of Workers in parallel.
+If you are using a university cluster or HPC system, then you will likely be submitting
+the workers to a batch system such as HTCondor, SLURM, or SGE.  If you are using a commercial
+cloud, then you can run your workers inside of virtual machines.  We provide a number of
+scripts to facilitate starting workers this way, or you can arrange things yourself to
+simply run the `work_queue_worker` executable.
+
+
+
+## Writing a Manager Program
+
+A manager program can be written in Python, Perl, or C.
+In each language, the underlying principles are the same, but there are some syntactic differences shown below.
+The full API documentation for each language is here:
+
+- [Work Queue Python API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePython.html)
 - [Work Queue Perl API](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePerl.html)
-- [Work Queue C API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html) and
+- [Work Queue C API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html)
 
-## Building a Work Queue Application
+The basic outline of a Work Queue manager is:
 
-We begin by running a simple but complete example of a Work Queue application.
-After trying it out, we will then show how to write a Work Queue application
-from scratch.
+1. Create and configure the tasks' queue.
+2. Create tasks and add them to the queue.
+3. Wait for a task to complete.
+4. Process the result of one task.
+5. If more tasks are outstanding, return to step 3.
 
-First, download the example file for the language of your choice:
+### Creating a Queue
+
+To begin, you must import the Work Queue library, and then create a WorkQueue object.
+You may specific a specific port number to listen on like this:
+ 
+=== "Python"
+    ```python
+    # Import the Work Queue library
+    import work_queue as wq
+
+    # Create a new queue listening on port 9123
+    q = wq.WorkQueue(9123)
+    ```
+
+=== "Perl"
+    ```perl
+    # Import the Work Queue library
+    use Work_Queue;
+
+    # Create a new queue listening on port 9123
+    my $q = Work_Queue->new(9123);
+    ```
+
+=== "C"
+    ```
+    /* Import the Work Queue library */
+    #include "work_queue.h"
+
+    /* Create a new queue listening on port 9123 */
+    struct work_queue *q = work_queue_create(9123);
+    ```
+
+Of course, that specific port might already be in use, and so you may
+specify zero to indicate any available port, and then use `q.port` to
+discover which port was obtained:
+
+=== "Python"
+    ```python
+    # Create a new queue listening on any port
+    q = wq.WorkQueue(0)
+    print("listening on port {}".format(q.port))
+    ```
+
+=== "Perl"
+    ```perl
+    # Create a new queue listening on any port
+    my $q = Work_Queue->new(0);
+    printf("listening on port %d\n",q->port);
+    ```
+
+=== "C"
+    ```
+    /* Create a new queue listening on any port */
+    struct work_queue *q = work_queue_create(0);
+    printf("listening on port %d\n",work_queue_port(q));
+
+    ```
+
+### Creating Standard Tasks
+
+A **standard task** consists of a Unix command line to execute, along with
+a statement of what data is needed as input, and what data will
+be produced by the command. Input data can be provided in the form of a file
+or a local memory buffer. Output data can be provided in the form of a file or
+the standard output of the program.
+
+Here is an example of a task that consists of the standard Unix `gzip` program,
+which will read the file `my-file` and produce `my-file.gz` as an output:
+
+=== "Python"
+    ```python
+    t = wq.Task("./gzip < my-file > my-file.gz")
+    ```
+
+=== "Perl"
+    ```perl
+    my $t = Work_Queue::Task->new("./gzip < my-file > my-file.gz");
+    ```
+
+=== "C"
+    ```C
+    struct work_queue_task *t = work_queue_task_create("./gzip < my-file > my-file.gz");
+    ```
+
+It is not enough to simply state the command line.  In addition, the
+input and output files associated with the task must be accurately stated.
+This is because the input files will be copied
+over to the worker, and the output files will be brough back to the manager.
+
+In this example, the task will require `my-file` as an input file,
+and produce `my-file.gz` as an output file.  If the executable program
+itself is not already installed at the worker, then it should also be
+specified as an input file, so that it will be copied to the worker.
+
+In addition, any input file that will remain unchanged through the
+course of the application should be marked as **cacheable**.
+This will allow the worker to keep a single copy of the file and share
+it between multiple tasks that need it.
+
+Here is how to describe the files needed by this task:
+
+
+=== "Python"
+    ```python
+    # t.specify_input_file("name at manager", "name when copied at execution site", ...)
+
+    t.specify_input_file("/usr/bin/gzip", "gzip",       cache = True)
+    t.specify_input_file("my-file",       "my-file",    cache = False)
+    t.specify_output_file("my-file.gz",   "my-file.gz", cache = False)
+
+    # when the name at manager is the same as the exection site, we can write instead:
+    t.specify_input_file("my-file",     cache = False)
+    t.specify_output_file("my-file.gz", cache = False)
+    ```
+
+=== "Perl"
+    ```perl
+    # $t->specify_input_file(local_name => "name at manager", remote_name => "name when copied at execution site", ...);
+
+    $t->specify_input_file(local_name => "/usr/bin/gzip", remote_name => "gzip",       cache = True);
+    $t->specify_input_file(local_name => "my-file",       remote_name => "my-file",    cache = False);
+    $t->specify_output_file(local_name => "my-file.gz",   remote_name => "my-file.gz", cache = False);
+
+    # when the name at manager is the same as the exection site, we can write instead:
+    $t->specify_input_file(local_name => "my-file",     cache = False);
+    $t->specify_output_file(local_name => "my-file.gz", cache = False);
+    ```
+
+=== "C"
+    ```C
+    # work_queue_task_specify_file(t, "name at manager", "name when copied at execution site", ...)
+
+    work_queue_task_specify_file(t, "/usr/bin/gzip", "gzip",       WORK_QUEUE_INPUT,  WORK_QUEUE_CACHE);
+    work_queue_task_specify_file(t, "my-file",       "my-file",    WORK_QUEUE_INPUT,  WORK_QUEUE_NOCACHE);
+    work_queue_task_specify_file(t, "my-file.gz",    "my-file.gz", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+    ```
+
+When the task actually executes, the worker will create a **sandbox** directory,
+which serves as the working directory for the task.  Each of the input files
+and directories will be copied into the sandbox directory.
+The task outputs should be written into the current working directory.
+The path of the sandbox directory is exported to
+the execution environment of each worker through the `WORK_QUEUE_SANDBOX` shell
+environment variable. This shell variable can be used in the execution
+environment of the worker to describe and access the locations of files in the
+sandbox directory.
+
+### Describing Tasks
+
+In addition to describing the input and output files, you may optionally
+specify additional details about the task that will assist Work Queue in
+making good scheduling decisions.
+
+If you are able, describe the resources needed by each task -- `cores`, `gpus`,
+`memory`, `disk` -- so that the worker can pack as many concurrent tasks.
+This is described in greater detail under :ref:`Managing Resources` 
+
+You may also attach a `tag` to a task, which is just an user-defined string
+that describes the purpose of the taask.  The tag is available as `t.tag`
+when the task is complete.
+
+=== "Python"
+    ```python
+    t.specify_cores(2)
+    t.specify_memory(4096)
+    t.specify_tag("config-4.5.0")
+    ```
+
+=== "Perl"
+    ```perl
+    $t->specify_cores(2)
+    $t->specify_memory(4096)
+    $t->specify_tag("config-4.5.0")
+    ```
+
+=== "C"
+    ```C
+    work_queue_task_specify_cores(t,2);
+    work_queue_task_specify_memory(t,4096);
+    work_queue_task_specify_tag(t,"config-4.5.0");
+    ```
+
+### Managing Tasks
+
+Once a task has been fully specified, it can be submitted to the queue.
+`submit` returns a unique taskid that can be helpful when later referring
+to a task:
+
+=== "Python"
+    ```python
+    taskid = q.submit(t)
+    ```
+
+=== "Perl"
+    ```perl
+    my $taskid = $q->submit($t)
+    ```
+
+=== "C"
+    ```C
+    int taskid = work_queue_submit(q,t);
+    ```
+
+Once all tasks are submitted, use `wait` to wait until a task completes,
+indicating how many seconds you are willing to pause.  If a task completes
+within that time limit, then `wait` will return that task object.
+If no task completes within the timeout, it returns null.
+
+=== "Python"
+    ```python
+    while not q.empty():
+        t = q.wait(5)
+        if t:
+            print("Task {} has returned!".format(t.id))
+
+            if t.return_status == 0:
+                print("command exit code:\n{}".format(t.exit_code))
+                print("stdout:\n{}".format(t.output))
+            else:
+                print("There was a problem executing the task.")
+    ```
+
+=== "Perl"
+    ```perl
+    while(not $q->empty()) {
+        my $t = $q->wait(5)
+        if($t) {
+            print("Task @{[$t->id]} has returned!\n");
+
+            if($t->{return_status} == 0) {
+                print("command exit code:\n@{[$t->{exit_code}]}\n");
+                print("stdout:\n@{[$t->{output}]}\n");
+            } else {
+                print("There was a problem executing the task.\n");
+            }
+        }
+    }
+    ```
+
+=== "C"
+    ```C
+    while(!work_queue_empty(q)) {
+        struct work_queue_task *t = work_queue_wait(q,5);
+        if(t) {
+            printf("Task %d has returned!\n", t->taskid);
+            if(t->return_status == 0) {
+                printf("command exit code: %d\n", t->exit_code);
+                printf("stdout: %s\n", t->output);
+            } else {
+                printf("There was a problem executing the task.\n");
+            }
+        }
+    }
+    ```
+
+A completed task will have its output files written to disk. You may examine
+the standard output of the task in `output` and the exit code in
+`exit_status`.
+
+!!! note
+    The size of `output` is limited to 1 GB. Any output beyond 1 GB will be
+    truncated. So, please redirect the stdout `./my-command > my-stdout` of the
+    task to a file and specify the file as an output file of the task as
+    described above.
+
+When you are done with the task, delete it (only needed for C):
+
+=== "C"
+    ```C
+    work_queue_task_delete(t);
+    ```
+
+Continue submitting and waiting for tasks until all work is complete. You may
+check to make sure that the queue is empty with `work_queue_empty`. When all
+is done, delete the queue (only needed for C):
+
+=== "C"
+    ```C
+    work_queue_delete(q);
+    ```
+
+Full details of all of the Work Queue functions can be found in the [Work Queue API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
+
+### Managing Python Tasks
+
+A `PythonTask` is an extension of a standard task.
+It is not defined with a command line to execute,
+but with a Python function and its arguments, like this:
+
+=== "Python"
+    ```python
+    def my_sum(x, y):
+        return x+y
+
+    # task to execute x = my_sum(1, 2)
+    t = wq.PythonTask(my_sum, 1, 2)
+    ```
+
+A PythonTask is handled in the same way as a standard task,
+except that its output `t.output` is simply the Python return
+value of the function.  If the function should throw an exception,
+then the output will be the exception object.
+
+You can examine the result of a PythonTask like this:
+
+=== "Python"
+    ```
+    while not q.empty():
+        t = q.wait(5)
+        if t:
+            x = t.output
+            if isinstance(x,Exception):
+                print("Exception: {}".format(x))
+            else:
+                print("Result: {}".format(x))
+    ```
+
+A `PythonTask` is derived from `Task` and so all other methods for
+controlling scheduling, managing resources, and setting performance options
+all apply to `PythonTask` as well.
+
+When running a Python function remotely, it is assumed that the Python interpreter
+and libraries available at the worker correspond to the appropiate python environment for the task.
+If this is not the case, an environment file can be provided with t.specify_environment:
+
+=== "Python"
+    ```python
+    t = wq.PythonTask(my_sum, 1, 2)
+    t.specify_environment("my-env.tar.gz")
+    ```
+
+The file `my-env.tar.gz` is a
+[conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html)
+environment created with [conda-pack](https://conda.github.io/conda-pack/).  A
+minimal environment can be created a follows:
+
+```sh
+conda create -y -p my-env python=3.8 dill conda
+conda install -y -p my-env -c conda-forge conda-pack
+# conda install -y -p my-env pip and conda install other modules, etc.
+conda run -p my-env conda-pack
+```
+
+## Running Managers and Workers
+
+This section makes use of a simple but complete exmample of a Work
+Queue manager application to demonstrate various features.
+
+Donload the example file for the language of your choice:
 
   * Python: [work_queue_example.py](examples/work_queue_example.py)
   * Perl: [work_queue_example.pl](examples/work_queue_example.pl)
   * C: [work_queue_example.c](examples/work_queue_example.c)
 
-If you are using the Python example and did *not* install via Conda, then set `PYTHONPATH` to include the Python modules in cctools:
+### Language Specific Setup
+
+Before running the ication, you may need some
+additional setup, depending on the language in use:
+
+#### Python Setup
+
+If you installed via Conda, then no further setup is needed.
+
+If you are running a Python application and did *not* install via Conda,
+then you will need to set the `PYTHONPATH` to point to the cctools
+installation, like this:
     
 ```sh
 # Note: This is only needed if not using Conda:
 $ PYVER=$(python -c 'import sys; print("%s.%s" % sys.version_info[:2])')
-$ export PYTHONPATH=${PYTHONPATH}:${HOME}/cctools/lib/python${PYVER}/site-packages
+$ export PYTHONPATH=${HOME}/cctools/lib/python${PYVER}/site-packages:${PYTHONPATH}
 ```
 
-If you are using the Perl example, set `PERL5LIB` to include the Perl modules in
-cctools:
+#### Perl Setup
 
+If you are running a Perl application,  you must set `PERL5LIB` to point to the Perl modules in cctools:
 ```sh
-$ export PERL5LIB=${PERL5LIB}:${HOME}/cctools/lib/perl5/site_perl
+$ export PERL5LIB=${HOME}/cctools/lib/perl5/site_perl:${PERL5LIB}
 ```
 
-If you are using the C example, compile it like this:
+#### C Language Setup
+
+If you are writing a Work Queue application in C, you should compile it into an executable like this:
 
 ```sh
 $ gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -lwork_queue -ldttools -lm -lz
 ```
    
-    
-
-## Running a Work Queue Application
+### Running a Manager Program
 
 The example application simply compresses a bunch of files in parallel. The
 files to be compressed must be listed on the command line. Each will be
@@ -105,7 +542,6 @@ submitted task: /usr/bin/gzip < c > c.gz
 waiting for tasks to complete...
 ```
     
-
 The Work Queue manager is now waiting for workers to connect and begin
 requesting work. (Without any workers, it will wait forever.) You can start
 one worker on the same machine by opening a new shell and running:
@@ -116,13 +552,14 @@ one worker on the same machine by opening a new shell and running:
 $ work_queue_worker MACHINENAME 9123
 ```
 
-If you have access to other machines, you can `ssh` there and run workers as
-well. In general, the more you start, the faster the work gets done. If a
+If you have access to other machines, you can simply `ssh` there and run workers as well. In general, the more you start, the faster the work gets done. If a
 worker should fail, the work queue infrastructure will retry the work
 elsewhere, so it is safe to submit many workers to an unreliable system.
 
-If you have access to a Condor pool, you can use this shortcut to submit ten
-workers at once via Condor:
+### Submitting Workers to a Batch System
+
+If you have access to a HTCondor pool, you can use this shortcut to submit ten
+workers at once via HTCondor:
 
 ```sh
 $ condor_submit_workers MACHINENAME 9123 10
@@ -131,382 +568,59 @@ Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
 ```
-    
 
-Or, if you have access to an SGE cluster, do this:
-
-```sh
-$ sge_submit_workers MACHINENAME 9123 10
-
-Your job 153083 ("worker.sh") has been submitted
-Your job 153084 ("worker.sh") has been submitted
-Your job 153085 ("worker.sh") has been submitted
-...
-```
-    
+This will cause HTCondor to schedule worker jobs on remote machines.
+When they begin to run, they will call home to the indicated machine
+and port number, and begin to service the manager application.
 
 Similar scripts are available for other common batch systems:
 
 ```sh
-$ pbs_submit_workers MACHINENAME 9123 10
-
-$ torque_submit_workers MACHINENAME 9123 10
-
 $ slurm_submit_workers MACHINENAME 9123 10
-
-$ ec2_submit_workers MACHINENAME 9123 10
+$ sge_submit_workers MACHINENAME 9123 10
+$ pbs_submit_workers MACHINENAME 9123 10
+$ torque_submit_workers MACHINENAME 9123 10
 ```
 
-When the manager completes, if the workers were not shut down in the manager,
-your workers will still be available, so you can either run another manager
+When the manager completes, if the workers were not otherwise shut down,
+they will still be available, so you can either run another manager
 with the same workers, or you can remove the workers with `kill`, `condor_rm`,
 or `qdel` as appropriate. If you forget to remove them, they will exit
 automatically after fifteen minutes. (This can be adjusted with the `-t`
 option to `worker`.)
 
-## Writing a Work Queue Manager Program
-
-The easiest way to start writing your own program using WorkQueue is to modify
-with one of the examples in [Python](examples/work_queue_example.py),
-[Perl](examples/work_queue_example.pl), or [C](examples/work_queue_example.c).
-The basic outline of a WorkQueue manager is:
-
-1. Create and configure the tasks' queue.
-2. Create tasks and add them to the queue.
-3. Wait for tasks to complete.
-
-To create a new queue listening on port 9123:
-
-#### Python
-
-```python
-import work_queue as wq
-
-# create a new queue listening on port 9123
-q = wq.WorkQueue(9123)
-```
-
-#### Perl
-
-```perl
-use Work_Queue;
-
-# create a new queue listening on port 9123
-my $q = Work_Queue->new(9123);
-```
-
-#### C
-
-```C
-#include "work_queue.h"
-
-# create a new queue listening on port 9123
-struct work_queue *q = work_queue_create(9123);
-```
-
-The manager then creates tasks to submit to the queue. Each task consists of a
-command line to run and a statement of what data is needed, and what data will
-be produced by the command. Input data can be provided in the form of a file
-or a local memory buffer. Output data can be provided in the form of a file or
-the standard output of the program. It is also required to specify whether the
-data, input or output, need to be cached at the worker site for later use.
-
-In the example, we specify a command `./gzip` that takes a single input file
-`my-file` and produces a single output file `my-file.gz`. We then create a task
-by providing the specified command as an argument:
-
-#### Python
-
-```python
-t = wq.Task("./gzip < my-file > my-file.gz")
-```
-
-#### Perl
-
-```perl
-my $t = Work_Queue::Task->new("./gzip < my-file > my-file.gz");
-```
-
-#### C
-
-```C
-struct work_queue_task *t = work_queue_task_create("./gzip < my-file > my-file.gz");
-```
-    
-The input and output files associated with the execution of the task must be
-explicitly specified. In the example, we also specify the executable in the
-command invocation as an input file so that it is transferred and installed in
-the working directory of the worker. We require this executable to be cached
-so that it can be used by subsequent tasks that need it in their execution. On
-the other hand, the input and output of the task are not required to be cached
-since they are not used by subsequent tasks in this example.
-
-
-#### Python
-    
-```python
-# t.specify_input_file("name at manager", "name when copied at execution site", ...)
-
-t.specify_input_file("/usr/bin/gzip", "gzip",       cache = True)
-t.specify_input_file("my-file",       "my-file",    cache = False)
-t.specify_output_file("my-file.gz",   "my-file.gz", cache = False)
-
-# when the name at manager is the same as the exection site, we can write instead:
-t.specify_input_file("my-file",     cache = False)
-t.specify_output_file("my-file.gz", cache = False)
-```
-
-#### Perl
-    
-```perl
-# $t->specify_input_file(local_name => "name at manager", remote_name => "name when copied at execution site", ...);
-
-$t->specify_input_file(local_name => "/usr/bin/gzip", remote_name => "gzip",       cache = True);
-$t->specify_input_file(local_name => "my-file",       remote_name => "my-file",    cache = False);
-$t->specify_output_file(local_name => "my-file.gz",   remote_name => "my-file.gz", cache = False);
-
-# when the name at manager is the same as the exection site, we can write instead:
-$t->specify_input_file(local_name => "my-file",     cache = False);
-$t->specify_output_file(local_name => "my-file.gz", cache = False);
-```
-
-
-#### C
-
-```C
-# work_queue_task_specify_file(t, "name at manager", "name when copied at execution site", ...)
-
-work_queue_task_specify_file(t, "/usr/bin/gzip", "gzip",       WORK_QUEUE_INPUT,  WORK_QUEUE_CACHE);
-work_queue_task_specify_file(t, "my-file",       "my-file",    WORK_QUEUE_INPUT,  WORK_QUEUE_NOCACHE);
-work_queue_task_specify_file(t, "my-file.gz",    "my-file.gz", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
-```
-
-Note that the specified input directories and files for each task are
-transferred and setup in the sandbox directory of the worker (unless an
-absolute path is specified for their location). This sandbox serves as the
-initial working directory of each task executed by the worker. The task
-outputs are also stored in the sandbox directory (unless an absolute path is
-specified for their storage). The path of the sandbox directory is exported to
-the execution environment of each worker through the `WORK_QUEUE_SANDBOX` shell
-environment variable. This shell variable can be used in the execution
-environment of the worker to describe and access the locations of files in the
-sandbox directory.
-
-We can also run a program that is already installed at the remote site, where
-the worker runs, by specifying its installed location in the command line of
-the task (and removing the specification of the executable as an input file).
-For example:
-
-#### Python
-
-```python
-t = Task("/usr/bin/gzip < my-file > my-file.gz")
-```
-
-#### Perl
-
-```perl
-my $t = Work_Queue::Task->new("/usr/bin/gzip < my-file > my-file.gz")
-```
-
-#### C
-
-```C
-struct work_queue_task *t = work_queue_task_create("/usr/bin/gzip < my-file > my-file.gz");
-```
-
-Once a task has been fully specified, it can be submitted to the queue where it
-gets assigned a unique taskid:
-
-### Python
-
-```python
-taskid = q.submit(t)
-```
-
-### Perl
-
-```perl
-my $taskid = $q->submit($t)
-```
-
-#### C
-
-```C
-int taskid = work_queue_submit(q,t);
-```
-
-Next, wait for a task to complete, stating how long you are willing to wait for
-a result, in seconds:
-
-#### Python
-    
-```python
-while not q.empty():
-    t = q.wait(5)
-    if t:
-        print("Task {} has returned!".format(t.id))
-
-        if t.return_status == 0:
-            print("command exit code:\n{}".format(t.exit_code))
-            print("stdout:\n{}".format(t.output))
-        else:
-            print("There was a problem executing the task.")
-```
-
-#### Perl
-    
-```perl
-while(not $q->empty()) {
-    my $t = $q->wait(5)
-    if($t) {
-        print("Task @{[$t->id]} has returned!\n");
-
-        if($t->{return_status} == 0) {
-            print("command exit code:\n@{[$t->{exit_code}]}\n");
-            print("stdout:\n@{[$t->{output}]}\n");
-        } else {
-            print("There was a problem executing the task.\n");
-        }
-    }
-}
-```
-
-#### C
-
-```C
-while(!work_queue_empty(q)) {
-    struct work_queue_task *t = work_queue_wait(q,5);
-    if(t) {
-        printf("Task %d has returned!\n", t->taskid);
-        if(t->return_status == 0) {
-            printf("command exit code: %d\n", t->exit_code);
-            printf("stdout: %s\n", t->output);
-        } else {
-            printf("There was a problem executing the task.\n");
-        }
-
-    }
-}
-```
-
-A completed task will have its output files written to disk. You may examine
-the standard output of the task in `output` and the exit code in
-`exit_status`.
-
-!!! note
-    The size of `output` is limited to 1 GB. Any output beyond 1 GB will be
-    truncated. So, please redirect the stdout `./my-command > my-stdout` of the
-    task to a file and specify the file as an output file of the task as
-    described above.
-
-When you are done with the task, delete it (only needed for C):
-
-#### C
-```C
-work_queue_task_delete(t);
-```
-
-Continue submitting and waiting for tasks until all work is complete. You may
-check to make sure that the queue is empty with `work_queue_empty`. When all
-is done, delete the queue (only needed for C):
-
-#### C
-
-```C
-work_queue_delete(q);
-```
-
-Full details of all of the Work Queue functions can be found in the [Work Queue API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
-
-## Running python functions as Work Queue tasks
-
-The `work_queue` python module provides `PythonTask`, which extends
-`work_queue.Task` to better integrate with python code. In particular,
-`PythonTask` is not defined with a command line to execute, but with a python
-function and its arguments, such as:
-
-```python
-import work_queue as wq
-
-def my_sum(x, y):
-    return x+y
-
-# task to execute x = my_sum(1, 2)
-t = wq.PythonTask(my_sum, 1, 2)
-
-while not q.empty():
-    t = q.wait(5)
-    if t:
-        x = t.output
-        if isinstance(x, wq.PythonTaskNoResult):
-            print("Error executing the function: {}".format(t.std_output))
-        print("Result is: {}".format(x))
-```
-
-Note that the output of the task is retrieved as python object
-with `t.output`.
-
-In the previous example, it is assumed that the python interpreter available at
-the worker correspond to the appropiate python environment for the task. If
-this is not the case, an environment file can be provided with
-t.specify_environment:
-
-```python
-t = wq.PythonTask(my_sum, 1, 2)
-t.specify_environment("my-env.tar.gz")
-```
-
-The file `my-env.tar.gz` is a
-[conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html)
-environment created with [conda-pack](https://conda.github.io/conda-pack/).  A
-minimal environment can be created a follows:
-
-```sh
-conda create -y -p my-env python=3.8 dill conda
-conda install -y -p my-env -c conda-forge conda-pack
-# conda install -y -p my-env pip and conda install other modules, etc.
-conda run -p my-env conda-pack
-```
-
-## Project Names and the Catalog Server
+### Project Names and the Catalog Server
 
 Keeping track of the manager's hostname and port can get cumbersome, especially
-if there are multiple managers. To help with difficulty, we provide the project
-name feature to identify a Work Queue manager with a more recognizable project
-name. Work Queue workers can then be started for their managers by providing
-the project names.
+if there are multiple managers. To help with this, a **project name** can be used to identify a Work Queue manager with a human-readable name.
+Work Queue workers can then be started for their managers by providing
+the project name instead of a host an port number.
 
-The project name feature uses the **catalog server** to maintain and track the
+The project name feature uses the [Catalog Server](../catalog) to maintain and track the
 project names of managers and their respective locations. It works as follows:
 the manager advertises its project name along with its hostname and port to the
 catalog server. Work Queue workers that are provided with the manager's project
 name query the catalog server to find the hostname and port of the manager with
-the given project name. So, to utilize this feature, the manager must be
-specified to run in the `WORK_QUEUE_MANAGER_MODE_CATALOG`. See [Catalog
-Servers](../catalog) for details on specifying catalog servers.
+the given project name.
 
 For example, to have a Work Queue manager advertise its project name as
 `myproject`, add the following code snippet after creating the queue:
 
-#### Python
-```python
-q = wq.WorkQueue(name = "myproject")
-```
+=== "Python"
+    ```python
+    q = wq.WorkQueue(name = "myproject")
+    ```
 
-#### Perl
-```perl
-my $q = Work_Queue->new(name => "myproject");
-```
+=== "Perl"
+    ```perl
+    my $q = Work_Queue->new(name => "myproject");
+    ```
 
-#### C
-
-```C
-work_queue_specify_name(q, "myproject");
-```
-    
-
-    
+=== "C"
+    ```C
+    work_queue_specify_name(q, "myproject");
+    ```
+        
 To start a worker for this manager, specify the project name (`myproject`) to
 connect in the `-M` option:
 
@@ -535,9 +649,30 @@ Your job 153099 ("worker.sh") has been submitted
 ...
 ```
 
-Project names are particularly useful when automatically maintaining a pool of workers with the **work queue factory**, as explained next.
+### Work Queue Status Display
 
-### Work Queue Factory
+An additional benefit of using a project name is that you can
+now use the [work_queue_status](../man_pages/work_queue_status) command
+to display the progress of your application.  This shows the name,
+location, and statistics of each application that reports itself to the
+catalog server.  (Note that this information is updated about once
+per minute.).  For example:
+
+```sh
+% work_queue_status
+PROJECT               HOST                      PORT WAITING RUNNING COMPLETE WORKERS 
+molsim-c2h2           home.cse.nd.edu           8999     793      64      791      16 
+freds-model-search    mars.indiana.edu          9123     100     700     1372     350 
+yang-analysis-355     login.crc.nd.edu          9100    8932    4873    10007    4873  
+```
+
+The same information is available in a more graphical form online
+at the [Work Queue Status Display](http://ccl.cse.nd.edu/software/workqueue/status),
+which looks like this:
+
+<img src=examples/work-queue-status-example.png>
+
+### Managing Workers with the Work Queue Factory
 
 Instead of launching each worker manually from the command line, the utility
 **work_queue_factory** may be used to launch workers are needed. The factory
@@ -582,6 +717,63 @@ running on that machine. For
 example, if you have a 8-core machine, then you might want to run four 2-core
 tasks on a single worker at once, being careful not to exceed the available
 memory and disk.
+
+### Task Resources
+
+To run several tasks in a worker, every task must have a description of the
+resources it uses, in terms of cores, memory, disk, and gpus. While time is
+not exactly a type of resource, specifying the running time of tasks can
+often be helpful to map tasks to workers. These resources can be specified
+as in the following example:
+
+```python
+t.specify_cores(1)                     # task needs one core
+t.specify_memory(1024)                 # task needs 1024 MB of memory
+t.specify_disk(4096)                   # task needs 4096 MB of disk space
+t.specify_gpus(0)                      # task does not need a gpu
+t.specify_running_time_max(100)        # task is allowed to run in 100 seconds
+t.specify_running_time_min(10)         # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
+```
+
+```perl
+$t->specify_cores(1)      # task needs one core
+$t->specify_memory(1024)  # task needs 1024 MB of memory
+$t->specify_disk(4096)    # task needs 4096 MB of disk space
+$t->specify_gpus(0)       # task does not need a gpu
+$t->specify_running_time_max(100)  # task is allowed to run in 100 seconds
+$t->specify_running_time_min(10)   # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
+```
+
+When all cores, memory, and disk are specified, Work Queue will simply fit as
+many tasks as possible without going above the resources available at a
+particular worker. When the maximum running time is specified, Work Queue will
+kill any task that exceeds its maximum running time. The minimum running time,
+if specified, helps Work Queue decide which worker best fits which task.
+Specifying tasks' running time is especially helpful in clusters where workers
+may have a hard threshold of their running time.
+
+When some of the resources are left unspecified, then Work Queue tries to find
+some reasonable defaults as follows:
+
+- If no resources are specified, or all resources are specified to be 0, then a
+  single task from the category will consume a **whole worker**.
+- Unspecified gpus are always zero.
+- If a task specifies gpus, then the default cores is zero.
+- Unspecified cores, memory and disk will get a default according to the
+  proportion the specified resources will use at a worker, rounding-up. Thus,
+  if task specifies that it will use two cores, but does not specify memory or
+  disk, it will be allocated %50 of memory and disk in 4-core workers, or %25
+  in 8-core workers. When more than one resource is specified, the default uses
+  the largest proportion.
+
+The current Work Queue implementation only accepts whole integers for its
+resources, which means that no worker can concurrently execute more tasks than
+its number of cores. (This will likely change in the future.)
+
+When you would like to run several tasks in a worker, but you are not sure
+about the resources each task needs, Work Queue can automatically find values
+of resources that maximize throughput, or minimize waste. This is discussed in
+the section (below)[#grouping-tasks-with-similar-resources-needs].
 
 ### Worker Resources
 
@@ -672,65 +864,6 @@ specified in the configuration file as follows:
 ```
 
 Both memory and disk are specified in `MB`.
-
-
-### Specifying Task Resources
-
-To run several tasks in a worker, every task must have a description of the
-resources it uses, in terms of cores, memory, disk, and gpus. While time is
-not exactly a type of resource, specifying the running time of tasks can
-often be helpful to map tasks to workers. These resources can be specified
-as in the following example:
-
-```python
-t.specify_cores(1)                     # task needs one core
-t.specify_memory(1024)                 # task needs 1024 MB of memory
-t.specify_disk(4096)                   # task needs 4096 MB of disk space
-t.specify_gpus(0)                      # task does not need a gpu
-t.specify_running_time_max(100)        # task is allowed to run in 100 seconds
-t.specify_running_time_min(10)         # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
-```
-
-```perl
-$t->specify_cores(1)      # task needs one core
-$t->specify_memory(1024)  # task needs 1024 MB of memory
-$t->specify_disk(4096)    # task needs 4096 MB of disk space
-$t->specify_gpus(0)       # task does not need a gpu
-$t->specify_running_time_max(100)  # task is allowed to run in 100 seconds
-$t->specify_running_time_min(10)   # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
-```
-
-When all cores, memory, and disk are specified, Work Queue will simply fit as
-many tasks as possible without going above the resources available at a
-particular worker. When the maximum running time is specified, Work Queue will
-kill any task that exceeds its maximum running time. The minimum running time,
-if specified, helps Work Queue decide which worker best fits which task.
-Specifying tasks' running time is especially helpful in clusters where workers
-may have a hard threshold of their running time.
-
-When some of the resources are left unspecified, then Work Queue tries to find
-some reasonable defaults as follows:
-
-- If no resources are specified, or all resources are specified to be 0, then a
-  single task from the category will consume a **whole worker**.
-- Unspecified gpus are always zero.
-- If a task specifies gpus, then the default cores is zero.
-- Unspecified cores, memory and disk will get a default according to the
-  proportion the specified resources will use at a worker, rounding-up. Thus,
-  if task specifies that it will use two cores, but does not specify memory or
-  disk, it will be allocated %50 of memory and disk in 4-core workers, or %25
-  in 8-core workers. When more than one resource is specified, the default uses
-  the largest proportion.
-
-The current Work Queue implementation only accepts whole integers for its
-resources, which means that no worker can concurrently execute more tasks than
-its number of cores. (This will likely change in the future.)
-
-When you would like to run several tasks in a worker, but you are not sure
-about the resources each task needs, Work Queue can automatically find values
-of resources that maximize throughput, or minimize waste. This is discussed in
-the section (below)[#grouping-tasks-with-similar-resources-needs].
-
 
 ### Monitoring and Enforcement
 
@@ -827,33 +960,35 @@ as part of a category.
 
 We can create some categories with their resource description as follows:
 
-#### Python
+=== "Python"
+    ```python
+    # memory and disk values in MB.
+    q.specify_category_max_resources('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
+    q.specify_category_max_resources('my-category-b', {'cores': 1})
+    q.specify_category_max_resources('my-category-c', {})
+    ```
 
-```python
-# memory and disk values in MB.
-q.specify_category_max_resources('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
-q.specify_category_max_resources('my-category-b', {'cores': 1})
-q.specify_category_max_resources('my-category-c', {})
-```
-
-```perl
-# memory and disk values in MB.
-$q->specify_category_max_resources('my-category-a', {'cores' => 2, 'memory' => 1024, 'disk' => 2048, 'gpus' => 0})
-$q->specify_category_max_resources('my-category-b', {'cores' => 1})
-$q->specify_category_max_resources('my-category-c', {})
-```
+=== "Perl"
+    ```perl
+    # memory and disk values in MB.
+    $q->specify_category_max_resources('my-category-a', {'cores' => 2, 'memory' => 1024, 'disk' => 2048, 'gpus' => 0})
+    $q->specify_category_max_resources('my-category-b', {'cores' => 1})
+    $q->specify_category_max_resources('my-category-c', {})
+    ```
 
 In the previous examples, we created three categories. Note that it is not
 necessary to specify all the resources, as Work Queue can be directed to
 compute some efficient defaults. To assign a task to a category:
 
-```python
-t.specify_category('my-category-a')
-```
+=== "Python"
+    ```python
+    t.specify_category('my-category-a')
+    ```
 
-```perl
-$t->specify_category('my-category-a')
-```
+=== "Perl"
+    ```perl
+    $t->specify_category('my-category-a')
+    ```
 
 When a category leaves some resource unspecified, then Work Queue tries to find
 some reasonable defaults in the same way described before in the section
@@ -869,7 +1004,7 @@ When the resources used by a task are unknown, Work Queue can measure and
 compute efficient resource values to maximize throughput or minimize waste, as
 we explain in the following sections. 
 
-#### Automatic Management of Task Resources in a Category
+### Automatic Resource Management
 
 If the resources a category uses are unknown, then Work Queue can be directed
 to find efficient resource values to maximize throughput or minimize resources
@@ -949,7 +1084,12 @@ cores, memory and disk have modifiers `~` and `>` as follows:
     `t.specify_cores`, such resources are fixed for the task and are not
     modified when more efficient values are found.
 
-## Recommended Practices
+## Advanced Techniques
+
+A variety of advanced features are available for programs with unusual needs
+or very large scales. Each feature is described briefly here, and more details
+may be found in the [Work Queue
+API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
 
 ### Security
 
@@ -968,23 +1108,20 @@ the password.
 
 Then, modify your manager program to use the password:
 
-#### Python
+=== "Python"
+    ```python
+    q.specify_password_file("mypwfile")
+    ```
 
-```python
-q.specify_password_file("mypwfile")
-```
+=== "Perl"
+    ```perl
+    $q->specify_password_file("mypwfile");
+    ```
 
-#### Perl
-
-```perl
-$q->specify_password_file("mypwfile");
-```
-
-#### C
-
-```C
-work_queue_specify_password_file(q,"mypwfile");
-```
+=== "C"
+    ```C
+    work_queue_specify_password_file(q,"mypwfile");
+    ```
     
 
 And give the `--password` option to give the same password file to your
@@ -999,6 +1136,267 @@ other has the matching password before proceeding. The password is not sent in
 the clear, but is securely verified through a SHA1-based challenge-response
 protocol.
 
+### Maximum retries
+
+When a task cannot be completed because a worker disconnection or because it
+exhausted some intermediate resource allocation, it is automatically retried.
+By default, there is no limit on the number of retries. However, you can set a
+limit on the number of retries:
+
+=== "Python"
+    ```python
+    t.specify_max_retries(5)   # Task will be try at most 6 times (5 retries).
+    ```
+
+=== "Perl"
+    ```perl
+    $t->specify_max_retries(5)   # Task will be try at most 6 times (5 retries).
+    ```
+
+=== "C"
+    ```C
+    work_queue_specify_max_retries(t, 5)
+    ```
+
+When a task cannot be completed in the specified number of tries,
+then the task result is set to  `WORK_QUEUE_RESULT_MAX_RETRIES`:
+
+### Pipelined Submission.
+
+If you have a **very** large number of tasks to run, it may not be possible to
+submit all of the tasks, and then wait for all of them. Instead, submit a
+small number of tasks, then alternate waiting and submitting to keep a constant
+number in the queue. The `hungry` will tell you if more submission are
+warranted:
+
+=== "Python"
+    ```python
+    if q.hungry():
+        # submit more tasks...
+    ```
+
+=== "Perl"
+    ```perl
+    if($q->hungry()) {
+        # submit more tasks...
+    }
+    ```
+
+=== "C"
+    ```C
+    if(q->hungry()) {
+        // submit more tasks...
+    }
+    ```
+
+### Watching Output Files
+
+If you would like to see the output of a task as it is produced, add
+`WORK_QUEUE_WATCH` to the flags argument of `specify_file`. This will
+cause the worker to periodically send output appended to that file back to the
+manager. This is useful for a program that produces a log or progress bar as
+part of its output.
+
+=== "Python"
+    ```python
+    t.specify_output_file("my-file", flags = wq.WORK_QUEUE_WATCH)
+    ```
+
+=== "Perl"
+    ```perl
+    $t->specify_output_file(local_name => "my-file", flags = wq.WORK_QUEUE_WATCH)
+    ``` 
+
+=== "C"
+    ```C
+    work_queue_task_specify_file(t, "my-file", "my-file", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE | WORK_QUEUE_WATCH);
+    ```
+
+### Fast Abort
+
+A large computation can often be slowed down by stragglers. If you have a
+large number of small tasks that take a short amount of time, then Fast Abort
+can help. The Fast Abort feature keeps statistics on tasks execution times and
+proactively aborts tasks that are statistical outliers:
+
+=== "Python"
+    ```python
+    # Disconnect workers that are executing tasks twice as slow as compared to the average.
+    q.activate_fast_abort(2)
+    ```
+
+=== "Perl"
+    ```perl
+    # Disconnect workers that are executing tasks twice as slow as compared to the average.
+    $q->activate_fast_abort(2);
+    ```
+
+=== "C"
+    ```C
+    // Disconnect workers that are executing tasks twice as slow as compared to the average.
+    work_queue_activate_fast_abort(q, 2);
+    ```
+
+Tasks that trigger fast abort are automatically retried in some other worker.
+Each retry allows the task to run for longer and longer times until a
+completion is reached. You can set an upper bound in the number of retries with
+[Maximum retries](#maximum-retries).
+
+### String Interpolation
+
+If you have workers distributed across multiple operating systems (such as
+Linux, Cygwin, Solaris) and/or architectures (such as i686, x86_64) and have
+files specific to each of these systems, this feature will help. The strings
+$OS and $ARCH are available for use in the specification of input file names.
+Work Queue will automatically resolve these strings to the operating system
+and architecture of each connected worker and transfer the input file
+corresponding to the resolved file name. For example:
+
+=== "Python"
+    ```C
+    t.specify_input_file("my-executable.$OS.$ARCH", "my-exe")
+    ```
+
+=== "Perl"
+    ```perl
+    $t->specify_output_file(local_name => "my-executable.$OS.$ARCH", remote_name => "my-exe");
+    ```
+
+=== "C"
+    ```C
+    work_queue_task_specify_file(t,"my-executable.$OS.$ARCH","./my-exe",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+    ```
+
+This will transfer `my-executable.Linux.x86_64` to workers running on a Linux
+system with an x86_64 architecture and `a.Cygwin.i686` to workers on Cygwin
+with an i686 architecture.
+
+Note this feature is specifically designed for specifying and distingushing
+input file names for different platforms and architectures. Also, this is
+different from the $WORK_QUEUE_SANDBOX shell environment variable that exports
+the location of the working directory of the worker to its execution
+environment.
+
+
+### Task Cancellations
+
+This feature is useful in workflows where there are redundant tasks or tasks
+that become obsolete as other tasks finish. Tasks that have been submitted can
+be cancelled and immediately retrieved without waiting for Work Queue to
+return them in `work_queue_wait`. The tasks to cancel can be identified by
+either their `taskid` or `tag`. For example:
+
+=== "Python"
+    ```python
+    # create task as usual and tag it with an arbitrary string.
+    t = wq.Task(...)
+    t.specify_tag("my-tag")
+
+    taskid = q.submit(t)
+
+    # cancel task by id. Return the canceled task.
+    t = q.cancel_by_taskid(taskid)
+
+    # or cancel task by tag. Return the canceled task.
+    t = q.cancel_by_tasktag("my-tag")
+    ```
+
+=== "Perl"
+    ```perl
+    # create task as usual and tag it with an arbitrary string.
+    my $t = Work_Queue::Task->new(...)
+    my $t->specify_tag("my-tag")
+
+    my taskid = $q->submit($t);
+
+    # cancel task by id. Return the canceled task.
+    $t = $q->cancel_by_taskid(taskid);
+
+    # or cancel task by tag. Return the canceled task.
+    $t = $q->cancel_by_tasktag("my-tag");
+    ```
+
+=== "C"
+    ```C
+    // create task as usual and tag it with an arbitrary string.
+    struct work_queue_task *t = work_queue_task_create("...");
+    work_queue_specify_task(t, "my-tag");
+
+    int taskid = work_queue_submit(q, t);
+
+    // cancel task by id. Return the canceled task.
+    t = work_queue_cancel_by_taskid(q, taskid);
+
+    # or cancel task by tag. Return the canceled task.
+    t = work_queue_cancel_by_tasktag(q, "my-tag");
+    ```
+
+
+!!! note
+    If several tasks have the same tag, only one of them is cancelled. If you
+    want to cancel all the tasks with the same tag, you can use loop until
+    `cancel_by_task` does not return a task, as in:
+```
+    while q->cancel_by_taskid("my-tag"):
+        pass
+```
+
+
+### Worker Blacklist
+
+You may find that certain hosts are not correctly configured to run your
+tasks. The manager can be directed to ignore certain workers with the blacklist
+feature. For example:
+
+=== "Python"
+    ```python
+    t = q.wait(5)
+
+    # if t fails given a worker misconfiguration:
+    q.blacklist(t.hostname)
+    ```
+
+=== "Perl"
+    ```perl
+    my $t = $q->wait(5);
+
+    # if $t fails given a worker misconfiguration:
+    $q->blacklist($t->hostname);
+    ```
+
+=== "C"
+    ```C
+    struct work_queue_task *t = work_queue_wait(q, t);
+
+    //if t fails given a worker misconfiguration:
+    work_queue_blacklist_add(q, t->{hostname});
+    ```
+
+### Performance Statistics
+
+The queue tracks a fair number of statistics that count the number of tasks,
+number of workers, number of failures, and so forth. This information is useful
+to make a progress bar or other user-visible information:
+
+=== "Python"
+    ```python
+    stats = q.stats
+    print(stats.workers_busy)
+    ```
+
+=== "Perl"
+    ```perl
+    my $stats = $q->stats;
+    print($stats->{task_running});
+    ```
+
+=== "C"
+    ```C
+    struct work_queue_stats stats;
+    work_queue_get_stats(q, &stats);
+    printf("%d\n", stats->workers_connected);
+    ```
+
 ## Logging facilities
 
 We can observe the lifetime of the queue through three different logs:
@@ -1010,26 +1408,22 @@ The debug log prints unstructured messages as the queue transfers files and
 tasks, workers connect and report resources, etc. This is specially useful to
 find failures, bugs, and other errors. To activate debug output:
 
-#### Python
+=== "Python"
+    ```python
+    q = wq.WorkQueue(debug_log = "my.debug.log")
+    ```
 
-```python
-q = wq.WorkQueue(debug_log = "my.debug.log")
-```
+=== "Perl"
+    ```perl
+    my $q = Work_Queue->new(debug_log => "my.debug.log");
+    ```
 
-#### Perl
-
-```perl
-my $q = Work_Queue->new(debug_log => "my.debug.log");
-```
-
-#### C
-
-```C
-#include "debug.h"
-
-cctools_debug_flags_set("all");
-cctools_debug_config_file("my.debug.log");
-```
+=== "C"
+    ```C
+    #include "debug.h"
+    cctools_debug_flags_set("all");
+    cctools_debug_config_file("my.debug.log");
+    ```
     
 The `all` flag causes debug messages from every subsystem called by Work Queue
 to be printed. More information about the debug flags are
@@ -1049,23 +1443,20 @@ The statistics logs contains a time series of the statistics collected by Work
 Queue, such as number of tasks waiting and completed, number of workers busy,
 total number of cores available, etc. The log is activated as follows:
 
-#### Python
+=== "Python"
+    ```python
+    q = wq.WorkQueue(stats_log = "my.statslog")
+    ```
 
-```python
-q = wq.WorkQueue(stats_log = "my.statslog")
-```
+=== "Perl"
+    ```perl
+    my $q = Work_Queue->new(stats_log => "my.stats.log");
+    ```
 
-#### Perl
-
-```perl
-my $q = Work_Queue->new(stats_log => "my.stats.log");
-```
-
-#### C
-
-```C
-work_queue_specify_log(q, "my.stats.log");
-```
+=== "C"
+    ```C
+    work_queue_specify_log(q, "my.stats.log");
+    ```
 
 The time series are presented in columns, with the leftmost column as a
 timestamp in microseconds. The first row always contains the name of the
@@ -1098,22 +1489,20 @@ Finally, the transactions log records the lifetime of tasks and workers. It is
 specially useful for tracking the resources requested, allocated, and used by
 tasks. It is activated as follows:
 
-#### Python
+=== "Python"
+    ```python
+    q = wq.WorkQueue(transactions_log = "my.tr.log")
+    ```
 
-```python
-q = wq.WorkQueue(transactions_log = "my.tr.log")
-```
+=== "Perl"
+    ```perl
+    my $q = Work_Queue->new(transactions_log => "my.tr.log");
+    ```
 
-#### Perl
-
-```perl
-my $q = Work_Queue->new(transactions_log => "my.tr.log");
-```
-
-#### C
-
-```C
-work_queue_specify_transactions_log(q, "my.tr.log");
+=== "C"
+    ```C
+   work_queue_specify_transactions_log(q, "my.tr.log");
+   ```
 
 The first few lines of the log document the possible log records:
 
@@ -1149,289 +1538,6 @@ $ grep 'TASK \<1\>' my.tr.log
 1599244539953798 16444 TASK 1 WAITING_RETRIEVAL 10.32.79.143:48268
 1599244540075173 16444 TASK 1 RETRIEVED SUCCESS  0  {} {"cores":[1,"cores"],"wall_time":[123.137485,"s"],...}
 1599244540083820 16444 TASK 1 DONE SUCCESS  0  {} {"cores":[1,"cores"],"wall_time":[123.137485,"s"],...}
-```
-
-
-## Advanced Topics
-
-A variety of advanced features are available for programs with unusual needs
-or very large scales. Each feature is described briefly here, and more details
-may be found in the [Work Queue
-API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
-
-### Maximum retries
-
-When a task cannot be completed because a worker disconnection or because it
-exhausted some intermediate resource allocation, it is automatically retried.
-By default, there is no limit on the number of retries. However, you can set a
-limit on the number of retries:
-
-```python
-t.specify_max_retries(5)   # Task will be try at most 6 times (5 retries).
-```
-
-```perl
-$t->specify_max_retries(5)   # Task will be try at most 6 times (5 retries).
-```
-
-```C
-work_queue_specify_max_retries(t, 5)
-```
-
-When a task cannot be completed in the specified number of tries, it is
-returned with the result `WORK_QUEUE_RESULT_MAX_RETRIES`. In python this would
-look like:
-
-```python
-import work_queue as wq
-t = q.wait(5)
-if t:
-    if t.result == wq.WORK_QUEUE_RESULT_MAX_RETRIES:
-        print("Task could not be completed in the specified number of attempts.")
-```
-
-
-### Pipelined Submission.
-
-If you have a **very** large number of tasks to run, it may not be possible to
-submit all of the tasks, and then wait for all of them. Instead, submit a
-small number of tasks, then alternate waiting and submitting to keep a constant
-number in the queue. The `hungry` will tell you if more submission are
-warranted:
-
-#### Python
-
-```python
-if q.hungry():
-    # submit more tasks...
-```
-
-#### Perl
-
-```perl
-if($q->hungry()) {
-    # submit more tasks...
-}
-```
-
-#### C
-
-```C
-if(q->hungry()) {
-    // submit more tasks...
-}
-```
-
-
-### Watching Output Files
-
-If you would like to see the output of a task as it is produced, add
-`WORK_QUEUE_WATCH` to the flags argument of `specify_file`. This will
-cause the worker to periodically send output appended to that file back to the
-manager. This is useful for a program that produces a log or progress bar as
-part of its output.
-
-#### Python
-```python
-t.specify_output_file("my-file", flags = wq.WORK_QUEUE_WATCH)
-```
-
-#### Perl
-```perl
-$t->specify_output_file(local_name => "my-file", flags = wq.WORK_QUEUE_WATCH)
-```
-
-#### C
-```C
-work_queue_task_specify_file(t, "my-file", "my-file", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE | WORK_QUEUE_WATCH);
-```
-
-### Fast Abort
-
-A large computation can often be slowed down by stragglers. If you have a
-large number of small tasks that take a short amount of time, then Fast Abort
-can help. The Fast Abort feature keeps statistics on tasks execution times and
-proactively aborts tasks that are statistical outliers:
-
-#### Python
-```python
-# Disconnect workers that are executing tasks twice as slow as compared to the
-# average.
-q.activate_fast_abort(2)
-```
-
-#### Perl
-```perl
-# Disconnect workers that are executing tasks twice as slow as compared to the
-# average.
-$q->activate_fast_abort(2);
-```
-
-#### C
-```C
-// Disconnect workers that are executing tasks twice as slow as compared to the
-// average.
-work_queue_activate_fast_abort(q, 2);
-```
-
-Tasks that trigger fast abort are automatically retried in some other worker.
-Each retry allows the task to run for longer and longer times until a
-completion is reached. You can set an upper bound in the number of retries with
-[Maximum retries](#maximum-retries).
-
-
-### String Interpolation
-
-If you have workers distributed across multiple operating systems (such as
-Linux, Cygwin, Solaris) and/or architectures (such as i686, x86_64) and have
-files specific to each of these systems, this feature will help. The strings
-$OS and $ARCH are available for use in the specification of input file names.
-Work Queue will automatically resolve these strings to the operating system
-and architecture of each connected worker and transfer the input file
-corresponding to the resolved file name. For example:
-
-#### Python
-```C
-t.specify_input_file("my-executable.$OS.$ARCH", "my-exe")
-```
-
-#### Perl
-```perl
-$t->specify_output_file(local_name => "my-executable.$OS.$ARCH", remote_name => "my-exe");
-```
-
-#### C
-
-```C
-work_queue_task_specify_file(t,"my-executable.$OS.$ARCH","./my-exe",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
-```
-
-This will transfer `my-executable.Linux.x86_64` to workers running on a Linux
-system with an x86_64 architecture and `a.Cygwin.i686` to workers on Cygwin
-with an i686 architecture.
-
-Note this feature is specifically designed for specifying and distingushing
-input file names for different platforms and architectures. Also, this is
-different from the $WORK_QUEUE_SANDBOX shell environment variable that exports
-the location of the working directory of the worker to its execution
-environment.
-
-
-### Task Cancellations
-
-This feature is useful in workflows where there are redundant tasks or tasks
-that become obsolete as other tasks finish. Tasks that have been submitted can
-be cancelled and immediately retrieved without waiting for Work Queue to
-return them in `work_queue_wait`. The tasks to cancel can be identified by
-either their `taskid` or `tag`. For example:
-
-```python
-# create task as usual and tag it with an arbitrary string.
-t = wq.Task(...)
-t.specify_tag("my-tag")
-
-taskid = q.submit(t)
-
-# cancel task by id. Return the canceled task.
-t = q.cancel_by_taskid(taskid)
-
-# or cancel task by tag. Return the canceled task.
-t = q.cancel_by_tasktag("my-tag")
-```
-
-
-```perl
-# create task as usual and tag it with an arbitrary string.
-my $t = Work_Queue::Task->new(...)
-my $t->specify_tag("my-tag")
-
-my taskid = $q->submit($t);
-
-# cancel task by id. Return the canceled task.
-$t = $q->cancel_by_taskid(taskid);
-
-# or cancel task by tag. Return the canceled task.
-$t = $q->cancel_by_tasktag("my-tag");
-```
-
-```C
-// create task as usual and tag it with an arbitrary string.
-struct work_queue_task *t = work_queue_task_create("...");
-work_queue_specify_task(t, "my-tag");
-
-int taskid = work_queue_submit(q, t);
-
-// cancel task by id. Return the canceled task.
-t = work_queue_cancel_by_taskid(q, taskid);
-
-# or cancel task by tag. Return the canceled task.
-t = work_queue_cancel_by_tasktag(q, "my-tag");
-```
-
-
-!!! note
-    If several tasks have the same tag, only one of them is cancelled. If you
-    want to cancel all the tasks with the same tag, you can use loop until
-    `cancel_by_task` does not return a task, as in:
-```
-    while q->cancel_by_taskid("my-tag"):
-        pass
-```
-
-
-### Worker Blacklist
-
-You may find that certain hosts are not correctly configured to run your
-tasks. The manager can be directed to ignore certain workers with the blacklist
-feature. For example:
-
-#### Python
-```python
-t = q.wait(5)
-
-# if t fails given a worker misconfiguration:
-q.blacklist(t.hostname)
-```
-
-#### Perl
-```perl
-my $t = $q->wait(5);
-
-# if $t fails given a worker misconfiguration:
-$q->blacklist($t->hostname);
-```
-
-#### C
-```C
-struct work_queue_task *t = work_queue_wait(q, t);
-
-//if t fails given a worker misconfiguration:
-work_queue_blacklist_add(q, t->{hostname});
-```
-
-### Performance Statistics
-
-The queue tracks a fair number of statistics that count the number of tasks,
-number of workers, number of failures, and so forth. This information is useful
-to make a progress bar or other user-visible information:
-
-#### Python
-```python
-stats = q.stats
-print(stats.workers_busy)
-```
-
-#### Perl
-```perl
-my $stats = $q->stats;
-print($stats->{task_running});
-```
-
-#### C
-```C
-struct work_queue_stats stats;
-work_queue_get_stats(q, &stats);
-printf("%d\n", stats->workers_connected);
 ```
 
 The statistics available are:
