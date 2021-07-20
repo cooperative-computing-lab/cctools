@@ -87,7 +87,7 @@ at each worker to speed up execution.
 
 Tasks come in two types:
 
-- A **basic task** is a single Unix command line to execute, along with its needed input files.  Upon completion, it will produce one or more output files to be returned to the manager.
+- A **standard task** is a single Unix command line to execute, along with its needed input files.  Upon completion, it will produce one or more output files to be returned to the manager.
 - A **PythonTask** is a single Python function to execute, along with its needed arguments.  Upon completion, it will produce a Python value (or an exception) as a result to return to the master.
 
 Both types of tasks share a common set of options.  Each task can be labelled with the **resources**
