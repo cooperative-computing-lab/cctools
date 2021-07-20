@@ -1245,8 +1245,34 @@ part of its output.
 
 === "C"
     ```C
-    work_queue_task_specify_file(t, "my-file", "my-file", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE | WORK_QUEUE_WATCH);
+    work_queue_task_specify_file(t, "my-file", "my-file", WORK_QUEUE_OUTPUT, WORK_QUEUE_WATCH);
     ```
+
+### Optional Output Files
+
+It is sometimes useful to return an output file only in the case of a failed task.
+For example, if your task generates a very large debugging output file `debug.out`,
+then you might not want to keep the file if the task succeeded.  In this case,
+you can add the `WORK_QUEUE_FAILURE_ONLY` flag to indicate that a file should
+only be returned in the event of failure:
+
+=== "Python"
+    ```python
+    t.specify_output_file("debug.out", flags = wq.WORK_QUEUE_FAILURE_ONLY)
+    ```
+
+=== "Perl"
+    ```perl
+    $t->specify_output_file(local_name => "debug.out", flags = wq.WORK_QUEUE_FAILURE_ONLY)
+    ``` 
+
+=== "C"
+    ```C
+    work_queue_task_specify_file(t, "debug.out", "debug.out", WORK_QUEUE_OUTPUT, WORK_QUEUE_FAILURE_ONLY);
+    ```
+
+In a similar way, the `WORK_QUEUE_SUCCESS_ONLY` flag indicates that an output file
+should only be returned if the task actually succeeded.
 
 ### Fast Abort
 
