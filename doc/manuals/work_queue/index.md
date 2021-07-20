@@ -726,23 +726,35 @@ not exactly a type of resource, specifying the running time of tasks can
 often be helpful to map tasks to workers. These resources can be specified
 as in the following example:
 
-```python
-t.specify_cores(1)                     # task needs one core
-t.specify_memory(1024)                 # task needs 1024 MB of memory
-t.specify_disk(4096)                   # task needs 4096 MB of disk space
-t.specify_gpus(0)                      # task does not need a gpu
-t.specify_running_time_max(100)        # task is allowed to run in 100 seconds
-t.specify_running_time_min(10)         # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
-```
+=== "Python"
+    ```python
+    t.specify_cores(1)                     # task needs one core
+    t.specify_memory(1024)                 # task needs 1024 MB of memory
+    t.specify_disk(4096)                   # task needs 4096 MB of disk space
+    t.specify_gpus(0)                      # task does not need a gpu
+    t.specify_running_time_max(100)        # task is allowed to run in 100 seconds
+    t.specify_running_time_min(10)         # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
+    ```
 
-```perl
-$t->specify_cores(1)      # task needs one core
-$t->specify_memory(1024)  # task needs 1024 MB of memory
-$t->specify_disk(4096)    # task needs 4096 MB of disk space
-$t->specify_gpus(0)       # task does not need a gpu
-$t->specify_running_time_max(100)  # task is allowed to run in 100 seconds
-$t->specify_running_time_min(10)   # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
-```
+=== "Perl"
+    ```perl
+    $t->specify_cores(1)      # task needs one core
+    $t->specify_memory(1024)  # task needs 1024 MB of memory
+    $t->specify_disk(4096)    # task needs 4096 MB of disk space
+    $t->specify_gpus(0)       # task does not need a gpu
+    $t->specify_running_time_max(100)  # task is allowed to run in 100 seconds
+    $t->specify_running_time_min(10)   # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
+    ```
+
+=== "C"
+    ```C
+    work_queue_task_specify_cores(t,1)                 # task needs one core
+    work_queue_task_specify_memory(t,1024)             # task needs 1024 MB of memory
+    work_queue_task_specify_disk(t,4096)               # task needs 4096 MB of disk space
+    work_queue_task_specify_gpus(t,0)                  # task does not need a gpu
+    work_queue_task_specify_running_time_max(t,100)    # task is allowed to run in 100 seconds
+    work_queue_task_specify_running_time_min(t,10)     # task needs at least 10 seconds to run (see work_queue_worker --wall-time option above)
+    ```
 
 When all cores, memory, and disk are specified, Work Queue will simply fit as
 many tasks as possible without going above the resources available at a
@@ -773,7 +785,7 @@ its number of cores. (This will likely change in the future.)
 When you would like to run several tasks in a worker, but you are not sure
 about the resources each task needs, Work Queue can automatically find values
 of resources that maximize throughput, or minimize waste. This is discussed in
-the section (below)[#grouping-tasks-with-similar-resources-needs].
+the section [below](#grouping-tasks-with-similar-resources-needs).
 
 ### Worker Resources
 
@@ -871,30 +883,43 @@ So far we have used resources values simply as hints to Work Queue to schedule
 concurrent tasks at workers. By default, Work Queue does not monitor or enforce
 these limits. You can enable monitoring and enforcement as follows:
 
+=== "Python"
+    ```python
+    # Measure the resources used by tasks, and terminate tasks that go above their
+    # resources:
+    q.enable_monitoring()
 
-```python
-# Measure the resources used by tasks, and terminate tasks that go above their
-# resources:
-q.enable_monitoring()
+    # Measure the resources used by tasks, but do not terminate tasks that go above
+    # declared resources:
+    q.enable_monitoring(watchdog=False)
+    ```
 
-# Measure the resources used by tasks, but do not terminate tasks that go above
-# declared resources:
-q.enable_monitoring(watchdog=False)
-```
+=== "Perl"
+    ```perl
+    # Measure the resources used by tasks, and terminate tasks that go above their
+    # resources:
+    $q->enable_monitoring()
 
-```perl
-# Measure the resources used by tasks, and terminate tasks that go above their
-# resources:
-$q->enable_monitoring()
+    # Measure the resources used by tasks, but do not terminate tasks that go above
+    # declared resources:
+    $q->enable_monitoring(watchdog => 0)
+    ```
 
-# Measure the resources used by tasks, but do not terminate tasks that go above
-# declared resources:
-$q->enable_monitoring(watchdog => 0)
-```
+=== "C"
+    ```C
+    # Measure the resources used by tasks, and terminate tasks that go above their
+    # resources:
+    work_queue_enable_monitoring(q,0,0)
+
+    # Measure the resources used by tasks, but do not terminate tasks that go above
+    # declared resources:
+    work_queue_enable_monitoring(q,0,1)
+    ```
 
 When monitoring is enabled, you can explore the resources measured when a task
 returns:
 
+=== "Python"
 ```python
 t = q.wait()
 if t:
@@ -910,48 +935,51 @@ if t:
         print("Task exceeded its cores allocation.")
 ```
 
-```perl
-my $t = $q=>wait()
-if($t) {
-    say("Task used %f cores, %f MB memory, %f MB disk",
-        $t->resources_measured->{cores},
-        $t->resources_measured->{memory},
-        $t->resources_measured->{disk})
-    say("Task was allocated %f cores, %f MB memory, %f MB disk",
-        t.resources_requested->{cores},
-        t.resources_requested->{memory},
-        t.resources_requested->{disk})
-    if($t->limits_exceeded and $t->limits_exceeded{cores} > -1) {
-        say("Task exceeded its cores allocation.")
+=== "Perl"
+    ```perl
+    my $t = $q=>wait()
+    if($t) {
+        say("Task used %f cores, %f MB memory, %f MB disk",
+	    $t->resources_measured->{cores},
+	    $t->resources_measured->{memory},
+            t->resources_measured->{disk})
+        say("Task was allocated %f cores, %f MB memory, %f MB disk",
+            t.resources_requested->{cores},
+            t.resources_requested->{memory},
+            t.resources_requested->{disk})
+        if($t->limits_exceeded and $t->limits_exceeded{cores} > -1) {
+            say("Task exceeded its cores allocation.")
+        }
     }
-}
-```
+    ```
 
 Alternatively, when you declare a task (i.e., before submitting it), you can
 declare a directory to which a report of the resources will be written. The
 report format is JSON, as its filename has the form
 `wq-PID_OF_MANAGER-task-TASK_ID.summary`.
 
-```python
-t = wq.Task(...)
-t.specify_monitor_output("my-resources-output")
-...
-q.submit(t)
-```
+=== "Python"
+    ```python
+    t = wq.Task(...)
+    t.specify_monitor_output("my-resources-output")
+    ...
+    q.submit(t)
+    ```
 
-```perl
-$t = WorkQueue::Task->new(...)
-$t->specify_monitor_output("my-resources-output")
-...
-$q->submit($t)
-```
+=== "Perl"
+    ```perl
+    $t = WorkQueue::Task->new(...)
+    $t->specify_monitor_output("my-resources-output")
+    ...
+    $q->submit($t)
+    ```
 
 Work Queue also measures other resources, such as peak `bandwidth`,
 `bytes_read`, `bytes_written`, `bytes_sent`, `bytes_received`,
 `total_files`, `cpu_time`, and `wall_time`.
 
 
-### Grouping Tasks with Similar Resources Needs
+### Grouping Tasks with Similar Resource Needs
 
 Several tasks usually share the same resource description, and to this end,
 Work Queue allows you to tasks into groups called **categories**. You can
@@ -990,6 +1018,10 @@ compute some efficient defaults. To assign a task to a category:
     $t->specify_category('my-category-a')
     ```
 
+=== "C"
+    ```C
+    work_queue_task_specify_category(t,"my-category-a")
+    ```
 When a category leaves some resource unspecified, then Work Queue tries to find
 some reasonable defaults in the same way described before in the section
 (Specifying Task Resources)[#specifying-task-resources].
@@ -1024,23 +1056,25 @@ or a whole worker, as explained before.
 
 Automatic resource management is enabled per category as follows:
 
-```python
-q.enable_monitoring()
-q.specify_category_max_resources('my-category-a', {})
-q.specify_category_mode('my-category-a', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+=== "Python"
+    ```python
+    q.enable_monitoring()
+    q.specify_category_max_resources('my-category-a', {})
+    q.specify_category_mode('my-category-a', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
 
-q.specify_category_max_resources('my-category-b', {'cores': 2})
-q.specify_category_mode('my-category-b', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
-```
+    q.specify_category_max_resources('my-category-b', {'cores': 2})
+    q.specify_category_mode('my-category-b', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    ```
 
-```perl
-$q->enable_monitoring()
-$q->specify_category_max_resources('my-category-a', {})
-$q->specify_category_mode('my-category', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+=== "Perl"
+    ```perl
+    $q->enable_monitoring()
+    $q->specify_category_max_resources('my-category-a', {})
+    $q->specify_category_mode('my-category', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
 
-$q->specify_category_max_resources('my-category-b', {'cores' => 2})
-$q->specify_category_mode('my-category', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
-```
+    $q->specify_category_max_resources('my-category-b', {'cores' => 2})
+    $q->specify_category_mode('my-category', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    ```
 
 In the previous examples, tasks in 'my-category-b' will never use more than two
 cores, while tasks in 'my-category-a' are free to use as many cores as the
@@ -1049,13 +1083,15 @@ largest worker available if needed.
 You can set a limit on the minimum resource value a category can use. The
 automatic resource computation will never go below the values specified:
 
-```python
-q.specify_category_min_resources('my-category-a', {'memory': 512})
-```
+=== "Python"
+    ```python
+    q.specify_category_min_resources('my-category-a', {'memory': 512})
+   ```
 
-```perl
-$q->specify_category_min_resources('my-category-a', {'memory' => 512})
-```
+=== "Perl"
+    ```perl
+    $q->specify_category_min_resources('my-category-a', {'memory' => 512})
+    ```
 
 You can enquire about the resources computed per category with
 `work_queue_status`:
@@ -1136,7 +1172,7 @@ other has the matching password before proceeding. The password is not sent in
 the clear, but is securely verified through a SHA1-based challenge-response
 protocol.
 
-### Maximum retries
+### Maximum Retries
 
 When a task cannot be completed because a worker disconnection or because it
 exhausted some intermediate resource allocation, it is automatically retried.
@@ -1159,9 +1195,9 @@ limit on the number of retries:
     ```
 
 When a task cannot be completed in the specified number of tries,
-then the task result is set to  `WORK_QUEUE_RESULT_MAX_RETRIES`:
+then the task result is set to  `WORK_QUEUE_RESULT_MAX_RETRIES`.
 
-### Pipelined Submission.
+### Pipelined Submission
 
 If you have a **very** large number of tasks to run, it may not be possible to
 submit all of the tasks, and then wait for all of them. Instead, submit a
@@ -1184,7 +1220,7 @@ warranted:
 
 === "C"
     ```C
-    if(q->hungry()) {
+    if(work_queue_hungry(q)) {
         // submit more tasks...
     }
     ```
@@ -1240,7 +1276,7 @@ proactively aborts tasks that are statistical outliers:
 Tasks that trigger fast abort are automatically retried in some other worker.
 Each retry allows the task to run for longer and longer times until a
 completion is reached. You can set an upper bound in the number of retries with
-[Maximum retries](#maximum-retries).
+[Maximum Retries](#maximum-retries).
 
 ### String Interpolation
 
