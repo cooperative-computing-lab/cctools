@@ -921,7 +921,7 @@ returns:
 
 === "Python"
 ```python
-t = q.wait()
+t = q.wait(5)
 if t:
     print("Task used {} cores, {} MB memory, {} MB disk",
         t.resources_measured.cores,
@@ -937,18 +937,36 @@ if t:
 
 === "Perl"
     ```perl
-    my $t = $q=>wait()
+    my $t = $q=>wait(5)
     if($t) {
         say("Task used %f cores, %f MB memory, %f MB disk",
-	    $t->resources_measured->{cores},
-	    $t->resources_measured->{memory},
-            t->resources_measured->{disk})
+            $t->resources_measured->{cores},
+            $t->resources_measured->{memory},
+            $t->resources_measured->{disk})
         say("Task was allocated %f cores, %f MB memory, %f MB disk",
-            t.resources_requested->{cores},
-            t.resources_requested->{memory},
-            t.resources_requested->{disk})
-        if($t->limits_exceeded and $t->limits_exceeded{cores} > -1) {
+            $t.resources_requested->{cores},
+            $t.resources_requested->{memory},
+            $t.resources_requested->{disk})
+        if($t->limits_exceeded and $t->limits_exceeded->{cores} > -1) {
             say("Task exceeded its cores allocation.")
+        }
+    }
+    ```
+
+=== "C"
+    ```C
+    work_queue_task *t = work_queue_wait(q,5); 
+    if(t) {
+        printf("Task used %f cores, %f MB memory, %f MB disk",
+            t->resources_measured->cores,
+            t->resources_measured->memory,
+            t->resources_measured->disk);
+        printf("Task was allocated %f cores, %f MB memory, %f MB disk",
+            t->resources_requested->cores,
+            t->resources_requested->memory,
+            t->resources_requested->disk});
+        if(t->limits_exceeded && t->limits_exceeded->cores > -1) {
+            printf("Task exceeded its cores allocation.")
         }
     }
     ```
@@ -963,7 +981,7 @@ report format is JSON, as its filename has the form
     t = wq.Task(...)
     t.specify_monitor_output("my-resources-output")
     ...
-    q.submit(t)
+    taskid = q.submit(t)
     ```
 
 === "Perl"
@@ -971,7 +989,15 @@ report format is JSON, as its filename has the form
     $t = WorkQueue::Task->new(...)
     $t->specify_monitor_output("my-resources-output")
     ...
-    $q->submit($t)
+    taskid = $q->submit($t)
+    ```
+
+=== "C"
+    ```C
+    struct work_queue_task *t = work_queue_task_create(...);
+    work_queue_specify_monitor_output("my-resources-output");
+    ...
+    int taskid = work_queue_submti(q, t);
     ```
 
 Work Queue also measures other resources, such as peak `bandwidth`,
@@ -1002,6 +1028,24 @@ We can create some categories with their resource description as follows:
     $q->specify_category_max_resources('my-category-a', {'cores' => 2, 'memory' => 1024, 'disk' => 2048, 'gpus' => 0})
     $q->specify_category_max_resources('my-category-b', {'cores' => 1})
     $q->specify_category_max_resources('my-category-c', {})
+    ```
+
+=== "C"
+    ```C
+    # memory and disk values in MB.
+    struct rmsummary *ra = rmsummary_create(-1);
+    ra->cores = 2;
+    ra->memory = 1024;
+    ra->disk = 2048;
+    work_queue_specify_max_resources("my-category-a", ra);
+    rmsummary_delete(ra);
+
+    struct rmsummary *rb = rmsummary_create(-1);
+    rb->cores = 1;
+    work_queue_specify_max_resources("my-category-b", rb);
+    rmsummary_delete(rb);
+
+    work_queue_specify_max_resources("my-category-c", NULL);
     ```
 
 In the previous examples, we created three categories. Note that it is not
@@ -1076,6 +1120,19 @@ Automatic resource management is enabled per category as follows:
     $q->specify_category_mode('my-category', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
     ```
 
+=== "C"
+    ```C
+    work_queue_enable_monitoring(q,0,0);
+    work_queue_specify_category_max_resources(q, "my-category-a", NULL);
+    work_queue_specify_category_mode(q, "my-category-a", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
+
+    struct rmsummary *r = rmsummary_create(-1);
+    r->cores = 2;
+    work_queue_specify_category_max_resources(q, "my-category-b", r);
+    work_queue_specify_category_mode(q, "my-category-b", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
+    rmsummary_delete(r);
+    ```
+
 In the previous examples, tasks in 'my-category-b' will never use more than two
 cores, while tasks in 'my-category-a' are free to use as many cores as the
 largest worker available if needed.
@@ -1091,6 +1148,14 @@ automatic resource computation will never go below the values specified:
 === "Perl"
     ```perl
     $q->specify_category_min_resources('my-category-a', {'memory' => 512})
+    ```
+
+=== "C"
+    ```C
+    struct rmsummary *r = rmsummary_create(-1);
+    r->memory = 512;
+    $q->specify_category_min_resources("my-category-a", r);
+    rmsummary_delete(r);
     ```
 
 You can enquire about the resources computed per category with
