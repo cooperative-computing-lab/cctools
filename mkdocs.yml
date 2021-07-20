@@ -37,6 +37,8 @@ markdown_extensions:
     - admonition:
     - pymdownx.tabbed:
     - pymdownx.superfences:
+    - pymdownx.snippets:
+        base_path: doc/manuals
 
 permalink: True
 

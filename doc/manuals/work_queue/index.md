@@ -36,38 +36,11 @@ Then, open a terminal and install `ndcctools` like this:
 conda install -c conda-forge ndcctools
 ```
 
+
 Using a text editor, create a manager program called `manager.py` like this:
 
 ```
-# Quick Start Example of Work Queue with Python Functions
-
-# Import the Work Queue library.
-import work_queue as wq
-
-# Define a function to invoke remotely.
-def my_sum(x, y):
-    import math
-    return x+y
-
-# Create a new queue, listening on port 9123:
-queue = wq.WorkQueue(9123)
-print("listening on port {}".format(queue.port))
-
-# Submit several tasks for execution:
-print("submitting tasks...")
-for value in [10,20,30]:
-    task = wq.PythonTask(my_sum, value, value)
-    task.specify_cores(1)
-    queue.submit(task)
-
-# As they complete, display the results:
-print("waiting for tasks to complete...")
-while not queue.empty():
-    task = queue.wait(5)
-    if task:
-        print("task {} completed with result {}".format(task.id,task.output))
-
-print("all done.")
+--8<-- "work_queue/examples/work_queue_function_example.py"
 ```
 
 Run the manager program at the command line like this:
