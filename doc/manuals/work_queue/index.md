@@ -920,20 +920,20 @@ When monitoring is enabled, you can explore the resources measured when a task
 returns:
 
 === "Python"
-```python
-t = q.wait(5)
-if t:
-    print("Task used {} cores, {} MB memory, {} MB disk",
-        t.resources_measured.cores,
-        t.resources_measured.memory,
-        t.resources_measured.disk)
-    print("Task was allocated {} cores, {} MB memory, {} MB disk",
-        t.resources_requested.cores,
-        t.resources_requested.memory,
-        t.resources_requested.disk)
-    if t.limits_exceeded and t.limits_exceeded.cores > -1:
-        print("Task exceeded its cores allocation.")
-```
+    ```python
+    t = q.wait(5)
+    if t:
+        print("Task used {} cores, {} MB memory, {} MB disk",
+            t.resources_measured.cores,
+            t.resources_measured.memory,
+            t.resources_measured.disk)
+        print("Task was allocated {} cores, {} MB memory, {} MB disk",
+            t.resources_requested.cores,
+            t.resources_requested.memory,
+            t.resources_requested.disk)
+        if t.limits_exceeded and t.limits_exceeded.cores > -1:
+            print("Task exceeded its cores allocation.")
+    ```
 
 === "Perl"
     ```perl
@@ -1143,7 +1143,7 @@ automatic resource computation will never go below the values specified:
 === "Python"
     ```python
     q.specify_category_min_resources('my-category-a', {'memory': 512})
-   ```
+    ```
 
 === "Perl"
     ```perl
