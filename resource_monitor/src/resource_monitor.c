@@ -888,7 +888,7 @@ struct peak_cores_sample {
 double peak_cores(double wall_time, double cpu_time) {
 	static struct list *samples = NULL;
 
-	double max_separation = 60 + 2*interval; /* at least one minute and a complete interval */
+	double max_separation = 180 + 2*interval; /* at least one minute and a complete interval */
 
 	if(!samples) {
 		samples = list_create();
