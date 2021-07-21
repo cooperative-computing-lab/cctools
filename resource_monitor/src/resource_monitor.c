@@ -1010,24 +1010,23 @@ void rmonitor_log_row(struct rmsummary *tr)
 {
 	if(log_series)
 	{
-		fprintf(log_series,  "%s", rmsummary_resource_to_str(tr->wall_time + summary->start, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->cpu_time, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->cores, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->max_concurrent_processes, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->virtual_memory, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->memory, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->swap_memory, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->bytes_read, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->bytes_written, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->bytes_received, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->bytes_sent, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->bandwidth, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->machine_load, 0));
+		fprintf(log_series,  "%s", rmsummary_resource_to_str("start", tr->wall_time + summary->start, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("cpu_time", tr->cpu_time, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("cores", tr->cores, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("max_concurrent_processes", tr->max_concurrent_processes, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("virtual_memory", tr->virtual_memory, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("memory", tr->memory, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("swap_memory", tr->swap_memory, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("bytes_read", tr->bytes_read, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("bytes_written", tr->bytes_written, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("bytes_received", tr->bytes_received, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("bytes_sent", tr->bytes_sent, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("bandwidth", tr->bandwidth, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("machine_load", tr->machine_load, 0));
 
-		if(resources_flags->disk)
-		{
-			fprintf(log_series, " %s", rmsummary_resource_to_str(tr->total_files, 0));
-			fprintf(log_series, " %s", rmsummary_resource_to_str(tr->disk, 0));
+		if(resources_flags->disk) {
+			fprintf(log_series, " %s", rmsummary_resource_to_str("total_files", tr->total_files, 0));
+			fprintf(log_series, " %s", rmsummary_resource_to_str("disk", tr->disk, 0));
 		}
 
 		fprintf(log_series, "\n");
