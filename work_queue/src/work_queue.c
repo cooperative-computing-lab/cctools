@@ -4422,67 +4422,52 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	return t;
 }
 
+
 struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task)
 {
-  struct work_queue_task *new = xxmalloc(sizeof(struct work_queue_task));
-  memcpy(new, task, sizeof(*new));
+	struct work_queue_task *new = work_queue_task_create(task->command_line);
 
-  new->taskid = 0;
+	if(task->tag) {
+		work_queue_task_specify_tag(new, task->tag);
+	}
 
-  //allocate new memory so we don't segfault when original memory is freed.
-  if(task->tag) {
-	new->tag = xxstrdup(task->tag);
-  }
-  if(task->category) {
-	new->category = xxstrdup(task->category);
-  }
+	if(task->category) {
+		work_queue_task_specify_category(new, task->category);
+	}
 
-  if(task->command_line) {
-	new->command_line = xxstrdup(task->command_line);
-  }
+	work_queue_task_specify_algorithm(new, task->worker_selection_algorithm);
+	work_queue_task_specify_priority(new, task->priority);
+	work_queue_task_specify_max_retries(new, task->max_retries);
+	work_queue_task_specify_running_time_min(new, task->min_running_time);
 
-  if(task->features) {
-	  new->features = list_create();
-	  char *req;
-	  list_first_item(task->features);
-	  while((req = list_next_item(task->features))) {
-		  list_push_tail(new->features, xxstrdup(req));
-	  }
-  }
 
-  new->input_files  = work_queue_task_file_list_clone(task->input_files);
-  new->output_files = work_queue_task_file_list_clone(task->output_files);
-  new->env_list     = work_queue_task_env_list_clone(task->env_list);
+	if(task->monitor_output_directory) {
+		work_queue_task_specify_monitor_output(new, task->monitor_output_directory);
+	}
 
-  if(task->resources_requested) {
-	  new->resources_requested = rmsummary_copy(task->resources_requested, 0);
-  }
+	if(task->monitor_snapshot_file) {
+		work_queue_specify_snapshot_file(new, task->monitor_snapshot_file);
+	}
 
-  if(task->resources_measured) {
-	  new->resources_measured = rmsummary_copy(task->resources_measured, 0);
-  }
+	new->input_files  = work_queue_task_file_list_clone(task->input_files);
+	new->output_files = work_queue_task_file_list_clone(task->output_files);
+	new->env_list     = work_queue_task_env_list_clone(task->env_list);
 
-  if(task->resources_allocated) {
-	  new->resources_allocated = rmsummary_copy(task->resources_allocated, 0);
-  }
+	if(task->features) {
+		new->features = list_create();
+		char *req;
+		list_first_item(task->features);
+		while((req = list_next_item(task->features))) {
+			list_push_tail(new->features, xxstrdup(req));
+		}
+	}
 
-  if(task->monitor_output_directory) {
-	new->monitor_output_directory = xxstrdup(task->monitor_output_directory);
-  }
+	if(task->resources_requested) {
+		new->resources_requested = rmsummary_copy(task->resources_requested, 0);
+	}
 
-  if(task->output) {
-	new->output = xxstrdup(task->output);
-  }
 
-  if(task->host) {
-	new->host = xxstrdup(task->host);
-  }
-
-  if(task->hostname) {
-	new->hostname = xxstrdup(task->hostname);
-  }
-
-  return new;
+	return new;
 }
 
 
