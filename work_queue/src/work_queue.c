@@ -6024,8 +6024,7 @@ int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 			 * definitions, but reset all of the stats. */
 			clean_task_state(t, /* full clean */ 1);
 		} else {
-			debug(D_NOTICE|D_WQ, "Task %d has been already submitted. Ignoring new submission.", t->taskid);
-			return 0;
+			fatal("Task %d has been already submitted and is not in any final state.", t->taskid);
 		}
 	}
 
