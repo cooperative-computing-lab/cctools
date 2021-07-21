@@ -325,6 +325,9 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving, worker_disconnect_reason reason_leaving);
 static void write_transaction_worker_resources(struct work_queue *q, struct work_queue_worker *w);
 
+static void fill_deprecated_queue_stats(struct work_queue *q, struct work_queue_stats *s);
+static void fill_deprecated_tasks_stats(struct work_queue_task *t);
+
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
 @param file The file to clone.
@@ -840,7 +843,7 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	q->catalog_last_update_time = time(0);
 }
 
-static void clean_task_state(struct work_queue_task *t) {
+static void clean_task_state(struct work_queue_task *t, int full_clean) {
 
 		t->time_when_commit_start = 0;
 		t->time_when_commit_end   = 0;
@@ -852,6 +855,8 @@ static void clean_task_state(struct work_queue_task *t) {
 		t->bytes_received = 0;
 		t->bytes_transferred = 0;
 
+		t->disk_allocation_exhausted = 0;
+
 		if(t->output) {
 			free(t->output);
 			t->output = NULL;
@@ -861,10 +866,27 @@ static void clean_task_state(struct work_queue_task *t) {
 			free(t->hostname);
 			t->hostname = NULL;
 		}
+
 		if(t->host) {
 			free(t->host);
 			t->host = NULL;
 		}
+
+		if(full_clean) {
+			t->resource_request = CATEGORY_ALLOCATION_FIRST;
+			t->try_count = 0;
+			t->exhausted_attempts = 0;
+			t->fast_abort_count = 0;
+
+			t->time_workers_execute_all = 0;
+			t->time_workers_execute_exhaustion = 0;
+			t->time_workers_execute_failure = 0;
+
+			rmsummary_delete(t->resources_allocated);
+			rmsummary_delete(t->resources_measured);
+		}
+
+		fill_deprecated_tasks_stats(t);
 
 		/* If result is never updated, then it is mark as a failure. */
 		t->result = WORK_QUEUE_RESULT_UNKNOWN;
@@ -894,7 +916,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			t->time_workers_execute_all     += delta_time;
 		}
 
-		clean_task_state(t);
+		clean_task_state(t, 0);
 		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
 
 		itable_firstkey(w->current_tasks);
@@ -5751,7 +5773,7 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 	}
 
 	/* If the task has been used before, clear out accumulated state. */
-	clean_task_state(t);
+	clean_task_state(t, 0);
 }
 
 
@@ -5996,9 +6018,15 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 
 int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 {
-	if(t->taskid > 0 && !task_in_terminal_state(q, t)) {
-		debug(D_NOTICE|D_WQ, "Task %d has been already submitted. Ignoring new submission.", t->taskid);
-		return 0;
+	if(t->taskid > 0) {
+		if(task_in_terminal_state(q, t)) {
+			/* this task struct has been submitted before. We keep all the
+			 * definitions, but reset all of the stats. */
+			clean_task_state(t, /* full clean */ 1);
+		} else {
+			debug(D_NOTICE|D_WQ, "Task %d has been already submitted. Ignoring new submission.", t->taskid);
+			return 0;
+		}
 	}
 
 	t->taskid = q->next_taskid;
