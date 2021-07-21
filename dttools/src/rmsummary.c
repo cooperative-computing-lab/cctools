@@ -930,10 +930,18 @@ int rmsummary_check_limits(struct rmsummary *measured, struct rmsummary *limits)
 
 		double l = rmsummary_get_by_offset(limits, info->offset);
 		double m = rmsummary_get_by_offset(measured, info->offset);
+		double f = 0;
+
+		if(!strcmp(info->name, "cores")) {
+			/* 'forgive' 1/4 of a core when doing measurements. As have been
+			 * observed, tasks sometimes go above their cores declared usage
+			 * for very short periods of time. */
+			f = 0.25;
+		}
 
 		// if there is a limit, and the resource was measured, and the
 		// measurement is larger than the limit, report the broken limit.
-		if(l > -1 && m > 0 && l < m) {
+		if(l > -1 && m > 0 && l < (m - f)) {
 			debug(D_DEBUG, "Resource limit for %s has been exceeded: %.*f > %.*f %s\n", info->name, info->decimals, m, info->decimals, l, info->units);
 
 			if(!measured->limits_exceeded) {
