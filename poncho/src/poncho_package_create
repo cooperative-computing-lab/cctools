@@ -19,19 +19,23 @@ def pack_env(spec, out):
         print('Creating temporary environment in {}'.format(env_dir))
 	
 	# creates conda spec file from original spec file
+        print('creating conda environment...')
         check_spec(spec, env_dir)
 	
         subprocess.check_call(['conda', 'env', 'create', '--prefix', env_dir,
             '--file', env_dir + '/conda_spec.yml'])
 
 	# fetch data
+        print('Fethcing data...')
         git_data(spec, env_dir)
         http_data(spec, env_dir)
 	
         # Bug breaks bundling common packages (e.g. python).
         # ignore_missing_files may be safe to remove in the future.
         # https://github.com/conda/conda-pack/issues/145
+        print('packing environment...')
         conda_pack.pack(prefix=env_dir, output=out, force=True, ignore_missing_files=True)
+        print('To activate environment run poncho_package_run -e {} <command>'.format(out))
 
 def git_data(spec, out_dir):
 
@@ -121,7 +125,7 @@ def check_spec(spec, out_dir):
     conda_spec['channels'] = []
     conda_spec['dependencies'] = []
     conda_spec['name'] = 'base'
-
+ 
     if 'conda' in data:
         for x in data['conda']:
             split = x.split('::')
