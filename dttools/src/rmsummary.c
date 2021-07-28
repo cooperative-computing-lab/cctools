@@ -58,7 +58,7 @@ static const struct resource_info resources_info[] = {
 	{ "bytes_sent",               "MB",       0,  offsetof(struct rmsummary, bytes_sent)},
 	{ "bandwidth",                "Mbps",     3,  offsetof(struct rmsummary, bandwidth)},
 	{ "gpus",                     "gpus",     0,  offsetof(struct rmsummary, gpus)},
-	{ "cores",                    "cores",    0,  offsetof(struct rmsummary, cores)},
+	{ "cores",                    "cores",    3,  offsetof(struct rmsummary, cores)},
 	{ "cores_avg",                "cores",    3,  offsetof(struct rmsummary, cores_avg)},
 	{ "machine_cpus",             "cores",    3,  offsetof(struct rmsummary, machine_cpus)},
 	{ "machine_load",             "procs",    0,  offsetof(struct rmsummary, machine_load)},
