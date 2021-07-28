@@ -983,14 +983,14 @@ const char *rmsummary_resource_to_str(const char *resource, double value, int in
 		return NULL;
 	}
 
-	char *tmp = string_format("%.*f%s%s",
+	string_nformat(
+			output,
+			sizeof(output),
+			"%.*f%s%s",
 			decimals,
 			value,
 			include_units ? " " : "",
 			include_units ? units : "");
-
-	strncpy(output, tmp, 256);
-	free(tmp);
 
 	return output;
 }
