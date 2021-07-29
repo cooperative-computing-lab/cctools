@@ -150,6 +150,15 @@ double histogram_max_value(struct histogram *h);
 
 double histogram_min_value(struct histogram *h);
 
+
+/** Return the largest value of the bucket that test_value would faill in.
+@param h A pointer to a histogram.
+@param test_value value to round up
+@return test_value rounded up according to bucket size.
+*/
+double histogram_round_up(struct histogram *h, double test_value);
+
+
 /** Return the mode of the histogram.
 @param h A pointer to a histogram.
 @return Histogram mode.

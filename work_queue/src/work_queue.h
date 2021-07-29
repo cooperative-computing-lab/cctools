@@ -104,8 +104,7 @@ typedef enum {
 /**< If maximum values are specified for cores, memory,
 disk or gpus (either a user-label or category-label) and one of those resources
 is exceeded, the task fails.  Otherwise it is retried until a large enough
-worker connects to the manager, using the maximum values specified, and the
-maximum values so far seen for resources not specified. */
+worker connects to the manager, using the maximum values so far seen for resources not specified. */
     WORK_QUEUE_ALLOCATION_MODE_MAX            = CATEGORY_ALLOCATION_MODE_MAX,
 /**< As above, but tasks are tried with an automatically computed first-allocation to minimize resource waste. */
     WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE      = CATEGORY_ALLOCATION_MODE_MIN_WASTE,
