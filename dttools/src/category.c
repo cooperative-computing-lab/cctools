@@ -430,7 +430,20 @@ int64_t category_first_allocation_max_seen(struct histogram *h, int64_t top_reso
 
     rounded = histogram_round_up(h, rounded + floor(bucket_size/2));
 
-    return MIN(rounded, MIN(max_explicit, max_worker));
+    double to_cmp = -1;
+    if(max_explicit > -1 && max_worker > -1) {
+        to_cmp = MIN(max_explicit, max_worker);
+    } else if(max_explicit > -1) {
+        to_cmp = max_explicit;
+    } else if(max_worker > -1) {
+        to_cmp = max_worker;
+    }
+
+    if(to_cmp > -1) {
+        return MIN(rounded, to_cmp);
+    } else {
+        return rounded;
+    }
 }
 
 int64_t category_first_allocation(struct histogram *h, category_mode_t mode, int64_t top_resource, int64_t max_worker, int64_t max_explicit) {
@@ -491,7 +504,11 @@ int category_update_first_allocation(struct category *c, const struct rmsummary 
 
             int64_t top_value = rmsummary_get_by_offset(top, o);
             int64_t max_explicit = rmsummary_get_by_offset(c->max_allocation, o);
-            int64_t worker = rmsummary_get_by_offset(max_worker, o);
+
+            int64_t worker = -1;
+            if(max_worker) {
+                worker = rmsummary_get_by_offset(max_worker, o);
+            }
 
             int64_t new_value = category_first_allocation(h, c->allocation_mode, top_value, worker, max_explicit);
 
