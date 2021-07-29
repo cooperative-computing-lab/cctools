@@ -38,9 +38,8 @@ typedef enum {
 											  or disk (either a user-label or category-label) and
 											  one of those resources is exceeded, the task fails.
 											  Otherwise it is retried until a large enough worker
-											  connects to the manager, using the maximum values
-											  specified, and the maximum values so far seen for
-											  resources not specified. */
+											  connects to the manager, the maximum values so far
+                                              seen for resources not specified. */
 
 	CATEGORY_ALLOCATION_MODE_MIN_WASTE,   /**< As above, but tasks are tried with an automatically
 											  computed first-allocation to minimize resource waste. */

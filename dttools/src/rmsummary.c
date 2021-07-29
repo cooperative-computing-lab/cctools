@@ -58,7 +58,7 @@ static const struct resource_info resources_info[] = {
 	{ "bytes_sent",               "MB",       0,  offsetof(struct rmsummary, bytes_sent)},
 	{ "bandwidth",                "Mbps",     3,  offsetof(struct rmsummary, bandwidth)},
 	{ "gpus",                     "gpus",     0,  offsetof(struct rmsummary, gpus)},
-	{ "cores",                    "cores",    0,  offsetof(struct rmsummary, cores)},
+	{ "cores",                    "cores",    3,  offsetof(struct rmsummary, cores)},
 	{ "cores_avg",                "cores",    3,  offsetof(struct rmsummary, cores_avg)},
 	{ "machine_cpus",             "cores",    3,  offsetof(struct rmsummary, machine_cpus)},
 	{ "machine_load",             "procs",    0,  offsetof(struct rmsummary, machine_load)},
@@ -983,14 +983,14 @@ const char *rmsummary_resource_to_str(const char *resource, double value, int in
 		return NULL;
 	}
 
-	char *tmp = string_format("%.*f%s%s",
+	string_nformat(
+			output,
+			sizeof(output),
+			"%.*f%s%s",
 			decimals,
 			value,
 			include_units ? " " : "",
 			include_units ? units : "");
-
-	strncpy(output, tmp, 256);
-	free(tmp);
 
 	return output;
 }

@@ -138,9 +138,10 @@ char *resource_monitor_write_command(const char *monitor_path, const char *templ
 		buffer_printf(&cmd_builder, " --measure-dir %s", measure_dir);
 
 	if(limits) {
+		size_t i = 0;
 		const char **resources = rmsummary_list_resources();
-		const char *r;
-		for(r = resources[0]; r; r++) {
+		for(i = 0; i < rmsummary_num_resources(); i++) {
+			const char *r = resources[i];
 			double v = rmsummary_get(limits, r);
 			if(v > -1) {
 				buffer_printf(&cmd_builder, " -L '%s: %s'", r, rmsummary_resource_to_str(r, v, 0));

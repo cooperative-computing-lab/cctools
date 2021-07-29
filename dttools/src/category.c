@@ -413,7 +413,40 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 	return a_1;
 }
 
-int64_t category_first_allocation(struct histogram *h, category_mode_t mode,  int64_t top_resource) {
+int64_t category_first_allocation_max_seen(struct histogram *h, int64_t top_resource, int64_t max_worker, int64_t max_explicit) {
+	/* Automatically labeling for resource is not activated. */
+	if(top_resource < 0) {
+		return -1;
+	}
+
+	int64_t n = histogram_size(h);
+	if(n < 1) {
+		return -1;
+    }
+
+    double max_seen = histogram_max_value(h);
+    double rounded = max_seen;
+    double bucket_size = histogram_bucket_size(h);
+
+    rounded = histogram_round_up(h, rounded + floor(bucket_size/2));
+
+    double to_cmp = -1;
+    if(max_explicit > -1 && max_worker > -1) {
+        to_cmp = MIN(max_explicit, max_worker);
+    } else if(max_explicit > -1) {
+        to_cmp = max_explicit;
+    } else if(max_worker > -1) {
+        to_cmp = max_worker;
+    }
+
+    if(to_cmp > -1) {
+        return MIN(rounded, to_cmp);
+    } else {
+        return rounded;
+    }
+}
+
+int64_t category_first_allocation(struct histogram *h, category_mode_t mode, int64_t top_resource, int64_t max_worker, int64_t max_explicit) {
 
 	int64_t alloc;
 
@@ -424,8 +457,10 @@ int64_t category_first_allocation(struct histogram *h, category_mode_t mode,  in
 		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
 			alloc = category_first_allocation_max_throughput(h, top_resource);
 			break;
-		case CATEGORY_ALLOCATION_MODE_FIXED:
 		case CATEGORY_ALLOCATION_MODE_MAX:
+			alloc = category_first_allocation_max_seen(h, top_resource, max_worker, max_explicit);
+			break;
+		case CATEGORY_ALLOCATION_MODE_FIXED:
 		default:
 			alloc = top_resource;
 			break;
@@ -468,7 +503,14 @@ int category_update_first_allocation(struct category *c, const struct rmsummary 
             assert(h);
 
             int64_t top_value = rmsummary_get_by_offset(top, o);
-            int64_t new_value = category_first_allocation(h, c->allocation_mode, top_value);
+            int64_t max_explicit = rmsummary_get_by_offset(c->max_allocation, o);
+
+            int64_t worker = -1;
+            if(max_worker) {
+                worker = rmsummary_get_by_offset(max_worker, o);
+            }
+
+            int64_t new_value = category_first_allocation(h, c->allocation_mode, top_value, worker, max_explicit);
 
             rmsummary_set_by_offset(c->first_allocation, o, new_value);
         }

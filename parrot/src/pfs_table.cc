@@ -558,7 +558,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 					pname->port = pname->service->get_default_port();
 				}
 				char *hostport=string_format("%s:%d", pname->host, pname->port);
-				strncpy(pname->hostport, hostport, sizeof(pname->hostport));
+				snprintf(pname->hostport, sizeof(pname->hostport), "%s", hostport);
 				free(hostport);
 			}
 
