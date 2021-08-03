@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define DELTADB_REDUCTION_H
 
 #include "jx.h"
+#include "hash_table.h"
 
 typedef enum {
 	COUNT,
@@ -17,12 +18,15 @@ typedef enum {
 	MIN,
 	AVERAGE,
 	MAX,
-	INC
+	INC,
+	UNIQUE
 } deltadb_reduction_t;
 
 struct deltadb_reduction {
 	deltadb_reduction_t type;
 	struct jx *expr;
+	struct hash_table *unique_table;
+	struct jx *unique_value;
 	double count;
 	double sum;
 	double first;
@@ -34,7 +38,7 @@ struct deltadb_reduction {
 struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx *expr );
 void deltadb_reduction_delete( struct deltadb_reduction *r );
 void deltadb_reduction_reset( struct deltadb_reduction *r );
-void deltadb_reduction_update( struct deltadb_reduction *r, double value );
-double deltadb_reduction_value( struct deltadb_reduction *r );
+void deltadb_reduction_update( struct deltadb_reduction *r, struct jx *value );
+char * deltadb_reduction_string( struct deltadb_reduction *r );
 
 #endif

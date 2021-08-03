@@ -10,6 +10,9 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "stringtools.h"
+#include "jx_print.h"
+
 struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx *expr )
 {
 	struct deltadb_reduction *r;
@@ -23,19 +26,23 @@ struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx 
 	else if (strcmp(name,"AVERAGE")==0)	type = AVERAGE;
 	else if (strcmp(name,"MAX")==0)		type = MAX;
 	else if (strcmp(name,"INC")==0)		type = INC;
+	else if (strcmp(name,"UNIQUE")==0)      type = UNIQUE;
 	else	return 0;
 
 	r = malloc(sizeof(*r));
 	memset(r,0,sizeof(*r));
 	r->type = type;
 	r->expr = expr;
-
+	r->unique_table = hash_table_create(0,0);
+	r->unique_value = jx_array(0);
 	return r;
 };
 
 void deltadb_reduction_delete( struct deltadb_reduction *r )
 {
 	if(!r) return;
+	jx_delete(r->unique_value);
+	hash_table_delete(r->unique_table);
 	jx_delete(r->expr);
 	free(r);
 }
@@ -45,8 +52,33 @@ void deltadb_reduction_reset( struct deltadb_reduction *r )
 	r->count = r->sum = r->first = r->last = r->min = r->max = 0;
 };
 
-void deltadb_reduction_update( struct deltadb_reduction *r, double val )
+void deltadb_reduction_update( struct deltadb_reduction *r, struct jx * value )
 {
+	/* UNIQUE: keep a value in a hash table, keyed by the string representation. */
+
+	if(r->type==UNIQUE) {
+		char *str = jx_print_string(value);
+		if(!hash_table_lookup(r->unique_table,str)) {
+			struct jx *value_copy = jx_copy(value);
+			hash_table_insert(r->unique_table,str,value_copy);
+			jx_array_append(r->unique_value,value_copy);
+		}
+		return;
+	}
+
+	/* Any other type: convert to a double and track the extrema. */
+
+	double val = 0;
+
+	if(value->type==JX_INTEGER) {
+		val = value->u.integer_value;
+	} else if(value->type==JX_DOUBLE) {
+		val = value->u.double_value;
+	} else {
+		// treat non-numerics as 1, to facilitate operations like COUNT
+		val = 1;
+	}
+
 	if(r->count==0) {
 		r->min = r->max = r->first = val;
 	} else {
@@ -59,10 +91,12 @@ void deltadb_reduction_update( struct deltadb_reduction *r, double val )
 	r->count++;
 };
 
-double deltadb_reduction_value( struct deltadb_reduction *r )
+char * deltadb_reduction_string( struct deltadb_reduction *r )
 {
 	double value = 0;
 	switch(r->type) {
+		case UNIQUE:
+			return jx_print_string(r->unique_value);
 		case COUNT:
 			value = r->count;
 			break;
@@ -88,7 +122,8 @@ double deltadb_reduction_value( struct deltadb_reduction *r )
 			value = r->last-r->first;
 			break;
 	}
-	return value;
+
+	return string_format("%lf",value);
 }
 
 /* vim: set noexpandtab tabstop=4: */

@@ -210,15 +210,7 @@ static void display_reduce_exprs( struct deltadb_query *query, time_t current )
 		for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
 			struct jx *value = jx_eval(r->expr,jobject);
 			if(value && !jx_istype(value, JX_ERROR)) {
-				if(value->type==JX_INTEGER) {
-					deltadb_reduction_update(r,(double)value->u.integer_value);
-				} else if(value->type==JX_DOUBLE) {
-					deltadb_reduction_update(r,value->u.double_value);
-				} else {
-					// treat non-numerics as 1, to facilitate operations like COUNT
-					deltadb_reduction_update(r,1);
-				}
-
+				deltadb_reduction_update(r,value);
 				jx_delete(value);
 			}
 		}
@@ -237,7 +229,9 @@ static void display_reduce_exprs( struct deltadb_query *query, time_t current )
 	/* For each reduction, display the final value. */
 	list_first_item(query->reduce_exprs);
 	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
-		fprintf(query->output_stream,"%lf\t",deltadb_reduction_value(r));
+		char *str = deltadb_reduction_string(r);
+		fprintf(query->output_stream,"%s\n",str);
+		return str;
 	}
 
 	fprintf(query->output_stream,"\n");
