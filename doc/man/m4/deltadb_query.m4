@@ -32,6 +32,45 @@ OPTION_ITEM(--where expr)  (multiple) If given, only records matching this expre
 OPTION_ITEM(--output expr) (multiple) Display this expression on the output.
 OPTIONS_END
 
+SECTION(JX QUERY LANGUAGE)
+
+The --filter, --where, and --output options all make use of the JX query language,
+which is described URL(here,http://cctools.readthedocs.io/jx).
+
+In addition, the --output clauses may contain one of the following reduction functions:
+
+LIST_BEGIN
+LIST_ITEM(COUNT) Give the count of items in the set.
+LIST_ITEM(SUM) Give the sum of the values in the set.
+LIST_ITEM(FIRST) Give the first value encountered in the set.
+LIST_ITEM(LAST) Give the last value encountered in the set.
+LIST_ITEM(MIN) Give the minimum value in the set.
+LIST_ITEM(MAX) Give the maximum value in the set.
+LIST_ITEM(AVERAGE) Give the average value of the set.
+LIST_ITEM(UNIQUE) Give a list of unique values in the set.
+LIST_END
+
+(The UNIQUE function can be applied to any record type, while the other reduction functions assume numeric values.)
+
+By default, reductions are computed at local scope.  This means the reduction is computed across the set of 
+records available at each periodic time step.  If the prefix GLOBAL is added to a reduction, then the reduction
+is computed across every record over time.
+
+For example, this:
+
+LONGCODE_BEGIN
+--output 'UNIQUE(name)' --every 7d
+LONGCODE_END
+
+will display all of the names in the database, at seven day intervals.  However, it will not display records that are
+created and deleted between those seven day intervals.  In comparison, this:
+
+LONGCODE_BEGIN
+--output 'GLOBALUNIQUE(name)' --every 7d
+LONGCODE_END
+
+will display all of the names encountered over the last seven days, at seven day intervals.
+
 SECTION(EXAMPLES)
 
 To show 1 week worth of history starting on 15 April 2013:
@@ -46,23 +85,35 @@ LONGCODE_BEGIN
 % deltadb_query --db /data/catalog.history --from 2013-03-01
 LONGCODE_END
 
-To show the names of fred's servers where load5 exceeds 2.0:
+To show the names of fred's chirp servers where load5 exceeds 2.0:
 
 LONGCODE_BEGIN
-% deltadb_query --db /data/catalog.history --from 2013-03-01 --filter 'owner=="fred"' --where 'load5>2.0' --output name --output load5
+% deltadb_query --db /data/catalog.history --from 2013-03-01 --filter 'owner=="fred" && type=="chirp"' --where 'load5>2.0' --output name --output load5
 LONGCODE_END
 
 To show the average load of all servers owned by fred at one hour intervals:
 
 LONGCODE_BEGIN
-% deltadb_query --db /data/catalog.history --from 2013-03-01 --filter 'owner=="fred"' --output 'AVERAGE(load5)' --every 1h
+% deltadb_query --db /data/catalog.history --from 2013-03-01 --filter 'owner=="fred" && type=="chirp"' --output 'AVERAGE(load5)' --every 1h
+LONGCODE_END
+
+To show the project names of all Work Queue applications running at a given time:
+
+LONGCODE_BEGIN
+% deltadb_query --db /data/catalog.history --at 2020-12-01 --filter 'type=="wq_master"' --output 'UNIQUE(project)'
+LONGCODE_END
+
+To show the number of managers, tasks, and cores in use for all Work Queue applications:
+
+LONGCODE_BEGIN
+% deltadb_query --db /data/catalog.history --from 2020-01-01 --to 2021-01-01 --filter 'type=="wq_master"' --output 'COUNT(name)' --output 'SUM(tasks_running)' -- output 'SUM(cores_inuse)'
 LONGCODE_END
 
 The raw event output of a query can be saved to a file, and then queried using the --file option, which can accelerate operations on reduced data.  For example:
 
 LONGCODE_BEGIN
-% deltadb_query --db /data/catalog.history --from 2014-01-01 --to 2015-01-01 --filter 'type=="wq_master"' > wq.data
-% deltadb_query --file wq.data --from 2014-01-01 --output 'COUNT(name)' --output 'MAX(tasks_running)'
+% deltadb_query --db /data/catalog.history --from 2020-01-01 --to 2021-01-01 --filter 'type=="wq_master"' > wq.data
+% deltadb_query --file wq.data --output 'COUNT(name)' --output 'SUM(tasks_running)' -- output 'SUM(cores_inuse)'
 LONGCODE_END
 
 SECTION(COPYRIGHT)
