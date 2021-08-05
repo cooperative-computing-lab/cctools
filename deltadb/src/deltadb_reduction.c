@@ -50,7 +50,11 @@ void deltadb_reduction_delete( struct deltadb_reduction *r )
 void deltadb_reduction_reset( struct deltadb_reduction *r )
 {
 	r->count = r->sum = r->first = r->last = r->min = r->max = 0;
-};
+	jx_delete(r->unique_value);
+	hash_table_delete(r->unique_table);
+	r->unique_table = hash_table_create(0,0);
+	r->unique_value = jx_array(0);
+}
 
 void deltadb_reduction_update( struct deltadb_reduction *r, struct jx * value )
 {
