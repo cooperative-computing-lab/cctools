@@ -19,11 +19,17 @@ typedef enum {
 	AVERAGE,
 	MAX,
 	INC,
-	UNIQUE
+	UNIQUE,
 } deltadb_reduction_t;
+
+typedef enum {
+  DELTADB_SCOPE_LOCAL,
+  DELTADB_SCOPE_GLOBAL,
+} deltadb_scope_t;
 
 struct deltadb_reduction {
 	deltadb_reduction_t type;
+	deltadb_scope_t scope;
 	struct jx *expr;
 	struct hash_table *unique_table;
 	struct jx *unique_value;
@@ -35,10 +41,10 @@ struct deltadb_reduction {
 	double max;
 };
 
-struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx *expr );
+struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx *expr, deltadb_scope_t scope );
 void deltadb_reduction_delete( struct deltadb_reduction *r );
-void deltadb_reduction_reset( struct deltadb_reduction *r );
-void deltadb_reduction_update( struct deltadb_reduction *r, struct jx *value );
+void deltadb_reduction_reset( struct deltadb_reduction *r, deltadb_scope_t scope );
+void deltadb_reduction_update( struct deltadb_reduction *r, struct jx *value, deltadb_scope_t scope );
 char * deltadb_reduction_string( struct deltadb_reduction *r );
 
 #endif

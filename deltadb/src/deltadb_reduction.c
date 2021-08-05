@@ -13,7 +13,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "jx_print.h"
 
-struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx *expr )
+struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx *expr, deltadb_scope_t scope )
 {
 	struct deltadb_reduction *r;
 	deltadb_reduction_t type;
@@ -32,6 +32,7 @@ struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx 
 	r = malloc(sizeof(*r));
 	memset(r,0,sizeof(*r));
 	r->type = type;
+	r->scope = scope;
 	r->expr = expr;
 	r->unique_table = hash_table_create(0,0);
 	r->unique_value = jx_array(0);
@@ -47,8 +48,10 @@ void deltadb_reduction_delete( struct deltadb_reduction *r )
 	free(r);
 }
 
-void deltadb_reduction_reset( struct deltadb_reduction *r )
+void deltadb_reduction_reset( struct deltadb_reduction *r, deltadb_scope_t scope )
 {
+	if(r->scope!=scope) return;
+
 	r->count = r->sum = r->first = r->last = r->min = r->max = 0;
 	jx_delete(r->unique_value);
 	hash_table_delete(r->unique_table);
@@ -56,8 +59,10 @@ void deltadb_reduction_reset( struct deltadb_reduction *r )
 	r->unique_value = jx_array(0);
 }
 
-void deltadb_reduction_update( struct deltadb_reduction *r, struct jx * value )
+void deltadb_reduction_update( struct deltadb_reduction *r, struct jx * value, deltadb_scope_t scope )
 {
+	if(r->scope!=scope) return;
+
 	/* UNIQUE: keep a value in a hash table, keyed by the string representation. */
 
 	if(r->type==UNIQUE) {

@@ -50,7 +50,26 @@ LIST_ITEM(AVERAGE) Give the average value of the set.
 LIST_ITEM(UNIQUE) Give a list of unique values in the set.
 LIST_END
 
-The UNIQUE function can be applied to any record type, while the other reduction functions assume numeric values.
+(The UNIQUE function can be applied to any record type, while the other reduction functions assume numeric values.)
+
+By default, reductions are computed at local scope.  This means the reduction is computed across the set of 
+records available at each periodic time step.  If the prefix GLOBAL is added to a reduction, then the reduction
+is computed across every record over time.
+
+For example, this:
+
+LONGCODE_BEGIN
+--output 'UNIQUE(name)' --every 7d
+LONGCODE_END
+
+will display all of the names in the database, at seven day intervals.  However, it will not display records that are
+created and deleted between those seven day intervals.  In comparison, this:
+
+LONGCODE_BEGIN
+--output 'GLOBALUNIQUE(name)' --every 7d
+LONGCODE_END
+
+will display all of the names encountered over the last seven days, at seven day intervals.
 
 SECTION(EXAMPLES)
 
