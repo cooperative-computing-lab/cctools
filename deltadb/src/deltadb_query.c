@@ -187,13 +187,30 @@ static int checkpoint_read( struct deltadb_query *query, const char *filename )
 	return 1;
 }
 
-static void display_reduce_exprs( struct deltadb_query *query, time_t current )
+static void reset_reductions( struct deltadb_query *query )
 {
-	/* Reset all reductions. */
 	list_first_item(query->reduce_exprs);
 	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
 		deltadb_reduction_reset(r);
 	}
+}
+
+static void update_reductions( struct deltadb_query *query, struct jx *jobject )
+{
+	list_first_item(query->reduce_exprs);
+	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
+		struct jx *value = jx_eval(r->expr,jobject);
+		if(value && !jx_istype(value, JX_ERROR)) {
+			deltadb_reduction_update(r,value);
+			jx_delete(value);
+		}
+	}
+}
+
+static void display_reduce_exprs( struct deltadb_query *query, time_t current )
+{
+	/* Reset all reductions. */
+	reset_reductions(query);
 
 	/* For each item in the hash table: */
 
@@ -201,19 +218,11 @@ static void display_reduce_exprs( struct deltadb_query *query, time_t current )
 	struct jx *jobject;
 	hash_table_firstkey(query->table);
 	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
-
 		/* Skip if the where expression doesn't match */
 		if(!deltadb_boolean_expr(query->where_expr,jobject)) continue;
 
 		/* Update each reduction with its value. */
-		list_first_item(query->reduce_exprs);
-		for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
-			struct jx *value = jx_eval(r->expr,jobject);
-			if(value && !jx_istype(value, JX_ERROR)) {
-				deltadb_reduction_update(r,value);
-				jx_delete(value);
-			}
-		}
+		update_reductions(query,jobject);
 	}
 
 	/* Emit the current time */
