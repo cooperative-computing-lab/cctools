@@ -682,7 +682,7 @@ $ makeflow -T wq example.makeflow
 Then, submit 10 worker processes to Condor like this:
 
 ```sh
-$ condor_submit_workers head.cluster.edu 9123
+$ condor_submit_workers head.cluster.edu 9123 10
 
 10 Submitting job(s)..........
 Logging submit event(s)..........
