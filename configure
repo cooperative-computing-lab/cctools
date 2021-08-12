@@ -1056,29 +1056,22 @@ then
 
 	if [ "${python2_avail}" = yes ]
 	then
-		python2_config_exe=$(dirname ${python2_exe})/python${python2_version}-config
-		if check_file ${python2_config_exe}
+		python2_ccflags=$(${python2_exe} -c "import sysconfig as s; print('-I{} {}'.format(s.get_config_var('CONFINCLUDEPY'), s.get_config_var('CPPFLAGS')))")
+		python2_ldflags=$(${python2_exe} -c "import sysconfig as s; print(s.get_config_var('LDFLAGS'))")
+
+		if [ $BUILD_SYS = DARWIN ]
 		then
-			python2_ccflags=$(${python2_config_exe} --includes)
-			python2_ldflags=$(${python2_config_exe} --ldflags)
-
-			if [ $BUILD_SYS = DARWIN ]
+			if [ "${CONDA_BUILD}" = 1 ]
 			then
-				if [ "${CONDA_BUILD}" = 1 ]
-				then
-					python2_ldflags="-undefined dynamic_lookup"
-				else
-					python2_ldflags="$python2_ldflags -undefined dynamic_lookup"
-				fi
+				python2_ldflags="-undefined dynamic_lookup"
+			else
+				python2_ldflags="$python2_ldflags -undefined dynamic_lookup"
 			fi
+		fi
 
-			if ! check_function Py_MATH_PI Python.h ${python2_ccflags} ${python2_ldflags}
-			then
-				echo "*** could not find python2 development files"
-				python2_avail=no
-			fi
-		else
-			echo "*** could not find ${python2_config_exe}"
+		if ! check_function Py_MATH_PI Python.h ${python2_ccflags} ${python2_ldflags}
+		then
+			echo "*** could not find python2 development files"
 			python2_avail=no
 		fi
 	fi
@@ -1137,29 +1130,22 @@ then
 
 	if [ "${python3_avail}" = yes ]
 	then
-		python3_config_exe=$(dirname ${python3_exe})/python${python3_version}-config
-		if check_file ${python3_config_exe}
+		python3_ccflags=$(${python3_exe} -c "import sysconfig as s; print('-I{} {}'.format(s.get_config_var('CONFINCLUDEPY'), s.get_config_var('CPPFLAGS')))")
+		python3_ldflags=$(${python3_exe} -c "import sysconfig as s; print(s.get_config_var('LDFLAGS'))")
+
+		if [ $BUILD_SYS = DARWIN ]
 		then
-			python3_ccflags=$(${python3_config_exe} --includes)
-			python3_ldflags=$(${python3_config_exe} --ldflags)
-
-			if [ $BUILD_SYS = DARWIN ]
+			if [ "${CONDA_BUILD}" = 1 ]
 			then
-				if [ "${CONDA_BUILD}" = 1 ]
-				then
-					python3_ldflags="-undefined dynamic_lookup"
-				else
-					python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
-				fi
+				python3_ldflags="-undefined dynamic_lookup"
+			else
+				python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
 			fi
+		fi
 
-			if ! check_function Py_MATH_PI Python.h ${python3_ccflags} ${python3_ldflags}
-			then
-				echo "*** could not find python3 development files"
-				python3_avail=no
-			fi
-		else
-			echo "*** could not find ${python3_config_exe}"
+		if ! check_function Py_MATH_PI Python.h ${python3_ccflags} ${python3_ldflags}
+		then
+			echo "*** could not find python3 development files"
 			python3_avail=no
 		fi
 	fi
