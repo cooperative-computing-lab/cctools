@@ -972,6 +972,9 @@ const char **rmsummary_list_resources() {
 	return (const char **) resources_names;
 }
 
+/* Do not use this more than once in a single printf statement */
+/* the static output array means that multiple uses in a single printf */
+/* will overwrite the previous calls leading to incorrect results */
 const char *rmsummary_resource_to_str(const char *resource, double value, int include_units) {
 	static char output[256];
 
