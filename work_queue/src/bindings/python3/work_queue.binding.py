@@ -916,10 +916,10 @@ class PythonTask(Task):
     def specify_environment(self, env_file):
         if env_file:
             self._env_file = env_file
-            self._pp_run = shutil.which('python_package_run')
+            self._pp_run = shutil.which('poncho_package_run')
 
             if not self._pp_run:
-                raise RuntimeError("Could not find python_package_run in PATH.")
+                raise RuntimeError("Could not find poncho_package_run in PATH.")
 
             self._command = self._python_function_command()
             work_queue_task_specify_command(self._task, self._command)
@@ -1733,6 +1733,7 @@ class Factory(object):
         "mesos-path",
         "mesos-preload",
         "min-workers",
+        "package",
         "password",
         "run-factory-as-manager",
         "runos",
@@ -1779,6 +1780,7 @@ class Factory(object):
 
         self._config_file = None
         self._factory_proc = None
+        self._env_file = None
         self._log_file = log_file
 
         (tmp, self._error_file) = tempfile.mkstemp(
@@ -1875,7 +1877,11 @@ class Factory(object):
                 raise AttributeError("{} is not a supported option".format(name))
 
     def _construct_command_line(self):
+	# check for environment file	
         args = [self._factory_binary]
+
+        if self.env_file:
+            args += ['--package', self._env_file ]
         args += ['--parent-death']
         args += ['--config-file', self._config_file]
 
@@ -1964,6 +1970,9 @@ class Factory(object):
         opts_subset = dict([(opt, self._opts[opt]) for opt in self._opts if opt in Factory._config_file_options ])
         with open(self._config_file, 'w') as f:
             json.dump(opts_subset, f, indent=4)
+
+    def _specify_environment(self, env):
+        self._env_file = env
 
 
 def rmsummary_snapshots(self):
