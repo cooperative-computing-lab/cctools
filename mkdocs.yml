@@ -17,6 +17,7 @@ nav:
         - Parrot: 'parrot/index.md'
         - Chirp: 'chirp/index.md'
         - Catalog Server: 'catalog/index.md'
+        - Poncho: 'poncho/index.md'
     - Research Prototypes:
         - AWE: 'awe/index.md'
         - Confuga: 'confuga/index.md'

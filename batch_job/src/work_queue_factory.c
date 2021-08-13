@@ -1056,9 +1056,9 @@ void add_wrapper_input( const char *filename )
 	if(!wrapper_input) {
 		wrapper_input = strdup(filename);
 	} else {
-		char *tmp = string_format("%s,%s",wrapper_input,filename);
-		free(wrapper_command);
-		wrapper_command = tmp;
+		char *tmp = string_format("%s %s",wrapper_input,filename);
+		free(wrapper_input);
+		wrapper_input = tmp;
 	}
 	struct jx *file = jx_string(filename);
 	jx_array_append(wrapper_inputs, file);
@@ -1318,15 +1318,14 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_PYTHON_PACKAGE:
 				{
-				// --package X is the equivalent of --wrapper "python_package_run X" --wrapper-input X
-				add_wrapper_command( string_format("./python_package_run -e %s --",optarg) );
-				char *fullpath = path_which("python_package_run");
+				// --package X is the equivalent of --wrapper "poncho_package_run X" --wrapper-input X
+				char *fullpath = path_which("poncho_package_run");
 				if(!fullpath) {
-					fprintf(stderr,"work_queue_factory: could not find python_package_run in PATH");
+					fprintf(stderr,"work_queue_factory: could not find poncho_package_run in PATH");
 					return 1;
 				}
 				add_wrapper_input(fullpath);
-				add_wrapper_input(optarg);
+				add_wrapper_command( string_format("%s -e %s ",fullpath, optarg) );
 				break;
 				}
 			case LONG_OPT_WRAPPER:
