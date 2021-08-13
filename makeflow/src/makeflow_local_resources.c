@@ -9,18 +9,16 @@
 
 void makeflow_local_resources_print( struct rmsummary *r )
 {
-	printf("local resources: %s, %s memory, %s disk\n",
-            rmsummary_resource_to_str("cores", r->cores, 1),
-            rmsummary_resource_to_str("memory", r->memory, 1),
-            rmsummary_resource_to_str("disk", r->disk, 1));
+	printf("local resources: %s, ", rmsummary_resource_to_str("cores", r->cores, 1));
+	printf("%s memory, ", rmsummary_resource_to_str("memory", r->memory, 1));
+	printf("%s disk\n", rmsummary_resource_to_str("disk", r->disk, 1));
 }
 
 void makeflow_local_resources_debug( struct rmsummary *r )
 {
-    debug(D_MAKEFLOW, "local resources: %s, %s memory, %s disk\n",
-            rmsummary_resource_to_str("cores", r->cores, 1),
-            rmsummary_resource_to_str("memory", r->memory, 1),
-            rmsummary_resource_to_str("disk", r->disk, 1));
+	debug(D_MAKEFLOW, "local resources: %s, ", rmsummary_resource_to_str("cores", r->cores, 1));
+	debug(D_MAKEFLOW, "%s memory, ", rmsummary_resource_to_str("memory", r->memory, 1));
+	debug(D_MAKEFLOW, "%s disk\n", rmsummary_resource_to_str("disk", r->disk, 1));
 }
 
 void makeflow_local_resources_measure( struct rmsummary *r )
