@@ -60,34 +60,6 @@ Then, to run a program in the environment:
 poncho_package_run -e package.tar.gz -- example.py
 ```
 
-## Using PONCHO With Work Queue
-
-```
-task = wq.PythonTask(myfunction,args)
-task.specify_package(package.tar.gz)
-```
-
-```
-work_queue_factory -Tcondor -w 10 --python-package package.tar.gz
-```
-
-```
-factory = wq.Factory(...)
-factory.specify_package(package.tar.gz)
-```
-
-## Using PONCHO with Makeflow
-
-```
-outfile: infile mysim.py
-   ./mysim.py infile > outfile
-```
-
-```
-outfile: infile mysim.py poncho_package_run package.tar.gz
-   poncho_package_run -e package.tar.gz ./mysim.py infile > outfile
-```
-
 ## Specification File
 
 Environment Specifications are declarative JSON-encoded documents
