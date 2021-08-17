@@ -127,15 +127,13 @@ def check_spec(spec, out_dir):
     conda_spec['name'] = 'base'
  
     if 'conda' in data:
-        for x in data['conda']:
-            split = x.split('::')
-            channel = split[0]
-            package = split[1]
+        for  channel in data['conda']['channels']:
             if channel not in conda_spec['channels']:
                 conda_spec['channels'].append(channel)
+        for  dep in data['conda']['packages']:
+            if dep not in conda_spec['dependencies']:
+                conda_spec['dependencies'].append(dep)
 
-            if package not in conda_spec['dependencies']:
-                conda_spec['dependencies'].append(package)
 
     if 'pip' in data:
         pip_pkgs = []
