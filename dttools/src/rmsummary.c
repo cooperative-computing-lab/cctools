@@ -58,7 +58,7 @@ static const struct resource_info resources_info[] = {
 	{ "bytes_sent",               "MB",       0,  offsetof(struct rmsummary, bytes_sent)},
 	{ "bandwidth",                "Mbps",     3,  offsetof(struct rmsummary, bandwidth)},
 	{ "gpus",                     "gpus",     0,  offsetof(struct rmsummary, gpus)},
-	{ "cores",                    "cores",    0,  offsetof(struct rmsummary, cores)},
+	{ "cores",                    "cores",    3,  offsetof(struct rmsummary, cores)},
 	{ "cores_avg",                "cores",    3,  offsetof(struct rmsummary, cores_avg)},
 	{ "machine_cpus",             "cores",    3,  offsetof(struct rmsummary, machine_cpus)},
 	{ "machine_load",             "procs",    0,  offsetof(struct rmsummary, machine_load)},
@@ -930,10 +930,18 @@ int rmsummary_check_limits(struct rmsummary *measured, struct rmsummary *limits)
 
 		double l = rmsummary_get_by_offset(limits, info->offset);
 		double m = rmsummary_get_by_offset(measured, info->offset);
+		double f = 0;
+
+		if(!strcmp(info->name, "cores")) {
+			/* 'forgive' 1/4 of a core when doing measurements. As have been
+			 * observed, tasks sometimes go above their cores declared usage
+			 * for very short periods of time. */
+			f = 0.25;
+		}
 
 		// if there is a limit, and the resource was measured, and the
 		// measurement is larger than the limit, report the broken limit.
-		if(l > -1 && m > 0 && l < m) {
+		if(l > -1 && m > 0 && l < (m - f)) {
 			debug(D_DEBUG, "Resource limit for %s has been exceeded: %.*f > %.*f %s\n", info->name, info->decimals, m, info->decimals, l, info->units);
 
 			if(!measured->limits_exceeded) {
@@ -964,6 +972,9 @@ const char **rmsummary_list_resources() {
 	return (const char **) resources_names;
 }
 
+/* Do not use this more than once in a single printf statement */
+/* the static output array means that multiple uses in a single printf */
+/* will overwrite the previous calls leading to incorrect results */
 const char *rmsummary_resource_to_str(const char *resource, double value, int include_units) {
 	static char output[256];
 
@@ -975,14 +986,14 @@ const char *rmsummary_resource_to_str(const char *resource, double value, int in
 		return NULL;
 	}
 
-	char *tmp = string_format("%.*f%s%s",
+	string_nformat(
+			output,
+			sizeof(output),
+			"%.*f%s%s",
 			decimals,
 			value,
 			include_units ? " " : "",
 			include_units ? units : "");
-
-	strncpy(output, tmp, 256);
-	free(tmp);
 
 	return output;
 }

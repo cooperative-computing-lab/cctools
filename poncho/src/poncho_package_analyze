@@ -142,6 +142,11 @@ def export_env(overrides, imports, extra):
         env['pip'] = pip_pkgs
     if conda_pkgs:
         env['conda'] = conda_pkgs
+=======
+    if pip_pkgs:
+        conda_pkgs.append({'pip': pip_pkgs})
+    if conda_pkgs:
+        env['dependencies'] = conda_pkgs
     return env
 
 if __name__ == '__main__':

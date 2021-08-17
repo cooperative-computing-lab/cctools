@@ -129,6 +129,11 @@ double end_of(struct histogram *h, uint64_t b) {
 	return start;
 }
 
+/* return the largest value of the bucket that test_value would fall in*/
+double histogram_round_up(struct histogram *h, double test_value) {
+    return end_of(h, bucket_of(h, test_value));
+}
+
 int histogram_insert(struct histogram *h, double value) {
 	uint64_t bucket = bucket_of(h, value);
 

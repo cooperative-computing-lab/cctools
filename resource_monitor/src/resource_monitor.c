@@ -888,7 +888,7 @@ struct peak_cores_sample {
 double peak_cores(double wall_time, double cpu_time) {
 	static struct list *samples = NULL;
 
-	double max_separation = 60 + 2*interval; /* at least one minute and a complete interval */
+	double max_separation = 180 + 2*interval; /* at least one minute and a complete interval */
 
 	if(!samples) {
 		samples = list_create();
@@ -924,14 +924,15 @@ double peak_cores(double wall_time, double cpu_time) {
 	double diff_wall = tail->wall_time - head->wall_time;
 	double diff_cpu  = tail->cpu_time  - head->cpu_time;
 
-	if(diff_wall < 60) {
-		/* hack to elimiate noise. if diff_wall < 60s, we return 1. If command runs
-		 * for more than 60s, the average cpu/wall serves as a fallback in the
-		 * final summary. */
-		return 1;
-	} else {
-		return ((double) diff_cpu) / diff_wall;
+	if(tail->wall_time - summary->start < max_separation) {
+		/* hack to elimiate noise. if we have not collected enough samples,
+		 * use max_separation as the wall_time. This eliminates short noisy
+		 * burst at the beginning of the execution, but also triggers limits
+		 * checks for extreme offenders. */
+		diff_wall = max_separation;
 	}
+
+	return ((double) diff_cpu) / diff_wall;
 }
 
 void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
@@ -1009,24 +1010,23 @@ void rmonitor_log_row(struct rmsummary *tr)
 {
 	if(log_series)
 	{
-		fprintf(log_series,  "%s", rmsummary_resource_to_str(tr->wall_time + summary->start, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->cpu_time, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->cores, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->max_concurrent_processes, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->virtual_memory, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->memory, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->swap_memory, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->bytes_read, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->bytes_written, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->bytes_received, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->bytes_sent, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->bandwidth, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str(tr->machine_load, 0));
+		fprintf(log_series,  "%s", rmsummary_resource_to_str("start", tr->wall_time + summary->start, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("cpu_time", tr->cpu_time, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("cores", tr->cores, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("max_concurrent_processes", tr->max_concurrent_processes, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("virtual_memory", tr->virtual_memory, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("memory", tr->memory, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("swap_memory", tr->swap_memory, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("bytes_read", tr->bytes_read, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("bytes_written", tr->bytes_written, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("bytes_received", tr->bytes_received, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("bytes_sent", tr->bytes_sent, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("bandwidth", tr->bandwidth, 0));
+		fprintf(log_series, " %s", rmsummary_resource_to_str("machine_load", tr->machine_load, 0));
 
-		if(resources_flags->disk)
-		{
-			fprintf(log_series, " %s", rmsummary_resource_to_str(tr->total_files, 0));
-			fprintf(log_series, " %s", rmsummary_resource_to_str(tr->disk, 0));
+		if(resources_flags->disk) {
+			fprintf(log_series, " %s", rmsummary_resource_to_str("total_files", tr->total_files, 0));
+			fprintf(log_series, " %s", rmsummary_resource_to_str("disk", tr->disk, 0));
 		}
 
 		fprintf(log_series, "\n");
