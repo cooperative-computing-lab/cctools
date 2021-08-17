@@ -99,15 +99,17 @@ typedef enum {
 typedef enum {
 /**< When monitoring is disabled, all tasks run as
   WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
-  exhaustion occurs: */
+  exhaustion occurs for specified resources values, then the task permanently fails. */
     WORK_QUEUE_ALLOCATION_MODE_FIXED          = CATEGORY_ALLOCATION_MODE_FIXED,
-/**< If maximum values are specified for cores, memory,
-disk or gpus (either a user-label or category-label) and one of those resources
-is exceeded, the task fails.  Otherwise it is retried until a large enough
-worker connects to the manager, using the maximum values specified, and the
-maximum values so far seen for resources not specified. */
+/**< When monitoring is enabled, tasks are tried with maximum specified values
+of cores, memory, disk or gpus until enough statistics are collected. Then,
+further tasks are first tried using the maximum values observed, and in case of
+resource exhaustion, they are retried using the maximum specified values. The
+task permanently fails when there is an exhaustion using the maximum values. If
+no maximum values are specified, the task will wait until a larger worker
+connects. */
     WORK_QUEUE_ALLOCATION_MODE_MAX            = CATEGORY_ALLOCATION_MODE_MAX,
-/**< As above, but tasks are tried with an automatically computed first-allocation to minimize resource waste. */
+/**< As above, but tasks are first tried with an automatically computed allocation to minimize resource waste. */
     WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE      = CATEGORY_ALLOCATION_MODE_MIN_WASTE,
 /**< As above, but maximizing throughput. */
     WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT

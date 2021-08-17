@@ -65,11 +65,18 @@ int main (int argc, char *argv[])
 	check(-1 ==, fd = open("foo", O_RDWR));
 	check(EISDIR ==, errno);
 
+/*
+This test is exercising behavior that is unspecified in POSIX,
+and seems to vary between versions of Linux.
+*/
+
+    /*
 	check(0 <=, fd = open("foo/bar", O_CREAT|O_DIRECTORY, S_IRUSR|S_IWUSR));
 	CATCHUNIX(fstat(fd, &info));
 	check(!!, S_ISREG(info.st_mode));
 	CATCHUNIX(close(fd));
 	CATCHUNIX(unlink("foo/bar"));
+    */
 
 	CATCHUNIX(fd = open("foo/bar", O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR));
 	CATCHUNIX(close(fd));

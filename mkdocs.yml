@@ -30,10 +30,16 @@ nav:
         - Chirp Reference: 'chirp/chirp_protocol.md'
         - API Reference: 'http://ccl.cse.nd.edu/software/manuals/api/html/index.html'
 
+extra_css:
+    - css/tabs.css
 
 markdown_extensions:
     - toc:
-    - admonition
+    - admonition:
+    - pymdownx.tabbed:
+    - pymdownx.superfences:
+    - pymdownx.snippets:
+        base_path: doc/manuals
 
 permalink: True
 

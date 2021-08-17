@@ -37,7 +37,7 @@ public:
 			finfo.st_dev = 0;
 			finfo.st_ino = 0;
 		}
-		strncpy(fpath, _file->get_name()->path, sizeof(fpath)-1);
+		snprintf(fpath, sizeof(fpath), "%s", _file->get_name()->path);
 		if(_flags&MAP_SHARED && _prot&PROT_WRITE)
 			file = _file; /* we only keep the reference if we need to write back */
 		else

@@ -54,6 +54,26 @@ A paper entitled DeltaDB describes the operation of the tools in detail (see ref
 - **--output expr**  (multiple) Display this expression on the output.
 
 
+## JX QUERY LANGUAGE
+
+The --filter, --where, and --output options all make use of the JX query language,
+which is described URL(here,http://cctools.readthedocs.io/jx).
+
+In addition, the --output clauses may contain one of the following reduction functions:
+
+
+- COUNT Give the count of items in the set.
+- SUM Give the sum of the values in the set.
+- FIRST Give the first value encountered in the set.
+- LAST Give the last value encountered in the set.
+- MIN Give the minimum value in the set.
+- MAX Give the maximum value in the set.
+- AVERAGE Give the average value of the set.
+- UNIQUE Give a list of unique values in the set.
+
+
+The UNIQUE function can be applied to any record type, while the other reduction functions assume numeric values.
+
 ## EXAMPLES
 
 To show 1 week worth of history starting on 15 April 2013:
@@ -68,23 +88,35 @@ To show all history after 1 March 2013:
 % deltadb_query --db /data/catalog.history --from 2013-03-01
 ```
 
-To show the names of fred's servers where load5 exceeds 2.0:
+To show the names of fred's chirp servers where load5 exceeds 2.0:
 
 ```
-% deltadb_query --db /data/catalog.history --from 2013-03-01 --filter 'owner=="fred"' --where 'load5>2.0' --output name --output load5
+% deltadb_query --db /data/catalog.history --from 2013-03-01 --filter 'owner=="fred" && type=="chirp"' --where 'load5>2.0' --output name --output load5
 ```
 
 To show the average load of all servers owned by fred at one hour intervals:
 
 ```
-% deltadb_query --db /data/catalog.history --from 2013-03-01 --filter 'owner=="fred"' --output 'AVERAGE(load5)' --every 1h
+% deltadb_query --db /data/catalog.history --from 2013-03-01 --filter 'owner=="fred" && type=="chirp"' --output 'AVERAGE(load5)' --every 1h
+```
+
+To show the project names of all Work Queue applications running at a given time:
+
+```
+% deltadb_query --db /data/catalog.history --at 2020-12-01 --filter 'type=="wq_master"' --output 'UNIQUE(project)'
+```
+
+To show the number of managers, tasks, and cores in use for all Work Queue applications:
+
+```
+% deltadb_query --db /data/catalog.history --from 2020-01-01 --to 2021-01-01 --filter 'type=="wq_master"' --output 'COUNT(name)' --output 'SUM(tasks_running)' -- output 'SUM(cores_inuse)'
 ```
 
 The raw event output of a query can be saved to a file, and then queried using the --file option, which can accelerate operations on reduced data.  For example:
 
 ```
-% deltadb_query --db /data/catalog.history --from 2014-01-01 --to 2015-01-01 --filter 'type=="wq_master"' > wq.data
-% deltadb_query --file wq.data --from 2014-01-01 --output 'COUNT(name)' --output 'MAX(tasks_running)'
+% deltadb_query --db /data/catalog.history --from 2020-01-01 --to 2021-01-01 --filter 'type=="wq_master"' > wq.data
+% deltadb_query --file wq.data --output 'COUNT(name)' --output 'SUM(tasks_running)' -- output 'SUM(cores_inuse)'
 ```
 
 ## COPYRIGHT

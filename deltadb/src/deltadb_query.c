@@ -187,41 +187,43 @@ static int checkpoint_read( struct deltadb_query *query, const char *filename )
 	return 1;
 }
 
-static void display_reduce_exprs( struct deltadb_query *query, time_t current )
+static void reset_reductions( struct deltadb_query *query, deltadb_scope_t scope )
 {
-	/* Reset all reductions. */
 	list_first_item(query->reduce_exprs);
 	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
-		deltadb_reduction_reset(r);
+		deltadb_reduction_reset(r,scope);
 	}
+}
 
-	/* For each item in the hash table: */
+static void update_reductions( struct deltadb_query *query, struct jx *jobject, deltadb_scope_t scope )
+{
+	/* Skip if the where expression doesn't match */
+	if(!deltadb_boolean_expr(query->where_expr,jobject)) return;
+
+	list_first_item(query->reduce_exprs);
+	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
+		if(r->scope!=scope) continue;
+		struct jx *value = jx_eval(r->expr,jobject);
+		if(value && !jx_istype(value, JX_ERROR)) {
+			deltadb_reduction_update(r,value,scope);
+			jx_delete(value);
+		}
+	}
+}
+
+static void display_reduce_exprs( struct deltadb_query *query, time_t current )
+{
+	/* Reset all local reductions. */
+	reset_reductions(query,DELTADB_SCOPE_LOCAL);
+
+	/* For each object in the hash table: */
 
 	char *key;
 	struct jx *jobject;
 	hash_table_firstkey(query->table);
 	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
-
-		/* Skip if the where expression doesn't match */
-		if(!deltadb_boolean_expr(query->where_expr,jobject)) continue;
-
-		/* Update each reduction with its value. */
-		list_first_item(query->reduce_exprs);
-		for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
-			struct jx *value = jx_eval(r->expr,jobject);
-			if(value && !jx_istype(value, JX_ERROR)) {
-				if(value->type==JX_INTEGER) {
-					deltadb_reduction_update(r,(double)value->u.integer_value);
-				} else if(value->type==JX_DOUBLE) {
-					deltadb_reduction_update(r,value->u.double_value);
-				} else {
-					// treat non-numerics as 1, to facilitate operations like COUNT
-					deltadb_reduction_update(r,1);
-				}
-
-				jx_delete(value);
-			}
-		}
+		/* Update each local reduction with its value. */
+		update_reductions(query,jobject,DELTADB_SCOPE_LOCAL);
 	}
 
 	/* Emit the current time */
@@ -237,10 +239,15 @@ static void display_reduce_exprs( struct deltadb_query *query, time_t current )
 	/* For each reduction, display the final value. */
 	list_first_item(query->reduce_exprs);
 	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
-		fprintf(query->output_stream,"%lf\t",deltadb_reduction_value(r));
+		char *str = deltadb_reduction_string(r);
+		fprintf(query->output_stream,"%s\n",str);
+		free(str);
 	}
 
 	fprintf(query->output_stream,"\n");
+
+	/* Reset global reductions to compute new values. */
+	reset_reductions(query,DELTADB_SCOPE_GLOBAL);
 
 }
 
@@ -338,6 +345,8 @@ int deltadb_create_event( struct deltadb_query *query, const char *key, struct j
 		return 1;
 	}
 
+	update_reductions(query,jobject,DELTADB_SCOPE_GLOBAL);
+
 	hash_table_insert(query->table,key,jobject);
 
 	if(query->display_mode==DELTADB_DISPLAY_STREAM) {
@@ -388,6 +397,8 @@ static void jx_merge_into( struct jx *current, struct jx *update )
 		p->next = current->u.pairs;
 		current->u.pairs = p;
 	}
+
+
 }
 
 int deltadb_merge_event( struct deltadb_query *query, const char *key, struct jx *update )
@@ -410,6 +421,8 @@ int deltadb_merge_event( struct deltadb_query *query, const char *key, struct jx
 
 	jx_delete(update);
 
+	update_reductions(query,current,DELTADB_SCOPE_GLOBAL);
+
 	return 1;
 }
 
@@ -424,6 +437,8 @@ int deltadb_update_event( struct deltadb_query *query, const char *key, const ch
 	struct jx *jname = jx_string(name);
 	jx_delete(jx_remove(jobject,jname));
 	jx_insert(jobject,jname,jvalue);
+
+	update_reductions(query,jobject,DELTADB_SCOPE_GLOBAL);
 
 	if(query->display_mode==DELTADB_DISPLAY_STREAM) {
 		display_deferred_time(query);

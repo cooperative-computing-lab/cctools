@@ -946,7 +946,7 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 		p->set_gid = p->egid;
 
 		tracer_copy_in_string(p->tracer,logical_name,POINTER(args[0]),sizeof(logical_name),0);
-		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
+		snprintf(p->new_logical_name, sizeof(p->new_logical_name), "%s", logical_name);
 
 		{
 			char buf[PFS_PATH_MAX] = "";

@@ -168,7 +168,16 @@ int main( int argc, char *argv[] )
 					return 1;
 				}
 
-				struct deltadb_reduction *r = deltadb_reduction_create(reduce_name,reduce_expr);
+				/* If the reduction name begins with GLOBAL, assign it global scope. */
+				deltadb_scope_t scope;
+				if(!strncmp(reduce_name,"GLOBAL",6)) {
+					scope = DELTADB_SCOPE_GLOBAL;
+					strcpy(reduce_name,&reduce_name[6]);
+				} else {
+					scope = DELTADB_SCOPE_LOCAL;
+				}
+
+				struct deltadb_reduction *r = deltadb_reduction_create(reduce_name,reduce_expr,scope);
 				if(!r) {
 					fprintf(stderr,"deltadb_query: invalid reduction: %s\n",reduce_name);
 					return 1;

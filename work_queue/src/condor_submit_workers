@@ -84,6 +84,13 @@ set_up_password_file()
 
 submit_workers_command()
 {
+	# check if host is localhost - if so then notify the user of an error
+	if [ $host = "localhost" ]
+	then
+		echo "Using localhost with condor workers may lead to unintended consequences, please specify the IP address instead" 1>&2
+		exit 1
+	fi
+
 	# rewrite cores, memory, disk with size of given slot. (sometimes the slot
 	# given is larger than the minimum requested).
 	arguments="--cores \$\$([TARGET.Cpus]) --memory \$\$([TARGET.Memory]) --disk \$\$([TARGET.Disk/1024]) $arguments"
