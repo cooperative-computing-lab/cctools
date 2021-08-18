@@ -16,7 +16,7 @@
 start_time=$(date +'%s%N')
 
 usage() {
-    echo "Usage: python_package_run [options] -e <file> command and args ..."
+    echo "Usage: poncho_package_run [options] -e <file> command and args ..."
     echo "where options are:"
     echo " -e, --environment <path>   Conda environment as a tar file or a directory. (Required.)"
     echo " -u, --unpack-to <dir>      Directory to unpack the environment. If not given,"
@@ -57,7 +57,7 @@ EOF
 function logmsg {
     if [[ "${PYTHON_PACKAGE_RUN_DEBUG}" = yes ]]
     then
-        printf "%s python_package_run: " "$(date +'%Y-%m-%dT%T.%N')"
+        printf "%s poncho_package_run: " "$(date +'%Y-%m-%dT%T.%N')"
         echo "$@"
     fi
 }
@@ -189,30 +189,30 @@ then
 fi
 
 # unpacking environment if needed...
-LOCKFILE="${UNPACK_TO}/.unpacking_python_package_run_lock"
+LOCKFILE="${UNPACK_TO}/.unpacking_poncho_package_run_lock"
 mkdir -p "${UNPACK_TO}"
 
-UNTAR_SCRIPT=$(mktemp python_package_run.XXXXXX)
+UNTAR_SCRIPT=$(mktemp poncho_package_run.XXXXXX)
 cat > ${UNTAR_SCRIPT} << EOF
-if [[ ! -e "${UNPACK_TO}"/.python_package_run_expanded ]]
+if [[ ! -e "${UNPACK_TO}"/.poncho_package_run_expanded ]]
 then
     # Directory is empty (the only file there is the lock). It is safe to untar.
     if ! tar -xf "${ENV_NAME}" -C "${UNPACK_TO}"
     then
-        echo "python_package_run: could not uncompress environment: ${ENV_NAME}"
+        echo "poncho_package_run: could not uncompress environment: ${ENV_NAME}"
         exit 1
     fi
 
     if ! ${UNPACK_TO}/bin/conda-unpack
     then
-        echo "python_package_run: could not relocate environment: ${ENV_NAME}"
+        echo "poncho_package_run: could not relocate environment: ${ENV_NAME}"
         exit 1
     fi
-    /bin/touch "${UNPACK_TO}"/.python_package_run_expanded
+    /bin/touch "${UNPACK_TO}"/.poncho_package_run_expanded
 else
     if [[ "${PYTHON_PACKAGE_RUN_DEBUG}" = yes ]]
     then
-        echo "python_package_run: directory ${UNPACK_TO} is not empty. Not expanding environment file again."
+        echo "poncho_package_run: directory ${UNPACK_TO} is not empty. Not expanding environment file again."
     fi
 fi
 exit 0
