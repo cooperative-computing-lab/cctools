@@ -152,7 +152,7 @@ function cleanup {
     ms=$((total_ms % 1000))
     s=$((total_ms/1000))
 
-    logmsg total runtime: $(printf "%d.%0.3d seconds" ${s} ${ms})
+    logmsg total runtime: $(printf "%d.%0.3d seconds" "${s}" "${ms}")
 }
 trap cleanup EXIT
 
@@ -164,7 +164,6 @@ shift ${arg_counsumed}
 
 ENV_NAME_IS_DIR=no
 UNPACK_IS_TMP=no
-NEED_TO_UNPACK=yes
 
 if [[ -d "${ENV_NAME}" ]]
 then
@@ -184,8 +183,8 @@ then
     UNPACK_TO="$(mktemp -d)"
 fi
 
-UNPACK_TO=$(realpath ${UNPACK_TO})
-logmsg setting up conda environment at ${UNPACK_TO}
+UNPACK_TO=$(realpath "${UNPACK_TO}")
+logmsg setting up conda environment at "${UNPACK_TO}"
 
 if [[ -f "${UNPACK_TO}" ]]
 then
@@ -197,7 +196,7 @@ fi
 mkdir -p "${UNPACK_TO}"
 
 UNTAR_SCRIPT=$(mktemp poncho_package_run.XXXXXX)
-cat > ${UNTAR_SCRIPT} << EOF
+cat > "${UNTAR_SCRIPT}" << EOF
 if [[ ! -e "${UNPACK_TO}"/.poncho_package_run_expanded ]]
 then
     logmsg expanding environment file ${ENV_NAME}
@@ -225,8 +224,8 @@ EOF
 
 if [[ "${ENV_NAME_IS_DIR}" = no ]]
 then
-    logmsg waiting for lock on directory ${UNPACK_TO}
-    flock -E 222 -w ${LOCK_WAIT} ${UNPACK_TO} -c "/bin/bash ${UNTAR_SCRIPT}"
+    logmsg waiting for lock on directory "${UNPACK_TO}"
+    flock -E 222 -w "${LOCK_WAIT}" "${UNPACK_TO}" -c "/bin/bash ${UNTAR_SCRIPT}"
     status=$?
     if [[ "$status" != 0 ]]
     then
@@ -234,7 +233,7 @@ then
         then
             errmsg could not acquire lock
         else
-            errmsg could not untar environment: ${ENV_NAME}
+            errmsg could not untar environment: "${ENV_NAME}"
         fi
         exit 1
     fi
@@ -253,7 +252,7 @@ fi
 #set enviornment variables
 if [[ -e "${UNPACK_TO}/poncho/set_env" ]]
 then
-    source  "${UNPACK_TO}/poncho/set_env" ${UNPACK_TO}
+    source  "${UNPACK_TO}/poncho/set_env" "${UNPACK_TO}"
 
 fi
 
