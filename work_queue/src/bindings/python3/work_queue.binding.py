@@ -1551,6 +1551,22 @@ class WorkQueue(object):
             task = self._task_table.pop(int(task_pointer.taskid))
         return task
 
+    ##
+    # Cancel all tasks of the given category and remove them from the queue.
+    #
+    # @param self   Reference to the current work queue object.
+    # @param tag    The tag assigned to task using @ref specify_tag.
+    def cancel_by_category(self, category):
+        canceled_tasks = []
+        ids_to_cancel = []
+
+        for task in self._task_table.values():
+            if task.category == category:
+                ids_to_cancel.append(task.id)
+
+        canceled_tasks =  [self.cancel_by_taskid(id) for id in ids_to_cancel]
+        return canceled_tasks
+
 
     ##
     # Shutdown workers connected to queue.
