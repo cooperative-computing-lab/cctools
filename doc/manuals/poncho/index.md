@@ -93,11 +93,17 @@ or system-specific details where possible.
 
 ```
 {
-	"conda": [
-		"defaults::python=3.7",
-		"conda-forge::numpy=1.20.0=py38h18fd61f_0",
-		"conda-forge::ndcctools"
-	]
+	"conda": {
+		"channels":[
+                        "defaults",
+			"conda-forge" 
+		],
+		"packages":[
+			"python=3.7",
+			"numpy=1.20.0=py38h18fd61f_0",
+			"ndcctools"
+		]
+	}
 }
 ```
 
