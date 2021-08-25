@@ -278,7 +278,7 @@ def check_spec(spec, out_dir, local_pkgs):
             if dep not in conda_spec['dependencies']:
                 conda_spec['dependencies'].append(dep)
 
-    # get pip packages that are not local
+    # get pip packages that are not
     if 'pip' in data:
         pip_pkgs = [x for x in data['pip'] if x not in local_pkgs]
         conda_spec['dependencies'].append({'pip':pip_pkgs})

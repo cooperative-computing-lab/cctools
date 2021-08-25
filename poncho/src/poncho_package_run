@@ -16,7 +16,7 @@
 start_time=$(date +'%s%N')
 
 usage() {
-    echo "Usage: python_package_run [options] -e <file> command and args ..."
+    echo "Usage: poncho_package_run [options] -e <file> command and args ..."
     echo "where options are:"
     echo " -e, --environment <path>   Conda environment as a tar file or a directory. (Required.)"
     echo " -u, --unpack-to <dir>      Directory to unpack the environment. If not given,"
@@ -53,19 +53,24 @@ The directory ./my-conda-env can be safely removed.
 EOF
 }
 
+export ORIGINAL_PID=$$
 
 function logmsg {
-    if [[ "${PYTHON_PACKAGE_RUN_DEBUG}" = yes ]]
+    if [[ "${PONCHO_PACKAGE_RUN_DEBUG}" = yes ]]
     then
-        printf "%s python_package_run: " "$(date +'%Y-%m-%dT%T.%N')"
+        printf "%s poncho_package_run($ORIGINAL_PID): " "$(date +'%Y-%m-%d %T')"
         echo "$@"
     fi
 }
+export -f logmsg
+
 
 function errmsg {
-    local PYTHON_PACKAGE_RUN_DEBUG=yes
+    local PONCHO_PACKAGE_RUN_DEBUG=yes
     logmsg "$@"
 }
+export -f errmsg
+
 
 UNPACK_TO=
 ENV_NAME=
@@ -90,7 +95,7 @@ parse_arguments() {
                 UNPACK_TO="$1"
                 ;;
             -d | --debug)
-                export PYTHON_PACKAGE_RUN_DEBUG=yes
+                export PONCHO_PACKAGE_RUN_DEBUG=yes
                 logmsg parsing arguments...
                 ;;
             -e | --environment)
@@ -147,7 +152,7 @@ function cleanup {
     ms=$((total_ms % 1000))
     s=$((total_ms/1000))
 
-    logmsg total runtime: $(printf "%d.%0.3d seconds" ${s} ${ms})
+    logmsg total runtime: $(printf "%d.%0.3d seconds" "${s}" "${ms}")
 }
 trap cleanup EXIT
 
@@ -159,7 +164,6 @@ shift ${arg_counsumed}
 
 ENV_NAME_IS_DIR=no
 UNPACK_IS_TMP=no
-NEED_TO_UNPACK=yes
 
 if [[ -d "${ENV_NAME}" ]]
 then
@@ -179,8 +183,8 @@ then
     UNPACK_TO="$(mktemp -d)"
 fi
 
-UNPACK_TO=$(realpath ${UNPACK_TO})
-logmsg setting up conda environment at ${UNPACK_TO}
+UNPACK_TO=$(realpath "${UNPACK_TO}")
+logmsg setting up conda environment at "${UNPACK_TO}"
 
 if [[ -f "${UNPACK_TO}" ]]
 then
@@ -189,42 +193,48 @@ then
 fi
 
 # unpacking environment if needed...
-LOCKFILE="${UNPACK_TO}/.unpacking_python_package_run_lock"
 mkdir -p "${UNPACK_TO}"
 
-UNTAR_SCRIPT=$(mktemp python_package_run.XXXXXX)
-cat > ${UNTAR_SCRIPT} << EOF
-if [[ ! -e "${UNPACK_TO}"/.python_package_run_expanded ]]
+UNTAR_SCRIPT=$(mktemp poncho_package_run.XXXXXX)
+cat > "${UNTAR_SCRIPT}" << EOF
+if [[ ! -e "${UNPACK_TO}"/.poncho_package_run_expanded ]]
 then
-    # Directory is empty (the only file there is the lock). It is safe to untar.
+    logmsg expanding environment file ${ENV_NAME}
+
+    # Directory is empty. It is safe to untar.
     if ! tar -xf "${ENV_NAME}" -C "${UNPACK_TO}"
     then
-        echo "python_package_run: could not uncompress environment: ${ENV_NAME}"
+        errmsg could not uncompress environment: ${ENV_NAME}
         exit 1
     fi
 
     if ! ${UNPACK_TO}/bin/conda-unpack
     then
-        echo "python_package_run: could not relocate environment: ${ENV_NAME}"
+        errmsg could not relocate environment: ${ENV_NAME}
         exit 1
     fi
-    /bin/touch "${UNPACK_TO}"/.python_package_run_expanded
+
+    /bin/date > "${UNPACK_TO}"/.python_package_run_expanded
+    /bin/sync "${UNPACK_TO}"
 else
-    if [[ "${PYTHON_PACKAGE_RUN_DEBUG}" = yes ]]
-    then
-        echo "python_package_run: directory ${UNPACK_TO} is not empty. Not expanding environment file again."
-    fi
+    logmsg directory ${UNPACK_TO} is not empty. Not expanding environment file again
 fi
 exit 0
 EOF
 
 if [[ "${ENV_NAME_IS_DIR}" = no ]]
 then
-    logmsg expanding environment file
-    flock -w ${LOCK_WAIT} ${LOCKFILE} -c "/bin/bash ${UNTAR_SCRIPT}"
-    if [ "$?" != 0 ]
+    logmsg waiting for lock on directory "${UNPACK_TO}"
+    flock -E 222 -w "${LOCK_WAIT}" "${UNPACK_TO}" -c "/bin/bash ${UNTAR_SCRIPT}"
+    status=$?
+    if [[ "$status" != 0 ]]
     then
-        errmsg "could not untar environment: ${ENV_NAME}"
+        if [[ "$status" = 222 ]]
+        then
+            errmsg could not acquire lock
+        else
+            errmsg could not untar environment: "${ENV_NAME}"
+        fi
         exit 1
     fi
 fi
@@ -242,7 +252,7 @@ fi
 #set enviornment variables
 if [[ -e "${UNPACK_TO}/poncho/set_env" ]]
 then
-    source  "${UNPACK_TO}/poncho/set_env" ${UNPACK_TO}
+    source  "${UNPACK_TO}/poncho/set_env" "${UNPACK_TO}"
 
 fi
 

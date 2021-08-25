@@ -4318,7 +4318,7 @@ static int tasktag_comparator(void *t, const void *r) {
 	struct work_queue_task *task_in_queue = t;
 	const char *tasktag = r;
 
-	if (!strcmp(task_in_queue->tag, tasktag)) {
+	if (task_in_queue->tag && !strcmp(task_in_queue->tag, tasktag)) {
 		return 1;
 	}
 	return 0;
