@@ -72,6 +72,8 @@ task 2 exited with output 20
 all done.
 ```
 
+(You can also declare and launch directly from python using the [work queue factory.](#using-the-factory-with-python))
+
 Congrads! You have now run a simple manager application that runs tasks on one local worker.
 Read on to learn how to build more complex applications and run large numbers of workers at scale.
 
@@ -705,6 +707,32 @@ For further options, please refer to the work queue factory [manual](../man_page
 By default, the factory submits as many tasks that are waiting and running up
 to a specified maximum. To run more than one task in a worker, please refer
 to the following section on describing [task resources](#task-resources) and [worker resources](#work-queue-factory-and-resources).
+
+
+#### Using the factory with python
+
+We can create a factory directly in python. Creating a factory object does not
+immediately launch it, so this is a good time to configure the resources,
+number of workers, etc. Factory objects function as Python context managers, so
+to indicate that a set of commands should be run with a factory running, wrap
+them in a with statement. The factory will be cleaned up automtically at the
+end of the block. As an example:
+
+```python
+workers = work_queue.Factory("condor", "myproject")
+workers.cores = 4
+workers.memory = 4000
+workers.disk = 5000
+workers.max_workers = 20
+with workers:
+    while not q.empty():
+        t = q.wait(5)
+        ...
+```
+
+
+
+
 
 ## Managing Resources
 
