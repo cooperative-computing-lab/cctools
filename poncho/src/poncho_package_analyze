@@ -143,7 +143,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description=HELPMSG)
     actions = parser.add_mutually_exclusive_group()
-    parser.add_argument('source', nargs='*',
+    parser.add_argument('source', nargs='+',
         help='Analyze the given Python source code, or - for stdin.')
     parser.add_argument('out',
         help='Path to write the JSON description, or - for stdout.')
@@ -158,9 +158,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     scan_pkgs()
-
-    if len(args.source) == 0:
-        args.source = ['-']
 
     if args.out == '-':
         out = sys.stdout
