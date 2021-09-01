@@ -76,8 +76,12 @@ class Task(object):
             raise Exception('Unable to create internal Task structure')
 
     def __del__(self):
-        if self._task:
-            work_queue_task_delete(self._task)
+        try:
+            if self._task:
+                work_queue_task_delete(self._task)
+        except:
+            #ignore exceptions, in case task has been already collected
+            pass
 
     @staticmethod
     def _determine_file_flags(flags, cache, failure_only):
@@ -1057,11 +1061,15 @@ class WorkQueue(object):
 
 
     def _free_queue(self):
-        if self._work_queue:
-            if self._shutdown:
-                self.shutdown_workers(0)
-            work_queue_delete(self._work_queue)
-            self._work_queue = None
+        try:
+            if self._work_queue:
+                if self._shutdown:
+                    self.shutdown_workers(0)
+                work_queue_delete(self._work_queue)
+                self._work_queue = None
+        except:
+            #ignore exceptions, as we are going away...
+            pass
 
     def __del__(self):
         self._free_queue()
