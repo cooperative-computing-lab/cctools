@@ -670,15 +670,26 @@ category_allocation_t category_next_label(struct category *c, category_allocatio
                 const size_t o = labeled_resources[i];
                 if(!over) {
                     int64_t meas_value = rmsummary_get_by_offset(measured, o);
+                    int64_t user_value = -1;
+                    int64_t max_value  = -1;
+
                     if(user) {
-                        int64_t user_value = rmsummary_get_by_offset(user, o);
-                        if(user_value > -1 && meas_value > user_value) {
+                        user_value = rmsummary_get_by_offset(user, o);
+                    }
+
+                    if(c->max_allocation) {
+                        max_value = rmsummary_get_by_offset(c->max_allocation, o);
+                    }
+
+                    if(user_value > -1) {
+                        if(meas_value > user_value) {
                             over = 1;
+                            break;
                         }
-                    } else if(c->max_allocation) {
-                        int64_t max_value = rmsummary_get_by_offset(c->max_allocation, o);
-                        if(max_value > -1 && meas_value > max_value) {
+                    } else if(max_value > -1) {
+                        if(meas_value > max_value) {
                             over = 1;
+                            break;
                         }
                     }
                 }
@@ -689,7 +700,6 @@ category_allocation_t category_next_label(struct category *c, category_allocatio
 	}
 
 	/* else... not overflow, no label change */
-
 	return current_label;
 }
 
