@@ -72,7 +72,26 @@ In addition, the --output clauses may contain one of the following reduction fun
 - UNIQUE Give a list of unique values in the set.
 
 
-The UNIQUE function can be applied to any record type, while the other reduction functions assume numeric values.
+(The UNIQUE function can be applied to any record type, while the other reduction functions assume numeric values.)
+
+By default, reductions are computed at local scope.  This means the reduction is computed across the set of 
+records available at each periodic time step.  If the prefix GLOBAL is added to a reduction, then the reduction
+is computed across every record over time.
+
+For example, this:
+
+```
+--output 'UNIQUE(name)' --every 7d
+```
+
+will display all of the names in the database, at seven day intervals.  However, it will not display records that are
+created and deleted between those seven day intervals.  In comparison, this:
+
+```
+--output 'GLOBALUNIQUE(name)' --every 7d
+```
+
+will display all of the names encountered over the last seven days, at seven day intervals.
 
 ## EXAMPLES
 
