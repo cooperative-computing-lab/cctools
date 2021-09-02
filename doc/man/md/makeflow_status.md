@@ -36,7 +36,7 @@
 
 ## OPTIONS
 
-- **-N --project <project>** The project on which to filter results.
+- **-M --project <project>** The project on which to filter results.
 - **-u --username <user>** The owner on which to filter results.
 - **-s --server <server>** The catalog server to retrieve the reports from.
 - **-p --port <port>** The port to contact the catalog server on.
@@ -59,7 +59,7 @@ On success, returns 0 and prints out the report to stdout.
 Retrieving reports related to project "awesome"
 
 ```
-% makeflow_status -N awesome
+% makeflow_status -M awesome
 ```
 
 

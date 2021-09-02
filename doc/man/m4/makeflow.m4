@@ -97,7 +97,7 @@ SUBSECTION(WorkQueue Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-C, catalog-server, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_TRIPLET(-F, wq-fast-abort, #)WorkQueue fast abort multiplier. (default is deactivated)
-OPTION_TRIPLET(-M,-N, project-name, project)Set the project name to PARAM(project).
+OPTION_TRIPLET(-M, project-name, project)Set the project name to PARAM(project).
 OPTION_TRIPLET(-p, port, port)Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
 OPTION_TRIPLET(-Z, port-file, file)Select port at random and write it to this file.  (default is disabled)
 OPTION_TRIPLET(-P, priority, integer)Priority. Higher the value, higher the priority.
@@ -286,7 +286,7 @@ LONGCODE_END
 
 Run makeflow with WorkQueue using named workers:
 LONGCODE_BEGIN
-makeflow -T wq -a -N project.name Makeflow
+makeflow -T wq -a -M project.name Makeflow
 LONGCODE_END
 
 Create a directory containing all of the dependencies required to run the

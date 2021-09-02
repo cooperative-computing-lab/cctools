@@ -107,7 +107,7 @@ The CODE(-A) option shows a summary of the resources observed per task
 category.
 
 LONGCODE_BEGIN
-$ work_queue_status -T cclws16.cse.nd.edu 9001
+$ work_queue_status -A cclws16.cse.nd.edu 9001
 CATEGORY        RUNNING    WAITING  FIT-WORKERS  MAX-CORES MAX-MEMORY   MAX-DISK
 analysis            216        784           54          4      ~1011      ~3502
 merge                20         92           30         ~1      ~4021      21318

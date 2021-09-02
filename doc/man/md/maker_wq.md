@@ -38,7 +38,7 @@
 
 - **-port port** Specify the port on which to create the Work Queue
 - **-fa fast_abort** Specify a fast abort multiplier
-- **-N project** Specify a project name for utilizing shared workers
+- **-M project** Specify a project name for utilizing shared workers
 
 
 ## EXIT STATUS

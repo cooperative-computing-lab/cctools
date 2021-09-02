@@ -63,7 +63,7 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 
 - **-v** Show version string.
 - **-h** Show this help message.
-- **-N ---M <manager-name>** Set the name of the project this worker should work for.  A worker can have multiple projects.
+- **-M --manager-name <name>** Set the name of the project this worker should work for.  A worker can have multiple projects.
 - **-C --catalog <catalog>** Set catalog server to <catalog>. Format: HOSTNAME:PORT
 - **-d --debug <flag>** Enable debugging for the given subsystem. Try -d all as a start.
 - **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
@@ -102,10 +102,9 @@ its manager are sent to its subordinate worker processes.
 
 
 
-**Foreman** mode is enabled by either specifying a port to listen on using the **-f <port>** option or by
-setting the mode directly with the **--foreman** option.  The foreman can be directed to advertise its
-presence on the [catalog_server()](catalog_server.md) with the **-N <project name>** flag, which other workers can use to
-contact the foreman.
+**Foreman** mode is enabled by either specifying a port to listen on using the **--foreman --foreman-port <port>** option or by
+setting the mode directly with the **--foreman --foreman-name <foreman_name>**
+option.  The foreman works for the manager specified with the with the **-M <project name>** flag.
 
 ## EXIT STATUS
 On success, returns zero.  On failure, returns non-zero.
@@ -123,9 +122,9 @@ to accept tasks only from a manager application with project name set to project
 % work_queue_worker -a -d all -M project_A
 ```
 
-To run **work_queue_worker** as a foreman working for project_A and advertising itself as foreman_A1 while listening on port 9123:
+To run **work_queue_worker** as a foreman working for project_A and advertising itself as foreman_A1:
 ```
-% work_queue_worker --foreman -M project_A -N foreman_A1 -f 9123
+% work_queue_worker --foreman -M project_A -f foreman_A1
 ```
 
 ## COPYRIGHT

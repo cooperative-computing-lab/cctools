@@ -30,7 +30,6 @@ auto mode option is specified for work_queue_worker.
 SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-M, manager-name, name)Name of the preferred manager for worker. (auto mode enabled)
-OPTION_TRIPLET(-N, name, name)Preferred project name for work_queue_worker to connect. (auto mode enabled)
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server for work_queue_worker to <catalog>. <catalog> format: HOSTNAME:PORT.
 OPTION_TRIPLET(-t, timeout, seconds)Abort work_queue_worker after this amount of idle time (default=900s).
 OPTION_TRIPLET(-d, debug, subsystem)Enable debugging on worker for this subsystem (try -d all to start).

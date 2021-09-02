@@ -16,7 +16,7 @@ SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_PAIR(-port, port)Specify the port on which to create the Work Queue
 OPTION_PAIR(-fa, fast_abort)Specify a fast abort multiplier
-OPTION_PAIR(-N, project)Specify a project name for utilizing shared workers
+OPTION_PAIR(-M, project)Specify a project name for utilizing shared workers
 OPTIONS_END
 
 SECTION(EXIT STATUS)
