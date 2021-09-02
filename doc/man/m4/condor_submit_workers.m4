@@ -29,7 +29,6 @@ the catalog server by specifying the name of the work queue using the --manager-
 SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-M, manager-name, name)Name of the preferred manager for worker.
-OPTION_TRIPLET(-N, name, name)Same as -M (backwards compatibility).
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT.
 OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time (default=900s).
 OPTION_TRIPLET(-d, debug, subsystem)Enable debugging on worker for this subsystem (try -d all to start).

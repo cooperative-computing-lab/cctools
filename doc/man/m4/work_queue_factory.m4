@@ -51,7 +51,7 @@ OPTION_ITEM(-T,--batch-type=<type>)
 Batch system type (required). One of: local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun
 OPTION_ITEM(-C,--config-file=<file>)
  Use configuration file <file>.
-OPTION_ITEM(-M,-N,--manager-name=<project>)
+OPTION_ITEM(-M,--manager-name=<project>)
  Project name of managers to server, can be regex
 OPTION_ITEM(-F,--foremen-name=<project>)
  Foremen to serve, can be a regular expression.

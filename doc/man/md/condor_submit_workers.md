@@ -51,7 +51,6 @@ the catalog server by specifying the name of the work queue using the --manager-
 ## OPTIONS
 
 - **-M --manager-name <name>** Name of the preferred manager for worker.
-- **-N --name <name>** Same as -M (backwards compatibility).
 - **-C --catalog <catalog>** Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT.
 - **-t --timeout <time>** Abort after this amount of idle time (default=900s).
 - **-d --debug <subsystem>** Enable debugging on worker for this subsystem (try -d all to start).

@@ -41,7 +41,7 @@ SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_ITEM(-v, --version')Show version string.
 OPTION_ITEM(-h, --help')Show this help message.
-OPTION_TRIPLET(-N,-M, manager-name, name)Set the name of the project this worker should work for.  A worker can have multiple projects.
+OPTION_TRIPLET(-M, manager-name, name)Set the name of the project this worker should work for.  A worker can have multiple projects.
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
@@ -80,10 +80,9 @@ its manager are sent to its subordinate worker processes.
 
 PARA
 
-BOLD(Foreman) mode is enabled by either specifying a port to listen on using the BOLD(-f PARAM(port)) option or by
-setting the mode directly with the BOLD(--foreman) option.  The foreman can be directed to advertise its
-presence on the MANPAGE(catalog_server) with the BOLD(-N PARAM(project name)) flag, which other workers can use to
-contact the foreman.
+BOLD(Foreman) mode is enabled by either specifying a port to listen on using the BOLD(--foreman --foreman-port PARAM(port)) option or by
+setting the mode directly with the BOLD(--foreman --foreman-name PARAM(foreman_name))
+option.  The foreman works for the manager specified with the with the BOLD(-M PARAM(project name)) flag.
 
 SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.
@@ -101,9 +100,9 @@ LONGCODE_BEGIN
 % work_queue_worker -a -d all -M project_A
 LONGCODE_END
 
-To run BOLD(work_queue_worker) as a foreman working for project_A and advertising itself as foreman_A1 while listening on port 9123:
+To run BOLD(work_queue_worker) as a foreman working for project_A and advertising itself as foreman_A1:
 LONGCODE_BEGIN
-% work_queue_worker --foreman -M project_A -N foreman_A1 -f 9123
+% work_queue_worker --foreman -M project_A -f foreman_A1
 LONGCODE_END
 
 SECTION(COPYRIGHT)

@@ -20,7 +20,6 @@ auto mode option is specified for work_queue_worker.
 SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_ITEM(-M, name)Name of the preferred manager for worker.
-OPTION_PAIR(-N, name)Preferred project name for work_queue_worker to connect.
 OPTION_PAIR(-c, cores)Set the number of cores each worker should use (0=auto). (default=1)
 OPTION_PAIR(-C, catalog)Set catalog server for work_queue_worker to <catalog>. <catalog> format: HOSTNAME:PORT.
 OPTION_PAIR(-t, seconds)Abort work_queue_worker after this amount of idle time (default=900s).
