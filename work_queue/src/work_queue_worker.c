@@ -156,11 +156,15 @@ struct work_queue_resources * total_resources = 0;
 struct work_queue_resources * total_resources_last = 0;
 
 static int64_t last_task_received  = 0;
+
+/* 0 means not given as a command line option. */
 static int64_t manual_cores_option = 0;
 static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
-static int64_t manual_gpus_option = 0;
 static time_t  manual_wall_time_option = 0;
+
+/* -1 means not given as a command line option. */
+static int64_t manual_gpus_option = -1;
 
 static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
@@ -300,14 +304,15 @@ void measure_worker_resources()
 	} else {
 		if(manual_cores_option > 0)
 			r->cores.total = manual_cores_option;
-		if(manual_memory_option)
+		if(manual_memory_option > 0)
 			r->memory.total = manual_memory_option;
-		if(manual_gpus_option)
+		if(manual_gpus_option > -1)
 			r->gpus.total = manual_gpus_option;
 	}
 
-	if(manual_disk_option)
+	if(manual_disk_option > 0) {
 		r->disk.total = MIN(r->disk.total, manual_disk_option);
+	}
 
 	r->cores.smallest = r->cores.largest = r->cores.total;
 	r->memory.smallest = r->memory.largest = r->memory.total;
@@ -2463,11 +2468,19 @@ static void show_help(const char *cmd)
 	printf( " %-30s of the value in uname (%s).\n", "", os_name);
 	printf( " %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
 	printf( " %-30s Set the maximum bandwidth the foreman will consume in bytes per second. Example: 100M for 100MBps. (default=unlimited)\n", "--bandwidth=<Bps>");
-	printf( " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
-	printf( " %-30s worker automatically measure. (default=%"PRId64")\n", "", manual_cores_option);
-	printf( " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");
-	printf( " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
+
+	printf( " %-30s Set the number of cores reported by this worker. If not given, or less than 1,\n", "--cores=<n>");
+	printf( " %-30s then try to detect cores available.\n", "");
+
+	printf( " %-30s Set the number of GPUs reported by this worker. If not given, or less than 0,\n", "--gpus=<n>");
+	printf( " %-30s then try to detect gpus available.\n", "");
+
+	printf( " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>");
+	printf( " %-30s If not given, or less than 1, then try to detect memory available.\n", "");
+
 	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
+	printf( " %-30s If not given, or less than 1, then try to detect disk space available.\n", "");
+
 	printf( " %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n", "--disk-allocation");
 	printf( " %-30s Specifies a user-defined feature the worker provides. May be specified several times.\n", "--feature");
 	printf( " %-30s Set the maximum number of seconds the worker may be active. (in s).\n", "--wall-time=<s>");
@@ -2708,7 +2721,7 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_GPUS:
 			if(!strncmp(optarg, "all", 3)) {
-				manual_gpus_option = 0;
+				manual_gpus_option = -1;
 			} else {
 				manual_gpus_option = atoi(optarg);
 			}
