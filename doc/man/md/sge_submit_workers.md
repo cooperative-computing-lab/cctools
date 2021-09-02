@@ -52,7 +52,6 @@ auto mode option is specified for work_queue_worker.
 ## OPTIONS
 
 - **-M --manager-name <name>** Name of the preferred manager for worker. (auto mode enabled)
-- **-N --name <name>** Preferred project name for work_queue_worker to connect. (auto mode enabled)
 - **-C --catalog <catalog>** Set catalog server for work_queue_worker to <catalog>. <catalog> format: HOSTNAME:PORT.
 - **-t --timeout <seconds>** Abort work_queue_worker after this amount of idle time (default=900s).
 - **-d --debug <subsystem>** Enable debugging on worker for this subsystem (try -d all to start).

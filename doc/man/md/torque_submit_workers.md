@@ -42,7 +42,6 @@ auto mode option is specified for work_queue_worker.
 ## OPTIONS
 
 - **-M** Name of the preferred manager for worker.
-- **-N name** Preferred project name for work_queue_worker to connect.
 - **-c cores** Set the number of cores each worker should use (0=auto). (default=1)
 - **-C catalog** Set catalog server for work_queue_worker to <catalog>. <catalog> format: HOSTNAME:PORT.
 - **-t seconds** Abort work_queue_worker after this amount of idle time (default=900s).

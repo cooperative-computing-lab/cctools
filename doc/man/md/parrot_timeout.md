@@ -44,7 +44,7 @@ On success, returns zero.  On failure, returns non-zero.
 
 ## EXAMPLES
 
-To change the main timeout to 5 hours:
+To change the manager timeout to 5 hours:
 
 ```
 % parrot_run tcsh

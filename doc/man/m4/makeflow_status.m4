@@ -14,7 +14,7 @@ BOLD(makeflow_status) retrieves the status of makeflow programs and prints out a
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-N, project, project)The project on which to filter results.
+OPTION_TRIPLET(-M, project, project)The project on which to filter results.
 OPTION_TRIPLET(-u, username, user)The owner on which to filter results.
 OPTION_TRIPLET(-s, server, server)The catalog server to retrieve the reports from.
 OPTION_TRIPLET(-p, port, port)The port to contact the catalog server on.
@@ -37,7 +37,7 @@ SECTION(EXAMPLES)
 Retrieving reports related to project "awesome"
 
 LONGCODE_BEGIN
-% makeflow_status -N awesome
+% makeflow_status -M awesome
 LONGCODE_END
 
 

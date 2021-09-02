@@ -119,7 +119,7 @@ OPTION_END
 
 - **-C --catalog-server <catalog>** Set catalog server to <catalog>. Format: HOSTNAME:PORT
 - **-F --wq-fast-abort <#>** WorkQueue fast abort multiplier. (default is deactivated)
-- **-M ---N <project-name>** Set the project name to <project>.
+- **-M --project-name <project>** Set the project name to <project>.
 - **-p --port <port>** Port number to use with WorkQueue. (default is 9123, 0=arbitrary)
 - **-Z --port-file <file>** Select port at random and write it to this file.  (default is disabled)
 - **-P --priority <integer>** Priority. Higher the value, higher the priority.
@@ -308,7 +308,7 @@ makeflow -T condor -B "requirements = MachineGroup == 'ccl'" Makeflow
 
 Run makeflow with WorkQueue using named workers:
 ```
-makeflow -T wq -a -N project.name Makeflow
+makeflow -T wq -a -M project.name Makeflow
 ```
 
 Create a directory containing all of the dependencies required to run the
