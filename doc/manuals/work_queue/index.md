@@ -74,7 +74,7 @@ all done.
 
 (You can also declare and launch directly from python using the [work queue factory.](#using-the-factory-with-python))
 
-Congrads! You have now run a simple manager application that runs tasks on one local worker.
+Congrats! You have now run a simple manager application that runs tasks on one local worker.
 Read on to learn how to build more complex applications and run large numbers of workers at scale.
 
 ## Principle of Operation
