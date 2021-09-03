@@ -190,7 +190,7 @@ void show_help(const char *cmd)
 	printf("   -h           Show help screen.\n");
 	printf("Note: Time values may be specified in seconds, or with an optional\n");
 	printf("letter (s,m,h,d) to indicate seconds, minutes, hours or days.\n");
-	printf("Examples: 5 is five seconds; 10m is ten minutes; 15h is fifteen hours.\n");
+	printf("Examples: 5s is five seconds; 10m is ten minutes; 15h is fifteen hours.\n");
 	exit(1);
 }
 
