@@ -26,7 +26,7 @@ jobs:
     strategy: 
       matrix:
         os-name: ['centos7', 'centos8', 'ubuntu20.04']
-        tag: ${{ format('release/{0}', github.event.inputs.version) }}
+        tag: [ format('release/{0}', github.event.inputs.version) ]
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
@@ -65,7 +65,7 @@ jobs:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-10.15') }}
     strategy: 
       matrix:
-        tag: ${{ format('release/{0}', github.event.inputs.version) }}
+        tag: [ format('release/{0}', github.event.inputs.version) ]
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
