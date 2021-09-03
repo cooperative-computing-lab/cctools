@@ -86,7 +86,7 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 - **-s --workdir <path>** Set the location where the worker should create its working directory. (default=/tmp)
 - **--bandwidth mbps** Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)
 - **--cores n** Set the number of cores this worker should use.  Set it to 0 to have the worker use all of the available resources. (default=1)
-- **--gpus n** Set the number of GPUs this worker should use. (default=0)
+- **--gpus n** Set the number of GPUs this worker should use. If less than 0 or not given, try to detect gpus available.
 - **--memory mb** Manually set the amount of memory (in MB) reported by this worker.
 - **--disk mb** Manually set the amount of disk space (in MB) reported by this worker.
 - **--wall-time s** Set the maximum number of seconds the worker may be active.
