@@ -9,10 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (e.g., if 1.2.3, then binaries look like cctools-1.2.3-ARCH.tar.gz)'
-        required: true
-      tag:
-        description: 'Tag to deploy (e.g. release/7.2.1)'
+        description: 'Version (e.g., if 1.2.3, then binaries look like cctools-1.2.3-ARCH.tar.gz, corresponds to tag release/1.2.3.)'
         required: true
 
 
@@ -29,6 +26,7 @@ jobs:
     strategy: 
       matrix:
         os-name: ['centos7', 'centos8', 'ubuntu20.04']
+        tag: ${{ format('release/{0}', github.event.inputs.version) }}
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
@@ -37,7 +35,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v2
         with:
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ matrix.tag }}
       - name: Get sha of tag
         id: vars
         shell: bash
@@ -58,13 +56,16 @@ jobs:
           prerelease: true
           replacesArtifacts: true
           commit: ${{ steps.vars.output.tag_sha }}
-          tag: ${{ github.event.inputs.tag }}
+          tag: ${{ matrix.tag }}
 
   build-osx:
     runs-on: macos-10.15
     timeout-minutes: 30
     env:
       CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-10.15') }}
+    strategy: 
+      matrix:
+        tag: ${{ format('release/{0}', github.event.inputs.version) }}
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'
@@ -73,7 +74,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v2
         with:
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ matrix.tag }}
       - name: Get sha of tag
         id: vars
         shell: bash
@@ -94,5 +95,5 @@ jobs:
           prerelease: true
           replacesArtifacts: true
           commit: ${{ steps.vars.output.tag_sha }}
-          tag: ${{ github.event.inputs.tag }}
+          tag: ${{ matrix.tag }}
 
