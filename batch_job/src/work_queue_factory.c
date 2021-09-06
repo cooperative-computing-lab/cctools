@@ -30,6 +30,7 @@ See the file COPYING for details.
 
 #include "jx.h"
 #include "jx_parse.h"
+#include "jx_eval.h"
 #include "jx_print.h"
 #include "jx_table.h"
 
@@ -669,10 +670,18 @@ void delete_projects_list(struct list *l)
 #define assign_new_value(new_var, old_var, option, type_c, type_json, field) \
 	type_c new_var = old_var;\
 	{\
-		struct jx *jv = jx_lookup(J,#option); \
+		struct jx *jv = jx_eval(jx_lookup(J, #option), J); \
 		if(jv) {\
-			if(jv->type==type_json) {\
+			if (jv->type == JX_DOUBLE) {\
+				int v = ceil(jv->u.double_value);\
+				jx_delete(jv);\
+				jv = jx_integer(v);\
+			}\
+			if (jv->type == type_json) {\
 				new_var = jv->u.field;\
+			} else if (jv->type == JX_ERROR) {\
+				debug(D_NOTICE, "%s", jv->u.err->u.string_value);\
+				error_found = 1;\
 			} else {\
 				debug(D_NOTICE, #option " has not a valid value.");\
 				error_found = 1;\
@@ -718,7 +727,7 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_factory_timeout_option, factory_timeout, factory-timeout, int, JX_INTEGER, integer_value)
 
-	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_INTEGER, integer_value)
+	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, int, JX_INTEGER, integer_value)
 
 	/* first try with old master option, then with manager */
 	assign_new_value(new_project_regex_old_opt, project_regex, master-name, const char *, JX_STRING, string_value)
