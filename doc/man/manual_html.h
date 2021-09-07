@@ -20,9 +20,13 @@ define(TAB,HALFTAB()HALFTAB())
 define(PARAM,<i>&lt;$1&gt;</i>)
 
 define(OPTIONS_BEGIN,<table>)dnl
-define(OPTION_ITEM,<tr><td> BOLD(CODE($1)) <td>)dnl
-define(OPTION_PAIR,<tr><td colspan=2> BOLD(CODE($1 PARAM($2)))<tr><td><td>)dnl
-define(OPTION_TRIPLET,<tr><td colspan=2> BOLD(CODE($1)``,''BOLD(CODE(--$2)) BOLD(CODE(PARAM($3))))<tr><td><td>)dnl
+define(OPTION_FLAG,<tr><td> CODE(-$1)`,'CODE(--$2) <td>)dnl
+define(OPTION_FLAG_SHORT,<tr><td> CODE(-$1) <td>)dnl
+define(OPTION_FLAG_LONG,<tr><td> CODE(--$1) <td>)dnl
+define(OPTION_ARG,<tr><td> CODE(--$1)`,'CODE(--$2=$3)<td>)dnl
+define(OPTION_ARG_SHORT,<tr><td> CODE(-$1 $2)<td>)dnl
+define(OPTION_ARG_LONG,<tr><td> CODE(--$1=$2)<td>)dnl
+
 define(OPTIONS_END,</table>)dnl
 
 define(LONGCODE_BEGIN,<pre>)

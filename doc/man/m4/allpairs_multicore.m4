@@ -41,7 +41,7 @@ SECTION(EXAMPLES)
 
 Let's suppose you have a whole lot of files that you want to compare all to
 each other, named CODE(a), CODE(b), CODE(c), and so on. Suppose that you also
-have a program named CODE(BOLD(compareit)) that when invoked as CODE(compareit a b)
+have a program named CODE(compareit)) that when invoked as CODE(compareit a b)
 will compare files CODE(a) and CODE(b) and produce some output summarizing the
 difference between the two, like this:
 
