@@ -129,7 +129,7 @@ To run **work_queue_worker** as a foreman working for project_A and advertising 
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -139,4 +139,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [work_queue_worker(1)](work_queue_worker.md) [work_queue_status(1)](work_queue_status.md) [work_queue_factory(1)](work_queue_factory.md) [condor_submit_workers(1)](condor_submit_workers.md) [sge_submit_workers(1)](sge_submit_workers.md) [torque_submit_workers(1)](torque_submit_workers.md) 
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 7.3.2 FINAL

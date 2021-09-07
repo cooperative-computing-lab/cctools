@@ -35,4 +35,4 @@ define(OPTIONS_END,LIST_END)
 define(LONGCODE_BEGIN,changequote([,])[changequote([,])```changequote]changequote)
 define(LONGCODE_END,changequote([,])[changequote([,])```changequote]changequote)
 
-define(FOOTER,CCTools CCTOOLS_VERSION released on CCTOOLS_RELEASE_DATE)dnl
+define(FOOTER,CCTools CCTOOLS_VERSION)dnl

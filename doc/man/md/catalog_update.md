@@ -99,7 +99,7 @@ EOF
 ```
 
 ## COPYRIGHT
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -107,4 +107,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [catalog_server(1)](catalog_server.md)  [catalog_update(1)](catalog_update.md)  [catalog_query(1)](catalog_query.md)  [chirp_status(1)](chirp_status.md)  [work_queue_status(1)](work_queue_status.md)   [deltadb_query(1)](deltadb_query.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 7.3.2 FINAL

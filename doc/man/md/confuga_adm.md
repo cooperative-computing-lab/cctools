@@ -70,9 +70,9 @@ confuga_adm sn-rm address 10.0.1.125:9090
 ```
 
 ## COPYRIGHT
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 [confuga(1)](confuga.md)
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 7.3.2 FINAL

@@ -56,8 +56,8 @@ This will begin the Maker run. All that is needed now is to submit workers that 
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 7.3.2 FINAL
