@@ -36,8 +36,6 @@ for a broader discussion of how each tool is used.
 ## Resource Monitor
 
   * [resource_monitor(1)](man_pages/resource_monitor.md)
-  * [resource_monitor_histograms(1)](man_pages/resource_monitor_histograms.md)
-  * [resource_monitor_visualizer(1)](man_pages/resource_monitor_visualizer.md)
 
 ## PONCHO Package Management
 
