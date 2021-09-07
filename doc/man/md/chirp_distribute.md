@@ -27,10 +27,10 @@
 **chirp_distribute** - copy a directory from one Chirp server to one or more Chirp server(s).
 
 ## SYNOPSIS
-****chirp_distribute [options] <sourcehost> <sourcepath> <host1> <host2> <host3> ...****
+**chirp_distribute [options] _&lt;sourcehost&gt;_ _&lt;sourcepath&gt;_ _&lt;host1&gt;_ _&lt;host2&gt;_ _&lt;host3&gt;_ ...**
 
 ## DESCRIPTION
-**chirp_distribute** is a tool for coping commonly used data across Chirp servers. Data is originated from a Chirp server <sourcehost> <sourcepath> and is copied to a given list of Chirp server(s) <host1> <host2> <host3>, etc ...
+**chirp_distribute** is a tool for coping commonly used data across Chirp servers. Data is originated from a Chirp server _&lt;sourcehost&gt;_ _&lt;sourcepath&gt;_ and is copied to a given list of Chirp server(s) _&lt;host1&gt;_ _&lt;host2&gt;_ _&lt;host3&gt;_, etc ...
 
 **chirp_distribute** is a quick and simple way for replicating a directory from a Chirp server to many Chirp Servers by creating a spanning tree and then transferring data concurrently from host to host using third party transfer. It is faster than manually copying data using **parrot cp**, **chirp_put** or **chirp_third_put**
 
@@ -38,26 +38,26 @@
 ## OPTIONS
 
 
-- **-a --auth <flag>** Require this authentication mode.
-- **-d --debug <flag>** Enable debugging for this subsystem.
-- **-D, --info-transfer** Show detailed location, time, and performance of each transfer.
-- **-F --failures-file <file>** Write matrix of failures to this file.
-- **-i --tickets <files>** Comma-delimited list of tickets to use for authentication.
-- **-N --copies-max <num>** Stop after this number of successful copies.
-- **-p --jobs <num>** Maximum number of processes to run at once (default=100)
-- **-R, --randomize-hosts** Randomize order of target hosts given on command line.
-- **-t --timeout <time>** Timeout for for each copy. (default is 3600s)
-- **-T --timeout-all <time>** Overall timeout for entire distribution. (default is 3600).
-- **-v, --verbose** Show program version.
-- **-X, --delete-target** Delete data from all of the target hosts.
-- **-Y, --info-success** Show confirmation of successful placements.
-- **-h, --help** Show help text.
+- **-a**,**--auth=_&lt;flag&gt;_**<br />Require this authentication mode.
+- **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
+- **-D**,**--info-transfer**<br />Show detailed location, time, and performance of each transfer.
+- **-F**,**--failures-file=_&lt;file&gt;_**<br />Write matrix of failures to this file.
+- **-i**,**--tickets=_&lt;files&gt;_**<br />Comma-delimited list of tickets to use for authentication.
+- **-N**,**--copies-max=_&lt;num&gt;_**<br />Stop after this number of successful copies.
+- **-p**,**--jobs=_&lt;num&gt;_**<br />Maximum number of processes to run at once (default=100)
+- **-R**,**--randomize-hosts**<br />Randomize order of target hosts given on command line.
+- **-t**,**--timeout=_&lt;time&gt;_**<br />Timeout for for each copy. (default is 3600s)
+- **-T**,**--timeout-all=_&lt;time&gt;_**<br />Overall timeout for entire distribution. (default is 3600).
+- **-v**,**--verbose**<br />Show program version.
+- **-X**,**--delete-target**<br />Delete data from all of the target hosts.
+- **-Y**,**--info-success**<br />Show confirmation of successful placements.
+- **-h**,**--help**<br />Show help text.
 
 
 ## ENVIRONMENT VARIABLES
 
 
-- ****CHIRP_CLIENT_TICKETS**** Comma delimited list of tickets to authenticate with (same as **-i**).
+- **CHIRP_CLIENT_TICKETS** Comma delimited list of tickets to authenticate with (same as **-i**).
 
 
 ## EXIT STATUS

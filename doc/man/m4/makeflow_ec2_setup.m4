@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(makeflow_ec2_setup) - set up Amazon services for running Makeflow
 
 SECTION(SYNOPSIS)
-CODE(BOLD(makeflow_ec2_setup PARAM(config-file) PARAM(ami)))
+CODE(makeflow_ec2_setup PARAM(config-file) PARAM(ami))
 
 SECTION(DESCRIPTION)
 

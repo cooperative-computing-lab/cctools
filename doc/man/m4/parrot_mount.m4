@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(parrot_mount) - mount new directories inside of a Parrot instance.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_mount PARAM(path) PARAM(destination) PARAM(permissions)))
+CODE(parrot_mount PARAM(path) PARAM(destination) PARAM(permissions))
 
 SECTION(DESCRIPTION)
 CODE(parrot_mount) utilizes BOLD(Parrot) system calls to change the namespace
@@ -15,8 +15,8 @@ can be removed.  The namespace can be locked down with the CODE(--disable)
 option, which prevents any further changes in the current session.
 
 OPTIONS_BEGIN
-OPTION_PAIR(--unmount,path) Unmount a previously mounted path.
-OPTION_ITEM(--disable) Disable any further mounting/unmounting in this parrot session.
+OPTION_ARG_LONG(unmount,path) Unmount a previously mounted path.
+OPTION_FLAG_LONG(disable) Disable any further mounting/unmounting in this parrot session.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

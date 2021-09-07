@@ -27,7 +27,7 @@
 **sand_uncompress_reads** - uncompress sequence data
 
 ## SYNOPSIS
-****sand_uncompress_reads [-qvh] [infile] [outfile]****
+**sand_uncompress_reads [-qvh] [infile] [outfile]**
 
 ## DESCRIPTION
 
@@ -42,9 +42,9 @@ line of sequences and bytes compressed.
 ## OPTIONS
 
 
-- **-q** Quiet mode: suppress summary line.
-- **-h** Display version information.
-- **-v** Show help text.
+- **-q**<br />Quiet mode: suppress summary line.
+- **-h**<br />Display version information.
+- **-v**<br />Show help text.
 
 
 ## EXIT STATUS

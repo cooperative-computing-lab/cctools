@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(sand_filter_kernel) - filter read sequences sequentially
 
 SECTION(SYNOPSIS)
-CODE(BOLD(sand_filter_kernel [options] PARAM(sequence file) [second sequence file]))
+CODE(sand_filter_kernel [options] PARAM(sequence file) [second sequence file])
 
 SECTION(DESCRIPTION)
 
@@ -24,15 +24,15 @@ name of the candidate sequences and a starting position for alignment.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_PAIR(-s,size)Size of "rectangle" for filtering. You can determine
+OPTION_ARG_SHORT(s,size)Size of "rectangle" for filtering. You can determine
 the size dynamically by passing in d rather than a number.
-OPTION_PAIR(-r,file)A meryl file of repeat mers to be ignored.
-OPTION_PAIR(-k,size)The k-mer size to use in candidate selection (default is 22).
-OPTION_PAIR(-w,number)The minimizer window size to use in candidate selection (default is 22).
-OPTION_PAIR(-o,filename)The output file. Default is stdout.
-OPTION_PAIR(-d,subsystem)Enable debug messages for this subsystem.  Try BOLD(-d all) to start.
-OPTION_ITEM(-v)Show version string.
-OPTION_ITEM(-h)Show help screen.
+OPTION_ARG_SHORT(r,file)A meryl file of repeat mers to be ignored.
+OPTION_ARG_SHORT(k,size)The k-mer size to use in candidate selection (default is 22).
+OPTION_ARG_SHORT(w,number)The minimizer window size to use in candidate selection (default is 22).
+OPTION_ARG_SHORT(o,filename)The output file. Default is stdout.
+OPTION_ARG_SHORT(d,subsystem)Enable debug messages for this subsystem.  Try BOLD(-d all) to start.
+OPTION_FLAG_SHORT(v)Show version string.
+OPTION_FLAG_SHORT(h)Show help screen.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

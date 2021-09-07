@@ -27,26 +27,26 @@
 **makeflow_monitor** - Makeflow log monitor
 
 ## SYNOPSIS
-****makeflow_monitor [options] <makeflowlog>****
+**makeflow_monitor [options] _&lt;makeflowlog&gt;_**
 
 ## DESCRIPTION
 **makeflow_monitor** is simple **Makeflow** log monitor that displays the
-progress and statistics of a workflow based on the provided <makeflowlog>.
-Once started, it will continually monitor the specified <makeflowlogs> for
+progress and statistics of a workflow based on the provided _&lt;makeflowlog&gt;_.
+Once started, it will continually monitor the specified _&lt;makeflowlogs&gt;_ for
 new events and update the progress display.
 
 ## OPTIONS
 
-- **-h** Show this help message and exit.
-- **-f format** Output format to emit.
-- **-t seconds** Timeout for reading the logs.
-- **-m minimum** Mininum number of tasks.
-- **-S** Sort logs by progress.
-- **-P** Parse dag for node information.
-- **-H** Hide finished makeflows.
+- **-h**<br />Show this help message and exit.
+- **-f** _&lt;format&gt;_<br />Output format to emit.
+- **-t** _&lt;seconds&gt;_<br />Timeout for reading the logs.
+- **-m** _&lt;minimum&gt;_<br />Mininum number of tasks.
+- **-S**<br />Sort logs by progress.
+- **-P**<br />Parse dag for node information.
+- **-H**<br />Hide finished makeflows.
 
 
-Currently, the only supported <format> is "text", which means
+Currently, the only supported _&lt;format&gt;_ is "text", which means
 **makeflow_monitor** will display the progress of the workflows directly to
 the console.
 
@@ -78,7 +78,7 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [Makeflow User Manual]("../makeflow.html")
-- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md) [makeflow_ec2_estimate(1)](makeflow_ec2_estimate.md)
+- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md)
 
 
 CCTools 7.3.2 FINAL

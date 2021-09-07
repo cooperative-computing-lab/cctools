@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(makeflow_graph_log) - convert a makeflow log into a graph
 
 SECTION(SYNOPSIS)
-CODE(BOLD(makeflow_graph_log PARAM(logfile) PARAM(imagefile)))
+CODE(makeflow_graph_log PARAM(logfile) PARAM(imagefile))
 
 SECTION(DESCRIPTION)
 

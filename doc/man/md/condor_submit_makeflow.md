@@ -27,9 +27,7 @@
 **condor_submit_makeflow** - submit workflow to HTCondor batch system
 
 ## SYNOPSIS
-```
-****condor_submit_makeflow [options] <workflow>****
-```
+**condor_submit_makeflow [options] _&lt;workflow&gt;_**
 
 ## DESCRIPTION
 **condor_submit_makeflow** submits Makeflow itself as a batch job,
@@ -59,7 +57,7 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [Makeflow User Manual]("../makeflow.html")
-- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md) [makeflow_ec2_estimate(1)](makeflow_ec2_estimate.md)
+- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md)
 
 
 CCTools 7.3.2 FINAL

@@ -27,7 +27,7 @@
 **parrot_namespace** - run a command in a modified namespace.
 
 ## SYNOPSIS
-****parrot_cp [options] <command>****
+**parrot_cp [options] _&lt;command&gt;_**
 
 ## DESCRIPTION
 
@@ -40,14 +40,12 @@ for **parrot_run** that automatically handles nested invocations.
 ## OPTIONS
 
 
-- **-M, --mount /foo=/bar** Mount (redirect) **/foo**
-to **/bar** (**PARROT_MOUNT_STRING**)
-- **-m, --ftab-file <path>** Use **<file>** as a
-mountlist (**PARROT_MOUNT_FILE**)
-- **-l --ld-path <path>** Path to ld.so to use.
-- **--parrot-path** Path to **parrot_run** (**PARROT_PATH**)
-- **-v, --version** Show version number
-- **-h, --help** Help: Show these options
+- **-M**,**--mount=_&lt;/foo=/bar&gt;_**<br />Mount (redirect) _&lt;/foo&gt;_ to _&lt;/bar&gt;_ (**PARROT_MOUNT_STRING**)
+- **-m**,**--ftab-file=_&lt;path&gt;_**<br />Use _&lt;path&gt;_ as a mountlist (**PARROT_MOUNT_FILE**)
+- **-l**,**--ld-path=_&lt;path&gt;_**<br />Path to ld.so to use.
+- **--parrot-path**<br />Path to **parrot_run** (**PARROT_PATH**)
+- **-v**,**--version**<br />Show version number
+- **-h**,**--help**<br />Help: Show these options
 
 
 ## EXIT STATUS

@@ -27,15 +27,11 @@
 **sge_submit_workers** - submit work_queue_worker to a SUN Grid Engine (SGE).
 
 ## SYNOPSIS
-```
-****sge_submit_workers [options] <servername> <port> <num-workers>****
-```
+**sge_submit_workers [options] _&lt;servername&gt;_ _&lt;port&gt;_ _&lt;num-workers&gt;_**
 
 when auto mode is not enabled for the worker, or
 
-```
-****sge_submit_workers [options] <num-workers>****
-```
+**sge_submit_workers [options] _&lt;num-workers&gt;_**
 
 when auto mode is enabled for the worker.
 
@@ -51,24 +47,25 @@ auto mode option is specified for work_queue_worker.
 
 ## OPTIONS
 
-- **-M --manager-name <name>** Name of the preferred manager for worker. (auto mode enabled)
-- **-C --catalog <catalog>** Set catalog server for work_queue_worker to <catalog>. <catalog> format: HOSTNAME:PORT.
-- **-t --timeout <seconds>** Abort work_queue_worker after this amount of idle time (default=900s).
-- **-d --debug <subsystem>** Enable debugging on worker for this subsystem (try -d all to start).
-- **-w --tcp-window-size <size>** Set TCP window size
-- **-i --min-backoff <time>** Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
-- **-b --max-backoff <time>** Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
-- **-z --disk-threshold <size>** Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
-- **-A --arch <arch>** Set architecture string for the worker to report to manager instead of the value in uname.
-- **-O --os <os>** Set operating system string for the worker to report to manager instead of the value in uname.
-- **-s --workdir <path>** Set the location for creating the working directory of the worker.
-- **-P ----password <file>** Password file to authenticate workers to manager.
-- **--cores cores** Set the number of cores each worker should use (0=auto). (default=1)
-- **--memory size** Manually set the amonut of memory (in MB) reported by this worker.
-- **--disk size** Manually set the amount of disk (in MB) reported by this worker.
-- **-j** Use job array to submit workers.
-- **-p parameters** SGE qsub parameters.
-- **-h,--help** Show help message.
+- **-M**,**--manager-name=_&lt;name&gt;_**<br />Name of the preferred manager for worker. (auto mode enabled)
+- **-C**,**--catalog=_&lt;catalog&gt;_**<br />Set catalog server for work_queue_worker to _&lt;catalog&gt;_. _&lt;catalog&gt;_ format: HOSTNAME:PORT.
+- **-C**,**--catalog=_&lt;catalog&gt;_**<br />Set catalog server for work_queue_worker to _&lt;catalog&gt;_. _&lt;catalog&gt;_ format: HOSTNAME:PORT.
+- **-t**,**--timeout=_&lt;seconds&gt;_**<br />Abort work_queue_worker after this amount of idle time (default=900s).
+- **-d**,**--debug=_&lt;subsystem&gt;_**<br />Enable debugging on worker for this subsystem (try -d all to start).
+- **-w**,**--tcp-window-size=_&lt;size&gt;_**<br />Set TCP window size
+- **-i**,**--min-backoff=_&lt;time&gt;_**<br />Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+- **-b**,**--max-backoff=_&lt;time&gt;_**<br />Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
+- **-z**,**--disk-threshold=_&lt;size&gt;_**<br />Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
+- **-A**,**--arch=_&lt;arch&gt;_**<br />Set architecture string for the worker to report to manager instead of the value in uname.
+- **-O**,**--os=_&lt;os&gt;_**<br />Set operating system string for the worker to report to manager instead of the value in uname.
+- **-s**,**--workdir=_&lt;path&gt;_**<br />Set the location for creating the working directory of the worker.
+- **-P**,**----password=_&lt;file&gt;_**<br />Password file to authenticate workers to manager.
+- **--cores=_&lt;cores&gt;_**<br />Set the number of cores each worker should use (0=auto). (default=1)
+- **--memory=_&lt;size&gt;_**<br />Manually set the amonut of memory (in MB) reported by this worker.
+- **--disk=_&lt;size&gt;_**<br />Manually set the amount of disk (in MB) reported by this worker.
+- **-j**<br />Use job array to submit workers.
+- **--p** _&lt;parameters&gt;_<br />SGE qsub parameters.
+- **-h**,**--help**<br />Show help message.
 
 
 ## EXIT STATUS

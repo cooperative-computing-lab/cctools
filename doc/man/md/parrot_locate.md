@@ -27,17 +27,17 @@
 **parrot_locate** - provides the true location of the data stored in a named file.
 
 ## SYNOPSIS
-****parrot_locate path****
+**parrot_locate path**
 
 ## DESCRIPTION
 
 **parrot_locate** utilises **parrot** system calls to identify where the data stored as the file
-at **<path>** is actually located.  For example, running **parrot_locate** on a file stored in a
+at **_&lt;path&gt;_** is actually located.  For example, running **parrot_locate** on a file stored in a
 **chirp** multi-volume will return the server name and file path on the server where the data is.
 Running it on a file stored in **hdfs** will return the list of chunk servers storing the file.
 
 Note that **parrot_locate** varies depending on the underlying system.  Most systems return output
-in the form "**<server>:<real path>**", but that output is not guaranteed.
+in the form "**_&lt;server&gt;_:_&lt;real path&gt;_**", but that output is not guaranteed.
 
 
 ## OPTIONS

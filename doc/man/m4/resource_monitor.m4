@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(resource_monitor) - monitors the cpu, memory, io, and disk usage of a tree of processes.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(resource_monitor [options] -- command [command-options]))
+CODE(resource_monitor [options] -- command [command-options])
 
 SECTION(DESCRIPTION)
 
@@ -95,30 +95,31 @@ LONGCODE_END
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-d,debug,subsystem)Enable debugging for this subsystem.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-OPTION_ITEM(`-v,--version')Show version string.
-OPTION_ITEM(`-h,--help')Show help text.
-OPTION_TRIPLET(-i,interval,n)Maximum interval between observations, in seconds (default=1).
-OPTION_ITEM(--pid=pid)Track pid instead of executing a command line (warning: less precise measurements).
-OPTION_ITEM(--accurate-short-processes)Accurately measure short running processes (adds overhead).
-OPTION_TRIPLET(-c,sh,str)Read command line from CODE(str), and execute as '/bin/sh -c CODE(str)'.
-OPTION_TRIPLET(-l,limits-file,file)Use maxfile with list of var: value pairs for resource limits.
-OPTION_TRIPLET(-L,limits,string)String of the form `"var: value, var: value"' to specify resource limits. (Could be specified multiple times.)
-OPTION_ITEM(`-f, --child-in-foreground')Keep the monitored process in foreground (for interactive use).
-OPTION_TRIPLET(-O,with-output-files,template)Specify CODE(template) for log files (default=CODE(resource-pid)).
-OPTION_ITEM(--with-time-series)Write resource time series to CODE(template.series).
-OPTION_ITEM(--with-inotify)Write inotify statistics of opened files to default=CODE(template.files).
-OPTION_TRIPLET(-V,verbatim-to-summary,str)Include this string verbatim in a line in the summary. (Could be specified multiple times.)
-OPTION_ITEM(--measure-dir=dir)Follow the size of dir. By default the directory at the start of execution is followed. Can be specified multiple times. See --without-disk-footprint below.
-OPTION_ITEM(--follow-chdir)Follow the current working directories of the processes tree.
-OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint. Overrides --measure-dir.
-OPTION_ITEM(--no-pprint)Do not pretty-print summaries.
-OPTION_ITEM(--snapshot-events=file)Configuration file for snapshots on file patterns. See below.
-OPTION_ITEM(--catalog-task-name=<task-name>)Report measurements to catalog server with "task"=<task-name>.
-OPTION_ITEM(--catalog-project=<project>)Set project name of catalog update to <project> (default=<task-name>).
-OPTION_ITEM(--catalog=<catalog>)Use catalog server <catalog>. (default=catalog.cse.nd.edu:9097).
-OPTION_ITEM(--catalog-interval=<interval>)Send update to catalog every <interval> seconds. (default=30).
+OPTION_ARG(d,debug,subsystem)Enable debugging for this subsystem.
+OPTION_ARG(o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+OPTION_FLAG(v,version)Show version string.
+OPTION_FLAG(h,help)Show help text.
+OPTION_ARG(i,interval,n)Maximum interval between observations, in seconds (default=1).
+OPTION_ARG_LONG(pid,pid)Track pid instead of executing a command line (warning: less precise measurements).
+OPTION_FLAG_LONG(accurate-short-processes)Accurately measure short running processes (adds overhead).
+OPTION_ARG(c,sh,str)Read command line from CODE(str), and execute as '/bin/sh -c CODE(str)'.
+OPTION_ARG(l,limits-file,file)Use maxfile with list of var: value pairs for resource limits.
+OPTION_ARG(L,limits,string)String of the form `"var: value, var: value"' to specify resource limits. (Could be specified multiple times.)
+OPTION_FLAG(f,child-in-foreground)Keep the monitored process in foreground (for interactive use).
+OPTION_ARG(-O,with-output-files,template)Specify CODE(template) for log files (default=CODE(resource-pid)).
+OPTION_FLAG_LONG(with-time-series)Write resource time series to CODE(template.series).
+OPTION_FLAG_LONG(with-inotify)Write inotify statistics of opened files to default=CODE(template.files).
+OPTION_ARG(V,verbatim-to-summary,str)Include this string verbatim in a line in the summary. (Could be specified multiple times.)
+OPTION_ARG_LONG(measure-dir,dir)Follow the size of dir. By default the directory at the start of execution is followed. Can be specified multiple times. See --without-disk-footprint below.
+OPTION_FLAG_LONG(follow-chdir)Follow the current working directories of the processes tree.
+OPTION_FLAG_LONG(without-disk-footprint)Do not measure working directory footprint. Overrides --measure-dir.
+OPTION_FLAG_LONG(no-pprint)Do not pretty-print summaries.
+OPTION_ARG_LONG(snapshot-events,file)Configuration file for snapshots on file patterns. See below.
+OPTION_ARG_LONG(catalog-task-name,task-name)Report measurements to catalog server with "task"=PARAM(task-name).
+OPTION_ARG_LONG(catalog-project,project)Set project name of catalog update to PARAM(project) (default=PARAM(task-name>)).
+OPTION_ARG_LONG(catalog,catalog)Use catalog server PARAM(catalog). (default=catalog.cse.nd.edu:9097).
+OPTION_ARG_LONG(catalog-interval,interval)Send update to catalog every PARAM(interval) seconds. (default=30).
+OPTION_ARG_LONG(catalog-interval,interval)Send update to catalog every PARAM(interval) seconds. (default=30).
 
 OPTIONS_END
 
@@ -140,7 +141,7 @@ CODE(`workdir_number_files_dirs, workdir_footprint')
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM(CODE(BOLD(CCTOOLS_RESOURCE_MONITOR_HELPER)) Location of the desired helper library to wrap libc calls. If not provided, a version of the helper library is packed with the resource_monitor executable.)
+LIST_ITEM(CODE(CCTOOLS_RESOURCE_MONITOR_HELPER)) Location of the desired helper library to wrap libc calls. If not provided, a version of the helper library is packed with the resource_monitor executable.)
 LIST_END
 
 SECTION(EXIT STATUS)

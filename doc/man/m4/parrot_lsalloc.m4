@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(parrot_lsalloc) - list current status of a space allocation
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_lsalloc [path]))
+CODE(parrot_lsalloc [path])
 
 SECTION(DESCRIPTION)
 
@@ -20,7 +20,7 @@ If none is given, the current directory is assumed.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(-h)Show help text.
+OPTION_FLAG_SHORT(h)Show help text.
 OPTIONS_END
 
 

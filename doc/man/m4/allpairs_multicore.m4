@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(allpairs_multicore) - executes All-Pairs workflow in parallel on a multicore machine
 
 SECTION(SYNOPSIS)
-CODE(BOLD(allparis_multicore [options] PARAM(set A) PARAM(set B) PARAM(compare function)))
+CODE(allparis_multicore [options] PARAM(set A) PARAM(set B) PARAM(compare function))
 
 SECTION(DESCRIPTION)
 
@@ -26,12 +26,12 @@ please refer to the MANPAGE(allpairs_master,1) utility.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_TRIPLET(-b, block-size, items)Block size: number of items to hold in memory at once. (default: 50% of RAM)
-OPTION_TRIPLET(-c, cores, cores)Number of cores to be used. (default: # of cores in machine)
-OPTION_TRIPLET(-e, extra-args, args)Extra arguments to pass to the comparison program.
-OPTION_TRIPLET(-d, debug, flag)Enable debugging for this subsystem.
-OPTION_ITEM(`-v, --version')Show program version.
-OPTION_ITEM(`-h, --help')Display this message.
+OPTION_ARG(b, block-size, items)Block size: number of items to hold in memory at once. (default: 50% of RAM)
+OPTION_ARG(c, cores, cores)Number of cores to be used. (default: # of cores in machine)
+OPTION_ARG(e, extra-args, args)Extra arguments to pass to the comparison program.
+OPTION_ARG(d, debug, flag)Enable debugging for this subsystem.
+OPTION_FLAG(v,version)Show program version.
+OPTION_FLAG(h,help)Display this message.
 OPTIONS_END
 
 SECTION(EXIT STATUS)
@@ -41,7 +41,7 @@ SECTION(EXAMPLES)
 
 Let's suppose you have a whole lot of files that you want to compare all to
 each other, named CODE(a), CODE(b), CODE(c), and so on. Suppose that you also
-have a program named CODE(BOLD(compareit)) that when invoked as CODE(compareit a b)
+have a program named CODE(compareit)) that when invoked as CODE(compareit a b)
 will compare files CODE(a) and CODE(b) and produce some output summarizing the
 difference between the two, like this:
 

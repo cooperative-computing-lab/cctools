@@ -27,15 +27,15 @@
 **allpairs_multicore** - executes All-Pairs workflow in parallel on a multicore machine
 
 ## SYNOPSIS
-****allparis_multicore [options] <set A> <set B> <compare function>****
+**allparis_multicore [options] _&lt;set A&gt;_ _&lt;set B&gt;_ _&lt;compare function&gt;_**
 
 ## DESCRIPTION
 
 **allpairs_multicore** computes the Cartesian product of two sets
-(**<set A>** and **<set B>**), generating a matrix where each cell
-M[i,j] contains the output of the function F (**<compare function>**) on
-objects A[i] (an item in **<set A>**) and B[j] (an item in
-**<set B>**). The resulting matrix is displayed on the standard output,
+(**_&lt;set A&gt;_** and **_&lt;set B&gt;_**), generating a matrix where each cell
+M[i,j] contains the output of the function F (**_&lt;compare function&gt;_**) on
+objects A[i] (an item in **_&lt;set A&gt;_**) and B[j] (an item in
+**_&lt;set B&gt;_**). The resulting matrix is displayed on the standard output,
 one comparison result per line along with the associated X and Y indices.
 
 For large sets of objects, **allpairs_multicore** will use as many cores as
@@ -48,12 +48,12 @@ please refer to the [allpairs_master(1)](allpairs_master.md) utility.
 ## OPTIONS
 
 
-- **-b --block-size <items>** Block size: number of items to hold in memory at once. (default: 50% of RAM)
-- **-c --cores <cores>** Number of cores to be used. (default: # of cores in machine)
-- **-e --extra-args <args>** Extra arguments to pass to the comparison program.
-- **-d --debug <flag>** Enable debugging for this subsystem.
-- **-v, --version** Show program version.
-- **-h, --help** Display this message.
+- **-b**,**--block-size=_&lt;items&gt;_**<br />Block size: number of items to hold in memory at once. (default: 50% of RAM)
+- **-c**,**--cores=_&lt;cores&gt;_**<br />Number of cores to be used. (default: # of cores in machine)
+- **-e**,**--extra-args=_&lt;args&gt;_**<br />Extra arguments to pass to the comparison program.
+- **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
+- **-v**,**--version**<br />Show program version.
+- **-h**,**--help**<br />Display this message.
 
 
 ## EXIT STATUS
@@ -63,7 +63,7 @@ On success, returns zero.  On failure, returns non-zero.
 
 Let's suppose you have a whole lot of files that you want to compare all to
 each other, named **a**, **b**, **c**, and so on. Suppose that you also
-have a program named ****compareit**** that when invoked as **compareit a b**
+have a program named **compareit**) that when invoked as **compareit a b**
 will compare files **a** and **b** and produce some output summarizing the
 difference between the two, like this:
 

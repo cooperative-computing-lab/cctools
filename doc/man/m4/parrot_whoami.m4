@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(parrot_whoami) - returns the user's credentials (id and authentication method) from the perspective of the system being accessed.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_whoami PARAM(path)))
+CODE(parrot_whoami PARAM(path))
 
 SECTION(DESCRIPTION)
 

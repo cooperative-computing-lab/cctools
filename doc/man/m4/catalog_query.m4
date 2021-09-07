@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(catalog_query) - query records from the catalog server
 
 SECTION(SYNOPSIS)
-CODE(BOLD(catalog_query [--where [expr]] [--catalog [host]] [-d [flag]] [-o [file]] [-O [size]] [-t [timeout]] [-h] ))
+CODE(catalog_query [--where [expr]] [--catalog [host]] [-d [flag]] [-o [file]] [-O [size]] [-t [timeout]] [-h] )
 
 SECTION(DESCRIPTION)
 
@@ -17,13 +17,13 @@ by other tools.
 SECTION(ARGUMENTS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(--where expr) Only records matching this expression will be displayed.
-OPTION_ITEM(--catalog host) Query this catalog host.
-OPTION_ITEM(--debug flag) Enable debugging for this subsystem.
-OPTION_ITEM(--debug-file file) Send debug output to this file.
-OPTION_ITEM(--debug-rotate-max bytes) Rotate debug file once it reaches this size.
-OPTION_ITEM(--timeout seconds) Abandon the query after this many seconds.
-OPTION_ITEM(--help) Show command options.
+OPTION_ARG_LONG(where, expr) Only records matching this expression will be displayed.
+OPTION_ARG_LONG(catalog, host) Query this catalog host.
+OPTION_ARG_LONG(debug, flag) Enable debugging for this subsystem.
+OPTION_ARG_LONG(debug-file, file) Send debug output to this file.
+OPTION_ARG_LONG(debug-rotate-max, bytes) Rotate debug file once it reaches this size.
+OPTION_ARG_LONG(timeout, seconds) Abandon the query after this many seconds.
+OPTION_FLAG_LONG(help) Show command options.
 OPTIONS_END
 
 SECTION(EXAMPLES)

@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(chirp_server_hdfs) - run a chirp server with HDFS client setup
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chirp_server_hdfs [options]))
+CODE(chirp_server_hdfs [options])
 
 SECTION(DESCRIPTION)
 
@@ -27,8 +27,8 @@ See MANPAGE(chirp_server,1) for option listing.
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM(CODE(BOLD(JAVA_HOME)) Location of your Java installation.)
-LIST_ITEM(CODE(BOLD(HADOOP_HOME)) Location of your Hadoop installation.)
+LIST_ITEM(CODE(JAVA_HOME)) Location of your Java installation.
+LIST_ITEM(CODE(HADOOP_HOME)) Location of your Hadoop installation.
 LIST_END
 
 

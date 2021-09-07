@@ -27,7 +27,7 @@
 **work_queue_factory** - maintain a pool of Work Queue workers on a batch system.
 
 ## SYNOPSIS
-****work_queue_factory -M <project-name> -T <batch-type> [options]****
+**work_queue_factory -M _&lt;project-name&gt;_ -T _&lt;batch-type&gt;_ [options]**
 
 ## DESCRIPTION
 **work_queue_factory** submits and maintains a number
@@ -69,107 +69,68 @@ remove all running workers before exiting.
 General options:
 
 
-- **-T** 
-Batch system type (required). One of: local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun
-- **-C** 
- Use configuration file <file>.
-- **-M** 
- Project name of managers to server, can be regex
-- **-F** 
- Foremen to serve, can be a regular expression.
-- **--catalog=<host:port>** 
- Catalog server to query for managers.
-- **-P** 
- Password file for workers to authenticate.
-- **-S** 
- Use this scratch dir for factory.
-- **(default:)
- /tmp/wq-factory-$uid** .
-- **--run-factory-as-manager** 
- Force factory to run itself as a manager.
-- **--parent-death** 
- Exit if parent process dies.
-- **-d** 
- Enable debugging for this subsystem.
-- **-o** 
- Send debugging to this file.
-- **-O** 
- Specify the size of the debug file.
-- **-v** 
- Show the version string.
-- **-h** 
- Show this screen.
+- **-T**,**--batch-type=_&lt;type&gt;_**<br /> Batch system type (required). One of: local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun
+- **-C**,**--config-file=_&lt;file&gt;_**<br /> Use configuration file _&lt;file&gt;_.
+- **-C**,**--config-file=_&lt;file&gt;_**<br /> Use configuration file _&lt;file&gt;_.
+- **-M**,**--manager-name=_&lt;project&gt;_**<br /> Project name of managers to server, can be regex
+- **-F**,**--foremen-name=_&lt;project&gt;_**<br /> Foremen to serve, can be a regular expression.
+- **--catalog=_&lt;host:port&gt;_**<br /> Catalog server to query for managers.
+- **-P**,**--password=_&lt;pwdfile&gt;_**<br /> Password file for workers to authenticate.
+- **-S**,**--scratch-dir=_&lt;dir&gt;_**<br /> Use this scratch dir for factory. Default is /tmp/wq-factory-$UID.
+- **--run-factory-as-manager**<br /> Force factory to run itself as a manager.
+- **--parent-death**<br /> Exit if parent process dies.
+- **-d**,**--debug=_&lt;subsystem&gt;_**<br /> Enable debugging for this subsystem.
+- **-o**,**--debug-file=_&lt;file&gt;_**<br /> Send debugging to this file.
+- **-O**,**--debug-file-size=_&lt;mb&gt;_**<br /> Specify the size of the debug file.
+- **-v**,**--version**<br /> Show the version string.
+- **-h**,**--help**<br /> Show this screen.
 
 
 Concurrent control options:
 
 
-- **-w** 
- Minimum workers running (default=5).
-- **-W** 
- Maximum workers running (default=100).
-- **--workers-per-cycle** 
- Max number of new workers per 30s (default=5)
-- **-t** 
- Workers abort after idle time (default=300).
-- **--factory-timeout** 
- Exit after no manager seen in <n> seconds.
-- **--tasks-per-worker** 
- Average tasks per worker (default=one per core).
-- **-c** 
- Use worker capacity reported by managers.
+- **-w**,**--min-workers=_&lt;n&gt;_**<br /> Minimum workers running (default=5).
+- **-W**,**--max-workers=_&lt;n&gt;_**<br /> Maximum workers running (default=100).
+- **--workers-per-cycle=_&lt;n&gt;_**<br /> Max number of new workers per 30s (default=5)
+- **-t**,**--timeout=_&lt;time&gt;_**<br /> Workers abort after idle time (default=300).
+- **--factory-timeout=_&lt;n&gt;_**<br /> Exit after no manager seen in _&lt;n&gt;_ seconds.
+- **--tasks-per-worker=_&lt;n&gt;_**<br /> Average tasks per worker (default=one per core).
+- **-c**,**--capacity=_&lt;cap&gt;_**<br /> Use worker capacity reported by managers.
 
 
 Resource management options:
 
-- **--cores=<n>** 
+- **--cores=_&lt;n&gt;_**<br />
  Set the number of cores requested per worker.
-- **--gpus=<n>** 
+- **--gpus=_&lt;n&gt;_**<br />
  Set the number of GPUs requested per worker.
-- **--memory=<mb>** 
+- **--memory=_&lt;mb&gt;_**<br />
  Set the amount of memory (in MB) per worker.
-- **--disk=<mb>** 
+- **--disk=_&lt;mb&gt;_**<br />
  Set the amount of disk (in MB) per worker.
-- **--autosize** 
+- **--autosize**<br />
  Autosize worker to slot (Condor, Mesos, K8S).
 
 
 Worker environment options:
 
-- **--env=<variable=value>** 
+- **--env=_&lt;variable=value&gt;_**<br />
  Environment variable to add to worker.
-- **-E** 
+- **-E**,**--extra-options=_&lt;options&gt;_**<br />
  Extra options to give to worker.
-- **--worker-binary=<file>** 
+- **--worker-binary=_&lt;file&gt;_**<br />
  Alternate binary instead of work_queue_worker.
-- **--wrapper** 
+- **--wrapper=_&lt;cmd&gt;_**<br />
  Wrap factory with this command prefix.
-- **--wrapper-input** 
- Add this input file needed by the wrapper.
-- **--runos=<img>** 
- Use runos tool to create environment (ND only).
-- **--python-package** 
- Run each worker inside this python package.
+- **--wrapper-input=_&lt;file&gt;_**<br /> Add this input file needed by the wrapper.
+- **--python-package=_&lt;pkg&gt;_**<br /> Run each worker inside this python package.
 
 
 Options  specific to batch systems:
 
-- **-B** 
- Generic batch system options.
-- **--amazon-config** 
- Specify Amazon config file.
-- **--condor-requirements** 
- Set requirements for the workers as Condor jobs.
-- **--mesos-master** 
- Host name of mesos manager node..
-- **--mesos-path** 
- Path to mesos python library..
-- **--mesos-preload** 
- Libraries for running mesos.
-- **--k8s-image** 
- Container image for Kubernetes.
-- **--k8s-worker-image** 
- Container image with worker for Kubernetes.
+- **-B**,**--batch-options=_&lt;options&gt;_**<br /> Generic batch system options.
+- **--amazon-config=_&lt;cfg&gt;_**<br /> Specify Amazon config file.
+- **--condor-requirements=_&lt;reqs&gt;_**<br /> Set requirements for the workers as Condor jobs.
 
 
 ## EXIT STATUS

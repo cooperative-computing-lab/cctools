@@ -27,7 +27,7 @@
 **chirp_server_hdfs** - run a chirp server with HDFS client setup
 
 ## SYNOPSIS
-****chirp_server_hdfs [options]****
+**chirp_server_hdfs [options]**
 
 ## DESCRIPTION
 
@@ -49,8 +49,8 @@ See [chirp_server(1)](chirp_server.md) for option listing.
 ## ENVIRONMENT VARIABLES
 
 
-- ****JAVA_HOME**** Location of your Java installation.
-- ****HADOOP_HOME**** Location of your Hadoop installation.
+- **JAVA_HOME** Location of your Java installation.
+- **HADOOP_HOME** Location of your Hadoop installation.
 
 
 

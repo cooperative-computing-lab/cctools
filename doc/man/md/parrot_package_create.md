@@ -27,21 +27,21 @@
 **parrot_package_create** - generate a package based on the accessed files and the preserved environment variables
 
 ## SYNOPSIS
-****parrot_package_create [options]****
+**parrot_package_create [options]**
 
 ## DESCRIPTION
 After recording the accessed files and environment variables of one program with the help of the **--name-list** parameter and the **--env-list** of **parrot_run**, **parrot_package_create** can generate a package containing all the accessed files. You can also add the dependencies recorded in a new namelist file into an existing package.
 
 ## OPTIONS
 
-- **-a --add <path>** The path of an existing package.
-- **-e --env-list <path>** The path of the environment variables.
-- **    --new-env** The relative path of the environment variable file under the package.
-- **-n --name-list <path>** The path of the namelist list.
-- **-p --package-path <path>** The path of the package.
-- **-d --debug <flag>** Enable debugging for this sub-system.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-- **-h, --help** Show the help info.
+- **-a**,**--add=_&lt;path&gt;_**<br />The path of an existing package.
+- **-e**,**--env-list=_&lt;path&gt;_**<br />The path of the environment variables.
+- **--new-env=_&lt;path&gt;_**<br />The relative path of the environment variable file under the package.
+- **-n**,**--name-list=_&lt;path&gt;_**<br />The path of the namelist list.
+- **-p**,**--package-path=_&lt;path&gt;_**<br />The path of the package.
+- **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this sub-system.
+- **-o**,**--debug-file=_&lt;file&gt;_**<br />Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+- **-h**,**--help**<br />Show the help info.
 
 
 ## EXIT STATUS

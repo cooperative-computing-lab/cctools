@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(chirp_stream_files) - move data to/from chirp servers in parallel
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chirp_stream_files [options] PARAM(copy|split|join) PARAM(localfile) { PARAM(hostname[:port]) PARAM(remotefile)))
+CODE(chirp_stream_files [options] PARAM(copy|split|join) PARAM(localfile) { PARAM(hostname[:port]) PARAM(remotefile))
 
 SECTION(DESCRIPTION)
 
@@ -21,13 +21,13 @@ In all cases, files are accessed in a streaming manner, making this particularly
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_TRIPLET(-a, auth,flag)Require this authentication mode.
-OPTION_TRIPLET(-b,block-size,size)Set transfer buffer size. (default is 1048576 bytes)
-OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
-OPTION_TRIPLET(-i,tickes,files)Comma-delimited list of tickets to use for authentication.
-OPTION_TRIPLET(-t,timeout,time)Timeout for failure. (default is 3600s)
-OPTION_ITEM(`-v, --version')Show program version.
-OPTION_ITEM(`-h, --help')Show help text.
+OPTION_ARG(a, auth,flag)Require this authentication mode.
+OPTION_ARG(b,block-size,size)Set transfer buffer size. (default is 1048576 bytes)
+OPTION_ARG(d,debug,flag)Enable debugging for this subsystem.
+OPTION_ARG(i,tickes,files)Comma-delimited list of tickets to use for authentication.
+OPTION_ARG(t,timeout,time)Timeout for failure. (default is 3600s)
+OPTION_FLAG(v,version)Show program version.
+OPTION_FLAG(h,help)Show help text.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

@@ -5,16 +5,17 @@ SECTION(NAME)
 BOLD(chroot_package_run) - repeat a program within the package with the help of CODE(chroot)
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chroot_package_run --package-path your-package-path [command]))
+CODE(chroot_package_run --package-path your-package-path [command])
 
 SECTION(DESCRIPTION)
 If CODE(chroot) is used to help repeat one experiment, common directories like BOLD(/proc), BOLD(/dev), BOLD(/net), BOLD(/sys), BOLD(/var), BOLD(/misc) and BOLD(/selinux) will be remounted into the package if they exists on your local filesystem. After you finish all your test within CODE(chroot_package_run), these remounted directories will be unmounted. If no command is given, a /bin/sh shell will be returned.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM(`-p, --package-path')The path of the package.
-OPTION_ITEM(`-e, --env-list')The path of the environment file, each line is in the format of <key>=<value>. (Default: package-path/env_list)
-OPTION_ITEM(`-h, --help')Show this help message.
+OPTION_FLAG(p,package-path)The path of the package.
+OPTION_FLAG(e,env-list)The path of the environment file, each line is in the format of PARAM(key)=PARAM(value). (Default: package-path/env_list)
+OPTION_FLAG(e,env-list)The path of the environment file, each line is in the format of PARAM(key)=PARAM(value). (Default: package-path/env_list)
+OPTION_FLAG(h,help)Show this help message.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

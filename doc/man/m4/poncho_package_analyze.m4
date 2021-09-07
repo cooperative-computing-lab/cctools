@@ -7,7 +7,7 @@ BOLD(poncho_package_analyze) - command-line utility for analyzing Python script 
 
 SECTION(SYNOPSIS)
 
-CODE(BOLD(poncho_package_analyze [options] PARAM(python-script ...)  PARAM(json-output-file)))
+CODE(poncho_package_analyze [options] PARAM(python-script ...)  PARAM(json-output-file))
 
 SECTION(DESCRIPTION)
 
@@ -18,11 +18,11 @@ The CODE(python-script ...) argument is the path(s) to the Python script(s) to b
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM( -h, --help)                   Show this help message
-OPTION_ITEM( --toplevel)                   Only include imports at the top level of the script.
-OPTION_ITEM( --function FUNCTION)          Only include imports in the given function.
-OPTION_ITEM( --pkg-mapping IMPORT=NAME)    Specify that the module imported as IMPORT in the code is provided by the pip/conda package NAME.
-OPTION_ITEM(--extra-pkg)                   Also include the pip/conda package PKG, even if it does not appear in the sources. May be useful for scripts that execute other (possibly non-Python) components that must also be included.
+OPTION_FLAG(h,help) Show this help message
+OPTION_FLAG_LONG(toplevel) Only include imports at the top level of the script.
+OPTION_ARG_LONG(function,PARAM(fn)) Only include imports in the given function.
+OPTION_ARG_LONG(pkg-mapping,PARAM(import=name)) Specify that the module imported as PARAM(import) in the code is provided by the pip/conda package PARAM(name).
+OPTION_ARG_LONG(extra-pkg,pkg) Also include the pip/conda package PARAM(pkg), even if it does not appear in the sources. May be useful for scripts that execute other (possibly non-Python) components that must also be included.
 OPTIONS_END
 
 SECTION(EXIT)

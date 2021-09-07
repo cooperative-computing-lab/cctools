@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(parrot_getacl) - get ACL information for Parrot filesystem
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_getacl PARAM(path)))
+CODE(parrot_getacl PARAM(path))
 
 SECTION(DESCRIPTION)
 CODE(parrot_getacl) utilizes BOLD(Parrot) system calls to retrieve the access

@@ -27,7 +27,7 @@
 **starch** - STandalone application ARCHiver
 
 ## SYNOPSIS
-****starch [options] <sfx_path>****
+**starch [options] _&lt;sfx_path&gt;_**
 
 ## DESCRIPTION
 
@@ -42,25 +42,25 @@ operating system variants.
 ## OPTIONS
 
 To create a **SFX**, simply specify the name of the **SFX** to create along
-with the <command> to execute and any other dependencies such as
-<executables>, <libraries>, <data>, or <environment>
+with the _&lt;command&gt;_ to execute and any other dependencies such as
+_&lt;executables&gt;_, _&lt;libraries&gt;_, _&lt;data&gt;_, or _&lt;environment&gt;_
 scripts.
 
-If a <command> is specified, but no <executable> is passed, then the
-first token in the <command> will be used as the executable.
+If a _&lt;command&gt;_ is specified, but no _&lt;executable&gt;_ is passed, then the
+first token in the _&lt;command&gt;_ will be used as the executable.
 
 By default, **starch** will use **ldd** to detect any necessary libraries
-from the specified set of <executables> and include them in the **SFX**.
+from the specified set of _&lt;executables&gt;_ and include them in the **SFX**.
 
-- **-A** Do not automatically detect library dependencies.
-- **-C cfg** Use configuration file.
-- **-c cmd** Specify command to execute.
-- **-d npath:opath** Add data (new path:old path).
-- **-e env** Add environment script.
-- **-l lib** Add library.
-- **-x exe** Add executable.
-- **-h** Show help message and exit.
-- **-v** Display verbose messages (default: False).
+- **-A**<br />Do not automatically detect library dependencies.
+- **-C** _&lt;cfg&gt;_<br />Use configuration file.
+- **-c** _&lt;cmd&gt;_<br />Specify command to execute.
+- **-d** _&lt;npath:opath&gt;_<br />Add data (new path:old path).
+- **-e** _&lt;env&gt;_<br />Add environment script.
+- **-l** _&lt;lib&gt;_<br />Add library.
+- **-x** _&lt;exe&gt;_<br />Add executable.
+- **-h**<br />Show help message and exit.
+- **-v**<br />Display verbose messages (default: False).
 
 Once a **SFX** is generated, you can use it as a normal executable.
 
@@ -155,7 +155,7 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [Makeflow User Manual]("../makeflow.html")
-- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md) [makeflow_ec2_estimate(1)](makeflow_ec2_estimate.md)
+- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md)
 
 
 CCTools 7.3.2 FINAL

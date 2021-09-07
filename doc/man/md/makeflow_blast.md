@@ -27,7 +27,7 @@
 **makeflow_blast** - Generate a Makeflow to parallelize and distribute blastall jobs
 
 ## SYNOPSIS
-****makeflow_blast query_granularity character_granularity [blast_options]****
+**makeflow_blast query_granularity character_granularity [blast_options]**
 
 ## DESCRIPTION
 **makeflow_blast** is a script to generate [makeflow()](makeflow.md) workflows to execute **blastall** jobs. Essentially, the script uses query_granularity (the maximum number of sequences per fasta file split) and character_granularity (the maximum number of characters per fasta file split) to determine how to break up the input fasta file.  It then creates a makeflow that will execute a blastall with the desired parameters on each part and concatenate the results into the desired output file.  For simplicity, all of the arguments following query_granularity and character_granularity are passed through as the options to **blastall**
@@ -38,9 +38,9 @@
 
 ## OPTIONS
 
-- **-i input** Specifiy the input fasta file for querying the BLAST database
-- **-o output** Specify the output file for final results
-- **-d databse** Specify the BLAST database to be queried
+- **-i** _&lt;input&gt;_<br />Specifiy the input fasta file for querying the BLAST database
+- **-o** _&lt;output&gt;_<br />Specify the output file for final results
+- **-d** _&lt;databse&gt;_<br />Specify the BLAST database to be queried
 
 
 ## EXIT STATUS
@@ -65,7 +65,7 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [Makeflow User Manual]("../makeflow.html")
-- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md) [makeflow_ec2_estimate(1)](makeflow_ec2_estimate.md)
+- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md)
 
 
 CCTools 7.3.2 FINAL

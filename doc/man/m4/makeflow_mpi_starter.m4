@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(makeflow_mpi_starter) - mpi wrapper program for makeflow and workqueue
 
 SECTION(SYNOPSIS)
-CODE(BOLD(makeflow_mpi_starter [options]))
+CODE(makeflow_mpi_starter [options])
 
 SECTION(DESCRIPTION)
 
@@ -21,12 +21,12 @@ workflow specified by the BOLD(Makeflow) dagfile.
 
 SUBSECTION(Commands)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-m, makeflow-arguments, option)Options to pass to makeflow, such as dagfile, etc
-OPTION_TRIPLET(-p, makeflow-port, port)The port for Makeflow to use when communicating with workers
-OPTION_TRIPLET(-q, workqueue-arguments, option)Options to pass to work_queue_worker
-OPTION_TRIPLET(-c, copy-out, location)Where to copy out all files produced
-OPTION_TRIPLET(-d, debug, debugprefix)Base Debug file name
-OPTION_ITEM(`-h, --help')Print out this help
+OPTION_ARG(m, makeflow-arguments, option)Options to pass to makeflow, such as dagfile, etc
+OPTION_ARG(p, makeflow-port, port)The port for Makeflow to use when communicating with workers
+OPTION_ARG(q, workqueue-arguments, option)Options to pass to work_queue_worker
+OPTION_ARG(c, copy-out, location)Where to copy out all files produced
+OPTION_ARG(d, debug, debugprefix)Base Debug file name
+OPTION_FLAG(h,help)Print out this help
 OPTIONS_END
 
 SECTION(EXIT STATUS)

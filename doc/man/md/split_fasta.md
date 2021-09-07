@@ -27,7 +27,7 @@
 **split_fasta** - Split a fasta file according to sequence and character counts
 
 ## SYNOPSIS
-****split_fasta query_granularity character_granularity fasta_file****
+**split_fasta query_granularity character_granularity fasta_file**
 
 ## DESCRIPTION
 **split_fasta** is a simple script to split a fasta file according to user provided parameters.  The script iterates over the given file, generating a new sub_file called input.i each time the contents of the previous file (input.(i-1)) exceed the number of queries given by query_granularity or the number of characters given by character_granularity.
@@ -58,7 +58,7 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [Makeflow User Manual]("../makeflow.html")
-- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md) [makeflow_ec2_estimate(1)](makeflow_ec2_estimate.md)
+- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md)
 
 
 CCTools 7.3.2 FINAL

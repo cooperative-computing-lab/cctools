@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(makeflow_ec2_cleanup) - clean up Amazon services after running Makeflow
 
 SECTION(SYNOPSIS)
-CODE(BOLD(makeflow_ec2_cleanup PARAM(config-file)))
+CODE(makeflow_ec2_cleanup PARAM(config-file))
 
 SECTION(DESCRIPTION)
 

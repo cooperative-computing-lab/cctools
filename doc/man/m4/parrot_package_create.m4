@@ -5,21 +5,21 @@ SECTION(NAME)
 BOLD(parrot_package_create) - generate a package based on the accessed files and the preserved environment variables
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_package_create [options]))
+CODE(parrot_package_create [options])
 
 SECTION(DESCRIPTION)
 After recording the accessed files and environment variables of one program with the help of the CODE(--name-list) parameter and the CODE(--env-list) of CODE(parrot_run), CODE(parrot_package_create) can generate a package containing all the accessed files. You can also add the dependencies recorded in a new namelist file into an existing package.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-a, add, path)The path of an existing package.
-OPTION_TRIPLET(-e, env-list, path)The path of the environment variables.
-OPTION_ITEM(`    --new-env')The relative path of the environment variable file under the package.
-OPTION_TRIPLET(-n, name-list, path)The path of the namelist list.
-OPTION_TRIPLET(-p, package-path, path)The path of the package.
-OPTION_TRIPLET(-d, debug, flag)Enable debugging for this sub-system.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-OPTION_ITEM(`-h, --help')Show the help info.
+OPTION_ARG(a, add, path)The path of an existing package.
+OPTION_ARG(e, env-list, path)The path of the environment variables.
+OPTION_ARG_LONG(new-env, path)The relative path of the environment variable file under the package.
+OPTION_ARG(n, name-list, path)The path of the namelist list.
+OPTION_ARG(p, package-path, path)The path of the package.
+OPTION_ARG(d, debug, flag)Enable debugging for this sub-system.
+OPTION_ARG(o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+OPTION_FLAG(h,help)Show the help info.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

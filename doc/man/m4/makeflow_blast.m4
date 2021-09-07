@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(makeflow_blast) - Generate a Makeflow to parallelize and distribute blastall jobs
 
 SECTION(SYNOPSIS)
-CODE(BOLD(makeflow_blast query_granularity character_granularity [blast_options]))
+CODE(makeflow_blast query_granularity character_granularity [blast_options])
 
 SECTION(DESCRIPTION)
 BOLD(makeflow_blast) is a script to generate MANPAGE(makeflow) workflows to execute CODE(blastall) jobs. Essentially, the script uses query_granularity (the maximum number of sequences per fasta file split) and character_granularity (the maximum number of characters per fasta file split) to determine how to break up the input fasta file.  It then creates a makeflow that will execute a blastall with the desired parameters on each part and concatenate the results into the desired output file.  For simplicity, all of the arguments following query_granularity and character_granularity are passed through as the options to CODE(blastall)
@@ -16,9 +16,9 @@ BOLD(makeflow_blast) expects a blastall in the path, and should be used from the
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_PAIR(-i, input)Specifiy the input fasta file for querying the BLAST database
-OPTION_PAIR(-o, output)Specify the output file for final results
-OPTION_PAIR(-d, databse)Specify the BLAST database to be queried
+OPTION_ARG_SHORT(i, input)Specifiy the input fasta file for querying the BLAST database
+OPTION_ARG_SHORT(o, output)Specify the output file for final results
+OPTION_ARG_SHORT(d, databse)Specify the BLAST database to be queried
 OPTIONS_END
 
 SECTION(EXIT STATUS)

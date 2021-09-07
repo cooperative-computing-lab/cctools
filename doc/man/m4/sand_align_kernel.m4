@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(sand_align_kernel) - align candidate sequences sequentially
 
 SECTION(SYNOPSIS)
-CODE(BOLD(sand_align_kernel [options] [input file]))
+CODE(sand_align_kernel [options] [input file])
 
 SECTION(DESCRIPTION)
 
@@ -28,14 +28,14 @@ all following sequences until the following separator, and so on.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_PAIR(-a,sw|ps|banded)Specify the type of alignment: sw (Smith-Waterman), ps (Prefix-Suffix), or banded.  If not specified, default is banded.
-OPTION_PAIR(-o,ovl|ovl_new|align|matrix)Specify how each alignment should be output: ovl (Celera V5, V6 OVL format), ovl_new (Celera V7 overlap format), align (display the sequences and alignment graphically) or matrix (display the dynamic programming matrix).  MANPAGE(sand_align_master,1) expects the ovl output format, which is the default.  The other formats are useful for debugging.
-OPTION_PAIR(-m,length)Minimum aligment length (default: 0).
-OPTION_PAIR(-q,quality)Minimum match quality (default: 1.00)
-OPTION_ITEM(-x)Delete input file after completion.
-OPTION_PAIR(-d,subsystem)Enable debugging for this subsystem.  (Try BOLD(-d all) to start.
-OPTION_ITEM(-v)Show program version.
-OPTION_ITEM(-h)Display this message.
+OPTION_ARG_SHORT(a,sw|ps|banded)Specify the type of alignment: sw (Smith-Waterman), ps (Prefix-Suffix), or banded.  If not specified, default is banded.
+OPTION_ARG_SHORT(o,ovl|ovl_new|align|matrix)Specify how each alignment should be output: ovl (Celera V5, V6 OVL format), ovl_new (Celera V7 overlap format), align (display the sequences and alignment graphically) or matrix (display the dynamic programming matrix).  MANPAGE(sand_align_master,1) expects the ovl output format, which is the default.  The other formats are useful for debugging.
+OPTION_ARG_SHORT(m,length)Minimum aligment length (default: 0).
+OPTION_ARG_SHORT(q,quality)Minimum match quality (default: 1.00)
+OPTION_FLAG_SHORT(x)Delete input file after completion.
+OPTION_ARG_SHORT(d,subsystem)Enable debugging for this subsystem.  (Try BOLD(-d all) to start.
+OPTION_FLAG_SHORT(v)Show program version.
+OPTION_FLAG_SHORT(h)Display this message.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

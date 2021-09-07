@@ -5,9 +5,7 @@ SECTION(NAME)
 BOLD(condor_submit_makeflow) - submit workflow to HTCondor batch system
 
 SECTION(SYNOPSIS)
-LONGCODE_BEGIN
-CODE(BOLD(condor_submit_makeflow [options] PARAM(workflow)))
-LONGCODE_END
+CODE(condor_submit_makeflow [options] PARAM(workflow))
 
 SECTION(DESCRIPTION)
 CODE(condor_submit_makeflow) submits Makeflow itself as a batch job,

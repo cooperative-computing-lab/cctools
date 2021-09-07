@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(parrot_locate) - provides the true location of the data stored in a named file.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_locate path))
+CODE(parrot_locate path)
 
 SECTION(DESCRIPTION)
 

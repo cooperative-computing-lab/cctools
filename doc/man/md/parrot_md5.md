@@ -27,11 +27,11 @@
 **parrot_md5** - returns the **MD5** checksum of a file, generated on the remote system if possible.
 
 ## SYNOPSIS
-****parrot_md5 <path>****
+**parrot_md5 _&lt;path&gt;_**
 
 ## DESCRIPTION
 
-**parrot_md5** returns the **MD5** checksum of the file stored at <path>.  If possible
+**parrot_md5** returns the **MD5** checksum of the file stored at _&lt;path&gt;_.  If possible
 it calls a native function of the remote system to get the checksum, without requiring the transfer
 of the file's contents to the user's machine.
 If the filesystem does not support the checksum function internally,

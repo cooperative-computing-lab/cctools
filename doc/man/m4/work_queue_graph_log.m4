@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(work_queue_graph_log) - plots Work Queue statistics logs.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(work_queue_graph_log [options] work-queue-log))
+CODE(work_queue_graph_log [options] work-queue-log)
 
 SECTION(DESCRIPTION)
 
@@ -31,12 +31,13 @@ CODE(tasks-log):
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_PAIR(-o,prefix-output)Generate prefix-output.{time,time-log,tasks,tasks-log}.<output-format>. Default is <work-queue-log>.
-OPTION_PAIR(-c,gnuplot-path)Specify the location of the gnuplot executable. Default is gnuplot.
-OPTION_PAIR(-r,range)Range of time to plot, in time units (see -u) from the start of execution. Of the form: min:max, min:, or :max.
-OPTION_PAIR(-T,output-format)Set output format. Default is png. If "text", then the gnuplot scripts are written instead of the images.
-OPTION_PAIR(-u,time-unit)Time scale to output. One of s,m,h or d, for seconds, minutes (default), hours or days.
-OPTION_ITEM(`-h')Show help text.
+OPTION_ARG_SHORT(o,prefix-output)Generate prefix-output.{time,time-log,tasks,tasks-log}.PARAM(output-format). Default is PARAM(work-queue-log).
+OPTION_ARG_SHORT(o,prefix-output)Generate prefix-output.{time,time-log,tasks,tasks-log}.PARAM(output-format). Default is PARAM(work-queue-log).
+OPTION_ARG_SHORT(c,gnuplot-path)Specify the location of the gnuplot executable. Default is gnuplot.
+OPTION_ARG_SHORT(r,range)Range of time to plot, in time units (see -u) from the start of execution. Of the form: min:max, min:, or :max.
+OPTION_ARG_SHORT(T,output-format)Set output format. Default is png. If "text", then the gnuplot scripts are written instead of the images.
+OPTION_ARG_SHORT(u,time-unit)Time scale to output. One of s,m,h or d, for seconds, minutes (default), hours or days.
+OPTION_FLAG_SHORT(h)Show help text.
 OPTIONS_END
 
 SECTION(EXAMPLES)

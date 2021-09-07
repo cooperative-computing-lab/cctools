@@ -27,7 +27,7 @@
 **parrot_mkalloc** - create a directory with a space allocation
 
 ## SYNOPSIS
-****parrot_mkalloc <path> <size>****
+**parrot_mkalloc _&lt;path&gt;_ _&lt;size&gt;_**
 
 ## DESCRIPTION
 
@@ -43,7 +43,7 @@ megabytes, gigabytes, and so forth.
 ## OPTIONS
 
 
-- **-h** Show help text.
+- **-h**<br />Show help text.
 
 
 

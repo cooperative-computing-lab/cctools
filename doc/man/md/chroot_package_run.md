@@ -27,16 +27,17 @@
 **chroot_package_run** - repeat a program within the package with the help of **chroot**
 
 ## SYNOPSIS
-****chroot_package_run --package-path your-package-path [command]****
+**chroot_package_run --package-path your-package-path [command]**
 
 ## DESCRIPTION
 If **chroot** is used to help repeat one experiment, common directories like **/proc**, **/dev**, **/net**, **/sys**, **/var**, **/misc** and **/selinux** will be remounted into the package if they exists on your local filesystem. After you finish all your test within **chroot_package_run**, these remounted directories will be unmounted. If no command is given, a /bin/sh shell will be returned.
 
 ## OPTIONS
 
-- **-p, --package-path** The path of the package.
-- **-e, --env-list** The path of the environment file, each line is in the format of <key>=<value>. (Default: package-path/env_list)
-- **-h, --help** Show this help message.
+- **-p**,**--package-path**<br />The path of the package.
+- **-e**,**--env-list**<br />The path of the environment file, each line is in the format of _&lt;key&gt;_=_&lt;value&gt;_. (Default: package-path/env_list)
+- **-e**,**--env-list**<br />The path of the environment file, each line is in the format of _&lt;key&gt;_=_&lt;value&gt;_. (Default: package-path/env_list)
+- **-h**,**--help**<br />Show this help message.
 
 
 ## EXIT STATUS

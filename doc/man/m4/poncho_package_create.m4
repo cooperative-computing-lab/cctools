@@ -6,7 +6,8 @@ BOLD(poncho_package_create) - command-line utility for creating a Conda virtual 
 
 SECTION(SYNOPSIS)
 
-CODE(BOLD(poncho_package_create [options] PARAM(dependency-file) PARAM(<output-path>)))
+CODE(poncho_package_create [options] PARAM(dependency-file) PARAM(PARAM(output-path)))
+CODE(poncho_package_create [options] PARAM(dependency-file) PARAM(PARAM(output-path)))
 
 SECTION(DESCRIPTION)
 
@@ -18,7 +19,7 @@ The CODE(dependency-file) argument is the path (relative or absolute) to the a J
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTIONS_ITEM(-h)        Show this help message
+OPTION_FLAG_SHORT(h)        Show this help message
 OPTIONS_END
 SECTION(EXIT STATUS)
 

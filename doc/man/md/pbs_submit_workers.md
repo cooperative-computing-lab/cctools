@@ -27,7 +27,7 @@
 **pbs_submit_workers** - submit work_queue_worker to a PBS cluster.
 
 ## SYNOPSIS
-****pbs_submit_workers [options] <servername> <port> <num-workers>****
+**pbs_submit_workers [options] _&lt;servername&gt;_ _&lt;port&gt;_ _&lt;num-workers&gt;_**
 
 ## DESCRIPTION
 **pbs_submit_workers** schedules the execution of [work_queue_worker(1)](work_queue_worker.md)
@@ -41,21 +41,22 @@ auto mode option is specified for work_queue_worker.
 
 ## OPTIONS
 
-- **-M** Name of the preferred manager for worker.
-- **-c cores** Set the number of cores each worker should use (0=auto). (default=1)
-- **-C catalog** Set catalog server for work_queue_worker to <catalog>. <catalog> format: HOSTNAME:PORT.
-- **-t seconds** Abort work_queue_worker after this amount of idle time (default=900s).
-- **-d subsystem** Enable debugging on worker for this subsystem (try -d all to start).
-- **-w size** Set TCP window size
-- **-i time** Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
-- **-b time** Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
-- **-z size** Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
-- **-A arch** Set architecture string for the worker to report to manager instead of the value in uname.
-- **-O os** Set operating system string for the worker to report to manager instead of the value in uname.
-- **-s path** Set the location for creating the working directory of the worker.
-- **-j ** Use job array to submit workers.
-- **-p parameters** PBS qsub parameters.
-- **-h** Show help message.
+- **-M**<br /> name)Name of the preferred manager for worker.
+- **-c** _&lt;cores&gt;_<br />Set the number of cores each worker should use (0=auto). (default=1)
+- **-C** _&lt;catalog&gt;_<br />Set catalog server for work_queue_worker to _&lt;catalog&gt;_. _&lt;catalog&gt;_ format: HOSTNAME:PORT.
+- **-C** _&lt;catalog&gt;_<br />Set catalog server for work_queue_worker to _&lt;catalog&gt;_. _&lt;catalog&gt;_ format: HOSTNAME:PORT.
+- **-t** _&lt;seconds&gt;_<br />Abort work_queue_worker after this amount of idle time (default=900s).
+- **-d** _&lt;subsystem&gt;_<br />Enable debugging on worker for this subsystem (try -d all to start).
+- **-w** _&lt;size&gt;_<br />Set TCP window size
+- **-i** _&lt;time&gt;_<br />Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+- **-b** _&lt;time&gt;_<br />Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
+- **-z** _&lt;size&gt;_<br />Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
+- **-A** _&lt;arch&gt;_<br />Set architecture string for the worker to report to manager instead of the value in uname.
+- **-O** _&lt;os&gt;_<br />Set operating system string for the worker to report to manager instead of the value in uname.
+- **-s** _&lt;path&gt;_<br />Set the location for creating the working directory of the worker.
+- **-j** _&lt;&gt;_<br />Use job array to submit workers.
+- **-p** _&lt;parameters&gt;_<br />PBS qsub parameters.
+- **-h**<br />Show help message.
 
 
 ## EXIT STATUS

@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(sand_uncompress_reads) - uncompress sequence data
 
 SECTION(SYNOPSIS)
-CODE(BOLD(sand_uncompress_reads [-qvh] [infile] [outfile]))
+CODE(sand_uncompress_reads [-qvh] [infile] [outfile])
 
 SECTION(DESCRIPTION)
 
@@ -20,9 +20,9 @@ line of sequences and bytes compressed.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(-q)Quiet mode: suppress summary line.
-OPTION_ITEM(-h)Display version information.
-OPTION_ITEM(-v)Show help text.
+OPTION_FLAG_SHORT(q)Quiet mode: suppress summary line.
+OPTION_FLAG_SHORT(h)Display version information.
+OPTION_FLAG_SHORT(v)Show help text.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

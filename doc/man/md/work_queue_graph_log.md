@@ -27,7 +27,7 @@
 **work_queue_graph_log** - plots Work Queue statistics logs.
 
 ## SYNOPSIS
-****work_queue_graph_log [options] work-queue-log****
+**work_queue_graph_log [options] work-queue-log**
 
 ## DESCRIPTION
 
@@ -53,12 +53,13 @@ the independent variable:
 
 ## OPTIONS
 
-- **-o prefix-output** Generate prefix-output.{time,time-log,tasks,tasks-log}.<output-format>. Default is <work-queue-log>.
-- **-c gnuplot-path** Specify the location of the gnuplot executable. Default is gnuplot.
-- **-r range** Range of time to plot, in time units (see -u) from the start of execution. Of the form: min:max, min:, or :max.
-- **-T output-format** Set output format. Default is png. If "text", then the gnuplot scripts are written instead of the images.
-- **-u time-unit** Time scale to output. One of s,m,h or d, for seconds, minutes (default), hours or days.
-- **-h** Show help text.
+- **-o** _&lt;prefix-output&gt;_<br />Generate prefix-output.{time,time-log,tasks,tasks-log}._&lt;output-format&gt;_. Default is _&lt;work-queue-log&gt;_.
+- **-o** _&lt;prefix-output&gt;_<br />Generate prefix-output.{time,time-log,tasks,tasks-log}._&lt;output-format&gt;_. Default is _&lt;work-queue-log&gt;_.
+- **-c** _&lt;gnuplot-path&gt;_<br />Specify the location of the gnuplot executable. Default is gnuplot.
+- **-r** _&lt;range&gt;_<br />Range of time to plot, in time units (see -u) from the start of execution. Of the form: min:max, min:, or :max.
+- **-T** _&lt;output-format&gt;_<br />Set output format. Default is png. If "text", then the gnuplot scripts are written instead of the images.
+- **-u** _&lt;time-unit&gt;_<br />Time scale to output. One of s,m,h or d, for seconds, minutes (default), hours or days.
+- **-h**<br />Show help text.
 
 
 ## EXAMPLES

@@ -27,16 +27,17 @@
 **parrot_package_run** - repeat a program within the package with the help of **parrot_run**
 
 ## SYNOPSIS
-****parrot_package_run --package-path your-package-path [command]****
+**parrot_package_run --package-path your-package-path [command]**
 
 ## DESCRIPTION
 If **parrot_run** is used to repeat one experiment, one mountlist must be created so that the file access request of your program can be redirected into the package. **parrot_package_run** is used to create the mountlist and repeat your program within the package with the help of **parrot_run** and **mountlist**. If no command is given, a /bin/sh shell will be returned.
 
 ## OPTIONS
 
-- **-p, --package-path** The path of the package.
-- **-e, --env-list** The path of the environment file, each line is in the format of <key>=<value>. (Default: package-path/env_list)
-- **-h, --help** Show this help message.
+- **-p**,**--package-path**<br />The path of the package.
+- **-e**,**--env-list**<br />The path of the environment file, each line is in the format of _&lt;key&gt;_=_&lt;value&gt;_. (Default: package-path/env_list)
+- **-e**,**--env-list**<br />The path of the environment file, each line is in the format of _&lt;key&gt;_=_&lt;value&gt;_. (Default: package-path/env_list)
+- **-h**,**--help**<br />Show this help message.
 
 
 ## EXIT STATUS

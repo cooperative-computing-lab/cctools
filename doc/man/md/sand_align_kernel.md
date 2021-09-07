@@ -27,7 +27,7 @@
 **sand_align_kernel** - align candidate sequences sequentially
 
 ## SYNOPSIS
-****sand_align_kernel [options] [input file]****
+**sand_align_kernel [options] [input file]**
 
 ## DESCRIPTION
 
@@ -50,14 +50,14 @@ all following sequences until the following separator, and so on.
 ## OPTIONS
 
 
-- **-a sw|ps|banded** Specify the type of alignment: sw (Smith-Waterman), ps (Prefix-Suffix), or banded.  If not specified, default is banded.
-- **-o ovl|ovl_new|align|matrix** Specify how each alignment should be output: ovl (Celera V5, V6 OVL format), ovl_new (Celera V7 overlap format), align (display the sequences and alignment graphically) or matrix (display the dynamic programming matrix).  [sand_align_master(1)](sand_align_master.md) expects the ovl output format, which is the default.  The other formats are useful for debugging.
-- **-m length** Minimum aligment length (default: 0).
-- **-q quality** Minimum match quality (default: 1.00)
-- **-x** Delete input file after completion.
-- **-d subsystem** Enable debugging for this subsystem.  (Try **-d all** to start.
-- **-v** Show program version.
-- **-h** Display this message.
+- **-a** _&lt;sw|ps|banded&gt;_<br />Specify the type of alignment: sw (Smith-Waterman), ps (Prefix-Suffix), or banded.  If not specified, default is banded.
+- **-o** _&lt;ovl|ovl_new|align|matrix&gt;_<br />Specify how each alignment should be output: ovl (Celera V5, V6 OVL format), ovl_new (Celera V7 overlap format), align (display the sequences and alignment graphically) or matrix (display the dynamic programming matrix).  [sand_align_master(1)](sand_align_master.md) expects the ovl output format, which is the default.  The other formats are useful for debugging.
+- **-m** _&lt;length&gt;_<br />Minimum aligment length (default: 0).
+- **-q** _&lt;quality&gt;_<br />Minimum match quality (default: 1.00)
+- **-x**<br />Delete input file after completion.
+- **-d** _&lt;subsystem&gt;_<br />Enable debugging for this subsystem.  (Try **-d all** to start.
+- **-v**<br />Show program version.
+- **-h**<br />Display this message.
 
 
 ## EXIT STATUS

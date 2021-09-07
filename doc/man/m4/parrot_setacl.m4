@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(parrot_setacl) - set ACL information for Parrot filesystem
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_setacl PARAM(path) PARAM(subject) PARAM(rights)))
+CODE(parrot_setacl PARAM(path) PARAM(subject) PARAM(rights))
 
 SECTION(DESCRIPTION)
 CODE(parrot_setacl) utilizes BOLD(Parrot) system calls to set the access

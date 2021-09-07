@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(parrot_md5) - returns the BOLD(MD5) checksum of a file, generated on the remote system if possible.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_md5 PARAM(path)))
+CODE(parrot_md5 PARAM(path))
 
 SECTION(DESCRIPTION)
 

@@ -27,7 +27,7 @@
 **sand_filter_kernel** - filter read sequences sequentially
 
 ## SYNOPSIS
-****sand_filter_kernel [options] <sequence file> [second sequence file]****
+**sand_filter_kernel [options] _&lt;sequence file&gt;_ [second sequence file]**
 
 ## DESCRIPTION
 
@@ -46,15 +46,15 @@ name of the candidate sequences and a starting position for alignment.
 ## OPTIONS
 
 
-- **-s size** Size of "rectangle" for filtering. You can determine
+- **-s** _&lt;size&gt;_<br />Size of "rectangle" for filtering. You can determine
 the size dynamically by passing in d rather than a number.
-- **-r file** A meryl file of repeat mers to be ignored.
-- **-k size** The k-mer size to use in candidate selection (default is 22).
-- **-w number** The minimizer window size to use in candidate selection (default is 22).
-- **-o filename** The output file. Default is stdout.
-- **-d subsystem** Enable debug messages for this subsystem.  Try **-d all** to start.
-- **-v** Show version string.
-- **-h** Show help screen.
+- **-r** _&lt;file&gt;_<br />A meryl file of repeat mers to be ignored.
+- **-k** _&lt;size&gt;_<br />The k-mer size to use in candidate selection (default is 22).
+- **-w** _&lt;number&gt;_<br />The minimizer window size to use in candidate selection (default is 22).
+- **-o** _&lt;filename&gt;_<br />The output file. Default is stdout.
+- **-d** _&lt;subsystem&gt;_<br />Enable debug messages for this subsystem.  Try **-d all** to start.
+- **-v**<br />Show version string.
+- **-h**<br />Show help screen.
 
 
 ## EXIT STATUS

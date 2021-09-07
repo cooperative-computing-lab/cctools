@@ -27,12 +27,12 @@
 **parrot_timeout** - changes or resets the main timeout for the current **parrot** session
 
 ## SYNOPSIS
-****parrot_timeout <time>****
+**parrot_timeout _&lt;time&gt;_**
 
 ## DESCRIPTION
 
 **parrot_timeout** changes the main timeout for the current **parrot** session to
-<time>.  If <time> was not given, it resets it to the default value (5 minutes if
+_&lt;time&gt;_.  If _&lt;time&gt;_ was not given, it resets it to the default value (5 minutes if
 an interactive session or 1 hour for a non-interactive session).
 
 ## OPTIONS

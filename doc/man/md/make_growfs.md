@@ -27,7 +27,7 @@
 **make_growfs** - generate directory listings for the GROW filesystem
 
 ## SYNOPSIS
-****make_growfs [options] <directory>****
+**make_growfs [options] _&lt;directory&gt;_**
 
 ## DESCRIPTION
 
@@ -44,13 +44,13 @@ with complete metadata.
 ## OPTIONS
 
 
-- **-v** Give verbose messages.
-- **-K** Create checksums for files. (default)
-- **-k** Disable checksums for files.
-- **-f** Follow all symbolic links.
-- **-F** Do not follow any symbolic links.
-- **-a** Only follow links that fall outside the root.  (default)
-- **-h** Show help text.
+- **-v**<br />Give verbose messages.
+- **-K**<br />Create checksums for files. (default)
+- **-k**<br />Disable checksums for files.
+- **-f**<br />Follow all symbolic links.
+- **-F**<br />Do not follow any symbolic links.
+- **-a**<br />Only follow links that fall outside the root.  (default)
+- **-h**<br />Show help text.
 
 
 ## EXIT STATUS

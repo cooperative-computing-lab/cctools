@@ -27,7 +27,7 @@
 **catalog_server** - start a catalog server
 
 ## SYNOPSIS
-****catalog_server [options]****
+**catalog_server [options]**
 
 ## DESCRIPTION
 
@@ -60,35 +60,35 @@ overwriting another service's record.
 ## OPTIONS
 
 
-- **-b, --background** Run as a daemon.
-- **-B --pid-file <file>** Write process identifier (PID) to file.
-- **-d --debug <flag>** Enable debugging for this subsystem
-- **-h, --help** Show this help screen
-- **-H --history <directory>**  Store catalog history in this directory.  Enables fast data recovery after a failure or restart, and enables historical queries via deltadb_query.
-- **-I --interface <addr>** Listen only on this network interface.
-- **-l --lifetime <secs>** Lifetime of data, in seconds (default is 1800)
-- **-L --update-log <file>** Log new updates to this file.
-- **-m --max-jobs <n>** Maximum number of child processes.  (default is 50)
-- **-M --server-size <size>** Maximum size of a server to be believed.  (default is any)
-- **-n --name <name>** Set the preferred hostname of this server.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-- **-O --debug-rotate-max <bytes>** Rotate debug file once it reaches this size (default 10M, 0 disables).
-- **-p -- <port>** Port number to listen on (default is 9097)
-- **-S, --single** Single process mode; do not fork on queries.
-- **-T --timeout <time>** Maximum time to allow a query process to run.  (default is 60s)
-- **-u --update-host <host>** Send status updates to this host. (default is catalog.cse.nd.edu,backup-catalog.cse.nd.edu)
-- **-U --update-interval <time>** Send status updates at this interval. (default is 5m)
-- **-v, --version** Show version string
-- **-Z --port-file <file>** Select port at random and write it to this file.  (default is disabled)
+- **-b**,**--background**<br />Run as a daemon.
+- **-B**,**--pid-file=_&lt;file&gt;_**<br />Write process identifier (PID) to file.
+- **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem
+- **-h**,**--help**<br />Show this help screen
+- **-H**,**--history=_&lt;directory&gt;_**<br /> Store catalog history in this directory.  Enables fast data recovery after a failure or restart, and enables historical queries via deltadb_query.
+- **-I**,**--interface=_&lt;addr&gt;_**<br />Listen only on this network interface.
+- **-l**,**--lifetime=_&lt;secs&gt;_**<br />Lifetime of data, in seconds (default is 1800)
+- **-L**,**--update-log=_&lt;file&gt;_**<br />Log new updates to this file.
+- **-m**,**--max-jobs=_&lt;n&gt;_**<br />Maximum number of child processes.  (default is 50)
+- **-M**,**--server-size=_&lt;size&gt;_**<br />Maximum size of a server to be believed.  (default is any)
+- **-n**,**--name=_&lt;name&gt;_**<br />Set the preferred hostname of this server.
+- **-o**,**--debug-file=_&lt;file&gt;_**<br />Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+- **-O**,**--debug-rotate-max=_&lt;bytes&gt;_**<br />Rotate debug file once it reaches this size (default 10M, 0 disables).
+- **-p**,**--=_&lt;port&gt;_**<br />Port number to listen on (default is 9097)
+- **-S**,**--single**<br />Single process mode; do not fork on queries.
+- **-T**,**--timeout=_&lt;time&gt;_**<br />Maximum time to allow a query process to run.  (default is 60s)
+- **-u**,**--update-host=_&lt;host&gt;_**<br />Send status updates to this host. (default is catalog.cse.nd.edu,backup-catalog.cse.nd.edu)
+- **-U**,**--update-interval=_&lt;time&gt;_**<br />Send status updates at this interval. (default is 5m)
+- **-v**,**--version**<br />Show version string
+- **-Z**,**--port-file=_&lt;file&gt;_**<br />Select port at random and write it to this file.  (default is disabled)
 
 
 ## ENVIRONMENT VARIABLES
 
 
-- ****CATALOG_HOST**** Hostname of catalog server (same as **-u**).
-- ****CATALOG_PORT**** Port number of catalog server to be contacted.
-- ****TCP_LOW_PORT**** Inclusive low port in range used with **-Z**.
-- ****TCP_HIGH_PORT**** Inclusive high port in range used with **-Z**.
+- **CATALOG_HOST** Hostname of catalog server (same as **-u**).
+- **CATALOG_PORT** Port number of catalog server to be contacted.
+- **TCP_LOW_PORT** Inclusive low port in range used with **-Z**.
+- **TCP_HIGH_PORT** Inclusive high port in range used with **-Z**.
 
 
 ## EXIT STATUS

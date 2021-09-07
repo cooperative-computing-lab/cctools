@@ -28,7 +28,7 @@
 with remote files via **parrot_run**.
 
 ## SYNOPSIS
-****parrot_cp [options] ... sources ... <dest>****
+**parrot_cp [options] ... sources ... _&lt;dest&gt;_**
 
 ## DESCRIPTION
 
@@ -40,15 +40,15 @@ block-by-block.
 ## OPTIONS
 
 
-- **-f, --force** Forcibly remove target before copying.
-- **-i, --interactive** Interactive mode: ask before overwriting.
-- **-r**  Same as -R
-- **-R, --recursive** Recursively copy directories.
-- **-s, --symlinks** Make symbolic links instead of copying files.
-- **-l, --hardlinks ** Make hard links instead of copying files.
-- **-u, --update-only** Update mode: Copy only if source is newer than target.
-- **-v, --version** Verbose mode: Show names of files copied.
-- **-h, --help** Help: Show these options.
+- **-f**,**--force**<br />Forcibly remove target before copying.
+- **-i**,**--interactive**<br />Interactive mode: ask before overwriting.
+- **-r**<br /> Same as -R
+- **-R**,**--recursive**<br />Recursively copy directories.
+- **-s**,**--symlinks**<br />Make symbolic links instead of copying files.
+- **-l**,**--hardlinks**<br />)Make hard links instead of copying files.
+- **-u**,**--update-only**<br />Update mode: Copy only if source is newer than target.
+- **-v**,**--version**<br />Verbose mode: Show names of files copied.
+- **-h**,**--help**<br />Help: Show these options.
 
 
 ## EXIT STATUS

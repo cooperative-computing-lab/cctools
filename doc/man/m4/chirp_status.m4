@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(chirp_status) - get current status of a one or more Chirp server(s)
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chirp_status [options] PARAM(nane) PARAM(value)))
+CODE(chirp_status [options] PARAM(nane) PARAM(value))
 
 SECTION(DESCRIPTION)
 BOLD(chirp_status) is a tool for checking status of Chirp server(s).
@@ -18,25 +18,25 @@ When using CODE(chirp_status) with long form option (-l), it lists additional in
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_PAIR(--where,expr) Show only servers matching this expression.
-OPTION_TRIPLET(-c,catalog,host)Query the catalog on this host.
-OPTION_TRIPLET(-A,server-space,size)Only show servers with this space available. (example: -A 100MB).
-OPTION_PAIR(--server-project,name)Only servers with this project name.
-OPTION_TRIPLET(-t,timeout,time)Timeout.
-OPTION_ITEM(`-s, --brief')Short output.
-OPTION_ITEM(`-l, --verbose')Long output.
-OPTION_ITEM(`-T, --totals')Totals output.
-OPTION_ITEM(`-v, --version')Show program version.
-OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-OPTION_TRIPLET(-O,debug-rotate-max,bytes)Rotate file once it reaches this size.
-OPTION_ITEM(`-h, --help')Show help text.
+OPTION_ARG_LONG(where,expr) Show only servers matching this expression.
+OPTION_ARG(c,catalog,host)Query the catalog on this host.
+OPTION_ARG(A,server-space,size)Only show servers with this space available. (example: -A 100MB).
+OPTION_ARG_LONG(server-project,name)Only servers with this project name.
+OPTION_ARG(t,timeout,time)Timeout.
+OPTION_FLAG(s,brief)Short output.
+OPTION_FLAG(l,verbose)Long output.
+OPTION_FLAG(T,totals)Totals output.
+OPTION_FLAG(v,version)Show program version.
+OPTION_ARG(d,debug,flag)Enable debugging for this subsystem.
+OPTION_ARG(o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+OPTION_ARG(O,debug-rotate-max,bytes)Rotate file once it reaches this size.
+OPTION_FLAG(h,help)Show help text.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM(CODE(BOLD(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).)
+LIST_ITEM(CODE(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).
 LIST_END
 
 SECTION(EXIT STATUS)

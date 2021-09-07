@@ -27,7 +27,7 @@
 **chirp_benchmark** - do micro-performance tests on a Chirp server
 
 ## SYNOPSIS
-****chirp_benchmark <host[:port]> <file> <loops> <cycles> <bwloops>****
+**chirp_benchmark _&lt;host[:port]&gt;_ _&lt;file&gt;_ _&lt;loops&gt;_ _&lt;cycles&gt;_ _&lt;bwloops&gt;_**
 
 ## DESCRIPTION
 

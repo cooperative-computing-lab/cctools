@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(parrot_mkalloc) - create a directory with a space allocation
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_mkalloc PARAM(path) PARAM(size)))
+CODE(parrot_mkalloc PARAM(path) PARAM(size))
 
 SECTION(DESCRIPTION)
 
@@ -21,7 +21,7 @@ megabytes, gigabytes, and so forth.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(-h)Show help text.
+OPTION_FLAG_SHORT(h)Show help text.
 OPTIONS_END
 
 

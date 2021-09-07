@@ -27,7 +27,7 @@
 **sand_filter_master** - filter sequences for alignment in parallel
 
 ## SYNOPSIS
-****sand_filter_master [options] sequences.cfa candidates.cand****
+**sand_filter_master [options] sequences.cfa candidates.cand**
 
 ## DESCRIPTION
 
@@ -46,20 +46,20 @@ is performed by [sand_filter_kernel(1)](sand_filter_kernel.md) on each machine.
 ## OPTIONS
 
 
-- **-p port** Port number for queue master to listen on. (default: 9123)
-- **-s size** Number of sequences in each filtering task. (default: 1000)
-- **-r file** A meryl file of repeat mers to be filtered out.
-- **-R n** Automatically retry failed jobs up to n times. (default: 100)
-- **-k size** The k-mer size to use in candidate selection (default is 22).
-- **-w size** The minimizer window size. (default is 22).
-- **-u** If set, do not unlink temporary binary output files.
-- **-c file** Checkpoint filename; will be created if necessary.
-- **-d flag** Enable debugging for this subsystem.  (Try **-d all** to start.)
-- **-F number** Work Queue fast abort multiplier.     (default is 10.)
-- **-Z file** Select port at random and write it out to this file.
-- **-o file** Send debugging to this file.
-- **-v** Show version string
-- **-h** Show this help screen
+- **-p** _&lt;port&gt;_<br />Port number for queue master to listen on. (default: 9123)
+- **-s** _&lt;size&gt;_<br />Number of sequences in each filtering task. (default: 1000)
+- **-r** _&lt;file&gt;_<br />A meryl file of repeat mers to be filtered out.
+- **-R** _&lt;n&gt;_<br />Automatically retry failed jobs up to n times. (default: 100)
+- **-k** _&lt;size&gt;_<br />The k-mer size to use in candidate selection (default is 22).
+- **-w** _&lt;size&gt;_<br />The minimizer window size. (default is 22).
+- **-u**<br />If set, do not unlink temporary binary output files.
+- **-c** _&lt;file&gt;_<br />Checkpoint filename; will be created if necessary.
+- **-d** _&lt;flag&gt;_<br />Enable debugging for this subsystem.  (Try **-d all** to start.)
+- **-F** _&lt;number&gt;_<br />Work Queue fast abort multiplier.     (default is 10.)
+- **-Z** _&lt;file&gt;_<br />Select port at random and write it out to this file.
+- **-o** _&lt;file&gt;_<br />Send debugging to this file.
+- **-v**<br />Show version string
+- **-h**<br />Show this help screen
 
 
 ## EXIT STATUS

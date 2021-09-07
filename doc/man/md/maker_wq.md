@@ -27,7 +27,7 @@
 **maker_wq** - Run the Maker genome annotation tool using Work Queue to harness heterogenous resources
 
 ## SYNOPSIS
-****maker_wq [options] <maker_opts> <maker_bopts> <maker_exe> ****
+**maker_wq [options] maker_opts maker_bopts maker_exe **
 
 ## DESCRIPTION
 **maker_wq** is a manager script to run the Maker genome annotation tool using Work Queue to enable the user to harness the heterogenous power of multiple systems simultaneously. It accepts all of the Maker inputs. The primary difference is that the MPI code has been replaced with Work Queue components.
@@ -36,9 +36,9 @@
 
 ## OPTIONS
 
-- **-port port** Specify the port on which to create the Work Queue
-- **-fa fast_abort** Specify a fast abort multiplier
-- **-M project** Specify a project name for utilizing shared workers
+- **-port** _&lt;port&gt;_<br />Specify the port on which to create the Work Queue
+- **-fa** _&lt;fast_abort&gt;_<br />Specify a fast abort multiplier
+- **-M** _&lt;project&gt;_<br />Specify a project name for utilizing shared workers
 
 
 ## EXIT STATUS

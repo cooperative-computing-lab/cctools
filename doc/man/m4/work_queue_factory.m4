@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(work_queue_factory) - maintain a pool of Work Queue workers on a batch system.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(work_queue_factory -M PARAM(project-name) -T PARAM(batch-type) [options]))
+CODE(work_queue_factory -M PARAM(project-name) -T PARAM(batch-type) [options])
 
 SECTION(DESCRIPTION)
 BOLD(work_queue_factory) submits and maintains a number
@@ -47,107 +47,68 @@ SECTION(OPTIONS)
 General options:
 
 OPTIONS_BEGIN
-OPTION_ITEM(-T,--batch-type=<type>)
-Batch system type (required). One of: local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun
-OPTION_ITEM(-C,--config-file=<file>)
- Use configuration file <file>.
-OPTION_ITEM(-M,--manager-name=<project>)
- Project name of managers to server, can be regex
-OPTION_ITEM(-F,--foremen-name=<project>)
- Foremen to serve, can be a regular expression.
-OPTION_ITEM(--catalog=<host:port>)
- Catalog server to query for managers.
-OPTION_ITEM(-P,--password)
- Password file for workers to authenticate.
-OPTION_ITEM(-S,--scratch-dir)
- Use this scratch dir for factory.
-OPTION_ITEM((default:)
- /tmp/wq-factory-$uid).
-OPTION_ITEM(--run-factory-as-manager)
- Force factory to run itself as a manager.
-OPTION_ITEM(--parent-death)
- Exit if parent process dies.
-OPTION_ITEM(-d,--debug=<subsystem>)
- Enable debugging for this subsystem.
-OPTION_ITEM(-o,--debug-file=<file>)
- Send debugging to this file.
-OPTION_ITEM(-O,--debug-file-size=<mb>)
- Specify the size of the debug file.
-OPTION_ITEM(-v,--version)
- Show the version string.
-OPTION_ITEM(-h,--help)
- Show this screen.
+OPTION_ARG(T,batch-type,type) Batch system type (required). One of: local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun
+OPTION_ARG(C,config-file,file) Use configuration file PARAM(file).
+OPTION_ARG(C,config-file,file) Use configuration file PARAM(file).
+OPTION_ARG(M,manager-name,project) Project name of managers to server, can be regex
+OPTION_ARG(F,foremen-name,project) Foremen to serve, can be a regular expression.
+OPTION_ARG_LONG(catalog,host:port) Catalog server to query for managers.
+OPTION_ARG(P,password,pwdfile) Password file for workers to authenticate.
+OPTION_ARG(S,scratch-dir,dir) Use this scratch dir for factory. Default is /tmp/wq-factory-$UID.
+OPTION_FLAG_LONG(run-factory-as-manager) Force factory to run itself as a manager.
+OPTION_FLAG_LONG(parent-death) Exit if parent process dies.
+OPTION_ARG(d,debug,subsystem) Enable debugging for this subsystem.
+OPTION_ARG(o,debug-file,file) Send debugging to this file.
+OPTION_ARG(O,debug-file-size,mb) Specify the size of the debug file.
+OPTION_FLAG(v,version) Show the version string.
+OPTION_FLAG(h,help) Show this screen.
 OPTIONS_END
 
 Concurrent control options:
 
 OPTIONS_BEGIN
-OPTION_ITEM(-w,--min-workers)
- Minimum workers running (default=5).
-OPTION_ITEM(-W,--max-workers)
- Maximum workers running (default=100).
-OPTION_ITEM(--workers-per-cycle)
- Max number of new workers per 30s (default=5)
-OPTION_ITEM(-t,--timeout=<time>)
- Workers abort after idle time (default=300).
-OPTION_ITEM(--factory-timeout)
- Exit after no manager seen in <n> seconds.
-OPTION_ITEM(--tasks-per-worker)
- Average tasks per worker (default=one per core).
-OPTION_ITEM(-c,--capacity)
- Use worker capacity reported by managers.
+OPTION_ARG(w,min-workers,n) Minimum workers running (default=5).
+OPTION_ARG(W,max-workers,n) Maximum workers running (default=100).
+OPTION_ARG_LONG(workers-per-cycle,n) Max number of new workers per 30s (default=5)
+OPTION_ARG(t,timeout,time) Workers abort after idle time (default=300).
+OPTION_ARG_LONG(factory-timeout,n) Exit after no manager seen in PARAM(n) seconds.
+OPTION_ARG_LONG(tasks-per-worker,n) Average tasks per worker (default=one per core).
+OPTION_ARG(c,capacity,cap) Use worker capacity reported by managers.
 OPTIONS_END
 
 Resource management options:
 OPTIONS_BEGIN
-OPTION_ITEM(--cores=<n>)
+OPTION_ARG_LONG(cores,n)
  Set the number of cores requested per worker.
-OPTION_ITEM(--gpus=<n>)
+OPTION_ARG_LONG(gpus,n)
  Set the number of GPUs requested per worker.
-OPTION_ITEM(--memory=<mb>)
+OPTION_ARG_LONG(memory,mb)
  Set the amount of memory (in MB) per worker.
-OPTION_ITEM(--disk=<mb>)
+OPTION_ARG_LONG(disk,mb)
  Set the amount of disk (in MB) per worker.
-OPTION_ITEM(--autosize)
+OPTION_FLAG_LONG(autosize)
  Autosize worker to slot (Condor, Mesos, K8S).
 OPTIONS_END
 
 Worker environment options:
 OPTIONS_BEGIN
-OPTION_ITEM(--env=<variable=value>)
+OPTION_ARG_LONG(env,variable=value)
  Environment variable to add to worker.
-OPTION_ITEM(-E,--extra-options=<options>)
+OPTION_ARG(E,extra-options,options)
  Extra options to give to worker.
-OPTION_ITEM(--worker-binary=<file>)
+OPTION_ARG_LONG(worker-binary,file)
  Alternate binary instead of work_queue_worker.
-OPTION_ITEM(--wrapper)
+OPTION_ARG_LONG(wrapper,cmd)
  Wrap factory with this command prefix.
-OPTION_ITEM(--wrapper-input)
- Add this input file needed by the wrapper.
-OPTION_ITEM(--runos=<img>)
- Use runos tool to create environment (ND only).
-OPTION_ITEM(--python-package)
- Run each worker inside this python package.
+OPTION_ARG_LONG(wrapper-input,file) Add this input file needed by the wrapper.
+OPTION_ARG_LONG(python-package,pkg) Run each worker inside this python package.
 OPTIONS_END
 
 Options  specific to batch systems:
 OPTIONS_BEGIN
-OPTION_ITEM(-B,--batch-options=<options>)
- Generic batch system options.
-OPTION_ITEM(--amazon-config)
- Specify Amazon config file.
-OPTION_ITEM(--condor-requirements)
- Set requirements for the workers as Condor jobs.
-OPTION_ITEM(--mesos-master)
- Host name of mesos manager node..
-OPTION_ITEM(--mesos-path)
- Path to mesos python library..
-OPTION_ITEM(--mesos-preload)
- Libraries for running mesos.
-OPTION_ITEM(--k8s-image)
- Container image for Kubernetes.
-OPTION_ITEM(--k8s-worker-image)
- Container image with worker for Kubernetes.
+OPTION_ARG(B,batch-options,options) Generic batch system options.
+OPTION_ARG_LONG(amazon-config,cfg) Specify Amazon config file.
+OPTION_ARG_LONG(condor-requirements,reqs) Set requirements for the workers as Condor jobs.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

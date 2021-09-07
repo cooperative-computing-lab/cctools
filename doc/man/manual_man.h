@@ -14,18 +14,30 @@ define(LIST_BEGIN)dnl
 define(LIST_ITEM,`.IP \(bu 4
 $1')dnl
 define(LIST_END)dnl
-define(PARAM,<$1>)dnl
+define(PARAM,ITALIC(<$1>))dnl
 define(OPTIONS_BEGIN,.LP)dnl
-define(OPTION_ITEM,.TP
-.B \ $1
+define(OPTION_FLAG,.TP
+.B \ -$1`,'--$2
 .
 )dnl
-define(OPTION_PAIR,.TP
-.BI \ $1 \ PARAM($2)
+define(OPTION_FLAG_SHORT,.TP
+.B \ -$1
 .
 )dnl
-define(OPTION_TRIPLET,.TP
-BOLD($1)`,' BOLD(-\-$2)`='ITALIC(PARAM($3))
+define(OPTION_FLAG_LONG,.TP
+.B \ --$1
+.
+)dnl
+define(OPTION_ARG,.TP
+.B \ -$1`,'--$2=PARAM($3)
+.
+)dnl
+define(OPTION_ARG_SHORT,.TP
+.B \ -$1 PARAM($2)
+.
+)dnl
+define(OPTION_ARG_LONG,.TP
+.B \ --$1=PARAM($2)
 .
 )dnl
 define(OPTIONS_END)dnl

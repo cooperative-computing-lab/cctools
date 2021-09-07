@@ -5,15 +5,11 @@ SECTION(NAME)
 BOLD(sge_submit_workers) - submit work_queue_worker to a SUN Grid Engine (SGE).
 
 SECTION(SYNOPSIS)
-LONGCODE_BEGIN
-CODE(BOLD(sge_submit_workers [options] PARAM(servername) PARAM(port) PARAM(num-workers)))
-LONGCODE_END
+CODE(sge_submit_workers [options] PARAM(servername) PARAM(port) PARAM(num-workers))
 
 when auto mode is not enabled for the worker, or
 
-LONGCODE_BEGIN
-CODE(BOLD(sge_submit_workers [options] PARAM(num-workers)))
-LONGCODE_END
+CODE(sge_submit_workers [options] PARAM(num-workers))
 
 when auto mode is enabled for the worker.
 
@@ -29,24 +25,25 @@ auto mode option is specified for work_queue_worker.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-M, manager-name, name)Name of the preferred manager for worker. (auto mode enabled)
-OPTION_TRIPLET(-C, catalog, catalog)Set catalog server for work_queue_worker to <catalog>. <catalog> format: HOSTNAME:PORT.
-OPTION_TRIPLET(-t, timeout, seconds)Abort work_queue_worker after this amount of idle time (default=900s).
-OPTION_TRIPLET(-d, debug, subsystem)Enable debugging on worker for this subsystem (try -d all to start).
-OPTION_TRIPLET(-w, tcp-window-size, size)Set TCP window size
-OPTION_TRIPLET(-i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
-OPTION_TRIPLET(-b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
-OPTION_TRIPLET(-z, disk-threshold, size)Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
-OPTION_TRIPLET(-A, arch, arch)Set architecture string for the worker to report to manager instead of the value in uname.
-OPTION_TRIPLET(-O, os, os)Set operating system string for the worker to report to manager instead of the value in uname.
-OPTION_TRIPLET(-s, workdir, path)Set the location for creating the working directory of the worker.
-OPTION_TRIPLET(-P,--password, file)Password file to authenticate workers to manager.
-OPTION_PAIR(--cores, cores)Set the number of cores each worker should use (0=auto). (default=1)
-OPTION_PAIR(--memory, size)Manually set the amonut of memory (in MB) reported by this worker.
-OPTION_PAIR(--disk, size)Manually set the amount of disk (in MB) reported by this worker.
-OPTION_ITEM(`-j')Use job array to submit workers.
-OPTION_PAIR(-p, parameters)SGE qsub parameters.
-OPTION_ITEM(`-h,--help')Show help message.
+OPTION_ARG(M, manager-name, name)Name of the preferred manager for worker. (auto mode enabled)
+OPTION_ARG(C, catalog, catalog)Set catalog server for work_queue_worker to PARAM(catalog). PARAM(catalog) format: HOSTNAME:PORT.
+OPTION_ARG(C, catalog, catalog)Set catalog server for work_queue_worker to PARAM(catalog). PARAM(catalog) format: HOSTNAME:PORT.
+OPTION_ARG(t, timeout, seconds)Abort work_queue_worker after this amount of idle time (default=900s).
+OPTION_ARG(d, debug, subsystem)Enable debugging on worker for this subsystem (try -d all to start).
+OPTION_ARG(w, tcp-window-size, size)Set TCP window size
+OPTION_ARG(i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+OPTION_ARG(b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
+OPTION_ARG(z, disk-threshold, size)Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
+OPTION_ARG(A, arch, arch)Set architecture string for the worker to report to manager instead of the value in uname.
+OPTION_ARG(O, os, os)Set operating system string for the worker to report to manager instead of the value in uname.
+OPTION_ARG(s, workdir, path)Set the location for creating the working directory of the worker.
+OPTION_ARG(P,--password, file)Password file to authenticate workers to manager.
+OPTION_ARG_LONG(cores, cores)Set the number of cores each worker should use (0=auto). (default=1)
+OPTION_ARG_LONG(memory, size)Manually set the amonut of memory (in MB) reported by this worker.
+OPTION_ARG_LONG(disk, size)Manually set the amount of disk (in MB) reported by this worker.
+OPTION_FLAG_SHORT(j)Use job array to submit workers.
+OPTION_ARG_SHORT(-p, parameters)SGE qsub parameters.
+OPTION_FLAG(h,help)Show help message.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

@@ -27,13 +27,13 @@
 **parrot_setacl** - set ACL information for Parrot filesystem
 
 ## SYNOPSIS
-****parrot_setacl <path> <subject> <rights>****
+**parrot_setacl _&lt;path&gt;_ _&lt;subject&gt;_ _&lt;rights&gt;_**
 
 ## DESCRIPTION
 **parrot_setacl** utilizes **Parrot** system calls to set the access
-control list (ACL) information for the directory specified by <path>.  The
-<subject> argument refers to the entity to authorize, while the
-<rights> argument is one of the following: read, write, admin, none.
+control list (ACL) information for the directory specified by _&lt;path&gt;_.  The
+_&lt;subject&gt;_ argument refers to the entity to authorize, while the
+_&lt;rights&gt;_ argument is one of the following: read, write, admin, none.
 
 Note, this program only works if it is executed under [parrot_run(1)](parrot_run.md) and if the
 underlying filesystem supports ACLs.

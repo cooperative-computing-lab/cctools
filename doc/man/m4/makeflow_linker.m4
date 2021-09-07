@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(makeflow_linker) - automatic dependency location for workflows
 
 SECTION(SYNOPSIS)
-CODE(BOLD(makeflow_linker [options] PARAM(workflow_description)))
+CODE(makeflow_linker [options] PARAM(workflow_description))
 
 SECTION(DESCRIPTION)
 BOLD(makeflow_linker) is a tool for automatically determining dependencies of workflows. It accepts a workflow description, currently Makeflow syntax is required, and recursively determines the dependencies and produces a self-contained package. BOLD(makeflow_linker) supports Python, Perl, and shared libraries.
@@ -16,12 +16,12 @@ BOLD(makeflow_linker) finds dependencies by static analysis. CODE(eval) and othe
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM(`--dry-run')Run without creating directories or copying dependencies.
-OPTION_ITEM(`-h, --help')Show this help screen.
-OPTION_ITEM(`-n, --use-named')Do not copy files which are part of a named dependency, e.g. standard libraries.
-OPTION_TRIPLET(-o, output, directory)Specify output directory.
-OPTION_ITEM(`--verbose')Output status during run.
-OPTION_ITEM(`-v, --version')Display version information.
+OPTION_FLAG_LONG(dry-run)Run without creating directories or copying dependencies.
+OPTION_FLAG(h,help)Show this help screen.
+OPTION_FLAG(n,use-named)Do not copy files which are part of a named dependency, e.g. standard libraries.
+OPTION_ARG(o, output, directory)Specify output directory.
+OPTION_FLAG_LONG(verbose)Output status during run.
+OPTION_FLAG(v,version)Display version information.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

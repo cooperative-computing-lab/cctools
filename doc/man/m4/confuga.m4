@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(Confuga) - An active storage cluster file system.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chirp_server --jobs --root=<Confuga URI> [options]))
+CODE(chirp_server --jobs --root=PARAM(Confuga URI) [options])
 
 SECTION(DESCRIPTION)
 
@@ -33,12 +33,12 @@ below.  Examples demonstrating how to start Confuga and a small cluster are at
 the end of this manual.
 
 OPTIONS_BEGIN
-OPTION_PAIR(auth,method)Enable this method for Head Node to Storage Node authentication. The default is to enable all available authentication mechanisms.
-OPTION_PAIR(concurrency,limit)Limits the number of concurrent jobs executed by the cluster. The default is 0 for limitless.
-OPTION_PAIR(pull-threshold,bytes)Sets the threshold for pull transfers. The default is 128MB.
-OPTION_PAIR(replication,type)Sets the replication mode for satisfying job dependencies. BOLD(type) may be BOLD(push-sync) or BOLD(push-async-N). The default is BOLD(push-async-1).
-OPTION_PAIR(scheduler,type)Sets the scheduler used to assign jobs to storage nodes. The default is BOLD(fifo-0).
-OPTION_PAIR(tickets,tickets)Sets tickets to use for authenticating with storage nodes. Paths must be absolute.
+OPTION_ARG_LONG(auth,method)Enable this method for Head Node to Storage Node authentication. The default is to enable all available authentication mechanisms.
+OPTION_ARG_LONG(concurrency,limit)Limits the number of concurrent jobs executed by the cluster. The default is 0 for limitless.
+OPTION_ARG_LONG(pull-threshold,bytes)Sets the threshold for pull transfers. The default is 128MB.
+OPTION_ARG_LONG(replication,type)Sets the replication mode for satisfying job dependencies. BOLD(type) may be BOLD(push-sync) or BOLD(push-async-N). The default is BOLD(push-async-1).
+OPTION_ARG_LONG(scheduler,type)Sets the scheduler used to assign jobs to storage nodes. The default is BOLD(fifo-0).
+OPTION_ARG_LONG(tickets,tickets)Sets tickets to use for authenticating with storage nodes. Paths must be absolute.
 OPTIONS_END
 
 SECTION(STORAGE NODES)

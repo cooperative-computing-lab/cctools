@@ -27,7 +27,7 @@
 **deltadb_query** - query historical data stored by the catalog server.
 
 ## SYNOPSIS
-****deltadb_query --db [source_directory] --from [starttime] --to [endtime] [--filter [expr]] [--where [expr]] [--output [expr]]****
+**deltadb_query --db [source_directory] --from [starttime] --to [endtime] [--filter [expr]] [--where [expr]] [--output [expr]]**
 
 ## DESCRIPTION
 
@@ -43,15 +43,15 @@ A paper entitled DeltaDB describes the operation of the tools in detail (see ref
 
 ## ARGUMENTS
 
-- **--db path**  Query this database directory.
-- **--file path**  Query the data stream in this file.
-- **--from time**  (required) The starting date and time of the query in an absolute time like "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD" or a relative time like 5s, 5m, 5h, 5d to indicate five seconds, minutes, hours, or days ago, respectively.
-- **--to time**  The ending time of the query, in the same format as the --from option.  If omitted, the current time is assumed.
-- **--every interval**  The intervals at which output should be produced, like 5s, 5m, 5h, 5d to indicate five seconds, minutes, hours, or days ago, respectively.
-- **--epoch**  Causes the output to be expressed in integer Unix epoch time, instead of a formatted time.
-- **--filter expr**  (multiple) If given, only records matching this expression will be processed.  Use --filter to apply expressions that do not change over time, such as the name or type of a record.
-- **--where expr**   (multiple) If given, only records matching this expression will be displayed.  Use --where to apply expressions that may change over time, such as load average or storage space consumed.
-- **--output expr**  (multiple) Display this expression on the output.
+- **----db=_&lt;path&gt;_**<br /> Query this database directory.
+- **----file=_&lt;path&gt;_**<br /> Query the data stream in this file.
+- **----from=_&lt;time&gt;_**<br /> (required) The starting date and time of the query in an absolute time like "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD" or a relative time like 5s, 5m, 5h, 5d to indicate five seconds, minutes, hours, or days ago, respectively.
+- **----to=_&lt;time&gt;_**<br /> The ending time of the query, in the same format as the --from option.  If omitted, the current time is assumed.
+- **----every=_&lt;interval&gt;_**<br /> The intervals at which output should be produced, like 5s, 5m, 5h, 5d to indicate five seconds, minutes, hours, or days ago, respectively.
+- **----epoch**<br />, Causes the output to be expressed in integer Unix epoch time, instead of a formatted time.
+- **----filter=_&lt;expr&gt;_**<br /> (multiple) If given, only records matching this expression will be processed.  Use --filter to apply expressions that do not change over time, such as the name or type of a record.
+- **----where=_&lt;expr&gt;_**<br />  (multiple) If given, only records matching this expression will be displayed.  Use --where to apply expressions that may change over time, such as load average or storage space consumed.
+- **----output=_&lt;expr&gt;_**<br /> (multiple) Display this expression on the output.
 
 
 ## JX QUERY LANGUAGE

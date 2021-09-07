@@ -27,7 +27,7 @@
 **parrot_mount** - mount new directories inside of a Parrot instance.
 
 ## SYNOPSIS
-****parrot_mount <path> <destination> <permissions>****
+**parrot_mount _&lt;path&gt;_ _&lt;destination&gt;_ _&lt;permissions&gt;_**
 
 ## DESCRIPTION
 **parrot_mount** utilizes **Parrot** system calls to change the namespace
@@ -37,8 +37,8 @@ can be removed.  The namespace can be locked down with the **--disable**
 option, which prevents any further changes in the current session.
 
 
-- **--unmount path**  Unmount a previously mounted path.
-- **--disable**  Disable any further mounting/unmounting in this parrot session.
+- **--unmount=_&lt;path&gt;_**<br /> Unmount a previously mounted path.
+- **--disable**<br /> Disable any further mounting/unmounting in this parrot session.
 
 
 ## EXIT STATUS

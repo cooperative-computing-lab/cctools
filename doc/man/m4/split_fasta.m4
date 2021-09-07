@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(split_fasta) - Split a fasta file according to sequence and character counts
 
 SECTION(SYNOPSIS)
-CODE(BOLD(split_fasta query_granularity character_granularity fasta_file))
+CODE(split_fasta query_granularity character_granularity fasta_file)
 
 SECTION(DESCRIPTION)
 BOLD(split_fasta) is a simple script to split a fasta file according to user provided parameters.  The script iterates over the given file, generating a new sub_file called input.i each time the contents of the previous file (input.(i-1)) exceed the number of queries given by query_granularity or the number of characters given by character_granularity.
