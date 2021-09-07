@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(disk_allocator) - tool for creating and deleting loop device allocations of a given size.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(disk_allocator [options] PARAM(create|delete) PARAM(target directory) PARAM(size) PARAM(filesystem)))
+CODE(disk_allocator [options] PARAM(create|delete) PARAM(target directory) PARAM(size) PARAM(filesystem))
 
 SECTION(DESCRIPTION)
 
@@ -23,8 +23,8 @@ PARA
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM(`-h, --help')Show this help screen.
-OPTION_ITEM(`-v, --version')Show version string.
+OPTION_FLAG(h,help)Show this help screen.
+OPTION_FLAG(v,version)Show version string.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

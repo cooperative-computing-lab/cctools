@@ -29,16 +29,17 @@
 
 ## SYNOPSIS
 
-****poncho_package_run [options] --environment <file> <command and args ...>****
+**poncho_package_run [options] --environment _&lt;file&gt;_ _&lt;command and args ...&gt;_**
 
 ## DESCRIPTION
 
 The **poncho_package_run** tool acts as a wrapper script for a Python task, running the task within the specified Conda environment. **poncho_package_run** can be utilized on different machines within the Work Queue system to unpack and activate a Conda environment, and run a task within the isolated environment.
 
-The --environment <file> argument is the name of the Conda environment as a tarball file in which to run the Python task.
+The --environment _&lt;file&gt;_ argument is the name of the Conda environment as a tarball file in which to run the Python task.
+The --environment _&lt;file&gt;_ argument is the name of the Conda environment as a tarball file in which to run the Python task.
 command and args (the COMMAND) are interpreted as ARGV for a command to be run inside the Conda environment.
 
-By default, the conda environment is unpacked into a temporary directory which is removed at the end of execution. If the --unpack-to <dir> is given, then the environment is unpacked to <dir>, and it is not removed at the end of execution. Further (even simultaneous) executions of python_package_run will not unpack the environment if <dir> is already populated. Instances of python_package_run coordinate via a writing lock. By default, the wait for a writing lock is 300 seconds, but this can be modified with the --wait-for-lock <secs> option.
+By default, the conda environment is unpacked into a temporary directory which is removed at the end of execution. If the --unpack-to _&lt;dir&gt;_ is given, then the environment is unpacked to _&lt;dir&gt;_, and it is not removed at the end of execution. Further (even simultaneous) executions of python_package_run will not unpack the environment if _&lt;dir&gt;_ is already populated. Instances of python_package_run coordinate via a writing lock. By default, the wait for a writing lock is 300 seconds, but this can be modified with the --wait-for-lock _&lt;secs&gt;_ option.
 
 If the argument to --unpack-to does not exist, then it is created as an empty directory. If it is an existing directory, but it is not empty, then unpacking is not performed, regardless on whether this directory contains a valid conda environment.
 
@@ -46,11 +47,11 @@ If the argument to --unpack-to does not exist, then it is created as an empty di
 ## OPTIONS 
 
 
-OPTIONS_ITEM(-e, --environment <file>)   Conda environment as a tar file. (Required.)
-OPTIONS_ITEM(-d, --unpack-to <dir>)      Directory to unpack the environment. If not given, a temporary directory is used.
-OPTIONS_ITEM(-w, --wait-for-lock <secs>) Number of seconds to wait to get a writing lock on <dir>. Default is 300.
-OPTIONS_ITEM(-h, --help)                 Show the help screen.
-- **command and args**            Command to execute inside the given environment.
+- **-e**,**--environment=_&lt;file&gt;_**<br />   Conda environment as a tar file. (Required.)
+- **-d**,**--unpack-to=_&lt;dir&gt;_**<br />      Directory to unpack the environment. If not given, a temporary directory is used.
+- **-w**,**--wait-for-lock=_&lt;secs&gt;_**<br /> Number of seconds to wait to get a writing lock on _&lt;dir&gt;_. Default is 300.
+- **-w**,**--wait-for-lock=_&lt;secs&gt;_**<br /> Number of seconds to wait to get a writing lock on _&lt;dir&gt;_. Default is 300.
+- **-h**,**--help**<br />                Show the help screen.
 
 ## EXIT STATUS
 

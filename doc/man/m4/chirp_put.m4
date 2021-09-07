@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(chirp_put) - copy a single file from local machine to a Chirp server
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chirp_put [options] PARAM(localfile) PARAM(hostname[:port]) PARAM(remotefile)))
+CODE(chirp_put [options] PARAM(localfile) PARAM(hostname[:port]) PARAM(remotefile))
 
 SECTION(DESCRIPTION)
 
@@ -16,20 +16,20 @@ BOLD(chirp_put) is a quick and simple way to copy a single local file PARAM(loca
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_TRIPLET(-a,auth, flag)Require this authentication mode.
-OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
-OPTION_TRIPLET(-b,block-size,size)Set transfer buffer size. (default is 65536 bytes).
-OPTION_ITEM(`-f, --follow')Follow input file like tail -f.
-OPTION_TRIPLET(-i,tickets,files)Comma-delimited list of tickets to use for authentication.
-OPTION_TRIPLET(-t,timeout, time)Timeout for failure. (default is 3600s)
-OPTION_ITEM(`-v, --version')Show program version.
-OPTION_ITEM(`-h, --help')Show help text.
+OPTION_ARG(a,auth, flag)Require this authentication mode.
+OPTION_ARG(d,debug,flag)Enable debugging for this subsystem.
+OPTION_ARG(b,block-size,size)Set transfer buffer size. (default is 65536 bytes).
+OPTION_FLAG(f,follow)Follow input file like tail -f.
+OPTION_ARG(i,tickets,files)Comma-delimited list of tickets to use for authentication.
+OPTION_ARG(t,timeout, time)Timeout for failure. (default is 3600s)
+OPTION_FLAG(v,version)Show program version.
+OPTION_FLAG(h,help)Show help text.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM(CODE(BOLD(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).)
+LIST_ITEM(CODE(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).
 LIST_END
 
 SECTION(EXIT STATUS)

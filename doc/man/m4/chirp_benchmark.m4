@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(chirp_benchmark) - do micro-performance tests on a Chirp server
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chirp_benchmark PARAM(host[:port]) PARAM(file) PARAM(loops) PARAM(cycles) PARAM(bwloops)))
+CODE(chirp_benchmark PARAM(host[:port]) PARAM(file) PARAM(loops) PARAM(cycles) PARAM(bwloops))
 
 SECTION(DESCRIPTION)
 

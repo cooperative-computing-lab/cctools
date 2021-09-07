@@ -27,12 +27,12 @@
 **parrot_getacl** - get ACL information for Parrot filesystem
 
 ## SYNOPSIS
-****parrot_getacl <path>****
+**parrot_getacl _&lt;path&gt;_**
 
 ## DESCRIPTION
 **parrot_getacl** utilizes **Parrot** system calls to retrieve the access
 control list (ACL) information for the filesystem located at the specified
-<path>.
+_&lt;path&gt;_.
 
 Note, this program only works if it is executed under **Parrot** and if the
 underlying filesystem supports ACLs.

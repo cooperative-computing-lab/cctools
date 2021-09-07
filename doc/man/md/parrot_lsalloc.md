@@ -27,7 +27,7 @@
 **parrot_lsalloc** - list current status of a space allocation
 
 ## SYNOPSIS
-****parrot_lsalloc [path]****
+**parrot_lsalloc [path]**
 
 ## DESCRIPTION
 
@@ -42,7 +42,7 @@ If none is given, the current directory is assumed.
 ## OPTIONS
 
 
-- **-h** Show help text.
+- **-h**<br />Show help text.
 
 
 

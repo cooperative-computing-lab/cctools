@@ -6,13 +6,13 @@ BOLD(work_queue_worker) - worker process for executing tasks
 dispatched through Work Queue
 
 SECTION(SYNOPSIS)
-CODE(BOLD(work_queue_worker [options] PARAM(managerhost) PARAM(port)))
+CODE(work_queue_worker [options] PARAM(managerhost) PARAM(port))
 
-CODE(BOLD(work_queue_worker [options] PARAM(managerhost:port])))
+CODE(work_queue_worker [options] PARAM(managerhost:port]))
 
-CODE(BOLD(work_queue_worker [options] "PARAM(managerhost:port;[managerhost:port;managerhost:port;...])))"
+CODE(work_queue_worker [options] "PARAM(managerhost:port;[managerhost:port;managerhost:port;...])))
 
-CODE(BOLD(work_queue_worker [options] -M PARAM(projectname)))
+CODE(work_queue_worker [options] -M PARAM(projectname))
 
 SECTION(DESCRIPTION)
 
@@ -39,37 +39,37 @@ MANPAGE(sge_submit_workers,1), MANPAGE(pbs_submit_workers,1), MANPAGE(slurm_subm
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM(-v, --version')Show version string.
-OPTION_ITEM(-h, --help')Show this help message.
-OPTION_TRIPLET(-M, manager-name, name)Set the name of the project this worker should work for.  A worker can have multiple projects.
-OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
-OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-OPTION_PAIR(--debug-max-rotate, bytes)Set the maximum file size of the debug log.  If the log exceeds this size, it is renamed to "filename.old" and a new logfile is opened.  (default=10M. 0 disables)
-OPTION_ITEM(--debug-release-reset)Debug file will be closed, renamed, and a new one opened after being released from a manager.
-OPTION_ITEM(`--foreman')Enable foreman mode.
-OPTION_TRIPLET(-f, foreman-name, name)Set the project name of this foreman to PARAM(project). Implies --foreman.
-OPTION_PAIR(--foreman-port, port[:highport]) Set the port for the foreman to listen on.  If PARAM(highport) is specified the port is chosen from between PARAM(port) and PARAM(highport). Implies --foreman.
-OPTION_TRIPLET(-Z, foreman-port-file, file)Select port to listen to at random and write to this file.  Implies --foreman.
-OPTION_TRIPLET(-F, fast-abort, mult)Set the fast abort multiplier for foreman (default=disabled).
-OPTION_PAIR(--specify-log, logfile)Send statistics about foreman to this file.
-OPTION_TRIPLET(-P, password, pwfile)Password file for authenticating to the manager.
-OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time. (default=900s)
-OPTION_ITEM(--parent-death)Exit if parent process dies.
-OPTION_TRIPLET(-w, tcp-window-size, size)Set TCP window size.
-OPTION_TRIPLET(-i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
-OPTION_TRIPLET(-b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
-OPTION_TRIPLET(-A, arch, arch)Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
-OPTION_TRIPLET(-O, os, os)Set the operating system string the worker reports to its supervisor. (default=the value reported by uname)
-OPTION_TRIPLET(-s, workdir, path)Set the location where the worker should create its working directory. (default=/tmp)
-OPTION_PAIR(--bandwidth, mbps)Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)
-OPTION_PAIR(--cores, n)Set the number of cores this worker should use.  Set it to 0 to have the worker use all of the available resources. (default=1)
-OPTION_PAIR(--gpus, n)Set the number of GPUs this worker should use. If less than 0 or not given, try to detect gpus available.
-OPTION_PAIR(--memory, mb)Manually set the amount of memory (in MB) reported by this worker.
-OPTION_PAIR(--disk, mb)Manually set the amount of disk space (in MB) reported by this worker.
-OPTION_PAIR(--wall-time, s)Set the maximum number of seconds the worker may be active.
-OPTION_PAIR(--feature, feature)Specifies a user-defined feature the worker provides (option can be repeated).
-OPTION_PAIR(--volatility, chance)Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).
+OPTION_FLAG(v, version)Show version string.
+OPTION_FLAG(h, help)Show this help message.
+OPTION_ARG(M, manager-name, name)Set the name of the project this worker should work for.  A worker can have multiple projects.
+OPTION_ARG(C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
+OPTION_ARG(d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
+OPTION_ARG(o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+OPTION_ARG_LONG(debug-max-rotate, bytes)Set the maximum file size of the debug log.  If the log exceeds this size, it is renamed to "filename.old" and a new logfile is opened.  (default=10M. 0 disables)
+OPTION_FLAG_LONG(debug-release-reset)Debug file will be closed, renamed, and a new one opened after being released from a manager.
+OPTION_FLAG_LONG(foreman)Enable foreman mode.
+OPTION_ARG(f, foreman-name, name)Set the project name of this foreman to PARAM(project). Implies --foreman.
+OPTION_ARG_LONG(foreman-port, port[:highport]) Set the port for the foreman to listen on.  If PARAM(highport) is specified the port is chosen from between PARAM(port) and PARAM(highport). Implies --foreman.
+OPTION_ARG(Z, foreman-port-file, file)Select port to listen to at random and write to this file.  Implies --foreman.
+OPTION_ARG(F, fast-abort, mult)Set the fast abort multiplier for foreman (default=disabled).
+OPTION_ARG_LONG(specify-log, logfile)Send statistics about foreman to this file.
+OPTION_ARG(P, password, pwfile)Password file for authenticating to the manager.
+OPTION_ARG(t, timeout, time)Abort after this amount of idle time. (default=900s)
+OPTION_FLAG_LONG(parent-death)Exit if parent process dies.
+OPTION_ARG(w, tcp-window-size, size)Set TCP window size.
+OPTION_ARG(i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+OPTION_ARG(b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
+OPTION_ARG(A, arch, arch)Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
+OPTION_ARG(O, os, os)Set the operating system string the worker reports to its supervisor. (default=the value reported by uname)
+OPTION_ARG(s, workdir, path)Set the location where the worker should create its working directory. (default=/tmp)
+OPTION_ARG_LONG(bandwidth, mbps)Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)
+OPTION_ARG_LONG(cores, n)Set the number of cores this worker should use.  Set it to 0 to have the worker use all of the available resources. (default=1)
+OPTION_ARG_LONG(gpus, n)Set the number of GPUs this worker should use. If less than 0 or not given, try to detect gpus available.
+OPTION_ARG_LONG(memory, mb)Manually set the amount of memory (in MB) reported by this worker.
+OPTION_ARG_LONG(disk, mb)Manually set the amount of disk space (in MB) reported by this worker.
+OPTION_ARG_LONG(wall-time, s)Set the maximum number of seconds the worker may be active.
+OPTION_ARG_LONG(feature, feature)Specifies a user-defined feature the worker provides (option can be repeated).
+OPTION_ARG_LONG(volatility, chance)Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).
 OPTIONS_END
 
 SECTION(FOREMAN MODE)

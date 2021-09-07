@@ -27,7 +27,7 @@
 **makeflow_linker** - automatic dependency location for workflows
 
 ## SYNOPSIS
-****makeflow_linker [options] <workflow_description>****
+**makeflow_linker [options] _&lt;workflow_description&gt;_**
 
 ## DESCRIPTION
 **makeflow_linker** is a tool for automatically determining dependencies of workflows. It accepts a workflow description, currently Makeflow syntax is required, and recursively determines the dependencies and produces a self-contained package. **makeflow_linker** supports Python, Perl, and shared libraries.
@@ -38,12 +38,12 @@
 
 ## OPTIONS
 
-- **--dry-run** Run without creating directories or copying dependencies.
-- **-h, --help** Show this help screen.
-- **-n, --use-named** Do not copy files which are part of a named dependency, e.g. standard libraries.
-- **-o --output <directory>** Specify output directory.
-- **--verbose** Output status during run.
-- **-v, --version** Display version information.
+- **--dry-run**<br />Run without creating directories or copying dependencies.
+- **-h**,**--help**<br />Show this help screen.
+- **-n**,**--use-named**<br />Do not copy files which are part of a named dependency, e.g. standard libraries.
+- **-o**,**--output=_&lt;directory&gt;_**<br />Specify output directory.
+- **--verbose**<br />Output status during run.
+- **-v**,**--version**<br />Display version information.
 
 
 ## EXIT STATUS

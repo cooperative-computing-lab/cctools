@@ -5,16 +5,17 @@ SECTION(NAME)
 BOLD(parrot_package_run) - repeat a program within the package with the help of CODE(parrot_run)
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_package_run --package-path your-package-path [command]))
+CODE(parrot_package_run --package-path your-package-path [command])
 
 SECTION(DESCRIPTION)
 If CODE(parrot_run) is used to repeat one experiment, one mountlist must be created so that the file access request of your program can be redirected into the package. CODE(parrot_package_run) is used to create the mountlist and repeat your program within the package with the help of CODE(parrot_run) and BOLD(mountlist). If no command is given, a /bin/sh shell will be returned.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM(`-p, --package-path')The path of the package.
-OPTION_ITEM(`-e, --env-list')The path of the environment file, each line is in the format of <key>=<value>. (Default: package-path/env_list)
-OPTION_ITEM(`-h, --help')Show this help message.
+OPTION_FLAG(p,package-path)The path of the package.
+OPTION_FLAG(e,env-list)The path of the environment file, each line is in the format of PARAM(key)=PARAM(value). (Default: package-path/env_list)
+OPTION_FLAG(e,env-list)The path of the environment file, each line is in the format of PARAM(key)=PARAM(value). (Default: package-path/env_list)
+OPTION_FLAG(h,help)Show this help message.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

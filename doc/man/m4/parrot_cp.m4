@@ -6,7 +6,7 @@ BOLD(parrot_cp) - a replacement for CODE(cp) that provides higher performance wh
 with remote files via CODE(parrot_run).
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_cp [options] ... sources ... PARAM(dest)))
+CODE(parrot_cp [options] ... sources ... PARAM(dest))
 
 SECTION(DESCRIPTION)
 
@@ -18,15 +18,15 @@ block-by-block.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(`-f, --force')Forcibly remove target before copying.
-OPTION_ITEM(`-i, --interactive')Interactive mode: ask before overwriting.
-OPTION_ITEM(-r) Same as -R
-OPTION_ITEM(`-R, --recursive')Recursively copy directories.
-OPTION_ITEM(`-s, --symlinks')Make symbolic links instead of copying files.
-OPTION_ITEM(`-l, --hardlinks' )Make hard links instead of copying files.
-OPTION_ITEM(`-u, --update-only')Update mode: Copy only if source is newer than target.
-OPTION_ITEM(`-v, --version')Verbose mode: Show names of files copied.
-OPTION_ITEM(`-h, --help')Help: Show these options.
+OPTION_FLAG(f,force)Forcibly remove target before copying.
+OPTION_FLAG(i,interactive)Interactive mode: ask before overwriting.
+OPTION_FLAG_SHORT(r) Same as -R
+OPTION_FLAG(R,recursive)Recursively copy directories.
+OPTION_FLAG(s,symlinks)Make symbolic links instead of copying files.
+OPTION_FLAG(l,hardlinks))Make hard links instead of copying files.
+OPTION_FLAG(u,update-only)Update mode: Copy only if source is newer than target.
+OPTION_FLAG(v,version)Verbose mode: Show names of files copied.
+OPTION_FLAG(h,help)Help: Show these options.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

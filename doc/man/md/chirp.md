@@ -27,7 +27,7 @@
 **chirp** - command line tool providing explicit control of a Chirp server.
 
 ## SYNOPSIS
-****chirp [options] [hostname] [command]****
+**chirp [options] [hostname] [command]**
 
 ## DESCRIPTION
 
@@ -36,16 +36,16 @@
 Here are some important  **chirp** commands:
 
 
-- **open** <host> Connect to a Chirp server.
+- **open** _&lt;host&gt;_ Connect to a Chirp server.
 - **close** Close connection to current Chirp server.  
-- **get** <remotefile> [localfile] Copy a remote file to local storage.
-- **put** <localfile> [remotefile] Copy a local file to Chirp server.
-- **thirdput** <file> <3rdhost> <3rdfile> Copy a remote file to another Chirp server.
-- **getacl** <remotepath> Get acl of a remote file/directory.
-- **setacl** <remotepath> <user> <rwldax> Set acl for a remote file/directory.
+- **get** _&lt;remotefile&gt;_ [localfile] Copy a remote file to local storage.
+- **put** _&lt;localfile&gt;_ [remotefile] Copy a local file to Chirp server.
+- **thirdput** _&lt;file&gt;_ _&lt;3rdhost&gt;_ _&lt;3rdfile&gt;_ Copy a remote file to another Chirp server.
+- **getacl** _&lt;remotepath&gt;_ Get acl of a remote file/directory.
+- **setacl** _&lt;remotepath&gt;_ _&lt;user&gt;_ _&lt;rwldax&gt;_ Set acl for a remote file/directory.
 - **ls** [-la] [remotepath] List contents of a remote directory.
-- **mv** <oldname> <newname> Change name of a remote file.
-- **rm** <file> Delete a remote file.
+- **mv** _&lt;oldname&gt;_ _&lt;newname&gt;_ Change name of a remote file.
+- **rm** _&lt;file&gt;_ Delete a remote file.
 - **audit**	[-r] Audit current Chirp server.
 - **exit** Close connection and exit **Chirp**.
 
@@ -53,29 +53,30 @@ Here are some important  **chirp** commands:
 **chirp** also manages Chirp tickets for authentication purpose.
 
 
-- **ticket_create** [-o[utput] <ticket filename>] [-s[ubject] <subject/user>] [-d[uration] <duration>] [-b[its] <bits>] [[<directory> <acl>] ...] Creat a ticket
-- **ticket_register** <name> [<subject>] <duration> Manually register a ticket with multiple Chirp severs.
-- **ticket_delete** <name> Remove a ticket.
-- **ticket_list** <name> List registered tickets on a Chirp server.
-- **ticket_get** <name> Check status of a ticket.
-- **ticket_modify** <name> <directory> <aclmask> Modify a ticket.
+- **ticket_create** [-o[utput] _&lt;ticket filename&gt;_] [-s[ubject] _&lt;subject/user&gt;_] [-d[uration] _&lt;duration&gt;_] [-b[its] _&lt;bits&gt;_] [[_&lt;directory&gt;_ _&lt;acl&gt;_] ...] Creat a ticket
+- **ticket_create** [-o[utput] _&lt;ticket filename&gt;_] [-s[ubject] _&lt;subject/user&gt;_] [-d[uration] _&lt;duration&gt;_] [-b[its] _&lt;bits&gt;_] [[_&lt;directory&gt;_ _&lt;acl&gt;_] ...] Creat a ticket
+- **ticket_register** _&lt;name&gt;_ [_&lt;subject&gt;_] _&lt;duration&gt;_ Manually register a ticket with multiple Chirp severs.
+- **ticket_delete** _&lt;name&gt;_ Remove a ticket.
+- **ticket_list** _&lt;name&gt;_ List registered tickets on a Chirp server.
+- **ticket_get** _&lt;name&gt;_ Check status of a ticket.
+- **ticket_modify** _&lt;name&gt;_ _&lt;directory&gt;_ _&lt;aclmask&gt;_ Modify a ticket.
 
 
 ## OPTIONS
 
-- **-a --auth <flag>** Require this authentication mode.
-- **-d --debug <flag>** Enable debugging for this subsystem.
-- **-i --tickets <files>** Comma-delimited list of tickets to use for authentication.
-- **-l, --verbose** Long transfer information.
-- **-t --timeout <time>** Set remote operation timeout.
-- **-v, --version** Show program version.
-- **-h, --help** Show help text.
+- **-a**,**--auth=_&lt;flag&gt;_**<br />Require this authentication mode.
+- **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
+- **-i**,**--tickets=_&lt;files&gt;_**<br />Comma-delimited list of tickets to use for authentication.
+- **-l**,**--verbose**<br />Long transfer information.
+- **-t**,**--timeout=_&lt;time&gt;_**<br />Set remote operation timeout.
+- **-v**,**--version**<br />Show program version.
+- **-h**,**--help**<br />Show help text.
 
 
 ## ENVIRONMENT VARIABLES
 
 
-- ****CHIRP_CLIENT_TICKETS**** Comma delimited list of tickets to authenticate with (same as **-i**).
+- **CHIRP_CLIENT_TICKETS** Comma delimited list of tickets to authenticate with (same as **-i**).
 
 
 ## EXIT STATUS

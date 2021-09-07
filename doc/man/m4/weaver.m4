@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(weaver) - workflow engine for executing distributed workflows
 
 SECTION(SYNOPSIS)
-CODE(BOLD(weaver [options] PARAM(weaverfile)))
+CODE(weaver [options] PARAM(weaverfile))
 
 SECTION(DESCRIPTION)
 
@@ -44,29 +44,29 @@ PARAM(_Stash), in which intermediate files are stored.
 
 General options:
 OPTIONS_BEGIN
-OPTION_ITEM(`-h')Give help information.
-OPTION_ITEM(`-W')Stop on warnings.
-OPTION_ITEM(`-g')Include debugging symbols in DAG.
-OPTION_ITEM(`-I')Do not automatically import built-ins.
-OPTION_ITEM(`-N')Do not normalize paths.
-OPTION_PAIR(`-b', options)Set batch job options (cpu, memory, disk, batch, local, collect).
-OPTION_PAIR(`-d', subsystem)Enable debugging for subsystem.
-OPTION_PAIR(`-o', log_path)Set log path (default: stderr).
-OPTION_PAIR(`-O', directory)Set stash output directory (default PARAM(_Stash)).
+OPTION_FLAG_SHORT(h)Give help information.
+OPTION_FLAG_SHORT(W)Stop on warnings.
+OPTION_FLAG_SHORT(g)Include debugging symbols in DAG.
+OPTION_FLAG_SHORT(I)Do not automatically import built-ins.
+OPTION_FLAG_SHORT(N)Do not normalize paths.
+OPTION_ARG_SHORT(b, options)Set batch job options (cpu, memory, disk, batch, local, collect).
+OPTION_ARG_SHORT(d, subsystem)Enable debugging for subsystem.
+OPTION_ARG_SHORT(o, log_path)Set log path (default: stderr).
+OPTION_ARG_SHORT(O, directory)Set stash output directory (default PARAM(_Stash)).
 OPTIONS_END
 
 Optimization Options:
 OPTIONS_BEGIN
 OPTIONS_END
-OPTION_ITEM(`-a')Automatically nest abstractions.
-OPTION_PAIR(`-t', group_size)Inline tasks based on group size.
+OPTION_FLAG_SHORT(a)Automatically nest abstractions.
+OPTION_ARG_SHORT(t, group_size)Inline tasks based on group size.
 
 Engine Options:
 
 OPTIONS_BEGIN
-OPTION_ITEM(`-x')Execute DAG using workflow engine after compiling.
-OPTION_PAIR(`-e', arguments)Set arguments to workflow engine when executing.
-OPTION_PAIR(`-w' wrapper)Set workflow engine wrapper.
+OPTION_FLAG_SHORT(x)Execute DAG using workflow engine after compiling.
+OPTION_ARG_SHORT(e, arguments)Set arguments to workflow engine when executing.
+OPTION_ARG_SHORT(w, wrapper)Set workflow engine wrapper.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

@@ -28,7 +28,8 @@
 
 ## SYNOPSIS
 
-****poncho_package_create [options] <dependency-file> <<output-path>>****
+**poncho_package_create [options] _&lt;dependency-file&gt;_ _&lt;_&lt;output-path&gt;_&gt;_**
+**poncho_package_create [options] _&lt;dependency-file&gt;_ _&lt;_&lt;output-path&gt;_&gt;_**
 
 ## DESCRIPTION
 
@@ -40,7 +41,7 @@ The **dependency-file** argument is the path (relative or absolute) to the a JSO
 
 ## OPTIONS
 
-OPTIONS_ITEM(-h)        Show this help message
+- **-h**<br />        Show this help message
 
 ## EXIT STATUS
 

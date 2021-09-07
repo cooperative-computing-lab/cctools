@@ -5,15 +5,11 @@ SECTION(NAME)
 BOLD(condor_submit_workers) - submit work_queue_worker to the Condor grid.
 
 SECTION(SYNOPSIS)
-LONGCODE_BEGIN
-CODE(BOLD(condor_submit_workers [options] PARAM(servername) PARAM(port) PARAM(num-workers)))
-LONGCODE_END
+CODE(condor_submit_workers [options] PARAM(servername) PARAM(port) PARAM(num-workers))
 
 or
 
-LONGCODE_BEGIN
-CODE(BOLD(condor_submit_workers [options] --manager-name PARAM(name) PARAM(num-workers)))
-LONGCODE_END
+CODE(condor_submit_workers [options] --manager-name PARAM(name) PARAM(num-workers))
 
 
 SECTION(DESCRIPTION)
@@ -28,30 +24,32 @@ the catalog server by specifying the name of the work queue using the --manager-
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-M, manager-name, name)Name of the preferred manager for worker.
-OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT.
-OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time (default=900s).
-OPTION_TRIPLET(-d, debug, subsystem)Enable debugging on worker for this subsystem (try -d all to start).
-OPTION_TRIPLET(-w, tcp-window-size, size)Set TCP window size
-OPTION_TRIPLET(-i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
-OPTION_TRIPLET(-b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
-OPTION_TRIPLET(-z, disk-threshold, size)Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
-OPTION_TRIPLET(-A, arch, arch)Set architecture string for the worker to report to manager instead of the value in uname.
-OPTION_TRIPLET(-O, os, os)Set operating system string for the worker to report to manager instead of the value in uname.
-OPTION_TRIPLET(-s, workdir, path)Set the location for creating the working directory of the worker.
-OPTION_TRIPLET(-P, password, file)Password file to authenticate workers to manager.
-OPTION_TRIPLET(-E, worker-options, <str>)Extra options passed to work_queue_worker
+OPTION_ARG(M, manager-name, name)Name of the preferred manager for worker.
+OPTION_ARG(C, catalog, catalog)Set catalog server to PARAM(catalog). PARAM(catalog) format: HOSTNAME:PORT.
+OPTION_ARG(C, catalog, catalog)Set catalog server to PARAM(catalog). PARAM(catalog) format: HOSTNAME:PORT.
+OPTION_ARG(t, timeout, time)Abort after this amount of idle time (default=900s).
+OPTION_ARG(d, debug, subsystem)Enable debugging on worker for this subsystem (try -d all to start).
+OPTION_ARG(w, tcp-window-size, size)Set TCP window size
+OPTION_ARG(i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+OPTION_ARG(b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
+OPTION_ARG(z, disk-threshold, size)Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
+OPTION_ARG(A, arch, arch)Set architecture string for the worker to report to manager instead of the value in uname.
+OPTION_ARG(O, os, os)Set operating system string for the worker to report to manager instead of the value in uname.
+OPTION_ARG(s, workdir, path)Set the location for creating the working directory of the worker.
+OPTION_ARG(P, password, file)Password file to authenticate workers to manager.
+OPTION_ARG(E, worker-options, str)Extra options passed to work_queue_worker
 
-OPTION_PAIR(--cores, cores)Set the number of cores each worker should use (0=auto). (default=1)
-OPTION_PAIR(--memory, size)Manually set the amonut of memory (in MB) reported by this worker.
-OPTION_PAIR(--disk, size)Manually set the amount of disk (in MB) reported by this worker.
+OPTION_ARG_LONG(cores, cores)Set the number of cores each worker should use (0=auto). (default=1)
+OPTION_ARG_LONG(memory, size)Manually set the amonut of memory (in MB) reported by this worker.
+OPTION_ARG_LONG(disk, size)Manually set the amount of disk (in MB) reported by this worker.
 
-OPTION_TRIPLET(-r,requirements,<reqs>)Condor requirements expression.
-OPTION_PAIR(--class-ad,<ad>)Extra condor class ad. May be specified multiple times.
-OPTION_ITEM(`--autosize')Condor will automatically size the worker to the slot.
-OPTION_PAIR(--docker-universe,<image>)Run worker inside <image> using condor's docker universe
+OPTION_ARG(r,requirements,reqs)Condor requirements expression.
+OPTION_ARG_LONG(class-ad,ad)Extra condor class ad. May be specified multiple times.
+OPTION_FLAG_LONG(autosize)Condor will automatically size the worker to the slot.
+OPTION_ARG_LONG(docker-universe,image)Run worker inside PARAM(image) using condor's docker universe
+OPTION_ARG_LONG(docker-universe,image)Run worker inside PARAM(image) using condor's docker universe
 
-OPTION_ITEM(`-h,--help')Show help message.
+OPTION_FLAG(h,help)Show help message.
 
 
 OPTIONS_END

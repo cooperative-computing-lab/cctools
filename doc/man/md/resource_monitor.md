@@ -27,7 +27,7 @@
 **resource_monitor** - monitors the cpu, memory, io, and disk usage of a tree of processes.
 
 ## SYNOPSIS
-****resource_monitor [options] -- command [command-options]****
+**resource_monitor [options] -- command [command-options]**
 
 ## DESCRIPTION
 
@@ -117,30 +117,31 @@ disk                      current size of working directories in the tree, in MB
 
 ## OPTIONS
 
-- **-d --debug <subsystem>** Enable debugging for this subsystem.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-- **-v,--version** Show version string.
-- **-h,--help** Show help text.
-- **-i --interval <n>** Maximum interval between observations, in seconds (default=1).
-- **--pid=pid** Track pid instead of executing a command line (warning: less precise measurements).
-- **--accurate-short-processes** Accurately measure short running processes (adds overhead).
-- **-c --sh <str>** Read command line from **str**, and execute as '/bin/sh -c **str**'.
-- **-l --limits-file <file>** Use maxfile with list of var: value pairs for resource limits.
-- **-L --limits <string>** String of the form "var: value, var: value" to specify resource limits. (Could be specified multiple times.)
-- **-f, --child-in-foreground** Keep the monitored process in foreground (for interactive use).
-- **-O --with-output-files <template>** Specify **template** for log files (default=**resource-pid**).
-- **--with-time-series** Write resource time series to **template.series**.
-- **--with-inotify** Write inotify statistics of opened files to default=**template.files**.
-- **-V --verbatim-to-summary <str>** Include this string verbatim in a line in the summary. (Could be specified multiple times.)
-- **--measure-dir=dir** Follow the size of dir. By default the directory at the start of execution is followed. Can be specified multiple times. See --without-disk-footprint below.
-- **--follow-chdir** Follow the current working directories of the processes tree.
-- **--without-disk-footprint** Do not measure working directory footprint. Overrides --measure-dir.
-- **--no-pprint** Do not pretty-print summaries.
-- **--snapshot-events=file** Configuration file for snapshots on file patterns. See below.
-- **--catalog-task-name=<task-name>** Report measurements to catalog server with "task"=<task-name>.
-- **--catalog-project=<project>** Set project name of catalog update to <project> (default=<task-name>).
-- **--catalog=<catalog>** Use catalog server <catalog>. (default=catalog.cse.nd.edu:9097).
-- **--catalog-interval=<interval>** Send update to catalog every <interval> seconds. (default=30).
+- **-d**,**--debug=_&lt;subsystem&gt;_**<br />Enable debugging for this subsystem.
+- **-o**,**--debug-file=_&lt;file&gt;_**<br />Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+- **-v**,**--version**<br />Show version string.
+- **-h**,**--help**<br />Show help text.
+- **-i**,**--interval=_&lt;n&gt;_**<br />Maximum interval between observations, in seconds (default=1).
+- **--pid=_&lt;pid&gt;_**<br />Track pid instead of executing a command line (warning: less precise measurements).
+- **--accurate-short-processes**<br />Accurately measure short running processes (adds overhead).
+- **-c**,**--sh=_&lt;str&gt;_**<br />Read command line from **str**, and execute as '/bin/sh -c **str**'.
+- **-l**,**--limits-file=_&lt;file&gt;_**<br />Use maxfile with list of var: value pairs for resource limits.
+- **-L**,**--limits=_&lt;string&gt;_**<br />String of the form "var: value, var: value" to specify resource limits. (Could be specified multiple times.)
+- **-f**,**--child-in-foreground**<br />Keep the monitored process in foreground (for interactive use).
+- **--O**,**--with-output-files=_&lt;template&gt;_**<br />Specify **template** for log files (default=**resource-pid**).
+- **--with-time-series**<br />Write resource time series to **template.series**.
+- **--with-inotify**<br />Write inotify statistics of opened files to default=**template.files**.
+- **-V**,**--verbatim-to-summary=_&lt;str&gt;_**<br />Include this string verbatim in a line in the summary. (Could be specified multiple times.)
+- **--measure-dir=_&lt;dir&gt;_**<br />Follow the size of dir. By default the directory at the start of execution is followed. Can be specified multiple times. See --without-disk-footprint below.
+- **--follow-chdir**<br />Follow the current working directories of the processes tree.
+- **--without-disk-footprint**<br />Do not measure working directory footprint. Overrides --measure-dir.
+- **--no-pprint**<br />Do not pretty-print summaries.
+- **--snapshot-events=_&lt;file&gt;_**<br />Configuration file for snapshots on file patterns. See below.
+- **--catalog-task-name=_&lt;task-name&gt;_**<br />Report measurements to catalog server with "task"=_&lt;task-name&gt;_.
+- **--catalog-project=_&lt;project&gt;_**<br />Set project name of catalog update to _&lt;project&gt;_ (default=_&lt;task-name>&gt;_).
+- **--catalog=_&lt;catalog&gt;_**<br />Use catalog server _&lt;catalog&gt;_. (default=catalog.cse.nd.edu:9097).
+- **--catalog-interval=_&lt;interval&gt;_**<br />Send update to catalog every _&lt;interval&gt;_ seconds. (default=30).
+- **--catalog-interval=_&lt;interval&gt;_**<br />Send update to catalog every _&lt;interval&gt;_ seconds. (default=30).
 
 
 
@@ -162,7 +163,7 @@ defined for the summary file:
 ## ENVIRONMENT VARIABLES
 
 
-- ****CCTOOLS_RESOURCE_MONITOR_HELPER**** Location of the desired helper library to wrap libc calls. If not provided
+- **CCTOOLS_RESOURCE_MONITOR_HELPER** Location of the desired helper library to wrap libc calls. If not provided, a version of the helper library is packed with the resource_monitor executable.)
 
 
 ## EXIT STATUS

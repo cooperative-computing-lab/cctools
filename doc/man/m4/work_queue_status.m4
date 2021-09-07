@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(work_queue_status) - display status of currently running Work Queue applications.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(work_queue_status [options] [manager] [port]))
+CODE(work_queue_status [options] [manager] [port])
 
 SECTION(DESCRIPTION)
 
@@ -25,22 +25,23 @@ LIST_END
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_PAIR(--where,expr) Show only Work Queue managers matching this expression.
-OPTION_ITEM(`-Q, --statistics')Show summary information about queues. (default)
-OPTION_ITEM(`-M, --project-name=<name>')Filter results of -Q for managers matching <name>.
-OPTION_ITEM(`-W, --workers')Show details of all workers connected to the manager.
-OPTION_ITEM(`-T, --tasks')Show details of all tasks in the queue.
-OPTION_ITEM(`-A, --able-workers')List categories of the given manager, size of largest task, and workers that can run it.
-OPTION_ITEM(`-R, --resources')Show available resources for each manager.
-OPTION_ITEM(`--capacity')Show resource capacities for each manager.
-OPTION_ITEM(`-l, --verbose')Long output.
-OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to <catalog>. Format: HOSTNAME:PORT
-OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
-OPTION_TRIPLET(-t, timeout, time)RPC timeout (default=300s).
-OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file. (can also be :stderr, or :stdout)
-OPTION_TRIPLET(-O, debug-rotate-max, bytes)Rotate debug file once it reaches this size.
-OPTION_ITEM(`-v, --version')Show work_queue_status version.
-OPTION_ITEM(`-h, --help')Show this help message.
+OPTION_ARG_LONG(where,expr) Show only Work Queue managers matching this expression.
+OPTION_FLAG(Q,statistics)Show summary information about queues. (default)
+OPTION_ARG(M,project-name,name)Filter results of -Q for managers matching PARAM(name).
+OPTION_FLAG(W,workers)Show details of all workers connected to the manager.
+OPTION_FLAG(T,tasks)Show details of all tasks in the queue.
+OPTION_FLAG(A,able-workers)List categories of the given manager, size of largest task, and workers that can run it.
+OPTION_FLAG(R,resources)Show available resources for each manager.
+OPTION_FLAG_LONG(capacity)Show resource capacities for each manager.
+OPTION_FLAG(l,verbose)Long output.
+OPTION_ARG(C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
+OPTION_ARG(C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
+OPTION_ARG(d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
+OPTION_ARG(t, timeout, time)RPC timeout (default=300s).
+OPTION_ARG(o, debug-file, file)Send debugging to this file. (can also be :stderr, or :stdout)
+OPTION_ARG(O, debug-rotate-max, bytes)Rotate debug file once it reaches this size.
+OPTION_FLAG(v,version)Show work_queue_status version.
+OPTION_FLAG(h,help)Show this help message.
 OPTIONS_END
 
 SECTION(EXAMPLES)
@@ -125,7 +126,7 @@ The value may have the following prefixes:
 LIST_BEGIN
 LIST_ITEM(No prefix.) The maximum value was manually specified.
 LIST_ITEM(~) All the task have run with at most this quantity of resources.
-LIST_ITEM(>) There is at least one task that has used more than this quantity of resources, but the maximum remains unknown.
+LIST_ITEM(＞) There is at least one task that has used more than this quantity of resources, but the maximum remains unknown.
 LIST_END
 
 

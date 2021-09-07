@@ -27,31 +27,31 @@
 **chirp_get** - get a single file from a Chirp server to local machine
 
 ## SYNOPSIS
-****chirp_get [options] <hostname[:port]> <remotefile> <localfile>****
+**chirp_get [options] _&lt;hostname[:port]&gt;_ _&lt;remotefile&gt;_ _&lt;localfile&gt;_**
 
 ## DESCRIPTION
 
 **chirp_get** is a tool for copying a single file from a Chirp server to local storage.
 
-**chirp_get** is a quick and simple way to copy a remote file given <hostname[:port]> <path> and write it to a local file <localfile>
+**chirp_get** is a quick and simple way to copy a remote file given _&lt;hostname[:port]&gt;_ _&lt;path&gt;_ and write it to a local file _&lt;localfile&gt;_
 
 **chirp_get** also can stream data which can be useful in a shell pipeline.
 
 ## OPTIONS
 
 
-- **-a --auth <flag>** Require this authentication mode.
-- **-d --debug <flag>** Enable debugging for this subsystem.
-- **-t --timeout <time>** Timeout for failure. (default is 3600s)
-- **-i --tickets <files>** Comma-delimited list of tickets to use for authentication.
-- **-v, --version** Show program version.
-- **-h, --help** Show help text.
+- **-a**,**--auth=_&lt;flag&gt;_**<br />Require this authentication mode.
+- **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
+- **-t**,**--timeout=_&lt;time&gt;_**<br />Timeout for failure. (default is 3600s)
+- **-i**,**--tickets=_&lt;files&gt;_**<br />Comma-delimited list of tickets to use for authentication.
+- **-v**,**--version**<br />Show program version.
+- **-h**,**--help**<br />Show help text.
 
 
 ## ENVIRONMENT VARIABLES
 
 
-- ****CHIRP_CLIENT_TICKETS**** Comma delimited list of tickets to authenticate with (same as **-i**).
+- **CHIRP_CLIENT_TICKETS** Comma delimited list of tickets to authenticate with (same as **-i**).
 
 
 ## EXIT STATUS
