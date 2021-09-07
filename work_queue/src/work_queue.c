@@ -2614,7 +2614,7 @@ static void priority_add_to_jx(struct jx *j, double priority)
 }
 
 
-struct jx * task_to_jx( struct work_queue_task *t, const char *state, const char *host )
+struct jx * task_to_jx( struct work_queue *q, struct work_queue_task *t, const char *state, const char *host )
 {
 	struct jx *j = jx_object(0);
 
@@ -2624,10 +2624,28 @@ struct jx * task_to_jx( struct work_queue_task *t, const char *state, const char
 	if(t->category) jx_insert_string(j,"category",t->category);
 	jx_insert_string(j,"command",t->command_line);
 	if(host) jx_insert_string(j,"host",host);
-	jx_insert_integer(j,"cores",t->resources_requested->cores);
-	jx_insert_integer(j,"gpus",t->resources_requested->gpus);
-	jx_insert_integer(j,"memory",t->resources_requested->memory);
-	jx_insert_integer(j,"disk",t->resources_requested->disk);
+
+	if(host) {
+		jx_insert_integer(j,"cores",t->resources_allocated->cores);
+		jx_insert_integer(j,"gpus",t->resources_allocated->gpus);
+		jx_insert_integer(j,"memory",t->resources_allocated->memory);
+		jx_insert_integer(j,"disk",t->resources_allocated->disk);
+	} else {
+		const struct rmsummary *min = task_min_resources(q, t);
+		const struct rmsummary *max = task_max_resources(q, t);
+		struct rmsummary *limits = rmsummary_create(-1);
+
+		rmsummary_merge_override(limits, max);
+		rmsummary_merge_max(limits, min);
+
+		jx_insert_integer(j,"cores",limits->cores);
+		jx_insert_integer(j,"gpus",limits->gpus);
+		jx_insert_integer(j,"memory",limits->memory);
+		jx_insert_integer(j,"disk",limits->disk);
+
+		rmsummary_delete(limits);
+	}
+
 	priority_add_to_jx(j, t->priority);
 
 
@@ -2719,8 +2737,9 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 		itable_firstkey(q->tasks);
 		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
 			w = itable_lookup(q->worker_task_map, taskid);
+			work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, taskid);
 			if(w) {
-				j = task_to_jx(t,"running",w->hostname);
+				j = task_to_jx(q,t,task_state_str(state),w->hostname);
 				if(j) {
 					// Include detailed information on where the task is running:
 					// address and port, workspace
@@ -2735,8 +2754,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 					jx_array_insert(a, j);
 				}
 			} else {
-				work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, taskid);
-				j = task_to_jx(t,task_state_str(state),0);
+				j = task_to_jx(q,t,task_state_str(state),0);
 				if(j) {
 					jx_array_insert(a, j);
 				}
