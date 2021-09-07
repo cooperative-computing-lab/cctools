@@ -29,3 +29,9 @@ SECTION(EXAMPLE)
 CODE($ poncho_package_create dependencies.json example_venv.tar.gz)
 
 This will create an example_venv.tar.gz environment tarball within the current working directory, which can then be exported to different machines for execution.
+
+SECTION(COPYRIGHT)
+
+COPYRIGHT_BOILERPLATE
+
+FOOTER
