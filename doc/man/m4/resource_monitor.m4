@@ -104,20 +104,20 @@ OPTION_ITEM(--pid=pid)Track pid instead of executing a command line (warning: le
 OPTION_ITEM(--accurate-short-processes)Accurately measure short running processes (adds overhead).
 OPTION_TRIPLET(-c,sh,str)Read command line from CODE(str), and execute as '/bin/sh -c CODE(str)'.
 OPTION_TRIPLET(-l,limits-file,file)Use maxfile with list of var: value pairs for resource limits.
-OPTION_TRIPLET(-L,limits,string)String of the form `"var: value, var: value\' to specify resource limits. (Could be specified multiple times.)
+OPTION_TRIPLET(-L,limits,string)String of the form `"var: value, var: value"' to specify resource limits. (Could be specified multiple times.)
 OPTION_ITEM(`-f, --child-in-foreground')Keep the monitored process in foreground (for interactive use).
 OPTION_TRIPLET(-O,with-output-files,template)Specify CODE(template) for log files (default=CODE(resource-pid)).
 OPTION_ITEM(--with-time-series)Write resource time series to CODE(template.series).
 OPTION_ITEM(--with-inotify)Write inotify statistics of opened files to default=CODE(template.files).
 OPTION_TRIPLET(-V,verbatim-to-summary,str)Include this string verbatim in a line in the summary. (Could be specified multiple times.)
 OPTION_ITEM(--measure-dir=dir)Follow the size of dir. By default the directory at the start of execution is followed. Can be specified multiple times. See --without-disk-footprint below.
-OPTION_ITEM(--follow-chdir)Follow processes' current working directories.
+OPTION_ITEM(--follow-chdir)Follow the current working directories of the processes tree.
 OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint. Overrides --measure-dir.
 OPTION_ITEM(--no-pprint)Do not pretty-print summaries.
 OPTION_ITEM(--snapshot-events=file)Configuration file for snapshots on file patterns. See below.
 OPTION_ITEM(--catalog-task-name=<task-name>)Report measurements to catalog server with "task"=<task-name>.
 OPTION_ITEM(--catalog-project=<project>)Set project name of catalog update to <project> (default=<task-name>).
-OPTION_ITEM(--catalog=<catalog>)Use catalog server <catalog>. (default=catalog.cse.nd.edu:9097).\n", "--catalog=<catalog>");
+OPTION_ITEM(--catalog=<catalog>)Use catalog server <catalog>. (default=catalog.cse.nd.edu:9097).
 OPTION_ITEM(--catalog-interval=<interval>)Send update to catalog every <interval> seconds. (default=30).
 
 OPTIONS_END

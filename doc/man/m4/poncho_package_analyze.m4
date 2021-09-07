@@ -1,3 +1,4 @@
+include(manual.h)dnl
 HEADER(poncho_package_analyze)
 
 SECTION(NAME)
@@ -55,4 +56,10 @@ Note that system-level modules are considered part of the Python package install
 Additionally, imports not managed by Pip or Conda are not allowed.
 This includes other modules within the CWD or in user-written packages.
 
+
+SECTION(COPYRIGHT)
+
+COPYRIGHT_BOILERPLATE
+
+FOOTER
 

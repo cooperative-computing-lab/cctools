@@ -1,4 +1,5 @@
-HEADER( poncho_package_run)
+include(manual.h)dnl
+HEADER(poncho_package_run)
 
 SECTION(NAME)
 
@@ -43,3 +44,9 @@ CODE(poncho_package_run --unpack-to my_persistent_env --environment example_venv
 
 The previous command will run faster the second time it is executed, as the environment is only unpacked once to my_persistent_env.
 
+
+SECTION(COPYRIGHT)
+
+COPYRIGHT_BOILERPLATE
+
+FOOTER

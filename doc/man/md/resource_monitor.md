@@ -126,20 +126,20 @@ disk                      current size of working directories in the tree, in MB
 - **--accurate-short-processes** Accurately measure short running processes (adds overhead).
 - **-c --sh <str>** Read command line from **str**, and execute as '/bin/sh -c **str**'.
 - **-l --limits-file <file>** Use maxfile with list of var: value pairs for resource limits.
-- **-L --limits <string>** String of the form "var: value, var: value\ to specify resource limits. (Could be specified multiple times.)
+- **-L --limits <string>** String of the form "var: value, var: value" to specify resource limits. (Could be specified multiple times.)
 - **-f, --child-in-foreground** Keep the monitored process in foreground (for interactive use).
 - **-O --with-output-files <template>** Specify **template** for log files (default=**resource-pid**).
 - **--with-time-series** Write resource time series to **template.series**.
 - **--with-inotify** Write inotify statistics of opened files to default=**template.files**.
 - **-V --verbatim-to-summary <str>** Include this string verbatim in a line in the summary. (Could be specified multiple times.)
 - **--measure-dir=dir** Follow the size of dir. By default the directory at the start of execution is followed. Can be specified multiple times. See --without-disk-footprint below.
-- **--follow-chdir** Follow processes' current working directories.
+- **--follow-chdir** Follow the current working directories of the processes tree.
 - **--without-disk-footprint** Do not measure working directory footprint. Overrides --measure-dir.
 - **--no-pprint** Do not pretty-print summaries.
 - **--snapshot-events=file** Configuration file for snapshots on file patterns. See below.
 - **--catalog-task-name=<task-name>** Report measurements to catalog server with "task"=<task-name>.
 - **--catalog-project=<project>** Set project name of catalog update to <project> (default=<task-name>).
-- **--catalog=<catalog>** Use catalog server <catalog>. (default=catalog.cse.nd.edu:9097).\n", "--catalog=<catalog>");
+- **--catalog=<catalog>** Use catalog server <catalog>. (default=catalog.cse.nd.edu:9097).
 - **--catalog-interval=<interval>** Send update to catalog every <interval> seconds. (default=30).
 
 
@@ -363,6 +363,6 @@ snapshot everytime the file **please-take-a-snapshot** is created:
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT
