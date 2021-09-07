@@ -27,7 +27,7 @@
 **work_queue_pool** - maintain a pool of Work Queue workers on a batch system.
 
 ## SYNOPSIS
-****work_queue_pool -M <project-name> -T <batch-type> [options]****
+**work_queue_pool -M _&lt;project-name&gt;_ -T _&lt;batch-type&gt;_ [options]**
 
 ## DESCRIPTION
 **work_queue_pool** is an alias for **work_queue_factory**,

@@ -27,7 +27,7 @@
 **chirp_fuse** - create a **FUSE** mount point with virtual access to remote chirp servers
 
 ## SYNOPSIS
-****chirp_fuse [options] <mount path>****
+**chirp_fuse [options] _&lt;mount path&gt;_**
 
 ## DESCRIPTION
 
@@ -50,23 +50,23 @@ For complete details with examples, see the
 ## OPTIONS
 
 
-- **-a --auth <flag>** Require this authentication mode.
-- **-b --block-size <bytes>** Block size for network I/O. (default is 65536s)
-- **-d --debug <flag>** Enable debugging for this subsystem.
-- **-D, --no-optimize** Disable small file optimizations such as recursive delete.
-- **-f, --foreground** Run in foreground for debugging.
-- **-i --tickets <files>** Comma-delimited list of tickets to use for authentication.
-- **-m --mount-options <option>** Pass mount option to FUSE. Can be specified multiple times.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-- **-t --timeout <timeout>** Timeout for network operations. (default is 60s)
-- **-v, --version** Show program version.
-- **-h, --help** Give help information.
+- **-a**,**--auth=_&lt;flag&gt;_**<br />Require this authentication mode.
+- **-b**,**--block-size=_&lt;bytes&gt;_**<br />Block size for network I/O. (default is 65536s)
+- **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem.
+- **-D**,**--no-optimize**<br />Disable small file optimizations such as recursive delete.
+- **-f**,**--foreground**<br />Run in foreground for debugging.
+- **-i**,**--tickets=_&lt;files&gt;_**<br />Comma-delimited list of tickets to use for authentication.
+- **-m**,**--mount-options=_&lt;option&gt;_**<br />Pass mount option to FUSE. Can be specified multiple times.
+- **-o**,**--debug-file=_&lt;file&gt;_**<br />Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+- **-t**,**--timeout=_&lt;timeout&gt;_**<br />Timeout for network operations. (default is 60s)
+- **-v**,**--version**<br />Show program version.
+- **-h**,**--help**<br />Give help information.
 
 
 ## ENVIRONMENT VARIABLES
 
 
-- ****CHIRP_CLIENT_TICKETS**** Comma delimited list of tickets to authenticate with (same as **-i**).
+- **CHIRP_CLIENT_TICKETS** Comma delimited list of tickets to authenticate with (same as **-i**).
 
 
 ## EXIT STATUS

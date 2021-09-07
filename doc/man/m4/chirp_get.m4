@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(chirp_get) - get a single file from a Chirp server to local machine
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chirp_get [options] PARAM(hostname[:port]) PARAM(remotefile) PARAM(localfile)))
+CODE(chirp_get [options] PARAM(hostname[:port]) PARAM(remotefile) PARAM(localfile))
 
 SECTION(DESCRIPTION)
 
@@ -18,18 +18,18 @@ BOLD(chirp_get) also can stream data which can be useful in a shell pipeline.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_TRIPLET(-a,auth,flag)Require this authentication mode.
-OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
-OPTION_TRIPLET(-t,timeout,time)Timeout for failure. (default is 3600s)
-OPTION_TRIPLET(-i,tickets,files)Comma-delimited list of tickets to use for authentication.
-OPTION_ITEM(`-v, --version')Show program version.
-OPTION_ITEM(`-h, --help')Show help text.
+OPTION_ARG(a,auth,flag)Require this authentication mode.
+OPTION_ARG(d,debug,flag)Enable debugging for this subsystem.
+OPTION_ARG(t,timeout,time)Timeout for failure. (default is 3600s)
+OPTION_ARG(i,tickets,files)Comma-delimited list of tickets to use for authentication.
+OPTION_FLAG(v,version)Show program version.
+OPTION_FLAG(h,help)Show help text.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM(CODE(BOLD(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).)
+LIST_ITEM(CODE(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).
 LIST_END
 
 SECTION(EXIT STATUS)

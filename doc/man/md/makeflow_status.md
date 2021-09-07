@@ -27,7 +27,7 @@
 **makeflow_status** - command line tool retrieving the status of makeflow programs.
 
 ## SYNOPSIS
-****makeflow_status [options]****
+**makeflow_status [options]**
 
 ## DESCRIPTION
 
@@ -36,19 +36,19 @@
 
 ## OPTIONS
 
-- **-M --project <project>** The project on which to filter results.
-- **-u --username <user>** The owner on which to filter results.
-- **-s --server <server>** The catalog server to retrieve the reports from.
-- **-p --port <port>** The port to contact the catalog server on.
-- **-t --timeout <time>** Set remote operation timeout.
-- **-h, --help** Show help text.
+- **-M**,**--project=_&lt;project&gt;_**<br />The project on which to filter results.
+- **-u**,**--username=_&lt;user&gt;_**<br />The owner on which to filter results.
+- **-s**,**--server=_&lt;server&gt;_**<br />The catalog server to retrieve the reports from.
+- **-p**,**--port=_&lt;port&gt;_**<br />The port to contact the catalog server on.
+- **-t**,**--timeout=_&lt;time&gt;_**<br />Set remote operation timeout.
+- **-h**,**--help**<br />Show help text.
 
 
 ## ENVIRONMENT VARIABLES
 
 
-- ****CATALOG_HOST**** The catalog server to retrieve reports from (same as **-s**).
-- ****CATALOG_PORT**** The port to contact the catalog server on (same as **-p**).
+- **CATALOG_HOST** The catalog server to retrieve reports from (same as **-s**).
+- **CATALOG_PORT** The port to contact the catalog server on (same as **-p**).
 
 
 ## EXIT STATUS

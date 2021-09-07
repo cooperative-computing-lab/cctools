@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(allpairs_master) - executes All-Pairs workflow in parallel on distributed systems
 
 SECTION(SYNOPSIS)
-CODE(BOLD(allparis_master [options] PARAM(set A) PARAM(set B) PARAM(compare function)))
+CODE(allparis_master [options] PARAM(set A) PARAM(set B) PARAM(compare function))
 
 SECTION(DESCRIPTION)
 
@@ -26,21 +26,21 @@ process and begin executing tasks.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_TRIPLET(-p,port,port)The port that the master will be listening on.
-OPTION_TRIPLET(-e,extra-args,args)Extra arguments to pass to the comparison function.
-OPTION_TRIPLET(-f,input-file,file)Extra input file needed by the comparison function. (may be given multiple times)
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-OPTION_TRIPLET(-O,--output-file,file)Write task output to this file (default to standard output)
-OPTION_TRIPLET(-t,estimated-time,seconds)Estimated time to run one comparison. (default chosen at runtime)
-OPTION_TRIPLET(-x,width,item)Width of one work unit, in items to compare. (default chosen at runtime)
-OPTION_TRIPLET(-y,height,items)Height of one work unit, in items to compare. (default chosen at runtime)
-OPTION_TRIPLET(-N,project-name,project)Report the master information to a catalog server with the project name - PARAM(project)
-OPTION_TRIPLET(-P,priority,integer)Priority. Higher the value, higher the priority.
-OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem. (Try -d all to start.)
-OPTION_ITEM(`-v, --version')Show program version.
-OPTION_PAIR(`-h, --help')Display this message.
-OPTION_TRIPLET(-Z,port-file,file)Select port at random and write it to this file.  (default is disabled)
-OPTION_PAIR(--work-queue-preferred-connection,connection)Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
+OPTION_ARG(p,port,port)The port that the master will be listening on.
+OPTION_ARG(e,extra-args,args)Extra arguments to pass to the comparison function.
+OPTION_ARG(f,input-file,file)Extra input file needed by the comparison function. (may be given multiple times)
+OPTION_ARG(o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+OPTION_ARG(O,--output-file,file)Write task output to this file (default to standard output)
+OPTION_ARG(t,estimated-time,seconds)Estimated time to run one comparison. (default chosen at runtime)
+OPTION_ARG(x,width,item)Width of one work unit, in items to compare. (default chosen at runtime)
+OPTION_ARG(y,height,items)Height of one work unit, in items to compare. (default chosen at runtime)
+OPTION_ARG(N,project-name,project)Report the master information to a catalog server with the project name - PARAM(project)
+OPTION_ARG(P,priority,integer)Priority. Higher the value, higher the priority.
+OPTION_ARG(d,debug,flag)Enable debugging for this subsystem. (Try -d all to start.)
+OPTION_FLAG(v,version)Show program version.
+OPTION_FLAG(h,help)Display this message.
+OPTION_ARG(Z,port-file,file)Select port at random and write it to this file.  (default is disabled)
+OPTION_ARG_LONG(work-queue-preferred-connection,connection)Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
 OPTIONS_END
 
 SECTION(EXIT STATUS)

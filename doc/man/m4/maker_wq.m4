@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(maker_wq) - Run the Maker genome annotation tool using Work Queue to harness heterogenous resources
 
 SECTION(SYNOPSIS)
-CODE(BOLD(maker_wq [options] <maker_opts> <maker_bopts> <maker_exe> ))
+CODE(maker_wq [options] maker_opts maker_bopts maker_exe )
 
 SECTION(DESCRIPTION)
 BOLD(maker_wq) is a manager script to run the Maker genome annotation tool using Work Queue to enable the user to harness the heterogenous power of multiple systems simultaneously. It accepts all of the Maker inputs. The primary difference is that the MPI code has been replaced with Work Queue components.
@@ -14,9 +14,9 @@ BOLD(maker_wq) expects a maker_wq_worker in the path, and can be used from any w
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_PAIR(-port, port)Specify the port on which to create the Work Queue
-OPTION_PAIR(-fa, fast_abort)Specify a fast abort multiplier
-OPTION_PAIR(-M, project)Specify a project name for utilizing shared workers
+OPTION_ARG_SHORT(port, port)Specify the port on which to create the Work Queue
+OPTION_ARG_SHORT(fa, fast_abort)Specify a fast abort multiplier
+OPTION_ARG_SHORT(M, project)Specify a project name for utilizing shared workers
 OPTIONS_END
 
 SECTION(EXIT STATUS)

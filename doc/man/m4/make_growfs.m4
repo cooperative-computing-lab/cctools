@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(make_growfs) - generate directory listings for the GROW filesystem
 
 SECTION(SYNOPSIS)
-CODE(BOLD(make_growfs [options] PARAM(directory)))
+CODE(make_growfs [options] PARAM(directory))
 
 SECTION(DESCRIPTION)
 
@@ -22,13 +22,13 @@ with complete metadata.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(-v)Give verbose messages.
-OPTION_ITEM(-K)Create checksums for files. (default)
-OPTION_ITEM(-k)Disable checksums for files.
-OPTION_ITEM(-f)Follow all symbolic links.
-OPTION_ITEM(-F)Do not follow any symbolic links.
-OPTION_ITEM(-a)Only follow links that fall outside the root.  (default)
-OPTION_ITEM(-h)Show help text.
+OPTION_FLAG_SHORT(v)Give verbose messages.
+OPTION_FLAG_SHORT(K)Create checksums for files. (default)
+OPTION_FLAG_SHORT(k)Disable checksums for files.
+OPTION_FLAG_SHORT(f)Follow all symbolic links.
+OPTION_FLAG_SHORT(F)Do not follow any symbolic links.
+OPTION_FLAG_SHORT(a)Only follow links that fall outside the root.  (default)
+OPTION_FLAG_SHORT(h)Show help text.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

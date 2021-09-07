@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(parrot_timeout) - changes or resets the main timeout for the current BOLD(parrot) session
 
 SECTION(SYNOPSIS)
-CODE(BOLD(parrot_timeout PARAM(time)))
+CODE(parrot_timeout PARAM(time))
 
 SECTION(DESCRIPTION)
 

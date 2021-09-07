@@ -27,16 +27,16 @@
 **wavefront_master** - executes Wavefront workflow in parallel on distributed systems
 
 ## SYNOPSIS
-****wavefront [options] <command> <xsize> <ysize> <inputdata> <outputdata>****
+**wavefront [options] _&lt;command&gt;_ _&lt;xsize&gt;_ _&lt;ysize&gt;_ _&lt;inputdata&gt;_ _&lt;outputdata&gt;_**
 
 ## DESCRIPTION
 
 **wavefront_master** computes a two dimensional recurrence relation. You
-provide a function F (**<command>**) that accepts the left (x), right
-(y), and diagonal (d) values and initial values (**<inputdata>**) for
+provide a function F (**_&lt;command&gt;_**) that accepts the left (x), right
+(y), and diagonal (d) values and initial values (**_&lt;inputdata&gt;_**) for
 the edges of the matrix. The output matrix, whose size is determined by
-**<xsize>** and **<ysize>**, will be stored in a file specified
-by **<outputdata>**.
+**_&lt;xsize&gt;_** and **_&lt;ysize&gt;_**, will be stored in a file specified
+by **_&lt;outputdata&gt;_**.
 
 **wavefront_master** uses the Work Queue system to distribute tasks among
 processors. After starting **wavefront_master**, you must start a number of
@@ -46,15 +46,16 @@ then connect back to the master process and begin executing tasks.
 ## OPTIONS
 
 
-- **-h, --help** Show this help screen
-- **-v, --version** Show version string
-- **-d --debug <subsystem>** Enable debugging for this subsystem. (Try -d all to start.)
-- **-N --project-name <project>** Set the project name to <project>
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-- **-p --port <port>** Port number for queue master to listen on.
-- **-P --priority <num>** Priority. Higher the value, higher the priority.
-- **-Z --port-file <file>** Select port at random and write it to this file.  (default is disabled)
-- **--work-queue-preferred-connection connection** Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
+- **-h**,**--help**<br />Show this help screen
+- **-v**,**--version**<br />Show version string
+- **-d**,**--debug=_&lt;subsystem&gt;_**<br />Enable debugging for this subsystem. (Try -d all to start.)
+- **-N**,**--project-name=_&lt;project&gt;_**<br />Set the project name to _&lt;project&gt;_
+- **-N**,**--project-name=_&lt;project&gt;_**<br />Set the project name to _&lt;project&gt;_
+- **-o**,**--debug-file=_&lt;file&gt;_**<br />Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+- **-p**,**--port=_&lt;port&gt;_**<br />Port number for queue master to listen on.
+- **-P**,**--priority=_&lt;num&gt;_**<br />Priority. Higher the value, higher the priority.
+- **-Z**,**--port-file=_&lt;file&gt;_**<br />Select port at random and write it to this file.  (default is disabled)
+- **--work-queue-preferred-connection=_&lt;connection&gt;_**<br />Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
 
 
 ## EXIT STATUS

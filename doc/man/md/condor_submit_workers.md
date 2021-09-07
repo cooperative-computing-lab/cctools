@@ -27,15 +27,11 @@
 **condor_submit_workers** - submit work_queue_worker to the Condor grid.
 
 ## SYNOPSIS
-```
-****condor_submit_workers [options] <servername> <port> <num-workers>****
-```
+**condor_submit_workers [options] _&lt;servername&gt;_ _&lt;port&gt;_ _&lt;num-workers&gt;_**
 
 or
 
-```
-****condor_submit_workers [options] --manager-name <name> <num-workers>****
-```
+**condor_submit_workers [options] --manager-name _&lt;name&gt;_ _&lt;num-workers&gt;_**
 
 
 ## DESCRIPTION
@@ -50,30 +46,32 @@ the catalog server by specifying the name of the work queue using the --manager-
 
 ## OPTIONS
 
-- **-M --manager-name <name>** Name of the preferred manager for worker.
-- **-C --catalog <catalog>** Set catalog server to <catalog>. <catalog> format: HOSTNAME:PORT.
-- **-t --timeout <time>** Abort after this amount of idle time (default=900s).
-- **-d --debug <subsystem>** Enable debugging on worker for this subsystem (try -d all to start).
-- **-w --tcp-window-size <size>** Set TCP window size
-- **-i --min-backoff <time>** Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
-- **-b --max-backoff <time>** Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
-- **-z --disk-threshold <size>** Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
-- **-A --arch <arch>** Set architecture string for the worker to report to manager instead of the value in uname.
-- **-O --os <os>** Set operating system string for the worker to report to manager instead of the value in uname.
-- **-s --workdir <path>** Set the location for creating the working directory of the worker.
-- **-P --password <file>** Password file to authenticate workers to manager.
-- **-E --worker-options <<str>>** Extra options passed to work_queue_worker
+- **-M**,**--manager-name=_&lt;name&gt;_**<br />Name of the preferred manager for worker.
+- **-C**,**--catalog=_&lt;catalog&gt;_**<br />Set catalog server to _&lt;catalog&gt;_. _&lt;catalog&gt;_ format: HOSTNAME:PORT.
+- **-C**,**--catalog=_&lt;catalog&gt;_**<br />Set catalog server to _&lt;catalog&gt;_. _&lt;catalog&gt;_ format: HOSTNAME:PORT.
+- **-t**,**--timeout=_&lt;time&gt;_**<br />Abort after this amount of idle time (default=900s).
+- **-d**,**--debug=_&lt;subsystem&gt;_**<br />Enable debugging on worker for this subsystem (try -d all to start).
+- **-w**,**--tcp-window-size=_&lt;size&gt;_**<br />Set TCP window size
+- **-i**,**--min-backoff=_&lt;time&gt;_**<br />Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+- **-b**,**--max-backoff=_&lt;time&gt;_**<br />Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
+- **-z**,**--disk-threshold=_&lt;size&gt;_**<br />Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
+- **-A**,**--arch=_&lt;arch&gt;_**<br />Set architecture string for the worker to report to manager instead of the value in uname.
+- **-O**,**--os=_&lt;os&gt;_**<br />Set operating system string for the worker to report to manager instead of the value in uname.
+- **-s**,**--workdir=_&lt;path&gt;_**<br />Set the location for creating the working directory of the worker.
+- **-P**,**--password=_&lt;file&gt;_**<br />Password file to authenticate workers to manager.
+- **-E**,**--worker-options=_&lt;str&gt;_**<br />Extra options passed to work_queue_worker
 
-- **--cores cores** Set the number of cores each worker should use (0=auto). (default=1)
-- **--memory size** Manually set the amonut of memory (in MB) reported by this worker.
-- **--disk size** Manually set the amount of disk (in MB) reported by this worker.
+- **--cores=_&lt;cores&gt;_**<br />Set the number of cores each worker should use (0=auto). (default=1)
+- **--memory=_&lt;size&gt;_**<br />Manually set the amonut of memory (in MB) reported by this worker.
+- **--disk=_&lt;size&gt;_**<br />Manually set the amount of disk (in MB) reported by this worker.
 
-- **-r --requirements <<reqs>>** Condor requirements expression.
-- **--class-ad <ad>** Extra condor class ad. May be specified multiple times.
-- **--autosize** Condor will automatically size the worker to the slot.
-- **--docker-universe <image>** Run worker inside <image> using condor's docker universe
+- **-r**,**--requirements=_&lt;reqs&gt;_**<br />Condor requirements expression.
+- **--class-ad=_&lt;ad&gt;_**<br />Extra condor class ad. May be specified multiple times.
+- **--autosize**<br />Condor will automatically size the worker to the slot.
+- **--docker-universe=_&lt;image&gt;_**<br />Run worker inside _&lt;image&gt;_ using condor's docker universe
+- **--docker-universe=_&lt;image&gt;_**<br />Run worker inside _&lt;image&gt;_ using condor's docker universe
 
-- **-h,--help** Show help message.
+- **-h**,**--help**<br />Show help message.
 
 
 

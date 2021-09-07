@@ -27,15 +27,15 @@
 **parrot_whoami** - returns the user's credentials (id and authentication method) from the perspective of the system being accessed.
 
 ## SYNOPSIS
-****parrot_whoami <path>****
+**parrot_whoami _&lt;path&gt;_**
 
 ## DESCRIPTION
 
-**parrot_whoami** interrogates the system being accessed at <path> and returns the user's id
+**parrot_whoami** interrogates the system being accessed at _&lt;path&gt;_ and returns the user's id
 from the perspective of that system as well as the authentication method being used.  The specific
 results depend on the system being accessed.
 
-If <path> is not provided the current working directory is used.
+If _&lt;path&gt;_ is not provided the current working directory is used.
 
 ## OPTIONS
 
@@ -52,7 +52,7 @@ To get the user's credentials when accessing a remote chirp server:
 unix:joe
 ```
 
-If you're working within a remote directory, <path> is not necessary:
+If you're working within a remote directory, _&lt;path&gt;_ is not necessary:
 ```
 % parrot_run tcsh
 % cd /chirp/server.nd.edu/joe_data/data

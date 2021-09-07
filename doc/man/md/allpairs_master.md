@@ -27,15 +27,15 @@
 **allpairs_master** - executes All-Pairs workflow in parallel on distributed systems
 
 ## SYNOPSIS
-****allparis_master [options] <set A> <set B> <compare function>****
+**allparis_master [options] _&lt;set A&gt;_ _&lt;set B&gt;_ _&lt;compare function&gt;_**
 
 ## DESCRIPTION
 
 **allpairs_master** computes the Cartesian product of two sets
-(**<set A>** and **<set B>**), generating a matrix where each cell
-M[i,j] contains the output of the function F (**<compare function>**) on
-objects A[i] (an item in **<set A>**) and B[j] (an item in
-**<set B>**). The resulting matrix is displayed on the standard output,
+(**_&lt;set A&gt;_** and **_&lt;set B&gt;_**), generating a matrix where each cell
+M[i,j] contains the output of the function F (**_&lt;compare function&gt;_**) on
+objects A[i] (an item in **_&lt;set A&gt;_**) and B[j] (an item in
+**_&lt;set B&gt;_**). The resulting matrix is displayed on the standard output,
 one comparison result per line along with the associated X and Y indices.
 
 **allpairs_master** uses the Work Queue system to distribute tasks among
@@ -48,21 +48,21 @@ process and begin executing tasks.
 ## OPTIONS
 
 
-- **-p --port <port>** The port that the master will be listening on.
-- **-e --extra-args <args>** Extra arguments to pass to the comparison function.
-- **-f --input-file <file>** Extra input file needed by the comparison function. (may be given multiple times)
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-- **-O ----output-file <file>** Write task output to this file (default to standard output)
-- **-t --estimated-time <seconds>** Estimated time to run one comparison. (default chosen at runtime)
-- **-x --width <item>** Width of one work unit, in items to compare. (default chosen at runtime)
-- **-y --height <items>** Height of one work unit, in items to compare. (default chosen at runtime)
-- **-N --project-name <project>** Report the master information to a catalog server with the project name - <project>
-- **-P --priority <integer>** Priority. Higher the value, higher the priority.
-- **-d --debug <flag>** Enable debugging for this subsystem. (Try -d all to start.)
-- **-v, --version** Show program version.
-- **-h, --help ** Display this message.
-- **-Z --port-file <file>** Select port at random and write it to this file.  (default is disabled)
-- **--work-queue-preferred-connection connection** Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
+- **-p**,**--port=_&lt;port&gt;_**<br />The port that the master will be listening on.
+- **-e**,**--extra-args=_&lt;args&gt;_**<br />Extra arguments to pass to the comparison function.
+- **-f**,**--input-file=_&lt;file&gt;_**<br />Extra input file needed by the comparison function. (may be given multiple times)
+- **-o**,**--debug-file=_&lt;file&gt;_**<br />Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+- **-O**,**----output-file=_&lt;file&gt;_**<br />Write task output to this file (default to standard output)
+- **-t**,**--estimated-time=_&lt;seconds&gt;_**<br />Estimated time to run one comparison. (default chosen at runtime)
+- **-x**,**--width=_&lt;item&gt;_**<br />Width of one work unit, in items to compare. (default chosen at runtime)
+- **-y**,**--height=_&lt;items&gt;_**<br />Height of one work unit, in items to compare. (default chosen at runtime)
+- **-N**,**--project-name=_&lt;project&gt;_**<br />Report the master information to a catalog server with the project name - _&lt;project&gt;_
+- **-P**,**--priority=_&lt;integer&gt;_**<br />Priority. Higher the value, higher the priority.
+- **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for this subsystem. (Try -d all to start.)
+- **-v**,**--version**<br />Show program version.
+- **-h**,**--help**<br />Display this message.
+- **-Z**,**--port-file=_&lt;file&gt;_**<br />Select port at random and write it to this file.  (default is disabled)
+- **--work-queue-preferred-connection=_&lt;connection&gt;_**<br />Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
 
 
 ## EXIT STATUS

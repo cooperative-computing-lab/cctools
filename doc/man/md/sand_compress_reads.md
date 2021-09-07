@@ -27,7 +27,7 @@
 **sand_compress_reads** - compress sequence data
 
 ## SYNOPSIS
-****sand_compress_reads [-qcivh] [infile] [outfile]****
+**sand_compress_reads [-qcivh] [infile] [outfile]**
 
 ## DESCRIPTION
 
@@ -43,11 +43,11 @@ line of sequences and bytes compressed.
 ## OPTIONS
 
 
-- **-q** Quiet mode: suppress summary line.
-- **-c** Remove Celera read ids if data came from the Celera gatekeeper.
-- **-i** Remove Celera read ids but leave internal ids if the data came from the Celera gatekeeper.
-- **-h** Display version information.
-- **-v** Show help text.
+- **-q**<br />Quiet mode: suppress summary line.
+- **-c**<br />Remove Celera read ids if data came from the Celera gatekeeper.
+- **-i**<br />Remove Celera read ids but leave internal ids if the data came from the Celera gatekeeper.
+- **-h**<br />Display version information.
+- **-v**<br />Show help text.
 
 
 ## EXIT STATUS

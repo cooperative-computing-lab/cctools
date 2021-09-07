@@ -27,7 +27,7 @@
 **catalog_update** - send update to catalog server
 
 ## SYNOPSIS
-****catalog_update [options] [name=value] ..****
+**catalog_update [options] [name=value] ..**
 
 ## DESCRIPTION
 
@@ -38,12 +38,12 @@ catalog server via a short UDP packet.
 ## OPTIONS
 
 
-- **-c --catalog <host>** Send update to this catalog host.
-- **-f --file <json-file>**  Send additional JSON attributes in this file.
-- **-d --debug <flags>**  Enable debug flags.
-- **-o --debug-file <file>**  Send debug output to this file.
-- **-v version**  Show software version.
-- **-h help**  Show all options.
+- **-c**,**--catalog=_&lt;host&gt;_**<br />Send update to this catalog host.
+- **-f**,**--file=_&lt;json-file&gt;_**<br /> Send additional JSON attributes in this file.
+- **-d**,**--debug=_&lt;flags&gt;_**<br /> Enable debug flags.
+- **-o**,**--debug-file=_&lt;file&gt;_**<br /> Send debug output to this file.
+- **-v** _&lt;version&gt;_<br /> Show software version.
+- **-h** _&lt;help&gt;_<br /> Show all options.
 
 
 The **catalog_update** tool sends a custom message to the catalog
@@ -52,19 +52,19 @@ the host.  By default, the **catalog_update** tool includes the following
 fields in the update:
 
 
-- ****type**** This describes the node type (default is "node").
-- ****version**** This is the version of CCTools.
-- ****cpu**** This is CPU architecture of the machine.
-- ****opsys**** This is operating system of the machine.
-- ****opsysversion**** This is operating system version of the machine.
-- ****load1**** This is 1-minute load of the machine.
-- ****load5**** This is 5-minute load of the machine.
-- ****load15**** This is 15-minute load of the machine.
-- ****memory_total**** This is total amount of memory on the machine
-- ****memory_avail**** This is amount of available memory on the machine
-- ****cpus**** This is number of detected CPUs on the machine.
-- ****uptime**** This how long the machine has been running.
-- ****owner**** This is user who sent the update.
+- **type** This describes the node type (default is "node").
+- **version** This is the version of CCTools.
+- **cpu** This is CPU architecture of the machine.
+- **opsys** This is operating system of the machine.
+- **opsysversion** This is operating system version of the machine.
+- **load1** This is 1-minute load of the machine.
+- **load5** This is 5-minute load of the machine.
+- **load15** This is 15-minute load of the machine.
+- **memory_total** This is total amount of memory on the machine
+- **memory_avail** This is amount of available memory on the machine
+- **cpus** This is number of detected CPUs on the machine.
+- **uptime** This how long the machine has been running.
+- **owner** This is user who sent the update.
 
 
 
@@ -75,7 +75,7 @@ application which accepts incoming connections at **port**.
 ## ENVIRONMENT VARIABLES
 
 
-- ****CATALOG_HOST**** Hostname of catalog server (same as **-c**).
+- **CATALOG_HOST** Hostname of catalog server (same as **-c**).
 
 
 ## EXIT STATUS

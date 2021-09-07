@@ -29,7 +29,7 @@
 
 ## SYNOPSIS
 
-****poncho_package_analyze [options] <python-script ...>  <json-output-file>****
+**poncho_package_analyze [options] _&lt;python-script ...&gt;_  _&lt;json-output-file&gt;_**
 
 ## DESCRIPTION
 
@@ -40,11 +40,11 @@ The **python-script ...** argument is the path(s) to the Python script(s) to be 
 ## OPTIONS
 
 
-- **-h**                    Show this help message
-- **--toplevel**                    Only include imports at the top level of the script.
-- **--function FUNCTION**           Only include imports in the given function.
-- **--pkg-mapping IMPORT=NAME**     Specify that the module imported as IMPORT in the code is provided by the pip/conda package NAME.
-- **--extra-pkg**                    Also include the pip/conda package PKG, even if it does not appear in the sources. May be useful for scripts that execute other (possibly non-Python) components that must also be included.
+- **-h**,**--help**<br /> Show this help message
+- **--toplevel**<br /> Only include imports at the top level of the script.
+- **--function=_&lt;_&lt;fn&gt;_&gt;_**<br /> Only include imports in the given function.
+- **--pkg-mapping=_&lt;_&lt;import=name&gt;_&gt;_**<br /> Specify that the module imported as _&lt;import&gt;_ in the code is provided by the pip/conda package _&lt;name&gt;_.
+- **--extra-pkg=_&lt;pkg&gt;_**<br /> Also include the pip/conda package _&lt;pkg&gt;_, even if it does not appear in the sources. May be useful for scripts that execute other (possibly non-Python) components that must also be included.
 
 
 ## EXIT

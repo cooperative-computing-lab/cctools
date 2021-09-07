@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(deltadb_query) - query historical data stored by the catalog server.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(deltadb_query --db [source_directory] --from [starttime] --to [endtime] [--filter [expr]] [--where [expr]] [--output [expr]]))
+CODE(deltadb_query --db [source_directory] --from [starttime] --to [endtime] [--filter [expr]] [--where [expr]] [--output [expr]])
 
 SECTION(DESCRIPTION)
 
@@ -21,15 +21,15 @@ A paper entitled DeltaDB describes the operation of the tools in detail (see ref
 
 SECTION(ARGUMENTS)
 OPTIONS_BEGIN
-OPTION_ITEM(--db path) Query this database directory.
-OPTION_ITEM(--file path) Query the data stream in this file.
-OPTION_ITEM(--from time) (required) The starting date and time of the query in an absolute time like "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD" or a relative time like 5s, 5m, 5h, 5d to indicate five seconds, minutes, hours, or days ago, respectively.
-OPTION_ITEM(--to time) The ending time of the query, in the same format as the --from option.  If omitted, the current time is assumed.
-OPTION_ITEM(--every interval) The intervals at which output should be produced, like 5s, 5m, 5h, 5d to indicate five seconds, minutes, hours, or days ago, respectively.
-OPTION_ITEM(--epoch) Causes the output to be expressed in integer Unix epoch time, instead of a formatted time.
-OPTION_ITEM(--filter expr) (multiple) If given, only records matching this expression will be processed.  Use --filter to apply expressions that do not change over time, such as the name or type of a record.
-OPTION_ITEM(--where expr)  (multiple) If given, only records matching this expression will be displayed.  Use --where to apply expressions that may change over time, such as load average or storage space consumed.
-OPTION_ITEM(--output expr) (multiple) Display this expression on the output.
+OPTION_ARG_LONG(--db, path) Query this database directory.
+OPTION_ARG_LONG(--file, path) Query the data stream in this file.
+OPTION_ARG_LONG(--from, time) (required) The starting date and time of the query in an absolute time like "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD" or a relative time like 5s, 5m, 5h, 5d to indicate five seconds, minutes, hours, or days ago, respectively.
+OPTION_ARG_LONG(--to, time) The ending time of the query, in the same format as the --from option.  If omitted, the current time is assumed.
+OPTION_ARG_LONG(--every, interval) The intervals at which output should be produced, like 5s, 5m, 5h, 5d to indicate five seconds, minutes, hours, or days ago, respectively.
+OPTION_FLAG_LONG(--epoch), Causes the output to be expressed in integer Unix epoch time, instead of a formatted time.
+OPTION_ARG_LONG(--filter, expr) (multiple) If given, only records matching this expression will be processed.  Use --filter to apply expressions that do not change over time, such as the name or type of a record.
+OPTION_ARG_LONG(--where, expr)  (multiple) If given, only records matching this expression will be displayed.  Use --where to apply expressions that may change over time, such as load average or storage space consumed.
+OPTION_ARG_LONG(--output, expr) (multiple) Display this expression on the output.
 OPTIONS_END
 
 SECTION(JX QUERY LANGUAGE)

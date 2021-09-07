@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(makeflow_amazon_batch_setup) - set up Amazon services for running Makeflow
 
 SECTION(SYNOPSIS)
-CODE(BOLD(makeflow_amazon_batch_setup PARAM(desired-num-cores) PARAM(min-num-cores) PARAM(max-num-cores) PARAM(config-file) ))
+CODE(makeflow_amazon_batch_setup PARAM(desired-num-cores) PARAM(min-num-cores) PARAM(max-num-cores) PARAM(config-file) )
 
 SECTION(DESCRIPTION)
 
