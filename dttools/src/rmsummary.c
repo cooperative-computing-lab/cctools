@@ -363,7 +363,11 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 			jx_insert_integer(output, "last_error", s->last_error);
 		}
 
-		jx_insert_integer(output, "exit_status", s->exit_status);
+		if(s->snapshot_name) {
+			jx_insert_string(output, "snapshot_name", s->snapshot_name);
+		} else {
+			jx_insert_integer(output, "exit_status", s->exit_status);
+		}
 
 		if(s->command) {
 			jx_insert_string(output, "command",   s->command);
