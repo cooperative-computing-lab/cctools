@@ -307,6 +307,17 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 	struct jx *output = jx_object(NULL);
 
 	if(!only_resources) {
+		if(s->snapshots_count > 0) {
+			int i;
+			struct jx *snapshots = jx_array(NULL);
+			for(i=s->snapshots_count - 1; i >= 0; i--) {
+				struct jx *j = rmsummary_to_json(s->snapshots[i], 1);
+				jx_insert(j, jx_string("snapshot_name"), jx_string(s->snapshots[i]->snapshot_name));
+				jx_array_insert(snapshots, j);
+			}
+			jx_insert(output, jx_string("snapshots"), snapshots);
+		}
+
 		if(s->peak_times) {
 			struct jx *peaks = peak_times_to_json(s->peak_times);
 			jx_insert(output, jx_string("peak_times"), peaks);
@@ -352,7 +363,11 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 			jx_insert_integer(output, "last_error", s->last_error);
 		}
 
-		jx_insert_integer(output, "exit_status", s->exit_status);
+		if(s->snapshot_name) {
+			jx_insert_string(output, "snapshot_name", s->snapshot_name);
+		} else {
+			jx_insert_integer(output, "exit_status", s->exit_status);
+		}
 
 		if(s->command) {
 			jx_insert_string(output, "command",   s->command);

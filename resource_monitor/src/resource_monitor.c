@@ -233,7 +233,7 @@ char *snapshot_watch_events_file = NULL;   /* name of the file with a jx documen
 											  A snapshot is generated when pattern matches a line in the file FILENAME. */
 
 
-struct list *snapshots = NULL;          /* list of snapshots, as json objects. */
+struct list *snapshots = NULL;          /* list of snapshots, as struct rmsummary's . */
 
 struct list *snapshot_labels = NULL;    /* list of labels for current snapshot. */
 
@@ -401,15 +401,16 @@ void add_snapshots() {
 		return;
 	}
 
-	struct jx *a = jx_array(0);
+	summary->snapshots_count = list_size(snapshots);
+	summary->snapshots = calloc(summary->snapshots_count, sizeof(struct rmsummary *));
 
-	struct jx *j;
+	struct rmsummary *s;
+	int count = 0;
 	list_first_item(snapshots);
-	while((j = list_next_item(snapshots))) {
-		jx_array_insert(a, j);
+	while((s = list_pop_head(snapshots))) {
+		summary->snapshots[count] = s;
+		count++;
 	}
-
-	jx_insert(verbatim_summary_fields, jx_string("snapshots"), a);
 }
 
 
@@ -1061,12 +1062,11 @@ int record_snapshot(struct rmsummary *tr) {
 		snapshots = list_create();
 	}
 
-	snapshot->end       = ((double) usecs_since_epoch() / ONE_SECOND);
-	snapshot->wall_time = snapshot->end - snapshot->start;
+	struct rmsummary *freeze = rmsummary_copy(snapshot, 0);
 
-	struct jx *j = rmsummary_to_json(tr, /* only resources */ 1);
-
-	jx_insert_string(j, "snapshot_name", buffer_tostring(&b));
+	freeze->end       = ((double) usecs_since_epoch() / ONE_SECOND);
+	freeze->wall_time = snapshot->end - snapshot->start;
+	freeze->snapshot_name = xxstrdup(buffer_tostring(&b));
 
 	char *output_file = string_format("%s.snapshot.%02d", template_path, list_size(snapshots));
 	FILE *snap_f = fopen(output_file, "w");
@@ -1074,14 +1074,13 @@ int record_snapshot(struct rmsummary *tr) {
 	if(!snap_f) {
 		warn(D_RMON, "Could not save snapshots file '%s': %s", output_file, strerror(errno));
 	} else {
-		jx_pretty_print_stream(j, snap_f);
+		rmsummary_print(snap_f, freeze, 1, NULL);
 		fclose(snap_f);
 	}
 
-	free(output_file);
+	list_push_tail(snapshots, freeze);
 
-	/* push to the front, since snapshots are writen in reverse order. */
-	list_push_head(snapshots, j);
+	free(output_file);
 
 	debug(D_RMON, "Recoded snapshot: '%s'", buffer_tostring(&b));
 
@@ -2098,7 +2097,7 @@ int rmonitor_resources(long int interval /*in seconds */)
 
 		if(record_snapshot(snapshot)) {
 			rmsummary_delete(snapshot);
-			snapshot = calloc(1, sizeof(*snapshot));
+			snapshot = rmsummary_create(-1);
 			snapshot->start = ((double) usecs_since_epoch()) / ONE_SECOND;
 		}
 
