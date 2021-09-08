@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(replica_exchange) -  Work Queue application for running replica exchange simulations using ProtoMol
 
 SECTION(SYNOPSIS)
-CODE(BOLD(replica_exchange [options] PARAM(pdb_file) PARAM(psf_file) PARAM(par_file) PARAM(min_temp) PARAM(max_temp) PARAM(num_replicas)))
+CODE(replica_exchange [options] PARAM(pdb_file) PARAM(psf_file) PARAM(par_file) PARAM(min_temp) PARAM(max_temp) PARAM(num_replicas))
 
 SECTION(DESCRIPTION)
 BOLD(replica_exchange) is a Work Queue application for running replica exchange simulations using the ProtoMol simulation package. The application supports both barrier and non-barrier based runs.
@@ -20,17 +20,17 @@ BOLD(replica_exchange) can be run on any machine accesible to work_queue_worker 
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_PAIR(-n, name)Specify a project name for using exclusive work_queue_worker instances.
-OPTION_PAIR(-x, filename)Specify the name of the xyz file for output.
-OPTION_PAIR(-d, filename)Specify the name of the dcd file for output.
-OPTION_PAIR(-m, number)Specify the number of monte carlo steps. Default = 100.
-OPTION_PAIR(-s, number)Specify the number of molecular dynamics steps. Default = 10000.
-OPTION_PAIR(-p, path)Specify path for storing output files.
-OPTION_ITEM(-q)Assign closer temperature values to replicas in the first and last quartile.
-OPTION_ITEM(-i)Assume ProtoMol is installed and available in PATH on worker site.
-OPTION_ITEM(-b)Use barrier in waiting for all replicas to finish their steps before attempting exchange.
-OPTION_ITEM(-l)Print debuggging information.
-OPTION_ITEM(-h)Show this help message.
+OPTION_ARG_SHORT(n, name)Specify a project name for using exclusive work_queue_worker instances.
+OPTION_ARG_SHORT(x, filename)Specify the name of the xyz file for output.
+OPTION_ARG_SHORT(d, filename)Specify the name of the dcd file for output.
+OPTION_ARG_SHORT(m, number)Specify the number of monte carlo steps. Default = 100.
+OPTION_ARG_SHORT(s, number)Specify the number of molecular dynamics steps. Default = 10000.
+OPTION_ARG_SHORT(p, path)Specify path for storing output files.
+OPTION_FLAG_SHORT(q)Assign closer temperature values to replicas in the first and last quartile.
+OPTION_FLAG_SHORT(i)Assume ProtoMol is installed and available in PATH on worker site.
+OPTION_FLAG_SHORT(b)Use barrier in waiting for all replicas to finish their steps before attempting exchange.
+OPTION_FLAG_SHORT(l)Print debuggging information.
+OPTION_FLAG_SHORT(h)Show this help message.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

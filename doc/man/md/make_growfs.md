@@ -27,7 +27,7 @@
 **make_growfs** - generate directory listings for the GROW filesystem
 
 ## SYNOPSIS
-****make_growfs [options] <directory>****
+**make_growfs [options] _&lt;directory&gt;_**
 
 ## DESCRIPTION
 
@@ -44,13 +44,13 @@ with complete metadata.
 ## OPTIONS
 
 
-- **-v** Give verbose messages.
-- **-K** Create checksums for files. (default)
-- **-k** Disable checksums for files.
-- **-f** Follow all symbolic links.
-- **-F** Do not follow any symbolic links.
-- **-a** Only follow links that fall outside the root.  (default)
-- **-h** Show help text.
+- **-v**<br />Give verbose messages.
+- **-K**<br />Create checksums for files. (default)
+- **-k**<br />Disable checksums for files.
+- **-f**<br />Follow all symbolic links.
+- **-F**<br />Do not follow any symbolic links.
+- **-a**<br />Only follow links that fall outside the root.  (default)
+- **-h**<br />Show help text.
 
 
 ## EXIT STATUS
@@ -79,7 +79,7 @@ to treat the web address as a read-only filesystem:
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -89,4 +89,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [parrot_run(1)](parrot_run.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

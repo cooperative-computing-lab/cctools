@@ -27,7 +27,7 @@
 **maker_wq** - Run the Maker genome annotation tool using Work Queue to harness heterogenous resources
 
 ## SYNOPSIS
-****maker_wq [options] <maker_opts> <maker_bopts> <maker_exe> ****
+**maker_wq [options] maker_opts maker_bopts maker_exe **
 
 ## DESCRIPTION
 **maker_wq** is a manager script to run the Maker genome annotation tool using Work Queue to enable the user to harness the heterogenous power of multiple systems simultaneously. It accepts all of the Maker inputs. The primary difference is that the MPI code has been replaced with Work Queue components.
@@ -36,9 +36,9 @@
 
 ## OPTIONS
 
-- **-port port** Specify the port on which to create the Work Queue
-- **-fa fast_abort** Specify a fast abort multiplier
-- **-M project** Specify a project name for utilizing shared workers
+- **-port** _&lt;port&gt;_<br />Specify the port on which to create the Work Queue
+- **-fa** _&lt;fast_abort&gt;_<br />Specify a fast abort multiplier
+- **-M** _&lt;project&gt;_<br />Specify a project name for utilizing shared workers
 
 
 ## EXIT STATUS
@@ -56,8 +56,8 @@ This will begin the Maker run. All that is needed now is to submit workers that 
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(catalog_server) - start a catalog server
 
 SECTION(SYNOPSIS)
-CODE(BOLD(catalog_server [options]))
+CODE(catalog_server [options])
 
 SECTION(DESCRIPTION)
 
@@ -38,35 +38,35 @@ overwriting another service's record.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(`-b, --background')Run as a daemon.
-OPTION_TRIPLET(-B, pid-file,file)Write process identifier (PID) to file.
-OPTION_TRIPLET(-d, debug, flag)Enable debugging for this subsystem
-OPTION_ITEM(`-h, --help')Show this help screen
-OPTION_TRIPLET(-H, history, directory) Store catalog history in this directory.  Enables fast data recovery after a failure or restart, and enables historical queries via deltadb_query.
-OPTION_TRIPLET(-I, interface, addr)Listen only on this network interface.
-OPTION_TRIPLET(-l, lifetime, secs)Lifetime of data, in seconds (default is 1800)
-OPTION_TRIPLET(-L, update-log,file)Log new updates to this file.
-OPTION_TRIPLET(-m, max-jobs,n)Maximum number of child processes.  (default is 50)
-OPTION_TRIPLET(-M, server-size, size)Maximum size of a server to be believed.  (default is any)
-OPTION_TRIPLET(-n, name, name)Set the preferred hostname of this server.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-OPTION_TRIPLET(-O, debug-rotate-max, bytes)Rotate debug file once it reaches this size (default 10M, 0 disables).
-OPTION_TRIPLET(-p,, port, port)Port number to listen on (default is 9097)
-OPTION_ITEM(`-S, --single')Single process mode; do not fork on queries.
-OPTION_TRIPLET(-T, timeout, time)Maximum time to allow a query process to run.  (default is 60s)
-OPTION_TRIPLET(-u, update-host, host)Send status updates to this host. (default is catalog.cse.nd.edu,backup-catalog.cse.nd.edu)
-OPTION_TRIPLET(-U, update-interval, time)Send status updates at this interval. (default is 5m)
-OPTION_ITEM(`-v, --version')Show version string
-OPTION_TRIPLET(-Z,port-file,file)Select port at random and write it to this file.  (default is disabled)
+OPTION_FLAG(b,background)Run as a daemon.
+OPTION_ARG(B, pid-file,file)Write process identifier (PID) to file.
+OPTION_ARG(d, debug, flag)Enable debugging for this subsystem
+OPTION_FLAG(h,help)Show this help screen
+OPTION_ARG(H, history, directory) Store catalog history in this directory.  Enables fast data recovery after a failure or restart, and enables historical queries via deltadb_query.
+OPTION_ARG(I, interface, addr)Listen only on this network interface.
+OPTION_ARG(l, lifetime, secs)Lifetime of data, in seconds (default is 1800)
+OPTION_ARG(L, update-log,file)Log new updates to this file.
+OPTION_ARG(m, max-jobs,n)Maximum number of child processes.  (default is 50)
+OPTION_ARG(M, server-size, size)Maximum size of a server to be believed.  (default is any)
+OPTION_ARG(n, name, name)Set the preferred hostname of this server.
+OPTION_ARG(o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+OPTION_ARG(O, debug-rotate-max, bytes)Rotate debug file once it reaches this size (default 10M, 0 disables).
+OPTION_ARG(p,, port, port)Port number to listen on (default is 9097)
+OPTION_FLAG(S,single)Single process mode; do not fork on queries.
+OPTION_ARG(T, timeout, time)Maximum time to allow a query process to run.  (default is 60s)
+OPTION_ARG(u, update-host, host)Send status updates to this host. (default is catalog.cse.nd.edu,backup-catalog.cse.nd.edu)
+OPTION_ARG(U, update-interval, time)Send status updates at this interval. (default is 5m)
+OPTION_FLAG(v,version)Show version string
+OPTION_ARG(Z,port-file,file)Select port at random and write it to this file.  (default is disabled)
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM(CODE(BOLD(CATALOG_HOST)) Hostname of catalog server (same as CODE(-u)).)
-LIST_ITEM(CODE(BOLD(CATALOG_PORT)) Port number of catalog server to be contacted.)
-LIST_ITEM(CODE(BOLD(TCP_LOW_PORT)) Inclusive low port in range used with CODE(-Z).)
-LIST_ITEM(CODE(BOLD(TCP_HIGH_PORT)) Inclusive high port in range used with CODE(-Z).)
+LIST_ITEM(CODE(CATALOG_HOST)) Hostname of catalog server (same as CODE(-u)).
+LIST_ITEM(CODE(CATALOG_PORT)) Port number of catalog server to be contacted.
+LIST_ITEM(CODE(TCP_LOW_PORT)) Inclusive low port in range used with CODE(-Z).
+LIST_ITEM(CODE(TCP_HIGH_PORT)) Inclusive high port in range used with CODE(-Z).
 LIST_END
 
 SECTION(EXIT STATUS)

@@ -27,7 +27,7 @@
 **sand_align_master** - align candidate sequences in parallel
 
 ## SYNOPSIS
-****sand_align_master [options] sand_align_kernel candidates.cand sequences.cfa overlaps.ovl****
+**sand_align_master [options] sand_align_kernel candidates.cand sequences.cfa overlaps.ovl**
 
 ## DESCRIPTION
 
@@ -47,15 +47,15 @@ are performed by [sand_align_kernel(1)](sand_align_kernel.md) on each machine.
 ## OPTIONS
 
 
-- **-p port** Port number for work queue master to listen on. (default: 9123)
-- **-n number** Maximum number of candidates per task. (default is 10000)
-- **-e args** Extra arguments to pass to the alignment program.
-- **-d subsystem** Enable debugging for this subsystem. (Try **-d all** to start.)
-- **-F mult** Work Queue fast abort multiplier.(default is 10.)
-- **-Z file** Select port at random and write it out to this file.
-- **-o file** Send debugging to this file.
-- **-v** Show version string.
-- **-h** Show help text.
+- **-p** _&lt;port&gt;_<br />Port number for work queue master to listen on. (default: 9123)
+- **-n** _&lt;number&gt;_<br />Maximum number of candidates per task. (default is 10000)
+- **-e** _&lt;args&gt;_<br />Extra arguments to pass to the alignment program.
+- **-d** _&lt;subsystem&gt;_<br />Enable debugging for this subsystem. (Try **-d all** to start.)
+- **-F** _&lt;mult&gt;_<br />Work Queue fast abort multiplier.(default is 10.)
+- **-Z** _&lt;file&gt;_<br />Select port at random and write it out to this file.
+- **-o** _&lt;file&gt;_<br />Send debugging to this file.
+- **-v**<br />Show version string.
+- **-h**<br />Show help text.
 
 
 ## EXIT STATUS
@@ -78,7 +78,7 @@ on other machines, or use [condor_submit_workers(1)](condor_submit_workers.md) o
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -88,4 +88,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [sand_filter_master(1)](sand_filter_master.md)  [sand_filter_kernel(1)](sand_filter_kernel.md)  [sand_align_master(1)](sand_align_master.md)  [sand_align_kernel(1)](sand_align_kernel.md)  [sand_compress_reads(1)](sand_compress_reads.md)  [sand_uncompress_reads(1)](sand_uncompress_reads.md)  [work_queue_worker(1)](work_queue_worker.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

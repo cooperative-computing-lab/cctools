@@ -27,7 +27,7 @@
 **Confuga** - An active storage cluster file system.
 
 ## SYNOPSIS
-****chirp_server --jobs --root=<Confuga URI> [options]****
+**chirp_server --jobs --root=_&lt;Confuga URI&gt;_ [options]**
 
 ## DESCRIPTION
 
@@ -55,12 +55,12 @@ below.  Examples demonstrating how to start Confuga and a small cluster are at
 the end of this manual.
 
 
-- **auth method** Enable this method for Head Node to Storage Node authentication. The default is to enable all available authentication mechanisms.
-- **concurrency limit** Limits the number of concurrent jobs executed by the cluster. The default is 0 for limitless.
-- **pull-threshold bytes** Sets the threshold for pull transfers. The default is 128MB.
-- **replication type** Sets the replication mode for satisfying job dependencies. **type** may be **push-sync** or **push-async-N**. The default is **push-async-1**.
-- **scheduler type** Sets the scheduler used to assign jobs to storage nodes. The default is **fifo-0**.
-- **tickets tickets** Sets tickets to use for authenticating with storage nodes. Paths must be absolute.
+- **--auth=_&lt;method&gt;_**<br />Enable this method for Head Node to Storage Node authentication. The default is to enable all available authentication mechanisms.
+- **--concurrency=_&lt;limit&gt;_**<br />Limits the number of concurrent jobs executed by the cluster. The default is 0 for limitless.
+- **--pull-threshold=_&lt;bytes&gt;_**<br />Sets the threshold for pull transfers. The default is 128MB.
+- **--replication=_&lt;type&gt;_**<br />Sets the replication mode for satisfying job dependencies. **type** may be **push-sync** or **push-async-N**. The default is **push-async-1**.
+- **--scheduler=_&lt;type&gt;_**<br />Sets the scheduler used to assign jobs to storage nodes. The default is **fifo-0**.
+- **--tickets=_&lt;tickets&gt;_**<br />Sets tickets to use for authenticating with storage nodes. Paths must be absolute.
 
 
 ## STORAGE NODES
@@ -216,7 +216,7 @@ chirp_server --advertise=localhost \\
 ```
 
 ## COPYRIGHT
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 [confuga_adm(1)](confuga_adm.md) 
@@ -225,4 +225,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [chirp(1)](chirp.md)  [chirp_status(1)](chirp_status.md)  [chirp_fuse(1)](chirp_fuse.md)  [chirp_get(1)](chirp_get.md)  [chirp_put(1)](chirp_put.md)  [chirp_stream_files(1)](chirp_stream_files.md)  [chirp_distribute(1)](chirp_distribute.md)  [chirp_benchmark(1)](chirp_benchmark.md)  [chirp_server(1)](chirp_server.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

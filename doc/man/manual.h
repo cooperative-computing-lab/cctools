@@ -2,13 +2,13 @@ ifdef(`HTML',`include(manual_html.h)')dnl
 ifdef(`MD',`include(manual_md.h)')dnl
 ifdef(`MAN',`include(manual_man.h)')dnl
 changecom(`@@')dnl
-define(COPYRIGHT_BOILERPLATE,The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.)dnl
+define(COPYRIGHT_BOILERPLATE,The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.)dnl
 dnl
 define(SEE_ALSO_MAKEFLOW,
 `LIST_BEGIN
 LIST_ITEM(MANUAL(Cooperative Computing Tools Documentation,"../index.html"))
 LIST_ITEM(MANUAL(Makeflow User Manual,"../makeflow.html"))
-LIST_ITEM(MANPAGE(makeflow,1) MANPAGE(makeflow_monitor,1) MANPAGE(makeflow_analyze,1) MANPAGE(makeflow_viz,1) MANPAGE(makeflow_graph_log,1) MANPAGE(starch,1) MANPAGE(makeflow_ec2_setup,1) MANPAGE(makeflow_ec2_cleanup,1) MANPAGE(makeflow_ec2_estimate,1))
+LIST_ITEM(MANPAGE(makeflow,1) MANPAGE(makeflow_monitor,1) MANPAGE(makeflow_analyze,1) MANPAGE(makeflow_viz,1) MANPAGE(makeflow_graph_log,1) MANPAGE(starch,1) MANPAGE(makeflow_ec2_setup,1) MANPAGE(makeflow_ec2_cleanup,1))
 LIST_END')dnl
 dnl
 define(SEE_ALSO_WORK_QUEUE,

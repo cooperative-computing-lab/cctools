@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(starch) - STandalone application ARCHiver
 
 SECTION(SYNOPSIS)
-CODE(BOLD(starch [options] PARAM(sfx_path)))
+CODE(starch [options] PARAM(sfx_path))
 
 SECTION(DESCRIPTION)
 
@@ -30,15 +30,15 @@ PARA
 By default, CODE(starch) will use CODE(ldd) to detect any necessary libraries
 from the specified set of PARAM(executables) and include them in the CODE(SFX).
 OPTIONS_BEGIN
-OPTION_ITEM(-A)Do not automatically detect library dependencies.
-OPTION_PAIR(-C, cfg)Use configuration file.
-OPTION_PAIR(-c, cmd)Specify command to execute.
-OPTION_PAIR(-d, npath:opath)Add data (new path:old path).
-OPTION_PAIR(-e, env)Add environment script.
-OPTION_PAIR(-l, lib)Add library.
-OPTION_PAIR(-x, exe)Add executable.
-OPTION_ITEM(-h)Show help message and exit.
-OPTION_ITEM(-v)Display verbose messages (default: False).
+OPTION_FLAG_SHORT(A)Do not automatically detect library dependencies.
+OPTION_ARG_SHORT(C, cfg)Use configuration file.
+OPTION_ARG_SHORT(c, cmd)Specify command to execute.
+OPTION_ARG_SHORT(d, npath:opath)Add data (new path:old path).
+OPTION_ARG_SHORT(e, env)Add environment script.
+OPTION_ARG_SHORT(l, lib)Add library.
+OPTION_ARG_SHORT(x, exe)Add executable.
+OPTION_FLAG_SHORT(h)Show help message and exit.
+OPTION_FLAG_SHORT(v)Display verbose messages (default: False).
 OPTIONS_END
 Once a CODE(SFX) is generated, you can use it as a normal executable.
 

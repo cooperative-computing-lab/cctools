@@ -27,7 +27,7 @@
 **makeflow_mpi_starter** - mpi wrapper program for makeflow and workqueue
 
 ## SYNOPSIS
-****makeflow_mpi_starter [options]****
+**makeflow_mpi_starter [options]**
 
 ## DESCRIPTION
 
@@ -43,12 +43,12 @@ workflow specified by the **Makeflow** dagfile.
 
 ### Commands
 
-- **-m --makeflow-arguments <option>** Options to pass to makeflow, such as dagfile, etc
-- **-p --makeflow-port <port>** The port for Makeflow to use when communicating with workers
-- **-q --workqueue-arguments <option>** Options to pass to work_queue_worker
-- **-c --copy-out <location>** Where to copy out all files produced
-- **-d --debug <debugprefix>** Base Debug file name
-- **-h, --help** Print out this help
+- **-m**,**--makeflow-arguments=_&lt;option&gt;_**<br />Options to pass to makeflow, such as dagfile, etc
+- **-p**,**--makeflow-port=_&lt;port&gt;_**<br />The port for Makeflow to use when communicating with workers
+- **-q**,**--workqueue-arguments=_&lt;option&gt;_**<br />Options to pass to work_queue_worker
+- **-c**,**--copy-out=_&lt;location&gt;_**<br />Where to copy out all files produced
+- **-d**,**--debug=_&lt;debugprefix&gt;_**<br />Base Debug file name
+- **-h**,**--help**<br />Print out this help
 
 
 ## EXIT STATUS
@@ -87,16 +87,16 @@ mpirun -np $NSLOTS makeflow_mpi_starter -m "Makeflow.mf" -d mydebug
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [Makeflow User Manual]("../makeflow.html")
-- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md) [makeflow_ec2_estimate(1)](makeflow_ec2_estimate.md)
+- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md)
 
 
 SEE_ALSO_WORKQUEUE
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

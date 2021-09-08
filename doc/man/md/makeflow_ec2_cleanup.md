@@ -27,7 +27,7 @@
 **makeflow_ec2_cleanup** - clean up Amazon services after running Makeflow
 
 ## SYNOPSIS
-****makeflow_ec2_cleanup <config-file>****
+**makeflow_ec2_cleanup _&lt;config-file&gt;_**
 
 ## DESCRIPTION
 
@@ -54,14 +54,14 @@ makeflow_ec2_cleanup my.config
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [Makeflow User Manual]("../makeflow.html")
-- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md) [makeflow_ec2_estimate(1)](makeflow_ec2_estimate.md)
+- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

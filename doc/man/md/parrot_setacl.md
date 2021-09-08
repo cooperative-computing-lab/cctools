@@ -27,13 +27,13 @@
 **parrot_setacl** - set ACL information for Parrot filesystem
 
 ## SYNOPSIS
-****parrot_setacl <path> <subject> <rights>****
+**parrot_setacl _&lt;path&gt;_ _&lt;subject&gt;_ _&lt;rights&gt;_**
 
 ## DESCRIPTION
 **parrot_setacl** utilizes **Parrot** system calls to set the access
-control list (ACL) information for the directory specified by <path>.  The
-<subject> argument refers to the entity to authorize, while the
-<rights> argument is one of the following: read, write, admin, none.
+control list (ACL) information for the directory specified by _&lt;path&gt;_.  The
+_&lt;subject&gt;_ argument refers to the entity to authorize, while the
+_&lt;rights&gt;_ argument is one of the following: read, write, admin, none.
 
 Note, this program only works if it is executed under [parrot_run(1)](parrot_run.md) and if the
 underlying filesystem supports ACLs.
@@ -49,7 +49,7 @@ Set read and list permissions for subject "unix:user" on a **Chirp** directory:
 ```
 
 ## COPYRIGHT
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -58,4 +58,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [parrot_run(1)](parrot_run.md) [parrot_cp(1)](parrot_cp.md) [parrot_getacl(1)](parrot_getacl.md)  [parrot_setacl(1)](parrot_setacl.md)  [parrot_mkalloc(1)](parrot_mkalloc.md)  [parrot_lsalloc(1)](parrot_lsalloc.md)  [parrot_locate(1)](parrot_locate.md)  [parrot_timeout(1)](parrot_timeout.md)  [parrot_whoami(1)](parrot_whoami.md)  [parrot_mount(1)](parrot_mount.md)  [parrot_md5(1)](parrot_md5.md)  [parrot_package_create(1)](parrot_package_create.md)  [parrot_package_run(1)](parrot_package_run.md)  [chroot_package_run(1)](chroot_package_run.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

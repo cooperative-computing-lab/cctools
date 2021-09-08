@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(jx_repl) - interactive command line tool to explore the JX language.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(jx_repl))
+CODE(jx_repl)
 
 SECTION(DESCRIPTION)
 

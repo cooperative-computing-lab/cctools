@@ -27,7 +27,7 @@
 **work_queue_status** - display status of currently running Work Queue applications.
 
 ## SYNOPSIS
-****work_queue_status [options] [manager] [port]****
+**work_queue_status [options] [manager] [port]**
 
 ## DESCRIPTION
 
@@ -47,22 +47,23 @@ more detailed information about tasks and workers.
 
 ## OPTIONS
 
-- **--where expr**  Show only Work Queue managers matching this expression.
-- **-Q, --statistics** Show summary information about queues. (default)
-- **-M, --project-name=<name>** Filter results of -Q for managers matching <name>.
-- **-W, --workers** Show details of all workers connected to the manager.
-- **-T, --tasks** Show details of all tasks in the queue.
-- **-A, --able-workers** List categories of the given manager, size of largest task, and workers that can run it.
-- **-R, --resources** Show available resources for each manager.
-- **--capacity** Show resource capacities for each manager.
-- **-l, --verbose** Long output.
-- **-C --catalog <catalog>** Set catalog server to <catalog>. Format: HOSTNAME:PORT
-- **-d --debug <flag>** Enable debugging for the given subsystem. Try -d all as a start.
-- **-t --timeout <time>** RPC timeout (default=300s).
-- **-o --debug-file <file>** Send debugging to this file. (can also be :stderr, or :stdout)
-- **-O --debug-rotate-max <bytes>** Rotate debug file once it reaches this size.
-- **-v, --version** Show work_queue_status version.
-- **-h, --help** Show this help message.
+- **--where=_&lt;expr&gt;_**<br /> Show only Work Queue managers matching this expression.
+- **-Q**,**--statistics**<br />Show summary information about queues. (default)
+- **-M**,**--project-name=_&lt;name&gt;_**<br />Filter results of -Q for managers matching _&lt;name&gt;_.
+- **-W**,**--workers**<br />Show details of all workers connected to the manager.
+- **-T**,**--tasks**<br />Show details of all tasks in the queue.
+- **-A**,**--able-workers**<br />List categories of the given manager, size of largest task, and workers that can run it.
+- **-R**,**--resources**<br />Show available resources for each manager.
+- **--capacity**<br />Show resource capacities for each manager.
+- **-l**,**--verbose**<br />Long output.
+- **-C**,**--catalog=_&lt;catalog&gt;_**<br />Set catalog server to _&lt;catalog&gt;_. Format: HOSTNAME:PORT
+- **-C**,**--catalog=_&lt;catalog&gt;_**<br />Set catalog server to _&lt;catalog&gt;_. Format: HOSTNAME:PORT
+- **-d**,**--debug=_&lt;flag&gt;_**<br />Enable debugging for the given subsystem. Try -d all as a start.
+- **-t**,**--timeout=_&lt;time&gt;_**<br />RPC timeout (default=300s).
+- **-o**,**--debug-file=_&lt;file&gt;_**<br />Send debugging to this file. (can also be :stderr, or :stdout)
+- **-O**,**--debug-rotate-max=_&lt;bytes&gt;_**<br />Rotate debug file once it reaches this size.
+- **-v**,**--version**<br />Show work_queue_status version.
+- **-h**,**--help**<br />Show this help message.
 
 
 ## EXAMPLES
@@ -147,7 +148,7 @@ The value may have the following prefixes:
 
 - No prefix. The maximum value was manually specified.
 - ~ All the task have run with at most this quantity of resources.
-- > There is at least one task that has used more than this quantity of resources, but the maximum remains unknown.
+- ＞ There is at least one task that has used more than this quantity of resources, but the maximum remains unknown.
 
 
 
@@ -163,7 +164,7 @@ On success, returns zero.  On failure, returns non-zero.
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -173,4 +174,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [work_queue_worker(1)](work_queue_worker.md) [work_queue_status(1)](work_queue_status.md) [work_queue_factory(1)](work_queue_factory.md) [condor_submit_workers(1)](condor_submit_workers.md) [sge_submit_workers(1)](sge_submit_workers.md) [torque_submit_workers(1)](torque_submit_workers.md) 
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

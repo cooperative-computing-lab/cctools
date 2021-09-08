@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(catalog_update) - send update to catalog server
 
 SECTION(SYNOPSIS)
-CODE(BOLD(catalog_update [options] [name=value] ..))
+CODE(catalog_update [options] [name=value] ..)
 
 SECTION(DESCRIPTION)
 
@@ -16,12 +16,12 @@ catalog server via a short UDP packet.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_TRIPLET(-c, catalog, host)Send update to this catalog host.
-OPTION_TRIPLET(-f, file, json-file) Send additional JSON attributes in this file.
-OPTION_TRIPLET(-d, debug, flags) Enable debug flags.
-OPTION_TRIPLET(-o, debug-file, file) Send debug output to this file.
-OPTION_PAIR(-v,version) Show software version.
-OPTION_PAIR(-h, help) Show all options.
+OPTION_ARG(c, catalog, host)Send update to this catalog host.
+OPTION_ARG(f, file, json-file) Send additional JSON attributes in this file.
+OPTION_ARG(d, debug, flags) Enable debug flags.
+OPTION_ARG(o, debug-file, file) Send debug output to this file.
+OPTION_ARG_SHORT(v,version) Show software version.
+OPTION_ARG_SHORT(h, help) Show all options.
 
 PARA
 The CODE(catalog_update) tool sends a custom message to the catalog
@@ -30,19 +30,19 @@ the host.  By default, the CODE(catalog_update) tool includes the following
 fields in the update:
 
 LIST_BEGIN
-LIST_ITEM(CODE(BOLD(type)) This describes the node type (default is "node").)
-LIST_ITEM(CODE(BOLD(version)) This is the version of CCTools.)
-LIST_ITEM(CODE(BOLD(cpu)) This is CPU architecture of the machine.)
-LIST_ITEM(CODE(BOLD(opsys)) This is operating system of the machine.)
-LIST_ITEM(CODE(BOLD(opsysversion)) This is operating system version of the machine.)
-LIST_ITEM(CODE(BOLD(load1)) This is 1-minute load of the machine.)
-LIST_ITEM(CODE(BOLD(load5)) This is 5-minute load of the machine.)
-LIST_ITEM(CODE(BOLD(load15)) This is 15-minute load of the machine.)
-LIST_ITEM(CODE(BOLD(memory_total)) This is total amount of memory on the machine)
-LIST_ITEM(CODE(BOLD(memory_avail)) This is amount of available memory on the machine)
-LIST_ITEM(CODE(BOLD(cpus)) This is number of detected CPUs on the machine.)
-LIST_ITEM(CODE(BOLD(uptime)) This how long the machine has been running.)
-LIST_ITEM(CODE(BOLD(owner)) This is user who sent the update.)
+LIST_ITEM(CODE(type)) This describes the node type (default is "node").
+LIST_ITEM(CODE(version)) This is the version of CCTools.
+LIST_ITEM(CODE(cpu)) This is CPU architecture of the machine.
+LIST_ITEM(CODE(opsys)) This is operating system of the machine.
+LIST_ITEM(CODE(opsysversion)) This is operating system version of the machine.
+LIST_ITEM(CODE(load1)) This is 1-minute load of the machine.
+LIST_ITEM(CODE(load5)) This is 5-minute load of the machine.
+LIST_ITEM(CODE(load15)) This is 15-minute load of the machine.
+LIST_ITEM(CODE(memory_total)) This is total amount of memory on the machine
+LIST_ITEM(CODE(memory_avail)) This is amount of available memory on the machine
+LIST_ITEM(CODE(cpus)) This is number of detected CPUs on the machine.
+LIST_ITEM(CODE(uptime)) This how long the machine has been running.
+LIST_ITEM(CODE(owner)) This is user who sent the update.
 LIST_END
 OPTIONS_END
 
@@ -53,7 +53,7 @@ application which accepts incoming connections at CODE(port).
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM(CODE(BOLD(CATALOG_HOST)) Hostname of catalog server (same as CODE(-c)).)
+LIST_ITEM(CODE(CATALOG_HOST)) Hostname of catalog server (same as CODE(-c)).
 LIST_END
 
 SECTION(EXIT STATUS)

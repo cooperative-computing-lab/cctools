@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(makeflow_monitor) - Makeflow log monitor
 
 SECTION(SYNOPSIS)
-CODE(BOLD(makeflow_monitor [options] PARAM(makeflowlog)))
+CODE(makeflow_monitor [options] PARAM(makeflowlog))
 
 SECTION(DESCRIPTION)
 CODE(makeflow_monitor) is simple BOLD(Makeflow) log monitor that displays the
@@ -15,13 +15,13 @@ new events and update the progress display.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM(-h)Show this help message and exit.
-OPTION_PAIR(-f, format)Output format to emit.
-OPTION_PAIR(-t, seconds)Timeout for reading the logs.
-OPTION_PAIR(-m, minimum)Mininum number of tasks.
-OPTION_ITEM(-S)Sort logs by progress.
-OPTION_ITEM(-P)Parse dag for node information.
-OPTION_ITEM(-H)Hide finished makeflows.
+OPTION_FLAG_SHORT(h)Show this help message and exit.
+OPTION_ARG_SHORT(f,format)Output format to emit.
+OPTION_ARG_SHORT(t,seconds)Timeout for reading the logs.
+OPTION_ARG_SHORT(m,minimum)Mininum number of tasks.
+OPTION_FLAG_SHORT(S)Sort logs by progress.
+OPTION_FLAG_SHORT(P)Parse dag for node information.
+OPTION_FLAG_SHORT(H)Hide finished makeflows.
 OPTIONS_END
 PARA
 Currently, the only supported PARAM(format) is "text", which means

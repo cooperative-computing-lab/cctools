@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(chirp) - command line tool providing explicit control of a Chirp server.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(chirp [options] [hostname] [command]))
+CODE(chirp [options] [hostname] [command])
 
 SECTION(DESCRIPTION)
 
@@ -31,7 +31,8 @@ LIST_END
 BOLD(chirp) also manages Chirp tickets for authentication purpose.
 
 LIST_BEGIN
-LIST_ITEM(BOLD(ticket_create) [-o[utput] PARAM(ticket filename)] [-s[ubject] PARAM(subject/user)] [-d[uration] PARAM(duration)] [-b[its] <bits>] [[PARAM(directory) PARAM(acl)] ...] Creat a ticket)
+LIST_ITEM(BOLD(ticket_create) [-o[utput] PARAM(ticket filename)] [-s[ubject] PARAM(subject/user)] [-d[uration] PARAM(duration)] [-b[its] PARAM(bits)] [[PARAM(directory) PARAM(acl)] ...] Creat a ticket)
+LIST_ITEM(BOLD(ticket_create) [-o[utput] PARAM(ticket filename)] [-s[ubject] PARAM(subject/user)] [-d[uration] PARAM(duration)] [-b[its] PARAM(bits)] [[PARAM(directory) PARAM(acl)] ...] Creat a ticket)
 LIST_ITEM(BOLD(ticket_register) PARAM(name) [PARAM(subject)] PARAM(duration) Manually register a ticket with multiple Chirp severs.)
 LIST_ITEM(BOLD(ticket_delete) PARAM(name) Remove a ticket.)
 LIST_ITEM(BOLD(ticket_list) PARAM(name) List registered tickets on a Chirp server.)
@@ -41,19 +42,19 @@ LIST_END
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-a, auth, flag)Require this authentication mode.
-OPTION_TRIPLET(-d, debug, flag)Enable debugging for this subsystem.
-OPTION_TRIPLET(-i, tickets, files)Comma-delimited list of tickets to use for authentication.
-OPTION_ITEM(`-l, --verbose')Long transfer information.
-OPTION_TRIPLET(-t, timeout, time)Set remote operation timeout.
-OPTION_ITEM(`-v, --version')Show program version.
-OPTION_ITEM(`-h, --help')Show help text.
+OPTION_ARG(a, auth, flag)Require this authentication mode.
+OPTION_ARG(d, debug, flag)Enable debugging for this subsystem.
+OPTION_ARG(i, tickets, files)Comma-delimited list of tickets to use for authentication.
+OPTION_FLAG(l,verbose)Long transfer information.
+OPTION_ARG(t, timeout, time)Set remote operation timeout.
+OPTION_FLAG(v,version)Show program version.
+OPTION_FLAG(h,help)Show help text.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN
-LIST_ITEM(CODE(BOLD(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).)
+LIST_ITEM(CODE(CHIRP_CLIENT_TICKETS)) Comma delimited list of tickets to authenticate with (same as CODE(-i)).
 LIST_END
 
 SECTION(EXIT STATUS)

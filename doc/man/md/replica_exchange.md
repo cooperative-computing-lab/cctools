@@ -27,7 +27,7 @@
 **replica_exchange** -  Work Queue application for running replica exchange simulations using ProtoMol
 
 ## SYNOPSIS
-****replica_exchange [options] <pdb_file> <psf_file> <par_file> <min_temp> <max_temp> <num_replicas>****
+**replica_exchange [options] _&lt;pdb_file&gt;_ _&lt;psf_file&gt;_ _&lt;par_file&gt;_ _&lt;min_temp&gt;_ _&lt;max_temp&gt;_ _&lt;num_replicas&gt;_**
 
 ## DESCRIPTION
 **replica_exchange** is a Work Queue application for running replica exchange simulations using the ProtoMol simulation package. The application supports both barrier and non-barrier based runs.
@@ -42,17 +42,17 @@ The **pdb_file**, **psf_file**, and **par_file** arguments specify the input fil
 
 ## OPTIONS
 
-- **-n name** Specify a project name for using exclusive work_queue_worker instances.
-- **-x filename** Specify the name of the xyz file for output.
-- **-d filename** Specify the name of the dcd file for output.
-- **-m number** Specify the number of monte carlo steps. Default = 100.
-- **-s number** Specify the number of molecular dynamics steps. Default = 10000.
-- **-p path** Specify path for storing output files.
-- **-q** Assign closer temperature values to replicas in the first and last quartile.
-- **-i** Assume ProtoMol is installed and available in PATH on worker site.
-- **-b** Use barrier in waiting for all replicas to finish their steps before attempting exchange.
-- **-l** Print debuggging information.
-- **-h** Show this help message.
+- **-n** _&lt;name&gt;_<br />Specify a project name for using exclusive work_queue_worker instances.
+- **-x** _&lt;filename&gt;_<br />Specify the name of the xyz file for output.
+- **-d** _&lt;filename&gt;_<br />Specify the name of the dcd file for output.
+- **-m** _&lt;number&gt;_<br />Specify the number of monte carlo steps. Default = 100.
+- **-s** _&lt;number&gt;_<br />Specify the number of molecular dynamics steps. Default = 10000.
+- **-p** _&lt;path&gt;_<br />Specify path for storing output files.
+- **-q**<br />Assign closer temperature values to replicas in the first and last quartile.
+- **-i**<br />Assume ProtoMol is installed and available in PATH on worker site.
+- **-b**<br />Use barrier in waiting for all replicas to finish their steps before attempting exchange.
+- **-l**<br />Print debuggging information.
+- **-h**<br />Show this help message.
 
 
 ## EXIT STATUS
@@ -83,7 +83,7 @@ and involving 84 replicas in the temperature range 278 to 400K using the sample 
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -93,4 +93,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [work_queue_worker(1)](work_queue_worker.md) [work_queue_status(1)](work_queue_status.md) [work_queue_factory(1)](work_queue_factory.md) [condor_submit_workers(1)](condor_submit_workers.md) [sge_submit_workers(1)](sge_submit_workers.md) [torque_submit_workers(1)](torque_submit_workers.md) 
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

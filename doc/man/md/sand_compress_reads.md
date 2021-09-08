@@ -27,7 +27,7 @@
 **sand_compress_reads** - compress sequence data
 
 ## SYNOPSIS
-****sand_compress_reads [-qcivh] [infile] [outfile]****
+**sand_compress_reads [-qcivh] [infile] [outfile]**
 
 ## DESCRIPTION
 
@@ -43,11 +43,11 @@ line of sequences and bytes compressed.
 ## OPTIONS
 
 
-- **-q** Quiet mode: suppress summary line.
-- **-c** Remove Celera read ids if data came from the Celera gatekeeper.
-- **-i** Remove Celera read ids but leave internal ids if the data came from the Celera gatekeeper.
-- **-h** Display version information.
-- **-v** Show help text.
+- **-q**<br />Quiet mode: suppress summary line.
+- **-c**<br />Remove Celera read ids if data came from the Celera gatekeeper.
+- **-i**<br />Remove Celera read ids but leave internal ids if the data came from the Celera gatekeeper.
+- **-h**<br />Display version information.
+- **-v**<br />Show help text.
 
 
 ## EXIT STATUS
@@ -63,7 +63,7 @@ To compress **mydata.fasta** into **mydata.cfa**:
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -73,4 +73,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [sand_filter_master(1)](sand_filter_master.md)  [sand_filter_kernel(1)](sand_filter_kernel.md)  [sand_align_master(1)](sand_align_master.md)  [sand_align_kernel(1)](sand_align_kernel.md)  [sand_compress_reads(1)](sand_compress_reads.md)  [sand_uncompress_reads(1)](sand_uncompress_reads.md)  [work_queue_worker(1)](work_queue_worker.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

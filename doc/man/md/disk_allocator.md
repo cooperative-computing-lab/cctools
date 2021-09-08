@@ -27,7 +27,7 @@
 **disk_allocator** - tool for creating and deleting loop device allocations of a given size.
 
 ## SYNOPSIS
-****disk_allocator [options] <create|delete> <target directory> <size> <filesystem>****
+**disk_allocator [options] _&lt;create|delete&gt;_ _&lt;target directory&gt;_ _&lt;size&gt;_ _&lt;filesystem&gt;_**
 
 ## DESCRIPTION
 
@@ -45,8 +45,8 @@ You will need superuser priveleges to run **disk_allocator** on your local machi
 
 ## OPTIONS
 
-- **-h, --help** Show this help screen.
-- **-v, --version** Show version string.
+- **-h**,**--help**<br />Show this help screen.
+- **-v**,**--version**<br />Show version string.
 
 
 ## EXIT STATUS
@@ -66,6 +66,6 @@ disk_allocator delete /tmp/test
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

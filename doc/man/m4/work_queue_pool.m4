@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(work_queue_pool) - maintain a pool of Work Queue workers on a batch system.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(work_queue_pool -M PARAM(project-name) -T PARAM(batch-type) [options]))
+CODE(work_queue_pool -M PARAM(project-name) -T PARAM(batch-type) [options])
 
 SECTION(DESCRIPTION)
 BOLD(work_queue_pool) is an alias for BOLD(work_queue_factory),

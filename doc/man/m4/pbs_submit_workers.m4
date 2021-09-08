@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(pbs_submit_workers) - submit work_queue_worker to a PBS cluster.
 
 SECTION(SYNOPSIS)
-CODE(BOLD(pbs_submit_workers [options] PARAM(servername) PARAM(port) PARAM(num-workers)))
+CODE(pbs_submit_workers [options] PARAM(servername) PARAM(port) PARAM(num-workers))
 
 SECTION(DESCRIPTION)
 CODE(pbs_submit_workers) schedules the execution of MANPAGE(work_queue_worker,1)
@@ -19,21 +19,22 @@ auto mode option is specified for work_queue_worker.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM(-M, name)Name of the preferred manager for worker.
-OPTION_PAIR(-c, cores)Set the number of cores each worker should use (0=auto). (default=1)
-OPTION_PAIR(-C, catalog)Set catalog server for work_queue_worker to <catalog>. <catalog> format: HOSTNAME:PORT.
-OPTION_PAIR(-t, seconds)Abort work_queue_worker after this amount of idle time (default=900s).
-OPTION_PAIR(-d, subsystem)Enable debugging on worker for this subsystem (try -d all to start).
-OPTION_PAIR(-w, size)Set TCP window size
-OPTION_PAIR(-i, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
-OPTION_PAIR(-b, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
-OPTION_PAIR(-z, size)Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
-OPTION_PAIR(-A, arch)Set architecture string for the worker to report to manager instead of the value in uname.
-OPTION_PAIR(-O, os)Set operating system string for the worker to report to manager instead of the value in uname.
-OPTION_PAIR(-s, path)Set the location for creating the working directory of the worker.
-OPTION_PAIR(-j)Use job array to submit workers.
-OPTION_PAIR(-p, parameters)PBS qsub parameters.
-OPTION_ITEM(-h)Show help message.
+OPTION_FLAG_SHORT(M) name)Name of the preferred manager for worker.
+OPTION_ARG_SHORT(c, cores)Set the number of cores each worker should use (0=auto). (default=1)
+OPTION_ARG_SHORT(C, catalog)Set catalog server for work_queue_worker to PARAM(catalog). PARAM(catalog) format: HOSTNAME:PORT.
+OPTION_ARG_SHORT(C, catalog)Set catalog server for work_queue_worker to PARAM(catalog). PARAM(catalog) format: HOSTNAME:PORT.
+OPTION_ARG_SHORT(t, seconds)Abort work_queue_worker after this amount of idle time (default=900s).
+OPTION_ARG_SHORT(d, subsystem)Enable debugging on worker for this subsystem (try -d all to start).
+OPTION_ARG_SHORT(w, size)Set TCP window size
+OPTION_ARG_SHORT(i, time)Set initial value for backoff interval when worker fails to connect to a manager. (default=1s)
+OPTION_ARG_SHORT(b, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
+OPTION_ARG_SHORT(z, size)Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
+OPTION_ARG_SHORT(A, arch)Set architecture string for the worker to report to manager instead of the value in uname.
+OPTION_ARG_SHORT(O, os)Set operating system string for the worker to report to manager instead of the value in uname.
+OPTION_ARG_SHORT(s, path)Set the location for creating the working directory of the worker.
+OPTION_ARG_SHORT(j)Use job array to submit workers.
+OPTION_ARG_SHORT(p, parameters)PBS qsub parameters.
+OPTION_FLAG_SHORT(h)Show help message.
 OPTIONS_END
 
 SECTION(EXIT STATUS)

@@ -27,17 +27,17 @@
 **parrot_locate** - provides the true location of the data stored in a named file.
 
 ## SYNOPSIS
-****parrot_locate path****
+**parrot_locate path**
 
 ## DESCRIPTION
 
 **parrot_locate** utilises **parrot** system calls to identify where the data stored as the file
-at **<path>** is actually located.  For example, running **parrot_locate** on a file stored in a
+at **_&lt;path&gt;_** is actually located.  For example, running **parrot_locate** on a file stored in a
 **chirp** multi-volume will return the server name and file path on the server where the data is.
 Running it on a file stored in **hdfs** will return the list of chunk servers storing the file.
 
 Note that **parrot_locate** varies depending on the underlying system.  Most systems return output
-in the form "**<server>:<real path>**", but that output is not guaranteed.
+in the form "**_&lt;server&gt;_:_&lt;real path&gt;_**", but that output is not guaranteed.
 
 
 ## OPTIONS
@@ -72,7 +72,7 @@ or a file stored in a chirp multi-volume
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -82,4 +82,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [parrot_run(1)](parrot_run.md) [parrot_cp(1)](parrot_cp.md) [parrot_getacl(1)](parrot_getacl.md)  [parrot_setacl(1)](parrot_setacl.md)  [parrot_mkalloc(1)](parrot_mkalloc.md)  [parrot_lsalloc(1)](parrot_lsalloc.md)  [parrot_locate(1)](parrot_locate.md)  [parrot_timeout(1)](parrot_timeout.md)  [parrot_whoami(1)](parrot_whoami.md)  [parrot_mount(1)](parrot_mount.md)  [parrot_md5(1)](parrot_md5.md)  [parrot_package_create(1)](parrot_package_create.md)  [parrot_package_run(1)](parrot_package_run.md)  [chroot_package_run(1)](chroot_package_run.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

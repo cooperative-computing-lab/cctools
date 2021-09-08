@@ -27,7 +27,7 @@
 **sand_align_kernel** - align candidate sequences sequentially
 
 ## SYNOPSIS
-****sand_align_kernel [options] [input file]****
+**sand_align_kernel [options] [input file]**
 
 ## DESCRIPTION
 
@@ -50,14 +50,14 @@ all following sequences until the following separator, and so on.
 ## OPTIONS
 
 
-- **-a sw|ps|banded** Specify the type of alignment: sw (Smith-Waterman), ps (Prefix-Suffix), or banded.  If not specified, default is banded.
-- **-o ovl|ovl_new|align|matrix** Specify how each alignment should be output: ovl (Celera V5, V6 OVL format), ovl_new (Celera V7 overlap format), align (display the sequences and alignment graphically) or matrix (display the dynamic programming matrix).  [sand_align_master(1)](sand_align_master.md) expects the ovl output format, which is the default.  The other formats are useful for debugging.
-- **-m length** Minimum aligment length (default: 0).
-- **-q quality** Minimum match quality (default: 1.00)
-- **-x** Delete input file after completion.
-- **-d subsystem** Enable debugging for this subsystem.  (Try **-d all** to start.
-- **-v** Show program version.
-- **-h** Display this message.
+- **-a** _&lt;sw|ps|banded&gt;_<br />Specify the type of alignment: sw (Smith-Waterman), ps (Prefix-Suffix), or banded.  If not specified, default is banded.
+- **-o** _&lt;ovl|ovl_new|align|matrix&gt;_<br />Specify how each alignment should be output: ovl (Celera V5, V6 OVL format), ovl_new (Celera V7 overlap format), align (display the sequences and alignment graphically) or matrix (display the dynamic programming matrix).  [sand_align_master(1)](sand_align_master.md) expects the ovl output format, which is the default.  The other formats are useful for debugging.
+- **-m** _&lt;length&gt;_<br />Minimum aligment length (default: 0).
+- **-q** _&lt;quality&gt;_<br />Minimum match quality (default: 1.00)
+- **-x**<br />Delete input file after completion.
+- **-d** _&lt;subsystem&gt;_<br />Enable debugging for this subsystem.  (Try **-d all** to start.
+- **-v**<br />Show program version.
+- **-h**<br />Display this message.
 
 
 ## EXIT STATUS
@@ -73,7 +73,7 @@ Users do not normally invoke sand_align_kernel directly.  Instead, pass argument
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -83,4 +83,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [sand_filter_master(1)](sand_filter_master.md)  [sand_filter_kernel(1)](sand_filter_kernel.md)  [sand_align_master(1)](sand_align_master.md)  [sand_align_kernel(1)](sand_align_kernel.md)  [sand_compress_reads(1)](sand_compress_reads.md)  [sand_uncompress_reads(1)](sand_uncompress_reads.md)  [work_queue_worker(1)](work_queue_worker.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

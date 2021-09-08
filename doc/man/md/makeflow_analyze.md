@@ -27,7 +27,7 @@
 **makeflow_analyze** - analysis of Makeflow workflows
 
 ## SYNOPSIS
-****makeflow_analyze [options] <dagfile>****
+**makeflow_analyze [options] _&lt;dagfile&gt;_**
 
 ## DESCRIPTION
 
@@ -36,12 +36,12 @@
 ## OPTIONS
 ### Commands
 
-- **-b --bundle-dir <directory>** Create portable bundle of workflow.
-- **-h, --help** Show this help screen.
-- **-I, --show-input** Show input files.
-- **-k, --syntax-check** Syntax check.
-- **-O, --show-output** Show output files.
-- **-v, --version** Show version string.
+- **-b**,**--bundle-dir=_&lt;directory&gt;_**<br />Create portable bundle of workflow.
+- **-h**,**--help**<br />Show this help screen.
+- **-I**,**--show-input**<br />Show input files.
+- **-k**,**--syntax-check**<br />Syntax check.
+- **-O**,**--show-output**<br />Show output files.
+- **-v**,**--version**<br />Show version string.
 
 
 ## EXAMPLES
@@ -53,14 +53,14 @@ makeflow_analyze -k Makeflow
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
 
 - [Cooperative Computing Tools Documentation]("../index.html")
 - [Makeflow User Manual]("../makeflow.html")
-- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md) [makeflow_ec2_estimate(1)](makeflow_ec2_estimate.md)
+- [makeflow(1)](makeflow.md) [makeflow_monitor(1)](makeflow_monitor.md) [makeflow_analyze(1)](makeflow_analyze.md) [makeflow_viz(1)](makeflow_viz.md) [makeflow_graph_log(1)](makeflow_graph_log.md) [starch(1)](starch.md) [makeflow_ec2_setup(1)](makeflow_ec2_setup.md) [makeflow_ec2_cleanup(1)](makeflow_ec2_cleanup.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

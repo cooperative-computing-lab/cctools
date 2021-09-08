@@ -27,7 +27,7 @@
 **sand_uncompress_reads** - uncompress sequence data
 
 ## SYNOPSIS
-****sand_uncompress_reads [-qvh] [infile] [outfile]****
+**sand_uncompress_reads [-qvh] [infile] [outfile]**
 
 ## DESCRIPTION
 
@@ -42,9 +42,9 @@ line of sequences and bytes compressed.
 ## OPTIONS
 
 
-- **-q** Quiet mode: suppress summary line.
-- **-h** Display version information.
-- **-v** Show help text.
+- **-q**<br />Quiet mode: suppress summary line.
+- **-h**<br />Display version information.
+- **-v**<br />Show help text.
 
 
 ## EXIT STATUS
@@ -60,7 +60,7 @@ To uncompress **mydata.cfa** into **mydata.fasta**:
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -70,4 +70,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [sand_filter_master(1)](sand_filter_master.md)  [sand_filter_kernel(1)](sand_filter_kernel.md)  [sand_align_master(1)](sand_align_master.md)  [sand_align_kernel(1)](sand_align_kernel.md)  [sand_compress_reads(1)](sand_compress_reads.md)  [sand_uncompress_reads(1)](sand_uncompress_reads.md)  [work_queue_worker(1)](work_queue_worker.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

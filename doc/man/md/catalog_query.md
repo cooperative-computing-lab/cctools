@@ -27,7 +27,7 @@
 **catalog_query** - query records from the catalog server
 
 ## SYNOPSIS
-****catalog_query [--where [expr]] [--catalog [host]] [-d [flag]] [-o [file]] [-O [size]] [-t [timeout]] [-h] ****
+**catalog_query [--where [expr]] [--catalog [host]] [-d [flag]] [-o [file]] [-O [size]] [-t [timeout]] [-h] **
 
 ## DESCRIPTION
 
@@ -39,13 +39,13 @@ by other tools.
 ## ARGUMENTS
 
 
-- **--where expr**  Only records matching this expression will be displayed.
-- **--catalog host**  Query this catalog host.
-- **--debug flag**  Enable debugging for this subsystem.
-- **--debug-file file**  Send debug output to this file.
-- **--debug-rotate-max bytes**  Rotate debug file once it reaches this size.
-- **--timeout seconds**  Abandon the query after this many seconds.
-- **--help**  Show command options.
+- **--where=_&lt;expr&gt;_**<br /> Only records matching this expression will be displayed.
+- **--catalog=_&lt;host&gt;_**<br /> Query this catalog host.
+- **--debug=_&lt;flag&gt;_**<br /> Enable debugging for this subsystem.
+- **--debug-file=_&lt;file&gt;_**<br /> Send debug output to this file.
+- **--debug-rotate-max=_&lt;bytes&gt;_**<br /> Rotate debug file once it reaches this size.
+- **--timeout=_&lt;seconds&gt;_**<br /> Abandon the query after this many seconds.
+- **--help**<br /> Show command options.
 
 
 ## EXAMPLES
@@ -70,7 +70,7 @@ To show all records of Chirp servers with more than 4 cpus:
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -78,4 +78,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [catalog_server(1)](catalog_server.md)  [catalog_update(1)](catalog_update.md)  [catalog_query(1)](catalog_query.md)  [chirp_status(1)](chirp_status.md)  [work_queue_status(1)](work_queue_status.md)   [deltadb_query(1)](deltadb_query.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

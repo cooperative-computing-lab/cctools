@@ -27,16 +27,17 @@
 **parrot_package_run** - repeat a program within the package with the help of **parrot_run**
 
 ## SYNOPSIS
-****parrot_package_run --package-path your-package-path [command]****
+**parrot_package_run --package-path your-package-path [command]**
 
 ## DESCRIPTION
 If **parrot_run** is used to repeat one experiment, one mountlist must be created so that the file access request of your program can be redirected into the package. **parrot_package_run** is used to create the mountlist and repeat your program within the package with the help of **parrot_run** and **mountlist**. If no command is given, a /bin/sh shell will be returned.
 
 ## OPTIONS
 
-- **-p, --package-path** The path of the package.
-- **-e, --env-list** The path of the environment file, each line is in the format of <key>=<value>. (Default: package-path/env_list)
-- **-h, --help** Show this help message.
+- **-p**,**--package-path**<br />The path of the package.
+- **-e**,**--env-list**<br />The path of the environment file, each line is in the format of _&lt;key&gt;_=_&lt;value&gt;_. (Default: package-path/env_list)
+- **-e**,**--env-list**<br />The path of the environment file, each line is in the format of _&lt;key&gt;_=_&lt;value&gt;_. (Default: package-path/env_list)
+- **-h**,**--help**<br />Show this help message.
 
 
 ## EXIT STATUS
@@ -87,7 +88,7 @@ After the execution of this command, one shell will be returned, where you can r
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
@@ -97,4 +98,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2019 The University of No
 - [parrot_run(1)](parrot_run.md) [parrot_cp(1)](parrot_cp.md) [parrot_getacl(1)](parrot_getacl.md)  [parrot_setacl(1)](parrot_setacl.md)  [parrot_mkalloc(1)](parrot_mkalloc.md)  [parrot_lsalloc(1)](parrot_lsalloc.md)  [parrot_locate(1)](parrot_locate.md)  [parrot_timeout(1)](parrot_timeout.md)  [parrot_whoami(1)](parrot_whoami.md)  [parrot_mount(1)](parrot_mount.md)  [parrot_md5(1)](parrot_md5.md)  [parrot_package_create(1)](parrot_package_create.md)  [parrot_package_run(1)](parrot_package_run.md)  [chroot_package_run(1)](chroot_package_run.md)
 
 
-CCTools 8.0.0 DEVELOPMENT released on 
+CCTools 8.0.0 DEVELOPMENT

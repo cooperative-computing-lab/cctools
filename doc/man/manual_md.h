@@ -24,15 +24,18 @@ define(LIST_END,)
 define(SPACE, )
 define(HALFTAB,    )
 define(TAB,HALFTAB()HALFTAB())
-define(PARAM,<$1>)
+define(PARAM,ITALIC(&lt;$1&gt;))
 
 define(OPTIONS_BEGIN,LIST_BEGIN)
-define(OPTION_ITEM,LIST_ITEM(BOLD($1) ))dnl
-define(OPTION_PAIR,LIST_ITEM(BOLD($1 $2) ))dnl
-define(OPTION_TRIPLET,LIST_ITEM(BOLD($1 --$2 PARAM($3)) ))dnl
+define(OPTION_FLAG,- BOLD(-$1)`,'BOLD(--$2)<br />)dnl
+define(OPTION_FLAG_SHORT,- BOLD(-$1)<br />)dnl
+define(OPTION_FLAG_LONG,- BOLD(--$1)<br />)dnl
+define(OPTION_ARG,- BOLD(-$1)`,'BOLD(--$2=PARAM($3))<br />)dnl
+define(OPTION_ARG_SHORT,- BOLD(-$1) PARAM($2)<br />)dnl
+define(OPTION_ARG_LONG,- BOLD(--$1=PARAM($2))<br />)dnl
 define(OPTIONS_END,LIST_END)
 
 define(LONGCODE_BEGIN,changequote([,])[changequote([,])```changequote]changequote)
 define(LONGCODE_END,changequote([,])[changequote([,])```changequote]changequote)
 
-define(FOOTER,CCTools CCTOOLS_VERSION released on CCTOOLS_RELEASE_DATE)dnl
+define(FOOTER,CCTools CCTOOLS_VERSION)dnl

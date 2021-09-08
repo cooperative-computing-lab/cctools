@@ -5,7 +5,7 @@ SECTION(NAME)
 BOLD(wavefront_master) - executes Wavefront workflow in parallel on distributed systems
 
 SECTION(SYNOPSIS)
-CODE(BOLD(wavefront [options] PARAM(command) PARAM(xsize) PARAM(ysize) PARAM(inputdata) PARAM(outputdata)))
+CODE(wavefront [options] PARAM(command) PARAM(xsize) PARAM(ysize) PARAM(inputdata) PARAM(outputdata))
 
 SECTION(DESCRIPTION)
 
@@ -24,15 +24,16 @@ then connect back to the master process and begin executing tasks.
 SECTION(OPTIONS)
 
 OPTIONS_BEGIN
-OPTION_ITEM(`-h, --help')Show this help screen
-OPTION_ITEM(`-v, --version')Show version string
-OPTION_TRIPLET(-d, debug, subsystem)Enable debugging for this subsystem. (Try -d all to start.)
-OPTION_TRIPLET(-N, project-name, project)Set the project name to <project>
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
-OPTION_TRIPLET(-p, port, port)Port number for queue master to listen on.
-OPTION_TRIPLET(-P, priority, num)Priority. Higher the value, higher the priority.
-OPTION_TRIPLET(-Z, port-file, file)Select port at random and write it to this file.  (default is disabled)
-OPTION_PAIR(--work-queue-preferred-connection,connection)Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
+OPTION_FLAG(h,help)Show this help screen
+OPTION_FLAG(v,version)Show version string
+OPTION_ARG(d, debug, subsystem)Enable debugging for this subsystem. (Try -d all to start.)
+OPTION_ARG(N, project-name, project)Set the project name to PARAM(project)
+OPTION_ARG(N, project-name, project)Set the project name to PARAM(project)
+OPTION_ARG(o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
+OPTION_ARG(p, port, port)Port number for queue master to listen on.
+OPTION_ARG(P, priority, num)Priority. Higher the value, higher the priority.
+OPTION_ARG(Z, port-file, file)Select port at random and write it to this file.  (default is disabled)
+OPTION_ARG_LONG(work-queue-preferred-connection,connection)Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
 OPTIONS_END
 
 SECTION(EXIT STATUS)
