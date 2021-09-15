@@ -1056,6 +1056,7 @@ void work_queue_manager_preferred_connection(struct work_queue *q, const char *p
  - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
  - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
  - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
+ - "hungry-minimum" Mimimum number of tasks to consider queue not hungry. (default=10)
 @param value The value to set the parameter to.
 @return 0 on succes, -1 on failure.
 */

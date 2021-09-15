@@ -184,6 +184,8 @@ struct work_queue {
 	time_t resources_last_update_time;
 	int    busy_waiting_flag;
 
+	int hungry_minimum;               /* minimum number of waiting tasks to consider queue not hungry. */;
+
 	work_queue_category_mode_t allocation_default_mode;
 
 	FILE *logfile;
@@ -5320,6 +5322,8 @@ struct work_queue *work_queue_create(int port)
 
 	q->monitor_mode = MON_DISABLED;
 
+	q->hungry_minimum = 10;
+
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
@@ -6442,9 +6446,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 }
 
 //check if workers' resources are available to execute more tasks
-//queue should have at least 10 ready tasks
+//queue should have at least q->hungry_minimum ready tasks
 //@param: 	struct work_queue* - pointer to queue
-//@return: 	boolean - whether queue is "hungry"
+//@return: 	1 if hungry, 0 otherwise
 int work_queue_hungry(struct work_queue *q)
 {
 	//check if queue is initialized
@@ -6456,9 +6460,8 @@ int work_queue_hungry(struct work_queue *q)
 	struct work_queue_stats qstats;
 	work_queue_get_stats(q, &qstats);
 
-	//if number of ready tasks is less than 10, return true for more tasks in queue
-	//10 is chosen to be the default number of ready tasks in queue to keep queue efficient
-	if (qstats.tasks_waiting < 10){
+	//if number of ready tasks is less than q->hungry_minimum, then queue is hungry
+	if (qstats.tasks_waiting < q->hungry_minimum){
 		return 1;
 	}
 
@@ -6732,6 +6735,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "category-steady-n-tasks")) {
 		category_tune_bucket_size("category-steady-n-tasks", (int) value);
+
+	} else if(!strcmp(name, "hungry-minimum")) {
+		q->hungry_minimum = MAX(1, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
