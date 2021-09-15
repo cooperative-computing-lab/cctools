@@ -6270,16 +6270,15 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 /*
    - compute stoptime
    S time left?                              No:  return null
-   - task completed?                         Yes: return completed task to user
    - update catalog if appropiate
    - retrieve workers status messages
-   - tasks waiting to be retrieved?          Yes: retrieve one task and go to S.
-   - tasks waiting to be dispatched?         Yes: dispatch one task and go to S.
+   - tasks waiting to be retrieved?          Yes: retrieve one task.
+   - tasks waiting to be dispatched?         Yes: dispatch one task.
    - send keepalives to appropiate workers
    - fast-abort workers
    - if new workers, connect n of them
-   - expired tasks?                          Yes: mark expired tasks as retrieved and go to S.
-   - queue empty?                            Yes: return null
+   - expired tasks?                          Yes: mark expired tasks as retrieved.
+   - task completed?                         Yes: return completed task to user
    - go to S
 */
 {
