@@ -186,6 +186,8 @@ struct work_queue {
 
 	int hungry_minimum;               /* minimum number of waiting tasks to consider queue not hungry. */;
 
+	int wait_for_workers;             /* wait for these many workers before dispatching tasks at start of execution. */
+
 	work_queue_category_mode_t allocation_default_mode;
 
 	FILE *logfile;
@@ -5324,6 +5326,8 @@ struct work_queue *work_queue_create(int port)
 
 	q->hungry_minimum = 10;
 
+	q->wait_for_workers = 0;
+
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
@@ -6366,17 +6370,20 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// record that there was not task activity for this iteration
 		compute_manager_load(q, 0);
 
-		// tasks waiting to be dispatched?
-		BEGIN_ACCUM_TIME(q, time_send);
-		result = send_one_task(q);
-		END_ACCUM_TIME(q, time_send);
-		if(result) {
-			// sent at least one task
-			events++;
-			continue;
+		if(q->wait_for_workers <= hash_table_size(q->worker_table)) {
+			q->wait_for_workers = 0;
+			// tasks waiting to be dispatched?
+			BEGIN_ACCUM_TIME(q, time_send);
+			result = send_one_task(q);
+			END_ACCUM_TIME(q, time_send);
+			if(result) {
+				// sent at least one task
+				events++;
+				continue;
+			}
 		}
 
-		//we reach here only if no task was neither sent nor received. 
+		//we reach here only if no task was neither sent nor received.
 		compute_manager_load(q, 1);
 
 		// send keepalives to appropriate workers
@@ -6398,7 +6405,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		// if new workers, connect n of them
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
-		result = connect_new_workers(q, stoptime, MAX_NEW_WORKERS);
+		result = connect_new_workers(q, stoptime, MAX(q->wait_for_workers, MAX_NEW_WORKERS));
 		END_ACCUM_TIME(q, time_status_msgs);
 		if(result) {
 			// accepted at least one worker
@@ -6738,6 +6745,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "hungry-minimum")) {
 		q->hungry_minimum = MAX(1, (int)value);
+
+	} else if(!strcmp(name, "wait-for-workers")) {
+		q->wait_for_workers = MAX(0, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
