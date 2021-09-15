@@ -297,9 +297,8 @@ struct work_queue_stats {
 
     double manager_load;      /**< In the range of [0,1]. If close to 1, then
                                 the manager is at full load and spends most
-                                of its time sending and receiving taks, and
-                                thus cannot accept connections from new
-                                workers. If close to 0, the manager is spending
+                                of its time sending and receiving taks.
+                                If close to 0, the manager is spending
                                 most of its time waiting for something to happen. */
 
 	/**< deprecated fields: */

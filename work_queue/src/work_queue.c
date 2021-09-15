@@ -6332,7 +6332,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(result) {
 			// retrieved at least one task
 			events_round++;
-			compute_manager_load(q, 1);
 		}
 
 		// expired tasks
@@ -6342,11 +6341,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(result) {
 			// expired at least one task
 			events_round++;
-			compute_manager_load(q, 1);
 		}
-
-		// record that there was not task activity for this iteration
-		compute_manager_load(q, 0);
 
 		if(q->wait_for_workers <= hash_table_size(q->worker_table)) {
 			q->wait_for_workers = 0;
@@ -6359,9 +6354,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 				events_round++;
 			}
 		}
-
-		//we reach here only if no task was neither sent nor received.
-		compute_manager_load(q, 1);
 
 		// send keepalives to appropriate workers
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
@@ -6402,6 +6394,16 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			END_ACCUM_TIME(q, time_internal);
 		}
 
+		/* if no events_round, we set the busy_waiting flag so that link_poll waits
+		 * for some time the next time around. */
+		if(events_round < 1) {
+			q->busy_waiting_flag = 1;
+			compute_manager_load(q, 0);
+		} else {
+			compute_manager_load(q, 1);
+		}
+
+
 		events_total += events_round;
 		if(t) {
 			// return completed task (t) to the user. We do not return right
@@ -6419,12 +6421,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			if(pending) {
 				break;
 			}
-		}
-
-		/* if no events_round, we set the busy_waiting flag so that link_poll waits
-		 * for some time the next time around. */
-		if(events_round < 1) {
-			q->busy_waiting_flag = 1;
 		}
 
 		// If the foreman_uplink is active then break so the caller can handle it.
