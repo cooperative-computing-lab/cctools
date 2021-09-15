@@ -240,7 +240,7 @@ static void display_reduce_exprs( struct deltadb_query *query, time_t current )
 	list_first_item(query->reduce_exprs);
 	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
 		char *str = deltadb_reduction_string(r);
-		fprintf(query->output_stream,"%s\n",str);
+		fprintf(query->output_stream,"%s",str);
 		free(str);
 	}
 
