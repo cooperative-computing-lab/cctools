@@ -6283,7 +6283,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - go to S
 */
 {
-	int events = 0;
+	int events_total = 0;
 
 	// account for time we spend outside work_queue_wait
 	if(q->time_last_wait > 0) {
@@ -6302,28 +6302,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	// time left?
 
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
+		int events_round = 0;
 
 		BEGIN_ACCUM_TIME(q, time_internal);
 
-		// task completed?
-		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
-		if(t) {
-			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
-
-			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
-			{
-				q->stats->tasks_failed++;
-			}
-
-			// return completed task (t) to the user. We do not return right
-			// away, and instead break out of the loop to correctly update the
-			// queue time statistics.
-			events++;
-			END_ACCUM_TIME(q, time_internal);
-			break;
-		}
-
-		 // update catalog if appropriate
+		// update catalog if appropriate
 		if(q->name) {
 			update_catalog(q, foreman_uplink, 0);
 		}
@@ -6336,10 +6319,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// retrieve worker status messages
 		if(poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active) > 0) {
 			//at least one worker was removed.
-			events++;
-			// note we keep going, and we do not restart the loop as we do in
-			// further events. This is because we give top priority to
-			// returning and retrieving tasks.
+			events_round++;
 		}
 
 
@@ -6351,9 +6331,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		END_ACCUM_TIME(q, time_receive);
 		if(result) {
 			// retrieved at least one task
-			events++;
+			events_round++;
 			compute_manager_load(q, 1);
-			continue;
 		}
 
 		// expired tasks
@@ -6362,9 +6341,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
 			// expired at least one task
-			events++;
+			events_round++;
 			compute_manager_load(q, 1);
-			continue;
 		}
 
 		// record that there was not task activity for this iteration
@@ -6378,8 +6356,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			END_ACCUM_TIME(q, time_send);
 			if(result) {
 				// sent at least one task
-				events++;
-				continue;
+				events_round++;
 			}
 		}
 
@@ -6399,8 +6376,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
 			// removed at least one worker
-			events++;
-			continue;
+			events_round++;
 		}
 
 		// if new workers, connect n of them
@@ -6409,25 +6385,47 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		END_ACCUM_TIME(q, time_status_msgs);
 		if(result) {
 			// accepted at least one worker
-			events++;
-			continue;
+			events_round++;
+		}
+
+		// task completed?
+		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+		if(t) {
+			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
+
+			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
+			{
+				q->stats->tasks_failed++;
+			}
+
+			events_round++;
+			END_ACCUM_TIME(q, time_internal);
+		}
+
+		events_total += events_round;
+		if(t) {
+			// return completed task (t) to the user. We do not return right
+			// away, and instead break out of the loop to correctly update the
+			// queue time statistics.
+			//
+			break;
 		}
 
 		if(q->process_pending_check) {
-
 			BEGIN_ACCUM_TIME(q, time_internal);
 			int pending = process_pending();
 			END_ACCUM_TIME(q, time_internal);
 
 			if(pending) {
-				events++;
 				break;
 			}
 		}
 
-		/* if we got here, no events were triggered. we set the busy_waiting
-		 * flag so that link_poll waits for some time the next time around. */
-		q->busy_waiting_flag = 1;
+		/* if no events_round, we set the busy_waiting flag so that link_poll waits
+		 * for some time the next time around. */
+		if(events_round < 1) {
+			q->busy_waiting_flag = 1;
+		}
 
 		// If the foreman_uplink is active then break so the caller can handle it.
 		if(foreman_uplink) {
@@ -6435,7 +6433,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 	}
 
-	if(events > 0) {
+	if(events_total > 0) {
 		log_queue_stats(q, 1);
 	}
 
