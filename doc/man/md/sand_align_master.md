@@ -88,4 +88,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 - [sand_filter_master(1)](sand_filter_master.md)  [sand_filter_kernel(1)](sand_filter_kernel.md)  [sand_align_master(1)](sand_align_master.md)  [sand_align_kernel(1)](sand_align_kernel.md)  [sand_compress_reads(1)](sand_compress_reads.md)  [sand_uncompress_reads(1)](sand_uncompress_reads.md)  [work_queue_worker(1)](work_queue_worker.md)
 
 
-CCTools 8.0.0 DEVELOPMENT
+CCTools

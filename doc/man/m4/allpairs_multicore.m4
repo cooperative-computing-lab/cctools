@@ -41,11 +41,7 @@ SECTION(EXAMPLES)
 
 Let's suppose you have a whole lot of files that you want to compare all to
 each other, named CODE(a), CODE(b), CODE(c), and so on. Suppose that you also
-<<<<<<< HEAD
 have a program named CODE(compareit)) that when invoked as CODE(compareit a b)
-=======
-have a program namedCODE(compareit)) that when invoked as CODE(compareit a b)
->>>>>>> 45cdc6826... rebuild pages
 will compare files CODE(a) and CODE(b) and produce some output summarizing the
 difference between the two, like this:
 

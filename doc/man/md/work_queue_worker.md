@@ -139,4 +139,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 - [work_queue_worker(1)](work_queue_worker.md) [work_queue_status(1)](work_queue_status.md) [work_queue_factory(1)](work_queue_factory.md) [condor_submit_workers(1)](condor_submit_workers.md) [sge_submit_workers(1)](sge_submit_workers.md) [torque_submit_workers(1)](torque_submit_workers.md) 
 
 
-CCTools 8.0.0 DEVELOPMENT
+CCTools
