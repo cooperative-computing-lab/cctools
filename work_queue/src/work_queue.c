@@ -170,8 +170,7 @@ struct work_queue {
 
 	struct list *task_reports;	      /* list of last N work_queue_task_reports. */
 
-	double asynchrony_multiplier;     /* Times the resource value, but disk */
-	int    asynchrony_modifier;       /* Plus this many cores or unlabeled tasks */
+	double resource_submit_multiplier; /* Times the resource value, but disk */
 
 	int minimum_transfer_timeout;
 	int foreman_transfer_timeout;
@@ -353,16 +352,11 @@ void work_queue_disable_monitoring(struct work_queue *q);
 /********** work_queue internal functions *************/
 /******************************************************/
 
-static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total, int cores_flag) {
+static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total) {
 	int64_t r = 0;
 	if(total != 0)
 	{
-		r = ceil(total * q->asynchrony_multiplier);
-
-		if(cores_flag)
-		{
-			r += q->asynchrony_modifier;
-		}
+		r = ceil(total * q->resource_submit_multiplier);
 	}
 
 	return r;
@@ -394,7 +388,7 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown") != 0) {
-			if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total, 0) > w->resources->memory.inuse){
+			if(overcommitted_resource_total(q, w->resources->cores.total) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total) > w->resources->memory.inuse){
 				available_workers++;
 			}
 		}
@@ -3752,11 +3746,11 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 
 	int ok = 1;
 
-	if(w->resources->cores.inuse + limits->cores > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
+	if(w->resources->cores.inuse + limits->cores > overcommitted_resource_total(q, w->resources->cores.total)) {
 		ok = 0;
 	}
 
-	if(w->resources->memory.inuse + limits->memory > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
+	if(w->resources->memory.inuse + limits->memory > overcommitted_resource_total(q, w->resources->memory.total)) {
 		ok = 0;
 	}
 
@@ -3764,7 +3758,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		ok = 0;
 	}
 
-	if(w->resources->gpus.inuse + limits->gpus > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
+	if(w->resources->gpus.inuse + limits->gpus > overcommitted_resource_total(q, w->resources->gpus.total)) {
 		ok = 0;
 	}
 
@@ -5337,8 +5331,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->password = 0;
 
-	q->asynchrony_multiplier = 1.0;
-	q->asynchrony_modifier = 0;
+	q->resource_submit_multiplier = 1.0;
 
 	q->minimum_transfer_timeout = 60;
 	q->foreman_transfer_timeout = 3600;
@@ -6707,11 +6700,8 @@ void work_queue_manager_preferred_connection(struct work_queue *q, const char *p
 int work_queue_tune(struct work_queue *q, const char *name, double value)
 {
 
-	if(!strcmp(name, "asynchrony-multiplier")) {
-		q->asynchrony_multiplier = MAX(value, 1.0);
-
-	} else if(!strcmp(name, "asynchrony-modifier")) {
-		q->asynchrony_modifier = MAX(value, 0);
+	if(!strcmp(name, "resource-submit-multiplier") || !strcmp(name, "asynchrony-multiplier")) {
+		q->resource_submit_multiplier = MAX(value, 1.0);
 
 	} else if(!strcmp(name, "min-transfer-timeout")) {
 		q->minimum_transfer_timeout = (int)value;
