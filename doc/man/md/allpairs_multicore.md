@@ -63,7 +63,7 @@ On success, returns zero.  On failure, returns non-zero.
 
 Let's suppose you have a whole lot of files that you want to compare all to
 each other, named **a**, **b**, **c**, and so on. Suppose that you also
-have a program namedCODE(compareit)) that when invoked as **compareit a b**
+have a program named **compareit**) that when invoked as **compareit a b**
 will compare files **a** and **b** and produce some output summarizing the
 difference between the two, like this:
 
@@ -110,4 +110,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 - [allpairs_master(1)](allpairs_master.md)
 
 
-CCTools 8.0.0 DEVELOPMENT
+CCTools
