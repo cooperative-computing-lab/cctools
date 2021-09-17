@@ -28,6 +28,7 @@ A workflow is encoded as a JSON object with the following keys:
 }
 
 ```
+
 | Key | Required | Description |
 |-----|:--------:|-------------|
 |[**rules**](#rules)|  yes     | Unordered array of rules comprising the workflow.<br>  Each `<rule>` corresponds to a single job represented as a JSON object to be executed in the workflow.

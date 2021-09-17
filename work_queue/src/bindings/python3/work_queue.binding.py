@@ -1681,6 +1681,8 @@ class WorkQueue(object):
     # - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
     # - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
     # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
+    # - "hungry-minimum" Mimimum number of tasks to consider queue not hungry. (default=10)
+    # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
     # @param value The value to set the parameter to.
     # @return 0 on succes, -1 on failure.
     #
