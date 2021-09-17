@@ -6472,10 +6472,10 @@ int work_queue_hungry(struct work_queue *q)
 	int64_t workers_total_avail_disk 	= 0;
 	int64_t workers_total_avail_gpus 	= 0;
 
-	workers_total_avail_cores 	= q->stats->total_cores - q->stats->committed_cores;
-	workers_total_avail_memory 	= q->stats->total_memory - q->stats->committed_memory;
-	workers_total_avail_disk 	= q->stats->total_disk - q->stats->committed_disk;
-	workers_total_avail_gpus	= q->stats->total_gpus - q->stats->committed_gpus;
+	workers_total_avail_cores 	= overcommitted_resource_total(q, q->stats->total_cores) - q->stats->committed_cores;
+	workers_total_avail_memory 	= overcommitted_resource_total(q, q->stats->total_memory) - q->stats->committed_memory;
+	workers_total_avail_gpus	= overcommitted_resource_total(q, q->stats->total_gpus) - q->stats->committed_gpus;
+	workers_total_avail_disk 	= q->stats->total_disk - q->stats->committed_disk; //never overcommit disk
 
 	//get required resources (cores, memory, disk, gpus) of one waiting task
 	int64_t ready_task_cores 	= 0;
