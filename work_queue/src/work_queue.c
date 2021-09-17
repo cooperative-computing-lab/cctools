@@ -3742,23 +3742,24 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		}
 	}
 
-	struct rmsummary *limits = task_worker_box_size(q, w, t);
+	struct rmsummary *l = task_worker_box_size(q, w, t);
+	struct work_queue_resources *r = w->resources;
 
 	int ok = 1;
 
-	if(w->resources->cores.inuse + limits->cores > overcommitted_resource_total(q, w->resources->cores.total)) {
+	if(r->disk.inuse + l->disk > r->disk.total) { /* No overcommit disk */
 		ok = 0;
 	}
 
-	if(w->resources->memory.inuse + limits->memory > overcommitted_resource_total(q, w->resources->memory.total)) {
+	if((l->cores > r->cores.total) || (r->cores.inuse + l->cores > overcommitted_resource_total(q, r->cores.total))) {
 		ok = 0;
 	}
 
-	if(w->resources->disk.inuse + limits->disk > w->resources->disk.total) { /* No overcommit disk */
+	if((l->memory > r->memory.total) || (r->memory.inuse + l->memory > overcommitted_resource_total(q, r->memory.total))) {
 		ok = 0;
 	}
 
-	if(w->resources->gpus.inuse + limits->gpus > overcommitted_resource_total(q, w->resources->gpus.total)) {
+	if((l->gpus > r->gpus.total) || (r->gpus.inuse + l->gpus > overcommitted_resource_total(q, r->gpus.total))) {
 		ok = 0;
 	}
 
@@ -3778,7 +3779,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		}
 	}
 
-	rmsummary_delete(limits);
+	rmsummary_delete(l);
 
 	if(t->features) {
 		if(!w->features)
