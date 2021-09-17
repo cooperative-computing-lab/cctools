@@ -110,4 +110,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 - [allpairs_master(1)](allpairs_master.md)
 
 
-CCTools 7.3.2 FINAL
+CCTools

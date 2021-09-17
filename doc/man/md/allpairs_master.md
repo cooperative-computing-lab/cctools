@@ -151,4 +151,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 - [allpairs_multicore(1)](allpairs_multicore.md)
 
 
-CCTools 7.3.2 FINAL
+CCTools
