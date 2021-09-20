@@ -101,8 +101,8 @@ static char *condor_requirements = NULL;
 static char *batch_submit_options = NULL;
 
 static char *wrapper_command = 0;
-static char *wrapper_input = 0;
-struct jx   *wrapper_inputs = 0;
+
+struct list *wrapper_inputs = 0;
 
 static char *worker_command = 0;
 
@@ -427,8 +427,10 @@ static int submit_worker( struct batch_queue *queue )
 		files = newfiles;
 	}
 
-	if(wrapper_input) {
-		char *newfiles = string_format("%s,%s",files,wrapper_input);
+	const char *item = NULL;
+	list_first_item(wrapper_inputs);
+	while((item = list_next_item(wrapper_inputs))) {
+		char *newfiles = string_format("%s,%s",files,item);
 		free(files);
 		files = newfiles;
 	}
@@ -1062,15 +1064,7 @@ void add_wrapper_command( const char *cmd )
 
 void add_wrapper_input( const char *filename )
 {
-	if(!wrapper_input) {
-		wrapper_input = strdup(filename);
-	} else {
-		char *tmp = string_format("%s %s",wrapper_input,filename);
-		free(wrapper_input);
-		wrapper_input = tmp;
-	}
-	struct jx *file = jx_string(filename);
-	jx_array_append(wrapper_inputs, file);
+	list_push_tail(wrapper_inputs, xxstrdup(filename));
 }
 
 static void show_help(const char *cmd)
@@ -1215,7 +1209,7 @@ int main(int argc, char *argv[])
 	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
 
-	wrapper_inputs = jx_array(NULL);
+	wrapper_inputs = list_create();
 
 	// --run-factory-as-manager and -Twq should be used together.
 	int run_as_manager = 0;
@@ -1500,17 +1494,16 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if(wrapper_input) {
-		struct jx *item=0;
-		for( void *i=0; (item=jx_iterate_array(wrapper_inputs,&i)); ) {
-			const char *value = item->u.string_value;
-			const char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(value));
-			int result = copy_direntry(value, file_at_scratch_dir); 
-			if(result < 0) {
-				fprintf(stderr,"work_queue_factory: Cannot copy wrapper input file %s to factory scratch directory\n", value);
-				exit(EXIT_FAILURE);
-			}
+	const char *item = NULL;
+	list_first_item(wrapper_inputs);
+	while((item = list_next_item(wrapper_inputs))) {
+		char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(item));
+		int result = copy_direntry(item, file_at_scratch_dir);
+		if(result < 0) {
+			fprintf(stderr,"work_queue_factory: Cannot copy wrapper input file %s to factory scratch directory\n", item);
+			exit(EXIT_FAILURE);
 		}
+		free(file_at_scratch_dir);
 	}
 
 	char* cmd;
@@ -1599,7 +1592,6 @@ int main(int argc, char *argv[])
 
 	}
 
-	jx_delete(wrapper_inputs);
 	batch_queue_delete(queue);
 
 	return 0;
