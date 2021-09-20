@@ -415,9 +415,11 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	char *files = NULL;
-	if(!k8s_worker_image) {
-		files = string_format("work_queue_worker");
+	if(!runos_os && !k8s_worker_image) {
+		files = xxstrdup(worker_command);
 	} else {
+		// if runos, then worker comes from vc3_cmd. if k8s, then from the
+		// container image.
 		files = xxstrdup("");
 	}
 
@@ -444,10 +446,6 @@ static int submit_worker( struct batch_queue *queue )
 		temp = string_format("%s,%s",files,"vc3-builder");
 		free(files);
 		files = temp;
-	}else{
-		char* temp = string_format("%s,%s",files,worker);
-		free(files);
-		files=temp;
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
