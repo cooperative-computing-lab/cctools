@@ -432,7 +432,7 @@ static int submit_worker( struct batch_queue *queue )
 	const char *item = NULL;
 	list_first_item(wrapper_inputs);
 	while((item = list_next_item(wrapper_inputs))) {
-		char *newfiles = string_format("%s,%s",files,item);
+		char *newfiles = string_format("%s,%s",files,path_basename(item));
 		free(files);
 		files = newfiles;
 	}
@@ -1326,7 +1326,8 @@ int main(int argc, char *argv[])
 					return 1;
 				}
 				add_wrapper_input(fullpath);
-				add_wrapper_command( string_format("%s -e %s ",fullpath, optarg) );
+				add_wrapper_input(optarg);
+				add_wrapper_command( string_format("./%s -e %s ",path_basename(fullpath), path_basename(optarg)));
 				break;
 				}
 			case LONG_OPT_WRAPPER:
