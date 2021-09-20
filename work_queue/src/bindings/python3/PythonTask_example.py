@@ -17,7 +17,7 @@
 # execute the function. PythonTask can be submitted to a queue as regular Work
 # Queue functions, such as `q.submit(p_task)`.
 #
-# When a has completed, the resulting python value can be retrieved by calling
+# When a task has completed, the resulting python value can be retrieved by calling
 # the output method, such as: `x  = t.output` where t is the task retuned by
 # `t = q.wait()`.
 #
