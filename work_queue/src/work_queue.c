@@ -6371,7 +6371,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		compute_manager_load(q, 0);
 
 		if(q->wait_for_workers <= hash_table_size(q->worker_table)) {
-			q->wait_for_workers = 0;
+			if(q->wait_for_workers > 0) {
+				debug(D_WQ, "Target number of workers reached (%d).", q->wait_for_workers);
+				q->wait_for_workers = 0;
+			}
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
 			result = send_one_task(q);
@@ -6425,13 +6428,17 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 		}
 
-		// return if queue is empty.
-		BEGIN_ACCUM_TIME(q, time_internal);
-		int done = !task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink);
-		END_ACCUM_TIME(q, time_internal);
+		// return if queue is empty and something interesting already happened
+		// in this wait.
+		if(events > 0) {
+			BEGIN_ACCUM_TIME(q, time_internal);
+			int done = !task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink);
+			END_ACCUM_TIME(q, time_internal);
 
-		if(done)
-			break;
+			if(done) {
+				break;
+			}
+		}
 
 		/* if we got here, no events were triggered. we set the busy_waiting
 		 * flag so that link_poll waits for some time the next time around. */
