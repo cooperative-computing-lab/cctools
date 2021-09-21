@@ -9,7 +9,6 @@ See the file COPYING for details.
 #include "batch_job.h"
 #include "hash_table.h"
 #include "copy_stream.h"
-#include "copy_tree.h"
 #include "debug.h"
 #include "domain_name_cache.h"
 #include "envtools.h"
@@ -101,8 +100,8 @@ static char *condor_requirements = NULL;
 static char *batch_submit_options = NULL;
 
 static char *wrapper_command = 0;
-static char *wrapper_input = 0;
-struct jx   *wrapper_inputs = 0;
+
+struct list *wrapper_inputs = 0;
 
 static char *worker_command = 0;
 
@@ -415,9 +414,11 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	char *files = NULL;
-	if(!k8s_worker_image) {
-		files = string_format("work_queue_worker");
+	if(!runos_os && !k8s_worker_image) {
+		files = xxstrdup(worker_command);
 	} else {
+		// if runos, then worker comes from vc3_cmd. if k8s, then from the
+		// container image.
 		files = xxstrdup("");
 	}
 
@@ -427,8 +428,10 @@ static int submit_worker( struct batch_queue *queue )
 		files = newfiles;
 	}
 
-	if(wrapper_input) {
-		char *newfiles = string_format("%s,%s",files,wrapper_input);
+	const char *item = NULL;
+	list_first_item(wrapper_inputs);
+	while((item = list_next_item(wrapper_inputs))) {
+		char *newfiles = string_format("%s,%s",files,path_basename(item));
 		free(files);
 		files = newfiles;
 	}
@@ -442,10 +445,6 @@ static int submit_worker( struct batch_queue *queue )
 		temp = string_format("%s,%s",files,"vc3-builder");
 		free(files);
 		files = temp;
-	}else{
-		char* temp = string_format("%s,%s",files,worker);
-		free(files);
-		files=temp;
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
@@ -1062,15 +1061,7 @@ void add_wrapper_command( const char *cmd )
 
 void add_wrapper_input( const char *filename )
 {
-	if(!wrapper_input) {
-		wrapper_input = strdup(filename);
-	} else {
-		char *tmp = string_format("%s,%s",wrapper_input,filename);
-		free(wrapper_command);
-		wrapper_command = tmp;
-	}
-	struct jx *file = jx_string(filename);
-	jx_array_append(wrapper_inputs, file);
+	list_push_tail(wrapper_inputs, xxstrdup(filename));
 }
 
 static void show_help(const char *cmd)
@@ -1215,7 +1206,7 @@ int main(int argc, char *argv[])
 	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
 
-	wrapper_inputs = jx_array(NULL);
+	wrapper_inputs = list_create();
 
 	// --run-factory-as-manager and -Twq should be used together.
 	int run_as_manager = 0;
@@ -1336,6 +1327,7 @@ int main(int argc, char *argv[])
 				}
 				add_wrapper_input(fullpath);
 				add_wrapper_input(optarg);
+				add_wrapper_command( string_format("./%s -e %s ",path_basename(fullpath), path_basename(optarg)));
 				break;
 				}
 			case LONG_OPT_WRAPPER:
@@ -1501,17 +1493,17 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if(wrapper_input) {
-		struct jx *item=0;
-		for( void *i=0; (item=jx_iterate_array(wrapper_inputs,&i)); ) {
-			const char *value = item->u.string_value;
-			const char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(value));
-			int result = copy_direntry(value, file_at_scratch_dir); 
-			if(result < 0) {
-				fprintf(stderr,"work_queue_factory: Cannot copy wrapper input file %s to factory scratch directory\n", value);
-				exit(EXIT_FAILURE);
-			}
+	const char *item = NULL;
+	list_first_item(wrapper_inputs);
+	while((item = list_next_item(wrapper_inputs))) {
+		char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(item));
+		int result = copy_file_to_file(item, file_at_scratch_dir);
+		if(result < 0) {
+			fprintf(stderr,"work_queue_factory: Cannot copy wrapper input file %s to factory scratch directory %s:\n", item, file_at_scratch_dir);
+			fprintf(stderr,"%s\n", strerror(errno));
+			exit(EXIT_FAILURE);
 		}
+		free(file_at_scratch_dir);
 	}
 
 	char* cmd;
@@ -1600,7 +1592,6 @@ int main(int argc, char *argv[])
 
 	}
 
-	jx_delete(wrapper_inputs);
 	batch_queue_delete(queue);
 
 	return 0;

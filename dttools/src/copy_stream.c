@@ -95,7 +95,7 @@ int64_t copy_file_to_file(const char *input, const char *output)
 		return -1;
 	}
 
-	int out = open(output, O_WRONLY|O_CREAT|O_TRUNC, info.st_mode);
+	int out = open(output, O_WRONLY|O_CREAT|O_TRUNC, info.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
 	if (out == -1 && errno == ENOTDIR) {
 		char dir[PATH_MAX];
 		path_dirname(output, dir);
