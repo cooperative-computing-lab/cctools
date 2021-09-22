@@ -1669,8 +1669,7 @@ class WorkQueue(object):
     #
     # @param self  Reference to the current work queue object.
     # @param name  The name fo the parameter to tune. Can be one of following:
-    # - "asynchrony-multiplier" Treat each worker as having (actual_cores * multiplier) total cores. (default = 1.0)
-    # - "asynchrony-modifier" Treat each worker as having an additional "modifier" cores. (default=0)
+    # - "resource-submit-multiplier" Treat each worker as having ({cores,memory,gpus} * multiplier) when submitting tasks. This allows for tasks to wait at a worker rather than the manager. (default = 1.0)
     # - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
     # - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
     # - "transfer-outlier-factor" Transfer that are this many times slower than the average will be aborted.  (default=10x)
