@@ -962,22 +962,21 @@ static void mainloop( struct batch_queue *queue )
 		int workers_waiting_to_connect = workers_submitted - workers_connected;
 
 		if(workers_waiting_to_connect < 0) {
-			debug(D_WQ,"%d workers already connected from other sources", -workers_waiting_to_connect);
+			debug(D_WQ,"at least %d workers have already connected from other sources", -workers_waiting_to_connect);
+			new_workers_needed -= abs(workers_waiting_to_connect);
+
+			// this factory has no workers_waiting_to_connect
+			workers_waiting_to_connect = 0;
 		}
 
 		if(workers_waiting_to_connect > 0) {
 			debug(D_WQ,"waiting for %d previously submitted workers to connect", workers_waiting_to_connect);
 		}
 
-		//abs here because:
-		//if +, we are waiting for workers to connect, thus we don't need to submit as many new ones.
-		//if -, workers connected from other sources, thus we don't need to submit as many new ones.
-		new_workers_needed = new_workers_needed - abs(workers_waiting_to_connect);
-
-		// Always apply workers_per_cycle at the very end
-		if(workers_per_cycle > 0 && new_workers_needed > workers_per_cycle) {
+		// Apply workers_per_cycle. Never have more than workers_per_cycle waiting to connect.
+		if(workers_per_cycle > 0 && (new_workers_needed + workers_waiting_to_connect) > workers_per_cycle) {
 			debug(D_WQ,"applying maximum workers per cycle of %d",workers_per_cycle);
-			new_workers_needed = workers_per_cycle;
+			new_workers_needed = MAX(0, workers_per_cycle - workers_waiting_to_connect);
 		}
 
 		debug(D_WQ,"workers needed: %d",    workers_needed);
