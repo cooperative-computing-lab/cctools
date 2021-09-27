@@ -1318,7 +1318,6 @@ int main(int argc, char *argv[])
 			case LONG_OPT_PYTHON_PACKAGE:
 				{
 				// --package X is the equivalent of --wrapper "python_package_run X" --wrapper-input X
-				add_wrapper_command( string_format("./python_package_run -e %s --",optarg) );
 				char *fullpath = path_which("python_package_run");
 				if(!fullpath) {
 					fprintf(stderr,"work_queue_factory: could not find python_package_run in PATH");
