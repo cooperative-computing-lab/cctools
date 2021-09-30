@@ -100,6 +100,7 @@ typedef enum {
 	JX_OP_LOOKUP,
 	JX_OP_CALL,
 	JX_OP_SLICE,
+	JX_OP_PIPE,
 	JX_OP_INVALID,
 } jx_operator_t;
 

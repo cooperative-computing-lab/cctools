@@ -65,13 +65,13 @@ const struct jx_function_info jx_functions[] = {
     { "len", "len( array )", SINGLE_ARG, { .single_arg = jx_function_len }},
     { "fetch", "fetch( URL/path )", SINGLE_ARG, { .single_arg = jx_function_fetch }},
     { "schema", "schema( object )", SINGLE_ARG, { .single_arg = jx_function_schema }},
-    { "like", "like( string, object )", SINGLE_ARG, { .single_arg = jx_function_like }},
+    { "like", "like( object, string )", SINGLE_ARG, { .single_arg = jx_function_like }},
     { "keys", "keys( object )", SINGLE_ARG, { .single_arg = jx_function_keys }},
     { "values", "values( object )", SINGLE_ARG, { .single_arg = jx_function_values }},
     { "items", "items( object )", SINGLE_ARG, { .single_arg = jx_function_items}},
     { "template", "template( string [,object] )", DOUBLE_ARG, { .double_arg = jx_function_template }},
-    { "select", "select( boolean, array )", DEFERRED_EVAL, { .deferred_eval = jx_function_select }},
-    { "project", "project( expression, array )", DEFERRED_EVAL, { .deferred_eval = jx_function_project }},
+    { "select", "select( array, boolean )", DEFERRED_EVAL, { .deferred_eval = jx_function_select }},
+    { "project", "project( array, expression )", DEFERRED_EVAL, { .deferred_eval = jx_function_project }},
     { 0, 0, 0, {0} }
 };
 
@@ -904,8 +904,8 @@ struct jx *jx_function_select(struct jx *args, struct jx *ctx) {
     struct jx *new_ctx = NULL;
     struct jx *j = NULL;
 
-    struct jx *val = jx_array_shift(args);
     struct jx *objlist = jx_array_shift(args);
+    struct jx *val = jx_array_shift(args);
     if (jx_array_length(args) != 0) {
         result = make_error(func, args, "2 arguments required");
         goto FAILURE;
@@ -974,8 +974,8 @@ struct jx *jx_function_project(struct jx *args, struct jx *ctx) {
     struct jx *j = NULL;
     struct jx *new_ctx = NULL;
 
-    struct jx *val = jx_array_shift(args);
     struct jx *objlist = jx_array_shift(args);
+    struct jx *val = jx_array_shift(args);
     if (jx_array_length(args) != 0) {
         result = make_error(func, args, "2 arguments required");
         goto FAILURE;
@@ -1072,8 +1072,8 @@ struct jx *jx_function_like(struct jx *args) {
     const char *func = "like";
     struct jx *result = NULL;
 
-    struct jx *val = jx_array_shift(args);
     struct jx *obj = jx_array_shift(args);
+    struct jx *val = jx_array_shift(args);
     if (!jx_istype(val, JX_STRING)) {
         result = make_error(func, args, "1st argument must be a string");
         goto FAILURE;

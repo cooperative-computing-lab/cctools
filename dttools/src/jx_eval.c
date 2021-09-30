@@ -306,6 +306,21 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 		left = NULL;
 		goto DONE;
 	}
+
+	if (o->type == JX_OP_PIPE) {
+		assert(o->right);
+
+		if (o->right->type != JX_OPERATOR || o->right->u.oper.type != JX_OP_CALL) {
+			FAILOP(o, left, o->right, "expression must be piped into a function");
+		}
+
+		struct jx *func = o->right->u.oper.left;
+		struct jx *params = jx_copy(o->right->u.oper.right);
+		jx_array_insert(params, left);
+
+		return jx_eval_call(func, params, context);
+	}
+
 	right = jx_eval(o->right,context);
 	if (jx_istype(right, JX_ERROR)) {
 		result = right;

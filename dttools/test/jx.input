@@ -291,16 +291,16 @@ template("bad {object}");
 
 schema([{"x": 0, "y": "test", "z": 1.0}]);
 
-select(x<10, [{"x": 0, "y": "test", "z": 1.0}]);
-select(x>10, [{"x": 0, "y": "test", "z": 1.0}]);
-select(y=="test"&&z!=0.0, [{"x": 0, "y": "test", "z": 1.0}]);
+select([{"x": 0, "y": "test", "z": 1.0}], x<10);
+select([{"x": 0, "y": "test", "z": 1.0}], x>10);
+select([{"x": 0, "y": "test", "z": 1.0}], y=="test"&&z!=0.0);
 
-project(x, [{"x": 0, "y": "test", "z": 1.0}]);
-project({"z2":z*2.0}, [{"x": 0, "y": "test", "z": 1.0}]);
+project([{"x": 0, "y": "test", "z": 1.0}], x);
+project([{"x": 0, "y": "test", "z": 1.0}], {"z2":z*2.0});
 
-like(".es.*", "test");
-like("NULL", "test");
-select(like(".es.*", y), [{"x": 0, "y": "test", "z": 1.0}]);
+like("test", ".es.*");
+like("test", "NULL");
+select([{"x": 0, "y": "test", "z": 1.0}], like(y,".es.*"));
 
 !!true;
 not not false;
@@ -316,5 +316,23 @@ items({});
 keys({"a": 1, "b": 2});
 values({"a": 1, "b": 2});
 items({"a": 1, "b": 2});
+
+[":%d".format(2*i) for i in range(10)];
+["a", "b", "c", "d"].join(" ");
+f.ceil();
+f.floor();
+"/a/b/c/d".basename();
+"/a/b/c/d".dirname();
+"dir".listdir();
+"echo $PATH".escape();
+[1,2,3,4].len();
+[{"x": 0, "y": "test", "z": 1.0}].schema();
+"test".like(".es.*");
+{"a": 1, "b": 2}.keys();
+{"a": 1, "b": 2}.values();
+{"a": 1, "b": 2}.items();
+"{f}".template({"f": "ok"});
+[{"x": 0, "y": "test", "z": 1.0}].select(x<10);
+[{"x": 0, "y": "test", "z": 1.0}].project(x);
 
 #end

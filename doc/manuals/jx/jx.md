@@ -496,25 +496,25 @@ fetch("example.json")
 
 #### select
 
->       select(A, [,B]) -> Array
->       where A = Boolean and B = Object
+>       select([,A], B) -> Array
+>       where A = Object and B = Boolean
 
 select() returns an array of objects for which the boolean expression evaluates to true for that object.
 
 ```python
-select(x==1, [{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}])
+select([{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}], x==1)
 = [{"x": 1, "y": "example", "z": 0.0}]
 ```
 
 #### project
 
->       project(A, [,B]) -> Array
->       where A = Expression and B = Object
+>       project([,A], B) -> Array
+>       where A = Object and B = Expression
 
 project() returns an array of objects resulting from evaluating the expression upon the array.
 
 ```python
-project(x, [{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}])
+project([{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}], x)
 = [0, 1]
 ```
 
@@ -533,12 +533,12 @@ schema({"x": 0, "y": "test", "z": 1.0})
 #### like
 
 >       like(A, B) -> Boolean
->       where A = String and B = String
+>       where A = String (to be matched) and B = String (regex)
 
-like() returns a boolean value representing whether the given regex string matched to the given string.
+like() returns a boolean value representing whether the given string matches the given regex.
 
 ```python
-like(".es.*", "test")
+like("test", ".es.*")
 = true
 ```
 
@@ -568,7 +568,27 @@ If multiple clauses are specified, they are evaluated from left to right.
 [[i, j] for i in range(5) for j in range(4) if (i + j)%2 == 0]
 = [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2], [3, 1]]
 ```
-    
+
+### Anaphoric Expressions
+
+JX supports anaphoric expressions via the following syntax
+>       A.B()   where A is any type and B is a function
+which simply places `A` as the first parameter in `B`.
+
+This gives us the following examples:
+```
+"%d".format(10)
+= 10
+
+[1,2,3,4].len()
+= 4
+
+[{"a": 1}, {"a": 2}].project(a)
+= [1, 2]
+
+"abc".like("a.+")
+= true
+```
 
 ### Errors
 

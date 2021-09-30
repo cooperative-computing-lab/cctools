@@ -47,6 +47,7 @@ typedef enum {
 	JX_TOKEN_C_AND,
 	JX_TOKEN_OR,
 	JX_TOKEN_C_OR,
+	JX_TOKEN_PIPE,
 	JX_TOKEN_NOT,
 	JX_TOKEN_C_NOT,
 	JX_TOKEN_NULL,
@@ -343,6 +344,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		jx_ungetchar(s, c);
 		goto retry;
 	} else if(strchr("0123456789.",c)) {
+		if (c=='.') {
+			char d = jx_getchar(s);
+			jx_ungetchar(s, d);
+			if (!strchr("0123456789",d)) return JX_TOKEN_PIPE;
+		}
 		s->token[0] = c;
 		int i;
 		for(i=1;i<MAX_TOKEN_SIZE;i++) {
@@ -727,6 +733,7 @@ int jx_operator_precedence( jx_operator_t t )
 		case JX_OP_MOD:	return 1;
 		case JX_OP_LOOKUP: return 0;
 		case JX_OP_CALL: return 0;
+		case JX_OP_PIPE: return 0;
 		default:	return 0;
 	}
 }
@@ -753,6 +760,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_C_NOT:return JX_OP_NOT;
 		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
 		case JX_TOKEN_LPAREN: return JX_OP_CALL;
+		case JX_TOKEN_PIPE: return JX_OP_PIPE;
 		default:		return JX_OP_INVALID;
 	}
 }
