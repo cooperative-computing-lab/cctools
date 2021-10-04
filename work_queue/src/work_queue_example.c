@@ -87,6 +87,9 @@ int main(int argc, char *argv[])
 		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 
 		/* Once all files has been specified, we are ready to submit the task to the queue. */
+		if (i == 1){	
+			work_queue_task_specify_cores(t, 20);
+		}
 		taskid = work_queue_submit(q, t);
 
 		printf("submitted task (id# %d): %s\n", taskid, t->command_line);

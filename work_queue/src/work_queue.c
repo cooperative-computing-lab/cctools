@@ -3729,7 +3729,7 @@ void compute_manager_load(struct work_queue *q, int task_activity) {
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
-	/* worker has no reported any resources yet */
+	/* worker has not reported any resources yet */
 	if(w->resources->tag < 0)
 		return 0;
 
@@ -3970,6 +3970,56 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 	}
 }
 
+
+// checks workers against tasks and returns if a task has the  
+// possibility of fitting a worker
+static int task_is_compatible(struct work_queue *q, struct work_queue_task *t, struct work_queue_worker *w)
+{
+	/*
+ 	// Somehow, get the task resource request and compare it by hand with each 
+ 	// worker resource
+ 	// using "required" for now to represent what a task resource specification would be 
+ 	*/
+	int ok = 1;	
+	// baseline resurce comparison of worker total resources and a task requested resorces
+	//TODO ensure that these resource_requested stats are the correct ones from rmsummary
+	if(w->resources->cores.total < t->resources_requested->cores ) {
+		ok = 0;
+	}
+
+	if(w->resources->memory.total < t->resources_requested->memory ) {
+		ok = 0;
+	}
+
+	if(w->resources->disk.total < t->resources_requested->disk ) { /* No overcommit disk */
+		ok = 0;
+	}
+
+	if(w->resources->gpus.total < t->resources_requested->gpus ) {
+		ok = 0;
+	}
+
+	return ok;
+}
+static int check_task_compatibility(struct work_queue *q, struct work_queue_task *t)
+{
+	char *key;
+	struct work_queue_worker *w;
+	hash_table_firstkey(q->worker_table);
+	
+	
+	while(hash_table_nextkey(q->worker_table, &key, (void**)&w))
+	{
+		if (task_is_compatible(q, t, w)){
+			//printf("It's Fine. task %d will eventually match a worker\n", (int)t->taskid);
+			return 1;
+		}
+	}
+
+	return 0;
+
+}
+
 // use task-specific algorithm if set, otherwise default to the queue's setting.
 static struct work_queue_worker *find_best_worker(struct work_queue *q, struct work_queue_task *t)
 {
@@ -4116,18 +4166,31 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 static int send_one_task( struct work_queue *q )
 {
 	struct work_queue_task *t;
+	
 	struct work_queue_worker *w;
+
+	/*TODO one way solve this issue would be to call
+ 		* work_queue_get_stats and compare the data.
+ 		* I just need to find the best place to do this
+ 		* since calling the function is expensive.
+	printf("max worker cores %d\n",(int)q->stats->max_cores);
+	printf("max worker memory %d\n",(int)q->stats->max_memory);
+	printf("max worker disk %d\n",(int)q->stats->max_disk);
+	*/
 
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
-
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
 
 		// If there is no suitable worker, consider the next task.
-		if(!w) continue;
-
+		if(!w){
+			if (!check_task_compatibility(q, t)){
+				printf("task (id: %d) does not fit any workers\n", t->taskid);
+			}
+			continue;
+		}
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
 
@@ -6284,7 +6347,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 */
 {
 	int events = 0;
-
+	//work_queue_get_stats(q, q->stats);
+    //	printf("called work_queue_get_stats\n");
 	// account for time we spend outside work_queue_wait
 	if(q->time_last_wait > 0) {
 		q->stats->time_application += timestamp_get() - q->time_last_wait;
