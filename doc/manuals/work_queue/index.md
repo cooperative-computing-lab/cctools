@@ -283,7 +283,7 @@ memory, disk) so that the worker can pack as many concurrent tasks.
 This is described in greater detail under [Managing Resources](#managing-resources).
 
 You may also attach a `tag` to a task, which is just an user-defined string
-that describes the purpose of the taask.  The tag is available as `t.tag`
+that describes the purpose of the task.  The tag is available as `t.tag`
 when the task is complete.
 
 === "Python"
