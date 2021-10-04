@@ -334,5 +334,6 @@ f.floor();
 "{f}".template({"f": "ok"});
 [{"x": 0, "y": "test", "z": 1.0}].select(x<10);
 [{"x": 0, "y": "test", "z": 1.0}].project(x);
+[{"x": 1}, {"x": 2}].select(x>0).project(x).len();
 
 #end

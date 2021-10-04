@@ -822,3 +822,6 @@ value:      [{"x":0,"y":"test","z":1}]
 expression: [{"x":0,"y":"test","z":1}].project(x)
 value:      [0]
 
+expression: [{"x":1},{"x":2}].select(x>0).project(x).len()
+value:      2
+

@@ -569,25 +569,31 @@ If multiple clauses are specified, they are evaluated from left to right.
 = [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2], [3, 1]]
 ```
 
-### Anaphoric Expressions
+### Functions as Methods
 
-JX supports anaphoric expressions via the following syntax
+JX supports a syntax for functions very similar to object methods of the form `object.method()`.
+
+The syntax is constructed as follows:
 >       A.B()   where A is any type and B is a function
-which simply places `A` as the first parameter in `B`.
+In this example, A gets piped into B as the first argument.  As such, `A.B()` is logically equivalent to `B(A)`.
+
+The same logic applies for functions with multiple parameters as well.
+In these cases, the expression before the `.` simply gets inserted as
+the first argument, and the others get shifted over.
 
 This gives us the following examples:
 ```
-"%d".format(10)
-= 10
-
 [1,2,3,4].len()
 = 4
 
-[{"a": 1}, {"a": 2}].project(a)
-= [1, 2]
-
 "abc".like("a.+")
 = true
+
+"ceil(%f) -> %d".format(9.1, 10)
+= ceil(9.1) -> 10
+
+[{"a": 1}, {"a": 2}].select(a>0).project(a).len()
+= 2
 ```
 
 ### Errors

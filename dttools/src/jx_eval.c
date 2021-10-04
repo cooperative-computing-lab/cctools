@@ -192,6 +192,26 @@ static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx)
     return jx_function_eval(func->u.symbol_name, args, ctx);
 }
 
+static struct jx *jx_eval_dot(struct jx_operator *op, struct jx *left, struct jx *right, struct jx *ctx) {
+	// here, we want x.f(y) to be logically equivalent to f(x, y)
+	//   left  = x
+	//   right = f(y)
+	assert(op);
+	assert(left);
+	assert(right);
+	assert(jx_istype(right, JX_OPERATOR));
+
+	// inject x as the first parameter into f
+	struct jx *func_name = right->u.oper.left;
+	struct jx *params = jx_copy(right->u.oper.right);
+
+	assert(jx_istype(params, JX_ARRAY));
+	jx_array_insert(params, left);
+
+	// now, call eval as normal
+	return jx_eval_call(func_name, params, ctx);
+}
+
 static struct jx *jx_eval_slice(struct jx *array, struct jx *slice) {
 	assert(array);
 	assert(slice);
@@ -307,19 +327,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 		goto DONE;
 	}
 
-	if (o->type == JX_OP_PIPE) {
-		assert(o->right);
-
-		if (o->right->type != JX_OPERATOR || o->right->u.oper.type != JX_OP_CALL) {
-			FAILOP(o, left, o->right, "expression must be piped into a function");
-		}
-
-		struct jx *func = o->right->u.oper.left;
-		struct jx *params = jx_copy(o->right->u.oper.right);
-		jx_array_insert(params, left);
-
-		return jx_eval_call(func, params, context);
-	}
+	if (o->type == JX_OP_DOT) return jx_eval_dot(o, left, o->right, context);
 
 	right = jx_eval(o->right,context);
 	if (jx_istype(right, JX_ERROR)) {
