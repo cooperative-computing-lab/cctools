@@ -26,6 +26,9 @@ import shutil
 import atexit
 import time
 
+def brett(name)
+    print("hello {}".format(name))
+
 def set_debug_flag(*flags):
     for flag in flags:
         cctools_debug_flags_set(flag)
@@ -1718,6 +1721,27 @@ class WorkQueue(object):
             return task
         return None
 
+
+def qmap(f, a):
+    q = WorkQueue(9123)
+    results = []
+    for i in a:
+        p_task = PythonTask(f, i)
+        q.submit
+
+    while not q.empty():
+        t = q.wait()
+        if t:
+            x = t.output
+            if isinstance(x, PythonTaskNoResult):
+                print("Task {} failed and did not generate a result.".format(t.id))
+            else:
+                results.insert(0,x)
+
+    return results
+
+
+# test
 
 ##
 # \class Factory
