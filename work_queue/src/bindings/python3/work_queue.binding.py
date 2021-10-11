@@ -12,6 +12,7 @@
 # - @ref work_queue::Task
 # - @ref work_queue::Factory
 
+import itertools
 import copy
 import os
 import sys
@@ -25,9 +26,6 @@ import textwrap
 import shutil
 import atexit
 import time
-
-def brett(name)
-    print("hello {}".format(name))
 
 def set_debug_flag(*flags):
     for flag in flags:
@@ -1721,25 +1719,78 @@ class WorkQueue(object):
             return task
         return None
 
+    def map(self, fn, array):
+        results = [0] * len(array)
+        tasks = {}
+        for i, arg in enumerate(array):
+            p_task = PythonTask(fn, arg)
+            self.submit(p_task)          
+            tasks[p_task.id] = i
+ 
+        while not self.empty():
+            t = self.wait()
+            if t:
+                x = t.output
+                if isinstance(x, PythonTaskNoResult):
+                    print("Task {} failed and did not generate a result.".format(t.id))
+                else:
+                    results[tasks[t.id]] = x
+  
+        return results
 
-def qmap(f, a):
-    q = WorkQueue(9123)
-    results = []
-    for i in a:
-        p_task = PythonTask(f, i)
-        q.submit
+    def pair(self, fn, array1, array2):
+        results = [0] * (len(array1) * len(array2))
+        tasks = {}
+        for i, (x, y) in enumerate(itertools.product(array1, array2)):
+            p_task = PythonTask(fn, x, y)
+            self.submit(p_task)          
+            tasks[p_task.id] = i
 
-    while not q.empty():
-        t = q.wait()
-        if t:
-            x = t.output
-            if isinstance(x, PythonTaskNoResult):
-                print("Task {} failed and did not generate a result.".format(t.id))
-            else:
-                results.insert(0,x)
+        while not self.empty():
+            t = self.wait()
+            if t:
+                x = t.output
+                if isinstance(x, PythonTaskNoResult):
+                    print("Task {} failed and did not generate a result.".format(t.id))
+                else:
+                    results[tasks[t.id]] = x
+  
+        return results
 
-    return results
+    def treeReduce(self, fn, array):
+        tmp = array
+        size = len(array)
+        tasks = {}
+        isodd = 0
 
+        if (len(array) % 2) == 1:
+            extra = array[-1]
+            isodd = 1
+    
+        while size != 1:
+            results = [0] * (len(tmp)//2)
+            for i in range(len(tmp)//2):
+                p_task = PythonTask(fn, tmp[(i*2)], tmp[(i*2)+1])
+                self.submit(p_task)
+                tasks[p_task.id] = i
+
+            while not self.empty():
+                t = self.wait()
+                if t:
+                    x = t.output
+                    if isinstance(x, PythonTaskNoResult):
+                        print("Task {} failed and did not generate a result.".format(t.id))
+                    else:
+                        results[tasks[t.id]] = x
+
+            size = size // 2
+            if size == 1 and isodd:
+                results.append(extra)
+                size += 1
+                isodd = 0
+            tmp = results
+
+        return tmp[0]
 
 # test
 
