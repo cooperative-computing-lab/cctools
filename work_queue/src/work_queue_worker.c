@@ -2246,18 +2246,20 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 
 	int found_canonical = 0;
 
-	for (void *i = NULL; (ifa = jx_iterate_array(ifas, &i));) {
-		const char *ifa_addr = jx_lookup_string(ifa, "host");
+	if(ifas) {
+		for (void *i = NULL; (ifa = jx_iterate_array(ifas, &i));) {
+			const char *ifa_addr = jx_lookup_string(ifa, "host");
 
-		if(ifa_addr && strcmp(addr, ifa_addr) == 0) {
-			found_canonical = 1;
+			if(ifa_addr && strcmp(addr, ifa_addr) == 0) {
+				found_canonical = 1;
+			}
+
+			struct manager_address *m = calloc(1, sizeof(*m));
+			strncpy(m->host, ifa_addr, LINK_ADDRESS_MAX);
+			m->port = port;
+
+			list_push_tail(l, m);
 		}
-
-		struct manager_address *m = calloc(1, sizeof(*m));
-		strncpy(m->host, ifa_addr, LINK_ADDRESS_MAX);
-		m->port = port;
-
-		list_push_tail(l, m);
 	}
 
 	if(ifas && !found_canonical) {
@@ -2326,20 +2328,24 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 		int result;
 
 		if(pref && strcmp(pref, "by_hostname") == 0) {
-			debug(D_WQ,"selected manager with project=%s name=%s addr=%s port=%d",project,name,addr,port);
-			result = serve_manager_by_hostport(name,port,project);
+			debug(D_WQ,"selected manager with project=%s hostname=%s addr=%s port=%d",project,name,addr,port);
+			manager_addresses = interfaces_to_list(name, port, NULL);
+		} else if(pref && strcmp(pref, "by_apparent_ip") == 0) {
+			debug(D_WQ,"selected manager with project=%s apparent_addr=%s port=%d",project,addr,port);
+			manager_addresses = interfaces_to_list(addr, port, NULL);
 		} else {
+			debug(D_WQ,"selected manager with project=%s addr=%s port=%d",project,addr,port);
 			manager_addresses = interfaces_to_list(addr, port, ifas);
-
-			result = serve_manager_by_hostport_list(manager_addresses);
-
-			struct manager_address *m;
-			while((m = list_pop_head(manager_addresses))) {
-				free(m);
-			}
-			list_delete(manager_addresses);
-			manager_addresses = NULL;
 		}
+
+		result = serve_manager_by_hostport_list(manager_addresses);
+
+		struct manager_address *m;
+		while((m = list_pop_head(manager_addresses))) {
+			free(m);
+		}
+		list_delete(manager_addresses);
+		manager_addresses = NULL;
 
 		if(result) {
 			free(last_addr);
