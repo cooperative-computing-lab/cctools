@@ -20,7 +20,7 @@ The argument to --merge gives the maximum Jaccard distance at which to merge.
 '''
 
 TAR_EXT = '.tar.gz'
-CACHEDIR = os.path.join(tempfile.gettempdir(), 'python_package-{}'.format(os.geteuid()))
+CACHEDIR = os.path.join(tempfile.gettempdir(), 'poncho_package-{}'.format(os.geteuid()))
 SPECS = {}
 PKGSETS = {}
 PKGSIZE = {}
@@ -124,7 +124,7 @@ def insert(spec):
     tarball_fd, tarball_path = tempfile.mkstemp(dir=CACHEDIR, suffix=TAR_EXT)
     sys.stderr.write('creating new env at {}\n'.format(tarball_path))
     os.close(tarball_fd)
-    subprocess.run(['python_package_create', meta_path, tarball_path],
+    subprocess.run(['poncho_package_create', meta_path, tarball_path],
             check=True, stdout=sys.stderr)
 
     os.replace(tarball_path, out + TAR_EXT)
