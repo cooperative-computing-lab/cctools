@@ -4113,9 +4113,14 @@ static int send_one_task( struct work_queue *q )
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
+	timestamp_t now = timestamp_get();
+
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
+
+		// Skip task if min requested start time not met.
+		if(t->resources_requested->start > now) continue;
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
@@ -4598,6 +4603,18 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t usecon
 	else
 	{
 		t->resources_requested->end = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
+	}
+}
+
+void work_queue_task_specify_start_time_min( struct work_queue_task *t, int64_t useconds )
+{
+	if(useconds < 1)
+	{
+		t->resources_requested->start = -1;
+	}
+	else
+	{
+		t->resources_requested->start = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
 	}
 }
 
