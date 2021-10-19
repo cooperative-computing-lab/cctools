@@ -1325,11 +1325,13 @@ class WorkQueue(object):
 
     ##
     # Set the preference for using hostname over IP address to connect.
-    # 'by_ip' uses IP address (standard behavior), or 'by_hostname' to use the
-    # hostname at the manager.
+    # 'by_ip' uses IP addresses from the network interfaces of the manager
+    # (standard behavior), 'by_hostname' to use the hostname at the manager, or
+    # 'by_apparent_ip' to use the address of the manager as seen by the catalog
+    # server.
     #
     # @param self Reference to the current work queue object.
-    # @param mode An string to indicate using 'by_ip' or a 'by_hostname'.
+    # @param mode An string to indicate using 'by_ip', 'by_hostname' or 'by_apparent_ip'.
     def specify_manager_preferred_connection(self, mode):
         return work_queue_manager_preferred_connection(self._work_queue, mode)
 

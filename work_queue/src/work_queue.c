@@ -195,7 +195,7 @@ struct work_queue {
 	int keepalive_timeout;
 	timestamp_t link_poll_end;	//tracks when we poll link; used to timeout unacknowledged keepalive checks
 
-    char *manager_preferred_connection; 
+    char *manager_preferred_connection;
 
 	int monitor_mode;
 	FILE *monitor_file;
@@ -6719,6 +6719,12 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 void work_queue_manager_preferred_connection(struct work_queue *q, const char *preferred_connection)
 {
 	free(q->manager_preferred_connection);
+	assert(preferred_connection);
+
+	if(strcmp(preferred_connection, "by_ip") && strcmp(preferred_connection, "by_hostname") && strcmp(preferred_connection, "by_apparent_ip")) {
+		fatal("manager_preferred_connection should be one of: by_ip, by_hostname, by_apparent_ip");
+	}
+
 	q->manager_preferred_connection = xxstrdup(preferred_connection);
 }
 
