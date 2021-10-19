@@ -2500,6 +2500,10 @@ static void show_help(const char *cmd)
 	printf( " %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n", "--disk-allocation");
 	printf( " %-30s Specifies a user-defined feature the worker provides. May be specified several times.\n", "--feature");
 	printf( " %-30s Set the maximum number of seconds the worker may be active. (in s).\n", "--wall-time=<s>");
+
+	printf( " %-30s When using -M, override manager preference to resolve its address.\n", "--connection-mode");
+	printf( " %-30s One of by_ip, by_hostname, or by_apparent_ip. Default is set by manager.\n", "");
+
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
