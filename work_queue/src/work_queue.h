@@ -498,6 +498,14 @@ This is useful, for example, when the task uses certificates that expire.
 
 void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t useconds );
 
+/** Specify the minimum start time allowed for the task (in microseconds since the
+ * Epoch). If less than 1, then no minimum start time is specified (this is the default).
+@param t A task object.
+@param useconds Number of useconds since the Epoch.
+*/
+
+void work_queue_task_specify_start_time_min( struct work_queue_task *t, int64_t useconds );
+
 /** Specify the maximum time (in microseconds) the task is allowed to run in a
  * worker. This time is accounted since the the moment the task starts to run
  * in a worker.  If less than 1, then no maximum time is specified (this is the default).
