@@ -11,31 +11,154 @@ import argparse
 import subprocess
 import json
 import conda_pack
+import pathlib
+import hashlib
+import shutil
+import logging
 
 devnull = open(os.devnull, 'w')
+logger = logging.getLogger()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
 
-def pack_env(spec, out):
-    with tempfile.TemporaryDirectory() as env_dir:
-        print('Creating temporary environment in {}'.format(env_dir))
-	
-	# creates conda spec file from original spec file
-        print('creating conda environment...')
-        check_spec(spec, env_dir)
-	
-        subprocess.check_call(['conda', 'env', 'create', '--prefix', env_dir,
-            '--file', env_dir + '/conda_spec.yml'])
 
-	# fetch data
-        print('Fethcing data...')
-        git_data(spec, env_dir)
-        http_data(spec, env_dir)
+def pack_env(spec, env_dir_cache='envs'):
+
+    # Read and hash specification file
+    f = open(spec, 'r')
+    pkgs = json.load(f)
+    pathlib.Path(env_dir_cache).mkdir(parents=True, exist_ok=True)
+    packages_hash = hashlib.sha256(str(pkgs).encode()).hexdigest()[0:8]
+    
+    # find local pip packages	
+    local_pip_pkgs = _find_local_pip()
+    pip_commits = _commits_local_pip(local_pip_pkgs)
+    pip_check = _compute_commit(local_pip_pkgs, pip_commits, spec)
+
+    # check if any local pip packages are specified within specification    
+    local_reqs = []
+    if 'pip' in pkgs:
+        local_reqs = {x:local_pip_pkgs[x] for x in local_pip_pkgs if x in pkgs['pip']}
+        logger.info(str(local_reqs))
+    base_env_file=pathlib.Path(env_dir_cache).joinpath("base_env_{}.tar.gz".format(packages_hash))
+    if local_reqs:
+        full_env_tarball = pathlib.Path(env_dir_cache).joinpath("full_env_{}_{}".format(packages_hash, pip_check)).with_suffix(".tar.gz")
+    else:
+        full_env_tarball = pathlib.Path(env_dir_cache).joinpath("full_env_{}".format(packages_hash)).with_suffix(".tar.gz")
+ 
+    # search for cached environment
+    if pathlib.Path(base_env_file).exists():
+        logger.info('Found environment in cache')
+        base_env_tarball = base_env_file
+
+    # create environment
+    else:
+        with tempfile.TemporaryDirectory() as env_dir:
+            logger.info('Creating temporary environment in {}'.format(env_dir))
+ 
+	    # creates conda spec file from poncho spec file
+            logger.info('converting spec file...')
+            check_spec(spec, env_dir, local_pip_pkgs.keys())
+
+            # fetch data via git and https
+            logger.info('Fethcing data...')
+            git_data(spec, env_dir)
+            http_data(spec, env_dir)
 	
-        # Bug breaks bundling common packages (e.g. python).
-        # ignore_missing_files may be safe to remove in the future.
-        # https://github.com/conda/conda-pack/issues/145
-        print('packing environment...')
-        conda_pack.pack(prefix=env_dir, output=out, force=True, ignore_missing_files=True)
-        print('To activate environment run poncho_package_run -e {} <command>'.format(out))
+            # create conda environment in temp directory
+            logger.info('creating base environment...')
+            subprocess.check_call(['conda', 'env', 'create', '--prefix', env_dir,
+                '--file', env_dir + '/conda_spec.yml'])
+
+            # install local pip dependencies
+            for (pkg, location) in local_reqs.items():
+                _install_pip_requirements(env_dir, pkg, location)
+
+            logger.info('packing base environment...')
+            conda_pack.pack(prefix=env_dir, output=str(base_env_file), force=True, ignore_missing_files=True)
+            logger.info('To activate environment run poncho_package_run -e {} <command>'.format(base_env_file))
+            base_env_tarball = base_env_file
+
+    if local_reqs:
+        with tempfile.TemporaryDirectory() as tmp_env:
+            # install local pip pkgs
+            for path in local_pip_pkgs.values():
+                _install_local_pip(base_env_tarball, tmp_env, path)            
+            try:
+                # remove flag file that marks environment as expanded
+                os.remove(os.path.join(tmp_env ,'.python_package_run_expanded'))
+            except FileNotFoundError:
+                pass
+
+            # Bug breaks bundling common packages (e.g. python).
+            # ignore_missing_files may be safe to remove in the future.
+            # https://github.com/conda/conda-pack/issues/145
+            logger.info('packing full environment...')
+            conda_pack.pack(prefix=tmp_env, output=str(full_env_tarball), force=True, ignore_missing_files=True)
+    else:
+        shutil.copyfile(base_env_tarball, full_env_tarball)
+
+    logger.info('To activate environment run poncho_package_run -e {} <command>'.format(full_env_tarball))
+    return full_env_tarball
+
+def _install_pip_requirements(env_path, pkg, location):
+    logger.info("Installing requirements of {} into {} via pip".format(location, env_path))
+    all_args = ['conda', 'run', '--prefix={}'.format(str(env_path)), 'sh', '-c', 'cd {} && pip install . && pip uninstall --yes {}'.format(location, pkg)]
+    try:
+        subprocess.check_output(all_args, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        logging.warning("Error executing: {}".format(' '.join(all_args)))
+        print(e.output.decode())
+        sys.exit(1)
+
+def _commits_local_pip(paths):
+    commits = {}
+    for (pkg, path) in paths.items():
+        try:
+            commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=path).decode().rstrip()
+            changed = subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=path).decode().rstrip()
+            if changed:
+                logger.warning("Found unstaged changes in '{}'".format(path))
+                commits[pkg] = 'HEAD'
+            else:
+                commits[pkg] = commit
+        except Exception as e:
+            # on error, e.g., not a git repository, assume that current state
+            # should be installed
+            print(e)
+            logger.warning("Could not get current commit of '{}'.".format(path))
+            commits[pkg] = 'HEAD'
+    return commits
+            
+def _compute_commit(paths, commits, spec):
+    # list commits according to paths ordering
+    values = []
+    f = open(spec, 'r')
+    data = json.load(f)
+    if 'pip' in data:
+        v = [x for x in data['pip'] if x in paths.keys()]
+        values = [commits[p] for p in v]
+        if 'HEAD' in values:
+            # if commit is HEAD, then return that, as we always rebuild the
+            # environment in that case.
+            return 'HEAD'
+    return hashlib.sha256(''.join(values).encode()).hexdigest()[0:8]
+
+def _find_local_pip():
+    edit_raw = subprocess.check_output([sys.executable, '-m' 'pip', 'list', '--editable']).decode()
+
+    # drop first two lines, which are just a header
+    edit_raw = edit_raw.split('\n')[2:]
+
+    path_of = {}
+    for line in edit_raw:
+        if not line:
+            # skip empty lines
+            continue
+        # we are only interested in the path information of the package, which
+        # is in the last column
+        (pkg, version, location) = line.split()
+        path_of[pkg] = location
+    return path_of
 
 def git_data(spec, out_dir):
 
@@ -66,7 +189,28 @@ def git_data(spec, out_dir):
                 gd = 'export {}=$1/{}\n'.format(git_dir, git_dir) 
                 with open(out_dir + '/poncho/set_env', 'a') as f:
                     f.write(gd)
-            	
+
+def _install_local_pip(base_env_tarball, env_dir, pip_path):
+#    logger.info("Installing {} from editable pip".format(pip_path))
+
+    with tempfile.NamedTemporaryFile(mode='w') as pip_recipe:
+        pip_recipe.write("""
+#! /bin/bash
+# remove if conda installed:
+pip_name=$(cd {path} && python setup.py --name)
+python_package_run -e {base_env_tarball} -u {env_dir} -- conda remove --yes --force "$pip_name"
+
+# install from pip local path
+set -e
+python_package_run -e {base_env_tarball} -u {env_dir} -- pip install {path}
+    """.format(base_env_tarball=base_env_tarball, env_dir=env_dir, path=pip_path))
+        pip_recipe.flush()
+        try:
+            subprocess.check_output(['/bin/bash', pip_recipe.name], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            print(e.output.decode())
+            sys.exit(1)
+
 def http_data(spec, out_dir):
 
     f = open(spec, 'r')
@@ -117,7 +261,7 @@ def http_data(spec, out_dir):
                 with open(out_dir + '/poncho/set_env', 'a') as f:
                     f.write(gd)
 
-def check_spec(spec, out_dir):
+def check_spec(spec, out_dir, local_pkgs):
 
     f = open(spec, 'r')
     data = json.load(f)
@@ -134,12 +278,9 @@ def check_spec(spec, out_dir):
             if dep not in conda_spec['dependencies']:
                 conda_spec['dependencies'].append(dep)
 
-
+    # get pip packages that are not
     if 'pip' in data:
-        pip_pkgs = []
-        for x in data['pip']:
-            pip_pkgs.append(x)
-
+        pip_pkgs = [x for x in data['pip'] if x not in local_pkgs]
         conda_spec['dependencies'].append({'pip':pip_pkgs})
 
     with open(out_dir + '/conda_spec.yml',  'w') as jf:
@@ -150,7 +291,17 @@ if __name__ == '__main__':
         description='Create a packed environment from a spec.')
     parser.add_argument('spec',
         help='Read in a spec file, or - for stdin.')
-    parser.add_argument('out',
-        help='Write output from conda-pack to the given file.')
-    args = parser.parse_args()	
-    pack_env(args.spec, args.out)
+   # parser.add_argument('out',
+   #     help='Write output from conda-pack to the given file.')
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument('--cache',
+        help='specify environment cache location')
+    args = parser.parse_args()
+    if args.cache:
+        pack_env(args.spec, evs=args.cache)
+    else:
+        pack_env(args.spec)
+
+
+
+
