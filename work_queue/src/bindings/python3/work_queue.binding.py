@@ -1326,7 +1326,7 @@ class WorkQueue(object):
     # server.
     #
     # @param self Reference to the current work queue object.
-    # @param mode An string to indicate using 'by_ip' or a 'by_hostname'.
+    # @param mode An string to indicate using 'by_ip', 'by_hostname' or 'by_apparent_ip'.
     def specify_manager_preferred_connection(self, mode):
         return work_queue_manager_preferred_connection(self._work_queue, mode)
 

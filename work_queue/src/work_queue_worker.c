@@ -129,6 +129,11 @@ static int symlinks_enabled = 1;
 // Worker id. A unique id for this worker instance.
 static char *worker_id;
 
+// If set to "by_ip", "by_hostname", or "by_apparent_ip", overrides manager's
+// preferred connection mode.
+char *preferred_connection = NULL;
+
+
 // pid of the worker's parent process. If different from zero, worker will be
 // terminated when its parent process changes.
 static pid_t initial_ppid = 0;
@@ -2306,6 +2311,11 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 		struct jx *ifas  = jx_lookup(jx,"network_interfaces");
 		int port = jx_lookup_integer(jx,"port");
 
+		// give priority to worker's preferred connection option
+		if(preferred_connection) {
+			pref = preferred_connection;
+		}
+
 
 		if(last_addr) {
 			if(time(0) > idle_stoptime && strcmp(addr, last_addr->host) == 0 && port == last_addr->port) {
@@ -2501,7 +2511,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
-	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH};
+	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2546,6 +2556,7 @@ static const struct option long_options[] = {
 	{"feature",             required_argument,  0,  LONG_OPT_FEATURE},
 	{"tlq",					required_argument,	0,  LONG_OPT_TLQ},
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
+	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{0,0,0,0}
 };
 
@@ -2780,6 +2791,13 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_PARENT_DEATH:
 			initial_ppid = getppid();
+			break;
+		case LONG_OPT_CONN_MODE:
+			free(preferred_connection);
+			preferred_connection = xxstrdup(optarg);
+			if(strcmp(preferred_connection, "by_ip") && strcmp(preferred_connection, "by_hostname") && strcmp(preferred_connection, "by_apparent_ip")) {
+				fatal("connection-mode should be one of: by_ip, by_hostname, by_apparent_ip");
+			}
 			break;
 		default:
 			show_help(argv[0]);
