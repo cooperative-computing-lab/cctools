@@ -70,6 +70,7 @@ OPTION_ARG_LONG(disk, mb)Manually set the amount of disk space (in MB) reported 
 OPTION_ARG_LONG(wall-time, s)Set the maximum number of seconds the worker may be active.
 OPTION_ARG_LONG(feature, feature)Specifies a user-defined feature the worker provides (option can be repeated).
 OPTION_ARG_LONG(volatility, chance)Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).
+OPTION_ARG_LONG(connection-mode, mode)When using -M, override manager preference to resolve its address. One of by_ip, by_hostname, or by_apparent_ip. Default is set by manager.
 OPTIONS_END
 
 SECTION(FOREMAN MODE)
