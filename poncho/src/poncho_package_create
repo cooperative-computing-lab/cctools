@@ -102,7 +102,7 @@ def pack_env(spec, env_dir_cache='envs'):
 
 def _install_pip_requirements(env_path, pkg, location):
     logger.info("Installing requirements of {} into {} via pip".format(location, env_path))
-    all_args = ['conda', 'run', '--prefix={}'.format(str(env_path)), 'sh', '-c', 'cd {} && pip install . && pip uninstall --yes {}'.format(location, pkg)]
+    all_args = ['conda', 'run', '--prefix={}'.format(str(env_path)), 'sh', '-c', 'cd {} && pip install --use-feature=in-tree-build . && pip uninstall --yes {}'.format(location, pkg)]
     try:
         subprocess.check_output(all_args, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
@@ -202,7 +202,7 @@ python_package_run -e {base_env_tarball} -u {env_dir} -- conda remove --yes --fo
 
 # install from pip local path
 set -e
-python_package_run -e {base_env_tarball} -u {env_dir} -- pip install {path}
+python_package_run -e {base_env_tarball} -u {env_dir} -- pip install --use-feature=in-tree-build {path}
     """.format(base_env_tarball=base_env_tarball, env_dir=env_dir, path=pip_path))
         pip_recipe.flush()
         try:
