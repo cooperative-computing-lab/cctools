@@ -74,6 +74,7 @@ OPTION_ARG_LONG(batch-mem-type, type)Specify memory resource type. (SGE)
 OPTION_ARG_LONG(working-dir, dir|url)Working directory for batch system.
 OPTION_FLAG_LONG(sandbox)Run task in sandbox using bash script and task directory.
 OPTION_FLAG_LONG(verbose-jobnames)Set the job name based on the command.
+OPTION_FLAG_LONG(keep-wrapper-stdout)Do not redirect to /dev/null the stdout file from the batch system.
 OPTIONS_END
 
 SUBSECTION(JSON/JX Options)

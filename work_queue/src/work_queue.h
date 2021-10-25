@@ -499,6 +499,14 @@ This is useful, for example, when the task uses certificates that expire.
 
 void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t useconds );
 
+/** Specify the minimum start time allowed for the task (in microseconds since the
+ * Epoch). If less than 1, then no minimum start time is specified (this is the default).
+@param t A task object.
+@param useconds Number of useconds since the Epoch.
+*/
+
+void work_queue_task_specify_start_time_min( struct work_queue_task *t, int64_t useconds );
+
 /** Specify the maximum time (in microseconds) the task is allowed to run in a
  * worker. This time is accounted since the the moment the task starts to run
  * in a worker.  If less than 1, then no maximum time is specified (this is the default).
@@ -1036,7 +1044,7 @@ void work_queue_specify_keepalive_interval(struct work_queue *q, int interval);
 void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 
 /** Set the preference for using hostname over IP address to connect.
-'by_ip' uses IP address (standard behavior), or 'by_hostname' to use the hostname at the manager.
+'by_ip' uses IP addresses from the network interfaces of the manager (standard behavior), 'by_hostname' to use the hostname at the manager, or 'by_apparent_ip' to use the address of the manager as seen by the catalog server.
 @param q A work queue object.
 @param preferred_connection An string to indicate using 'by_ip' or a 'by_hostname'.
 */
@@ -1045,8 +1053,7 @@ void work_queue_manager_preferred_connection(struct work_queue *q, const char *p
 /** Tune advanced parameters for work queue.
 @param q A work queue object.
 @param name The name of the parameter to tune
- - "asynchrony-multiplier" Treat each worker as having (actual_cores * multiplier) total cores. (default = 1.0)
- - "asynchrony-modifier" Treat each worker as having an additional "modifier" cores. (default=0)
+ - "resource-submit-multiplier" Treat each worker as having ({cores,memory,gpus} * multiplier) when submitting tasks. This allows for tasks to wait at a worker rather than the manager. (default = 1.0)
  - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
  - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
  - "transfer-outlier-factor" Transfer that are this many times slower than the average will be aborted.  (default=10x)
