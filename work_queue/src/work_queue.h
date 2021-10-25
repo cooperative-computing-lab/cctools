@@ -251,6 +251,7 @@ struct work_queue_stats {
 
 	/* Master time statistics: */
 	timestamp_t time_when_started; /**< Absolute time at which the manager started. */
+	timestamp_t time_when_compatibility_checked; /**< Absolute time at which a tasks compatibility was checked*/
 	timestamp_t time_send;         /**< Total time spent in sending tasks to workers (tasks descriptions, and input files.). */
 	timestamp_t time_receive;      /**< Total time spent in receiving results from workers (output files.). */
 	timestamp_t time_send_good;    /**< Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS. */

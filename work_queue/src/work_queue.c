@@ -4168,15 +4168,8 @@ static int send_one_task( struct work_queue *q )
 	struct work_queue_task *t;
 	
 	struct work_queue_worker *w;
-
-	/*TODO one way solve this issue would be to call
- 		* work_queue_get_stats and compare the data.
- 		* I just need to find the best place to do this
- 		* since calling the function is expensive.
-	printf("max worker cores %d\n",(int)q->stats->max_cores);
-	printf("max worker memory %d\n",(int)q->stats->max_memory);
-	printf("max worker disk %d\n",(int)q->stats->max_disk);
-	*/
+	
+	
 
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
@@ -4186,7 +4179,10 @@ static int send_one_task( struct work_queue *q )
 
 		// If there is no suitable worker, consider the next task.
 		if(!w){
-			if (!check_task_compatibility(q, t)){
+			timestamp_t temp_time = timestamp_get();
+			int time_threshold_met = temp_time - q->stats->time_when_compatibility_checked > 5000000 ? 1:0;
+			if  (!check_task_compatibility(q, t) &&  time_threshold_met){
+				q->stats->time_when_compatibility_checked = timestamp_get();
 				printf("task (id: %d) does not fit any workers\n", t->taskid);
 			}
 			continue;
@@ -5375,6 +5371,7 @@ struct work_queue *work_queue_create(int port)
 	q->long_timeout = 3600;
 
 	q->stats->time_when_started = timestamp_get();
+	q->stats->time_when_compatibility_checked = timestamp_get();
 	q->task_reports = list_create();
 
 	q->time_last_wait = 0;
@@ -6347,8 +6344,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 */
 {
 	int events = 0;
-	//work_queue_get_stats(q, q->stats);
-    //	printf("called work_queue_get_stats\n");
 	// account for time we spend outside work_queue_wait
 	if(q->time_last_wait > 0) {
 		q->stats->time_application += timestamp_get() - q->time_last_wait;
@@ -6446,6 +6441,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			if(result) {
 				// sent at least one task
 				events++;
+	q->stats->time_when_compatibility_checked = timestamp_get();
 				continue;
 			}
 		}
