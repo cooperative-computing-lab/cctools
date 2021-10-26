@@ -12,6 +12,7 @@ MICRO=4
 # not match the branch name (like RC1 or FINAL).
 RELEASE=FINAL
 
+###########################
 # *** You should not need to change anything below this line. ***
 ###########################
 
@@ -73,8 +74,8 @@ include_package_makeflow="makeflow"
 include_package_parrot="parrot"
 include_package_resource_monitor="resource_monitor"
 include_package_tlq="tlq"
+include_package_poncho='poncho'
 
-include_package_dataswarm=
 include_package_umbrella=
 include_package_weaver=
 include_package_prune=
@@ -299,9 +300,6 @@ do
 		--without-system-prune)
 			include_package_prune=""
 			;;
-		--without-system-dataswarm)
-			include_package_dataswarm=""
-			;;
 		--with-*-path)
 			echo "ignoring unknown package ${arg}"
 			;;
@@ -353,7 +351,6 @@ Where PACKAGE may be:
 
 And SYSTEM may be:
 	chirp
-	dataswarm
 	doc
 	ftp-lite
 	makeflow
@@ -1403,7 +1400,7 @@ then
 	fi
 fi
 
-potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_dataswarm} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_tlq} ${include_package_doc} python_environments"
+potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_tlq} ${include_package_doc} ${include_package_poncho} python_environments"
 
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
