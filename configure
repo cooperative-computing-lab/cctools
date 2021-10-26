@@ -5,12 +5,12 @@
 
 MAJOR=7
 MINOR=3
-MICRO=4
+MICRO=5
 
 # Optionally set the source/tag for this code (e.g. RC1 or FINAL).  Setting
 # this variable is instead useful for statically naming the source when it will
 # not match the branch name (like RC1 or FINAL).
-RELEASE=FINAL
+RELEASE=RC1
 
 ###########################
 # *** You should not need to change anything below this line. ***
