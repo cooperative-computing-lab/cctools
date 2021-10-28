@@ -19,8 +19,6 @@ Suppose you have a Python program `example.py` like this:
 import os
 import sys
 import pickle
-
-import antigravity
 import matplotlib
 
 
