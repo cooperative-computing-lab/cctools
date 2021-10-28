@@ -35,7 +35,7 @@ Welcome to the JX Language Explorer.
 
 Type 'help' for help
 
-in_0  >>>
+in_0 :
 LONGCODE_END
 
 Enter any valid JX expression:
@@ -43,8 +43,8 @@ Enter any valid JX expression:
 LONGCODE_BEGIN
 % jx_repl
 ...
-in_0  >>> [ "file" + x + ".txt" for x in range(3) ]
-out_0 <<<
+in_0  : [ "file" + x + ".txt" for x in range(3) ]
+out_0 :
 [
   "file0.txt",
   "file1.txt",
@@ -57,8 +57,8 @@ Fetch the catalog data:
 LONGCODE_BEGIN
 % jx_repl
 ...
-in_1  >>> catalog
-out_1 <<<
+in_1  : catalog
+out_1 :
 [
   {
     "name":NAME,
@@ -77,8 +77,8 @@ Perform operations on previous output
 LONGCODE_BEGIN
 % jx_repl
 ...
-in_2  >>> select(type=="wq_master", out_1)
-out_2 <<<
+in_2  : select(out_1, type=="wq_master")
+out_2 :
 [
 
   {
@@ -99,8 +99,8 @@ Do more operations on previous output
 LONGCODE_BEGIN
 % jx_repl
 ...
-in_4  >>> join(project(name, out_2), ", ")
-out_4 <<< NAME_1, NAME_2, NAME_3, ..., NAME_N
+in_3  : join(project(out_2, name), ", ")
+out_3 : NAME_1, NAME_2, NAME_3, ..., NAME_N
 LONGCODE_END
 
 Now, fetch the query used to attain that output
@@ -108,8 +108,8 @@ Now, fetch the query used to attain that output
 LONGCODE_BEGIN
 % jx_repl
 ...
-in_5  >>> in_4
-out_5 <<< join(project(name,select(type=="wq_master",fetch("http://catalog.cse.nd.edu:9097/query.json"))),", ")
+in_4  : in_4
+out_4 : join(project(select(fetch("http://catalog.cse.nd.edu:9097/query.json"),type=="wq_master"),name),", ")
 LONGCODE_END
 
 Call one of reserved commands
@@ -117,7 +117,7 @@ Call one of reserved commands
 LONGCODE_BEGIN
 % jx_repl
 ...
-in_7  >>> help
+in_5  : help
 
   help          display this message
   functions     display a list of functions supported by the JX language

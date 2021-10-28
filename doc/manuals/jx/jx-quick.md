@@ -109,10 +109,10 @@ expr for x in [1,2,3]
     escape( string )
     len( array )
     fetch( URL/path )
-    select( boolean, array )
-    project( expression, array )
+    select( array, boolean )
+    project( array, expression )
     schema( object )
-    like( string, object )
+    like( object, string )
 ```
 
 </td>
