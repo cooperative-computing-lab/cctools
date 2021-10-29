@@ -174,8 +174,7 @@ struct work_queue {
 
 	struct list *task_reports;	      /* list of last N work_queue_task_reports. */
 
-	double asynchrony_multiplier;     /* Times the resource value, but disk */
-	int    asynchrony_modifier;       /* Plus this many cores or unlabeled tasks */
+	double resource_submit_multiplier; /* Times the resource value, but disk */
 
 	int minimum_transfer_timeout;
 	int foreman_transfer_timeout;
@@ -200,7 +199,7 @@ struct work_queue {
 	int keepalive_timeout;
 	timestamp_t link_poll_end;	//tracks when we poll link; used to timeout unacknowledged keepalive checks
 
-    char *manager_preferred_connection; 
+    char *manager_preferred_connection;
 
 	int monitor_mode;
 	FILE *monitor_file;
@@ -357,16 +356,11 @@ void work_queue_disable_monitoring(struct work_queue *q);
 /********** work_queue internal functions *************/
 /******************************************************/
 
-static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total, int cores_flag) {
+static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total) {
 	int64_t r = 0;
 	if(total != 0)
 	{
-		r = ceil(total * q->asynchrony_multiplier);
-
-		if(cores_flag)
-		{
-			r += q->asynchrony_modifier;
-		}
+		r = ceil(total * q->resource_submit_multiplier);
 	}
 
 	return r;
@@ -398,7 +392,7 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown") != 0) {
-			if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total, 0) > w->resources->memory.inuse){
+			if(overcommitted_resource_total(q, w->resources->cores.total) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total) > w->resources->memory.inuse){
 				available_workers++;
 			}
 		}
@@ -3752,23 +3746,24 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		}
 	}
 
-	struct rmsummary *limits = task_worker_box_size(q, w, t);
+	struct rmsummary *l = task_worker_box_size(q, w, t);
+	struct work_queue_resources *r = w->resources;
 
 	int ok = 1;
 
-	if(w->resources->cores.inuse + limits->cores > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
+	if(r->disk.inuse + l->disk > r->disk.total) { /* No overcommit disk */
 		ok = 0;
 	}
 
-	if(w->resources->memory.inuse + limits->memory > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
+	if((l->cores > r->cores.total) || (r->cores.inuse + l->cores > overcommitted_resource_total(q, r->cores.total))) {
 		ok = 0;
 	}
 
-	if(w->resources->disk.inuse + limits->disk > w->resources->disk.total) { /* No overcommit disk */
+	if((l->memory > r->memory.total) || (r->memory.inuse + l->memory > overcommitted_resource_total(q, r->memory.total))) {
 		ok = 0;
 	}
 
-	if(w->resources->gpus.inuse + limits->gpus > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
+	if((l->gpus > r->gpus.total) || (r->gpus.inuse + l->gpus > overcommitted_resource_total(q, r->gpus.total))) {
 		ok = 0;
 	}
 
@@ -3788,7 +3783,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		}
 	}
 
-	rmsummary_delete(limits);
+	rmsummary_delete(l);
 
 	if(t->features) {
 		if(!w->features)
@@ -4173,9 +4168,19 @@ static int send_one_task( struct work_queue *q )
 
 	struct work_queue_worker *w;
 	
+	
+
+	timestamp_t now = timestamp_get();
+
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
+
+
+		// Skip task if min requested start time not met.
+		if(t->resources_requested->start > now) continue;
+
+
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
 
@@ -4678,6 +4683,18 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t usecon
 	else
 	{
 		t->resources_requested->end = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
+	}
+}
+
+void work_queue_task_specify_start_time_min( struct work_queue_task *t, int64_t useconds )
+{
+	if(useconds < 1)
+	{
+		t->resources_requested->start = -1;
+	}
+	else
+	{
+		t->resources_requested->start = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
 	}
 }
 
@@ -5413,8 +5430,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->password = 0;
 
-	q->asynchrony_multiplier = 1.0;
-	q->asynchrony_modifier = 0;
+	q->resource_submit_multiplier = 1.0;
 
 	q->minimum_transfer_timeout = 60;
 	q->foreman_transfer_timeout = 3600;
@@ -6576,10 +6592,10 @@ int work_queue_hungry(struct work_queue *q)
 	int64_t workers_total_avail_disk 	= 0;
 	int64_t workers_total_avail_gpus 	= 0;
 
-	workers_total_avail_cores 	= q->stats->total_cores - q->stats->committed_cores;
-	workers_total_avail_memory 	= q->stats->total_memory - q->stats->committed_memory;
-	workers_total_avail_disk 	= q->stats->total_disk - q->stats->committed_disk;
-	workers_total_avail_gpus	= q->stats->total_gpus - q->stats->committed_gpus;
+	workers_total_avail_cores 	= overcommitted_resource_total(q, q->stats->total_cores) - q->stats->committed_cores;
+	workers_total_avail_memory 	= overcommitted_resource_total(q, q->stats->total_memory) - q->stats->committed_memory;
+	workers_total_avail_gpus	= overcommitted_resource_total(q, q->stats->total_gpus) - q->stats->committed_gpus;
+	workers_total_avail_disk 	= q->stats->total_disk - q->stats->committed_disk; //never overcommit disk
 
 	//get required resources (cores, memory, disk, gpus) of one waiting task
 	int64_t ready_task_cores 	= 0;
@@ -6798,17 +6814,20 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 void work_queue_manager_preferred_connection(struct work_queue *q, const char *preferred_connection)
 {
 	free(q->manager_preferred_connection);
+	assert(preferred_connection);
+
+	if(strcmp(preferred_connection, "by_ip") && strcmp(preferred_connection, "by_hostname") && strcmp(preferred_connection, "by_apparent_ip")) {
+		fatal("manager_preferred_connection should be one of: by_ip, by_hostname, by_apparent_ip");
+	}
+
 	q->manager_preferred_connection = xxstrdup(preferred_connection);
 }
 
 int work_queue_tune(struct work_queue *q, const char *name, double value)
 {
 
-	if(!strcmp(name, "asynchrony-multiplier")) {
-		q->asynchrony_multiplier = MAX(value, 1.0);
-
-	} else if(!strcmp(name, "asynchrony-modifier")) {
-		q->asynchrony_modifier = MAX(value, 0);
+	if(!strcmp(name, "resource-submit-multiplier") || !strcmp(name, "asynchrony-multiplier")) {
+		q->resource_submit_multiplier = MAX(value, 1.0);
 
 	} else if(!strcmp(name, "min-transfer-timeout")) {
 		q->minimum_transfer_timeout = (int)value;

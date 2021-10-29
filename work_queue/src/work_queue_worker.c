@@ -129,6 +129,11 @@ static int symlinks_enabled = 1;
 // Worker id. A unique id for this worker instance.
 static char *worker_id;
 
+// If set to "by_ip", "by_hostname", or "by_apparent_ip", overrides manager's
+// preferred connection mode.
+char *preferred_connection = NULL;
+
+
 // pid of the worker's parent process. If different from zero, worker will be
 // terminated when its parent process changes.
 static pid_t initial_ppid = 0;
@@ -2246,18 +2251,20 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 
 	int found_canonical = 0;
 
-	for (void *i = NULL; (ifa = jx_iterate_array(ifas, &i));) {
-		const char *ifa_addr = jx_lookup_string(ifa, "host");
+	if(ifas) {
+		for (void *i = NULL; (ifa = jx_iterate_array(ifas, &i));) {
+			const char *ifa_addr = jx_lookup_string(ifa, "host");
 
-		if(ifa_addr && strcmp(addr, ifa_addr) == 0) {
-			found_canonical = 1;
+			if(ifa_addr && strcmp(addr, ifa_addr) == 0) {
+				found_canonical = 1;
+			}
+
+			struct manager_address *m = calloc(1, sizeof(*m));
+			strncpy(m->host, ifa_addr, LINK_ADDRESS_MAX);
+			m->port = port;
+
+			list_push_tail(l, m);
 		}
-
-		struct manager_address *m = calloc(1, sizeof(*m));
-		strncpy(m->host, ifa_addr, LINK_ADDRESS_MAX);
-		m->port = port;
-
-		list_push_tail(l, m);
 	}
 
 	if(ifas && !found_canonical) {
@@ -2304,6 +2311,11 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 		struct jx *ifas  = jx_lookup(jx,"network_interfaces");
 		int port = jx_lookup_integer(jx,"port");
 
+		// give priority to worker's preferred connection option
+		if(preferred_connection) {
+			pref = preferred_connection;
+		}
+
 
 		if(last_addr) {
 			if(time(0) > idle_stoptime && strcmp(addr, last_addr->host) == 0 && port == last_addr->port) {
@@ -2326,20 +2338,24 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 		int result;
 
 		if(pref && strcmp(pref, "by_hostname") == 0) {
-			debug(D_WQ,"selected manager with project=%s name=%s addr=%s port=%d",project,name,addr,port);
-			result = serve_manager_by_hostport(name,port,project);
+			debug(D_WQ,"selected manager with project=%s hostname=%s addr=%s port=%d",project,name,addr,port);
+			manager_addresses = interfaces_to_list(name, port, NULL);
+		} else if(pref && strcmp(pref, "by_apparent_ip") == 0) {
+			debug(D_WQ,"selected manager with project=%s apparent_addr=%s port=%d",project,addr,port);
+			manager_addresses = interfaces_to_list(addr, port, NULL);
 		} else {
+			debug(D_WQ,"selected manager with project=%s addr=%s port=%d",project,addr,port);
 			manager_addresses = interfaces_to_list(addr, port, ifas);
-
-			result = serve_manager_by_hostport_list(manager_addresses);
-
-			struct manager_address *m;
-			while((m = list_pop_head(manager_addresses))) {
-				free(m);
-			}
-			list_delete(manager_addresses);
-			manager_addresses = NULL;
 		}
+
+		result = serve_manager_by_hostport_list(manager_addresses);
+
+		struct manager_address *m;
+		while((m = list_pop_head(manager_addresses))) {
+			free(m);
+		}
+		list_delete(manager_addresses);
+		manager_addresses = NULL;
 
 		if(result) {
 			free(last_addr);
@@ -2484,6 +2500,10 @@ static void show_help(const char *cmd)
 	printf( " %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n", "--disk-allocation");
 	printf( " %-30s Specifies a user-defined feature the worker provides. May be specified several times.\n", "--feature");
 	printf( " %-30s Set the maximum number of seconds the worker may be active. (in s).\n", "--wall-time=<s>");
+
+	printf( " %-30s When using -M, override manager preference to resolve its address.\n", "--connection-mode");
+	printf( " %-30s One of by_ip, by_hostname, or by_apparent_ip. Default is set by manager.\n", "");
+
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
@@ -2495,7 +2515,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
-	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH};
+	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2540,6 +2560,7 @@ static const struct option long_options[] = {
 	{"feature",             required_argument,  0,  LONG_OPT_FEATURE},
 	{"tlq",					required_argument,	0,  LONG_OPT_TLQ},
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
+	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{0,0,0,0}
 };
 
@@ -2774,6 +2795,13 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_PARENT_DEATH:
 			initial_ppid = getppid();
+			break;
+		case LONG_OPT_CONN_MODE:
+			free(preferred_connection);
+			preferred_connection = xxstrdup(optarg);
+			if(strcmp(preferred_connection, "by_ip") && strcmp(preferred_connection, "by_hostname") && strcmp(preferred_connection, "by_apparent_ip")) {
+				fatal("connection-mode should be one of: by_ip, by_hostname, by_apparent_ip");
+			}
 			break;
 		default:
 			show_help(argv[0]);

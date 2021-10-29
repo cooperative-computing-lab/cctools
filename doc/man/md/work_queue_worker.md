@@ -92,6 +92,7 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 - **--wall-time=_&lt;s&gt;_**<br />Set the maximum number of seconds the worker may be active.
 - **--feature=_&lt;feature&gt;_**<br />Specifies a user-defined feature the worker provides (option can be repeated).
 - **--volatility=_&lt;chance&gt;_**<br />Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).
+- **--connection-mode=_&lt;mode&gt;_**<br />When using -M, override manager preference to resolve its address. One of by_ip, by_hostname, or by_apparent_ip. Default is set by manager.
 
 
 ## FOREMAN MODE

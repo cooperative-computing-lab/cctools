@@ -96,6 +96,7 @@ OPTION_END
 - **--working-dir=_&lt;dir|url&gt;_**<br />Working directory for batch system.
 - **--sandbox**<br />Run task in sandbox using bash script and task directory.
 - **--verbose-jobnames**<br />Set the job name based on the command.
+- **--keep-wrapper-stdout**<br />Do not redirect to /dev/null the stdout file from the batch system.
 
 
 ### JSON/JX Options
