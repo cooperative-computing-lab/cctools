@@ -4165,10 +4165,7 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 static int send_one_task( struct work_queue *q )
 {
 	struct work_queue_task *t;
-
 	struct work_queue_worker *w;
-	
-	
 
 	timestamp_t now = timestamp_get();
 
@@ -4176,18 +4173,14 @@ static int send_one_task( struct work_queue *q )
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
 
-
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
-
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
 
 		// If there is no suitable worker, consider the next task.
-		if(!w){
-			continue;
-		}
+		if(!w) continue;
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
 
