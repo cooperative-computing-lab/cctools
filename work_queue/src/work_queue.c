@@ -84,6 +84,10 @@ See the file COPYING for details.
 
 #define MAX_NEW_WORKERS 10
 
+// Seconds for how often the user can be notified about when a task cannot fit to any workers
+// Used in check_task_fit_in_connected_workers()
+#define THRESHOLD 60000000
+
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
 	WQ_SUCCESS = 0,
@@ -160,7 +164,7 @@ struct work_queue {
 	struct work_queue_stats *stats_disconnected_workers;
 	timestamp_t time_last_wait;
 	timestamp_t time_last_log_stats;
-
+	timestamp_t last_time_tasks_fit_check;
 	int worker_selection_algorithm;
 	int task_ordering;
 	int process_pending_check;
@@ -3973,7 +3977,7 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 
 // checks workers against tasks and returns if a task has the  
 // possibility of fitting a worker
-static int task_is_compatible(struct work_queue *q, struct work_queue_task *t, struct work_queue_worker *w)
+static int check_task_fit_in_worker(struct work_queue *q, struct work_queue_task *t, struct work_queue_worker *w)
 {
 	/*
  	// Somehow, get the task resource request and compare it by hand with each 
@@ -4001,7 +4005,7 @@ static int task_is_compatible(struct work_queue *q, struct work_queue_task *t, s
 
 	return ok;
 }
-static int check_task_compatibility(struct work_queue *q, struct work_queue_task *t)
+static int check_task_fit_in_connected_workers(struct work_queue *q, struct work_queue_task *t)
 {
 	char *key;
 	struct work_queue_worker *w;
@@ -4010,7 +4014,7 @@ static int check_task_compatibility(struct work_queue *q, struct work_queue_task
 	
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w))
 	{
-		if (task_is_compatible(q, t, w)){
+		if (check_task_fit_in_worker(q, t, w)){
 			//printf("It's Fine. task %d will eventually match a worker\n", (int)t->taskid);
 			return 1;
 		}
@@ -4166,11 +4170,9 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 static int send_one_task( struct work_queue *q )
 {
 	struct work_queue_task *t;
-	
+
 	struct work_queue_worker *w;
 	
-	
-
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
@@ -4179,12 +4181,6 @@ static int send_one_task( struct work_queue *q )
 
 		// If there is no suitable worker, consider the next task.
 		if(!w){
-			timestamp_t temp_time = timestamp_get();
-			int time_threshold_met = temp_time - q->stats->time_when_compatibility_checked > 5000000 ? 1:0;
-			if  (!check_task_compatibility(q, t) &&  time_threshold_met){
-				q->stats->time_when_compatibility_checked = timestamp_get();
-				printf("task (id: %d) does not fit any workers\n", t->taskid);
-			}
 			continue;
 		}
 		// Otherwise, remove it from the ready list and start it:
@@ -4194,6 +4190,26 @@ static int send_one_task( struct work_queue *q )
 	}
 
 	return 0;
+}
+
+static void check_all_tasks(struct work_queue *q)
+{
+	struct work_queue_task *t;
+
+	list_first_item(q->ready_list);
+	
+
+	while( (t = list_next_item(q->ready_list))){
+		// check each task against the queue of connected workers
+		if (!check_task_fit_in_connected_workers(q, t)){
+			printf("task (id: %d) does not fit any connected workers\n", t->taskid);
+			printf("Task requested resources:\n");
+			printf("CPUs:   %.2lf\n", t->resources_requested->cores);
+			printf("Memory: %.2lf\n", t->resources_requested->memory);
+			printf("Disk:   %.2lf\n", t->resources_requested->disk);
+			printf("GPU:    %.2lf\n", t->resources_requested->gpus);
+		}
+	}
 }
 
 static int receive_one_task( struct work_queue *q )
@@ -5371,7 +5387,7 @@ struct work_queue *work_queue_create(int port)
 	q->long_timeout = 3600;
 
 	q->stats->time_when_started = timestamp_get();
-	q->stats->time_when_compatibility_checked = timestamp_get();
+	q->last_time_tasks_fit_check = timestamp_get();
 	q->task_reports = list_create();
 
 	q->time_last_wait = 0;
@@ -6441,7 +6457,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			if(result) {
 				// sent at least one task
 				events++;
-	q->stats->time_when_compatibility_checked = timestamp_get();
+				q->last_time_tasks_fit_check = timestamp_get();
 				continue;
 			}
 		}
@@ -6500,8 +6516,22 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 		}
 
-		/* if we got here, no events were triggered. we set the busy_waiting
+		/* if we got here, no events were triggered.
+
+ 		 * if the specified amount of time has passed,
+         * we can check all tasks against available workers	to see if the tasks fit*/	
+			timestamp_t temp_time = timestamp_get();
+			int time_threshold_met = temp_time - q->last_time_tasks_fit_check > THRESHOLD ? 1:0;
+			if (time_threshold_met){
+				// list all tasks that cannot fit any connected workers
+				check_all_tasks(q);
+				// update the last time checked
+				q->last_time_tasks_fit_check = timestamp_get();
+			}
+
+		/* we set the busy_waiting
 		 * flag so that link_poll waits for some time the next time around. */
+		
 		q->busy_waiting_flag = 1;
 
 		// If the foreman_uplink is active then break so the caller can handle it.
