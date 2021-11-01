@@ -6469,7 +6469,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(foreman_uplink) {
 			break;
 		}
-		if (!task_event)
+		if (!task_event && q->delayed_wait)
 		{
 			break;
 		}
