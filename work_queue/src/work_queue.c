@@ -170,8 +170,7 @@ struct work_queue {
 
 	struct list *task_reports;	      /* list of last N work_queue_task_reports. */
 
-	double asynchrony_multiplier;     /* Times the resource value, but disk */
-	int    asynchrony_modifier;       /* Plus this many cores or unlabeled tasks */
+	double resource_submit_multiplier; /* Times the resource value, but disk */
 
 	int minimum_transfer_timeout;
 	int foreman_transfer_timeout;
@@ -184,6 +183,10 @@ struct work_queue {
 	time_t resources_last_update_time;
 	int    busy_waiting_flag;
 
+	int hungry_minimum;               /* minimum number of waiting tasks to consider queue not hungry. */;
+
+	int wait_for_workers;             /* wait for these many workers before dispatching tasks at start of execution. */
+
 	work_queue_category_mode_t allocation_default_mode;
 
 	FILE *logfile;
@@ -192,7 +195,7 @@ struct work_queue {
 	int keepalive_timeout;
 	timestamp_t link_poll_end;	//tracks when we poll link; used to timeout unacknowledged keepalive checks
 
-    char *manager_preferred_connection; 
+    char *manager_preferred_connection;
 
 	int monitor_mode;
 	FILE *monitor_file;
@@ -211,6 +214,8 @@ struct work_queue {
 	char *debug_path;
 	int tlq_port;
 	char *tlq_url;
+
+	int delayed_wait;
 };
 
 struct work_queue_worker {
@@ -349,16 +354,11 @@ void work_queue_disable_monitoring(struct work_queue *q);
 /********** work_queue internal functions *************/
 /******************************************************/
 
-static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total, int cores_flag) {
+static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total) {
 	int64_t r = 0;
 	if(total != 0)
 	{
-		r = ceil(total * q->asynchrony_multiplier);
-
-		if(cores_flag)
-		{
-			r += q->asynchrony_modifier;
-		}
+		r = ceil(total * q->resource_submit_multiplier);
 	}
 
 	return r;
@@ -390,7 +390,7 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown") != 0) {
-			if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total, 0) > w->resources->memory.inuse){
+			if(overcommitted_resource_total(q, w->resources->cores.total) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total) > w->resources->memory.inuse){
 				available_workers++;
 			}
 		}
@@ -3744,23 +3744,24 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		}
 	}
 
-	struct rmsummary *limits = task_worker_box_size(q, w, t);
+	struct rmsummary *l = task_worker_box_size(q, w, t);
+	struct work_queue_resources *r = w->resources;
 
 	int ok = 1;
 
-	if(w->resources->cores.inuse + limits->cores > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
+	if(r->disk.inuse + l->disk > r->disk.total) { /* No overcommit disk */
 		ok = 0;
 	}
 
-	if(w->resources->memory.inuse + limits->memory > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
+	if((l->cores > r->cores.total) || (r->cores.inuse + l->cores > overcommitted_resource_total(q, r->cores.total))) {
 		ok = 0;
 	}
 
-	if(w->resources->disk.inuse + limits->disk > w->resources->disk.total) { /* No overcommit disk */
+	if((l->memory > r->memory.total) || (r->memory.inuse + l->memory > overcommitted_resource_total(q, r->memory.total))) {
 		ok = 0;
 	}
 
-	if(w->resources->gpus.inuse + limits->gpus > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
+	if((l->gpus > r->gpus.total) || (r->gpus.inuse + l->gpus > overcommitted_resource_total(q, r->gpus.total))) {
 		ok = 0;
 	}
 
@@ -3780,7 +3781,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		}
 	}
 
-	rmsummary_delete(limits);
+	rmsummary_delete(l);
 
 	if(t->features) {
 		if(!w->features)
@@ -4114,9 +4115,14 @@ static int send_one_task( struct work_queue *q )
 	struct work_queue_task *t;
 	struct work_queue_worker *w;
 
+	timestamp_t now = timestamp_get();
+
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
+
+		// Skip task if min requested start time not met.
+		if(t->resources_requested->start > now) continue;
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
@@ -4599,6 +4605,18 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t usecon
 	else
 	{
 		t->resources_requested->end = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
+	}
+}
+
+void work_queue_task_specify_start_time_min( struct work_queue_task *t, int64_t useconds )
+{
+	if(useconds < 1)
+	{
+		t->resources_requested->start = -1;
+	}
+	else
+	{
+		t->resources_requested->start = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
 	}
 }
 
@@ -5320,6 +5338,10 @@ struct work_queue *work_queue_create(int port)
 
 	q->monitor_mode = MON_DISABLED;
 
+	q->hungry_minimum = 10;
+
+	q->wait_for_workers = 0;
+
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
@@ -5329,8 +5351,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->password = 0;
 
-	q->asynchrony_multiplier = 1.0;
-	q->asynchrony_modifier = 0;
+	q->resource_submit_multiplier = 1.0;
 
 	q->minimum_transfer_timeout = 60;
 	q->foreman_transfer_timeout = 3600;
@@ -6296,9 +6317,13 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
-
+		// keep track of whether a task has been sent and recieved
+		int task_event = 0;
 		// task completed?
-		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+		if (t == NULL)
+		{
+			t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+		}
 		if(t) {
 			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
@@ -6312,7 +6337,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			// queue time statistics.
 			events++;
 			END_ACCUM_TIME(q, time_internal);
-			break;
+			if (!q->delayed_wait)
+			{
+				break;
+			}
 		}
 
 		 // update catalog if appropriate
@@ -6340,6 +6368,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// tasks waiting to be retrieved?
 		BEGIN_ACCUM_TIME(q, time_receive);
 		result = receive_one_task(q);
+		task_event |= result;
 		END_ACCUM_TIME(q, time_receive);
 		if(result) {
 			// retrieved at least one task
@@ -6362,17 +6391,23 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// record that there was not task activity for this iteration
 		compute_manager_load(q, 0);
 
-		// tasks waiting to be dispatched?
-		BEGIN_ACCUM_TIME(q, time_send);
-		result = send_one_task(q);
-		END_ACCUM_TIME(q, time_send);
-		if(result) {
-			// sent at least one task
-			events++;
-			continue;
+		if(q->wait_for_workers <= hash_table_size(q->worker_table)) {
+			if(q->wait_for_workers > 0) {
+				debug(D_WQ, "Target number of workers reached (%d).", q->wait_for_workers);
+				q->wait_for_workers = 0;
+			}
+			// tasks waiting to be dispatched?
+			BEGIN_ACCUM_TIME(q, time_send);
+			task_event |= result;
+			result = send_one_task(q);
+			END_ACCUM_TIME(q, time_send);
+			if(result) {
+				// sent at least one task
+				events++;
+				continue;
+			}
 		}
-
-		//we reach here only if no task was neither sent nor received. 
+		//we reach here only if no task was neither sent nor received.
 		compute_manager_load(q, 1);
 
 		// send keepalives to appropriate workers
@@ -6394,7 +6429,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		// if new workers, connect n of them
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
-		result = connect_new_workers(q, stoptime, MAX_NEW_WORKERS);
+		result = connect_new_workers(q, stoptime, MAX(q->wait_for_workers, MAX_NEW_WORKERS));
 		END_ACCUM_TIME(q, time_status_msgs);
 		if(result) {
 			// accepted at least one worker
@@ -6414,13 +6449,17 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 		}
 
-		// return if queue is empty.
-		BEGIN_ACCUM_TIME(q, time_internal);
-		int done = !task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink);
-		END_ACCUM_TIME(q, time_internal);
+		// return if queue is empty and something interesting already happened
+		// in this wait.
+		if(events > 0) {
+			BEGIN_ACCUM_TIME(q, time_internal);
+			int done = !task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink);
+			END_ACCUM_TIME(q, time_internal);
 
-		if(done)
-			break;
+			if(done) {
+				break;
+			}
+		}
 
 		/* if we got here, no events were triggered. we set the busy_waiting
 		 * flag so that link_poll waits for some time the next time around. */
@@ -6428,6 +6467,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		// If the foreman_uplink is active then break so the caller can handle it.
 		if(foreman_uplink) {
+			break;
+		}
+		if (!task_event)
+		{
 			break;
 		}
 	}
@@ -6442,9 +6485,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 }
 
 //check if workers' resources are available to execute more tasks
-//queue should have at least 10 ready tasks
+//queue should have at least q->hungry_minimum ready tasks
 //@param: 	struct work_queue* - pointer to queue
-//@return: 	boolean - whether queue is "hungry"
+//@return: 	1 if hungry, 0 otherwise
 int work_queue_hungry(struct work_queue *q)
 {
 	//check if queue is initialized
@@ -6456,9 +6499,8 @@ int work_queue_hungry(struct work_queue *q)
 	struct work_queue_stats qstats;
 	work_queue_get_stats(q, &qstats);
 
-	//if number of ready tasks is less than 10, return true for more tasks in queue
-	//10 is chosen to be the default number of ready tasks in queue to keep queue efficient
-	if (qstats.tasks_waiting < 10){
+	//if number of ready tasks is less than q->hungry_minimum, then queue is hungry
+	if (qstats.tasks_waiting < q->hungry_minimum){
 		return 1;
 	}
 
@@ -6469,10 +6511,10 @@ int work_queue_hungry(struct work_queue *q)
 	int64_t workers_total_avail_disk 	= 0;
 	int64_t workers_total_avail_gpus 	= 0;
 
-	workers_total_avail_cores 	= q->stats->total_cores - q->stats->committed_cores;
-	workers_total_avail_memory 	= q->stats->total_memory - q->stats->committed_memory;
-	workers_total_avail_disk 	= q->stats->total_disk - q->stats->committed_disk;
-	workers_total_avail_gpus	= q->stats->total_gpus - q->stats->committed_gpus;
+	workers_total_avail_cores 	= overcommitted_resource_total(q, q->stats->total_cores) - q->stats->committed_cores;
+	workers_total_avail_memory 	= overcommitted_resource_total(q, q->stats->total_memory) - q->stats->committed_memory;
+	workers_total_avail_gpus	= overcommitted_resource_total(q, q->stats->total_gpus) - q->stats->committed_gpus;
+	workers_total_avail_disk 	= q->stats->total_disk - q->stats->committed_disk; //never overcommit disk
 
 	//get required resources (cores, memory, disk, gpus) of one waiting task
 	int64_t ready_task_cores 	= 0;
@@ -6691,17 +6733,20 @@ void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout)
 void work_queue_manager_preferred_connection(struct work_queue *q, const char *preferred_connection)
 {
 	free(q->manager_preferred_connection);
+	assert(preferred_connection);
+
+	if(strcmp(preferred_connection, "by_ip") && strcmp(preferred_connection, "by_hostname") && strcmp(preferred_connection, "by_apparent_ip")) {
+		fatal("manager_preferred_connection should be one of: by_ip, by_hostname, by_apparent_ip");
+	}
+
 	q->manager_preferred_connection = xxstrdup(preferred_connection);
 }
 
 int work_queue_tune(struct work_queue *q, const char *name, double value)
 {
 
-	if(!strcmp(name, "asynchrony-multiplier")) {
-		q->asynchrony_multiplier = MAX(value, 1.0);
-
-	} else if(!strcmp(name, "asynchrony-modifier")) {
-		q->asynchrony_modifier = MAX(value, 0);
+	if(!strcmp(name, "resource-submit-multiplier") || !strcmp(name, "asynchrony-multiplier")) {
+		q->resource_submit_multiplier = MAX(value, 1.0);
 
 	} else if(!strcmp(name, "min-transfer-timeout")) {
 		q->minimum_transfer_timeout = (int)value;
@@ -6732,6 +6777,15 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "category-steady-n-tasks")) {
 		category_tune_bucket_size("category-steady-n-tasks", (int) value);
+
+	} else if(!strcmp(name, "hungry-minimum")) {
+		q->hungry_minimum = MAX(1, (int)value);
+
+	} else if(!strcmp(name, "wait-for-workers")) {
+		q->wait_for_workers = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "delayed-wait")){
+		q->delayed_wait = MAX(0, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
