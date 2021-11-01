@@ -5,7 +5,7 @@ import work_queue as wq
 
 def main():
     # Set up queue
-    q = wq.WorkQueue(port=9223)
+    q = wq.WorkQueue(port=9123)
 
     # map - similar to Python's own map function, but uses a work_queue worker
     # to complete computation. Returns array with the results from the given function
