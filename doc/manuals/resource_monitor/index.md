@@ -179,21 +179,24 @@ Snapshots are specified via a JSON-encoded file with the following syntax:
     ...
 ```
 
-|Field | Type | Description |
-|------|------|-------------|
+|Field | Type | Description | Default |
+|------|------|-------------|---------|
 |FILENAME  |string  |Name of a text file to watch.
-|from-start  |boolean  |If FILENAME exits when the monitor starts running, process from line 1. Default  |false, as monitored processes may be appending to already existing files.
-|from-start-if-truncated  |boolean  |If FILENAME is truncated, process from line 1. Default  |true, to account for log rotations.
-|delete-if-found boolean  |Delete FILENAME when found. Default  |false
-|events  |array  |xxx 
-|label  |string  |Name that identifies the snapshot. Only alphanumeric, -, and _ characters are allowed.
-|on-create  |boolean  |Take a snapshot every time the file is created. Default  |false
-|on-delete  |boolean  | Take a snapshot every time the file is deleted. Default  |false
-|on-truncate  |boolean  | Take a snapshot when the file is truncated. Default  |false
-|on-pattern  |boolean  | Take a snapshot when a line matches the regexp pattern. Default: none
-|count  |integer  |Maximum number of snapshots for this label. Default  |-1 (no limit) 
+|from-start  |boolean  |If FILENAME exits when the monitor starts running, process from line 1. | false |
+|from-start-if-truncated  |boolean  |If FILENAME is truncated, process from line 1. | true |
+|delete-if-found |boolean  |Delete FILENAME when found. | false|
+|events  |array  | See following table ||
 
-All fields but *label* are optional.
+Events fields:
+
+|Field | Type | Description | Default |
+|------|------|-------------|---------|
+|label  |string  |Name that identifies the snapshot. Only alphanumeric, -, and _ characters are allowed.| required|
+|on-create  |boolean  |Take a snapshot every time the file is created. |false|
+|on-delete  |boolean  | Take a snapshot every time the file is deleted. |false|
+|on-truncate  |boolean  | Take a snapshot when the file is truncated. |false|
+|on-pattern  |boolean  | Take a snapshot when a line matches the regexp pattern. ||
+|count  |integer  |Maximum number of snapshots for this label. |-1 (no limit)|
 
 As an example, assume that 'myapp' goes through three stages during execution:
 start, processing, and analysis, and that it indicates the current stage by
