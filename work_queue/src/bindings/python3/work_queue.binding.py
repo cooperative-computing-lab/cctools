@@ -331,12 +331,15 @@ class Task(object):
         flags = Task._determine_file_flags(flags, cache, None)
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
+
+    ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
     # to take a snapshot of the task resources. Snapshots appear in the JSON
     # summary file of the task, under the key "snapshots". Snapshots are taken
     # on events on files described in the monitor_snapshot_file. The
     # monitor_snapshot_file is a json encoded file with the following format:
     #
+    # @code
     #   {
     #       "FILENAME": {
     #           "from-start":boolean,
@@ -359,6 +362,7 @@ class Task(object):
     #       "FILENAME": {
     #           ...
     #   }
+    # @endcode
     #
     # All keys but "label" are optional:
     #
@@ -375,6 +379,14 @@ class Task(object):
     #   count        Maximum number of snapshots for this label. Default: -1 (no limit)
     #
     # Exactly one of on-create, on-truncate, or on-pattern should be specified.
+    #
+    # Once a task has finished, the snapshots are available as:
+    #
+    # @code
+    # for s in t.resources_measured.snapshots:
+    #   print(s.memory)
+    # @endcode
+    #
     # For more information, consult the manual of the resource_monitor.
     #
     # @param self           Reference to the current task object.
