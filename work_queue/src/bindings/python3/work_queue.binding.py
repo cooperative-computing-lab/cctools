@@ -961,7 +961,7 @@ class PythonTask(Task):
 
     def _serialize_python_function(self, func, *args):
         with open(self._func_file, 'wb') as wf:
-            dill.dump(func, wf)
+            dill.dump(func, wf, recurse=True)
         with open(self._args_file, 'wb') as wf:
             dill.dump([*args], wf)
 
