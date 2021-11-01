@@ -963,7 +963,7 @@ class PythonTask(Task):
         with open(self._func_file, 'wb') as wf:
             dill.dump(func, wf, recurse=True)
         with open(self._args_file, 'wb') as wf:
-            dill.dump([*args], wf)
+            dill.dump([*args], wf, recurse=True)
 
 
     def _python_function_command(self):
