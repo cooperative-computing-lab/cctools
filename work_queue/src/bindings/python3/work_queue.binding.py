@@ -1729,7 +1729,7 @@ class WorkQueue(object):
     # @param array      The array that will call the fucntion   
 
     def map(self, fn, array):
-        results = [0] * len(array)
+        results = [None] * len(array)
         tasks = {}
         for i, arg in enumerate(array):
             p_task = PythonTask(fn, arg)
@@ -1738,12 +1738,7 @@ class WorkQueue(object):
  
         while not self.empty():
             t = self.wait()
-            if t:
-                x = t.output
-                if isinstance(x, PythonTaskNoResult):
-                    print("Task {} failed and did not generate a result.".format(t.id))
-                else:
-                    results[tasks[t.id]] = x
+            results[tasks[t.id]] = t.output
   
         return results
 
@@ -1759,7 +1754,7 @@ class WorkQueue(object):
     # @param array2     The second array that will be used to generate pairs
 
     def pair(self, fn, array1, array2):
-        results = [0] * (len(array1) * len(array2))
+        results = [None] * (len(array1) * len(array2))
         tasks = {}
         for i, (x, y) in enumerate(itertools.product(array1, array2)):
             p_task = PythonTask(fn, x, y)
@@ -1768,12 +1763,7 @@ class WorkQueue(object):
 
         while not self.empty():
             t = self.wait()
-            if t:
-                x = t.output
-                if isinstance(x, PythonTaskNoResult):
-                    print("Task {} failed and did not generate a result.".format(t.id))
-                else:
-                    results[tasks[t.id]] = x
+            results[tasks[t.id]] = t.output
   
         return results
 
@@ -1786,42 +1776,29 @@ class WorkQueue(object):
     #
     # @param self       Reference to the current work queue object.
     # @param fn         The function that will be called on each element
-    # @param array      The array that will be reduced   
+    # @param seq        The seq that will be reduced   
 
-    def treeReduce(self, fn, array):
-        tmp = array
-        size = len(array)
+    def treeReduce(self, fn, seq):
+        size = len(seq)
         tasks = {}
-        isodd = 0
 
-        if (len(array) % 2) == 1:
-            extra = array[-1]
-            isodd = 1
-    
-        while size != 1:
-            results = [0] * (len(tmp)//2)
-            for i in range(len(tmp)//2):
-                p_task = PythonTask(fn, tmp[(i*2)], tmp[(i*2)+1])
+        while len(seq) > 1:
+            results = [None] * (len(seq)//2)
+            for i in range(len(seq)//2):
+                p_task = PythonTask(fn, seq[(i*2)], seq[(i*2)+1])
                 self.submit(p_task)
                 tasks[p_task.id] = i
 
             while not self.empty():
                 t = self.wait()
-                if t:
-                    x = t.output
-                    if isinstance(x, PythonTaskNoResult):
-                        print("Task {} failed and did not generate a result.".format(t.id))
-                    else:
-                        results[tasks[t.id]] = x
+                results[tasks[t.id]] = t.output
 
-            size = size // 2
-            if size == 1 and isodd:
-                results.append(extra)
-                size += 1
-                isodd = 0
-            tmp = results
-
-        return tmp[0]
+            if len(seq) % 2 == 1:
+                results.append(seq[-1])
+      
+            seq = results
+        
+        return seq[0]
 
 # test
 
