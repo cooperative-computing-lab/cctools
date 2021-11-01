@@ -214,6 +214,8 @@ struct work_queue {
 	char *debug_path;
 	int tlq_port;
 	char *tlq_url;
+
+	int delayed_wait;
 };
 
 struct work_queue_worker {
@@ -6315,9 +6317,13 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
-
+		// keep track of whether a task has been sent and recieved
+		int task_event = 0;
 		// task completed?
-		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+		if (t == NULL)
+		{
+			t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+		}
 		if(t) {
 			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
@@ -6331,7 +6337,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			// queue time statistics.
 			events++;
 			END_ACCUM_TIME(q, time_internal);
-			break;
+			if (!q->delayed_wait)
+			{
+				break;
+			}
 		}
 
 		 // update catalog if appropriate
@@ -6359,6 +6368,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// tasks waiting to be retrieved?
 		BEGIN_ACCUM_TIME(q, time_receive);
 		result = receive_one_task(q);
+		task_event |= result;
 		END_ACCUM_TIME(q, time_receive);
 		if(result) {
 			// retrieved at least one task
@@ -6388,6 +6398,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
+			task_event |= result;
 			result = send_one_task(q);
 			END_ACCUM_TIME(q, time_send);
 			if(result) {
@@ -6396,7 +6407,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 				continue;
 			}
 		}
-
 		//we reach here only if no task was neither sent nor received.
 		compute_manager_load(q, 1);
 
@@ -6457,6 +6467,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		// If the foreman_uplink is active then break so the caller can handle it.
 		if(foreman_uplink) {
+			break;
+		}
+		if (!task_event)
+		{
 			break;
 		}
 	}
@@ -6769,6 +6783,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "delayed-wait")){
+		q->delayed_wait = MAX(0, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
