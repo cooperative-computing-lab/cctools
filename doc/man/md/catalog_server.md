@@ -103,4 +103,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 - [catalog_server(1)](catalog_server.md)  [catalog_update(1)](catalog_update.md)  [catalog_query(1)](catalog_query.md)  [chirp_status(1)](chirp_status.md)  [work_queue_status(1)](work_queue_status.md)   [deltadb_query(1)](deltadb_query.md)
 
 
-CCTools 8.0.0 DEVELOPMENT
+CCTools

@@ -331,12 +331,15 @@ class Task(object):
         flags = Task._determine_file_flags(flags, cache, None)
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
+
+    ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
     # to take a snapshot of the task resources. Snapshots appear in the JSON
     # summary file of the task, under the key "snapshots". Snapshots are taken
     # on events on files described in the monitor_snapshot_file. The
     # monitor_snapshot_file is a json encoded file with the following format:
     #
+    # @code
     #   {
     #       "FILENAME": {
     #           "from-start":boolean,
@@ -359,6 +362,7 @@ class Task(object):
     #       "FILENAME": {
     #           ...
     #   }
+    # @endcode
     #
     # All keys but "label" are optional:
     #
@@ -375,6 +379,14 @@ class Task(object):
     #   count        Maximum number of snapshots for this label. Default: -1 (no limit)
     #
     # Exactly one of on-create, on-truncate, or on-pattern should be specified.
+    #
+    # Once a task has finished, the snapshots are available as:
+    #
+    # @code
+    # for s in t.resources_measured.snapshots:
+    #   print(s.memory)
+    # @endcode
+    #
     # For more information, consult the manual of the resource_monitor.
     #
     # @param self           Reference to the current task object.
@@ -422,6 +434,11 @@ class Task(object):
     # If less than 1, or not specified, no limit is imposed.
     def specify_end_time(self, useconds):
         return work_queue_task_specify_end_time(self._task, int(useconds))
+
+    # Indicate the minimum start time (absolute, in microseconds from the Epoch) of this task.
+    # If less than 1, or not specified, no limit is imposed.
+    def specify_start_time_min(self, useconds):
+        return work_queue_task_specify_start_time_min(self._task, int(useconds))
 
     # Indicate the maximum running time (in microseconds) for a task in a
     # worker (relative to when the task starts to run).  If less than 1, or not
@@ -1320,11 +1337,13 @@ class WorkQueue(object):
 
     ##
     # Set the preference for using hostname over IP address to connect.
-    # 'by_ip' uses IP address (standard behavior), or 'by_hostname' to use the
-    # hostname at the manager.
+    # 'by_ip' uses IP addresses from the network interfaces of the manager
+    # (standard behavior), 'by_hostname' to use the hostname at the manager, or
+    # 'by_apparent_ip' to use the address of the manager as seen by the catalog
+    # server.
     #
     # @param self Reference to the current work queue object.
-    # @param mode An string to indicate using 'by_ip' or a 'by_hostname'.
+    # @param mode An string to indicate using 'by_ip', 'by_hostname' or 'by_apparent_ip'.
     def specify_manager_preferred_connection(self, mode):
         return work_queue_manager_preferred_connection(self._work_queue, mode)
 
@@ -1669,8 +1688,7 @@ class WorkQueue(object):
     #
     # @param self  Reference to the current work queue object.
     # @param name  The name fo the parameter to tune. Can be one of following:
-    # - "asynchrony-multiplier" Treat each worker as having (actual_cores * multiplier) total cores. (default = 1.0)
-    # - "asynchrony-modifier" Treat each worker as having an additional "modifier" cores. (default=0)
+    # - "resource-submit-multiplier" Treat each worker as having ({cores,memory,gpus} * multiplier) when submitting tasks. This allows for tasks to wait at a worker rather than the manager. (default = 1.0)
     # - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
     # - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
     # - "transfer-outlier-factor" Transfer that are this many times slower than the average will be aborted.  (default=10x)
@@ -1681,6 +1699,8 @@ class WorkQueue(object):
     # - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
     # - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
     # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
+    # - "hungry-minimum" Mimimum number of tasks to consider queue not hungry. (default=10)
+    # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
     # @param value The value to set the parameter to.
     # @return 0 on succes, -1 on failure.
     #

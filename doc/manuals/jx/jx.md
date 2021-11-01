@@ -28,6 +28,7 @@ A workflow is encoded as a JSON object with the following keys:
 }
 
 ```
+
 | Key | Required | Description |
 |-----|:--------:|-------------|
 |[**rules**](#rules)|  yes     | Unordered array of rules comprising the workflow.<br>  Each `<rule>` corresponds to a single job represented as a JSON object to be executed in the workflow.
@@ -495,25 +496,25 @@ fetch("example.json")
 
 #### select
 
->       select(A, [,B]) -> Array
->       where A = Boolean and B = Object
+>       select([,A], B) -> Array
+>       where A = Object and B = Boolean
 
 select() returns an array of objects for which the boolean expression evaluates to true for that object.
 
 ```python
-select(x==1, [{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}])
+select([{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}], x==1)
 = [{"x": 1, "y": "example", "z": 0.0}]
 ```
 
 #### project
 
->       project(A, [,B]) -> Array
->       where A = Expression and B = Object
+>       project([,A], B) -> Array
+>       where A = Object and B = Expression
 
 project() returns an array of objects resulting from evaluating the expression upon the array.
 
 ```python
-project(x, [{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}])
+project([{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}], x)
 = [0, 1]
 ```
 
@@ -532,12 +533,12 @@ schema({"x": 0, "y": "test", "z": 1.0})
 #### like
 
 >       like(A, B) -> Boolean
->       where A = String and B = String
+>       where A = String (to be matched) and B = String (regex)
 
-like() returns a boolean value representing whether the given regex string matched to the given string.
+like() returns a boolean value representing whether the given string matches the given regex.
 
 ```python
-like(".es.*", "test")
+like("test", ".es.*")
 = true
 ```
 
@@ -567,7 +568,33 @@ If multiple clauses are specified, they are evaluated from left to right.
 [[i, j] for i in range(5) for j in range(4) if (i + j)%2 == 0]
 = [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2], [3, 1]]
 ```
-    
+
+### Functions as Methods
+
+JX supports a syntax for functions very similar to object methods of the form `object.method()`.
+
+The syntax is constructed as follows:
+>       A.B()   where A is any type and B is a function
+In this example, A gets piped into B as the first argument.  As such, `A.B()` is logically equivalent to `B(A)`.
+
+The same logic applies for functions with multiple parameters as well.
+In these cases, the expression before the `.` simply gets inserted as
+the first argument, and the others get shifted over.
+
+This gives us the following examples:
+```
+[1,2,3,4].len()
+= 4
+
+"abc".like("a.+")
+= true
+
+"ceil(%f) -> %d".format(9.1, 10)
+= ceil(9.1) -> 10
+
+[{"a": 1}, {"a": 2}].select(a>0).project(a).len()
+= 2
+```
 
 ### Errors
 

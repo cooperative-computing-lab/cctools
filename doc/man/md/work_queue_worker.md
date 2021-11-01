@@ -92,6 +92,7 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 - **--wall-time=_&lt;s&gt;_**<br />Set the maximum number of seconds the worker may be active.
 - **--feature=_&lt;feature&gt;_**<br />Specifies a user-defined feature the worker provides (option can be repeated).
 - **--volatility=_&lt;chance&gt;_**<br />Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).
+- **--connection-mode=_&lt;mode&gt;_**<br />When using -M, override manager preference to resolve its address. One of by_ip, by_hostname, or by_apparent_ip. Default is set by manager.
 
 
 ## FOREMAN MODE
@@ -139,4 +140,4 @@ The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of No
 - [work_queue_worker(1)](work_queue_worker.md) [work_queue_status(1)](work_queue_status.md) [work_queue_factory(1)](work_queue_factory.md) [condor_submit_workers(1)](condor_submit_workers.md) [sge_submit_workers(1)](sge_submit_workers.md) [torque_submit_workers(1)](torque_submit_workers.md) 
 
 
-CCTools 8.0.0 DEVELOPMENT
+CCTools

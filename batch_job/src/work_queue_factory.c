@@ -9,7 +9,6 @@ See the file COPYING for details.
 #include "batch_job.h"
 #include "hash_table.h"
 #include "copy_stream.h"
-#include "copy_tree.h"
 #include "debug.h"
 #include "domain_name_cache.h"
 #include "envtools.h"
@@ -30,6 +29,7 @@ See the file COPYING for details.
 
 #include "jx.h"
 #include "jx_parse.h"
+#include "jx_eval.h"
 #include "jx_print.h"
 #include "jx_table.h"
 
@@ -100,8 +100,8 @@ static char *condor_requirements = NULL;
 static char *batch_submit_options = NULL;
 
 static char *wrapper_command = 0;
-static char *wrapper_input = 0;
-struct jx   *wrapper_inputs = 0;
+
+struct list *wrapper_inputs = 0;
 
 static char *worker_command = 0;
 
@@ -414,9 +414,11 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	char *files = NULL;
-	if(!k8s_worker_image) {
-		files = string_format("work_queue_worker");
+	if(!runos_os && !k8s_worker_image) {
+		files = xxstrdup(worker_command);
 	} else {
+		// if runos, then worker comes from vc3_cmd. if k8s, then from the
+		// container image.
 		files = xxstrdup("");
 	}
 
@@ -426,8 +428,10 @@ static int submit_worker( struct batch_queue *queue )
 		files = newfiles;
 	}
 
-	if(wrapper_input) {
-		char *newfiles = string_format("%s,%s",files,wrapper_input);
+	const char *item = NULL;
+	list_first_item(wrapper_inputs);
+	while((item = list_next_item(wrapper_inputs))) {
+		char *newfiles = string_format("%s,%s",files,path_basename(item));
 		free(files);
 		files = newfiles;
 	}
@@ -441,10 +445,6 @@ static int submit_worker( struct batch_queue *queue )
 		temp = string_format("%s,%s",files,"vc3-builder");
 		free(files);
 		files = temp;
-	}else{
-		char* temp = string_format("%s,%s",files,worker);
-		free(files);
-		files=temp;
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
@@ -669,10 +669,18 @@ void delete_projects_list(struct list *l)
 #define assign_new_value(new_var, old_var, option, type_c, type_json, field) \
 	type_c new_var = old_var;\
 	{\
-		struct jx *jv = jx_lookup(J,#option); \
+		struct jx *jv = jx_eval(jx_lookup(J, #option), J); \
 		if(jv) {\
-			if(jv->type==type_json) {\
+			if (jv->type == JX_DOUBLE) {\
+				int v = ceil(jv->u.double_value);\
+				jx_delete(jv);\
+				jv = jx_integer(v);\
+			}\
+			if (jv->type == type_json) {\
 				new_var = jv->u.field;\
+			} else if (jv->type == JX_ERROR) {\
+				debug(D_NOTICE, "%s", jv->u.err->u.string_value);\
+				error_found = 1;\
 			} else {\
 				debug(D_NOTICE, #option " has not a valid value.");\
 				error_found = 1;\
@@ -718,7 +726,7 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_factory_timeout_option, factory_timeout, factory-timeout, int, JX_INTEGER, integer_value)
 
-	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_INTEGER, integer_value)
+	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, int, JX_INTEGER, integer_value)
 
 	/* first try with old master option, then with manager */
 	assign_new_value(new_project_regex_old_opt, project_regex, master-name, const char *, JX_STRING, string_value)
@@ -954,22 +962,21 @@ static void mainloop( struct batch_queue *queue )
 		int workers_waiting_to_connect = workers_submitted - workers_connected;
 
 		if(workers_waiting_to_connect < 0) {
-			debug(D_WQ,"%d workers already connected from other sources", -workers_waiting_to_connect);
+			debug(D_WQ,"at least %d workers have already connected from other sources", -workers_waiting_to_connect);
+			new_workers_needed -= abs(workers_waiting_to_connect);
+
+			// this factory has no workers_waiting_to_connect
+			workers_waiting_to_connect = 0;
 		}
 
 		if(workers_waiting_to_connect > 0) {
 			debug(D_WQ,"waiting for %d previously submitted workers to connect", workers_waiting_to_connect);
 		}
 
-		//abs here because:
-		//if +, we are waiting for workers to connect, thus we don't need to submit as many new ones.
-		//if -, workers connected from other sources, thus we don't need to submit as many new ones.
-		new_workers_needed = new_workers_needed - abs(workers_waiting_to_connect);
-
-		// Always apply workers_per_cycle at the very end
-		if(workers_per_cycle > 0 && new_workers_needed > workers_per_cycle) {
+		// Apply workers_per_cycle. Never have more than workers_per_cycle waiting to connect.
+		if(workers_per_cycle > 0 && (new_workers_needed + workers_waiting_to_connect) > workers_per_cycle) {
 			debug(D_WQ,"applying maximum workers per cycle of %d",workers_per_cycle);
-			new_workers_needed = workers_per_cycle;
+			new_workers_needed = MAX(0, workers_per_cycle - workers_waiting_to_connect);
 		}
 
 		debug(D_WQ,"workers needed: %d",    workers_needed);
@@ -1053,15 +1060,7 @@ void add_wrapper_command( const char *cmd )
 
 void add_wrapper_input( const char *filename )
 {
-	if(!wrapper_input) {
-		wrapper_input = strdup(filename);
-	} else {
-		char *tmp = string_format("%s %s",wrapper_input,filename);
-		free(wrapper_input);
-		wrapper_input = tmp;
-	}
-	struct jx *file = jx_string(filename);
-	jx_array_append(wrapper_inputs, file);
+	list_push_tail(wrapper_inputs, xxstrdup(filename));
 }
 
 static void show_help(const char *cmd)
@@ -1206,7 +1205,7 @@ int main(int argc, char *argv[])
 	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
 
-	wrapper_inputs = jx_array(NULL);
+	wrapper_inputs = list_create();
 
 	// --run-factory-as-manager and -Twq should be used together.
 	int run_as_manager = 0;
@@ -1325,7 +1324,8 @@ int main(int argc, char *argv[])
 					return 1;
 				}
 				add_wrapper_input(fullpath);
-				add_wrapper_command( string_format("%s -e %s ",fullpath, optarg) );
+				add_wrapper_input(optarg);
+				add_wrapper_command( string_format("./%s -e %s ",path_basename(fullpath), path_basename(optarg)));
 				break;
 				}
 			case LONG_OPT_WRAPPER:
@@ -1491,17 +1491,17 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if(wrapper_input) {
-		struct jx *item=0;
-		for( void *i=0; (item=jx_iterate_array(wrapper_inputs,&i)); ) {
-			const char *value = item->u.string_value;
-			const char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(value));
-			int result = copy_direntry(value, file_at_scratch_dir); 
-			if(result < 0) {
-				fprintf(stderr,"work_queue_factory: Cannot copy wrapper input file %s to factory scratch directory\n", value);
-				exit(EXIT_FAILURE);
-			}
+	const char *item = NULL;
+	list_first_item(wrapper_inputs);
+	while((item = list_next_item(wrapper_inputs))) {
+		char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(item));
+		int result = copy_file_to_file(item, file_at_scratch_dir);
+		if(result < 0) {
+			fprintf(stderr,"work_queue_factory: Cannot copy wrapper input file %s to factory scratch directory %s:\n", item, file_at_scratch_dir);
+			fprintf(stderr,"%s\n", strerror(errno));
+			exit(EXIT_FAILURE);
 		}
+		free(file_at_scratch_dir);
 	}
 
 	char* cmd;
@@ -1590,7 +1590,6 @@ int main(int argc, char *argv[])
 
 	}
 
-	jx_delete(wrapper_inputs);
 	batch_queue_delete(queue);
 
 	return 0;

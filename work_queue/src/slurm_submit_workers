@@ -62,10 +62,15 @@ submit_workers_command()
 		exit 1
 	fi
 
-	sbatch --job-name wqWorker --ntasks $count --nodes $count $slurm_parameters <<EOF
+	to_submit=$count
+	while [[ "$to_submit" -gt 0 ]]
+	do
+		to_submit=$((to_submit-1))
+		sbatch --job-name wqWorker --ntasks=1 --nodes=1 $slurm_parameters <<EOF
 #!/bin/sh
 work_queue_worker $arguments $host $port
 EOF
+	done
 
 }
 

@@ -6398,8 +6398,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
-			task_event |= result;
 			result = send_one_task(q);
+      task_event |= result;
 			END_ACCUM_TIME(q, time_send);
 			if(result) {
 				// sent at least one task
@@ -6407,6 +6407,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 				continue;
 			}
 		}
+    
 		//we reach here only if no task was neither sent nor received.
 		compute_manager_load(q, 1);
 

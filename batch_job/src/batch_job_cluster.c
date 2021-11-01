@@ -268,15 +268,18 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	}
 	submit_id++;
 
+	const char *cluster_stdout_redirect = batch_queue_option_is_yes(q,"keep-wrapper-stdout")  ? "" : "-o /dev/null";
+
 	/*
 	Note that dot-slash is needed in front of the wrapper command
 	b/c some batch systems perform a PATH search on the executable.
 	*/
 
-	char *command = string_format("%s %s %s %s %s %s ./%s.wrapper",
+	char *command = string_format("%s %s %s %s %s %s %s ./%s.wrapper",
 		cluster_submit_cmd,
 		cluster_resources,
 		cluster_options,
+		cluster_stdout_redirect,
 		cluster_jobname_var,
 		jobname,
 		options ? options : "",
@@ -429,47 +432,57 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 
 	cluster_name = cluster_submit_cmd = cluster_remove_cmd = cluster_options = cluster_jobname_var = NULL;
 
+	/*
+	By default, we don't want the wrapper file to create a
+	standard output file, which goes in an unusual filename
+	chosen by the batch system, making it difficult for us
+	to clean up.  However, it is occasionally useful to enable
+	for debugging purposes, and in at least one case, required
+	by the site:
+	https://github.com/cooperative-computing-lab/cctools/issues/2701
+	*/
+
 	switch(q->type) {
 		case BATCH_QUEUE_TYPE_SGE:
 			cluster_name = strdup("sge");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
-			cluster_options = strdup("-cwd -o /dev/null -j y -V");
+			cluster_options = string_format("-cwd -j y -V");
 			cluster_jobname_var = strdup("-N");
 			break;
 		case BATCH_QUEUE_TYPE_MOAB:
 			cluster_name = strdup("moab");
 			cluster_submit_cmd = strdup("msub");
 			cluster_remove_cmd = strdup("mdel");
-			cluster_options = strdup("-d . -o /dev/null -j oe -V");
+			cluster_options = string_format("-d . -j oe -V");
 			cluster_jobname_var = strdup("-N");
 			break;
 		case BATCH_QUEUE_TYPE_PBS:
 			cluster_name = strdup("pbs");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
-			cluster_options = strdup("-o /dev/null -j oe -V");
+			cluster_options = string_format("-j oe -V");
 			cluster_jobname_var = strdup("-N");
 			break;
 		case BATCH_QUEUE_TYPE_LSF:
 			cluster_name = strdup("lsf");
 			cluster_submit_cmd = strdup("bsub");
 			cluster_remove_cmd = strdup("bkill");
-			cluster_options = strdup("-o /dev/null -e /dev/null -env all");
+			cluster_options = string_format("-e /dev/null -env all");
 			cluster_jobname_var = strdup("-J");
 			break;
 		case BATCH_QUEUE_TYPE_TORQUE:
 			cluster_name = strdup("torque");
 			cluster_submit_cmd = strdup("qsub");
 			cluster_remove_cmd = strdup("qdel");
-			cluster_options = strdup("-o /dev/null -j oe -V");
+			cluster_options = string_format("-j oe -V");
 			cluster_jobname_var = strdup("-N");
 			break;
 		case BATCH_QUEUE_TYPE_SLURM:
 			cluster_name = strdup("slurm");
 			cluster_submit_cmd = strdup("sbatch");
 			cluster_remove_cmd = strdup("scancel");
-			cluster_options = strdup("-D . -o /dev/null -e /dev/null --export=ALL");
+			cluster_options = string_format("-D . -e /dev/null --export=ALL");
 			cluster_jobname_var = strdup("-J");
 			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:

@@ -1270,6 +1270,7 @@ static void show_help_run(const char *cmd)
 	printf("    --safe-submit-mode          Excludes resources at submission.\n");
 	printf("                                  (SLURM, TORQUE, and PBS)\n");
 	printf("    --verbose-jobnames          Set the job name based on the command.\n");
+	printf("    --keep-wrapper-stdout       Do not redirect to /dev/null the stdout file from the batch system.");
 	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
 	printf("    --batch-mem-type=<type>     Specify memory resource type (SGE).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
@@ -1367,6 +1368,7 @@ int main(int argc, char *argv[])
 	char *mesos_manager = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
+	int keep_wrapper_stdout = 0;
 
 	int mpi_cores = 0;
 	int mpi_memory = 0;
@@ -1511,6 +1513,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_SEND_ENVIRONMENT,
 		LONG_OPT_K8S_IMG,
 		LONG_OPT_VERBOSE_JOBNAMES,
+		LONG_OPT_KEEP_WRAPPER_STDOUT,
 		LONG_OPT_MPI_CORES,
 		LONG_OPT_MPI_MEMORY,
 		LONG_OPT_TLQ,
@@ -1635,6 +1638,7 @@ int main(int argc, char *argv[])
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
+		{"keep-wrapper-stdout", no_argument, 0, LONG_OPT_KEEP_WRAPPER_STDOUT},
 		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
 		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
 		{"tlq", required_argument, 0, LONG_OPT_TLQ},
@@ -2165,6 +2169,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_VERBOSE_JOBNAMES:
 				batch_job_verbose_jobnames = 1;
 				break;
+			case LONG_OPT_KEEP_WRAPPER_STDOUT:
+				keep_wrapper_stdout = 1;
+				break;
 			case LONG_OPT_MPI_CORES:
 				mpi_cores = atoi(optarg);
 				break;
@@ -2397,6 +2404,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "ignore-mem-spec", ignore_mem_spec ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "mem-type", batch_mem_type);
+	batch_queue_set_option(remote_queue, "keep-wrapper-stdout", keep_wrapper_stdout ? "yes" : "no" );
 	batch_queue_set_int_option(remote_queue, "tlq-port", tlq_port);
 
 	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);

@@ -714,28 +714,28 @@ value:      error("function template on line 290: cannot format expression in te
 expression: schema([{"x":0,"y":"test","z":1}])
 value:      {"z":"float","y":"string","x":"integer"}
 
-expression: select(x<10,[{"x":0,"y":"test","z":1}])
+expression: select([{"x":0,"y":"test","z":1}],x<10)
 value:      [{"x":0,"y":"test","z":1}]
 
-expression: select(x>10,[{"x":0,"y":"test","z":1}])
+expression: select([{"x":0,"y":"test","z":1}],x>10)
 value:      []
 
-expression: select(y=="test" and z!=0,[{"x":0,"y":"test","z":1}])
+expression: select([{"x":0,"y":"test","z":1}],y=="test" and z!=0)
 value:      [{"x":0,"y":"test","z":1}]
 
-expression: project(x,[{"x":0,"y":"test","z":1}])
+expression: project([{"x":0,"y":"test","z":1}],x)
 value:      [0]
 
-expression: project({"z2":z*2},[{"x":0,"y":"test","z":1}])
+expression: project([{"x":0,"y":"test","z":1}],{"z2":z*2})
 value:      [{"z2":2}]
 
-expression: like(".es.*","test")
+expression: like("test",".es.*")
 value:      true
 
-expression: like("NULL","test")
+expression: like("test","NULL")
 value:      false
 
-expression: select(like(".es.*",y),[{"x":0,"y":"test","z":1}])
+expression: select([{"x":0,"y":"test","z":1}],like(y,".es.*"))
 value:      [{"x":0,"y":"test","z":1}]
 
 expression:  not  not true
@@ -770,4 +770,58 @@ value:      [2,1]
 
 expression: items({"a":1,"b":2})
 value:      [["b",2],["a",1]]
+
+expression: [":%d".format(2*i) for i in range(10)]
+value:      [":0",":2",":4",":6",":8",":10",":12",":14",":16",":18"]
+
+expression: ["a","b","c","d"].join(" ")
+value:      "a b c d"
+
+expression: f.ceil()
+value:      1
+
+expression: f.floor()
+value:      0
+
+expression: "/a/b/c/d".basename()
+value:      "d"
+
+expression: "/a/b/c/d".dirname()
+value:      "/a/b/c"
+
+expression: "dir".listdir()
+value:      ["a"]
+
+expression: "echo $PATH".escape()
+value:      "\"echo \\$PATH\""
+
+expression: [1,2,3,4].len()
+value:      4
+
+expression: [{"x":0,"y":"test","z":1}].schema()
+value:      {"z":"float","y":"string","x":"integer"}
+
+expression: "test".like(".es.*")
+value:      true
+
+expression: {"a":1,"b":2}.keys()
+value:      ["b","a"]
+
+expression: {"a":1,"b":2}.values()
+value:      [2,1]
+
+expression: {"a":1,"b":2}.items()
+value:      [["b",2],["a",1]]
+
+expression: "{f}".template({"f":"ok"})
+value:      "ok"
+
+expression: [{"x":0,"y":"test","z":1}].select(x<10)
+value:      [{"x":0,"y":"test","z":1}]
+
+expression: [{"x":0,"y":"test","z":1}].project(x)
+value:      [0]
+
+expression: [{"x":1},{"x":2}].select(x>0).project(x).len()
+value:      2
 

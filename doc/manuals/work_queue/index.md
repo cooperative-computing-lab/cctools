@@ -283,7 +283,7 @@ memory, disk) so that the worker can pack as many concurrent tasks.
 This is described in greater detail under [Managing Resources](#managing-resources).
 
 You may also attach a `tag` to a task, which is just an user-defined string
-that describes the purpose of the taask.  The tag is available as `t.tag`
+that describes the purpose of the task.  The tag is available as `t.tag`
 when the task is complete.
 
 === "Python"
@@ -740,7 +740,7 @@ Unless otherwise specified, Work Queue assumes that a single task runs on a
 single worker at a time, and a single worker occupies an entire machine.
 
 However, if the resources at a machine are larger than what you know a task
-requires, you most likely you will want one worker to manage multiple tasks
+requires, you most likely will want one worker to manage multiple tasks
 running on that machine. For
 example, if you have a 8-core machine, then you might want to run four 2-core
 tasks on a single worker at once, being careful not to exceed the available
