@@ -15,7 +15,7 @@ def check_task(category, category_mode, max, min, expected):
     t.specify_category(category)
     q.submit(t)
 
-    t = q.wait(5)
+    t = q.wait(30)
     if not t:
         print("Task did not complete in the allotted time.")
         sys.exit(1)
