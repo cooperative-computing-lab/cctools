@@ -1045,6 +1045,10 @@ class WorkQueue(object):
         self._stats_hierarchy = None
         self._task_table = {}
 
+        # set for tasks that finished in a wait_for_tag call that did not have
+        # the correct tag.
+        self._done_tasks = set()
+
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
         try:
@@ -1723,13 +1727,59 @@ class WorkQueue(object):
     ##
     # Wait for tasks to complete.
     #
-    # This call will block until the timeout has elapsed
+    # This call will block until the timeout has elapsed or a task has
+    # finished.
     #
     # @param self       Reference to the current work queue object.
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.  Use an integer to set the timeout or the constant @ref
     #                   WORK_QUEUE_WAITFORTASK to block until a task has completed.
     def wait(self, timeout=WORK_QUEUE_WAITFORTASK):
+        if len(self._done_tasks) > 0:
+            return self._done_tasks.pop()
+        else:
+            return self._wait(timeout=timeout)
+
+
+    ##
+    # Wait for tasks with tag to complete.
+    #
+    # This call will block until a task with the specified tag has finished.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param tag        String with the desired tag for tasks.
+    #
+    # @code
+    # >>> t_a = Task('echo hello')
+    # >>> t_a.specify_tag('hello')
+    # >>> q.submit(t_a)
+    # >>>
+    # >>> t_b = Task('echo world')
+    # >>> t_b.specify_tag('world')
+    # >>> q.submit(t_b)
+    # >>>
+    # >>> t = q.wait_for_tag('world')
+    # >>> print(t.output)    # prints 'world'
+    # >>> t = q.wait()
+    # >>> print(t.output)    # prints 'hello' (assuming no other task in queue)
+    # @endcode
+    def wait_for_tag(self, tag):
+        for t in self._done_tasks:
+            if t.tag == tag:
+                self._done_tasks.remove(t)
+                return t
+
+        while not self.empty():
+            t = self._wait()
+            if t and t.tag == tag:
+                return t
+            else:
+                self._done_tasks.add(t)
+
+
+    def _wait(self, timeout=WORK_QUEUE_WAITFORTASK):
+        # Internal wait function. Updates the known submitted task table on
+        # task completion.
         task_pointer = work_queue_wait(self._work_queue, timeout)
         if task_pointer:
             task = self._task_table[int(task_pointer.taskid)]
