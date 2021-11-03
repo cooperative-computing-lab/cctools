@@ -3980,24 +3980,25 @@ static int check_task_fit_in_worker(struct work_queue *q, struct work_queue_task
  	// using "required" for now to represent what a task resource specification would be 
  	*/
 	int ok = 1;	
+	struct rmsummary *l = task_worker_box_size(q,w,t);
 	// baseline resurce comparison of worker total resources and a task requested resorces
 	//TODO ensure that these resource_requested stats are the correct ones from rmsummary
-	if(w->resources->cores.total < t->resources_requested->cores ) {
+	if(w->resources->cores.total < l->cores ) {
 		ok = 0;
 	}
 
-	if(w->resources->memory.total < t->resources_requested->memory ) {
+	if(w->resources->memory.total < l->memory ) {
 		ok = 0;
 	}
 
-	if(w->resources->disk.total < t->resources_requested->disk ) { /* No overcommit disk */
+	if(w->resources->disk.total < l->disk ) { /* No overcommit disk */
 		ok = 0;
 	}
 
-	if(w->resources->gpus.total < t->resources_requested->gpus ) {
+	if(w->resources->gpus.total < l->gpus ) {
 		ok = 0;
 	}
-
+	rmsummary_delete(l);
 	return ok;
 }
 static int check_task_fit_in_connected_workers(struct work_queue *q, struct work_queue_task *t)
