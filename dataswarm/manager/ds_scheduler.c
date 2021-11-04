@@ -108,7 +108,7 @@ struct ds_worker_rep * choose_worker_for_task( struct ds_manager *m, struct ds_t
 
 	//XXX do some matching of tasks to workers
 	int r = rand() % set_size(m->worker_table);
-	struct ds_worker_rep *w;
+	struct ds_worker_rep *w = NULL;
 	set_first_element(m->worker_table);
 	while (r >= 0) {
 		w = set_next_element(m->worker_table);
