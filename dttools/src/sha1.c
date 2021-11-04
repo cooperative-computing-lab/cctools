@@ -343,7 +343,7 @@ static void SHAtoByte(uint8_t * output, uint32_t * input, size_t len)
 	}
 }
 
-void sha1_final(unsigned char output[2], sha1_context_t * shsInfo)
+void sha1_final(unsigned char output[SHA1_DIGEST_LENGTH], sha1_context_t * shsInfo)
 {
 	size_t count;
 	uint8_t *dataPtr;

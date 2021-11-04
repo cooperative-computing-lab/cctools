@@ -728,7 +728,7 @@ INT64_T chirp_multi_utime(const char *volume, const char *path, time_t actime, t
 	}
 }
 
-INT64_T chirp_multi_md5(const char *volume, const char *path, unsigned char digest[16], time_t stoptime)
+INT64_T chirp_multi_md5(const char *volume, const char *path, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime)
 {
 	struct file_info info;
 	if(chirp_multi_lookup(volume, path, &info, stoptime)) {

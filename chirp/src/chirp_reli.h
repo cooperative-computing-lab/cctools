@@ -638,7 +638,7 @@ digest into a human readable form.
 @see md5_string
 */
 
-INT64_T chirp_reli_md5(const char *host, const char *path, unsigned char digest[16], time_t stoptime);
+INT64_T chirp_reli_md5(const char *host, const char *path, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime);
 
 /** Set replication factor.
 Sets the number of replicas desired for the indicated file or for all newly created files.

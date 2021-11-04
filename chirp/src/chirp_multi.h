@@ -50,7 +50,7 @@ INT64_T chirp_multi_chown(const char *volume, const char *path, INT64_T uid, INT
 INT64_T chirp_multi_lchown(const char *volume, const char *path, INT64_T uid, INT64_T gid, time_t stoptime);
 INT64_T chirp_multi_truncate(const char *volume, const char *path, INT64_T length, time_t stoptime);
 INT64_T chirp_multi_utime(const char *volume, const char *path, time_t actime, time_t modtime, time_t stoptime);
-INT64_T chirp_multi_md5(const char *volume, const char *path, unsigned char digest[16], time_t stoptime);
+INT64_T chirp_multi_md5(const char *volume, const char *path, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime);
 
 #endif
 
