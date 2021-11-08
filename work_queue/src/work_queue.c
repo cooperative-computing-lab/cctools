@@ -6317,32 +6317,31 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
-		// keep track of whether a task has been sent and recieved
+		// keep track of whether a task has been sent or recieved
 		int task_event = 0;
 		// task completed?
 		if (t == NULL)
 		{
 			t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
-		}
-		if(t) {
-			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
+			if(t) {
+				change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
-			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
-			{
-				q->stats->tasks_failed++;
-			}
+				if( t->result != WORK_QUEUE_RESULT_SUCCESS )
+				{
+					q->stats->tasks_failed++;
+				}
 
-			// return completed task (t) to the user. We do not return right
-			// away, and instead break out of the loop to correctly update the
-			// queue time statistics.
-			events++;
-			END_ACCUM_TIME(q, time_internal);
-			if (!q->delayed_wait)
-			{
-				break;
+				// return completed task (t) to the user. We do not return right
+				// away, and instead break out of the loop to correctly update the
+				// queue time statistics.
+				events++;
+				END_ACCUM_TIME(q, time_internal);
 			}
 		}
-
+		if (t && !q->delayed_wait)
+		{
+			break;
+		}
 		 // update catalog if appropriate
 		if(q->name) {
 			update_catalog(q, foreman_uplink, 0);
