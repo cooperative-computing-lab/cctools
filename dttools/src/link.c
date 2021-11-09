@@ -46,6 +46,13 @@ See the file COPYING for details.
 #define TCP_HIGH_PORT_DEFAULT 32767
 #endif
 
+#ifdef HAS_OPENSSL
+# include  "openssl/bio.h"
+# include  "openssl/ssl.h"
+# include  "openssl/err.h"
+#endif
+
+
 enum link_type {
 	LINK_TYPE_STANDARD,
 	LINK_TYPE_FILE,
@@ -60,6 +67,11 @@ struct link {
 	char buffer[1<<16];
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
+
+#ifdef HAS_OPENSSL
+	SSL_CTX *ctx;
+	SSL     *ssl;
+#endif
 };
 
 static int link_send_window = 65536;
@@ -285,6 +297,11 @@ static struct link *link_create()
 	link->rport = 0;
 	link->type = LINK_TYPE_STANDARD;
 
+#ifdef HAS_OPENSSL
+	link->ctx = 0;
+	link->ssl = 0;
+#endif
+
 	return link;
 }
 
@@ -346,12 +363,67 @@ void sockaddr_set_port( struct sockaddr_storage *addr, int port )
         } else {
                 fatal("sockaddr_set_port: unexpected address family %d\n",addr);
         }
-}               
+}
 
 struct link *link_serve(int port)
 {
 	return link_serve_address(0, port);
 }
+
+#ifdef HAS_OPENSSL
+static int _ssl_errors_cb(const char *str, size_t len, void *use_warn) {
+	if(use_warn) {
+		debug(D_SSL, "%s", str);
+	} else {
+		warn(D_SSL, "%s", str);
+	}
+	return 1;
+}
+
+static SSL_CTX *_create_ssl_context(int is_client) {
+	const SSL_METHOD *method;
+	SSL_CTX *ctx;
+
+	if(is_client) {
+		method = TLS_client_method();
+		debug(D_SSL, "setting context for connection");
+	} else {
+		method = TLS_server_method();
+		debug(D_SSL, "setting context for server");
+	}
+
+	ctx = SSL_CTX_new(method);
+	if (!ctx) {
+		ERR_print_errors_cb(_ssl_errors_cb, /* use warn */ (void *) 1);
+		fatal("could not create SSL context: %s", strerror(errno));
+	}
+
+	return ctx;
+}
+
+static void _set_ssl_keys(SSL_CTX *ctx, const char *ssl_key, const char *ssl_cert) {
+	debug(D_SSL, "setting certificate and key");
+
+	SSL_CTX_set_ecdh_auto(ctx, 1);
+
+	if((ssl_key && !ssl_cert) || (!ssl_key && ssl_cert)) {
+		fatal("both or neither ssl_key and ssl_cert should be specified.");
+	}
+
+	/* Set the key and cert */
+	if(ssl_key && ssl_cert) {
+		if (SSL_CTX_use_certificate_file(ctx, ssl_cert, SSL_FILETYPE_PEM) <= 0) {
+			ERR_print_errors_cb(_ssl_errors_cb, /* use warn */ (void *) 1);
+			fatal("could not set ssl certificate: %s", ssl_cert);
+		}
+
+		if (SSL_CTX_use_PrivateKey_file(ctx, ssl_key, SSL_FILETYPE_PEM) <= 0 ) {
+			ERR_print_errors_cb(_ssl_errors_cb, /* use warn */ (void *) 1);
+			fatal("could not set ssl key: %s", ssl_key);
+		}
+	}
+}
+#endif
 
 struct link *link_serve_address(const char *addr, int port)
 {
@@ -429,11 +501,81 @@ struct link *link_serve_address(const char *addr, int port)
 	debug(D_TCP, "listening on port %d", port);
 	return link;
 
-	  failure:
+failure:
 	if(link)
 		link_close(link);
 	return 0;
 }
+
+int link_ssl_wrap_server(struct link *link, const char *key, const char *cert) {
+#ifdef HAS_OPENSSL
+	if(key && cert) {
+		link->ctx = _create_ssl_context(/* is client */ 0);
+		_set_ssl_keys(link->ctx, key, cert);
+
+		return 1;
+	}
+#endif
+
+	return 0;
+}
+
+
+int link_ssl_wrap_accept(struct link *parent, struct link *link) {
+#ifdef HAS_OPENSSL
+	if(parent->ctx) {
+		debug(D_TCP, "setting up ssl state for %s port %d", link->raddr, link->rport);
+
+		link->ctx = _create_ssl_context(/* is client */ 1);
+
+		link->ssl = SSL_new(parent->ctx);
+		SSL_set_fd(link->ssl, link->fd);
+
+		int ret = SSL_accept(link->ssl);
+		if(ret <= 0) {
+			debug(D_SSL, "accept failed from %s port %d", link->raddr, link->rport);
+			ERR_print_errors_cb(_ssl_errors_cb, NULL);
+		}
+
+		return ret;
+	}
+#endif
+
+	return 0;
+}
+
+
+int link_ssl_wrap_connect(struct link *link) {
+#ifdef HAS_OPENSSL
+	link->ctx = _create_ssl_context(/* is client */ 1);
+	link->ssl = SSL_new(link->ctx);
+	SSL_set_fd(link->ssl, link->fd);
+
+	//set hostname for SNI
+	SSL_set_tlsext_host_name(link->ssl, link->raddr);
+
+	int result;
+	while((result=SSL_connect(link->ssl)) <= 0) {
+		switch(SSL_get_error(link->ssl, result)) {
+			case SSL_ERROR_WANT_READ:
+				link_sleep(link, LINK_FOREVER, 1, 0);
+				break;
+			case SSL_ERROR_WANT_WRITE:
+				link_sleep(link, LINK_FOREVER, 0, 1);
+				break;
+			default:
+				ERR_print_errors_cb(_ssl_errors_cb, 0);
+				return result;
+				break;
+		}
+	}
+
+	return result;
+#else
+	return 0;
+#endif
+}
+
 
 struct link *link_accept(struct link *parent, time_t stoptime)
 {
@@ -446,7 +588,18 @@ struct link *link_accept(struct link *parent, time_t stoptime)
 
 	do {
 		fd = accept(parent->fd, 0, 0);
+
 		if (fd >= 0) {
+			link = link_create();
+			if(!link) {
+				goto failure;
+			}
+			link->fd = fd;
+
+			if(link_using_ssl(parent) && link_ssl_wrap_accept(parent, link) < 1) {
+				goto failure;
+			}
+
 			break;
 		} else if (stoptime == LINK_NOWAIT && errno_is_temporary(errno)) {
 				return NULL;
@@ -456,25 +609,21 @@ struct link *link_accept(struct link *parent, time_t stoptime)
 		}
 	} while(1);
 
-	link = link_create();
-	if(!link)
-		goto failure;
-	link->fd = fd;
-
 	if(!link_nonblocking(link, 1))
 		goto failure;
 	if(!link_address_remote(link, link->raddr, &link->rport))
 		goto failure;
 	link_squelch();
 
-	debug(D_TCP, "got connection from %s port %d", link->raddr, link->rport);
+	debug(D_TCP, "accepted connection from %s port %d", link->raddr, link->rport);
 
 	return link;
 
-	  failure:
+failure:
 	close(fd);
-	if(link)
+	if(link) {
 		link_close(link);
+	}
 	return 0;
 }
 
@@ -533,6 +682,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 		// If the remote address is valid, we are connected no matter what.
 		if(link_address_remote(link, link->raddr, &link->rport)) {
 			debug(D_TCP, "made connection to %s port %d", link->raddr, link->rport);
+
 			return link;
 		}
 
@@ -560,13 +710,70 @@ failure:
 	return 0;
 }
 
+ssize_t read_aux(struct link *link, char *data, size_t count) {
+#ifdef HAS_OPENSSL
+	if(link->ssl) {
+		int result;
+		while((result=SSL_read(link->ssl, data, count)) <= 0) {
+			switch(SSL_get_error(link->ssl, result)) {
+				case SSL_ERROR_WANT_READ:
+					link_sleep(link, LINK_FOREVER, 1, 0);
+					break;
+				case SSL_ERROR_WANT_WRITE:
+					link_sleep(link, LINK_FOREVER, 0, 1);
+					break;
+				default:
+					ERR_print_errors_cb(_ssl_errors_cb, 0);
+					return result;
+					break;
+			}
+		}
+
+		return result;
+	}
+#endif
+
+	//if no ssl support, or no link->ssl, fallback to read syscall
+	return read(link->fd, data, count);
+}
+
+ssize_t write_aux(struct link *link, const char *data, size_t count) {
+#ifdef HAS_OPENSSL
+	if(link->ssl) {
+		int result;
+		while((result=SSL_write(link->ssl, data, count)) <= 0) {
+			switch(SSL_get_error(link->ssl, result)) {
+				case SSL_ERROR_WANT_READ:
+					link_sleep(link, LINK_FOREVER, 1, 0);
+					break;
+				case SSL_ERROR_WANT_WRITE:
+					link_sleep(link, LINK_FOREVER, 0, 1);
+					break;
+				default:
+					ERR_print_errors_cb(_ssl_errors_cb, 0);
+					return result;
+					break;
+			}
+		}
+
+		return result;
+	}
+#endif
+
+	//if no ssl support, or no link->ssl, fallback to write syscall
+	return write(link->fd, data, count);
+}
+
+
+
+
 static ssize_t fill_buffer(struct link *link, time_t stoptime)
 {
 	if(link->buffer_length > 0)
 		return link->buffer_length;
 
 	while(1) {
-		ssize_t chunk = read(link->fd, link->buffer, sizeof(link->buffer));
+		ssize_t chunk = read_aux(link, link->buffer, sizeof(link->buffer));
 		if(chunk > 0) {
 			link->read += chunk;
 			link->buffer_start = link->buffer;
@@ -590,8 +797,8 @@ static ssize_t fill_buffer(struct link *link, time_t stoptime)
 	}
 }
 
-/* link_read blocks until all the requested data is available */
 
+/* link_read blocks until all the requested data is available */
 ssize_t link_read(struct link *link, char *data, size_t count, time_t stoptime)
 {
 	ssize_t total = 0;
@@ -622,7 +829,7 @@ ssize_t link_read(struct link *link, char *data, size_t count, time_t stoptime)
 	/* Otherwise, pull it all off the wire. */
 
 	while(count > 0) {
-		chunk = read(link->fd, data, count);
+		chunk = read_aux(link, data, count);
 		if(chunk < 0) {
 			if(errno_is_temporary(errno)) {
 				if(link_sleep(link, stoptime, 1, 0)) {
@@ -676,7 +883,7 @@ ssize_t link_read_avail(struct link *link, char *data, size_t count, time_t stop
 	/* Next, read what is available off the wire */
 
 	while(count > 0) {
-		chunk = read(link->fd, data, count);
+		chunk = read_aux(link, data, count);
 		if(chunk < 0) {
 			/* ONLY BLOCK IF NOTHING HAS BEEN READ */
 			if(errno_is_temporary(errno) && total == 0) {
@@ -735,6 +942,7 @@ int link_readline(struct link *link, char *line, size_t length, time_t stoptime)
 	return 0;
 }
 
+
 ssize_t link_write(struct link *link, const char *data, size_t count, time_t stoptime)
 {
 	ssize_t total = 0;
@@ -744,7 +952,7 @@ ssize_t link_write(struct link *link, const char *data, size_t count, time_t sto
 		return errno = EINVAL, -1;
 
 	while(count > 0) {
-		chunk = write(link->fd, data, count);
+		chunk = write_aux(link, data, count);
 		if(chunk < 0) {
 			if(errno_is_temporary(errno)) {
 				if(link_sleep(link, stoptime, 0, 1)) {
@@ -828,6 +1036,22 @@ ssize_t link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...
 void link_close(struct link *link)
 {
 	if(link) {
+#ifdef HAS_OPENSSL
+		if(link->ctx) {
+			if(link->rport) {
+				debug(D_SSL, "deleting context from %s port %d", link->raddr, link->rport);
+			}
+			SSL_CTX_free(link->ctx);
+		}
+
+		if(link->ssl) {
+			if(link->rport) {
+				debug(D_SSL, "clearing state from %s port %d", link->raddr, link->rport);
+			}
+			SSL_shutdown(link->ssl);
+			SSL_free(link->ssl);
+		}
+#endif
 		if(link->fd >= 0)
 			close(link->fd);
 		if(link->rport)
@@ -846,6 +1070,15 @@ void link_detach(struct link *link)
 int link_fd(struct link *link)
 {
 	return link->fd;
+}
+
+int link_using_ssl(struct link *link)
+{
+#ifdef HAS_OPENSSL
+	return !!(link->ctx);
+#else
+	return 0;
+#endif
 }
 
 int link_address_local(struct link *link, char *addr, int *port)
