@@ -3,6 +3,7 @@
 # work queue python binding tests
 # tests for missing/recursive inputs/outputs.
 
+import argparse
 import atexit
 import sys
 import tempfile
@@ -59,119 +60,121 @@ def output_file():
 def make_task(exe, input, output):
     return t
 
-port_file = None
-try:
-    port_file = sys.argv[1]
-except IndexError:
-    sys.stderr.write("Usage: {} PORTFILE\n".format(sys.argv[0]))
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser("Test for Work Queue python bindings.")
+    parser.add_argument('port_file', help='File to write the port the queue is using.')
+    parser.add_argument('--ssl_key', default=None, help='SSL key in pem format.')
+    parser.add_argument('--ssl_cert', default=None, help='SSL certificate in pem format.')
+
+    args = parser.parse_args()
 
 
-with open(path.join(test_dir, input_file), 'w') as f:
-    f.write('hello world\n')
+    with open(path.join(test_dir, input_file), 'w') as f:
+        f.write('hello world\n')
 
-shutil.copyfile('/bin/cat', path.join(test_dir, exec_file))
-os.chmod(path.join(test_dir, exec_file), stat.S_IRWXU)
-
-
-q = wq.WorkQueue(0)
-
-with open(port_file, 'w') as f:
-    print('Writing port {port} to file {file}'.format(port=q.port, file=port_file))
-    f.write(str(q.port))
-
-# simple task
-# define a task, sending stderr to console, and stdout to output
-output = output_file()
-t = wq.Task("./{exe} {input} 2>&1 > {output}".format(exe=exec_file, input=input_file, output=output))
-t.specify_input_file(path.join(test_dir, exec_file), exec_file)
-t.specify_input_file(path.join(test_dir, input_file), input_file)
-t.specify_output_file(path.join(test_dir, output), output)
-
-q.submit(t)
-t = q.wait(5)
-report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
-
-# same simple task, but now we send the directory as an input
-output = output_file()
-t = wq.Task("cd my_dir && ./{exe} {input} 2>&1 > {output}".format(exe=exec_file, input=input_file, output=output))
-t.specify_directory(test_dir, 'my_dir', recursive=True)
-t.specify_output_file(path.join(test_dir, output), path.join('my_dir', output))
-
-q.submit(t)
-t = q.wait(5)
-report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
+    shutil.copyfile('/bin/cat', path.join(test_dir, exec_file))
+    os.chmod(path.join(test_dir, exec_file), stat.S_IRWXU)
 
 
-# we bring back the outputs from a directory:
-output = output_file()
-t = wq.Task("mkdir outs && ./{exe} {input} 2>&1 > outs/{output}".format(exe=exec_file, input=input_file, output=output))
-t.specify_input_file(path.join(test_dir, exec_file), exec_file)
-t.specify_input_file(path.join(test_dir, input_file), input_file)
-t.specify_directory(path.join(test_dir, 'outs'), 'outs', type = wq.WORK_QUEUE_OUTPUT)
+    q = wq.WorkQueue(port=0, ssl_key=args.ssl_key, ssl_cert=args.ssl_cert)
 
-q.submit(t)
-t = q.wait(5)
-report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0, [path.join(test_dir, 'outs', output)])
+    with open(args.port_file, 'w') as f:
+        print('Writing port {port} to file {file}'.format(port=q.port, file=args.port_file))
+        f.write(str(q.port))
 
-# should fail because the 'executable' cannot be executed:
-t = wq.Task("./{input}".format(input=input_file))
-t.specify_input_file(path.join(test_dir, input_file), input_file)
+    # simple task
+    # define a task, sending stderr to console, and stdout to output
+    output = output_file()
+    t = wq.Task("./{exe} {input} 2>&1 > {output}".format(exe=exec_file, input=input_file, output=output))
+    t.specify_input_file(path.join(test_dir, exec_file), exec_file)
+    t.specify_input_file(path.join(test_dir, input_file), input_file)
+    t.specify_output_file(path.join(test_dir, output), output)
 
-q.submit(t)
-t = q.wait(5)
-report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 126)
+    q.submit(t)
+    t = q.wait(5)
+    report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
 
-# should fail because the 'executable' cannot be found:
-t = wq.Task("./notacommand")
+    # same simple task, but now we send the directory as an input
+    output = output_file()
+    t = wq.Task("cd my_dir && ./{exe} {input} 2>&1 > {output}".format(exe=exec_file, input=input_file, output=output))
+    t.specify_directory(test_dir, 'my_dir', recursive=True)
+    t.specify_output_file(path.join(test_dir, output), path.join('my_dir', output))
 
-q.submit(t)
-t = q.wait(5)
-report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 127)
+    q.submit(t)
+    t = q.wait(5)
+    report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
 
-# should fail because an input file does not exists:
-t = wq.Task("./notacommand")
-t.specify_input_file('notacommand')
 
-q.submit(t)
-t = q.wait(5)
-report_task(t, wq.WORK_QUEUE_RESULT_INPUT_MISSING, -1)
+    # we bring back the outputs from a directory:
+    output = output_file()
+    t = wq.Task("mkdir outs && ./{exe} {input} 2>&1 > outs/{output}".format(exe=exec_file, input=input_file, output=output))
+    t.specify_input_file(path.join(test_dir, exec_file), exec_file)
+    t.specify_input_file(path.join(test_dir, input_file), input_file)
+    t.specify_directory(path.join(test_dir, 'outs'), 'outs', type = wq.WORK_QUEUE_OUTPUT)
 
-# should fail because an output file was not created:
-output = output_file()
-t = wq.Task("./{exe} {input} 2>&1".format(exe=exec_file, input=input_file))
-t.specify_input_file(path.join(test_dir, exec_file), exec_file)
-t.specify_input_file(path.join(test_dir, input_file), input_file)
-t.specify_output_file(path.join(test_dir, output), output)
+    q.submit(t)
+    t = q.wait(5)
+    report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0, [path.join(test_dir, 'outs', output)])
 
-q.submit(t)
-t = q.wait(5)
-report_task(t, wq.WORK_QUEUE_RESULT_OUTPUT_MISSING, 0)
+    # should fail because the 'executable' cannot be executed:
+    t = wq.Task("./{input}".format(input=input_file))
+    t.specify_input_file(path.join(test_dir, input_file), input_file)
 
-# should succeed in the alloted time
-t = wq.Task("/bin/sleep 1")
-t.specify_running_time_max(10)
-q.submit(t)
-t = q.wait(5)
-report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0)
+    q.submit(t)
+    t = q.wait(5)
+    report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 126)
 
-# should fail in the alloted time
-t = wq.Task("/bin/sleep 10")
-t.specify_running_time_max(1)
-q.submit(t)
-t = q.wait(20)
-report_task(t, wq.WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME, 9)
+    # should fail because the 'executable' cannot be found:
+    t = wq.Task("./notacommand")
 
-# should run in the alloted absolute time
-t = wq.Task("/bin/sleep 1")
-t.specify_end_time((time.time() + 5) * 1e6)
-q.submit(t)
-t = q.wait(5)
-report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0)
+    q.submit(t)
+    t = q.wait(5)
+    report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 127)
 
-# should fail in the alloted absolute time
-t = wq.Task("/bin/sleep 10")
-t.specify_end_time((time.time() + 2) * 1e6)
-q.submit(t)
-t = q.wait(20)
-report_task(t, wq.WORK_QUEUE_RESULT_TASK_TIMEOUT, 9)
+    # should fail because an input file does not exists:
+    t = wq.Task("./notacommand")
+    t.specify_input_file('notacommand')
+
+    q.submit(t)
+    t = q.wait(5)
+    report_task(t, wq.WORK_QUEUE_RESULT_INPUT_MISSING, -1)
+
+    # should fail because an output file was not created:
+    output = output_file()
+    t = wq.Task("./{exe} {input} 2>&1".format(exe=exec_file, input=input_file))
+    t.specify_input_file(path.join(test_dir, exec_file), exec_file)
+    t.specify_input_file(path.join(test_dir, input_file), input_file)
+    t.specify_output_file(path.join(test_dir, output), output)
+
+    q.submit(t)
+    t = q.wait(5)
+    report_task(t, wq.WORK_QUEUE_RESULT_OUTPUT_MISSING, 0)
+
+    # should succeed in the alloted time
+    t = wq.Task("/bin/sleep 1")
+    t.specify_running_time_max(10)
+    q.submit(t)
+    t = q.wait(5)
+    report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0)
+
+    # should fail in the alloted time
+    t = wq.Task("/bin/sleep 10")
+    t.specify_running_time_max(1)
+    q.submit(t)
+    t = q.wait(20)
+    report_task(t, wq.WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME, 9)
+
+    # should run in the alloted absolute time
+    t = wq.Task("/bin/sleep 1")
+    t.specify_end_time((time.time() + 5) * 1e6)
+    q.submit(t)
+    t = q.wait(5)
+    report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0)
+
+    # should fail in the alloted absolute time
+    t = wq.Task("/bin/sleep 10")
+    t.specify_end_time((time.time() + 2) * 1e6)
+    q.submit(t)
+    t = q.wait(20)
+    report_task(t, wq.WORK_QUEUE_RESULT_TASK_TIMEOUT, 9)
 
