@@ -5,7 +5,7 @@ include $(CCTOOLS_HOME)/rules.mk
 CCTOOLS_DYNAMIC_SUFFIX = so
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
 LOCAL_CCFLAGS = -w -fPIC -DNDEBUG $(CCTOOLS_PYTHON3_CCFLAGS)
-LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz
+LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz $(CCTOOLS_OPENSSL_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 WQPYTHONSO = _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
