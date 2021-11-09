@@ -1876,6 +1876,7 @@ class Factory(object):
         "run-factory-as-manager",
         "runos",
         "scratch-dir",
+        "ssl",
         "tasks-per-worker",
         "timeout",
         "worker-binary",
@@ -2026,9 +2027,17 @@ class Factory(object):
         if self._opts['batch-type'] == 'local':
             self._opts['extra-options'] = self._opts.get('extra-options', '') + ' --parent-death'
 
-        args += ["--{}={}".format(opt, self._opts[opt])
-                 for opt in self._opts
-                 if opt in Factory._command_line_options and opt not in Factory._config_file_options]
+        flags = [opt for opt in Factory._command_line_options if opt[0] != ":"]
+
+        for opt in self._opts:
+            if opt not in Factor._command_line_options:
+                continue
+            if opt in Factor._config_file_options:
+                continue
+            if self._opts[opt] is True:
+                args.append("--{}".format(opt))
+            else:
+                args.append("--{}={}".format(opt, self._opts[opt]))
 
         if 'manager-host' in self._opts:
             args += [self._opts['manager-host'], self._opts['manager-port']]

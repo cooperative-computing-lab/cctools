@@ -114,6 +114,10 @@ static int64_t factory_timeout = 0;
 
 struct batch_queue *queue = 0;
 
+// Whether workers should use ssl. If using the catalog server and the manager
+// announces it is using SSL, then SSL is used regardless of manual_ssl_option.
+int manual_ssl_option = 0;
+
 //Environment variables to pass along in batch_job_submit
 struct jx *batch_env = NULL;
 
@@ -381,19 +385,20 @@ static int submit_worker( struct batch_queue *queue )
 
 	if(using_catalog) {
 		cmd = string_format(
-		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s",
+		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s",
 		worker,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
+		manual_ssl_option ? "--ssl" : "",
 		extra_worker_args ? extra_worker_args : ""
 		);
 	}
 	else {
 		cmd = string_format(
-		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s",
+		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s %s",
 		worker,
 		manager_host,
 		manager_port,
@@ -401,6 +406,7 @@ static int submit_worker( struct batch_queue *queue )
 		catalog_host,
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
+		manual_ssl_option ? "--ssl" : "",
 		extra_worker_args ? extra_worker_args : ""
 		);
 	}
@@ -1083,6 +1089,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
 	printf(" %-30s Specify the size of the debug file.\n", "-O,--debug-file-size=<mb>");
+	printf(" %-30s Workers should use SSL to connect to managers. (Not needed if project names.)", "--ssl");
 	printf(" %-30s Show the version string.\n", "-v,--version");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 
@@ -1149,6 +1156,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_RUN_OS,
 		LONG_OPT_PARENT_DEATH,
 		LONG_OPT_PYTHON_PACKAGE,
+		LONG_OPT_USE_SSL
 	};
 
 static const struct option long_options[] = {
@@ -1193,7 +1201,8 @@ static const struct option long_options[] = {
 	{"worker-binary", required_argument, 0, LONG_OPT_WORKER_BINARY},
 	{"workers-per-cycle", required_argument, 0, LONG_OPT_WORKERS_PER_CYCLE},
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
-	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},	
+	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
+	{"ssl",no_argument, 0, LONG_OPT_USE_SSL},
 	{0,0,0,0}
 };
 
@@ -1391,6 +1400,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_PARENT_DEATH:
 				initial_ppid = getppid();
+				break;
+			case LONG_OPT_USE_SSL:
+				manual_ssl_option=1;
 				break;
 			default:
 				show_help(argv[0]);
