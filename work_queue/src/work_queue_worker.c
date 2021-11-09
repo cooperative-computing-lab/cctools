@@ -133,6 +133,10 @@ static char *worker_id;
 // preferred connection mode.
 char *preferred_connection = NULL;
 
+// Whether to force a ssl connection. If using the catalog server and the
+// manager announces it is using SSL, then SSL is used regardless of
+// manual_ssl_option.
+int manual_ssl_option = 0;
 
 // pid of the worker's parent process. If different from zero, worker will be
 // terminated when its parent process changes.
@@ -2142,7 +2146,7 @@ static void workspace_delete()
 	free(workspace);
 }
 
-static int serve_manager_by_hostport( const char *host, int port, const char *verify_project )
+static int serve_manager_by_hostport( const char *host, int port, const char *verify_project, int use_ssl )
 {
 	if(!domain_name_cache_lookup(host,current_manager_address->addr)) {
 		fprintf(stderr,"couldn't resolve hostname %s",host);
@@ -2162,10 +2166,24 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	reset_idle_timer();
 
 	struct link *manager = link_connect(current_manager_address->addr,port,idle_stoptime);
+
 	if(!manager) {
 		fprintf(stderr,"couldn't connect to %s:%d: %s\n",current_manager_address->addr,port,strerror(errno));
 		return 0;
 	}
+
+	if(manual_ssl_option && !use_ssl) {
+		fprintf(stderr,"work_queue_worker: --ssl was given, but manager %s:%d is not using ssl.\n",host,port);
+		link_close(manager);
+		return 0;
+	} else if(manual_ssl_option || use_ssl) {
+		if(link_ssl_wrap_connect(manager) < 1) {
+			fprintf(stderr,"work_queue_worker: could not setup ssl connection.\n");
+			link_close(manager);
+			return 0;
+		}
+	}
+
 	link_tune(manager,LINK_TUNE_INTERACTIVE);
 
 	char local_addr[LINK_ADDRESS_MAX];
@@ -2227,14 +2245,14 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	return 1;
 }
 
-int serve_manager_by_hostport_list(struct list *manager_addresses) {
+int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl) {
 	int result = 0;
 
 	/* keep trying managers in the list, until all manager addresses
 	 * are tried, or a succesful connection was done */
 	list_first_item(manager_addresses);
 	while((current_manager_address = list_next_item(manager_addresses))) {
-		result = serve_manager_by_hostport(current_manager_address->host,current_manager_address->port,0);
+		result = serve_manager_by_hostport(current_manager_address->host,current_manager_address->port,/*verify name*/ 0, use_ssl);
 
 		if(result) {
 			break;
@@ -2310,6 +2328,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 		const char *pref = jx_lookup_string(jx,"manager_preferred_connection");
 		struct jx *ifas  = jx_lookup(jx,"network_interfaces");
 		int port = jx_lookup_integer(jx,"port");
+		int use_ssl = jx_lookup_boolean(jx,"ssl");
 
 		// give priority to worker's preferred connection option
 		if(preferred_connection) {
@@ -2348,7 +2367,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 			manager_addresses = interfaces_to_list(addr, port, ifas);
 		}
 
-		result = serve_manager_by_hostport_list(manager_addresses);
+		result = serve_manager_by_hostport_list(manager_addresses, use_ssl);
 
 		struct manager_address *m;
 		while((m = list_pop_head(manager_addresses))) {
@@ -2455,11 +2474,12 @@ static void show_help(const char *cmd)
 	printf( "where options are:\n");
 	printf( " %-30s Show version string\n", "-v,--version");
 	printf( " %-30s Show this help screen\n", "-h,--help");
-	printf( " %-30s Name of manager (project) to contact.  May be a regular expression.\n", "-N,-M,--manager-name=<name>");
+	printf( " %-30s Name of manager (project) to contact.  May be a regular expression.\n", "-M,--manager-name=<name>");
 	printf( " %-30s Catalog server to query for managers.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
 	printf( " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf( " %-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
 	printf( " %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
+	printf( " %-30s Use SSL to connect to the manager. (Not needed if using -M)", "--ssl");
 	printf( " %-30s Set worker to run as a foreman.\n", "--foreman");
 	printf( " %-30s Run as a foreman, and advertise to the catalog server with <name>.\n", "-f,--foreman-name=<name>");
 	printf( " %-30s\n", "--foreman-port=<port>[:<highport>]");
@@ -2515,7 +2535,8 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
-	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE};
+	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
+	  LONG_OPT_USE_SSL};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2561,6 +2582,7 @@ static const struct option long_options[] = {
 	{"tlq",					required_argument,	0,  LONG_OPT_TLQ},
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
+	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
 	{0,0,0,0}
 };
 
@@ -2803,6 +2825,9 @@ int main(int argc, char *argv[])
 				fatal("connection-mode should be one of: by_ip, by_hostname, by_apparent_ip");
 			}
 			break;
+		case LONG_OPT_USE_SSL:
+			manual_ssl_option=1;
+			break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -2969,7 +2994,7 @@ int main(int argc, char *argv[])
 		if(project_regex) {
 			result = serve_manager_by_name(catalog_hosts, project_regex);
 		} else {
-			result = serve_manager_by_hostport_list(manager_addresses);
+			result = serve_manager_by_hostport_list(manager_addresses, /* use ssl only if --ssl */ manual_ssl_option);
 		}
 
 		/*

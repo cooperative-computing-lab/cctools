@@ -1022,7 +1022,9 @@ static void add_worker(struct work_queue *q)
 	int port;
 
 	link = link_accept(q->manager_link, time(0) + q->short_timeout);
-	if(!link) return;
+	if(!link) {
+		return;
+	}
 
 	link_keepalive(link, 1);
 	link_tune(link, LINK_TUNE_INTERACTIVE);
@@ -2347,6 +2349,14 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"priority",info.priority);
 	jx_insert_string(j,"manager_preferred_connection",q->manager_preferred_connection);
 
+	int use_ssl = 0;
+#ifdef HAS_OPENSSL
+	if(link_using_ssl(q->manager_link)) {
+		use_ssl = 1;
+	}
+#endif
+	jx_insert_boolean(j,"ssl",use_ssl);
+
 	struct jx *interfaces = interfaces_of_host();
 	if(interfaces) {
 		jx_insert(j,jx_string("network_interfaces"),interfaces);
@@ -2477,6 +2487,14 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
 	jx_insert_string(j,"type","wq_master");
 	jx_insert_integer(j,"port",work_queue_port(q));
+
+	int use_ssl = 0;
+#ifdef HAS_OPENSSL
+	if(link_using_ssl(q->manager_link)) {
+		use_ssl = 1;
+	}
+#endif
+	jx_insert_boolean(j,"ssl",use_ssl);
 
 	char owner[USERNAME_MAX];
 	username_get(owner);
@@ -5252,7 +5270,11 @@ int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, c
 /********** work_queue public functions **********/
 /******************************************************/
 
-struct work_queue *work_queue_create(int port)
+struct work_queue *work_queue_create(int port) {
+	return work_queue_ssl_create(port, NULL, NULL);
+}
+
+struct work_queue *work_queue_ssl_create(int port, const char *key, const char *cert)
 {
 	struct work_queue *q = malloc(sizeof(*q));
 	if(!q) {
@@ -5279,6 +5301,15 @@ struct work_queue *work_queue_create(int port)
 		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
 
 	q->manager_link = link_serve(port);
+
+	// we need both or neither key and cert. We let link_ssl_wrap_server do the
+	// error checking.
+	if(key || cert) {
+		if(link_ssl_wrap_server(q->manager_link, key, cert) < 1) {
+			fprintf(stderr, "Error: failed to setup ssl.\n");
+			return 0;
+		}
+	}
 
 	if(!q->manager_link) {
 		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
