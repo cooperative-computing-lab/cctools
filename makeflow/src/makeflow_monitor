@@ -200,9 +200,9 @@ class MakeflowInfo:
             if m:
                 field   = str(m[0].title() + ':').rjust(field_width)
                 message = str(m[1])
-                print field, message
+                print("{} {}".format(field, message))
             else:
-                print
+                print("")
 
 # Monitor makeflows
 def monitor_makeflows(log_paths, options):
