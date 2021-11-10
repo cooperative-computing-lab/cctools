@@ -114,11 +114,13 @@ class MakeflowInfo:
             with open(self.filename, 'r') as log_stream:
                 # if log shrank, assume it comes from a new makeflow execution
                 log_stream.seek(0, os.SEEK_END)
+                end_of_file = log_stream.tell()
                 if log_stream.tell() < self.last_position:
                     self.reset_state()
+
                 log_stream.seek(self.last_position, os.SEEK_SET)
+                self.last_position = end_of_file
                 for line in log_stream:
-                    self.last_position = log_stream.tell()
                     yield line
         except IOError as e:
             sys.stderr.write('unable to open {log}: {error}\n'.format(log=self.filename, error=e))
