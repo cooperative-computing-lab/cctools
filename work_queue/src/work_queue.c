@@ -84,10 +84,6 @@ See the file COPYING for details.
 
 #define MAX_NEW_WORKERS 10
 
-// Seconds for how often the user can be notified about when a task cannot fit to any workers
-// Used in check_task_fit_in_connected_workers()
-#define THRESHOLD 60000000
-
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
 	WQ_SUCCESS = 0,
@@ -132,6 +128,9 @@ int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blocklist_slow_workers_timeout = 900;
+
+/* time threshold for when tasks are checked to fit to workers */ 
+static timestamp_t interval_tasks_fit_check = 180000000; // 3 minutes in usecs
 
 struct work_queue {
 	char *name;
@@ -3974,32 +3973,28 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 // possibility of fitting a worker
 static int check_task_fit_in_worker(struct work_queue *q, struct work_queue_task *t, struct work_queue_worker *w)
 {
-	/*
- 	// Somehow, get the task resource request and compare it by hand with each 
- 	// worker resource
- 	// using "required" for now to represent what a task resource specification would be 
- 	*/
-	int ok = 1;	
+	int set = 0;
 	struct rmsummary *l = task_worker_box_size(q,w,t);
+
 	// baseline resurce comparison of worker total resources and a task requested resorces
-	//TODO ensure that these resource_requested stats are the correct ones from rmsummary
+
 	if(w->resources->cores.total < l->cores ) {
-		ok = 0;
+		set = set | (1<<0);
 	}
 
 	if(w->resources->memory.total < l->memory ) {
-		ok = 0;
+		set = set | (1<<1);
 	}
 
-	if(w->resources->disk.total < l->disk ) { /* No overcommit disk */
-		ok = 0;
+	if(w->resources->disk.total < l->disk ) { 
+		set = set | (1<<2);
 	}
 
 	if(w->resources->gpus.total < l->gpus ) {
-		ok = 0;
+		set = set | (1<<3);
 	}
 	rmsummary_delete(l);
-	return ok;
+	return set;
 }
 static int check_task_fit_in_connected_workers(struct work_queue *q, struct work_queue_task *t)
 {
@@ -4007,16 +4002,22 @@ static int check_task_fit_in_connected_workers(struct work_queue *q, struct work
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	
-	
+	int bit_set = 0;
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w))
 	{
-		if (check_task_fit_in_worker(q, t, w)){
-			//printf("It's Fine. task %d will eventually match a worker\n", (int)t->taskid);
+		int new_set = check_task_fit_in_worker(q, t, w);
+		
+		if (bit_set == 0){
+			// Task could run on a currently connected worker, immediately return	
 			return 1;
 		}
+
+		// Inherit the unfit criteria for this task
+		bit_set = bit_set | new_set;
+		
 	}
 
-	return 0;
+	return bit_set;
 
 }
 
@@ -4197,18 +4198,34 @@ static void check_all_tasks(struct work_queue *q)
 
 	list_first_item(q->ready_list);
 	
+	int unfit_core = 0;
+	int unfit_mem = 0;
+	int unfit_disk = 0;
+	 int unfit_gpu = 0;
 
 	while( (t = list_next_item(q->ready_list))){
 		// check each task against the queue of connected workers
-		if (!check_task_fit_in_connected_workers(q, t)){
-			printf("task (id: %d) does not fit any connected workers\n", t->taskid);
-			printf("Task requested resources:\n");
-			printf("CPUs:   %.2lf\n", t->resources_requested->cores);
-			printf("Memory: %.2lf\n", t->resources_requested->memory);
-			printf("Disk:   %.2lf\n", t->resources_requested->disk);
-			printf("GPU:    %.2lf\n", t->resources_requested->gpus);
-		}
+		int bit_set = check_task_fit_in_connected_workers(q, t);
+		if (bit_set & (1<<0))
+			unfit_core++;
+		if (bit_set & (1<<1))
+			unfit_mem++;		
+		if (bit_set & (1<<2))
+			unfit_disk++;	
+		if (bit_set & (1<<3))
+			unfit_gpu++;	
 	}
+	struct work_queue_stats s;
+	work_queue_get_stats(q, &s);	
+	
+	if(unfit_core)
+		printf("%d waiting tasks need more than %d cores(max available)\n",unfit_core,(int)s.max_cores);
+	if(unfit_mem)
+		printf("%d waiting tasks need more than %d MB of memory(max available)\n",unfit_mem,(int)s.max_memory);
+	if(unfit_disk)
+		printf("%d waiting tasks need more than %d MB of disk(max available)\n",unfit_disk,(int)s.max_disk);
+	if(unfit_gpu)
+		printf("%d waiting tasks need more than %d gpus(max available)\n",unfit_gpu,(int)s.max_gpus);
 }
 
 static int receive_one_task( struct work_queue *q )
@@ -6531,7 +6548,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
  		 * if the specified amount of time has passed,
          * we can check all tasks against available workers	to see if the tasks fit*/	
 			timestamp_t temp_time = timestamp_get();
-			int time_threshold_met = temp_time - q->last_time_tasks_fit_check > THRESHOLD ? 1:0;
+			int time_threshold_met = temp_time - q->last_time_tasks_fit_check > interval_tasks_fit_check ? 1:0;
 			if (time_threshold_met){
 				// list all tasks that cannot fit any connected workers
 				check_all_tasks(q);
