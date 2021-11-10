@@ -83,20 +83,6 @@ class MakeflowInfo:
         self.tasks_running  = event.tasks_running
 
     @property
-    def tasks_total(self):
-        if self.last_node_event:
-            return self.last_node_event.tasks_total
-        else:
-            return 0
-
-    @property
-    def tasks_complete(self):
-        if self.last_node_event:
-            return self.last_node_event.tasks_complete
-        else:
-            return 0
-
-    @property
     def average_task_rate(self):
         try:
             return float(self.tasks_complete) / self.elapsed_time
