@@ -290,7 +290,7 @@ lsb_release              => 'lsb-release',
 m4                       => 'm4',
 mysql                    => [],             # from builder
 ncurses                  => 'libncurses-dev',
-openssl                  => 'openssl',
+openssl                  => ['openssl', 'libssl-dev'],
 patch                    => 'patch',
 perl                     => 'libperl-dev',
 pkg_config               => 'pkg-config',
@@ -309,7 +309,7 @@ xrootd                   => [],             # from builder
 zlib                     => 'libz-dev',
 };
 
-$extras_for{debian}{default} = ['tzdata', 'locales', 'libssl-dev'];
+$extras_for{debian}{default} = ['tzdata', 'locales', 'apt-transport-https', 'ca-certificates'];
 
 $preinstall_for{debian}{default} = [
 	"apt-get update"
