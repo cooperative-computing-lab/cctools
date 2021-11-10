@@ -269,7 +269,7 @@ def time_format(seconds):
             tlist.append(ctime)
             break
 
-    return ':'.join(reversed(map(lambda d: '%02d' % d, tlist)))
+    return ':'.join(reversed(list(map(lambda d: '%02d' % d, tlist))))
 
 # Main Execution
 
