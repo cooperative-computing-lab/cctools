@@ -47,6 +47,7 @@ See the file COPYING for details.
 #include "pattern.h"
 #include "gpu_info.h"
 #include "tlq_config.h"
+#include "stringtools.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -70,6 +71,8 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+
+void trash_file( const char *filename );
 
 typedef enum {
 	WORKER_MODE_WORKER,
@@ -737,7 +740,7 @@ static int handle_tasks(struct link *manager)
 					p->task_status = WORK_QUEUE_RESULT_DISK_ALLOC_FULL;
 					p->task->disk_allocation_exhausted = 1;
 					fclose(loop_full_check);
-					unlink(disk_alloc_filename);
+					trash_file(disk_alloc_filename);
 				}
 
 				free(buf);
@@ -1268,6 +1271,12 @@ static int do_tlq_url(const char *manager_tlq_url) {
 	return 1;
 }
 
+/*
+The manager has requested the deletion of a file in the cache
+directory.  If the request is valid, then move the file to the
+trash and deal with it there.
+*/
+
 static int do_unlink(const char *path)
 {
 	char cached_path[WORK_QUEUE_LINE_MAX];
@@ -1278,17 +1287,8 @@ static int do_unlink(const char *path)
 		return 0;
 	}
 
-	if(unlink_recursive(cached_path) != 0) {
-		struct stat buf;
-		if(stat(cached_path, &buf) != 0) {
-			if(errno == ENOENT) {
-				// If the path does not exist, return success
-				return 1;
-			}
-		}
-		// Failed to do unlink
-		return 0;
-	}
+	trash_file(path);
+
 	return 1;
 }
 
@@ -1561,9 +1561,8 @@ static int enforce_processes_limits() {
 			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
 			if(p->loop_mount == 1) {
 				disk_alloc_delete(p->sandbox);
-			}
-			else {
-				unlink_recursive(p->sandbox);
+			} else {
+				trash_file(p->sandbox);
 			}
 
 			ok = 0;
@@ -2077,7 +2076,7 @@ static int workspace_check() {
 		}
 	}
 
-	unlink(fname);
+	trash_file(fname);
 	free(fname);
 
 	if(error) {
@@ -2089,21 +2088,58 @@ static int workspace_check() {
 }
 
 /*
+A direct unlink of a file may fail, in particular if the file
+is being executed by a process.  To avoid the problem of unlinkable
+files, we instead move a file to a random name within the trash directory,
+and then attempt to delete it there.  If that fails, it's ok b/c we will
+get it later on the next attempt to empty the trash.
+*/
+
+#define TRASH_COOKIE_LENGTH 8
+
+void trash_file( const char *filename )
+{
+	char cookie[TRASH_COOKIE_LENGTH];
+	string_cookie(cookie,TRASH_COOKIE_LENGTH);
+
+	char *trashdir = string_format("%s/trash",workspace);
+	char *trashname = string_format("%s/%s",trashdir,cookie);
+
+	debug(D_WQ,"trashing file %s to %s",filename,trashname);
+	int result = rename(filename,trashname);
+	if(result!=0) {
+		fatal("failed to move file (%s) to trash location (%s)",filename,trashname);
+	}
+
+	result = unlink_dir_contents(trashdir);
+	if(result!=0) {
+		debug(D_WQ,"warning: unable to delete all items in trash directory (%s), will try again later.",trashdir);
+	}
+
+	free(trashdir);
+	free(trashname);
+}
+
+/*
 workspace_prepare is called every time we connect to a new manager,
 */
 
 static int workspace_prepare()
 {
 	debug(D_WQ,"preparing workspace %s",workspace);
+
 	char *cachedir = string_format("%s/cache",workspace);
 	int result = create_dir(cachedir,0777);
 	free(cachedir);
 
 	char *tmp_name = string_format("%s/cache/tmp", workspace);
 	result |= create_dir(tmp_name,0777);
-
-	setenv("WORKER_TMPDIR", tmp_name, 1);
+	setenv("WORKER_TMPDIR", tmp_name, 1);	
 	free(tmp_name);
+
+	char *trash_dir = string_format("%s/trash", workspace);
+	result |= create_dir(trash_dir,0777);
+	free(trash_dir);
 
 	return result;
 }
@@ -2141,7 +2177,13 @@ static void workspace_delete()
 
 	printf( "work_queue_worker: deleting workspace %s\n", workspace);
 
+	/*
+	Note that we cannot use trash_file here because the trash dir
+	is inside the workspace.  Abort if we really cannot clean up.
+	*/
+
 	unlink_recursive(workspace);
+
 	free(workspace);
 }
 
