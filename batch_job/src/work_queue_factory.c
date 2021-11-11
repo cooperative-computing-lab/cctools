@@ -16,7 +16,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "itable.h"
 #include "create_dir.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "macros.h"
 #include "catalog_query.h"
 #include "link.h"

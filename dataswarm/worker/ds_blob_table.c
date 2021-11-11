@@ -6,7 +6,7 @@
 #include "stringtools.h"
 #include "debug.h"
 #include "jx.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "create_dir.h"
 #include "host_disk_info.h"
 #include "host_memory_info.h"
@@ -285,10 +285,10 @@ ds_result_t ds_blob_table_delete(struct ds_worker *w, const char *blobid)
 	char *blob_data = ds_worker_blob_data(w,blobid);
 
 	// First delete the data which may take some time.
-	delete_dir(blob_data);
+	unlink_recursive(blob_data);
 
 	// Then delete the containing directory, which should be quick
-	delete_dir(blob_dir);
+	unlink_recursive(blob_dir);
 
 	// Account for space only after the whole object is deleted
 	ds_worker_disk_free(w,b->size);

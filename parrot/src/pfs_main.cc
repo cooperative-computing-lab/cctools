@@ -34,7 +34,7 @@ extern "C" {
 #include "chirp_ticket.h"
 #include "create_dir.h"
 #include "debug.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "file_cache.h"
 #include "ftp_lite.h"
 #include "getopt.h"
@@ -1456,7 +1456,7 @@ int main( int argc, char *argv[] )
 
 	if(pfs_paranoid_mode) pfs_paranoia_cleanup();
 
-	delete_dir(pfs_temp_per_instance_dir);
+	unlink_recursive(pfs_temp_per_instance_dir);
 
 	if(namelist_table && namelist_file) {
 		char *key;

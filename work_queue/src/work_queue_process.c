@@ -9,7 +9,7 @@
 #include "macros.h"
 #include "stringtools.h"
 #include "create_dir.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "list.h"
 #include "disk_alloc.h"
 #include "path.h"
@@ -117,7 +117,7 @@ void work_queue_process_delete(struct work_queue_process *p)
 			disk_alloc_delete(p->sandbox);
 		}
 		else {
-			delete_dir(p->sandbox);
+			unlink_recursive(p->sandbox);
 		}
 		free(p->sandbox);
 	}

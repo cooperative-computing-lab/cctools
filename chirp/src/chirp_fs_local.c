@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include "catch.h"
 #include "compat-at.h"
 #include "debug.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "full_io.h"
 #include "int_sizes.h"
 #include "mkdir_recursive.h"

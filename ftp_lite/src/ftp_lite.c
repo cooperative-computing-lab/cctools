@@ -682,7 +682,7 @@ int ftp_lite_make_dir( struct ftp_lite_server *s, const char *dir )
 	return 1;
 }
 
-int ftp_lite_delete_dir( struct ftp_lite_server *s, const char *dir )
+int ftp_lite_unlink_recursive( struct ftp_lite_server *s, const char *dir )
 {
 	char buffer[FTP_LITE_LINE_MAX];
 	int response;

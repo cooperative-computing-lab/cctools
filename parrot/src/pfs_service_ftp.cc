@@ -304,7 +304,7 @@ public:
 		int result=-1;
 		struct ftp_lite_server *server = (struct ftp_lite_server *)pfs_service_connect_cache(name);
 		if(server) {
-			if(ftp_lite_delete_dir(server,name->rest)) {
+			if(ftp_lite_unlink_recursive(server,name->rest)) {
 				result = 0;
 			} else {
 				result = -1;
