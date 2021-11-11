@@ -2076,7 +2076,8 @@ static int workspace_check() {
 		}
 	}
 
-	trash_file(fname);
+	/* do not use trash here; workspace has not been set up yet */
+	unlink(fname);
 	free(fname);
 
 	if(error) {
@@ -2099,16 +2100,21 @@ get it later on the next attempt to empty the trash.
 
 void trash_file( const char *filename )
 {
-	char cookie[TRASH_COOKIE_LENGTH];
+	struct stat info;
+
+	int result = stat(filename,&info);
+	if(result<0 && errno==ENOENT) return;
+
+	char cookie[TRASH_COOKIE_LENGTH+1];
 	string_cookie(cookie,TRASH_COOKIE_LENGTH);
 
 	char *trashdir = string_format("%s/trash",workspace);
 	char *trashname = string_format("%s/%s",trashdir,cookie);
 
 	debug(D_WQ,"trashing file %s to %s",filename,trashname);
-	int result = rename(filename,trashname);
+	result = rename(filename,trashname);
 	if(result!=0) {
-		fatal("failed to move file (%s) to trash location (%s)",filename,trashname);
+		fatal("failed to move file (%s) to trash location (%s): %s",filename,trashname,strerror(errno));
 	}
 
 	result = unlink_dir_contents(trashdir);
