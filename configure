@@ -1228,10 +1228,15 @@ then
 		echo "*** Couldn't find libcrypto"
 		openssl_avail=no
 	fi
+	
+	if ! optional_include openssl/ssl.h HAS_OPENSSL
+	then
+		echo "*** Couldn't find openssl headers"
+		openssl_avail=no
+	fi
 
 	if [ "${openssl_avail}" = yes ]
 	then
-			ccflags_append_define HAS_OPENSSL
 			openssl_ccflags="-I${openssl_path}/include"
 			openssl_ldflags="-L${openssl_path}/lib -lssl -lcrypto"
 	fi
