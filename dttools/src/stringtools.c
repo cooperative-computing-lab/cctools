@@ -466,7 +466,7 @@ void string_cookie(char *s, int length)
 	random_init();
 
 	for(i = 0; i < length; i++) {
-		s[i] = random_int() % 26 + 'a';
+		s[i] = 'a' + ((unsigned)random_int() % 26);
 	}
 
 	s[length - 1] = 0;
