@@ -2887,10 +2887,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	//Check GPU name
 	char *gpu_name = gpu_name_get();
 	if(gpu_name) {
 		hash_table_insert(features, gpu_name, (void **) 1);
+		free(gpu_name);
 	}
 
 	signal(SIGTERM, handle_abort);
