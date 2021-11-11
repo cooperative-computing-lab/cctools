@@ -9,7 +9,6 @@
 #include "macros.h"
 #include "stringtools.h"
 #include "create_dir.h"
-#include "unlink_recursive.h"
 #include "list.h"
 #include "disk_alloc.h"
 #include "path.h"
@@ -29,6 +28,12 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+/*
+Hack: Use routine from work_queue_worker.c to trash files into a common directory.
+*/
+
+extern void trash_file( const char *filename );
 
 // return 0 on error, 1 otherwise
 static int create_task_directories(struct work_queue_process *p) {
@@ -108,16 +113,15 @@ void work_queue_process_delete(struct work_queue_process *p)
 	}
 
 	if(p->output_file_name) {
-		unlink(p->output_file_name);
+		trash_file(p->output_file_name);
 		free(p->output_file_name);
 	}
 
 	if(p->sandbox) {
 		if(p->loop_mount == 1) {
 			disk_alloc_delete(p->sandbox);
-		}
-		else {
-			unlink_recursive(p->sandbox);
+		} else {
+			trash_file(p->sandbox);
 		}
 		free(p->sandbox);
 	}
