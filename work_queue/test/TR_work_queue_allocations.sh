@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -ex
 
 . ../../dttools/test/test_runner_common.sh
 
