@@ -7,7 +7,7 @@
 #include "macros.h"
 #include "stringtools.h"
 #include "create_dir.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "list.h"
 #include "path.h"
 #include "xxmalloc.h"

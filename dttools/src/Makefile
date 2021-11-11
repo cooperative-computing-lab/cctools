@@ -134,7 +134,6 @@ HEADERS_PUBLIC = \
 	copy_tree.h \
 	compat-at.h \
 	debug.h \
-	delete_dir.h \
 	envtools.h \
 	fast_popen.h \
 	full_io.h \

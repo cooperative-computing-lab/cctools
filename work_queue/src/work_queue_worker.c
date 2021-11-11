@@ -37,7 +37,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "getopt_aux.h"
 #include "create_dir.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "itable.h"
 #include "random.h"
 #include "url_encode.h"
@@ -1274,8 +1274,7 @@ static int do_unlink(const char *path)
 		return 0;
 	}
 
-	//Use delete_dir() since it calls unlink() if path is a file.
-	if(delete_dir(cached_path) != 0) {
+	if(unlink_recursive(cached_path) != 0) {
 		struct stat buf;
 		if(stat(cached_path, &buf) != 0) {
 			if(errno == ENOENT) {
@@ -1560,7 +1559,7 @@ static int enforce_processes_limits() {
 				disk_alloc_delete(p->sandbox);
 			}
 			else {
-				delete_dir(p->sandbox);
+				unlink_recursive(p->sandbox);
 			}
 
 			ok = 0;
@@ -2113,7 +2112,7 @@ to remove any state left over from a previous run.
 static void workspace_cleanup()
 {
 	debug(D_WQ,"cleaning workspace %s",workspace);
-	delete_dir_contents(workspace);
+	unlink_dir_contents(workspace);
 }
 
 /*
@@ -2138,7 +2137,7 @@ static void workspace_delete()
 
 	printf( "work_queue_worker: deleting workspace %s\n", workspace);
 
-	delete_dir(workspace);
+	unlink_recursive(workspace);
 	free(workspace);
 }
 

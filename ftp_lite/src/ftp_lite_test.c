@@ -243,7 +243,7 @@ static void do_rm( const char *path, const char *x )
 
 static void do_rmdir( const char *path, const char *x )
 {
-	if(!ftp_lite_delete_dir(server,path)) {
+	if(!ftp_lite_unlink_recursive(server,path)) {
 		printf("couldn't delete %s: %s\n",path,strerror(errno));
 	} else {
 		printf("deleted %s\n",path);
