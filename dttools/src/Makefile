@@ -111,6 +111,7 @@ SOURCES = \
 	timer.c \
 	timestamp.c \
 	tlq_config.c \
+	trash.c \
 	unlink_recursive.c \
 	uptime.c \
 	url_encode.c \

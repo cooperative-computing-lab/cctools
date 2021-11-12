@@ -48,6 +48,7 @@ See the file COPYING for details.
 #include "gpu_info.h"
 #include "tlq_config.h"
 #include "stringtools.h"
+#include "trash.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -71,8 +72,6 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
-
-void trash_file( const char *filename );
 
 typedef enum {
 	WORKER_MODE_WORKER,
@@ -2089,44 +2088,6 @@ static int workspace_check() {
 }
 
 /*
-A direct unlink of a file may fail, in particular if the file
-is being executed by a process.  To avoid the problem of unlinkable
-files, we instead move a file to a random name within the trash directory,
-and then attempt to delete it there.  If that fails, it's ok b/c we will
-get it later on the next attempt to empty the trash.
-*/
-
-#define TRASH_COOKIE_LENGTH 8
-
-void trash_file( const char *filename )
-{
-	struct stat info;
-
-	int result = stat(filename,&info);
-	if(result<0 && errno==ENOENT) return;
-
-	char cookie[TRASH_COOKIE_LENGTH+1];
-	string_cookie(cookie,TRASH_COOKIE_LENGTH);
-
-	char *trashdir = string_format("%s/trash",workspace);
-	char *trashname = string_format("%s/%s",trashdir,cookie);
-
-	debug(D_WQ,"trashing file %s to %s",filename,trashname);
-	result = rename(filename,trashname);
-	if(result!=0) {
-		fatal("failed to move file (%s) to trash location (%s): %s",filename,trashname,strerror(errno));
-	}
-
-	result = unlink_dir_contents(trashdir);
-	if(result!=0) {
-		debug(D_WQ,"warning: unable to delete all items in trash directory (%s), will try again later.",trashdir);
-	}
-
-	free(trashdir);
-	free(trashname);
-}
-
-/*
 workspace_prepare is called every time we connect to a new manager,
 */
 
@@ -2144,7 +2105,7 @@ static int workspace_prepare()
 	free(tmp_name);
 
 	char *trash_dir = string_format("%s/trash", workspace);
-	result |= create_dir(trash_dir,0777);
+	trash_setup(trash_dir);
 	free(trash_dir);
 
 	return result;
