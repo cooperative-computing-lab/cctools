@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 EOF
-	if ${CC:-gcc} .configure.tmp.c -c -o .configure.tmp.o ${compiler_options} > .configure.tmp.out 2>&1; then
+	if ${CC:-gcc} ${CFLAGS} .configure.tmp.c -c -o .configure.tmp.o ${compiler_options} > .configure.tmp.out 2>&1; then
 		echo yes
 		rm -f .configure.tmp.c .configure.tmp.out
 		return 0

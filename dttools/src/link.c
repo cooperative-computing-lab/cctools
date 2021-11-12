@@ -47,9 +47,10 @@ See the file COPYING for details.
 #endif
 
 #ifdef HAS_OPENSSL
-# include  "openssl/bio.h"
-# include  "openssl/ssl.h"
-# include  "openssl/err.h"
+#include  "openssl/bio.h"
+#include  "openssl/ssl.h"
+#include  "openssl/err.h"
+static int openssl_initialized = 0;
 #endif
 
 
@@ -384,11 +385,32 @@ static SSL_CTX *_create_ssl_context(int is_client) {
 	const SSL_METHOD *method;
 	SSL_CTX *ctx;
 
+#if HAS_SSLv23_method
+	//older openssl versions need explicit init
+	if(!openssl_initialized) {
+		SSL_library_init();
+	}
+#endif
+
+	openssl_initialized = 1;
+
 	if(is_client) {
+		#ifdef HAS_TLS_method
 		method = TLS_client_method();
+		#elif HAS_SSLv23_method
+		method = SSLv23_client_method();
+		#else
+		#error "Compiled support for OpenSSL is too old."
+		#endif
 		debug(D_SSL, "setting context for connection");
 	} else {
+		#ifdef HAS_TLS_method
 		method = TLS_server_method();
+		#elif HAS_SSLv23_method
+		method = SSLv23_server_method();
+		#else
+		#error "Compiled support for OpenSSL is too old."
+		#endif
 		debug(D_SSL, "setting context for server");
 	}
 

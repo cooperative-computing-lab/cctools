@@ -1228,7 +1228,7 @@ then
 		echo "*** Couldn't find libcrypto"
 		openssl_avail=no
 	fi
-	
+
 	if ! optional_include openssl/ssl.h HAS_OPENSSL
 	then
 		echo "*** Couldn't find openssl headers"
@@ -1239,6 +1239,15 @@ then
 	then
 			openssl_ccflags="-I${openssl_path}/include"
 			openssl_ldflags="-L${openssl_path}/lib -lssl -lcrypto"
+
+			if ! optional_function TLS_method openssl/ssl.h HAS_TLS_method
+			then
+				if ! optional_function SSLv23_method openssl/ssl.h HAS_SSLv23_method
+				then
+					echo "*** Couldn't find openssl methods. Perhaps openssl installation is too old?"
+					openssl_avail=no
+				fi
+			fi
 	fi
 fi
 
