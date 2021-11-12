@@ -41,7 +41,7 @@ ftp_lite_size_t ftp_lite_size( struct ftp_lite_server *s, const char *path );
 
 int ftp_lite_change_dir( struct ftp_lite_server *s, const char *dir );
 int ftp_lite_make_dir( struct ftp_lite_server *s, const char *dir );
-int ftp_lite_unlink_recursive( struct ftp_lite_server *s, const char *dir );
+int ftp_lite_delete_dir( struct ftp_lite_server *s, const char *dir );
 int ftp_lite_current_dir( struct ftp_lite_server *s, char *dir );
 
 int ftp_lite_nop( struct ftp_lite_server *s );
