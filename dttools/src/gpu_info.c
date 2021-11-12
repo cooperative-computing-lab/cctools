@@ -46,9 +46,7 @@ int gpu_info_get()
 			return gpus;
 		}
 	}
-	
 	return 0;
-
 }
 
 char *gpu_name_get()
