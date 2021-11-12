@@ -40,7 +40,7 @@ run()
 	echo "+++++ second run: should rebuild 6 files +++++"
 	./makeflow --jx test.jx | tee output.2
 
-	count=`grep "deleted" output.2 | wc -l`
+	count=`grep "deleted file" output.2 | wc -l`
 
 	echo "+++++ $count files deleted +++++"
 
