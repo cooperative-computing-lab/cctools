@@ -31,10 +31,10 @@ See the file COPYING for details.
 int unlinkat_recursive (int dirfd, const char *path)
 {
 	int rc = unlinkat(dirfd, path, 0);
-	if(rc == -1 && errno==ENOENT) {
+	if(rc<0 && errno==ENOENT) {
 		/* If it doesn't exist, return success. */
 		return 0;
-	} else if(rc == -1 && (errno == EISDIR || errno == EPERM || errno == ENOTEMPTY)) {
+	} else if(rc<0 && (errno == EISDIR || errno == EPERM || errno == ENOTEMPTY)) {
 		int subdirfd = openat(dirfd, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOCTTY|O_NOFOLLOW, 0);
 		if (subdirfd >= 0) {
 			DIR *dir = fdopendir(subdirfd);
@@ -45,7 +45,7 @@ int unlinkat_recursive (int dirfd, const char *path)
 					if(!(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)) {
 						assert(strchr(d->d_name, '/') == NULL);
 						rc = unlinkat_recursive(subdirfd, d->d_name);
-						if (rc == -1) {
+						if (rc<0) {
 							closedir(dir);
 							return -1;
 						}
@@ -79,7 +79,7 @@ int unlink_dir_contents (const char *path)
 				if(!(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)) {
 					assert(strchr(d->d_name, '/') == NULL);
 					rc = unlinkat_recursive(dirfd, d->d_name);
-					if (rc == -1) {
+					if (rc<0) {
 						int s = errno;
 						closedir(dir);
 						errno = s;
