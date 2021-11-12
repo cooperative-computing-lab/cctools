@@ -1,5 +1,9 @@
 include config.mk
+# export all variables in config.mk
+export
+
 include rules.mk
+
 
 CYGWINLIB = cygwin1.dll cyggcc_s-1.dll cygintl-8.dll cygreadline7.dll cygncursesw-10.dll cygiconv-2.dll cygattr-1.dll sh.exe
 

@@ -36,10 +36,6 @@ echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
 PATH="$(pwd)/resource_monitor/src:$PATH"
 export PATH
 
-export CCTOOLS_PYTHON_TEST_EXEC=$(grep "^CCTOOLS_PYTHON_TEST_EXEC=" config.mk | cut -d = -f 2)
-export CCTOOLS_PYTHON_TEST_DIR=$(grep "^CCTOOLS_PYTHON_TEST_DIR=" config.mk | cut -d = -f 2)
-export CCTOOLS_PERL=$(grep "^CCTOOLS_PERL=" config.mk | cut -d = -f 2)
-
 export PYTHONPATH="$(pwd)/chirp/src/python:$(pwd)/work_queue/src/python:$PYTHONPATH"
 export PERL5LIB="$(pwd)/chirp/src/perl:$(pwd)/work_queue/src/perl:$PERL5LIB"
 
