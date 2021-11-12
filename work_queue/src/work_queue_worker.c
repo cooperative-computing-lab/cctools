@@ -2152,13 +2152,24 @@ static int workspace_prepare()
 
 /*
 workspace_cleanup is called every time we disconnect from a manager,
-to remove any state left over from a previous run.
+to remove any state left over from a previous run.  Remove all
+directories (except trash) and move them to the trash directory.
 */
 
 static void workspace_cleanup()
 {
 	debug(D_WQ,"cleaning workspace %s",workspace);
-	unlink_dir_contents(workspace);
+	DIR *dir = opendir(workspace);
+	if(dir) {
+		struct dirent *d;
+		while((d=readdir(dir))) {
+			if(!strcmp(d->d_name,".")) continue;
+			if(!strcmp(d->d_name,"..")) continue;
+			if(!strcmp(d->d_name,"trash")) continue;
+			trash_file(d->d_name);
+		}
+		closedir(dir);
+	}
 }
 
 /*
