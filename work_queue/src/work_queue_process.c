@@ -13,6 +13,7 @@
 #include "disk_alloc.h"
 #include "path.h"
 #include "xxmalloc.h"
+#include "trash.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -28,12 +29,6 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-/*
-Hack: Use routine from work_queue_worker.c to trash files into a common directory.
-*/
-
-extern void trash_file( const char *filename );
 
 // return 0 on error, 1 otherwise
 static int create_task_directories(struct work_queue_process *p) {
