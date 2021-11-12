@@ -31,7 +31,10 @@ See the file COPYING for details.
 int unlinkat_recursive (int dirfd, const char *path)
 {
 	int rc = unlinkat(dirfd, path, 0);
-	if(rc == -1 && (errno == EISDIR || errno == EPERM || errno == ENOTEMPTY)) {
+	if(rc == -1 && errno==ENOENT) {
+		/* If it doesn't exist, return success. */
+		return 0;
+	} else if(rc == -1 && (errno == EISDIR || errno == EPERM || errno == ENOTEMPTY)) {
 		int subdirfd = openat(dirfd, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOCTTY|O_NOFOLLOW, 0);
 		if (subdirfd >= 0) {
 			DIR *dir = fdopendir(subdirfd);
