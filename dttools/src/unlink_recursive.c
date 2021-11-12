@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "unlink_recursive.h"
+#include "debug.h"
 
 #include <dirent.h>
 #include <fcntl.h>
@@ -45,20 +46,22 @@ int unlinkat_recursive (int dirfd, const char *path)
 					if(!(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)) {
 						assert(strchr(d->d_name, '/') == NULL);
 						rc = unlinkat_recursive(subdirfd, d->d_name);
-						if (rc<0) {
-							closedir(dir);
-							return -1;
-						}
+						/* On failure, just keep going so as to remove as much as possible. */
+						if(rc<0) debug(D_DEBUG,"warning: couldn't delete %s: %s\n",d->d_name,strerror(errno));
 					}
 				}
 				closedir(dir);
 			} else {
 				close(subdirfd);
 			}
-			rc = unlinkat(dirfd, path, AT_REMOVEDIR);
+			/* If there was an interior failure, then this will also fail. */
+			return unlinkat(dirfd, path, AT_REMOVEDIR);
+		} else {
+			return -1;
 		}
+	} else {
+		return rc;
 	}
-	return rc;
 }
 
 int unlink_recursive (const char *path)
