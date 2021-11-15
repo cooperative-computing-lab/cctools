@@ -6317,8 +6317,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
-		// keep track of whether a task has been sent or recieved
-		int task_event = 0;
 		// task completed?
 		if (t == NULL)
 		{
@@ -6336,13 +6334,14 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 				// queue time statistics.
 				events++;
 				END_ACCUM_TIME(q, time_internal);
+
+				if(!q->wait_retrieve_many) {
+					break;
+				}
 			}
 		}
-		if (t && !q->wait_retrieve_many)
-		{
-			break;
-		}
-		 // update catalog if appropriate
+
+		// update catalog if appropriate
 		if(q->name) {
 			update_catalog(q, foreman_uplink, 0);
 		}
@@ -6367,7 +6366,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// tasks waiting to be retrieved?
 		BEGIN_ACCUM_TIME(q, time_receive);
 		result = receive_one_task(q);
-		task_event |= result;
 		END_ACCUM_TIME(q, time_receive);
 		if(result) {
 			// retrieved at least one task
@@ -6397,7 +6395,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 			// tasks waiting to be dispatched?
 			BEGIN_ACCUM_TIME(q, time_send);
-			task_event |= result;
 			result = send_one_task(q);
 			END_ACCUM_TIME(q, time_send);
 			if(result) {
@@ -6466,10 +6463,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		// If the foreman_uplink is active then break so the caller can handle it.
 		if(foreman_uplink) {
-			break;
-		}
-		if (!task_event && q->wait_retrieve_many)
-		{
 			break;
 		}
 	}
