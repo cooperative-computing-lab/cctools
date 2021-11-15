@@ -1222,20 +1222,33 @@ API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
 
 ### Security
 
-#### TLS (SSL) support
+By default, Work Queue does **not** perform any encryption or authentication,
+so any workers will be able to connect to your manager, and vice versa. This
+may be fine for a short running anonymous application, but is not safe for a
+long running application with a public name.
 
-Work Queue can encrypt the communication between manager and workers using TLS.
+Currently, Work Queue uses SSL to provide communication encryption, and a
+password file to provide worker-manager authentication. These features can be
+enabled independet of each other.
+
+
+#### SSL support
+
+Work Queue can encrypt the communication between manager and workers using SSL.
 For this, you need to specify the key and certificate (in PEM format) of your
 server when creating the queue.
 
 If you do not have a key and certificate at hand, but you want the
-communications to be encrypted, you can create them using a command like:
+communications to be encrypted, you can create your own key and certificate:
 
 ```sh
+# Be aware that since this certificate would not be signed by any authority, it
+# cannot be used to prove the identity of the server running the manager.
+
 openssl req -x509 -newkey rsa:4096 -keyout MY_KEY.pem -out MY_CERT.pem -sha256 -days 365 -nodes
 ```
 
-To activate TLS encryption, indicate the paths to the key and certificate when
+To activate SSL encryption, indicate the paths to the key and certificate when
 creating the queue:
 
 === "Python"
@@ -1257,7 +1270,7 @@ creating the queue:
 
 
 If you are using a (project name)[#project-names-and-the-catalog-server] for
-your queue, then the workers will be aware that the manager is using TLS and
+your queue, then the workers will be aware that the manager is using SSL and
 communicate accordingly automatically. However, you are directly specifying the
 address of the manager when launching the workers, then you need to add the
 `--ssl` flag to the command line, as:
@@ -1271,11 +1284,6 @@ condor_submit_workers -E'--ssl' HOST PORT
 
 
 #### Password Files
-
-By default, Work Queue does **not** perform any authentication, so any workers
-will be able to connect to your manager, and vice versa. This may be fine for a
-short running anonymous application, but is not safe for a long running
-application with a public name.
 
 We recommend that you enable a password for your applications. Create a file
 (e.g. ` mypwfile`) that contains any password (or other long phrase) that you
