@@ -6181,13 +6181,21 @@ static void print_password_warning( struct work_queue *q )
 {
 	static int did_password_warning = 0;
 
-	if(did_password_warning) return;
-
-		if(!q->password && q->name) {
-			fprintf(stderr,"warning: this work queue manager is visible to the public.\n");
-			fprintf(stderr,"warning: you should set a password with the --password option.\n");
-		did_password_warning = 1;
+	if(did_password_warning) {
+		return;
 	}
+
+	if(!q->password && q->name) {
+		fprintf(stderr,"warning: this work queue manager is visible to the public.\n");
+		fprintf(stderr,"warning: you should set a password with the --password option.\n");
+	}
+
+	if(!link_using_ssl(q->manager_link)) {
+		fprintf(stderr,"warning: using plain-text when communicating with workers.\n");
+		fprintf(stderr,"warning: use encryption with a key and cert when creating the manager.\n");
+	}
+
+	did_password_warning = 1;
 }
 
 #define BEGIN_ACCUM_TIME(q, stat) {\
