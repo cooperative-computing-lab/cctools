@@ -13,6 +13,7 @@
 # - @ref work_queue::Factory
 
 import itertools
+import math
 import copy
 import os
 import sys
@@ -1799,6 +1800,30 @@ class WorkQueue(object):
             seq = results
         
         return seq[0]
+
+
+    def Nmap(self, fn, array, chunk_size=1):
+        size = math.ceil(len(array)/chunk_size)
+        results = [None] * size
+        tasks = {}
+
+        for i in range(size):
+            start = i*chunk_size
+            end = start + chunk_size
+
+            if end > len(array):
+                p_task = PythonTask(map, fn, array[start:])
+            else:
+                p_task = PythonTask(map, fn, array[start:end])
+
+            self.submit(p_task)
+            tasks[p_task.id] = i
+
+        while not self.empty():
+            t = self.wait()
+            results[tasks[t.id]] = list(t.output)
+
+        return results
 
 # test
 
