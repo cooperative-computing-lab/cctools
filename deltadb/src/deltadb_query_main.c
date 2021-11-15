@@ -168,13 +168,23 @@ int main( int argc, char *argv[] )
 					return 1;
 				}
 
-				/* If the reduction name begins with GLOBAL, assign it global scope. */
 				deltadb_scope_t scope;
+
+				/* If the reduction name begins with GLOBAL, assign it global scope. */
 				if(!strncmp(reduce_name,"GLOBAL",6)) {
 					scope = DELTADB_SCOPE_GLOBAL;
 					strcpy(reduce_name,&reduce_name[6]);
+
+				/* If the reduction name begins with t, assign it temporal scope. */
+				} else if (!strncmp(reduce_name, "t", 1)) {
+					scope = DELTADB_SCOPE_TEMPORAL;
+					if (!jx_istype(reduce_expr, JX_SYMBOL)) {
+						fprintf(stderr, "deltadb_query: must supply attribute name to temporal reduction: %s\n",reduce_attr);
+						return 1;
+					}
+					strcpy(reduce_name,&reduce_name[1]);
 				} else {
-					scope = DELTADB_SCOPE_LOCAL;
+					scope = DELTADB_SCOPE_SPATIAL;
 				}
 
 				struct deltadb_reduction *r = deltadb_reduction_create(reduce_name,reduce_expr,scope);
@@ -186,6 +196,7 @@ int main( int argc, char *argv[] )
 				deltadb_query_add_reduction(query,r);
 				deltadb_query_set_display(query,DELTADB_DISPLAY_REDUCE);
 				nreduces++;
+				jx_delete(reduce_expr);
 			} else {
 				struct jx *j = jx_parse_string(optarg);
 				if(!j) {

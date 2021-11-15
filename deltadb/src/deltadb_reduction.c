@@ -13,9 +13,22 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "jx_print.h"
 
-struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx *expr, deltadb_scope_t scope )
+struct deltadb_reduction *deltadb_reduction_create_type( deltadb_reduction_t type, struct jx *expr, deltadb_scope_t scope )
 {
 	struct deltadb_reduction *r;
+	r = malloc(sizeof(*r));
+	memset(r,0,sizeof(*r));
+	r->type = type;
+	r->scope = scope;
+	r->expr = jx_copy(expr);
+	r->temporal_table = hash_table_create(0,0);
+	r->unique_table = hash_table_create(0,0);
+	r->unique_value = jx_array(0);
+	return r;
+};
+
+struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx *expr, deltadb_scope_t scope )
+{
 	deltadb_reduction_t type;
 
 	if (strcmp(name,"COUNT")==0)		type = COUNT;
@@ -29,19 +42,30 @@ struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx 
 	else if (strcmp(name,"UNIQUE")==0)      type = UNIQUE;
 	else	return 0;
 
-	r = malloc(sizeof(*r));
-	memset(r,0,sizeof(*r));
-	r->type = type;
-	r->scope = scope;
-	r->expr = expr;
-	r->unique_table = hash_table_create(0,0);
-	r->unique_value = jx_array(0);
-	return r;
-};
+	return deltadb_reduction_create_type(type, expr, scope);
+}
+
+void deltadb_reduction_delete_temporal_table(struct hash_table *temporal_table) {
+	if (!temporal_table) return;
+
+	char *key;
+	void *value;
+	struct deltadb_reduction *r;
+
+	hash_table_firstkey(temporal_table);
+	while(hash_table_nextkey(temporal_table,&key,&value)) {
+		r = (struct deltadb_reduction *) value;
+		deltadb_reduction_delete(r);
+	}
+
+	hash_table_delete(temporal_table);
+}
 
 void deltadb_reduction_delete( struct deltadb_reduction *r )
 {
 	if(!r) return;
+
+	deltadb_reduction_delete_temporal_table(r->temporal_table);
 	jx_delete(r->unique_value);
 	hash_table_delete(r->unique_table);
 	jx_delete(r->expr);
@@ -53,15 +77,26 @@ void deltadb_reduction_reset( struct deltadb_reduction *r, deltadb_scope_t scope
 	if(r->scope!=scope) return;
 
 	r->count = r->sum = r->first = r->last = r->min = r->max = 0;
+	deltadb_reduction_delete_temporal_table(r->temporal_table);
+	r->temporal_table = hash_table_create(0,0);
 	jx_delete(r->unique_value);
 	hash_table_delete(r->unique_table);
 	r->unique_table = hash_table_create(0,0);
 	r->unique_value = jx_array(0);
 }
 
-void deltadb_reduction_update( struct deltadb_reduction *r, struct jx * value, deltadb_scope_t scope )
+void deltadb_reduction_update( struct deltadb_reduction *r, const char *key, struct jx * value, deltadb_scope_t scope )
 {
 	if(r->scope!=scope) return;
+
+	if (r->scope == DELTADB_SCOPE_TEMPORAL) {
+		struct deltadb_reduction *base = r;
+		r = hash_table_lookup(base->temporal_table, key);
+		if (!r) {
+			r = deltadb_reduction_create_type(base->type,base->expr,base->scope);
+			hash_table_insert(base->temporal_table, key, r);
+		}
+	}
 
 	/* UNIQUE: keep a value in a hash table, keyed by the string representation. */
 
@@ -133,6 +168,22 @@ char * deltadb_reduction_string( struct deltadb_reduction *r )
 	}
 
 	return string_format("%lf",value);
+}
+
+const char * deltadb_reduction_name( struct deltadb_reduction *r )
+{
+	switch(r->type) {
+		case UNIQUE: return "UNIQUE";
+		case COUNT: return "COUNT";
+		case SUM: return "SUM";
+		case FIRST: return "FIRST";
+		case LAST: return "LAST";
+		case MIN: return "MIN";
+		case AVERAGE: return "AVERAGE";
+		case MAX: return "MAX";
+		case INC: return "INC";
+		default: return 0;
+	}
 }
 
 /* vim: set noexpandtab tabstop=4: */
