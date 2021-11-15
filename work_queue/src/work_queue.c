@@ -215,7 +215,7 @@ struct work_queue {
 	int tlq_port;
 	char *tlq_url;
 
-	int delayed_wait;
+	int wait_retrieve_many;
 };
 
 struct work_queue_worker {
@@ -6338,7 +6338,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 				END_ACCUM_TIME(q, time_internal);
 			}
 		}
-		if (t && !q->delayed_wait)
+		if (t && !q->wait_retrieve_many)
 		{
 			break;
 		}
@@ -6468,7 +6468,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(foreman_uplink) {
 			break;
 		}
-		if (!task_event && q->delayed_wait)
+		if (!task_event && q->wait_retrieve_many)
 		{
 			break;
 		}
@@ -6783,8 +6783,8 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "delayed-wait")){
-		q->delayed_wait = MAX(0, (int)value);
+	} else if(!strcmp(name, "wait_retrieve_many")){
+		q->wait_retrieve_many = MAX(0, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
