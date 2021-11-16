@@ -6036,6 +6036,20 @@ static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_t
 	return NULL;
 }
 
+static struct work_queue_task *task_state_any_with_tag(struct work_queue *q, work_queue_task_state_t state, const char *tag) {
+	struct work_queue_task *t;
+	uint64_t taskid;
+
+	itable_firstkey(q->tasks);
+	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+		if( task_state_is(q, taskid, state) && tasktag_comparator((void *) t, (void *) tag)) {
+			return t;
+		}
+	}
+
+	return NULL;
+}
+
 static int task_state_count(struct work_queue *q, const char *category, work_queue_task_state_t state) {
 	struct work_queue_task *t;
 	uint64_t taskid;
