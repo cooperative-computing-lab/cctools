@@ -31,6 +31,7 @@ export CCTOOLS_TEST_FAIL=${CCTOOLS_TEST_LOG%.log}.fail
 export CCTOOLS_TEST_TMP=${CCTOOLS_TEST_LOG%.log}.tmp
 
 echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
+rm -f "${CCTOOLS_TEST_FAIL}"
 
 # we need resource_monitor in the path.
 PATH="$(pwd)/resource_monitor/src:$PATH"
