@@ -6337,7 +6337,8 @@ static int connect_new_workers(struct work_queue *q, int stoptime, int max_new_w
 }
 
 
-struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
+struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active, const char *tag)
+{
 /*
    - compute stoptime
    S time left?                              No:  return null
@@ -6353,7 +6354,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - queue empty?                            Yes: return null
    - go to S
 */
-{
 	int events = 0;
 
 	// account for time we spend outside work_queue_wait
@@ -6378,7 +6378,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// task completed?
 		if (t == NULL)
 		{
-			t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+			if(tag) {
+				t = task_state_any_with_tag(q, WORK_QUEUE_TASK_RETRIEVED);
+			} else {
+				t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+			}
 			if(t) {
 				change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
