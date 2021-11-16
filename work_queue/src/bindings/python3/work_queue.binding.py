@@ -1733,7 +1733,20 @@ class WorkQueue(object):
     #                   before returning.  Use an integer to set the timeout or the constant @ref
     #                   WORK_QUEUE_WAITFORTASK to block until a task has completed.
     def wait(self, timeout=WORK_QUEUE_WAITFORTASK):
-        task_pointer = work_queue_wait(self._work_queue, timeout)
+        return self.wait_for_tag(None, timeout)
+
+    ##
+    # Similar to @ref wait, but guarantees that the returned task has the
+    # specified tag.
+    #
+    # This call will block until the timeout has elapsed.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param tag        Desired tag. If None, then it is equivalent to self.wait(timeout)
+    # @param timeout    The number of seconds to wait for a completed task
+    #                   before returning.
+    def wait_for_tag(self, tag, timeout=WORK_QUEUE_WAITFORTASK):
+        task_pointer = work_queue_wait_for_tag(self._work_queue, tag, timeout)
         if task_pointer:
             task = self._task_table[int(task_pointer.taskid)]
             del self._task_table[task_pointer.taskid]
