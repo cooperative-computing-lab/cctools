@@ -68,6 +68,12 @@ link_close(link);
 */
 struct link *link_connect(const char *addr, int port, time_t stoptime);
 
+/** Wrap a connect link with an ssl context and state
+@param link A link returned from @ref link_connect
+@return 0 on failure, 1 on success
+*/
+int link_ssl_wrap_connect(struct link *link);
+
 /** Turn a FILE* into a link.  Useful when trying to poll both remote and local connections using @ref link_poll
 @param file File to create the link from.
 @return On success, returns a pointer to a link object.  On failure, returns a null pointer with errno set appropriately.
@@ -120,6 +126,16 @@ struct link *link_serve_addrrange(const char *addr, int low, int high);
 @return link A connection to a client, or null on failure.
 */
 struct link *link_accept(struct link *parent, time_t stoptime);
+
+
+/** Wrap a server link with an ssl context and state
+@param parent A link returned from @ref link_serve or @ref link_serve_address.
+@param key   The ssl key of the server.
+@param cert  The ssl cert of the server.
+@return 0 on failure, 1 on success
+*/
+int link_ssl_wrap_server(struct link *l, const char *key, const char *cert);
+
 
 /** Read data from a connection.
 This call will block until the given number of bytes have been read,
@@ -272,6 +288,13 @@ int link_readline(struct link *link, char *line, size_t length, time_t stoptime)
 @return The integer file descriptor of the link.
 */
 int link_fd(struct link *link);
+
+
+/** Whether the link is using ssl.
+@param link The link to examine.
+@return True if ssl context has been created, False otherwise
+*/
+int link_using_ssl(struct link *link);
 
 int link_keepalive(struct link *link, int onoff);
 

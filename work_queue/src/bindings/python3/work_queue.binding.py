@@ -1036,9 +1036,11 @@ class WorkQueue(object):
     # @param transactions_log  The name of a file to write the queue's transactions log.
     # @param debug_log  The name of a file to write the queue's debug log.
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
+    # @param ssl_key    SSL key in pem format (If not given, then TSL is not activated).
+    # @param ssl_cert   SSL cert in pem format (If not given, then TSL is not activated).
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None):
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl_key=None, ssl_cert=None):
         self._shutdown = shutdown
         self._work_queue = None
         self._stats = None
@@ -1062,7 +1064,7 @@ class WorkQueue(object):
                 specify_debug_log(debug_log)
             self._stats = work_queue_stats()
             self._stats_hierarchy = work_queue_stats()
-            self._work_queue = work_queue_create(port)
+            self._work_queue = work_queue_ssl_create(port, ssl_key, ssl_cert)
             if not self._work_queue:
                 raise Exception('Could not create work_queue on port %d' % port)
 
@@ -1875,6 +1877,7 @@ class Factory(object):
         "run-factory-as-manager",
         "runos",
         "scratch-dir",
+        "ssl",
         "tasks-per-worker",
         "timeout",
         "worker-binary",
@@ -2025,9 +2028,17 @@ class Factory(object):
         if self._opts['batch-type'] == 'local':
             self._opts['extra-options'] = self._opts.get('extra-options', '') + ' --parent-death'
 
-        args += ["--{}={}".format(opt, self._opts[opt])
-                 for opt in self._opts
-                 if opt in Factory._command_line_options and opt not in Factory._config_file_options]
+        flags = [opt for opt in Factory._command_line_options if opt[0] != ":"]
+
+        for opt in self._opts:
+            if opt not in Factor._command_line_options:
+                continue
+            if opt in Factor._config_file_options:
+                continue
+            if self._opts[opt] is True:
+                args.append("--{}".format(opt))
+            else:
+                args.append("--{}={}".format(opt, self._opts[opt]))
 
         if 'manager-host' in self._opts:
             args += [self._opts['manager-host'], self._opts['manager-port']]

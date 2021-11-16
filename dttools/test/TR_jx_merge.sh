@@ -6,7 +6,7 @@ exe="merge.test"
 
 prepare()
 {
-	${CC} -g -o "$exe" -I ../src/ -x c - -x none ../src/libdttools.a -lm <<EOF
+	${CC} -g -o "$exe" -I ../src/ -x c - -x none ../src/libdttools.a ${CCTOOLS_EXTERNAL_LINKAGE} <<EOF
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

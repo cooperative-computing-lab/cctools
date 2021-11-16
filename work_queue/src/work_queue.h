@@ -667,6 +667,17 @@ the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as descr
 */
 struct work_queue *work_queue_create(int port);
 
+
+/** Create a new work queue using SSL.
+ Like @ref work_queue_create, but all communications with the queue are encoded
+ using TLS with they key and certificate provided. If key or cert are NULL,
+ then TLS is not activated.
+@param port The port number to listen on.  If zero is specified, then the port stored in the <b>WORK_QUEUE_PORT</b> environment variable is used if available. If it isn't, or if -1 is specified, the first unused port between <b>WORK_QUEUE_LOW_PORT</b> and <b>WORK_QUEUE_HIGH_PORT</b> (1024 and 32767 by default) is chosen.
+@param key A key in pem format.
+@param cert A certificate in pem format.
+*/
+struct work_queue *work_queue_ssl_create(int port, const char *key, const char *cert);
+
 /** Enables resource monitoring on the give work queue.
 It generates a resource summary per task, which is written to the given
 directory. It also creates all_summaries-PID.log, that consolidates all

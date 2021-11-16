@@ -95,6 +95,7 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_EXT      (1LL<<47)  /**< Debug the ext module in Parrot */
 #define D_DATASWARM (1LL<<48) /**< Debug the dataswarm service. */
 #define D_TLQ (1LL<<49) /**< Debug the TLQ service's interactions with CCTools. */
+#define D_SSL (1LL<<50) /**< Debug the TLQ service's interactions with CCTools. */
 
 /** Debug all remote I/O operations. */
 #define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD|D_CVMFS)

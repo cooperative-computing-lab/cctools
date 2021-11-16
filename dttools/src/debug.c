@@ -98,6 +98,7 @@ static struct flag_info table[] = {
 	{"dataswarm", D_DATASWARM},
 	{"tlq", D_TLQ},
 	{"jx", D_JX},
+	{"ssl", D_SSL},
 	{"all", D_ALL},
 	{"time", 0},		/* backwards compatibility */
 	{"pid", 0},		/* backwards compatibility */

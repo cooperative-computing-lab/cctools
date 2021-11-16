@@ -1222,10 +1222,68 @@ API](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html).
 
 ### Security
 
-By default, Work Queue does **not** perform any authentication, so any workers
-will be able to connect to your manager, and vice versa. This may be fine for a
-short running anonymous application, but is not safe for a long running
-application with a public name.
+By default, Work Queue does **not** perform any encryption or authentication,
+so any workers will be able to connect to your manager, and vice versa. This
+may be fine for a short running anonymous application, but is not safe for a
+long running application with a public name.
+
+Currently, Work Queue uses SSL to provide communication encryption, and a
+password file to provide worker-manager authentication. These features can be
+enabled independet of each other.
+
+
+#### SSL support
+
+Work Queue can encrypt the communication between manager and workers using SSL.
+For this, you need to specify the key and certificate (in PEM format) of your
+server when creating the queue.
+
+If you do not have a key and certificate at hand, but you want the
+communications to be encrypted, you can create your own key and certificate:
+
+```sh
+# Be aware that since this certificate would not be signed by any authority, it
+# cannot be used to prove the identity of the server running the manager.
+
+openssl req -x509 -newkey rsa:4096 -keyout MY_KEY.pem -out MY_CERT.pem -sha256 -days 365 -nodes
+```
+
+To activate SSL encryption, indicate the paths to the key and certificate when
+creating the queue:
+
+=== "Python"
+    ```python
+    # Import the Work Queue library
+    import work_queue as wq
+
+    q = wq.WorkQueue(port=9123, ssl_key='MY_KEY.pem', ssl_cert='MY_CERT.pem')
+    ```
+
+=== "C"
+    ```
+    /* Import the Work Queue library */
+    #include "work_queue.h"
+
+    /* Create a new queue listening on port 9123 */
+    struct work_queue *q = work_queue_ssl_create(9123, 'MY_KEY.pem', 'MY_CERT.pem');
+    ```
+
+
+If you are using a (project name)[#project-names-and-the-catalog-server] for
+your queue, then the workers will be aware that the manager is using SSL and
+communicate accordingly automatically. However, you are directly specifying the
+address of the manager when launching the workers, then you need to add the
+`--ssl` flag to the command line, as:
+
+```sh
+work_queue_worker (... other args ...) --ssl HOST PORT
+work_queue_factory (... other args ...) --ssl HOST PORT
+work_queue_status --ssl HOST PORT
+condor_submit_workers -E'--ssl' HOST PORT
+```
+
+
+#### Password Files
 
 We recommend that you enable a password for your applications. Create a file
 (e.g. ` mypwfile`) that contains any password (or other long phrase) that you
