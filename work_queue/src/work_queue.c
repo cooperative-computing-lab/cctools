@@ -4354,16 +4354,21 @@ static int abort_drained_workers(struct work_queue *q) {
 }
 
 
-//comparator function for checking if a task matches given tag.
+//comparator function for checking if a task matches a given tag.
 static int tasktag_comparator(void *t, const void *r) {
 
 	struct work_queue_task *task_in_queue = t;
 	const char *tasktag = r;
 
-	if (task_in_queue->tag && !strcmp(task_in_queue->tag, tasktag)) {
+	if(!task_in_queue->tag && !tasktag) {
 		return 1;
 	}
-	return 0;
+
+	if(!task_in_queue->tag || !tasktag) {
+		return 0;
+	}
+
+	return !strcmp(task_in_queue->tag, tasktag);
 }
 
 
