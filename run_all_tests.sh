@@ -10,7 +10,7 @@ then
 	CCTOOLS_PACKAGES_TEST=$(grep CCTOOLS_PACKAGES config.mk | cut -d = -f 2)
 	if [ -n "${CCTOOLS_DOCKER_GITHUB}" ]
 	then
-		if ! parrot/src/parrot_run /bin/ls
+		if ! parrot/src/parrot_run /bin/ls > /dev/null 2>&1
 		then
 			echo "Skipping parrot tests inside docker build."
 			export PARROT_SKIP_TEST=yes
