@@ -6234,7 +6234,11 @@ static void print_password_warning( struct work_queue *q )
 
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
+	return work_queue_wait_for_tag(q, NULL, timeout);
+}
 
+struct work_queue_task *work_queue_wait_for_tag(struct work_queue *q, const char *tag, int timeout)
+{
 	if(timeout == 0) {
 		// re-establish old, if unintended behavior, where 0 would wait at
 		// least a second. With 0, we would like the loop to be executed at
@@ -6248,7 +6252,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 		timeout = 5;
 	}
 
-	return work_queue_wait_internal(q, timeout, NULL, NULL);
+	return work_queue_wait_internal(q, timeout, NULL, NULL, tag);
 }
 
 /* return number of workers that failed */
@@ -6379,7 +6383,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if (t == NULL)
 		{
 			if(tag) {
-				t = task_state_any_with_tag(q, WORK_QUEUE_TASK_RETRIEVED);
+				t = task_state_any_with_tag(q, WORK_QUEUE_TASK_RETRIEVED, tag);
 			} else {
 				t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
 			}
