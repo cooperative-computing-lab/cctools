@@ -1746,19 +1746,30 @@ class WorkQueue(object):
     # @param self       Reference to the current work queue object.
     # @param fn         The function that will be called on each element
     # @param seq        The sequence that will call the function
-    def map(self, fn, seq):
-        results = [None] * len(seq)
+    # @param chunk_size The number of elements to process at once
+
+    def Nmap(self, fn, array, chunk_size=1):
+        size = math.ceil(len(array)/chunk_size)
+        results = [None] * size
         tasks = {}
-        for i, arg in enumerate(seq):
-            p_task = PythonTask(fn, arg)
+
+        for i in range(size):
+            start = i*chunk_size
+            end = start + chunk_size
+
+            if end > len(array):
+                p_task = PythonTask(map, fn, array[start:])
+            else:
+                p_task = PythonTask(map, fn, array[start:end])
+
             self.submit(p_task)
             tasks[p_task.id] = i
 
         while not self.empty():
             t = self.wait()
-            results[tasks[t.id]] = t.output
+            results[tasks[t.id]] = list(t.output)
 
-        return results
+        return [item for elem in results for item in elem]
 
 
     ##
@@ -1818,30 +1829,6 @@ class WorkQueue(object):
             seq = results
 
         return seq[0]
-
-
-    def Nmap(self, fn, array, chunk_size=1):
-        size = math.ceil(len(array)/chunk_size)
-        results = [None] * size
-        tasks = {}
-
-        for i in range(size):
-            start = i*chunk_size
-            end = start + chunk_size
-
-            if end > len(array):
-                p_task = PythonTask(map, fn, array[start:])
-            else:
-                p_task = PythonTask(map, fn, array[start:end])
-
-            self.submit(p_task)
-            tasks[p_task.id] = i
-
-        while not self.empty():
-            t = self.wait()
-            results[tasks[t.id]] = list(t.output)
-
-        return results
 
 # test
 
