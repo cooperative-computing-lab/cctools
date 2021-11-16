@@ -214,6 +214,8 @@ struct work_queue {
 	char *debug_path;
 	int tlq_port;
 	char *tlq_url;
+
+	int wait_retrieve_many;
 };
 
 struct work_queue_worker {
@@ -6315,26 +6317,31 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
-
 		// task completed?
-		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
-		if(t) {
-			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
+		if (t == NULL)
+		{
+			t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+			if(t) {
+				change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
-			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
-			{
-				q->stats->tasks_failed++;
+				if( t->result != WORK_QUEUE_RESULT_SUCCESS )
+				{
+					q->stats->tasks_failed++;
+				}
+
+				// return completed task (t) to the user. We do not return right
+				// away, and instead break out of the loop to correctly update the
+				// queue time statistics.
+				events++;
+				END_ACCUM_TIME(q, time_internal);
+
+				if(!q->wait_retrieve_many) {
+					break;
+				}
 			}
-
-			// return completed task (t) to the user. We do not return right
-			// away, and instead break out of the loop to correctly update the
-			// queue time statistics.
-			events++;
-			END_ACCUM_TIME(q, time_internal);
-			break;
 		}
 
-		 // update catalog if appropriate
+		// update catalog if appropriate
 		if(q->name) {
 			update_catalog(q, foreman_uplink, 0);
 		}
@@ -6396,7 +6403,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 				continue;
 			}
 		}
-
 		//we reach here only if no task was neither sent nor received.
 		compute_manager_load(q, 1);
 
@@ -6769,6 +6775,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "wait_retrieve_many")){
+		q->wait_retrieve_many = MAX(0, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
