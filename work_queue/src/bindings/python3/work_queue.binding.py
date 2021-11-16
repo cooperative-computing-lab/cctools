@@ -1748,7 +1748,7 @@ class WorkQueue(object):
     # @param seq        The sequence that will call the function
     # @param chunk_size The number of elements to process at once
 
-    def Nmap(self, fn, array, chunk_size=1):
+    def map(self, fn, array, chunk_size=1):
         size = math.ceil(len(array)/chunk_size)
         results = [None] * size
         tasks = {}
