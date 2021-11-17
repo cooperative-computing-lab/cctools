@@ -6,3 +6,5 @@ void trash_file( const char *filename );
 void trash_empty();
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

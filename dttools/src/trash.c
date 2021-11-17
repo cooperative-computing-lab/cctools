@@ -55,7 +55,7 @@ void trash_file( const char *filename )
 
 	result = unlink_recursive(trashname);
 	if(result!=0) {
-		warn("failed to delete file (%s) from trash location (%s): %s",filename,trashname,strerror(errno));
+		debug(D_NOTICE, "failed to delete file (%s) from trash location (%s): %s",filename,trashname,strerror(errno));
 	}
 
 
