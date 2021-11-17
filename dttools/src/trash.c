@@ -53,11 +53,7 @@ void trash_file( const char *filename )
 		fatal("failed to move file (%s) to trash location (%s): %s",filename,trashname,strerror(errno));
 	}
 
-	result = unlink_recursive(trashname);
-	if(result!=0) {
-		debug(D_NOTICE, "failed to delete file (%s) from trash location (%s): %s",filename,trashname,strerror(errno));
-	}
-
+	trash_empty();
 
 	free(trashname);
 }
@@ -68,9 +64,6 @@ void trash_empty()
 	if(result!=0) {
 		debug(D_DEBUG,"warning: unable to delete all items in trash directory (%s), will try again later.",trashdir);
 	}
-
-	// recreate trash directory
-	create_dir(trashdir,0700);
 }
 
 /* vim: set noexpandtab tabstop=4: */
