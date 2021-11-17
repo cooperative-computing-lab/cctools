@@ -2122,7 +2122,10 @@ static void workspace_cleanup()
 		while((d=readdir(dir))) {
 			if(!strcmp(d->d_name,".")) continue;
 			if(!strcmp(d->d_name,"..")) continue;
-			if(!strcmp(d->d_name,"trash")) trash_empty();
+			if(!strcmp(d->d_name,"trash")) {
+				trash_empty();
+				continue;
+			}
 			trash_file(d->d_name);
 		}
 		closedir(dir);

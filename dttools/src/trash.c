@@ -63,4 +63,8 @@ void trash_empty()
 		debug(D_DEBUG,"warning: unable to delete all items in trash directory (%s), will try again later.",trashdir);
 	}
 
+	// recreate trash directory
+	create_dir(trashdir,0700);
 }
+
+/* vim: set noexpandtab tabstop=4: */
