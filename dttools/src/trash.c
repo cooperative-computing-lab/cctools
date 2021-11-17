@@ -53,6 +53,12 @@ void trash_file( const char *filename )
 		fatal("failed to move file (%s) to trash location (%s): %s",filename,trashname,strerror(errno));
 	}
 
+	result = unlink_recursive(trashname);
+	if(result!=0) {
+		warn("failed to delete file (%s) from trash location (%s): %s",filename,trashname,strerror(errno));
+	}
+
+
 	free(trashname);
 }
 
