@@ -67,3 +67,5 @@ void trash_empty()
 		warn(D_ERROR,"unable to delete all items in trash directory (%s), will try again later.",trashdir);
 	}
 }
+
+/* vim: set noexpandtab tabstop=4: */
