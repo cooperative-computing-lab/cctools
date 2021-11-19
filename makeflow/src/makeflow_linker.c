@@ -17,7 +17,7 @@ See the file COPYING for details.
 #include "cctools.h"
 #include "copy_stream.h"
 #include "create_dir.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "debug.h"
 #include "getopt_aux.h"
 #include "list.h"
@@ -417,7 +417,7 @@ static void show_help(const char *cmd){
 
 void cleanup(){
 	if(workspace){
-		if(delete_dir(workspace) != 0) fprintf(stderr, "Could not delete workspace (%s)\n", workspace);
+		if(unlink_recursive(workspace) != 0) fprintf(stderr, "Could not delete workspace (%s)\n", workspace);
 		if(verbose) fprintf(stdout, "Deleted temporary workspace: %s\n", workspace);
 		free(workspace);
 	}

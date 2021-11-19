@@ -111,6 +111,7 @@ SOURCES = \
 	timer.c \
 	timestamp.c \
 	tlq_config.c \
+	trash.c \
 	unlink_recursive.c \
 	uptime.c \
 	url_encode.c \
@@ -134,7 +135,6 @@ HEADERS_PUBLIC = \
 	copy_tree.h \
 	compat-at.h \
 	debug.h \
-	delete_dir.h \
 	envtools.h \
 	fast_popen.h \
 	full_io.h \

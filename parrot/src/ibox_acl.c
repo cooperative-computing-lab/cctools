@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "stringtools.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "path.h"
 
 #include <assert.h>
@@ -331,7 +331,7 @@ int ibox_acl_rmdir(const char *path)
 			return -1;
 		}
 		closedir(dir);
-		return delete_dir(path);
+		return unlink_recursive(path);
 	} else {
 		errno = ENOENT;
 		return -1;

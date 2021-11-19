@@ -9,11 +9,11 @@
 #include "macros.h"
 #include "stringtools.h"
 #include "create_dir.h"
-#include "delete_dir.h"
 #include "list.h"
 #include "disk_alloc.h"
 #include "path.h"
 #include "xxmalloc.h"
+#include "trash.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -108,16 +108,15 @@ void work_queue_process_delete(struct work_queue_process *p)
 	}
 
 	if(p->output_file_name) {
-		unlink(p->output_file_name);
+		trash_file(p->output_file_name);
 		free(p->output_file_name);
 	}
 
 	if(p->sandbox) {
 		if(p->loop_mount == 1) {
 			disk_alloc_delete(p->sandbox);
-		}
-		else {
-			delete_dir(p->sandbox);
+		} else {
+			trash_file(p->sandbox);
 		}
 		free(p->sandbox);
 	}

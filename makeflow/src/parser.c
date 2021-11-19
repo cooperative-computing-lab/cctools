@@ -30,7 +30,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "itable.h"
 #include "debug.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "stringtools.h"
 #include "load_average.h"
 #include "get_line.h"

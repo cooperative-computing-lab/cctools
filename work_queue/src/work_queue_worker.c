@@ -37,7 +37,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "getopt_aux.h"
 #include "create_dir.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "itable.h"
 #include "random.h"
 #include "url_encode.h"
@@ -47,6 +47,8 @@ See the file COPYING for details.
 #include "pattern.h"
 #include "gpu_info.h"
 #include "tlq_config.h"
+#include "stringtools.h"
+#include "trash.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -737,7 +739,7 @@ static int handle_tasks(struct link *manager)
 					p->task_status = WORK_QUEUE_RESULT_DISK_ALLOC_FULL;
 					p->task->disk_allocation_exhausted = 1;
 					fclose(loop_full_check);
-					unlink(disk_alloc_filename);
+					trash_file(disk_alloc_filename);
 				}
 
 				free(buf);
@@ -1268,6 +1270,12 @@ static int do_tlq_url(const char *manager_tlq_url) {
 	return 1;
 }
 
+/*
+The manager has requested the deletion of a file in the cache
+directory.  If the request is valid, then move the file to the
+trash and deal with it there.
+*/
+
 static int do_unlink(const char *path)
 {
 	char cached_path[WORK_QUEUE_LINE_MAX];
@@ -1278,18 +1286,8 @@ static int do_unlink(const char *path)
 		return 0;
 	}
 
-	//Use delete_dir() since it calls unlink() if path is a file.
-	if(delete_dir(cached_path) != 0) {
-		struct stat buf;
-		if(stat(cached_path, &buf) != 0) {
-			if(errno == ENOENT) {
-				// If the path does not exist, return success
-				return 1;
-			}
-		}
-		// Failed to do unlink
-		return 0;
-	}
+	trash_file(path);
+
 	return 1;
 }
 
@@ -1562,9 +1560,8 @@ static int enforce_processes_limits() {
 			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
 			if(p->loop_mount == 1) {
 				disk_alloc_delete(p->sandbox);
-			}
-			else {
-				delete_dir(p->sandbox);
+			} else {
+				trash_file(p->sandbox);
 			}
 
 			ok = 0;
@@ -2078,6 +2075,7 @@ static int workspace_check() {
 		}
 	}
 
+	/* do not use trash here; workspace has not been set up yet */
 	unlink(fname);
 	free(fname);
 
@@ -2096,28 +2094,44 @@ workspace_prepare is called every time we connect to a new manager,
 static int workspace_prepare()
 {
 	debug(D_WQ,"preparing workspace %s",workspace);
+
 	char *cachedir = string_format("%s/cache",workspace);
 	int result = create_dir(cachedir,0777);
 	free(cachedir);
 
 	char *tmp_name = string_format("%s/cache/tmp", workspace);
 	result |= create_dir(tmp_name,0777);
-
-	setenv("WORKER_TMPDIR", tmp_name, 1);
+	setenv("WORKER_TMPDIR", tmp_name, 1);	
 	free(tmp_name);
+
+	char *trash_dir = string_format("%s/trash", workspace);
+	trash_setup(trash_dir);
+	free(trash_dir);
 
 	return result;
 }
 
 /*
 workspace_cleanup is called every time we disconnect from a manager,
-to remove any state left over from a previous run.
+to remove any state left over from a previous run.  Remove all
+directories (except trash) and move them to the trash directory.
 */
 
 static void workspace_cleanup()
 {
 	debug(D_WQ,"cleaning workspace %s",workspace);
-	delete_dir_contents(workspace);
+	DIR *dir = opendir(workspace);
+	if(dir) {
+		struct dirent *d;
+		while((d=readdir(dir))) {
+			if(!strcmp(d->d_name,".")) continue;
+			if(!strcmp(d->d_name,"..")) continue;
+			if(!strcmp(d->d_name,"trash")) continue;
+			trash_file(d->d_name);
+		}
+		closedir(dir);
+	}
+	trash_empty();
 }
 
 /*
@@ -2142,7 +2156,13 @@ static void workspace_delete()
 
 	printf( "work_queue_worker: deleting workspace %s\n", workspace);
 
-	delete_dir(workspace);
+	/*
+	Note that we cannot use trash_file here because the trash dir
+	is inside the workspace.  Abort if we really cannot clean up.
+	*/
+
+	unlink_recursive(workspace);
+
 	free(workspace);
 }
 
@@ -2866,10 +2886,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	//Check GPU name
 	char *gpu_name = gpu_name_get();
 	if(gpu_name) {
 		hash_table_insert(features, gpu_name, (void **) 1);
+		free(gpu_name);
 	}
 
 	signal(SIGTERM, handle_abort);
