@@ -2238,9 +2238,10 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	last_task_received     = 0;
 	results_to_be_sent_msg = 0;
 
-	workspace_cleanup();
 	disconnect_manager(manager);
 	printf("disconnected from manager %s:%d\n", host, port );
+
+	workspace_cleanup();
 
 	return 1;
 }
