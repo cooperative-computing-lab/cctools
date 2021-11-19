@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "unlink_recursive.h"
+#include "debug.h"
 
 #include <dirent.h>
 #include <fcntl.h>
@@ -31,31 +32,37 @@ See the file COPYING for details.
 int unlinkat_recursive (int dirfd, const char *path)
 {
 	int rc = unlinkat(dirfd, path, 0);
-	if(rc == -1 && (errno == EISDIR || errno == EPERM || errno == ENOTEMPTY)) {
+	if(rc<0 && errno==ENOENT) {
+		/* If it doesn't exist, return success. */
+		return 0;
+	} else if(rc<0 && (errno == EISDIR || errno == EPERM || errno == ENOTEMPTY)) {
 		int subdirfd = openat(dirfd, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOCTTY|O_NOFOLLOW, 0);
 		if (subdirfd >= 0) {
 			DIR *dir = fdopendir(subdirfd);
-			if (dir) {
+			if(dir) {
 				struct dirent *d;
-				rc = 0;
-				while(rc == 0 && (d = readdir(dir))) {
+				while((d = readdir(dir))) {
 					if(!(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)) {
 						assert(strchr(d->d_name, '/') == NULL);
-						rc = unlinkat_recursive(subdirfd, d->d_name);
-						if (rc == -1) {
-							closedir(dir);
-							return -1;
-						}
+						/* On failure, just keep going so as to remove as much as possible. */
+						unlinkat_recursive(subdirfd, d->d_name);
 					}
 				}
 				closedir(dir);
-			} else {
-				close(subdirfd);
 			}
+			close(subdirfd);
+
+			/* If there was an interior failure, then this will also fail. */
 			rc = unlinkat(dirfd, path, AT_REMOVEDIR);
+			if(rc<0) warn(D_ERROR,"couldn't delete directory %s: %s\n",path,strerror(errno));
+			return rc;
+		} else {
+			return -1;
 		}
+	} else {
+		if(rc<0) warn(D_ERROR,"couldn't delete %s: %s\n",path,strerror(errno));
+		return rc;
 	}
-	return rc;
 }
 
 int unlink_recursive (const char *path)
@@ -65,34 +72,28 @@ int unlink_recursive (const char *path)
 
 int unlink_dir_contents (const char *path)
 {
-	int rc;
 	int dirfd = openat(AT_FDCWD, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOCTTY, 0);
 	if (dirfd >= 0) {
+		int rcs = 0;
 		DIR *dir = fdopendir(dirfd);
 		if (dir) {
 			struct dirent *d;
-			rc = 0;
-			while(rc == 0 && (d = readdir(dir))) {
+			while((d = readdir(dir))) {
 				if(!(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)) {
 					assert(strchr(d->d_name, '/') == NULL);
-					rc = unlinkat_recursive(dirfd, d->d_name);
-					if (rc == -1) {
-						int s = errno;
-						closedir(dir);
-						errno = s;
-						return -1;
-					}
+					rcs |= unlinkat_recursive(dirfd, d->d_name);
 				}
 			}
 			closedir(dir);
-			return 0;
 		} else {
-			close(dirfd);
-			return -1;
+			rcs = -1;
 		}
-	} else {
-		return -1;
+
+		close(dirfd);
+		return rcs != 0 ? -1 : 0;
 	}
+
+	return -1;
 }
 
 /* vim: set noexpandtab tabstop=4: */

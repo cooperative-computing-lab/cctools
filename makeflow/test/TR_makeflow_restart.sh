@@ -40,10 +40,9 @@ run()
 	echo "+++++ second run: should rebuild 6 files +++++"
 	./makeflow --jx test.jx | tee output.2
 
-	count=`grep "deleted" output.2 | wc -l`
+	count=`grep "^deleted file." output.2 | wc -l`
 
-	echo "+++++ $count files deleted +++++"
-
+	echo "+++++ $count files deleted, expecting 6 +++++"
 	if [ $count -ne 6 ]
 	then
 		exit 1
@@ -57,9 +56,9 @@ run()
 	echo "+++++ third run: should rebuild 8 files +++++"
 	./makeflow --jx test.jx | tee output.3
 
-	count=`grep "deleted" output.3 | wc -l`
-	echo "+++++ $count files deleted +++++"
+	count=`grep "^deleted file." output.3 | wc -l`
 
+	echo "+++++ $count files deleted, expecting 8 +++++"
 	if [ $count -ne 8 ]
 	then
 		exit 1
