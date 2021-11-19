@@ -2131,6 +2131,7 @@ static void workspace_cleanup()
 		}
 		closedir(dir);
 	}
+	trash_empty();
 }
 
 /*

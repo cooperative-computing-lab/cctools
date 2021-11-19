@@ -9,10 +9,16 @@
 #include <string.h>
 #include <errno.h>
 
+#include "trash.h"
+
 static char *trashdir = 0;
 
 void trash_setup( const char *dir )
 {
+    if(trashdir) {
+        notice(D_NOTICE, "Trash directory already setup to %s. Ignoring setup for %s.", trashdir, dir);
+    }
+
 	trashdir = strdup(dir);
 	create_dir(trashdir,0700);
 	random_init();
@@ -43,11 +49,13 @@ void trash_file( const char *filename )
 	char *trashname = string_format("%s/%s",trashdir,cookie);
 	debug(D_WQ,"trashing file %s to %s",filename,trashname);
 
-	/* Move the file to the trash directory. */	
+	/* Move the file to the trash directory. */
 	result = rename(filename,trashname);
 	if(result!=0) {
 		fatal("failed to move file (%s) to trash location (%s): %s",filename,trashname,strerror(errno));
 	}
+
+	trash_empty();
 
 	free(trashname);
 }
@@ -56,7 +64,6 @@ void trash_empty()
 {
 	int result = unlink_dir_contents(trashdir);
 	if(result!=0) {
-		debug(D_DEBUG,"warning: unable to delete all items in trash directory (%s), will try again later.",trashdir);
+		warn(D_ERROR,"unable to delete all items in trash directory (%s), will try again later.",trashdir);
 	}
-
 }
