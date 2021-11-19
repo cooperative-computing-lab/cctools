@@ -24,7 +24,7 @@ See the file COPYING for details.
 
 int gpu_info_get()
 {
-	char* nvidia_cmd= "/bin/nvidia-smi -q";
+	char* nvidia_cmd= "/bin/nvidia-smi --query-gpu=count --format=csv,noheader";
 	if(access(nvidia_cmd, X_OK) != 0){	
 			return 0;
 	}
@@ -35,18 +35,11 @@ int gpu_info_get()
 		return 0;
 	}
 	
-	char buffer[BUFSIZ];
-	char *target;
-	while(fgets(buffer, BUFSIZ, pipe)){
-		if(strstr(buffer, "Attached GPUs")){
-			target = strtok(buffer, " :");
-			target = strtok(NULL, " :");
-			target = strtok(NULL, " :");
-			int gpus = atoi(target);
-			return gpus;
-		}
-	}
-	return 0;
+	int gpus;
+	fscanf(pipe, "%d", &gpus);	
+	
+	
+	return gpus;
 }
 
 char *gpu_name_get()
