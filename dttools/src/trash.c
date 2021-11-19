@@ -4,6 +4,7 @@
 #include "unlink_recursive.h"
 #include "stringtools.h"
 #include "debug.h"
+#include "timestamp.h"
 
 #include <sys/stat.h>
 #include <string.h>
@@ -46,7 +47,7 @@ void trash_file( const char *filename )
 	char cookie[TRASH_COOKIE_LENGTH];
 	string_cookie(cookie,TRASH_COOKIE_LENGTH);
 
-	char *trashname = string_format("%s/%s",trashdir,cookie);
+	char *trashname = string_format("%s/%s.%"PRIu64, trashdir,cookie,timestamp_get());
 	debug(D_WQ,"trashing file %s to %s",filename,trashname);
 
 	/* Move the file to the trash directory. */
