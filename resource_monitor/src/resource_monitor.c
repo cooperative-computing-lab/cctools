@@ -1948,7 +1948,7 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
         first_process_pid = pid;
         close(STDIN_FILENO);
         close(STDOUT_FILENO);
-        setpgid(pid, 0);
+        setpgid(pid, getpid());
 
         if (child_in_foreground)
         {
