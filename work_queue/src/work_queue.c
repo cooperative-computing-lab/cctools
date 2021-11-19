@@ -4192,6 +4192,25 @@ static int send_one_task( struct work_queue *q )
 	return 0;
 }
 
+static void find_max_task_stats(int max_task_stats[], struct work_queue_task *t)
+{
+
+	// baseline resurce comparison of worker total resources and a task requested resorces
+
+	if(max_task_stats[0] < t->resources_requested->cores ) {
+		max_task_stats[0] = t->resources_requested->cores ;
+	}
+	if(max_task_stats[1] < t->resources_requested->memory ) {
+		max_task_stats[1] = t->resources_requested->memory ;
+	}
+	if(max_task_stats[2] < t->resources_requested->disk ) {
+		max_task_stats[2] = t->resources_requested->disk ;
+	}
+	if(max_task_stats[3] < t->resources_requested->gpus ) {
+		max_task_stats[3] = t->resources_requested->gpus ;
+	}
+}
+
 static void check_all_tasks(struct work_queue *q)
 {
 	struct work_queue_task *t;
@@ -4199,12 +4218,15 @@ static void check_all_tasks(struct work_queue *q)
 	list_first_item(q->ready_list);
 	
 	int unfit_core = 0;
-	int unfit_mem = 0;
+	int unfit_mem  = 0;
 	int unfit_disk = 0;
-	 int unfit_gpu = 0;
+	int unfit_gpu  = 0;
+	
+	int max_task_stats[] = {-1, -1, -1, -1};
 
 	while( (t = list_next_item(q->ready_list))){
 		// check each task against the queue of connected workers
+		find_max_task_stats(max_task_stats, t);
 		int bit_set = check_task_fit_in_connected_workers(q, t);
 		if (bit_set & (1<<0))
 			unfit_core++;
@@ -4219,13 +4241,13 @@ static void check_all_tasks(struct work_queue *q)
 	work_queue_get_stats(q, &s);	
 	
 	if(unfit_core)
-		printf("%d waiting tasks need more than %d cores(max available)\n",unfit_core,(int)s.max_cores);
+		printf("%d waiting tasks need more than %d cores(max available). The largest task needs %d cores\n",unfit_core,(int)s.max_cores, max_task_stats[0]);
 	if(unfit_mem)
-		printf("%d waiting tasks need more than %d MB of memory(max available)\n",unfit_mem,(int)s.max_memory);
+		printf("%d waiting tasks need more than %d MB of memory(max available). The largest task needs %d MB of memroy\n",unfit_mem,(int)s.max_memory, max_task_stats[1]);
 	if(unfit_disk)
-		printf("%d waiting tasks need more than %d MB of disk(max available)\n",unfit_disk,(int)s.max_disk);
+		printf("%d waiting tasks need more than %d MB of disk(max available). The largest task needs %d MB of disk\n",unfit_disk,(int)s.max_disk, max_task_stats[2]);
 	if(unfit_gpu)
-		printf("%d waiting tasks need more than %d gpus(max available)\n",unfit_gpu,(int)s.max_gpus);
+		printf("%d waiting tasks need more than %d gpus(max available). The largest task needs %d gpus\n",unfit_gpu,(int)s.max_gpus, max_task_stats[3]);
 }
 
 static int receive_one_task( struct work_queue *q )
