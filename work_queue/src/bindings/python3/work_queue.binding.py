@@ -1796,15 +1796,49 @@ class WorkQueue(object):
     # @param self       Reference to the current work queue object.
     # @param fn         The function that will be called on each element
     # @param seq        The seq that will be reduced
+    # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
 
-    def tree_reduce(self, fn, seq):
-        size = len(seq)
+    def tree_reduce(self, fn, seq, chunk_size=2):
+        def reduce(fn, seq):
+            ''' Serializable tree reduce function '''    
+            while len(seq) > 1:
+                results = []
+                for i in range(len(seq)//2):
+                    results.append(fn(seq[(i*2)], seq[(i*2)+1]))
+
+                if len(seq) % 2 == 1:
+                    results.append(seq[-1])
+                
+                seq = results
+    
+            return seq[0]
+
+        def find_pow(n):
+            ''' Finds the largest power of 2 smaller than n '''
+            bit = 1
+            while(bit <= n):
+                bit = bit << 1
+
+            return bit >> 1
+
+        # parallel function
         tasks = {}
-
+        n = find_pow(chunk_size)
+        
         while len(seq) > 1:
-            results = [None] * (len(seq)//2)
-            for i in range(len(seq)//2):
-                p_task = PythonTask(fn, seq[(i*2)], seq[(i*2)+1])
+
+            size = math.ceil(len(seq)/n)
+            results = [None] * size
+        
+            for i in range(size):
+                start = i*n
+                end = start + n
+
+                if end > len(seq):
+                    p_task = PythonTask(reduce, fn, seq[start:])
+                else:
+                    p_task = PythonTask(reduce, fn, seq[start:end])
+
                 self.submit(p_task)
                 tasks[p_task.id] = i
 
@@ -1812,11 +1846,10 @@ class WorkQueue(object):
                 t = self.wait()
                 results[tasks[t.id]] = t.output
 
-            if len(seq) % 2 == 1:
-                results.append(seq[-1])
             seq = results
 
         return seq[0]
+           
 
 
 ##
