@@ -235,9 +235,9 @@ specified by BOLD(-L) PARAM(logfile). This script will run the commands in
 serial that Makeflow would have run. This shell script format may be useful
 for archival purposes, since it does not depend on Makeflow.
 
-SECTION(MPI)
+SECTION(MPI MODE)
 
-When cctools is built with --with-mpi-path=`which mpicc` configuration, Makeflow can be ran as an MPI program.
+When cctools is built with the --with-mpi-path configuration, Makeflow can be ran as an MPI program.
 To do so, run Makeflow as an argument to BOLD(mpirun)/BOLD(mpiexec) and set BOLD(-T) PARAM(mpi) as a Makeflow option.
 When submitting mpi, request one process per core. Makeflow will count up how many processes each node given to MPI
 has, and use that as the core count for the worker on that node. Makeflow will then share memory evenly amongst the cores
