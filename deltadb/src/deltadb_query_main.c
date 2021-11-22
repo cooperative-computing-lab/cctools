@@ -175,14 +175,14 @@ int main( int argc, char *argv[] )
 					scope = DELTADB_SCOPE_GLOBAL;
 					strcpy(reduce_name,&reduce_name[6]);
 
-				/* If the reduction name begins with t, assign it temporal scope. */
-				} else if (!strncmp(reduce_name, "t", 1)) {
+				/* If the reduction name begins with TEMP, assign it temporal scope. */
+				} else if (!strncmp(reduce_name, "TEMP",4)) {
 					scope = DELTADB_SCOPE_TEMPORAL;
 					if (!jx_istype(reduce_expr, JX_SYMBOL)) {
 						fprintf(stderr, "deltadb_query: must supply attribute name to temporal reduction: %s\n",reduce_attr);
 						return 1;
 					}
-					strcpy(reduce_name,&reduce_name[1]);
+					strcpy(reduce_name,&reduce_name[4]);
 				} else {
 					scope = DELTADB_SCOPE_SPATIAL;
 				}

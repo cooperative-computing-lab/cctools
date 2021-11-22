@@ -33,7 +33,6 @@ struct deltadb_reduction {
 	deltadb_scope_t scope;
 	struct jx *expr;
 	struct hash_table *temporal_table;
-	struct jx *temporal_value;
 	struct hash_table *unique_table;
 	struct jx *unique_value;
 	double count;
@@ -49,6 +48,5 @@ void deltadb_reduction_delete( struct deltadb_reduction *r );
 void deltadb_reduction_reset( struct deltadb_reduction *r, deltadb_scope_t scope );
 void deltadb_reduction_update( struct deltadb_reduction *r, const char *key, struct jx *value, deltadb_scope_t scope );
 char * deltadb_reduction_string( struct deltadb_reduction *r );
-const char * deltadb_reduction_name( struct deltadb_reduction *r );
 
 #endif

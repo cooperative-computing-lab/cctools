@@ -170,20 +170,4 @@ char * deltadb_reduction_string( struct deltadb_reduction *r )
 	return string_format("%lf",value);
 }
 
-const char * deltadb_reduction_name( struct deltadb_reduction *r )
-{
-	switch(r->type) {
-		case UNIQUE: return "UNIQUE";
-		case COUNT: return "COUNT";
-		case SUM: return "SUM";
-		case FIRST: return "FIRST";
-		case LAST: return "LAST";
-		case MIN: return "MIN";
-		case AVERAGE: return "AVERAGE";
-		case MAX: return "MAX";
-		case INC: return "INC";
-		default: return 0;
-	}
-}
-
 /* vim: set noexpandtab tabstop=4: */

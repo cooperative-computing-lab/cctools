@@ -59,11 +59,10 @@ void deltadb_query_delete( struct deltadb_query *query )
 {
 	if(!query) return;
 	hash_table_delete(query->table);
-	list_delete(query->reduce_exprs);
 	jx_delete(query->filter_expr);
 	jx_delete(query->where_expr);
 	list_delete(query->output_exprs);
-	//list_delete(query->reduce_exprs);
+	list_delete(query->reduce_exprs);
 	free(query);
 }
 
@@ -249,23 +248,12 @@ static void display_reduce_exprs( struct deltadb_query *query, time_t current )
 			while(hash_table_nextkey(r->temporal_table,&key,&value)){
 				temporal = (struct deltadb_reduction *) value;
 				char *value_str = deltadb_reduction_string(temporal);
-				/*
-				const char *reduction_name = deltadb_reduction_name(temporal);
-				struct jx *item = jx_lookup(row, key);
-				if (item) {
-					jx_insert_string(item, reduction_name, value_str);
-				} else {
-					item = jx_object(0);
-					jx_insert_string(item, reduction_name, value_str);
-					jx_insert(row, jx_string(key), item);
-				}
-				*/
 				jx_insert_string(column, key, value_str);
-				//fprintf(query->output_stream, "key=%s\nvalue=%s\n", key, str);
 				free(value_str);
 			}
 			fprintf(query->output_stream, "%s ", jx_print_string(column));
-		} else {
+			jx_delete(column);
+		} else if (r->scope == DELTADB_SCOPE_SPATIAL || r->scope == DELTADB_SCOPE_GLOBAL) {
 			char *str = deltadb_reduction_string(r);
 			fprintf(query->output_stream,"%s ",str);
 			free(str);
