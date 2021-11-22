@@ -667,6 +667,17 @@ the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as descr
 */
 struct work_queue *work_queue_create(int port);
 
+
+/** Create a new work queue using SSL.
+ Like @ref work_queue_create, but all communications with the queue are encoded
+ using TLS with they key and certificate provided. If key or cert are NULL,
+ then TLS is not activated.
+@param port The port number to listen on.  If zero is specified, then the port stored in the <b>WORK_QUEUE_PORT</b> environment variable is used if available. If it isn't, or if -1 is specified, the first unused port between <b>WORK_QUEUE_LOW_PORT</b> and <b>WORK_QUEUE_HIGH_PORT</b> (1024 and 32767 by default) is chosen.
+@param key A key in pem format.
+@param cert A certificate in pem format.
+*/
+struct work_queue *work_queue_ssl_create(int port, const char *key, const char *cert);
+
 /** Enables resource monitoring on the give work queue.
 It generates a resource summary per task, which is written to the given
 directory. It also creates all_summaries-PID.log, that consolidates all
@@ -1065,6 +1076,7 @@ void work_queue_manager_preferred_connection(struct work_queue *q, const char *p
  - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
  - "hungry-minimum" Mimimum number of tasks to consider queue not hungry. (default=10)
  - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
+ - "wait_retrieve_many" Parameter to alter how work_queue_wait works. If set to 0, work_queue_wait breaks out of the while loop whenever a task changes to WORK_QUEUE_TASK_DONE (wait_retrieve_one mode). If set to 1, work_queue_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
 @param value The value to set the parameter to.
 @return 0 on succes, -1 on failure.
 */

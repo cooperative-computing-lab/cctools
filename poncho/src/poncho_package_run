@@ -96,7 +96,6 @@ parse_arguments() {
                 ;;
             -d | --debug)
                 export PONCHO_PACKAGE_RUN_DEBUG=yes
-                logmsg parsing arguments...
                 ;;
             -e | --environment)
                 shift

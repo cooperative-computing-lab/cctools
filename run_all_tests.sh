@@ -10,7 +10,7 @@ then
 	CCTOOLS_PACKAGES_TEST=$(grep CCTOOLS_PACKAGES config.mk | cut -d = -f 2)
 	if [ -n "${CCTOOLS_DOCKER_GITHUB}" ]
 	then
-		if ! parrot/src/parrot_run /bin/ls
+		if ! parrot/src/parrot_run /bin/ls > /dev/null 2>&1
 		then
 			echo "Skipping parrot tests inside docker build."
 			export PARROT_SKIP_TEST=yes
@@ -31,14 +31,11 @@ export CCTOOLS_TEST_FAIL=${CCTOOLS_TEST_LOG%.log}.fail
 export CCTOOLS_TEST_TMP=${CCTOOLS_TEST_LOG%.log}.tmp
 
 echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
+rm -f "${CCTOOLS_TEST_FAIL}"
 
 # we need resource_monitor in the path.
 PATH="$(pwd)/resource_monitor/src:$PATH"
 export PATH
-
-export CCTOOLS_PYTHON_TEST_EXEC=$(grep "^CCTOOLS_PYTHON_TEST_EXEC=" config.mk | cut -d = -f 2)
-export CCTOOLS_PYTHON_TEST_DIR=$(grep "^CCTOOLS_PYTHON_TEST_DIR=" config.mk | cut -d = -f 2)
-export CCTOOLS_PERL=$(grep "^CCTOOLS_PERL=" config.mk | cut -d = -f 2)
 
 export PYTHONPATH="$(pwd)/chirp/src/python:$(pwd)/work_queue/src/python:$PYTHONPATH"
 export PERL5LIB="$(pwd)/chirp/src/perl:$(pwd)/work_queue/src/perl:$PERL5LIB"

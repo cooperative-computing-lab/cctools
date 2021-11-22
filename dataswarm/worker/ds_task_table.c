@@ -9,7 +9,7 @@
 #include "jx.h"
 #include "stringtools.h"
 #include "debug.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "macros.h"
 
 #include <dirent.h>
@@ -160,10 +160,10 @@ void ds_task_table_advance( struct ds_worker *w )
 				char *task_dir = ds_worker_task_dir(w,task->taskid);
 
 				// First delete the sandbox dir, which could be large and slow.
-				delete_dir(sandbox_dir);
+				unlink_recursive(sandbox_dir);
 
 				// Now delete the task dir and metadata file, which should be quick.
-				delete_dir(task_dir);
+				unlink_recursive(task_dir);
 
 				free(sandbox_dir);
 				free(task_dir);

@@ -320,7 +320,7 @@ void md5_buffer(const void *buffer, size_t length, unsigned char digest[16])
 #endif
 
 #define BUFFER_SIZE (1<<20)
-int md5_file(const char *filename, unsigned char digest[20])
+int md5_file(const char *filename, unsigned char digest[MD5_DIGEST_LENGTH])
 {
 	int fd;
 	struct stat buf;

@@ -15,7 +15,7 @@ See the file COPYING for details.
 #include "batch_job.h"
 #include "copy_stream.h"
 #include "create_dir.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "hash_table.h"
 #include "itable.h"
 
@@ -70,7 +70,7 @@ struct batch_queue {
 #define batch_fs_stub_putfile(name)  static int batch_fs_##name##_putfile (struct batch_queue *Q, const char *lpath, const char *rpath) { return copy_file_to_file(lpath, rpath); }
 #define batch_fs_stub_rename(name)  static int batch_fs_##name##_rename (struct batch_queue *Q, const char *lpath, const char *rpath) { return create_dir_parents(rpath, 0755) && !rename(lpath, rpath) ? 0 : -1; }
 #define batch_fs_stub_stat(name)  static int batch_fs_##name##_stat (struct batch_queue *Q, const char *path, struct stat *buf) { return stat(path, buf); }
-#define batch_fs_stub_unlink(name)  static int batch_fs_##name##_unlink (struct batch_queue *Q, const char *path) { return delete_dir(path); }
+#define batch_fs_stub_unlink(name)  static int batch_fs_##name##_unlink (struct batch_queue *Q, const char *path) { return unlink_recursive(path); }
 
 #endif
 

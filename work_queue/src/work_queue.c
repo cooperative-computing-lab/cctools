@@ -214,6 +214,8 @@ struct work_queue {
 	char *debug_path;
 	int tlq_port;
 	char *tlq_url;
+
+	int wait_retrieve_many;
 };
 
 struct work_queue_worker {
@@ -1022,7 +1024,9 @@ static void add_worker(struct work_queue *q)
 	int port;
 
 	link = link_accept(q->manager_link, time(0) + q->short_timeout);
-	if(!link) return;
+	if(!link) {
+		return;
+	}
 
 	link_keepalive(link, 1);
 	link_tune(link, LINK_TUNE_INTERACTIVE);
@@ -2347,6 +2351,14 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"priority",info.priority);
 	jx_insert_string(j,"manager_preferred_connection",q->manager_preferred_connection);
 
+	int use_ssl = 0;
+#ifdef HAS_OPENSSL
+	if(link_using_ssl(q->manager_link)) {
+		use_ssl = 1;
+	}
+#endif
+	jx_insert_boolean(j,"ssl",use_ssl);
+
 	struct jx *interfaces = interfaces_of_host();
 	if(interfaces) {
 		jx_insert(j,jx_string("network_interfaces"),interfaces);
@@ -2477,6 +2489,14 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
 	jx_insert_string(j,"type","wq_master");
 	jx_insert_integer(j,"port",work_queue_port(q));
+
+	int use_ssl = 0;
+#ifdef HAS_OPENSSL
+	if(link_using_ssl(q->manager_link)) {
+		use_ssl = 1;
+	}
+#endif
+	jx_insert_boolean(j,"ssl",use_ssl);
 
 	char owner[USERNAME_MAX];
 	username_get(owner);
@@ -5252,7 +5272,11 @@ int work_queue_task_specify_input_file_do_not_cache(struct work_queue_task *t, c
 /********** work_queue public functions **********/
 /******************************************************/
 
-struct work_queue *work_queue_create(int port)
+struct work_queue *work_queue_create(int port) {
+	return work_queue_ssl_create(port, NULL, NULL);
+}
+
+struct work_queue *work_queue_ssl_create(int port, const char *key, const char *cert)
 {
 	struct work_queue *q = malloc(sizeof(*q));
 	if(!q) {
@@ -5279,6 +5303,15 @@ struct work_queue *work_queue_create(int port)
 		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
 
 	q->manager_link = link_serve(port);
+
+	// we need both or neither key and cert. We let link_ssl_wrap_server do the
+	// error checking.
+	if(key || cert) {
+		if(link_ssl_wrap_server(q->manager_link, key, cert) < 1) {
+			fprintf(stderr, "Error: failed to setup ssl.\n");
+			return 0;
+		}
+	}
 
 	if(!q->manager_link) {
 		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
@@ -6150,13 +6183,21 @@ static void print_password_warning( struct work_queue *q )
 {
 	static int did_password_warning = 0;
 
-	if(did_password_warning) return;
-
-		if(!q->password && q->name) {
-			fprintf(stderr,"warning: this work queue manager is visible to the public.\n");
-			fprintf(stderr,"warning: you should set a password with the --password option.\n");
-		did_password_warning = 1;
+	if(did_password_warning) {
+		return;
 	}
+
+	if(!q->password && q->name) {
+		fprintf(stderr,"warning: this work queue manager is visible to the public.\n");
+		fprintf(stderr,"warning: you should set a password with the --password option.\n");
+	}
+
+	if(!link_using_ssl(q->manager_link)) {
+		fprintf(stderr,"warning: using plain-text when communicating with workers.\n");
+		fprintf(stderr,"warning: use encryption with a key and cert when creating the manager.\n");
+	}
+
+	did_password_warning = 1;
 }
 
 #define BEGIN_ACCUM_TIME(q, stat) {\
@@ -6315,26 +6356,31 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
-
 		// task completed?
-		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
-		if(t) {
-			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
+		if (t == NULL)
+		{
+			t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+			if(t) {
+				change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
-			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
-			{
-				q->stats->tasks_failed++;
+				if( t->result != WORK_QUEUE_RESULT_SUCCESS )
+				{
+					q->stats->tasks_failed++;
+				}
+
+				// return completed task (t) to the user. We do not return right
+				// away, and instead break out of the loop to correctly update the
+				// queue time statistics.
+				events++;
+				END_ACCUM_TIME(q, time_internal);
+
+				if(!q->wait_retrieve_many) {
+					break;
+				}
 			}
-
-			// return completed task (t) to the user. We do not return right
-			// away, and instead break out of the loop to correctly update the
-			// queue time statistics.
-			events++;
-			END_ACCUM_TIME(q, time_internal);
-			break;
 		}
 
-		 // update catalog if appropriate
+		// update catalog if appropriate
 		if(q->name) {
 			update_catalog(q, foreman_uplink, 0);
 		}
@@ -6396,7 +6442,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 				continue;
 			}
 		}
-
 		//we reach here only if no task was neither sent nor received.
 		compute_manager_load(q, 1);
 
@@ -6769,6 +6814,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "wait_retrieve_many")){
+		q->wait_retrieve_many = MAX(0, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);

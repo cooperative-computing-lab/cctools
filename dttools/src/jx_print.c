@@ -71,6 +71,7 @@ const char * jx_operator_string( jx_operator_t type )
 		// note that the closing bracket/paren is in jx_print_subexpr
 		case JX_OP_LOOKUP: return "[";
 		case JX_OP_CALL: return "(";
+		case JX_OP_DOT: return ".";
 		case JX_OP_SLICE: return ":";
 		default:        return "???";
 	}

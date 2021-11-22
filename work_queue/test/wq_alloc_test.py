@@ -15,7 +15,7 @@ def check_task(category, category_mode, max, min, expected):
     t.specify_category(category)
     q.submit(t)
 
-    t = q.wait(5)
+    t = q.wait(30)
     if not t:
         print("Task did not complete in the allotted time.")
         sys.exit(1)
@@ -40,7 +40,7 @@ try:
     (worker_cores, worker_memory, worker_disk, worker_gpus) = (int(sys.argv[i]) for i in range(2,6))
 except IndexError:
     sys.stderr.write("Usage: {} PORTFILE WORKER_CORES WORKER_MEMORY WORKER_DISK\n".format(sys.argv[0]))
-
+    raise
 
 q = wq.WorkQueue(0)
 with open(port_file, 'w') as f:

@@ -53,6 +53,9 @@ char *gpu_name_get()
 	}
 
 	char *gpu_name = get_line(pipe);
+
+	string_chomp(gpu_name);
+
 	pclose(pipe);
 
 	return gpu_name;

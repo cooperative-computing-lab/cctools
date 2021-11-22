@@ -450,7 +450,7 @@ static int sn_authenticate (confuga *C)
 		const void *password = sqlite3_column_blob(select, 3);
 		time_t stoptime = STOPTIME_SHORT;
 		char path[CHIRP_PATH_MAX];
-		unsigned char digest[SHA1_DIGEST_LENGTH];
+		unsigned char digest[CHIRP_DIGEST_MAX];
 
 		assert(sqlite3_column_bytes(select, 3) == SHA1_DIGEST_LENGTH);
 		CATCHUNIX(snprintf(path, sizeof(path), "%s/password", root));

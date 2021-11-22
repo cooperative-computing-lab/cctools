@@ -19,8 +19,6 @@ Suppose you have a Python program `example.py` like this:
 import os
 import sys
 import pickle
-
-import antigravity
 import matplotlib
 
 
@@ -39,19 +37,28 @@ This will create `package.json` with contents similar to this:
 
 ```
 {
-	"conda": [
-                "defaults::python=3.8.5=h7579374_1"
-	        "defaults::matplotlib=3.3.4=py38h06a4308_0",
-		"defaults::pip=20.2.4=py38h06a4308_0",
-	]
+	"conda":{
+		"channels":[
+			"defaults"
+			"conda-forge"
+		]
+		"packages":[
+                	"python=3.8.5=h7579374_1"
+	        	"matplotlib=3.3.4=py38h06a4308_0",
+			"pip=20.2.4=py38h06a4308_0",
+		]
+	}
 }
 ```
 
 Then to create a complete package from the specification:
 
 ```
-poncho_package_create package.json package.tar.gz
+poncho_package_create package.json
 ```
+
+The outputed tarball will be put into a directory named `envs` if a specific 
+cache directory is not specified.
 
 Once created, this package can be moved to another machine for execution.
 Then, to run a program in the environment:
@@ -107,13 +114,12 @@ or system-specific details where possible.
 }
 ```
 
-The `"conda"` key, if present, gives a list of strings.
-Each string must be a valid Conda package specification.
-Conda package specifications SHOULD use the full three-item
-specifications,
+The `"conda"` key, if present, gives a list of channels and packages.
+Each package must be a valid Conda package specification.
+
 
 ```
-channel::package=version=build
+package=version=build
 ```
 
 if coming from an existing user install. This is because the
@@ -133,10 +139,7 @@ Note that Environment Specifications do not include any way to
 specify the Conda channels a user has configured.
 This is intentional,
 since Environment Specification should not depend on
-the user's `.condarc`. Each package specification MUST
-specify a channel using the `channel::package` syntax.
-The channel will likely be `conda-forge` for most packages.
-If generating an Environment Specification from a user's existing
+the user's `.condarc`. If generating an Environment Specification from a user's existing
 Conda prefix, be sure to capture the channel used.
 When building a Conda prefix from an Environment Specification,
 it should not be necessary to perform any channel configuration.
@@ -168,10 +171,8 @@ package specifications.
 
 It is also sometimes necessary to work with locally available packages
 (often installed via `pip install -e .`).
-Due to the added difficulties in managing such dependencies,
-such packages are outside the scope of this document.
-It may be necessary to use another tool to
-detect and prepare local Pip package installations.
+If a local pip package is listed within the specification, the pip package must be installed
+into the user's current environment to be included.
 
 ### Git Repository
 
@@ -180,7 +181,6 @@ detect and prepare local Pip package installations.
 	"git": {
 		"DATA_DIR": {
 			"remote": "http://.../repo.git",
-			"tag": "abcd1234...."
 		}
 	}
 }

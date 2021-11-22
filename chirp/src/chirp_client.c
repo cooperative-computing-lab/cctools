@@ -1566,7 +1566,7 @@ INT64_T chirp_client_hash(struct chirp_client * c, const char *path, const char 
 	return result;
 }
 
-INT64_T chirp_client_md5(struct chirp_client * c, const char *path, unsigned char digest[16], time_t stoptime)
+INT64_T chirp_client_md5(struct chirp_client * c, const char *path, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime)
 {
 	return chirp_client_hash(c, path, "md5", digest, stoptime); /* digest has wrong length, but it is okay for md5 */
 }

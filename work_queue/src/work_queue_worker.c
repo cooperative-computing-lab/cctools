@@ -37,7 +37,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "getopt_aux.h"
 #include "create_dir.h"
-#include "delete_dir.h"
+#include "unlink_recursive.h"
 #include "itable.h"
 #include "random.h"
 #include "url_encode.h"
@@ -47,6 +47,8 @@ See the file COPYING for details.
 #include "pattern.h"
 #include "gpu_info.h"
 #include "tlq_config.h"
+#include "stringtools.h"
+#include "trash.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -133,6 +135,10 @@ static char *worker_id;
 // preferred connection mode.
 char *preferred_connection = NULL;
 
+// Whether to force a ssl connection. If using the catalog server and the
+// manager announces it is using SSL, then SSL is used regardless of
+// manual_ssl_option.
+int manual_ssl_option = 0;
 
 // pid of the worker's parent process. If different from zero, worker will be
 // terminated when its parent process changes.
@@ -733,7 +739,7 @@ static int handle_tasks(struct link *manager)
 					p->task_status = WORK_QUEUE_RESULT_DISK_ALLOC_FULL;
 					p->task->disk_allocation_exhausted = 1;
 					fclose(loop_full_check);
-					unlink(disk_alloc_filename);
+					trash_file(disk_alloc_filename);
 				}
 
 				free(buf);
@@ -1264,6 +1270,12 @@ static int do_tlq_url(const char *manager_tlq_url) {
 	return 1;
 }
 
+/*
+The manager has requested the deletion of a file in the cache
+directory.  If the request is valid, then move the file to the
+trash and deal with it there.
+*/
+
 static int do_unlink(const char *path)
 {
 	char cached_path[WORK_QUEUE_LINE_MAX];
@@ -1274,18 +1286,8 @@ static int do_unlink(const char *path)
 		return 0;
 	}
 
-	//Use delete_dir() since it calls unlink() if path is a file.
-	if(delete_dir(cached_path) != 0) {
-		struct stat buf;
-		if(stat(cached_path, &buf) != 0) {
-			if(errno == ENOENT) {
-				// If the path does not exist, return success
-				return 1;
-			}
-		}
-		// Failed to do unlink
-		return 0;
-	}
+	trash_file(path);
+
 	return 1;
 }
 
@@ -1558,9 +1560,8 @@ static int enforce_processes_limits() {
 			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
 			if(p->loop_mount == 1) {
 				disk_alloc_delete(p->sandbox);
-			}
-			else {
-				delete_dir(p->sandbox);
+			} else {
+				trash_file(p->sandbox);
 			}
 
 			ok = 0;
@@ -2074,6 +2075,7 @@ static int workspace_check() {
 		}
 	}
 
+	/* do not use trash here; workspace has not been set up yet */
 	unlink(fname);
 	free(fname);
 
@@ -2092,28 +2094,44 @@ workspace_prepare is called every time we connect to a new manager,
 static int workspace_prepare()
 {
 	debug(D_WQ,"preparing workspace %s",workspace);
+
 	char *cachedir = string_format("%s/cache",workspace);
 	int result = create_dir(cachedir,0777);
 	free(cachedir);
 
 	char *tmp_name = string_format("%s/cache/tmp", workspace);
 	result |= create_dir(tmp_name,0777);
-
-	setenv("WORKER_TMPDIR", tmp_name, 1);
+	setenv("WORKER_TMPDIR", tmp_name, 1);	
 	free(tmp_name);
+
+	char *trash_dir = string_format("%s/trash", workspace);
+	trash_setup(trash_dir);
+	free(trash_dir);
 
 	return result;
 }
 
 /*
 workspace_cleanup is called every time we disconnect from a manager,
-to remove any state left over from a previous run.
+to remove any state left over from a previous run.  Remove all
+directories (except trash) and move them to the trash directory.
 */
 
 static void workspace_cleanup()
 {
 	debug(D_WQ,"cleaning workspace %s",workspace);
-	delete_dir_contents(workspace);
+	DIR *dir = opendir(workspace);
+	if(dir) {
+		struct dirent *d;
+		while((d=readdir(dir))) {
+			if(!strcmp(d->d_name,".")) continue;
+			if(!strcmp(d->d_name,"..")) continue;
+			if(!strcmp(d->d_name,"trash")) continue;
+			trash_file(d->d_name);
+		}
+		closedir(dir);
+	}
+	trash_empty();
 }
 
 /*
@@ -2138,11 +2156,17 @@ static void workspace_delete()
 
 	printf( "work_queue_worker: deleting workspace %s\n", workspace);
 
-	delete_dir(workspace);
+	/*
+	Note that we cannot use trash_file here because the trash dir
+	is inside the workspace.  Abort if we really cannot clean up.
+	*/
+
+	unlink_recursive(workspace);
+
 	free(workspace);
 }
 
-static int serve_manager_by_hostport( const char *host, int port, const char *verify_project )
+static int serve_manager_by_hostport( const char *host, int port, const char *verify_project, int use_ssl )
 {
 	if(!domain_name_cache_lookup(host,current_manager_address->addr)) {
 		fprintf(stderr,"couldn't resolve hostname %s",host);
@@ -2162,10 +2186,24 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	reset_idle_timer();
 
 	struct link *manager = link_connect(current_manager_address->addr,port,idle_stoptime);
+
 	if(!manager) {
 		fprintf(stderr,"couldn't connect to %s:%d: %s\n",current_manager_address->addr,port,strerror(errno));
 		return 0;
 	}
+
+	if(manual_ssl_option && !use_ssl) {
+		fprintf(stderr,"work_queue_worker: --ssl was given, but manager %s:%d is not using ssl.\n",host,port);
+		link_close(manager);
+		return 0;
+	} else if(manual_ssl_option || use_ssl) {
+		if(link_ssl_wrap_connect(manager) < 1) {
+			fprintf(stderr,"work_queue_worker: could not setup ssl connection.\n");
+			link_close(manager);
+			return 0;
+		}
+	}
+
 	link_tune(manager,LINK_TUNE_INTERACTIVE);
 
 	char local_addr[LINK_ADDRESS_MAX];
@@ -2220,21 +2258,22 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	last_task_received     = 0;
 	results_to_be_sent_msg = 0;
 
-	workspace_cleanup();
 	disconnect_manager(manager);
 	printf("disconnected from manager %s:%d\n", host, port );
+
+	workspace_cleanup();
 
 	return 1;
 }
 
-int serve_manager_by_hostport_list(struct list *manager_addresses) {
+int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl) {
 	int result = 0;
 
 	/* keep trying managers in the list, until all manager addresses
 	 * are tried, or a succesful connection was done */
 	list_first_item(manager_addresses);
 	while((current_manager_address = list_next_item(manager_addresses))) {
-		result = serve_manager_by_hostport(current_manager_address->host,current_manager_address->port,0);
+		result = serve_manager_by_hostport(current_manager_address->host,current_manager_address->port,/*verify name*/ 0, use_ssl);
 
 		if(result) {
 			break;
@@ -2310,6 +2349,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 		const char *pref = jx_lookup_string(jx,"manager_preferred_connection");
 		struct jx *ifas  = jx_lookup(jx,"network_interfaces");
 		int port = jx_lookup_integer(jx,"port");
+		int use_ssl = jx_lookup_boolean(jx,"ssl");
 
 		// give priority to worker's preferred connection option
 		if(preferred_connection) {
@@ -2348,7 +2388,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 			manager_addresses = interfaces_to_list(addr, port, ifas);
 		}
 
-		result = serve_manager_by_hostport_list(manager_addresses);
+		result = serve_manager_by_hostport_list(manager_addresses, use_ssl);
 
 		struct manager_address *m;
 		while((m = list_pop_head(manager_addresses))) {
@@ -2455,11 +2495,12 @@ static void show_help(const char *cmd)
 	printf( "where options are:\n");
 	printf( " %-30s Show version string\n", "-v,--version");
 	printf( " %-30s Show this help screen\n", "-h,--help");
-	printf( " %-30s Name of manager (project) to contact.  May be a regular expression.\n", "-N,-M,--manager-name=<name>");
+	printf( " %-30s Name of manager (project) to contact.  May be a regular expression.\n", "-M,--manager-name=<name>");
 	printf( " %-30s Catalog server to query for managers.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
 	printf( " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf( " %-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
 	printf( " %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
+	printf( " %-30s Use SSL to connect to the manager. (Not needed if using -M)", "--ssl");
 	printf( " %-30s Set worker to run as a foreman.\n", "--foreman");
 	printf( " %-30s Run as a foreman, and advertise to the catalog server with <name>.\n", "-f,--foreman-name=<name>");
 	printf( " %-30s\n", "--foreman-port=<port>[:<highport>]");
@@ -2515,7 +2556,8 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
-	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE};
+	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
+	  LONG_OPT_USE_SSL};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2561,6 +2603,7 @@ static const struct option long_options[] = {
 	{"tlq",					required_argument,	0,  LONG_OPT_TLQ},
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
+	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
 	{0,0,0,0}
 };
 
@@ -2803,6 +2846,9 @@ int main(int argc, char *argv[])
 				fatal("connection-mode should be one of: by_ip, by_hostname, by_apparent_ip");
 			}
 			break;
+		case LONG_OPT_USE_SSL:
+			manual_ssl_option=1;
+			break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -2840,10 +2886,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	//Check GPU name
 	char *gpu_name = gpu_name_get();
 	if(gpu_name) {
 		hash_table_insert(features, gpu_name, (void **) 1);
+		free(gpu_name);
 	}
 
 	signal(SIGTERM, handle_abort);
@@ -2969,7 +3015,7 @@ int main(int argc, char *argv[])
 		if(project_regex) {
 			result = serve_manager_by_name(catalog_hosts, project_regex);
 		} else {
-			result = serve_manager_by_hostport_list(manager_addresses);
+			result = serve_manager_by_hostport_list(manager_addresses, /* use ssl only if --ssl */ manual_ssl_option);
 		}
 
 		/*

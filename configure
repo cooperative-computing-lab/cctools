@@ -75,7 +75,6 @@ include_package_makeflow="makeflow"
 include_package_parrot="parrot"
 include_package_resource_monitor="resource_monitor"
 include_package_tlq="tlq"
-include_package_poncho='poncho'
 
 include_package_umbrella=
 include_package_weaver=
@@ -108,6 +107,7 @@ config_zlib_path=yes
 config_ext2fs_path=auto
 config_fuse_path=auto
 config_mysql_path=auto
+config_openssl_path=auto
 config_perl_path=auto
 config_python_path=auto    # for python2 or python3, version automatically detected
 config_python2_path=auto
@@ -121,7 +121,6 @@ config_cvmfs_path=no
 config_globus_path=no
 config_irods_path=no
 config_mpi_path=no
-config_openssl_path=no
 config_uuid_path=no
 config_xrootd_path=no
 
@@ -1229,6 +1228,27 @@ then
 		echo "*** Couldn't find libcrypto"
 		openssl_avail=no
 	fi
+
+	if ! optional_include openssl/ssl.h HAS_OPENSSL
+	then
+		echo "*** Couldn't find openssl headers"
+		openssl_avail=no
+	fi
+
+	if [ "${openssl_avail}" = yes ]
+	then
+			openssl_ccflags="-I${openssl_path}/include"
+			openssl_ldflags="-L${openssl_path}/lib -lssl -lcrypto"
+
+			if ! optional_function TLS_method openssl/ssl.h HAS_TLS_method
+			then
+				if ! optional_function SSLv23_method openssl/ssl.h HAS_SSLv23_method
+				then
+					echo "*** Couldn't find openssl methods. Perhaps openssl installation is too old?"
+					openssl_avail=no
+				fi
+			fi
+	fi
 fi
 
 report_detection openssl "${openssl_avail}" "${config_openssl_path}" "${openssl_path}"
@@ -1405,7 +1425,7 @@ then
 	fi
 fi
 
-potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_dataswarm} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_tlq} ${include_package_doc} ${include_package_poncho} python_environments"
+potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_dataswarm} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_tlq} ${include_package_doc} poncho"
 
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
@@ -1629,6 +1649,10 @@ CCTOOLS_CVMFS_AVAILABLE=${cvmfs_avail}
 CCTOOLS_CVMFS_LDFLAGS=${cvmfs_ldflags}
 CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
 
+CCTOOLS_OPENSSL_AVAILABLE=${openssl_avail}
+CCTOOLS_OPENSSL_LDFLAGS=${openssl_ldflags}
+CCTOOLS_OPENSSL_CCFLAGS=${openssl_ccflags}
+
 CCTOOLS_EXT2FS_AVAILABLE=${ext2fs_avail}
 CCTOOLS_EXT2FS_LDFLAGS=${ext2fs_ldflags}
 CCTOOLS_EXT2FS_CCFLAGS=${ext2fs_ccflags}
@@ -1660,8 +1684,9 @@ echo "General libraries"
 printf "%-15s %3s\n" curl ${curl_avail}
 printf "%-15s %3s\n" ext2fs ${ext2fs_avail}
 printf "%-15s %3s\n" fuse ${fuse_avail}
-printf "%-15s %3s\n" readline ${readline_avail}
 printf "%-15s %3s\n" "makeflow mpi" ${mpi_avail}
+printf "%-15s %3s\n" openssl ${openssl_avail}
+printf "%-15s %3s\n" readline ${readline_avail}
 
 echo ""
 echo "Language support:"

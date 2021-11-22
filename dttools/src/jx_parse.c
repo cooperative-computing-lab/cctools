@@ -47,6 +47,7 @@ typedef enum {
 	JX_TOKEN_C_AND,
 	JX_TOKEN_OR,
 	JX_TOKEN_C_OR,
+	JX_TOKEN_DOT,
 	JX_TOKEN_NOT,
 	JX_TOKEN_C_NOT,
 	JX_TOKEN_NULL,
@@ -343,6 +344,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		jx_ungetchar(s, c);
 		goto retry;
 	} else if(strchr("0123456789.",c)) {
+		if (c=='.') {
+			char d = jx_getchar(s);
+			jx_ungetchar(s, d);
+			if (!strchr("0123456789",d)) return JX_TOKEN_DOT;
+		}
 		s->token[0] = c;
 		int i;
 		for(i=1;i<MAX_TOKEN_SIZE;i++) {
@@ -727,6 +733,7 @@ int jx_operator_precedence( jx_operator_t t )
 		case JX_OP_MOD:	return 1;
 		case JX_OP_LOOKUP: return 0;
 		case JX_OP_CALL: return 0;
+		case JX_OP_DOT: return 0;
 		default:	return 0;
 	}
 }
@@ -753,6 +760,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_C_NOT:return JX_OP_NOT;
 		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
 		case JX_TOKEN_LPAREN: return JX_OP_CALL;
+		case JX_TOKEN_DOT: return JX_OP_DOT;
 		default:		return JX_OP_INVALID;
 	}
 }
@@ -877,6 +885,36 @@ static struct jx *jx_parse_postfix_oper(struct jx_parser *s, struct jx *a )
 			struct jx *j = jx_operator(JX_OP_CALL, a, args);
 			j->line = line;
 			j->u.oper.line = line;
+
+			// Multiple postfix operations can be stacked
+			return jx_parse_postfix_oper(s,j);
+		}
+		case JX_TOKEN_DOT: {
+			// Get function name
+			struct jx *func_name = jx_parse_atomic(s, false);
+			if (!func_name || !jx_istype(func_name, JX_SYMBOL)) {
+				jx_parse_error_c(s, "dot operator must be followed by a symbol");
+				jx_delete(func_name);
+				jx_delete(a);
+				return NULL;
+			}
+
+			unsigned line = s->line;
+
+			// Get the function arguments, including both parens.
+			struct jx *args = jx_parse_atomic(s, true);
+			if (!args) {
+				jx_delete(a);
+				return NULL;
+			}
+
+			// Create a new expression for the funcion call
+			struct jx *call = jx_operator(JX_OP_CALL, func_name, args);
+			call->line = line;
+			call->u.oper.line = line;
+
+			// Create a new expression for the anaphoric operation
+			struct jx *j = jx_operator(JX_OP_DOT, a, call);
 
 			// Multiple postfix operations can be stacked
 			return jx_parse_postfix_oper(s,j);

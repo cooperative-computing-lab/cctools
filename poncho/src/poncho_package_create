@@ -11,37 +11,91 @@ import argparse
 import subprocess
 import json
 import conda_pack
+import pathlib
+import hashlib
+import shutil
+import logging
 
-devnull = open(os.devnull, 'w')
+logger = logging.getLogger()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
 
-def pack_env(spec, out):
+
+def pack_env(spec, output):
+    # Read and hash specification file
+    with open(spec) as f:
+        pkgs = json.load(f)
+
+    # record packages installed as editable from pip
+    local_pip_pkgs = _find_local_pip()
+
     with tempfile.TemporaryDirectory() as env_dir:
-        print('Creating temporary environment in {}'.format(env_dir))
-	
-	# creates conda spec file from original spec file
-        print('creating conda environment...')
-        check_spec(spec, env_dir)
-	
-        subprocess.check_call(['conda', 'env', 'create', '--prefix', env_dir,
-            '--file', env_dir + '/conda_spec.yml'])
+        logger.info('Creating temporary environment in {}'.format(env_dir))
 
-	# fetch data
-        print('Fethcing data...')
+        # creates conda spec file from poncho spec file
+        logger.info('Converting spec file...')
+        conda_spec = create_conda_spec(spec, env_dir, local_pip_pkgs)
+
+        # fetch data via git and https
+        logger.info('Fetching git data...')
         git_data(spec, env_dir)
+
+        logger.info('Fetching http data...')
         http_data(spec, env_dir)
-	
+
+        # create conda environment in temp directory
+        logger.info('Populating environment...')
+        _run_conda_command(env_dir, 'env create', '--file', env_dir + '/conda_spec.yml')
+
+        logger.info('Adding local packages...')
+        for (name, path) in conda_spec['pip_local'].items():
+            _install_local_pip(env_dir, name, path)
+
+        logger.info('Generating environment file...')
+
         # Bug breaks bundling common packages (e.g. python).
         # ignore_missing_files may be safe to remove in the future.
         # https://github.com/conda/conda-pack/issues/145
-        print('packing environment...')
-        conda_pack.pack(prefix=env_dir, output=out, force=True, ignore_missing_files=True)
-        print('To activate environment run poncho_package_run -e {} <command>'.format(out))
+        conda_pack.pack(prefix=env_dir, output=str(output), force=True, ignore_missing_files=True)
+
+        logger.info('To activate environment run poncho_package_run -e {} <command>'.format(output))
+
+    return output
+
+
+def _run_conda_command(environment, command, *args):
+    all_args = ['conda'] + command.split()
+    all_args = all_args + ['--prefix={}'.format(str(environment))] + list(args)
+
+    try:
+        subprocess.check_output(all_args, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        logger.warning("Error executing: {}".format(' '.join(all_args)))
+        print(e.output.decode())
+        sys.exit(1)
+
+
+def _find_local_pip():
+    edit_raw = subprocess.check_output([sys.executable, '-m' 'pip', 'list', '--editable']).decode()
+
+    # drop first two lines, which are just a header
+    edit_raw = edit_raw.split('\n')[2:]
+
+    path_of = {}
+    for line in edit_raw:
+        if not line:
+            # skip empty lines
+            continue
+        # we are only interested in the path information of the package, which
+        # is in the last column
+        (pkg, version, location) = line.split()
+        path_of[pkg] = location
+    return path_of
+
 
 def git_data(spec, out_dir):
-
     f = open(spec, 'r')
     data = json.load(f)
-    
+
     if 'git' in data:
         for git_dir in data['git']:
 
@@ -58,17 +112,22 @@ def git_data(spec, out_dir):
                 path = '{}/{}'.format(out_dir, git_dir)
 
                 subprocess.check_call(['git', 'clone', git_repo, path])
-            
+
                 if not os.path.exists(out_dir + '/poncho'):
                     os.mkdir(out_dir + '/poncho')
 
                 # add to script
-                gd = 'export {}=$1/{}\n'.format(git_dir, git_dir) 
+                gd = 'export {}=$1/{}\n'.format(git_dir, git_dir)
                 with open(out_dir + '/poncho/set_env', 'a') as f:
                     f.write(gd)
-            	
-def http_data(spec, out_dir):
 
+
+def _install_local_pip(env_dir, pip_name, pip_path):
+    logger.info("Installing {} from editable pip".format(pip_path))
+    _run_conda_command(env_dir, 'run', 'pip', 'install', '--use-feature=in-tree-build', pip_path)
+
+
+def http_data(spec, out_dir):
     f = open(spec, 'r')
     data = json.load(f)
 
@@ -89,7 +148,7 @@ def http_data(spec, out_dir):
             if url:
                 # curl datai
                 path = '{}/{}'.format(out_dir, filename)
-              
+
                 if file_type == 'tar' and compression == 'gzip':
                     tgz = path + '.tar.gz'
                     subprocess.check_call(['curl', url, '--output', tgz])
@@ -109,48 +168,66 @@ def http_data(spec, out_dir):
 
                 else:
                     subprocess.check_call(['curl', url, '--output', path])
-                
                 if not os.path.exists(out_dir + '/poncho'):
                     os.mkdir(out_dir + '/poncho')
 
-                gd = 'export {}=$1/{}\n'.format(filename, filename) 
+                gd = 'export {}=$1/{}\n'.format(filename, filename)
                 with open(out_dir + '/poncho/set_env', 'a') as f:
                     f.write(gd)
 
-def check_spec(spec, out_dir):
 
-    f = open(spec, 'r')
-    data = json.load(f)
+def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
+    f = open(spec_file, 'r')
+    poncho_spec = json.load(f)
+
     conda_spec = {}
     conda_spec['channels'] = []
-    conda_spec['dependencies'] = []
+    conda_spec['dependencies'] = set()
     conda_spec['name'] = 'base'
- 
-    if 'conda' in data:
-        for  channel in data['conda']['channels']:
-            if channel not in conda_spec['channels']:
-                conda_spec['channels'].append(channel)
-        for  dep in data['conda']['packages']:
-            if dep not in conda_spec['dependencies']:
-                conda_spec['dependencies'].append(dep)
+
+    # packages in the spec that are installed in the current environment with
+    # pip --editable
+    local_reqs = set()
+    
+    if 'conda' in poncho_spec:
+        conda_spec['channels'] = poncho_spec['conda'].get('channels', ['conda-forge', 'defaults'])
+        conda_spec['dependencies'] = set(poncho_spec['conda'].get('packages', []))
+
+        for pip_name in local_pip_pkgs:
+            if pip_name in conda_spec['dependencies']:
+                local_reqs.add(pip_name)
+                conda_spec['dependencies'].remove(pip_name)
+
+        conda_spec['dependencies'] = list(conda_spec['dependencies'])
 
 
-    if 'pip' in data:
-        pip_pkgs = []
-        for x in data['pip']:
-            pip_pkgs.append(x)
+    # get pip packages that are not installed --editable
+    pip_pkgs = set(poncho_spec.get('pip', []))
+    for pip_name in local_pip_pkgs:
+        if pip_name in pip_pkgs:
+            local_reqs.add(pip_name)
+            pip_pkgs.remove(pip_name)
 
-        conda_spec['dependencies'].append({'pip':pip_pkgs})
+    conda_spec['dependencies'].append({'pip': list(pip_pkgs)})
+
+    for (pip_name, location) in local_pip_pkgs.items():
+        if pip_name not in local_reqs:
+            logger.warning("pip package {} was found as pip --editable, but it is not part of the spec. Ignoring local installation.")
 
     with open(out_dir + '/conda_spec.yml',  'w') as jf:
-        json.dump(conda_spec, jf, indent=4)			
-	
+        json.dump(conda_spec, jf, indent=4)
+
+    # adding local pips to the spec after writing file, as conda complains of
+    # unknown field.
+    conda_spec['pip_local'] = {name:local_pip_pkgs[name] for name in local_reqs}
+
+    return conda_spec
+
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='Create a packed environment from a spec.')
-    parser.add_argument('spec',
-        help='Read in a spec file, or - for stdin.')
-    parser.add_argument('out',
-        help='Write output from conda-pack to the given file.')
-    args = parser.parse_args()	
-    pack_env(args.spec, args.out)
+    parser = argparse.ArgumentParser(description='Create a packed environment from a spec.')
+    parser.add_argument('spec', help='Read in a spec file, or - for stdin.')
+    parser.add_argument('output', help='Write output from conda-pack to the given file.')
+
+    args = parser.parse_args()
+    pack_env(args.spec, output=args.output)

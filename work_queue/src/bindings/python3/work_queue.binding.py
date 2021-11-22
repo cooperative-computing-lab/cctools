@@ -12,6 +12,8 @@
 # - @ref work_queue::Task
 # - @ref work_queue::Factory
 
+import itertools
+import math
 import copy
 import os
 import sys
@@ -331,12 +333,15 @@ class Task(object):
         flags = Task._determine_file_flags(flags, cache, None)
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
+
+    ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
     # to take a snapshot of the task resources. Snapshots appear in the JSON
     # summary file of the task, under the key "snapshots". Snapshots are taken
     # on events on files described in the monitor_snapshot_file. The
     # monitor_snapshot_file is a json encoded file with the following format:
     #
+    # @code
     #   {
     #       "FILENAME": {
     #           "from-start":boolean,
@@ -359,6 +364,7 @@ class Task(object):
     #       "FILENAME": {
     #           ...
     #   }
+    # @endcode
     #
     # All keys but "label" are optional:
     #
@@ -375,6 +381,14 @@ class Task(object):
     #   count        Maximum number of snapshots for this label. Default: -1 (no limit)
     #
     # Exactly one of on-create, on-truncate, or on-pattern should be specified.
+    #
+    # Once a task has finished, the snapshots are available as:
+    #
+    # @code
+    # for s in t.resources_measured.snapshots:
+    #   print(s.memory)
+    # @endcode
+    #
     # For more information, consult the manual of the resource_monitor.
     #
     # @param self           Reference to the current task object.
@@ -949,9 +963,9 @@ class PythonTask(Task):
 
     def _serialize_python_function(self, func, *args):
         with open(self._func_file, 'wb') as wf:
-            dill.dump(func, wf)
+            dill.dump(func, wf, recurse=True)
         with open(self._args_file, 'wb') as wf:
-            dill.dump([*args], wf)
+            dill.dump([*args], wf, recurse=True)
 
 
     def _python_function_command(self):
@@ -1023,9 +1037,11 @@ class WorkQueue(object):
     # @param transactions_log  The name of a file to write the queue's transactions log.
     # @param debug_log  The name of a file to write the queue's debug log.
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
+    # @param ssl_key    SSL key in pem format (If not given, then TSL is not activated).
+    # @param ssl_cert   SSL cert in pem format (If not given, then TSL is not activated).
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None):
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl_key=None, ssl_cert=None):
         self._shutdown = shutdown
         self._work_queue = None
         self._stats = None
@@ -1049,7 +1065,7 @@ class WorkQueue(object):
                 specify_debug_log(debug_log)
             self._stats = work_queue_stats()
             self._stats_hierarchy = work_queue_stats()
-            self._work_queue = work_queue_create(port)
+            self._work_queue = work_queue_ssl_create(port, ssl_key, ssl_cert)
             if not self._work_queue:
                 raise Exception('Could not create work_queue on port %d' % port)
 
@@ -1689,6 +1705,7 @@ class WorkQueue(object):
     # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
     # - "hungry-minimum" Mimimum number of tasks to consider queue not hungry. (default=10)
     # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
+    # - "wait_retrieve_many" Parameter to alter how work_queue_wait works. If set to 0, work_queue_wait breaks out of the while loop whenever a task changes to WORK_QUEUE_TASK_DONE (wait_retrieve_one mode). If set to 1, work_queue_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
     # @param value The value to set the parameter to.
     # @return 0 on succes, -1 on failure.
     #
@@ -1724,6 +1741,99 @@ class WorkQueue(object):
             return task
         return None
 
+    ##
+    # Maps a function to elements in a sequence using work_queue
+    #
+    # Similar to regular map function in python
+    #
+    # @param self       Reference to the current work queue object.
+    # @param fn         The function that will be called on each element
+    # @param seq        The sequence that will call the function
+    # @param chunk_size The number of elements to process at once
+
+    def map(self, fn, array, chunk_size=1):
+        size = math.ceil(len(array)/chunk_size)
+        results = [None] * size
+        tasks = {}
+
+        for i in range(size):
+            start = i*chunk_size
+            end = start + chunk_size
+
+            if end > len(array):
+                p_task = PythonTask(map, fn, array[start:])
+            else:
+                p_task = PythonTask(map, fn, array[start:end])
+
+            self.submit(p_task)
+            tasks[p_task.id] = i
+
+        while not self.empty():
+            t = self.wait()
+            results[tasks[t.id]] = list(t.output)
+
+        return [item for elem in results for item in elem]
+
+
+    ##
+    # Returns the values for a function of each pair from 2 sequences
+    #
+    # The pairs that are passed into the function are generated by itertools
+    #
+    # @param self     Reference to the current work queue object.
+    # @param fn       The function that will be called on each element
+    # @param seq1     The first seq that will be used to generate pairs
+    # @param seq2     The second seq that will be used to generate pairs
+    def pair(self, fn, seq1, seq2):
+        results = [None] * (len(seq1) * len(seq2))
+        tasks = {}
+        for i, (x, y) in enumerate(itertools.product(seq1, seq2)):
+            p_task = PythonTask(fn, x, y)
+            self.submit(p_task)
+            tasks[p_task.id] = i
+
+        while not self.empty():
+            t = self.wait()
+            results[tasks[t.id]] = t.output
+
+        return results
+
+
+    ##
+    # Reduces a sequence until only one value is left, and then returns that value.
+    # The sequence is reduced by passing a pair of elements into a function and
+    # then stores the result. It then makes a sequence from the results, and
+    # reduces again until one value is left.
+    #
+    # If the sequence has an odd length, the last element gets reduced at the
+    # end.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param fn         The function that will be called on each element
+    # @param seq        The seq that will be reduced
+
+    def tree_reduce(self, fn, seq):
+        size = len(seq)
+        tasks = {}
+
+        while len(seq) > 1:
+            results = [None] * (len(seq)//2)
+            for i in range(len(seq)//2):
+                p_task = PythonTask(fn, seq[(i*2)], seq[(i*2)+1])
+                self.submit(p_task)
+                tasks[p_task.id] = i
+
+            while not self.empty():
+                t = self.wait()
+                results[tasks[t.id]] = t.output
+
+            if len(seq) % 2 == 1:
+                results.append(seq[-1])
+            seq = results
+
+        return seq[0]
+
+# test
 
 ##
 # \class Factory
@@ -1735,7 +1845,7 @@ class WorkQueue(object):
 # the resources, number of workers, etc. Factory objects function as Python
 # context managers, so to indicate that a set of commands should be run with
 # a factory running, wrap them in a `with` statement. The factory will be
-# cleaned up automtically at the end of the block. You can also make
+# cleaned up automatically at the end of the block. You can also make
 # config changes to the factory while it is running. As an example,
 #
 #     # normal WQ setup stuff
@@ -1780,6 +1890,7 @@ class Factory(object):
         "run-factory-as-manager",
         "runos",
         "scratch-dir",
+        "ssl",
         "tasks-per-worker",
         "timeout",
         "worker-binary",
@@ -1930,9 +2041,17 @@ class Factory(object):
         if self._opts['batch-type'] == 'local':
             self._opts['extra-options'] = self._opts.get('extra-options', '') + ' --parent-death'
 
-        args += ["--{}={}".format(opt, self._opts[opt])
-                 for opt in self._opts
-                 if opt in Factory._command_line_options and opt not in Factory._config_file_options]
+        flags = [opt for opt in Factory._command_line_options if opt[0] != ":"]
+
+        for opt in self._opts:
+            if opt not in Factor._command_line_options:
+                continue
+            if opt in Factor._config_file_options:
+                continue
+            if self._opts[opt] is True:
+                args.append("--{}".format(opt))
+            else:
+                args.append("--{}={}".format(opt, self._opts[opt]))
 
         if 'manager-host' in self._opts:
             args += [self._opts['manager-host'], self._opts['manager-port']]

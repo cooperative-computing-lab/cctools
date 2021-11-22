@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -ex
 
 . ../../dttools/test/test_runner_common.sh
 
@@ -37,7 +37,7 @@ run()
 	(PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} wq_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE) &
 
 	# wait at most 5 seconds for makeflow to find a port.
-	wait_for_file_creation $PORT_FILE 2
+	wait_for_file_creation $PORT_FILE 5
 
 	run_local_worker $PORT_FILE worker.log
 
