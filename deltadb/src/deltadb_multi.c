@@ -100,7 +100,7 @@ must consist of printables, not begin with dot,
 nor contain a slash.
 */
 
-static int is_safe_type_string( const char *s )
+int deltadb_multi_is_valid_type_string( const char *s )
 {
 	if(s[0]=='.') return 0;
 
@@ -124,7 +124,7 @@ int deltadb_multi_insert( struct deltadb_multi *mdb, const char *key, struct jx 
 	const char *type = jx_lookup_string(j,"type");
 	if(!type) return 0;
 
-	if(!is_safe_type_string(type)) {
+	if(!deltadb_multi_is_valid_type_string(type)) {
 		debug(D_NOTICE,"skipping illegal type field: %s",type);
 		return 0;
 	}

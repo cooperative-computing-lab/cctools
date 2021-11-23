@@ -34,6 +34,13 @@ struct deltadb_multi * deltadb_multi_create( const char *path );
 
 void deltadb_multi_delete( struct deltadb_multi *mdb );
 
+/**
+Determine if a type string is valid. A type string must be printable and not contain special characters that interfere with file and directory names.
+@param name The proposed table name.
+@return True if valid.
+*/
+
+int deltadb_multi_is_valid_type_string( const char *name );
 
 /** Insert or update an object into the database.
 @param db The database to access.

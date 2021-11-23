@@ -541,19 +541,14 @@ static void handle_query( struct link *ql, time_t st )
 		buffer_free(&buf);
 
 	} else if(4==sscanf(path, "/history/%ld/%ld/%[^/]/%[^/]",&time_start,&time_stop,strtable,strexpr)) {
-		struct buffer buf;
-		buffer_init(&buf);
-		if(b64_decode(strexpr,&buf)==0) {
-			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
-			if(expr) {
-				if(link_using_ssl(ql)) {
-					send_http_response(ql,501,"Server Error","text/plain",st);
-					link_printf(ql,st,"Sorry, unable to serve queries over HTTPS.");
-				} else {
+		if(deltadb_multi_is_valid_type_string(strtable)) {
+			struct buffer buf;
+			buffer_init(&buf);
+			if(b64_decode(strexpr,&buf)==0) {
+				struct jx *expr = jx_parse_string(buffer_tostring(&buf));
+				if(expr) {
 					send_http_response(ql,200,"OK","text/plain",st);
-					// check validity of table string
 					char *table_dir = string_format("%s/%s",history_dir,strtable);
-
 					struct deltadb_query *query = deltadb_query_create();
 					deltadb_query_set_filter(query,expr);
 					// Note this leaks a stdio stream, but it will be shortly recovered on process exit.
@@ -563,17 +558,19 @@ static void handle_query( struct link *ql, time_t st )
 					deltadb_query_delete(query);
 					jx_delete(expr);
 					free(table_dir);
+				} else {
+					send_http_response(ql,400,"Bad Request","text/plain",st);
+					link_printf(ql,st,"Invalid query text.\n");
 				}
 			} else {
 				send_http_response(ql,400,"Bad Request","text/plain",st);
-				link_printf(ql,st,"Invalid query text.\n");
+				link_printf(ql,st,"Invalid base-64 encoding.\n");
 			}
+			buffer_free(&buf);
 		} else {
 			send_http_response(ql,400,"Bad Request","text/plain",st);
-			link_printf(ql,st,"Invalid base-64 encoding.\n");
+			link_printf(ql,st,"Invalid table name: %s\n",strtable);
 		}
-		buffer_free(&buf);
-
 	} else if(!strcmp(path, "/query.newclassads")) {
 		send_http_response(ql,200,"OK","text/plain",st);
 		for(i = 0; i < n; i++)
