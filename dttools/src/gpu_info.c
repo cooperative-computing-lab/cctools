@@ -21,7 +21,7 @@ See the file COPYING for details.
 #define GPU_COUNT_COMMAND GPU_EXECUTABLE " --query-gpu=count --format=csv,noheader"
 #define GPU_NAME_COMMAND GPU_EXECUTABLE " --query-gpu=name --format=csv,noheader"
 
-int gpu_info_get()
+int gpu_count_get()
 {
 	if(access(GPU_EXECUTABLE, X_OK) != 0) return 0;
 	

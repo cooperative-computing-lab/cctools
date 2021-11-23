@@ -14,7 +14,7 @@ Query gpu properties.
 /** Get the total number of gpus
 @return Number of gpus
 */
-int gpu_info_get();
+int gpu_count_get();
 
 /** Get the model name of gpu
 @return Name of gpu
