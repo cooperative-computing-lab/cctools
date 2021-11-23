@@ -9,12 +9,14 @@ See the file COPYING for details.
 
 /** @file deltadb_multi.h
 
-A deltadb_multi manages a large body of JX records.
-This API allows the caller to treat a collection of databases
+A deltadb_multi manages a collection of DeltaDB databases,
+with each instance specialized to a different type of data.
+This effectively gives multiple tables that then can be
+queried efficiently and separately.  This API treats the
+collection of tables as a single database using the 
 as a single database, using the same insert, lookup, and iterate
-API as the plain jx_database.  The difference is that, internally,
-the data is partitioned by the "type" field of the record,
-so that each type will have its own directory structure on disk.
+API as the plain deltadb.  However, queries will now be much
+more efficient when broken down by type, which is the common case.
 */
 
 #include "deltadb.h"
@@ -27,7 +29,7 @@ so that each type will have its own directory structure on disk.
 struct deltadb_multi * deltadb_multi_create( const char *path );
 
 /** Delete a multi database from memory, retaining state on disk.
-@param db The database to close
+@param db The database to close.
 */
 
 void deltadb_multi_delete( struct deltadb_multi *mdb );
