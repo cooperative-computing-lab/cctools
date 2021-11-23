@@ -6,7 +6,7 @@ LIBRARIES = libdeltadb.a
 OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = deltadb_query deltadb_upgrade_log catalog_server
 SCRIPTS =
-SOURCES = deltadb.c deltadb_query.c deltadb_stream.c deltadb_reduction.c
+SOURCES = deltadb.c deltadb_multi.c deltadb_query.c deltadb_stream.c deltadb_reduction.c
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
 all: $(TARGETS)
