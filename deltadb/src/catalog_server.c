@@ -58,8 +58,8 @@ See the file COPYING for details.
 /* Maximum size of a JX record arriving via TCP is 1MB. */
 #define TCP_PAYLOAD_MAX 1024*1024
 
-/* The table of record, hashed on address:port */
-static struct deltadb *table = 0;
+/* The database of records, hashed by address:port */
+static struct deltadb *db = 0;
 
 /* An array of jxs used to sort for display */
 static struct jx *array[MAX_TABLE_SIZE];
@@ -67,7 +67,7 @@ static struct jx *array[MAX_TABLE_SIZE];
 /* The time for which updated data lives before automatic deletion */
 static int lifetime = 1800;
 
-/* Time when the table was most recently cleaned of expired items. */
+/* Time when the db was most recently cleaned of expired items. */
 static time_t last_clean_time = 0;
 
 /* How frequently to clean out expired items. */
@@ -181,8 +181,8 @@ static void remove_expired_records()
 	// Run for a minimum of lifetime seconds before cleaning anything up.
 	if((current-starttime)<lifetime ) return;
 
-	deltadb_firstkey(table);
-	while(deltadb_nextkey(table, &key, &j)) {
+	deltadb_firstkey(db);
+	while(deltadb_nextkey(db, &key, &j)) {
 		time_t lastheardfrom = jx_lookup_integer(j,"lastheardfrom");
 
 		int this_lifetime = jx_lookup_integer(j,"lifetime");
@@ -193,7 +193,7 @@ static void remove_expired_records()
 		}
 
 		if( (current-lastheardfrom) > this_lifetime ) {
-				j = deltadb_remove(table,key);
+				j = deltadb_remove(db,key);
 			if(j) jx_delete(j);
 		}
 	}
@@ -336,14 +336,14 @@ static void handle_update( const char *addr, int port, const char *raw_data, int
 		make_hash_key(j, key);
 
 		if(logfile) {
-			if(!deltadb_lookup(table,key)) {
+			if(!deltadb_lookup(db,key)) {
 				jx_print_stream(j,logfile);
 				fprintf(logfile,"\n");
 				fflush(logfile);
 			}
 		}
 
-		deltadb_insert(table, key, j);
+		deltadb_insert(db, key, j);
 
 		debug(D_DEBUG, "received %s update from %s",protocol,key);
 }
@@ -481,11 +481,11 @@ static void handle_query( struct link *ql, time_t st )
 		strcpy(path, url);
 	}
 
-	/* load the hash table entries into one big array */
+	/* load the database entries into one big array */
 
 	n = 0;
-	deltadb_firstkey(table);
-	while(deltadb_nextkey(table, &hkey, &j)) {
+	deltadb_firstkey(db);
+	while(deltadb_nextkey(db, &hkey, &j)) {
 		array[n] = j;
 		n++;
 	}
@@ -578,7 +578,7 @@ static void handle_query( struct link *ql, time_t st )
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct jx *j;
 		send_http_response(ql,200,"OK","text/html",st);
-		j = deltadb_lookup(table, key);
+		j = deltadb_lookup(db, key);
 		if(j) {
 			const char *name = jx_lookup_string(j, "name");
 			if(!name)
@@ -870,8 +870,8 @@ int main(int argc, char *argv[])
 	username_get(owner);
 	starttime = time(0);
 
-	table = deltadb_create(history_dir);
-	if(!table)
+	db = deltadb_create(history_dir);
+	if(!db)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
 	query_port = link_serve_address(interface, port);
