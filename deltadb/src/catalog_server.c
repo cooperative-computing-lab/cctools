@@ -76,6 +76,15 @@ static time_t clean_interval = 60;
 /* The port upon which to listen. */
 static int port = CATALOG_PORT_DEFAULT;
 
+/* The SSL port upon which to listen. */
+static int ssl_port = 9443;
+
+/* Filename containing the SSL certificate. */
+static const char *ssl_cert_filename = 0;
+
+/* Filename containing the SSL private key. */
+static const char *ssl_key_filename = 0;
+
 /* The file for writing out the port number. */
 const char *port_file = 0;
 
@@ -642,6 +651,27 @@ static void handle_query(struct link *query_link)
 	fclose(stream);
 }
 
+void handle_tcp_query( struct link *port )
+{
+	if(fork_mode) {
+		pid_t pid = fork();
+		if(pid == 0) {
+			char raddr[LINK_ADDRESS_MAX];
+			int rport;
+			link_address_remote(port, raddr, &rport);
+			change_process_title("catalog_server [%s]", raddr);
+			alarm(child_procs_timeout);
+			handle_query(port);
+			_exit(0);
+		} else if (pid>0) {
+			child_procs_count++;
+		}
+	} else {
+		handle_query(port);
+	}
+	link_close(port);
+}
+
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options]\n", cmd);
@@ -678,14 +708,14 @@ static void show_help(const char *cmd)
 
 int main(int argc, char *argv[])
 {
-	struct link *link, *query_port = 0;
+	struct link *link;
+	struct link *query_port = 0;
+	struct link *query_ssl_port = 0;
 	signed char ch;
 	time_t current;
 	int is_daemon = 0;
 	char *pidfile = NULL;
 	char *interface = NULL;
-	char raddr[LINK_ADDRESS_MAX];
-	int rport;
 
 	outgoing_host_list = list_create();
 
@@ -708,6 +738,9 @@ int main(int argc, char *argv[])
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
 		{"port", required_argument, 0, 'p'},
+		{"ssl-port", required_argument, 0, 'S'},
+		{"ssl-cert", required_argument, 0, 'C'},
+		{"ssl-key", required_argument, 0, 'K'},
 		{"single", no_argument, 0, 'S'},
 		{"timeout", required_argument, 0, 'T'},
 		{"update-host", required_argument, 0, 'u'},
@@ -717,7 +750,7 @@ int main(int argc, char *argv[])
 		{0,0,0,0}};
 
 
-	while((ch = getopt_long(argc, argv, "bB:d:hH:I:l:L:m:M:n:o:O:p:ST:u:U:vZ:", long_options, NULL)) > -1) {
+	while((ch = getopt_long(argc, argv, "bB:C:d:hH:I:l:K:L:m:M:n:o:O:p:P:ST:u:U:vZ:", long_options, NULL)) > -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
@@ -764,6 +797,15 @@ int main(int argc, char *argv[])
 			case 'p':
 				port = atoi(optarg);
 				break;
+			case 'P':
+				ssl_port = atoi(optarg);
+				break;
+			case 'C':
+				ssl_cert_filename = optarg;
+				break;
+			case 'K':
+				ssl_key_filename = optarg;
+				break;	
 			case 'S':
 				fork_mode = 0;
 				break;
@@ -842,6 +884,20 @@ int main(int argc, char *argv[])
 			fatal("couldn't listen on TCP port %d", port);
 	}
 
+	query_ssl_port = link_serve_address(interface, ssl_port);
+	if(query_ssl_port) {
+		if(ssl_port==0) {
+			char addr[LINK_ADDRESS_MAX];
+			link_address_local(query_ssl_port,addr,&ssl_port);
+		}
+		link_ssl_wrap_server(query_ssl_port,ssl_key_filename,ssl_cert_filename);
+	} else {
+		if(interface)
+			fatal("couldn't listen on SSL TCP address %s port %d", interface, ssl_port);
+		else
+			fatal("couldn't listen on SSL TCP port %d", ssl_port);
+	}
+
 	update_dgram = datagram_create_address(interface, port);
 	if(!update_dgram) {
 		if(interface)
@@ -864,6 +920,7 @@ int main(int argc, char *argv[])
 		fd_set rfds;
 		int dfd = datagram_fd(update_dgram);
 		int lfd = link_fd(query_port);
+		int sfd = link_fd(query_ssl_port);
 		int ufd = link_fd(update_port);
 
 		int result, maxfd;
@@ -911,25 +968,19 @@ int main(int argc, char *argv[])
 		}
 
 		if(FD_ISSET(lfd, &rfds)) {
-			link = link_accept(query_port, time(0) + 5);
+			link = link_accept(query_port,time(0)+5);
 			if(link) {
-				if(fork_mode) {
-					pid_t pid = fork();
-					if(pid == 0) {
-						link_address_remote(link, raddr, &rport);
-						change_process_title("catalog_server [%s]", raddr);
-						alarm(child_procs_timeout);
-						handle_query(link);
-						_exit(0);
-					} else if (pid>0) {
-						child_procs_count++;
-					}
-				} else {
-					handle_query(link);
-				}
-				link_close(link);
+				handle_tcp_query(link);
 			}
 		}
+
+		if(FD_ISSET(sfd, &rfds)) {
+			link = link_accept(query_ssl_port,time(0)+5);
+			if(link) {
+				handle_tcp_query(link);
+			}
+		}
+
 	}
 
 	return 1;
