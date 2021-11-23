@@ -257,58 +257,58 @@ specified by **-L** _&lt;logfile&gt;_. This script will run the commands in
 serial that Makeflow would have run. This shell script format may be useful
 for archival purposes, since it does not depend on Makeflow.
 
-## MPI
+## MPI MODE
 
-When cctools is built with --with-mpi-path=which mpicc` configuration, Makeflow can be ran as an MPI program.
-To do so, run Makeflow as an argument to BOLD(mpirun)/BOLD(mpiexec) and set BOLD(-T) PARAM(mpi) as a Makeflow option.
+When cctools is built with the --with-mpi-path configuration, Makeflow can be ran as an MPI program.
+To do so, run Makeflow as an argument to **mpirun**/**mpiexec** and set **-T** _&lt;mpi&gt;_ as a Makeflow option.
 When submitting mpi, request one process per core. Makeflow will count up how many processes each node given to MPI
 has, and use that as the core count for the worker on that node. Makeflow will then share memory evenly amongst the cores
-on the node, following the following equation BOLD(worker_memory) = (BOLD(total_memory) / BOLD(total_logical_cores)) * BOLD(num_cores_for_worker).
-To override Makeflow sharing memory equally, or setting per-worker cores value, use CODE(--mpi-cores) and CODE(--mpi-memory).
+on the node, following the following equation **worker_memory** = (**total_memory** / **total_logical_cores**) * **num_cores_for_worker**.
+To override Makeflow sharing memory equally, or setting per-worker cores value, use **--mpi-cores** and **--mpi-memory**.
 
-Tasks can also have their own sandbox. To specify the directory for tasks to create their sandbox subdirectory in, use CODE(--mpi-task-working-dir).
+Tasks can also have their own sandbox. To specify the directory for tasks to create their sandbox subdirectory in, use **--mpi-task-working-dir**.
 
-SECTION(ENVIRONMENT VARIABLES)
+## ENVIRONMENT VARIABLES
 
 The following environment variables will affect the execution of your
-BOLD(Makeflow):
-SUBSECTION(BATCH_OPTIONS)
+**Makeflow**:
+### BATCH_OPTIONS
 
-This corresponds to the BOLD(-B) PARAM(options) parameter and will pass extra
+This corresponds to the **-B** _&lt;options&gt;_ parameter and will pass extra
 batch options to the underlying execution engine.
 
-SUBSECTION(MAKEFLOW_MAX_LOCAL_JOBS)
-This corresponds to the BOLD(-j) PARAM(#) parameter and will set the maximum
-number of local batch jobs.  If a BOLD(-j) PARAM(#) parameter is specified, the
+### MAKEFLOW_MAX_LOCAL_JOBS
+This corresponds to the **-j** _&lt;#&gt;_ parameter and will set the maximum
+number of local batch jobs.  If a **-j** _&lt;#&gt;_ parameter is specified, the
 minimum of the argument and the environment variable is used.
 
-SUBSECTION(MAKEFLOW_MAX_REMOTE_JOBS)
-This corresponds to the BOLD(-J) PARAM(#) parameter and will set the maximum
-number of local batch jobs.  If a BOLD(-J) PARAM(#) parameter is specified, the
+### MAKEFLOW_MAX_REMOTE_JOBS
+This corresponds to the **-J** _&lt;#&gt;_ parameter and will set the maximum
+number of local batch jobs.  If a **-J** _&lt;#&gt;_ parameter is specified, the
 minimum of the argument and the environment variable is used.
-PARA
-Note that variables defined in your BOLD(Makeflow) are exported to the
+
+Note that variables defined in your **Makeflow** are exported to the
 environment.
 
-SUBSECTION(TCP_LOW_PORT)
-Inclusive low port in range used with CODE(-p 0).
+### TCP_LOW_PORT
+Inclusive low port in range used with **-p 0**.
 
-SUBSECTION(TCP_HIGH_PORT))
-Inclusive high port in range used with CODE(-p 0).
+### TCP_HIGH_PORT)
+Inclusive high port in range used with **-p 0**.
 
-SECTION(EXIT STATUS)
+## EXIT STATUS
 On success, returns zero.  On failure, returns non-zero.
 
-SECTION(EXAMPLES)
+## EXAMPLES
 
 Run makeflow locally with debugging:
-LONGCODE_BEGIN
+```
 makeflow -d all Makeflow
-LONGCODE_END
+```
 
 Run makeflow on Condor will special requirements:
-LONGCODE_BEGIN
-makeflow -T condor -B "requirements = MachineGroup == 'ccl" Makeflow
+```
+makeflow -T condor -B "requirements = MachineGroup == 'ccl'" Makeflow
 ```
 
 Run makeflow with WorkQueue using named workers:
