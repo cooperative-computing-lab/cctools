@@ -217,6 +217,7 @@ int  deltadb_multi_nextkey( struct deltadb_multi *mdb, char **key, struct jx **j
 	}
 
 	while(hash_table_nextkey(mdb->table,&mdb->iter_key,(void**)&mdb->iter_db)) {
+		deltadb_firstkey(mdb->iter_db);
 		if(deltadb_nextkey(mdb->iter_db,key,j)) return 1;
 	}
 
