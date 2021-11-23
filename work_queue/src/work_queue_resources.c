@@ -55,7 +55,7 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 
 	if(!gpu_check)
 	{
-		r->gpus.total = gpu_info_get();
+		r->gpus.total = gpu_count_get();
 		r->gpus.largest = r->gpus.smallest = r->gpus.total;
 		gpu_check = 1;
 	}

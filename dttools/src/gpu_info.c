@@ -17,40 +17,34 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <fcntl.h>
 
+#define GPU_EXECUTABLE "/bin/nvidia-smi"
+#define GPU_COUNT_COMMAND GPU_EXECUTABLE " --query-gpu=count --format=csv,noheader"
+#define GPU_NAME_COMMAND GPU_EXECUTABLE " --query-gpu=name --format=csv,noheader"
 
-
-#define GPU_AUTODETECT "cctools_gpu_autodetect"
-
-int gpu_info_get()
+int gpu_count_get()
 {
-	char* nvidia_cmd= "/bin/nvidia-smi --query-gpu=count --format=csv,noheader";
-	if(access(nvidia_cmd, X_OK) != 0){	
-			return 0;
-	}
+	if(access(GPU_EXECUTABLE, X_OK) != 0) return 0;
 	
-	FILE *pipe = popen(nvidia_cmd, "r");
-	if (!pipe)
-		return 0;
+	FILE *pipe = popen(GPU_COUNT_COMMAND,"r");
+	if (!pipe) return 0;
 	
 	int gpus;
-	fscanf(pipe, "%d", &gpus);	
+	int fields = fscanf(pipe, "%d", &gpus);	
 	pclose(pipe);	
-	
-	return gpus;
+
+	if(fields==1) {
+		return gpus;
+	} else {
+		return 0;
+	}
 }
 
 char *gpu_name_get()
 {
-	char *nvidia_cmd = "/bin/nvidia-smi";
+	if(access(GPU_EXECUTABLE, X_OK) != 0) return 0;
 
-	if(access(nvidia_cmd, X_OK) != 0) {
-		return NULL;
-	}
-
-	FILE *pipe = popen("/bin/nvidia-smi --query-gpu=gpu_name --format=csv,noheader", "r");
-	if(!pipe) {
-		return NULL;
-	}
+	FILE *pipe = popen(GPU_NAME_COMMAND,"r");
+	if(!pipe) return 0;
 
 	char *gpu_name = get_line(pipe);
 
