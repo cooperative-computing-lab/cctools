@@ -14,7 +14,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "nvpair.h"
 #include "nvpair_jx.h"
-#include "deltadb.h"
+#include "deltadb_multi.h"
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "jx_table.h"
@@ -59,7 +59,7 @@ See the file COPYING for details.
 #define TCP_PAYLOAD_MAX 1024*1024
 
 /* The database of records, hashed by address:port */
-static struct deltadb *db = 0;
+static struct deltadb_multi *db = 0;
 
 /* An array of jxs used to sort for display */
 static struct jx *array[MAX_TABLE_SIZE];
@@ -181,8 +181,8 @@ static void remove_expired_records()
 	// Run for a minimum of lifetime seconds before cleaning anything up.
 	if((current-starttime)<lifetime ) return;
 
-	deltadb_firstkey(db);
-	while(deltadb_nextkey(db, &key, &j)) {
+	deltadb_multi_firstkey(db);
+	while(deltadb_multi_nextkey(db, &key, &j)) {
 		time_t lastheardfrom = jx_lookup_integer(j,"lastheardfrom");
 
 		int this_lifetime = jx_lookup_integer(j,"lifetime");
@@ -193,7 +193,7 @@ static void remove_expired_records()
 		}
 
 		if( (current-lastheardfrom) > this_lifetime ) {
-				j = deltadb_remove(db,key);
+				j = deltadb_multi_remove(db,key);
 			if(j) jx_delete(j);
 		}
 	}
@@ -336,14 +336,14 @@ static void handle_update( const char *addr, int port, const char *raw_data, int
 		make_hash_key(j, key);
 
 		if(logfile) {
-			if(!deltadb_lookup(db,key)) {
+			if(!deltadb_multi_lookup(db,key)) {
 				jx_print_stream(j,logfile);
 				fprintf(logfile,"\n");
 				fflush(logfile);
 			}
 		}
 
-		deltadb_insert(db, key, j);
+		deltadb_multi_insert(db, key, j);
 
 		debug(D_DEBUG, "received %s update from %s",protocol,key);
 }
@@ -445,6 +445,7 @@ static void handle_query( struct link *ql, time_t st )
 	char addr[LINK_ADDRESS_MAX];
 	char key[LINE_MAX];
 	char strexpr[LINE_MAX];
+	char strtable[LINE_MAX];
 	int port;
 	long time_start, time_stop;
 
@@ -484,8 +485,8 @@ static void handle_query( struct link *ql, time_t st )
 	/* load the database entries into one big array */
 
 	n = 0;
-	deltadb_firstkey(db);
-	while(deltadb_nextkey(db, &hkey, &j)) {
+	deltadb_multi_firstkey(db);
+	while(deltadb_multi_nextkey(db, &hkey, &j)) {
 		array[n] = j;
 		n++;
 	}
@@ -539,8 +540,7 @@ static void handle_query( struct link *ql, time_t st )
 		}
 		buffer_free(&buf);
 
-	} else if(3==sscanf(path, "/history/%ld/%ld/%[^/]",&time_start,&time_stop,strexpr)) {
-
+	} else if(3==sscanf(path, "/history/%ld/%ld/%[^/]/%[^/]",&time_start,&time_stop,strtable,strexpr)) {
 		struct buffer buf;
 		buffer_init(&buf);
 		if(b64_decode(strexpr,&buf)==0) {
@@ -551,15 +551,18 @@ static void handle_query( struct link *ql, time_t st )
 					link_printf(ql,st,"Sorry, unable to serve queries over HTTPS.");
 				} else {
 					send_http_response(ql,200,"OK","text/plain",st);
+					// check validity of table string
+					char *table_dir = string_format("%s/%s",history_dir,strtable);
 
 					struct deltadb_query *query = deltadb_query_create();
 					deltadb_query_set_filter(query,expr);
 					// Note this leaks a stdio stream, but it will be shortly recovered on process exit.
 					deltadb_query_set_output(query,fdopen(link_fd(ql),"w"));
 					deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
-					deltadb_query_execute_dir(query,history_dir,time_start,time_stop);
+					deltadb_query_execute_dir(query,table_dir,time_start,time_stop);
 					deltadb_query_delete(query);
 					jx_delete(expr);
+					free(table_dir);
 				}
 			} else {
 				send_http_response(ql,400,"Bad Request","text/plain",st);
@@ -578,7 +581,7 @@ static void handle_query( struct link *ql, time_t st )
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct jx *j;
 		send_http_response(ql,200,"OK","text/html",st);
-		j = deltadb_lookup(db, key);
+		j = deltadb_multi_lookup(db, key);
 		if(j) {
 			const char *name = jx_lookup_string(j, "name");
 			if(!name)
@@ -870,7 +873,7 @@ int main(int argc, char *argv[])
 	username_get(owner);
 	starttime = time(0);
 
-	db = deltadb_create(history_dir);
+	db = deltadb_multi_create(history_dir);
 	if(!db)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
