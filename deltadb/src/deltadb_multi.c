@@ -45,8 +45,7 @@ void deltadb_multi_delete( struct deltadb_multi *mdb )
 	hash_table_firstkey(mdb->table);
 	while(hash_table_nextkey(mdb->table,&key,(void**)&db)) {
 		hash_table_remove(mdb->table,key);
-		// XXX individual delete doesn't exist yet
-		// deltadb_delete(db);
+		deltadb_delete(db);
 	}
 
 	hash_table_delete(mdb->table);

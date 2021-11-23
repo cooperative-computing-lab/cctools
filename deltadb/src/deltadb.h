@@ -69,6 +69,12 @@ totalling under 8GB data per year.
 
 struct deltadb * deltadb_create( const char *logdir );
 
+/** Delete the memory state of a database, leaving the persistent content on disk.
+@param db The database to delete.
+*/
+
+void deltadb_delete( struct deltadb *db );
+
 /** Insert or update an object into the database.
 If an object with the same primary key exists in the database, it will generate update (U) records in the log, otherwise a create (C) record is generated against the original object.
 @param db The database to access.

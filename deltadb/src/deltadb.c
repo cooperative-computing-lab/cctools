@@ -24,7 +24,7 @@ See the file COPYING for details.
 
 struct deltadb {
 	struct hash_table *table;
-	const char *logdir;
+	char *logdir;
 	int logyear;
 	int logday;
 	FILE *logfile;
@@ -465,6 +465,23 @@ struct deltadb * deltadb_create( const char *logdir )
 	}
 
 	return db;
+}
+
+void deltadb_delete( struct deltadb *db )
+{
+	char *key;
+	struct jx *jvalue;
+
+	hash_table_firstkey(db->table);
+	while(hash_table_nextkey(db->table,&key,(void**)&jvalue)) {
+		jvalue = hash_table_remove(db->table,key);
+		if(jvalue) jx_delete(jvalue);
+	}
+
+	hash_table_delete(db->table);
+	if(db->logfile) fclose(db->logfile);
+	if(db->logdir)  free(db->logdir);
+	free(db);
 }
 
 void deltadb_insert( struct deltadb *db, const char *key, struct jx *nv )
