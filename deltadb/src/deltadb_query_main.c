@@ -81,6 +81,7 @@ static struct option long_options[] =
 	{"db", required_argument, 0, 'D'},
 	{"file", required_argument, 0, 'L'},
 	{"catalog", required_argument, 0, 'c'},
+	{"table", required_argument, 0, 'b' },
 	{"output", required_argument, 0, 'o'},
 	{"where", required_argument, 0,'w'},
 	{"filter", required_argument, 0,'f'},
@@ -102,6 +103,7 @@ void show_help()
 	printf("  --db <path>         Query this database directory.\n");
 	printf("  --file <path>       Query this raw data file.\n");
 	printf("  --catalog <host>    Query this catalog server.\n");
+	printf("  --table <name>      Query this table on the catalog server.\n");
 	printf("  --output <expr>     Output this expression. (multiple)\n");
 	printf("  --where <expr>      Only output records matching this expression.\n");
 	printf("  --filter <expr>     Only process records matching this expression.\n");
@@ -126,6 +128,7 @@ int main( int argc, char *argv[] )
 	const char *dbdir=0;
 	const char *dbfile=0;
 	const char *dbhost=0;
+	const char *dbtable=0;
 
 	struct jx *where_expr=0;
 	struct jx *filter_expr=0;
@@ -147,7 +150,7 @@ int main( int argc, char *argv[] )
 	struct deltadb_query *query = deltadb_query_create();
 	deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
 
-	while((c=getopt_long(argc,argv,"D:L:o:w:f:F:T:e:tvh",long_options,0))!=-1) {
+	while((c=getopt_long(argc,argv,"D:L:c:b:o:w:f:F:T:e:tvh",long_options,0))!=-1) {
 		switch(c) {
 		case 'D':
 			dbdir = optarg;
@@ -158,7 +161,9 @@ int main( int argc, char *argv[] )
 		case 'c':
 			dbhost = optarg;
 			break;
-
+		case 'b':
+			dbtable = optarg;
+			break;
 		case 'o':
 			if(2==sscanf(optarg,"%[^(](%[^)])",reduce_name,reduce_attr)) {
 
@@ -294,13 +299,18 @@ int main( int argc, char *argv[] )
 		deltadb_query_execute_dir(query,dbdir,start_time,stop_time);
 	} else if(dbhost) {
 
+		if(!dbtable) {
+			fprintf(stderr,"deltadb_query: --table option required to query a specific table (wq_master, chirp, etc.)\n");
+			return 1;
+		}
+
 		if(!filter_expr) filter_expr = jx_boolean(1);
 
 		buffer_t buf;
 		buffer_init(&buf);
 		char *filter_str = jx_print_string(filter_expr);
 		b64_encode(filter_str,strlen(filter_str),&buf);
-		char *cmd = string_format("curl -s http://%s:9097/history/%ld/%ld/%s",dbhost,start_time,stop_time,buffer_tostring(&buf));
+		char *cmd = string_format("curl -s http://%s:9097/history/%ld/%ld/%s/%s",dbhost,start_time,stop_time,dbtable,buffer_tostring(&buf));
 		buffer_free(&buf);
 		free(filter_str);
 
