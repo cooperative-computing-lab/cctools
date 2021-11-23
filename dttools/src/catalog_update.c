@@ -14,7 +14,6 @@ See the file COPYING for details.
 #include "host_memory_info.h"
 #include "stringtools.h"
 #include "username.h"
-#include "uptime.h"
 #include "getopt.h"
 #include "cctools.h"
 
@@ -89,7 +88,6 @@ int main(int argc, char *argv[]) {
 
 	struct utsname name;
 	int cpus;
-	int uptime;
 	double load[3];
 	UINT64_T memory_total, memory_avail;
 	char owner[USERNAME_MAX];
@@ -101,7 +99,6 @@ int main(int argc, char *argv[]) {
 	load_average_get(load);
 	cpus = load_average_get_cpus();
 	host_memory_info_get(&memory_avail, &memory_total);
-	uptime = uptime_get();
 	username_get(owner);
 
 	jx_insert_string(j,"type","node");
@@ -115,7 +112,6 @@ int main(int argc, char *argv[]) {
 	jx_insert_integer(j,"memory_total",memory_total);
 	jx_insert_integer(j,"memory_avail",memory_avail);
 	jx_insert_integer(j,"cpus",cpus);
-	jx_insert_integer(j,"uptime,",uptime);
 	jx_insert_string(j,"owner",owner);
 
 	struct jx *merged = jx_merge(j,custom,0);
