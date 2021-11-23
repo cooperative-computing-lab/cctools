@@ -540,7 +540,7 @@ static void handle_query( struct link *ql, time_t st )
 		}
 		buffer_free(&buf);
 
-	} else if(3==sscanf(path, "/history/%ld/%ld/%[^/]/%[^/]",&time_start,&time_stop,strtable,strexpr)) {
+	} else if(4==sscanf(path, "/history/%ld/%ld/%[^/]/%[^/]",&time_start,&time_stop,strtable,strexpr)) {
 		struct buffer buf;
 		buffer_init(&buf);
 		if(b64_decode(strexpr,&buf)==0) {
