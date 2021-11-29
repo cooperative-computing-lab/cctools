@@ -1026,7 +1026,7 @@ ssize_t link_putlstring(struct link *link, const char *data, size_t count, time_
 	return total;
 }
 
-ssize_t link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va)
+ssize_t link_vprintf(struct link *link, time_t stoptime, const char *fmt, va_list va)
 {
 	ssize_t rc;
 	size_t l;
@@ -1043,13 +1043,13 @@ ssize_t link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va
 	return rc;
 }
 
-ssize_t link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
+ssize_t link_printf(struct link *link, time_t stoptime, const char *fmt, ...)
 {
 	ssize_t rc;
 	va_list va;
 
-	va_start(va, stoptime);
-	rc = link_putvfstring(link, fmt, stoptime, va);
+	va_start(va,fmt);
+	rc = link_vprintf(link, stoptime, fmt, va);
 	va_end(va);
 
 	return rc;
