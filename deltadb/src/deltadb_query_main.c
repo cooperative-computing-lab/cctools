@@ -196,7 +196,6 @@ int main( int argc, char *argv[] )
 				deltadb_query_add_reduction(query,r);
 				deltadb_query_set_display(query,DELTADB_DISPLAY_REDUCE);
 				nreduces++;
-				jx_delete(reduce_expr);
 			} else {
 				struct jx *j = jx_parse_string(optarg);
 				if(!j) {

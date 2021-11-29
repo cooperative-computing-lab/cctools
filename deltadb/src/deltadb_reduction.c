@@ -20,7 +20,7 @@ struct deltadb_reduction *deltadb_reduction_create_type( deltadb_reduction_t typ
 	memset(r,0,sizeof(*r));
 	r->type = type;
 	r->scope = scope;
-	r->expr = jx_copy(expr);
+	r->expr = expr;
 	r->temporal_table = hash_table_create(0,0);
 	r->unique_table = hash_table_create(0,0);
 	r->unique_value = jx_array(0);
@@ -93,7 +93,7 @@ void deltadb_reduction_update( struct deltadb_reduction *r, const char *key, str
 		struct deltadb_reduction *base = r;
 		r = hash_table_lookup(base->temporal_table, key);
 		if (!r) {
-			r = deltadb_reduction_create_type(base->type,base->expr,base->scope);
+			r = deltadb_reduction_create_type(base->type,jx_copy(base->expr),base->scope);
 			hash_table_insert(base->temporal_table, key, r);
 		}
 	}
@@ -107,6 +107,7 @@ void deltadb_reduction_update( struct deltadb_reduction *r, const char *key, str
 			hash_table_insert(r->unique_table,str,value_copy);
 			jx_array_append(r->unique_value,value_copy);
 		}
+		free(str);
 		return;
 	}
 

@@ -58,11 +58,30 @@ struct deltadb_query * deltadb_query_create()
 void deltadb_query_delete( struct deltadb_query *query )
 {
 	if(!query) return;
+
+	char *key;
+	struct jx *jobject;
+	hash_table_firstkey(query->table);
+	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
+		jx_delete(jobject);
+	}
 	hash_table_delete(query->table);
+
 	jx_delete(query->filter_expr);
 	jx_delete(query->where_expr);
+
+	list_first_item(query->output_exprs);
+	for(struct jx *j; (j = list_next_item(query->output_exprs));) {
+		jx_delete(j);
+	}
 	list_delete(query->output_exprs);
+
+	list_first_item(query->reduce_exprs);
+	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
+		deltadb_reduction_delete(r);
+	}
 	list_delete(query->reduce_exprs);
+
 	free(query);
 }
 
@@ -206,8 +225,8 @@ static void update_reductions( struct deltadb_query *query, const char *key, str
 		struct jx *value = jx_eval(r->expr,jobject);
 		if(value && !jx_istype(value, JX_ERROR)) {
 			deltadb_reduction_update(r,key,value,scope);
-			jx_delete(value);
 		}
+		jx_delete(value);
 	}
 }
 
@@ -251,7 +270,9 @@ static void display_reduce_exprs( struct deltadb_query *query, time_t current )
 				jx_insert_string(column, key, value_str);
 				free(value_str);
 			}
-			fprintf(query->output_stream, "%s ", jx_print_string(column));
+			char *str = jx_print_string(column);
+			fprintf(query->output_stream, "%s ", str);
+			free(str);
 			jx_delete(column);
 		} else if (r->scope == DELTADB_SCOPE_SPATIAL || r->scope == DELTADB_SCOPE_GLOBAL) {
 			char *str = deltadb_reduction_string(r);
