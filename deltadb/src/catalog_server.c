@@ -884,18 +884,26 @@ int main(int argc, char *argv[])
 			fatal("couldn't listen on TCP port %d", port);
 	}
 
-	query_ssl_port = link_serve_address(interface, ssl_port);
-	if(query_ssl_port) {
-		if(ssl_port==0) {
-			char addr[LINK_ADDRESS_MAX];
-			link_address_local(query_ssl_port,addr,&ssl_port);
+	if(ssl_key_filename || ssl_cert_filename) {
+
+		if(!ssl_key_filename) fatal("--ssl-cert also requires --ssl-key");
+		if(!ssl_cert_filename) fatal("--ssl-key also requires --ssl-cert");
+
+		query_ssl_port = link_serve_address(interface, ssl_port);
+		if(query_ssl_port) {
+			if(ssl_port==0) {
+				char addr[LINK_ADDRESS_MAX];
+				link_address_local(query_ssl_port,addr,&ssl_port);
+			}
+			link_ssl_wrap_server(query_ssl_port,ssl_key_filename,ssl_cert_filename);
+		} else {
+			if(interface)
+				fatal("couldn't listen on SSL TCP address %s port %d: %s", interface, ssl_port,strerror(errno));
+			else
+				fatal("couldn't listen on SSL TCP port %d: %s", ssl_port,strerror(errno));
 		}
-		link_ssl_wrap_server(query_ssl_port,ssl_key_filename,ssl_cert_filename);
 	} else {
-		if(interface)
-			fatal("couldn't listen on SSL TCP address %s port %d", interface, ssl_port);
-		else
-			fatal("couldn't listen on SSL TCP port %d", ssl_port);
+		query_ssl_port = 0;
 	}
 
 	update_dgram = datagram_create_address(interface, port);
@@ -920,7 +928,7 @@ int main(int argc, char *argv[])
 		fd_set rfds;
 		int dfd = datagram_fd(update_dgram);
 		int lfd = link_fd(query_port);
-		int sfd = link_fd(query_ssl_port);
+		int sfd = query_ssl_port ? link_fd(query_ssl_port) : -1;
 		int ufd = link_fd(update_port);
 
 		int result, maxfd;
@@ -947,8 +955,17 @@ int main(int argc, char *argv[])
 		FD_ZERO(&rfds);
 		FD_SET(dfd, &rfds);
 		FD_SET(ufd, &rfds);
+
+		/* Only accept incoming connections if child_procs available. */
+
 		if(child_procs_count < child_procs_max) {
+			/* Accept plain HTTP */ 
 			FD_SET(lfd, &rfds);
+
+			/* Accept HTTPS if enabled */
+			if(query_ssl_port) {
+				FD_SET(sfd,&rfds);
+			}
 		}
 		maxfd = MAX(ufd,MAX(dfd, lfd)) + 1;
 
@@ -974,7 +991,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		if(FD_ISSET(sfd, &rfds)) {
+		if(query_ssl_port && FD_ISSET(sfd, &rfds)) {
 			link = link_accept(query_ssl_port,time(0)+5);
 			if(link) {
 				handle_tcp_query(link);
