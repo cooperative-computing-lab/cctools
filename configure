@@ -3,14 +3,14 @@
 ###########################
 # *** Set for releases. ***
 
-MAJOR=8
-MINOR=0
+MAJOR=7
+MINOR=4
 MICRO=0
 
 # Optionally set the source/tag for this code (e.g. RC1 or FINAL).  Setting
 # this variable is instead useful for statically naming the source when it will
 # not match the branch name (like RC1 or FINAL).
-RELEASE=DEVELOPMENT
+RELEASE=RC1
 
 ###########################
 # *** You should not need to change anything below this line. ***
@@ -68,7 +68,6 @@ include_package_apps="apps"
 include_package_chirp="chirp"
 include_package_deltadb="deltadb"
 include_package_doc="doc"
-include_package_dataswarm="dataswarm"
 include_package_ftplite="ftp_lite"
 include_package_grow="grow"
 include_package_makeflow="makeflow"
@@ -300,9 +299,6 @@ do
 		--without-system-prune)
 			include_package_prune=""
 			;;
-		--without-system-dataswarm)
-			include_package_dataswarm=""
-			;;
 		--with-*-path)
 			echo "ignoring unknown package ${arg}"
 			;;
@@ -354,7 +350,6 @@ Where PACKAGE may be:
 
 And SYSTEM may be:
 	chirp
-	dataswarm
 	doc
 	ftp-lite
 	makeflow
@@ -1426,6 +1421,7 @@ then
 fi
 
 potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_dataswarm} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_tlq} ${include_package_doc} poncho"
+
 
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
