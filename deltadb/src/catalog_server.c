@@ -77,7 +77,7 @@ static time_t clean_interval = 60;
 static int port = CATALOG_PORT_DEFAULT;
 
 /* The SSL port upon which to listen. */
-static int ssl_port = 9443;
+static int ssl_port = 0;
 
 /* Filename containing the SSL certificate. */
 static const char *ssl_cert_filename = 0;
@@ -694,6 +694,9 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s (default 10M, 0 disables)\n", "");
 	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);
+	fprintf(stdout, " %-30s Port number to listen for HTTPS connections.\n","-,--ssl-port=<port>");
+	fprintf(stdout, " %-30s File containing SSL certificate for HTTPS.\n","-C,--ssl-cert=<file>");
+	fprintf(stdout, " %-30s File containing SSL key for HTTPS.\n","-K,--ssl-key=<file>");
 	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
 	fprintf(stdout, " %-30s Maximum time to allow a query process to run.\n", "-T,--timeout=<time>");
 	fprintf(stdout, " %-30s (default is %ds)\n", "", child_procs_timeout);
@@ -738,7 +741,7 @@ int main(int argc, char *argv[])
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
 		{"port", required_argument, 0, 'p'},
-		{"ssl-port", required_argument, 0, 'S'},
+		{"ssl-port", required_argument, 0, 'P'},
 		{"ssl-cert", required_argument, 0, 'C'},
 		{"ssl-key", required_argument, 0, 'K'},
 		{"single", no_argument, 0, 'S'},
@@ -884,10 +887,11 @@ int main(int argc, char *argv[])
 			fatal("couldn't listen on TCP port %d", port);
 	}
 
-	if(ssl_key_filename || ssl_cert_filename) {
+	if(ssl_port || ssl_key_filename || ssl_cert_filename) {
 
-		if(!ssl_key_filename) fatal("--ssl-cert also requires --ssl-key");
-		if(!ssl_cert_filename) fatal("--ssl-key also requires --ssl-cert");
+		if(!ssl_port) fatal("--ssl-port is also required for SSL.");
+		if(!ssl_key_filename) fatal("--ssl-key is also required for SSL.");
+		if(!ssl_cert_filename) fatal("--ssl-cert is also required for SSL.");
 
 		query_ssl_port = link_serve_address(interface, ssl_port);
 		if(query_ssl_port) {
@@ -895,7 +899,9 @@ int main(int argc, char *argv[])
 				char addr[LINK_ADDRESS_MAX];
 				link_address_local(query_ssl_port,addr,&ssl_port);
 			}
-			link_ssl_wrap_server(query_ssl_port,ssl_key_filename,ssl_cert_filename);
+			if(!link_ssl_wrap_server(query_ssl_port,ssl_key_filename,ssl_cert_filename)) {
+				fatal("couldn't initialized certificate (%s) or key (%s) file",ssl_cert_filename,ssl_key_filename);
+			}
 		} else {
 			if(interface)
 				fatal("couldn't listen on SSL TCP address %s port %d: %s", interface, ssl_port,strerror(errno));
