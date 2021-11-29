@@ -133,6 +133,9 @@ static char data[1024*1024];
 struct datagram *update_dgram = 0;
 struct link *update_port = 0;
 
+/* temporary hack to get link_printf working as desired */
+void link_printf( struct link *l, time_t stoptime, const char *fmt, ... );
+
 void shutdown_clean(int sig)
 {
 	exit(0);
@@ -418,20 +421,19 @@ int jx_eval_is_true( struct jx *expr, struct jx *context )
 	return result;
 }
 
-void send_http_response( FILE *stream, int code, const char *message, const char *content_type )
+void send_http_response( struct link *l, int code, const char *message, const char *content_type, time_t stoptime )
 {
 	time_t current = time(0);
-	fprintf(stream, "HTTP/1.1 %d %s\n",code,message);
-	fprintf(stream, "Date: %s", ctime(&current));
-	fprintf(stream, "Server: catalog_server\n");
-	fprintf(stream, "Connection: close\n");
-	fprintf(stream, "Access-Control-Allow-Origin: *\n");
-	fprintf(stream, "Content-type: %s\n\n",content_type);
+	link_printf(l,stoptime, "HTTP/1.1 %d %s\n",code,message);
+	link_printf(l,stoptime, "Date: %s", ctime(&current));
+	link_printf(l,stoptime, "Server: catalog_server\n");
+	link_printf(l,stoptime, "Connection: close\n");
+	link_printf(l,stoptime, "Access-Control-Allow-Origin: *\n");
+	link_printf(l,stoptime, "Content-type: %s\n\n",content_type);
 }
 
-static void handle_query(struct link *query_link)
+static void handle_query( struct link *query_link, time_t stoptime )
 {
-	FILE *stream;
 	char line[LINE_MAX];
 	char url[LINE_MAX];
 	char path[LINE_MAX];
@@ -471,13 +473,6 @@ static void handle_query(struct link *query_link)
 		return;
 	}
 
-	// Output response
-	stream = fdopen(link_fd(query_link), "w");
-	if(!stream) {
-		return;
-	}
-	link_nonblocking(query_link, 0);
-
 	if(sscanf(url, "http://%[^/]%s", hostport, path) == 2) {
 		// continue on
 	} else {
@@ -498,17 +493,17 @@ static void handle_query(struct link *query_link)
 	qsort(array, n, sizeof(struct jx *), compare_jx);
 
 	if(!strcmp(path, "/query.text")) {
-		send_http_response(stream,200,"OK","text/plain");
+		send_http_response(query_link,200,"OK","text/plain",stoptime);
 		for(i = 0; i < n; i++)
-			jx_export_nvpair(array[i], stream);
+			jx_export_nvpair(array[i], query_link,stoptime);
 	} else if(!strcmp(path, "/query.json")) {
-		send_http_response(stream,200,"OK","text/plain");
-		fprintf(stream,"[\n");
+		send_http_response(query_link,200,"OK","text/plain",stoptime);
+		link_printf(query_link,stoptime,"[\n");
 		for(i = 0; i < n; i++) {
-			jx_print_stream(array[i],stream);
-			if(i<(n-1)) fprintf(stream,",\n");
+			jx_print_link(array[i],query_link,stoptime);
+			if(i<(n-1)) link_printf(query_link,stoptime,",\n");
 		}
-		fprintf(stream,"\n]\n");
+		link_printf(query_link,stoptime,"\n]\n");
 	} else if(1==sscanf(path, "/query/%[^/]",strexpr)) {
 
 		struct buffer buf;
@@ -516,26 +511,26 @@ static void handle_query(struct link *query_link)
 		if(b64_decode(strexpr,&buf)==0) {
 			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
-				send_http_response(stream,200,"OK","text/plain");
-				fprintf(stream,"[\n");
+				send_http_response(query_link,200,"OK","text/plain",stoptime);
+				link_printf(query_link,stoptime,"[\n");
 
 				int first = 1;
 				for(i = 0; i < n; i++) {
 					if(jx_eval_is_true(expr,array[i])) {
-						if(!first) fprintf(stream,",\n");
-						jx_print_stream(array[i],stream);
+						if(!first) link_printf(query_link,stoptime,",\n");
+						jx_print_link(array[i],query_link,stoptime);
 						first = 0;
 					}
 				}
-				fprintf(stream,"\n]\n");
+				link_printf(query_link,stoptime,"\n]\n");
 				jx_delete(expr);
 			} else {
-				send_http_response(stream,400,"Bad Request","text/plain");
-				fprintf(stream,"Invalid query text.\n");
+				send_http_response(query_link,400,"Bad Request","text/plain",stoptime);
+				link_printf(query_link,stoptime,"Invalid query text.\n");
 			}
 		} else {
-			send_http_response(stream,400,"Bad Request","text/plain");
-			fprintf(stream,"Invalid base-64 encoding.\n");
+			send_http_response(query_link,400,"Bad Request","text/plain",stoptime);
+			link_printf(query_link,stoptime,"Invalid base-64 encoding.\n");
 		}
 		buffer_free(&buf);
 
@@ -547,61 +542,62 @@ static void handle_query(struct link *query_link)
 		if(b64_decode(strexpr,&buf)==0) {
 			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
-				send_http_response(stream,200,"OK","text/plain");
+				send_http_response(query_link,200,"OK","text/plain",stoptime);
 				struct deltadb_query *query = deltadb_query_create();
 				deltadb_query_set_filter(query,expr);
-				deltadb_query_set_output(query,stream);
+				//XXX fix deltadb to output to a link as well
+				//deltadb_query_set_output(query,stream);
 				deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
 				deltadb_query_execute_dir(query,history_dir,time_start,time_stop);
 				deltadb_query_delete(query);
 				jx_delete(expr);
 			} else {
-				send_http_response(stream,400,"Bad Request","text/plain");
-				fprintf(stream,"Invalid query text.\n");
+				send_http_response(query_link,400,"Bad Request","text/plain",stoptime);
+				link_printf(query_link,stoptime,"Invalid query text.\n");
 			}
 		} else {
-			send_http_response(stream,400,"Bad Request","text/plain");
-			fprintf(stream,"Invalid base-64 encoding.\n");
+			send_http_response(query_link,400,"Bad Request","text/plain",stoptime);
+			link_printf(query_link,stoptime,"Invalid base-64 encoding.\n");
 		}
 		buffer_free(&buf);
 
 
 	} else if(!strcmp(path, "/query.oldclassads")) {
-		send_http_response(stream,200,"OK","text/plain");
+		send_http_response(query_link,200,"OK","text/plain",stoptime);
 		for(i = 0; i < n; i++)
-			jx_export_old_classads(array[i], stream);
+			jx_export_old_classads(array[i], query_link,stoptime);
 	} else if(!strcmp(path, "/query.newclassads")) {
-		send_http_response(stream,200,"OK","text/plain");
+		send_http_response(query_link,200,"OK","text/plain",stoptime);
 		for(i = 0; i < n; i++)
-			jx_export_new_classads(array[i], stream);
+			jx_export_new_classads(array[i], query_link,stoptime);
 	} else if(!strcmp(path, "/query.xml")) {
-		send_http_response(stream,200,"OK","text/xml");
-		fprintf(stream, "<?xml version=\"1.0\" standalone=\"yes\"?>\n");
-		fprintf(stream, "<catalog>\n");
+		send_http_response(query_link,200,"OK","text/xml",stoptime);
+		link_printf(query_link,stoptime, "<?xml version=\"1.0\" standalone=\"yes\"?>\n");
+		link_printf(query_link,stoptime, "<catalog>\n");
 		for(i = 0; i < n; i++)
-			jx_export_xml(array[i], stream);
-		fprintf(stream, "</catalog>\n");
+			jx_export_xml(array[i], query_link,stoptime);
+		link_printf(query_link,stoptime, "</catalog>\n");
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct jx *j;
-		send_http_response(stream,200,"OK","text/html");
+		send_http_response(query_link,200,"OK","text/html",stoptime);
 		j = deltadb_lookup(table, key);
 		if(j) {
 			const char *name = jx_lookup_string(j, "name");
 			if(!name)
 				name = "unknown";
-			fprintf(stream, "<title>%s catalog server: %s</title>\n", preferred_hostname, name);
-			fprintf(stream, "<center>\n");
-			fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
-			fprintf(stream, "<h2>%s</h2>\n", name);
-			fprintf(stream, "<p><a href=/>return to catalog view</a><p>\n");
-			jx_export_html_solo(j, stream);
-			fprintf(stream, "</center>\n");
+			link_printf(query_link,stoptime, "<title>%s catalog server: %s</title>\n", preferred_hostname, name);
+			link_printf(query_link,stoptime, "<center>\n");
+			link_printf(query_link,stoptime, "<h1>%s catalog server</h1>\n", preferred_hostname);
+			link_printf(query_link,stoptime, "<h2>%s</h2>\n", name);
+			link_printf(query_link,stoptime, "<p><a href=/>return to catalog view</a><p>\n");
+			jx_export_html_solo(j, query_link,stoptime);
+			link_printf(query_link,stoptime, "</center>\n");
 		} else {
-			fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
-			fprintf(stream, "<center>\n");
-			fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
-			fprintf(stream, "<h2>Unknown Item!</h2>\n");
-			fprintf(stream, "</center>\n");
+			link_printf(query_link,stoptime, "<title>%s catalog server</title>\n", preferred_hostname);
+			link_printf(query_link,stoptime, "<center>\n");
+			link_printf(query_link,stoptime, "<h1>%s catalog server</h1>\n", preferred_hostname);
+			link_printf(query_link,stoptime, "<h2>Unknown Item!</h2>\n");
+			link_printf(query_link,stoptime, "</center>\n");
 		}
 	} else if(!strcmp(path,"/")) {
 		char avail_line[LINE_MAX];
@@ -610,17 +606,17 @@ static void handle_query(struct link *query_link)
 		INT64_T sum_avail = 0;
 		INT64_T sum_devices = 0;
 
-		send_http_response(stream,200,"OK","text/html");
-		fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
-		fprintf(stream, "<center>\n");
-		fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
-		fprintf(stream, "<a href=/query.text>text</a> - ");
-		fprintf(stream, "<a href=/query.html>html</a> - ");
-		fprintf(stream, "<a href=/query.xml>xml</a> - ");
-		fprintf(stream, "<a href=/query.json>json</a> - ");
-		fprintf(stream, "<a href=/query.oldclassads>oldclassads</a> - ");
-		fprintf(stream, "<a href=/query.newclassads>newclassads</a>");
-		fprintf(stream, "<p>\n");
+		send_http_response(query_link,200,"OK","text/html",stoptime);
+		link_printf(query_link,stoptime, "<title>%s catalog server</title>\n", preferred_hostname);
+		link_printf(query_link,stoptime, "<center>\n");
+		link_printf(query_link,stoptime, "<h1>%s catalog server</h1>\n", preferred_hostname);
+		link_printf(query_link,stoptime, "<a href=/query.text>text</a> - ");
+		link_printf(query_link,stoptime, "<a href=/query.html>html</a> - ");
+		link_printf(query_link,stoptime, "<a href=/query.xml>xml</a> - ");
+		link_printf(query_link,stoptime, "<a href=/query.json>json</a> - ");
+		link_printf(query_link,stoptime, "<a href=/query.oldclassads>oldclassads</a> - ");
+		link_printf(query_link,stoptime, "<a href=/query.newclassads>newclassads</a>");
+		link_printf(query_link,stoptime, "<p>\n");
 
 		for(i = 0; i < n; i++) {
 			j = array[i];
@@ -631,24 +627,23 @@ static void handle_query(struct link *query_link)
 
 		string_metric(sum_avail, -1, avail_line);
 		string_metric(sum_total, -1, total_line);
-		fprintf(stream, "<b>%sB available out of %sB on %d devices</b><p>\n", avail_line, total_line, (int) sum_devices);
+		link_printf(query_link,stoptime, "<b>%sB available out of %sB on %d devices</b><p>\n", avail_line, total_line, (int) sum_devices);
 
-		jx_export_html_header(stream, html_headers);
+		jx_export_html_header(query_link, html_headers, stoptime);
 		for(i = 0; i < n; i++) {
 			j = array[i];
 			make_hash_key(j, key);
 			string_nformat(url, sizeof(url), "/detail/%s", key);
-			jx_export_html_with_link(j, stream, html_headers, "name", url);
+			jx_export_html_with_link(j, query_link, html_headers, "name", url, stoptime);
 		}
-		jx_export_html_footer(stream, html_headers);
-		fprintf(stream, "</center>\n");
+		jx_export_html_footer(query_link, html_headers, stoptime);
+		link_printf(query_link,stoptime, "</center>\n");
 	} else {
-		send_http_response(stream,404,"Not Found","text/html");
-		fprintf(stream,"<p>Error 404: Invalid URL</p>");
-		fprintf(stream,"<pre>%s</pre>",url);
-		fprintf(stream,"<p><a href=/>Return to Index</a></p>");
+		send_http_response(query_link,404,"Not Found","text/html",stoptime);
+		link_printf(query_link,stoptime,"<p>Error 404: Invalid URL</p>");
+		link_printf(query_link,stoptime,"<pre>%s</pre>",url);
+		link_printf(query_link,stoptime,"<p><a href=/>Return to Index</a></p>");
 	}
-	fclose(stream);
 }
 
 void handle_tcp_query( struct link *port )
@@ -661,13 +656,13 @@ void handle_tcp_query( struct link *port )
 			link_address_remote(port, raddr, &rport);
 			change_process_title("catalog_server [%s]", raddr);
 			alarm(child_procs_timeout);
-			handle_query(port);
+			handle_query(port,time(0)+child_procs_timeout);
 			_exit(0);
 		} else if (pid>0) {
 			child_procs_count++;
 		}
 	} else {
-		handle_query(port);
+		handle_query(port,time(0)+child_procs_timeout);
 	}
 	link_close(port);
 }
