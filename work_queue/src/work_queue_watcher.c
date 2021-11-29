@@ -185,7 +185,7 @@ int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *
 				}
 
 				lseek(fd,offset,SEEK_SET);
-				link_putfstring(manager,"update %"PRId64" %s %"PRId64" %"PRId64"\n",stoptime,e->taskid,e->logical_path,offset,length);
+				link_printf(manager,stoptime,"update %"PRId64" %s %"PRId64" %"PRId64"\n",e->taskid,e->logical_path,offset,length);
 				int actual = link_stream_from_fd(manager,fd,length,stoptime);
 				close(fd);
 				if(actual!=length) return 0;

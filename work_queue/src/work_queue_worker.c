@@ -237,7 +237,7 @@ static void send_manager_message( struct link *manager, const char *fmt, ... )
 	va_copy(debug_va, va);
 
 	vdebug(D_WQ, debug_msg, debug_va);
-	link_putvfstring(manager, fmt, time(0)+active_timeout, va);
+	link_vprintf(manager, time(0)+active_timeout, fmt, va);
 
 	va_end(va);
 }

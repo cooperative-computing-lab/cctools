@@ -13,8 +13,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <stdio.h>
 
-void link_printf( struct link *l, time_t stoptime, const char *fmt, ... );
-
 static char * unquoted_string( struct jx *j )
 {
 	char *str;
@@ -193,7 +191,7 @@ void jx_export_html_solo(struct jx *j, struct link *l, time_t stoptime )
 	for(p=j->u.pairs;p;p=p->next) {
 		link_printf(l,stoptime, "<tr bgcolor=%s>\n", color_counter % 2 ? COLOR_ONE : COLOR_TWO);
 		color_counter++;
-		link_printf(l,stoptime, "<td align=left><b>%s</b>\n", stoptime, p->key->u.string_value);
+		link_printf(l,stoptime, "<td align=left><b>%s</b>\n", p->key->u.string_value);
 		char *str = unquoted_string(p->value);
 		if(!strcmp(p->key->u.string_value, "url")) {
 			link_printf(l,stoptime, "<td align=left><a href=%s>%s</a>\n",str,str);

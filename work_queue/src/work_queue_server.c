@@ -49,7 +49,7 @@ void reply(struct link *client, char *method, char *message, int id)
 
 	int len = strlen(buffer);
 
-	link_putfstring(client, "%d\n", time(NULL) + timeout, len);
+	link_printf(client, time(NULL) + timeout, "%d\n", len);
 
 	int total_written = 0;
 	ssize_t written = 0;

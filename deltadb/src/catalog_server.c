@@ -133,9 +133,6 @@ static char data[1024*1024];
 struct datagram *update_dgram = 0;
 struct link *update_port = 0;
 
-/* temporary hack to get link_printf working as desired */
-void link_printf( struct link *l, time_t stoptime, const char *fmt, ... );
-
 void shutdown_clean(int sig)
 {
 	exit(0);

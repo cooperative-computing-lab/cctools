@@ -43,7 +43,7 @@ int link_auth_password( struct link *link, const char *password, time_t stoptime
 
 	// Verify we are using the same procedure.
 	char line[LINK_AUTH_LINE_MAX];
-	link_putfstring(link,"%s\n",stoptime,auth_password_ident);
+	link_printf(link,stoptime,"%s\n",auth_password_ident);
 	link_readline(link,line,sizeof(line),stoptime);
 	if(strcmp(line,auth_password_ident)) {
 		debug(D_AUTH,"peer is not using password authentication.\n");
@@ -54,7 +54,7 @@ int link_auth_password( struct link *link, const char *password, time_t stoptime
 	debug(D_AUTH,"sending challenge data");
 	char my_random_key[LINK_AUTH_LINE_MAX];
 	string_cookie(my_random_key,RANDOM_KEY_LENGTH);
-	link_putfstring(link,"%s\n",stoptime,my_random_key);
+	link_printf(link,stoptime,"%s\n",my_random_key);
 
 	// Read and parse the peer's random key.
 	debug(D_AUTH,"receiving peer's challenge data");
@@ -67,7 +67,7 @@ int link_auth_password( struct link *link, const char *password, time_t stoptime
 	unsigned char digest[SHA1_DIGEST_LENGTH];
 	sprintf(my_response,"%s %s",password,peer_random_key);
 	sha1_buffer(my_response,strlen(my_response),digest);
-	link_putfstring(link,"%s\n",stoptime,sha1_string(digest));
+	link_printf(link,stoptime,"%s\n",sha1_string(digest));
 
 	// Compute the expected value of SHA1( password + my_random_key )
 	char expected_response[LINK_AUTH_LINE_MAX*2+1];

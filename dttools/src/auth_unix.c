@@ -170,7 +170,7 @@ static int auth_unix_accept(struct link *link, char **subject, time_t stoptime)
 
 	debug(D_AUTH, "unix: generating challenge");
 	make_challenge_path(path);
-	link_putfstring(link, "%s\n", stoptime, path);
+	link_printf(link, stoptime, "%s\n", path);
 
 	debug(D_AUTH, "unix: waiting for response");
 	if(link_readline(link, line, sizeof(line), stoptime)) {
