@@ -381,40 +381,27 @@ static int _ssl_errors_cb(const char *str, size_t len, void *use_warn) {
 	return 1;
 }
 
-static SSL_CTX *_create_ssl_context(int is_client) {
+static SSL_CTX *_create_ssl_context()
+{
 	const SSL_METHOD *method;
 	SSL_CTX *ctx;
 
-#if HAS_SSLv23_method
 	//older openssl versions need explicit init
 	if(!openssl_initialized) {
+#if HAS_SSLv23_method
 		SSL_library_init();
-	}
 #endif
-
-	openssl_initialized = 1;
-
-	SSL_load_error_strings();
-
-	if(is_client) {
-		#ifdef HAS_TLS_method
-		method = TLS_client_method();
-		#elif HAS_SSLv23_method
-		method = SSLv23_client_method();
-		#else
-		#error "Compiled support for OpenSSL is too old."
-		#endif
-		debug(D_SSL, "setting context for connection");
-	} else {
-		#ifdef HAS_TLS_method
-		method = TLS_server_method();
-		#elif HAS_SSLv23_method
-		method = SSLv23_server_method();
-		#else
-		#error "Compiled support for OpenSSL is too old."
-		#endif
-		debug(D_SSL, "setting context for server");
+		SSL_load_error_strings();
+		openssl_initialized = 1;
 	}
+
+	#ifdef HAS_TLS_method
+	method = TLS_method();
+	#elif HAS_SSLv23_method
+	method = SSLv23_method();
+	#else
+	#error "Compiled support for OpenSSL is too old."
+	#endif
 
 	ctx = SSL_CTX_new(method);
 	if (!ctx) {
@@ -536,7 +523,7 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 	if(key && cert) {
 		debug(D_TCP, "accepting ssl state for %s port %d", link->raddr, link->rport);
 
-		link->ctx = _create_ssl_context(/* is client */ 0);
+		link->ctx = _create_ssl_context();
 		_set_ssl_keys(link->ctx, key, cert);
 
 		link->ssl = SSL_new(link->ctx);
@@ -558,7 +545,7 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 
 int link_ssl_wrap_connect(struct link *link) {
 #ifdef HAS_OPENSSL
-	link->ctx = _create_ssl_context(/* is client */ 1);
+	link->ctx = _create_ssl_context();
 	link->ssl = SSL_new(link->ctx);
 	SSL_set_fd(link->ssl, link->fd);
 
