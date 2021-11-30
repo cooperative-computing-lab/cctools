@@ -392,7 +392,11 @@ void handle_tcp_update( struct link *update_port )
 
 	if(length>0) {
 		data[length] = 0;
-		handle_update(addr,port,data,length,"tcp");
+		if(length>4 && !strncmp(data,"GET ",4)) {
+			// Random web server is connecting, reject it.
+		} else {
+			handle_update(addr,port,data,length,"tcp");
+		}
 	}
 
 	link_close(l);
