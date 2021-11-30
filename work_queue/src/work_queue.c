@@ -209,6 +209,9 @@ struct work_queue {
 	struct rmsummary *max_task_resources_requested;
 
 	char *password;
+	char *ssl_key;
+	char *ssl_cert;
+
 	double bandwidth;
 
 	char *debug_path;
@@ -1037,6 +1040,18 @@ static void add_worker(struct work_queue *q)
 	}
 
 	debug(D_WQ,"worker %s:%d connected",addr,port);
+
+	if(q->ssl_cert || q->ssl_key) {
+		if(link_ssl_wrap_server(link,q->ssl_cert,q->ssl_key)) {
+			debug(D_WQ,"worker %s:%d completed ssl connection",addr,port);
+		} else {
+			debug(D_WQ,"worker %s:%d failed ssl connection",addr,port);
+			link_close(link);
+			return;
+		}
+	} else {
+		/* nothing to do */
+	}
 
 	if(q->password) {
 		debug(D_WQ,"worker %s:%d authenticating",addr,port);
@@ -5304,14 +5319,8 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 
 	q->manager_link = link_serve(port);
 
-	// we need both or neither key and cert. We let link_ssl_wrap_server do the
-	// error checking.
-	if(key || cert) {
-		if(link_ssl_wrap_server(q->manager_link, key, cert) < 1) {
-			fprintf(stderr, "Error: failed to setup ssl.\n");
-			return 0;
-		}
-	}
+	q->ssl_cert = strdup(cert);
+	q->ssl_key = strdup(key);
 
 	if(!q->manager_link) {
 		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
@@ -5677,6 +5686,10 @@ void work_queue_delete(struct work_queue *q)
 			free(q->manager_preferred_connection);
 
 		free(q->poll_table);
+
+		if(q->ssl_cert) free(q->ssl_cert);
+		if(q->ssl_key)  free(q->ssl_key);
+
 		link_close(q->manager_link);
 		if(q->logfile) {
 			fclose(q->logfile);

@@ -128,7 +128,7 @@ struct link *link_serve_addrrange(const char *addr, int low, int high);
 struct link *link_accept(struct link *parent, time_t stoptime);
 
 
-/** Wrap a server link with an ssl context and state
+/** Wrap an accepted link with an ssl context and state
 @param parent A link returned from @ref link_serve or @ref link_serve_address.
 @param key   The ssl key of the server.
 @param cert  The ssl cert of the server.

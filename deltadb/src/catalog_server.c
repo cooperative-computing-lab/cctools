@@ -448,7 +448,7 @@ static void handle_query( struct link *ql, time_t st )
 	int i, n;
 
 	link_address_remote(ql, addr, &port);
-	debug(D_DEBUG, "www query from %s:%d", addr, port);
+	debug(D_DEBUG, "%s query from %s:%d", link_using_ssl(ql) ? "https" : "http", addr, port);
 
 	if(link_readline(ql, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
 		string_chomp(line);
@@ -643,22 +643,33 @@ static void handle_query( struct link *ql, time_t st )
 	}
 }
 
-void handle_tcp_query( struct link *port )
+void handle_tcp_query( struct link *port, int using_ssl )
 {
+	char raddr[LINK_ADDRESS_MAX];
+	int rport;
+	link_address_remote(port, raddr, &rport);
+
 	if(fork_mode) {
 		pid_t pid = fork();
 		if(pid == 0) {
-			char raddr[LINK_ADDRESS_MAX];
-			int rport;
-			link_address_remote(port, raddr, &rport);
 			change_process_title("catalog_server [%s]", raddr);
 			alarm(child_procs_timeout);
+			if(using_ssl) {
+				if(!link_ssl_wrap_server(port,ssl_key_filename,ssl_cert_filename)){
+					fatal("couldn't accept ssl connection from %s:%d",raddr,rport);
+				}
+			}
 			handle_query(port,time(0)+child_procs_timeout);
 			_exit(0);
 		} else if (pid>0) {
 			child_procs_count++;
 		}
 	} else {
+		if(using_ssl) {
+			if(!link_ssl_wrap_server(port,ssl_key_filename,ssl_cert_filename)){
+				debug(D_DEBUG,"couldn't accept ssl connection from %s:%d",raddr,rport);
+			}
+		}
 		handle_query(port,time(0)+child_procs_timeout);
 	}
 	link_close(port);
@@ -891,9 +902,6 @@ int main(int argc, char *argv[])
 				char addr[LINK_ADDRESS_MAX];
 				link_address_local(query_ssl_port,addr,&ssl_port);
 			}
-			if(!link_ssl_wrap_server(query_ssl_port,ssl_key_filename,ssl_cert_filename)) {
-				fatal("couldn't initialized certificate (%s) or key (%s) file",ssl_cert_filename,ssl_key_filename);
-			}
 		} else {
 			if(interface)
 				fatal("couldn't listen on SSL TCP address %s port %d: %s", interface, ssl_port,strerror(errno));
@@ -985,14 +993,14 @@ int main(int argc, char *argv[])
 		if(FD_ISSET(lfd, &rfds)) {
 			link = link_accept(query_port,time(0)+5);
 			if(link) {
-				handle_tcp_query(link);
+				handle_tcp_query(link,0);
 			}
 		}
 
 		if(query_ssl_port && FD_ISSET(sfd, &rfds)) {
 			link = link_accept(query_ssl_port,time(0)+5);
 			if(link) {
-				handle_tcp_query(link);
+				handle_tcp_query(link,1);
 			}
 		}
 
