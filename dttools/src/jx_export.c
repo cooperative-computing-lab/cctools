@@ -25,21 +25,6 @@ static char * unquoted_string( struct jx *j )
 }
 
 /*
-Export a JX object as environment variables in bash format.
-*/
-
-void jx_export_shell( struct jx *j, FILE *stream )
-{
-	struct jx_pair *p;
-	for(p=j->u.pairs;p;p=p->next) {
-		char *str = unquoted_string(p->value);
-		fprintf(stream,"export %s=%s\n",p->key->u.string_value,str);
-		free(str);
-	}
-}
-
-
-/*
 The old nvpair format simply has unquoted data following the key.
 */
 

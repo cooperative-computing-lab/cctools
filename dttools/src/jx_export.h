@@ -12,8 +12,6 @@ See the file COPYING for details.
 #include "link.h"
 #include <stdio.h>
 
-void jx_export_shell( struct jx *j, FILE *stream );
-
 void jx_export_nvpair( struct jx *j, struct link *l, time_t stoptime );
 void jx_export_old_classads( struct jx *j, struct link *l, time_t stoptime );
 void jx_export_new_classads( struct jx *j, struct link *l, time_t stoptime );

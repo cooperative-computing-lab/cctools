@@ -15,7 +15,6 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "jx_eval.h"
-#include "jx_export.h"
 #include "semaphore.h"
 #include "list.h"
 #include "timestamp.h"
@@ -378,7 +377,7 @@ static int create_script( const char *filename, const char *cmd, struct jx *envl
 	if(!file) return 0;
 
 	fprintf(file,"#!/bin/sh\n");
-	jx_export_shell(envlist,file);
+	jx_print_shell(envlist,file);
 	fprintf(file,"exec %s\n",cmd);
 	fprintf(file,"exit 127\n");
 	fclose(file);
