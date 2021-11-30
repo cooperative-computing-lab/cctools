@@ -5318,10 +5318,6 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
 
 	q->manager_link = link_serve(port);
-
-	q->ssl_cert = cert ? strdup(cert) : 0;
-	q->ssl_key = key ? strdup(key) : 0;
-
 	if(!q->manager_link) {
 		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
 		free(q);
@@ -5330,6 +5326,9 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 		char address[LINK_ADDRESS_MAX];
 		link_address_local(q->manager_link, address, &q->port);
 	}
+
+	q->ssl_cert = cert ? strdup(cert) : 0;
+	q->ssl_key = key ? strdup(key) : 0;
 
 	getcwd(q->workingdir,PATH_MAX);
 
