@@ -1042,7 +1042,7 @@ static void add_worker(struct work_queue *q)
 	debug(D_WQ,"worker %s:%d connected",addr,port);
 
 	if(q->ssl_cert || q->ssl_key) {
-		if(link_ssl_wrap_server(link,q->ssl_key,q->ssl_cert)) {
+		if(link_ssl_wrap_accept(link,q->ssl_key,q->ssl_cert)) {
 			debug(D_WQ,"worker %s:%d completed ssl connection",addr,port);
 		} else {
 			debug(D_WQ,"worker %s:%d failed ssl connection",addr,port);

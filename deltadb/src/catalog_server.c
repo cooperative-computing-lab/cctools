@@ -655,7 +655,7 @@ void handle_tcp_query( struct link *port, int using_ssl )
 			change_process_title("catalog_server [%s]", raddr);
 			alarm(child_procs_timeout);
 			if(using_ssl) {
-				if(!link_ssl_wrap_server(port,ssl_key_filename,ssl_cert_filename)){
+				if(!link_ssl_wrap_accept(port,ssl_key_filename,ssl_cert_filename)){
 					fatal("couldn't accept ssl connection from %s:%d",raddr,rport);
 				}
 			}
@@ -666,7 +666,7 @@ void handle_tcp_query( struct link *port, int using_ssl )
 		}
 	} else {
 		if(using_ssl) {
-			if(!link_ssl_wrap_server(port,ssl_key_filename,ssl_cert_filename)){
+			if(!link_ssl_wrap_accept(port,ssl_key_filename,ssl_cert_filename)){
 				debug(D_DEBUG,"couldn't accept ssl connection from %s:%d",raddr,rport);
 			}
 		}

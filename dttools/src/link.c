@@ -531,10 +531,10 @@ failure:
 	return 0;
 }
 
-int link_ssl_wrap_server(struct link *link, const char *key, const char *cert) {
+int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 #ifdef HAS_OPENSSL
 	if(key && cert) {
-		debug(D_TCP, "setting up ssl state for %s port %d", link->raddr, link->rport);
+		debug(D_TCP, "accepting ssl state for %s port %d", link->raddr, link->rport);
 
 		link->ctx = _create_ssl_context(/* is client */ 0);
 		_set_ssl_keys(link->ctx, key, cert);
