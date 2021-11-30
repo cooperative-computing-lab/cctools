@@ -558,22 +558,10 @@ static void handle_query( struct link *ql, time_t st )
 		}
 		buffer_free(&buf);
 
-
-	} else if(!strcmp(path, "/query.oldclassads")) {
-		send_http_response(ql,200,"OK","text/plain",st);
-		for(i = 0; i < n; i++)
-			catalog_export_old_classads(array[i], ql,st);
 	} else if(!strcmp(path, "/query.newclassads")) {
 		send_http_response(ql,200,"OK","text/plain",st);
 		for(i = 0; i < n; i++)
 			catalog_export_new_classads(array[i], ql,st);
-	} else if(!strcmp(path, "/query.xml")) {
-		send_http_response(ql,200,"OK","text/xml",st);
-		link_printf(ql,st, "<?xml version=\"1.0\" standalone=\"yes\"?>\n");
-		link_printf(ql,st, "<catalog>\n");
-		for(i = 0; i < n; i++)
-			catalog_export_xml(array[i], ql,st);
-		link_printf(ql,st, "</catalog>\n");
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct jx *j;
 		send_http_response(ql,200,"OK","text/html",st);
@@ -609,10 +597,8 @@ static void handle_query( struct link *ql, time_t st )
 		link_printf(ql,st, "<h1>%s catalog server</h1>\n", preferred_hostname);
 		link_printf(ql,st, "<a href=/query.text>text</a> - ");
 		link_printf(ql,st, "<a href=/query.html>html</a> - ");
-		link_printf(ql,st, "<a href=/query.xml>xml</a> - ");
 		link_printf(ql,st, "<a href=/query.json>json</a> - ");
-		link_printf(ql,st, "<a href=/query.oldclassads>oldclassads</a> - ");
-		link_printf(ql,st, "<a href=/query.newclassads>newclassads</a>");
+		link_printf(ql,st, "<a href=/query.newclassads>classads</a>");
 		link_printf(ql,st, "<p>\n");
 
 		for(i = 0; i < n; i++) {

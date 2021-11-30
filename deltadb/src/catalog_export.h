@@ -13,9 +13,7 @@ See the file COPYING for details.
 #include <stdio.h>
 
 void catalog_export_nvpair( struct jx *j, struct link *l, time_t stoptime );
-void catalog_export_old_classads( struct jx *j, struct link *l, time_t stoptime );
 void catalog_export_new_classads( struct jx *j, struct link *l, time_t stoptime );
-void catalog_export_xml( struct jx *j, struct link *l, time_t stoptime );
 
 void catalog_export_html_solo( struct jx *j, struct link *l, time_t stoptime );
 void catalog_export_html_header( struct link *l, struct jx_table *h, time_t stoptime );
