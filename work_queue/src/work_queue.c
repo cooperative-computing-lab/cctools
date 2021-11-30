@@ -1042,7 +1042,7 @@ static void add_worker(struct work_queue *q)
 	debug(D_WQ,"worker %s:%d connected",addr,port);
 
 	if(q->ssl_cert || q->ssl_key) {
-		if(link_ssl_wrap_server(link,q->ssl_cert,q->ssl_key)) {
+		if(link_ssl_wrap_server(link,q->ssl_key,q->ssl_cert)) {
 			debug(D_WQ,"worker %s:%d completed ssl connection",addr,port);
 		} else {
 			debug(D_WQ,"worker %s:%d failed ssl connection",addr,port);
@@ -5327,8 +5327,8 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 		link_address_local(q->manager_link, address, &q->port);
 	}
 
-	q->ssl_cert = cert ? strdup(cert) : 0;
 	q->ssl_key = key ? strdup(key) : 0;
+	q->ssl_cert = cert ? strdup(cert) : 0;
 
 	getcwd(q->workingdir,PATH_MAX);
 
