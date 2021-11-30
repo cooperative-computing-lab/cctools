@@ -394,6 +394,8 @@ static SSL_CTX *_create_ssl_context(int is_client) {
 
 	openssl_initialized = 1;
 
+	SSL_load_error_strings();
+
 	if(is_client) {
 		#ifdef HAS_TLS_method
 		method = TLS_client_method();
