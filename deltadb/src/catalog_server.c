@@ -543,15 +543,20 @@ static void handle_query( struct link *ql, time_t st )
 		if(b64_decode(strexpr,&buf)==0) {
 			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
-				send_http_response(ql,200,"OK","text/plain",st);
-				struct deltadb_query *query = deltadb_query_create();
-				deltadb_query_set_filter(query,expr);
-				//XXX fix deltadb to output to a link as well
-				//deltadb_query_set_output(query,stream);
-				deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
-				deltadb_query_execute_dir(query,history_dir,time_start,time_stop);
-				deltadb_query_delete(query);
-				jx_delete(expr);
+				if(link_using_ssl(ql)) {
+					send_http_response(ql,400,"OK","text/plain",st);
+					link_printf(ql,st,"Sorry, unable to dump queries to encrypted connection");
+				} else {
+					send_http_response(ql,200,"OK","text/plain",st);
+					struct deltadb_query *query = deltadb_query_create();
+					deltadb_query_set_filter(query,expr);
+					// Note this leaks a stdio stream, but it will be shortly recovered on process exit.
+					deltadb_query_set_output(query,fdopen(link_fd(ql),"w"));
+					deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
+					deltadb_query_execute_dir(query,history_dir,time_start,time_stop);
+					deltadb_query_delete(query);
+					jx_delete(expr);
+				}
 			} else {
 				send_http_response(ql,400,"Bad Request","text/plain",st);
 				link_printf(ql,st,"Invalid query text.\n");
