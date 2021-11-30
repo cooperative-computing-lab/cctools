@@ -18,7 +18,7 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "jx_table.h"
-#include "jx_export.h"
+#include "catalog_export.h"
 #include "jx_eval.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"
@@ -492,7 +492,7 @@ static void handle_query( struct link *ql, time_t st )
 	if(!strcmp(path, "/query.text")) {
 		send_http_response(ql,200,"OK","text/plain",st);
 		for(i = 0; i < n; i++)
-			jx_export_nvpair(array[i], ql,st);
+			catalog_export_nvpair(array[i], ql,st);
 	} else if(!strcmp(path, "/query.json")) {
 		send_http_response(ql,200,"OK","text/plain",st);
 		link_printf(ql,st,"[\n");
@@ -562,17 +562,17 @@ static void handle_query( struct link *ql, time_t st )
 	} else if(!strcmp(path, "/query.oldclassads")) {
 		send_http_response(ql,200,"OK","text/plain",st);
 		for(i = 0; i < n; i++)
-			jx_export_old_classads(array[i], ql,st);
+			catalog_export_old_classads(array[i], ql,st);
 	} else if(!strcmp(path, "/query.newclassads")) {
 		send_http_response(ql,200,"OK","text/plain",st);
 		for(i = 0; i < n; i++)
-			jx_export_new_classads(array[i], ql,st);
+			catalog_export_new_classads(array[i], ql,st);
 	} else if(!strcmp(path, "/query.xml")) {
 		send_http_response(ql,200,"OK","text/xml",st);
 		link_printf(ql,st, "<?xml version=\"1.0\" standalone=\"yes\"?>\n");
 		link_printf(ql,st, "<catalog>\n");
 		for(i = 0; i < n; i++)
-			jx_export_xml(array[i], ql,st);
+			catalog_export_xml(array[i], ql,st);
 		link_printf(ql,st, "</catalog>\n");
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct jx *j;
@@ -587,7 +587,7 @@ static void handle_query( struct link *ql, time_t st )
 			link_printf(ql,st, "<h1>%s catalog server</h1>\n", preferred_hostname);
 			link_printf(ql,st, "<h2>%s</h2>\n", name);
 			link_printf(ql,st, "<p><a href=/>return to catalog view</a><p>\n");
-			jx_export_html_solo(j, ql,st);
+			catalog_export_html_solo(j, ql,st);
 			link_printf(ql,st, "</center>\n");
 		} else {
 			link_printf(ql,st, "<title>%s catalog server</title>\n", preferred_hostname);
@@ -626,14 +626,14 @@ static void handle_query( struct link *ql, time_t st )
 		string_metric(sum_total, -1, total_line);
 		link_printf(ql,st, "<b>%sB available out of %sB on %d devices</b><p>\n", avail_line, total_line, (int) sum_devices);
 
-		jx_export_html_header(ql, html_headers, st);
+		catalog_export_html_header(ql, html_headers, st);
 		for(i = 0; i < n; i++) {
 			j = array[i];
 			make_hash_key(j, key);
 			string_nformat(url, sizeof(url), "/detail/%s", key);
-			jx_export_html_with_link(j, ql, html_headers, "name", url, st);
+			catalog_export_html_with_link(j, ql, html_headers, "name", url, st);
 		}
-		jx_export_html_footer(ql, html_headers, st);
+		catalog_export_html_footer(ql, html_headers, st);
 		link_printf(ql,st, "</center>\n");
 	} else {
 		send_http_response(ql,404,"Not Found","text/html",st);

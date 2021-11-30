@@ -17,7 +17,7 @@ deltadb_query: deltadb_query_main.o libdeltadb.a $(EXTERNAL_DEPENDENCIES)
 
 deltadb_upgrade_log: deltadb_upgrade_log.o libdeltadb.a $(EXTERNAL_DEPENDENCIES)
 
-catalog_server: catalog_server.o libdeltadb.a $(EXTERNAL_DEPENDENCIES)
+catalog_server: catalog_server.o catalog_export.o libdeltadb.a $(EXTERNAL_DEPENDENCIES)
 
 clean:
 	rm -f $(OBJECTS) $(TARGETS) *.o

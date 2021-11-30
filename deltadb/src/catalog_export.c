@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "jx_export.h"
+#include "catalog_export.h"
 #include "jx_print.h"
 
 #include "stringtools.h"
@@ -28,7 +28,7 @@ static char * unquoted_string( struct jx *j )
 The old nvpair format simply has unquoted data following the key.
 */
 
-void jx_export_nvpair( struct jx *j, struct link *l, time_t stoptime )
+void catalog_export_nvpair( struct jx *j, struct link *l, time_t stoptime )
 {
 	struct jx_pair *p;
 	for(p=j->u.pairs;p;p=p->next) {
@@ -43,7 +43,7 @@ void jx_export_nvpair( struct jx *j, struct link *l, time_t stoptime )
 The old classad format has quoted strings, symbols, booleans, integers, but not objects or arrays.  So, we quote the latter two types.  Individual ads are separated by newlines.
 */
 
-void jx_export_old_classads( struct jx *j, struct link *l, time_t stoptime )
+void catalog_export_old_classads( struct jx *j, struct link *l, time_t stoptime )
 {
 	struct jx_pair *p;
 	for(p=j->u.pairs;p;p=p->next) {
@@ -62,7 +62,7 @@ void jx_export_old_classads( struct jx *j, struct link *l, time_t stoptime )
 For XML encoding, we use plain text for atomic types and tags to structure objects and arrays.
 */
 
-void jx_export_xml( struct jx *j, struct link *l, time_t stoptime )
+void catalog_export_xml( struct jx *j, struct link *l, time_t stoptime )
 {
 	struct jx_pair *p;
 	struct jx_item *i;
@@ -91,7 +91,7 @@ void jx_export_xml( struct jx *j, struct link *l, time_t stoptime )
 		for(p=j->u.pairs;p;p=p->next) {
 			link_printf(l,stoptime,"<pair><key>%s</key>",p->key->u.string_value);
 			link_printf(l,stoptime,"<value>");
-			jx_export_xml(p->value,l,stoptime);
+			catalog_export_xml(p->value,l,stoptime);
 			link_printf(l,stoptime,"</value></pair>");
 		}
 		link_printf(l,stoptime,"</object>\n");
@@ -100,7 +100,7 @@ void jx_export_xml( struct jx *j, struct link *l, time_t stoptime )
 		link_printf(l,stoptime,"<array>\n");
 		for (i = j->u.items; i; i = i->next) {
 			link_printf(l,stoptime, "<item>");
-			jx_export_xml(i->value,l,stoptime);
+			catalog_export_xml(i->value,l,stoptime);
 			link_printf(l,stoptime,"</item>");
 		}
 		link_printf(l,stoptime,"</array>\n");
@@ -122,7 +122,7 @@ void jx_export_xml( struct jx *j, struct link *l, time_t stoptime )
 New classads are quite similar to json, except that the use of [] and {} is reversed.
 */
 
-void jx_export_new_classads( struct jx *j, struct link *l, time_t stoptime )
+void catalog_export_new_classads( struct jx *j, struct link *l, time_t stoptime )
 {
 	struct jx_pair *p;
 	struct jx_item *i;
@@ -165,7 +165,7 @@ static const char *align_string(struct jx_table *h)
 	}
 }
 
-void jx_export_html_solo(struct jx *j, struct link *l, time_t stoptime )
+void catalog_export_html_solo(struct jx *j, struct link *l, time_t stoptime )
 {
 	link_printf(l,stoptime, "<table bgcolor=%s>\n", COLOR_TWO);
 	link_printf(l,stoptime, "<tr bgcolor=%s>\n", COLOR_ONE);
@@ -188,7 +188,7 @@ void jx_export_html_solo(struct jx *j, struct link *l, time_t stoptime )
 	link_printf(l,stoptime, "</table>\n");
 }
 
-void jx_export_html_header( struct link *l, struct jx_table *h, time_t stoptime )
+void catalog_export_html_header( struct link *l, struct jx_table *h, time_t stoptime )
 {
 	link_printf(l,stoptime,"<table bgcolor=%s>\n", COLOR_TWO);
 	link_printf(l,stoptime,"<tr bgcolor=%s>\n", COLOR_ONE);
@@ -199,12 +199,12 @@ void jx_export_html_header( struct link *l, struct jx_table *h, time_t stoptime 
 	color_counter = 0;
 }
 
-void jx_export_html( struct jx *n, struct link *l, struct jx_table *h, time_t stoptime )
+void catalog_export_html( struct jx *n, struct link *l, struct jx_table *h, time_t stoptime )
 {
-	jx_export_html_with_link(n, l, h, 0, 0, stoptime);
+	catalog_export_html_with_link(n, l, h, 0, 0, stoptime);
 }
 
-void jx_export_html_with_link( struct jx *n, struct link *l, struct jx_table *h, const char *linkname, const char *linktext, time_t stoptime )
+void catalog_export_html_with_link( struct jx *n, struct link *l, struct jx_table *h, const char *linkname, const char *linktext, time_t stoptime )
 {
 	link_printf(l,stoptime,"<tr bgcolor=%s>\n", color_counter % 2 ? COLOR_ONE : COLOR_TWO);
 	color_counter++;
@@ -235,7 +235,7 @@ void jx_export_html_with_link( struct jx *n, struct link *l, struct jx_table *h,
 	}
 }
 
-void jx_export_html_footer( struct link *l, struct jx_table *h, time_t stoptime )
+void catalog_export_html_footer( struct link *l, struct jx_table *h, time_t stoptime )
 {
 	link_printf(l,stoptime,"</table>\n");
 }
