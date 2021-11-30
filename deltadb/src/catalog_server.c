@@ -584,7 +584,7 @@ static void handle_query( struct link *ql, time_t st )
 			link_printf(ql,st, "<h2>Unknown Item!</h2>\n");
 			link_printf(ql,st, "</center>\n");
 		}
-	} else if(!strcmp(path,"/")) {
+	} else if(!strcmp(path,"/") || !strcmp(path,"/query.html") ) {
 		char avail_line[LINE_MAX];
 		char total_line[LINE_MAX];
 		INT64_T sum_total = 0;
