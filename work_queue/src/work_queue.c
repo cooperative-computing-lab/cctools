@@ -5330,7 +5330,8 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 
 	q->ssl_key = key ? strdup(key) : 0;
 	q->ssl_cert = cert ? strdup(cert) : 0;
-	if(q->ssl_key || q->ssl_cert) q->ssl_enabled;
+
+	if(q->ssl_key || q->ssl_cert) q->ssl_enabled=1;
 
 	getcwd(q->workingdir,PATH_MAX);
 
