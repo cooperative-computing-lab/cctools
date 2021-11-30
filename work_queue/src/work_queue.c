@@ -211,6 +211,7 @@ struct work_queue {
 	char *password;
 	char *ssl_key;
 	char *ssl_cert;
+	int ssl_enabled;
 
 	double bandwidth;
 
@@ -1041,7 +1042,7 @@ static void add_worker(struct work_queue *q)
 
 	debug(D_WQ,"worker %s:%d connected",addr,port);
 
-	if(q->ssl_cert || q->ssl_key) {
+	if(q->ssl_enabled) {
 		if(link_ssl_wrap_accept(link,q->ssl_key,q->ssl_cert)) {
 			debug(D_WQ,"worker %s:%d completed ssl connection",addr,port);
 		} else {
@@ -2368,7 +2369,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
-	if(link_using_ssl(q->manager_link)) {
+	if(q->ssl_enabled) {
 		use_ssl = 1;
 	}
 #endif
@@ -2507,7 +2508,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
-	if(link_using_ssl(q->manager_link)) {
+	if(q->ssl_enabled) {
 		use_ssl = 1;
 	}
 #endif
@@ -5329,6 +5330,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 
 	q->ssl_key = key ? strdup(key) : 0;
 	q->ssl_cert = cert ? strdup(cert) : 0;
+	if(q->ssl_key || q->ssl_cert) q->ssl_enabled;
 
 	getcwd(q->workingdir,PATH_MAX);
 
@@ -5685,9 +5687,8 @@ void work_queue_delete(struct work_queue *q)
 			free(q->manager_preferred_connection);
 
 		free(q->poll_table);
-
-		if(q->ssl_cert) free(q->ssl_cert);
-		if(q->ssl_key)  free(q->ssl_key);
+		free(q->ssl_cert);
+		free(q->ssl_key);
 
 		link_close(q->manager_link);
 		if(q->logfile) {
@@ -6204,7 +6205,7 @@ static void print_password_warning( struct work_queue *q )
 		fprintf(stderr,"warning: you should set a password with the --password option.\n");
 	}
 
-	if(!link_using_ssl(q->manager_link)) {
+	if(!q->ssl_enabled) {
 		fprintf(stderr,"warning: using plain-text when communicating with workers.\n");
 		fprintf(stderr,"warning: use encryption with a key and cert when creating the manager.\n");
 	}
