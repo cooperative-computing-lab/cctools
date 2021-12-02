@@ -539,10 +539,11 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 			debug(D_SSL, "ssl accept failed from %s port %d", link->raddr, link->rport);
 			ERR_print_errors_cb(_ssl_errors_cb, NULL);
 			ret = 0;
-		} else {
-			if(!link_nonblocking(link, 1)) {
-				return 0;
-			}
+		}
+
+		if(!link_nonblocking(link, 1)) {
+			debug(D_SSL, "Could not switch link back to non-blocking after SSL handshake: %s", strerror(errno));
+			return 0;
 		}
 
 		return ret;
@@ -584,6 +585,7 @@ int link_ssl_wrap_connect(struct link *link) {
 	}
 
 	if(!link_nonblocking(link, 1)) {
+		debug(D_SSL, "Could not switch link back to non-blocking after SSL handshake: %s", strerror(errno));
 		return 0;
 	}
 
