@@ -518,33 +518,20 @@ failure:
 	return 0;
 }
 
-int link_ssl_wrap_server(struct link *link, const char *key, const char *cert) {
+int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 #ifdef HAS_OPENSSL
 	if(key && cert) {
-		link->ctx = _create_ssl_context(/* is client */ 0);
+		debug(D_TCP, "accepting ssl state for %s port %d", link->raddr, link->rport);
+
+		link->ctx = _create_ssl_context();
 		_set_ssl_keys(link->ctx, key, cert);
 
-		return 1;
-	}
-#endif
-
-	return 0;
-}
-
-
-int link_ssl_wrap_accept(struct link *parent, struct link *link) {
-#ifdef HAS_OPENSSL
-	if(parent->ctx) {
-		debug(D_TCP, "setting up ssl state for %s port %d", link->raddr, link->rport);
-
-		link->ctx = _create_ssl_context(/* is client */ 1);
-
-		link->ssl = SSL_new(parent->ctx);
+		link->ssl = SSL_new(link->ctx);
 		SSL_set_fd(link->ssl, link->fd);
 
 		int ret = SSL_accept(link->ssl);
 		if(ret <= 0) {
-			debug(D_SSL, "accept failed from %s port %d", link->raddr, link->rport);
+			debug(D_SSL, "ssl accept failed from %s port %d", link->raddr, link->rport);
 			ERR_print_errors_cb(_ssl_errors_cb, NULL);
 		}
 
@@ -606,10 +593,6 @@ struct link *link_accept(struct link *parent, time_t stoptime)
 				goto failure;
 			}
 			link->fd = fd;
-
-			if(link_using_ssl(parent) && link_ssl_wrap_accept(parent, link) < 1) {
-				goto failure;
-			}
 
 			break;
 		} else if (stoptime == LINK_NOWAIT && errno_is_temporary(errno)) {
