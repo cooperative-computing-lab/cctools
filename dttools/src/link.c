@@ -523,6 +523,11 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 	if(key && cert) {
 		debug(D_TCP, "accepting ssl state for %s port %d", link->raddr, link->rport);
 
+		/* go to blocking mode during handshake */
+		if(!link_nonblocking(link, 0)) {
+			return 0;
+		}
+
 		link->ctx = _create_ssl_context();
 		_set_ssl_keys(link->ctx, key, cert);
 
@@ -533,6 +538,11 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 		if(ret <= 0) {
 			debug(D_SSL, "ssl accept failed from %s port %d", link->raddr, link->rport);
 			ERR_print_errors_cb(_ssl_errors_cb, NULL);
+			ret = 0;
+		} else {
+			if(!link_nonblocking(link, 1)) {
+				return 0;
+			}
 		}
 
 		return ret;
@@ -545,6 +555,11 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 
 int link_ssl_wrap_connect(struct link *link) {
 #ifdef HAS_OPENSSL
+	/* go to blocking mode during the ssl handshake */
+	if(!link_nonblocking(link, 0)) {
+		return 0;
+	}
+
 	link->ctx = _create_ssl_context();
 	link->ssl = SSL_new(link->ctx);
 	SSL_set_fd(link->ssl, link->fd);
@@ -566,6 +581,10 @@ int link_ssl_wrap_connect(struct link *link) {
 				return result;
 				break;
 		}
+	}
+
+	if(!link_nonblocking(link, 1)) {
+		return 0;
 	}
 
 	return result;
