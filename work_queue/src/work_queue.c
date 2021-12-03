@@ -3448,9 +3448,7 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 			}
 
 			if(limits->memory < 0) {
-				printf("b: %lf, %lf\n",limits->cores, limits->memory);
 				limits->memory = MAX(1, floor(w->resources->memory.largest * max_proportion));
-				printf("a: %lf, %lf\n",limits->cores, limits->memory);
 			}
 
 			if(limits->disk < 0) {
