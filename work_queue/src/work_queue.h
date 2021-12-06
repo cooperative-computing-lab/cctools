@@ -787,6 +787,16 @@ If the task could not, then the <tt>result</tt> field will be non-zero and the
 */
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout);
 
+
+/** Wait for a task with a given task to complete.
+Similar to @ref work_queue_wait, but guarantees that the returned task has the specified tag.
+@param q A work queue object.
+@param tag The desired tag. If NULL, then tasks are returned regardless of their tag.
+@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref WORK_QUEUE_WAITFORTASK to block until a task has completed.
+@returns A completed task description, or null if the queue is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
+*/
+struct work_queue_task *work_queue_wait_for_tag(struct work_queue *q, const char *tag, int timeout);
+
 /** Determine whether the queue is 'hungry' for more tasks.
 While the Work Queue can handle a very large number of tasks,
 it runs most efficiently when the number of tasks is slightly

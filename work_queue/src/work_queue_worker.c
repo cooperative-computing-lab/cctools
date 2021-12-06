@@ -1980,7 +1980,7 @@ static void foreman_for_manager(struct link *manager) {
 		}
 		prev_num_workers = curr_num_workers;
 
-		task = work_queue_wait_internal(foreman_q, foreman_internal_timeout, manager, &manager_active);
+		task = work_queue_wait_internal(foreman_q, foreman_internal_timeout, manager, &manager_active, NULL);
 
 		if(task) {
 			struct work_queue_process *p;
