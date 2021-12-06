@@ -26,6 +26,7 @@ import textwrap
 import shutil
 import atexit
 import time
+import math
 
 def set_debug_flag(*flags):
     for flag in flags:
@@ -1798,13 +1799,18 @@ class WorkQueue(object):
     # @param seq        The seq that will be reduced
     # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
 
-    def tree_reduce(self, fn, seq, chunk_size=2):
-        def reduce(fn, seq):
+    def tree_reduce(self, fn, seq, iter_size, chunk_size=2):
+        def reduce(fn, iter_size, seq):
             ''' Serializable tree reduce function '''    
             while len(seq) > 1:
                 results = []
-                for i in range(len(seq)//2):
-                    results.append(fn(seq[(i*2)], seq[(i*2)+1]))
+                for i in range(len(seq)//iter_size):
+                    s = i*iter_size
+                    e = s + iter_size
+                    if e < len(seq):
+                        results.append(fn(seq[s:e]))
+                    else:
+                        results.append(fn(seq[s:]))
 
                 if len(seq) % 2 == 1:
                     results.append(seq[-1])
@@ -1813,31 +1819,23 @@ class WorkQueue(object):
     
             return seq[0]
 
-        def find_pow(n):
-            ''' Finds the largest power of 2 smaller than n '''
-            bit = 1
-            while(bit <= n):
-                bit = bit << 1
-
-            return bit >> 1
 
         # parallel function
         tasks = {}
-        n = find_pow(chunk_size)
         
         while len(seq) > 1:
 
-            size = math.ceil(len(seq)/n)
+            size = math.ceil(len(seq)/chunk_size)
             results = [None] * size
         
             for i in range(size):
-                start = i*n
-                end = start + n
+                start = i*chunk_size
+                end = start + chunk_size
 
                 if end > len(seq):
-                    p_task = PythonTask(reduce, fn, seq[start:])
+                    p_task = PythonTask(reduce, fn, iter_size, seq[start:])
                 else:
-                    p_task = PythonTask(reduce, fn, seq[start:end])
+                    p_task = PythonTask(reduce, fn, iter_size, seq[start:end])
 
                 self.submit(p_task)
                 tasks[p_task.id] = i
