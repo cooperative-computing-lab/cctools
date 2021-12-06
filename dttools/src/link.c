@@ -381,38 +381,27 @@ static int _ssl_errors_cb(const char *str, size_t len, void *use_warn) {
 	return 1;
 }
 
-static SSL_CTX *_create_ssl_context(int is_client) {
+static SSL_CTX *_create_ssl_context()
+{
 	const SSL_METHOD *method;
 	SSL_CTX *ctx;
 
-#if HAS_SSLv23_method
 	//older openssl versions need explicit init
 	if(!openssl_initialized) {
+#if HAS_SSLv23_method
 		SSL_library_init();
-	}
 #endif
-
-	openssl_initialized = 1;
-
-	if(is_client) {
-		#ifdef HAS_TLS_method
-		method = TLS_client_method();
-		#elif HAS_SSLv23_method
-		method = SSLv23_client_method();
-		#else
-		#error "Compiled support for OpenSSL is too old."
-		#endif
-		debug(D_SSL, "setting context for connection");
-	} else {
-		#ifdef HAS_TLS_method
-		method = TLS_server_method();
-		#elif HAS_SSLv23_method
-		method = SSLv23_server_method();
-		#else
-		#error "Compiled support for OpenSSL is too old."
-		#endif
-		debug(D_SSL, "setting context for server");
+		SSL_load_error_strings();
+		openssl_initialized = 1;
 	}
+
+	#ifdef HAS_TLS_method
+	method = TLS_method();
+	#elif HAS_SSLv23_method
+	method = SSLv23_method();
+	#else
+	#error "Compiled support for OpenSSL is too old."
+	#endif
 
 	ctx = SSL_CTX_new(method);
 	if (!ctx) {
@@ -529,34 +518,32 @@ failure:
 	return 0;
 }
 
-int link_ssl_wrap_server(struct link *link, const char *key, const char *cert) {
+int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 #ifdef HAS_OPENSSL
 	if(key && cert) {
-		link->ctx = _create_ssl_context(/* is client */ 0);
+		debug(D_TCP, "accepting ssl state for %s port %d", link->raddr, link->rport);
+
+		/* go to blocking mode during handshake */
+		if(!link_nonblocking(link, 0)) {
+			return 0;
+		}
+
+		link->ctx = _create_ssl_context();
 		_set_ssl_keys(link->ctx, key, cert);
 
-		return 1;
-	}
-#endif
-
-	return 0;
-}
-
-
-int link_ssl_wrap_accept(struct link *parent, struct link *link) {
-#ifdef HAS_OPENSSL
-	if(parent->ctx) {
-		debug(D_TCP, "setting up ssl state for %s port %d", link->raddr, link->rport);
-
-		link->ctx = _create_ssl_context(/* is client */ 1);
-
-		link->ssl = SSL_new(parent->ctx);
+		link->ssl = SSL_new(link->ctx);
 		SSL_set_fd(link->ssl, link->fd);
 
 		int ret = SSL_accept(link->ssl);
 		if(ret <= 0) {
-			debug(D_SSL, "accept failed from %s port %d", link->raddr, link->rport);
+			debug(D_SSL, "ssl accept failed from %s port %d", link->raddr, link->rport);
 			ERR_print_errors_cb(_ssl_errors_cb, NULL);
+			ret = 0;
+		}
+
+		if(!link_nonblocking(link, 1)) {
+			debug(D_SSL, "Could not switch link back to non-blocking after SSL handshake: %s", strerror(errno));
+			return 0;
 		}
 
 		return ret;
@@ -569,7 +556,12 @@ int link_ssl_wrap_accept(struct link *parent, struct link *link) {
 
 int link_ssl_wrap_connect(struct link *link) {
 #ifdef HAS_OPENSSL
-	link->ctx = _create_ssl_context(/* is client */ 1);
+	/* go to blocking mode during the ssl handshake */
+	if(!link_nonblocking(link, 0)) {
+		return 0;
+	}
+
+	link->ctx = _create_ssl_context();
 	link->ssl = SSL_new(link->ctx);
 	SSL_set_fd(link->ssl, link->fd);
 
@@ -590,6 +582,11 @@ int link_ssl_wrap_connect(struct link *link) {
 				return result;
 				break;
 		}
+	}
+
+	if(!link_nonblocking(link, 1)) {
+		debug(D_SSL, "Could not switch link back to non-blocking after SSL handshake: %s", strerror(errno));
+		return 0;
 	}
 
 	return result;
@@ -617,10 +614,6 @@ struct link *link_accept(struct link *parent, time_t stoptime)
 				goto failure;
 			}
 			link->fd = fd;
-
-			if(link_using_ssl(parent) && link_ssl_wrap_accept(parent, link) < 1) {
-				goto failure;
-			}
 
 			break;
 		} else if (stoptime == LINK_NOWAIT && errno_is_temporary(errno)) {
