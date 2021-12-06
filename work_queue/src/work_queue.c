@@ -130,7 +130,7 @@ int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 double wq_option_blocklist_slow_workers_timeout = 900;
 
 /* time threshold for when tasks are checked to fit to workers */ 
-static timestamp_t interval_tasks_fit_check = 180000000; // 3 minutes in usecs
+static timestamp_t interval_tasks_fit_check = 600000; // 180000000; // 3 minutes in usecs
 
 struct work_queue {
 	char *name;
@@ -4240,6 +4240,9 @@ static void check_all_tasks(struct work_queue *q)
 	struct work_queue_stats s;
 	work_queue_get_stats(q, &s);	
 	
+	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
+		fprintf(stderr,"\nWARNING: There are tasks that cannot fit any currently connected worker\n"); 	
+	}
 	if(unfit_core)
 		fprintf(stderr,"%d waiting task(s) need(s) more than %d cores(max available).\n",unfit_core,(int)s.max_cores);
 	if(unfit_mem)
@@ -4248,6 +4251,10 @@ static void check_all_tasks(struct work_queue *q)
 		fprintf(stderr,"%d waiting task(s) need(s) more than %d MB of disk(max available).\n",unfit_disk,(int)s.max_disk);
 	if(unfit_gpu)
 		fprintf(stderr,"%d waiting task(s) need(s) more than %d gpus(max available).\n",unfit_gpu,(int)s.max_gpus);
+	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
+		fprintf(stderr, "A worker with %d core(s), %d MB of memory, %d MB of disk, and %d gpu(s) will fit these tasks\n", max_task_stats[0],max_task_stats[1],max_task_stats[2],max_task_stats[3]);
+	}
+	
 }
 
 static int receive_one_task( struct work_queue *q )
