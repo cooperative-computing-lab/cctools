@@ -1799,26 +1799,7 @@ class WorkQueue(object):
     # @param seq        The seq that will be reduced
     # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
 
-    def tree_reduce(self, fn, seq, iter_size, chunk_size=2):
-        def reduce(fn, iter_size, seq):
-            ''' Serializable tree reduce function '''    
-            while len(seq) > 1:
-                results = []
-                for i in range(len(seq)//iter_size):
-                    s = i*iter_size
-                    e = s + iter_size
-                    if e < len(seq):
-                        results.append(fn(seq[s:e]))
-                    else:
-                        results.append(fn(seq[s:]))
-
-                if len(seq) % 2 == 1:
-                    results.append(seq[-1])
-                
-                seq = results
-    
-            return seq[0]
-
+    def tree_reduce(self, fn, seq, chunk_size=2): 
 
         # parallel function
         tasks = {}
@@ -1833,9 +1814,9 @@ class WorkQueue(object):
                 end = start + chunk_size
 
                 if end > len(seq):
-                    p_task = PythonTask(reduce, fn, iter_size, seq[start:])
+                    p_task = PythonTask(fn, seq[start:])
                 else:
-                    p_task = PythonTask(reduce, fn, iter_size, seq[start:end])
+                    p_task = PythonTask(fn, seq[start:end])
 
                 self.submit(p_task)
                 tasks[p_task.id] = i
