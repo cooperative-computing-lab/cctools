@@ -209,6 +209,10 @@ struct work_queue {
 	struct rmsummary *max_task_resources_requested;
 
 	char *password;
+	char *ssl_key;
+	char *ssl_cert;
+	int ssl_enabled;
+
 	double bandwidth;
 
 	char *debug_path;
@@ -1037,6 +1041,18 @@ static void add_worker(struct work_queue *q)
 	}
 
 	debug(D_WQ,"worker %s:%d connected",addr,port);
+
+	if(q->ssl_enabled) {
+		if(link_ssl_wrap_accept(link,q->ssl_key,q->ssl_cert)) {
+			debug(D_WQ,"worker %s:%d completed ssl connection",addr,port);
+		} else {
+			debug(D_WQ,"worker %s:%d failed ssl connection",addr,port);
+			link_close(link);
+			return;
+		}
+	} else {
+		/* nothing to do */
+	}
 
 	if(q->password) {
 		debug(D_WQ,"worker %s:%d authenticating",addr,port);
@@ -2353,7 +2369,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
-	if(link_using_ssl(q->manager_link)) {
+	if(q->ssl_enabled) {
 		use_ssl = 1;
 	}
 #endif
@@ -2492,7 +2508,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 
 	int use_ssl = 0;
 #ifdef HAS_OPENSSL
-	if(link_using_ssl(q->manager_link)) {
+	if(q->ssl_enabled) {
 		use_ssl = 1;
 	}
 #endif
@@ -5308,16 +5324,6 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 		setenv("TCP_HIGH_PORT", getenv("WORK_QUEUE_HIGH_PORT"), 0);
 
 	q->manager_link = link_serve(port);
-
-	// we need both or neither key and cert. We let link_ssl_wrap_server do the
-	// error checking.
-	if(key || cert) {
-		if(link_ssl_wrap_server(q->manager_link, key, cert) < 1) {
-			fprintf(stderr, "Error: failed to setup ssl.\n");
-			return 0;
-		}
-	}
-
 	if(!q->manager_link) {
 		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
 		free(q);
@@ -5326,6 +5332,11 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 		char address[LINK_ADDRESS_MAX];
 		link_address_local(q->manager_link, address, &q->port);
 	}
+
+	q->ssl_key = key ? strdup(key) : 0;
+	q->ssl_cert = cert ? strdup(cert) : 0;
+
+	if(q->ssl_key || q->ssl_cert) q->ssl_enabled=1;
 
 	getcwd(q->workingdir,PATH_MAX);
 
@@ -5682,6 +5693,9 @@ void work_queue_delete(struct work_queue *q)
 			free(q->manager_preferred_connection);
 
 		free(q->poll_table);
+		free(q->ssl_cert);
+		free(q->ssl_key);
+
 		link_close(q->manager_link);
 		if(q->logfile) {
 			fclose(q->logfile);
@@ -6211,7 +6225,7 @@ static void print_password_warning( struct work_queue *q )
 		fprintf(stderr,"warning: you should set a password with the --password option.\n");
 	}
 
-	if(!link_using_ssl(q->manager_link)) {
+	if(!q->ssl_enabled) {
 		fprintf(stderr,"warning: using plain-text when communicating with workers.\n");
 		fprintf(stderr,"warning: use encryption with a key and cert when creating the manager.\n");
 	}
