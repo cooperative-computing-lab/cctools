@@ -1784,19 +1784,45 @@ class WorkQueue(object):
     # @param fn       The function that will be called on each element
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
-    def pair(self, fn, seq1, seq2):
-        results = [None] * (len(seq1) * len(seq2))
+    def pair(self, fn, seq1, seq2, chunk_size=1):
+        def fpairs(fn, List):
+            results = []
+
+            for item in List:
+                results.append(fn(item))
+
+            return results
+       
+        size = math.ceil((len(seq1) * len(seq2))/chunk_size)
+        results = [None] * size
         tasks = {}
-        for i, (x, y) in enumerate(itertools.product(seq1, seq2)):
-            p_task = PythonTask(fn, x, y)
+        task = []
+        num = 0
+        num_task = 0
+
+        for item in itertools.product(seq1, seq2):
+            if num == chunk_size:
+                p_task = PythonTask(fpairs, fn, task)
+                self.submit(p_task)
+                tasks[p_task.id] = num_task
+                
+                num = 0
+                num_task += 1
+                task.clear()
+
+            task.append(item)
+            num += 1
+
+        if len(task) > 0:
+            p_task = PythonTask(fpairs, fn, task)
             self.submit(p_task)
-            tasks[p_task.id] = i
+            tasks[p_task.id] = num_task
 
         while not self.empty():
             t = self.wait()
             results[tasks[t.id]] = t.output
 
-        return results
+        return [item for elem in results for item in elem]
 
 
     ##
