@@ -171,12 +171,12 @@ int main( int argc, char *argv[] )
 				deltadb_scope_t scope;
 
 				/* If the reduction name begins with GLOBAL, assign it global scope. */
-				if(!strncmp(reduce_name,"GLOBAL",6)) {
+				if(!strncmp(reduce_name,"GLOBAL_",7)) {
 					scope = DELTADB_SCOPE_GLOBAL;
 					strcpy(reduce_name,&reduce_name[6]);
 
-				/* If the reduction name begins with TEMP, assign it temporal scope. */
-				} else if (!strncmp(reduce_name, "TEMP",4)) {
+				/* If the reduction name begins with TIME, assign it temporal scope. */
+				} else if (!strncmp(reduce_name, "TIME_",5)) {
 					scope = DELTADB_SCOPE_TEMPORAL;
 					if (!jx_istype(reduce_expr, JX_SYMBOL)) {
 						fprintf(stderr, "deltadb_query: must supply attribute name to temporal reduction: %s\n",reduce_attr);
