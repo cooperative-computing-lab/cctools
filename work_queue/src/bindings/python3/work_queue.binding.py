@@ -27,6 +27,7 @@ import textwrap
 import shutil
 import atexit
 import time
+import math
 
 def set_debug_flag(*flags):
     for flag in flags:
@@ -1824,15 +1825,27 @@ class WorkQueue(object):
     # @param self       Reference to the current work queue object.
     # @param fn         The function that will be called on each element
     # @param seq        The seq that will be reduced
+    # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
 
-    def tree_reduce(self, fn, seq):
-        size = len(seq)
+    def tree_reduce(self, fn, seq, chunk_size=2): 
+
+        # parallel function
         tasks = {}
-
+        
         while len(seq) > 1:
-            results = [None] * (len(seq)//2)
-            for i in range(len(seq)//2):
-                p_task = PythonTask(fn, seq[(i*2)], seq[(i*2)+1])
+
+            size = math.ceil(len(seq)/chunk_size)
+            results = [None] * size
+        
+            for i in range(size):
+                start = i*chunk_size
+                end = start + chunk_size
+
+                if end > len(seq):
+                    p_task = PythonTask(fn, seq[start:])
+                else:
+                    p_task = PythonTask(fn, seq[start:end])
+
                 self.submit(p_task)
                 tasks[p_task.id] = i
 
@@ -1840,11 +1853,10 @@ class WorkQueue(object):
                 t = self.wait()
                 results[tasks[t.id]] = t.output
 
-            if len(seq) % 2 == 1:
-                results.append(seq[-1])
             seq = results
 
         return seq[0]
+           
 
 # test
 
