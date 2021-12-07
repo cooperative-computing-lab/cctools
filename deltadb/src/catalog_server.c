@@ -515,26 +515,28 @@ static void handle_query( struct link *ql, time_t st )
 				send_http_response(ql,200,"OK","text/plain",st);
 				link_printf(ql,st,"[\n");
 
-				int first = 1;
+				int count = 0;
 				for(i = 0; i < n; i++) {
 					if(jx_eval_is_true(expr,array[i])) {
-						if(!first) link_printf(ql,st,",\n");
+						if(count>0) link_printf(ql,st,",\n");
 						jx_print_link(array[i],ql,st);
-						first = 0;
+						count++;
 					}
 				}
 				link_printf(ql,st,"\n]\n");
 				jx_delete(expr);
+				debug(D_DEBUG,"query '%s' matched %d records",buffer_tostring(&buf),count);
 			} else {
 				send_http_response(ql,400,"Bad Request","text/plain",st);
 				link_printf(ql,st,"Invalid query text.\n");
+				debug(D_DEBUG,"query '%s' failed jx parse",buffer_tostring(&buf));
 			}
 		} else {
 			send_http_response(ql,400,"Bad Request","text/plain",st);
 			link_printf(ql,st,"Invalid base-64 encoding.\n");
+			debug(D_DEBUG,"query '%s' failed base-64 decode",strexpr);
 		}
 		buffer_free(&buf);
-
 
 	} else if(3==sscanf(path, "/history/%ld/%ld/%[^/]",&time_start,&time_stop,strexpr)) {
 
