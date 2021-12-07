@@ -31,15 +31,16 @@
 
 ## DESCRIPTION
 
-**catalog_query** is a tool that queries a catalog server for raw
-JSON records.  The records can be filtered by an optional --where expression.
-This tool is handy for querying custom record types not handled
+**catalog_query** is a tool that queries the catalog server for running services.
+The output can be filtered by an arbitrary expression, and displayed in raw JSON
+form, or in tabular form. This tool is handy for querying custom record types not handled
 by other tools.
 
 ## ARGUMENTS
 
 
 - **--where=_&lt;expr&gt;_**<br /> Only records matching this expression will be displayed.
+- **--output=_&lt;expr&gt;_**<br /> Display this expression for each record.
 - **--catalog=_&lt;host&gt;_**<br /> Query this catalog host.
 - **--debug=_&lt;flag&gt;_**<br /> Enable debugging for this subsystem.
 - **--debug-file=_&lt;file&gt;_**<br /> Send debug output to this file.
@@ -66,6 +67,18 @@ To show all records of Chirp servers with more than 4 cpus:
 
 ```
 % catalog_query --where \'type=="chirp" && cpus > 4\'
+```
+
+To show all records of WQ applications with name, port, and owner in tabular form:
+
+```
+% catalog_query --where \'type=="wq_master\" --output name --output port --output owner
+```
+
+To show all records of WQ applications with name, port, and owner as JSON records:
+
+```
+% catalog_query --where \'type=="wq_master\" --output '{"name":name,"port":port,"owner":owner}'
 ```
 
 ## COPYRIGHT

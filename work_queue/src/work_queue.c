@@ -4370,16 +4370,21 @@ static int abort_drained_workers(struct work_queue *q) {
 }
 
 
-//comparator function for checking if a task matches given tag.
+//comparator function for checking if a task matches a given tag.
 static int tasktag_comparator(void *t, const void *r) {
 
 	struct work_queue_task *task_in_queue = t;
 	const char *tasktag = r;
 
-	if (task_in_queue->tag && !strcmp(task_in_queue->tag, tasktag)) {
+	if(!task_in_queue->tag && !tasktag) {
 		return 1;
 	}
-	return 0;
+
+	if(!task_in_queue->tag || !tasktag) {
+		return 0;
+	}
+
+	return !strcmp(task_in_queue->tag, tasktag);
 }
 
 
@@ -6045,6 +6050,20 @@ static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_t
 	return NULL;
 }
 
+static struct work_queue_task *task_state_any_with_tag(struct work_queue *q, work_queue_task_state_t state, const char *tag) {
+	struct work_queue_task *t;
+	uint64_t taskid;
+
+	itable_firstkey(q->tasks);
+	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+		if( task_state_is(q, taskid, state) && tasktag_comparator((void *) t, (void *) tag)) {
+			return t;
+		}
+	}
+
+	return NULL;
+}
+
 static int task_state_count(struct work_queue *q, const char *category, work_queue_task_state_t state) {
 	struct work_queue_task *t;
 	uint64_t taskid;
@@ -6229,7 +6248,11 @@ static void print_password_warning( struct work_queue *q )
 
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
+	return work_queue_wait_for_tag(q, NULL, timeout);
+}
 
+struct work_queue_task *work_queue_wait_for_tag(struct work_queue *q, const char *tag, int timeout)
+{
 	if(timeout == 0) {
 		// re-establish old, if unintended behavior, where 0 would wait at
 		// least a second. With 0, we would like the loop to be executed at
@@ -6243,7 +6266,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 		timeout = 5;
 	}
 
-	return work_queue_wait_internal(q, timeout, NULL, NULL);
+	return work_queue_wait_internal(q, timeout, NULL, NULL, tag);
 }
 
 /* return number of workers that failed */
@@ -6332,7 +6355,8 @@ static int connect_new_workers(struct work_queue *q, int stoptime, int max_new_w
 }
 
 
-struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
+struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active, const char *tag)
+{
 /*
    - compute stoptime
    S time left?                              No:  return null
@@ -6348,7 +6372,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - queue empty?                            Yes: return null
    - go to S
 */
-{
 	int events = 0;
 
 	// account for time we spend outside work_queue_wait
@@ -6373,7 +6396,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		// task completed?
 		if (t == NULL)
 		{
-			t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+			if(tag) {
+				t = task_state_any_with_tag(q, WORK_QUEUE_TASK_RETRIEVED, tag);
+			} else {
+				t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
+			}
 			if(t) {
 				change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 

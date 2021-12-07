@@ -52,9 +52,17 @@ LIST_END
 
 (The UNIQUE function can be applied to any record type, while the other reduction functions assume numeric values.)
 
-By default, reductions are computed at local scope.  This means the reduction is computed across the set of 
-records available at each periodic time step.  If the prefix GLOBAL is added to a reduction, then the reduction
-is computed across every record over time.
+By default, reductions are computed spatially.  This means the reduction is computed across the set of 
+records available at each periodic time step.  For example, MAX(count) gives the (single) maximum value of
+count seen across all records.  A single value MAX(count) will be displayed at each output step.
+
+If the prefix TIME_ is added to a reduction, then the reduction is computed over time for each record.
+For example, TIME_MAX(count) computes the maximum value of count over each time interval, for each record.
+TIME_MAX(count) will be given for each record at each output step.
+
+Finally, if the prefix GLOBAL is added to a reduction, then it will be computed for all records
+across all time intervals.  For example, GLOBAL_MAX(count) will display the maximum value of count
+seen for any record at any time.  A single value GLOBAL_MAX(count) will be display at each output step.
 
 For example, this:
 
@@ -62,11 +70,10 @@ LONGCODE_BEGIN
 --output 'UNIQUE(name)' --every 7d
 LONGCODE_END
 
-will display all of the names in the database, at seven day intervals.  However, it will not display records that are
-created and deleted between those seven day intervals.  In comparison, this:
+will display all of the names in the database, at seven day intervals.  However, it will not display records that are created and deleted between those seven day intervals.  In comparison, this:
 
 LONGCODE_BEGIN
---output 'GLOBALUNIQUE(name)' --every 7d
+--output 'GLOBAL_UNIQUE(name)' --every 7d
 LONGCODE_END
 
 will display all of the names encountered over the last seven days, at seven day intervals.

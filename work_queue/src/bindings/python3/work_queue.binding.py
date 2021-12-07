@@ -27,6 +27,7 @@ import textwrap
 import shutil
 import atexit
 import time
+import math
 
 def set_debug_flag(*flags):
     for flag in flags:
@@ -1734,7 +1735,20 @@ class WorkQueue(object):
     #                   before returning.  Use an integer to set the timeout or the constant @ref
     #                   WORK_QUEUE_WAITFORTASK to block until a task has completed.
     def wait(self, timeout=WORK_QUEUE_WAITFORTASK):
-        task_pointer = work_queue_wait(self._work_queue, timeout)
+        return self.wait_for_tag(None, timeout)
+
+    ##
+    # Similar to @ref wait, but guarantees that the returned task has the
+    # specified tag.
+    #
+    # This call will block until the timeout has elapsed.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param tag        Desired tag. If None, then it is equivalent to self.wait(timeout)
+    # @param timeout    The number of seconds to wait for a completed task
+    #                   before returning.
+    def wait_for_tag(self, tag, timeout=WORK_QUEUE_WAITFORTASK):
+        task_pointer = work_queue_wait_for_tag(self._work_queue, tag, timeout)
         if task_pointer:
             task = self._task_table[int(task_pointer.taskid)]
             del self._task_table[task_pointer.taskid]
@@ -1784,19 +1798,45 @@ class WorkQueue(object):
     # @param fn       The function that will be called on each element
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
-    def pair(self, fn, seq1, seq2):
-        results = [None] * (len(seq1) * len(seq2))
+    def pair(self, fn, seq1, seq2, chunk_size=1):
+        def fpairs(fn, List):
+            results = []
+
+            for item in List:
+                results.append(fn(item))
+
+            return results
+       
+        size = math.ceil((len(seq1) * len(seq2))/chunk_size)
+        results = [None] * size
         tasks = {}
-        for i, (x, y) in enumerate(itertools.product(seq1, seq2)):
-            p_task = PythonTask(fn, x, y)
+        task = []
+        num = 0
+        num_task = 0
+
+        for item in itertools.product(seq1, seq2):
+            if num == chunk_size:
+                p_task = PythonTask(fpairs, fn, task)
+                self.submit(p_task)
+                tasks[p_task.id] = num_task
+                
+                num = 0
+                num_task += 1
+                task.clear()
+
+            task.append(item)
+            num += 1
+
+        if len(task) > 0:
+            p_task = PythonTask(fpairs, fn, task)
             self.submit(p_task)
-            tasks[p_task.id] = i
+            tasks[p_task.id] = num_task
 
         while not self.empty():
             t = self.wait()
             results[tasks[t.id]] = t.output
 
-        return results
+        return [item for elem in results for item in elem]
 
 
     ##
@@ -1811,15 +1851,27 @@ class WorkQueue(object):
     # @param self       Reference to the current work queue object.
     # @param fn         The function that will be called on each element
     # @param seq        The seq that will be reduced
+    # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
 
-    def tree_reduce(self, fn, seq):
-        size = len(seq)
+    def tree_reduce(self, fn, seq, chunk_size=2): 
+
+        # parallel function
         tasks = {}
-
+        
         while len(seq) > 1:
-            results = [None] * (len(seq)//2)
-            for i in range(len(seq)//2):
-                p_task = PythonTask(fn, seq[(i*2)], seq[(i*2)+1])
+
+            size = math.ceil(len(seq)/chunk_size)
+            results = [None] * size
+        
+            for i in range(size):
+                start = i*chunk_size
+                end = start + chunk_size
+
+                if end > len(seq):
+                    p_task = PythonTask(fn, seq[start:])
+                else:
+                    p_task = PythonTask(fn, seq[start:end])
+
                 self.submit(p_task)
                 tasks[p_task.id] = i
 
@@ -1827,11 +1879,10 @@ class WorkQueue(object):
                 t = self.wait()
                 results[tasks[t.id]] = t.output
 
-            if len(seq) % 2 == 1:
-                results.append(seq[-1])
             seq = results
 
         return seq[0]
+           
 
 # test
 
