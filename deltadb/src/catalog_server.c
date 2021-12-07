@@ -544,8 +544,8 @@ static void handle_query( struct link *ql, time_t st )
 			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
 				if(link_using_ssl(ql)) {
-					send_http_response(ql,400,"OK","text/plain",st);
-					link_printf(ql,st,"Sorry, unable to dump queries to encrypted connection");
+					send_http_response(ql,501,"Server Error","text/plain",st);
+					link_printf(ql,st,"Sorry, unable to serve queries over HTTPS.");
 				} else {
 					send_http_response(ql,200,"OK","text/plain",st);
 					struct deltadb_query *query = deltadb_query_create();
