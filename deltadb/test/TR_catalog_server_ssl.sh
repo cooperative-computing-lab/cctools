@@ -2,8 +2,20 @@
 
 . ../../dttools/test/test_runner_common.sh
 
+check_needed()
+{
+	avail=`grep CCTOOLS_OPENSSL_AVAILABLE ../../config.mk | cut -f2 -d=`
+	if [ $avail = no ] 
+	then
+		return 1
+	fi
+}
+
 prepare()
 {
+	echo "creating a temporary certificate"
+	openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 365 -nodes -subj "/C=US/ST=Indiana/L=Notre Dame/O=Testing/OU=Testing/CN=localhost/emailAddress=nobody@nowhere.com"
+
 	echo "creating update.json"
 	echo '{"type":"cctools-test","size":1048576,"enabled":true}' > update.json
 }
@@ -11,7 +23,7 @@ prepare()
 run()
 {
 	echo "starting the catalog server"
-	../src/catalog_server -d all -o catalog.log &
+	../src/catalog_server -d all -o catalog.log --ssl-port 9099 --ssl-cert cert.pem --ssl-key key.pem &
 	pid=$!
 
 	echo "sending three udp updates to the server"
@@ -24,8 +36,8 @@ run()
 	# note the url contains the base 64 encoding of a jx expression:
 	# echo 'type=="cctools-test"' | base64
 
-	echo "fetching the results via http"
-	curl http://localhost:9097/query/dHlwZT09ImNjdG9vbHMtdGVzdCIK > query.out
+	echo "fetching the results via https"
+	curl --insecure https://localhost:9099/query/dHlwZT09ImNjdG9vbHMtdGVzdCIK > query.out
 
 	if ../../dttools/src/jx2json < query.out
 	then
