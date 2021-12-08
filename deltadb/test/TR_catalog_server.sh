@@ -2,6 +2,15 @@
 
 . ../../dttools/test/test_runner_common.sh
 
+check_needed()
+{
+	avail=`grep CCTOOLS_OPENSSL_AVAILABLE ../../config.mk | cut -f2 -d=`
+	if [ $avail = no ] 
+	then
+		return 1
+	fi
+}
+
 prepare()
 {
 	echo "creating a temporary certificate"
