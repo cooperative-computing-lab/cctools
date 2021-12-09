@@ -395,6 +395,7 @@ the nested workflows as if they were a regular rule. Also note how `my_var` is
 set from the main workflow, and used inside the nested one:
 
 `FILE: main.jx`
+```json
 {
     "rules": [
         {
@@ -409,9 +410,10 @@ set from the main workflow, and used inside the nested one:
         } for N in range(5)
     ]
 }
+```
 
 `FILE: nested.jx`
-```
+```json
 {
     "rules": [
         {
