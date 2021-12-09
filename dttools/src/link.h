@@ -290,6 +290,16 @@ int link_readline(struct link *link, char *line, size_t length, time_t stoptime)
 */
 int link_fd(struct link *link);
 
+/** Enable output buffering for link_printf.
+@param link The link to modify.
+@param size The number of bytes to buffer.  Zero disables buffering and flushes pending output.
+*/
+int link_buffer_output(struct link *link, size_t size );
+
+/** Flush buffered output from link_printf.
+@param link The link to modify.
+*/
+int link_flush_output(struct link *link );
 
 /** Whether the link is using ssl.
 @param link The link to examine.

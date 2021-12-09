@@ -66,6 +66,10 @@ struct link {
 	char *buffer_start;
 	size_t buffer_length;
 	char buffer[1<<16];
+
+	buffer_t output_buffer;
+	size_t output_buffer_size;
+
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
 
@@ -292,8 +296,13 @@ static struct link *link_create()
 
 	link->read = link->written = 0;
 	link->fd = -1;
+
 	link->buffer_start = link->buffer;
 	link->buffer_length = 0;
+
+	buffer_init(&link->output_buffer);
+	link->output_buffer_size = 0;
+
 	link->raddr[0] = 0;
 	link->rport = 0;
 	link->type = LINK_TYPE_STANDARD;
@@ -1019,19 +1028,35 @@ ssize_t link_putlstring(struct link *link, const char *data, size_t count, time_
 	return total;
 }
 
+int link_buffer_output( struct link *link, size_t size )
+{
+	link->output_buffer_size = size;
+	if(size<buffer_pos(&link->output_buffer)) {
+		return link_flush_output(link);
+	} else {
+		return 0;
+	}
+}
+
+int link_flush_output( struct link * link )
+{
+	if(buffer_pos(&link->output_buffer)==0) return 0;
+
+	size_t len;
+	const char *str = buffer_tolstring(&link->output_buffer, &len);
+	int rc = link_putlstring(link, str, len, time(0)+60 );
+	buffer_free(&link->output_buffer);
+	buffer_init(&link->output_buffer);
+	return rc;
+}
+
 ssize_t link_vprintf(struct link *link, time_t stoptime, const char *fmt, va_list va)
 {
-	ssize_t rc;
-	size_t l;
-	const char *str;
-	buffer_t B;
+	int rc = buffer_putvfstring(&link->output_buffer, fmt, va);
 
-	buffer_init(&B);
-	if (buffer_putvfstring(&B, fmt, va) == -1)
-		return -1;
-	str = buffer_tolstring(&B, &l);
-	rc = link_putlstring(link, str, l, stoptime);
-	buffer_free(&B);
+	if(buffer_pos(&link->output_buffer)>link->output_buffer_size) {
+		if(link_flush_output(link)<0) rc = -1;
+	}
 
 	return rc;
 }
@@ -1051,6 +1076,9 @@ ssize_t link_printf(struct link *link, time_t stoptime, const char *fmt, ...)
 void link_close(struct link *link)
 {
 	if(link) {
+		link_flush_output(link);
+		buffer_free(&link->output_buffer);
+
 #ifdef HAS_OPENSSL
 		if(link->ctx) {
 			if(link->rport) {

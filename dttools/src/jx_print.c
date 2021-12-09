@@ -233,7 +233,7 @@ void jx_print_link( struct jx *j, struct link *l, time_t stoptime )
 	size_t len;
 	const char *str = buffer_tolstring(&buffer, &len);
 
-	link_write(l,str,len,stoptime);
+	link_printf(l,stoptime,"%s",str);
 	buffer_free(&buffer);
 }
 

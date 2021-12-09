@@ -431,6 +431,7 @@ void send_http_response( struct link *l, int code, const char *message, const ch
 	link_printf(l,stoptime, "Connection: close\n");
 	link_printf(l,stoptime, "Access-Control-Allow-Origin: *\n");
 	link_printf(l,stoptime, "Content-type: %s\n\n",content_type);
+	link_flush_output(l);
 }
 
 static void handle_query( struct link *ql, time_t st )
@@ -550,6 +551,7 @@ static void handle_query( struct link *ql, time_t st )
 					link_printf(ql,st,"Sorry, unable to serve queries over HTTPS.");
 				} else {
 					send_http_response(ql,200,"OK","text/plain",st);
+
 					struct deltadb_query *query = deltadb_query_create();
 					deltadb_query_set_filter(query,expr);
 					// Note this leaks a stdio stream, but it will be shortly recovered on process exit.
@@ -638,6 +640,7 @@ static void handle_query( struct link *ql, time_t st )
 		link_printf(ql,st,"<pre>%s</pre>",url);
 		link_printf(ql,st,"<p><a href=/>Return to Index</a></p>");
 	}
+
 }
 
 void handle_tcp_query( struct link *port, int using_ssl )
@@ -645,6 +648,8 @@ void handle_tcp_query( struct link *port, int using_ssl )
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
 	link_address_remote(port, raddr, &rport);
+
+	link_buffer_output(port,4096);
 
 	if(fork_mode) {
 		pid_t pid = fork();
@@ -657,6 +662,7 @@ void handle_tcp_query( struct link *port, int using_ssl )
 				}
 			}
 			handle_query(port,time(0)+child_procs_timeout);
+			link_flush_output(port);
 			_exit(0);
 		} else if (pid>0) {
 			child_procs_count++;
@@ -668,6 +674,7 @@ void handle_tcp_query( struct link *port, int using_ssl )
 			}
 		}
 		handle_query(port,time(0)+child_procs_timeout);
+		link_flush_output(port);
 	}
 	link_close(port);
 }
