@@ -1885,8 +1885,8 @@ class Factory(object):
         "mesos-path",
         "mesos-preload",
         "min-workers",
-        "package",
         "password",
+        "python-package",
         "run-factory-as-manager",
         "runos",
         "scratch-dir",
@@ -1933,7 +1933,6 @@ class Factory(object):
 
         self._config_file = None
         self._factory_proc = None
-        self._env_file = None
         self._log_file = log_file
 
         (tmp, self._error_file) = tempfile.mkstemp(
@@ -2030,11 +2029,9 @@ class Factory(object):
                 raise AttributeError("{} is not a supported option".format(name))
 
     def _construct_command_line(self):
-	# check for environment file	
+	# check for environment file
         args = [self._factory_binary]
 
-        if self.env_file:
-            args += ['--python-package', self._env_file ]
         args += ['--parent-death']
         args += ['--config-file', self._config_file]
 
@@ -2044,9 +2041,9 @@ class Factory(object):
         flags = [opt for opt in Factory._command_line_options if opt[0] != ":"]
 
         for opt in self._opts:
-            if opt not in Factor._command_line_options:
+            if opt not in Factory._command_line_options:
                 continue
-            if opt in Factor._config_file_options:
+            if opt in Factory._config_file_options:
                 continue
             if self._opts[opt] is True:
                 args.append("--{}".format(opt))
