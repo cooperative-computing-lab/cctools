@@ -881,7 +881,9 @@ class Task(object):
 try:
     import dill
     pythontask_available = True
-except ModuleNotFoundError:
+except Exception:
+    # Note that the intended exception here is ModuleNotFoundError.
+    # However, that type does not exist in Python 2
     pythontask_available = False
 
 class PythonTask(Task):
@@ -966,7 +968,10 @@ class PythonTask(Task):
         with open(self._func_file, 'wb') as wf:
             dill.dump(func, wf, recurse=True)
         with open(self._args_file, 'wb') as wf:
-            dill.dump([*args], wf, recurse=True)
+            # This next line is valid Python 3 syntax,
+            # however we also need backwards compatibility with Python 2.
+            # dill.dump([*args], wf, recurse=True)
+            dill.dump(list(*args), wf, recurse=True)
 
 
     def _python_function_command(self):
