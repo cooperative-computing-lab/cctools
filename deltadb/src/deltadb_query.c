@@ -152,10 +152,10 @@ static int compat_checkpoint_read( struct deltadb_query *query, const char *file
 				nvpair_delete(hash_table_remove(query->table,key));
 				struct jx *j = nvpair_to_jx(nv);
 				/* skip objects that don't match the filter */
-				if(deltadb_boolean_expr(query->filter_expr,j)) {
-					hash_table_insert(query->table,key,j);
-				} else {
+				if(query->filter_expr && deltadb_boolean_expr(query->filter_expr,j)) {
 					jx_delete(j);
+				} else {
+					hash_table_insert(query->table,key,j);
 				}
 			}
 			nvpair_delete(nv);
@@ -194,7 +194,7 @@ static int checkpoint_read( struct deltadb_query *query, const char *filename )
 	struct jx_pair *p;
 	for(p=jcheckpoint->u.pairs;p;p=p->next) {
 		if(p->key->type!=JX_STRING) continue;
-		if(!deltadb_boolean_expr(query->filter_expr,p->value)) continue;
+		if(query->filter_expr && !deltadb_boolean_expr(query->filter_expr,p->value)) continue;
 		hash_table_insert(query->table,p->key->u.string_value,p->value);
 		p->value = 0;
 	}
@@ -217,7 +217,7 @@ static void reset_reductions( struct deltadb_query *query, deltadb_scope_t scope
 static void update_reductions( struct deltadb_query *query, const char *key, struct jx *jobject, deltadb_scope_t scope )
 {
 	/* Skip if the where expression doesn't match */
-	if(!deltadb_boolean_expr(query->where_expr,jobject)) return;
+	if(query->where_expr && !deltadb_boolean_expr(query->where_expr,jobject)) return;
 
 	list_first_item(query->reduce_exprs);
 	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
@@ -299,7 +299,7 @@ static void display_output_exprs( struct deltadb_query *query, time_t current )
 
 		/* Skip if the where expression doesn't match */
 
-		if(!deltadb_boolean_expr(query->where_expr,jobject)) continue;
+		if(query->where_expr && !deltadb_boolean_expr(query->where_expr,jobject)) continue;
 
 		/* Emit the current time */
 
@@ -340,7 +340,7 @@ static void display_output_objects( struct deltadb_query *query, time_t current 
 	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
 
 		/* Skip if the where expression doesn't match */
-		if(!deltadb_boolean_expr(query->where_expr,jobject)) continue;
+		if(query->where_expr && !deltadb_boolean_expr(query->where_expr,jobject)) continue;
 
 		if(!firstobject) {			
 			fprintf(query->output_stream,",\n");
@@ -377,7 +377,7 @@ static void display_deferred_time( struct deltadb_query *query )
 
 int deltadb_create_event( struct deltadb_query *query, const char *key, struct jx *jobject )
 {
-	if(!deltadb_boolean_expr(query->filter_expr,jobject)) {
+	if(query->filter_expr && !deltadb_boolean_expr(query->filter_expr,jobject)) {
 		jx_delete(jobject);
 		return 1;
 	}
@@ -530,8 +530,9 @@ int deltadb_time_event( struct deltadb_query *query, time_t starttime, time_t st
 	return 1;
 }
 
-int deltadb_post_event( struct deltadb_query *query, const char *line )
+int deltadb_raw_event( struct deltadb_query *query, const char *line )
 {
+	fputs(line,query->output_stream);
 	return 1;
 }
 
@@ -549,6 +550,11 @@ static int days_in_year( int y )
 	}
 }
 
+static int is_fast_query( struct deltadb_query *query )
+{
+	return query->display_mode==DELTADB_DISPLAY_STREAM && !query->filter_expr && !query->where_expr;
+}
+
 static struct deltadb_event_handlers handlers = {
   deltadb_create_event,
   deltadb_delete_event,
@@ -556,7 +562,7 @@ static struct deltadb_event_handlers handlers = {
   deltadb_merge_event,
   deltadb_remove_event,
   deltadb_time_event,
-  deltadb_post_event
+  deltadb_raw_event
 };
 
 /*
@@ -566,7 +572,11 @@ Execute a query on a single data stream.
 int deltadb_query_execute_stream( struct deltadb_query *query, FILE *stream, time_t starttime, time_t stoptime )
 {
 	query->display_next = starttime;
-	return deltadb_process_stream(query,&handlers,stream,starttime,stoptime);
+	if(is_fast_query(query)) {
+		return deltadb_process_stream_fast(query,&handlers,stream,starttime,stoptime);
+	} else {
+		return deltadb_process_stream(query,&handlers,stream,starttime,stoptime);
+	}
 }
 
 /*
@@ -607,7 +617,12 @@ int deltadb_query_execute_dir( struct deltadb_query *query, const char *logdir, 
 
 		} else {
 			free(filename);
-			int keepgoing = deltadb_process_stream(query,&handlers,file,starttime,stoptime);
+			int keepgoing;
+			if(is_fast_query(query)) {
+				keepgoing = deltadb_process_stream_fast(query,&handlers,file,starttime,stoptime);
+			} else {
+				keepgoing = deltadb_process_stream(query,&handlers,file,starttime,stoptime);
+			}
 			starttime = 0;
 
 			fclose(file);

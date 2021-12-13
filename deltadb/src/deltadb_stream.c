@@ -18,8 +18,7 @@ See the file COPYING for details.
 
 static void corrupt_data( const char *filename, const char *line )
 {
-	fprintf(stderr,"corrupt data in %s: %s\n",filename,line);
-
+	fprintf(stderr,"corrupt data: %s\n",line);
 }
 
 int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_handlers *handlers, FILE *stream, time_t starttime, time_t stoptime )
@@ -36,6 +35,7 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 	const char *filename = "stream";
 
 	while(fgets(line,sizeof(line),stream)) {
+
 		if(line[0]=='C') {
 			n = sscanf(line,"C %s %[^\n]",key,value);
 			if(n==1) {
@@ -133,8 +133,45 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 		} else {
 			corrupt_data(filename,line);
 		}
+		if(!handlers->deltadb_raw_event(query,line)) break;
+	}
 
-		if(!handlers->deltadb_post_event(query,line)) break;
+	return 1;
+}
+
+int deltadb_process_stream_fast( struct deltadb_query *query, struct deltadb_event_handlers *handlers, FILE *stream, time_t starttime, time_t stoptime )
+{
+	char line[LOG_LINE_MAX];
+	int n;
+	const char *filename = "stream";
+
+	long long current = 0;
+
+	while(fgets(line,sizeof(line),stream)) {
+		if(line[0]=='T') {
+			n = sscanf(line,"T %lld",&current);
+			if(n!=1) {
+				corrupt_data(filename,line);
+				continue;
+			}
+			if(stoptime && current>stoptime) return 0;
+
+		} else if(line[0]=='t') {
+			long long change;
+			n = sscanf(line,"t %lld",&change);
+			if(n!=1) {
+				corrupt_data(filename,line);
+				continue;
+			}
+
+			current += change;
+
+			if(stoptime && current>stoptime) return 0;
+		} else {
+			/* any other type, just pass the line through */
+		}
+
+		if(!handlers->deltadb_raw_event(query,line)) break;
 	}
 
 	return 1;
