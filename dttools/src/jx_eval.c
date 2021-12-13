@@ -508,7 +508,7 @@ static struct jx_pair *jx_eval_dict_comprehension(struct jx *key, struct jx *val
 	if (!jx_istype(list, JX_ARRAY)) {
 		jx_delete(list);
 		return jx_pair(jx_error(jx_format(
-			"on line %d: list comprehension takes an array",
+			"on line %d: dict comprehension takes an array",
 			comp->line
 		)), NULL, NULL);
 	}
@@ -535,7 +535,7 @@ static struct jx_pair *jx_eval_dict_comprehension(struct jx *key, struct jx *val
 				jx_pair_delete(result);
 				char *s = jx_print_string(cond);
 				struct jx *err = jx_error(jx_format(
-					"on line %d, %s: list comprehension condition takes a boolean",
+					"on line %d, %s: dict comprehension condition takes a boolean",
 					cond->line,
 					s
 				));

@@ -176,7 +176,9 @@ static struct jx_pair *jx_sub_dict_comprehension( struct jx *key, struct jx *val
 			jx_delete(condition);
 			jx_delete(new_key);
 			jx_delete(new_value);
-			return jx_pair(value, NULL, NULL);
+			return jx_pair(jx_error(jx_format(
+				"on line %d, invalid pair in dict comprehension", key->line)
+			), NULL, NULL);
 		}
 	}
 
