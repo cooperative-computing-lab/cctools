@@ -152,7 +152,7 @@ static int compat_checkpoint_read( struct deltadb_query *query, const char *file
 				nvpair_delete(hash_table_remove(query->table,key));
 				struct jx *j = nvpair_to_jx(nv);
 				/* skip objects that don't match the filter */
-				if(query->filter_expr && deltadb_boolean_expr(query->filter_expr,j)) {
+				if(deltadb_boolean_expr(query->filter_expr,j)) {
 					jx_delete(j);
 				} else {
 					hash_table_insert(query->table,key,j);
@@ -194,7 +194,7 @@ static int checkpoint_read( struct deltadb_query *query, const char *filename )
 	struct jx_pair *p;
 	for(p=jcheckpoint->u.pairs;p;p=p->next) {
 		if(p->key->type!=JX_STRING) continue;
-		if(query->filter_expr && !deltadb_boolean_expr(query->filter_expr,p->value)) continue;
+		if(!deltadb_boolean_expr(query->filter_expr,p->value)) continue;
 		hash_table_insert(query->table,p->key->u.string_value,p->value);
 		p->value = 0;
 	}
@@ -217,7 +217,7 @@ static void reset_reductions( struct deltadb_query *query, deltadb_scope_t scope
 static void update_reductions( struct deltadb_query *query, const char *key, struct jx *jobject, deltadb_scope_t scope )
 {
 	/* Skip if the where expression doesn't match */
-	if(query->where_expr && !deltadb_boolean_expr(query->where_expr,jobject)) return;
+	if(!deltadb_boolean_expr(query->where_expr,jobject)) return;
 
 	list_first_item(query->reduce_exprs);
 	for(struct deltadb_reduction *r; (r = list_next_item(query->reduce_exprs));) {
@@ -299,7 +299,7 @@ static void display_output_exprs( struct deltadb_query *query, time_t current )
 
 		/* Skip if the where expression doesn't match */
 
-		if(query->where_expr && !deltadb_boolean_expr(query->where_expr,jobject)) continue;
+		if(!deltadb_boolean_expr(query->where_expr,jobject)) continue;
 
 		/* Emit the current time */
 
@@ -340,7 +340,7 @@ static void display_output_objects( struct deltadb_query *query, time_t current 
 	while(hash_table_nextkey(query->table,&key,(void**)&jobject)) {
 
 		/* Skip if the where expression doesn't match */
-		if(query->where_expr && !deltadb_boolean_expr(query->where_expr,jobject)) continue;
+		if(!deltadb_boolean_expr(query->where_expr,jobject)) continue;
 
 		if(!firstobject) {			
 			fprintf(query->output_stream,",\n");
@@ -377,7 +377,7 @@ static void display_deferred_time( struct deltadb_query *query )
 
 int deltadb_create_event( struct deltadb_query *query, const char *key, struct jx *jobject )
 {
-	if(query->filter_expr && !deltadb_boolean_expr(query->filter_expr,jobject)) {
+	if(!deltadb_boolean_expr(query->filter_expr,jobject)) {
 		jx_delete(jobject);
 		return 1;
 	}
