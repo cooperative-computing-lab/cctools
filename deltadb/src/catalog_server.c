@@ -18,7 +18,7 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "jx_table.h"
-#include "jx_export.h"
+#include "catalog_export.h"
 #include "jx_eval.h"
 #include "stringtools.h"
 #include "domain_name_cache.h"
@@ -75,6 +75,15 @@ static time_t clean_interval = 60;
 
 /* The port upon which to listen. */
 static int port = CATALOG_PORT_DEFAULT;
+
+/* The SSL port upon which to listen. */
+static int ssl_port = 0;
+
+/* Filename containing the SSL certificate. */
+static const char *ssl_cert_filename = 0;
+
+/* Filename containing the SSL private key. */
+static const char *ssl_key_filename = 0;
 
 /* The file for writing out the port number. */
 const char *port_file = 0;
@@ -383,7 +392,11 @@ void handle_tcp_update( struct link *update_port )
 
 	if(length>0) {
 		data[length] = 0;
-		handle_update(addr,port,data,length,"tcp");
+		if(length>4 && !strncmp(data,"GET ",4)) {
+			// Random web server is connecting, reject it.
+		} else {
+			handle_update(addr,port,data,length,"tcp");
+		}
 	}
 
 	link_close(l);
@@ -409,20 +422,20 @@ int jx_eval_is_true( struct jx *expr, struct jx *context )
 	return result;
 }
 
-void send_http_response( FILE *stream, int code, const char *message, const char *content_type )
+void send_http_response( struct link *l, int code, const char *message, const char *content_type, time_t stoptime )
 {
 	time_t current = time(0);
-	fprintf(stream, "HTTP/1.1 %d %s\n",code,message);
-	fprintf(stream, "Date: %s", ctime(&current));
-	fprintf(stream, "Server: catalog_server\n");
-	fprintf(stream, "Connection: close\n");
-	fprintf(stream, "Access-Control-Allow-Origin: *\n");
-	fprintf(stream, "Content-type: %s\n\n",content_type);
+	link_printf(l,stoptime, "HTTP/1.1 %d %s\n",code,message);
+	link_printf(l,stoptime, "Date: %s", ctime(&current));
+	link_printf(l,stoptime, "Server: catalog_server\n");
+	link_printf(l,stoptime, "Connection: close\n");
+	link_printf(l,stoptime, "Access-Control-Allow-Origin: *\n");
+	link_printf(l,stoptime, "Content-type: %s\n\n",content_type);
+	link_flush_output(l);
 }
 
-static void handle_query(struct link *query_link)
+static void handle_query( struct link *ql, time_t st )
 {
-	FILE *stream;
 	char line[LINE_MAX];
 	char url[LINE_MAX];
 	char path[LINE_MAX];
@@ -439,10 +452,10 @@ static void handle_query(struct link *query_link)
 	struct jx *j;
 	int i, n;
 
-	link_address_remote(query_link, addr, &port);
-	debug(D_DEBUG, "www query from %s:%d", addr, port);
+	link_address_remote(ql, addr, &port);
+	debug(D_DEBUG, "%s query from %s:%d", link_using_ssl(ql) ? "https" : "http", addr, port);
 
-	if(link_readline(query_link, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
+	if(link_readline(ql, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
 		string_chomp(line);
 		if(sscanf(line, "%s %s %s", action, url, version) != 3) {
 			return;
@@ -450,7 +463,7 @@ static void handle_query(struct link *query_link)
 
 		// Consume the rest of the query
 		while(1) {
-			if(!link_readline(query_link, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
+			if(!link_readline(ql, line, LINE_MAX, time(0) + HANDLE_QUERY_TIMEOUT)) {
 				return;
 			}
 
@@ -461,13 +474,6 @@ static void handle_query(struct link *query_link)
 	} else {
 		return;
 	}
-
-	// Output response
-	stream = fdopen(link_fd(query_link), "w");
-	if(!stream) {
-		return;
-	}
-	link_nonblocking(query_link, 0);
 
 	if(sscanf(url, "http://%[^/]%s", hostport, path) == 2) {
 		// continue on
@@ -489,17 +495,17 @@ static void handle_query(struct link *query_link)
 	qsort(array, n, sizeof(struct jx *), compare_jx);
 
 	if(!strcmp(path, "/query.text")) {
-		send_http_response(stream,200,"OK","text/plain");
+		send_http_response(ql,200,"OK","text/plain",st);
 		for(i = 0; i < n; i++)
-			jx_export_nvpair(array[i], stream);
+			catalog_export_nvpair(array[i], ql,st);
 	} else if(!strcmp(path, "/query.json")) {
-		send_http_response(stream,200,"OK","text/plain");
-		fprintf(stream,"[\n");
+		send_http_response(ql,200,"OK","text/plain",st);
+		link_printf(ql,st,"[\n");
 		for(i = 0; i < n; i++) {
-			jx_print_stream(array[i],stream);
-			if(i<(n-1)) fprintf(stream,",\n");
+			jx_print_link(array[i],ql,st);
+			if(i<(n-1)) link_printf(ql,st,",\n");
 		}
-		fprintf(stream,"\n]\n");
+		link_printf(ql,st,"\n]\n");
 	} else if(1==sscanf(path, "/query/%[^/]",strexpr)) {
 
 		struct buffer buf;
@@ -507,29 +513,31 @@ static void handle_query(struct link *query_link)
 		if(b64_decode(strexpr,&buf)==0) {
 			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
-				send_http_response(stream,200,"OK","text/plain");
-				fprintf(stream,"[\n");
+				send_http_response(ql,200,"OK","text/plain",st);
+				link_printf(ql,st,"[\n");
 
-				int first = 1;
+				int count = 0;
 				for(i = 0; i < n; i++) {
 					if(jx_eval_is_true(expr,array[i])) {
-						if(!first) fprintf(stream,",\n");
-						jx_print_stream(array[i],stream);
-						first = 0;
+						if(count>0) link_printf(ql,st,",\n");
+						jx_print_link(array[i],ql,st);
+						count++;
 					}
 				}
-				fprintf(stream,"\n]\n");
+				link_printf(ql,st,"\n]\n");
 				jx_delete(expr);
+				debug(D_DEBUG,"query '%s' matched %d records",buffer_tostring(&buf),count);
 			} else {
-				send_http_response(stream,400,"Bad Request","text/plain");
-				fprintf(stream,"Invalid query text.\n");
+				send_http_response(ql,400,"Bad Request","text/plain",st);
+				link_printf(ql,st,"Invalid query text.\n");
+				debug(D_DEBUG,"query '%s' failed jx parse",buffer_tostring(&buf));
 			}
 		} else {
-			send_http_response(stream,400,"Bad Request","text/plain");
-			fprintf(stream,"Invalid base-64 encoding.\n");
+			send_http_response(ql,400,"Bad Request","text/plain",st);
+			link_printf(ql,st,"Invalid base-64 encoding.\n");
+			debug(D_DEBUG,"query '%s' failed base-64 decode",strexpr);
 		}
 		buffer_free(&buf);
-
 
 	} else if(3==sscanf(path, "/history/%ld/%ld/%[^/]",&time_start,&time_stop,strexpr)) {
 
@@ -538,80 +546,73 @@ static void handle_query(struct link *query_link)
 		if(b64_decode(strexpr,&buf)==0) {
 			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
 			if(expr) {
-				send_http_response(stream,200,"OK","text/plain");
-				struct deltadb_query *query = deltadb_query_create();
-				deltadb_query_set_filter(query,expr);
-				deltadb_query_set_output(query,stream);
-				deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
-				deltadb_query_execute_dir(query,history_dir,time_start,time_stop);
-				deltadb_query_delete(query);
-				jx_delete(expr);
+				if(link_using_ssl(ql)) {
+					send_http_response(ql,501,"Server Error","text/plain",st);
+					link_printf(ql,st,"Sorry, unable to serve queries over HTTPS.");
+				} else {
+					send_http_response(ql,200,"OK","text/plain",st);
+
+					struct deltadb_query *query = deltadb_query_create();
+					deltadb_query_set_filter(query,expr);
+					// Note this leaks a stdio stream, but it will be shortly recovered on process exit.
+					deltadb_query_set_output(query,fdopen(link_fd(ql),"w"));
+					deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
+					deltadb_query_execute_dir(query,history_dir,time_start,time_stop);
+					deltadb_query_delete(query);
+					jx_delete(expr);
+				}
 			} else {
-				send_http_response(stream,400,"Bad Request","text/plain");
-				fprintf(stream,"Invalid query text.\n");
+				send_http_response(ql,400,"Bad Request","text/plain",st);
+				link_printf(ql,st,"Invalid query text.\n");
 			}
 		} else {
-			send_http_response(stream,400,"Bad Request","text/plain");
-			fprintf(stream,"Invalid base-64 encoding.\n");
+			send_http_response(ql,400,"Bad Request","text/plain",st);
+			link_printf(ql,st,"Invalid base-64 encoding.\n");
 		}
 		buffer_free(&buf);
 
-
-	} else if(!strcmp(path, "/query.oldclassads")) {
-		send_http_response(stream,200,"OK","text/plain");
-		for(i = 0; i < n; i++)
-			jx_export_old_classads(array[i], stream);
 	} else if(!strcmp(path, "/query.newclassads")) {
-		send_http_response(stream,200,"OK","text/plain");
+		send_http_response(ql,200,"OK","text/plain",st);
 		for(i = 0; i < n; i++)
-			jx_export_new_classads(array[i], stream);
-	} else if(!strcmp(path, "/query.xml")) {
-		send_http_response(stream,200,"OK","text/xml");
-		fprintf(stream, "<?xml version=\"1.0\" standalone=\"yes\"?>\n");
-		fprintf(stream, "<catalog>\n");
-		for(i = 0; i < n; i++)
-			jx_export_xml(array[i], stream);
-		fprintf(stream, "</catalog>\n");
+			catalog_export_new_classads(array[i], ql,st);
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct jx *j;
-		send_http_response(stream,200,"OK","text/html");
+		send_http_response(ql,200,"OK","text/html",st);
 		j = deltadb_lookup(table, key);
 		if(j) {
 			const char *name = jx_lookup_string(j, "name");
 			if(!name)
 				name = "unknown";
-			fprintf(stream, "<title>%s catalog server: %s</title>\n", preferred_hostname, name);
-			fprintf(stream, "<center>\n");
-			fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
-			fprintf(stream, "<h2>%s</h2>\n", name);
-			fprintf(stream, "<p><a href=/>return to catalog view</a><p>\n");
-			jx_export_html_solo(j, stream);
-			fprintf(stream, "</center>\n");
+			link_printf(ql,st, "<title>%s catalog server: %s</title>\n", preferred_hostname, name);
+			link_printf(ql,st, "<center>\n");
+			link_printf(ql,st, "<h1>%s catalog server</h1>\n", preferred_hostname);
+			link_printf(ql,st, "<h2>%s</h2>\n", name);
+			link_printf(ql,st, "<p><a href=/>return to catalog view</a><p>\n");
+			catalog_export_html_solo(j, ql,st);
+			link_printf(ql,st, "</center>\n");
 		} else {
-			fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
-			fprintf(stream, "<center>\n");
-			fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
-			fprintf(stream, "<h2>Unknown Item!</h2>\n");
-			fprintf(stream, "</center>\n");
+			link_printf(ql,st, "<title>%s catalog server</title>\n", preferred_hostname);
+			link_printf(ql,st, "<center>\n");
+			link_printf(ql,st, "<h1>%s catalog server</h1>\n", preferred_hostname);
+			link_printf(ql,st, "<h2>Unknown Item!</h2>\n");
+			link_printf(ql,st, "</center>\n");
 		}
-	} else if(!strcmp(path,"/")) {
+	} else if(!strcmp(path,"/") || !strcmp(path,"/query.html") ) {
 		char avail_line[LINE_MAX];
 		char total_line[LINE_MAX];
 		INT64_T sum_total = 0;
 		INT64_T sum_avail = 0;
 		INT64_T sum_devices = 0;
 
-		send_http_response(stream,200,"OK","text/html");
-		fprintf(stream, "<title>%s catalog server</title>\n", preferred_hostname);
-		fprintf(stream, "<center>\n");
-		fprintf(stream, "<h1>%s catalog server</h1>\n", preferred_hostname);
-		fprintf(stream, "<a href=/query.text>text</a> - ");
-		fprintf(stream, "<a href=/query.html>html</a> - ");
-		fprintf(stream, "<a href=/query.xml>xml</a> - ");
-		fprintf(stream, "<a href=/query.json>json</a> - ");
-		fprintf(stream, "<a href=/query.oldclassads>oldclassads</a> - ");
-		fprintf(stream, "<a href=/query.newclassads>newclassads</a>");
-		fprintf(stream, "<p>\n");
+		send_http_response(ql,200,"OK","text/html",st);
+		link_printf(ql,st, "<title>%s catalog server</title>\n", preferred_hostname);
+		link_printf(ql,st, "<center>\n");
+		link_printf(ql,st, "<h1>%s catalog server</h1>\n", preferred_hostname);
+		link_printf(ql,st, "<a href=/query.text>text</a> - ");
+		link_printf(ql,st, "<a href=/query.html>html</a> - ");
+		link_printf(ql,st, "<a href=/query.json>json</a> - ");
+		link_printf(ql,st, "<a href=/query.newclassads>classads</a>");
+		link_printf(ql,st, "<p>\n");
 
 		for(i = 0; i < n; i++) {
 			j = array[i];
@@ -622,24 +623,60 @@ static void handle_query(struct link *query_link)
 
 		string_metric(sum_avail, -1, avail_line);
 		string_metric(sum_total, -1, total_line);
-		fprintf(stream, "<b>%sB available out of %sB on %d devices</b><p>\n", avail_line, total_line, (int) sum_devices);
+		link_printf(ql,st, "<b>%sB available out of %sB on %d devices</b><p>\n", avail_line, total_line, (int) sum_devices);
 
-		jx_export_html_header(stream, html_headers);
+		catalog_export_html_header(ql, html_headers, st);
 		for(i = 0; i < n; i++) {
 			j = array[i];
 			make_hash_key(j, key);
 			string_nformat(url, sizeof(url), "/detail/%s", key);
-			jx_export_html_with_link(j, stream, html_headers, "name", url);
+			catalog_export_html_with_link(j, ql, html_headers, "name", url, st);
 		}
-		jx_export_html_footer(stream, html_headers);
-		fprintf(stream, "</center>\n");
+		catalog_export_html_footer(ql, html_headers, st);
+		link_printf(ql,st, "</center>\n");
 	} else {
-		send_http_response(stream,404,"Not Found","text/html");
-		fprintf(stream,"<p>Error 404: Invalid URL</p>");
-		fprintf(stream,"<pre>%s</pre>",url);
-		fprintf(stream,"<p><a href=/>Return to Index</a></p>");
+		send_http_response(ql,404,"Not Found","text/html",st);
+		link_printf(ql,st,"<p>Error 404: Invalid URL</p>");
+		link_printf(ql,st,"<pre>%s</pre>",url);
+		link_printf(ql,st,"<p><a href=/>Return to Index</a></p>");
 	}
-	fclose(stream);
+
+}
+
+void handle_tcp_query( struct link *port, int using_ssl )
+{
+	char raddr[LINK_ADDRESS_MAX];
+	int rport;
+	link_address_remote(port, raddr, &rport);
+
+	link_buffer_output(port,4096);
+
+	if(fork_mode) {
+		pid_t pid = fork();
+		if(pid == 0) {
+			change_process_title("catalog_server [%s]", raddr);
+			alarm(child_procs_timeout);
+			if(using_ssl) {
+				if(!link_ssl_wrap_accept(port,ssl_key_filename,ssl_cert_filename)){
+					fatal("couldn't accept ssl connection from %s:%d",raddr,rport);
+				}
+			}
+			handle_query(port,time(0)+child_procs_timeout);
+			link_flush_output(port);
+			_exit(0);
+		} else if (pid>0) {
+			child_procs_count++;
+		}
+	} else {
+		if(using_ssl) {
+			if(!link_ssl_wrap_accept(port,ssl_key_filename,ssl_cert_filename)){
+				debug(D_DEBUG,"couldn't accept ssl connection from %s:%d",raddr,rport);
+			}
+		}
+		handle_query(port,time(0)+child_procs_timeout);
+		link_flush_output(port);
+	}
+	link_close(port);
 }
 
 static void show_help(const char *cmd)
@@ -664,6 +701,9 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s (default 10M, 0 disables)\n", "");
 	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);
+	fprintf(stdout, " %-30s Port number to listen for HTTPS connections.\n","-,--ssl-port=<port>");
+	fprintf(stdout, " %-30s File containing SSL certificate for HTTPS.\n","-C,--ssl-cert=<file>");
+	fprintf(stdout, " %-30s File containing SSL key for HTTPS.\n","-K,--ssl-key=<file>");
 	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
 	fprintf(stdout, " %-30s Maximum time to allow a query process to run.\n", "-T,--timeout=<time>");
 	fprintf(stdout, " %-30s (default is %ds)\n", "", child_procs_timeout);
@@ -678,14 +718,14 @@ static void show_help(const char *cmd)
 
 int main(int argc, char *argv[])
 {
-	struct link *link, *query_port = 0;
+	struct link *link;
+	struct link *query_port = 0;
+	struct link *query_ssl_port = 0;
 	signed char ch;
 	time_t current;
 	int is_daemon = 0;
 	char *pidfile = NULL;
 	char *interface = NULL;
-	char raddr[LINK_ADDRESS_MAX];
-	int rport;
 
 	outgoing_host_list = list_create();
 
@@ -708,6 +748,9 @@ int main(int argc, char *argv[])
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
 		{"port", required_argument, 0, 'p'},
+		{"ssl-port", required_argument, 0, 'P'},
+		{"ssl-cert", required_argument, 0, 'C'},
+		{"ssl-key", required_argument, 0, 'K'},
 		{"single", no_argument, 0, 'S'},
 		{"timeout", required_argument, 0, 'T'},
 		{"update-host", required_argument, 0, 'u'},
@@ -717,7 +760,7 @@ int main(int argc, char *argv[])
 		{0,0,0,0}};
 
 
-	while((ch = getopt_long(argc, argv, "bB:d:hH:I:l:L:m:M:n:o:O:p:ST:u:U:vZ:", long_options, NULL)) > -1) {
+	while((ch = getopt_long(argc, argv, "bB:C:d:hH:I:l:K:L:m:M:n:o:O:p:P:ST:u:U:vZ:", long_options, NULL)) > -1) {
 		switch (ch) {
 			case 'b':
 				is_daemon = 1;
@@ -764,6 +807,15 @@ int main(int argc, char *argv[])
 			case 'p':
 				port = atoi(optarg);
 				break;
+			case 'P':
+				ssl_port = atoi(optarg);
+				break;
+			case 'C':
+				ssl_cert_filename = optarg;
+				break;
+			case 'K':
+				ssl_key_filename = optarg;
+				break;	
 			case 'S':
 				fork_mode = 0;
 				break;
@@ -842,6 +894,28 @@ int main(int argc, char *argv[])
 			fatal("couldn't listen on TCP port %d", port);
 	}
 
+	if(ssl_port || ssl_key_filename || ssl_cert_filename) {
+
+		if(!ssl_port) fatal("--ssl-port is also required for SSL.");
+		if(!ssl_key_filename) fatal("--ssl-key is also required for SSL.");
+		if(!ssl_cert_filename) fatal("--ssl-cert is also required for SSL.");
+
+		query_ssl_port = link_serve_address(interface, ssl_port);
+		if(query_ssl_port) {
+			if(ssl_port==0) {
+				char addr[LINK_ADDRESS_MAX];
+				link_address_local(query_ssl_port,addr,&ssl_port);
+			}
+		} else {
+			if(interface)
+				fatal("couldn't listen on SSL TCP address %s port %d: %s", interface, ssl_port,strerror(errno));
+			else
+				fatal("couldn't listen on SSL TCP port %d: %s", ssl_port,strerror(errno));
+		}
+	} else {
+		query_ssl_port = 0;
+	}
+
 	update_dgram = datagram_create_address(interface, port);
 	if(!update_dgram) {
 		if(interface)
@@ -864,6 +938,7 @@ int main(int argc, char *argv[])
 		fd_set rfds;
 		int dfd = datagram_fd(update_dgram);
 		int lfd = link_fd(query_port);
+		int sfd = query_ssl_port ? link_fd(query_ssl_port) : -1;
 		int ufd = link_fd(update_port);
 
 		int result, maxfd;
@@ -890,8 +965,17 @@ int main(int argc, char *argv[])
 		FD_ZERO(&rfds);
 		FD_SET(dfd, &rfds);
 		FD_SET(ufd, &rfds);
+
+		/* Only accept incoming connections if child_procs available. */
+
 		if(child_procs_count < child_procs_max) {
+			/* Accept plain HTTP */ 
 			FD_SET(lfd, &rfds);
+
+			/* Accept HTTPS if enabled */
+			if(query_ssl_port) {
+				FD_SET(sfd,&rfds);
+			}
 		}
 		maxfd = MAX(ufd,MAX(dfd, lfd)) + 1;
 
@@ -911,25 +995,19 @@ int main(int argc, char *argv[])
 		}
 
 		if(FD_ISSET(lfd, &rfds)) {
-			link = link_accept(query_port, time(0) + 5);
+			link = link_accept(query_port,time(0)+5);
 			if(link) {
-				if(fork_mode) {
-					pid_t pid = fork();
-					if(pid == 0) {
-						link_address_remote(link, raddr, &rport);
-						change_process_title("catalog_server [%s]", raddr);
-						alarm(child_procs_timeout);
-						handle_query(link);
-						_exit(0);
-					} else if (pid>0) {
-						child_procs_count++;
-					}
-				} else {
-					handle_query(link);
-				}
-				link_close(link);
+				handle_tcp_query(link,0);
 			}
 		}
+
+		if(query_ssl_port && FD_ISSET(sfd, &rfds)) {
+			link = link_accept(query_ssl_port,time(0)+5);
+			if(link) {
+				handle_tcp_query(link,1);
+			}
+		}
+
 	}
 
 	return 1;

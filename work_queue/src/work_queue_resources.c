@@ -73,7 +73,7 @@ static void work_queue_resource_debug( struct work_queue_resource *r, const char
 static void work_queue_resource_send( struct link *manager, struct work_queue_resource *r, const char *name, time_t stoptime )
 {
 	work_queue_resource_debug(r, name);
-	link_putfstring(manager, "resource %s %"PRId64" %"PRId64" %"PRId64"\n", stoptime, name, r->total, r->smallest, r->largest );
+	link_printf(manager, stoptime, "resource %s %"PRId64" %"PRId64" %"PRId64"\n", name, r->total, r->smallest, r->largest );
 }
 
 void work_queue_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime )
@@ -86,7 +86,7 @@ void work_queue_resources_send( struct link *manager, struct work_queue_resource
 	work_queue_resource_send(manager, &r->cores,   "cores",  stoptime);
 
 	/* send the tag last, the manager knows when the resource update is complete */
-	link_putfstring(manager, "resource tag %"PRId64"\n", stoptime, r->tag);
+	link_printf(manager, stoptime, "resource tag %"PRId64"\n", r->tag);
 }
 
 void work_queue_resources_debug( struct work_queue_resources *r )

@@ -298,7 +298,7 @@ struct jx *jx_array_shift(struct jx *array);
 /** Determine if an expression is constant.  Traverses the expression recursively, and returns true if it consists only of constant values, arrays, and objects. @param j The expression to evaluate.  @return True if constant. */
 int jx_is_constant( struct jx *j );
 
-/** Export a jx object as a set of environment variables.  @param j A JX_OBJECT. */
+/** Export a jx object into the current environment using setenv(). @param j A JX_OBJECT. */
 void jx_export( struct jx *j );
 
 /** Iterate over the values in an array.

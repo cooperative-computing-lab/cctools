@@ -496,7 +496,7 @@ int do_direct_query( const char *manager_host, int manager_port, time_t stoptime
 		return 1;
 	}
 
-	link_putfstring(l,"%s_status\n",stoptime,query_string);
+	link_printf(l,stoptime,"%s_status\n",query_string);
 
 	struct jx *jarray = jx_parse_link(l,stoptime);
 

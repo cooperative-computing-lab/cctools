@@ -66,6 +66,10 @@ struct link {
 	char *buffer_start;
 	size_t buffer_length;
 	char buffer[1<<16];
+
+	buffer_t output_buffer;
+	size_t output_buffer_size;
+
 	char raddr[LINK_ADDRESS_MAX];
 	int rport;
 
@@ -292,8 +296,13 @@ static struct link *link_create()
 
 	link->read = link->written = 0;
 	link->fd = -1;
+
 	link->buffer_start = link->buffer;
 	link->buffer_length = 0;
+
+	buffer_init(&link->output_buffer);
+	link->output_buffer_size = 0;
+
 	link->raddr[0] = 0;
 	link->rport = 0;
 	link->type = LINK_TYPE_STANDARD;
@@ -528,7 +537,7 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 			return 0;
 		}
 
-		link->ctx = _create_ssl_context();
+    link->ctx = _create_ssl_context();
 		_set_ssl_keys(link->ctx, key, cert);
 
 		link->ssl = SSL_new(link->ctx);
@@ -556,7 +565,8 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 
 int link_ssl_wrap_connect(struct link *link) {
 #ifdef HAS_OPENSSL
-	/* go to blocking mode during the ssl handshake */
+
+  /* go to blocking mode during the ssl handshake */
 	if(!link_nonblocking(link, 0)) {
 		return 0;
 	}
@@ -614,7 +624,6 @@ struct link *link_accept(struct link *parent, time_t stoptime)
 				goto failure;
 			}
 			link->fd = fd;
-
 			break;
 		} else if (stoptime == LINK_NOWAIT && errno_is_temporary(errno)) {
 				return NULL;
@@ -1019,30 +1028,46 @@ ssize_t link_putlstring(struct link *link, const char *data, size_t count, time_
 	return total;
 }
 
-ssize_t link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va)
+int link_buffer_output( struct link *link, size_t size )
 {
-	ssize_t rc;
-	size_t l;
-	const char *str;
-	buffer_t B;
+	link->output_buffer_size = size;
+	if(size<buffer_pos(&link->output_buffer)) {
+		return link_flush_output(link);
+	} else {
+		return 0;
+	}
+}
 
-	buffer_init(&B);
-	if (buffer_putvfstring(&B, fmt, va) == -1)
-		return -1;
-	str = buffer_tolstring(&B, &l);
-	rc = link_putlstring(link, str, l, stoptime);
-	buffer_free(&B);
+int link_flush_output( struct link * link )
+{
+	if(buffer_pos(&link->output_buffer)==0) return 0;
+
+	size_t len;
+	const char *str = buffer_tolstring(&link->output_buffer, &len);
+	int rc = link_putlstring(link, str, len, time(0)+60 );
+	buffer_free(&link->output_buffer);
+	buffer_init(&link->output_buffer);
+	return rc;
+}
+
+ssize_t link_vprintf(struct link *link, time_t stoptime, const char *fmt, va_list va)
+{
+	int rc = buffer_putvfstring(&link->output_buffer, fmt, va);
+
+	if(buffer_pos(&link->output_buffer)>link->output_buffer_size) {
+		if(link_flush_output(link)<0) rc = -1;
+	}
 
 	return rc;
 }
 
-ssize_t link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
+ssize_t link_printf(struct link *link, time_t stoptime, const char *fmt, ...)
 {
 	ssize_t rc;
 	va_list va;
 
-	va_start(va, stoptime);
-	rc = link_putvfstring(link, fmt, stoptime, va);
+	va_start(va,fmt);
+	rc = link_vprintf(link, stoptime, fmt, va);
 	va_end(va);
 
 	return rc;
@@ -1051,6 +1076,9 @@ ssize_t link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...
 void link_close(struct link *link)
 {
 	if(link) {
+		link_flush_output(link);
+		buffer_free(&link->output_buffer);
+
 #ifdef HAS_OPENSSL
 		if(link->ctx) {
 			if(link->rport) {

@@ -705,7 +705,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 					if(!strncmp(d->name, ".__", 3))
 						continue;
 					chirp_stat_encode(B, &d->info);
-					link_putfstring(l, "%s\n%s\n", stalltime, d->name, buffer_tostring(B));
+					link_printf(l, stalltime, "%s\n%s\n", d->name, buffer_tostring(B));
 					buffer_rewind(B, 0);
 				}
 				cfs->closedir(dir);
@@ -727,7 +727,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				while((d = cfs->readdir(dir))) {
 					if(!strncmp(d->name, ".__", 3))
 						continue;
-					link_putfstring(l, "%s\n", stalltime, d->name);
+					link_printf(l, stalltime, "%s\n", d->name);
 				}
 				cfs->closedir(dir);
 				link_putliteral(l, "\n", stalltime);
@@ -789,7 +789,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			time_t transmission_stalltime = time(NULL)+(length/1024)+30; /* 1KB/s minimum */
 			transmission_stalltime = MAX(stalltime, transmission_stalltime);
 
-			link_putfstring(l, "%" PRId64 "\n", transmission_stalltime, length);
+			link_printf(l, transmission_stalltime, "%" PRId64 "\n", length);
 
 			INT64_T total = 0;
 			while (total < length) {
@@ -1476,10 +1476,10 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				char *key;
 				struct chirp_audit *entry;
 
-				link_putfstring(l, "%d\n", stalltime, hash_table_size(table));
+				link_printf(l, stalltime, "%d\n", hash_table_size(table));
 				hash_table_firstkey(table);
 				while(hash_table_nextkey(table, &key, (void *) &entry)) {
-					link_putfstring(l, "%s %" PRId64 " %" PRId64 " %" PRId64 "\n", stalltime, key, entry->nfiles, entry->ndirs, entry->nbytes);
+					link_printf(l, stalltime, "%s %" PRId64 " %" PRId64 " %" PRId64 "\n", key, entry->nfiles, entry->ndirs, entry->nbytes);
 				}
 				chirp_audit_delete(table);
 				result = 0;
@@ -1544,9 +1544,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				path_fix(fixed);
 
 				if(cfs->access(fixed, F_OK) == -1) {
-					link_putfstring(l, "%d:%d:%s:\n", stalltime, ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
+					link_printf(l, stalltime, "%d:%d:%s:\n", ENOENT, CHIRP_SEARCH_ERR_OPEN, fixed);
 				} else if(!chirp_acl_check(fixed, subject, CHIRP_ACL_WRITE)) {
-					link_putfstring(l, "%d:%d:%s:\n", stalltime, EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
+					link_printf(l, stalltime, "%d:%d:%s:\n", EPERM, CHIRP_SEARCH_ERR_OPEN, fixed);
 				} else {
 					int found = cfs->search(subject, fixed, pattern, flags, l, stalltime);
 					if(found && (flags & CHIRP_SEARCH_STOPATFIRST))
@@ -1669,7 +1669,7 @@ failure:
 result:
 		if (result < 0)
 			result = errno_to_chirp(errno);
-		if (link_putfstring(l, "%" PRId64 "\n", stalltime, result) == -1)
+		if (link_printf(l, stalltime, "%" PRId64 "\n", result) == -1)
 			goto die;
 		if(result >= 0 && buffer_pos(B)) {
 			if (link_putlstring(l, buffer_tostring(B), buffer_pos(B), stalltime) == -1)

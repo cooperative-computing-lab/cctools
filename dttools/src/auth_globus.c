@@ -49,7 +49,7 @@ static int write_token(void *link, void *buf, size_t size)
 {
 	time_t stoptime = time(0) + 3600;
 
-	link_putfstring(link, "%zu\n", stoptime, size);
+	link_printf(link, stoptime, "%zu\n", size);
 	if(link_putlstring(link, buf, size, stoptime) == (int) size) {
 		return GLOBUS_SUCCESS;
 	} else {

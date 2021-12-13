@@ -764,17 +764,17 @@ static int search_directory(const char *subject, const char *const base, char fu
 					if(metadata) {
 						/* A match was found, but the matched file couldn't be statted. Generate a result and an error. */
 						if(entry->lstatus == -1) {
-							link_putfstring(l, "0:%s::\n", stoptime, matched);	// FIXME is this a bug?
-							link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_STAT, matched);
+							link_printf(l, stoptime, "0:%s::\n", matched);	// FIXME is this a bug?
+							link_printf(l, stoptime, "%d:%d:%s:\n", errno, CHIRP_SEARCH_ERR_STAT, matched);
 						} else {
 							BUFFER_STACK_ABORT(B, 4096)
 							chirp_stat_encode(B, &entry->info);
-							link_putfstring(l, "0:%s:%s:\n", stoptime, matched, buffer_tostring(B));
+							link_printf(l, stoptime, "0:%s:%s:\n", matched, buffer_tostring(B));
 							if(stopatfirst)
 								return 1;
 						}
 					} else {
-						link_putfstring(l, "0:%s::\n", stoptime, matched);
+						link_printf(l, stoptime, "0:%s::\n", matched);
 						if(stopatfirst)
 							return 1;
 					}
@@ -790,7 +790,7 @@ static int search_directory(const char *subject, const char *const base, char fu
 							return result;
 					}
 				} else {
-					link_putfstring(l, "%d:%d:%s:\n", stoptime, EPERM, CHIRP_SEARCH_ERR_OPEN, fullpath);
+					link_printf(l, stoptime, "%d:%d:%s:\n", EPERM, CHIRP_SEARCH_ERR_OPEN, fullpath);
 				}
 			}
 			*current = '\0';	/* clear current entry */
@@ -798,14 +798,14 @@ static int search_directory(const char *subject, const char *const base, char fu
 		}
 
 		if(errno)
-			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_READ, fullpath);
+			link_printf(l, stoptime, "%d:%d:%s:\n", errno, CHIRP_SEARCH_ERR_READ, fullpath);
 
 		errno = 0;
 		cfs->closedir(dirp);
 		if(errno)
-			link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_CLOSE, fullpath);
+			link_printf(l, stoptime, "%d:%d:%s:\n", errno, CHIRP_SEARCH_ERR_CLOSE, fullpath);
 	} else {
-		link_putfstring(l, "%d:%d:%s:\n", stoptime, errno, CHIRP_SEARCH_ERR_OPEN, fullpath);
+		link_printf(l, stoptime, "%d:%d:%s:\n", errno, CHIRP_SEARCH_ERR_OPEN, fullpath);
 	}
 
 	return result;

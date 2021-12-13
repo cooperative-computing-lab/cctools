@@ -70,7 +70,7 @@ int auth_assert(struct link *link, char **type, char **subject, time_t stoptime)
 
 		debug(D_AUTH, "requesting '%s' authentication", a->type);
 
-		CATCHUNIX(link_putfstring(link, "%s\n", stoptime, a->type));
+		CATCHUNIX(link_printf(link, stoptime, "%s\n", a->type));
 
 		CATCHUNIX(link_readline(link, line, AUTH_LINE_MAX, stoptime) ? 0 : -1);
 
@@ -143,7 +143,7 @@ int auth_accept(struct link *link, char **typeout, char **subject, time_t stopti
 			auth_sanitize(*subject);
 			debug(D_AUTH, "'%s' authentication succeeded", type);
 			debug(D_AUTH, "%s:%d is %s:%s\n", addr, port, type, *subject);
-			if (link_putfstring(link, "yes\n%s\n%s\n", stoptime, type, *subject) <= 0)
+			if (link_printf(link, stoptime, "yes\n%s\n%s\n", type, *subject) <= 0)
 				return 0;
 			*typeout = xxstrdup(type);
 			return 1;
