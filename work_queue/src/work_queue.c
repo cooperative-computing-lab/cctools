@@ -4250,7 +4250,7 @@ static int send_one_task( struct work_queue *q )
 static void print_large_tasks_warning(struct work_queue *q)
 {
 	timestamp_t current_time = timestamp_get();
-	if(current_time - q->time_last_large_tasks_check > interval_check_for_large_tasks) {
+	if(current_time - q->time_last_large_tasks_check < interval_check_for_large_tasks) {
 		return;
 	}
 
