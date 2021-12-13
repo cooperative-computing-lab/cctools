@@ -333,6 +333,45 @@ value:      error("on line 140, j: undefined symbol")
 expression: [[i,j,k,l] for i in range(4) for j in range(3) for k in range(3) for l in [true,false]]
 value:      [[0,0,0,true],[0,0,0,false],[0,0,1,true],[0,0,1,false],[0,0,2,true],[0,0,2,false],[0,1,0,true],[0,1,0,false],[0,1,1,true],[0,1,1,false],[0,1,2,true],[0,1,2,false],[0,2,0,true],[0,2,0,false],[0,2,1,true],[0,2,1,false],[0,2,2,true],[0,2,2,false],[1,0,0,true],[1,0,0,false],[1,0,1,true],[1,0,1,false],[1,0,2,true],[1,0,2,false],[1,1,0,true],[1,1,0,false],[1,1,1,true],[1,1,1,false],[1,1,2,true],[1,1,2,false],[1,2,0,true],[1,2,0,false],[1,2,1,true],[1,2,1,false],[1,2,2,true],[1,2,2,false],[2,0,0,true],[2,0,0,false],[2,0,1,true],[2,0,1,false],[2,0,2,true],[2,0,2,false],[2,1,0,true],[2,1,0,false],[2,1,1,true],[2,1,1,false],[2,1,2,true],[2,1,2,false],[2,2,0,true],[2,2,0,false],[2,2,1,true],[2,2,1,false],[2,2,2,true],[2,2,2,false],[3,0,0,true],[3,0,0,false],[3,0,1,true],[3,0,1,false],[3,0,2,true],[3,0,2,false],[3,1,0,true],[3,1,0,false],[3,1,1,true],[3,1,1,false],[3,1,2,true],[3,1,2,false],[3,2,0,true],[3,2,0,false],[3,2,1,true],[3,2,1,false],[3,2,2,true],[3,2,2,false]]
 
+expression: {k:k for k in range(3),3:false,4:null,"5":[1,2,3],"6":6}
+value:      {0:0,1:1,2:2,3:false,4:null,"5":[1,2,3],"6":6}
+
+expression: {format("key(%d)",k):format("value(%d)",k) for k in range(5)}
+value:      {"key(0)":"value(0)","key(1)":"value(1)","key(2)":"value(2)","key(3)":"value(3)","key(4)":"value(4)"}
+
+expression: {p[0]:p[1] for p in items({k:0 for k in ["A","B","C","D"]})}
+value:      {"D":0,"C":0,"B":0,"A":0}
+
+expression: [{p[0]:p[1]+v for p in items({k:0 for k in ["A","B","C","D"]})} for v in range(3)]
+value:      [{"D":0,"C":0,"B":0,"A":0},{"D":1,"C":1,"B":1,"A":1},{"D":2,"C":2,"B":2,"A":2}]
+
+expression: {k:null for k in 7}
+value:      error("on line 147: dict comprehension takes an array")
+
+expression: {k:null for a in ["a","b"]}
+value:      error("on line 148, k: undefined symbol")
+
+expression: {k:0 for k in range(3)}
+value:      {0:0,1:0,2:0}
+
+expression: {k:0 for k in range(10) if k%3==0}
+value:      {0:0,3:0,6:0,9:0}
+
+expression: {k:v for k in range(4) for v in range(3)}
+value:      {0:0,0:1,0:2,1:0,1:1,1:2,2:0,2:1,2:2,3:0,3:1,3:2}
+
+expression: {k:v for k in range(5) for v in range(4) if (k+v)%2==0}
+value:      {0:0,0:2,1:1,1:3,2:0,2:2,3:1,3:3,4:0,4:2}
+
+expression: {k:v for k in range(5) for v in range(4) if v%2==1}
+value:      {0:1,0:3,1:1,1:3,2:1,2:3,3:1,3:3,4:1,4:3}
+
+expression: {k:v for k in range(5) if k%2==0 for v in range(4) if v%2==1}
+value:      {0:1,0:3,2:1,2:3,4:1,4:3}
+
+expression: {k:v for k in range(5) if v%2==0 for v in range(4) if k%2==1}
+value:      error("on line 155, v: undefined symbol")
+
 expression: list[2]
 value:      300
 
@@ -343,7 +382,7 @@ expression: list[-3]
 value:      100
 
 expression: list[-10]
-value:      error("array reference on line 146: index out of range")
+value:      error("array reference on line 160: index out of range")
 
 expression: list[1:]
 value:      [200,300]
@@ -454,10 +493,10 @@ expression: format("%s","foo")
 value:      "foo"
 
 expression: 10+[1]
-value:      error("on line 195, 10+[1]: mismatched types for operator")
+value:      error("on line 209, 10+[1]: mismatched types for operator")
 
 expression: "abc"+[2]
-value:      error("on line 196, \"abc\"+[2]: mismatched types for operator")
+value:      error("on line 210, \"abc\"+[2]: mismatched types for operator")
 
 expression: []+[]
 value:      []
@@ -541,7 +580,7 @@ expression: join()
 value:      error("function join on line 0: too few arguments to join")
 
 expression: join([a,b,c])
-value:      error("on line 227, c: undefined symbol")
+value:      error("on line 241, c: undefined symbol")
 
 expression: join(["a","b","c","d"])
 value:      "a b c d"
@@ -673,31 +712,31 @@ expression: template("{{{f}}}")
 value:      "{0.5}"
 
 expression: template("{zzzzzzzzzzzzzzzzzzzzzz}")
-value:      error("function template on line 278: undefined symbol in template")
+value:      error("function template on line 292: undefined symbol in template")
 
 expression: template("{")
-value:      error("function template on line 279: unterminated template expression")
+value:      error("function template on line 293: unterminated template expression")
 
 expression: template("}")
-value:      error("function template on line 280: unmatched } in template")
+value:      error("function template on line 294: unmatched } in template")
 
 expression: template("{}")
-value:      error("function template on line 281: invalid template; each expression must be a single identifier")
+value:      error("function template on line 295: invalid template; each expression must be a single identifier")
 
 expression: template("{x y}")
-value:      error("function template on line 282: invalid template; each expression must be a single identifier")
+value:      error("function template on line 296: invalid template; each expression must be a single identifier")
 
 expression: template("{x+y}")
-value:      error("function template on line 283: invalid template; each expression must be a single identifier")
+value:      error("function template on line 297: invalid template; each expression must be a single identifier")
 
 expression: template("{12}")
-value:      error("function template on line 284: invalid template; each expression must be a single identifier")
+value:      error("function template on line 298: invalid template; each expression must be a single identifier")
 
 expression: template("f}")
-value:      error("function template on line 285: unmatched } in template")
+value:      error("function template on line 299: unmatched } in template")
 
 expression: template("{f")
-value:      error("function template on line 286: unterminated template expression")
+value:      error("function template on line 300: unterminated template expression")
 
 expression: template("{f}",{"f":"ok"})
 value:      "ok"
@@ -706,10 +745,10 @@ expression: template("{f} {q}",{"q":"ok"})
 value:      "0.5 ok"
 
 expression: template("{q}",{"f":"ok"})
-value:      error("function template on line 289: undefined symbol in template")
+value:      error("function template on line 303: undefined symbol in template")
 
 expression: template("bad {object}")
-value:      error("function template on line 290: cannot format expression in template")
+value:      error("function template on line 304: cannot format expression in template")
 
 expression: schema([{"x":0,"y":"test","z":1}])
 value:      {"z":"float","y":"string","x":"integer"}
