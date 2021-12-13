@@ -549,6 +549,16 @@ static int days_in_year( int y )
 	}
 }
 
+static struct deltadb_event_handlers handlers = {
+  deltadb_create_event,
+  deltadb_delete_event,
+  deltadb_update_event,
+  deltadb_merge_event,
+  deltadb_remove_event,
+  deltadb_time_event,
+  deltadb_post_event
+};
+
 /*
 Execute a query on a single data stream.
 */
@@ -556,7 +566,7 @@ Execute a query on a single data stream.
 int deltadb_query_execute_stream( struct deltadb_query *query, FILE *stream, time_t starttime, time_t stoptime )
 {
 	query->display_next = starttime;
-	return deltadb_process_stream(query,stream,starttime,stoptime);
+	return deltadb_process_stream(query,&handlers,stream,starttime,stoptime);
 }
 
 /*
@@ -597,7 +607,7 @@ int deltadb_query_execute_dir( struct deltadb_query *query, const char *logdir, 
 
 		} else {
 			free(filename);
-			int keepgoing = deltadb_process_stream(query,file,starttime,stoptime);
+			int keepgoing = deltadb_process_stream(query,&handlers,file,starttime,stoptime);
 			starttime = 0;
 
 			fclose(file);
