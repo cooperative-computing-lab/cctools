@@ -414,7 +414,7 @@ DONE:
 	return result;
 }
 
-static struct jx_item *jx_eval_comprehension(struct jx *body, struct jx_comprehension *comp, struct jx *context) {
+static struct jx_item *jx_eval_list_comprehension(struct jx *body, struct jx_comprehension *comp, struct jx *context) {
 	assert(body);
 	assert(comp);
 
@@ -466,7 +466,7 @@ static struct jx_item *jx_eval_comprehension(struct jx *body, struct jx_comprehe
 		}
 
 		if (comp->next) {
-			struct jx_item *val = jx_eval_comprehension(body, comp->next, ctx);
+			struct jx_item *val = jx_eval_list_comprehension(body, comp->next, ctx);
 			jx_delete(ctx);
 			if (result) {
 				tail->next = val;
@@ -498,20 +498,120 @@ static struct jx_item *jx_eval_comprehension(struct jx *body, struct jx_comprehe
 	return result;
 }
 
+static struct jx_pair *jx_eval_dict_comprehension(struct jx *key, struct jx *value, struct jx_comprehension *comp, struct jx *context) {
+	assert(key);
+	assert(value);
+	assert(comp);
+
+	struct jx *list = jx_eval(comp->elements, context);
+	if (jx_istype(list, JX_ERROR)) return jx_pair(list, NULL, NULL);
+	if (!jx_istype(list, JX_ARRAY)) {
+		jx_delete(list);
+		return jx_pair(jx_error(jx_format(
+			"on line %d: list comprehension takes an array",
+			comp->line
+		)), NULL, NULL);
+	}
+
+	struct jx_pair *result = NULL;
+	struct jx_pair *tail = NULL;
+
+	struct jx *j = NULL;
+	void *i = NULL;
+	while ((j = jx_iterate_array(list, &i))) {
+		struct jx *ctx = jx_copy(context);
+		jx_insert(ctx, jx_string(comp->variable), jx_copy(j));
+		if (comp->condition) {
+			struct jx *cond = jx_eval(comp->condition, ctx);
+			if (jx_istype(cond, JX_ERROR)) {
+				jx_delete(ctx);
+				jx_delete(list);
+				jx_pair_delete(result);
+				return jx_pair(cond, NULL, NULL);
+			}
+			if (!jx_istype(cond, JX_BOOLEAN)) {
+				jx_delete(ctx);
+				jx_delete(list);
+				jx_pair_delete(result);
+				char *s = jx_print_string(cond);
+				struct jx *err = jx_error(jx_format(
+					"on line %d, %s: list comprehension condition takes a boolean",
+					cond->line,
+					s
+				));
+				free(s);
+				return jx_pair(err, NULL, NULL);
+			}
+			int ok = cond->u.boolean_value;
+			jx_delete(cond);
+			if (!ok) {
+				jx_delete(ctx);
+				continue;
+			}
+		}
+
+		if (comp->next) {
+			struct jx_pair *pair = jx_eval_dict_comprehension(key, value, comp->next, ctx);
+			jx_delete(ctx);
+			if (result) {
+				tail->next = pair;
+			} else {
+				result = tail = pair;
+			}
+			// this is going to go over the list LOTS of times
+			// in the various recursive calls
+			while (tail && tail->next) tail = tail->next;
+
+		} else {
+			struct jx *new_key = jx_eval(key, ctx);
+			struct jx *new_value = jx_eval(value, ctx);
+			jx_delete(ctx);
+			if (!new_key || !new_value) {
+				jx_delete(list);
+				jx_pair_delete(result);
+				jx_delete(new_key);
+				jx_delete(new_value);
+				return NULL;
+			}
+			if (result) {
+				tail->next = jx_pair(new_key, new_value, NULL);
+				tail = tail->next;
+			} else {
+				result = tail = jx_pair(new_key, new_value, NULL);
+			}
+		}
+	}
+
+	jx_delete(list);
+	return result;
+}
+
 static struct jx_pair *jx_eval_pair(struct jx_pair *pair, struct jx *context) {
 	if (!pair) return 0;
 
-	return jx_pair(
-		jx_eval(pair->key, context),
-		jx_eval(pair->value, context),
-		jx_eval_pair(pair->next, context));
+	if (pair->comp) {
+		struct jx_pair *result = jx_eval_dict_comprehension(pair->key, pair->value, pair->comp, context);
+		if (result) {
+			struct jx_pair *p = result;
+			while (p->next) p = p->next;
+			p->next = jx_eval_pair(pair->next, context);
+			return result;
+		} else {
+			return jx_eval_pair(pair->next, context);
+		}
+	} else {
+		return jx_pair(
+			jx_eval(pair->key, context),
+			jx_eval(pair->value, context),
+			jx_eval_pair(pair->next, context));
+	}
 }
 
 static struct jx_item *jx_eval_item(struct jx_item *item, struct jx *context) {
 	if (!item) return NULL;
 
 	if (item->comp) {
-		struct jx_item *result = jx_eval_comprehension(item->value, item->comp, context);
+		struct jx_item *result = jx_eval_list_comprehension(item->value, item->comp, context);
 		if (result) {
 			struct jx_item *i = result;
 			while (i->next) i = i->next;

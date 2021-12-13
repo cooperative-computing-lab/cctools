@@ -23,6 +23,8 @@ static void jx_pretty_print_pair( struct jx_pair *pair, buffer_t *b, int level)
 	buffer_printf(b,":");
 	jx_pretty_print_buffer(pair->value, b, level+1 );
 
+	jx_comprehension_print(pair->comp, b);
+
 	if(pair->next) {
 		buffer_putstring(b,",\n");
 		jx_pretty_print_pair(pair->next, b, level);
