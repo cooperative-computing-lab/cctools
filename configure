@@ -1230,23 +1230,47 @@ then
 		openssl_avail=no
 	fi
 
+	if ! optional_function TLS_method openssl/ssl.h HAS_TLS_method
+	then
+		if ! optional_function SSLv23_method openssl/ssl.h HAS_SSLv23_method
+		then
+			echo "*** Couldn't find openssl methods. Perhaps openssl installation is too old?"
+			openssl_avail=no
+		fi
+	fi
+
 	if [ "${openssl_avail}" = yes ]
 	then
-			openssl_ccflags="-I${openssl_path}/include"
-			openssl_ldflags="-L${openssl_path}/lib -lssl -lcrypto"
-
-			if ! optional_function TLS_method openssl/ssl.h HAS_TLS_method
-			then
-				if ! optional_function SSLv23_method openssl/ssl.h HAS_SSLv23_method
-				then
-					echo "*** Couldn't find openssl methods. Perhaps openssl installation is too old?"
-					openssl_avail=no
-				fi
-			fi
+		openssl_ccflags="-I${openssl_path}/include"
+		openssl_ldflags="-L${openssl_path}/lib -lssl -lcrypto"
 	fi
 fi
 
 report_detection openssl "${openssl_avail}" "${config_openssl_path}" "${openssl_path}"
+
+
+#check for static openssl for wq worker in conda environments
+if [ "$openssl_avail" = yes ]
+then
+	openssl_static_avail=yes
+	if ! check_file "${openssl_path}"/lib/libssl.a
+	then
+		openssl_static_avail=no
+	fi
+
+	if ! check_file "${openssl_path}"/lib/libcrypto.a
+	then
+		openssl_static_avail=no
+	fi
+
+	if [ "$openssl_static_avail" = yes ]
+	then
+		openssl_static_ldflags="${CONDA_PREFIX}/lib/libssl.a ${CONDA_PREFIX}/lib/libcrypto.a"
+		external_libraries="${openssl_static_ldflags} ${external_libraries}"
+	fi
+
+	report_detection openssl_static "${openssl_static_avail}" "${config_openssl_path}" "${CONDA_PREFIX}"
+fi
 
 
 # from glibc:
@@ -1648,6 +1672,10 @@ CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
 CCTOOLS_OPENSSL_AVAILABLE=${openssl_avail}
 CCTOOLS_OPENSSL_LDFLAGS=${openssl_ldflags}
 CCTOOLS_OPENSSL_CCFLAGS=${openssl_ccflags}
+
+CCTOOLS_OPENSSL_STATIC_AVAILABLE=${openssl_static_avail}
+CCTOOLS_OPENSSL_STATIC_LDFLAGS=${openssl_static_ldflags}
+CCTOOLS_OPENSSL_STATIC_CCFLAGS=${openssl_ccflags}
 
 CCTOOLS_EXT2FS_AVAILABLE=${ext2fs_avail}
 CCTOOLS_EXT2FS_LDFLAGS=${ext2fs_ldflags}
