@@ -2644,9 +2644,12 @@ EXIT_WITH_FAILURE:
 		batch_queue_delete(local_queue);
 
 	makeflow_log_close(d);
-        
+
+	//free(batchlogfilename);
+	jx_delete(jx_args);
+	jx_delete(base_hook_args);
+
 	exit(exit_value);
-        
 	return 0;
 }
 
