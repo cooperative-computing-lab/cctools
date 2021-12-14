@@ -124,6 +124,7 @@ config_uuid_path=no
 config_xrootd_path=no
 
 config_static_libgcc=yes
+config_static_openssl=yes
 
 while [ $# -gt 0 ]
 do
@@ -310,6 +311,9 @@ do
 			;;
 		--without-static-libgcc)
 			config_static_libgcc=no
+			;;
+		--without-static-openssl)
+			config_static_openssl=no
 			;;
 		-h | -help | --h | --help)
 			cat <<EOF
@@ -1212,41 +1216,58 @@ then
 	openssl_avail=yes
 	openssl_path=${openssl_path:-${base_root}}
 
-	if ! library_search_standard ssl $openssl_path
+	if ! library_search ssl $openssl_path
 	then
 		echo "*** Couldn't find libssl"
 		openssl_avail=no
 	fi
 
-	if ! library_search_standard crypto $openssl_path
+	if ! library_search crypto $openssl_path
 	then
 		echo "*** Couldn't find libcrypto"
 		openssl_avail=no
 	fi
 
-	if ! optional_include openssl/ssl.h HAS_OPENSSL
+	if ! optional_function TLS_method openssl/ssl.h HAS_TLS_method HAS_OPENSSL
 	then
-		echo "*** Couldn't find openssl headers"
-		openssl_avail=no
+		if ! optional_function SSLv23_method openssl/ssl.h HAS_SSLv23_method HAS_OPENSSL
+		then
+			openssl_avail=no
+		fi
 	fi
 
 	if [ "${openssl_avail}" = yes ]
 	then
-			openssl_ccflags="-I${openssl_path}/include"
-			openssl_ldflags="-L${openssl_path}/lib -lssl -lcrypto"
-
-			if ! optional_function TLS_method openssl/ssl.h HAS_TLS_method
-			then
-				if ! optional_function SSLv23_method openssl/ssl.h HAS_SSLv23_method
-				then
-					echo "*** Couldn't find openssl methods. Perhaps openssl installation is too old?"
-					openssl_avail=no
-				fi
-			fi
+		openssl_ccflags="-I${openssl_path}/include"
+		openssl_ldflags="-L${openssl_path}/lib -lssl -lcrypto"
 	fi
 fi
 
 report_detection openssl "${openssl_avail}" "${config_openssl_path}" "${openssl_path}"
+
+
+#check for static openssl for cctools binaries (but parrot) in conda environments
+openssl_static_avail=no
+if [ "$openssl_avail" = yes ] && [ "$config_static_openssl" = yes ]
+then
+	openssl_static_avail=yes
+	if ! check_file "${openssl_path}"/lib/libssl.a
+	then
+		openssl_static_avail=no
+	fi
+
+	if ! check_file "${openssl_path}"/lib/libcrypto.a
+	then
+		openssl_static_avail=no
+	fi
+
+	if [ "$openssl_static_avail" = yes ]
+	then
+		openssl_static_ldflags="${openssl_path}/lib/libssl.a ${openssl_path}/lib/libcrypto.a"
+	fi
+
+	report_detection openssl_static "${openssl_static_avail}" auto "${CONDA_PREFIX}"
+fi
 
 
 # from glibc:
@@ -1530,6 +1551,18 @@ fi
 
 source_path=$(pwd)
 
+openssl_default_ldflags_var=CCTOOLS_OPENSSL_STATIC_LDFLAGS
+if [ "${openssl_avail}" = yes ] && [ "${openssl_static_avail}" = no ]
+then
+	openssl_default_ldflags_var=CCTOOLS_OPENSSL_LDFLAGS
+
+	if [ -n "${CONDA_PREFIX}" ]
+	then
+		echo "*** building inside a conda environment without linking static openssl."
+		echo "*** probably this is not what you want. binaries may not work outside the environment"
+	fi
+fi
+
 cat <<EOF >>config.mk
 # Generated at `date` by $USER@`uname -n`
 
@@ -1560,7 +1593,8 @@ CCTOOLS_BASE_LDFLAGS = ${ldflags}
 
 CCTOOLS_INTERNAL_LDFLAGS = \$(CCTOOLS_BASE_LDFLAGS) ${internal_ldflags}
 
-CCTOOLS_EXTERNAL_LINKAGE = ${external_libraries}
+CCTOOLS_EXTERNAL_LINKAGE = \$(${openssl_default_ldflags_var}) ${external_libraries}
+CCTOOLS_EXTERNAL_LINKAGE_NO_OPENSSL = ${external_libraries}
 
 CCTOOLS_STATIC_LINKAGE = ${static_libraries}
 
@@ -1648,6 +1682,10 @@ CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
 CCTOOLS_OPENSSL_AVAILABLE=${openssl_avail}
 CCTOOLS_OPENSSL_LDFLAGS=${openssl_ldflags}
 CCTOOLS_OPENSSL_CCFLAGS=${openssl_ccflags}
+
+CCTOOLS_OPENSSL_STATIC_AVAILABLE=${openssl_static_avail}
+CCTOOLS_OPENSSL_STATIC_LDFLAGS=${openssl_static_ldflags}
+CCTOOLS_OPENSSL_STATIC_CCFLAGS=${openssl_ccflags}
 
 CCTOOLS_EXT2FS_AVAILABLE=${ext2fs_avail}
 CCTOOLS_EXT2FS_LDFLAGS=${ext2fs_ldflags}
