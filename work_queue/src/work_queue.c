@@ -4291,27 +4291,27 @@ static void print_large_tasks_warning(struct work_queue *q)
 	}
 
 	if(unfit_core) {
-		notice(D_WQ,"%d waiting task(s) need(s) did not fit a worker because of cores requirements", unfit_core);
+		notice(D_WQ,"%d waiting task(s)  did not fit a worker because of cores requirements", unfit_core);
 	}
 
 	if(unfit_mem) {
-		notice(D_WQ,"%d waiting task(s) need(s) did not fit a worker because of memory requirements", unfit_mem);
+		notice(D_WQ,"%d waiting task(s) did not fit a worker because of memory requirements", unfit_mem);
 	}
 
 	if(unfit_disk) {
-		notice(D_WQ,"%d waiting task(s) need(s) did not fit a worker because of disk requirements", unfit_disk);
+		notice(D_WQ,"%d waiting task(s) did not fit a worker because of disk requirements", unfit_disk);
 	}
 
 	if(unfit_gpu) {
-		notice(D_WQ,"%d waiting task(s) need(s) did not fit a worker because of gpus requirements", unfit_gpu);
+		notice(D_WQ,"%d waiting task(s) did not fit a worker because of gpus requirements", unfit_gpu);
 	}
 
 	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
 		notice(D_WQ, "workers with at least: %s %s %s %s would fit these tasks\n",
-				unfit_core > 0 ? rmsummary_resource_to_str("cores", largest_unfit_task, 1)  : "",
-				unfit_mem  > 0 ? rmsummary_resource_to_str("memory", largest_unfit_task, 1) : "",
-				unfit_disk > 0 ? rmsummary_resource_to_str("disk", largest_unfit_task, 1)   : "",
-				unfit_gpu  > 0 ? rmsummary_resource_to_str("gpus", largest_unfit_task, 1)   : "");
+				largest_unfit_task->cores  > 0 ? rmsummary_resource_to_str("cores",  largest_unfit_task, 1) : "",
+				largest_unfit_task->memory > 0 ? rmsummary_resource_to_str("memory", largest_unfit_task, 1) : "",
+				largest_unfit_task->disk   > 0 ? rmsummary_resource_to_str("disk",   largest_unfit_task, 1) : "",
+				largest_unfit_task->gpus   > 0 ? rmsummary_resource_to_str("gpus",   largest_unfit_task, 1) : "");
 	}
 
 	rmsummary_delete(largest_unfit_task);
