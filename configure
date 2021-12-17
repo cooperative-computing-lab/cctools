@@ -95,7 +95,7 @@ ccompiler=${CC:-gcc}
 cxxcompiler=${CXX:-g++}
 linker="${ccompiler}"
 
-ccflags="${CFLAGS} -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -fPIC"
+ccflags="${CFLAGS} -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -Wno-unused-result -fPIC"
 c_only_flags="-std=c99"
 
 config_zlib_path=yes

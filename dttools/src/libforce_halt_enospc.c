@@ -44,7 +44,7 @@ int open(const char *path, int flags, ...)
 			fprintf(stderr, "OPEN ERROR: device capacity reached.\n");
 			return fd;
 		}
-		err_fd = open(filename, O_RDWR | O_CREAT);
+		err_fd = original_open(filename, O_RDWR | O_CREAT);
 		if(err_fd < 0) { fprintf(stderr, "OPEN ERROR: could not alert resource management system that loop device is full.\n"); }
 		fprintf(stderr, "OPEN ERROR: device capacity reached.\n");
 		return fd;
