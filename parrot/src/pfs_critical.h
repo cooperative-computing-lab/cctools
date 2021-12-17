@@ -10,7 +10,20 @@ See the file COPYING for details.
 
 #include <signal.h>
 
-#define CRITICAL_BEGIN sigsetmask(sigmask(SIGIO)|sigmask(SIGINT)|sigmask(SIGHUP)|sigmask(SIGCHLD)|sigmask(SIGPIPE));
-#define CRITICAL_END sigsetmask(sigmask(SIGPIPE));
+#define CRITICAL_BEGIN {\
+    sigset_t s;\
+    sigaddset(&s, SIGIO);\
+    sigaddset(&s, SIGINT);\
+    sigaddset(&s, SIGHUP);\
+    sigaddset(&s, SIGCHLD);\
+    sigaddset(&s, SIGPIPE);\
+    sigprocmask(SIG_SETMASK, &s, NULL);\
+}
+
+#define CRITICAL_END {\
+    sigset_t s;\
+    sigaddset(&s, SIGPIPE);\
+    sigprocmask(SIG_SETMASK, &s, NULL);\
+}
 
 #endif
