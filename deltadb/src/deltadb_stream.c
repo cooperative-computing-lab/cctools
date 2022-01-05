@@ -16,14 +16,18 @@ See the file COPYING for details.
 
 #define LOG_LINE_MAX 65536
 
-static void corrupt_data( const char *filename, const char *line )
+static void corrupt_data( FILE *stream )
 {
-	fprintf(stderr,"corrupt data: %s\n",line);
+	fprintf(stderr,"deltadb: corrupt data in stream: ");
+	int c;
+	do {
+		c = fgetc(stream);
+		fprintf(stderr,"%c",c);
+	} while( c!=EOF && c!='\n');
 }
 
 int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_handlers *handlers, FILE *stream, time_t starttime, time_t stoptime )
 {
-	char line[LOG_LINE_MAX];
 	char value[LOG_LINE_MAX];
 	char name[LOG_LINE_MAX];
 	char key[LOG_LINE_MAX];
@@ -32,12 +36,10 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 
 	long long current = 0;
 
-	const char *filename = "stream";
-
-	while(fgets(line,sizeof(line),stream)) {
-
-		if(line[0]=='C') {
-			n = sscanf(line,"C %s %[^\n]",key,value);
+	while(1) {
+		int command = fgetc(stream);
+		if(command=='C') {
+			n = fscanf(stream,"%s %[^\n]\n",key,value);
 			if(n==1) {
 				/* backwards compatibility with old log format */
 				struct nvpair *nv = nvpair_create();
@@ -48,40 +50,40 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 				jvalue = jx_parse_string(value);
 				if(!jvalue) jvalue = jx_string(value);
 			} else {
-				corrupt_data(filename,line);
+				corrupt_data(stream);
 				continue;
 			}
 
 			if(!handlers->deltadb_create_event(query,key,jvalue)) break;
 
-		} else if(line[0]=='D') {
-			n = sscanf(line,"D %s\n",key);
+		} else if(command=='D') {
+			n = fscanf(stream,"%s\n",key);
 			if(n!=1) {
-				corrupt_data(filename,line);
+				corrupt_data(stream);
 				continue;
 			}
 
 			if(!handlers->deltadb_delete_event(query,key)) break;
 
-		} else if(line[0]=='M') {
-			n = sscanf(line,"M %s %[^\n]",key,value);
+		} else if(command=='M') {
+			n = fscanf(stream,"M %s %[^\n]\n",key,value);
 			if(n==2) {
 				jvalue = jx_parse_string(value);
 				if(!jvalue) {
-					corrupt_data(filename,line);
+					corrupt_data(stream);
 					continue;
 				}
 			} else {
-				corrupt_data(filename,line);
+				corrupt_data(stream);
 				continue;
 			}
 
 			if(!handlers->deltadb_merge_event(query,key,jvalue)) break;
 
-		} else if(line[0]=='U') {
-			n=sscanf(line,"U %s %s %[^\n],",key,name,value);
+		} else if(command=='U') {
+			n=fscanf(stream,"%s %s %[^\n]\n",key,name,value);
 			if(n!=3) {
-				corrupt_data(filename,line);
+				corrupt_data(stream);
 				continue;
 			}
 
@@ -94,19 +96,19 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 
 			if(!handlers->deltadb_update_event(query,key,name,jvalue)) break;
 
-		} else if(line[0]=='R') {
-			n=sscanf(line,"R %s %s",key,name);
+		} else if(command=='R') {
+			n=fscanf(stream,"%s %s\n",key,name);
 			if(n!=2) {
-				corrupt_data(filename,line);
+				corrupt_data(stream);
 				continue;
 			}
 
 			if(!handlers->deltadb_remove_event(query,key,name)) break;
 
-		} else if(line[0]=='T') {
-			n = sscanf(line,"T %lld",&current);
+		} else if(command=='T') {
+			n = fscanf(stream,"%lld\n",&current);
 			if(n!=1) {
-				corrupt_data(filename,line);
+				corrupt_data(stream);
 				continue;
 			}
 
@@ -114,11 +116,11 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 
 			if(stoptime && current>stoptime) return 0;
 
-		} else if(line[0]=='t') {
+		} else if(command=='t') {
 			long long change;
-			n = sscanf(line,"t %lld",&change);
+			n = fscanf(stream,"%lld\n",&change);
 			if(n!=1) {
-				corrupt_data(filename,line);
+				corrupt_data(stream);
 				continue;
 			}
 
@@ -128,12 +130,13 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 
 			if(stoptime && current>stoptime) return 0;
 
-		} else if(line[0]=='\n') {
+		} else if(command=='\n') {
 			continue;
+		} else if(command==EOF) {
+			break;
 		} else {
-			corrupt_data(filename,line);
+			corrupt_data(stream);
 		}
-		if(!handlers->deltadb_raw_event(query,line)) break;
 	}
 
 	return 1;
@@ -143,7 +146,6 @@ int deltadb_process_stream_fast( struct deltadb_query *query, struct deltadb_eve
 {
 	char line[LOG_LINE_MAX];
 	int n;
-	const char *filename = "stream";
 
 	long long current = 0;
 
@@ -151,7 +153,7 @@ int deltadb_process_stream_fast( struct deltadb_query *query, struct deltadb_eve
 		if(line[0]=='T') {
 			n = sscanf(line,"T %lld",&current);
 			if(n!=1) {
-				corrupt_data(filename,line);
+				corrupt_data(stream);
 				continue;
 			}
 			if(stoptime && current>stoptime) return 0;
@@ -160,7 +162,7 @@ int deltadb_process_stream_fast( struct deltadb_query *query, struct deltadb_eve
 			long long change;
 			n = sscanf(line,"t %lld",&change);
 			if(n!=1) {
-				corrupt_data(filename,line);
+				corrupt_data(stream);
 				continue;
 			}
 
