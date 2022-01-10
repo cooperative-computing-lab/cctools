@@ -156,6 +156,19 @@ fi
 
 SFX_DEFAULT_COMMAND=%s
 
+if [ "$1" = "--sfx-help" ]
+then
+    echo starch package options:
+    echo executing the sfx file by itself executes the command ${SFX_DEFAULT_COMMAND}
+    echo
+    echo environment variables to set packages options:
+    echo SFX_EXEC=CMD        Execute CMD instead of the default.
+    echo SFX_EXTRACT_ONLY=1  Extract package, but do not run a command.
+    echo SFX_KEEP=1          Do not remove extracted package when command finishes.
+    echo SFX_DIR=DIR         Extract to DIR, instead of a temporary directory. Implies SFX_KEEP=1
+    exit 0
+fi
+
 if [ -z "$SFX_EXEC" ]
 then
     SFX_EXEC="${SFX_DEFAULT_COMMAND}"
