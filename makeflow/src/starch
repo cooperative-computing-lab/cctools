@@ -153,7 +153,15 @@ if [ -d "$SFX_DIR/lib" ]; then
         fi
     fi
 fi
-%s "$@"
+
+SFX_DEFAULT_COMMAND=%s
+
+if [ -z "$SFX_EXEC" ]
+then
+    SFX_EXEC="${SFX_DEFAULT_COMMAND}"
+fi
+
+${SFX_EXEC} "$@"
 '''
 
 # Create SFX
@@ -329,7 +337,6 @@ def autodetect_libraries_darwin(executable):
     return libs
 
 # Configuration Parser
-
 class StarchConfigParser(ConfigParser):
     def safe_get(self, section, name, default = None):
         try:
@@ -338,7 +345,6 @@ class StarchConfigParser(ConfigParser):
             return default
 
 # Parse commandline options
-
 def parse_command_line_options():
     global STARCH_AUTODETECT
     global STARCH_PLATFORM
