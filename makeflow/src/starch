@@ -154,12 +154,11 @@ if [ -d "$SFX_DIR/lib" ]; then
     fi
 fi
 
-SFX_DEFAULT_COMMAND=%s
-
 if [ "$1" = "--sfx-help" ]
 then
     echo starch package options:
-    echo executing the sfx file by itself executes the command ${SFX_DEFAULT_COMMAND}
+    echo executing the sfx file by itself executes the command:
+    echo  "{cmd}"   
     echo
     echo environment variables to set packages options:
     echo SFX_EXEC=CMD        Execute CMD instead of the default.
@@ -169,12 +168,12 @@ then
     exit 0
 fi
 
-if [ -z "$SFX_EXEC" ]
+if [ -n "$SFX_EXEC" ]
 then
-    SFX_EXEC="${SFX_DEFAULT_COMMAND}"
+    $SFX_EXEC "$@"
+else
+    {cmd} "$@"
 fi
-
-${SFX_EXEC} "$@"
 '''
 
 # Create SFX
@@ -227,7 +226,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         archive.addfile(env_info, open(real_path, 'rb'))
 
     run_info = TarInfo('run.sh')
-    run_info_data  = RUN_SH % command
+    run_info_data  = RUN_SH.format(cmd=command)
     run_info.mode  = int('755', 8)
     run_info.mtime = time()
     run_info.size  = len(run_info_data)
