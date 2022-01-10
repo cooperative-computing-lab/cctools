@@ -92,6 +92,8 @@ extract() {
 }
 
 run() {
+    # make the extraction directory easily available in run.sh
+    export SFX_DIR
     $SFX_DIR/run.sh "$@"
     SFX_EXIT_STATUS=$?
 }
