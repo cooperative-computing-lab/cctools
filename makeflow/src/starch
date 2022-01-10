@@ -391,11 +391,14 @@ def parse_command_line_options():
             options.command = config.safe_get('starch', 'command', '')
 
     if not options.executables:
-        logging.error('no executables specified')
+        logging.error('At least one executable should be specified with -x')
+        parser.print_help()
+        sys.exit(1)
+
 
     if not options.command:
         options.command = os.path.basename(options.executables[0])
-        logging.warn('no command specified, so using: %s' % options.command)
+        logging.warn('no command specified with -c, using: %s' % options.command)
 
     logging.debug('command ... ' + options.command)
 
@@ -403,7 +406,6 @@ def parse_command_line_options():
                     options.data, options.environments, options.command
 
 # Main execution
-
 if __name__ == '__main__':
     create_sfx(*parse_command_line_options())
 
