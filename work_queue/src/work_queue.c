@@ -345,7 +345,7 @@ This performs a deep copy of the file struct.
 static struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file);
 
 /** Clone a list of @ref work_queue_file structs
-Thie performs a deep copy of the file list.
+This performs a deep copy of the file list.
 @param list The list to clone.
 @return A newly allocated list of files.
 */
@@ -453,7 +453,7 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.workers_busy);
 	buffer_printf(&B, " %d", s.workers_able);
 
-	/* Cummulative stats for workers: */
+	/* Cumulative stats for workers: */
 	buffer_printf(&B, " %d", s.workers_joined);
 	buffer_printf(&B, " %d", s.workers_removed);
 	buffer_printf(&B, " %d", s.workers_released);
@@ -468,7 +468,7 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.tasks_running);
 	buffer_printf(&B, " %d", s.tasks_with_results);
 
-	/* Cummulative stats for tasks: */
+	/* Cumulative stats for tasks: */
 	buffer_printf(&B, " %d", s.tasks_submitted);
 	buffer_printf(&B, " %d", s.tasks_dispatched);
 	buffer_printf(&B, " %d", s.tasks_done);
@@ -1128,7 +1128,7 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 	debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
 	// Check if there is space for incoming file at manager
 	if(!check_disk_space_for_filesize(dirname, length, disk_avail_threshold)) {
-		debug(D_WQ, "Could not recieve file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
+		debug(D_WQ, "Could not receive file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
 		return WQ_APP_FAILURE;
 	}
 
@@ -1163,7 +1163,7 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 
 /*
 This function implements the recursive get protocol.
-The manager sents a single get message, then the worker
+The manager sends a single get message, then the worker
 responds with a continuous stream of dir and file message
 that indicate the entire contents of the directory.
 This makes it efficient to move deep directory hierarchies with
@@ -1565,7 +1565,7 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 
 	if(q->monitor_mode & MON_FULL && q->monitor_output_directory)
 		keep = 1;
-				
+
 	if(!keep)
 		unlink(summary);
 
@@ -1582,7 +1582,7 @@ void resource_monitor_compress_logs(struct work_queue *q, struct work_queue_task
 	int rc = shellcode(command, NULL, NULL, 0, NULL, NULL, &status);
 
 	if(rc) {
-		debug(D_NOTICE, "Could no succesfully compress '%s', and '%s'\n", series, debug_log);
+		debug(D_NOTICE, "Could no successfully compress '%s', and '%s'\n", series, debug_log);
 	}
 
 	free(series);
@@ -1980,7 +1980,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 		retrieved_output_length = output_length;
 	} else {
 		retrieved_output_length = MAX_TASK_STDOUT_STORAGE;
-		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retreived.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
+		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retrieved.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
 		update_task_result(t, WORK_QUEUE_RESULT_STDOUT_MISSING);
 	}
 
@@ -2534,7 +2534,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_integer(j,"tasks_running",info.tasks_running);
 	jx_insert_integer(j,"tasks_complete",info.tasks_done);    // tasks_complete is deprecated, but the old work_queue_status expects it.
 
-	//addtional task information for work_queue_factory
+	//additional task information for work_queue_factory
 	jx_insert_integer(j,"tasks_on_workers",info.tasks_on_workers);
 	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
 
@@ -2991,7 +2991,7 @@ static int build_poll_table(struct work_queue *q, struct link *manager)
 /*
 Send a symbolic link to the remote worker.
 Note that the target of the link is sent
-as sthe "body" of the link, following the
+as the "body" of the link, following the
 message header.
 */
 
@@ -3717,17 +3717,12 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 			q->stats->capacity_weighted = (int) ceil((alpha * (float) capacity_instantaneous) + ((1.0 - alpha) * q->stats->capacity_weighted));
 			time_t ts;
 			time(&ts);
-			//debug(D_WQ, "capacity: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->manager_time, q->stats->capacity_weighted, s->tasks_done, s->workers_connected);
 		}
 	}
 
 	capacity->transfer_time = MAX(1, capacity->transfer_time);
 	capacity->exec_time     = MAX(1, capacity->exec_time);
 	capacity->manager_time   = MAX(1, capacity->manager_time);
-
-	//debug(D_WQ, "capacity.exec_time: %lld", (long long) capacity->exec_time);
-	//debug(D_WQ, "capacity.transfer_time: %lld", (long long) capacity->transfer_time);
-	//debug(D_WQ, "capacity.manager_time: %lld", (long long) capacity->manager_time);
 
 	// Never go below the default capacity
 	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->manager_time)));
@@ -4203,7 +4198,7 @@ static void ask_for_workers_updates(struct work_queue *q) {
 		if(q->keepalive_interval > 0) {
 
 			/* we have not received workqueue message from worker yet, so we
-			 * simply check agains its start_time. */
+			 * simply check again its start_time. */
 			if(!strcmp(w->hostname, "unknown")){
 				if ((int)((current_time - w->start_time)/1000000) >= q->keepalive_timeout) {
 					debug(D_WQ, "Removing worker %s (%s): hasn't sent its initialization in more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
@@ -4303,7 +4298,7 @@ static int abort_slow_workers(struct work_queue *q)
 			multiplier = c_def->fast_abort;
 		}
 		else {
-			/* Fast abort also deactivated for the defaut category. */
+			/* Fast abort also deactivated for the default category. */
 			continue;
 		}
 
@@ -4825,7 +4820,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	}
 
 	// @param remote_name is the path of the file as on the worker machine. In
-	// the Work Queue framework, workers are prohibitted from writing to paths
+	// the Work Queue framework, workers are prohibited from writing to paths
 	// outside of their workspaces. When a task is specified, the workspace of
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
@@ -4893,7 +4888,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	}
 
 	// @param remote_name is the path of the file as on the worker machine. In
-	// the Work Queue framework, workers are prohibitted from writing to paths
+	// the Work Queue framework, workers are prohibited from writing to paths
 	// outside of their workspaces. When a task is specified, the workspace of
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
@@ -5592,7 +5587,7 @@ void work_queue_specify_num_tasks_left(struct work_queue *q, int ntasks)
 
 void work_queue_specify_manager_mode(struct work_queue *q, int mode)
 {
-	// Deprecated: Report to the catalog iff a name is given.
+	// Deprecated: Report to the catalog if a name is given.
 }
 
 void work_queue_specify_catalog_server(struct work_queue *q, const char *hostname, int port)
@@ -6337,11 +6332,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - compute stoptime
    S time left?                              No:  return null
    - task completed?                         Yes: return completed task to user
-   - update catalog if appropiate
+   - update catalog if appropriate
    - retrieve workers status messages
    - tasks waiting to be retrieved?          Yes: retrieve one task and go to S.
    - tasks waiting to be dispatched?         Yes: dispatch one task and go to S.
-   - send keepalives to appropiate workers
+   - send keepalives to appropriate workers
    - fast-abort workers
    - if new workers, connect n of them
    - expired tasks?                          Yes: mark expired tasks as retrieved and go to S.
@@ -7102,11 +7097,11 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			" timestamp"
 			// workers current:
 			" workers_connected workers_init workers_idle workers_busy workers_able"
-			// workers cummulative:
+			// workers cumulative:
 			" workers_joined workers_removed workers_released workers_idled_out workers_blocked workers_fast_aborted workers_lost"
 			// tasks current:
 			" tasks_waiting tasks_on_workers tasks_running tasks_with_results"
-			// tasks cummulative
+			// tasks cumulative
 			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts"
 			// manager time statistics:
 			" time_when_started time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application"
