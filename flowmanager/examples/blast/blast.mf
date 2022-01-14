@@ -1,0 +1,18 @@
+
+small small/small.fasta: input.tar.gz
+	tar -xzvf input.tar.gz
+
+small/small.fasta.0 : small/small.fasta split_fasta
+	LOCAL ./split_fasta 1000 small/small.fasta
+
+small/small.fasta.0.out small/small.fasta.0.err : blastn small/small.fasta.0 small/small.fasta
+	./blastn -db small/small.fasta -query small/small.fasta.0 -out small/small.fasta.0.out 2> small/small.fasta.0.err
+
+output.out : cat_blast small/small.fasta.0.out
+	LOCAL ./cat_blast output.out small/small.fasta.0.out
+
+output.out.err : small/small.fasta.0.err
+	LOCAL cat small/small.fasta.0.err > output.out.err
+
+output.tar.gz: output.out output.out.err
+	tar -czvf output.tar.gz output.out output.out.err

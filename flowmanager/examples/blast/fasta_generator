@@ -1,0 +1,20 @@
+#!/usr/bin/perl
+
+$num_args = $#ARGV + 1;
+if ($num_args != 2) {
+    print "Usage: fasta_generator number_contigs length_of_contigs\n";
+    exit;
+}
+
+my $n = $ARGV[0];
+my $m = $ARGV[1];
+
+@chars = ('A', 'G', 'C', 'T');
+
+foreach my $i (1..$n) {
+	print ">contig$i\n";
+	foreach my $j (1..$m) {
+			print $chars[rand @chars];
+	}
+	print "\n";
+}
