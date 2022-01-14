@@ -1142,7 +1142,11 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 	// Write the data on the link to file.
 	int64_t actual = link_stream_to_fd(w->link, fd, length, stoptime);
 
-	close(fd);
+	if(close(fd) < 0) {
+		warn(D_WQ, "Could not write file %s: %s\n", local_name, strerror(errno));
+		unlink(local_name);
+		return WQ_APP_FAILURE;
+	}
 
 	if(actual != length) {
 		debug(D_WQ, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
@@ -1900,7 +1904,11 @@ static work_queue_result_code_t get_update( struct work_queue *q, struct work_qu
 	lseek(fd,offset,SEEK_SET);
 	link_stream_to_fd(w->link,fd,length,stoptime);
 	ftruncate(fd,offset+length);
-	close(fd);
+
+	if(close(fd) < 0) {
+		debug(D_WQ, "unable to update watched file %s: %s\n", local_name, strerror(errno));
+		return WQ_SUCCESS;
+	}
 
 	return WQ_SUCCESS;
 }
@@ -5698,7 +5706,10 @@ void work_queue_delete(struct work_queue *q)
 
 		if(q->transactions_logfile) {
 			write_transaction(q, "MANAGER END");
-			fclose(q->transactions_logfile);
+
+			if(!fclose(q->transactions_logfile)) {
+				debug(D_WQ, "unable to write transactions log: %s\n", strerror(errno));
+			}
 		}
 
 		rmsummary_delete(q->measured_local_resources);
@@ -5767,11 +5778,15 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 		copy_fd_to_stream(summs_fd, final);
 
 		jx_delete(extra);
-		fclose(final);
 		close(summs_fd);
 
-		if(rename(template, q->monitor_summary_filename) < 0)
+		if(!fclose(final)) {
+			debug(D_WQ, "unable to update monitor report to final destination file: %s\n", strerror(errno));
+		}
+
+		if(rename(template, q->monitor_summary_filename) < 0) {
 			warn(D_DEBUG, "Could not move monitor report to final destination file.");
+		}
 	}
 
 	if(q->monitor_exe)
