@@ -7,13 +7,13 @@ tarfile=starch.tar.gz
 
 prepare()
 {
-	cd ..; tar czvf $tarfile src; cd -; mv ../$tarfile .
+	(cd .. && tar czvf $tarfile src) && mv ../$tarfile .
 	exit 0
 }
 
 run()
 {
-	../src/starch -v -x tar -x rm -c 'tar_test() { for f in $@; do if ! tar xvf $f; then exit 1; fi ; done; rm $@; }; tar_test' $sfxfile
+	../src/starch -v -x tar -x rm -c 'tar_test() { for f in "$@"; do if ! tar xvf $f; then exit 1; fi ; done; }; tar_test' $sfxfile
 	exec ./$sfxfile $tarfile
 }
 

@@ -92,6 +92,8 @@ extract() {
 }
 
 run() {
+    # make the extraction directory easily available in run.sh
+    export SFX_DIR
     $SFX_DIR/run.sh "$@"
     SFX_EXIT_STATUS=$?
 }
@@ -153,7 +155,27 @@ if [ -d "$SFX_DIR/lib" ]; then
         fi
     fi
 fi
-%s "$@"
+
+if [ "$1" = "--sfx-help" ]
+then
+    echo starch package options:
+    echo executing the sfx file by itself executes the command:
+    echo  "{cmd}"   
+    echo
+    echo environment variables to set packages options:
+    echo SFX_EXEC=CMD        Execute CMD instead of the default.
+    echo SFX_EXTRACT_ONLY=1  Extract package, but do not run a command.
+    echo SFX_KEEP=1          Do not remove extracted package when command finishes.
+    echo SFX_DIR=DIR         Extract to DIR, instead of a temporary directory. Implies SFX_KEEP=1
+    exit 0
+fi
+
+if [ -n "$SFX_EXEC" ]
+then
+    $SFX_EXEC "$@"
+else
+    {cmd} "$@"
+fi
 '''
 
 # Create SFX
@@ -206,7 +228,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         archive.addfile(env_info, open(real_path, 'rb'))
 
     run_info = TarInfo('run.sh')
-    run_info_data  = RUN_SH % command
+    run_info_data  = RUN_SH.format(cmd=command)
     run_info.mode  = int('755', 8)
     run_info.mtime = time()
     run_info.size  = len(run_info_data)
@@ -329,7 +351,6 @@ def autodetect_libraries_darwin(executable):
     return libs
 
 # Configuration Parser
-
 class StarchConfigParser(ConfigParser):
     def safe_get(self, section, name, default = None):
         try:
@@ -338,7 +359,6 @@ class StarchConfigParser(ConfigParser):
             return default
 
 # Parse commandline options
-
 def parse_command_line_options():
     global STARCH_AUTODETECT
     global STARCH_PLATFORM
@@ -391,11 +411,14 @@ def parse_command_line_options():
             options.command = config.safe_get('starch', 'command', '')
 
     if not options.executables:
-        logging.error('no executables specified')
+        logging.error('At least one executable should be specified with -x')
+        parser.print_help()
+        sys.exit(1)
+
 
     if not options.command:
         options.command = os.path.basename(options.executables[0])
-        logging.warn('no command specified, so using: %s' % options.command)
+        logging.warn('no command specified with -c, using: %s' % options.command)
 
     logging.debug('command ... ' + options.command)
 
@@ -403,7 +426,6 @@ def parse_command_line_options():
                     options.data, options.environments, options.command
 
 # Main execution
-
 if __name__ == '__main__':
     create_sfx(*parse_command_line_options())
 
