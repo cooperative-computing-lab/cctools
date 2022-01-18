@@ -121,6 +121,14 @@ typedef enum {
 	WORKER_TYPE_FOREMAN = 8
 } worker_type;
 
+
+typedef enum {
+	CORES_BIT = (1 << 0),
+	MEMORY_BIT = (1 << 1),
+	DISK_BIT = (1 << 2),
+	GPUS_BIT = (1 << 3),
+} resource_bitmask;
+
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
 
@@ -128,6 +136,9 @@ int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blocklist_slow_workers_timeout = 900;
+
+/* time threshold to check when tasks are larger than connected workers */
+static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
 
 struct work_queue {
 	char *name;
@@ -160,7 +171,7 @@ struct work_queue {
 	struct work_queue_stats *stats_disconnected_workers;
 	timestamp_t time_last_wait;
 	timestamp_t time_last_log_stats;
-
+	timestamp_t time_last_large_tasks_check;
 	int worker_selection_algorithm;
 	int task_ordering;
 	int process_pending_check;
@@ -3466,7 +3477,14 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 			max_proportion = MAX(max_proportion, limits->gpus / w->resources->gpus.largest);
 		}
 
-		if(max_proportion > 0) {
+		//if max_proportion > 1, then the task does not fit the worker for the
+		//specified resources. For the unspecified resources we use the whole
+		//worker as not to trigger a warning when checking for tasks that can't
+		//run on any available worker.
+		if (max_proportion > 1){
+			use_whole_worker = 1;
+		}
+		else if(max_proportion > 0) {
 			use_whole_worker = 0;
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
 			 * Otherwise they get a proportion according to specified
@@ -3762,7 +3780,7 @@ void compute_manager_load(struct work_queue *q, int task_activity) {
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
-	/* worker has no reported any resources yet */
+	/* worker has not reported any resources yet */
 	if(w->resources->tag < 0)
 		return 0;
 
@@ -4004,6 +4022,63 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 	}
 }
 
+
+// compares the resources needed by a task to a given worker
+// returns a bitmask that indicates which resource of the task, if any, cannot
+// be met by the worker. If the task fits in the worker, it returns 0.
+static int is_task_larger_than_worker(struct work_queue *q, struct work_queue_task *t, struct work_queue_worker *w)
+{
+	int set = 0;
+	struct rmsummary *l = task_worker_box_size(q,w,t);
+
+	// baseline resurce comparison of worker total resources and a task requested resorces
+
+	if((double)w->resources->cores.total < l->cores ) {
+		set = set | CORES_BIT;
+	}
+
+	if((double)w->resources->memory.total < l->memory ) {
+		set = set | MEMORY_BIT;
+	}
+
+	if((double)w->resources->disk.total < l->disk ) {
+		set = set | DISK_BIT;
+	}
+
+	if((double)w->resources->gpus.total < l->gpus ) {
+		set = set | GPUS_BIT;
+	}
+	rmsummary_delete(l);
+
+	return set;
+}
+
+// compares the resources needed by a task to all connected workers.
+// returns 0 if there is worker than can fit the task. Otherwise it returns a bitmask
+// that indicates that there was at least one worker that could not fit that task resource.
+static int is_task_larger_than_connected_workers(struct work_queue *q, struct work_queue_task *t)
+{
+	char *key;
+	struct work_queue_worker *w;
+	hash_table_firstkey(q->worker_table);
+
+	int bit_set = 0;
+	while(hash_table_nextkey(q->worker_table, &key, (void**)&w))
+	{
+		int new_set = is_task_larger_than_worker(q, t, w);
+		if (new_set == 0){
+			// Task could run on a currently connected worker, immediately
+			// return
+			return 0;
+		}
+
+		// Inherit the unfit criteria for this task
+		bit_set = bit_set | new_set;
+	}
+
+	return bit_set;
+}
+
 // use task-specific algorithm if set, otherwise default to the queue's setting.
 static struct work_queue_worker *find_best_worker(struct work_queue *q, struct work_queue_task *t)
 {
@@ -4070,12 +4145,12 @@ static void update_max_worker(struct work_queue *q, struct work_queue_worker *w)
 		q->current_max_worker->memory = w->resources->memory.largest;
 	}
 
-	if(q->current_max_worker->disk < w->resources->memory.largest) {
-		q->current_max_worker->disk = w->resources->memory.largest;
+	if(q->current_max_worker->disk < w->resources->disk.largest) {
+		q->current_max_worker->disk = w->resources->disk.largest;
 	}
 
-	if(q->current_max_worker->gpus < w->resources->memory.largest) {
-		q->current_max_worker->gpus = w->resources->memory.largest;
+	if(q->current_max_worker->gpus < w->resources->gpus.largest) {
+		q->current_max_worker->gpus = w->resources->gpus.largest;
 	}
 }
 
@@ -4157,7 +4232,6 @@ static int send_one_task( struct work_queue *q )
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
-
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 
@@ -4166,7 +4240,6 @@ static int send_one_task( struct work_queue *q )
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
-
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
 
@@ -4174,6 +4247,77 @@ static int send_one_task( struct work_queue *q )
 	}
 
 	return 0;
+}
+
+
+static void print_large_tasks_warning(struct work_queue *q)
+{
+	timestamp_t current_time = timestamp_get();
+	if(current_time - q->time_last_large_tasks_check < interval_check_for_large_tasks) {
+		return;
+	}
+
+	q->time_last_large_tasks_check = current_time;
+
+	struct work_queue_task *t;
+	int unfit_core = 0;
+	int unfit_mem  = 0;
+	int unfit_disk = 0;
+	int unfit_gpu  = 0;
+
+	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
+
+	list_first_item(q->ready_list);
+	while( (t = list_next_item(q->ready_list))){
+		// check each task against the queue of connected workers
+		int bit_set = is_task_larger_than_connected_workers(q, t);
+		if(bit_set) {
+			rmsummary_merge_max(largest_unfit_task, task_max_resources(q, t));
+			rmsummary_merge_max(largest_unfit_task, task_min_resources(q, t));
+		}
+		if (bit_set & CORES_BIT) {
+			unfit_core++;
+		}
+		if (bit_set & MEMORY_BIT) {
+			unfit_mem++;
+		}
+		if (bit_set & DISK_BIT) {
+			unfit_disk++;
+		}
+		if (bit_set & GPUS_BIT) {
+			unfit_gpu++;
+		}
+	}
+
+	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
+		notice(D_WQ,"There are tasks that cannot fit any currently connected worker.\n");
+	}
+
+	if(unfit_core) {
+		notice(D_WQ,"%d waiting task(s)  did not fit a worker because of cores requirements", unfit_core);
+	}
+
+	if(unfit_mem) {
+		notice(D_WQ,"%d waiting task(s) did not fit a worker because of memory requirements", unfit_mem);
+	}
+
+	if(unfit_disk) {
+		notice(D_WQ,"%d waiting task(s) did not fit a worker because of disk requirements", unfit_disk);
+	}
+
+	if(unfit_gpu) {
+		notice(D_WQ,"%d waiting task(s) did not fit a worker because of gpus requirements", unfit_gpu);
+	}
+
+	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
+		notice(D_WQ, "workers with at least: %s %s %s %s would fit these tasks\n",
+				largest_unfit_task->cores  > 0 ? rmsummary_resource_to_str("cores",  largest_unfit_task, 1) : "",
+				largest_unfit_task->memory > 0 ? rmsummary_resource_to_str("memory", largest_unfit_task, 1) : "",
+				largest_unfit_task->disk   > 0 ? rmsummary_resource_to_str("disk",   largest_unfit_task, 1) : "",
+				largest_unfit_task->gpus   > 0 ? rmsummary_resource_to_str("gpus",   largest_unfit_task, 1) : "");
+	}
+
+	rmsummary_delete(largest_unfit_task);
 }
 
 static int receive_one_task( struct work_queue *q )
@@ -5376,6 +5520,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->long_timeout = 3600;
 
 	q->stats->time_when_started = timestamp_get();
+	q->time_last_large_tasks_check = timestamp_get();
 	q->task_reports = list_create();
 
 	q->time_last_wait = 0;
@@ -6383,7 +6528,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - go to S
 */
 	int events = 0;
-
 	// account for time we spend outside work_queue_wait
 	if(q->time_last_wait > 0) {
 		q->stats->time_application += timestamp_get() - q->time_last_wait;
@@ -6547,8 +6691,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 		}
 
-		/* if we got here, no events were triggered. we set the busy_waiting
-		 * flag so that link_poll waits for some time the next time around. */
+		print_large_tasks_warning(q);
+
+		// if we got here, no events were triggered.
+		// we set the busy_waiting flag so that link_poll waits for some time
+		// the next time around.
 		q->busy_waiting_flag = 1;
 
 		// If the foreman_uplink is active then break so the caller can handle it.
