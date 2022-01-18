@@ -6024,6 +6024,9 @@ const char *work_queue_result_str(work_queue_result_t result) {
 		case WORK_QUEUE_RESULT_TASK_TIMEOUT:
 			str = "END_TIME";
 			break;
+		case WORK_QUEUE_RESULT_UNKNOWN:
+			str = "UNKNOWN";
+			break;
 		case WORK_QUEUE_RESULT_FORSAKEN:
 			str = "FORSAKEN";
 			break;
@@ -6033,9 +6036,14 @@ const char *work_queue_result_str(work_queue_result_t result) {
 		case WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:
 			str = "MAX_WALL_TIME";
 			break;
-		case WORK_QUEUE_RESULT_UNKNOWN:
-		default:
-			str = "UNKNOWN";
+		case WORK_QUEUE_RESULT_DISK_ALLOC_FULL:
+			str = "DISK_FULL";
+			break;
+		case WORK_QUEUE_RESULT_RMONITOR_ERROR:
+			str = "MONITOR_ERROR";
+			break;
+		case WORK_QUEUE_RESULT_OUTPUT_TRANSFER_ERROR:
+			str = "OUTPUT_TRANSFER_ERROR";
 			break;
 	}
 
@@ -7425,6 +7433,7 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 		case WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION:
 		case WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:
 		case WORK_QUEUE_RESULT_DISK_ALLOC_FULL:
+		case WORK_QUEUE_RESULT_OUTPUT_TRANSFER_ERROR:
 			if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
 				write_transaction_category(q, c);
 			}
