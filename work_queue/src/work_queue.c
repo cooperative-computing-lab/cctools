@@ -87,12 +87,13 @@ See the file COPYING for details.
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
 	WQ_SUCCESS = 0,
-	WQ_WORKER_FAILURE, 
-	WQ_APP_FAILURE
+	WQ_WORKER_FAILURE,
+	WQ_APP_FAILURE,
+	WQ_MGR_FAILURE
 } work_queue_result_code_t;
 
 typedef enum {
-	MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */  
+	MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */
 	MSG_PROCESSED_DISCONNECT, /* Message was processed and disconnect now expected. */
 	MSG_NOT_PROCESSED,        /* Message was not processed, waiting to be consumed. */
 	MSG_FAILURE               /* Message not received, connection failure. */
@@ -1120,7 +1121,7 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 		if(!create_dir(dirname, 0777)) {
 			debug(D_WQ, "Could not create directory - %s (%s)", dirname, strerror(errno));
 			link_soak(w->link, length, stoptime);
-			return WQ_APP_FAILURE;
+			return WQ_MGR_FAILURE;
 		}
 	}
 
@@ -1129,14 +1130,14 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 	// Check if there is space for incoming file at manager
 	if(!check_disk_space_for_filesize(dirname, length, disk_avail_threshold)) {
 		debug(D_WQ, "Could not receive file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
-		return WQ_APP_FAILURE;
+		return WQ_MGR_FAILURE;
 	}
 
 	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
 		link_soak(w->link, length, stoptime);
-		return WQ_APP_FAILURE;
+		return WQ_MGR_FAILURE;
 	}
 
 	// Write the data on the link to file.
@@ -1145,7 +1146,7 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 	if(close(fd) < 0) {
 		warn(D_WQ, "Could not write file %s: %s\n", local_name, strerror(errno));
 		unlink(local_name);
-		return WQ_APP_FAILURE;
+		return WQ_MGR_FAILURE;
 	}
 
 	if(actual != length) {
@@ -1221,7 +1222,9 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
 			free(tmp_local_name);
 			//Return if worker failure. Else wait for end message from worker.
-			if(result == WQ_WORKER_FAILURE) break;
+			if((result == WQ_WORKER_FAILURE) || (result == WQ_MGR_FAILURE)) {
+				break;
+			}
 		} else if(pattern_match(line, "^missing (.+) (%d+)$", &tmp_remote_path, &errnum_str) >= 0) {
 			// If the output file is missing, we make a note of that in the task result,
 			// but we continue and consider the transfer a 'success' so that other
@@ -1251,8 +1254,11 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 	// to be returned to the queue to be attempted elsewhere.
 	debug(D_WQ, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, remote_name, local_name);
 	if(result == WQ_APP_FAILURE) {
-		update_task_result(t, WORK_QUEUE_RESULT_OUTPUT_MISSING);;
+		update_task_result(t, WORK_QUEUE_RESULT_OUTPUT_MISSING);
+	} else if(result == WQ_MGR_FAILURE) {
+		update_task_result(t, WORK_QUEUE_RESULT_OUTPUT_TRANSFER_ERROR);
 	}
+
 	return result;
 }
 
