@@ -600,6 +600,15 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 			return head;
 		}
 
+		/* A value could be followed by a dict comprehension */
+
+		p->comp = jx_parse_comprehension(s);
+		if (jx_parser_errors(s)) {
+			// error set by deeper layer
+			jx_pair_delete(p);
+			return head;
+		}
+
 		/* First item becomes the head, others added to the tail. */
 
 		if(!head) {
