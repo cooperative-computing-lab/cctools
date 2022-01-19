@@ -32,6 +32,7 @@ static void jx_pair_print( struct jx_pair *pair, buffer_t *b )
 	jx_print_buffer(pair->key,b);
 	buffer_putstring(b,":");
 	jx_print_buffer(pair->value,b);
+	jx_comprehension_print(pair->comp, b);
 	if(pair->next) {
 		buffer_putstring(b,",");
 		jx_pair_print(pair->next,b);

@@ -140,6 +140,20 @@ x or y;
 [[i, j] for i in range(5) if j % 2 == 0 for j in range(4) if i % 2 == 1];
 [[i, j, k, l] for i in range(4) for j in range(3) for k in range(3) for l in [true, false]];
 
+{k:k for k in range(3), 3:false, 4:null, "5":[1,2,3], "6":6.0};
+{format("key(%d)", k): format("value(%d)", k) for k in range(5)};
+{p[0]:p[1] for p in items({k:0 for k in ["A", "B", "C", "D"]})};
+[{p[0]:p[1]+v for p in items({k:0 for k in ["A", "B", "C", "D"]})} for v in range(3)];
+{k:null for k in 7};
+{k:null for a in ["a","b"]};
+{k:0 for k in range(3)};
+{k:0 for k in range(10) if k % 3 == 0};
+{k:v for k in range(4) for v in range(3)};
+{k:v for k in range(5) for v in range(4) if (k + v) % 2 == 0};
+{k:v for k in range(5) for v in range(4) if v % 2 == 1};
+{k:v for k in range(5) if k % 2 == 0 for v in range(4) if v % 2 == 1};
+{k:v for k in range(5) if v % 2 == 0 for v in range(4) if k % 2 == 1};
+
 list[2];
 list[-1];
 list[-3];

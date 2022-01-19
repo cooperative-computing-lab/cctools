@@ -76,9 +76,10 @@ struct jx_item {
 /** JX key-value pairs used by @ref JX_OBJECT and @ref jx.pairs */
 
 struct jx_pair {
+	unsigned line;
 	struct jx      *key;	/**< key of this pair */
 	struct jx      *value;  /**< value of this pair */
-	unsigned line;
+	struct jx_comprehension *comp;
 	struct jx_pair *next;   /**< pointer to next pair */
 };
 
