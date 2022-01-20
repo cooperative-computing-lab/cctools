@@ -36,6 +36,8 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 
 	while(fgets(line,sizeof(line),stream)) {
 
+		reconsider:
+
 		if(line[0]=='C') {
 			n = sscanf(line,"C %s %[^\n]",key,value);
 			if(n==1) {
@@ -95,13 +97,47 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 			if(!handlers->deltadb_update_event(query,key,name,jvalue)) break;
 
 		} else if(line[0]=='R') {
-			n=sscanf(line,"R %s %s",key,name);
-			if(n!=2) {
+			/*
+			A correct R record should just have a key and a name.
+			However, due to a bug in an earlier version, R records were
+			sometimes written without a trailing newline, causing the
+			next record to appear immediately after on the same line.
+			*/
+
+			n=sscanf(line,"R %s %s %s",key,name,value);
+			if(n==3) {
+				/*
+				A third field here indicates a corrupted record.
+				Check to see if the final character of key is a
+				valid record type.
+				*/
+				char type = name[strlen(name)-1];
+
+				if(strchr("CDUMRTt",type)) {
+
+					/* If so, remove the character and process the R record */
+					name[strlen(name)-1] = 0;
+					if(!handlers->deltadb_remove_event(query,key,name)) break;
+					name[strlen(name)] = type;
+
+					/* Now process the remainder of the line as a new command. */
+					int position = strlen(key) + strlen(name) + 2;
+					strcpy(line,&line[position]);
+					goto reconsider;
+				} else {
+					/* Invalid type: the line is totally corrupted. */
+					corrupt_data(filename,line);
+					continue;
+				}
+
+			} else if(n==2) {
+				/* This is a correct record with just a key and value */
+				if(!handlers->deltadb_remove_event(query,key,name)) break;
+			} else {
 				corrupt_data(filename,line);
 				continue;
 			}
 
-			if(!handlers->deltadb_remove_event(query,key,name)) break;
 
 		} else if(line[0]=='T') {
 			n = sscanf(line,"T %lld",&current);
