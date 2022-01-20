@@ -169,7 +169,6 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 		} else {
 			corrupt_data(filename,line);
 		}
-		if(!handlers->deltadb_raw_event(query,line)) break;
 	}
 
 	return 1;
