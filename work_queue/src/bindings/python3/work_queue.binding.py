@@ -39,7 +39,7 @@ def specify_debug_log(logfile):
     cctools_debug_config_file(logfile)
 
 def specify_port_range(low_port, high_port):
-    if low_port >= high_port:
+    if low_port > high_port:
         raise TypeError('low_port {} should be smaller than high_port {}'.format(low_port, high_port))
 
     os.environ['TCP_LOW_PORT'] = str(low_port)
