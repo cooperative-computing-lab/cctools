@@ -39,7 +39,7 @@ def specify_debug_log(logfile):
     cctools_debug_config_file(logfile)
 
 def specify_port_range(low_port, high_port):
-    if low_port >= high_port:
+    if low_port > high_port:
         raise TypeError('low_port {} should be smaller than high_port {}'.format(low_port, high_port))
 
     os.environ['TCP_LOW_PORT'] = str(low_port)
@@ -1073,7 +1073,7 @@ class WorkQueue(object):
             self._stats_hierarchy = work_queue_stats()
             self._work_queue = work_queue_ssl_create(port, ssl_key, ssl_cert)
             if not self._work_queue:
-                raise Exception('Could not create work_queue on port %d' % port)
+                raise Exception('Could not create queue on port {}'.format(port))
 
             if stats_log:
                 self.specify_log(stats_log)
@@ -1084,7 +1084,7 @@ class WorkQueue(object):
             if name:
                 work_queue_specify_name(self._work_queue, name)
         except Exception as e:
-            raise Exception('Unable to create internal Work Queue structure: %s' % e)
+            raise Exception('Unable to create internal Work Queue structure: {}'.format(e))
 
 
     def _free_queue(self):
