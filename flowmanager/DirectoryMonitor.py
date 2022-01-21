@@ -10,10 +10,10 @@ import threading
 from queue import Queue
 
 class DirectoryMonitor():
-        def __init__(self, path, event_handler):
+        def __init__(self, path, scheduler):
                 self.dir_state = {}
                 self.path = path
-                self.event_handler = event_handler
+                self.scheduler = scheduler
                 self.__initialize_state()
 
         def __initialize_state(self):
@@ -23,7 +23,7 @@ class DirectoryMonitor():
         def monitor(self):
                 for entry in os.scandir(self.path):
                         if not entry.inode() in self.dir_state:
-                                self.event_handler.handle(os.path.join(self.path, entry.name))
+                                self.scheduler.push(os.path.join(self.path, entry.name))
                                 self.dir_state[entry.inode()] = entry.name
 
 def main():
