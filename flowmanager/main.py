@@ -1,11 +1,9 @@
 from DirectoryMonitor import DirectoryMonitor
 from BasicEventHandler import BasicEventHandler
 from Workflow import Workflow
-from WorkflowEventHandler import WorkflowEventHandler
+from WorkflowScheduler import WorkflowScheduler
 from utils import parse_filename
 
-from queue import Queue
-import work_queue as wq
 import time
 import os
 import re
@@ -25,53 +23,48 @@ def handle_event(src_path):
         task.specify_cores(1)
         self.wq.submit(task)
 
-def init(path, event_handler):
+def init(path, scheduler):
         for entry in os.scandir(path):
                 if entry.is_file():
                         if re.search("-pre-", entry.name):
                             original_name, _, extension = parse_filename(entry.name)
                             new_path = os.path.join(path, original_name + extension)
-                            print(new_path)
-                            print(entry.name)
                             # TODO: Think about if this is the right thing to do
                             os.rename(os.path.join(path, entry.name), new_path)
-                            event_handler.handle(new_path)
+                            scheduler.push(new_path)
                         elif not re.search("-post-", entry.name):
-                            event_handler.handle(os.path.join(path, entry.name))
+                            scheduler.push(os.path.join(path, entry.name))
 
 def parse_options():
     parser = argparse.ArgumentParser(description='Manage makeflows.')
     parser.add_argument('--input', '-i', nargs=1, required=True, type=str, help='inbox directory for input files')
     parser.add_argument('--output', '-o', nargs=1, required=True, type=str, help='outbox directory for output files from makeflows')
     parser.add_argument('--makeflow', '-m', nargs=1, required=True, type=str, help='directory containing code along with makeflow file')
+    parser.add_argument('--process-limit', '-p', nargs=1, required=False, type=int, help='maximum concurrent running workflows', default=5)
+    parser.add_argument('--error', '-e', nargs=1, required=True, type=str, help='directory to output workflows that resulted in errors')
     return parser.parse_args()
 
 def main():
         args = parse_options()
-        INPUT = args.input[0]
-        OUTPUT = args.output[0]
-        MAKEFILE = args.makeflow[0]
-        EXPECTED_INPUT = "input.tar.gz"
-        PROCESS_LIST = []
+        INPUT = os.path.abspath(args.input[0])
+        OUTPUT = os.path.abspath(args.output[0])
+        MAKEFILE = os.path.abspath(args.makeflow[0])
+        PROC_LIMIT = args.process_limit
+        ERROR_FILE = os.path.abspath(args.error[0])
 
-        # specify  event_handler
-        w = Workflow(MAKEFILE, EXPECTED_INPUT)
-        event_handler = WorkflowEventHandler(OUTPUT, w, PROCESS_LIST)
+        EXPECTED_INPUT = "input.tar.gz" # the input file for the makeflow
 
-        # create a directory monitor
-        dm = DirectoryMonitor(INPUT, event_handler)
+        wf = Workflow(MAKEFILE, EXPECTED_INPUT)
+        scheduler = WorkflowScheduler(OUTPUT, wf, ERROR_FILE, PROC_LIMIT)
+        dm = DirectoryMonitor(INPUT, scheduler)
 
         # scan the directory
-        init(INPUT, event_handler)
+        init(INPUT, scheduler)
 
         dm.monitor()
 
         while True:
-            for proc in PROCESS_LIST:
-                proc.join(timeout=0)
-                if not proc.is_alive():
-                    print("process done!")
-                    PROCESS_LIST.remove(proc)
+            scheduler.schedule()
             dm.monitor()
 
 if __name__=="__main__":

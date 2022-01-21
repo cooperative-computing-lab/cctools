@@ -12,14 +12,14 @@ class Workflow():
             self.makeflow_dir = os.path.dirname(self.makeflow)
             self.expected_input_name = expected_input_name
 
-        def run(self, input_file, output_directory):
-            proc = multiprocessing.Process(target=self.__run, args=(input_file, output_directory))
+        def run(self, input_file, output_directory, error_dir):
+            proc = multiprocessing.Process(target=self.__run, args=(input_file, output_directory, error_dir))
             proc.start()
             return proc
 
         # takes the input file, runs it with the given workflow
         # puts the output file in output_directory
-        def __run(self, input_file, output_directory):
+        def __run(self, input_file, output_directory, error_dir):
             # parse the filename
             (inputname, filehash, ext) = parse_filename(os.path.basename(input_file))
             workflow_directory_name = f"makeflow-{inputname}-{filehash}"
@@ -34,10 +34,14 @@ class Workflow():
             
             # run the makeflow
             prc = subprocess.run(["makeflow", os.path.basename(self.makeflow)], stdout=subprocess.DEVNULL)
-
+            
             # create output filename
             output_filename = inputname + "-" +  filehash + ".tar.gz"
-            shutil.move("output.tar.gz", os.path.join(output_directory, output_filename))
+
+            if prc.returncode:
+                shutil.move("output.tar.gz", os.path.join(error_dir, output_filename))
+            else:
+                shutil.move("output.tar.gz", os.path.join(output_directory, output_filename))
 
             os.chdir(prev_dir)
             shutil.rmtree(workflow_directory_name)

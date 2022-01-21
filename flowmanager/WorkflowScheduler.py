@@ -6,8 +6,9 @@ from queue import Queue
 import logging
 
 class WorkflowScheduler:
-    def __init__(self, output_dir, workflow, proc_limit = 5):
+    def __init__(self, output_dir, workflow, error_dir, proc_limit = 5):
         self.output_dir = output_dir
+        self.error_dir = error_dir
         self.workflow = workflow
         self.proc_limit = proc_limit
         self.proc_list = []
@@ -19,7 +20,7 @@ class WorkflowScheduler:
     def run(self, path):
         input_file = self.__process_file(path)
         print("running:", input_file)
-        self.proc_list.append(self.workflow.run(input_file, self.output_dir))
+        self.proc_list.append(self.workflow.run(input_file, self.output_dir, self.error_dir))
 
     def __process_file(self, event_path):
         # construct new filename
@@ -41,6 +42,6 @@ class WorkflowScheduler:
             proc.join(timeout=0)
             if not proc.is_alive():
                 self.proc_list.remove(proc)
-                print("done:", proc)
+                print("done:", proc.name, "Success" if not proc.exitcode else "Failure")
                 if not self.queue.empty():
                     self.run(self.queue.get())
