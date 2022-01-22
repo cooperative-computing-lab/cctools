@@ -25,4 +25,7 @@ Check to make sure that the makeflow file is correct
 makeflow blast.mf
 ```
 
+Other notes:
+use makeblastdb to create blast db from fasta file
+modify makeflow blast to output correct blast.mf based on blastn
 

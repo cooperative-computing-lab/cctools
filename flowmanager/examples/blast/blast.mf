@@ -1,18 +1,164 @@
-
-small small/small.fasta: input.tar.gz
+large.fasta large.fasta/large.fasta: input.tar.gz
 	tar -xzvf input.tar.gz
 
-small/small.fasta.0 : small/small.fasta split_fasta
-	LOCAL ./split_fasta 1000 small/small.fasta
+output.tar.gz: output.txt output.txt.err
+	tar -czvf output.tar.gz output.txt output.txt.err
 
-small/small.fasta.0.out small/small.fasta.0.err : blastn small/small.fasta.0 small/small.fasta
-	./blastn -db small/small.fasta -query small/small.fasta.0 -out small/small.fasta.0.out 2> small/small.fasta.0.err
+large.fasta/large.fasta.0 large.fasta/large.fasta.1 large.fasta/large.fasta.2 large.fasta/large.fasta.3 large.fasta/large.fasta.4 large.fasta/large.fasta.5 large.fasta/large.fasta.6 large.fasta/large.fasta.7 large.fasta/large.fasta.8 large.fasta/large.fasta.9 large.fasta/large.fasta.10 large.fasta/large.fasta.11 large.fasta/large.fasta.12 large.fasta/large.fasta.13 large.fasta/large.fasta.14 large.fasta/large.fasta.15 large.fasta/large.fasta.16 large.fasta/large.fasta.17 large.fasta/large.fasta.18 large.fasta/large.fasta.19 large.fasta/large.fasta.20 large.fasta/large.fasta.21 large.fasta/large.fasta.22 large.fasta/large.fasta.23 large.fasta/large.fasta.24 large.fasta/large.fasta.25 large.fasta/large.fasta.26 large.fasta/large.fasta.27 large.fasta/large.fasta.28 large.fasta/large.fasta.29 large.fasta/large.fasta.30 large.fasta/large.fasta.31 large.fasta/large.fasta.32 large.fasta/large.fasta.33 large.fasta/large.fasta.34 large.fasta/large.fasta.35 large.fasta/large.fasta.36 large.fasta/large.fasta.37 large.fasta/large.fasta.38 large.fasta/large.fasta.39 large.fasta/large.fasta.40 large.fasta/large.fasta.41 large.fasta/large.fasta.42 large.fasta/large.fasta.43 large.fasta/large.fasta.44 large.fasta/large.fasta.45 large.fasta/large.fasta.46 large.fasta/large.fasta.47 large.fasta/large.fasta.48 large.fasta/large.fasta.49 : large.fasta/large.fasta split_fasta
+	LOCAL ./split_fasta 100 large.fasta/large.fasta
 
-output.out : cat_blast small/small.fasta.0.out
-	LOCAL ./cat_blast output.out small/small.fasta.0.out
+large.fasta/large.fasta.0.out large.fasta/large.fasta.0.err : blastn large.fasta/large.fasta.0 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.0 -out large.fasta/large.fasta.0.out 2> large.fasta/large.fasta.0.err
 
-output.out.err : small/small.fasta.0.err
-	LOCAL cat small/small.fasta.0.err > output.out.err
+large.fasta/large.fasta.1.out large.fasta/large.fasta.1.err : blastn large.fasta/large.fasta.1 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.1 -out large.fasta/large.fasta.1.out 2> large.fasta/large.fasta.1.err
 
-output.tar.gz: output.out output.out.err
-	tar -czvf output.tar.gz output.out output.out.err
+large.fasta/large.fasta.2.out large.fasta/large.fasta.2.err : blastn large.fasta/large.fasta.2 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.2 -out large.fasta/large.fasta.2.out 2> large.fasta/large.fasta.2.err
+
+large.fasta/large.fasta.3.out large.fasta/large.fasta.3.err : blastn large.fasta/large.fasta.3 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.3 -out large.fasta/large.fasta.3.out 2> large.fasta/large.fasta.3.err
+
+large.fasta/large.fasta.4.out large.fasta/large.fasta.4.err : blastn large.fasta/large.fasta.4 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.4 -out large.fasta/large.fasta.4.out 2> large.fasta/large.fasta.4.err
+
+large.fasta/large.fasta.5.out large.fasta/large.fasta.5.err : blastn large.fasta/large.fasta.5 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.5 -out large.fasta/large.fasta.5.out 2> large.fasta/large.fasta.5.err
+
+large.fasta/large.fasta.6.out large.fasta/large.fasta.6.err : blastn large.fasta/large.fasta.6 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.6 -out large.fasta/large.fasta.6.out 2> large.fasta/large.fasta.6.err
+
+large.fasta/large.fasta.7.out large.fasta/large.fasta.7.err : blastn large.fasta/large.fasta.7 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.7 -out large.fasta/large.fasta.7.out 2> large.fasta/large.fasta.7.err
+
+large.fasta/large.fasta.8.out large.fasta/large.fasta.8.err : blastn large.fasta/large.fasta.8 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.8 -out large.fasta/large.fasta.8.out 2> large.fasta/large.fasta.8.err
+
+large.fasta/large.fasta.9.out large.fasta/large.fasta.9.err : blastn large.fasta/large.fasta.9 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.9 -out large.fasta/large.fasta.9.out 2> large.fasta/large.fasta.9.err
+
+large.fasta/large.fasta.10.out large.fasta/large.fasta.10.err : blastn large.fasta/large.fasta.10 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.10 -out large.fasta/large.fasta.10.out 2> large.fasta/large.fasta.10.err
+
+large.fasta/large.fasta.11.out large.fasta/large.fasta.11.err : blastn large.fasta/large.fasta.11 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.11 -out large.fasta/large.fasta.11.out 2> large.fasta/large.fasta.11.err
+
+large.fasta/large.fasta.12.out large.fasta/large.fasta.12.err : blastn large.fasta/large.fasta.12 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.12 -out large.fasta/large.fasta.12.out 2> large.fasta/large.fasta.12.err
+
+large.fasta/large.fasta.13.out large.fasta/large.fasta.13.err : blastn large.fasta/large.fasta.13 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.13 -out large.fasta/large.fasta.13.out 2> large.fasta/large.fasta.13.err
+
+large.fasta/large.fasta.14.out large.fasta/large.fasta.14.err : blastn large.fasta/large.fasta.14 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.14 -out large.fasta/large.fasta.14.out 2> large.fasta/large.fasta.14.err
+
+large.fasta/large.fasta.15.out large.fasta/large.fasta.15.err : blastn large.fasta/large.fasta.15 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.15 -out large.fasta/large.fasta.15.out 2> large.fasta/large.fasta.15.err
+
+large.fasta/large.fasta.16.out large.fasta/large.fasta.16.err : blastn large.fasta/large.fasta.16 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.16 -out large.fasta/large.fasta.16.out 2> large.fasta/large.fasta.16.err
+
+large.fasta/large.fasta.17.out large.fasta/large.fasta.17.err : blastn large.fasta/large.fasta.17 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.17 -out large.fasta/large.fasta.17.out 2> large.fasta/large.fasta.17.err
+
+large.fasta/large.fasta.18.out large.fasta/large.fasta.18.err : blastn large.fasta/large.fasta.18 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.18 -out large.fasta/large.fasta.18.out 2> large.fasta/large.fasta.18.err
+
+large.fasta/large.fasta.19.out large.fasta/large.fasta.19.err : blastn large.fasta/large.fasta.19 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.19 -out large.fasta/large.fasta.19.out 2> large.fasta/large.fasta.19.err
+
+large.fasta/large.fasta.20.out large.fasta/large.fasta.20.err : blastn large.fasta/large.fasta.20 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.20 -out large.fasta/large.fasta.20.out 2> large.fasta/large.fasta.20.err
+
+large.fasta/large.fasta.21.out large.fasta/large.fasta.21.err : blastn large.fasta/large.fasta.21 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.21 -out large.fasta/large.fasta.21.out 2> large.fasta/large.fasta.21.err
+
+large.fasta/large.fasta.22.out large.fasta/large.fasta.22.err : blastn large.fasta/large.fasta.22 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.22 -out large.fasta/large.fasta.22.out 2> large.fasta/large.fasta.22.err
+
+large.fasta/large.fasta.23.out large.fasta/large.fasta.23.err : blastn large.fasta/large.fasta.23 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.23 -out large.fasta/large.fasta.23.out 2> large.fasta/large.fasta.23.err
+
+large.fasta/large.fasta.24.out large.fasta/large.fasta.24.err : blastn large.fasta/large.fasta.24 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.24 -out large.fasta/large.fasta.24.out 2> large.fasta/large.fasta.24.err
+
+large.fasta/large.fasta.25.out large.fasta/large.fasta.25.err : blastn large.fasta/large.fasta.25 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.25 -out large.fasta/large.fasta.25.out 2> large.fasta/large.fasta.25.err
+
+large.fasta/large.fasta.26.out large.fasta/large.fasta.26.err : blastn large.fasta/large.fasta.26 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.26 -out large.fasta/large.fasta.26.out 2> large.fasta/large.fasta.26.err
+
+large.fasta/large.fasta.27.out large.fasta/large.fasta.27.err : blastn large.fasta/large.fasta.27 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.27 -out large.fasta/large.fasta.27.out 2> large.fasta/large.fasta.27.err
+
+large.fasta/large.fasta.28.out large.fasta/large.fasta.28.err : blastn large.fasta/large.fasta.28 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.28 -out large.fasta/large.fasta.28.out 2> large.fasta/large.fasta.28.err
+
+large.fasta/large.fasta.29.out large.fasta/large.fasta.29.err : blastn large.fasta/large.fasta.29 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.29 -out large.fasta/large.fasta.29.out 2> large.fasta/large.fasta.29.err
+
+large.fasta/large.fasta.30.out large.fasta/large.fasta.30.err : blastn large.fasta/large.fasta.30 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.30 -out large.fasta/large.fasta.30.out 2> large.fasta/large.fasta.30.err
+
+large.fasta/large.fasta.31.out large.fasta/large.fasta.31.err : blastn large.fasta/large.fasta.31 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.31 -out large.fasta/large.fasta.31.out 2> large.fasta/large.fasta.31.err
+
+large.fasta/large.fasta.32.out large.fasta/large.fasta.32.err : blastn large.fasta/large.fasta.32 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.32 -out large.fasta/large.fasta.32.out 2> large.fasta/large.fasta.32.err
+
+large.fasta/large.fasta.33.out large.fasta/large.fasta.33.err : blastn large.fasta/large.fasta.33 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.33 -out large.fasta/large.fasta.33.out 2> large.fasta/large.fasta.33.err
+
+large.fasta/large.fasta.34.out large.fasta/large.fasta.34.err : blastn large.fasta/large.fasta.34 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.34 -out large.fasta/large.fasta.34.out 2> large.fasta/large.fasta.34.err
+
+large.fasta/large.fasta.35.out large.fasta/large.fasta.35.err : blastn large.fasta/large.fasta.35 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.35 -out large.fasta/large.fasta.35.out 2> large.fasta/large.fasta.35.err
+
+large.fasta/large.fasta.36.out large.fasta/large.fasta.36.err : blastn large.fasta/large.fasta.36 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.36 -out large.fasta/large.fasta.36.out 2> large.fasta/large.fasta.36.err
+
+large.fasta/large.fasta.37.out large.fasta/large.fasta.37.err : blastn large.fasta/large.fasta.37 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.37 -out large.fasta/large.fasta.37.out 2> large.fasta/large.fasta.37.err
+
+large.fasta/large.fasta.38.out large.fasta/large.fasta.38.err : blastn large.fasta/large.fasta.38 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.38 -out large.fasta/large.fasta.38.out 2> large.fasta/large.fasta.38.err
+
+large.fasta/large.fasta.39.out large.fasta/large.fasta.39.err : blastn large.fasta/large.fasta.39 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.39 -out large.fasta/large.fasta.39.out 2> large.fasta/large.fasta.39.err
+
+large.fasta/large.fasta.40.out large.fasta/large.fasta.40.err : blastn large.fasta/large.fasta.40 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.40 -out large.fasta/large.fasta.40.out 2> large.fasta/large.fasta.40.err
+
+large.fasta/large.fasta.41.out large.fasta/large.fasta.41.err : blastn large.fasta/large.fasta.41 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.41 -out large.fasta/large.fasta.41.out 2> large.fasta/large.fasta.41.err
+
+large.fasta/large.fasta.42.out large.fasta/large.fasta.42.err : blastn large.fasta/large.fasta.42 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.42 -out large.fasta/large.fasta.42.out 2> large.fasta/large.fasta.42.err
+
+large.fasta/large.fasta.43.out large.fasta/large.fasta.43.err : blastn large.fasta/large.fasta.43 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.43 -out large.fasta/large.fasta.43.out 2> large.fasta/large.fasta.43.err
+
+large.fasta/large.fasta.44.out large.fasta/large.fasta.44.err : blastn large.fasta/large.fasta.44 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.44 -out large.fasta/large.fasta.44.out 2> large.fasta/large.fasta.44.err
+
+large.fasta/large.fasta.45.out large.fasta/large.fasta.45.err : blastn large.fasta/large.fasta.45 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.45 -out large.fasta/large.fasta.45.out 2> large.fasta/large.fasta.45.err
+
+large.fasta/large.fasta.46.out large.fasta/large.fasta.46.err : blastn large.fasta/large.fasta.46 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.46 -out large.fasta/large.fasta.46.out 2> large.fasta/large.fasta.46.err
+
+large.fasta/large.fasta.47.out large.fasta/large.fasta.47.err : blastn large.fasta/large.fasta.47 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.47 -out large.fasta/large.fasta.47.out 2> large.fasta/large.fasta.47.err
+
+large.fasta/large.fasta.48.out large.fasta/large.fasta.48.err : blastn large.fasta/large.fasta.48 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.48 -out large.fasta/large.fasta.48.out 2> large.fasta/large.fasta.48.err
+
+large.fasta/large.fasta.49.out large.fasta/large.fasta.49.err : blastn large.fasta/large.fasta.49 large.fasta
+	./blastn -db large.fasta/large.fasta -query large.fasta/large.fasta.49 -out large.fasta/large.fasta.49.out 2> large.fasta/large.fasta.49.err
+
+output.txt : cat_blast large.fasta/large.fasta.0.out large.fasta/large.fasta.1.out large.fasta/large.fasta.2.out large.fasta/large.fasta.3.out large.fasta/large.fasta.4.out large.fasta/large.fasta.5.out large.fasta/large.fasta.6.out large.fasta/large.fasta.7.out large.fasta/large.fasta.8.out large.fasta/large.fasta.9.out large.fasta/large.fasta.10.out large.fasta/large.fasta.11.out large.fasta/large.fasta.12.out large.fasta/large.fasta.13.out large.fasta/large.fasta.14.out large.fasta/large.fasta.15.out large.fasta/large.fasta.16.out large.fasta/large.fasta.17.out large.fasta/large.fasta.18.out large.fasta/large.fasta.19.out large.fasta/large.fasta.20.out large.fasta/large.fasta.21.out large.fasta/large.fasta.22.out large.fasta/large.fasta.23.out large.fasta/large.fasta.24.out large.fasta/large.fasta.25.out large.fasta/large.fasta.26.out large.fasta/large.fasta.27.out large.fasta/large.fasta.28.out large.fasta/large.fasta.29.out large.fasta/large.fasta.30.out large.fasta/large.fasta.31.out large.fasta/large.fasta.32.out large.fasta/large.fasta.33.out large.fasta/large.fasta.34.out large.fasta/large.fasta.35.out large.fasta/large.fasta.36.out large.fasta/large.fasta.37.out large.fasta/large.fasta.38.out large.fasta/large.fasta.39.out large.fasta/large.fasta.40.out large.fasta/large.fasta.41.out large.fasta/large.fasta.42.out large.fasta/large.fasta.43.out large.fasta/large.fasta.44.out large.fasta/large.fasta.45.out large.fasta/large.fasta.46.out large.fasta/large.fasta.47.out large.fasta/large.fasta.48.out large.fasta/large.fasta.49.out
+	LOCAL ./cat_blast output.txt large.fasta/large.fasta.0.out large.fasta/large.fasta.1.out large.fasta/large.fasta.2.out large.fasta/large.fasta.3.out large.fasta/large.fasta.4.out large.fasta/large.fasta.5.out large.fasta/large.fasta.6.out large.fasta/large.fasta.7.out large.fasta/large.fasta.8.out large.fasta/large.fasta.9.out large.fasta/large.fasta.10.out large.fasta/large.fasta.11.out large.fasta/large.fasta.12.out large.fasta/large.fasta.13.out large.fasta/large.fasta.14.out large.fasta/large.fasta.15.out large.fasta/large.fasta.16.out large.fasta/large.fasta.17.out large.fasta/large.fasta.18.out large.fasta/large.fasta.19.out large.fasta/large.fasta.20.out large.fasta/large.fasta.21.out large.fasta/large.fasta.22.out large.fasta/large.fasta.23.out large.fasta/large.fasta.24.out large.fasta/large.fasta.25.out large.fasta/large.fasta.26.out large.fasta/large.fasta.27.out large.fasta/large.fasta.28.out large.fasta/large.fasta.29.out large.fasta/large.fasta.30.out large.fasta/large.fasta.31.out large.fasta/large.fasta.32.out large.fasta/large.fasta.33.out large.fasta/large.fasta.34.out large.fasta/large.fasta.35.out large.fasta/large.fasta.36.out large.fasta/large.fasta.37.out large.fasta/large.fasta.38.out large.fasta/large.fasta.39.out large.fasta/large.fasta.40.out large.fasta/large.fasta.41.out large.fasta/large.fasta.42.out large.fasta/large.fasta.43.out large.fasta/large.fasta.44.out large.fasta/large.fasta.45.out large.fasta/large.fasta.46.out large.fasta/large.fasta.47.out large.fasta/large.fasta.48.out large.fasta/large.fasta.49.out
+
+output.txt.err : large.fasta/large.fasta.0.err large.fasta/large.fasta.1.err large.fasta/large.fasta.2.err large.fasta/large.fasta.3.err large.fasta/large.fasta.4.err large.fasta/large.fasta.5.err large.fasta/large.fasta.6.err large.fasta/large.fasta.7.err large.fasta/large.fasta.8.err large.fasta/large.fasta.9.err large.fasta/large.fasta.10.err large.fasta/large.fasta.11.err large.fasta/large.fasta.12.err large.fasta/large.fasta.13.err large.fasta/large.fasta.14.err large.fasta/large.fasta.15.err large.fasta/large.fasta.16.err large.fasta/large.fasta.17.err large.fasta/large.fasta.18.err large.fasta/large.fasta.19.err large.fasta/large.fasta.20.err large.fasta/large.fasta.21.err large.fasta/large.fasta.22.err large.fasta/large.fasta.23.err large.fasta/large.fasta.24.err large.fasta/large.fasta.25.err large.fasta/large.fasta.26.err large.fasta/large.fasta.27.err large.fasta/large.fasta.28.err large.fasta/large.fasta.29.err large.fasta/large.fasta.30.err large.fasta/large.fasta.31.err large.fasta/large.fasta.32.err large.fasta/large.fasta.33.err large.fasta/large.fasta.34.err large.fasta/large.fasta.35.err large.fasta/large.fasta.36.err large.fasta/large.fasta.37.err large.fasta/large.fasta.38.err large.fasta/large.fasta.39.err large.fasta/large.fasta.40.err large.fasta/large.fasta.41.err large.fasta/large.fasta.42.err large.fasta/large.fasta.43.err large.fasta/large.fasta.44.err large.fasta/large.fasta.45.err large.fasta/large.fasta.46.err large.fasta/large.fasta.47.err large.fasta/large.fasta.48.err large.fasta/large.fasta.49.err
+	LOCAL cat large.fasta/large.fasta.0.err large.fasta/large.fasta.1.err large.fasta/large.fasta.2.err large.fasta/large.fasta.3.err large.fasta/large.fasta.4.err large.fasta/large.fasta.5.err large.fasta/large.fasta.6.err large.fasta/large.fasta.7.err large.fasta/large.fasta.8.err large.fasta/large.fasta.9.err large.fasta/large.fasta.10.err large.fasta/large.fasta.11.err large.fasta/large.fasta.12.err large.fasta/large.fasta.13.err large.fasta/large.fasta.14.err large.fasta/large.fasta.15.err large.fasta/large.fasta.16.err large.fasta/large.fasta.17.err large.fasta/large.fasta.18.err large.fasta/large.fasta.19.err large.fasta/large.fasta.20.err large.fasta/large.fasta.21.err large.fasta/large.fasta.22.err large.fasta/large.fasta.23.err large.fasta/large.fasta.24.err large.fasta/large.fasta.25.err large.fasta/large.fasta.26.err large.fasta/large.fasta.27.err large.fasta/large.fasta.28.err large.fasta/large.fasta.29.err large.fasta/large.fasta.30.err large.fasta/large.fasta.31.err large.fasta/large.fasta.32.err large.fasta/large.fasta.33.err large.fasta/large.fasta.34.err large.fasta/large.fasta.35.err large.fasta/large.fasta.36.err large.fasta/large.fasta.37.err large.fasta/large.fasta.38.err large.fasta/large.fasta.39.err large.fasta/large.fasta.40.err large.fasta/large.fasta.41.err large.fasta/large.fasta.42.err large.fasta/large.fasta.43.err large.fasta/large.fasta.44.err large.fasta/large.fasta.45.err large.fasta/large.fasta.46.err large.fasta/large.fasta.47.err large.fasta/large.fasta.48.err large.fasta/large.fasta.49.err > output.txt.err

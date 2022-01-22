@@ -3,6 +3,8 @@ from utils import parse_filename
 import shutil
 import multiprocessing
 import subprocess
+from memory_profiler import memory_usage
+
 class Workflow():
         # note that the workflow should accept a single input gzipped tar file
         # and it should output a single gzipped tar file called output
@@ -33,7 +35,14 @@ class Workflow():
             os.chdir(workflow_directory_name)
             
             # run the makeflow
-            prc = subprocess.run(["makeflow", os.path.basename(self.makeflow)], stdout=subprocess.DEVNULL)
+            prc = subprocess.Popen(["makeflow", os.path.basename(self.makeflow)], stdout=subprocess.DEVNULL)
+
+            # monitor memory usage
+            mem_usage = memory_usage(proc=prc, interval=0.2, include_children=True, max_usage=True)
+
+            # wait for makeflow to complete
+            prc.wait()
+            print("Maximum Memory (MB):", mem_usage)
             
             # create output filename
             output_filename = inputname + "-" +  filehash + ".tar.gz"
