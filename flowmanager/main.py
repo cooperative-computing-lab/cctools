@@ -49,7 +49,7 @@ def main():
         INPUT = os.path.abspath(args.input[0])
         OUTPUT = os.path.abspath(args.output[0])
         MAKEFILE = os.path.abspath(args.makeflow[0])
-        PROC_LIMIT = args.process_limit
+        PROC_LIMIT = args.process_limit[0]
         ERROR_FILE = os.path.abspath(args.error[0])
 
         EXPECTED_INPUT = "input.tar.gz" # the input file for the makeflow

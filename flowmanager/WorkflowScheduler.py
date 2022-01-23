@@ -2,6 +2,7 @@ import os
 import Workflow
 from utils import file_hash
 from queue import Queue
+import multiprocessing
 
 import logging
 
@@ -12,6 +13,8 @@ class WorkflowScheduler:
         self.workflow = workflow
         self.proc_limit = proc_limit
         self.proc_list = []
+        self.proc_stats_queue = multiprocessing.Queue()
+        self.proc_stats = {}
         self.queue = Queue()
 
     def push(self, event_path):
@@ -20,7 +23,7 @@ class WorkflowScheduler:
     def run(self, path):
         input_file = self.__process_file(path)
         print("running:", input_file)
-        self.proc_list.append(self.workflow.run(input_file, self.output_dir, self.error_dir))
+        self.proc_list.append(self.workflow.run(input_file, self.output_dir, self.error_dir, self.proc_stats_queue))
 
     def __process_file(self, event_path):
         # construct new filename
@@ -42,6 +45,9 @@ class WorkflowScheduler:
             proc.join(timeout=0)
             if not proc.is_alive():
                 self.proc_list.remove(proc)
-                print("done:", proc.name, "Success" if not proc.exitcode else "Failure")
+                print("done:", proc.pid, "Success" if not proc.exitcode else "Failure")
+                stats = self.proc_stats_queue.get()
+                self.proc_stats[proc.pid] = stats
+                print("stats:", str(stats))
                 if not self.queue.empty():
                     self.run(self.queue.get())

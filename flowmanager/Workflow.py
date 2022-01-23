@@ -3,7 +3,10 @@ from utils import parse_filename
 import shutil
 import multiprocessing
 import subprocess
+import psutil
 from memory_profiler import memory_usage
+
+from WorkflowProfiler import profile
 
 class Workflow():
         # note that the workflow should accept a single input gzipped tar file
@@ -14,14 +17,14 @@ class Workflow():
             self.makeflow_dir = os.path.dirname(self.makeflow)
             self.expected_input_name = expected_input_name
 
-        def run(self, input_file, output_directory, error_dir):
-            proc = multiprocessing.Process(target=self.__run, args=(input_file, output_directory, error_dir))
+        def run(self, input_file, output_directory, error_dir, proc_stats):
+            proc = multiprocessing.Process(target=self.__run, args=(input_file, output_directory, error_dir, proc_stats))
             proc.start()
             return proc
 
         # takes the input file, runs it with the given workflow
         # puts the output file in output_directory
-        def __run(self, input_file, output_directory, error_dir):
+        def __run(self, input_file, output_directory, error_dir, proc_stats):
             # parse the filename
             (inputname, filehash, ext) = parse_filename(os.path.basename(input_file))
             workflow_directory_name = f"makeflow-{inputname}-{filehash}"
@@ -37,13 +40,12 @@ class Workflow():
             # run the makeflow
             prc = subprocess.Popen(["makeflow", os.path.basename(self.makeflow)], stdout=subprocess.DEVNULL)
 
-            # monitor memory usage
-            mem_usage = memory_usage(proc=prc, interval=0.2, include_children=True, max_usage=True)
+            # monitor memory and cpu usage
+            cpu_usage, mem_usage = profile(prc.pid, interval=0.5)
 
-            # wait for makeflow to complete
+            # wait for it to finish to get return code
             prc.wait()
-            print("Maximum Memory (MB):", mem_usage)
-            
+
             # create output filename
             output_filename = inputname + "-" +  filehash + ".tar.gz"
 
@@ -57,4 +59,8 @@ class Workflow():
 
             input_dir = os.path.dirname(input_file)
             os.rename(input_file, os.path.join(input_dir, inputname + "-post-" + filehash + ext))
+
+            stats = {"pid": os.getpid(), "exitcode": prc.returncode, "memusage": mem_usage, "cpuusage": cpu_usage}
+            proc_stats.put(stats)
+
 
