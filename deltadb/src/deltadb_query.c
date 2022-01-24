@@ -153,9 +153,9 @@ static int compat_checkpoint_read( struct deltadb_query *query, const char *file
 				struct jx *j = nvpair_to_jx(nv);
 				/* skip objects that don't match the filter */
 				if(deltadb_boolean_expr(query->filter_expr,j)) {
-					jx_delete(j);
-				} else {
 					hash_table_insert(query->table,key,j);
+				} else {
+					jx_delete(j);
 				}
 			}
 			nvpair_delete(nv);
