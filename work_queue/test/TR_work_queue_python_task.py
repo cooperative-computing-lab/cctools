@@ -13,6 +13,9 @@ PORT_FILE=wq.port
 check_needed()
 {
 	[ -n "${python}" ] || return 1
+	"${python}" -c "import dill" /dev/null 2>&1 > || return 1
+
+	return 0
 }
 
 prepare()
