@@ -173,7 +173,7 @@ int main( int argc, char *argv[] )
 				/* If the reduction name begins with GLOBAL, assign it global scope. */
 				if(!strncmp(reduce_name,"GLOBAL_",7)) {
 					scope = DELTADB_SCOPE_GLOBAL;
-					strcpy(reduce_name,&reduce_name[6]);
+					strcpy(reduce_name,&reduce_name[7]);
 
 				/* If the reduction name begins with TIME, assign it temporal scope. */
 				} else if (!strncmp(reduce_name, "TIME_",5)) {
@@ -182,7 +182,7 @@ int main( int argc, char *argv[] )
 						fprintf(stderr, "deltadb_query: must supply attribute name to temporal reduction: %s\n",reduce_attr);
 						return 1;
 					}
-					strcpy(reduce_name,&reduce_name[4]);
+					strcpy(reduce_name,&reduce_name[5]);
 				} else {
 					scope = DELTADB_SCOPE_SPATIAL;
 				}

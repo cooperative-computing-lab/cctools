@@ -236,7 +236,7 @@ static void log_updates( struct deltadb *db, const char *key, struct jx *a, stru
 			}
 		} else {
 			// item was removed, log a remove record instead
-			log_message(db,"R %s %s",key,name);
+			log_message(db,"R %s %s\n",key,name);
 		}
 	}
 

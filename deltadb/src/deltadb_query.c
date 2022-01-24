@@ -530,8 +530,9 @@ int deltadb_time_event( struct deltadb_query *query, time_t starttime, time_t st
 	return 1;
 }
 
-int deltadb_post_event( struct deltadb_query *query, const char *line )
+int deltadb_raw_event( struct deltadb_query *query, const char *line )
 {
+	fputs(line,query->output_stream);
 	return 1;
 }
 
@@ -549,6 +550,21 @@ static int days_in_year( int y )
 	}
 }
 
+static int is_fast_query( struct deltadb_query *query )
+{
+	return query->display_mode==DELTADB_DISPLAY_STREAM && !query->filter_expr && !query->where_expr;
+}
+
+static struct deltadb_event_handlers handlers = {
+  deltadb_create_event,
+  deltadb_delete_event,
+  deltadb_update_event,
+  deltadb_merge_event,
+  deltadb_remove_event,
+  deltadb_time_event,
+  deltadb_raw_event
+};
+
 /*
 Execute a query on a single data stream.
 */
@@ -556,7 +572,11 @@ Execute a query on a single data stream.
 int deltadb_query_execute_stream( struct deltadb_query *query, FILE *stream, time_t starttime, time_t stoptime )
 {
 	query->display_next = starttime;
-	return deltadb_process_stream(query,stream,starttime,stoptime);
+	if(is_fast_query(query)) {
+		return deltadb_process_stream_fast(query,&handlers,stream,starttime,stoptime);
+	} else {
+		return deltadb_process_stream(query,&handlers,stream,starttime,stoptime);
+	}
 }
 
 /*
@@ -597,7 +617,12 @@ int deltadb_query_execute_dir( struct deltadb_query *query, const char *logdir, 
 
 		} else {
 			free(filename);
-			int keepgoing = deltadb_process_stream(query,file,starttime,stoptime);
+			int keepgoing;
+			if(is_fast_query(query)) {
+				keepgoing = deltadb_process_stream_fast(query,&handlers,file,starttime,stoptime);
+			} else {
+				keepgoing = deltadb_process_stream(query,&handlers,file,starttime,stoptime);
+			}
 			starttime = 0;
 
 			fclose(file);
