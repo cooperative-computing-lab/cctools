@@ -9,19 +9,8 @@ import os
 import re
 import sys
 import argparse
+import logging
 
-
-def handle_event(src_path):
-        def wq_task(path):
-                f = open(path)
-                data = f.read()
-                f.close()
-                return (path, data)
-        print("handling:", event_path)
-        task = wq.PythonTask(wq_task, event_path)
-        task.specify_input_file("BasicEventHandler.py", cache=True)
-        task.specify_cores(1)
-        self.wq.submit(task)
 
 def init(path, scheduler):
         for entry in os.scandir(path):
@@ -45,27 +34,28 @@ def parse_options():
     return parser.parse_args()
 
 def main():
-        args = parse_options()
-        INPUT = os.path.abspath(args.input[0])
-        OUTPUT = os.path.abspath(args.output[0])
-        MAKEFILE = os.path.abspath(args.makeflow[0])
-        PROC_LIMIT = args.process_limit[0]
-        ERROR_FILE = os.path.abspath(args.error[0])
+    logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.DEBUG)
+    args = parse_options()
+    INPUT = os.path.abspath(args.input[0])
+    OUTPUT = os.path.abspath(args.output[0])
+    MAKEFILE = os.path.abspath(args.makeflow[0])
+    PROC_LIMIT = args.process_limit[0]
+    ERROR_FILE = os.path.abspath(args.error[0])
 
-        EXPECTED_INPUT = "input.tar.gz" # the input file for the makeflow
+    EXPECTED_INPUT = "input.tar.gz" # the input file for the makeflow
 
-        wf = Workflow(MAKEFILE, EXPECTED_INPUT)
-        scheduler = WorkflowScheduler(OUTPUT, wf, ERROR_FILE, PROC_LIMIT)
-        dm = DirectoryMonitor(INPUT, scheduler)
+    wf = Workflow(MAKEFILE, EXPECTED_INPUT)
+    scheduler = WorkflowScheduler(OUTPUT, wf, ERROR_FILE, PROC_LIMIT)
+    dm = DirectoryMonitor(INPUT, scheduler)
 
-        # scan the directory
-        init(INPUT, scheduler)
+    # scan the directory
+    init(INPUT, scheduler)
 
+    dm.monitor()
+
+    while True:
+        scheduler.schedule()
         dm.monitor()
-
-        while True:
-            scheduler.schedule()
-            dm.monitor()
 
 if __name__=="__main__":
         main()
