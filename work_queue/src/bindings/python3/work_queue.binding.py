@@ -893,7 +893,8 @@ class PythonTask(Task):
     # @param self 	Reference to the current python task object
     # @param func	python function to be executed by task
     # @param args	arguments used in function to be executed by task
-    def __init__(self, func, *args):
+    # @param kwargs	keyword arguments used in function to be executed by task
+    def __init__(self, func, *args, **kwargs):
         self._id = str(uuid.uuid4())
         self._tmpdir = tempfile.mkdtemp(dir=staging_directory)
 
@@ -908,7 +909,7 @@ class PythonTask(Task):
         self._pp_run = None
         self._env_file  = None
 
-        self._serialize_python_function(func, *args)
+        self._serialize_python_function(func, args, kwargs)
         self._create_wrapper()
 
         self._command = self._python_function_command()
@@ -964,14 +965,11 @@ class PythonTask(Task):
             sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
 
 
-    def _serialize_python_function(self, func, *args):
+    def _serialize_python_function(self, func, args, kwargs):
         with open(self._func_file, 'wb') as wf:
             dill.dump(func, wf, recurse=True)
         with open(self._args_file, 'wb') as wf:
-            # This next line is valid Python 3 syntax,
-            # however we also need backwards compatibility with Python 2.
-            # dill.dump([*args], wf, recurse=True)
-            dill.dump(list(*args), wf, recurse=True)
+            dill.dump([args, kwargs], wf, recurse=True)
 
 
     def _python_function_command(self):
@@ -1009,9 +1007,9 @@ class PythonTask(Task):
                 with open (fn , 'rb') as f:
                     exec_function = dill.load(f)
                 with open(args, 'rb') as f:
-                    exec_args = dill.load(f)
+                    args, kwargs = dill.load(f)
                 try:
-                    exec_out = exec_function(*exec_args)
+                    exec_out = exec_function(*args, **kwargs)
 
                 except Exception as e:
                     exec_out = e
