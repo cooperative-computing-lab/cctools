@@ -45,13 +45,13 @@ run()
 	# send command to the background, saving its exit status.
 	(PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} wq_test.py $PORT_FILE --ssl_key ${KEY_FILE} --ssl_cert ${CERT_FILE}; echo $? > $STATUS_FILE) &
 
-	# wait at most 5 seconds for the command to find a port.
-	wait_for_file_creation $PORT_FILE 2
+	# wait at most 15 seconds for the command to find a port.
+	wait_for_file_creation $PORT_FILE 15
 
 	run_local_worker $PORT_FILE worker.log --ssl
 
 	# wait for command to exit.
-	wait_for_file_creation $STATUS_FILE 5
+	wait_for_file_creation $STATUS_FILE 15
 
 	# retrieve makeflow exit status
 	status=$(cat $STATUS_FILE)

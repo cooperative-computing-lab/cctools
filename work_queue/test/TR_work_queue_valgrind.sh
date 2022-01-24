@@ -34,15 +34,15 @@ EOF
 	(${VALGRIND} --log-file=manager.valgrind -- work_queue_test -d all -o manager.log -Z manager.port < manager.script; echo $? > manager.exitcode ) &
 
 	echo "waiting for manager to get ready"
-	wait_for_file_creation manager.port 5
+	wait_for_file_creation manager.port 15
 
 	port=$(cat manager.port)
 
 	echo "starting worker"
 	(${VALGRIND} --log-file=worker.valgrind -- work_queue_worker -d all -o worker.log localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot; echo $? > worker.exitcode)
 
-	wait_for_file_creation manager.exitcode 5
-	wait_for_file_creation worker.exitcode 1
+	wait_for_file_creation manager.exitcode 15
+	wait_for_file_creation worker.exitcode 5
 
 	echo "checking for valgrind errors"
 	manager=$(cat manager.exitcode)
