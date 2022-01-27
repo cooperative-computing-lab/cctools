@@ -112,8 +112,8 @@ static struct jx_table manager_resource_headers[] = {
 {"cores_inuse",		"INUSE", 	    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 6},
 {"memory_total",	"MEM(GB)",     JX_TABLE_MODE_GIGABYTES, JX_TABLE_ALIGN_RIGHT, 8},
 {"memory_inuse",	"INUSE", 	JX_TABLE_MODE_GIGABYTES, JX_TABLE_ALIGN_RIGHT, 8},
-{"disk_total",  	"DISK(GB)",  	JX_TABLE_MODE_GIGABYTES, JX_TABLE_ALIGN_RIGHT, 9},
-{"disk_inuse",		"INUSE", 	JX_TABLE_MODE_GIGABYTES, JX_TABLE_ALIGN_RIGHT, 9},
+{"gpus_total",  	"GPUS",  	JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 9},
+{"gpus_inuse",		"INUSE", 	JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 9},
 {NULL,NULL,0,0,0}
 };
 
@@ -496,7 +496,7 @@ int do_direct_query( const char *manager_host, int manager_port, time_t stoptime
 		return 1;
 	}
 
-	link_putfstring(l,"%s_status\n",stoptime,query_string);
+	link_printf(l,stoptime,"%s_status\n",query_string);
 
 	struct jx *jarray = jx_parse_link(l,stoptime);
 

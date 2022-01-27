@@ -32,6 +32,7 @@ static void jx_pair_print( struct jx_pair *pair, buffer_t *b )
 	jx_print_buffer(pair->key,b);
 	buffer_putstring(b,":");
 	jx_print_buffer(pair->value,b);
+	jx_comprehension_print(pair->comp, b);
 	if(pair->next) {
 		buffer_putstring(b,",");
 		jx_pair_print(pair->next,b);
@@ -233,7 +234,7 @@ void jx_print_link( struct jx *j, struct link *l, time_t stoptime )
 	size_t len;
 	const char *str = buffer_tolstring(&buffer, &len);
 
-	link_write(l,str,len,stoptime);
+	link_printf(l,stoptime,"%s",str);
 	buffer_free(&buffer);
 }
 
@@ -247,4 +248,29 @@ char * jx_print_string( struct jx *j )
 	buffer_dup(&buffer,&str);
 	buffer_free(&buffer);
 	return str;
+}
+
+static char * unquoted_string( struct jx *j )
+{
+	char *str;
+	if(j->type==JX_STRING) {
+		str = strdup(j->u.string_value);
+	} else {
+		str = jx_print_string(j);
+	}
+	return str;
+}
+
+/*
+Export a JX object as environment variables in bash format.
+*/
+
+void jx_print_shell( struct jx *j, FILE *stream )
+{
+	struct jx_pair *p;
+	for(p=j->u.pairs;p;p=p->next) {
+		char *str = unquoted_string(p->value);
+		fprintf(stream,"export %s=%s\n",p->key->u.string_value,str);
+		free(str);
+	}
 }

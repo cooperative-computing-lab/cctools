@@ -97,7 +97,7 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 			}
 
 			debug(D_AUTH, "trying ticket %s", digest);
-			CATCHUNIX(link_putfstring(link, "%s\n", stoptime, digest));
+			CATCHUNIX(link_printf(link, stoptime, "%s\n", digest));
 
 			CATCHUNIX(link_readline(link, line, sizeof(line), stoptime) ? 0 : -1);
 			if(strcmp(line, "declined") == 0) {
@@ -143,7 +143,7 @@ static int auth_ticket_assert(struct link *link, time_t stoptime)
 					continue;
 				}
 
-				CATCHUNIX(link_putfstring(link, "%zu\n", stoptime, buffer_pos(Bout)));
+				CATCHUNIX(link_printf(link, stoptime, "%zu\n", buffer_pos(Bout)));
 				CATCHUNIX(link_putlstring(link, buffer_tostring(Bout), buffer_pos(Bout), stoptime));
 				debug(D_AUTH, "sent signed challenge of %zu bytes", buffer_pos(Bout));
 			}
@@ -201,7 +201,7 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 					size_t siglen;
 
 					random_array(challenge, sizeof(challenge));
-					CATCHUNIX(link_putfstring(link, "%zu\n", stoptime, sizeof(challenge)));
+					CATCHUNIX(link_printf(link, stoptime, "%zu\n", sizeof(challenge)));
 					CATCHUNIX(link_putlstring(link, challenge, sizeof(challenge), stoptime));
 					debug(D_AUTH, "sending challenge of %zu bytes", sizeof(challenge));
 

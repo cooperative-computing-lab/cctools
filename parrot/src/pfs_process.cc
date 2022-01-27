@@ -67,7 +67,12 @@ void pfs_process_kill_everyone( int sig )
 	debug(D_NOTICE,"sending myself %d (%s), goodbye!",sig,string_signal(sig));
 	while(1) {
 		signal(sig,SIG_DFL);
-		sigsetmask(~sigmask(sig));
+
+		sigset_t s;
+		sigfillset(&s);
+		sigdelset(&s, sig);
+		sigprocmask(SIG_SETMASK, &s, NULL);\
+
 		kill(getpid(),sig);
 		kill(getpid(),SIGKILL);
 	}

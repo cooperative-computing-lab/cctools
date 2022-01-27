@@ -39,7 +39,7 @@ def specify_debug_log(logfile):
     cctools_debug_config_file(logfile)
 
 def specify_port_range(low_port, high_port):
-    if low_port >= high_port:
+    if low_port > high_port:
         raise TypeError('low_port {} should be smaller than high_port {}'.format(low_port, high_port))
 
     os.environ['TCP_LOW_PORT'] = str(low_port)
@@ -881,7 +881,9 @@ class Task(object):
 try:
     import dill
     pythontask_available = True
-except ModuleNotFoundError:
+except Exception:
+    # Note that the intended exception here is ModuleNotFoundError.
+    # However, that type does not exist in Python 2
     pythontask_available = False
 
 class PythonTask(Task):
@@ -891,7 +893,8 @@ class PythonTask(Task):
     # @param self 	Reference to the current python task object
     # @param func	python function to be executed by task
     # @param args	arguments used in function to be executed by task
-    def __init__(self, func, *args):
+    # @param kwargs	keyword arguments used in function to be executed by task
+    def __init__(self, func, *args, **kwargs):
         self._id = str(uuid.uuid4())
         self._tmpdir = tempfile.mkdtemp(dir=staging_directory)
 
@@ -906,7 +909,7 @@ class PythonTask(Task):
         self._pp_run = None
         self._env_file  = None
 
-        self._serialize_python_function(func, *args)
+        self._serialize_python_function(func, args, kwargs)
         self._create_wrapper()
 
         self._command = self._python_function_command()
@@ -962,11 +965,11 @@ class PythonTask(Task):
             sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
 
 
-    def _serialize_python_function(self, func, *args):
+    def _serialize_python_function(self, func, args, kwargs):
         with open(self._func_file, 'wb') as wf:
             dill.dump(func, wf, recurse=True)
         with open(self._args_file, 'wb') as wf:
-            dill.dump([*args], wf, recurse=True)
+            dill.dump([args, kwargs], wf, recurse=True)
 
 
     def _python_function_command(self):
@@ -1004,9 +1007,9 @@ class PythonTask(Task):
                 with open (fn , 'rb') as f:
                     exec_function = dill.load(f)
                 with open(args, 'rb') as f:
-                    exec_args = dill.load(f)
+                    args, kwargs = dill.load(f)
                 try:
-                    exec_out = exec_function(*exec_args)
+                    exec_out = exec_function(*args, **kwargs)
 
                 except Exception as e:
                     exec_out = e
@@ -1068,7 +1071,7 @@ class WorkQueue(object):
             self._stats_hierarchy = work_queue_stats()
             self._work_queue = work_queue_ssl_create(port, ssl_key, ssl_cert)
             if not self._work_queue:
-                raise Exception('Could not create work_queue on port %d' % port)
+                raise Exception('Could not create queue on port {}'.format(port))
 
             if stats_log:
                 self.specify_log(stats_log)
@@ -1079,7 +1082,7 @@ class WorkQueue(object):
             if name:
                 work_queue_specify_name(self._work_queue, name)
         except Exception as e:
-            raise Exception('Unable to create internal Work Queue structure: %s' % e)
+            raise Exception('Unable to create internal Work Queue structure: {}'.format(e))
 
 
     def _free_queue(self):

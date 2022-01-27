@@ -22,6 +22,10 @@ char * jx_print_string( struct jx *j );
 
 void jx_print_stream( struct jx *j, FILE *file );
 
+/** Print a JX object as shell environment variables.  @param j A JX expression.  @param file A standard IO stream. */
+
+void jx_print_shell( struct jx *j, FILE *file );
+
 /** Print a JX expression to a buffer. @param j A JX expression. @param buffer The buffer for output. @see buffer.h */
 
 void jx_print_buffer( struct jx *j, buffer_t *buffer);
@@ -44,4 +48,6 @@ const char * jx_type_string( jx_type_t type );
 
 // internal function for printing list comprehension expressions
 void jx_comprehension_print(struct jx_comprehension *comp, buffer_t *b);
+
+
 #endif

@@ -398,6 +398,7 @@ void jx_pair_delete( struct jx_pair *pair )
 	if(!pair) return;
 	jx_delete(pair->key);
 	jx_delete(pair->value);
+	jx_comprehension_delete(pair->comp);
 	jx_pair_delete(pair->next);
 	free(pair);
 }
@@ -489,7 +490,10 @@ int jx_pair_equals( struct jx_pair *j, struct jx_pair *k )
 {
 	if(!j && !k) return 1;
 	if(!j || !k) return 0;
-	return jx_equals(j->key,k->key) && jx_equals(j->value,k->value) && jx_pair_equals(j->next,k->next);
+	return jx_equals(j->key,k->key)
+		&& jx_equals(j->value,k->value)
+		&& jx_comprehension_equals(j->comp, k->comp)
+		&& jx_pair_equals(j->next,k->next);
 }
 
 int jx_item_equals( struct jx_item *j, struct jx_item *k )
@@ -562,9 +566,10 @@ struct jx_pair * jx_pair_copy( struct jx_pair *p )
 
 	while(p) {
 		*np = calloc(1, sizeof(struct jx_pair));
+		(*np)->line = p->line;
 		(*np)->key = jx_copy(p->key);
 		(*np)->value = jx_copy(p->value);
-		(*np)->line = p->line;
+		(*np)->comp = jx_comprehension_copy(p->comp);
 
 		np = &(*np)->next;
 		p = p->next;
@@ -652,6 +657,7 @@ struct jx *jx_merge(struct jx *j, ...) {
 
 static int jx_pair_is_constant(struct jx_pair *p) {
 	if(!p) return 1;
+	if (p->comp) return 0;
 	return jx_is_constant(p->key)
 		&& jx_is_constant(p->value)
 		&& jx_pair_is_constant(p->next);

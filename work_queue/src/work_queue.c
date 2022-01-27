@@ -87,12 +87,13 @@ See the file COPYING for details.
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
 	WQ_SUCCESS = 0,
-	WQ_WORKER_FAILURE, 
-	WQ_APP_FAILURE
+	WQ_WORKER_FAILURE,
+	WQ_APP_FAILURE,
+	WQ_MGR_FAILURE
 } work_queue_result_code_t;
 
 typedef enum {
-	MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */  
+	MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */
 	MSG_PROCESSED_DISCONNECT, /* Message was processed and disconnect now expected. */
 	MSG_NOT_PROCESSED,        /* Message was not processed, waiting to be consumed. */
 	MSG_FAILURE               /* Message not received, connection failure. */
@@ -121,6 +122,14 @@ typedef enum {
 	WORKER_TYPE_FOREMAN = 8
 } worker_type;
 
+
+typedef enum {
+	CORES_BIT = (1 << 0),
+	MEMORY_BIT = (1 << 1),
+	DISK_BIT = (1 << 2),
+	GPUS_BIT = (1 << 3),
+} resource_bitmask;
+
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
 
@@ -128,6 +137,9 @@ int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blocklist_slow_workers_timeout = 900;
+
+/* time threshold to check when tasks are larger than connected workers */
+static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
 
 struct work_queue {
 	char *name;
@@ -160,7 +172,7 @@ struct work_queue {
 	struct work_queue_stats *stats_disconnected_workers;
 	timestamp_t time_last_wait;
 	timestamp_t time_last_log_stats;
-
+	timestamp_t time_last_large_tasks_check;
 	int worker_selection_algorithm;
 	int task_ordering;
 	int process_pending_check;
@@ -345,7 +357,7 @@ This performs a deep copy of the file struct.
 static struct work_queue_file *work_queue_file_clone(const struct work_queue_file *file);
 
 /** Clone a list of @ref work_queue_file structs
-Thie performs a deep copy of the file list.
+This performs a deep copy of the file list.
 @param list The list to clone.
 @return A newly allocated list of files.
 */
@@ -453,7 +465,7 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.workers_busy);
 	buffer_printf(&B, " %d", s.workers_able);
 
-	/* Cummulative stats for workers: */
+	/* Cumulative stats for workers: */
 	buffer_printf(&B, " %d", s.workers_joined);
 	buffer_printf(&B, " %d", s.workers_removed);
 	buffer_printf(&B, " %d", s.workers_released);
@@ -468,7 +480,7 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.tasks_running);
 	buffer_printf(&B, " %d", s.tasks_with_results);
 
-	/* Cummulative stats for tasks: */
+	/* Cumulative stats for tasks: */
 	buffer_printf(&B, " %d", s.tasks_submitted);
 	buffer_printf(&B, " %d", s.tasks_dispatched);
 	buffer_printf(&B, " %d", s.tasks_done);
@@ -1120,7 +1132,7 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 		if(!create_dir(dirname, 0777)) {
 			debug(D_WQ, "Could not create directory - %s (%s)", dirname, strerror(errno));
 			link_soak(w->link, length, stoptime);
-			return WQ_APP_FAILURE;
+			return WQ_MGR_FAILURE;
 		}
 	}
 
@@ -1128,21 +1140,25 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 	debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
 	// Check if there is space for incoming file at manager
 	if(!check_disk_space_for_filesize(dirname, length, disk_avail_threshold)) {
-		debug(D_WQ, "Could not recieve file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
-		return WQ_APP_FAILURE;
+		debug(D_WQ, "Could not receive file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
+		return WQ_MGR_FAILURE;
 	}
 
 	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
 		link_soak(w->link, length, stoptime);
-		return WQ_APP_FAILURE;
+		return WQ_MGR_FAILURE;
 	}
 
 	// Write the data on the link to file.
 	int64_t actual = link_stream_to_fd(w->link, fd, length, stoptime);
 
-	close(fd);
+	if(close(fd) < 0) {
+		warn(D_WQ, "Could not write file %s: %s\n", local_name, strerror(errno));
+		unlink(local_name);
+		return WQ_MGR_FAILURE;
+	}
 
 	if(actual != length) {
 		debug(D_WQ, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
@@ -1163,7 +1179,7 @@ static work_queue_result_code_t get_file( struct work_queue *q, struct work_queu
 
 /*
 This function implements the recursive get protocol.
-The manager sents a single get message, then the worker
+The manager sends a single get message, then the worker
 responds with a continuous stream of dir and file message
 that indicate the entire contents of the directory.
 This makes it efficient to move deep directory hierarchies with
@@ -1217,7 +1233,9 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
 			free(tmp_local_name);
 			//Return if worker failure. Else wait for end message from worker.
-			if(result == WQ_WORKER_FAILURE) break;
+			if((result == WQ_WORKER_FAILURE) || (result == WQ_MGR_FAILURE)) {
+				break;
+			}
 		} else if(pattern_match(line, "^missing (.+) (%d+)$", &tmp_remote_path, &errnum_str) >= 0) {
 			// If the output file is missing, we make a note of that in the task result,
 			// but we continue and consider the transfer a 'success' so that other
@@ -1247,8 +1265,11 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 	// to be returned to the queue to be attempted elsewhere.
 	debug(D_WQ, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, remote_name, local_name);
 	if(result == WQ_APP_FAILURE) {
-		update_task_result(t, WORK_QUEUE_RESULT_OUTPUT_MISSING);;
+		update_task_result(t, WORK_QUEUE_RESULT_OUTPUT_MISSING);
+	} else if(result == WQ_MGR_FAILURE) {
+		update_task_result(t, WORK_QUEUE_RESULT_OUTPUT_TRANSFER_ERROR);
 	}
+
 	return result;
 }
 
@@ -1565,7 +1586,7 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 
 	if(q->monitor_mode & MON_FULL && q->monitor_output_directory)
 		keep = 1;
-				
+
 	if(!keep)
 		unlink(summary);
 
@@ -1582,7 +1603,7 @@ void resource_monitor_compress_logs(struct work_queue *q, struct work_queue_task
 	int rc = shellcode(command, NULL, NULL, 0, NULL, NULL, &status);
 
 	if(rc) {
-		debug(D_NOTICE, "Could no succesfully compress '%s', and '%s'\n", series, debug_log);
+		debug(D_NOTICE, "Could no successfully compress '%s', and '%s'\n", series, debug_log);
 	}
 
 	free(series);
@@ -1900,7 +1921,11 @@ static work_queue_result_code_t get_update( struct work_queue *q, struct work_qu
 	lseek(fd,offset,SEEK_SET);
 	link_stream_to_fd(w->link,fd,length,stoptime);
 	ftruncate(fd,offset+length);
-	close(fd);
+
+	if(close(fd) < 0) {
+		debug(D_WQ, "unable to update watched file %s: %s\n", local_name, strerror(errno));
+		return WQ_SUCCESS;
+	}
 
 	return WQ_SUCCESS;
 }
@@ -1980,7 +2005,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 		retrieved_output_length = output_length;
 	} else {
 		retrieved_output_length = MAX_TASK_STDOUT_STORAGE;
-		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retreived.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
+		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retrieved.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
 		update_task_result(t, WORK_QUEUE_RESULT_STDOUT_MISSING);
 	}
 
@@ -2534,7 +2559,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_integer(j,"tasks_running",info.tasks_running);
 	jx_insert_integer(j,"tasks_complete",info.tasks_done);    // tasks_complete is deprecated, but the old work_queue_status expects it.
 
-	//addtional task information for work_queue_factory
+	//additional task information for work_queue_factory
 	jx_insert_integer(j,"tasks_on_workers",info.tasks_on_workers);
 	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
 
@@ -2991,7 +3016,7 @@ static int build_poll_table(struct work_queue *q, struct link *manager)
 /*
 Send a symbolic link to the remote worker.
 Note that the target of the link is sent
-as sthe "body" of the link, following the
+as the "body" of the link, following the
 message header.
 */
 
@@ -3458,7 +3483,14 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 			max_proportion = MAX(max_proportion, limits->gpus / w->resources->gpus.largest);
 		}
 
-		if(max_proportion > 0) {
+		//if max_proportion > 1, then the task does not fit the worker for the
+		//specified resources. For the unspecified resources we use the whole
+		//worker as not to trigger a warning when checking for tasks that can't
+		//run on any available worker.
+		if (max_proportion > 1){
+			use_whole_worker = 1;
+		}
+		else if(max_proportion > 0) {
 			use_whole_worker = 0;
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
 			 * Otherwise they get a proportion according to specified
@@ -3717,17 +3749,12 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 			q->stats->capacity_weighted = (int) ceil((alpha * (float) capacity_instantaneous) + ((1.0 - alpha) * q->stats->capacity_weighted));
 			time_t ts;
 			time(&ts);
-			//debug(D_WQ, "capacity: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->manager_time, q->stats->capacity_weighted, s->tasks_done, s->workers_connected);
 		}
 	}
 
 	capacity->transfer_time = MAX(1, capacity->transfer_time);
 	capacity->exec_time     = MAX(1, capacity->exec_time);
 	capacity->manager_time   = MAX(1, capacity->manager_time);
-
-	//debug(D_WQ, "capacity.exec_time: %lld", (long long) capacity->exec_time);
-	//debug(D_WQ, "capacity.transfer_time: %lld", (long long) capacity->transfer_time);
-	//debug(D_WQ, "capacity.manager_time: %lld", (long long) capacity->manager_time);
 
 	// Never go below the default capacity
 	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->manager_time)));
@@ -3759,7 +3786,7 @@ void compute_manager_load(struct work_queue *q, int task_activity) {
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
-	/* worker has no reported any resources yet */
+	/* worker has not reported any resources yet */
 	if(w->resources->tag < 0)
 		return 0;
 
@@ -4001,6 +4028,63 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 	}
 }
 
+
+// compares the resources needed by a task to a given worker
+// returns a bitmask that indicates which resource of the task, if any, cannot
+// be met by the worker. If the task fits in the worker, it returns 0.
+static int is_task_larger_than_worker(struct work_queue *q, struct work_queue_task *t, struct work_queue_worker *w)
+{
+	int set = 0;
+	struct rmsummary *l = task_worker_box_size(q,w,t);
+
+	// baseline resurce comparison of worker total resources and a task requested resorces
+
+	if((double)w->resources->cores.total < l->cores ) {
+		set = set | CORES_BIT;
+	}
+
+	if((double)w->resources->memory.total < l->memory ) {
+		set = set | MEMORY_BIT;
+	}
+
+	if((double)w->resources->disk.total < l->disk ) {
+		set = set | DISK_BIT;
+	}
+
+	if((double)w->resources->gpus.total < l->gpus ) {
+		set = set | GPUS_BIT;
+	}
+	rmsummary_delete(l);
+
+	return set;
+}
+
+// compares the resources needed by a task to all connected workers.
+// returns 0 if there is worker than can fit the task. Otherwise it returns a bitmask
+// that indicates that there was at least one worker that could not fit that task resource.
+static int is_task_larger_than_connected_workers(struct work_queue *q, struct work_queue_task *t)
+{
+	char *key;
+	struct work_queue_worker *w;
+	hash_table_firstkey(q->worker_table);
+
+	int bit_set = 0;
+	while(hash_table_nextkey(q->worker_table, &key, (void**)&w))
+	{
+		int new_set = is_task_larger_than_worker(q, t, w);
+		if (new_set == 0){
+			// Task could run on a currently connected worker, immediately
+			// return
+			return 0;
+		}
+
+		// Inherit the unfit criteria for this task
+		bit_set = bit_set | new_set;
+	}
+
+	return bit_set;
+}
+
 // use task-specific algorithm if set, otherwise default to the queue's setting.
 static struct work_queue_worker *find_best_worker(struct work_queue *q, struct work_queue_task *t)
 {
@@ -4067,12 +4151,12 @@ static void update_max_worker(struct work_queue *q, struct work_queue_worker *w)
 		q->current_max_worker->memory = w->resources->memory.largest;
 	}
 
-	if(q->current_max_worker->disk < w->resources->memory.largest) {
-		q->current_max_worker->disk = w->resources->memory.largest;
+	if(q->current_max_worker->disk < w->resources->disk.largest) {
+		q->current_max_worker->disk = w->resources->disk.largest;
 	}
 
-	if(q->current_max_worker->gpus < w->resources->memory.largest) {
-		q->current_max_worker->gpus = w->resources->memory.largest;
+	if(q->current_max_worker->gpus < w->resources->gpus.largest) {
+		q->current_max_worker->gpus = w->resources->gpus.largest;
 	}
 }
 
@@ -4154,7 +4238,6 @@ static int send_one_task( struct work_queue *q )
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
-
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 
@@ -4163,7 +4246,6 @@ static int send_one_task( struct work_queue *q )
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
-
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
 
@@ -4171,6 +4253,77 @@ static int send_one_task( struct work_queue *q )
 	}
 
 	return 0;
+}
+
+
+static void print_large_tasks_warning(struct work_queue *q)
+{
+	timestamp_t current_time = timestamp_get();
+	if(current_time - q->time_last_large_tasks_check < interval_check_for_large_tasks) {
+		return;
+	}
+
+	q->time_last_large_tasks_check = current_time;
+
+	struct work_queue_task *t;
+	int unfit_core = 0;
+	int unfit_mem  = 0;
+	int unfit_disk = 0;
+	int unfit_gpu  = 0;
+
+	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
+
+	list_first_item(q->ready_list);
+	while( (t = list_next_item(q->ready_list))){
+		// check each task against the queue of connected workers
+		int bit_set = is_task_larger_than_connected_workers(q, t);
+		if(bit_set) {
+			rmsummary_merge_max(largest_unfit_task, task_max_resources(q, t));
+			rmsummary_merge_max(largest_unfit_task, task_min_resources(q, t));
+		}
+		if (bit_set & CORES_BIT) {
+			unfit_core++;
+		}
+		if (bit_set & MEMORY_BIT) {
+			unfit_mem++;
+		}
+		if (bit_set & DISK_BIT) {
+			unfit_disk++;
+		}
+		if (bit_set & GPUS_BIT) {
+			unfit_gpu++;
+		}
+	}
+
+	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
+		notice(D_WQ,"There are tasks that cannot fit any currently connected worker.\n");
+	}
+
+	if(unfit_core) {
+		notice(D_WQ,"%d waiting task(s)  did not fit a worker because of cores requirements", unfit_core);
+	}
+
+	if(unfit_mem) {
+		notice(D_WQ,"%d waiting task(s) did not fit a worker because of memory requirements", unfit_mem);
+	}
+
+	if(unfit_disk) {
+		notice(D_WQ,"%d waiting task(s) did not fit a worker because of disk requirements", unfit_disk);
+	}
+
+	if(unfit_gpu) {
+		notice(D_WQ,"%d waiting task(s) did not fit a worker because of gpus requirements", unfit_gpu);
+	}
+
+	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
+		notice(D_WQ, "workers with at least: %s %s %s %s would fit these tasks\n",
+				largest_unfit_task->cores  > 0 ? rmsummary_resource_to_str("cores",  largest_unfit_task, 1) : "",
+				largest_unfit_task->memory > 0 ? rmsummary_resource_to_str("memory", largest_unfit_task, 1) : "",
+				largest_unfit_task->disk   > 0 ? rmsummary_resource_to_str("disk",   largest_unfit_task, 1) : "",
+				largest_unfit_task->gpus   > 0 ? rmsummary_resource_to_str("gpus",   largest_unfit_task, 1) : "");
+	}
+
+	rmsummary_delete(largest_unfit_task);
 }
 
 static int receive_one_task( struct work_queue *q )
@@ -4203,7 +4356,7 @@ static void ask_for_workers_updates(struct work_queue *q) {
 		if(q->keepalive_interval > 0) {
 
 			/* we have not received workqueue message from worker yet, so we
-			 * simply check agains its start_time. */
+			 * simply check again its start_time. */
 			if(!strcmp(w->hostname, "unknown")){
 				if ((int)((current_time - w->start_time)/1000000) >= q->keepalive_timeout) {
 					debug(D_WQ, "Removing worker %s (%s): hasn't sent its initialization in more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
@@ -4303,7 +4456,7 @@ static int abort_slow_workers(struct work_queue *q)
 			multiplier = c_def->fast_abort;
 		}
 		else {
-			/* Fast abort also deactivated for the defaut category. */
+			/* Fast abort also deactivated for the default category. */
 			continue;
 		}
 
@@ -4830,7 +4983,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	}
 
 	// @param remote_name is the path of the file as on the worker machine. In
-	// the Work Queue framework, workers are prohibitted from writing to paths
+	// the Work Queue framework, workers are prohibited from writing to paths
 	// outside of their workspaces. When a task is specified, the workspace of
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
@@ -4898,7 +5051,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	}
 
 	// @param remote_name is the path of the file as on the worker machine. In
-	// the Work Queue framework, workers are prohibitted from writing to paths
+	// the Work Queue framework, workers are prohibited from writing to paths
 	// outside of their workspaces. When a task is specified, the workspace of
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
@@ -5373,6 +5526,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->long_timeout = 3600;
 
 	q->stats->time_when_started = timestamp_get();
+	q->time_last_large_tasks_check = timestamp_get();
 	q->task_reports = list_create();
 
 	q->time_last_wait = 0;
@@ -5597,7 +5751,7 @@ void work_queue_specify_num_tasks_left(struct work_queue *q, int ntasks)
 
 void work_queue_specify_manager_mode(struct work_queue *q, int mode)
 {
-	// Deprecated: Report to the catalog iff a name is given.
+	// Deprecated: Report to the catalog if a name is given.
 }
 
 void work_queue_specify_catalog_server(struct work_queue *q, const char *hostname, int port)
@@ -5703,7 +5857,10 @@ void work_queue_delete(struct work_queue *q)
 
 		if(q->transactions_logfile) {
 			write_transaction(q, "MANAGER END");
-			fclose(q->transactions_logfile);
+
+			if(!fclose(q->transactions_logfile)) {
+				debug(D_WQ, "unable to write transactions log: %s\n", strerror(errno));
+			}
 		}
 
 		rmsummary_delete(q->measured_local_resources);
@@ -5772,11 +5929,15 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 		copy_fd_to_stream(summs_fd, final);
 
 		jx_delete(extra);
-		fclose(final);
 		close(summs_fd);
 
-		if(rename(template, q->monitor_summary_filename) < 0)
+		if(!fclose(final)) {
+			debug(D_WQ, "unable to update monitor report to final destination file: %s\n", strerror(errno));
+		}
+
+		if(rename(template, q->monitor_summary_filename) < 0) {
 			warn(D_DEBUG, "Could not move monitor report to final destination file.");
+		}
 	}
 
 	if(q->monitor_exe)
@@ -6014,6 +6175,9 @@ const char *work_queue_result_str(work_queue_result_t result) {
 		case WORK_QUEUE_RESULT_TASK_TIMEOUT:
 			str = "END_TIME";
 			break;
+		case WORK_QUEUE_RESULT_UNKNOWN:
+			str = "UNKNOWN";
+			break;
 		case WORK_QUEUE_RESULT_FORSAKEN:
 			str = "FORSAKEN";
 			break;
@@ -6023,9 +6187,14 @@ const char *work_queue_result_str(work_queue_result_t result) {
 		case WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:
 			str = "MAX_WALL_TIME";
 			break;
-		case WORK_QUEUE_RESULT_UNKNOWN:
-		default:
-			str = "UNKNOWN";
+		case WORK_QUEUE_RESULT_DISK_ALLOC_FULL:
+			str = "DISK_FULL";
+			break;
+		case WORK_QUEUE_RESULT_RMONITOR_ERROR:
+			str = "MONITOR_ERROR";
+			break;
+		case WORK_QUEUE_RESULT_OUTPUT_TRANSFER_ERROR:
+			str = "OUTPUT_TRANSFER_ERROR";
 			break;
 	}
 
@@ -6361,11 +6530,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - compute stoptime
    S time left?                              No:  return null
    - task completed?                         Yes: return completed task to user
-   - update catalog if appropiate
+   - update catalog if appropriate
    - retrieve workers status messages
    - tasks waiting to be retrieved?          Yes: retrieve one task and go to S.
    - tasks waiting to be dispatched?         Yes: dispatch one task and go to S.
-   - send keepalives to appropiate workers
+   - send keepalives to appropriate workers
    - fast-abort workers
    - if new workers, connect n of them
    - expired tasks?                          Yes: mark expired tasks as retrieved and go to S.
@@ -6373,7 +6542,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - go to S
 */
 	int events = 0;
-
 	// account for time we spend outside work_queue_wait
 	if(q->time_last_wait > 0) {
 		q->stats->time_application += timestamp_get() - q->time_last_wait;
@@ -6537,8 +6705,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 		}
 
-		/* if we got here, no events were triggered. we set the busy_waiting
-		 * flag so that link_poll waits for some time the next time around. */
+		print_large_tasks_warning(q);
+
+		// if we got here, no events were triggered.
+		// we set the busy_waiting flag so that link_poll waits for some time
+		// the next time around.
 		q->busy_waiting_flag = 1;
 
 		// If the foreman_uplink is active then break so the caller can handle it.
@@ -7129,11 +7300,11 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			" timestamp"
 			// workers current:
 			" workers_connected workers_init workers_idle workers_busy workers_able"
-			// workers cummulative:
+			// workers cumulative:
 			" workers_joined workers_removed workers_released workers_idled_out workers_blocked workers_fast_aborted workers_lost"
 			// tasks current:
 			" tasks_waiting tasks_on_workers tasks_running tasks_with_results"
-			// tasks cummulative
+			// tasks cumulative
 			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts"
 			// manager time statistics:
 			" time_when_started time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application"
@@ -7415,6 +7586,7 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 		case WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION:
 		case WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:
 		case WORK_QUEUE_RESULT_DISK_ALLOC_FULL:
+		case WORK_QUEUE_RESULT_OUTPUT_TRANSFER_ERROR:
 			if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
 				write_transaction_category(q, c);
 			}

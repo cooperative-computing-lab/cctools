@@ -200,23 +200,23 @@ ssize_t link_putlstring(struct link *link, const char *str, size_t len, time_t s
 /** Write formatted data to a connection. All data is written until finished
   * or an error is encountered.
 @param link The link to write.
-@param fmt A pointer to the data.
 @param stoptime The time at which to abort.
+@param fmt A pointer to the data.
 @param ... Format arguments.
 @return The number of bytes actually written, or less than zero on error.
 */
-ssize_t link_putfstring(struct link *link, const char *fmt, time_t stoptime, ...)
-  __attribute__ (( format(printf,2,4) )) ;
+ssize_t link_printf(struct link *link, time_t stoptime, const char *fmt, ...)
+  __attribute__ (( format(printf,3,4) )) ;
 
 /** Write formatted data to a connection. All data is written until finished
   * or an error is encountered.
 @param link The link to write.
-@param fmt A pointer to the data.
 @param stoptime The time at which to abort.
+@param fmt A pointer to the data.
 @param va Format arguments.
 @return The number of bytes actually written, or less than zero on error.
 */
-ssize_t link_putvfstring(struct link *link, const char *fmt, time_t stoptime, va_list va);
+ssize_t link_vprintf(struct link *link, time_t stoptime, const char *fmt, va_list va);
 
 /** Block until a link is readable or writable.
 @param link The link to wait on.
@@ -290,6 +290,16 @@ int link_readline(struct link *link, char *line, size_t length, time_t stoptime)
 */
 int link_fd(struct link *link);
 
+/** Enable output buffering for link_printf.
+@param link The link to modify.
+@param size The number of bytes to buffer.  Zero disables buffering and flushes pending output.
+*/
+int link_buffer_output(struct link *link, size_t size );
+
+/** Flush buffered output from link_printf.
+@param link The link to modify.
+*/
+int link_flush_output(struct link *link );
 
 /** Whether the link is using ssl.
 @param link The link to examine.

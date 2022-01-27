@@ -13,6 +13,9 @@ PORT_FILE=wq.port
 check_needed()
 {
 	[ -n "${python}" ] || return 1
+	"${python}" -c "import dill" /dev/null 2>&1 > || return 1
+
+	return 0
 }
 
 prepare()
@@ -20,31 +23,21 @@ prepare()
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
 
-	rm -rf input.file
-	rm -rf output.file
-	rm -rf executable.file
-
-	/bin/echo hello world > input.file
-	/bin/cp /bin/echo executable.file
-
-	mkdir -p testdir
-	cp input.file executable.file testdir
-
 	return 0
 }
 
 run()
 {
 	# send makeflow to the background, saving its exit status.
-	(PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} wq_test.py $PORT_FILE; echo $? > $STATUS_FILE) &
+	(PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} wq_python_task.py $PORT_FILE; echo $? > $STATUS_FILE) &
 
-	# wait at most 15 seconds for wq to find a port.
-	wait_for_file_creation $PORT_FILE 15
+	# wait at most 5 seconds for wq to find a port.
+	wait_for_file_creation $PORT_FILE 5
 
 	run_local_worker $PORT_FILE worker.log
 
 	# wait for wq to exit.
-	wait_for_file_creation $STATUS_FILE 15
+	wait_for_file_creation $STATUS_FILE 5
 
 	# retrieve makeflow exit status
 	status=$(cat $STATUS_FILE)
@@ -60,11 +53,6 @@ clean()
 {
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
-
-	rm -rf input.file
-	rm -rf output.file
-	rm -rf executable.file
-	rm -rf testdir
 
 	exit 0
 }
