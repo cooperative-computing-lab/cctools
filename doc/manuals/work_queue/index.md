@@ -1656,13 +1656,30 @@ only one element left and then returns it. The given fucntion must accept an ite
 and must be an associative fucntion, or else the same result cannot be gaurenteed for
 different chunk sizes. Again, cheaper functions work better with larger chunk_sizes, 
 more expensive functions work better with smaller ones. Errors will be placed in results.
+Also, the minimum chunk size is 2, as going 1 element at time would not reduce the array
 
 ```python
 def fn(seq):
     return max(seq)
 
 q.treeReduce(fn, arry, chunk_size) 
+```
 
+Below is an example of all three abstractions, and their expected output:
+
+--8<-- "work_queue/examples/wq_python_abstractions.py"
+
+Run:
+```
+python abstractions.py
+```
+
+Expected output:
+```
+Map: [2, 4, 6, 8]
+Pair: [2, 4, 6, 8, 4, 8, 12, 16, 6, 12, 18, 24, 8, 18, 24, 32]
+Tree: 8
+```
 
 ## Logging facilities
 
