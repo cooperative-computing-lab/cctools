@@ -1,0 +1,37 @@
+import work_queue as wq
+import time
+import random
+
+def main():
+    NAME = "blyons1-" + str(random.getrandbits(64))
+    with open("input.csv", "r") as f:
+        inp = f.read().split(',')
+        cores = int(inp[0])
+        memory = int(inp[1])
+        disk = int(inp[2])
+        max_workers = int(inp[3])
+        seq_max = int(inp[4])
+        print(inp)
+
+    q = wq.WorkQueue(port=0, name=NAME, stats_log="stats.log")
+
+    workers = wq.Factory("condor", NAME)
+    workers.cores = cores
+    workers.memory = memory
+    workers.disk = disk
+    workers.max_workers = max_workers
+    workers.min_workers = max_workers
+
+    seq = list(range(seq_max))
+
+    with workers:
+        start = time.time()
+        results = q.pair(lambda x,y: x*y, seq, seq)
+        stop = time.time()
+        print("Elapsed time:", str(stop-start))
+
+    with open("output.txt", "w") as f:
+        f.write(str(results))
+
+if __name__ == "__main__":
+    main()

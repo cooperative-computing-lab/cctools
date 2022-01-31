@@ -4,7 +4,6 @@ import shutil
 import multiprocessing
 import subprocess
 import psutil
-from memory_profiler import memory_usage
 
 from WorkflowProfiler import profile
 
@@ -27,7 +26,7 @@ class Workflow():
         def __run(self, input_file, output_directory, error_dir, proc_stats):
             # parse the filename
             (inputname, filehash, ext) = parse_filename(os.path.basename(input_file))
-            workflow_directory_name = f"makeflow-{inputname}-{filehash}"
+            workflow_directory_name = os.path.abspath(f"makeflow-{inputname}-{filehash}")
 
             # copy the makeflow code and input file
             shutil.copytree(self.makeflow_dir, workflow_directory_name)
@@ -41,7 +40,7 @@ class Workflow():
             prc = subprocess.Popen(["makeflow", os.path.basename(self.makeflow)], stdout=subprocess.DEVNULL)
 
             # monitor memory and cpu usage
-            cpu_usage, mem_usage = profile(prc.pid, interval=0.5)
+            cpu_usage, mem_usage, ccpu, cmem = profile(prc.pid, workflow_directory_name, interval=0.5)
 
             # wait for it to finish to get return code
             prc.wait()
@@ -60,7 +59,7 @@ class Workflow():
             input_dir = os.path.dirname(input_file)
             os.rename(input_file, os.path.join(input_dir, inputname + "-post-" + filehash + ext))
 
-            stats = {"pid": os.getpid(), "exitcode": prc.returncode, "memusage": mem_usage, "cpuusage": cpu_usage}
+            stats = {"pid": os.getpid(), "exitcode": prc.returncode, "memusage": mem_usage, "cpuusage": cpu_usage, "cluster_cpu": ccpu, "cluster_mem": cmem}
             proc_stats.put(stats)
 
 

@@ -7,16 +7,18 @@ import multiprocessing
 import logging
 
 class WorkflowScheduler:
-    def __init__(self, output_dir, workflow, error_dir, proc_limit=5, memory_limit=8000):
+    def __init__(self, output_dir, workflow, error_dir, proc_limit=5, memory_limit=8000, cluster_cpu=200, cluster_mem=500000):
         self.output_dir = output_dir
         self.error_dir = error_dir
         self.workflow = workflow
         self.proc_limit = proc_limit
         self.proc_list = []
         self.proc_stats_queue = multiprocessing.Queue()
-        self.proc_stat_averages = {"count": 0, "memusage": 0, "cpuusage": 0}
+        self.proc_stat_averages = {"count": 0, "memusage": 0, "cpuusage": 0, "cluster_cpu": 0, "cluster_mem": 0}
         self.queue = Queue()
         self.mem_limit = memory_limit
+        self.cluster_cpu = cluster_cpu
+        self.cluster_mem = cluster_mem
 
     def push(self, event_path):
         self.queue.put(event_path)
@@ -68,5 +70,13 @@ class WorkflowScheduler:
             return 1
 
         # compute based on memory usage
-        return self.mem_limit // self.proc_stat_averages["memusage"]
+        proc_limit = self.mem_limit // self.proc_stat_averages["memusage"]
+        
+        # based on cluster emmory
+        proc_limit = min(proc_limit, self.cluster_mem // self.proc_stat_averages["cluster_mem"])
+
+        # based on cores
+        proc_limit = min(proc_limit, self.cluster_cpu // self.proc_stat_averages["cluster_cpu"])
+
+        return proc_limit
 
