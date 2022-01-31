@@ -6151,7 +6151,7 @@ static int task_in_terminal_state(struct work_queue *q, struct work_queue_task *
 }
 
 const char *work_queue_result_str(work_queue_result_t result) {
-	const char *str;
+	const char *str = NULL;
 
 	switch(result) {
 		case WORK_QUEUE_RESULT_SUCCESS:
