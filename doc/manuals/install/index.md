@@ -26,16 +26,29 @@ If it fails, then you need to install either
 [miniconda](https://docs.conda.io/projects/conda/en/latest/user-guide/install)
 or [anaconda](https://docs.anaconda.com/anaconda/install). Miniconda is a
 __light__ version of anaconda, and we recommend it as it is much faster to
-install. We also recommend installing the versions for `Python 3.7`
+install. We also recommend installing the versions for `Python 3.9`
 
 !!! warning
     On Mac, the available from conda **CCTools** does not work with `Python 2.7` or with `perl`. For such case, please compile **CCTools** from [source](#from-source.md).
 
-With `conda` command available, install **CCTools** with:
+With the `conda` command available, create a new environment and install **CCTools** with:
 
 ```sh
-$ conda install -y -c conda-forge ndcctools
+# run this command once
+$ conda create -n cctools-env -y -c conda-forge --strict-channel-priority python ndcctools
+
+# run this command every time you want to use cctools
+$ conda activate cctools-env
+
+# run this command every time you want to update your version of cctools (after `activate` as above).
+$ conda update -y -c conda-forge ndcctools
 ```
+
+!!! note
+    You could simply run the command `conda install -y -c conda-forge ndcctools` without creating
+    a new environment. However, sometimes conda takes a long time to resolve
+    all dependencies when adding new packages to an already existing
+    environment.
 
 And that's it! You can test your setup following the instructions [here](#testing-your-installation).
 
