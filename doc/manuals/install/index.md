@@ -55,7 +55,7 @@ And that's it! You can test your setup following the instructions [here](#testin
 
 ## Install from Spack
 
-Alternatively, you can install **CCTools** using the [spack.io](https://www.spack.org)
+Alternatively, you can install **CCTools** using the [spack.io](https://spack.io)
 package manager. Spack will compile **CCTools** for you, and it is recommended
 for HPC sites for which a conda installation is not available, or which have
 special software stack requirements (such as specially compiled python versions).
