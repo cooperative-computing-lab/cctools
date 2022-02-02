@@ -716,16 +716,6 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 
 	struct rmsummary *max   = c->max_allocation;
 	struct rmsummary *first = c->first_allocation;
-	struct rmsummary *seen  = c->max_resources_seen;
-
-	if(c->steady_state && c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED) {
-        size_t i;
-        for(i = 0; labeled_resources[i]; i++) {
-            const size_t o = labeled_resources[i];
-            /* set internal to seen value */
-            rmsummary_set_by_offset(internal, o, rmsummary_get_by_offset(seen, o));
-        }
-	}
 
 	/* load max values */
 	rmsummary_merge_override(internal, max);
