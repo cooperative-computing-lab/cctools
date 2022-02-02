@@ -5850,7 +5850,7 @@ void work_queue_delete(struct work_queue *q)
 		if(q->transactions_logfile) {
 			write_transaction(q, "MANAGER END");
 
-			if(!fclose(q->transactions_logfile)) {
+			if(fclose(q->transactions_logfile) != 0) {
 				debug(D_WQ, "unable to write transactions log: %s\n", strerror(errno));
 			}
 		}
@@ -5923,7 +5923,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 		jx_delete(extra);
 		close(summs_fd);
 
-		if(!fclose(final)) {
+		if(fclose(final) != 0) {
 			debug(D_WQ, "unable to update monitor report to final destination file: %s\n", strerror(errno));
 		}
 
