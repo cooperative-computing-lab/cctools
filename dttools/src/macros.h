@@ -25,7 +25,7 @@ See the file COPYING for details.
 #define ABS(x) ( ((x)>=0) ? (x) : (-(x)) )
 #endif
 
-#define DIV_INT_ROUND_UP(a, b) (((a) + (b) - 1) / (b))
+#define DIV_INT_ROUND_UP(a, b) ((__typeof__(a)) ((int64_t) ((((a) + (b) - 1) / (b)))))
 
 #define KILO 1024
 #define MEGA (KILO*KILO)

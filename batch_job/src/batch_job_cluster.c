@@ -165,13 +165,13 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 	} else if(q->type == BATCH_QUEUE_TYPE_SGE){
 		if(!ignore_mem && resources->memory > 0) {
 			const char *mem_type = batch_queue_get_option(q, "mem-type");
-			buffer_printf(&cluster_resources, " -l %s=%.0f M", mem_type ? mem_type : "h_vmem", resources->memory);
+			buffer_printf(&cluster_resources, " -l %s=%.0fM", mem_type ? mem_type : "h_vmem", resources->memory);
 		}
 		if(!ignore_time && resources->wall_time > 0) {
 			buffer_printf(&cluster_resources, " -l h_rt=00:%.0f:00", DIV_INT_ROUND_UP(resources->wall_time, 60));
 		}
 
-		buffer_printf(&cluster_resources, " -pe smp %0.f", resources->cores > 0 ? DIV_INT_ROUND_UP(resources->cores, 1) : 1);
+		buffer_printf(&cluster_resources, " -pe smp %.0f", resources->cores > 0 ? DIV_INT_ROUND_UP(resources->cores, 1) : 1);
 	} else if(q->type==BATCH_QUEUE_TYPE_LSF) {
 		if(!ignore_mem && resources->memory>0) {
 			// resources->memory is in units of MB
