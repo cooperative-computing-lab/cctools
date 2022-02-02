@@ -171,7 +171,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 			buffer_printf(&cluster_resources, " -l h_rt=00:%.0f:00", DIV_INT_ROUND_UP(resources->wall_time, 60));
 		}
 
-		buffer_printf(&cluster_resources, " -pe smp %0.f", resources->cores > 0 ? DIV_INT_ROUND_UP(resources->cores, 1) : 1);
+		buffer_printf(&cluster_resources, " -pe smp %.0f", resources->cores > 0 ? DIV_INT_ROUND_UP(resources->cores, 1) : 1);
 	} else if(q->type==BATCH_QUEUE_TYPE_LSF) {
 		if(!ignore_mem && resources->memory>0) {
 			// resources->memory is in units of MB
