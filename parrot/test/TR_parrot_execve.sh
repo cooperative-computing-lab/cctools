@@ -1,26 +1,23 @@
 #!/bin/sh
 
+# This test evaluates the ability of parrot to load and run an executable via chirp.
+# To avoid complex dependencies, this is a simple static hello-world.
+
+
 set -e
 
 . ../../dttools/test/test_runner_common.sh
 . ./parrot-test.sh
 . ../../chirp/test/chirp-common.sh
 
-c="./hostport.$PPID"
-exe="hello-static"
-
-myp() {
-	parrot --no-chirp-catalog --timeout=5 --work-dir="/chirp/$hostport/" "$@"
-}
-
 prepare()
 {
 	chirp_start local
-	echo "$hostport" > "$c"
+	echo "$hostport" > config.txt
 
 	set +e
 	# -static requires "libc-devel" which is missing on some platforms
-	gcc -static -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none <<EOF
+	gcc -static -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o ${root}/hello.exe -x c - -x none <<EOF
 #include <stdio.h>
 int main (int argc, char *argv[])
 {
@@ -35,39 +32,24 @@ EOF
 
 run()
 {
-	hostport=$(cat "$c")
+	hostport=$(cat "config.txt")
 
-	myp /bin/sh <<EOF1
-mkdir bin
-cat > bin/a.py <<EOF2
-#!/chirp/$hostport/bin/python
+	parrot --no-chirp-catalog --timeout=5 --work-dir="/chirp/${hostport}/" ./hello.exe > output.txt
 
-import sys
-
-print(' '.join(sys.argv))
-EOF2
-cp /usr/bin/python /bin/sh bin/
-chmod 700 bin/a.py bin/python bin/sh
-EOF1
-	if [ -x "$exe" ]; then
-		[ "$(myp -- "$(pwd)/$exe" | tee -a /dev/stderr)" = 'Hello, world!' ]
+	if [ "$(cat output.txt)" == "Hello, world!" ]
+	then
+		return 0	
+	else
+		echo -n "Incorrect output: "
+		cat output.txt
+		return 1
 	fi
-	for loader in `find -L /lib64 /lib -name 'ld-linux*.so*' 2>/dev/null`; do
-		[ "$(myp --ld-path="$loader" -- ./bin/a.py 1 2 | tee -a /dev/stderr)" = './bin/a.py 1 2' ]
-		[ "$(myp --ld-path="$loader" -- ./bin/sh -c 'echo "$0"' | tee -a /dev/stderr)" = './bin/sh' ]
-		if [ -x "$exe" ]; then
-			[ "$(myp --ld-path="$loader" -- "$(pwd)/$exe" | tee -a /dev/stderr)" = 'Hello, world!' ]
-		fi
-		return 0
-	done
-	echo No loader found!
-	return 1
 }
 
 clean()
 {
 	chirp_clean
-	rm -f "$c" "$exe"
+	rm -f config.txt output.txt
 }
 
 dispatch "$@"
