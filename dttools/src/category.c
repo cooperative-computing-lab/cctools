@@ -714,15 +714,22 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 
 	internal = rmsummary_create(-1);
 
-	struct rmsummary *max   = c->max_allocation;
-	struct rmsummary *first = c->first_allocation;
+    if(category_in_steady_state(c) &&
+            c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED &&
+            c->allocation_mode != CATEGORY_ALLOCATION_MODE_MAX) {
+        /* load max seen values values, but only if not in fixed or max mode.
+         * In max mode, max seen is the first allocation, and next allocation
+         * is to use whole workers. */
+        rmsummary_merge_override(internal, c->max_resources_seen);
+    }
 
-	/* load max values */
-	rmsummary_merge_override(internal, max);
+    /* load explicit category max values */
+    rmsummary_merge_override(internal, c->max_allocation);
 
-    if(category_in_steady_state(c) && c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
-            && request == CATEGORY_ALLOCATION_FIRST) {
-		rmsummary_merge_override(internal, first);
+    if(category_in_steady_state(c) &&
+            c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED &&
+            request == CATEGORY_ALLOCATION_FIRST) {
+		rmsummary_merge_override(internal, c->first_allocation);
 	}
 
 	/* chip in user values if explicitely given */
