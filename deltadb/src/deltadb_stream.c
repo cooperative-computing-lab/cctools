@@ -23,7 +23,7 @@ static void corrupt_data( const char *filename, const char *line )
 
 int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_handlers *handlers, FILE *stream, time_t starttime, time_t stoptime )
 {
-	char line[LOG_LINE_MAX];
+	char whole_line[LOG_LINE_MAX];
 	char value[LOG_LINE_MAX];
 	char name[LOG_LINE_MAX];
 	char key[LOG_LINE_MAX];
@@ -34,7 +34,8 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 
 	const char *filename = "stream";
 
-	while(fgets(line,sizeof(line),stream)) {
+	while(fgets(whole_line,sizeof(whole_line),stream)) {
+        char *line = whole_line;
 
 		reconsider:
 
@@ -122,7 +123,7 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 
 					/* Now process the remainder of the line as a new command. */
 					int position = strlen(key) + strlen(name) + 2;
-					strcpy(line,&line[position]);
+                    line = (line + position);
 					goto reconsider;
 				} else {
 					/* Invalid type: the line is totally corrupted. */

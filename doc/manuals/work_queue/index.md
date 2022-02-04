@@ -1610,6 +1610,77 @@ to make a progress bar or other user-visible information:
     printf("%d\n", stats->workers_connected);
     ```
 
+### Python Abstractions
+
+#### Map
+
+The work_queue map abstraction works similar to python map, as it applies a 
+a function to every element in a list. This function works by taking in a chunk_size, 
+which is the size of an iterable to send to a worker. The worker than maps the given 
+function over the iterable and returns it. All the results are then combined from the 
+workers and returned. The size of the chunk depends on the cost of the function.
+If the function is very cheap, then sending a larger chunk_size is better. If the
+function is expensive, then smaller is better. If an invalid operation happens, 
+the error will appear in the results.
+
+```python
+def fn(a):
+    return a*a
+
+q.map(fn, arry, chunk_size)
+```
+
+#### Pair
+
+The work_queue pair function computes all the pairs of 2 sequences, and then uses
+them as inputs of a given function. The pairs are generated locally using itertools,
+and then based on the given chunk_size, are sent out to a worker as an iterable of pairs.
+The given function must accept an iterable, as the pair will be sent to the function as
+a tuple. The worker will then return the results, and each result from each worker will be 
+combined locally. Again, cheaper functions work better with larger chunk_sizes, 
+more expensive functions work better with smaller ones. Errors will be placed in results.
+
+```python
+def fn(pair):
+    return pair[0] * pair[1]
+
+q.pair(fn, seq1, seq2, chunk_size)
+```
+
+#### Tree Reduce
+
+The work_queue treeReduce fucntion combines an array using a given function by
+breaking up the array into chunk_sized chunks, computing the results, and returning
+the results to a new array. It then does the same process on the new array until there
+only one element left and then returns it. The given fucntion must accept an iterable, 
+and must be an associative fucntion, or else the same result cannot be gaurenteed for
+different chunk sizes. Again, cheaper functions work better with larger chunk_sizes, 
+more expensive functions work better with smaller ones. Errors will be placed in results.
+Also, the minimum chunk size is 2, as going 1 element at time would not reduce the array
+
+```python
+def fn(seq):
+    return max(seq)
+
+q.treeReduce(fn, arry, chunk_size) 
+```
+
+Below is an example of all three abstractions, and their expected output:
+
+--8<-- "work_queue/examples/wq_python_abstractions.py"
+
+Run:
+```
+python abstractions.py
+```
+
+Expected output:
+```
+Map: [2, 4, 6, 8]
+Pair: [2, 4, 6, 8, 4, 8, 12, 16, 6, 12, 18, 24, 8, 18, 24, 32]
+Tree: 8
+```
+
 ## Logging facilities
 
 We can observe the lifetime of the queue through three different logs:

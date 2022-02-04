@@ -217,9 +217,6 @@ void set_resources_from_env(struct rmsummary *rs, struct dag_variable_lookup_set
             debug(D_NOTICE, "%s defined multiple times for category %s. Using last defined value: %s",
                     RESOURCES_WALL_TIME, c->name, rmsummary_resource_to_str("wall_time", rs->wall_time, 0));
         }
-
-        /* value in RESOURCES_WALL_TIME is in seconds. struct rmsummary expects it in useconds. */
-		rs->wall_time *= 1000000;
 	}
 }
 

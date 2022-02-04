@@ -19,13 +19,29 @@ You may already have Conda installed.  To check:
 ```sh
 $ conda list
 ```
+
 If it fails, then you should install [Miniconda](https://docs.conda.io/projects/conda/en/latest/user-guide/install).
 Miniconda is a __light__ version of Anaconda, and we recommend it as it is much faster to install.
+We also recommend installing the version for `Python 3.9`
+
 Once Conda is installed, then install **CCTools** with:
 
 ```sh
-$ conda install -y -c conda-forge ndcctools
+# run this command once
+$ conda create -n cctools-env -y -c conda-forge --strict-channel-priority python ndcctools
+
+# run this command every time you want to use cctools
+$ conda activate cctools-env
+
+# run this command every time you want to update your version of cctools (after `activate` as above).
+$ conda update -y -c conda-forge ndcctools
 ```
+
+!!! note
+    You could simply run the command `conda install -y -c conda-forge ndcctools` without creating
+    a new environment. However, sometimes conda takes a long time to resolve
+    all dependencies when adding new packages to an already existing
+    environment.
 
 And that's it! You can test your setup following the instructions [here](#testing-your-installation).
 
@@ -34,7 +50,7 @@ And that's it! You can test your setup following the instructions [here](#testin
 
 ## Install From Spack
 
-Alternatively, you can install **CCTools** using the [spack.io](https://www.spack.org)
+Alternatively, you can install **CCTools** using the [spack.io](https://spack.io)
 package manager. Spack will compile **CCTools** for you, and it is recommended
 for HPC sites for which a conda installation is not available, or which have
 special software stack requirements (such as specially compiled python versions).
