@@ -2,8 +2,8 @@
 input.csv: input.tar.gz
 	tar -xzvf input.tar.gz input.csv
 
-output.tar.gz: output.txt stats.log
-	tar -czvf output.tar.gz output.txt stats.log
+output.tar.gz: output.txt stats.log output.txt.err
+	tar -czvf output.tar.gz output.txt stats.log output.txt.err
 
-output.txt stats.log: pairs.py input.csv
+output.txt.err output.txt stats.log: pairs.py input.csv
 	python pairs.py > output.txt 2> output.txt.err

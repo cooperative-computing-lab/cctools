@@ -1,6 +1,8 @@
 import work_queue as wq
 import time
 import random
+import tempfile
+import shutil
 
 def main():
     NAME = "blyons1-" + str(random.getrandbits(64))
@@ -21,6 +23,7 @@ def main():
     workers.disk = disk
     workers.max_workers = max_workers
     workers.min_workers = max_workers
+    workers.scratch_dir = tempfile.mkdtemp()
 
     seq = list(range(seq_max))
 
@@ -32,6 +35,8 @@ def main():
 
     with open("output.txt", "w") as f:
         f.write(str(results))
+
+    shutil.rmtree(workers.scratch_dir)
 
 if __name__ == "__main__":
     main()
