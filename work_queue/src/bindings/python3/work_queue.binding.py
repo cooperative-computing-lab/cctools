@@ -2126,6 +2126,12 @@ class Factory(object):
                 dir=staging_directory,
                 prefix='wq-factory-config-',
                 suffix='.json')
+
+        if not self.scratch_dir:
+            self.scratch_dir = tempfile.mkdtemp(
+                    dir=staging_directory,
+                    prefix="wq-factory-scratch-")
+
         os.close(tmp)
         self._write_config()
         logfd = open(self._log_file, 'a')
