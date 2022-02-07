@@ -459,7 +459,7 @@ INT64_T chirp_client_getdir(struct chirp_client * c, const char *path, chirp_dir
 	const char *name;
 
 	result = chirp_client_opendir(c, path, stoptime);
-	if(result == 0) {
+	if(result >= 0) {
 		while((name = chirp_client_readdir(c, stoptime))) {
 			callback(name, arg);
 		}
