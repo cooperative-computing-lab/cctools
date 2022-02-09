@@ -49,7 +49,6 @@ General options:
 OPTIONS_BEGIN
 OPTION_ARG(T,batch-type,type) Batch system type (required). One of: local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun
 OPTION_ARG(C,config-file,file) Use configuration file PARAM(file).
-OPTION_ARG(C,config-file,file) Use configuration file PARAM(file).
 OPTION_ARG(M,manager-name,project) Project name of managers to server, can be regex
 OPTION_ARG(F,foremen-name,project) Foremen to serve, can be a regular expression.
 OPTION_ARG_LONG(catalog,host:port) Catalog server to query for managers.
