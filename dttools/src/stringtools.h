@@ -45,6 +45,18 @@ char *string_quote_shell (const char *str);
   @return String with special characters escaped.
   */
 char *string_escape_condor( const char *str);
+
+/** Escape special characters in a string with backslash.
+@param s The null-terminated string to escape.
+@param t A buffer for the new string.
+@param specials A string indicating all special character to escape.
+@param length The length of buffer t, including the null terminator.
+@return True if t was long enough to encode the entire escaped string.
+*/
+
+int string_escape_chars( const char *s, char *t, const char *specials, int length );
+
+
 void string_chomp(char *str);
 int whole_string_match_regex(const char *text, const char *pattern);
 int string_match_regex(const char *text, const char *pattern);
