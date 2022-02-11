@@ -1512,8 +1512,9 @@ struct rmsummary *rmonitor_final_usage_tree(void)
 
 
 /* signal handler forward to process */
-void rmonitor_forward_signal(const int signal)
+void rmonitor_forward_signal(const int signal, siginfo_t *info, void *data)
 {
+	notice(D_RMON, "forwarding signal %s(%d)", strsignal(signal), signal);
 	kill(first_process_pid, signal);
 }
 
@@ -1525,7 +1526,7 @@ void rmonitor_check_child(const int signal)
     if(pid != (uint64_t) first_process_pid)
 	    return;
 
-    debug(D_RMON, "SIGCHLD from %d : ", first_process_pid);
+    debug(D_RMON, "got SIGCHLD from %d", first_process_pid);
 
     if(WIFEXITED(first_process_sigchild_status))
     {
@@ -1576,58 +1577,32 @@ void cleanup_library() {
 	unlink(lib_helper_name);
 }
 
-//SIGINT, SIGQUIT, SIGTERM signal handler.
-void rmonitor_final_cleanup(int signum)
-{
+void rmonitor_final_cleanup() {
     uint64_t pid;
     struct   rmonitor_process_info *p;
     int      status;
 
-	static int handler_already_running = 0;
-
-	if(handler_already_running)
-		return;
-	handler_already_running = 1;
-
-    signal(SIGCHLD, rmonitor_check_child);
+	sigset_t block;
+	sigfillset(&block);
+	sigprocmask(SIG_BLOCK, &block, NULL);
 
 	if(!first_pid_manually_set) {
-		//ask politely to quit
 		itable_firstkey(processes);
 		while(itable_nextkey(processes, &pid, (void **) &p))
 		{
-			debug(D_RMON, "sending %s(%d) to process %"PRId64".\n", strsignal(signum), signum, pid);
-
-			kill(pid, signum);
+			notice(D_RMON, "sending kill signal to process %"PRId64".%d\n", pid);
+			kill(pid, SIGKILL);
 		}
 
-		/* wait for processes to cleanup. We wait 5 seconds, but no more than 0.2 seconds at a time. */
-		int count = 25;
-		do{
-			usleep(200000);
+		while(!first_process_already_waited) {
+			usleep((int) (0.1 * USECOND)); //0.2s
+
 			ping_processes();
 			cleanup_zombies();
-			count--;
-		} while(itable_size(processes) > 0 && count > 0);
 
-		if(!first_process_already_waited)
-			rmonitor_check_child(signum);
-
-		signal(SIGCHLD, SIG_DFL);
-
-		//we did ask...
-		itable_firstkey(processes);
-		while(itable_nextkey(processes, &pid, (void **) &p))
-		{
-			debug(D_RMON, "sending %s(%d) to process %"PRId64".\n", strsignal(SIGKILL), SIGKILL, pid);
-
-			kill(pid, SIGKILL);
-
-			rmonitor_untrack_process(pid);
+			rmonitor_check_child(0);
 		}
 	}
-
-    cleanup_zombies();
 
     if(lib_helper_extracted) {
 		cleanup_library();
@@ -1807,7 +1782,7 @@ int rmonitor_dispatch_msg(void)
 	summary->last_error = msg.error;
 
 	if(!rmsummary_check_limits(summary, resources_limits) && enforce_limits) {
-		rmonitor_final_cleanup(SIGTERM);
+		rmonitor_final_cleanup();
 	}
 
 	// find out if messages are urgent:
@@ -1914,6 +1889,8 @@ pid_t rmonitor_fork(void)
     sigset_t set;
     void (*prev_handler)(int signum);
 
+	//make the monitor the leader of its own process group
+	setpgid(0, 0);
     pid = fork();
 
     prev_handler = signal(SIGCONT, wakeup_after_fork);
@@ -1956,8 +1933,6 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
         first_process_pid = pid;
         close(STDIN_FILENO);
         close(STDOUT_FILENO);
-
-        setpgid(pid, getpid());
 
         if (child_in_foreground)
         {
@@ -2097,7 +2072,7 @@ int rmonitor_resources(long int interval /*in seconds */)
 		rmonitor_log_row(resources_now);
 
 		if(!rmsummary_check_limits(summary, resources_limits) && enforce_limits) {
-			rmonitor_final_cleanup(SIGTERM);
+			rmonitor_final_cleanup();
 		}
 
 		release_waiting_processes();
@@ -2157,17 +2132,22 @@ int main(int argc, char **argv) {
 
     debug_config(argv[0]);
 
-    signal(SIGCHLD, rmonitor_check_child);
-    signal(SIGINT,  rmonitor_final_cleanup);
-    signal(SIGQUIT, rmonitor_final_cleanup);
-    signal(SIGTERM, rmonitor_final_cleanup);
 
-    signal(SIGABRT,  rmonitor_forward_signal);
-    signal(SIGALRM,  rmonitor_forward_signal);
-    signal(SIGCONT, rmonitor_forward_signal);
-    signal(SIGHUP,  rmonitor_forward_signal);
-    signal(SIGUSR1, rmonitor_forward_signal);
-    signal(SIGUSR2, rmonitor_forward_signal);
+    signal(SIGCHLD, rmonitor_check_child);
+
+	struct sigaction sig_act_forward;
+	sig_act_forward.sa_flags = 0;
+	sig_act_forward.sa_sigaction = rmonitor_forward_signal;
+	sigfillset(&sig_act_forward.sa_mask);
+
+    sigaction(SIGINT,  &sig_act_forward, NULL);
+    sigaction(SIGQUIT, &sig_act_forward, NULL);
+    sigaction(SIGTERM, &sig_act_forward, NULL);
+    sigaction(SIGABRT, &sig_act_forward, NULL);
+    sigaction(SIGALRM, &sig_act_forward, NULL);
+    sigaction(SIGHUP,  &sig_act_forward, NULL);
+    sigaction(SIGUSR1, &sig_act_forward, NULL);
+    sigaction(SIGUSR2, &sig_act_forward, NULL);
 
     summary  = calloc(1, sizeof(struct rmsummary));
     snapshot = calloc(1, sizeof(struct rmsummary));
@@ -2487,6 +2467,7 @@ int main(int argc, char **argv) {
     }
 
     write_helper_lib();
+
     rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd, stop_short_running);
 
 	summary_path = default_summary_name(template_path);
@@ -2535,7 +2516,7 @@ int main(int argc, char **argv) {
 	}
 
     rmonitor_resources(interval);
-    rmonitor_final_cleanup(SIGTERM);
+    rmonitor_final_cleanup();
 
 	/* rmonitor_final_cleanup exits */
     return 0;
