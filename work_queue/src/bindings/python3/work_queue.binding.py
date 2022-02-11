@@ -1786,15 +1786,17 @@ class WorkQueue(object):
             self.submit(p_task)
             tasks[p_task.id] = i
                
+        n = 0
         for i in range(size+1):
-            while not self.empty():
-                t = self.wait_for_tag(str(i), 10)
+            while not self.empty() and n < size:
+
+                t = self.wait_for_tag(str(i), 1)                
                 if t:
                     results[tasks[t.id]] = list(t.output)
+                    n += 1
                     break
 
         return [item for elem in results for item in elem]
-
 
     ##
     # Returns the values for a function of each pair from 2 sequences
@@ -1843,13 +1845,15 @@ class WorkQueue(object):
             tasks[p_task.id] = num_task
             num_task += 1
 
+        n = 0
         for i in range(num_task):
 
-            while not self.empty():
+            while not self.empty() and n < num_task:
                 t = self.wait_for_tag(str(i), 10)
 
                 if t:
                     results[tasks[t.id]] = t.output
+                    n += 1
                     break
  
         return [item for elem in results for item in elem]
@@ -1889,13 +1893,15 @@ class WorkQueue(object):
                 self.submit(p_task)
                 tasks[p_task.id] = i
 
+            n = 0
             for i in range(size+1):
 
-                while not self.empty():
+                while not self.empty() and n < size:
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
                         results[tasks[t.id]] = t.output
+                        n += 1
                         break
 
             seq = results
