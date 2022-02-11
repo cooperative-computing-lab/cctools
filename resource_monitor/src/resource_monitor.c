@@ -1509,6 +1509,13 @@ struct rmsummary *rmonitor_final_usage_tree(void)
     return tr_usg;
 }
 
+
+/* signal handler forward to process */
+void rmonitor_forward_signal(const int signal)
+{
+	kill(first_process_pid, signal);
+}
+
 /* sigchild signal handler */
 void rmonitor_check_child(const int signal)
 {
@@ -2151,6 +2158,13 @@ int main(int argc, char **argv) {
     signal(SIGINT,  rmonitor_final_cleanup);
     signal(SIGQUIT, rmonitor_final_cleanup);
     signal(SIGTERM, rmonitor_final_cleanup);
+
+    signal(SIGABRT,  rmonitor_forward_signal);
+    signal(SIGALRM,  rmonitor_forward_signal);
+    signal(SIGCONT, rmonitor_forward_signal);
+    signal(SIGHUP,  rmonitor_forward_signal);
+    signal(SIGUSR1, rmonitor_forward_signal);
+    signal(SIGUSR2, rmonitor_forward_signal);
 
     summary  = calloc(1, sizeof(struct rmsummary));
     snapshot = calloc(1, sizeof(struct rmsummary));
