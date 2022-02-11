@@ -1801,7 +1801,7 @@ class WorkQueue(object):
     # @param fn       The function that will be called on each element
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
-    def pair(self, fn, seq1, seq2, chunk_size=1):
+    def pair(self, fn, seq1, seq2, chunk_size=1, env=None):
         def fpairs(fn, List):
             results = []
 
@@ -1820,6 +1820,10 @@ class WorkQueue(object):
         for item in itertools.product(seq1, seq2):
             if num == chunk_size:
                 p_task = PythonTask(fpairs, fn, task)
+
+                if env:
+                    p_task.specify_environment(env)
+                
                 self.submit(p_task)
                 tasks[p_task.id] = num_task
                 
