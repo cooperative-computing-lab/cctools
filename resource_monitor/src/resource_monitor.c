@@ -1948,6 +1948,7 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
         first_process_pid = pid;
         close(STDIN_FILENO);
         close(STDOUT_FILENO);
+
         setpgid(pid, getpid());
 
         if (child_in_foreground)
@@ -1983,8 +1984,6 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 	}
     else //child
     {
-        setpgid(0, 0);
-
         debug(D_RMON, "executing: %s\n", executable);
 
 		char *pid_s = string_format("%d", getpid());
