@@ -61,6 +61,7 @@ totalling under 8GB data per year.
 */
 
 #include "jx.h"
+#include <time.h>
 
 /** Create a new database, recovering state from disk if available.
 @param logdir A directory to contain the database on disk.  If it does not exist, it will be created.  If null, no disk storage will be used.
@@ -68,6 +69,14 @@ totalling under 8GB data per year.
 */
 
 struct deltadb * deltadb_create( const char *logdir );
+
+/** Load a deltadb snapshot at a given timestamp
+@param logdir A directory to contain the database on disk.  If it does not exist, it will be created.  If null, no disk storage will be used.
+@param timestamp A timestamp for the database to revert to.
+@return A pointer to a newly created history table.
+*/
+
+struct deltadb * deltadb_create_snapshot( const char *logdir , time_t timestamp );
 
 /** Insert or update an object into the database.
 If an object with the same primary key exists in the database, it will generate update (U) records in the log, otherwise a create (C) record is generated against the original object.

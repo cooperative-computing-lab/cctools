@@ -16,7 +16,6 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <time.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -29,6 +28,7 @@ struct deltadb {
 	int logday;
 	FILE *logfile;
 	time_t last_log_time;
+	bool snapshot;
 };
 
 /* Take the current state of the table and write it out verbatim to a checkpoint file. */
@@ -444,7 +444,7 @@ static int log_recover( struct deltadb *db, time_t snapshot )
 	return 1;
 }
 
-struct deltadb * deltadb_create( const char *logdir )
+static struct deltadb * deltadb_create_instance( const char *logdir, time_t timestamp, bool snapshot)
 {
 	if(logdir) {
 		int result = mkdir(logdir,0777);
@@ -458,17 +458,33 @@ struct deltadb * deltadb_create( const char *logdir )
 	db->logfile = 0;
 	db->last_log_time = 0;
 	db->logdir = 0;
+	db->snapshot = snapshot;
 
 	if(logdir) {
 		db->logdir = strdup(logdir);
-		log_recover(db,time(0));
+		log_recover(db,timestamp);
 	}
 
 	return db;
 }
 
+struct deltadb * deltadb_create( const char *logdir )
+{
+	return deltadb_create_instance(logdir, time(0), false);
+}
+
+struct deltadb * deltadb_create_snapshot( const char *logdir, time_t timestamp )
+{
+	return deltadb_create_instance(logdir, timestamp, true);
+}
+
 void deltadb_insert( struct deltadb *db, const char *key, struct jx *nv )
 {
+	if (db->snapshot) {
+		debug(D_ERROR, "can't modify a deltadb snapshot");
+		return;
+	}
+
 	struct jx *old = hash_table_remove(db->table,key);
 
 	hash_table_insert(db->table,key,nv);
@@ -493,6 +509,11 @@ struct jx * deltadb_lookup( struct deltadb *db, const char *key )
 
 struct jx * deltadb_remove( struct deltadb *db, const char *key )
 {
+	if (db->snapshot) {
+		debug(D_ERROR, "can't modify a deltadb snapshot");
+		return 0;
+	}
+
 	const char *nkey = strdup(key);
 
 	struct jx *j = hash_table_remove(db->table,key);

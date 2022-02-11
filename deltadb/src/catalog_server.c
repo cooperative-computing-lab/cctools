@@ -438,6 +438,7 @@ static void handle_query( struct link *ql, time_t st )
 {
 	char line[LINE_MAX];
 	char url[LINE_MAX];
+	char full_path[LINE_MAX];
 	char path[LINE_MAX];
 	char action[LINE_MAX];
 	char version[LINE_MAX];
@@ -447,6 +448,7 @@ static void handle_query( struct link *ql, time_t st )
 	char strexpr[LINE_MAX];
 	int port;
 	long time_start, time_stop;
+	long timestamp = 0;
 
 	char *hkey;
 	struct jx *j;
@@ -475,14 +477,63 @@ static void handle_query( struct link *ql, time_t st )
 		return;
 	}
 
-	if(sscanf(url, "http://%[^/]%s", hostport, path) == 2) {
+	if(sscanf(url, "http://%[^/]%s", hostport, full_path) == 2) {
 		// continue on
 	} else {
-		strcpy(path, url);
+		strcpy(full_path, url);
 	}
 
-	/* load the hash table entries into one big array */
+	if(3==sscanf(full_path, "/updates/%ld/%ld/%[^/]",&time_start,&time_stop,strexpr)) {
+		// check for updates request first, before processing deltadb state
+		struct buffer buf;
+		buffer_init(&buf);
+		if(b64_decode(strexpr,&buf)==0) {
+			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
+			if(expr) {
+				if(link_using_ssl(ql)) {
+					send_http_response(ql,501,"Server Error","text/plain",st);
+					link_printf(ql,st,"Sorry, unable to serve queries over HTTPS.");
+				} else {
+					send_http_response(ql,200,"OK","text/plain",st);
 
+					struct deltadb_query *query = deltadb_query_create();
+					deltadb_query_set_filter(query,expr);
+					// Note this leaks a stdio stream, but it will be shortly recovered on process exit.
+					deltadb_query_set_output(query,fdopen(link_fd(ql),"w"));
+					deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
+					deltadb_query_execute_dir(query,history_dir,time_start,time_stop);
+					deltadb_query_delete(query);
+					jx_delete(expr);
+				}
+			} else {
+				send_http_response(ql,400,"Bad Request","text/plain",st);
+				link_printf(ql,st,"Invalid query text.\n");
+			}
+		} else {
+			send_http_response(ql,400,"Bad Request","text/plain",st);
+			link_printf(ql,st,"Invalid base-64 encoding.\n");
+		}
+		buffer_free(&buf);
+		return;
+	}
+
+	// check for historical timestamp prefix
+	int matches = sscanf(full_path, "/history/%ld%s", &timestamp, path);
+	if (matches == 2) {
+		// continue on
+	} else if (matches == 1) {
+		strncpy(path, "/", sizeof(path));
+	} else {
+		strcpy(path, full_path);
+	}
+
+	// reset catalog to timestamp
+	if (timestamp > 0) {
+		//deltadb_delete(table);
+		table = deltadb_create_snapshot(history_dir, timestamp);
+	}
+	
+	/* load the hash table entries into one big array */
 	n = 0;
 	deltadb_firstkey(table);
 	while(deltadb_nextkey(table, &hkey, &j)) {
@@ -490,8 +541,7 @@ static void handle_query( struct link *ql, time_t st )
 		n++;
 	}
 
-	/* sort the array by name before displaying */
-
+	// sort the array by name before displaying
 	qsort(array, n, sizeof(struct jx *), compare_jx);
 
 	if(!strcmp(path, "/query.text")) {
@@ -539,38 +589,6 @@ static void handle_query( struct link *ql, time_t st )
 		}
 		buffer_free(&buf);
 
-	} else if(3==sscanf(path, "/history/%ld/%ld/%[^/]",&time_start,&time_stop,strexpr)) {
-
-		struct buffer buf;
-		buffer_init(&buf);
-		if(b64_decode(strexpr,&buf)==0) {
-			struct jx *expr = jx_parse_string(buffer_tostring(&buf));
-			if(expr) {
-				if(link_using_ssl(ql)) {
-					send_http_response(ql,501,"Server Error","text/plain",st);
-					link_printf(ql,st,"Sorry, unable to serve queries over HTTPS.");
-				} else {
-					send_http_response(ql,200,"OK","text/plain",st);
-
-					struct deltadb_query *query = deltadb_query_create();
-					deltadb_query_set_filter(query,expr);
-					// Note this leaks a stdio stream, but it will be shortly recovered on process exit.
-					deltadb_query_set_output(query,fdopen(link_fd(ql),"w"));
-					deltadb_query_set_display(query,DELTADB_DISPLAY_STREAM);
-					deltadb_query_execute_dir(query,history_dir,time_start,time_stop);
-					deltadb_query_delete(query);
-					jx_delete(expr);
-				}
-			} else {
-				send_http_response(ql,400,"Bad Request","text/plain",st);
-				link_printf(ql,st,"Invalid query text.\n");
-			}
-		} else {
-			send_http_response(ql,400,"Bad Request","text/plain",st);
-			link_printf(ql,st,"Invalid base-64 encoding.\n");
-		}
-		buffer_free(&buf);
-
 	} else if(!strcmp(path, "/query.newclassads")) {
 		send_http_response(ql,200,"OK","text/plain",st);
 		for(i = 0; i < n; i++)
@@ -587,7 +605,11 @@ static void handle_query( struct link *ql, time_t st )
 			link_printf(ql,st, "<center>\n");
 			link_printf(ql,st, "<h1>%s catalog server</h1>\n", preferred_hostname);
 			link_printf(ql,st, "<h2>%s</h2>\n", name);
-			link_printf(ql,st, "<p><a href=/>return to catalog view</a><p>\n");
+			if (timestamp) {
+				link_printf(ql,st, "<p><a href=/history/%ld/>return to catalog view</a><p>\n", timestamp);
+			} else {
+				link_printf(ql,st, "<p><a href=/>return to catalog view</a><p>\n");
+			}
 			catalog_export_html_solo(j, ql,st);
 			link_printf(ql,st, "</center>\n");
 		} else {
@@ -608,10 +630,20 @@ static void handle_query( struct link *ql, time_t st )
 		link_printf(ql,st, "<title>%s catalog server</title>\n", preferred_hostname);
 		link_printf(ql,st, "<center>\n");
 		link_printf(ql,st, "<h1>%s catalog server</h1>\n", preferred_hostname);
-		link_printf(ql,st, "<a href=/query.text>text</a> - ");
-		link_printf(ql,st, "<a href=/query.html>html</a> - ");
-		link_printf(ql,st, "<a href=/query.json>json</a> - ");
-		link_printf(ql,st, "<a href=/query.newclassads>classads</a>");
+		if (timestamp) {
+			catalog_export_html_datetime_picker(ql, st, timestamp);
+			link_printf(ql,st, "<h3>Historical Snapshot as of %s</h3>", ctime(&timestamp));
+			link_printf(ql,st, "<a href=/history/%ld/query.text>text</a> - ", timestamp);
+			link_printf(ql,st, "<a href=/history/%ld/query.html>html</a> - ", timestamp);
+			link_printf(ql,st, "<a href=/history/%ld/query.json>json</a> - ", timestamp);
+			link_printf(ql,st, "<a href=/history/%ld/query.newclassads>classads</a>", timestamp);
+		} else {
+			catalog_export_html_datetime_picker(ql, st, time(0));
+			link_printf(ql,st, "<a href=/query.text>text</a> - ");
+			link_printf(ql,st, "<a href=/query.html>html</a> - ");
+			link_printf(ql,st, "<a href=/query.json>json</a> - ");
+			link_printf(ql,st, "<a href=/query.newclassads>classads</a>");
+		}
 		link_printf(ql,st, "<p>\n");
 
 		for(i = 0; i < n; i++) {
@@ -629,7 +661,11 @@ static void handle_query( struct link *ql, time_t st )
 		for(i = 0; i < n; i++) {
 			j = array[i];
 			make_hash_key(j, key);
-			string_nformat(url, sizeof(url), "/detail/%s", key);
+			if (timestamp) {
+				string_nformat(url, sizeof(url), "/history/%ld/detail/%s", timestamp, key);
+			} else {
+				string_nformat(url, sizeof(url), "/detail/%s", key);
+			}
 			catalog_export_html_with_link(j, ql, html_headers, "name", url, st);
 		}
 		catalog_export_html_footer(ql, html_headers, st);
@@ -637,10 +673,9 @@ static void handle_query( struct link *ql, time_t st )
 	} else {
 		send_http_response(ql,404,"Not Found","text/html",st);
 		link_printf(ql,st,"<p>Error 404: Invalid URL</p>");
-		link_printf(ql,st,"<pre>%s</pre>",url);
+		link_printf(ql,st,"<pre>%s</pre>",path);
 		link_printf(ql,st,"<p><a href=/>Return to Index</a></p>");
 	}
-
 }
 
 void handle_tcp_query( struct link *port, int using_ssl )
