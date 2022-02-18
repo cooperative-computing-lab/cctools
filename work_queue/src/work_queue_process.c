@@ -29,6 +29,10 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+
+#include <netinet/in.h>
+#include <netdb.h>
 
 // return 0 on error, 1 otherwise
 static int create_task_directories(struct work_queue_process *p) {
@@ -255,6 +259,60 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 		result = dup2(p->output_fd, STDERR_FILENO);
 		if(result == -1)
 			fatal("could not dup pipe to stderr: %s", strerror(errno));
+
+		if(strcmp(p->task->command_line, "@FUNCTION") == 0) {
+			// this code simply prints some basic json to the process output file
+			/*
+			char * result_json = "{\"result\": \"success\"}";
+			write(p->output_fd, result_json, strlen(result_json));
+			close(p->output_fd);
+			exit(0);
+			*/
+			
+			// Should this be split into a separate function?
+			// i.e. void work_queue_process_network_function(struct work_queue_process *p)
+			// build necessary networking components
+			struct hostent *hp;
+			struct sockaddr_in sin;
+			char * host;
+			char * port;
+			int s, len;
+			socklen_t addr_len;
+			char buf[BUFSIZ];
+
+			host = "crcfe02.crc.nd.edu";
+			port = "45107";
+
+			hp = gethostbyname(host);
+			bzero((char *)&sin, sizeof(sin));
+			sin.sin_family = AF_INET;
+			bcopy(hp->h_addr_list[0], (char *)&sin.sin_addr, hp->h_length);
+			sin.sin_port = htons(atoi(port));
+			addr_len = sizeof(sin);
+
+			if((s = socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
+				perror("socket create error\n");
+			}
+
+			// send message to server
+			char * event = "{\"a\": \"2\", \"b\": \"3\"}";
+			strncpy(buf, event, strlen(event)+1);
+			len = strlen(buf);
+
+			if(sendto(s, buf, len, 0, (struct sockaddr *)&sin, sizeof(struct sockaddr)) == -1) {
+				perror("error sending message\n");
+			}
+
+			// receive message from server
+			bzero(buf, sizeof(buf));
+			if(recvfrom(s, buf, sizeof(buf), 0, (struct sockaddr *)&sin, &addr_len) == -1) {
+				perror("error receiving response from server\n");
+			}
+	
+			write(p->output_fd, buf, strlen(buf));
+
+			exit(0);
+		}
 
 		close(p->output_fd);
 
