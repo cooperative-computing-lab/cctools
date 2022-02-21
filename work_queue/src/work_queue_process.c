@@ -14,7 +14,7 @@
 #include "path.h"
 #include "xxmalloc.h"
 #include "trash.h"
-#include "link.h"
+#include "datagram.h"
 #include "domain_name.h"
 
 #include <math.h>
@@ -267,69 +267,42 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 			close(p->output_fd);
 			exit(0);
 			*/
-			
-			// Should this be split into a separate function?
-			// i.e. void work_queue_process_network_function(struct work_queue_process *p)
-			// build necessary networking components
-			/*
-			struct hostent *hp;
-			struct sockaddr_in sin;
-			char * host;
-			char * port;
-			int s, len;
-			socklen_t addr_len;
-			char buf[BUFSIZ];
-
-			host = "crcfe02.crc.nd.edu";
-			port = "45107";
-
-			hp = gethostbyname(host);
-			bzero((char *)&sin, sizeof(sin));
-			sin.sin_family = AF_INET;
-			bcopy(hp->h_addr_list[0], (char *)&sin.sin_addr, hp->h_length);
-			sin.sin_port = htons(atoi(port));
-			addr_len = sizeof(sin);
-
-			if((s = socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
-				perror("socket create error\n");
-			}
-
-			// send message to server
-			
-			if(sendto(s, buf, len, 0, (struct sockaddr *)&sin, sizeof(struct sockaddr)) == -1) {
-				perror("error sending message\n");
-			}
-
-			// receive message from server
-			bzero(buf, sizeof(buf));
-			if(recvfrom(s, buf, sizeof(buf), 0, (struct sockaddr *)&sin, &addr_len) == -1) {
-				perror("error receiving response from server\n");
-			}
-	
-			write(p->output_fd, buf, strlen(buf));
-			*/
 
 			char addr[DOMAIN_NAME_MAX];
-			char buf[BUFSIZ];
+			char buf[DATAGRAM_PAYLOAD_MAX];
 			int len;
-			time_t curr_time, seconds;
-			struct link *link;
+			int port = 45107;
+			int timeout = 60000000; // one minute, can be changed
 
+			// create datagram
 			if(!domain_name_lookup("localhost", addr)) {
 				fatal("could not lookup address of localhost");
 			}
-		
-			curr_time = time(&seconds);
-			link = link_connect(addr, 45107, curr_time+1000);
-			if(!link) {
-				fatal("could not create link: %s", strerror(errno));
+			
+			struct datagram *dgram = datagram_create(DATAGRAM_PORT_ANY);
+			if(!dgram) {
+				fatal("could not create datagram: %s", strerror(errno));
 			}
-		
+			
+			// currently just a dummy event to send to network function
 			char * event = "{\"a\": \"2\", \"b\": \"3\"}";
 			strncpy(buf, event, strlen(event)+1);
 			len = strlen(buf);
 
-			link_write(link, buf, len, curr_time+10000);
+			// send event to network function
+			int bytes_sent = datagram_send(dgram, buf, len, addr, port);
+			if(bytes_sent < 0) {
+				fatal("error sending data to network function: %s", strerror(errno));
+			}
+
+			// get response from network function
+			bzero(buf, sizeof(buf));
+			int bytes_recv = datagram_recv(dgram, buf, sizeof(buf), addr, &port, timeout);
+			if(bytes_recv < 0) {
+				fatal("error receving from network function: %s", strerror(errno));
+			}
+
+			write(p->output_fd, buf, strlen(buf));
 
 			exit(0);
 		}
