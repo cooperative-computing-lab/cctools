@@ -14,6 +14,8 @@
 #include "path.h"
 #include "xxmalloc.h"
 #include "trash.h"
+#include "link.h"
+#include "domain_name.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -29,10 +31,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 
-#include <netinet/in.h>
-#include <netdb.h>
 
 // return 0 on error, 1 otherwise
 static int create_task_directories(struct work_queue_process *p) {
@@ -272,6 +271,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 			// Should this be split into a separate function?
 			// i.e. void work_queue_process_network_function(struct work_queue_process *p)
 			// build necessary networking components
+			/*
 			struct hostent *hp;
 			struct sockaddr_in sin;
 			char * host;
@@ -295,10 +295,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 			}
 
 			// send message to server
-			char * event = "{\"a\": \"2\", \"b\": \"3\"}";
-			strncpy(buf, event, strlen(event)+1);
-			len = strlen(buf);
-
+			
 			if(sendto(s, buf, len, 0, (struct sockaddr *)&sin, sizeof(struct sockaddr)) == -1) {
 				perror("error sending message\n");
 			}
@@ -310,6 +307,29 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 			}
 	
 			write(p->output_fd, buf, strlen(buf));
+			*/
+
+			char addr[DOMAIN_NAME_MAX];
+			char buf[BUFSIZ];
+			int len;
+			time_t curr_time, seconds;
+			struct link *link;
+
+			if(!domain_name_lookup("localhost", addr)) {
+				fatal("could not lookup address of localhost");
+			}
+		
+			curr_time = time(&seconds);
+			link = link_connect(addr, 45107, curr_time+1000);
+			if(!link) {
+				fatal("could not create link: %s", strerror(errno));
+			}
+		
+			char * event = "{\"a\": \"2\", \"b\": \"3\"}";
+			strncpy(buf, event, strlen(event)+1);
+			len = strlen(buf);
+
+			link_write(link, buf, len, curr_time+10000);
 
 			exit(0);
 		}

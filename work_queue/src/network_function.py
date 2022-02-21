@@ -14,7 +14,7 @@ def main():
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	
 	try:
-		s.bind(('0.0.0.0', 45107))
+		s.bind(('localhost', 45107))
 	except Exception as e:
 		s.close()
 		print(e)
