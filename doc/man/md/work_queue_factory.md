@@ -71,7 +71,6 @@ General options:
 
 - **-T**,**--batch-type=_&lt;type&gt;_**<br /> Batch system type (required). One of: local, wq, condor, sge, pbs, lsf, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun
 - **-C**,**--config-file=_&lt;file&gt;_**<br /> Use configuration file _&lt;file&gt;_.
-- **-C**,**--config-file=_&lt;file&gt;_**<br /> Use configuration file _&lt;file&gt;_.
 - **-M**,**--manager-name=_&lt;project&gt;_**<br /> Project name of managers to server, can be regex
 - **-F**,**--foremen-name=_&lt;project&gt;_**<br /> Foremen to serve, can be a regular expression.
 - **--catalog=_&lt;host:port&gt;_**<br /> Catalog server to query for managers.
