@@ -224,6 +224,9 @@ static char *debug_path = NULL;
 static char *catalog_hosts = NULL;
 static int tlq_port = 0;
 
+static char *coprocess_command = NULL;
+static pid_t coprocess_pid = 0;
+
 __attribute__ (( format(printf,2,3) ))
 static void send_manager_message( struct link *manager, const char *fmt, ... )
 {
@@ -2486,6 +2489,66 @@ struct list *parse_manager_addresses(const char *specs, int default_port) {
 	return(managers);
 }
 
+void start_coprocess()
+{
+	coprocess_pid = fork();
+	if (coprocess_pid < 0) // unable to fork
+	{
+		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
+		return;
+	}		
+	else if (coprocess_pid == 0) // child executes this
+	{
+		execlp(coprocess_command, coprocess_command, (char *) 0);
+		fprintf(stderr, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
+		_exit(127); // if we get here, the exec failed so we just quit
+	}
+	else // parent goes here
+	{
+		debug(D_WQ, "Forked child process to run %s\n", coprocess_command);
+	}
+}
+
+void end_coprocess()
+{
+	int max_time_to_wait = 60; // maximum seconds we wish to wait for a given process
+	int max_wait_per_iteration = 5; // maximum seconds to wait before attempting to send another signal
+	int number_of_attempted_terms = 0; // keep track of how many attempts we have made to terminate the child process cleanly
+	int signal_to_send = SIGTERM; // contains which signal we attempt to send to a child process. Begins as SIGTERM, moved to SIGKILL after max_time_to_wait seconds of attempts
+	while(kill(coprocess_pid, signal_to_send) == 0) {
+		debug(D_WQ, "waiting for process %d", coprocess_pid);
+		int wait_return, status = 0;
+		wait_return = waitpid(coprocess_pid, &status, WNOHANG);
+		if(wait_return < 0)
+		{
+			debug(D_WQ, "unable to wait for %d: %s\n", coprocess_pid, strerror(errno));
+			return;
+		}
+		// check up to max_time_to_wait / max_wait_per_iteration times (total max_time_to_wait seconds) for process to terminate cleanly
+		number_of_attempted_terms++;
+		if (number_of_attempted_terms >= (max_time_to_wait / max_wait_per_iteration)) // otherwise we begin to send SIGKILL
+		{
+			signal_to_send = SIGKILL;
+		}
+		else if (number_of_attempted_terms >= (2 * max_time_to_wait / max_wait_per_iteration)) // if the process doesn't clean up after another max_time_to_wait seconds of sending SIGKILL, abandon trying and return
+		{
+			return;
+		}
+		if (wait_return == 0) // if nothing has changed, wait for 5 seconds
+                {
+                        sleep(max_wait_per_iteration);
+                        continue;
+                }
+                if (WIFEXITED(status) | WIFSIGNALED(status)) 
+		{
+			debug(D_WQ, "coprocess %d finished successfully!\n", coprocess_pid);
+                        return;
+                }
+	} 
+
+	debug(D_WQ, "could not signal process %d: %s\n", coprocess_pid, strerror(errno));
+}
+
 static void show_help(const char *cmd)
 {
 	printf( "Use: %s [options] <managerhost> <port> \n"
@@ -2549,6 +2612,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
+	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2557,7 +2621,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL};
+	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2604,6 +2668,7 @@ static const struct option long_options[] = {
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
+	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
 	{0,0,0,0}
 };
 
@@ -2849,6 +2914,13 @@ int main(int argc, char *argv[])
 		case LONG_OPT_USE_SSL:
 			manual_ssl_option=1;
 			break;
+		case LONG_OPT_COPROCESS:
+			coprocess_command = xxstrdup(optarg); // get coprocess name from argument list
+			char absolute[1024];
+			path_absolute(coprocess_command, absolute, 1); // get absolute path of executable
+			free(coprocess_command);
+			coprocess_command = xxstrdup(absolute); 
+			break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -2998,6 +3070,11 @@ int main(int argc, char *argv[])
 		total_resources->disk.total,
 		total_resources->gpus.total);
 
+	if (coprocess_command != NULL)
+	{
+		start_coprocess();
+	}
+
 	while(1) {
 		int result = 0;
 
@@ -3054,6 +3131,7 @@ int main(int argc, char *argv[])
 	}
 
 	workspace_delete();
+	end_coprocess();	
 
 	return 0;
 }
