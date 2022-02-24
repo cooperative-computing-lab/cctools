@@ -2500,7 +2500,7 @@ void start_coprocess()
 	else if (coprocess_pid == 0) // child executes this
 	{
 		execlp(coprocess_command, coprocess_command, (char *) 0);
-		fprintf(stderr, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
+		debug(D_WQ, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
 		_exit(127); // if we get here, the exec failed so we just quit
 	}
 	else // parent goes here
@@ -3131,8 +3131,10 @@ int main(int argc, char *argv[])
 	}
 
 	workspace_delete();
-	end_coprocess();	
-
+	if (coprocess_command != NULL)
+	{
+		end_coprocess();	
+	}
 	return 0;
 }
 
