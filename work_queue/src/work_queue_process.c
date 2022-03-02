@@ -267,6 +267,37 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 			close(p->output_fd);
 			exit(0);
 			*/
+			
+			/*
+			struct list *infiles = p->task->input_files; 
+			char *file = (char *)list_pop_head(infiles);
+			printf("file: %d", list_size(p->task->input_files));
+			*/
+
+			// this is returning a data from f->payload, but says that there is no such file when I try to open it
+			struct work_queue_file *f;
+			list_first_item(p->task->input_files);
+			while((f = list_next_item(p->task->input_files))) {
+				char *file_name = f->payload;
+				printf("file: %s", file_name);
+
+				FILE *fp;
+				char buf[BUFSIZ];
+
+				fp = fopen(file_name, "r");
+				
+				if(!fp) {
+					fatal("could not open file: %s", strerror(errno));
+				}
+			
+				/*
+				fgets(buf, BUFSIZ, (FILE *)fp);
+				printf("read: %s", buf);
+				*/
+			}
+
+			exit(0);
+	
 
 			char addr[DOMAIN_NAME_MAX];
 			char buf[DATAGRAM_PAYLOAD_MAX];
@@ -283,9 +314,9 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 			if(!dgram) {
 				fatal("could not create datagram: %s", strerror(errno));
 			}
-			
+		
 			// currently just a dummy event to send to network function
-			char * event = "{\"a\": \"2\", \"b\": \"3\"}";
+			char *event = "{\"a\": \"2\", \"b\": \"3\"}";
 			strncpy(buf, event, strlen(event)+1);
 			len = strlen(buf);
 

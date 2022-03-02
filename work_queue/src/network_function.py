@@ -28,6 +28,11 @@ def main():
 		event = json.loads(event)
 		print('received message: {} from {}'.format(event, addr))
 
+		'''
+		Once we have received the function input, we need to call that function somehow
+		- How do we actually get the function over here?
+		'''
+
 		result = function_handler(event)
 
 		response = {
