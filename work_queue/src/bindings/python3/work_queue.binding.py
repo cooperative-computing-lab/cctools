@@ -1781,16 +1781,22 @@ class WorkQueue(object):
                 p_task = PythonTask(map, fn, array[start:])
             else:
                 p_task = PythonTask(map, fn, array[start:end])
-
+            
+            p_task.specify_tag(str(i))
             self.submit(p_task)
             tasks[p_task.id] = i
+               
+        n = 0
+        for i in range(size+1):
+            while not self.empty() and n < size:
 
-        while not self.empty():
-            t = self.wait()
-            results[tasks[t.id]] = list(t.output)
+                t = self.wait_for_tag(str(i), 1)                
+                if t:
+                    results[tasks[t.id]] = list(t.output)
+                    n += 1
+                    break
 
         return [item for elem in results for item in elem]
-
 
     ##
     # Returns the values for a function of each pair from 2 sequences
@@ -1802,11 +1808,12 @@ class WorkQueue(object):
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
     def pair(self, fn, seq1, seq2, chunk_size=1):
-        def fpairs(fn, List):
+
+        def fpairs(fn, s):
             results = []
 
-            for item in List:
-                results.append(fn(item))
+            for p in s:    
+                results.append(fn(p))
 
             return results
        
@@ -1818,11 +1825,12 @@ class WorkQueue(object):
         num_task = 0
 
         for item in itertools.product(seq1, seq2):
+
             if num == chunk_size:
                 p_task = PythonTask(fpairs, fn, task)
+                p_task.specify_tag(str(num_task))
                 self.submit(p_task)
-                tasks[p_task.id] = num_task
-                
+                tasks[p_task.id] = num_task                
                 num = 0
                 num_task += 1
                 task.clear()
@@ -1832,13 +1840,22 @@ class WorkQueue(object):
 
         if len(task) > 0:
             p_task = PythonTask(fpairs, fn, task)
+            p_task.specify_tag(str(num_task))
             self.submit(p_task)
             tasks[p_task.id] = num_task
+            num_task += 1
 
-        while not self.empty():
-            t = self.wait()
-            results[tasks[t.id]] = t.output
+        n = 0
+        for i in range(num_task):
 
+            while not self.empty() and n < num_task:
+                t = self.wait_for_tag(str(i), 10)
+
+                if t:
+                    results[tasks[t.id]] = t.output
+                    n += 1
+                    break
+ 
         return [item for elem in results for item in elem]
 
 
@@ -1857,12 +1874,9 @@ class WorkQueue(object):
     # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
 
     def tree_reduce(self, fn, seq, chunk_size=2): 
-
-        # parallel function
         tasks = {}
         
         while len(seq) > 1:
-
             size = math.ceil(len(seq)/chunk_size)
             results = [None] * size
         
@@ -1875,12 +1889,20 @@ class WorkQueue(object):
                 else:
                     p_task = PythonTask(fn, seq[start:end])
 
+                p_task.specify_tag(str(i))
                 self.submit(p_task)
                 tasks[p_task.id] = i
 
-            while not self.empty():
-                t = self.wait()
-                results[tasks[t.id]] = t.output
+            n = 0
+            for i in range(size+1):
+
+                while not self.empty() and n < size:
+                    t = self.wait_for_tag(str(i), 10)
+
+                    if t:
+                        results[tasks[t.id]] = t.output
+                        n += 1
+                        break
 
             seq = results
 
