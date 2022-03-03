@@ -259,46 +259,41 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 		if(result == -1)
 			fatal("could not dup pipe to stderr: %s", strerror(errno));
 
-		if(strcmp(p->task->command_line, "@FUNCTION") == 0) {
-			// this code simply prints some basic json to the process output file
-			/*
-			char * result_json = "{\"result\": \"success\"}";
-			write(p->output_fd, result_json, strlen(result_json));
-			close(p->output_fd);
-			exit(0);
-			*/
-			
-			/*
-			struct list *infiles = p->task->input_files; 
-			char *file = (char *)list_pop_head(infiles);
-			printf("file: %d", list_size(p->task->input_files));
-			*/
+		if(strcmp(p->task->command_line, "@FUNCTION") == 0) {	
+			// read the contents from the input file
+			FILE *fp;
+			char *file_buf = NULL;
+			long numbytes = 0;
 
-			// this is returning a data from f->payload, but says that there is no such file when I try to open it
 			struct work_queue_file *f;
 			list_first_item(p->task->input_files);
 			while((f = list_next_item(p->task->input_files))) {
-				char *file_name = f->payload;
-				printf("file: %s", file_name);
-
-				FILE *fp;
-				char buf[BUFSIZ];
+				char *file_name = f->remote_name;
+				// printf("file: %s\n", file_name);
 
 				fp = fopen(file_name, "r");
 				
 				if(!fp) {
 					fatal("could not open file: %s", strerror(errno));
 				}
-			
-				/*
-				fgets(buf, BUFSIZ, (FILE *)fp);
-				printf("read: %s", buf);
-				*/
+				
+				// get the file size for reading
+				fseek(fp, 0L, SEEK_END);
+				numbytes = ftell(fp);
+				fseek(fp, 0L, SEEK_SET);
+				
+				// allocate memory and read
+				file_buf = (char *)calloc(numbytes, sizeof(char));
+				fread(file_buf, sizeof(char), numbytes, fp);
+
+				fclose(fp);
 			}
 
-			exit(0);
-	
-
+			if(file_buf == NULL) {
+				fatal("couldn't read contents of file");
+			}	
+			
+			// networking portion
 			char addr[DOMAIN_NAME_MAX];
 			char buf[DATAGRAM_PAYLOAD_MAX];
 			int len;
@@ -314,13 +309,13 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 			if(!dgram) {
 				fatal("could not create datagram: %s", strerror(errno));
 			}
-		
-			// currently just a dummy event to send to network function
-			char *event = "{\"a\": \"2\", \"b\": \"3\"}";
-			strncpy(buf, event, strlen(event)+1);
+	
+			// copy file contents into buffer and free file buffer
+			strncpy(buf, file_buf, numbytes+1);
+			free(file_buf);
 			len = strlen(buf);
 
-			// send event to network function
+			// send data to network function
 			int bytes_sent = datagram_send(dgram, buf, len, addr, port);
 			if(bytes_sent < 0) {
 				fatal("error sending data to network function: %s", strerror(errno));
@@ -333,6 +328,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 				fatal("error receving from network function: %s", strerror(errno));
 			}
 
+			// write response to manager output file
 			write(p->output_fd, buf, strlen(buf));
 
 			exit(0);
