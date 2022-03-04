@@ -18,7 +18,7 @@ def main():
 	except Exception as e:
 		s.close()
 		print(e)
-		exit(-1)
+		exit(1)
 
 	while True:
 		print('listening on port: {}\n'.format(s.getsockname()[1]))

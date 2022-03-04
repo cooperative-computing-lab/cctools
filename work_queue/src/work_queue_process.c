@@ -16,6 +16,7 @@
 #include "trash.h"
 #include "datagram.h"
 #include "domain_name.h"
+#include "full_io.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -197,6 +198,68 @@ static void specify_resources_vars(struct work_queue_process *p) {
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
+char * load_input_file(struct work_queue_task *t) {
+	FILE *fp = fopen("infile", "r");
+	if(!fp) {
+		fatal("could not open file for reading: %s", strerror(errno));
+	}
+
+	fseek(fp, 0L, SEEK_END);
+	size_t fsize = ftell(fp);
+	fseek(fp, 0L, SEEK_SET);
+	// using calloc solves problem of garbage appended to buffer
+	char *buf = calloc(fsize, sizeof(*buf));
+
+	int bytes_read = full_fread(fp, buf, fsize);
+	if(bytes_read < 0) {
+		fatal("error reading file: %s", strerror(errno));
+	}
+
+	return buf;	
+}
+
+char * invoke_coprocess_function(char *input) {
+	char addr[DOMAIN_NAME_MAX];
+	char buf[DATAGRAM_PAYLOAD_MAX];
+	int len;
+	int port = 45107;
+	int timeout = 60000000; // one minute, can be changed
+
+	if(!domain_name_lookup("localhost", addr)) {
+		fatal("could not lookup address of localhost");
+	}
+
+	struct datagram *dgram = datagram_create(DATAGRAM_PORT_ANY);
+	if(!dgram) {
+		fatal("could not create datagram: %s", strerror(errno));
+	}
+
+	memcpy(buf, input, strlen(input)+1);
+	len = strlen(buf);
+
+	// send data to network function
+	int bytes_sent = datagram_send(dgram, buf, len, addr, port);
+	if(bytes_sent < 0) {
+		fatal("error sending data to network function: %s", strerror(errno));
+	}
+
+	// wait for response from network function
+	bzero(buf, sizeof(buf));
+	int bytes_recv = datagram_recv(dgram, buf, sizeof(buf), addr, &port, timeout);
+	if(bytes_recv < 0) {
+		fatal("error receiving from network function: %s", strerror(errno));
+	}
+
+	char *output = malloc(strlen(buf));
+	memcpy(output, buf, strlen(buf));
+
+	return output;
+}
+
+void write_output_file(char *output) {
+
+}
+
 pid_t work_queue_process_execute(struct work_queue_process *p )
 {
 	// make warning
@@ -260,77 +323,15 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 			fatal("could not dup pipe to stderr: %s", strerror(errno));
 
 		if(strcmp(p->task->command_line, "@FUNCTION") == 0) {	
-			// read the contents from the input file
-			FILE *fp;
-			char *file_buf = NULL;
-			long numbytes = 0;
-
-			struct work_queue_file *f;
-			list_first_item(p->task->input_files);
-			while((f = list_next_item(p->task->input_files))) {
-				char *file_name = f->remote_name;
-				// printf("file: %s\n", file_name);
-
-				fp = fopen(file_name, "r");
-				
-				if(!fp) {
-					fatal("could not open file: %s", strerror(errno));
-				}
-				
-				// get the file size for reading
-				fseek(fp, 0L, SEEK_END);
-				numbytes = ftell(fp);
-				fseek(fp, 0L, SEEK_SET);
-				
-				// allocate memory and read
-				file_buf = (char *)calloc(numbytes, sizeof(char));
-				fread(file_buf, sizeof(char), numbytes, fp);
-
-				fclose(fp);
-			}
-
-			if(file_buf == NULL) {
-				fatal("couldn't read contents of file");
-			}	
-			
-			// networking portion
-			char addr[DOMAIN_NAME_MAX];
-			char buf[DATAGRAM_PAYLOAD_MAX];
-			int len;
-			int port = 45107;
-			int timeout = 60000000; // one minute, can be changed
-
-			// create datagram
-			if(!domain_name_lookup("localhost", addr)) {
-				fatal("could not lookup address of localhost");
-			}
-			
-			struct datagram *dgram = datagram_create(DATAGRAM_PORT_ANY);
-			if(!dgram) {
-				fatal("could not create datagram: %s", strerror(errno));
-			}
+			// load data from input file
+			char *input = load_input_file(p->task);
 	
-			// copy file contents into buffer and free file buffer
-			strncpy(buf, file_buf, numbytes+1);
-			free(file_buf);
-			len = strlen(buf);
+			// call invoke_coprocess_function
+		 	char *output = invoke_coprocess_function(input);
 
-			// send data to network function
-			int bytes_sent = datagram_send(dgram, buf, len, addr, port);
-			if(bytes_sent < 0) {
-				fatal("error sending data to network function: %s", strerror(errno));
-			}
-
-			// get response from network function
-			bzero(buf, sizeof(buf));
-			int bytes_recv = datagram_recv(dgram, buf, sizeof(buf), addr, &port, timeout);
-			if(bytes_recv < 0) {
-				fatal("error receving from network function: %s", strerror(errno));
-			}
-
-			// write response to manager output file
-			write(p->output_fd, buf, strlen(buf));
-
+			// write data to output file
+			full_write(p->output_fd, output, strlen(output));
+			
 			exit(0);
 		}
 
