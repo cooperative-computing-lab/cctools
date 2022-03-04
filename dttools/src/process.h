@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 /** @file process.h
 Provides a higher level interface to finding information about complete processes.
@@ -58,6 +59,13 @@ If so, its status may be obtained without delay by calling @ref process_wait .
 */
 
 int process_pending();
+
+/** Attempt to cleanly terminate process pid for timeout seconds max_attempt times
+If the process has not returned by then, try for another timeout seconds in max_attempt times to forcefully end the process
+if this is still not successfuly, stop trying and return. Return value of 0 is clean exit, while a return value of 1 is a terminated exit
+*/
+
+int process_kill_waitpid(pid_t pid, int timeout, int max_attempts);
 
 /** Return a process_info structure to the queue.
 @param p A @ref process_info structure returned by @ref process_wait.

@@ -98,6 +98,66 @@ struct process_info *process_waitpid( pid_t pid, int timeout)
 	return 0;
 }
 
+int process_kill_waitpid(pid_t pid, int timeout, int max_attempts)
+{
+	int flags = 0;
+        struct sigaction new_action, old_action;
+
+	if(timeout == 0) {
+                flags = WNOHANG; // if the timeout is zero, we want waitpid to return immediately
+        } else { // set up the signal handler for alarm to get us out of wait
+                flags = 0;
+                new_action.sa_handler = alarm_handler;
+                sigemptyset(&new_action.sa_mask);
+                new_action.sa_flags = 0;
+                sigaction(SIGALRM, &new_action, &old_action);
+        }
+	int num_attempts = 0; // keep track of how many time we attempted to signal process pid
+	int current_signal = SIGTERM; // start by sending SIGTERM, move on to SIGKILL
+	int status; 
+	int ret_val = 1; // return value from this function: 0 means process exited cleanly, 1 means there was an error
+	while (kill(pid, current_signal) == 0) // send signal to process
+	{
+		if (timeout != 0) {alarm(timeout);} // and set an alarm for timeout seconds
+		num_attempts++;
+		if (num_attempts == max_attempts) // change to sending SIGKILL after max_attempts tries
+		{
+			current_signal = SIGKILL;
+		}
+		else if (num_attempts >= max_attempts * 2) // and give up after 2 * max_attempt tries
+		{
+			break;
+		}
+        	pid_t return_pid = waitpid(pid, &status, flags); // we will wait for the process to return for timeout seconds before the alarm signal is sent and we break out of wait
+		if (return_pid < 0) // handle errors
+		{
+			if (errno == EINTR) // this is the case that the alarm woke us up so we try again to signal
+			{
+				continue;
+			}
+			else // if there is any other error, it is fatal and we should just exit
+			{
+				break;
+			}
+		}
+		else if (return_pid == 0) // if the return value is 0, it means we set the timeout to zero and nothing changed, so we try to signal and wait for the process again
+		{
+			continue;
+		}
+		else // if we get a positive return value, the process exited successfully
+		{
+			ret_val = 0;
+			break;
+		}
+	}
+        if(timeout != 0) { // clear any alarms that are currently ongoing and reset the alarm signal handler before we exit
+                alarm(0);
+                sigaction(SIGALRM, &old_action, NULL);
+        }
+
+        return ret_val;	
+}
+
 void process_putback(struct process_info *p)
 {
 	if(!complete_list)

@@ -49,6 +49,7 @@ See the file COPYING for details.
 #include "tlq_config.h"
 #include "stringtools.h"
 #include "trash.h"
+#include "process.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -2509,46 +2510,6 @@ void start_coprocess()
 	}
 }
 
-void end_coprocess()
-{
-	int max_time_to_wait = 60; // maximum seconds we wish to wait for a given process
-	int max_wait_per_iteration = 5; // maximum seconds to wait before attempting to send another signal
-	int number_of_attempted_terms = 0; // keep track of how many attempts we have made to terminate the child process cleanly
-	int signal_to_send = SIGTERM; // contains which signal we attempt to send to a child process. Begins as SIGTERM, moved to SIGKILL after max_time_to_wait seconds of attempts
-	while(kill(coprocess_pid, signal_to_send) == 0) {
-		debug(D_WQ, "waiting for process %d", coprocess_pid);
-		int wait_return, status = 0;
-		wait_return = waitpid(coprocess_pid, &status, WNOHANG);
-		if(wait_return < 0)
-		{
-			debug(D_WQ, "unable to wait for %d: %s\n", coprocess_pid, strerror(errno));
-			return;
-		}
-		// check up to max_time_to_wait / max_wait_per_iteration times (total max_time_to_wait seconds) for process to terminate cleanly
-		number_of_attempted_terms++;
-		if (number_of_attempted_terms >= (max_time_to_wait / max_wait_per_iteration)) // otherwise we begin to send SIGKILL
-		{
-			signal_to_send = SIGKILL;
-		}
-		else if (number_of_attempted_terms >= (2 * max_time_to_wait / max_wait_per_iteration)) // if the process doesn't clean up after another max_time_to_wait seconds of sending SIGKILL, abandon trying and return
-		{
-			return;
-		}
-		if (wait_return == 0) // if nothing has changed, wait for 5 seconds
-                {
-                        sleep(max_wait_per_iteration);
-                        continue;
-                }
-                if (WIFEXITED(status) | WIFSIGNALED(status)) 
-		{
-			debug(D_WQ, "coprocess %d finished successfully!\n", coprocess_pid);
-                        return;
-                }
-	} 
-
-	debug(D_WQ, "could not signal process %d: %s\n", coprocess_pid, strerror(errno));
-}
-
 static void show_help(const char *cmd)
 {
 	printf( "Use: %s [options] <managerhost> <port> \n"
@@ -3133,7 +3094,9 @@ int main(int argc, char *argv[])
 	workspace_delete();
 	if (coprocess_command != NULL)
 	{
-		end_coprocess();	
+		int max_time_to_wait = 60; // maximum seconds we wish to wait for a given process
+		int max_wait_per_iteration = 5; // maximum seconds to wait before attempting to send another signal
+		process_kill_waitpid(coprocess_pid, max_wait_per_iteration, max_time_to_wait / max_wait_per_iteration);
 	}
 	return 0;
 }
