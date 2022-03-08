@@ -122,6 +122,7 @@ See the file COPYING for details.
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/times.h>
+#include <sys/prctl.h>
 
 #include <inttypes.h>
 #include <sys/types.h>
@@ -1996,6 +1997,8 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 		char *pid_s = string_format("%d", getpid());
 		setenv(RESOURCE_MONITOR_ROOT_PROCESS, pid_s, 1);
 		free(pid_s);
+
+		prctl(PR_SET_PDEATHSIG, SIGKILL);
 
 		errno = 0;
         execvp(executable, argv);
