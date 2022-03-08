@@ -392,7 +392,7 @@ void add_verbatim_field(const char *str) {
 		verbatim_summary_fields = jx_object(NULL);
 
 	jx_insert_string(verbatim_summary_fields, field, value);
-	debug(D_RMON, "%s", pair);
+	debug(D_RMON, "%s", str);
 
 	free(pair);
 }
