@@ -198,7 +198,7 @@ static void specify_resources_vars(struct work_queue_process *p) {
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
-char * load_input_file(struct work_queue_task *t) {
+static char * load_input_file(struct work_queue_task *t) {
 	FILE *fp = fopen("infile", "r");
 	if(!fp) {
 		fatal("could not open file for reading: %s", strerror(errno));
@@ -218,7 +218,7 @@ char * load_input_file(struct work_queue_task *t) {
 	return buf;	
 }
 
-char * invoke_coprocess_function(char *input) {
+static char * invoke_coprocess_function(char *input) {
 	char addr[DOMAIN_NAME_MAX];
 	char buf[DATAGRAM_PAYLOAD_MAX];
 	int len;
@@ -244,7 +244,7 @@ char * invoke_coprocess_function(char *input) {
 	}
 
 	// wait for response from network function
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	int bytes_recv = datagram_recv(dgram, buf, sizeof(buf), addr, &port, timeout);
 	if(bytes_recv < 0) {
 		fatal("error receiving from network function: %s", strerror(errno));
@@ -254,10 +254,6 @@ char * invoke_coprocess_function(char *input) {
 	memcpy(output, buf, strlen(buf));
 
 	return output;
-}
-
-void write_output_file(char *output) {
-
 }
 
 pid_t work_queue_process_execute(struct work_queue_process *p )
