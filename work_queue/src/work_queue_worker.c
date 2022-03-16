@@ -2493,20 +2493,30 @@ struct list *parse_manager_addresses(const char *specs, int default_port) {
 void start_coprocess()
 {
 	coprocess_pid = fork();
-	if (coprocess_pid < 0) // unable to fork
-	{
+	if (coprocess_pid < 0) { // unable to fork
 		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
 		return;
 	}		
-	else if (coprocess_pid == 0) // child executes this
-	{
+	else if (coprocess_pid == 0) { // child executes this
 		execlp(coprocess_command, coprocess_command, (char *) 0);
 		debug(D_WQ, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
 		_exit(127); // if we get here, the exec failed so we just quit
 	}
-	else // parent goes here
-	{
+	else { // parent goes here
 		debug(D_WQ, "Forked child process to run %s\n", coprocess_command);
+	}
+}
+
+int check_if_coprocess_exited()
+{
+	struct process_info *p = process_waitpid(coprocess_pid, 0); // see if p has exitex
+	if (p) { // if we get a nonnull return, the process exited
+		free(p);
+		return 1;
+	}
+	else // otherwise the process is still running
+	{
+		return 0;
 	}
 }
 
@@ -3088,15 +3098,18 @@ int main(int argc, char *argv[])
 			break;
 		}
 
+		if (check_if_coprocess_exited())
+		{
+			start_coprocess();
+		}
+
 		sleep(backoff_interval);
 	}
-
 	workspace_delete();
 	if (coprocess_command != NULL)
 	{
-		int max_time_to_wait = 60; // maximum seconds we wish to wait for a given process
-		int max_wait_per_iteration = 5; // maximum seconds to wait before attempting to send another signal
-		process_kill_waitpid(coprocess_pid, max_wait_per_iteration, max_time_to_wait / max_wait_per_iteration);
+		int max_wait = 5; // maximum seconds we wish to wait for a given process
+		process_kill_waitpid(coprocess_pid, max_wait);
 	}
 	return 0;
 }
