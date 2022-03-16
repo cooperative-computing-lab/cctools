@@ -2901,6 +2901,7 @@ int main(int argc, char *argv[])
 			path_absolute(coprocess_command, absolute, 1); // get absolute path of executable
 			free(coprocess_command);
 			coprocess_command = xxstrdup(absolute); 
+			break;
 		case LONG_OPT_PYTHON_FUNCTION:
 			python_function = xxstrdup(optarg);
 			break;
