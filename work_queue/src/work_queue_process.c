@@ -14,6 +14,9 @@
 #include "path.h"
 #include "xxmalloc.h"
 #include "trash.h"
+#include "datagram.h"
+#include "domain_name.h"
+#include "full_io.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -29,6 +32,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
 
 // return 0 on error, 1 otherwise
 static int create_task_directories(struct work_queue_process *p) {
@@ -194,6 +198,64 @@ static void specify_resources_vars(struct work_queue_process *p) {
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
+static char * load_input_file(struct work_queue_task *t) {
+	FILE *fp = fopen("infile", "r");
+	if(!fp) {
+		fatal("could not open file for reading: %s", strerror(errno));
+	}
+
+	fseek(fp, 0L, SEEK_END);
+	size_t fsize = ftell(fp);
+	fseek(fp, 0L, SEEK_SET);
+	// using calloc solves problem of garbage appended to buffer
+	char *buf = calloc(fsize, sizeof(*buf));
+
+	int bytes_read = full_fread(fp, buf, fsize);
+	if(bytes_read < 0) {
+		fatal("error reading file: %s", strerror(errno));
+	}
+
+	return buf;	
+}
+
+static char * invoke_coprocess_function(char *input) {
+	char addr[DOMAIN_NAME_MAX];
+	char buf[DATAGRAM_PAYLOAD_MAX];
+	int len;
+	int port = 45107;
+	int timeout = 60000000; // one minute, can be changed
+
+	if(!domain_name_lookup("localhost", addr)) {
+		fatal("could not lookup address of localhost");
+	}
+
+	struct datagram *dgram = datagram_create(DATAGRAM_PORT_ANY);
+	if(!dgram) {
+		fatal("could not create datagram: %s", strerror(errno));
+	}
+
+	memcpy(buf, input, strlen(input)+1);
+	len = strlen(buf);
+
+	// send data to network function
+	int bytes_sent = datagram_send(dgram, buf, len, addr, port);
+	if(bytes_sent < 0) {
+		fatal("error sending data to network function: %s", strerror(errno));
+	}
+
+	// wait for response from network function
+	memset(buf, 0, sizeof(buf));
+	int bytes_recv = datagram_recv(dgram, buf, sizeof(buf), addr, &port, timeout);
+	if(bytes_recv < 0) {
+		fatal("error receiving from network function: %s", strerror(errno));
+	}
+
+	char *output = malloc(strlen(buf));
+	memcpy(output, buf, strlen(buf));
+
+	return output;
+}
+
 pid_t work_queue_process_execute(struct work_queue_process *p )
 {
 	// make warning
@@ -255,6 +317,19 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 		result = dup2(p->output_fd, STDERR_FILENO);
 		if(result == -1)
 			fatal("could not dup pipe to stderr: %s", strerror(errno));
+
+		if(p->python_function != NULL && strcmp(p->task->command_line, p->python_function) == 0) {	
+			// load data from input file
+			char *input = load_input_file(p->task);
+	
+			// call invoke_coprocess_function
+		 	char *output = invoke_coprocess_function(input);
+
+			// write data to output file
+			full_write(p->output_fd, output, strlen(output));
+			
+			exit(0);
+		}
 
 		close(p->output_fd);
 
