@@ -318,7 +318,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 		if(result == -1)
 			fatal("could not dup pipe to stderr: %s", strerror(errno));
 
-		if(strcmp(p->task->command_line, "@FUNCTION") == 0) {	
+		if(p->python_function != NULL && strcmp(p->task->command_line, p->python_function) == 0) {	
 			// load data from input file
 			char *input = load_input_file(p->task);
 	

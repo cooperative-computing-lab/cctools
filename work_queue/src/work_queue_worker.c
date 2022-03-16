@@ -224,6 +224,9 @@ static char *debug_path = NULL;
 static char *catalog_hosts = NULL;
 static int tlq_port = 0;
 
+// User specified python function
+static char *python_function = NULL;
+
 __attribute__ (( format(printf,2,3) ))
 static void send_manager_message( struct link *manager, const char *fmt, ... )
 {
@@ -1916,6 +1919,10 @@ static void work_for_manager(struct link *manager) {
 				if(!p) {
 					break;
 				} else if(task_resources_fit_now(p->task)) {
+					// attach the python function name to process if applicable
+					if(python_function != NULL) {
+						p->python_function = xxstrdup(python_function);
+					}
 					start_process(p);
 					task_event++;
 				} else if(task_resources_fit_eventually(p->task)) {
@@ -2549,6 +2556,8 @@ static void show_help(const char *cmd)
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
+
+	printf( " %-30s Specify a python function to execute remotely.\n", "--python-function=<func>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2557,7 +2566,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL};
+	  LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2604,6 +2613,7 @@ static const struct option long_options[] = {
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
+	{"python-function",		required_argument,	0, 	LONG_OPT_PYTHON_FUNCTION},
 	{0,0,0,0}
 };
 
@@ -2848,6 +2858,9 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_USE_SSL:
 			manual_ssl_option=1;
+			break;
+		case LONG_OPT_PYTHON_FUNCTION:
+			python_function = xxstrdup(optarg);
 			break;
 		default:
 			show_help(argv[0]);
