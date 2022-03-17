@@ -49,6 +49,7 @@ See the file COPYING for details.
 #include "tlq_config.h"
 #include "stringtools.h"
 #include "trash.h"
+#include "process.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -223,6 +224,10 @@ static char *tlq_url = NULL;
 static char *debug_path = NULL;
 static char *catalog_hosts = NULL;
 static int tlq_port = 0;
+
+
+static char *coprocess_command = NULL;
+static pid_t coprocess_pid = 0;
 
 // User specified python function
 static char *python_function = NULL;
@@ -2493,6 +2498,36 @@ struct list *parse_manager_addresses(const char *specs, int default_port) {
 	return(managers);
 }
 
+void start_coprocess()
+{
+	coprocess_pid = fork();
+	if (coprocess_pid < 0) { // unable to fork
+		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
+		return;
+	}		
+	else if (coprocess_pid == 0) { // child executes this
+		execlp(coprocess_command, coprocess_command, (char *) 0);
+		debug(D_WQ, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
+		_exit(127); // if we get here, the exec failed so we just quit
+	}
+	else { // parent goes here
+		debug(D_WQ, "Forked child process to run %s\n", coprocess_command);
+	}
+}
+
+int check_if_coprocess_exited()
+{
+	struct process_info *p = process_waitpid(coprocess_pid, 0); // see if p has exitex
+	if (p) { // if we get a nonnull return, the process exited
+		free(p);
+		return 1;
+	}
+	else // otherwise the process is still running
+	{
+		return 0;
+	}
+}
+
 static void show_help(const char *cmd)
 {
 	printf( "Use: %s [options] <managerhost> <port> \n"
@@ -2556,7 +2591,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
-
+	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
 	printf( " %-30s Specify a python function to execute remotely.\n", "--python-function=<func>");
 }
 
@@ -2566,7 +2601,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION};
+	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2613,6 +2648,7 @@ static const struct option long_options[] = {
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
+	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
 	{"python-function",		required_argument,	0, 	LONG_OPT_PYTHON_FUNCTION},
 	{0,0,0,0}
 };
@@ -2859,6 +2895,13 @@ int main(int argc, char *argv[])
 		case LONG_OPT_USE_SSL:
 			manual_ssl_option=1;
 			break;
+		case LONG_OPT_COPROCESS:
+			coprocess_command = xxstrdup(optarg); // get coprocess name from argument list
+			char absolute[1024];
+			path_absolute(coprocess_command, absolute, 1); // get absolute path of executable
+			free(coprocess_command);
+			coprocess_command = xxstrdup(absolute); 
+			break;
 		case LONG_OPT_PYTHON_FUNCTION:
 			python_function = xxstrdup(optarg);
 			break;
@@ -3011,6 +3054,11 @@ int main(int argc, char *argv[])
 		total_resources->disk.total,
 		total_resources->gpus.total);
 
+	if (coprocess_command != NULL)
+	{
+		start_coprocess();
+	}
+
 	while(1) {
 		int result = 0;
 
@@ -3063,11 +3111,19 @@ int main(int argc, char *argv[])
 			break;
 		}
 
+		if (check_if_coprocess_exited())
+		{
+			start_coprocess();
+		}
+
 		sleep(backoff_interval);
 	}
-
 	workspace_delete();
-
+	if (coprocess_command != NULL)
+	{
+		int max_wait = 5; // maximum seconds we wish to wait for a given process
+		process_kill_waitpid(coprocess_pid, max_wait);
+	}
 	return 0;
 }
 
