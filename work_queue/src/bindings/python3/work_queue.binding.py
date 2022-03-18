@@ -1756,7 +1756,7 @@ class WorkQueue(object):
             task = self._task_table[int(task_pointer.taskid)]
             del self._task_table[task_pointer.taskid]
             return task
-        return None
+        return None            
 
     ##
     # Maps a function to elements in a sequence using work_queue
@@ -1907,7 +1907,28 @@ class WorkQueue(object):
             seq = results
 
         return seq[0]
-           
+
+    def test(self, fn, array):
+        p_task = RemoteTask(fn, array)
+        self.submit(p_task)
+
+        while not self.empty():
+            t = self.wait()
+            if t:
+                return t.output
+
+    
+class RemoteTask(Task):
+
+    def __init__(self, fn, array):
+        Task.__init__(self, fn)
+        print(array, fn)
+        
+        f = open("infile", "w")
+        data = json.dumps({"p" : array})
+         
+        f.write("{}\n".format(data))    
+        Task.specify_input_file(self, "infile")
 
 # test
 
