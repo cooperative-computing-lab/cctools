@@ -86,10 +86,10 @@ def profile(pid, workflow_path, interval, resources):
 
         reason = check_over_limits(max_cpu, max_mem / 10**6, max_cluster_cpu, max_cluster_mem, resources)
         if reason:
-            print("Killing because of", reason)
-            for child in children:
-                child.kill()
-            subject_process.kill()
+            print("Killing because of", reason, resources)
+            for child in subject_process.children(recursive=True):
+                child.terminate()
+            subject_process.terminate()
             return max_cpu, max_mem // 10**6, max_cluster_cpu, max_cluster_mem, reason
 
         time.sleep(interval)

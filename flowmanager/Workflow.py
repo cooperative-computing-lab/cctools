@@ -64,8 +64,9 @@ class Workflow():
                 input_dir = os.path.dirname(input_file)
                 os.rename(input_file, os.path.join(input_dir, inputname + "-post-" + filehash + ext))
             else:
+                # os.remove("stats.log")
                 os.chdir(prev_dir)
-                input_dir = os.path.dirname(input_file)
+                shutil.rmtree(workflow_directory_name)
 
 
             stats = {"pid": os.getpid(), "exitcode": prc.returncode, "memusage": mem_usage, "cpuusage": cpu_usage, "cluster_cpu": ccpu, "cluster_mem": cmem, "reason": reason}

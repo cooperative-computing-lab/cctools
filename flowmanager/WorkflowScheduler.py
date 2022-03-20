@@ -65,9 +65,10 @@ class WorkflowScheduler:
             reason = stats["reason"]
             path = proc[2]
             if reason:
-                resources[reason] *= 2
+                resources[reason] = int(resources[reason]*2.0)
                 self.queue.put((path, resources))
                 logging.info(f"Process ran out of {reason}")
+                logging.info(f"Resubmitting with {resources[reason]} of {reason}")
 
 
     def __update_averages(self, stats):
