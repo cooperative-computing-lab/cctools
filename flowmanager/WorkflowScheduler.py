@@ -3,57 +3,71 @@ import Workflow
 from utils import file_hash
 from queue import Queue
 import multiprocessing
-
+from copy import copy
+import psutil
+import time
 import logging
 
 class WorkflowScheduler:
-    def __init__(self, output_dir, workflow, error_dir, proc_limit=5, memory_limit=8000, cluster_cpu=200, cluster_mem=500000):
+    def __init__(self, output_dir, workflow, error_dir, total_limits={"memusage": 8000, "cpuusage": 10, "cluster_cpu": 500, "cluster_mem": 80000, "disk": 50000}, workflow_limits={"cpuusage": 1, "memusage": 1000, "disk": 5000, "cluster_cpu": 10, "cluster_mem": 20000}):
         self.output_dir = output_dir
         self.error_dir = error_dir
         self.workflow = workflow
-        self.proc_limit = proc_limit
         self.proc_list = []
         self.proc_stats_queue = multiprocessing.Queue()
         self.proc_stat_averages = {"count": 0, "memusage": 0, "cpuusage": 0, "cluster_cpu": 0, "cluster_mem": 0}
         self.queue = Queue()
-        self.mem_limit = memory_limit
-        self.cluster_cpu = cluster_cpu
-        self.cluster_mem = cluster_mem
+        self.total_limits = total_limits
+        self.current_resources = { key: 0 for key, val in self.total_limits.items() }
+        self.default_wf_limits = workflow_limits
 
     def push(self, event_path):
-        self.queue.put(event_path)
+        self.queue.put((event_path, copy(self.default_wf_limits)))
 
-    def run(self, path):
-        input_file = self.__process_file(path)
-        logging.info(f"running: {os.path.basename(input_file)}")
-        self.proc_list.append(self.workflow.run(input_file, self.output_dir, self.error_dir, self.proc_stats_queue))
+    def run(self, path, resources):
+        logging.info(f"running: {os.path.basename(path)}")
+        self.proc_list.append((self.workflow.run(path, self.output_dir, self.error_dir, self.proc_stats_queue, resources), resources, path))
+        for res, val in resources.items():
+            self.current_resources[res] += val
+        logging.info(f"current_resources: {self.current_resources}")
 
-    def __process_file(self, event_path):
-        # construct new filename
-        filename = os.path.basename(event_path)
-        h = file_hash(event_path)
-        new_filename = filename + "-pre-" + h
-        dirname = os.path.dirname(event_path)
-        new_event_path = os.path.join(os.path.dirname(event_path), new_filename)
-        # rename the file
-        os.rename(event_path, new_event_path)
-        return new_event_path
-
+    def check_fit(self, resources):
+        for res, val in resources.items():
+            # if it won't fit
+            if self.total_limits[res] - self.current_resources[res] < val:
+                return False
+        return True
 
     def schedule(self):
-        self.proc_limit = self.__compute_process_limit()
+        # current algorithm is FCFS
+        while not self.queue.empty() and self.check_fit(self.default_wf_limits):
+            input_file, resources = self.queue.queue[0]
 
-        while len(self.proc_list) < self.proc_limit and not self.queue.empty():
-            self.run(self.queue.get())
+            if not self.check_fit(resources):
+                break
 
-        for proc in self.proc_list:
-            proc.join(timeout=0)
-            if not proc.is_alive():
-                self.proc_list.remove(proc)
-                stats = self.proc_stats_queue.get()
-                self.__update_averages(stats)
-                logging.info(f"Completed process {proc.pid}: {stats}")
-                logging.info(f"Current workflow limit: {self.proc_limit}")
+            input_file, resources = self.queue.get()
+            self.run(input_file, resources)
+
+        while not self.proc_stats_queue.empty():
+            resources, stats = self.proc_stats_queue.get()
+            pid = stats["pid"]
+            for prc in self.proc_list:
+                if prc[0].pid == pid:
+                    proc = prc
+            proc[0].join()
+            # remove blocked resources
+            for res, val in resources.items():
+                self.current_resources[res] -= val
+            self.proc_list.remove(proc)
+            logging.info(f"Completed process {proc[0].pid}: {stats}")
+
+            reason = stats["reason"]
+            path = proc[2]
+            if reason:
+                resources[reason] *= 2
+                self.queue.put((path, resources))
+                logging.info(f"Process ran out of {reason}")
 
 
     def __update_averages(self, stats):

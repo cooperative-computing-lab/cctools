@@ -3,6 +3,7 @@ import multiprocessing
 import os
 import time
 import subprocess
+import sys
 
 
 def get_process_stats(prc):
@@ -27,13 +28,27 @@ def get_workflow_stats(workflow_path):
 
     prc = subprocess.run(["tail", "-n", "1", stats_file], capture_output=True)
     stats = prc.stdout.decode().strip().split(' ')
-    cores = int(stats[types.index("total_cores")-1]) # at somepoint stop hardcoding this
-    memory = int(stats[types.index("total_memory")-1])
+    try:
+        cores = int(stats[types.index("total_cores")-1]) 
+        memory = int(stats[types.index("total_memory")-1])
+    except:
+        return 0, 0
 
     return cores, memory
             
 
-def profile(pid, workflow_path, interval):
+def check_over_limits(max_cpu, max_mem, max_cluster_cpu, max_cluster_mem, resources):
+    if max_mem > resources["memusage"]:
+        return "memusage"    
+    elif max_cluster_cpu > resources["cluster_cpu"]:
+        return "cluster_cpu"
+    elif max_cluster_mem > resources["cluster_mem"]:
+        return "cluster_mem"
+    else:
+        return False
+
+def profile(pid, workflow_path, interval, resources):
+    print("resources:", resources)
     max_cpu = 0
     max_mem = 0
     max_cluster_cpu = 0
@@ -69,6 +84,14 @@ def profile(pid, workflow_path, interval):
         max_cluster_cpu = max(cluster_cpu_usage, max_cluster_cpu)
         max_cluster_mem = max(cluster_mem_usage, max_cluster_mem)
 
+        reason = check_over_limits(max_cpu, max_mem / 10**6, max_cluster_cpu, max_cluster_mem, resources)
+        if reason:
+            print("Killing because of", reason)
+            for child in children:
+                child.kill()
+            subject_process.kill()
+            return max_cpu, max_mem // 10**6, max_cluster_cpu, max_cluster_mem, reason
+
         time.sleep(interval)
 
-    return max_cpu, max_mem // 10**6, max_cluster_cpu, max_cluster_mem
+    return max_cpu, max_mem // 10**6, max_cluster_cpu, max_cluster_mem, None
