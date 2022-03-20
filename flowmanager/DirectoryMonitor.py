@@ -19,7 +19,7 @@ class DirectoryMonitor():
         self.__initialize_state()
 
     def __initialize_state(self):
-        for entry in os.scandir(self.path):
+        for entry in list(os.scandir(self.path)):
             self.dir_state[entry.inode()] = entry.name
             if re.search("-pre-", entry.name):
                 self.scheduler.push(os.path.join(self.path, entry.name))
