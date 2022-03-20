@@ -39,7 +39,7 @@ class Workflow():
             os.chdir(workflow_directory_name)
             
             # run the makeflow
-            prc = subprocess.Popen(["makeflow", os.path.basename(self.makeflow)], stdout=subprocess.DEVNULL)
+            prc = subprocess.Popen(["makeflow", os.path.basename(self.makeflow)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             # monitor memory and cpu usage
             cpu_usage, mem_usage, ccpu, cmem, reason = profile(prc.pid, workflow_directory_name, interval=0.5, resources=resources)
@@ -64,9 +64,8 @@ class Workflow():
                 input_dir = os.path.dirname(input_file)
                 os.rename(input_file, os.path.join(input_dir, inputname + "-post-" + filehash + ext))
             else:
-                # os.remove("stats.log")
                 os.chdir(prev_dir)
-                shutil.rmtree(workflow_directory_name)
+                # shutil.rmtree(workflow_directory_name)
 
 
             stats = {"pid": os.getpid(), "exitcode": prc.returncode, "memusage": mem_usage, "cpuusage": cpu_usage, "cluster_cpu": ccpu, "cluster_mem": cmem, "reason": reason}
