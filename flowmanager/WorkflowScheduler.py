@@ -9,7 +9,7 @@ import time
 import logging
 
 class WorkflowScheduler:
-    def __init__(self, output_dir, workflow, error_dir, total_limits={"memusage": 8000, "cpuusage": 10, "cluster_cpu": 500, "cluster_mem": 80000, "disk": 50000}, workflow_limits={"cpuusage": 1, "memusage": 1000, "disk": 5000, "cluster_cpu": 10, "cluster_mem": 20000}):
+    def __init__(self, output_dir, workflow, error_dir, total_limits={"memusage": 8000, "cpuusage": 20, "cluster_cpu": 500, "cluster_mem": 80000, "disk": 50000}, workflow_limits={"cpuusage": 4, "memusage": 1000, "disk": 5000, "cluster_cpu": 10, "cluster_mem": 20000}):
         self.output_dir = output_dir
         self.error_dir = error_dir
         self.workflow = workflow
