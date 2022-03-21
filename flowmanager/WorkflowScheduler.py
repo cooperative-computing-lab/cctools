@@ -16,13 +16,13 @@ class WorkflowScheduler:
         self.proc_list = []
         self.proc_stats_queue = multiprocessing.Queue()
         self.proc_stat_averages = {"count": 0, "memusage": 0, "cpuusage": 0, "cluster_cpu": 0, "cluster_mem": 0}
-        self.queue = Queue()
+        self.queue = []
         self.total_limits = total_limits
         self.current_resources = { key: 0 for key, val in self.total_limits.items() }
         self.default_wf_limits = workflow_limits
 
     def push(self, event_path):
-        self.queue.put((event_path, copy(self.default_wf_limits)))
+        self.queue.append((event_path, copy(self.default_wf_limits), 0))
 
     def run(self, path, resources):
         logging.info(f"running: {os.path.basename(path)}")
@@ -40,13 +40,13 @@ class WorkflowScheduler:
 
     def schedule(self):
         # current algorithm is FCFS
-        while not self.queue.empty() and self.check_fit(self.default_wf_limits):
-            input_file, resources = self.queue.queue[0]
+        while len(self.queue) and self.check_fit(self.default_wf_limits):
+            input_file, resources, current_disk = self.queue[0]
 
             if not self.check_fit(resources):
                 break
 
-            input_file, resources = self.queue.get()
+            input_file, resources, current_disk = self.queue.pop(0)
             self.run(input_file, resources)
 
         while not self.proc_stats_queue.empty():
@@ -66,9 +66,11 @@ class WorkflowScheduler:
             path = proc[2]
             if reason:
                 resources[reason] = int(resources[reason]*2.0)
-                self.queue.put((path, resources))
+                self.queue.append((path, resources, resources["disk"]))
                 logging.info(f"Process ran out of {reason}")
                 logging.info(f"Resubmitting with {resources[reason]} of {reason}")
+
+        self.queue = sorted(self.queue, key=lambda x: x[2], reverse=True)
 
 
     def __update_averages(self, stats):
