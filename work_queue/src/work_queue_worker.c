@@ -2515,20 +2515,20 @@ void start_coprocess() {
 	else if (coprocess_pid == 0) { // child executes this
 		if (close(coprocess_in[1]) || close(0)) {
 			debug(D_WQ, "coprocess could not close stdin: %s\n", strerror(errno));
-			return;
+			_exit(127);
 		}
 		if (dup(coprocess_in[0])) {
 			debug(D_WQ, "coprocess could not attach pipe to stdin: %s\n", strerror(errno));
-			return;
+			_exit(127);
 		}
 		
 		if (close(coprocess_out[0]) || close(1)) {
 			debug(D_WQ, "coprocess could not close stdout: %s\n", strerror(errno));
-			return;
+			_exit(127);
 		}
 		if (dup(coprocess_out[1])) {
 			debug(D_WQ, "coprocess could not attach pipe to stdout: %s\n", strerror(errno));
-			return;
+			_exit(127);
 		}
 		
 		execlp(coprocess_command, coprocess_command, (char *) 0);
@@ -2536,7 +2536,11 @@ void start_coprocess() {
 		_exit(127); // if we get here, the exec failed so we just quit
 	}
 	else { // parent goes here
-		fcntl(coprocess_out[0], F_SETFL, O_NONBLOCK); 
+		if (fcntl(coprocess_out[0], F_SETFL, O_NONBLOCK))
+		{
+			debug(D_WQ, "parent could not set pipe to nonblocking: %s\n", strerror(errno));
+			return;
+		}
 		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
 			debug(D_WQ, "parent could not close unneeded pipes: %s\n", strerror(errno));
 			return;
