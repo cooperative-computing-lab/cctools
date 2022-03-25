@@ -2504,7 +2504,7 @@ struct list *parse_manager_addresses(const char *specs, int default_port) {
 void start_coprocess() {
 
 	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
-		debug(D_WQ, "couldn't create coprocess pipes: %s\n", strerror(errno));
+		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
 		return;
 	}
 	coprocess_pid = fork();
