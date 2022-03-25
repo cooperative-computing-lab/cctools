@@ -1908,8 +1908,8 @@ class WorkQueue(object):
 
         return seq[0]
 
-    def test(self, fn, array):
-        p_task = RemoteTask(fn, array)
+    def test(self, fn, array, name):
+        p_task = RemoteTask(fn, array, name)
         self.submit(p_task)
 
         while not self.empty():
@@ -1920,12 +1920,12 @@ class WorkQueue(object):
     
 class RemoteTask(Task):
 
-    def __init__(self, fn, array):
+    def __init__(self, fn, array, name):
         Task.__init__(self, fn)
-        print(array, fn)
+        print(array, fn, name)
         
         f = open("infile", "w")
-        data = json.dumps({"p" : array})
+        data = json.dumps({name : array})
          
         f.write("{}\n".format(data))    
         Task.specify_input_file(self, "infile")
