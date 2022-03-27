@@ -14,7 +14,7 @@ class WorkflowScheduler:
         self.error_dir = error_dir
         self.workflow = workflow
         self.proc_list = []
-        self.proc_stats_queue = multiprocessing.Queue()
+        self.proc_pipes = []
         self.proc_stat_averages = {"count": 0, "memusage": 0, "cpuusage": 0, "cluster_cpu": 0, "cluster_mem": 0}
         self.queue = []
         self.total_limits = total_limits
@@ -26,7 +26,9 @@ class WorkflowScheduler:
 
     def run(self, path, resources):
         logging.info(f"running: {os.path.basename(path)}")
-        self.proc_list.append((self.workflow.run(path, self.output_dir, self.error_dir, self.proc_stats_queue, resources), resources, path))
+        mufasa_conn, workflow_conn = multiprocessing.Pipe()
+        self.proc_list.append((self.workflow.run(path, self.output_dir, self.error_dir, workflow_conn, resources), resources, path))
+        self.proc_pipes.append(mufasa_conn)
         for res, val in resources.items():
             self.current_resources[res] += val
         logging.info(f"current_resources: {self.current_resources}")
@@ -37,6 +39,60 @@ class WorkflowScheduler:
             if self.total_limits[res] - self.current_resources[res] < val:
                 return False
         return True
+
+    def __join_proc(self, pid, resources):
+        for prc in self.proc_list:
+            if prc[0].pid == pid:
+                proc = prc
+        proc[0].join()
+        # remove blocked resources
+        for res, val in resources.items():
+            self.current_resources[res] -= val
+        self.proc_list.remove(proc)
+        return proc
+
+    def __handle_request(self, conn):
+        request = conn.recv()
+        status = request["status"]
+        stats = request["workflow_stats"]
+        resources = request["allocated_resources"]
+
+        if status == "success" or status == "error":
+            proc = self.__join_proc(stats["pid"], resources)
+            if status == "success":
+                logging.info(f"Completed process {proc[0].pid}: {stats}")
+            else:
+                logging.info(f"Error with process {proc[0].pid}: {stats}")
+            conn.close()
+            self.proc_pipes.remove(conn)
+        elif status == "killed":
+            proc = self.__join_proc(stats["pid"], resources)
+            reason = stats["reason"]
+            path = proc[2]
+            resources[reason] = int(resources[reason]*2.0)
+            self.queue.append((path, resources, 0))
+            logging.info(f"Process killed: {reason}")
+            logging.info(f"Resubmitting with {resources[reason]} of {reason}")
+            conn.close()
+            self.proc_pipes.remove(conn)
+        elif status == "paused":
+            proc = self.__join_proc(stats["pid"], resources)
+            reason = stats["reason"]
+            path = proc[2]
+            resources[reason] = int(resources[reason]*2.0)
+            self.current_resources["disk"] += resources["disk"]
+            self.queue.append((path, resources, resources["disk"]))
+            logging.info(f"Process paused: {reason}")
+            logging.info(f"Resubmitting with {resources[reason]} of {reason}")
+            conn.close()
+            self.proc_pipes.remove(conn)
+        elif status == "request_pause":
+            if self.total_limits["disk"] - self.current_resources["disk"] < self.default_wf_limits["disk"]:
+                message = {"response": "kill"}
+                conn.send(message)
+            else:
+                message = {"response": "pause"}
+                conn.send(message)
 
     def schedule(self):
         # current algorithm is FCFS
@@ -49,26 +105,10 @@ class WorkflowScheduler:
             input_file, resources, current_disk = self.queue.pop(0)
             self.run(input_file, resources)
 
-        while not self.proc_stats_queue.empty():
-            resources, stats = self.proc_stats_queue.get()
-            pid = stats["pid"]
-            for prc in self.proc_list:
-                if prc[0].pid == pid:
-                    proc = prc
-            proc[0].join()
-            # remove blocked resources
-            for res, val in resources.items():
-                self.current_resources[res] -= val
-            self.proc_list.remove(proc)
-            logging.info(f"Completed process {proc[0].pid}: {stats}")
-
-            reason = stats["reason"]
-            path = proc[2]
-            if reason:
-                resources[reason] = int(resources[reason]*2.0)
-                self.queue.append((path, resources, resources["disk"]))
-                logging.info(f"Process ran out of {reason}")
-                logging.info(f"Resubmitting with {resources[reason]} of {reason}")
+        for conn in self.proc_pipes:
+            if not conn.poll():
+                continue 
+            self.__handle_request(conn)
 
         self.queue = sorted(self.queue, key=lambda x: x[2], reverse=True)
 
