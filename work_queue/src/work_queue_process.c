@@ -3,6 +3,7 @@
 #include "work_queue.h"
 #include "work_queue_internal.h"
 #include "work_queue_gpus.h"
+#include "work_queue_protocol.h"
 
 #include "debug.h"
 #include "errno.h"
@@ -14,7 +15,8 @@
 #include "path.h"
 #include "xxmalloc.h"
 #include "trash.h"
-#include "datagram.h"
+#include "link.h"
+#include "timestamp.h"
 #include "domain_name.h"
 #include "full_io.h"
 
@@ -220,7 +222,7 @@ static char * load_input_file(struct work_queue_task *t) {
 
 static char * invoke_coprocess_function(char *input) {
 	char addr[DOMAIN_NAME_MAX];
-	char buf[DATAGRAM_PAYLOAD_MAX];
+	char buf[BUFSIZ];
 	int len;
 	int port = 45107;
 	int timeout = 60000000; // one minute, can be changed
@@ -229,28 +231,58 @@ static char * invoke_coprocess_function(char *input) {
 		fatal("could not lookup address of localhost");
 	}
 
-	struct datagram *dgram = datagram_create(DATAGRAM_PORT_ANY);
-	if(!dgram) {
-		fatal("could not create datagram: %s", strerror(errno));
-	}
+	timestamp_t curr_time = timestamp_get();
+	time_t stoptime = curr_time + timeout;
 
+	bool connected = false;
+	struct link *link;
+	int tries = 0;
+	// retry connection for ~30 seconds
+	while(!connected && tries < 30) {
+		link = link_connect(addr, port, stoptime);
+		if(link) {
+			connected = true;
+		} else {
+			tries++;
+			sleep(1);
+		}
+	}
+	// if we can't connect at all, abort
+	if(!link) {
+		fatal("connection error: %s", strerror(errno));
+	}
+	
 	memcpy(buf, input, strlen(input)+1);
 	len = strlen(buf);
 
-	// send data to network function
-	int bytes_sent = datagram_send(dgram, buf, len, addr, port);
+	curr_time = timestamp_get();
+	stoptime = curr_time + timeout;
+	// send the length of the data first
+	int bytes_sent = link_printf(link, stoptime, "data: %d\n", len);
 	if(bytes_sent < 0) {
-		fatal("error sending data to network function: %s", strerror(errno));
+		fatal("could not send size: %s", strerror(errno));
+	}
+	
+	// send actual data
+	bytes_sent = link_write(link, buf, len, stoptime);
+	if(bytes_sent < 0) {
+		fatal("could not send data: %s", strerror(errno));
 	}
 
-	// wait for response from network function
 	memset(buf, 0, sizeof(buf));
-	int bytes_recv = datagram_recv(dgram, buf, sizeof(buf), addr, &port, timeout);
-	if(bytes_recv < 0) {
-		fatal("error receiving from network function: %s", strerror(errno));
-	}
 
-	char *output = malloc(strlen(buf));
+	curr_time = timestamp_get();
+	stoptime = curr_time + timeout;
+	// read in the length of the response
+	char line[WORK_QUEUE_LINE_MAX];
+	int length;
+	link_readline(link, line, sizeof(line), stoptime);
+	sscanf(line, "data %d", &length);
+
+	// read the response
+	link_read(link, buf, length, stoptime);
+
+	char *output = calloc(strlen(buf), sizeof(char));
 	memcpy(output, buf, strlen(buf));
 
 	return output;
