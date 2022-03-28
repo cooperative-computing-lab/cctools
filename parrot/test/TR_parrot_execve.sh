@@ -10,22 +10,14 @@ set -e
 . ./parrot-test.sh
 . ../../chirp/test/chirp-common.sh
 
+exe=../src/parrot_test_execve
+
 prepare()
 {
 	chirp_start local
-	echo "$hostport" > config.txt
+	cp ${exe} ${root}/hello
 
-	set +e
-	# -static requires "libc-devel" which is missing on some platforms
-	gcc -static -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o ${root}/hello.exe -x c - -x none <<EOF
-#include <stdio.h>
-int main (int argc, char *argv[])
-{
-	printf("Hello, world!\\n");
-	return 0;
-}
-EOF
-	set -e
+	echo "$hostport" > config.txt
 
 	return 0
 }
@@ -34,11 +26,12 @@ run()
 {
 	hostport=$(cat "config.txt")
 
-	parrot --no-chirp-catalog --timeout=5 --work-dir="/chirp/${hostport}/" ./hello.exe > output.txt
+
+	parrot --no-chirp-catalog --timeout=5 --work-dir="/chirp/${hostport}/" ./hello > output.txt
 
 	if [ "$(cat output.txt)" == "Hello, world!" ]
 	then
-		return 0	
+		return 0
 	else
 		echo -n "Incorrect output: "
 		cat output.txt
