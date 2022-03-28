@@ -234,14 +234,14 @@ static char * invoke_coprocess_function(char *input) {
 	timestamp_t curr_time = timestamp_get();
 	time_t stoptime = curr_time + timeout;
 
-	bool connected = false;
+	int connected = 0;
 	struct link *link;
 	int tries = 0;
 	// retry connection for ~30 seconds
 	while(!connected && tries < 30) {
 		link = link_connect(addr, port, stoptime);
 		if(link) {
-			connected = true;
+			connected = 1;
 		} else {
 			tries++;
 			sleep(1);
