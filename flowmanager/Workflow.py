@@ -42,7 +42,7 @@ class Workflow():
             prc = subprocess.Popen(["makeflow", os.path.basename(self.makeflow), f"--local-cores={resources['cpuusage']}", f"--local-memory={resources['memusage']}", f"--local-disk={resources['disk']}"], stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
             # monitor memory and cpu usage
-            cpu_usage, mem_usage, ccpu, cmem, reason = profile(prc.pid, workflow_directory_name, interval=0.5, resources=resources)
+            cpu_usage, mem_usage, ccpu, cmem, reason = profile(prc.pid, workflow_directory_name, interval=0.5, resources=resources, conn=conn)
 
             # wait for it to finish to get return code
             for p in psutil.Process(prc.pid).children(recursive=True):

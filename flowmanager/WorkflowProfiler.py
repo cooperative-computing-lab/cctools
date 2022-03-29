@@ -47,7 +47,7 @@ def check_over_limits(max_cpu, max_mem, max_cluster_cpu, max_cluster_mem, resour
     else:
         return False
 
-def profile(pid, workflow_path, interval, resources):
+def profile(pid, workflow_path, interval, resources, conn):
     print("resources:", resources)
     max_cpu = 0
     max_mem = 0
@@ -83,6 +83,11 @@ def profile(pid, workflow_path, interval, resources):
         max_mem = max(mem_usage, max_mem)
         max_cluster_cpu = max(cluster_cpu_usage, max_cluster_cpu)
         max_cluster_mem = max(cluster_mem_usage, max_cluster_mem)
+
+        # send update to mufasa
+        stats = {"pid": os.getpid(), "memusage": mem_usage // 10**6, "cpuusage": cpu_usage, "cluster_cpu": cluster_cpu_usage, "cluster_mem": cluster_mem_usage, "disk": resources["disk"]}
+        message = {"status": "resource_update", "allocated_resources": resources, "workflow_stats":stats}
+        conn.send(message)
 
         reason = check_over_limits(max_cpu, max_mem / 10**6, max_cluster_cpu, max_cluster_mem, resources)
         if reason:
