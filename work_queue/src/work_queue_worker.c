@@ -228,6 +228,9 @@ static int tlq_port = 0;
 
 static char *coprocess_command = NULL;
 static pid_t coprocess_pid = 0;
+static int coprocess_num_deaths = 0;
+static int coprocess_in[2];
+static int coprocess_out[2];
 
 // User specified python function
 static char *python_function = NULL;
@@ -2498,27 +2501,76 @@ struct list *parse_manager_addresses(const char *specs, int default_port) {
 	return(managers);
 }
 
-void start_coprocess()
-{
+void start_coprocess() {
+
+	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
+		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
+		return;
+	}
 	coprocess_pid = fork();
 	if (coprocess_pid < 0) { // unable to fork
 		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
 		return;
 	}		
 	else if (coprocess_pid == 0) { // child executes this
+		if (close(coprocess_in[1]) || close(0)) {
+			debug(D_WQ, "coprocess could not close stdin: %s\n", strerror(errno));
+			_exit(127);
+		}
+		if (dup(coprocess_in[0])) {
+			debug(D_WQ, "coprocess could not attach pipe to stdin: %s\n", strerror(errno));
+			_exit(127);
+		}
+		
+		if (close(coprocess_out[0]) || close(1)) {
+			debug(D_WQ, "coprocess could not close stdout: %s\n", strerror(errno));
+			_exit(127);
+		}
+		if (dup(coprocess_out[1])) {
+			debug(D_WQ, "coprocess could not attach pipe to stdout: %s\n", strerror(errno));
+			_exit(127);
+		}
+		
 		execlp(coprocess_command, coprocess_command, (char *) 0);
 		debug(D_WQ, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
 		_exit(127); // if we get here, the exec failed so we just quit
 	}
 	else { // parent goes here
+		if (fcntl(coprocess_out[0], F_SETFL, O_NONBLOCK))
+		{
+			debug(D_WQ, "parent could not set pipe to nonblocking: %s\n", strerror(errno));
+			return;
+		}
+		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
+			debug(D_WQ, "parent could not close unneeded pipes: %s\n", strerror(errno));
+			return;
+		}
 		debug(D_WQ, "Forked child process to run %s\n", coprocess_command);
 	}
+}
+
+int write_to_coprocess(char *buffer, int len)
+{
+	return write(coprocess_in[1], buffer, len);
+}
+
+int read_from_coprocess(char *buffer, int len){
+	int bytes_read = read(coprocess_out[0], buffer, len - 1);
+	if (bytes_read < 0)
+	{
+		debug(D_WQ, "Read from coprocess failed\n");
+		return -1;
+	}
+	buffer[bytes_read] = '\0';
+	printf("%d %s\n", bytes_read, buffer);
+	return bytes_read;
 }
 
 int check_if_coprocess_exited()
 {
 	struct process_info *p = process_waitpid(coprocess_pid, 0); // see if p has exitex
 	if (p) { // if we get a nonnull return, the process exited
+		coprocess_num_deaths++;
 		free(p);
 		return 1;
 	}
@@ -3110,16 +3162,21 @@ int main(int argc, char *argv[])
 			debug(D_NOTICE,"stopping: could not connect after %d seconds.",connect_timeout);
 			break;
 		}
-
-		if (check_if_coprocess_exited())
+		if (coprocess_pid > 0 && coprocess_num_deaths < 10)
 		{
-			start_coprocess();
+			if (check_if_coprocess_exited())
+			{
+				start_coprocess();
+			}
 		}
-
+		char buffer[4096];
+		write_to_coprocess("haha", strlen(buffer));
+		read_from_coprocess(buffer, 4096);
+		printf("%s\n", buffer);
 		sleep(backoff_interval);
 	}
 	workspace_delete();
-	if (coprocess_command != NULL)
+	if (coprocess_pid > 0 && coprocess_num_deaths < 10)
 	{
 		int max_wait = 5; // maximum seconds we wish to wait for a given process
 		process_kill_waitpid(coprocess_pid, max_wait);
