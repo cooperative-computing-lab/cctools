@@ -18,10 +18,10 @@ for index, (t, m) in enumerate(zip(time, mem_usage)):
     prev_time = t
 df["cluster_mem"] = mem_usage.tolist()
 
-for i in range(max_id):
+for i in sorted(range(max_id), reverse=True):
     mem_usage = df.loc[df["id"] == i]["cluster_mem"].to_numpy()
     t  = df.loc[df["id"] == i]["time"].to_numpy()
-    plt.plot(t, mem_usage)
+    plt.fill_between(t, mem_usage)
 
 #
 # plt.scatter(time, mem_usage)
