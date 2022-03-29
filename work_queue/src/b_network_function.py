@@ -8,9 +8,11 @@ and the function body (that you define) will work accordingly. For now,
 this is just a dummy prototype
 '''
 def function_handler(event):
-	
-    return [ x + 1 for x in event["p"] ]
-       
+    res = []
+    for pair in event["p"]:
+        res.append(pair[0] * pair[1])
+
+    return res
 def main():
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	

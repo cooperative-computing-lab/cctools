@@ -1908,27 +1908,78 @@ class WorkQueue(object):
 
         return seq[0]
 
+    def Rpair(self, fn, seq1, seq2, name, chunk_size=1):
+       
+        size = math.ceil((len(seq1) * len(seq2))/chunk_size)
+        results = [None] * size
+        tasks = {}
+        task = []
+        num = 0
+        num_task = 0
+
+        for item in itertools.product(seq1, seq2):
+
+            if num == chunk_size:
+                event = json.dumps({name : task})
+                p_task = RemoteTask(fn, event)
+                p_task.specify_tag(str(num_task))
+                self.submit(p_task)
+                tasks[p_task.id] = num_task                
+                num = 0
+                num_task += 1
+                task.clear()
+
+            task.append(item)
+            num += 1
+
+        if len(task) > 0:
+            event = json.dumps({name : task})
+            p_task = RemoteTask(fn, event)
+            p_task.specify_tag(str(num_task))
+            self.submit(p_task)
+            tasks[p_task.id] = num_task
+            num_task += 1
+
+        n = 0
+        for i in range(num_task):
+
+            while not self.empty() and n < num_task:
+                t = self.wait_for_tag(str(i), 10)
+
+                if t:
+                    results[tasks[t.id]] = json.loads(t.output)["Result"]
+                    n += 1
+                    break
+ 
+        return [item for elem in results for item in elem]
+
     def test(self, fn, array, name):
-        p_task = RemoteTask(fn, array, name)
+        res = []
+        event = json.dumps({name : array[:2]})
+        p_task = RemoteTask(fn, event)
+        self.submit(p_task)
+        time.sleep(5)
+        event = json.dumps({name : array[3:6]})
+        p_task = RemoteTask(fn, event)
         self.submit(p_task)
 
         while not self.empty():
             t = self.wait()
             if t:
-                return t.output
+                res.append(json.loads(t.output)["Result"])
+
+        return res
+                
 
     
 class RemoteTask(Task):
 
-    def __init__(self, fn, array, name):
+    def __init__(self, fn, event):
         Task.__init__(self, fn)
-        print(array, fn, name)
-        
-        f = open("infile", "w")
-        data = json.dumps({name : array})
-         
-        f.write("{}\n".format(data))    
-        Task.specify_input_file(self, "infile")
+        print(event)
+        #f = open("infile", "w") 
+        #f.write(event)    
+        Task.specify_buffer(self, event, "infile")
 
 # test
 
