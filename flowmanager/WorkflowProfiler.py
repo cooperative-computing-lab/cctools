@@ -84,12 +84,21 @@ def profile(pid, workflow_path, interval, resources, conn):
         max_cluster_cpu = max(cluster_cpu_usage, max_cluster_cpu)
         max_cluster_mem = max(cluster_mem_usage, max_cluster_mem)
 
+        #comment out this line to remove box checking
+        # reason = check_over_limits(max_cpu, max_mem / 10**6, max_cluster_cpu, max_cluster_mem, resources)
+        reason = None
+
         # send update to mufasa
         stats = {"pid": os.getpid(), "memusage": mem_usage // 10**6, "cpuusage": cpu_usage, "cluster_cpu": cluster_cpu_usage, "cluster_mem": cluster_mem_usage, "disk": resources["disk"]}
         message = {"status": "resource_update", "allocated_resources": resources, "workflow_stats":stats}
         conn.send(message)
 
-        reason = check_over_limits(max_cpu, max_mem / 10**6, max_cluster_cpu, max_cluster_mem, resources)
+        message = conn.recv()
+
+        if message["status"] == "stop":
+            reason = message["reason"]
+            # should only receive a message if the message is STOP
+
         if reason:
             for child in subject_process.children(recursive=True):
                 child.terminate()

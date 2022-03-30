@@ -9,7 +9,7 @@ import time
 import logging
 
 class WorkflowScheduler:
-    def __init__(self, output_dir, workflow, error_dir, total_limits={"memusage": 8000, "cpuusage": 20, "cluster_cpu": 500, "cluster_mem": 80000, "disk": 75000}, workflow_limits={"cpuusage": 1, "memusage": 250, "disk": 5000, "cluster_cpu": 20, "cluster_mem": 20000}):
+    def __init__(self, output_dir, workflow, error_dir, total_limits={"memusage": 8000, "cpuusage": 2000, "cluster_cpu": 500, "cluster_mem": 80000, "disk": 100000}, workflow_limits={"cpuusage": 1, "memusage": 250, "disk": 5000, "cluster_cpu": 20, "cluster_mem": 20000}):
         self.output_dir = output_dir
         self.error_dir = error_dir
         self.workflow = workflow
@@ -108,11 +108,29 @@ class WorkflowScheduler:
             wf_resources = [str(stats[rtype]) for rtype in self.resource_types]
             for rtype in self.resource_types:
                 self.current_usage[rtype] += stats[rtype]
+
             self.logfile.write(str(self.logcount) + ",")
             self.logfile.write(str(wf_id) + ",")
             self.logfile.write(",".join(wf_resources))
             allocated_resources = [str(resources[rtype]) for rtype in self.resource_types]
             self.logfile.write("," + ",".join(allocated_resources) + "\n")
+
+            reason = self.__check_total()
+            if reason:
+                print("Sending stop:", wf_id)
+                message = {"status": "stop", "reason": reason}
+                conn.send(message)
+            else:
+                message = {"status": "continue"}
+                conn.send(message)
+
+    # checks if the current usage is with total_limits
+    def __check_total(self):
+        for key, val in self.current_usage.items():
+            if val > self.total_limits[key]:
+                print(key, val, self.total_limits[key])
+                return key
+        return None
 
     def schedule(self):
         self.current_usage = { key: 0 for key, val in self.total_limits.items() }
@@ -120,9 +138,10 @@ class WorkflowScheduler:
         for index, (input_file, resources, current_disk) in list(enumerate(self.queue)):
             self.current_resources["disk"] -= current_disk
 
-            if not self.check_fit(resources):
-                self.current_resources["disk"] += current_disk
-                continue
+            #remove the if statement to remove boxes
+            # if not self.check_fit(resources):
+            #     self.current_resources["disk"] += current_disk
+            #     continue
                 # break
 
             input_file, resources, current_disk = self.queue.pop(index)

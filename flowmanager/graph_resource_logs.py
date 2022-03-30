@@ -35,7 +35,7 @@ for i in sorted(range(max_id+1), reverse=True):
 #
 # plt.scatter(time, mem_usage)
 plt.plot(np.arange(max(time)), np.full(max(time), 80000))
-plt.plot(np.arange(max(time)), allocated_mem_usage_total)
+# plt.plot(np.arange(max(time)), allocated_mem_usage_total)
 
 plt.title("Cluster Memory Usage vs Time")
 plt.xlabel("Time Steps (0.5 sec)")
