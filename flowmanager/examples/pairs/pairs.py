@@ -3,9 +3,10 @@ import time
 import random
 import tempfile
 import shutil
+import os
 
 def main():
-    NAME = "blyons1-" + str(random.getrandbits(64))
+    NAME = os.getlogin() + "-" + str(random.getrandbits(64))
     with open("input.csv", "r") as f:
         inp = f.read().split(',')
         cores = int(inp[0])

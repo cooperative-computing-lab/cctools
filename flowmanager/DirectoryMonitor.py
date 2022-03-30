@@ -45,15 +45,3 @@ class DirectoryMonitor():
         # rename the file
         os.rename(event_path, new_event_path)
         return new_event_path
-
-def main():
-    # start WQ
-        # queue = wq.WorkQueue(name="blyons1-flowmanager", port=9125)
-        # print("listening on port {}".format(queue.port))
-
-        queue = Queue()
-        dm = DirectoryMonitor("/scratch365/blyons1/flowmanager-input", queue)
-        dm.monitor()
-
-if __name__ == '__main__':
-    main()
