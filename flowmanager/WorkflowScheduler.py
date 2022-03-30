@@ -112,7 +112,7 @@ class WorkflowScheduler:
             self.logfile.write(str(wf_id) + ",")
             self.logfile.write(",".join(wf_resources))
             allocated_resources = [str(resources[rtype]) for rtype in self.resource_types]
-            self.logfile.write(",".join(allocated_resources) + "\n")
+            self.logfile.write("," + ",".join(allocated_resources) + "\n")
 
     def schedule(self):
         self.current_usage = { key: 0 for key, val in self.total_limits.items() }
