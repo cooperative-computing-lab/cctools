@@ -2513,6 +2513,7 @@ void start_coprocess() {
 		return;
 	}		
 	else if (coprocess_pid == 0) { // child executes this
+	/* 
 		if (close(coprocess_in[1]) || close(0)) {
 			debug(D_WQ, "coprocess could not close stdin: %s\n", strerror(errno));
 			_exit(127);
@@ -2530,6 +2531,7 @@ void start_coprocess() {
 			debug(D_WQ, "coprocess could not attach pipe to stdout: %s\n", strerror(errno));
 			_exit(127);
 		}
+		*/
 		
 		execlp(coprocess_command, coprocess_command, (char *) 0);
 		debug(D_WQ, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
@@ -3169,10 +3171,12 @@ int main(int argc, char *argv[])
 				start_coprocess();
 			}
 		}
+		/*
 		char buffer[4096];
 		write_to_coprocess("haha", strlen(buffer));
 		read_from_coprocess(buffer, 4096);
 		printf("%s\n", buffer);
+		*/
 		sleep(backoff_interval);
 	}
 	workspace_delete();

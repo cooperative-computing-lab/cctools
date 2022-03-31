@@ -1908,6 +1908,7 @@ class WorkQueue(object):
 
         return seq[0]
 
+    # Pair, but remote
     def Rpair(self, fn, seq1, seq2, name, chunk_size=1):
        
         size = math.ceil((len(seq1) * len(seq2))/chunk_size)
@@ -1950,35 +1951,11 @@ class WorkQueue(object):
                     results[tasks[t.id]] = json.loads(t.output)["Result"]
                     n += 1
                     break
- 
-        return [item for elem in results for item in elem]
-
-    def test(self, fn, array, name):
-        res = []
-        event = json.dumps({name : array[:2]})
-        p_task = RemoteTask(fn, event)
-        self.submit(p_task)
-        time.sleep(5)
-        event = json.dumps({name : array[3:6]})
-        p_task = RemoteTask(fn, event)
-        self.submit(p_task)
-
-        while not self.empty():
-            t = self.wait()
-            if t:
-                res.append(json.loads(t.output)["Result"])
-
-        return res
-                
-
-    
+     
 class RemoteTask(Task):
 
     def __init__(self, fn, event):
         Task.__init__(self, fn)
-        print(event)
-        #f = open("infile", "w") 
-        #f.write(event)    
         Task.specify_buffer(self, event, "infile")
 
 # test
