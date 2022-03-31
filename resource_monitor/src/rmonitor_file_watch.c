@@ -7,8 +7,9 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/stat.h>
 #include <signal.h>
+#include <sys/stat.h>
+#include <sys/prctl.h>
 
 #include "buffer.h"
 #include "debug.h"
@@ -436,6 +437,8 @@ pid_t rmonitor_watch_file(const char *fname, struct jx *watch_spec) {
         return pid;
     }
     else {
+        /* terminate this process when main process monitor goes away */
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
 
         signal(SIGCHLD, SIG_DFL);
         signal(SIGINT,  SIG_DFL);
