@@ -72,6 +72,7 @@ struct jx_parser {
 	char *error_string;
 	int errors;
 	bool strict_mode;
+	bool static_mode;
 	bool putback_char_valid;
 	int putback_char;
 	bool putback_token_valid;
@@ -84,6 +85,7 @@ struct jx_parser *jx_parser_create(bool strict_mode) {
 	struct jx_parser *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
 	p->strict_mode = strict_mode;
+	p->static_mode = false;
 	p->line = 1;
 	return p;
 }
@@ -1054,7 +1056,13 @@ static struct jx * jx_parse_binary( struct jx_parser *s, int precedence )
 
 struct jx * jx_parse( struct jx_parser *s )
 {
-	struct jx *j = jx_parse_binary(s,JX_PRECEDENCE_MAX);
+	struct jx *j = NULL;
+	if (s->static_mode) {
+		j = jx_parse_unary(s);
+	} else {
+		j = jx_parse_binary(s,JX_PRECEDENCE_MAX);
+	}
+
 	if (!j)
 		return NULL;
 
@@ -1091,6 +1099,14 @@ struct jx * jx_parser_yield( struct jx_parser *p )
 struct jx * jx_parse_string( const char *str )
 {
 	struct jx_parser *p = jx_parser_create(false);
+	jx_parser_read_string(p,str);
+	return jx_parse_finish(p);
+}
+
+struct jx * jx_parse_static_string( const char *str )
+{
+	struct jx_parser *p = jx_parser_create(false);
+	p->static_mode = true;
 	jx_parser_read_string(p,str);
 	return jx_parse_finish(p);
 }

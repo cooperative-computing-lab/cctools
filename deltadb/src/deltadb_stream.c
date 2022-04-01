@@ -48,7 +48,7 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 				jvalue = nvpair_to_jx(nv);
 				nvpair_delete(nv);
 			} else if(n==2) {
-				jvalue = jx_parse_string(value);
+				jvalue = jx_parse_static_string(value);
 				if(!jvalue) jvalue = jx_string(value);
 			} else {
 				corrupt_data(filename,line);
@@ -69,7 +69,7 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 		} else if(line[0]=='M') {
 			n = sscanf(line,"M %s %[^\n]",key,value);
 			if(n==2) {
-				jvalue = jx_parse_string(value);
+				jvalue = jx_parse_static_string(value);
 				if(!jvalue) {
 					corrupt_data(filename,line);
 					continue;
@@ -88,7 +88,7 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 				continue;
 			}
 
-			jvalue = jx_parse_string(value);
+			jvalue = jx_parse_static_string(value);
 			if(!jvalue) {
 				/* backwards compatibility with old format */
 				jvalue = jx_string(value);
