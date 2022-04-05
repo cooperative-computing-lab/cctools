@@ -19,26 +19,40 @@ def get_process_stats(prc):
 
 def get_workflow_stats(workflow_path):
     stats_file = os.path.join(workflow_path, "stats.log")
+    factory_log = os.path.join(workflow_path, "factory.log")
 
     if not os.path.exists(stats_file):
-        return 0, 0
+        cores = 0
+        memory = 0
+    else:
+        prc = subprocess.run(["head", "-n", "1", stats_file], capture_output=True)
+        types = prc.stdout.decode().strip().split(' ')
 
-    prc = subprocess.run(["head", "-n", "1", stats_file], capture_output=True)
-    types = prc.stdout.decode().strip().split(' ')
+        prc = subprocess.run(["tail", "-n", "1", stats_file], capture_output=True)
+        stats = prc.stdout.decode().strip().split(' ')
+        try:
+            cores = int(stats[types.index("total_cores")-1]) 
+            memory = int(stats[types.index("total_memory")-1])
+        except:
+            cores = 0
+            memory = 0
 
-    prc = subprocess.run(["tail", "-n", "1", stats_file], capture_output=True)
-    stats = prc.stdout.decode().strip().split(' ')
-    try:
-        cores = int(stats[types.index("total_cores")-1]) 
-        memory = int(stats[types.index("total_memory")-1])
-    except:
-        return 0, 0
+    if not os.path.exists(factory_log):
+        workers = 0
+    else:
+        factory_log = os.path.join(workflow_path, "factory.log")
+        with open(factory_log, "r") as f:
+            workers = int(f.readline().strip())
 
-    return cores, memory
+    return cores, memory, workers
             
 
-def check_over_limits(max_cpu, max_mem, max_cluster_cpu, max_cluster_mem, resources):
-    if max_mem > resources["memusage"]:
+def check_over_limits(max_cpu, max_mem, max_cluster_cpu, max_cluster_mem, max_cluster_jobs, resources):
+    if max_cpu > resources["cpuusage"]:
+        return "cpu"
+    elif max_cluster_jobs > resources["jobs"]:
+        return "jobs"
+    elif max_mem > resources["memusage"]:
         return "memusage"    
     elif max_cluster_cpu > resources["cluster_cpu"]:
         return "cluster_cpu"
@@ -53,6 +67,7 @@ def profile(pid, workflow_path, interval, resources, conn):
     max_mem = 0
     max_cluster_cpu = 0
     max_cluster_mem = 0
+    max_cluster_workers = 0
 
     try:
         subject_process = psutil.Process(pid)
@@ -64,7 +79,7 @@ def profile(pid, workflow_path, interval, resources, conn):
     while subject_process.is_running() and subject_process.status() != psutil.STATUS_ZOMBIE:
         try:
             cpu_usage, mem_usage = get_process_stats(subject_process)
-            cluster_cpu_usage, cluster_mem_usage = get_workflow_stats(workflow_path)
+            cluster_cpu_usage, cluster_mem_usage, cluster_workers = get_workflow_stats(workflow_path)
             children.update(subject_process.children(recursive=True))
         except psutil.NoSuchProcess:
             break
@@ -83,19 +98,20 @@ def profile(pid, workflow_path, interval, resources, conn):
         max_mem = max(mem_usage, max_mem)
         max_cluster_cpu = max(cluster_cpu_usage, max_cluster_cpu)
         max_cluster_mem = max(cluster_mem_usage, max_cluster_mem)
+        max_cluster_workers = max(cluster_workers, max_cluster_workers)
 
         # send update to mufasa
-        stats = {"pid": os.getpid(), "memusage": mem_usage // 10**6, "cpuusage": cpu_usage, "cluster_cpu": cluster_cpu_usage, "cluster_mem": cluster_mem_usage, "disk": resources["disk"]}
+        stats = {"pid": os.getpid(), "memusage": mem_usage // 10**6, "cpuusage": cpu_usage, "cluster_cpu": cluster_cpu_usage, "cluster_mem": cluster_mem_usage, "disk": resources["disk"], "jobs": max_cluster_workers}
         message = {"status": "resource_update", "allocated_resources": resources, "workflow_stats":stats}
         conn.send(message)
 
-        reason = check_over_limits(max_cpu, max_mem / 10**6, max_cluster_cpu, max_cluster_mem, resources)
+        reason = check_over_limits(max_cpu, max_mem / 10**6, max_cluster_cpu, max_cluster_mem, max_cluster_workers, resources)
         if reason:
             for child in subject_process.children(recursive=True):
                 child.terminate()
             subject_process.terminate()
-            return max_cpu, max_mem // 10**6, max_cluster_cpu, max_cluster_mem, reason
+            return max_cpu, max_mem // 10**6, max_cluster_cpu, max_cluster_mem, max_cluster_workers, reason
 
         time.sleep(interval)
 
-    return max_cpu, max_mem // 10**6, max_cluster_cpu, max_cluster_mem, None
+    return max_cpu, max_mem // 10**6, max_cluster_cpu, max_cluster_mem, max_cluster_workers, None

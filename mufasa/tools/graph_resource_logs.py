@@ -1,12 +1,15 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import sys
+
+resource = sys.argv[1]
 
 df = pd.read_csv("resources.log")
 
 time = df["time"].to_numpy()
-mem_usage = df["cluster_mem"].to_numpy()
-allocated_mem_usage = df["allocated_cluster_mem"].to_numpy()
+mem_usage = df[resource].to_numpy()
+allocated_mem_usage = df[f"allocated_{resource}"].to_numpy()
 # print(allocated_mem_usage)
 max_id = max(df["id"].to_numpy())
 
@@ -23,26 +26,26 @@ for index, (t, m, a) in enumerate(zip(time, mem_usage, allocated_mem_usage)):
     allocated_total += a
     mem_usage[index] = current_total
     prev_time = t
-df["cluster_mem"] = mem_usage.tolist()
+df[resource] = mem_usage.tolist()
 
 plt.figure(figsize=(8,4))
 plt.style.use('grayscale')
 for i in sorted(range(max_id+1), reverse=True):
-    mem_usage = df.loc[df["id"] == i]["cluster_mem"].to_numpy()
+    mem_usage = df.loc[df["id"] == i][resource].to_numpy()
     t  = df.loc[df["id"] == i]["time"].to_numpy()
     plt.fill_between(t, mem_usage)
 
 #
 # plt.scatter(time, mem_usage)
-plt.plot(np.arange(max(time)), np.full(max(time), 80000))
+# plt.plot(np.arange(max(time)), np.full(max(time), 80000))
 plt.plot(np.arange(max(time)), allocated_mem_usage_total)
 
-plt.title("Cluster Memory Usage vs Time")
+plt.title(f"{resource} usage vs time")
 plt.xlabel("Time Steps (0.5 sec)")
-plt.ylabel("Memory (MB)")
+plt.ylabel(f"{resource}")
 plt.tight_layout()
 
-plt.savefig("cluster_mem_usage.jpg")
+plt.savefig(f"{resource}.jpg")
 
 
 
