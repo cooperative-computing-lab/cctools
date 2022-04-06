@@ -2557,28 +2557,17 @@ void start_coprocess() {
 		_exit(127); // if we get here, the exec failed so we just quit
 	}
 	else { // parent goes here
-		function_name = "my_func";
-		function_port = 45107;
-		function_type = "python";
-
-
 		if (fcntl(coprocess_out[0], F_SETFL, O_NONBLOCK))
 		{
 			debug(D_WQ, "parent could not set pipe to nonblocking: %s\n", strerror(errno));
 			return;
 		}
 		
-		char buffer[BUFSIZ];
-		int reading = 1;
-		int count = 0;
+		// read from coprocess - values just hardcoded for now but can get rid of this later
+		function_name = "my_func";
+		function_port = 45107;
+		function_type = "python";
 
-		while(reading && count < 15) {
-			int bytes_read = read_from_coprocess(buffer, 30);
-			printf("%d %s\n", bytes_read, buffer);
-			sleep(1);
-			count++;
-		}
-		
 		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
 			debug(D_WQ, "parent could not close unneeded pipes: %s\n", strerror(errno));
 			return;

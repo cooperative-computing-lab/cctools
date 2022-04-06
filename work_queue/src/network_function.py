@@ -15,6 +15,7 @@ def function_handler(event):
 def main():
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	try:
+		# modify the port argument to be 0 to listen on an arbitrary port
 		s.bind(('localhost', 45107))
 	except Exception as e:
 		s.close()
