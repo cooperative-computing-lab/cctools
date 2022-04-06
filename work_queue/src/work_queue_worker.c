@@ -2576,6 +2576,7 @@ void start_coprocess() {
 			int bytes_read = read_from_coprocess(buffer, 30);
 			printf("%d %s\n", bytes_read, buffer);
 			sleep(1);
+			count++;
 		}
 		
 		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
