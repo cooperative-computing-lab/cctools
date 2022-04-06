@@ -13,18 +13,22 @@ def function_handler(event):
 	return int(event["a"]) + int(event["b"])
 
 def main():
-	HOST = "localhost"
-	PORT = 45107
-
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	try:
-		s.bind((HOST, PORT))
+		s.bind(('localhost', 45107))
 	except Exception as e:
 		s.close()
 		print(e)
 		exit(1)
-	
-	print('listening on port: {}'.format(s.getsockname()[1]))
+
+	# information to print to stdout for worker
+	name = "my_func"
+	port = s.getsockname()[1]
+	_type = "python"	
+
+	print('name: {}'.format(name))
+	print('port: {}'.format(port))
+	print('type: {}'.format(_type))
 
 	while True:
 		s.listen()

@@ -232,8 +232,11 @@ static int coprocess_num_deaths = 0;
 static int coprocess_in[2];
 static int coprocess_out[2];
 
-// User specified python function
+// Global variables for network function
 static char *python_function = NULL;
+static char *function_name = NULL;
+static int function_port = -1;
+static char *function_type = NULL;
 
 __attribute__ (( format(printf,2,3) ))
 static void send_manager_message( struct link *manager, const char *fmt, ... )
@@ -1927,9 +1930,11 @@ static void work_for_manager(struct link *manager) {
 				if(!p) {
 					break;
 				} else if(task_resources_fit_now(p->task)) {
-					// attach the python function name to process if applicable
-					if(python_function != NULL) {
-						p->python_function = xxstrdup(python_function);
+					// attach the function name, port, and type to process
+					if(function_name != NULL && function_port != -1 && function_type != NULL) {
+						p->function_name = xxstrdup(function_name);
+						p->function_port = function_port;
+						p->function_type = xxstrdup(function_type);
 					}
 					start_process(p);
 					task_event++;
@@ -2501,6 +2506,21 @@ struct list *parse_manager_addresses(const char *specs, int default_port) {
 	return(managers);
 }
 
+int write_to_coprocess(char *buffer, int len) {
+	return write(coprocess_in[1], buffer, len);
+}
+
+int read_from_coprocess(char *buffer, int len) {
+	int bytes_read = read(coprocess_out[0], buffer, len - 1);
+	if(bytes_read < 0) {
+		debug(D_WQ, "Read from coprocess failed\n");
+		return -1;
+	}
+	buffer[bytes_read] = '\0';
+	printf("%d %s\n", bytes_read, buffer);
+	return bytes_read;
+}
+
 void start_coprocess() {
 
 	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
@@ -2513,6 +2533,7 @@ void start_coprocess() {
 		return;
 	}		
 	else if (coprocess_pid == 0) { // child executes this
+		/*
 		if (close(coprocess_in[1]) || close(0)) {
 			debug(D_WQ, "coprocess could not close stdin: %s\n", strerror(errno));
 			_exit(127);
@@ -2530,40 +2551,39 @@ void start_coprocess() {
 			debug(D_WQ, "coprocess could not attach pipe to stdout: %s\n", strerror(errno));
 			_exit(127);
 		}
-		
+		*/
 		execlp(coprocess_command, coprocess_command, (char *) 0);
 		debug(D_WQ, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
 		_exit(127); // if we get here, the exec failed so we just quit
 	}
 	else { // parent goes here
+		function_name = "my_func";
+		function_port = 45107;
+		function_type = "python";
+
+
 		if (fcntl(coprocess_out[0], F_SETFL, O_NONBLOCK))
 		{
 			debug(D_WQ, "parent could not set pipe to nonblocking: %s\n", strerror(errno));
 			return;
 		}
+		
+		char buffer[BUFSIZ];
+		int reading = 1;
+		int count = 0;
+
+		while(reading && count < 15) {
+			int bytes_read = read_from_coprocess(buffer, 30);
+			printf("%d %s\n", bytes_read, buffer);
+			sleep(1);
+		}
+		
 		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
 			debug(D_WQ, "parent could not close unneeded pipes: %s\n", strerror(errno));
 			return;
 		}
 		debug(D_WQ, "Forked child process to run %s\n", coprocess_command);
 	}
-}
-
-int write_to_coprocess(char *buffer, int len)
-{
-	return write(coprocess_in[1], buffer, len);
-}
-
-int read_from_coprocess(char *buffer, int len){
-	int bytes_read = read(coprocess_out[0], buffer, len - 1);
-	if (bytes_read < 0)
-	{
-		debug(D_WQ, "Read from coprocess failed\n");
-		return -1;
-	}
-	buffer[bytes_read] = '\0';
-	printf("%d %s\n", bytes_read, buffer);
-	return bytes_read;
 }
 
 int check_if_coprocess_exited()
@@ -3169,10 +3189,12 @@ int main(int argc, char *argv[])
 				start_coprocess();
 			}
 		}
+		/*
 		char buffer[4096];
 		write_to_coprocess("haha", strlen(buffer));
 		read_from_coprocess(buffer, 4096);
 		printf("%s\n", buffer);
+		*/
 		sleep(backoff_interval);
 	}
 	workspace_delete();
