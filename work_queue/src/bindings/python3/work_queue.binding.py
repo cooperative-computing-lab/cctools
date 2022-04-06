@@ -1959,6 +1959,7 @@ class Factory(object):
         "mesos-preload",
         "min-workers",
         "password",
+        "python-env",
         "python-package",
         "run-factory-as-manager",
         "runos",

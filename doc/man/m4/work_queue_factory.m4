@@ -100,7 +100,7 @@ OPTION_ARG_LONG(worker-binary,file)
 OPTION_ARG_LONG(wrapper,cmd)
  Wrap factory with this command prefix.
 OPTION_ARG_LONG(wrapper-input,file) Add this input file needed by the wrapper.
-OPTION_ARG_LONG(python-package,pkg) Run each worker inside this python package.
+OPTION_ARG_LONG(python-env,file.tar.gz) Run each worker inside this python environment.
 OPTIONS_END
 
 Options  specific to batch systems:
