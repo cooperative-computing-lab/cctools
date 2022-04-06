@@ -220,11 +220,10 @@ static char * load_input_file(struct work_queue_task *t) {
 	return buf;	
 }
 
-static char * invoke_coprocess_function(char *input) {
+static char * invoke_coprocess_function(int function_port, char *input) {
 	char addr[DOMAIN_NAME_MAX];
 	char buf[BUFSIZ];
 	int len;
-	int port = 45107;
 	int timeout = 60000000; // one minute, can be changed
 
 	if(!domain_name_lookup("localhost", addr)) {
@@ -239,7 +238,7 @@ static char * invoke_coprocess_function(char *input) {
 	int tries = 0;
 	// retry connection for ~30 seconds
 	while(!connected && tries < 30) {
-		link = link_connect(addr, port, stoptime);
+		link = link_connect(addr, function_port, stoptime);
 		if(link) {
 			connected = 1;
 		} else {
@@ -355,7 +354,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 			char *input = load_input_file(p->task);
 	
 			// call invoke_coprocess_function
-		 	char *output = invoke_coprocess_function(input);
+		 	char *output = invoke_coprocess_function(p->function_port, input);
 
 			// write data to output file
 			full_write(p->output_fd, output, strlen(output));
