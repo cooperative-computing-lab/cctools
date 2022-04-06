@@ -122,7 +122,7 @@ Worker environment options:
 - **--wrapper=_&lt;cmd&gt;_**<br />
  Wrap factory with this command prefix.
 - **--wrapper-input=_&lt;file&gt;_**<br /> Add this input file needed by the wrapper.
-- **--python-package=_&lt;pkg&gt;_**<br /> Run each worker inside this python package.
+- **--python-env=_&lt;file.tar.gz&gt;_**<br /> Run each worker inside this python environment.
 
 
 Options  specific to batch systems:

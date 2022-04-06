@@ -953,7 +953,7 @@ class PythonTask(Task):
 
             self.specify_input_file(self._env_file, cache=True)
             self.specify_input_file(self._pp_run, cache=True)
-    
+
     specify_package = specify_environment
 
     def __del__(self):
@@ -1962,6 +1962,7 @@ class Factory(object):
         "mesos-preload",
         "min-workers",
         "password",
+        "python-env",
         "python-package",
         "run-factory-as-manager",
         "runos",
