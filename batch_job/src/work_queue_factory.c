@@ -1117,7 +1117,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
 	printf(" %-30s Use runos tool to create environment (ND only).\n","--runos=<img>");
-	printf(" %-30s Run each worker inside this python package.\n","--python-package");
+	printf(" %-30s Run each worker inside this python environment.\n","--python-env=<file.tar.gz>");
 
 	printf("\nOptions specific to batch systems:\n");
 	printf(" %-30s Generic batch system options.\n", "-B,--batch-options=<options>");
@@ -1191,7 +1191,8 @@ static const struct option long_options[] = {
 	{"min-workers", required_argument, 0, 'w'},
 	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 	{"password", required_argument, 0, 'P'},
-	{"python-package", required_argument, 0, LONG_OPT_PYTHON_PACKAGE},
+	{"python-env", required_argument, 0, LONG_OPT_PYTHON_PACKAGE},
+	{"python-package", required_argument, 0, LONG_OPT_PYTHON_PACKAGE}, //same as python-env, kept for compatibility
 	{"run-factory-as-manager", no_argument, 0, LONG_OPT_RUN_AS_MANAGER},
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{"scratch-dir", required_argument, 0, 'S' },
