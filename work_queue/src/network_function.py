@@ -16,7 +16,7 @@ def main():
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	try:
 		# modify the port argument to be 0 to listen on an arbitrary port
-		s.bind(('localhost', 45107))
+		s.bind(('localhost', 0))
 	except Exception as e:
 		s.close()
 		print(e)
@@ -27,9 +27,9 @@ def main():
 	port = s.getsockname()[1]
 	_type = "python"	
 
-	print('name: {}'.format(name))
-	print('port: {}'.format(port))
-	print('type: {}'.format(_type))
+	print('name: {}'.format(name),flush=True)
+	print('port: {}'.format(port),flush=True)
+	print('type: {}'.format(_type),flush=True)
 
 	while True:
 		s.listen()
