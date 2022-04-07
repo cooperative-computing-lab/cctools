@@ -241,6 +241,12 @@ struct list *snapshot_labels = NULL;    /* list of labels for current snapshot. 
 struct itable *snapshot_watch_pids;     /* pid of all processes watching files for snapshots. */
 
 
+static timestamp_t last_termination_signal_time = 0; /* Records the time a termination signal is received. */
+static int fast_terminate_from_signal = 0;           /* Whether to stop monitoring loop before main process
+														terminates. (e.g., if receiving two terminating signals
+														in less than a second. */
+
+
 char *catalog_task_readable_name = NULL;
 char *catalog_uuid    = NULL;
 char *catalog_hosts   = NULL;
@@ -1510,12 +1516,31 @@ struct rmsummary *rmonitor_final_usage_tree(void)
     return tr_usg;
 }
 
-
 /* signal handler forward to process */
 void rmonitor_forward_signal(const int signal, siginfo_t *info, void *data)
 {
-	notice(D_RMON, "forwarding signal %s(%d)", strsignal(signal), signal);
-	kill(first_process_pid, signal);
+	timestamp_t current_time = timestamp_get();
+	switch(signal)
+	{
+		case SIGINT:
+		case SIGQUIT:
+		case SIGTERM:
+			if(current_time - last_termination_signal_time < USECOND) {
+				fast_terminate_from_signal = 1;
+			}
+			last_termination_signal_time = current_time;
+			if(first_pid_manually_set) {
+				/* do not forward termination signal if monitor attached to
+				 * already running process. */
+				break;
+			}
+			/* fall through */
+		default:
+			notice(D_RMON, "forwarding signal %s(%d)", strsignal(signal), signal);
+			kill(first_process_pid, signal);
+			break;
+	}
+
 }
 
 /* sigchild signal handler */
@@ -2048,7 +2073,7 @@ int rmonitor_resources(long int interval /*in seconds */)
 	// the last process exits after the while(...) is tested, but
 	// before we reach select.
 	round = 1;
-	while(itable_size(processes) > 0)
+	while(itable_size(processes) > 0 && !fast_terminate_from_signal)
 	{
 		debug(D_RMON, "Round %" PRId64, round);
 		activate_debug_log_if_file();
