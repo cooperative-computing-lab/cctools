@@ -27,9 +27,7 @@ def main():
 	port = s.getsockname()[1]
 	_type = "python"	
 
-	print('name: {}'.format(name),flush=True)
-	print('port: {}'.format(port),flush=True)
-	print('type: {}'.format(_type),flush=True)
+	print('name: {}\nport: {}\ntype: {}'.format(name,port,_type),flush=True)
 
 	while True:
 		s.listen()
