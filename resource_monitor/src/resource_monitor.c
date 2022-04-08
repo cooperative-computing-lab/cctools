@@ -889,14 +889,14 @@ void rmonitor_summary_header()
 }
 
 struct peak_cores_sample {
-	int64_t wall_time;
-	int64_t cpu_time;
+	double wall_time;
+	double cpu_time;
 };
 
 double peak_cores(double wall_time, double cpu_time) {
 	static struct list *samples = NULL;
 
-	double max_separation = 180 + 2*interval; /* at least one minute and a complete interval */
+	double max_separation = 180 + 2*interval; /* at least three minutes and a complete interval */
 
 	if(!samples) {
 		samples = list_create();
@@ -929,8 +929,8 @@ double peak_cores(double wall_time, double cpu_time) {
 
 	head = list_peek_head(samples);
 
-	double diff_wall = tail->wall_time - head->wall_time;
-	double diff_cpu  = tail->cpu_time  - head->cpu_time;
+	double diff_wall = MAX(0, tail->wall_time - head->wall_time);
+	double diff_cpu  = MAX(0, tail->cpu_time  - head->cpu_time);
 
 	if(tail->wall_time - summary->start < max_separation) {
 		/* hack to elimiate noise. if we have not collected enough samples,
