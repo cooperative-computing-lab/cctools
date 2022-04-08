@@ -15,6 +15,7 @@ import pathlib
 import hashlib
 import shutil
 import logging
+import re
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
@@ -191,28 +192,30 @@ def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
     
     if 'conda' in poncho_spec:
         conda_spec['channels'] = poncho_spec['conda'].get('channels', ['conda-forge', 'defaults'])
+
         conda_spec['dependencies'] = set(poncho_spec['conda'].get('packages', []))
 
-        for pip_name in local_pip_pkgs:
-            if pip_name in conda_spec['dependencies']:
-                local_reqs.add(pip_name)
-                conda_spec['dependencies'].remove(pip_name)
-
+        for dep in list(conda_spec['dependencies']):
+            only_name = re.sub("[!~=<>].*$", "", dep)  # remove possible version from spec
+            if only_name in local_pip_pkgs:
+                local_reqs.add(only_name)
+                conda_spec['dependencies'].remove(dep)
         conda_spec['dependencies'] = list(conda_spec['dependencies'])
 
 
     # get pip packages that are not installed --editable
     pip_pkgs = set(poncho_spec.get('pip', []))
-    for pip_name in local_pip_pkgs:
-        if pip_name in pip_pkgs:
-            local_reqs.add(pip_name)
-            pip_pkgs.remove(pip_name)
+    for dep in list(pip_pkgs):
+        only_name = re.sub("[!~=<>].*$", "", dep)  # remove possible version from spec
+        if only_name in local_pip_pkgs:
+            local_reqs.add(only_name)
+            pip_pkgs.remove(dep)
 
     conda_spec['dependencies'].append({'pip': list(pip_pkgs)})
 
     for (pip_name, location) in local_pip_pkgs.items():
         if pip_name not in local_reqs:
-            logger.warning("pip package {} was found as pip --editable, but it is not part of the spec. Ignoring local installation.")
+            logger.warning("pip package {} was found as pip --editable, but it is not part of the spec. Ignoring local installation.".format(pip_name))
 
     with open(out_dir + '/conda_spec.yml',  'w') as jf:
         json.dump(conda_spec, jf, indent=4)
