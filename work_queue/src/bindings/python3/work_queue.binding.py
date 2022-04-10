@@ -2019,6 +2019,8 @@ class Factory(object):
         self._set_manager(manager_name, manager_host_port)
         self._opts['batch-type'] = batch_type
         self._opts['worker-binary'] = self._find_exe(worker_binary, 'work_queue_worker')
+        self._opts['scratch-dir'] = None
+
         self._factory_binary = self._find_exe(factory_binary, 'work_queue_factory')
 
     def _set_manager(self, manager_name, manager_host_port):
