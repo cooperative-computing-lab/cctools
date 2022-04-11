@@ -33,7 +33,10 @@ run()
 	echo $(pwd) ${python}
 
 	# send makeflow to the background, saving its exit status.
-	PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} wq_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
+	export PATH=/bin:/usr/bin
+	export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
+	export PYTHONPATH=$(pwd)/../src/bindings/${python_dir}
+	${python} wq_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
 
 	# retrieve wq script exit status
 	status=$(cat $STATUS_FILE)
