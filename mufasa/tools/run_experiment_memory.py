@@ -11,9 +11,9 @@ count = 0
 total = int(sys.argv[1])
 inbox_path = os.path.abspath(sys.argv[2])
 default_cluster_cores = 4
-default_cluster_mem = 2000
+default_cluster_mem = 500
 default_disk = 5000
-default_jobs = 10
+default_jobs = 100
 default_max_seq = 100
 
 tmpdir = tempfile.mkdtemp()
@@ -34,9 +34,9 @@ while count < total:
     disk = default_disk
 
     if random.random() > prob:
-        jobs = default_jobs + random.randint(0, 5)
+        jobs = default_jobs + random.randint(0, 40)
     else:
-        jobs = default_jobs - random.randint(0, 5)
+        jobs = default_jobs - random.randint(0, 40)
 
     if random.random() > prob:
         max_seq = default_max_seq + random.randint(0, 15)
@@ -50,6 +50,6 @@ while count < total:
     os.system(f"cp input_{count}.tar.gz {inbox_path}")
 
     count += 1
-    time.sleep(60)
+    time.sleep(30)
 
 shutil.rmtree(tmpdir)

@@ -43,14 +43,14 @@ class Workflow():
                 prc = subprocess.Popen(["makeflow", os.path.basename(self.makeflow), f"--local-cores={resources['cpuusage']}", f"--local-memory={resources['memusage']}", f"--local-disk={resources['disk']}"], stdout=f,stderr=f)
 
             # monitor memory and cpu usage
-            cpu_usage, mem_usage, ccpu, cmem, jobs, reason = profile(prc.pid, workflow_directory_name, interval=0.5, resources=resources, conn=conn)
+            cpu_usage, mem_usage, jobs, reason = profile(prc.pid, workflow_directory_name, interval=0.5, resources=resources, conn=conn)
 
             # wait for it to finish to get return code
             for p in psutil.Process(prc.pid).children(recursive=True):
                 p.wait()
             prc.wait()
 
-            stats = {"pid": os.getpid(), "exitcode": prc.returncode, "memusage": mem_usage, "cpuusage": cpu_usage, "cluster_cpu": ccpu, "cluster_mem": cmem, "jobs": jobs, "reason": reason}
+            stats = {"pid": os.getpid(), "exitcode": prc.returncode, "memusage": mem_usage, "cpuusage": cpu_usage,  "jobs": jobs, "reason": reason}
             if not reason:
                 # create output filename
                 output_filename = inputname + "-" +  filehash + ".tar.gz"

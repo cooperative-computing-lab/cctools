@@ -49,15 +49,15 @@ def get_workflow_stats(workflow_path):
 
 def check_over_limits(max_cpu, max_mem, max_cluster_cpu, max_cluster_mem, max_cluster_jobs, resources):
     if max_cpu > resources["cpuusage"]:
-        return "cpu"
+        return "cpuusage"
     elif max_cluster_jobs > resources["jobs"]:
         return "jobs"
     elif max_mem > resources["memusage"]:
         return "memusage"    
-    elif max_cluster_cpu > resources["cluster_cpu"]:
-        return "cluster_cpu"
-    elif max_cluster_mem > resources["cluster_mem"]:
-        return "cluster_mem"
+    # elif max_cluster_cpu > resources["cluster_cpu"]:
+    #     return "cluster_cpu"
+    # elif max_cluster_mem > resources["cluster_mem"]:
+    #     return "cluster_mem"
     else:
         return False
 
@@ -110,8 +110,8 @@ def profile(pid, workflow_path, interval, resources, conn):
             for child in subject_process.children(recursive=True):
                 child.terminate()
             subject_process.terminate()
-            return max_cpu, max_mem // 10**6, max_cluster_cpu, max_cluster_mem, max_cluster_workers, reason
+            return max_cpu, max_mem // 10**6, max_cluster_workers, reason
 
         time.sleep(interval)
 
-    return max_cpu, max_mem // 10**6, max_cluster_cpu, max_cluster_mem, max_cluster_workers, None
+    return max_cpu, max_mem // 10**6, max_cluster_workers, None

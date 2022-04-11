@@ -1,0 +1,15 @@
+.SIZE input.csv 1MB
+.SIZE input.tar.gz 1MB
+.SIZE stats.log 1MB
+.SIZE output.tar.gz 1MB
+.SIZE output.txt 1MB
+.SIZE pairs.py 1MB
+
+input.csv: input.tar.gz
+	tar -xzvf input.tar.gz input.csv
+
+output.tar.gz: output.txt stats.log output.txt.err
+	tar -czvf output.tar.gz output.txt stats.log output.txt.err
+
+output.txt.err output.txt stats.log: pairs.py input.csv
+	python pairs.py > output.txt 2> output.txt.err

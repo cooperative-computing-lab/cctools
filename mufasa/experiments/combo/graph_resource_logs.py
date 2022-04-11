@@ -6,7 +6,7 @@ import sys
 filename = sys.argv[1]
 df = pd.read_csv(filename)
 
-STATS = {"cpuusage": 800, "memusage": 8000, "jobs": 2000}
+STATS = {"cpuusage": 1100, "memusage": 20000, "jobs": 2000}
 
 for resource in STATS:
     time = df["time"].to_numpy()

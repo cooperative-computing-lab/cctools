@@ -4,6 +4,11 @@ import random
 import tempfile
 import shutil
 import os
+import sys
+
+def task(x, y):
+    # time.sleep(1)
+    return x*y
 
 def main():
     NAME = os.getlogin() + "-" + str(random.getrandbits(64))
@@ -19,6 +24,7 @@ def main():
     q = wq.WorkQueue(port=0, name=NAME, stats_log="stats.log")
 
     workers = wq.Factory("condor", NAME)
+
     workers.cores = cores
     workers.memory = memory
     workers.disk = disk
@@ -26,16 +32,30 @@ def main():
     workers.min_workers = max_workers
     workers.scratch_dir = tempfile.mkdtemp()
 
+    with open("factory.log", "w") as f:
+        f.write(f"{max_workers}\n")
+
+    data = []
+    count = 0
+    while count < (seq_max**4)/2:
+        count+=1
+        data.append(count)
+
     seq = list(range(seq_max))
 
     with workers:
         start = time.time()
-        results = q.pair(lambda x,y: x*y, seq, seq)
+        results = q.pair(task, seq, seq)
         stop = time.time()
         print("Elapsed time:", str(stop-start))
 
     with open("output.txt", "w") as f:
         f.write(str(results))
+
+    # count = 0
+    # while count < (seq_max**4)/4:
+    #     count+=1
+    #     data.pop(0)
 
     shutil.rmtree(workers.scratch_dir)
 

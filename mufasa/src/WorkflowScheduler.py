@@ -9,13 +9,12 @@ import time
 import logging
 
 class WorkflowScheduler:
-    def __init__(self, output_dir, workflow, error_dir, total_limits={"memusage": 2000, "cpuusage": 2000, "cluster_cpu": 500, "cluster_mem": 80000, "disk": 75000, "jobs": 100}, workflow_limits={"cpuusage": 110, "memusage": 80, "disk": 5000, "cluster_cpu": 20, "cluster_mem": 20000, "jobs": 10}):
+    def __init__(self, output_dir, workflow, error_dir, total_limits={"memusage": 20000, "cpuusage":1100, "disk": 75000, "jobs": 2000}, workflow_limits={"cpuusage": 110, "memusage": 2000, "disk": 5000,  "jobs": 200}):
         self.output_dir = output_dir
         self.error_dir = error_dir
         self.workflow = workflow
         self.proc_list = []
         self.proc_pipes = []
-        self.proc_stat_averages = {"count": 0, "memusage": 0, "cpuusage": 0, "cluster_cpu": 0, "cluster_mem": 0}
         self.queue = []
         self.total_limits = total_limits
         self.current_resources = { key: 0 for key, val in self.total_limits.items() }
