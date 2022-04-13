@@ -9,7 +9,6 @@ python_dir=${CCTOOLS_PYTHON_TEST_DIR}
 STATUS_FILE=wq.status
 PORT_FILE=wq.port
 
-
 check_needed()
 {
 	[ -n "${python}" ] || return 1
@@ -25,7 +24,7 @@ prepare()
 
 run()
 {
-	# worker resources (used by run_local_worker):
+	# worker resources (used by worker in factory in wq_alloc_test.py):
 	cores=4
 	memory=200
 	disk=200
@@ -34,15 +33,10 @@ run()
 	echo $(pwd) ${python}
 
 	# send makeflow to the background, saving its exit status.
-	(PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} wq_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE) &
-
-	# wait at most 15 seconds for makeflow to find a port.
-	wait_for_file_creation $PORT_FILE 15
-
-	run_local_worker $PORT_FILE worker.log
-
-	# wait for wq script to exit.
-	wait_for_file_creation $STATUS_FILE 15
+	export PATH=/bin:/usr/bin
+	export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
+	export PYTHONPATH=$(pwd)/../src/bindings/${python_dir}
+	${python} wq_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
 
 	# retrieve wq script exit status
 	status=$(cat $STATUS_FILE)

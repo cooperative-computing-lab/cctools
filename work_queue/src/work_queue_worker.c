@@ -232,8 +232,11 @@ static int coprocess_num_deaths = 0;
 static int coprocess_in[2];
 static int coprocess_out[2];
 
-// User specified python function
-static char *python_function = NULL;
+// Global variables for network function
+static char *function_name = NULL;
+static int function_port = -1;
+static char *function_type = NULL;
+
 
 __attribute__ (( format(printf,2,3) ))
 static void send_manager_message( struct link *manager, const char *fmt, ... )
@@ -1927,9 +1930,11 @@ static void work_for_manager(struct link *manager) {
 				if(!p) {
 					break;
 				} else if(task_resources_fit_now(p->task)) {
-					// attach the python function name to process if applicable
-					if(python_function != NULL) {
-						p->python_function = xxstrdup(python_function);
+					// attach the function name, port, and type to process, if applicable
+					if(function_name != NULL && function_port != -1 && function_type != NULL) {
+						p->function_name = xxstrdup(function_name);
+						p->function_port = function_port;
+						p->function_type = xxstrdup(function_type);
 					}
 					start_process(p);
 					task_event++;
@@ -2502,17 +2507,17 @@ struct list *parse_manager_addresses(const char *specs, int default_port) {
 }
 
 void start_coprocess() {
-
 	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
 		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
 		return;
 	}
 	coprocess_pid = fork();
 	if (coprocess_pid < 0) { // unable to fork
-		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
+		fatal("couldn't create new process: %s\n", strerror(errno));
 		return;
 	}		
 	else if (coprocess_pid == 0) { // child executes this
+<<<<<<< HEAD
 	/* 
 		if (close(coprocess_in[1]) || close(0)) {
 			debug(D_WQ, "coprocess could not close stdin: %s\n", strerror(errno));
@@ -2520,14 +2525,20 @@ void start_coprocess() {
 		}
 		if (dup(coprocess_in[0])) {
 			debug(D_WQ, "coprocess could not attach pipe to stdin: %s\n", strerror(errno));
+=======
+		if ( (close(coprocess_in[1]) < 0) || (close(coprocess_out[0]) < 0) ) {
+			debug(D_WQ, "coprocess could not close pipes: %s\n", strerror(errno));
+>>>>>>> master
 			_exit(127);
 		}
 		
-		if (close(coprocess_out[0]) || close(1)) {
-			debug(D_WQ, "coprocess could not close stdout: %s\n", strerror(errno));
+		if (dup2(coprocess_in[0], 0) < 0) {
+			debug(D_WQ, "coprocess could not attach pipe to stdin: %s\n", strerror(errno));
 			_exit(127);
 		}
-		if (dup(coprocess_out[1])) {
+
+		if (dup2(coprocess_out[1], 1) < 0) {
+			printf("%s\n", strerror(errno));
 			debug(D_WQ, "coprocess could not attach pipe to stdout: %s\n", strerror(errno));
 			_exit(127);
 		}
@@ -2538,33 +2549,74 @@ void start_coprocess() {
 		_exit(127); // if we get here, the exec failed so we just quit
 	}
 	else { // parent goes here
-		if (fcntl(coprocess_out[0], F_SETFL, O_NONBLOCK))
-		{
-			debug(D_WQ, "parent could not set pipe to nonblocking: %s\n", strerror(errno));
+		/*
+		if (fcntl(coprocess_out[0], F_SETFL, O_NONBLOCK) < 0) {
+			debug(D_WQ, "parent could not make pipe nonblocking: %s\n", strerror(errno));
 			return;
 		}
+		*/
 		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
-			debug(D_WQ, "parent could not close unneeded pipes: %s\n", strerror(errno));
+			debug(D_WQ, "parent could not close pipes: %s\n", strerror(errno));
 			return;
 		}
 		debug(D_WQ, "Forked child process to run %s\n", coprocess_command);
 	}
 }
 
-int write_to_coprocess(char *buffer, int len)
+int write_to_coprocess_timeout(char *buffer, int len, int timeout)
 {
-	return write(coprocess_in[1], buffer, len);
+	struct pollfd read_poll = {coprocess_in[1], POLLOUT, 0};
+	int poll_result = poll(&read_poll, 1, timeout);
+	if (poll_result < 0)
+	{
+		debug(D_WQ, "Write to coprocess failed: %s\n", strerror(errno));
+		return -1;
+	}
+	if (poll_result == 0) // check for timeout
+	{
+		debug(D_WQ, "writing to coprocess timed out\n");
+		return -1;
+	}
+	if ( !(read_poll.revents & POLLOUT)) // check we have data
+	{
+		debug(D_WQ, "Data able to be written to pipe: %s\n", strerror(errno));
+		return -1;
+	}
+	int bytes_written = write(coprocess_in[1], buffer, len);
+	if (bytes_written < 0)
+	{
+		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
+		return -2;
+	}
+	return bytes_written;
 }
 
-int read_from_coprocess(char *buffer, int len){
+int read_from_coprocess_timeout(char *buffer, int len, int timeout){
+	struct pollfd read_poll = {coprocess_out[0], POLLIN, 0};
+	int poll_result = poll(&read_poll, 1, timeout);
+	if (poll_result < 0)
+	{
+		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
+		return -1;
+	}
+	if (poll_result == 0) // check for timeout
+	{
+		debug(D_WQ, "reading from coprocess timed out\n");
+		return -1;
+	}
+	if ( !(read_poll.revents & POLLIN)) // check we have data
+	{
+		debug(D_WQ, "Data not returned from pipe: %s\n", strerror(errno));
+		return -1;
+	}
+	
 	int bytes_read = read(coprocess_out[0], buffer, len - 1);
 	if (bytes_read < 0)
 	{
-		debug(D_WQ, "Read from coprocess failed\n");
-		return -1;
+		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
+		return -2;
 	}
 	buffer[bytes_read] = '\0';
-	printf("%d %s\n", bytes_read, buffer);
 	return bytes_read;
 }
 
@@ -2646,7 +2698,6 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
-	printf( " %-30s Specify a python function to execute remotely.\n", "--python-function=<func>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2703,7 +2754,6 @@ static const struct option long_options[] = {
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
 	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
-	{"python-function",		required_argument,	0, 	LONG_OPT_PYTHON_FUNCTION},
 	{0,0,0,0}
 };
 
@@ -2956,9 +3006,6 @@ int main(int argc, char *argv[])
 			free(coprocess_command);
 			coprocess_command = xxstrdup(absolute); 
 			break;
-		case LONG_OPT_PYTHON_FUNCTION:
-			python_function = xxstrdup(optarg);
-			break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -3111,6 +3158,21 @@ int main(int argc, char *argv[])
 	if (coprocess_command != NULL)
 	{
 		start_coprocess();
+		char buffer[4096];
+		int bytes_read = read_from_coprocess_timeout(buffer, 4096, 5000);
+		if (bytes_read < 0)
+		{
+			debug(D_WQ, "Unable to get information from network function");
+		}
+		else
+		{
+			char *token = strtok(buffer, "\n");
+			function_name = xxstrdup(token + 6);
+			token = strtok(NULL, "\n");
+			function_port = atoi(token + 6);
+			token = strtok(NULL, "\n");
+			function_type = xxstrdup(token + 6);
+		}
 	}
 
 	while(1) {
@@ -3171,12 +3233,16 @@ int main(int argc, char *argv[])
 				start_coprocess();
 			}
 		}
+<<<<<<< HEAD
 		/*
 		char buffer[4096];
 		write_to_coprocess("haha", strlen(buffer));
 		read_from_coprocess(buffer, 4096);
 		printf("%s\n", buffer);
 		*/
+=======
+		printf("coprocess listening on: %d\n", function_port);
+>>>>>>> master
 		sleep(backoff_interval);
 	}
 	workspace_delete();
@@ -3184,6 +3250,8 @@ int main(int argc, char *argv[])
 	{
 		int max_wait = 5; // maximum seconds we wish to wait for a given process
 		process_kill_waitpid(coprocess_pid, max_wait);
+		free(function_name);
+		free(function_type);
 	}
 	return 0;
 }

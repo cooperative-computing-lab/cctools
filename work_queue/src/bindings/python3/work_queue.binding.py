@@ -953,7 +953,7 @@ class PythonTask(Task):
 
             self.specify_input_file(self._env_file, cache=True)
             self.specify_input_file(self._pp_run, cache=True)
-    
+
     specify_package = specify_environment
 
     def __del__(self):
@@ -1982,6 +1982,7 @@ class WorkQueue(object):
                 t = self.wait_for_tag(str(i), 10)
 
                 if t:
+                    print(t.output)
                     results[tasks[t.id]] = json.loads(t.output)["Result"]
                     n += 1
                     break
@@ -2090,6 +2091,7 @@ class Factory(object):
         "mesos-preload",
         "min-workers",
         "password",
+        "python-env",
         "python-package",
         "run-factory-as-manager",
         "runos",
@@ -2149,6 +2151,8 @@ class Factory(object):
         self._set_manager(manager_name, manager_host_port)
         self._opts['batch-type'] = batch_type
         self._opts['worker-binary'] = self._find_exe(worker_binary, 'work_queue_worker')
+        self._opts['scratch-dir'] = None
+
         self._factory_binary = self._find_exe(factory_binary, 'work_queue_factory')
 
     def _set_manager(self, manager_name, manager_host_port):
