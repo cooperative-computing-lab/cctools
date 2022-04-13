@@ -2,6 +2,7 @@
 
 import socket
 import json
+import os
 
 '''
 The function signature should always be the same, but what is actually
@@ -13,6 +14,7 @@ def function_handler(event):
 	return int(event["a"]) + int(event["b"])
 
 def main():
+	initialppid = os.getppid()
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	try:
 		# modify the port argument to be 0 to listen on an arbitrary port
@@ -27,7 +29,7 @@ def main():
 	port = s.getsockname()[1]
 	_type = "python"	
 
-	print('name: {}\nport: {}\ntype: {}'.format(name,port,_type),flush=True)
+	print(json.dumps({"name": name, "port": port, "type": _type}), flush=True)
 
 	while True:
 		s.listen()
