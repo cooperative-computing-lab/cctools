@@ -1908,6 +1908,40 @@ class WorkQueue(object):
 
         return seq[0]
 
+    # map, but remote
+    def Rmap(self, fn, array, name, chunk_size=1):
+        size = math.ceil(len(array)/chunk_size)
+        results = [None] * size
+        tasks = {}
+
+        for i in range(size):
+            start = i*chunk_size
+            end = start + chunk_size
+
+            if end > len(array):
+                event = json.dumps({name : array[start:]})
+                p_task = RemoteTask(fn, event)
+            else:
+                event = json.dumps({name : array[start:end]})
+                p_task = RemoteTask(fn, event)
+            
+            p_task.specify_tag(str(i))
+            self.submit(p_task)
+            tasks[p_task.id] = i
+               
+        n = 0
+        for i in range(size+1):
+            while not self.empty() and n < size:
+
+                t = self.wait_for_tag(str(i), 1)                
+                if t:
+                    results[tasks[t.id]] = list(json.loads(t.output)["Result"])
+                    n += 1
+                    break
+
+        return [item for elem in results for item in elem]
+
+
     # Pair, but remote
     def Rpair(self, fn, seq1, seq2, name, chunk_size=1):
        
@@ -1951,7 +1985,52 @@ class WorkQueue(object):
                     results[tasks[t.id]] = json.loads(t.output)["Result"]
                     n += 1
                     break
-     
+         
+        return [item for elem in results for item in elem]
+    
+    # treeReduce, but remote
+    def Rtree_reduce(self, fn, seq, name, chunk_size=2): 
+        tasks = {}
+        
+        while len(seq) > 1:
+            size = math.ceil(len(seq)/chunk_size)
+            results = [None] * size
+        
+            for i in range(size):
+                start = i*chunk_size
+                end = start + chunk_size
+
+                if end > len(seq):
+                    event = json.dumps({name : seq[start:]})
+                    p_task = RemoteTask(fn, event)
+                else:
+                    event = json.dumps({name : seq[start:end]})
+                    p_task = RemoteTask(fn, event)
+
+                p_task.specify_tag(str(i))
+                self.submit(p_task)
+                tasks[p_task.id] = i
+
+            n = 0
+            for i in range(size+1):
+
+                while not self.empty() and n < size:
+                    t = self.wait_for_tag(str(i), 10)
+
+                    if t:
+                        results[tasks[t.id]] = json.loads(t.output)["Result"]
+
+                        n += 1
+                        break
+
+            seq = results
+
+        return seq[0]
+
+
+
+
+
 class RemoteTask(Task):
 
     def __init__(self, fn, event):
