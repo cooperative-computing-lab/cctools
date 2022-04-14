@@ -34,13 +34,18 @@ for resource in STATS:
     time = df["time"].to_numpy()
     mem_usage = df[resource].to_numpy()
     allocated_mem_usage = df[f"allocated_{resource}"].to_numpy()
-    max_id = max(df["id"].to_numpy())
+    ids = df["id"].to_numpy()
+    max_id = max(ids)
 
     prev_time = 0
     current_total = 0
     allocated_total = 0
     allocated_mem_usage_total = np.zeros(max(time))
-    for index, (t, m, a) in enumerate(zip(time, mem_usage, allocated_mem_usage)):
+    for index, (t, i, m, a) in enumerate(zip(time, ids, mem_usage, allocated_mem_usage)):
+        #  if the id is -1, then its the total amount and we just want to skip it except for disk
+        if i == -1 and resource != "disk":
+            continue
+
         if t != prev_time:
             current_total = 0
             allocated_mem_usage_total[t-1] = allocated_total
