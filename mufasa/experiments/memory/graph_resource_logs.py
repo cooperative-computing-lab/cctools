@@ -46,7 +46,7 @@ for resource in STATS:
     plt.ylabel(f"{resource}")
     plt.tight_layout()
 
-    plt.savefig(f"{resource}.jpg")
+    plt.savefig(f"{resource}.pdf")
 
 
 

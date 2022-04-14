@@ -141,8 +141,9 @@ class WorkflowScheduler:
         self.queue = sorted(self.queue, key=lambda x: x[2], reverse=True)
         self.current_usage["disk"] = self.current_resources["disk"]
         usage_str = [ str(self.current_usage[rtype]) for rtype in self.resource_types ]
-        # self.logfile.write(str(self.logcount) + ",")
-        # self.logfile.write(",".join(usage_str) + "\n")
+        self.logfile.write(str(self.logcount) + ",")
+        self.logfile.write(str(-1) + ",")
+        self.logfile.write(",".join(usage_str) + "\n")
         self.logfile.flush()
 
     def __update_averages(self, stats):

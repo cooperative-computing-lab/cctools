@@ -2,11 +2,33 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import sys
+import os
+
+# config stuff
+font = {'family': 'serif',
+        'serif': ['Computer Modern Roman'],
+        'weight': 'normal',
+        'size': 33}
+plt.rc('font', **font)
+plt.rc('text', usetex=True)
+plt.style.use('tableau-colorblind10')
 
 filename = sys.argv[1]
 df = pd.read_csv(filename)
 
-STATS = {"cpuusage": 800, "memusage": 2000, "jobs": 1000}
+dirname = os.path.basename(os.getcwd())
+
+with open("config.csv") as f:
+    rtypes = f.readline().strip().split(",")
+    maxs = f.readline().strip().split(",")
+
+set_max = True
+if rtypes[-1] == "no_box":
+    rtypes = rtypes[:-1]
+    maxs = maxs[:-1]
+    set_max = False
+
+STATS = {r: int(m) for r,m in zip(rtypes, maxs)}
 
 for resource in STATS:
     time = df["time"].to_numpy()
@@ -29,7 +51,7 @@ for resource in STATS:
         prev_time = t
     df[resource] = mem_usage.tolist()
 
-    plt.figure(figsize=(8,4))
+    plt.figure(figsize=(8,5))
     plt.style.use('grayscale')
     for i in sorted(range(max_id+1), reverse=True):
         mem_usage = df.loc[df["id"] == i][resource].to_numpy()
@@ -39,14 +61,16 @@ for resource in STATS:
     #
     # plt.scatter(time, mem_usage)
     plt.plot(np.arange(max(time)), np.full(max(time), STATS[resource]))
-    plt.plot(np.arange(max(time)), allocated_mem_usage_total)
+    if set_max:
+        plt.plot(np.arange(max(time)), allocated_mem_usage_total)
 
-    plt.title(f"{resource} vs time")
-    plt.xlabel("Time Steps (0.5 sec)")
+    # plt.title(f"{resource} vs time")
+    if dirname == "combo" or dirname == "bad":
+        plt.xlabel("Time Steps (0.5 sec)")
     plt.ylabel(f"{resource}")
-    plt.tight_layout()
+    # plt.tight_layout()
 
-    plt.savefig(f"{resource}.jpg")
+    plt.savefig(f"{dirname}_{resource}.pdf", bbox_inches='tight')
 
 
 
