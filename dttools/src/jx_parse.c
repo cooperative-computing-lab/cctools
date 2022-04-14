@@ -80,6 +80,12 @@ struct jx_parser {
 	double double_value;
 };
 
+static bool static_mode = false;
+
+void jx_parse_set_static_mode( bool mode ) {
+	static_mode = mode;
+}
+
 struct jx_parser *jx_parser_create(bool strict_mode) {
 	struct jx_parser *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
@@ -1054,7 +1060,13 @@ static struct jx * jx_parse_binary( struct jx_parser *s, int precedence )
 
 struct jx * jx_parse( struct jx_parser *s )
 {
-	struct jx *j = jx_parse_binary(s,JX_PRECEDENCE_MAX);
+	struct jx *j = NULL;
+	if (static_mode) {
+		j = jx_parse_unary(s);
+	} else {
+		j = jx_parse_binary(s,JX_PRECEDENCE_MAX);
+	}
+
 	if (!j)
 		return NULL;
 
