@@ -2,6 +2,10 @@
 
 import socket
 import json
+import multiprocessing
+import os
+
+from function_handler import handler, get_name
 
 '''
 The function signature should always be the same, but what is actually
@@ -9,8 +13,10 @@ contained in the event will be different. You decide what is in the event,
 and the function body (that you define) will work accordingly. For now,
 this is just a dummy prototype
 '''
-def function_handler(event):
-	return int(event["a"]) + int(event["b"])
+def function_handler(event, response):
+	result = int(event["a"]) + int(event["b"])
+	response["Result"] = result
+	response["StatusCode"] = 200
 
 def main():
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -23,7 +29,7 @@ def main():
 		exit(1)
 
 	# information to print to stdout for worker
-	name = "my_func"
+	name = get_name()
 	port = s.getsockname()[1]
 	_type = "python"	
 
@@ -50,14 +56,14 @@ def main():
 				event = json.loads(event)
 				print('event: {}'.format(event))
 
-				result = function_handler(event)
+				# create a forked process for function handler
+				manager = multiprocessing.Manager()
+				response = manager.dict()
+				p = multiprocessing.Process(target=handler, args=(event, response))
+				p.start()
+				p.join()
 
-				response = {
-					"Result": result,
-					"StatusCode": 200
-				}
-
-				response = json.dumps(response)
+				response = json.dumps(response.copy())
 				response_size = len(response)
 
 				size_msg = "data {}\n".format(response_size)
