@@ -45,19 +45,29 @@ for resource in STATS:
         #  if the id is -1, then its the total amount and we just want to skip it except for disk
         if i == -1 and resource != "disk":
             continue
+        elif i == -1:
+            mem_usage[index] = m
+            prev_time = t
+        else:
+            if t != prev_time:
+                current_total = 0
+                allocated_mem_usage_total[t-1] = allocated_total
+                allocated_total = 0
 
-        if t != prev_time:
-            current_total = 0
-            allocated_mem_usage_total[t-1] = allocated_total
-            allocated_total = 0
-        current_total += m
-        allocated_total += a
-        mem_usage[index] = current_total
-        prev_time = t
+            current_total += m
+            allocated_total += a
+            mem_usage[index] = current_total
+            prev_time = t
     df[resource] = mem_usage.tolist()
 
     plt.figure(figsize=(8,5))
     plt.style.use('grayscale')
+
+    if resource == "disk":
+        mem_usage = df.loc[df["id"] == -1][resource].to_numpy()
+        t  = df.loc[df["id"] == -1]["time"].to_numpy()
+        plt.fill_between(t, mem_usage)
+
     for i in sorted(range(max_id+1), reverse=True):
         mem_usage = df.loc[df["id"] == i][resource].to_numpy()
         t  = df.loc[df["id"] == i]["time"].to_numpy()
