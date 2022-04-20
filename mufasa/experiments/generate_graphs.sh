@@ -9,3 +9,6 @@ for d in */; do
 	cd ..
 	mv $d*.pdf plots
 done
+
+python graph_violations.py bad combo
+mv wfs_started.pdf plots
