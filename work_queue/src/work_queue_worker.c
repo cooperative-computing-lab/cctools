@@ -2545,7 +2545,7 @@ int read_from_coprocess_timeout(char *buffer, int len, int timeout){
 	if (poll_result == 0) // check for timeout
 	{
 		debug(D_WQ, "reading from coprocess timed out\n");
-		return -1;
+		return -3;
 	}
 	if ( !(read_poll.revents & POLLIN)) // check we have data
 	{
@@ -2565,39 +2565,79 @@ int read_from_coprocess_timeout(char *buffer, int len, int timeout){
 
 void update_coprocess_info()
 {
+	int json_offset, json_length = -1, cumulative_bytes_read = 0, buffer_offset = 0;
 	char buffer[4096];
-	int bytes_read = read_from_coprocess_timeout(buffer, 4096, 5000);
-	
-	if (bytes_read < 0) {
-		debug(D_WQ, "Unable to get information from network function\n");
-		return;
-	}
-	else {
-		struct jx *item, *coprocess_json = jx_parse_string(buffer);
-		void *i = NULL;
-		const char *key;
-		while ((item = jx_iterate_values(coprocess_json, &i))) {
-			key = jx_get_key(&i);
-			if (key == NULL) {
-				continue;
+	char *envelope_size;
+	while (1)
+	{
+		int curr_bytes_read = read_from_coprocess_timeout(buffer + buffer_offset, 4096 - buffer_offset, 5000);
+		if (curr_bytes_read < 0) {
+			debug(D_WQ, "Unable to get information from network function\n");
+			return;
+		}
+		else if (curr_bytes_read == -3)
+		{
+			break;
+		}
+		cumulative_bytes_read += curr_bytes_read;
+
+		envelope_size = memchr(buffer, '\n', cumulative_bytes_read);
+		if ( envelope_size != NULL )
+		{
+			if (json_length == -1)
+			{
+				json_length = atoi(buffer);
+				debug(D_WQ, "json_length %d\n", json_length);
 			}
-			if (!strcmp(key, "name")) {
-				function_name = jx_print_string(item);
-			}
-			else if (!strcmp(key, "port")) {
-				char *temp_port = jx_print_string(item);
-				function_port = atoi(temp_port);
-				free(temp_port);
-			}
-			else if (!strcmp(key, "type")) {
-				function_type = jx_print_string(item);
-			}
-			else {
-				debug(D_WQ, "Unable to recognize key %s\n", key);
+			if (json_length != -1)
+			{
+				json_offset = (int) (envelope_size - buffer) + 1;
+				while ( json_offset < cumulative_bytes_read )
+				{
+					if (buffer[json_offset] == '\n')
+					{
+						buffer_offset = -1;
+					}
+					json_offset++;
+				}
 			}
 		}
-		jx_delete(coprocess_json);
+		if (buffer_offset == -1)
+		{
+			break;
+		}
+		buffer_offset += curr_bytes_read;
 	}
+	
+	if ( ( (envelope_size - buffer + 1) + json_length + 1 ) != cumulative_bytes_read)
+	{
+		return;
+	}
+	
+	struct jx *item, *coprocess_json = jx_parse_string(envelope_size + 1);
+	void *i = NULL;
+	const char *key;
+	while ((item = jx_iterate_values(coprocess_json, &i))) {
+		key = jx_get_key(&i);
+		if (key == NULL) {
+			continue;
+		}
+		if (!strcmp(key, "name")) {
+			function_name = jx_print_string(item);
+		}
+		else if (!strcmp(key, "port")) {
+			char *temp_port = jx_print_string(item);
+			function_port = atoi(temp_port);
+			free(temp_port);
+		}
+		else if (!strcmp(key, "type")) {
+			function_type = jx_print_string(item);
+		}
+		else {
+			debug(D_WQ, "Unable to recognize key %s\n", key);
+		}
+	}
+	jx_delete(coprocess_json);
 }
 
 void start_coprocess() {

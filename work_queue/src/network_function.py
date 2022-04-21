@@ -2,6 +2,7 @@
 
 import socket
 import json
+import time
 
 '''
 The function signature should always be the same, but what is actually
@@ -11,6 +12,10 @@ this is just a dummy prototype
 '''
 def function_handler(event):
 	return int(event["a"]) + int(event["b"])
+
+def send_configuration(config):
+	config_string = json.dumps(config)
+	print(len(config_string) + 1, "\n", config_string, flush=True)
 
 def main():
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -23,11 +28,14 @@ def main():
 		exit(1)
 
 	# information to print to stdout for worker
-	name = "my_func"
-	port = s.getsockname()[1]
-	_type = "python"	
+	config = {
+		"name": "my_func",
+		"port": s.getsockname()[1],
+		"type": "python",
+		"version": "1.1.2"
+	}
 
-	print(json.dumps({"name": name, "port": port, "type": _type}), flush=True)
+	send_configuration(config)
 
 	while True:
 		s.listen()
