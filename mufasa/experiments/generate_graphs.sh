@@ -10,5 +10,5 @@ for d in */; do
 	mv $d*.pdf plots
 done
 
-python graph_violations.py bad combo
+python graph_violations.py bad combo oracle
 mv wfs_started.pdf plots
