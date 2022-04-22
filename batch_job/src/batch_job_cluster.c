@@ -91,7 +91,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	}
 
 	// Each job writes out to its own log file.
-	fprintf(file, "logfile=%s.status.${JOB_ID}\n", sysname);
+	fprintf(file, "logfile=\"${PWD}/%s.status.${JOB_ID}\"\n", sysname);
 	fprintf(file, "starttime=`date +%%s`\n");
 	fprintf(file, "echo start $starttime > $logfile\n");
 
