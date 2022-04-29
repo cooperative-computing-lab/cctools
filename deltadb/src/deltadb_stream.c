@@ -34,6 +34,8 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 
 	const char *filename = "stream";
 
+	jx_parse_set_static_mode(true);
+
 	while(fgets(whole_line,sizeof(whole_line),stream)) {
         char *line = whole_line;
 
@@ -149,7 +151,7 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 
 			if(!handlers->deltadb_time_event(query,starttime,stoptime,current)) break;
 
-			if(stoptime && current>stoptime) return 0;
+			if(stoptime && current>stoptime) goto fail;
 
 		} else if(line[0]=='t') {
 			long long change;
@@ -163,7 +165,7 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 
 			if(!handlers->deltadb_time_event(query,starttime,stoptime,current)) break;
 
-			if(stoptime && current>stoptime) return 0;
+			if(stoptime && current>stoptime) goto fail;
 
 		} else if(line[0]=='\n') {
 			continue;
@@ -172,7 +174,12 @@ int deltadb_process_stream( struct deltadb_query *query, struct deltadb_event_ha
 		}
 	}
 
+	jx_parse_set_static_mode(false);
 	return 1;
+
+fail:
+	jx_parse_set_static_mode(false);
+	return 0;
 }
 
 int deltadb_process_stream_fast( struct deltadb_query *query, struct deltadb_event_handlers *handlers, FILE *stream, time_t starttime, time_t stoptime )

@@ -1,0 +1,10 @@
+name: Makeflow
+headline: Makeflow is a workflow system for parallel and distributed computing that uses a language very similar to Make.
+language: Make
+description: Makeflow is a workflow engine for large scale distributed computing. It accepts a specification of a large amount of work to be performed, and runs it on remote machines in parallel where possible with support to several batch systems (e.g., HTCondor, SLURM, PBS, and Work Queue among others). It is fault-tolerant, so you can use it to coordinate very large tasks that may run for days or weeks in the face of failures. Makeflow is designed to be similar to Make , so if you can write a Makefile, then you can write a Makeflow.
+documentation:
+  general: https://cctools.readthedocs.io/en/stable
+  installation: https://cctools.readthedocs.io/en/stable/install
+  tutorial: https://cctools.readthedocs.io/en/stable/makeflow/#getting-started
+
+

@@ -2553,7 +2553,7 @@ int read_from_coprocess_timeout(char *buffer, int len, int timeout){
 		debug(D_WQ, "Data not returned from pipe: %s\n", strerror(errno));
 		return -1;
 	}
-	
+
 	int bytes_read = read(coprocess_out[0], buffer, len - 1);
 	if (bytes_read < 0)
 	{
@@ -3066,7 +3066,7 @@ int main(int argc, char *argv[])
 			char absolute[1024];
 			path_absolute(coprocess_command, absolute, 1); // get absolute path of executable
 			free(coprocess_command);
-			coprocess_command = xxstrdup(absolute); 
+			coprocess_command = xxstrdup(absolute);
 			break;
 		default:
 			show_help(argv[0]);
@@ -3279,8 +3279,8 @@ int main(int argc, char *argv[])
 			{
 				start_coprocess();
 			}
+			printf("coprocess listening on: %d\n", function_port);
 		}
-		printf("coprocess listening on: %d\n", function_port);
 		sleep(backoff_interval);
 	}
 	workspace_delete();
