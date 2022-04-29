@@ -231,6 +231,7 @@ static pid_t coprocess_pid = 0;
 static int coprocess_num_deaths = 0;
 static int coprocess_in[2];
 static int coprocess_out[2];
+static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
 // Global variables for network function
 static char *function_name = NULL;
@@ -2570,7 +2571,7 @@ void update_coprocess_info()
 	char *envelope_size;
 	while (1)
 	{
-		int curr_bytes_read = read_from_coprocess_timeout(buffer + buffer_offset, 4096 - buffer_offset, 5000);
+		int curr_bytes_read = read_from_coprocess_timeout(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout);
 		if (curr_bytes_read < 0) {
 			debug(D_WQ, "Unable to get information from network function\n");
 			return;
