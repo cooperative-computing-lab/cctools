@@ -10,5 +10,8 @@ for d in */; do
 	mv $d*.pdf plots
 done
 
+python graph_violations.py bad_penalty_300 combo oracle
+python graph_violations.py bad_penalty_30 combo oracle
+python graph_violations.py global_kill combo oracle
 python graph_violations.py bad combo oracle
-mv wfs_started.pdf plots
+mv *.pdf plots

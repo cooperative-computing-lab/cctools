@@ -47,5 +47,5 @@ for dirname in sys.argv[1:]:
 plt.legend()
 plt.xlabel("Time Steps (0.5 sec)")
 plt.ylabel("Num Started/Restarted")
-plt.savefig(f"wfs_started.pdf", bbox_inches='tight')
+plt.savefig(f"{sys.argv[1]}_wfs_started.pdf", bbox_inches='tight')
 
