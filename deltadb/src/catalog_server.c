@@ -530,6 +530,7 @@ static void handle_query( struct link *ql, time_t st )
 	// reset catalog to timestamp
 	if (timestamp > 0) {
 		//deltadb_delete(table);
+		printf("timestamp: %ld\n", timestamp);
 		table = deltadb_create_snapshot(history_dir, timestamp);
 	}
 	

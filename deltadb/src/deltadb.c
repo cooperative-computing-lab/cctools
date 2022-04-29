@@ -310,7 +310,7 @@ Returns true if file could be open and played, false otherwise.
 
 static int log_replay( struct deltadb *db, const char *filename, time_t snapshot)
 {
-	char line[LOG_LINE_MAX];
+	char whole_line[LOG_LINE_MAX];
 	char value[LOG_LINE_MAX];
 	char name[LOG_LINE_MAX];
 	char key[LOG_LINE_MAX];
@@ -322,7 +322,11 @@ static int log_replay( struct deltadb *db, const char *filename, time_t snapshot
 	FILE *file = fopen(filename,"r");
 	if(!file) return 0;
 
-	while(fgets(line,sizeof(line),file)) {
+	while(fgets(whole_line,sizeof(whole_line),file)) {
+		char *line = whole_line;
+
+		reconsider:
+
 		if(line[0]=='C') {
 			n = sscanf(line,"C %s %[^\n]",key,value);
 			if(n==1) {
@@ -379,19 +383,54 @@ static int log_replay( struct deltadb *db, const char *filename, time_t snapshot
 			jx_delete(jx_remove(jobject,jname));
 			jx_insert(jobject,jname,jvalue);
 		} else if(line[0]=='R') {
-			n=sscanf(line,"R %s %s",key,name);
-			if(n!=2) {
+			n=sscanf(line,"R %s %s %s",key,name,value);
+			if(n==3) {
+				/*
+				A third field here indicates a corrupted record.
+				Check to see if the final character of key is a
+				valid record type.
+				*/
+				char type = name[strlen(name)-1];
+
+				if(strchr("CDUMRTt",type)) {
+					/* If so, remove the character and process the R record */
+					name[strlen(name)-1] = 0;
+
+					jobject = hash_table_lookup(db->table,key);
+					if(!jobject) {
+						corrupt_data(filename,line);
+						continue;
+					}
+					struct jx *jname = jx_string(name);
+					jx_delete(jx_remove(jobject,jname));
+					jx_delete(jname);
+
+					name[strlen(name)] = type;
+
+					/* Now process the remainder of the line as a new command. */
+					int position = strlen(key) + strlen(name) + 2;
+					strcpy(line,&line[position]);
+					goto reconsider;
+				} else {
+					/* Invalid type: the line is totally corrupted. */
+					corrupt_data(filename,line);
+					continue;
+				}
+
+			} else if(n==2) {
+				/* This is a correct record with just a key and value */
+				jobject = hash_table_lookup(db->table,key);
+				if(!jobject) {
+					corrupt_data(filename,line);
+					continue;
+				}
+				struct jx *jname = jx_string(name);
+				jx_delete(jx_remove(jobject,jname));
+				jx_delete(jname);
+			} else {
 				corrupt_data(filename,line);
 				continue;
 			}
-			jobject = hash_table_lookup(db->table,key);
-			if(!jobject) {
-				corrupt_data(filename,line);
-				continue;
-			}
-			struct jx *jname = jx_string(name);
-			jx_delete(jx_remove(jobject,jname));
-			jx_delete(jname);
 		} else if(line[0]=='T') {
 			n = sscanf(line,"T %lld",&current);
 			if(n!=1) {
