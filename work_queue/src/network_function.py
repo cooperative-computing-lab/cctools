@@ -18,6 +18,10 @@ def function_handler(event, response):
 	response["Result"] = result
 	response["StatusCode"] = 200
 
+def send_configuration(config):
+	config_string = json.dumps(config)
+	print(len(config_string) + 1, "\n", config_string, flush=True)
+
 def main():
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	try:
@@ -29,11 +33,13 @@ def main():
 		exit(1)
 
 	# information to print to stdout for worker
-	name = get_name()
-	port = s.getsockname()[1]
-	_type = "python"	
+	config = {
+		"name": get_name(),
+		"port": s.getsockname()[1],
+		"type": "python",
+	}
 
-	print('name: {}\nport: {}\ntype: {}'.format(name,port,_type),flush=True)
+	send_configuration(config)
 
 	while True:
 		s.listen()

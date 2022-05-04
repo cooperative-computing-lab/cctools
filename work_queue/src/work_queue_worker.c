@@ -231,6 +231,7 @@ static pid_t coprocess_pid = 0;
 static int coprocess_num_deaths = 0;
 static int coprocess_in[2];
 static int coprocess_out[2];
+static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
 // Global variables for network function
 static char *function_name = NULL;
@@ -2506,52 +2507,6 @@ struct list *parse_manager_addresses(const char *specs, int default_port) {
 	return(managers);
 }
 
-void start_coprocess() {
-	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
-		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
-		return;
-	}
-	coprocess_pid = fork();
-	if (coprocess_pid < 0) { // unable to fork
-		fatal("couldn't create new process: %s\n", strerror(errno));
-		return;
-	}
-	else if (coprocess_pid == 0) { // child executes this
-		if ( (close(coprocess_in[1]) < 0) || (close(coprocess_out[0]) < 0) ) {
-			debug(D_WQ, "coprocess could not close pipes: %s\n", strerror(errno));
-			_exit(127);
-		}
-
-		if (dup2(coprocess_in[0], 0) < 0) {
-			debug(D_WQ, "coprocess could not attach pipe to stdin: %s\n", strerror(errno));
-			_exit(127);
-		}
-
-		if (dup2(coprocess_out[1], 1) < 0) {
-			printf("%s\n", strerror(errno));
-			debug(D_WQ, "coprocess could not attach pipe to stdout: %s\n", strerror(errno));
-			_exit(127);
-		}
-
-		execlp(coprocess_command, coprocess_command, (char *) 0);
-		debug(D_WQ, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
-		_exit(127); // if we get here, the exec failed so we just quit
-	}
-	else { // parent goes here
-		/*
-		if (fcntl(coprocess_out[0], F_SETFL, O_NONBLOCK) < 0) {
-			debug(D_WQ, "parent could not make pipe nonblocking: %s\n", strerror(errno));
-			return;
-		}
-		*/
-		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
-			debug(D_WQ, "parent could not close pipes: %s\n", strerror(errno));
-			return;
-		}
-		debug(D_WQ, "Forked child process to run %s\n", coprocess_command);
-	}
-}
-
 int write_to_coprocess_timeout(char *buffer, int len, int timeout)
 {
 	struct pollfd read_poll = {coprocess_in[1], POLLOUT, 0};
@@ -2591,7 +2546,7 @@ int read_from_coprocess_timeout(char *buffer, int len, int timeout){
 	if (poll_result == 0) // check for timeout
 	{
 		debug(D_WQ, "reading from coprocess timed out\n");
-		return -1;
+		return -3;
 	}
 	if ( !(read_poll.revents & POLLIN)) // check we have data
 	{
@@ -2607,6 +2562,124 @@ int read_from_coprocess_timeout(char *buffer, int len, int timeout){
 	}
 	buffer[bytes_read] = '\0';
 	return bytes_read;
+}
+
+void update_coprocess_info()
+{
+	int json_offset, json_length = -1, cumulative_bytes_read = 0, buffer_offset = 0;
+	char buffer[4096];
+	char *envelope_size;
+	while (1)
+	{
+		int curr_bytes_read = read_from_coprocess_timeout(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout);
+		if (curr_bytes_read < 0) {
+			debug(D_WQ, "Unable to get information from network function\n");
+			return;
+		}
+		else if (curr_bytes_read == -3)
+		{
+			break;
+		}
+		cumulative_bytes_read += curr_bytes_read;
+
+		envelope_size = memchr(buffer, '\n', cumulative_bytes_read);
+		if ( envelope_size != NULL )
+		{
+			if (json_length == -1)
+			{
+				json_length = atoi(buffer);
+				debug(D_WQ, "json_length %d\n", json_length);
+			}
+			if (json_length != -1)
+			{
+				json_offset = (int) (envelope_size - buffer) + 1;
+				while ( json_offset < cumulative_bytes_read )
+				{
+					if (buffer[json_offset] == '\n')
+					{
+						buffer_offset = -1;
+					}
+					json_offset++;
+				}
+			}
+		}
+		if (buffer_offset == -1)
+		{
+			break;
+		}
+		buffer_offset += curr_bytes_read;
+	}
+	
+	if ( ( (envelope_size - buffer + 1) + json_length + 1 ) != cumulative_bytes_read)
+	{
+		return;
+	}
+	
+	struct jx *item, *coprocess_json = jx_parse_string(envelope_size + 1);
+	void *i = NULL;
+	const char *key;
+	while ((item = jx_iterate_values(coprocess_json, &i))) {
+		key = jx_get_key(&i);
+		if (key == NULL) {
+			continue;
+		}
+		if (!strcmp(key, "name")) {
+			function_name = jx_print_string(item);
+		}
+		else if (!strcmp(key, "port")) {
+			char *temp_port = jx_print_string(item);
+			function_port = atoi(temp_port);
+			free(temp_port);
+		}
+		else if (!strcmp(key, "type")) {
+			function_type = jx_print_string(item);
+		}
+		else {
+			debug(D_WQ, "Unable to recognize key %s\n", key);
+		}
+	}
+	jx_delete(coprocess_json);
+}
+
+void start_coprocess() {
+	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
+		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
+		return;
+	}
+	coprocess_pid = fork();
+	if (coprocess_pid < 0) { // unable to fork
+		fatal("couldn't create new process: %s\n", strerror(errno));
+		return;
+	}		
+	else if (coprocess_pid == 0) { // child executes this
+		if ( (close(coprocess_in[1]) < 0) || (close(coprocess_out[0]) < 0) ) {
+			debug(D_WQ, "coprocess could not close pipes: %s\n", strerror(errno));
+			_exit(127);
+		}
+		
+		if (dup2(coprocess_in[0], 0) < 0) {
+			debug(D_WQ, "coprocess could not attach pipe to stdin: %s\n", strerror(errno));
+			_exit(127);
+		}
+
+		if (dup2(coprocess_out[1], 1) < 0) {
+			printf("%s\n", strerror(errno));
+			debug(D_WQ, "coprocess could not attach pipe to stdout: %s\n", strerror(errno));
+			_exit(127);
+		}
+		
+		execlp(coprocess_command, coprocess_command, (char *) 0);
+		debug(D_WQ, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
+		_exit(127); // if we get here, the exec failed so we just quit
+	}
+	else { // parent goes here
+		update_coprocess_info();
+		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
+			debug(D_WQ, "parent could not close pipes: %s\n", strerror(errno));
+			return;
+		}
+		debug(D_WQ, "Forked child process to run %s\n", coprocess_command);
+	}
 }
 
 int check_if_coprocess_exited()
@@ -3147,21 +3220,6 @@ int main(int argc, char *argv[])
 	if (coprocess_command != NULL)
 	{
 		start_coprocess();
-		char buffer[4096];
-		int bytes_read = read_from_coprocess_timeout(buffer, 4096, 5000);
-		if (bytes_read < 0)
-		{
-			debug(D_WQ, "Unable to get information from network function");
-		}
-		else
-		{
-			char *token = strtok(buffer, "\n");
-			function_name = xxstrdup(token + 6);
-			token = strtok(NULL, "\n");
-			function_port = atoi(token + 6);
-			token = strtok(NULL, "\n");
-			function_type = xxstrdup(token + 6);
-		}
 	}
 
 	while(1) {
