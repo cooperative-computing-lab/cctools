@@ -95,25 +95,23 @@ typedef enum {
 } work_queue_file_t;
 
 
-/** Here we repeat the category_mode_t declaration but with work_queue names.
- * This is needed to generate uniform names in the API and bindings. */
+// Here we repeat the category_mode_t declaration but with work_queue names.
+// This is needed to generate uniform names in the API and bindings:
+
 typedef enum {
-/**< When monitoring is disabled, all tasks run as
-  WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
-  exhaustion occurs for specified resources values, then the task permanently fails. */
-    WORK_QUEUE_ALLOCATION_MODE_FIXED          = CATEGORY_ALLOCATION_MODE_FIXED,
-/**< When monitoring is enabled, tasks are tried with maximum specified values
-of cores, memory, disk or gpus until enough statistics are collected. Then,
-further tasks are first tried using the maximum values observed, and in case of
-resource exhaustion, they are retried using the maximum specified values. The
-task permanently fails when there is an exhaustion using the maximum values. If
-no maximum values are specified, the task will wait until a larger worker
-connects. */
-    WORK_QUEUE_ALLOCATION_MODE_MAX            = CATEGORY_ALLOCATION_MODE_MAX,
-/**< As above, but tasks are first tried with an automatically computed allocation to minimize resource waste. */
-    WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE      = CATEGORY_ALLOCATION_MODE_MIN_WASTE,
-/**< As above, but maximizing throughput. */
-    WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
+    WORK_QUEUE_ALLOCATION_MODE_FIXED          = CATEGORY_ALLOCATION_MODE_FIXED, /**< When monitoring is disabled, all tasks run as
+                                                                                  WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
+                                                                                  exhaustion occurs for specified resources values, then the task permanently fails. */
+    WORK_QUEUE_ALLOCATION_MODE_MAX            = CATEGORY_ALLOCATION_MODE_MAX, /**< When monitoring is enabled, tasks are tried with maximum specified values
+                                                                                of cores, memory, disk or gpus until enough statistics are collected. Then,
+                                                                                further tasks are first tried using the maximum values observed, and in case of
+                                                                                resource exhaustion, they are retried using the maximum specified values. The
+                                                                                task permanently fails when there is an exhaustion using the maximum values. If
+                                                                                no maximum values are specified, the task will wait until a larger worker
+                                                                                connects. */
+    WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE      = CATEGORY_ALLOCATION_MODE_MIN_WASTE, /**< As above, but tasks are first tried with an automatically
+                                                                                      computed allocation to minimize resource waste. */
+    WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT /**< As above, but maximizing throughput. */
 } work_queue_category_mode_t;
 
 
