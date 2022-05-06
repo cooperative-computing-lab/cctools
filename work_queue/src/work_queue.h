@@ -113,7 +113,19 @@ connects. */
 /**< As above, but tasks are first tried with an automatically computed allocation to minimize resource waste. */
     WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE      = CATEGORY_ALLOCATION_MODE_MIN_WASTE,
 /**< As above, but maximizing throughput. */
-    WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
+    WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT,
+/**< When monitoring is enabled, tasks are allocated according to the QBucket
+algorithm. An optional user-defined number of tasks are first run with an
+optional user-defined guess of allocation in terms of cores, memory, disk, or gpus until enough
+statistics are collected. The amount of resources are doubled every time
+the same task fails due to resource exhaustion, up to a required user-defined maximum
+resource limit. After this phase, QBucket divides the collected values into
+a variable number of partitions(or buckets) and probabilistically pick one
+of these buckets to allocate to the new task. If no bucket can satisfy
+the current task then the allocation is doubled until it reaches the 
+user-defined maximum resource limit.
+*/
+    WORK_QUEUE_ALLOCATION_MODE_QBUCKET = CATEGORY_ALLOCATION_MODE_QBUCKET
 } work_queue_category_mode_t;
 
 
