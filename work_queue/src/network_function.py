@@ -36,7 +36,6 @@ def main():
 	config = {
 		"name": get_name(),
 		"port": s.getsockname()[1],
-		"type": "python",
 	}
 
 	send_configuration(config)
