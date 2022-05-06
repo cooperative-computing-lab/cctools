@@ -7671,6 +7671,7 @@ int work_queue_specify_category_mode(struct work_queue *q, const char *category,
 		case CATEGORY_ALLOCATION_MODE_MAX:
 		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
 		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
+		case CATEGORY_ALLOCATION_MODE_QBUCKET:
 			break;
 		default:
 			notice(D_WQ, "Unknown category mode specified.");
