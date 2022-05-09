@@ -1,17 +1,9 @@
-# Flow Manager
+# Mufasa
 -------------
-A management system that monitors an input directory and runs the specified workflow on the input files.
-It then outputs the result to an outbox.
-
-## Usage
----------
-Create an inbox, outbox, and error directory.
-Then run 
-```
-python main.py -i /path/to/inbox -o /path/to/outbox -m /path/to/makeflow/file -e /path/to/error
-```
-This will monitor start monitoring the inbox directory for input files. 
-When they are processed, they will be moved to the outbox directory if successful, if not, then they are moved to the error directory.
+A workflow ensemble is a set of workflows that need to be processed by a research campaign.
+Mufasa is a tool for managing the ensemble given a set of global resource limits for CPU usage, memory usage, number of jobs, and disk consumption.
+Mufasa will schedule and monitor WMSs such that the total resource consumption does not exceed these global limits.
+The current iteration of Mufasa can run and monitor Makeflows, although this will someday be expanded to include a wider variety of WMSs.
 
 ## Configuring your makeflow file
 ----------------------------------
@@ -22,32 +14,104 @@ unpack that file in your makeflow file.
 - All desired output files must be packed into `output.tar.gz`. This is the file put in the outbox or error directory in the event of an error.
 
 
+## Basic Usage
+---------
+The general structure for configuring Mufasa is shown in the src/main.py file.
+The point of this file is to create a program that can be run like the following:
+```
+python src/main.py -i /path/to/inbox -o /path/to/outbox -m /path/to/makeflow/file -e /path/to/error
+```
+This will monitor start monitoring the inbox directory for input files. 
+When they are processed, they will be moved to the outbox directory if successful, if not, then they are moved to the error directory.
+
+***IMPORTANT NOTE***: You should ***NOT*** `cp` files into the inbox directory. Instead, you must `mv` them.
+
+This program performs the following basic operations. 
+The first step is to create an instance of the Workflow() class.
+```
+wf = Workflow(path_to_makeflow_file, name_of_expected_inputfile)
+```
+The `path_to_makeflow_file` is the absolute path to the makefile which must be in the same directory as the source code necessary for it to run.
+The expected input file should be the name of the tarfile that makefile unpacks to extract the other input files.
+
+Then you must create an instance of a WorkflowScheduler.
+The first three arguments of a WorkflowScheduler specify the path to the outbox directory, the path to the created Workflow, and the path to the error directory.
+The two other options are `total_limits` and `workflow_limits` which both have default values specified in the WorkflowScheduler.py module, but it is highly recommended to override them.
+The total resource limits can be specified as a dictionary and should be passed as an argument to the WorkflowScheduler(). 
+They must be a dictionary similar to the following:
+```
+total_limits = {
+	"cpuusage": 800,
+	"memusage": 2000,
+	"jobs": 1000,
+	"disk": 75000
+}
+```
+
+The estimated default limits for workflows should also be a dictionary passed as an argument to the WorkflowScheduler().
+```
+workflow_limits = {
+	"cpuusage": 100,
+	"memusage": 400,
+	"jobs": 200,
+	"disk": 5000
+}
+```
+
+Thus, if you wanted to create a WorkflowScheduler with the above limits you would run:
+```
+scheduler = WorkflowScheduler(path_to_outbox, instance_of_workflow, path_to_error_dir, total_limits=total_limits, workflow_limits=workflow_limits)
+```
+
+Next, you must create a DirectoryMonitor to monitor the inbox directory for new files.
+```
+dm = DirectoryMonitor(path_to_inbox, scheduler)
+```
+To check the directory for new files:
+```
+dm.monitor()
+```
+This compares the current state of the directory with the previous state, and pushes any new files to the scheduler's internal queue.
+Then to schedule WMSs run:
+```
+scheduler.schedule()
+```
+which checks the internal scheduling queue for inputs and starts a WMS if the `workflow_limits` fit within the `total_limits`.
+
+To combine these two commands to routinely monitor a directory and then schedule workflows, you can create a loop like this:
+```
+while True:
+	scheduler.schedule()
+	dm.monitor()
+```
+
 ## Running an example
 ----------------------
 The examples directory contains a few different types of workflows.
 The `examples/pairs_combo/` is probably the best example to run.
 To run an instance of this example workflow, perform the following:
-	1. Create the inbox, outbox, error directories
+1. Create the inbox, outbox, error directories
 ``` 
-	mkdir inbox
-	mkdir outbox
-	mkdir error
+mkdir inbox
+mkdir outbox
+mkdir error
 ```
-	2. Start mufasa
+2. Start mufasa
 ```
-	python main.py -i inbox -o outbox -m examples/pairs_combo/pairs.mf -e error
+python src/main.py -i inbox -o outbox -m examples/pairs_combo/pairs.mf -e error
 ```
-	3. Add a bunch of input files to the inbox directory
+3. Add a bunch of input files to the inbox directory
 ```
-	python tools/run_experiment_combo.py 40 inbox
+python tools/run_experiment_combo.py 40 inbox
 ```
 Now Mufasa should be running and begin processing the input files.
 
-## Improvements
+
+## Possible Improvements
 ---------------
-- Add a way to dynamically adjust the default expected resource consumption of a workflow
-- Detect if the global resources are insufficient for a workflow to ever be completed
-- Monitor the read/write bandwidth on the shared filesystem
-- Improve the scheduling and allocation policy to be more intelligent and attempt to reduce fragmentation
-- Add a way to dynamically adjust a WMS's resource limits without pausing or killing the WMS
+- Add a way to dynamically adjust the default expected resource consumption of a workflow (modify WorkflowScheduler.py)
+- Detect if the global resources are insufficient for a workflow to ever be completed (WorkflowScheduler.py)
+- Monitor the read/write bandwidth on the shared filesystem (WorkflowProfiler.py, Workflow.py, WorkflowScheduler.py)
+- Improve the scheduling and allocation policy to be more intelligent and attempt to reduce fragmentation (WorkflowScheduler.py
+- Add a way to dynamically adjust a WMS's resource limits without pausing or killing the WMS (Workflow.py, WorkflowScheduler.py)
 
