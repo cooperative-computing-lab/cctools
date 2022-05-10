@@ -4248,7 +4248,7 @@ static int send_one_task( struct work_queue *q )
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
-		// Skip task if min requested start time not met.
+		// Skip task if min requested start time is not met.
 		if(t->resources_requested->start > now) continue;
 
 		// Find the best worker for the task at the head of the list
@@ -5529,6 +5529,9 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	getcwd(q->workingdir,PATH_MAX);
 
 	q->next_taskid = 1;
+
+	/* counter for unique id for qbuckets */
+	q->next_qbucket_id = 1;
 
 	q->ready_list = list_create();
 
@@ -7436,6 +7439,10 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 }
 
 static void write_transaction_category(struct work_queue *q, struct category *c) {
+
+	#if it is qbucket, don't write anything to transaction log
+	if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_QBUCKET)
+		return;
 
 	if(!q->transactions_logfile)
 		return;
