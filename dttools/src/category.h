@@ -30,31 +30,33 @@ typedef enum {
   Valid modes for computing automatic resource allocations.
 */
 typedef enum {
-    CATEGORY_ALLOCATION_MODE_FIXED = 0, /**< When monitoring is disabled, all
-                                          tasks run as
-                                          WORK_QUEUE_ALLOCATION_MODE_FIXED. If
-                                          monitoring is enabled and resource
-                                          exhaustion occurs for specified
-                                          resources values, then the task
-                                          permanently fails. */
-    CATEGORY_ALLOCATION_MODE_MAX, /**< When monitoring is enabled, tasks are
-                                    tried with maximum specified values of
-                                    cores, memory, disk or gpus until enough
-                                    statistics are collected.  Then, further
-                                    tasks are first tried using the maximum
-                                    values observed, and in case of resource
-                                    exhaustion, they are retried using the
-                                    maximum specified values. The task
-                                    permanently fails when there is an
-                                    exhaustion using the maximum values. If no
-                                    maximum values are specified, the task will
-                                    wait until a larger worker connects. */
-    CATEGORY_ALLOCATION_MODE_MIN_WASTE, /**< As above, but tasks are first
-                                          tried with an automatically computed
-                                         * allocation to minimize resource
-                                         * waste. */
-    CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT /**< As above, but maximizing
-                                              throughput. */
+/**< When monitoring is disabled, all tasks run as
+  WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
+  exhaustion occurs for specified resources values, then the task permanently fails. */
+    CATEGORY_ALLOCATION_MODE_FIXED = 0,
+/**< When monitoring is enabled, tasks are tried with maximum specified values
+of cores, memory, disk or gpus until enough statistics are collected. Then,
+further tasks are first tried using the maximum values observed, and in case of
+resource exhaustion, they are retried using the maximum specified values. The
+task permanently fails when there is an exhaustion using the maximum values. If
+no maximum values are specified, the task will wait until a larger worker
+connects. */
+    CATEGORY_ALLOCATION_MODE_MAX,
+/**< As above, but tasks are first tried with an automatically computed allocation to minimize resource waste. */
+    CATEGORY_ALLOCATION_MODE_MIN_WASTE,
+/**< As above, but maximizing throughput. */
+    CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT,
+/**< When monitoring is enabled, tasks are allocated according to the QBucket
+algorithm. An optional user-defined number of tasks are first run with an
+optional user-defined guess of allocation in terms of cores, memory, disk, or gpus until enough
+statistics are collected. The amount of resources are doubled every time
+the same task fails due to resource exhaustion, up to a required user-defined maximum
+resource limit. After this phase, QBucket divides the collected values into
+a variable number of partitions(or buckets) and probabilistically pick one
+of these buckets to allocate to the new task. If no bucket can satisfy
+the current task then the allocation is doubled until it reaches the 
+user-defined maximum resource limit. */
+    CATEGORY_ALLOCATION_MODE_QBUCKET
 } category_mode_t;
 
 
@@ -62,7 +64,9 @@ struct category {
 	char *name;
 	category_mode_t allocation_mode;
 
-	double fast_abort;
+    struct qbucket *qbucket_ptr;
+	
+    double fast_abort;
 
 	struct rmsummary *first_allocation;
 	struct rmsummary *max_allocation;
