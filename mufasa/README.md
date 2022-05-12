@@ -12,8 +12,7 @@ directory containing the makeflow file is copied before being run.
 - The primary datafile or input file in the makeflow file should be `input.tar.gz`. It is your responsible to
 unpack that file in your makeflow file.
 - All desired output files must be packed into `output.tar.gz`. This is the file put in the outbox or error directory in the event of an error.
-- In order for Mufasa to properly manage disk consumption, the Makeflow should specify the size of files between tasks. It should also declare the resource consumption of tasks in the workflow.
-
+- In order for Mufasa to properly manage disk consumption, the Makeflow should specify the size of files between tasks.
 
 ## Basic Usage
 ---------
