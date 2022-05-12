@@ -1,3 +1,6 @@
+# Copyright (C) 2014 The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
 import psutil
 import multiprocessing
 import os
@@ -6,6 +9,7 @@ import subprocess
 import sys
 
 
+# gets the cpu and memory usage stats about a process
 def get_process_stats(prc):
     try: 
         with prc.oneshot():
@@ -17,6 +21,7 @@ def get_process_stats(prc):
 
     return cpu_usage, mem_usage
 
+# reads information about the WMS from log files
 def get_workflow_stats(workflow_path):
     stats_file = os.path.join(workflow_path, "stats.log")
     factory_log = os.path.join(workflow_path, "factory.log")
@@ -47,13 +52,14 @@ def get_workflow_stats(workflow_path):
     return cores, memory, workers
             
 
+# checks if any of the max resource consumption stats exceed the limits specified in resources
 def check_over_limits(max_cpu, max_mem, max_cluster_cpu, max_cluster_mem, max_cluster_jobs, resources):
-    if max_cpu > resources["cpuusage"]:
-        return "cpuusage"
+    if max_cpu > resources["cores"]:
+        return "cores"
     elif max_cluster_jobs > resources["jobs"]:
         return "jobs"
-    elif max_mem > resources["memusage"]:
-        return "memusage"    
+    elif max_mem > resources["memory"]:
+        return "memory"    
     # elif max_cluster_cpu > resources["cluster_cpu"]:
     #     return "cluster_cpu"
     # elif max_cluster_mem > resources["cluster_mem"]:
@@ -61,6 +67,13 @@ def check_over_limits(max_cpu, max_mem, max_cluster_cpu, max_cluster_mem, max_cl
     else:
         return False
 
+# tracks the resource consumption of the process with pid
+# and corresponding to the WMS running at workflow_path
+# the limits for this WMS are specified in resources
+# conn is used to communicate with Mufasa
+# the interval is how frequently the resources are checked
+# if there is a resource violation, this updates Mufasa and asks
+# whether it should be killed or paused, then takes the appropriate action
 def profile(pid, workflow_path, interval, resources, conn):
     print("resources:", resources)
     max_cpu = 0
@@ -101,7 +114,7 @@ def profile(pid, workflow_path, interval, resources, conn):
         max_cluster_workers = max(cluster_workers, max_cluster_workers)
 
         # send update to mufasa
-        stats = {"pid": os.getpid(), "memusage": mem_usage // 10**6, "cpuusage": cpu_usage, "cluster_cpu": cluster_cpu_usage, "cluster_mem": cluster_mem_usage, "disk": resources["disk"], "jobs": max_cluster_workers}
+        stats = {"pid": os.getpid(), "memory": mem_usage // 10**6, "cores": cpu_usage, "cluster_cpu": cluster_cpu_usage, "cluster_mem": cluster_mem_usage, "disk": resources["disk"], "jobs": max_cluster_workers}
         message = {"status": "resource_update", "allocated_resources": resources, "workflow_stats":stats}
         conn.send(message)
 

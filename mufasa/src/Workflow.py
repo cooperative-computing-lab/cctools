@@ -1,3 +1,6 @@
+# Copyright (C) 2014 The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
 import os
 from utils import parse_filename
 import shutil
@@ -11,12 +14,12 @@ import resource_monitor
 class Workflow():
         # note that the workflow should accept a single input gzipped tar file
         # and it should output a single gzipped tar file called output
-        # the workflow executable should be 
         def __init__(self, makeflow_file, expected_input_name):
             self.makeflow = makeflow_file
             self.makeflow_dir = os.path.dirname(self.makeflow)
             self.expected_input_name = expected_input_name
 
+        # forks a process to be responsible for running and profiling the workflow
         def run(self, input_file, output_directory, error_dir, conn, resources):
             proc = multiprocessing.Process(target=self.__run, args=(input_file, output_directory, error_dir, conn, resources))
             proc.start()
@@ -40,7 +43,7 @@ class Workflow():
             
             # run the makeflow
             with open("makeflow_output.log", "w") as f:
-                prc = subprocess.Popen(["makeflow", os.path.basename(self.makeflow), f"--local-cores={resources['cpuusage']}", f"--local-memory={resources['memusage']}", f"--local-disk={resources['disk']}"], stdout=f,stderr=f)
+                prc = subprocess.Popen(["makeflow", os.path.basename(self.makeflow), f"--local-cores={resources['cores']}", f"--local-memory={resources['memory']}", f"--local-disk={resources['disk']}"], stdout=f,stderr=f)
 
             # monitor memory and cpu usage
             cpu_usage, mem_usage, jobs, reason = profile(prc.pid, workflow_directory_name, interval=0.5, resources=resources, conn=conn)
@@ -50,7 +53,7 @@ class Workflow():
                 p.wait()
             prc.wait()
 
-            stats = {"pid": os.getpid(), "exitcode": prc.returncode, "memusage": mem_usage, "cpuusage": cpu_usage,  "jobs": jobs, "reason": reason}
+            stats = {"pid": os.getpid(), "exitcode": prc.returncode, "memory": mem_usage, "cores": cpu_usage,  "jobs": jobs, "reason": reason}
             if not reason:
                 # create output filename
                 output_filename = inputname + "-" +  filehash + ".tar.gz"

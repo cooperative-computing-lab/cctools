@@ -1,5 +1,7 @@
+# Copyright (C) 2014 The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
 from DirectoryMonitor import DirectoryMonitor
-from BasicEventHandler import BasicEventHandler
 from Workflow import Workflow
 from WorkflowScheduler import WorkflowScheduler
 from utils import parse_filename
@@ -30,14 +32,22 @@ def main():
 
     EXPECTED_INPUT = "input.tar.gz" # the input file for the makeflow
 
+    # create a workflow by passing the associated makefile and the expected input name
     wf = Workflow(MAKEFILE, EXPECTED_INPUT)
+
+    # create an instance of Mufasa
     scheduler = WorkflowScheduler(OUTPUT, wf, ERROR_FILE)
+
+    # monitor the inbox directory specified at INPUT and push submitted files into the scheduling queue
     dm = DirectoryMonitor(INPUT, scheduler)
 
+    # check if there have been any changes in the directory
     dm.monitor()
 
     while True:
+        # run the scheduling algorithm to start new WMSs
         scheduler.schedule()
+        # check for new files
         dm.monitor()
 
 if __name__=="__main__":
