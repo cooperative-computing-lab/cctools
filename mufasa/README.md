@@ -1,7 +1,7 @@
 # Mufasa
 -------------
 A workflow ensemble is a set of workflows that need to be processed by a research campaign.
-Mufasa is a tool for managing the ensemble given a set of global resource limits for CPU usage, memory usage, number of jobs, and disk consumption.
+Mufasa is a tool for managing the ensemble given a set of global resource limits for cores usage, memory usage, number of jobs, and disk consumption.
 Mufasa will schedule and monitor WMSs such that the total resource consumption does not exceed these global limits.
 The current iteration of Mufasa can run and monitor Makeflows, although this will someday be expanded to include a wider variety of WMSs.
 
@@ -16,15 +16,15 @@ unpack that file in your makeflow file.
 
 ## Basic Usage
 ---------
-The general structure for configuring Mufasa is shown in the src/main.py file.
+The general structure for configuring Mufasa is shown in the src/mufasa.py file.
 The point of this file is to create a program that can be run like the following:
 ```
-python src/main.py -i /path/to/inbox -o /path/to/outbox -m /path/to/makeflow/file -e /path/to/error
+python src/mufasa.py -i /path/to/inbox -o /path/to/outbox -m /path/to/makeflow/file -e /path/to/error
 ```
 This will monitor start monitoring the inbox directory for input files. 
 When they are processed, they will be moved to the outbox directory if successful, if not, then they are moved to the error directory.
 
-***IMPORTANT NOTE***: You should ***NOT*** `cp` files into the inbox directory. Instead, you must `mv` them.
+***IMPORTANT NOTE***: You should ***NOT*** `cp` files into the inbox directory. Instead, you must `mv` them. The reason for this is because `cp` is not an atomic operation, thus the file is created before the data is copied into it. This means it is possible for Mufasa to begin processing the file before it is fully copied. The solution is to just `mv` the file since this is an atomic operation.
 
 This program performs the following basic operations. 
 The first step is to create an instance of the Workflow() class.
@@ -41,8 +41,8 @@ The total resource limits can be specified as a dictionary and should be passed 
 They must be a dictionary similar to the following:
 ```
 total_limits = {
-	"cpuusage": 800,
-	"memusage": 2000,
+	"cores": 800,
+	"memory": 2000,
 	"jobs": 1000,
 	"disk": 75000
 }
@@ -51,12 +51,14 @@ total_limits = {
 The estimated default limits for workflows should also be a dictionary passed as an argument to the WorkflowScheduler().
 ```
 workflow_limits = {
-	"cpuusage": 100,
-	"memusage": 400,
+	"cores": 100,
+	"memory": 400,
 	"jobs": 200,
 	"disk": 5000
 }
 ```
+
+***IMPORTANT***: The units for cores are core usage percentage. Thus, 100 signifies 1 core, 200 signifies 2 cores, etc. This enables greater flexibility in regulating resources than specifying a whole number of cores. The units for memory and disk are both MB.
 
 Thus, if you wanted to create a WorkflowScheduler with the above limits you would run:
 ```
@@ -98,7 +100,7 @@ mkdir error
 ```
 2. Start mufasa
 ```
-python src/main.py -i inbox -o outbox -m examples/pairs_combo/pairs.mf -e error
+python src/mufasa.py -i inbox -o outbox -m examples/pairs_combo/pairs.mf -e error
 ```
 3. Add a bunch of input files to the inbox directory
 ```
