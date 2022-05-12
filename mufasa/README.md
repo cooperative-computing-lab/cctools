@@ -5,13 +5,14 @@ Mufasa is a tool for managing the ensemble given a set of global resource limits
 Mufasa will schedule and monitor WMSs such that the total resource consumption does not exceed these global limits.
 The current iteration of Mufasa can run and monitor Makeflows, although this will someday be expanded to include a wider variety of WMSs.
 
-## Configuring your makeflow file
+## Configuring your Makeflow file
 ----------------------------------
 - The makeflow file must be in the same directory as the code necessary to run it. This is because the entire
 directory containing the makeflow file is copied before being run.
 - The primary datafile or input file in the makeflow file should be `input.tar.gz`. It is your responsible to
 unpack that file in your makeflow file.
 - All desired output files must be packed into `output.tar.gz`. This is the file put in the outbox or error directory in the event of an error.
+- In order for Mufasa to properly manage disk consumption, the Makeflow should specify the size of files between tasks. It should also declare the resource consumption of tasks in the workflow.
 
 
 ## Basic Usage
