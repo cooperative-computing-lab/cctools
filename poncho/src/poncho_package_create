@@ -16,7 +16,7 @@ import hashlib
 import shutil
 import logging
 import re
-from distutils.version import StrictVersion
+from packaging import version
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
@@ -66,7 +66,7 @@ def _run_conda_command(environment, command, *args):
     all_args = all_args + ['--prefix={}'.format(str(environment))] + list(args)
 
     try:
-        subprocess.check_output(all_args, stderr=subprocess.STDOUT)
+        subprocess.check_output(all_args)
     except subprocess.CalledProcessError as e:
         logger.warning("Error executing: {}".format(' '.join(all_args)))
         print(e.output.decode())
@@ -128,11 +128,9 @@ def _install_local_pip(env_dir, pip_name, pip_path):
     process = subprocess.Popen([pip_exec, '-V'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = process.communicate()
     pip_version = out.decode('utf-8').split()[1]
-    if StrictVersion(pip_version) < StrictVersion('22.1'):
-        print('1')
+    if version.parse(pip_version) < version.parse('22.1'):
         _run_conda_command(env_dir, 'run', 'pip', 'install', '--use-feature=in-tree-build', pip_path)
     else:
-        print('2')
         _run_conda_command(env_dir, 'run', 'pip', 'install', pip_path)
 
 
@@ -225,6 +223,8 @@ def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
         if pip_name not in local_reqs:
             logger.warning("pip package {} was found as pip --editable, but it is not part of the spec. Ignoring local installation.".format(pip_name))
 
+    with open('conda_spec.yml',  'w') as jf:
+        json.dump(conda_spec, jf, indent=4)
     with open(out_dir + '/conda_spec.yml',  'w') as jf:
         json.dump(conda_spec, jf, indent=4)
 
