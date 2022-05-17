@@ -223,8 +223,6 @@ def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
         if pip_name not in local_reqs:
             logger.warning("pip package {} was found as pip --editable, but it is not part of the spec. Ignoring local installation.".format(pip_name))
 
-    with open('conda_spec.yml',  'w') as jf:
-        json.dump(conda_spec, jf, indent=4)
     with open(out_dir + '/conda_spec.yml',  'w') as jf:
         json.dump(conda_spec, jf, indent=4)
 
