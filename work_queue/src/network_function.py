@@ -14,9 +14,10 @@ and the function body (that you define) will work accordingly. For now,
 this is just a dummy prototype
 '''
 def function_handler(event, response):
-	result = int(event["a"]) + int(event["b"])
-	response["Result"] = result
-	response["StatusCode"] = 200
+	res = []
+	for pair in event["p"]:
+		res.append(pair[0] * pair[1])
+	return res
 
 def send_configuration(config):
 	config_string = json.dumps(config)

@@ -2507,6 +2507,53 @@ struct list *parse_manager_addresses(const char *specs, int default_port) {
 	return(managers);
 }
 
+void start_coprocess() {
+	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
+		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
+		return;
+	}
+	coprocess_pid = fork();
+	if (coprocess_pid < 0) { // unable to fork
+		fatal("couldn't create new process: %s\n", strerror(errno));
+		return;
+	}		
+	else if (coprocess_pid == 0) { // child executes this
+		if ( (close(coprocess_in[1]) < 0) || (close(coprocess_out[0]) < 0) ) {
+			debug(D_WQ, "coprocess could not close pipes: %s\n", strerror(errno));
+			_exit(127);
+		}
+		
+		if (dup2(coprocess_in[0], 0) < 0) {
+			debug(D_WQ, "coprocess could not attach pipe to stdin: %s\n", strerror(errno));
+			_exit(127);
+		}
+
+		if (dup2(coprocess_out[1], 1) < 0) {
+			printf("%s\n", strerror(errno));
+			debug(D_WQ, "coprocess could not attach pipe to stdout: %s\n", strerror(errno));
+			_exit(127);
+		}
+		*/
+		
+		execlp(coprocess_command, coprocess_command, (char *) 0);
+		debug(D_WQ, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
+		_exit(127); // if we get here, the exec failed so we just quit
+	}
+	else { // parent goes here
+		/*
+		if (fcntl(coprocess_out[0], F_SETFL, O_NONBLOCK) < 0) {
+			debug(D_WQ, "parent could not make pipe nonblocking: %s\n", strerror(errno));
+			return;
+		}
+		*/
+		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
+			debug(D_WQ, "parent could not close pipes: %s\n", strerror(errno));
+			return;
+		}
+		debug(D_WQ, "Forked child process to run %s\n", coprocess_command);
+	}
+}
+
 int write_to_coprocess_timeout(char *buffer, int len, int timeout)
 {
 	struct pollfd read_poll = {coprocess_in[1], POLLOUT, 0};
