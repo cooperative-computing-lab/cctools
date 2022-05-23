@@ -152,12 +152,6 @@ function cleanup {
     s=$((total_ms/1000))
 
     logmsg total runtime: $(printf "%d.%0.3d seconds" "${s}" "${ms}")
-    cpids=$(pgrep -P "$$")
-    for cpid in $cpids;
-    do
-        kill -SIGTERM $cpid
-        wait $cpid
-    done
 }
 trap cleanup EXIT
 
