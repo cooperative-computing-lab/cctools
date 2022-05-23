@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include "int_sizes.h"
 
 /* structure holding resources in interests of qbucket */
 struct qbucket_resources
@@ -19,7 +20,7 @@ struct qbucket_task
 
     /*significance value of current task */
     double sig;
-}
+};
 
 /* QBucket structure */
 struct qbucket
@@ -84,7 +85,7 @@ struct qbucket
 
     /* qbucket id */
     int qbucket_id;
-}
+};
 
 /* Initialize default values for a qbucket_resources structure
  * @param qbres the pointer to a qbucket_resources structure
@@ -93,8 +94,18 @@ struct qbucket
  * @param disk the number of disk in MBs
  * @param gpus the number of gpus
  */
-void init_default_resources(struct qbucket_resources *qbres, 
-        double cores, double mem, double disk, double gpus);
+void init_default_qbucket_resources(struct qbucket_resources *qbres, 
+        double cores, double mem, double disk, double gpus, double sig);
+
+/* Create a pointer to a qbucket struct
+ * @return Pointer to a qbucket struct
+ */
+struct qbucket *qbucket_create();
+
+/* Destroy qbucket struct and its elements
+ * @param qb The qbucket to be destroyed
+ */
+void qbucket_destroy(struct qbucket *qb);
 
 /* Initialize a qbucket
  * @param qbucket_id the id of the new qbucket
@@ -108,6 +119,11 @@ int init_qbucket(int qbucket_id, struct qbucket *qb);
  */
 struct qbucket_task qbucket_task_create();
 
+/* Destroy a qbucket_task struct
+ * @param qbtask The pointer to a qbucket_task struct
+ */
+void qbucket_task_destroy(struct qbucket_task *qbtask);
+
 /* Calculate the cost of partitioning at the current point
  * @param p1 Probability of lower half (including current point)
  * @param p2 Probability of upper half (excluding current point)
@@ -119,6 +135,7 @@ struct qbucket_task qbucket_task_create();
  * @param num_tasks_above_delim Number of tasks above delimiter/current point
  * @param sorted_res List of qbucket_task structures sorted in increasing order by measured_cons
  * @param bot_sig Array holding cumulative significances of points, have length of (high_index - low_index) 
+ * @return the cost of partitioning at the current point
  */
 static double __partitioning_policy(double p1, double p2, double delim_res, double max_res, 
         int i, int low_index, int high_index, int num_tasks_above_delim, 
@@ -126,7 +143,7 @@ static double __partitioning_policy(double p1, double p2, double delim_res, doub
 
 /* Create a list of one element, which is a double
  * @param num The double to store
- * @return 
+ * @return pointer to a list containing only one element
  */
 static struct list *__create_one_num_list(double num);
 
@@ -172,7 +189,7 @@ struct qbucket_resources *qbucket_resources_create();
  * @param task_prev_alloc The resource report of previous allocation of current task
  * @return A rmsummary struct containing all relevant information to allocate tasks
  */
-struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev_res
+struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev_res,
         struct rmsummary *task_prev_alloc);
 
 /* Map a qbucket task to its priority in sorted resource list
@@ -180,3 +197,10 @@ struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev
  * @return The qbtask's priority
  */
 double qbucket_task_priority(struct qbucket_task qbtask);
+
+/* Add tasks to appropriate structures in a qbucket struct
+ * @param qb The relevant qbucket struct
+ * @param qbtask the qbucket_resources struct containing resource reports of a successfully completed task
+ */
+
+void add_task(struct qbucket *qb, struct qbucket_resources qbtask);

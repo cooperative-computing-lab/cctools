@@ -89,6 +89,7 @@ SOURCES = \
 	ppoll_compat.c \
 	preadwrite.c \
 	process.c \
+	qbucket.c \
 	random.c \
 	rmonitor.c \
 	rmonitor_poll.c \
@@ -154,6 +155,7 @@ HEADERS_PUBLIC = \
 	macros.h \
 	mq.h \
 	path.h \
+	qbucket.h \
 	rmonitor_poll.h \
 	rmsummary.h \
 	stringtools.h \
@@ -183,7 +185,7 @@ PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
-TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test jx_canonicalize_test jx_merge_test histogram_test category_test jx_binary_test mq_poll_test mq_wait_test mq_store_test
+TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test jx_canonicalize_test jx_merge_test histogram_test category_test jx_binary_test mq_poll_test mq_wait_test mq_store_test qbucket_test
 
 all: $(TARGETS) catalog_query
 

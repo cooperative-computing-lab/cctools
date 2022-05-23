@@ -4,92 +4,7 @@
 #include "twister.h"
 #include "list.h"
 #include "rmsummary.h"
-
-/* structure holding resources in interests of qbucket */
-struct qbucket_resources
-{
-    double cores;
-    double mem;
-    double disk;
-    double gpus;
-    double sig;
-};
-
-/* QBucket_task structure, only track 1 type of resource per structure instance */
-struct qbucket_task
-{
-
-    /* measured consumption of 1 resource */
-    double measured_cons;
-
-    /*significance value of current task */
-    double sig;
-}
-
-/* QBucket structure */
-struct qbucket
-{
-
-    /* The following arrays all have the same length */
-    /* --------------------------------------------------- */
-    
-    /* a doubly linked list of qbucket_tasks of cores in sorted order */
-    struct list *sorted_cores;
-
-    /* a doubly linked list of qbucket_tasks of memory in sorted order */
-    struct list *sorted_mem;
-    
-    /* a doubly linked list of qbucket_tasks of disk in sorted order */
-    struct list *sorted_disk;
-    
-    /* a doubly linked list of qbucket_tasks of gpus in sorted order */
-    struct list *sorted_gpus;
-    
-    /* a doubly linked list of indices to qbucket_tasks of cores
-     * where each index is a bucket's delimiter */
-    struct list *buckets_cores;
-
-    /* a doubly linked list of indices to qbucket_tasks of memory
-     * where each index is a bucket's delimiter */
-    struct list *buckets_mem;
-
-    /* a doubly linked list of indices to qbucket_tasks of disk
-     * where each index is a bucket's delimiter */
-    struct list *buckets_disk;
-
-    /* a doubly linked list of indices to qbucket_tasks of gpus
-     * where each index is a bucket's delimiter */
-    struct list *buckets_gpus;
-    
-    /* ------------------------ */
-    /* End of listing of arrays */
-
-    /* default resource request, only use fields in {cores, memory, disk, gpus} */
-    struct qbucket_resources *default_request;
-
-    /* maximum resource request that a task can make, user specifies this */
-    struct qbucket_resources *max_request;
-
-    /* number of tasks needed to be run to warm up QBucket (fill it with some values)
-    * -> cold start tasks */
-    int64_t num_cold_start_tasks;
-    
-    /* total number of tasks completed without errors from WQ or resource exhaustion*/
-    int64_t total_tasks;
-
-    /* rate to increase resources when tasks fail in cold start phase or when 
-     * tasks exceed all buckets in QBucket */
-    double increase_rate;
-    
-    /* whether qbucket is in cold start phase, 1 is yes, 0 is no */
-    int cold_start_phase;
-
-    /* maximum number of tasks to keep in qbucket */
-    int max_num_tasks;
-
-    /* qbucket id */
-    int qbucket_id;
-}
+#include "qbucket.h"
 
 /** @file qbucket.c Implements the QBucket algorithm to allocate resources to tasks.
  * Each task's category has its own QBucket object
@@ -151,6 +66,7 @@ void qbucket_destroy(struct qbucket *qb)
     list_free_and_delete(qb->buckets_gpus);
     list_free_and_delete(qb->default_request);
     list_free_and_delete(qb->max_request);
+    free(qb);
 }
 
 int init_qbucket(int qbucket_id, struct qbucket *qb)
@@ -191,7 +107,7 @@ struct qbucket_task qbucket_task_create()
     return qbtask;
 }
 
-void qbucket_task qbucket_task_destroy(struct qbucket_task *qbtask)
+void qbucket_task_destroy(struct qbucket_task *qbtask)
 {
     free(qbtask);
 }
