@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/prctl.h>
 
 static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
 {
@@ -57,7 +58,9 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		 * 2, since bash 2 drops privileges on startup. (Debian uses a modified
 		 * bash which does not do this when invoked as sh.)
 		 */
-
+		#ifndef CCTOOLS_OPSYS_DARWIN
+			prctl(PR_SET_PDEATHSIG, SIGKILL);
+		#endif
 		execlp("/bin/sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
@@ -110,17 +113,31 @@ static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch
 
 static int batch_job_local_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
-	while(kill(jobid, SIGTERM) == 0) {
+	int max_time_to_wait = 60; // maximum seconds we wish to wait for a given process
+	int max_wait_per_iteration = 5; // maximum seconds to wait before attempting to send another signal
+	int number_of_attempted_terms = 0; // keep track of how many attempts we have made to terminate the child process cleanly
+	int signal_to_send = SIGTERM; // contains which signal we attempt to send to a child process. Begins as SIGTERM, moved to SIGKILL after max_time_to_wait seconds of attempts
+	while(kill(jobid, signal_to_send) == 0) {
 		if(!itable_lookup(q->job_table, jobid)) {
 			debug(D_BATCH, "runaway process %" PRIbjid "?\n", jobid);
 			return 0;
 		} else {
 			debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
-			struct process_info *p = process_waitpid(jobid,5);
+			struct process_info *p = process_waitpid(jobid,max_wait_per_iteration);
 			if(p)
 			{
 				free(p);
 				return 1;
+			}
+			// check up to max_time_to_wait / max_wait_per_iteration times (total max_time_to_wait seconds) for process to terminate cleanly
+			number_of_attempted_terms++;
+			if (number_of_attempted_terms >= (max_time_to_wait / max_wait_per_iteration)) // otherwise we begin to send SIGKILL
+			{
+				signal_to_send = SIGKILL;
+			}
+			else if (number_of_attempted_terms >= (2 * max_time_to_wait / max_wait_per_iteration)) // if the process doesn't clean up after another max_time_to_wait seconds of sending SIGKILL, abandon trying and return
+			{
+				return 0;
 			}
 		}
 	} 
