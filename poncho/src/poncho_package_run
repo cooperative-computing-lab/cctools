@@ -220,7 +220,6 @@ then
     fi
 
     /bin/date > "${UNPACK_TO}"/.poncho_package_run_expanded
-    /bin/sync "${UNPACK_TO}"
 else
     logmsg directory ${UNPACK_TO} is not empty. Not expanding environment file again
 fi

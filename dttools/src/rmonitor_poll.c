@@ -354,7 +354,10 @@ int rmonitor_get_cpu_time_usage(pid_t pid, struct rmonitor_cpu_time_info *cpu)
 
 	uint64_t accum = clicks_to_usecs(kernel) + clicks_to_usecs(user);
 
-	cpu->delta       = accum  - cpu->accumulated;
+	cpu->delta = 0;
+	if(cpu->accumulated < accum) {
+		cpu->delta = accum - cpu->accumulated;
+	}
 	cpu->accumulated = accum;
 
 	return 0;
@@ -838,7 +841,7 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	tr->cores_avg = 0;
 
 	/* set both cores and cores_avg to avg, as info does not come from time windows. */
-	if(tr->wall_time > 0) {
+	if(tr->wall_time > 0 && tr->cpu_time >= 0) {
 		// set cores = cpu_time/wall_time;
 		tr->cores = DIV_INT_ROUND_UP(tr->cpu_time, tr->wall_time);
 		tr->cores_avg = tr->cores;

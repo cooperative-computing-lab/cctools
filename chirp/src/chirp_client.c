@@ -74,11 +74,17 @@ See the file COPYING for details.
 
 static int global_serial = 0;
 
+typedef enum {
+	CHIRP_ENCODE_MODE_URL,
+	CHIRP_ENCODE_MODE_BACKSLASH
+} chirp_encode_mode_t;
+
 struct chirp_client {
 	struct link *link;
 	char hostport[CHIRP_PATH_MAX];
 	int broken;
 	int serial;
+	chirp_encode_mode_t encode_mode;
 };
 
 static INT64_T convert_result(INT64_T result)
@@ -152,6 +158,22 @@ static INT64_T convert_result(INT64_T result)
 		return -1;
 	}
 }
+
+/*
+Encode a filename for transmission, escaping special characters like space.
+- The CCL Chirp server encodes using URL encoding (RFC 3986)
+- The Condor Chirp proxy encodes by backslashing special characters.
+*/
+
+static void chirp_encode( struct chirp_client *c, const char *name, char *encoded_name, int length )
+{
+	if(c->encode_mode==CHIRP_ENCODE_MODE_URL) {
+		url_encode(name,encoded_name,length);
+	} else {
+		string_escape_chars(name,encoded_name,"% \t\n",length);
+	}
+}
+
 
 static INT64_T get_stat_result(struct chirp_client *c, const char *name, struct chirp_stat *info, time_t stoptime)
 {
@@ -340,6 +362,8 @@ struct chirp_client *chirp_client_connect_condor(time_t stoptime)
 		return 0;
 	}
 
+	client->encode_mode = CHIRP_ENCODE_MODE_BACKSLASH;
+
 	return client;
 }
 
@@ -366,6 +390,7 @@ struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_au
 		c->link = link_connect(addr, port, stoptime);
 		c->broken = 0;
 		c->serial = global_serial++;
+		c->encode_mode = CHIRP_ENCODE_MODE_URL;
 		strcpy(c->hostport, hostport);
 		if(c->link) {
 			link_tune(c->link, LINK_TUNE_INTERACTIVE);
@@ -430,7 +455,7 @@ INT64_T chirp_client_getlongdir(struct chirp_client * c, const char *path, chirp
 	int result;
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	result = simple_command(c, stoptime, "getlongdir %s\n", safepath);
 	if(result < 0)
@@ -459,7 +484,7 @@ INT64_T chirp_client_getdir(struct chirp_client * c, const char *path, chirp_dir
 	const char *name;
 
 	result = chirp_client_opendir(c, path, stoptime);
-	if(result == 0) {
+	if(result >= 0) {
 		while((name = chirp_client_readdir(c, stoptime))) {
 			callback(name, arg);
 		}
@@ -471,7 +496,7 @@ INT64_T chirp_client_getdir(struct chirp_client * c, const char *path, chirp_dir
 INT64_T chirp_client_opendir(struct chirp_client * c, const char *path, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	return simple_command(c, stoptime, "getdir %s\n", safepath);
 }
@@ -481,6 +506,13 @@ const char *chirp_client_readdir(struct chirp_client *c, time_t stoptime)
 	static char name[CHIRP_PATH_MAX];
 
 	if(link_readline(c->link, name, sizeof(name), stoptime)) {
+		/*
+		Note that the server (either CCL or HTCondor) does not
+		encode names returned in a directory listing.  This is
+		arguably wrong, but works because we are only looking
+		for newline as a delimiter.  So filenames can contain
+		anything *except* a newline.
+		*/
 		if(name[0]) {
 			return name;
 		} else {
@@ -512,7 +544,7 @@ INT64_T chirp_client_getacl(struct chirp_client * c, const char *path, chirp_dir
 INT64_T chirp_client_openacl(struct chirp_client * c, const char *path, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	return simple_command(c, stoptime, "getacl %s\n", safepath);
 }
@@ -910,7 +942,7 @@ INT64_T chirp_client_ticket_modify(struct chirp_client * c, const char *name, co
 	char safepath[CHIRP_LINE_MAX];
 	if (ticket_translate(name, ticket_subject) == -1)
 		return -1;
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "ticket_modify %s %s %s\n", ticket_subject, safepath, aclmask);
 	if(result == 0) {
 		time_t t;
@@ -933,14 +965,14 @@ INT64_T chirp_client_ticket_modify(struct chirp_client * c, const char *name, co
 INT64_T chirp_client_setacl(struct chirp_client * c, const char *path, const char *user, const char *acl, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "setacl %s %s %s\n", safepath, user, acl);
 }
 
 INT64_T chirp_client_resetacl(struct chirp_client * c, const char *path, const char *acl, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "resetacl %s %s\n", safepath, acl);
 }
 
@@ -960,7 +992,7 @@ INT64_T chirp_client_open(struct chirp_client * c, const char *path, INT64_T fla
 	char fstr[256];
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	fstr[0] = 0;
 
@@ -1069,7 +1101,7 @@ INT64_T chirp_client_getfile(struct chirp_client * c, const char *path, FILE * s
 	INT64_T length;
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	length = simple_command(c, stoptime, "getfile %s\n", safepath);
 
@@ -1091,7 +1123,7 @@ INT64_T chirp_client_getfile_buffer(struct chirp_client * c, const char *path, c
 	INT64_T result;
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	*buffer = 0;
 
@@ -1124,7 +1156,7 @@ INT64_T chirp_client_readlink(struct chirp_client * c, const char *path, char *b
 	INT64_T actual;
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	result = simple_command(c, stoptime, "readlink %s %lld\n", safepath, length);
 
@@ -1146,7 +1178,7 @@ INT64_T chirp_client_localpath(struct chirp_client * c, const char *path, char *
 	INT64_T actual;
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	result = simple_command(c, stoptime, "localpath %s\n", path);
 
@@ -1274,7 +1306,7 @@ INT64_T chirp_client_putfile(struct chirp_client * c, const char *path, FILE * s
 	INT64_T result;
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	result = simple_command(c, stoptime, "putfile %s %lld %lld\n", safepath, mode, length);
 	if(result < 0)
@@ -1295,7 +1327,7 @@ INT64_T chirp_client_putfile_buffer(struct chirp_client * c, const char *path, c
 	INT64_T result;
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	result = simple_command(c, stoptime, "putfile %s %lld %lld\n", safepath, mode, length);
 	if(result < 0)
@@ -1314,7 +1346,7 @@ INT64_T chirp_client_putfile_buffer(struct chirp_client * c, const char *path, c
 INT64_T chirp_client_getstream(struct chirp_client * c, const char *path, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	return simple_command(c, stoptime, "getstream %s\n", path);
 }
@@ -1327,7 +1359,7 @@ INT64_T chirp_client_getstream_read(struct chirp_client * c, void *buffer, INT64
 INT64_T chirp_client_putstream(struct chirp_client * c, const char *path, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "putstream %s\n", path);
 }
 
@@ -1341,8 +1373,8 @@ INT64_T chirp_client_thirdput(struct chirp_client * c, const char *path, const c
 	char safepath[CHIRP_LINE_MAX];
 	char safenewpath[CHIRP_LINE_MAX];
 
-	url_encode(path, safepath, sizeof(safepath));
-	url_encode(newpath, safenewpath, sizeof(safenewpath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
+	chirp_encode(c,newpath, safenewpath, sizeof(safenewpath));
 
 	return simple_command(c, stoptime, "thirdput %s %s %s\n", safepath, hostname, safenewpath);
 }
@@ -1386,7 +1418,7 @@ INT64_T chirp_client_fstat(struct chirp_client * c, INT64_T fd, struct chirp_sta
 INT64_T chirp_client_stat(struct chirp_client * c, const char *path, struct chirp_stat * info, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "stat %s\n", safepath);
 	if(result >= 0)
 		result = get_stat_result(c, path, info, stoptime);
@@ -1396,7 +1428,7 @@ INT64_T chirp_client_stat(struct chirp_client * c, const char *path, struct chir
 INT64_T chirp_client_lstat(struct chirp_client * c, const char *path, struct chirp_stat * info, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "lstat %s\n", safepath);
 	if(result >= 0)
 		result = get_stat_result(c, path, info, stoptime);
@@ -1414,7 +1446,7 @@ INT64_T chirp_client_fstatfs(struct chirp_client * c, INT64_T fd, struct chirp_s
 INT64_T chirp_client_statfs(struct chirp_client * c, const char *path, struct chirp_statfs * info, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "statfs %s\n", safepath);
 	if(result >= 0)
 		result = get_statfs_result(c, info, stoptime);
@@ -1424,7 +1456,7 @@ INT64_T chirp_client_statfs(struct chirp_client * c, const char *path, struct ch
 INT64_T chirp_client_unlink(struct chirp_client * c, const char *path, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "unlink %s\n", safepath);
 }
 
@@ -1433,8 +1465,8 @@ INT64_T chirp_client_rename(struct chirp_client * c, const char *oldpath, const 
 	char safeoldpath[CHIRP_LINE_MAX];
 	char safenewpath[CHIRP_LINE_MAX];
 
-	url_encode(oldpath, safeoldpath, sizeof(safeoldpath));
-	url_encode(newpath, safenewpath, sizeof(safenewpath));
+	chirp_encode(c,oldpath, safeoldpath, sizeof(safeoldpath));
+	chirp_encode(c,newpath, safenewpath, sizeof(safenewpath));
 
 	return simple_command(c, stoptime, "rename %s %s\n", safeoldpath, safenewpath);
 }
@@ -1444,8 +1476,8 @@ INT64_T chirp_client_link(struct chirp_client * c, const char *oldpath, const ch
 	char safeoldpath[CHIRP_LINE_MAX];
 	char safenewpath[CHIRP_LINE_MAX];
 
-	url_encode(oldpath, safeoldpath, sizeof(safeoldpath));
-	url_encode(newpath, safenewpath, sizeof(safenewpath));
+	chirp_encode(c,oldpath, safeoldpath, sizeof(safeoldpath));
+	chirp_encode(c,newpath, safenewpath, sizeof(safenewpath));
 
 	return simple_command(c, stoptime, "link %s %s\n", safeoldpath, safenewpath);
 }
@@ -1455,8 +1487,8 @@ INT64_T chirp_client_symlink(struct chirp_client * c, const char *oldpath, const
 	char safeoldpath[CHIRP_LINE_MAX];
 	char safenewpath[CHIRP_LINE_MAX];
 
-	url_encode(oldpath, safeoldpath, sizeof(safeoldpath));
-	url_encode(newpath, safenewpath, sizeof(safenewpath));
+	chirp_encode(c,oldpath, safeoldpath, sizeof(safeoldpath));
+	chirp_encode(c,newpath, safenewpath, sizeof(safenewpath));
 
 	debug(D_CHIRP, "symlink %s %s", safeoldpath, safenewpath);
 	return simple_command(c, stoptime, "symlink %s %s\n", safeoldpath, safenewpath);
@@ -1483,63 +1515,63 @@ INT64_T chirp_client_fsync(struct chirp_client * c, INT64_T fd, time_t stoptime)
 INT64_T chirp_client_mkdir(struct chirp_client * c, char const *path, INT64_T mode, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "mkdir %s %lld\n", safepath, mode);
 }
 
 INT64_T chirp_client_rmdir(struct chirp_client * c, char const *path, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "rmdir %s\n", safepath);
 }
 
 INT64_T chirp_client_rmall(struct chirp_client * c, char const *path, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "rmall %s\n", safepath);
 }
 
 INT64_T chirp_client_truncate(struct chirp_client * c, char const *path, INT64_T length, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "truncate %s %lld\n", safepath, length);
 }
 
 INT64_T chirp_client_utime(struct chirp_client * c, char const *path, time_t actime, time_t modtime, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "utime %s %u %u\n", safepath, actime, modtime);
 }
 
 INT64_T chirp_client_access(struct chirp_client * c, char const *path, INT64_T mode, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "access %s %lld\n", safepath, mode);
 }
 
 INT64_T chirp_client_chmod(struct chirp_client * c, char const *path, INT64_T mode, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "chmod %s %lld\n", safepath, mode);
 }
 
 INT64_T chirp_client_chown(struct chirp_client * c, char const *path, INT64_T uid, INT64_T gid, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "chown %s %lld %lld\n", safepath, uid, gid);
 }
 
 INT64_T chirp_client_lchown(struct chirp_client * c, char const *path, INT64_T uid, INT64_T gid, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "lchown %s %lld %lld\n", safepath, uid, gid);
 }
 
@@ -1549,7 +1581,7 @@ INT64_T chirp_client_hash(struct chirp_client * c, const char *path, const char 
 	INT64_T actual;
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	result = simple_command(c, stoptime, "hash %s %s\n", algorithm, path);
 
@@ -1574,7 +1606,7 @@ INT64_T chirp_client_md5(struct chirp_client * c, const char *path, unsigned cha
 INT64_T chirp_client_setrep(struct chirp_client * c, char const *path, int nreps, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "setrep %s %d\n", safepath, nreps);
 }
 
@@ -1593,7 +1625,7 @@ INT64_T chirp_client_audit(struct chirp_client * c, const char *path, struct chi
 	char line[CHIRP_LINE_MAX];
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	result = simple_command(c, stoptime, "audit %s\n", safepath);
 	if(result <= 0)
@@ -1621,7 +1653,7 @@ INT64_T chirp_client_audit(struct chirp_client * c, const char *path, struct chi
 INT64_T chirp_client_mkalloc(struct chirp_client * c, char const *path, INT64_T size, INT64_T mode, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	return simple_command(c, stoptime, "mkalloc %s %lld %lld\n", safepath, size, mode);
 }
 
@@ -1631,7 +1663,7 @@ INT64_T chirp_client_lsalloc(struct chirp_client * c, char const *path, char *al
 	char line[CHIRP_LINE_MAX];
 
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 
 	result = simple_command(c, stoptime, "lsalloc %s\n", safepath);
 	if(result == 0) {
@@ -1752,7 +1784,7 @@ int chirp_client_closesearch(CHIRP_SEARCH * search)
 INT64_T chirp_client_getxattr(struct chirp_client * c, const char *path, const char *name, void *data, size_t size, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "getxattr %s %s\n", safepath, name);
 	if(result < 0)
 		return result;
@@ -1797,7 +1829,7 @@ INT64_T chirp_client_fgetxattr(struct chirp_client * c, INT64_T fd, const char *
 INT64_T chirp_client_lgetxattr(struct chirp_client * c, const char *path, const char *name, void *data, size_t size, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "lgetxattr %s %s\n", safepath, name);
 	if(result < 0)
 		return result;
@@ -1820,7 +1852,7 @@ INT64_T chirp_client_lgetxattr(struct chirp_client * c, const char *path, const 
 INT64_T chirp_client_listxattr(struct chirp_client * c, const char *path, char *list, size_t size, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "listxattr %s\n", safepath);
 	if(result < 0)
 		return result;
@@ -1860,7 +1892,7 @@ INT64_T chirp_client_flistxattr(struct chirp_client * c, INT64_T fd, char *list,
 INT64_T chirp_client_llistxattr(struct chirp_client * c, const char *path, char *list, size_t size, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "llistxattr %s\n", safepath);
 	if(result < 0)
 		return result;
@@ -1881,7 +1913,7 @@ INT64_T chirp_client_llistxattr(struct chirp_client * c, const char *path, char 
 INT64_T chirp_client_setxattr(struct chirp_client * c, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "setxattr %s %s %zu %d\n", safepath, name, size, flags);
 	if(result < 0)
 		return result;
@@ -1929,7 +1961,7 @@ INT64_T chirp_client_fsetxattr(struct chirp_client * c, INT64_T fd, const char *
 INT64_T chirp_client_lsetxattr(struct chirp_client * c, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = send_command(c, stoptime, "lsetxattr %s %s %zu %d\n", safepath, name, size, flags);
 	if(result < 0)
 		return result;
@@ -1954,7 +1986,7 @@ INT64_T chirp_client_lsetxattr(struct chirp_client * c, const char *path, const 
 INT64_T chirp_client_removexattr(struct chirp_client * c, const char *path, const char *name, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "removexattr %s %s\n", safepath, name);
 	if(result == -1 && errno == EINVAL)
 		errno = ENOATTR;
@@ -1972,7 +2004,7 @@ INT64_T chirp_client_fremovexattr(struct chirp_client * c, INT64_T fd, const cha
 INT64_T chirp_client_lremovexattr(struct chirp_client * c, const char *path, const char *name, time_t stoptime)
 {
 	char safepath[CHIRP_LINE_MAX];
-	url_encode(path, safepath, sizeof(safepath));
+	chirp_encode(c, path, safepath, sizeof(safepath));
 	INT64_T result = simple_command(c, stoptime, "lremovexattr %s %s\n", safepath, name);
 	if(result == -1 && errno == EINVAL)
 		errno = ENOATTR;

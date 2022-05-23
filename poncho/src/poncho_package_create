@@ -15,15 +15,14 @@ import pathlib
 import hashlib
 import shutil
 import logging
+import re
+from packaging import version
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
 
 
 def pack_env(spec, output):
-    # Read and hash specification file
-    with open(spec) as f:
-        pkgs = json.load(f)
 
     # record packages installed as editable from pip
     local_pip_pkgs = _find_local_pip()
@@ -67,7 +66,7 @@ def _run_conda_command(environment, command, *args):
     all_args = all_args + ['--prefix={}'.format(str(environment))] + list(args)
 
     try:
-        subprocess.check_output(all_args, stderr=subprocess.STDOUT)
+        subprocess.check_output(all_args)
     except subprocess.CalledProcessError as e:
         logger.warning("Error executing: {}".format(' '.join(all_args)))
         print(e.output.decode())
@@ -124,7 +123,15 @@ def git_data(spec, out_dir):
 
 def _install_local_pip(env_dir, pip_name, pip_path):
     logger.info("Installing {} from editable pip".format(pip_path))
-    _run_conda_command(env_dir, 'run', 'pip', 'install', '--use-feature=in-tree-build', pip_path)
+    # TODO GET pip version
+    pip_exec = shutil.which('pip')
+    process = subprocess.Popen([pip_exec, '-V'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    pip_version = out.decode('utf-8').split()[1]
+    if version.parse(pip_version) < version.parse('22.1'):
+        _run_conda_command(env_dir, 'run', 'pip', 'install', '--use-feature=in-tree-build', pip_path)
+    else:
+        _run_conda_command(env_dir, 'run', 'pip', 'install', pip_path)
 
 
 def http_data(spec, out_dir):
@@ -191,28 +198,30 @@ def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
     
     if 'conda' in poncho_spec:
         conda_spec['channels'] = poncho_spec['conda'].get('channels', ['conda-forge', 'defaults'])
+
         conda_spec['dependencies'] = set(poncho_spec['conda'].get('packages', []))
 
-        for pip_name in local_pip_pkgs:
-            if pip_name in conda_spec['dependencies']:
-                local_reqs.add(pip_name)
-                conda_spec['dependencies'].remove(pip_name)
-
+        for dep in list(conda_spec['dependencies']):
+            only_name = re.sub("[!~=<>].*$", "", dep)  # remove possible version from spec
+            if only_name in local_pip_pkgs:
+                local_reqs.add(only_name)
+                conda_spec['dependencies'].remove(dep)
         conda_spec['dependencies'] = list(conda_spec['dependencies'])
 
 
     # get pip packages that are not installed --editable
     pip_pkgs = set(poncho_spec.get('pip', []))
-    for pip_name in local_pip_pkgs:
-        if pip_name in pip_pkgs:
-            local_reqs.add(pip_name)
-            pip_pkgs.remove(pip_name)
+    for dep in list(pip_pkgs):
+        only_name = re.sub("[!~=<>].*$", "", dep)  # remove possible version from spec
+        if only_name in local_pip_pkgs:
+            local_reqs.add(only_name)
+            pip_pkgs.remove(dep)
 
     conda_spec['dependencies'].append({'pip': list(pip_pkgs)})
 
     for (pip_name, location) in local_pip_pkgs.items():
         if pip_name not in local_reqs:
-            logger.warning("pip package {} was found as pip --editable, but it is not part of the spec. Ignoring local installation.")
+            logger.warning("pip package {} was found as pip --editable, but it is not part of the spec. Ignoring local installation.".format(pip_name))
 
     with open(out_dir + '/conda_spec.yml',  'w') as jf:
         json.dump(conda_spec, jf, indent=4)

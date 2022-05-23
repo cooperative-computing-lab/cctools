@@ -11,7 +11,6 @@ See the file COPYING for details.
 
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 static char * unquoted_string( struct jx *j )
 {
@@ -159,4 +158,44 @@ void catalog_export_html_with_link( struct jx *n, struct link *l, struct jx_tabl
 void catalog_export_html_footer( struct link *l, struct jx_table *h, time_t stoptime )
 {
 	link_printf(l,stoptime,"</table>\n");
+}
+
+void catalog_export_html_datetime_picker( struct link *l, time_t stoptime, time_t current) {
+	struct tm *t = localtime(&current);
+	struct tm *tm_yesterday, *tm_tomorrow;
+	time_t yesterday, tomorrow;
+
+	int year = t->tm_year + 1900;
+	int month = t->tm_mon + 1;
+	int day = t->tm_mday;
+	int hour = t->tm_hour;
+	int minute = t->tm_min;
+
+	t->tm_hour = t->tm_min = t->tm_sec = 0;
+
+	tm_yesterday = t;
+	tm_yesterday->tm_mday = day - 1;
+	yesterday = mktime(tm_yesterday);
+
+	tm_tomorrow  = t;
+	tm_tomorrow->tm_mday = day + 1;
+	tomorrow = mktime(tm_tomorrow);
+
+	link_printf(l,stoptime,
+	"<script>"
+		"function redirect() {"
+			"var day = document.getElementById('day').value;"
+			"var time = document.getElementById('time').value;"
+			"var timestamp = new Date(`${day} ${time}`).getTime() / 1000;"
+			"window.location = `/history/${timestamp}/`;"
+		"}"
+	"</script>"
+	"<p>"
+		"<a href='/history/%ld' style='padding: 0 10px' title='Move backward one day'><</a>"
+		"<input type='date' id='day' name='day' value='%d-%02d-%02d' />"
+		"<input type='time' id='time' name='time' value='%02d:%02d'/>"
+		"<button type='button' onclick='redirect()'>Go To</button>"
+		"<a href='/history/%ld' style='padding: 0 10px' title='Move foreward one day'>></a>"
+	"</p>",
+	yesterday, year, month, day, hour, minute, tomorrow);
 }

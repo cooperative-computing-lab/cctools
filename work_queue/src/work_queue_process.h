@@ -43,6 +43,11 @@ struct work_queue_process {
 
 	/* state between complete disk measurements. */
 	struct path_disk_size_info *disk_measurement_state;
+
+	/* variables for remote function */
+	char *function_name;
+	int function_port;
+	char *function_type;
 };
 
 struct work_queue_process * work_queue_process_create( struct work_queue_task *task, int disk_allocation );

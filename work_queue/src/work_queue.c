@@ -4296,31 +4296,23 @@ static void print_large_tasks_warning(struct work_queue *q)
 	}
 
 	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
-		notice(D_WQ,"There are tasks that cannot fit any currently connected worker.\n");
+		notice(D_WQ,"There are tasks that cannot fit any currently connected worker:\n");
 	}
 
 	if(unfit_core) {
-		notice(D_WQ,"%d waiting task(s)  did not fit a worker because of cores requirements", unfit_core);
+		notice(D_WQ,"    %d waiting task(s) need more than %s", unfit_core, rmsummary_resource_to_str("cores", largest_unfit_task, 1));
 	}
 
 	if(unfit_mem) {
-		notice(D_WQ,"%d waiting task(s) did not fit a worker because of memory requirements", unfit_mem);
+		notice(D_WQ,"    %d waiting task(s) need more than %s of memory", unfit_mem, rmsummary_resource_to_str("memory", largest_unfit_task, 1));
 	}
 
 	if(unfit_disk) {
-		notice(D_WQ,"%d waiting task(s) did not fit a worker because of disk requirements", unfit_disk);
+		notice(D_WQ,"    %d waiting task(s) need more than %s of disk", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task, 1));
 	}
 
 	if(unfit_gpu) {
-		notice(D_WQ,"%d waiting task(s) did not fit a worker because of gpus requirements", unfit_gpu);
-	}
-
-	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
-		notice(D_WQ, "workers with at least: %s %s %s %s would fit these tasks\n",
-				largest_unfit_task->cores  > 0 ? rmsummary_resource_to_str("cores",  largest_unfit_task, 1) : "",
-				largest_unfit_task->memory > 0 ? rmsummary_resource_to_str("memory", largest_unfit_task, 1) : "",
-				largest_unfit_task->disk   > 0 ? rmsummary_resource_to_str("disk",   largest_unfit_task, 1) : "",
-				largest_unfit_task->gpus   > 0 ? rmsummary_resource_to_str("gpus",   largest_unfit_task, 1) : "");
+		notice(D_WQ,"    %d waiting task(s) need more than %s", unfit_gpu, rmsummary_resource_to_str("gpus", largest_unfit_task, 1));
 	}
 
 	rmsummary_delete(largest_unfit_task);
@@ -5858,7 +5850,7 @@ void work_queue_delete(struct work_queue *q)
 		if(q->transactions_logfile) {
 			write_transaction(q, "MANAGER END");
 
-			if(!fclose(q->transactions_logfile)) {
+			if(fclose(q->transactions_logfile) != 0) {
 				debug(D_WQ, "unable to write transactions log: %s\n", strerror(errno));
 			}
 		}
@@ -5931,7 +5923,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 		jx_delete(extra);
 		close(summs_fd);
 
-		if(!fclose(final)) {
+		if(fclose(final) != 0) {
 			debug(D_WQ, "unable to update monitor report to final destination file: %s\n", strerror(errno));
 		}
 

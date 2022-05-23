@@ -25,6 +25,9 @@ with the following exceptions:
 
 struct jx_parser;
 
+/* Sets module-wide flag for static parse mode */
+void jx_parse_set_static_mode( bool mode );
+
 /** Parse a JSON string to a JX expression.  @param str A C string containing JSON data.  @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
 struct jx * jx_parse_string( const char *str );
 

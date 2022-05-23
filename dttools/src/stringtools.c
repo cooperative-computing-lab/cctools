@@ -61,6 +61,22 @@ char *string_escape_shell( const char *str )
 	return result;
 }
 
+int string_escape_chars( const char *s, char *t, const char *specials, int length )
+{
+	while(*s) {
+		if(strchr(specials,*s)) {
+			if(length<3) return 0;
+			*t++ = '\\';
+			length--;
+		}
+		if(length<2) return 0;
+		*t++ = *s++;
+		length--;
+	}
+	*t = 0;
+	return 1;	
+}
+
 char *string_quote_shell(const char *str) {
 	int backslashed = 0;
 	buffer_t B[1];
