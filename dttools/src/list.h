@@ -220,6 +220,26 @@ void list_insert(struct list_cursor *cur, void *item);
 typedef int (*list_op_t) (void *item, const void *arg);
 typedef double (*list_priority_t) (void *item);
 
+/** Create a new cursor on a list,
+ * then move the cursor to given position.
+ * The cursor must be deleted with @ref list_cursor_destroy.
+ * @param list The list to use.
+ * @param index The position of the cursor.
+ * @returns A pointer to a new cursor.
+ */
+struct list_cursor *list_cursor_create_and_seek(struct list *list, int index);
+
+/** Move cursor to position and get the element.
+ * Same notes as @ref list_cursor_seek and @ref list_cursor_get.
+ * @param cur The cursor to use.
+ * @param index The position of cursor.
+ * @param item The location at which the pointer to the item is stored
+ * @returns true if the value of the list item was stored.
+ * @returns false if @ref list_cursor_seek or @ref list_cursor_get returns false.
+*/
+
+bool list_cursor_seek_and_get(struct list_cursor *cur, int index, void **item);
+
 /** Count the elements in a list.
  * @param list The list to count.
  * @return The number of items stored in the list.

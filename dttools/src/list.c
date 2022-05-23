@@ -116,6 +116,13 @@ struct list_cursor *list_cursor_create(struct list *list) {
 	return cur;
 }
 
+struct list_cursor *list_cursor_create_and_seek(struct list *list, int index)
+{
+	struct list_cursor *cur = list_cursor_create(list);
+	assert(list_seek(cur, index), true);
+	return cur;
+}
+
 void list_reset(struct list_cursor *cur) {
 	assert(cur);
 	list_item_unref(cur->target);
@@ -284,6 +291,14 @@ void list_insert(struct list_cursor *cur, void *item) {
 
 int list_size(struct list *list) {
 	return (int) list_length(list);
+}
+
+
+bool list_cursor_seek_and_get(struct list_cursor *cur, int index, void **item)
+{
+	if (list_seek(cur, index) == false)
+		return false;
+	return list_get(cur, item);
 }
 
 struct list *list_splice(struct list *top, struct list *bottom) {
