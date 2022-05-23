@@ -254,21 +254,19 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 		fatal("connection error: %s", strerror(errno));
 	}
 
-	memcpy(buf, input, strlen(input)+1);
-	len = strlen(buf);
-
+	len = strlen(function_input);
 	curr_time = timestamp_get();
 	stoptime = curr_time + timeout;
 	// send the length of the data first
-	int bytes_sent = link_printf(link, stoptime, "data: %d\n", len);
+	int bytes_sent = link_printf(link, stoptime, "%s %d\n", function_name, len);
 	if(bytes_sent < 0) {
-		fatal("could not send size: %s", strerror(errno));
+		fatal("could not send input data size: %s", strerror(errno));
 	}
 
 	// send actual data
-	bytes_sent = link_write(link, buf, len, stoptime);
+	bytes_sent = link_write(link, function_input, len, stoptime);
 	if(bytes_sent < 0) {
-		fatal("could not send data: %s", strerror(errno));
+		fatal("could not send input data: %s", strerror(errno));
 	}
 
 	memset(buf, 0, sizeof(buf));
@@ -279,7 +277,7 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 	char line[WORK_QUEUE_LINE_MAX];
 	int length;
 	link_readline(link, line, sizeof(line), stoptime);
-	sscanf(line, "data %d", &length);
+	sscanf(line, "output %d", &length);
 
 	// read the response
 	link_read(link, buf, length, stoptime);
