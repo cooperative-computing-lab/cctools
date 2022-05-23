@@ -8,5 +8,5 @@ See the file COPYING for details.
 char *work_queue_coprocess_start(char *coprocess_command, int *coprocess_port);
 void work_queue_coprocess_terminate();
 int work_queue_coprocess_check();
-char *work_queue_coprocess_run(int coprocess_port, char *input);
+char *work_queue_coprocess_run(const char *function_name, const char *function_input, int coprocess_port);
 

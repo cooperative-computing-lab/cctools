@@ -989,6 +989,13 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			work_queue_task_specify_command(task,cmd);
 			debug(D_WQ,"rx from manager: %s",cmd);
 			free(cmd);
+		} else if(sscanf(line,"coprocess %d",&length)==1) {
+			char *cmd = malloc(length+1);
+			link_read(manager,cmd,length,stoptime);
+			cmd[length] = 0;
+			work_queue_task_specify_coprocess(task,cmd);
+			debug(D_WQ,"rx from manager: %s",cmd);
+			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", filename, taskname_encoded, &flags)) {
 			string_nformat(localname, sizeof(localname), "cache/%s", filename);
 			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);

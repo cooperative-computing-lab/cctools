@@ -204,7 +204,7 @@ static const char task_output_template[] = "./worker.stdout.XXXXXX";
 static char * load_input_file(struct work_queue_task *t) {
 	FILE *fp = fopen("infile", "r");
 	if(!fp) {
-		fatal("could not open file for reading: %s", strerror(errno));
+		fatal("coprocess could not open file 'infile' for reading: %s", strerror(errno));
 	}
 
 	fseek(fp, 0L, SEEK_END);
@@ -283,12 +283,12 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 		if(result == -1)
 			fatal("could not dup pipe to stderr: %s", strerror(errno));
 
-		if(p->coprocess_name != NULL && strcmp(p->task->command_line, p->coprocess_name) == 0) {
+		if(p->coprocess_name != NULL) {
 			// load data from input file
 			char *input = load_input_file(p->task);
 
 			// call invoke_coprocess_function
-		 	char *output = work_queue_coprocess_run(p->coprocess_port, input);
+		 	char *output = work_queue_coprocess_run(p->task->command_line, input, p->coprocess_port);
 
 			// write data to output file
 			full_write(p->output_fd, output, strlen(output));

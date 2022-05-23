@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "link.h"
 #include "timestamp.h"
 #include "process.h"
+#include "stringtools.h"
 
 static pid_t coprocess_pid = 0;
 static int coprocess_in[2];
@@ -145,7 +146,9 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 			continue;
 		}
 		if (!strcmp(key, "name")) {
-			name = jx_print_string(item);
+            if(item->type == JX_STRING) {
+                name = string_format("wq_worker_coprocess:%s", item->u.string_value);
+            }
 		}
 		else if (!strcmp(key, "port")) {
 			char *temp_port = jx_print_string(item);
@@ -159,6 +162,9 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 
 	jx_delete(coprocess_json);
 
+    if(!name) {
+		fatal("couldn't find \"name\" in coprocess configuration\n");
+    }
     return name;
 }
 
@@ -217,7 +223,7 @@ int work_queue_coprocess_check()
     return 1;
 }
 
-char *work_queue_coprocess_run(int coprocess_port, char *input) {
+char *work_queue_coprocess_run(const char *function_name, const char *function_input, int coprocess_port) {
 	char addr[DOMAIN_NAME_MAX];
 	char buf[BUFSIZ];
 	int len;

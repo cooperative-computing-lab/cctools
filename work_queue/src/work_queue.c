@@ -346,6 +346,8 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving, worker_disconnect_reason reason_leaving);
 static void write_transaction_worker_resources(struct work_queue *q, struct work_queue_worker *w);
 
+static void delete_feature(struct work_queue_task *t, const char *name);
+
 static void fill_deprecated_queue_stats(struct work_queue *q, struct work_queue_stats *s);
 static void fill_deprecated_tasks_stats(struct work_queue_task *t);
 
@@ -2629,7 +2631,7 @@ struct jx * worker_to_jx( struct work_queue *q, struct work_queue_worker *w )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
-	
+
 	if(strcmp(w->hostname, "QUEUE_STATUS") == 0){
 		return 0;
 	}
@@ -2682,6 +2684,7 @@ struct jx * task_to_jx( struct work_queue *q, struct work_queue_task *t, const c
 	if(t->tag) jx_insert_string(j,"tag",t->tag);
 	if(t->category) jx_insert_string(j,"category",t->category);
 	jx_insert_string(j,"command",t->command_line);
+	if(t->coprocess) jx_insert_string(j,"coprocess",t->coprocess);
 	if(host) jx_insert_string(j,"host",host);
 
 	if(host) {
@@ -3565,7 +3568,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	struct rmsummary *limits = task_worker_box_size(q, w, t);
 
 	char *command_line;
-	if(q->monitor_mode) {
+	if(q->monitor_mode && !t->coprocess) {
 		command_line = work_queue_monitor_wrap(q, w, t, limits);
 	} else {
 		command_line = xxstrdup(t->command_line);
@@ -3585,6 +3588,13 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	link_putlstring(w->link, command_line, cmd_len, /* stoptime */ time(0) + (w->type == WORKER_TYPE_FOREMAN ? q->long_timeout : q->short_timeout));
 	debug(D_WQ, "%s\n", command_line);
 	free(command_line);
+
+
+	if(t->coprocess) {
+		cmd_len = strlen(t->coprocess);
+		send_worker_msg(q,w, "coprocess %lld\n", (long long) cmd_len);
+		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + (w->type == WORKER_TYPE_FOREMAN ? q->long_timeout : q->short_timeout));
+	}
 
 	send_worker_msg(q,w, "category %s\n", t->category);
 
@@ -4708,6 +4718,20 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
+void work_queue_task_specify_coprocess( struct work_queue_task *t, const char *coprocess )
+{
+	if(t->coprocess) {
+		delete_feature(t, t->coprocess);
+		free(t->coprocess);
+		t->coprocess = NULL;
+	}
+
+	if(coprocess) {
+		t->coprocess = string_format("wq_worker_coprocess:%s", coprocess);
+		work_queue_task_specify_feature(t, t->coprocess);
+	}
+}
+
 void work_queue_task_specify_environment_variable( struct work_queue_task *t, const char *name, const char *value )
 {
 	if(value) {
@@ -4873,6 +4897,24 @@ void work_queue_task_specify_feature(struct work_queue_task *t, const char *name
 	}
 
 	list_push_tail(t->features, xxstrdup(name));
+}
+
+static void delete_feature(struct work_queue_task *t, const char *name)
+{
+	if(!t->features) {
+		return;
+	}
+
+	struct list_cursor *c = list_cursor_create(t->features);
+
+	char *feature;
+	for(list_seek(c, 0); list_get(c, (void **) &feature); list_next(c)) {
+		if(name && feature && (strcmp(name, feature) == 0)) {
+			list_drop(c);
+		}
+	}
+
+	list_cursor_destroy(c);
 }
 
 struct work_queue_file *work_queue_file_create(const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
@@ -5361,6 +5403,7 @@ void work_queue_task_delete(struct work_queue_task *t)
 	if(t) {
 
 		free(t->command_line);
+		free(t->coprocess);
 		free(t->tag);
 		free(t->category);
 		free(t->output);
