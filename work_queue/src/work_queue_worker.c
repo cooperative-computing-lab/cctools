@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "work_queue_watcher.h"
 #include "work_queue_gpus.h"
+#include "work_queue_coprocess.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -225,19 +226,9 @@ static char *debug_path = NULL;
 static char *catalog_hosts = NULL;
 static int tlq_port = 0;
 
-
 static char *coprocess_command = NULL;
-static pid_t coprocess_pid = 0;
-static int coprocess_num_deaths = 0;
-static int coprocess_in[2];
-static int coprocess_out[2];
-static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
-
-// Global variables for network function
-static char *function_name = NULL;
-static int function_port = -1;
-static char *function_type = NULL;
-
+static char *coprocess_name = NULL;
+static int coprocess_port = -1;
 
 __attribute__ (( format(printf,2,3) ))
 static void send_manager_message( struct link *manager, const char *fmt, ... )
@@ -996,6 +987,13 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
 			work_queue_task_specify_command(task,cmd);
+			debug(D_WQ,"rx from manager: %s",cmd);
+			free(cmd);
+		} else if(sscanf(line,"coprocess %d",&length)==1) {
+			char *cmd = malloc(length+1);
+			link_read(manager,cmd,length,stoptime);
+			cmd[length] = 0;
+			work_queue_task_specify_coprocess(task,cmd);
 			debug(D_WQ,"rx from manager: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", filename, taskname_encoded, &flags)) {
@@ -1932,10 +1930,11 @@ static void work_for_manager(struct link *manager) {
 					break;
 				} else if(task_resources_fit_now(p->task)) {
 					// attach the function name, port, and type to process, if applicable
-					if(function_name != NULL && function_port != -1 && function_type != NULL) {
-						p->function_name = xxstrdup(function_name);
-						p->function_port = function_port;
-						p->function_type = xxstrdup(function_type);
+					if(coprocess_command) {
+						/* for coprocesses, p->task->command_line is the name
+						 * of the function to execute */
+						p->coprocess_name = xxstrdup(coprocess_name);
+						p->coprocess_port = coprocess_port;
 					}
 					start_process(p);
 					task_event++;
@@ -2507,195 +2506,6 @@ struct list *parse_manager_addresses(const char *specs, int default_port) {
 	return(managers);
 }
 
-int write_to_coprocess_timeout(char *buffer, int len, int timeout)
-{
-	struct pollfd read_poll = {coprocess_in[1], POLLOUT, 0};
-	int poll_result = poll(&read_poll, 1, timeout);
-	if (poll_result < 0)
-	{
-		debug(D_WQ, "Write to coprocess failed: %s\n", strerror(errno));
-		return -1;
-	}
-	if (poll_result == 0) // check for timeout
-	{
-		debug(D_WQ, "writing to coprocess timed out\n");
-		return -1;
-	}
-	if ( !(read_poll.revents & POLLOUT)) // check we have data
-	{
-		debug(D_WQ, "Data able to be written to pipe: %s\n", strerror(errno));
-		return -1;
-	}
-	int bytes_written = write(coprocess_in[1], buffer, len);
-	if (bytes_written < 0)
-	{
-		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
-		return -2;
-	}
-	return bytes_written;
-}
-
-int read_from_coprocess_timeout(char *buffer, int len, int timeout){
-	struct pollfd read_poll = {coprocess_out[0], POLLIN, 0};
-	int poll_result = poll(&read_poll, 1, timeout);
-	if (poll_result < 0)
-	{
-		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
-		return -1;
-	}
-	if (poll_result == 0) // check for timeout
-	{
-		debug(D_WQ, "reading from coprocess timed out\n");
-		return -3;
-	}
-	if ( !(read_poll.revents & POLLIN)) // check we have data
-	{
-		debug(D_WQ, "Data not returned from pipe: %s\n", strerror(errno));
-		return -1;
-	}
-
-	int bytes_read = read(coprocess_out[0], buffer, len - 1);
-	if (bytes_read < 0)
-	{
-		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
-		return -2;
-	}
-	buffer[bytes_read] = '\0';
-	return bytes_read;
-}
-
-void update_coprocess_info()
-{
-	int json_offset, json_length = -1, cumulative_bytes_read = 0, buffer_offset = 0;
-	char buffer[4096];
-	char *envelope_size;
-	while (1)
-	{
-		int curr_bytes_read = read_from_coprocess_timeout(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout);
-		if (curr_bytes_read < 0) {
-			debug(D_WQ, "Unable to get information from network function\n");
-			return;
-		}
-		else if (curr_bytes_read == -3)
-		{
-			break;
-		}
-		cumulative_bytes_read += curr_bytes_read;
-
-		envelope_size = memchr(buffer, '\n', cumulative_bytes_read);
-		if ( envelope_size != NULL )
-		{
-			if (json_length == -1)
-			{
-				json_length = atoi(buffer);
-				debug(D_WQ, "json_length %d\n", json_length);
-			}
-			if (json_length != -1)
-			{
-				json_offset = (int) (envelope_size - buffer) + 1;
-				while ( json_offset < cumulative_bytes_read )
-				{
-					if (buffer[json_offset] == '\n')
-					{
-						buffer_offset = -1;
-					}
-					json_offset++;
-				}
-			}
-		}
-		if (buffer_offset == -1)
-		{
-			break;
-		}
-		buffer_offset += curr_bytes_read;
-	}
-	
-	if ( ( (envelope_size - buffer + 1) + json_length + 1 ) != cumulative_bytes_read)
-	{
-		return;
-	}
-	
-	struct jx *item, *coprocess_json = jx_parse_string(envelope_size + 1);
-	void *i = NULL;
-	const char *key;
-	while ((item = jx_iterate_values(coprocess_json, &i))) {
-		key = jx_get_key(&i);
-		if (key == NULL) {
-			continue;
-		}
-		if (!strcmp(key, "name")) {
-			function_name = jx_print_string(item);
-		}
-		else if (!strcmp(key, "port")) {
-			char *temp_port = jx_print_string(item);
-			function_port = atoi(temp_port);
-			free(temp_port);
-		}
-		else if (!strcmp(key, "type")) {
-			function_type = jx_print_string(item);
-		}
-		else {
-			debug(D_WQ, "Unable to recognize key %s\n", key);
-		}
-	}
-	jx_delete(coprocess_json);
-}
-
-void start_coprocess() {
-	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
-		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
-		return;
-	}
-	coprocess_pid = fork();
-	if (coprocess_pid < 0) { // unable to fork
-		fatal("couldn't create new process: %s\n", strerror(errno));
-		return;
-	}		
-	else if (coprocess_pid == 0) { // child executes this
-		if ( (close(coprocess_in[1]) < 0) || (close(coprocess_out[0]) < 0) ) {
-			debug(D_WQ, "coprocess could not close pipes: %s\n", strerror(errno));
-			_exit(127);
-		}
-		
-		if (dup2(coprocess_in[0], 0) < 0) {
-			debug(D_WQ, "coprocess could not attach pipe to stdin: %s\n", strerror(errno));
-			_exit(127);
-		}
-
-		if (dup2(coprocess_out[1], 1) < 0) {
-			printf("%s\n", strerror(errno));
-			debug(D_WQ, "coprocess could not attach pipe to stdout: %s\n", strerror(errno));
-			_exit(127);
-		}
-		
-		execlp(coprocess_command, coprocess_command, (char *) 0);
-		debug(D_WQ, "failed to execute %s: %s\n", coprocess_command, strerror(errno));
-		_exit(127); // if we get here, the exec failed so we just quit
-	}
-	else { // parent goes here
-		update_coprocess_info();
-		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
-			debug(D_WQ, "parent could not close pipes: %s\n", strerror(errno));
-			return;
-		}
-		debug(D_WQ, "Forked child process to run %s\n", coprocess_command);
-	}
-}
-
-int check_if_coprocess_exited()
-{
-	struct process_info *p = process_waitpid(coprocess_pid, 0); // see if p has exitex
-	if (p) { // if we get a nonnull return, the process exited
-		coprocess_num_deaths++;
-		free(p);
-		return 1;
-	}
-	else // otherwise the process is still running
-	{
-		return 0;
-	}
-}
-
 static void show_help(const char *cmd)
 {
 	printf( "Use: %s [options] <managerhost> <port> \n"
@@ -2830,6 +2640,7 @@ int main(int argc, char *argv[])
 	int enable_capacity = 1; // enabled by default
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
+
 	catalog_hosts = CATALOG_HOST;
 
 	features = hash_table_create(4, 0);
@@ -3062,11 +2873,10 @@ int main(int argc, char *argv[])
 			manual_ssl_option=1;
 			break;
 		case LONG_OPT_COPROCESS:
-			coprocess_command = xxstrdup(optarg); // get coprocess name from argument list
-			char absolute[1024];
-			path_absolute(coprocess_command, absolute, 1); // get absolute path of executable
-			free(coprocess_command);
-			coprocess_command = xxstrdup(absolute);
+			coprocess_command = calloc(PATH_MAX, sizeof(char));
+			path_absolute(optarg, coprocess_command, 1);
+			realloc(coprocess_command, strlen(coprocess_command)+1);
+			printf("%s\n", coprocess_command);
 			break;
 		default:
 			show_help(argv[0]);
@@ -3217,9 +3027,10 @@ int main(int argc, char *argv[])
 		total_resources->disk.total,
 		total_resources->gpus.total);
 
-	if (coprocess_command != NULL)
-	{
-		start_coprocess();
+	if(coprocess_command) {
+		/* start coprocess per manager attempt */
+		coprocess_name = work_queue_coprocess_start(coprocess_command, &coprocess_port);
+		hash_table_insert(features, coprocess_name, (void **) 1);
 	}
 
 	while(1) {
@@ -3273,24 +3084,17 @@ int main(int argc, char *argv[])
 			debug(D_NOTICE,"stopping: could not connect after %d seconds.",connect_timeout);
 			break;
 		}
-		if (coprocess_pid > 0 && coprocess_num_deaths < 10)
-		{
-			if (check_if_coprocess_exited())
-			{
-				start_coprocess();
-			}
-			printf("coprocess listening on: %d\n", function_port);
-		}
+
 		sleep(backoff_interval);
 	}
-	workspace_delete();
-	if (coprocess_pid > 0 && coprocess_num_deaths < 10)
-	{
-		int max_wait = 5; // maximum seconds we wish to wait for a given process
-		process_kill_waitpid(coprocess_pid, max_wait);
-		free(function_name);
-		free(function_type);
+
+	if (coprocess_command) {
+		work_queue_coprocess_terminate();
+		free(coprocess_name);
 	}
+
+	workspace_delete();
+
 	return 0;
 }
 

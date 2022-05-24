@@ -4,6 +4,7 @@
 #include "work_queue_internal.h"
 #include "work_queue_gpus.h"
 #include "work_queue_protocol.h"
+#include "work_queue_coprocess.h"
 
 #include "debug.h"
 #include "errno.h"
@@ -203,7 +204,7 @@ static const char task_output_template[] = "./worker.stdout.XXXXXX";
 static char * load_input_file(struct work_queue_task *t) {
 	FILE *fp = fopen("infile", "r");
 	if(!fp) {
-		fatal("could not open file for reading: %s", strerror(errno));
+		fatal("coprocess could not open file 'infile' for reading: %s", strerror(errno));
 	}
 
 	fseek(fp, 0L, SEEK_END);
@@ -217,74 +218,7 @@ static char * load_input_file(struct work_queue_task *t) {
 		fatal("error reading file: %s", strerror(errno));
 	}
 
-	return buf;	
-}
-
-static char * invoke_coprocess_function(int function_port, char *input) {
-	char addr[DOMAIN_NAME_MAX];
-	char buf[BUFSIZ];
-	int len;
-	int timeout = 60000000; // one minute, can be changed
-
-	if(!domain_name_lookup("localhost", addr)) {
-		fatal("could not lookup address of localhost");
-	}
-
-	timestamp_t curr_time = timestamp_get();
-	time_t stoptime = curr_time + timeout;
-
-	int connected = 0;
-	struct link *link;
-	int tries = 0;
-	// retry connection for ~30 seconds
-	while(!connected && tries < 30) {
-		link = link_connect(addr, function_port, stoptime);
-		if(link) {
-			connected = 1;
-		} else {
-			tries++;
-			sleep(1);
-		}
-	}
-	// if we can't connect at all, abort
-	if(!link) {
-		fatal("connection error: %s", strerror(errno));
-	}
-	
-	memcpy(buf, input, strlen(input)+1);
-	len = strlen(buf);
-
-	curr_time = timestamp_get();
-	stoptime = curr_time + timeout;
-	// send the length of the data first
-	int bytes_sent = link_printf(link, stoptime, "data: %d\n", len);
-	if(bytes_sent < 0) {
-		fatal("could not send size: %s", strerror(errno));
-	}
-	
-	// send actual data
-	bytes_sent = link_write(link, buf, len, stoptime);
-	if(bytes_sent < 0) {
-		fatal("could not send data: %s", strerror(errno));
-	}
-
-	memset(buf, 0, sizeof(buf));
-
-	curr_time = timestamp_get();
-	stoptime = curr_time + timeout;
-	// read in the length of the response
-	char line[WORK_QUEUE_LINE_MAX];
-	int length;
-	link_readline(link, line, sizeof(line), stoptime);
-	sscanf(line, "data %d", &length);
-
-	// read the response
-	link_read(link, buf, length, stoptime);
-
-	char *output = calloc(strlen(buf), sizeof(char));
-	memcpy(output, buf, strlen(buf));
-
-	return output;
+	return buf;
 }
 
 pid_t work_queue_process_execute(struct work_queue_process *p )
@@ -349,16 +283,16 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 		if(result == -1)
 			fatal("could not dup pipe to stderr: %s", strerror(errno));
 
-		if(p->function_name != NULL && strcmp(p->task->command_line, p->function_name) == 0) {	
+		if(p->coprocess_name != NULL) {
 			// load data from input file
 			char *input = load_input_file(p->task);
-	
+
 			// call invoke_coprocess_function
-		 	char *output = invoke_coprocess_function(p->function_port, input);
+		 	char *output = work_queue_coprocess_run(p->task->command_line, input, p->coprocess_port);
 
 			// write data to output file
 			full_write(p->output_fd, output, strlen(output));
-			
+
 			exit(0);
 		}
 

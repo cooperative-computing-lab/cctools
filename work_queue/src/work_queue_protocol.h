@@ -20,7 +20,8 @@ This file should not be installed and should only be included by .c files.
 /* 7: added category message */
 /* 8: worker send feature message. */
 /* 9: recursive send/recv and filename encoding. */
-#define WORK_QUEUE_PROTOCOL_VERSION 9
+/* 10: added coprocess message. */
+#define WORK_QUEUE_PROTOCOL_VERSION 10
 
 #define WORK_QUEUE_LINE_MAX 4096       /**< Maximum length of a work queue message line. */
 #define WORK_QUEUE_POOL_NAME_MAX 128   /**< Maximum length of a work queue pool name. */
