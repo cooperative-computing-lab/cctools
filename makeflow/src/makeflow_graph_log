@@ -10,16 +10,30 @@
 
 show_help()
 {
-	echo "use: makeflow_graph_log <makeflowlog> <imagefile>"
+	echo "use: makeflow_graph_log [options] <makeflowlog> <imagefile>"
+	echo "	-g <gnuplot-path> Specify the location of the gnuplot executable."
+	echo "			  Default is gnuplot."
+	echo "	-c <convert-path> Specify the location of the convert executable."
+	echo "			  Default is convert."
 	exit 1
 }
 
+gnuplot='gnuplot'
+convert='convert'
 while [ $# -gt 0 ]
 do
 	case $1 in
 	-h |--help )
 		show_help
 		exit 1
+		;;
+	-g)
+		shift
+		gnuplot=$1
+		;;
+	-c)
+		shift
+		convert=$1
 		;;
 	*)
 		break
@@ -47,7 +61,7 @@ do
    then
 	  true
    else
-	  echo "$0: could not find $prog in your PATH"
+	  echo "$0: could not find $prog in the PATH variable or in the specified path"
 	  exit 1
    fi
 done
@@ -63,7 +77,7 @@ fi
 # to always generate a precise and attractive EPS, and then
 # rely upon convert to yield the appropriate output format.
 
-gnuplot <<EOF
+$gnuplot <<EOF
 set terminal postscript solid eps 24 color
 set output "$tempfile"
 set size 2,1
@@ -81,6 +95,6 @@ if [ $output_format = "eps" ]
 then
 	mv $tempfile $outfile
 else
-	convert eps:$tempfile -background white -flatten -antialias $outfile
+	$convert eps:$tempfile -background white -flatten -antialias $outfile
 	rm $tempfile
 fi
