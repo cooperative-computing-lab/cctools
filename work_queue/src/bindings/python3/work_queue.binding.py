@@ -126,6 +126,16 @@ class Task(object):
     def specify_command(self, command):
         return work_queue_task_specify_command(self._task, command)
 
+
+    ##
+    # Set the coprocess at the worker that should execute the task's command.
+    # This is not needed for regular tasks.
+    #
+    # @param self       Reference to the current task object.
+    # @param coprocess  The name of the coprocess.
+    def specify_coprocess(self, coprocess):
+        return work_queue_task_specify_coprocess(self._task, coprocess)
+
     ##
     # Set the worker selection algorithm for task.
     #
