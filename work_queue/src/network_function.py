@@ -3,7 +3,6 @@
 import socket
 import json
 import multiprocessing
-import os
 
 from function_handler import handler, get_name
 
