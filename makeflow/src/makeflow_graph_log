@@ -57,7 +57,7 @@ output_format=${outfile##*.}
 
 for prog in gnuplot convert
 do
-   if which $prog >& /dev/null
+   if ! which ${prog} >& /dev/null
    then
 	  echo "$0: could not find $prog in the PATH variable or in the specified path"
 	  exit 1
