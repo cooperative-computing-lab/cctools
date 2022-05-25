@@ -17,10 +17,10 @@ installation of the software in your home directory.
 You may already have Conda installed.  To check:
 
 ```sh
-$ conda list
+$ conda -V
 ```
 
-If it fails, then you should install [Miniconda](https://docs.conda.io/projects/conda/en/latest/user-guide/install).
+This displays the version of conda currently installed. If it fails, then you should install [Miniconda](https://docs.conda.io/projects/conda/en/latest/user-guide/install).
 Miniconda is a __light__ version of Anaconda, and we recommend it as it is much faster to install.
 We also recommend installing the version for `Python 3.9`
 
