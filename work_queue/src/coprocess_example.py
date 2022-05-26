@@ -3,7 +3,7 @@ A work queue worker coprocess should at a minimum define a get_name() function.
 '''
 def name():
     return "my_coprocess_example"
-
+import math
 def remote_execute(func):
     def remote_wrapper(event):
         return func(**event)
@@ -28,7 +28,7 @@ def my_multiplication(event, response):
 @remote_execute
 def my_fact(a):
     response = dict()
-    response["Result"] = [5]
+    response["Result"] = [math.factorial(x) for x in a]
     response["StatusCode"] = 200
     return response
 
