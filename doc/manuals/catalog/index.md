@@ -51,8 +51,10 @@ This can be used to simply dump all records in JSON format:
 catalog_query
 ```
 
-Or, use the `--where` option to show only records matching an expression. (The
-expression must be quoted to protect it from the shell.)
+Use the `--where` option to show only records matching an expression. (The
+expression must be quoted to protect it from the shell.)  You may
+construct expressions using any combination of operators and values in
+the [JX Expression Language](../jx).
 
 For example, to show all records of catalog servers:
 
@@ -66,14 +68,19 @@ Or to show all chirp servers with more than 4 cpus:
 catalog_query --where 'type=="chirp" && cpus > 4'
 ```
 
-When any of these tools are configured with multiple servers, the program will
-try each in succession until receiving an answer. If no servers give valid
-responses, the query as a whole fails. The order in which servers are listed
-sets the initial query order. If a server fails to respond, it will be marked
-as down before trying the next server in the list. On subsequent queries,
-servers that were down will not be tried unless every other server is non-
-responsive. If in this scenario the previously down server answers the query,
-it will be marked as up again and used with normal priority in future queries.
+The default output of `catalog_query` is raw JSON data, which is comprehensive,
+but may contain much more than you need.  To limit the output, use one or
+more `--output` options to select specific values to show.
+
+```sh
+catalog_query --where 'type=="chirp"' --output name --output port --output cpus
+```
+
+Again, you may construct complex output expressions using the [JX Expression Language](../jx):
+
+```sh
+catalog_query --where 'type=="chirp"' --output '{"name": name, "port": port, "size": avail/1024.0 }'
+```
 
 ## Updating Catalog Servers
 
@@ -134,6 +141,17 @@ instead. To do this, set the following environment variable:
 ```sh
 CATALOG_UPDATE_PROTOCOL=tcp
 ```
+
+## Multiple Catalog Servers
+
+When any of these tools are configured with multiple servers, the program will
+try each in succession until receiving an answer. If no servers give valid
+responses, the query as a whole fails. The order in which servers are listed
+sets the initial query order. If a server fails to respond, it will be marked
+as down before trying the next server in the list. On subsequent queries,
+servers that were down will not be tried unless every other server is non-
+responsive. If in this scenario the previously down server answers the query,
+it will be marked as up again and used with normal priority in future queries.
 
 ## Running a Catalog Server
 
