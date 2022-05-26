@@ -118,8 +118,8 @@ $ makeflow -T torque example.makeflow
 $ makeflow -T amazon example.makeflow
 ```
 
-To learn more about the various batch system options, see the Batch System
-Support section.
+To learn more about the various batch system options, see the [Batch System
+Support section](#batch-system-support).
 
 
 !!! warning

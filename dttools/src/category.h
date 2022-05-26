@@ -30,22 +30,31 @@ typedef enum {
   Valid modes for computing automatic resource allocations.
 */
 typedef enum {
-/**< When monitoring is disabled, all tasks run as
-  WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
-  exhaustion occurs for specified resources values, then the task permanently fails. */
-    CATEGORY_ALLOCATION_MODE_FIXED = 0,
-/**< When monitoring is enabled, tasks are tried with maximum specified values
-of cores, memory, disk or gpus until enough statistics are collected. Then,
-further tasks are first tried using the maximum values observed, and in case of
-resource exhaustion, they are retried using the maximum specified values. The
-task permanently fails when there is an exhaustion using the maximum values. If
-no maximum values are specified, the task will wait until a larger worker
-connects. */
-    CATEGORY_ALLOCATION_MODE_MAX,
-/**< As above, but tasks are first tried with an automatically computed allocation to minimize resource waste. */
-    CATEGORY_ALLOCATION_MODE_MIN_WASTE,
-/**< As above, but maximizing throughput. */
-    CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
+    CATEGORY_ALLOCATION_MODE_FIXED = 0, /**< When monitoring is disabled, all
+                                          tasks run as
+                                          WORK_QUEUE_ALLOCATION_MODE_FIXED. If
+                                          monitoring is enabled and resource
+                                          exhaustion occurs for specified
+                                          resources values, then the task
+                                          permanently fails. */
+    CATEGORY_ALLOCATION_MODE_MAX, /**< When monitoring is enabled, tasks are
+                                    tried with maximum specified values of
+                                    cores, memory, disk or gpus until enough
+                                    statistics are collected.  Then, further
+                                    tasks are first tried using the maximum
+                                    values observed, and in case of resource
+                                    exhaustion, they are retried using the
+                                    maximum specified values. The task
+                                    permanently fails when there is an
+                                    exhaustion using the maximum values. If no
+                                    maximum values are specified, the task will
+                                    wait until a larger worker connects. */
+    CATEGORY_ALLOCATION_MODE_MIN_WASTE, /**< As above, but tasks are first
+                                          tried with an automatically computed
+                                         * allocation to minimize resource
+                                         * waste. */
+    CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT /**< As above, but maximizing
+                                              throughput. */
 } category_mode_t;
 
 

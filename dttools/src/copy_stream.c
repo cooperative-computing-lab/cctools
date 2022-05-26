@@ -33,12 +33,7 @@ int64_t copy_fd_to_stream(int fd, FILE *output)
 		char buffer[COPY_BUFFER_SIZE];
 
 		int64_t actual_read = full_read(fd, buffer, sizeof(buffer));
-		if(actual_read <= 0) {
-			if(total == 0)
-				return -1;
-			else
-				break;
-		}
+		if(actual_read <= 0) break;
 
 		int64_t actual_write = full_fwrite(output, buffer, actual_read);
 		if(actual_write == -1) {
@@ -62,12 +57,7 @@ int64_t copy_fd_to_fd(int in, int out)
 		char buffer[COPY_BUFFER_SIZE];
 
 		int64_t actual_read = full_read(in, buffer, COPY_BUFFER_SIZE);
-		if(actual_read <= 0) {
-			if (total == 0)
-				return -1;
-			else
-				break;
-		}
+		if(actual_read <= 0) break;
 
 		int64_t actual_write = full_write(out, buffer, actual_read);
 		if(actual_write == -1) {
@@ -158,12 +148,7 @@ int64_t copy_stream_to_stream(FILE *input, FILE *output)
 		char buffer[COPY_BUFFER_SIZE];
 
 		int64_t actual_read = full_fread(input, buffer, COPY_BUFFER_SIZE);
-		if(actual_read <= 0) {
-			if (total == 0)
-				return -1;
-			else
-				break;
-		}
+		if(actual_read <= 0) break;
 
 		int64_t actual_write = full_fwrite(output, buffer, actual_read);
 		if(actual_write == -1) {
@@ -193,12 +178,7 @@ int64_t copy_stream_to_buffer(FILE *input, char **buffer, size_t *len)
 		char buffer[COPY_BUFFER_SIZE];
 
 		int64_t actual_read = full_fread(input, buffer, COPY_BUFFER_SIZE);
-		if(actual_read <= 0) {
-			if (total == 0)
-				return -1;
-			else
-				break;
-		}
+		if(actual_read <= 0) break;
 
 		if (buffer_putlstring(&B, buffer, actual_read) == -1) {
 			buffer_free(&B);
