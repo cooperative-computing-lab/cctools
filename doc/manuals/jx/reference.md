@@ -1,8 +1,8 @@
-# JX (JSON Extended) Language Reference
+# JX Expression Language Reference
 
 ## Overview
 
-JX is an extension of the JSON data description language.
+The JX Expression language is an extension of the JSON data description language.
 It combines familiar expression operators, function calls,
 external data, and ordinary JSON contents to yield a powerful
 data querying and manipulation language.  JX is used throughout

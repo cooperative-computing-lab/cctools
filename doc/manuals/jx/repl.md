@@ -1,26 +1,28 @@
-# jx_repl: A Tool for JX Language Exploration
+# JX Expression Language REPL
 
 ## Overview
-This is a brief guide on how to use the ***jx_repl*** command-line utility,
-which acts as an explorer for the [JX workflow language](jx.md).  It's recommended
-that you follow the [JX Tutorial](jx-tutorial.md) first or simultaneously when using this
-tool.
+
+This is a brief guide on how to use the **jx_repl** command-line utility,
+which acts as an explorer for the [JX Expression Language](reference.md).
+
+(REPL is a shorthand for "Read, Evaluate, Print, Loop", a pattern for
+working with interactive expression languages.)
 
 ## Usage
 To use this interactive utility, simply run
->       $ jx_repl
+> jx_repl
 
 ## Commands
-***jx_repl*** reserves a number of symbols in the context, which act as commands when entered:
+**jx_repl** reserves a number of symbols in the context, which act as commands when entered:
 
 | Command | Description |
 |:-------:|:------------|
 |help | display a help message which lists details on reserved commands |
 |in_# | return the #'th input query |
 |out_# | return the result of in_# |
-|functions | display a list of functions supported by the JX language |
-|values | display a list of values supported by the JX language |
-|operators | display a list of operators supported by the JX language |
+|functions | display a list of functions supported by JX |
+|values | display a list of values supported by JX |
+|operators | display a list of operators supported by JX |
 |catalog | fetch the catalog data from http://catalog.cse.nd.edu:9097 |
 |exit | exit the program |
 |quit | same as "exit" |
@@ -29,7 +31,7 @@ To use this interactive utility, simply run
 Start the utility
 ```bash
 $ jx_repl
-Welcome to the JX Language Explorer.
+Welcome to the JX REPL.
 
 Type 'help' for help
 
