@@ -32,10 +32,10 @@ OPTION_ARG_LONG(--where, expr)  (multiple) If given, only records matching this 
 OPTION_ARG_LONG(--output, expr) (multiple) Display this expression on the output.
 OPTIONS_END
 
-SECTION(JX QUERY LANGUAGE)
+SECTION(JX EXPRESSION LANGUAGE)
 
-The --filter, --where, and --output options all make use of the JX query language,
-which is described URL(here,http://cctools.readthedocs.io/jx).
+The --filter, --where, and --output options all make use of the JX expression language,
+which is described LINK(here,http://cctools.readthedocs.io/jx).
 
 In addition, the --output clauses may contain one of the following reduction functions:
 
