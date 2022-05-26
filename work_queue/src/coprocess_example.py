@@ -4,6 +4,12 @@ A work queue worker coprocess should at a minimum define a get_name() function.
 def name():
     return "my_coprocess_example"
 
+def remote_execute(func):
+    def remote_wrapper(event):
+        return func(**event)
+    return remote_wrapper
+
+
 '''
 The function signatures should always be the same, but what is actually
 contained in the event will be different. You decide what is in the event, and
@@ -19,11 +25,12 @@ def my_multiplication(event, response):
 	response["Result"] = result
 	response["StatusCode"] = 200
 
-def my_fact(event, response):
-    import math
-    result = math.factorial(int(event["a"][0]))
-    response["Result"] = result
+@remote_execute
+def my_fact(a):
+    response = dict()
+    response["Result"] = [5]
     response["StatusCode"] = 200
+    return response
 
 def my_pair(event, response):
     result = int(event["a"][0][0]) + int(event["a"][0][1])

@@ -2,12 +2,14 @@
 
 import socket
 import json
-import multiprocessing
+import os
+import sys
 
 # Note: To change. the actual name of the module (i.e. instead of
 # "coprocess_example") should come from some worker's argument.
 import coprocess_example as wq_worker_coprocess
 
+read, write = os.pipe() 
 
 def send_configuration(config):
     config_string = json.dumps(config)
@@ -53,27 +55,33 @@ def main():
 
                 event = json.loads(event)
                 print('event: {}'.format(event))
-
+                import sys
                 # create a forked process for function handler
-                manager = multiprocessing.Manager()
-                response = manager.dict()
-                p = multiprocessing.Process(target=getattr(wq_worker_coprocess, function_name), args=(event, response))
-                p.start()
-                p.join()
-
-                response = json.dumps(dict(response))
+                p = os.fork()
+                if p == 0:
+                    response = getattr(wq_worker_coprocess, function_name)(event)
+                    print("leaving", response, file=sys.stderr)
+                    os.write(write, json.dumps(response).encode("utf-8"))
+                    print("exit", file=sys.stderr)
+                    os._exit(-1)
+                response = os.read(read, 999999)
+                print("begin wait", file=sys.stderr)
+                os.waitid(os.P_PID, p, os.WEXITED)
+                print("end wait", file=sys.stderr)
+                
                 response_size = len(response)
 
                 size_msg = "output {}\n".format(response_size)
 
+                print("begin send", file=sys.stderr)
                 # send the size of response
                 conn.sendall(size_msg.encode('utf-8'))
 
                 # send response
-                conn.sendall(response.encode('utf-8'))
+                conn.sendall(response)
+                print("end send", file=sys.stderr)
 
                 break
-
     return 0
 
 if __name__ == "__main__":
