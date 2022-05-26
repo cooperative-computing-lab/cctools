@@ -275,15 +275,16 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 		if(result == -1)
 			fatal("could not dup /dev/null to stdin: %s", strerror(errno));
 
-		result = dup2(p->output_fd, STDOUT_FILENO);
-		if(result == -1)
-			fatal("could not dup pipe to stdout: %s", strerror(errno));
+		if (p->coprocess_name == NULL) {
+			result = dup2(p->output_fd, STDOUT_FILENO);
+			if(result == -1)
+				fatal("could not dup pipe to stdout: %s", strerror(errno));
 
-		result = dup2(p->output_fd, STDERR_FILENO);
-		if(result == -1)
-			fatal("could not dup pipe to stderr: %s", strerror(errno));
-
-		if(p->coprocess_name != NULL) {
+			result = dup2(p->output_fd, STDERR_FILENO);
+			if(result == -1)
+				fatal("could not dup pipe to stderr: %s", strerror(errno));
+			}
+		else {
 			// load data from input file
 			char *input = load_input_file(p->task);
 
