@@ -1,24 +1,32 @@
-# The JX Workflow Language
+# JX (JSON Extended) Introduction
 
-JX (JSON eXtended) is a language for expressing workflows that allows for easy
-manipulations to the structure and partitioning of a workflow.
+JX is an extension of the JSON data description language.
+It combines familiar expression operators, function calls,
+external data, and ordinary JSON contents to yield a powerful
+data querying and manipulation language.  JX is used throughout
+the CCTools to manage and query unstructured data.
 
-JX extends a JSON representation of the workflow by supporting a Python-like
-syntax for expressions, allowing for a concise intermediate representation that
-expands to a normal JSON document. Using JX, it is easy to treat a subset of
-the workflow as if it were an atomic job that can be dispatched as part of a
-higher-level application.
+For example, given this JSON data context:
 
-## Getting Started
+```
+{ "temp_c": 17, "city": "Minneapolis", "state": "MN"}
+```
 
-  * [JX Tutorial](jx-tutorial)  
+You can write this JX expression:
+```
+{ "temp_f" : (temp_c/0.5556)+32, "location": city + ", " + state }
+```
 
-## Quick Reference
+Yielding this result:
+```
+{ "temp_f" : 62.57553956834532, "location": "Minneapolis, MN" }
+```
 
-  * [JX Quick Reference](jx-quick)  
+And you can read about the full details here:
+- [JX REPL Tool](repl)
+- [JX Language Reference](reference)
 
-## Complete Reference
-
-  * [JX Complete Reference](jx)
-
-
+JX is used as the basic language underlying these tools and systems:
+- [JX Workflow Language](../jx-workflow)
+- [Catalog Server](../catalog)
+- [DeltaDB Time Series Database](../man_pages/deltadb_query)
