@@ -1,0 +1,2 @@
+out:
+    echo "# a comment" > out

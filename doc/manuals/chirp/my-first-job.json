@@ -1,0 +1,12 @@
+{
+    "executable": "/bin/sh",
+    "arguments": [ "sh", "-c", "echo Hello, world! > my.output" ],
+    "files": [
+                {
+                    "task_path": "my.output",
+                    "serv_path": "/some/directory/my.0.output",
+                    "type": "OUTPUT"
+                }
+             ]
+}
+

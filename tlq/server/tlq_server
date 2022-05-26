@@ -1,0 +1,436 @@
+#! /usr/bin/env perl
+
+use Error qw(:try);
+use Error::Simple;
+use Getopt::Long qw(:config no_ignore_case);
+use sigtrap qw/handler signal_handler INT TERM/;
+use Sys::Hostname;
+
+use strict;
+
+my $timing = 0;
+my $usage = "TLQ Log Server Options:
+
+Required:
+
+Optional:
+    --dir,-d    <path>      Use the specified path for TLQ's working directory.
+                            Default: /tmp/tlq
+    --port,-p   <integer>   Attempt to use selected port.
+                            Default: 11855.
+    --time,-t               Captures timing data for benchmarking.
+
+    --help                  Display this message.
+
+Example Usage:
+
+    perl tlq_server --port 9000 --dir /tmp/user/tlq
+
+";
+
+my %OPT;
+try {
+    GetOptions(
+        "dir=s" => \$OPT{dir},
+        "port=s" => \$OPT{port},
+        "time|?" => sub { $timing = 1;  },
+        "help|?" => sub { print $usage; exit(0); },
+    );
+}
+catch Error::Simple with {
+    my $E = shift;
+    print STDERR $E->{-text};
+    die "Failed to parse command line options.\n";
+};
+
+my $client = 0;
+my $err = 0;
+our $dir = $OPT{dir};
+my $port = $OPT{port};
+if(!$dir) { $dir = "/tmp/tlq"; }
+if(!$port) { $port = 11855; }
+if($err) { print_help(); }
+my $host = hostname();
+if(!$host) { $host = `hostname`; }
+if(!$host) {
+    print(STDERR "Could not resolve local hostname.\n");
+    exit(1);
+}
+my $start = time();
+my $total_data = 0;
+my $total_parse = 0;
+my $total_request = 0;
+
+#Define application-specific web server handling
+{
+    package WebServer;
+    use Compress::Zlib;
+    use Data::Dumper;
+    use HTTP::Server::Simple::CGI;
+    use IO::Socket::INET;
+    use JSON;
+    use Sys::Hostname;
+    use threads;
+    use URI::Encode;
+    use base qw(HTTP::Server::Simple::CGI);
+
+    my %logs; #Logs have a UUID, path, JSON path, type, component, and size
+    my %parsers; #Parsers have an type ID, and path
+    if(!(-e $dir)) { mkdir($dir); }
+    else { check_deposit(); }
+    chmod(0766, $dir);
+    opendir(DIR, "parsers");
+    my @localparsers = grep(/_parser$/,readdir(DIR));
+    closedir(DIR);
+    foreach my $p (@localparsers) {
+        system("cp parsers/$p $dir/$p");
+        my $type = $p;
+        $type =~ s/_parser//g;
+        $parsers{$type} = {};
+        $parsers{$type}{path} = "$dir/$p";
+    }
+    my $log_thread = threads->create("watch_logs");
+    my $url_thread = threads->create("watch_urls");
+    $log_thread->detach();
+    $url_thread->detach();
+    my %dispatch = (
+        "/query" => \&run_query,
+        "/jx" => \&send_json,
+        "/pull" => \&send_file,
+        "/list" => \&send_index,
+        "/rm" => \&rm_file
+    );
+
+    sub check_deposit {
+        open(DEPOSIT, "$dir/deposits.log");
+        while(my $line = <DEPOSIT>) {
+            chomp($line);
+            my @parts = split(' ', $line);
+            my ($log, $home, $redirect, $type, $uuid) = @parts;
+            my $cmd = join(' ', @parts[5..$#parts]);
+            if(exists($logs{$uuid})) { next; }
+            $logs{$uuid} = {};
+            $logs{$uuid}{json} = "$dir/$uuid.json";
+            $logs{$uuid}{original} = $log;
+            $logs{$uuid}{home} = $home;
+            $logs{$uuid}{path} = $redirect;
+            $logs{$uuid}{size} = 0;
+            $logs{$uuid}{type} = $type;
+            $logs{$uuid}{command} = $cmd;
+            $logs{$uuid}{noredirect} = 0;
+            $logs{$uuid}{parsed} = 0;
+            $logs{$uuid}{tlq_host} = $host;
+            $logs{$uuid}{tlq_port} = $port;
+            $logs{$uuid}{url} = "http://$host:$port/jx/$uuid.json";
+            if(-e $logs{$uuid}{json}) { $logs{$uuid}{parsed} = 1; }
+            if($redirect eq "NONE") {
+                $logs{$uuid}{path} = "$dir/$uuid.log";
+                $logs{$uuid}{noredirect} = 1;
+            }
+            my $uri="http://$host:$port/<ACTION>/$uuid";
+            my $deposit = "$cmd created log $log queryable at $uri.";
+            system("curl -s --data-urlencode \"DEPOSIT=$deposit\" http://$home/deposit");
+        }
+        close(DEPOSIT);
+        my $dc = scalar(keys(%logs));
+    }
+
+    sub check_file {
+        my ($file, $mode) = @_;
+        if(!$file) { return 0; }
+        if(exists($logs{$file}) and !$mode) { $file = $logs{$file}{path}; }
+        elsif(exists($logs{$file}) and $mode) { $file = $logs{$file}{json}; }
+        my $localfile = "$dir/$file";
+        if(-e $localfile) { $file = $localfile; }
+        if(!(-e $file)) { return 0; }
+        my $result = open(FILE, $file);
+        close(FILE);
+        if(!$result) { return 0; }
+        return $file;
+    } 
+
+    sub run_query {
+        my ($cgi) = @_;
+        my $request_start = time();
+        my $path;
+        my $query = request_from_json($cgi->param("PUTDATA"));
+        if($cgi->path_info() =~ m/query\/(?<path>\S+)/) { $path = $+{path}; }
+        if($path and $query !~ m/.*$dir\/$path.*/) { $query =~ s/$path/$dir\/$path/; }
+        my $data = "";
+        my %encode;
+        $encode{request} = $query;
+        $encode{result} = `$query`;
+        my $result = JSON->new->utf8->pretty->encode(\%encode);
+        print(STDOUT $result);
+        my $request_end = time();
+        if($timing) { $total_request += $request_end - $request_start; }
+        return 0;
+    }
+
+    sub send_json {
+        my ($cgi) = @_;
+        my $request_start = time();
+        my ($uuid, $json);
+        if($cgi->path_info() =~ m/jx\/(?<uuid>[a-f0-9\-]+)(.json)?/) { $uuid = $+{uuid}; }
+        $json = "$uuid.json";
+        $json = check_file($uuid, 1);
+        my $request_end = time();
+        if($timing) { $total_request += $request_end - $request_start; }
+        return transfer($cgi, $json);
+    }
+
+    sub send_file {
+        my ($cgi) = @_;
+        my $request_start = time();
+        my ($path, $file);
+        if($cgi->path_info() =~ m/pull\/(?<path>\S+)/) { $path = $+{path}; }
+        print(STDERR "Got request for $path\n");
+        $file = check_file($path, 0);
+        my $request_end = time();
+        if($timing) { $total_request += $request_end - $request_start; }
+        return transfer($cgi, $file);
+    }
+
+    sub send_index {
+        my ($cgi) = @_;
+        my $request_start = time();
+        my %encode;
+        $encode{logs} = {};
+        foreach my $log (keys(%logs)) {
+            $encode{logs}{$log}{json} = $logs{$log}{json};
+            $encode{logs}{$log}{original} = $logs{$log}{original};
+            $encode{logs}{$log}{home} = $logs{$log}{home};
+            $encode{logs}{$log}{path} = $logs{$log}{path};
+            $encode{logs}{$log}{type} = $logs{$log}{type};
+            $encode{logs}{$log}{command} = $logs{$log}{command};
+            $encode{logs}{$log}{tlq_host} = $logs{$log}{tlq_host};
+            $encode{logs}{$log}{tlq_port} = $logs{$log}{tlq_port};
+            $encode{logs}{$log}{url} = $logs{$log}{url};
+        }
+        my $result = JSON->new->utf8->pretty->encode(\%encode);
+        print(STDOUT $result);
+        my $request_end = time();
+        if($timing) { $total_request += $request_end - $request_start; }
+        return 1;
+    }
+
+    sub rm_file {
+        my ($cgi) = @_;
+        my $request_start = time();
+        my ($uuid, $err, $flag, $result) = 0;
+        my %encode;
+        if($cgi->path_info() =~ m/rm\/(?<uuid>[a-f0-9\-]+)(.json)?/ or $cgi->path_info() =~ m/rm\/(?<uuid>[a-f0-9\-]+)(.log)?/) { $uuid = $+{uuid}; }
+        if($uuid) {
+            my $file = check_file($uuid, 1);
+            if($file) { $result = unlink($file); }
+            if(!$result) {
+                $err = $!;
+                $flag = 1;
+            }
+            $encode{json} = $file;
+            $encode{error} = $err;
+            $file = check_file($uuid, 0);
+            if($file) { unlink($file); }
+            if(!$result) {
+                $err = $!;
+                $flag = 1;
+            }
+            $encode{log} = $file;
+            $encode{error} = $err;
+            if(!$flag) { delete($logs{$uuid}); }
+        }
+        my $request_end = time();
+        if($timing) { $total_request += $request_end - $request_start; }
+        if($flag) {
+            $encode{result} = "failure";
+            my $json = JSON->new->utf8->pretty->encode(\%encode);
+            print(STDOUT $json);
+            return 1;
+        }
+        else {
+            $encode{result} = "success";
+            my $json = JSON->new->utf8->pretty->encode(\%encode);
+            print(STDOUT $json);
+            return 0;
+        }
+    }
+
+    sub transfer {
+        my ($cgi, $file) = @_;
+        my $request_start = time();
+        if(!$file) {
+            my %encode;
+            $encode{result} = "failure";
+            $encode{error} = "$file not found";
+            my $json = JSON->new->utf8->pretty->encode(\%encode);
+            print(STDOUT $json);
+            return 1;
+        }
+        my $rawtext = "\n";
+        open(FILE, $file);
+        while(my $line = <FILE>) { $rawtext = $rawtext . $line; }
+        close(FILE);
+        print(STDOUT $rawtext);
+        my $request_end = time();
+        if($timing) { $total_request += $request_end - $request_start; }
+        return 0;
+    }
+
+    sub parse_logs {
+        my ($type) = @_;
+        my $parser = $parsers{$type}{path};
+        my @toparse;
+        foreach my $uuid (keys(%logs)) {
+            if((!$logs{$uuid}{parsed} and $logs{$uuid}{type} eq $type) or ($logs{$uuid}{type} eq $type and ($logs{$uuid}{size} < -s $logs{$uuid}{path}))) { push(@toparse, $uuid); }
+            $logs{$uuid}{size} = -s $logs{$uuid}{path};
+        }
+        foreach my $uuid (@toparse) {
+            my $path = $logs{$uuid}{path};
+            print(STDERR "Calling $parser $path $uuid\n");
+            my $parsed = `$parser $path $uuid`;
+            my $json = $logs{$uuid}{json};
+            if(-e $json) { unlink($json); }
+            open(QUERIES, ">>", $json);
+            print(QUERIES $parsed);
+            close(QUERIES);
+            $logs{$uuid}{parsed} = 1;
+        }
+        return 0;
+    }
+
+    sub watch_logs {
+        my @prevlogs;
+        my $prevtime = 0;
+        while(1) {
+            my $currtime = time();
+            my $currdata = 0;
+            check_deposit();
+            foreach my $uuid (keys(%logs)) {
+                if($logs{$uuid}{noredirect} and -e $logs{$uuid}{original} and $logs{$uuid}{size} < -s $logs{$uuid}{original}) {
+                    system("cp $logs{$uuid}{original} $logs{$uuid}{path}");
+                }
+            }
+            my $parse_start = time();
+            foreach my $type (keys(%parsers)) { parse_logs($type); }
+            my $parse_end = time();
+            foreach my $file (<$dir/*>) {
+                if(-f $file) {
+                    my $fsize = (stat($file))[7];
+                    $currdata += $fsize;
+                }
+            }
+            if($currdata > $total_data) { $total_data = $currdata; }
+            if($timing) { $total_parse += $parse_end - $parse_start; }
+            my @listlogs;
+            foreach my $l (sort(keys(%logs))) {
+                my %item;
+                $item{uuid} = $l;
+                push(@listlogs, \%item);
+            }
+            if((scalar(@listlogs) != scalar(@prevlogs)) or ($currtime - $prevtime) > 60) {
+                my %encode;
+                $encode{type} = "tlq_server";
+                $encode{name} = $host;
+                $encode{port} = $port;
+                $encode{owner} = $ENV{USER};
+                $encode{working_dir} = $dir;
+                $encode{starttime} = $start;
+                $encode{url} = "http://$host:$port";
+                print(STDERR "Sending heartbeat to catalog.cse.nd.edu:9097.\n");
+                my $heartbeat = JSON->new->utf8->pretty->encode(\%encode);
+                $heartbeat = Compress::Zlib::compress($heartbeat);
+                my $socket = IO::Socket::INET->new(PeerAddr => "catalog.cse.nd.edu:9097", Proto => "udp");
+                $socket->send(chr(26) . $heartbeat);
+                $socket->close();
+                @prevlogs = @listlogs;
+                $prevtime = $currtime;
+                if($timing) {
+                    print(STDERR "Total parsing time: $total_parse seconds.\n");
+                    print(STDERR "Total request time: $total_request seconds.\n");
+                    print(STDERR "Total data usage: $total_data\B.\n");
+                    print(STDERR "Current data usage: $currdata\B.\n");
+                }
+            }
+        }
+        print(STDERR "\nExiting log watcher thread.\n");
+        threads->exit();
+        return 0;
+    }
+
+    sub watch_urls {
+        my $sockport = $port + 1;
+        my $socket = IO::Socket::INET->new(LocalAddr => "127.0.0.1:$sockport", Proto => "tcp", Listen => 10, Reuse => 1) or die "Could not bind TLQ URL advertising socket: $@\n";
+        while(1) {
+            next unless my $connection = $socket->accept();
+            my $peer_host = $connection->peerhost();
+            my $peer_port = $connection->peerport();
+            my $peer_addr = "$peer_host:$peer_port";
+            print(STDERR "Connected to $peer_addr over local socket.\n");
+            my $line;
+            $connection->recv($line, 1024);
+            check_deposit();
+            my $url;
+            foreach my $log (keys(%logs)) {
+                if($logs{$log}{path} == $line or $logs{$log}{original} == $line) {
+                    $url = $logs{$log}{url};
+                    last;
+                }
+            }
+            if($url) {
+                $connection->print($url);
+                print(STDERR "Connection $peer_addr given $url.\n");
+            }
+            else { $connection->print("unable to find TLQ url"); }
+        }
+        close($socket);
+        print(STDERR "\nExiting URL watcher thread.\n");
+        threads->exit();
+        return 0;
+    }
+
+    sub request_from_json {
+        my ($json) = @_;
+        $json = URI::Encode->new( { encode_reserved => 0 } )->decode($json);
+        my $reqref = JSON->new->decode($json);
+        my %req = %$reqref;
+        return $req{request};
+    }
+
+    sub handle_request {
+        my ($self, $cgi) = @_;
+        my $path = $cgi->path_info();
+        if($path =~ m/jx/) { $path = "/jx"; }
+        if($path =~ m/pull/) { $path = "/pull"; }
+        elsif($path =~ m/query/) { $path = "/query"; }
+        elsif($path =~ m/rm/) { $path = "/rm"; }
+        my $handler = $dispatch{$path};
+        check_deposit();
+        if(ref($handler) eq "CODE") { $handler->($cgi); }
+        else {
+            my %encode;
+            $encode{result} = "failure";
+            $encode{error} = "404 Not found";
+            $encode{path} = $path;
+            my $json = JSON->new->utf8->pretty->encode(\%encode);
+            print(STDOUT $json);
+        }
+        return 0;
+    }
+}
+
+my $server = WebServer->new($port);
+print(STDOUT "Server established at $host:$port.\n\n");
+$server->run();
+exit(0);
+
+sub signal_handler {
+    print(STDERR "\nCaught '$!' signal. Terminating process.\n");
+    exit(1);
+}
+
+sub print_help {
+    print(STDOUT $usage);
+    exit(1);
+}
+
+# vim: tabstop=8 shiftwidth=4 softtabstop=4 expandtab shiftround autoindent

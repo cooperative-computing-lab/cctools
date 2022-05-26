@@ -1,0 +1,17 @@
+MAKEFLOW_INPUTS=
+MAKEFLOW_OUTPUTS=out_rule_1 out_rule_2a out_rule_2b out_rule_3
+
+.MAKEFLOW CATEGORY one
+out_rule_1:
+    /bin/echo \${CATEGORY} > out_rule_1
+
+.MAKEFLOW CATEGORY two
+out_rule_2a:
+    /bin/echo ${CATEGORY} > out_rule_2a
+
+out_rule_2b:
+    /bin/echo \${CATEGORY} > out_rule_2b
+
+.MAKEFLOW CATEGORY three
+out_rule_3:
+    /bin/echo ${CATEGORY} > out_rule_3

@@ -1,0 +1,62 @@
+{
+    "comment": "An example makeflow.",
+    "kernel": {
+        "version": ">=2.6.18",
+        "name": "linux"
+    },
+    "os": {
+       "name": "centos",
+        "format": "tgz",
+        "checksum": "d600c8653a59ea9698e9a9270a839d47",
+		"note": "this os image = `docker pull centos:6` + `yum install ImageMagick`. Using yum is becuase ImageMagick is not relocatable.",
+        "source": [
+            "http://ccl.cse.nd.edu/research/data/hep-case-study/d600c8653a59ea9698e9a9270a839d47/centos-6.8-x86_64.tar.gz"
+        ],
+        "version": "6.8",
+        "uncompressed_size": "309442560",
+        "id": "d600c8653a59ea9698e9a9270a839d47",
+        "size": "104707989"
+    },
+    "cmd": "makeflow example.makeflow",
+    "hardware": {
+        "cores": "1",
+        "disk": "2GB",
+        "arch": "x86_64",
+        "memory": "1GB"
+    },
+    "environ": {
+        "PWD": "/tmp"
+    },
+    "output": {
+        "files": [
+            "/tmp/capitol.montage.gif"
+        ],
+        "dirs": []
+    },
+    "data": {
+        "example.makeflow": {
+            "format": "plain",
+            "checksum": "bb09d37eb85a21068bc041fe38d9078e",
+            "source": [
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/bb09d37eb85a21068bc041fe38d9078e/example.makeflow"
+            ],
+            "action": "none",
+            "mountpoint": "/tmp/example.makeflow",
+            "id": "bb09d37eb85a21068bc041fe38d9078e",
+            "size": "650"
+        }
+    },
+    "software": {
+       "makeflow-5.4.19-centos6-x86_64": {
+            "format": "tgz",
+            "checksum": "a9ef4f815436f6db24e486d5a6accfd0",
+            "source": [
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/a9ef4f815436f6db24e486d5a6accfd0/makeflow-5.4.19-centos6-x86_64.tar.gz"
+            ],
+            "mountpoint": "/software/makeflow-5.4.19-centos6-x86_64",
+            "uncompressed_size": "1269760",
+            "id": "a9ef4f815436f6db24e486d5a6accfd0",
+            "size": "457768"
+        }
+    }
+}

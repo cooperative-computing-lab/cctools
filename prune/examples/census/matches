@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+
+import os, sys, json
+import hashlib
+
+
+
+years = [3000,3010]
+
+fields = ['CY','CS','CC','CT','HS','FM','PN', 'FN','GN','BY','BP','SX', 'RL','ET','RC','AG', 'ID']
+numbers = ['CY', 'HS','FM','PN', 'BY', 'AG']  # These fields should be numerical
+
+indata = sys.stdin
+
+
+cnt = 0
+ycnts = {}
+for year in years:
+    ycnts[year] = 0
+matching_lines = []
+
+
+line = indata.readline()
+while line:
+    line = line[:-1]
+    if len(line)>0:
+        ar = line.split('|')
+        year = int(ar[0])
+        ycnts[year] += 1
+        cnt += 1
+        matching_lines.append(line)
+    else:
+        no_more = True
+        ones = False
+        for year in years:
+            if ycnts[year]>1:
+                no_more = False
+            elif ycnts[year]==1:
+                ones = True
+        if ones and no_more:
+            for l in matching_lines:
+                print(l)
+            print('')
+
+        cnt = 0
+        ycnts = {}
+        for year in years:
+            ycnts[year] = 0
+        matching_lines = []
+
+
+    line = indata.readline()

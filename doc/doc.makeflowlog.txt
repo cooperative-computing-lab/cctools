@@ -1,0 +1,26 @@
+#Programmer: Li Yu
+#Date: Nov. 12, 2009
+#Purpose: Explain makeflow log files
+
+1		2		3		4		5		6		7		8		9		10
+time	nodeid	newstat	jobid	wait	run		comp	fail	abort	total
+
+time: number of seconds since midnight of the 1st of January 1970 UTC
+
+nodeid: node ID in DAG
+
+newstat: current status
+
+jobid: job ID
+
+wait: number of jobs with status -- WAITING
+
+run: number of jobs with status --  RUNNING
+
+comp: number of jobs with status -- COMPLETE
+
+fail: number of jobs with status -- FAILED
+
+abort: number of jobs with status -- ABORTED
+
+total: number of all jobs

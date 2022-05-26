@@ -1,0 +1,26 @@
+#!/bin/bash
+
+source "$(dirname "$0")"/test-common.bash
+
+DIR="$(pwd)/load-balance.workflow"
+
+#if ! [ -d "$DIR/" ]; then
+#	run tar xzf "$ARCHIVE"
+#fi
+
+if ! [ -d "$DIR" ]; then
+	weaver -N -O "$DIR" "$(dirname "$0")/pull-tests.py"
+fi
+
+for concurrency in 20 16 12 08 04 02 01; do
+	for scheduler in fifo-4 fifo-2 fifo-1; do
+		for replication in push-async-4 push-async-2 push-sync-1; do
+			if [ "$replication" = 'push-sync-1' -a ! \( "$scheduler" = 'fifo-1' \) ]; then
+				continue;
+			fi
+			testrun "$DIR" "$(pwd)/test.${concurrency}.${scheduler}.${replication}" "scheduler=${scheduler}&replication=${replication}" --job-concurrency="${concurrency}"
+		done
+	done
+done
+
+# vim: set noexpandtab tabstop=4:

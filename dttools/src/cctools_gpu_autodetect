@@ -1,0 +1,17 @@
+#! /bin/sh
+
+exe=`which nvidia-smi 2>/dev/null`
+if [ $? -ne 0 ]; then
+  #echo "nvidia-smi was not found. Please add the location of nvidia-smi to PATH." 1>&2
+  echo 0
+  exit 1
+fi
+
+gpu_count=`nvidia-smi -q 2>/dev/null | grep 'Attached GPUs' | awk '{print $4}'`
+if [ $? -ne 0 ]; then
+  echo "NVIDIA driver was not found. Is the driver installed/loaded?" 1>&2
+  echo 0
+  exit 1
+fi
+
+echo $gpu_count

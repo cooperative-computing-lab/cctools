@@ -1,0 +1,98 @@
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+      - 'release/*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., if 1.2.3, then binaries look like cctools-1.2.3-ARCH.tar.gz)'
+        required: true
+      tag:
+        description: 'Tag to deploy (e.g. release/7.2.1)'
+        required: true
+
+
+name: Test and deploy
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    container: ${{ format('cclnd/cctools-env:x86_64-{0}', matrix.os-name) }}
+    timeout-minutes: 30
+    env:
+      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, matrix.os-name) }}
+      CCTOOLS_DOCKER_GITHUB: ${{ matrix.os-name }}
+    strategy: 
+      matrix:
+        os-name: ['centos7', 'centos8', 'ubuntu20.04']
+    steps:
+      - name: checkout CCTools from branch head
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v2
+      - name: checkout CCTools from tag
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: Get sha of tag
+        id: vars
+        shell: bash
+        run: echo "::set-output name=tag_sha::$(git rev-parse --short HEAD)"
+      - name: build
+        run: ${GITHUB_WORKSPACE}/packaging/scripts/build.sh
+      - name: deploy
+        uses: ncipollo/release-action@v1
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+          artifactContentType: application/gzip
+          draft: true
+          omitBody: true
+          omitBodyDuringUpdate: true
+          prerelease: true
+          replacesArtifacts: true
+          commit: ${{ steps.vars.output.tag_sha }}
+          tag: ${{ github.event.inputs.tag }}
+
+  build-osx:
+    runs-on: macos-10.15
+    timeout-minutes: 30
+    env:
+      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-10.15') }}
+    steps:
+      - name: checkout CCTools from branch head
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v2
+      - name: checkout CCTools from tag
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: Get sha of tag
+        id: vars
+        shell: bash
+        run: echo "::set-output name=tag_sha::$(git rev-parse --short HEAD)"
+      - name: build
+        run: ${GITHUB_WORKSPACE}/packaging/scripts/build.sh
+      - name: deploy
+        uses: ncipollo/release-action@v1
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          artifacts: /tmp/${{ env.CCTOOLS_OUTPUT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+          artifactContentType: application/gzip
+          draft: true
+          omitBody: true
+          omitBodyDuringUpdate: true
+          prerelease: true
+          replacesArtifacts: true
+          commit: ${{ steps.vars.output.tag_sha }}
+          tag: ${{ github.event.inputs.tag }}
+

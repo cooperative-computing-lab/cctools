@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+
+import json
+import sys
+import os
+import uuid
+import subprocess
+import time
+
+set_of_instances = set()
+instance_state_code_terminate = 48
+
+if __name__ == "__main__":
+
+    if len(sys.argv) != 2:
+        print("use: {} <config-file>".format(sys.argv[0]))
+        exit(1)
+
+    CONFIG_FILE=sys.argv[1].rstrip()
+    print("Loading config file {}...".format(CONFIG_FILE))
+
+    if not os.path.isfile(CONFIG_FILE):
+        print("{}: config file {} not found".format(sys.argv[0], CONFIG_FILE))
+        exit(1)
+
+    f = open(CONFIG_FILE,'r')
+    for line in f.readlines():
+        words = line.split()
+        if words[0] == 'vpc':
+            VPC = words[1]
+        if words[0] == 'subnet':
+            SUBNET = words[1]
+        if words[0] == 'gateway':
+            GATEWAY = words[1]
+        if words[0] == 'security_group_id':
+            SECURITY_GROUP_ID = words[1]
+        if words[0] == 'keypair_name':
+            KEYPAIR_NAME = words[1]
+        if words[0] == 'CREATE':
+            set_of_instances.add(words[1])
+        if words[0] == 'TERMINATE':
+            set_of_instances.discard(words[1])
+
+    # assign values
+    print("Checking for aws command in PATH...")
+    if not os.system("which aws >/dev/null 2>&1"):
+        print("okay")
+    else:
+        print("failed")
+        print("{}: The \"aws\" command must be in your path to use this script.".format(sys.argv[0]))
+        exit(1)
+
+    #remove idle instances
+    for INSTANCE_ID in set_of_instances:
+        if(os.system("aws ec2 terminate-instances --instance-ids {}".format(INSTANCE_ID))):
+            print("deleted virtual machine instance {}".format(INSTANCE_ID))
+            # record deleted
+
+    # remain in a loop to check if instances are deleted or no longer exist
+    while set_of_instances:
+        non_terminated_instances = set()
+
+        describe_instance_cmd = "aws ec2 describe-instance-status --query \"InstanceStatuses[*].{InstanceId:InstanceId,InstanceState:InstanceState.Code}\" --output json"
+        describe_instance_proc = subprocess.Popen(describe_instance_cmd, stdout=subprocess.PIPE, shell=True)
+        describe_instance_json = describe_instance_proc.stdout.read()
+        describe_instance_array = json.loads(describe_instance_json.rstrip())
+
+        if len(describe_instance_array) > 0:
+            for instances in describe_instance_array:
+                if instances['InstanceStateCode'] != instance_state_code_terminate:
+                    non_terminated_instances.add(instances['InstanceId'])
+
+        set_of_instances = set_of_instances.intersection(non_terminated_instances)
+
+        time.sleep(10)
+
+    print("Deleting keypair {}...".format(KEYPAIR_NAME))
+    os.system("aws ec2 delete-key-pair --key-name {}".format(KEYPAIR_NAME))
+    os.system("rm {}.pem".format(KEYPAIR_NAME))
+
+    # print("Deleting security group {}").format(SECURITY_GROUP_ID)
+    # os.system("aws ec2 delete-security-group --group-id {}").format(SECURITY_GROUP_ID)
+
+    # Detaching internet gateway before deleting VPC.
+    print("Detaching internet gateway {}...".format(GATEWAY))
+    os.system("aws ec2 detach-internet-gateway --internet-gateway-id {} --vpc-id {}".format(GATEWAY, VPC))
+
+    print("Deleting internet gateway {}...".format(GATEWAY))
+    os.system("aws ec2 delete-internet-gateway --internet-gateway-id {}".format(GATEWAY))
+
+    print("Deleting subnet {}...".format(SUBNET))
+    os.system("aws ec2 delete-subnet --subnet-id {}".format(SUBNET))
+
+    print("Deleting virtual private cluster {}...".format(VPC))
+    os.system("aws ec2 delete-vpc --vpc-id {}".format(VPC))
+
+    print("Done!")

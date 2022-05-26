@@ -1,0 +1,49 @@
+# This is a sample Makeflow script that retrieves an image from the web,
+# creates four variations of it, and then combines them into an animation
+
+{
+  # Makeflow will set $CONVERT and $CURL in the environment when executing the tasks.
+  # We repeat the variables here so there's only one place to change the paths.
+  # In the rules, we can run $CONVERT rather than hardcoding paths.
+  "environment": {
+    "CONVERT": CONVERT,
+    "CURL": CURL
+  },
+
+  # This is the meat of the Makeflow, the actual production rules
+  "rules": [
+    # Once the files are generated, this rule combines them into the final output.
+    {
+      "command": "$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif",
+      "outputs": ["capitol.montage.gif"],
+      "inputs": [
+        CONVERT,
+        "capitol.jpg",
+        format("capitol.%d.jpg", i) for i in ANGLES,
+      ],
+    },
+    # This rule downloads the input data.
+    {
+      # We could have let the shell substitute $CURL rather than concatenating
+      # the strings ourselves. Also note that we need to escape the double quotes
+      # around $URL so that it's properly quoted in the shell.
+      "command": CURL + " -o capitol.jpg \"$URL\"",
+      "outputs": ["capitol.jpg"],
+      # Makeflow requires programs to be specified as inputs as well.
+      "inputs": [CURL],
+      # Environment variables here apply only to the current rule.
+      "environment": {
+        "URL": "http://ccl.cse.nd.edu/images/capitol.jpg"
+      },
+      # If a rule is specified with local_job, it executes at the local site
+      "local_job": true
+    }, {
+      # The current angle will be bound to `i`, so we can concatenate
+      # to build the command line and output.
+      "command": format("$CONVERT -swirl %d capitol.jpg capitol.%d.jpg", i, i),
+      "outputs": [format("capitol.%d.jpg", i)],
+      "inputs": [CONVERT, "capitol.jpg"]
+    } for i in ANGLES,
+    # the list comprehension here will repeat the previous expression for each angle
+  ]
+}

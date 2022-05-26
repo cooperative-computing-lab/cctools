@@ -1,0 +1,1754 @@
+#!/bin/sh
+
+###########################
+# *** Set for releases. ***
+
+MAJOR=8
+MINOR=0
+MICRO=0
+
+# Optionally set the source/tag for this code (e.g. RC1 or FINAL).  Setting
+# this variable is instead useful for statically naming the source when it will
+# not match the branch name (like RC1 or FINAL).
+RELEASE=DEVELOPMENT
+
+###########################
+# *** You should not need to change anything below this line. ***
+###########################
+
+. ./configure.tools.sh
+
+uname -a
+
+if [ -z "$USER" ]; then
+  USER=`whoami`
+  export USER
+fi
+
+save_arguments "$0" "$@"
+
+# Bourne shell is tricky when you use backtick command substitution backslash
+# has special meaning even when surrounded by single-quotes. It is necessary to
+# escape the backslash.
+# Here's what we want to exec literally:
+#   echo "$*" | sed s/#/\\#/ | sed s/\$/$$/
+# The above sed commands are to escape the output for the Makefile.
+# Arguments to configure which can be printed for version/debug information.
+configure_arguments=`echo "$*" | sed 's/#/\\\\#/' | sed 's/\\$/$$/'`
+
+# Bourne shell is tricky when you use backtick command substitution backslash
+# has special meaning even when surrounded by single-quotes. It is necessary to
+# escape the backslash.
+# Here's what we want to exec literally:
+#   uname -a | sed s/#/\\#/ | sed s/\$/$$/
+# The above sed commands are to escape the output for the Makefile.
+system_information=`uname -a | sed 's/#/\\\\#/' | sed 's/\\$/$$/'`
+
+BUILD_CPU="$(uname -m | tr \[a-z\] \[A-Z\])"
+BUILD_DATE="$NOW"
+BUILD_HOST="$(uname -n)"
+BUILD_SYS="$(uname -s | tr \[a-z\] \[A-Z\] | awk -F_ '{print $1}')"
+BUILD_USER="$USER"
+
+if [ "$BUILD_CPU" = UNKNOWN ]
+then
+	BUILD_CPU=`uname -p | tr \[a-z\] \[A-Z\]`
+fi
+
+case "$BUILD_CPU" in
+	I[0-9]86)
+	BUILD_CPU=I386
+	;;
+	POWER\ MACINTOSH)
+	BUILD_CPU=POWERPC
+	;;
+esac
+
+include_package_apps="apps"
+include_package_chirp="chirp"
+include_package_deltadb="deltadb"
+include_package_doc="doc"
+include_package_dataswarm="dataswarm"
+include_package_ftplite="ftp_lite"
+include_package_grow="grow"
+include_package_makeflow="makeflow"
+include_package_parrot="parrot"
+include_package_resource_monitor="resource_monitor"
+include_package_tlq="tlq"
+
+include_package_umbrella=
+include_package_weaver=
+include_package_prune=
+
+swig_bindings=""
+
+install_path="$HOME/cctools"
+
+build_label=
+build_date=
+
+base_root="/usr"
+
+globus_flavor=auto
+
+ccompiler=${CC:-gcc}
+cxxcompiler=${CXX:-g++}
+linker="${ccompiler}"
+
+ccflags="${CFLAGS} -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -Wno-unused-result -fPIC"
+c_only_flags="-std=c99"
+
+config_zlib_path=yes
+
+# config_PACKAGE_path possible values:
+# no   -> exclude from configuration
+# yes  -> include in configuration, and only from PACKAGE_path. If not found, exit with error.
+# auto -> include in configuration if found in standard locations. If not found, exclude from configuration.
+config_ext2fs_path=auto
+config_fuse_path=auto
+config_mysql_path=auto
+config_openssl_path=auto
+config_perl_path=auto
+config_python_path=auto    # for python2 or python3, version automatically detected
+config_python2_path=auto
+config_python3_path=auto
+config_readline_path=auto
+config_swig_path=auto
+
+config_golang_path=no
+config_curl_path=no
+config_cvmfs_path=no
+config_globus_path=no
+config_irods_path=no
+config_mpi_path=no
+config_uuid_path=no
+config_xrootd_path=no
+
+config_static_libgcc=yes
+config_static_openssl=yes
+
+while [ $# -gt 0 ]
+do
+	opt=$1
+	arg=''
+	shift
+
+	case $opt in
+			# handle options of the form --opt=arg
+		--*=*)
+			arg=$(eval echo ${opt#*=})
+			opt=${opt%%=*}
+			;;
+			# empty arg only for these options
+		--debug|--strict|--sanitize|--static|--without-*|--help)
+			arg=''
+			;;
+		--*)
+			# handle options of the form --opt arg
+			arg=$1
+			shift
+		;;
+	esac
+
+	case $opt in
+		--debug)
+			optdebug=1
+			optstrict=1
+			;;
+		--prefix)
+			install_path=$(abspath "${arg}")
+			;;
+		--strict)
+			optstrict=1
+			;;
+		--sanitize)
+			optsanitize=1
+			;;
+		--static)
+			# example: CFLAGS=-D__MUSL__ CC=musl-gcc ./configure --without-system-{doc,apps} --with-readline-path=no --static
+			optstatic=1
+			;;
+		--build-label)
+			build_label=${arg}
+			;;
+		--build-date)
+			build_date=${arg}
+			;;
+		--sge-parameter)
+			if [ -z "$sge_parameters" ]
+			then
+				sge_parameters="\#$ ${arg}"
+			else
+				sge_parameters="${sge_parameters}\n\#$ ${arg}"
+			fi
+			;;
+		--with-base-dir)
+			base_root=${arg}
+			;;
+		--with-curl-path)
+			curl_path=${arg}
+			config_curl_path=$(config_X_path ${arg})
+			;;
+		--with-cvmfs-path)
+			cvmfs_path=${arg}
+			config_cvmfs_path=$(config_X_path ${arg})
+			;;
+		--with-ext2fs-path)
+			ext2fs_path=${arg}
+			config_ext2fs_path=$(config_X_path ${arg})
+			;;
+		--with-fuse-path)
+			fuse_path=${arg}
+			config_fuse_path=$(config_X_path ${arg})
+			;;
+		--with-globus-path)
+			globus_path=${arg}
+			config_globus_path=$(config_X_path ${arg})
+			;;
+		--globus-flavor)
+			globus_flavor=${arg}
+			;;
+		--with-golang-path)
+			golang_path=${arg}
+			config_golang_path=$(config_X_path ${arg})
+			;;
+		--with-irods-path)
+			irods_path=${arg}
+			config_irods_path=$(config_X_path ${arg})
+			;;
+		--with-mpi-path)
+			mpi_path=${arg}
+			config_mpi_path=$(config_X_path ${arg})
+			;;
+		--with-mysql-path)
+			mysql_path=${arg}
+			config_mysql_path=$(config_X_path ${arg})
+			;;
+		--with-openssl-path)
+			openssl_path=${arg}
+			config_openssl_path=$(config_X_path ${arg})
+			;;
+		--with-perl-path)
+			perl_path=${arg}
+			config_perl_path=$(config_X_path ${arg})
+			;;
+		--with-python-path)
+			python_path=${arg}
+			config_python_path=$(config_X_path ${arg})
+			;;
+		--with-python2-path)
+			python2_path=${arg}
+			config_python2_path=$(config_X_path ${arg})
+			;;
+		--with-python3-path)
+			python3_path=${arg}
+			config_python3_path=$(config_X_path ${arg})
+			;;
+		--with-readline-path)
+			readline_path=${arg}
+			config_readline_path=$(config_X_path ${arg})
+			;;
+		--with-swig-path)
+			swig_path=${arg}
+			config_swig_path=$(config_X_path ${arg})
+			;;
+		--with-uuid-path)
+			uuid_path=${arg}
+			config_uuid_path=$(config_X_path ${arg})
+			;;
+		--with-xrootd-path)
+			xrootd_path=${arg}
+			config_xrootd_path=$(config_X_path ${arg})
+			;;
+		--with-zlib-path)
+			zlib_path=${arg}
+			if [ "$zlib_path" = no ]
+			then
+				echo "*** zlib is not optional"
+				exit 1
+			fi
+			;;
+		--without-system-apps)
+			include_package_apps=""
+			;;
+		--without-system-makeflow)
+			include_package_makeflow=""
+			;;
+		--without-system-ftp-lite)
+			include_package_ftplite=""
+			;;
+		--without-system-chirp)
+			include_package_chirp=""
+			;;
+		--without-system-grow)
+			include_package_grow=""
+			;;
+		--without-system-umbrella)
+			include_package_umbrella=""
+			;;
+		--without-system-parrot)
+			include_package_parrot=""
+			;;
+		--without-system-resource_monitor)
+			include_package_resource_monitor=""
+			;;
+		--without-system-weaver)
+			include_package_weaver=""
+			;;
+		--without-system-doc)
+			include_package_doc=""
+			;;
+		--without-system-prune)
+			include_package_prune=""
+			;;
+		--without-system-dataswarm)
+			include_package_dataswarm=""
+			;;
+		--with-*-path)
+			echo "ignoring unknown package ${arg}"
+			;;
+		--tcp-low-port)
+			ccflags="${ccflags} -DTCP_LOW_PORT_DEFAULT=${arg}"
+			;;
+		--tcp-high-port)
+			ccflags="${ccflags} -DTCP_HIGH_PORT_DEFAULT=${arg}"
+			;;
+		--without-static-libgcc)
+			config_static_libgcc=no
+			;;
+		--without-static-openssl)
+			config_static_openssl=no
+			;;
+		-h | -help | --h | --help)
+			cat <<EOF
+Use: configure [options]
+Where options are:
+  --help
+  --prefix             <path>
+  --debug
+  --build-label        <label>
+  --strict
+  --sanitize
+  --sge-parameter      <parameter>
+  --globus-flavor      <flavor>
+  --irods-flavor       3 | 4
+  --tcp-low-port       <port>
+  --tcp-high-port      <port>
+  --with-base-dir      <dir>   (where to find system libraries, default is /usr)
+  --with-PACKAGE-path  <path>
+  --without-system-SYSTEM
+
+Where PACKAGE may be:
+	curl
+	cvmfs
+	ext2fs
+	fuse
+	globus
+	irods
+	mpi
+	mysql
+	perl
+	python
+	python3
+	readline
+	swig
+	uuid
+	xrootd
+	zlib
+
+And SYSTEM may be:
+	chirp
+	dataswarm
+	doc
+	ftp-lite
+	makeflow
+	parrot
+	resource_monitor
+	umbrella
+EOF
+			exit 0
+			;;
+		*)
+			echo "Unknown option ${opt}"
+			exit 1
+			;;
+	esac
+done
+
+SOURCE=$RELEASE
+if [ -n "$build_label" ]; then
+	SOURCE="$SOURCE $build_label"
+fi
+
+DATE=$NOW
+if [ -n "$build_date" ]; then
+	DATE=$build_date
+fi
+
+VERSION="$MAJOR.$MINOR.$MICRO $SOURCE"
+
+if [ "$optstrict" = 1 ]; then
+	ccflags="${ccflags} -Werror"
+fi
+
+export HOST_MULTIARCH=$(check_multiarch)
+
+rm -f config.mk
+
+require_path ${ccompiler}
+require_gnu_make
+
+if ! optional_path ${cxxcompiler}
+then
+	echo "*** could not find a C++ compiler, skipping parrot support"
+	include_package_parrot=""
+fi
+
+
+# Lots of warnings are enabled by default, but several are too strict
+# and crop up in third-party code, so we disable those checks.
+# However, not all compilers support these flags, so we check each one.
+
+for flag in no-unused-parameter no-unknown-pragmas no-deprecated-declarations no-unused-const-variable
+do
+	if check_compiler_flag -W$flag
+	then
+		ccflags="${ccflags} -W$flag"
+	fi
+done
+
+#
+# Currently, we rely on the linker --as-needed flag to sort out
+# which dynamic libraries each executable actually needs.
+# This is apparently a recent addition to gnu ld.
+# A better solution would be to explicitely specify which libraries
+# are needed by which executable, but this will come in a later version.
+#
+
+echon "checking if ld supports the --as-needed flag..."
+if ld --help 2>&1 | grep -- --as-needed 2>&1 >/dev/null
+then
+		echo "yes"
+		link_as_needed="-Xlinker --as-needed"
+		link_no_as_needed="-Xlinker --no-as-needed"
+else
+		echo "no"
+fi
+
+ldflags="${LDFLAGS}"
+
+if [ $BUILD_SYS = LINUX ]
+then
+		if [ "${config_static_libgcc}" = yes ]
+		then
+				ldflags="${ldflags} -Xlinker -Bstatic -static-libgcc"
+		fi
+		
+		ldflags="${ldflags} -Xlinker -Bdynamic ${link_as_needed}"
+elif [ $BUILD_SYS != DARWIN ]
+then
+		if [ "${config_static_libgcc}" = yes ]
+		then
+				ldflags="${ldflags} -static-libgcc"
+		fi
+fi
+
+if [ "$optsanitize" = 1 ]; then
+	ccflags="${ccflags} -fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined"
+	ldflags="-fsanitize=address -lasan -lubsan ${ldflags}"
+	test_ccflags="-lasan -lubsan"
+fi
+
+##########################################################################
+# SWITCH TO STATIC LINKING FOR UNCOMMON THIRD-PARTY PACKAGES
+##########################################################################
+library_search_mode=prefer_static
+##########################################################################
+
+if [ "$globus_flavor" = auto ]
+then
+	if [ $BUILD_CPU = X86_64 ]
+	then
+		globus_flavor=gcc64
+	else
+		globus_flavor=gcc32
+	fi
+fi
+
+globus_avail=no
+if [ $config_globus_path != no ]
+then
+	globus_path=${globus_path:-${base_root}}
+	globus_avail=yes  # assume yes until not found
+
+	if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
+	then
+		echo "*** using a globus flavor of '$globus_flavor' (if this is wrong, use the --globus-flavor argument)"
+		globus_ccflags="-DHAS_GLOBUS_GSS -I${globus_path}/include -I${globus_path}/include/${globus_flavor}"
+		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
+		do
+			if library_search ${library}_${globus_flavor} ${globus_path}
+			then
+				globus_ldflags="${globus_ldflags} ${library_search_result}"
+			fi
+		done
+	elif check_file ${globus_path}/include/globus/globus_common.h
+	then
+		globus_ccflags="-DHAS_GLOBUS_GSS -I${globus_path}/lib/globus/include -I${globus_path}/include/globus"
+		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
+		do
+			if library_search $library ${globus_path}
+			then
+				globus_ldflags="${globus_ldflags} ${library_search_result}"
+			fi
+		done
+	else
+		# not found
+		globus_avail=no
+	fi
+
+	if [ "${globus_avail}" = yes ]
+	then
+		# globus needs openssl
+		config_openssl_path=yes
+	fi
+fi
+
+report_detection globus "${globus_avail}" "${config_globus_path}" "${globus_path}"
+
+
+# irods >= 4.0 uses .so plugins which are found in /var/lib/irods.
+# These require the parrot is linked with -rdynamic so that
+# the plugins can refer to symbols in libRodsAPI.a in parrot.
+
+# irods 4.x changed the API from C to C++, so we must look
+# for .hpp files instead of .h files.
+
+irods_avail=no
+if [ $config_irods_path != no ]
+then
+	irods_avail=yes       # assume yes until a component not found
+	irods_path=${irods_path:-${base_root}}
+
+	if library_search RodsAPIs "${irods_path}/lib"
+	then
+		ldflags="${ldflags} -rdynamic"
+		irods_ldflags="${library_search_result}"
+	else
+		irods_avail=no
+	fi
+
+	if library_search irods_client_api "${irods_path}/lib"
+	then
+		irods_ldflags="${irods_ldflags} ${library_search_result}"
+	else
+		irods_avail=no
+	fi
+
+	for d in ${irods_path}/include/irods
+	do
+		irods_ccflags="${irods_ccflags} -DHAS_IRODS -DIRODS_USES_PLUGINS -DIRODS_USES_HPP -DIRODS_USES_ERROR_HPP -I$d"
+	done
+
+	boost_path=`ls -d ${irods_path}/lib/irods/externals`
+	if [ ! -d ${boost_path} ]
+	then
+		echo "*** Could not find irods boost in ${irods_path}/external"
+		irods_avail=no
+	fi
+
+	for subtype in system thread chrono filesystem regex
+	do
+		lib=${boost_path}/libboost_${subtype}.a
+		if [ -f $lib ]
+		then
+			echo "found $lib"
+			irods_ldflags="${irods_ldflags} $lib"
+		fi
+	done
+
+	jansson_path=${irods_path}/lib/irods/externals/libjansson.a
+	if check_file ${jansson_path}
+	then
+		irods_ldflags="${irods_ldflags} ${jansson_path}/libjansson.a"
+	else
+		echo "*** Could not find irods jansson in ${irods_path}/external"
+		irods_avail=no
+	fi
+
+	if [ "${irods_avail}" = yes ]
+	then
+		# irods needs openssl
+		config_openssl_path=yes
+		echo "*** warning: irods 4.x requires plugins installed in /var/lib, or for the irods_plugins_home variable to be set."
+	fi
+fi
+
+report_detection irods "${irods_avail}" "${config_irods_path}" "${irods_path}"
+
+
+mysql_avail=no
+if [ $config_mysql_path != no ]
+then
+	mysql_avail=yes
+	mysql_path=${mysql_path:-${base_root}}
+	if library_search mysqlclient ${mysql_path} mysql
+	then
+		mysql_ldflags="${library_search_result}"
+
+		if [ "${mysql_path}" != "${base_root}" ]
+		then
+			mysql_ccflags="-I${mysql_path}/include"
+		fi
+
+		mysql_ccflags="${mysql_ccflags} -DHAS_MYSQL -DHAS_BXGRID"
+	else
+		mysql_avail=no
+	fi
+
+	# It seems that the various versions move around the key include file,
+	# so we check for it in several places here.
+	if [ -f ${mysql_path}/include/mysql.h ]
+	then
+		mysql_ccflags="${mysql_ccflags} -DHAS_MYSQL_H"
+	elif [ -f ${mysql_path}/include/mysql/mysql.h ]
+	then
+		mysql_ccflags="${mysql_ccflags} -DHAS_MYSQL_MYSQL_H"
+	else
+		mysql_avail=no
+	fi
+
+	if [ "${mysql_avail}" = yes ]
+	then
+		# mysql needs openssl
+		config_openssl_path=yes
+	fi
+fi
+
+report_detection mysql "${mysql_avail}" "${config_mysql_path}" "${mysql_path}"
+
+
+xrootd_avail=no
+if [ $config_xrootd_path != no ]
+then
+	xrootd_avail=yes
+	xrootd_path=${xrootd_path:-${base_root}}
+	if check_file ${xrootd_path}/include/xrootd/XrdVersion.hh
+	then
+		xrootd_ccflags="-DHAS_XROOTD -I${xrootd_path}/include/xrootd"
+
+		for library in XrdPosix XrdClient XrdSys XrdNet XrdNetUtil XrdOuc
+		do
+			if library_search $library ${xrootd_path} ${xrootd_arch}
+			then
+				xrootd_ldflags="${xrootd_ldflags} ${library_search_result}"
+			else
+				echo "*** Couldn't find $library in ${xrootd_path}"
+				xrootd_avail=no
+			fi
+		done
+	else
+		xrootd_avail=no
+	fi
+fi
+
+if [ "${xrootd_avail}" = yes ]
+then
+	# xrootd needs openssl
+	config_openssl_path=yes
+fi
+
+report_detection xrootd "${xrootd_avail}" "${config_xrootd_path}" "${xrootd_path}"
+
+
+cvmfs_avail=no
+if [ $config_cvmfs_path != no ]
+then
+	cvmfs_avail=yes
+	cvmfs_path=${cvmfs_path:-${base_root}}
+	if check_file ${cvmfs_path}/include/libcvmfs.h && library_search cvmfs ${cvmfs_path}
+	then
+		cvmfs_ccflags="-DHAS_CVMFS -I${cvmfs_path}/include"
+		cvmfs_ldflags="${library_search_result}"
+	else
+		cvmfs_avail=no
+	fi
+fi
+
+if [ "${cvmfs_avail}" = yes ]
+then
+	# cvmfs needs openssl and uuid
+	config_openssl_path=yes
+	config_uuid_path=yes
+fi
+
+report_detection cvmfs "${cvmfs_avail}" "${config_cvmfs_path}" "${cvmfs_path}"
+
+
+# uuid only needed for cvmfs, thus we never use 'auto', only 'yes'
+uuid_avail=no
+if [ "${config_uuid_path}" = yes ]
+then
+	uuid_avail=yes
+	uuid_path=${uuid_path:-${base_root}}
+	if library_search uuid $uuid_path
+	then
+		cvmfs_ldflags="${cvmfs_ldflags} ${library_search_result}"
+	else
+		uuid_avail=no
+	fi
+fi
+
+report_detection uuid "${uuid_avail}" "${config_uuid_path}" "${uuid_path}"
+
+
+fuse_avail=no
+if [ $config_fuse_path != no ]
+then
+	fuse_avail=yes
+	fuse_path=${fuse_path:-${base_root}}
+	if library_search fuse ${fuse_path} || library_search fuse /
+	then
+		if [ "${fuse_path}" != / -a "${fuse_path}" != ${base_root} ]
+		then
+			fuse_ccflags="-I${fuse_path}/include"
+		fi
+		fuse_ldflags="-DHAS_FUSE ${library_search_result}"
+	else
+		fuse_avail=no
+	fi
+fi
+
+report_detection fuse "${fuse_avail}" "${config_fuse_path}" "${fuse_path}"
+
+
+ext2fs_avail=no
+if [ $config_ext2fs_path != no ]
+then
+	ext2fs_avail=yes
+	ext2fs_path=${ext2fs_path:-${base_root}}
+	if [ "${fuse_avail}" = no ]
+	then
+		echo "*** ext2fs support requires fuse"
+		ext2fs_avail=no
+	elif library_search ext2fs ${ext2fs_path} || library_search ext2fs /
+	then
+		if [ "${ext2fs_path}" != / -a "${ext2fs_path}" != /usr ]
+		then
+			ext2fs_ccflags="-I${ext2fs_path}/include"
+		fi
+		ext2fs_ldflags="-DHAS_EXT2FS ${library_search_result} -lcom_err"
+	fi
+fi
+
+report_detection ext2fs "${ext2fs_avail}" "${config_ext2fs_path}" "${ext2fs_path}"
+
+
+mpi_avail=no
+mpi_exe=""
+if [ "$config_mpi_path" != no ]
+then
+	mpi_avail=yes
+	mpi_path=${mpi_path:-${base_root}}
+
+	if [ "${config_mpi_path}" = auto ] && search_file_executable mpicc
+	then
+		mpi_exe=${executable_search_result}
+	elif search_file_executable ${mpi_path} ${mpi_path}/bin/mpicc ${mpi_path}/mpicc
+	then
+		mpi_exe=${executable_search_result}
+	else
+		mpi_avail=no
+	fi
+
+	if [ "${mpi_avail}" = yes ]
+	then
+		ccflags="-DCCTOOLS_WITH_MPI"
+		ccompiler=${mpi_exe}
+		linker=${mpi_exe}
+	else
+		mpi_avail=no
+	fi
+fi
+
+report_detection mpi "${mpi_avail}" "${config_mpi_path}" "${mpi_path}"
+
+
+##########################################################################
+# SWITCH BACK TO DYNAMIC LINKING FOR COMMON SYSTEM LIBRARIES
+##########################################################################
+library_search_mode=prefer_dynamic
+##########################################################################
+
+readline_avail=no
+if [ $config_readline_path != no ]
+then
+	readline_avail=yes
+	readline_path=${readline_path:-${base_root}}
+
+	if library_search readline ${readline_path}
+	then
+		external_libraries="${external_libraries} ${library_search_result}"
+
+		if [ "${readline_path}" != "${base_root}" ]
+		then
+			ccflags="${ccflags} -I${readline_path}/include"
+		fi
+
+		ccflags="${ccflags} -DHAS_LIBREADLINE"
+
+		# We rely on the --as-needed flag to figure out what dynamic
+		# libraries are actually used by each executable.
+		# However, libreadline doesn't properly specify a dependency
+		# on ncurses, termcap, and history, so we must force them to link.
+
+		if [ $BUILD_SYS = LINUX ]
+		then
+			# Remove the -lreadline that was added by "library_search readline" above
+			external_libraries=`echo $external_libraries | sed "s/-lreadline//"`
+
+			# Put the readline flags in a separate variable to be used only where needed.
+			readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
+		else
+			if library_search ncurses ${readline_path}
+			then
+				external_libraries="${external_libraries} ${library_search_result}"
+			fi
+
+			if library_search termcap ${readline_path}
+			then
+				external_libraries="${external_libraries} ${library_search_result}"
+			fi
+
+			if library_search history ${readline_path}
+			then
+				external_libraries="${external_libraries} ${library_search_result}"
+			fi
+		fi
+	else
+		readline_avail=no
+	fi
+fi
+
+report_detection readline "${readline_avail}" "${config_readline_path}" "${readline_path}"
+
+
+curl_avail=no
+if [ $config_curl_path != no ]
+then
+	curl_avail=yes
+	curl_path=${curl_path:-${base_root}}
+	if library_search curl ${curl_path} || library_search curl /
+	then
+		if [ "${curl_path}" != / -a "${curl_path}" != /usr ]
+		then
+			curl_ccflags="-I${curl_path}/include"
+		fi
+		ccflags="${ccflags} -DHAS_CURL"
+		curl_ldflags="${library_search_result} -lcrypto"
+	else
+		curl_avail=no
+	fi
+fi
+
+report_detection curl "${curl_avail}" "${config_curl_path}" "${curl_path}"
+
+
+if [ $BUILD_SYS = DARWIN ]
+then
+        if [ -d "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include" ]
+        then
+			ccflags_append_define CCTOOLS_OSX_GETOPT_FROM_SDK
+        else
+                # The version of getopt.h packaged in cctools appears to cause a SIGBUS on Darwin.
+                # Mac OS X Command Line Tools need to be installed to obtain a getopt.h that works.
+                echo "*** Sorry, I can't proceed without Mac OS X Command Line Tools."
+                echo "*** Please refer to the installation instructions."
+                exit 1
+        fi
+fi
+
+
+### version requirements for swig:
+# at least version 1.3.29 for python 2.4--2.7
+# at least version 2.0.4  for python 3.0--
+# at least version 4.0 for golang 1.5--
+
+swig_avail=no
+swig_exe=""
+swig_version=""
+if [ $config_swig_path != no ]
+then
+	swig_avail=yes
+	swig_path=${swig_path:-${base_root}}
+	if [ "$optstatic" = 1 ]
+	then
+		echo "*** buildin statically, skipping swig support"
+		swig_avail=no
+	elif [ "${config_swig_path}" = auto ] && search_file_executable ${SWIG} swig
+	then
+		swig_exe="${executable_search_result}"
+	elif search_file_executable ${swig_path} ${swig_path}/bin/swig ${swig_path}/swig
+	then
+		swig_exe="${executable_search_result}"
+	else
+		swig_avail=no
+	fi
+
+	if [ "${swig_avail}" = yes ]
+	then
+		swig_version=$(${swig_exe} -version | grep -i version | awk '{print $3}')
+	fi
+fi
+
+report_detection swig "${swig_avail}" "${config_swig_path}" "${swig_path}"
+
+
+perl_avail=no
+perl_exe=""
+perl_version=""
+if [ $config_perl_path != no ]
+then
+	perl_avail=yes
+	perl_path=${perl_path:-${base_root}}
+	if [ "${swig_avail}" = no ]
+	then
+		echo "*** swig is needed for perl support"
+		perl_avail=no
+	elif [ "${config_perl_path}" = auto ] && search_file_executable perl
+	then
+		perl_exe=${executable_search_result}
+	elif search_file_executable ${perl_path} ${perl_path}/bin/perl
+	then
+		perl_exe=${executable_search_result}
+	else
+		perl_avail=no
+	fi
+
+	if [ "${perl_avail}" = yes ]
+	then
+		perl_version=$(${perl_exe} -e 'printf "%vd\n",$^V;' 2> /dev/null)
+		if [ $? = 0 ]
+		then
+			echo "perl version is ${perl_version}"
+		else
+			perl_avail=no
+		fi
+	fi
+
+	# check that the perl core module to ask for correct compilation flags is
+	# available
+	if "${perl_exe}" -e 'eval { require ExtUtils::Embed }; $@ ? exit(1) : exit(0)'
+	then
+		perl_ccflags=$(${perl_exe} -MExtUtils::Embed -e ccopts)
+		perl_ldflags=$(${perl_exe} -MExtUtils::Embed -e ldopts)
+	else
+		echo "*** perl core module ExtUtils::Embed is not available"
+		perl_avail=no
+	fi
+
+	if [ "${perl_avail}" = yes -a "${BUILD_SYS}" = DARWIN ]
+	then
+		# On OSX, the ExtUtils::Embed options contain options
+		# to generate triple-fat binaries, which fails when
+		# we attempt to bring in our thin binaries.
+
+		# To avoid this problem, remove all of the -arch XXX
+		# arguments, so that the compiler produces the default,
+		# which will be compatible with the other objects we compile.
+		perl_ccflags=`echo ${perl_ccflags} | sed 's/-arch [^ ]* *//g'`
+		perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
+	fi
+
+	if [ "${perl_avail}" = yes ]
+	then
+		# Remove -lperl, as it is not needed for swig, and it causes trouble if libperl is not compiled with -fPIC, as in conda.
+		perl_ldflags=`echo ${perl_ldflags} | sed 's/-lperl//g'`
+
+		if [ "${CONDA_BUILD}" = 1 ]
+		then
+			perl_install_dir="site_perl"
+			perl_ccflags="${perl_ccflags} -I${BUILD_PREFIX}/${BUILD}/sysroot/usr/include"
+		else
+			perl_install_dir="perl5/site_perl"
+		fi
+
+		swig_bindings="$swig_bindings perl"
+	fi
+fi
+
+report_detection perl "${perl_avail}" "${config_perl_path}" "${perl_path}"
+
+
+### This section does not configure python, only determines which version to
+### use (2 or 3) when not specified.
+if [ $config_python_path != no ]
+then
+	python_path=${python_path:-${base_root}}
+	python_exe=""
+
+	if [ "${config_python_path}" = auto ] && search_file_executable python3 python python2 > /dev/null 2>&1
+	then
+		python_exe=${executable_search_result}
+	elif search_file_executable ${python_path} ${python_path}/python3 ${python_path}/python ${python_path}/python2 > /dev/null 2>&1
+	then
+		python_exe=${executable_search_result}
+	fi
+
+	if [ -n "${python_exe}" ]
+	then
+		python_major_version=$(${python_exe} -c 'import sys; print(sys.version_info[0])' 2> /dev/null)
+
+		# only set python*_path if not already explicitely set
+		if [ "${config_python2_path}" != yes -a "${config_python3_path}" = auto -a "${python_major_version}" = 3 ]
+		then
+			python3_path=${python_path}
+			config_python2_path=no
+		elif [ "${config_python2_path}" = auto -a "${config_python3_path}" != yes -a "${python_major_version}" = 2 ]
+		then
+			python2_path=${python_path}
+			config_python3_path=no
+		fi
+	fi
+fi
+
+### configure python2
+python2_avail=no
+python2_exe=""
+python2_version=""
+if [ $config_python2_path != no ]
+then
+	python2_avail=yes
+	python2_path=${python_path:-${base_root}}
+
+	if [ "${swig_avail}" = no ]
+	then
+		echo "*** swig is needed for python2 support"
+		python2_avail=no
+	elif [ $(format_version ${swig_version}) -lt $(format_version 1.3.29) ]
+	then
+		echo "*** swig version ${swig_version} is older than 1.3.29, disabling python2 support"
+		python2_avail=no
+	elif [ "${config_python2_path}" = auto ] && search_file_executable python python2
+	then
+		python2_exe=${executable_search_result}
+	elif search_file_executable ${python2_path} ${python2_path}/bin/python ${python2_path}/bin/python2 ${python2_path}/python ${python2_path}/python2
+	then
+		python2_exe=${executable_search_result}
+	else
+		python2_avail=no
+	fi
+
+	if [ "${python2_avail}" = yes ]
+	then
+		python2_version=$(${python2_exe} -c 'import sys; print("%d.%d" % (sys.version_info[0],sys.version_info[1]))' 2> /dev/null)
+
+		if [ -z "${python2_version}" ]
+		then
+			echo "*** could not find version of python from ${python2_exe}"
+			python2_avail=no
+		elif [ $(format_version ${python2_version}) -lt $(format_version 2.4) ]
+		then
+			echo "*** python ${python2_version} is too old"
+			python2_avail=no
+		elif [ $(format_version ${python2_version}) -ge $(format_version 3.0) ]
+		then
+			echo "*** ${python2_exe} version ${python2_version} is not a python2"
+			python2_avail=no
+		fi
+	fi
+
+	if [ "${python2_avail}" = yes ]
+	then
+		python2_ccflags=$(${python2_exe} -c "import sysconfig as s; print('-I{} {}'.format(s.get_config_var('CONFINCLUDEPY'), s.get_config_var('CPPFLAGS')))")
+		python2_ldflags=$(${python2_exe} -c "import sysconfig as s; print(s.get_config_var('LDFLAGS'))")
+
+		if [ $BUILD_SYS = DARWIN ]
+		then
+			if [ "${CONDA_BUILD}" = 1 ]
+			then
+				python2_ldflags="-undefined dynamic_lookup"
+			else
+				python2_ldflags="$python2_ldflags -undefined dynamic_lookup"
+			fi
+		fi
+
+		if ! check_function Py_MATH_PI Python.h ${python2_ccflags} ${python2_ldflags}
+		then
+			echo "*** could not find python2 development files"
+			python2_avail=no
+		fi
+	fi
+
+	if [ "${python2_avail}" = yes ]
+	then
+		# to change to python2
+		swig_bindings="$swig_bindings python2"
+	fi
+fi
+
+report_detection python2 "${python2_avail}" "${config_python2_path}" "${python2_path}"
+
+
+### configure python3
+python3_avail=no
+python3_exe=""
+python3_version=""
+if [ $config_python3_path != no ]
+then
+	python3_avail=yes
+	python3_path=${python_path:-${base_root}}
+
+	if [ "${swig_avail}" = no ]
+	then
+		echo "*** swig is needed for python3 support"
+		python3_avail=no
+	elif [ $(format_version ${swig_version}) -lt $(format_version 2.0.4) ]
+	then
+		echo "*** swig version ${swig_version} is older than 2.0.4, disabling python3 support"
+		python3_avail=no
+	elif [ "${config_python3_path}" = auto ] && search_file_executable python3 python
+	then
+		python3_exe=${executable_search_result}
+	elif search_file_executable ${python3_path} ${python3_path}/bin/python3 ${python3_path}/bin/python ${python3_path}/python3 ${python3_path}/python
+	then
+		python3_exe=${executable_search_result}
+	else
+		python3_avail=no
+	fi
+
+	if [ "${python3_avail}" = yes ]
+	then
+		python3_version=$(${python3_exe} -c 'import sys; print("{}.{}".format(sys.version_info[0],sys.version_info[1]))' 2> /dev/null)
+
+		if [ -z "${python3_version}" ]
+		then
+			echo "*** could not find version of python from ${python3_exe}"
+			python3_avail=no
+		elif [ $(format_version ${python3_version}) -lt $(format_version 3.0) ]
+		then
+			echo "*** ${python3_exe} version ${python3_version} is not a python3"
+			python3_avail=no
+		fi
+	fi
+
+	if [ "${python3_avail}" = yes ]
+	then
+		python3_ccflags=$(${python3_exe} -c "import sysconfig as s; print('-I{} {}'.format(s.get_config_var('CONFINCLUDEPY'), s.get_config_var('CPPFLAGS')))")
+		python3_ldflags=$(${python3_exe} -c "import sysconfig as s; print(s.get_config_var('LDFLAGS'))")
+
+		if [ $BUILD_SYS = DARWIN ]
+		then
+			if [ "${CONDA_BUILD}" = 1 ]
+			then
+				python3_ldflags="-undefined dynamic_lookup"
+			else
+				python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
+			fi
+		fi
+
+		if ! check_function Py_MATH_PI Python.h ${python3_ccflags} ${python3_ldflags}
+		then
+			echo "*** could not find python3 development files"
+			python3_avail=no
+		fi
+	fi
+
+	if [ "${python3_avail}" = yes ]
+	then
+		swig_bindings="$swig_bindings python3"
+	fi
+fi
+
+report_detection python3 "${python3_avail}" "${config_python3_path}" "${python3_path}"
+
+# python_test_exec is the python executable to use in make test
+# preference is given to python3
+python_test_exec=""
+python_test_dir=""
+if [ "${python3_avail}" = yes ]
+then
+	python_test_exec=${python3_exe}
+	python_test_dir=python3
+elif [ "${python2_avail}"  = yes ]
+then
+	python_test_exec=${python2_exe}
+	python_test_dir=python2
+fi
+
+golang_avail=no
+golang_exe=""
+if [ $config_golang_path != no ]
+then
+	golang_avail=yes
+	golang_path=${golang_path:-${base_root}}
+
+	if [ "${swig_avail}" = no ]
+	then
+		echo "*** swig is needed for golang support"
+		golang_avail=no
+	elif [ $(format_version ${swig_version}) -lt $(format_version 4.0) ]
+	then
+		echo "*** swig version ${swig_version} is older than 4.0, disabling golang support"
+		golang_avail=no
+	elif [ "${config_golang_path}" = auto ] && search_file_executable go
+	then
+		golang_exe=${executable_search_result}
+	elif search_file_executable ${golang_path} ${golang_path}/bin/go ${golang_path}/go
+	then
+		golang_exe=${executable_search_result}
+	else
+		golang_avail=no
+	fi
+fi
+
+report_detection golang "${golang_avail}" "${config_golang_path}" "${golang_path}"
+
+
+
+library_search_standard()
+{
+	if library_search "$@"
+	then
+		external_libraries="${external_libraries} ${library_search_result}"
+	fi
+}
+
+
+openssl_avail=no
+if [ $config_openssl_path != no ]
+then
+	openssl_avail=yes
+	openssl_path=${openssl_path:-${base_root}}
+
+	if ! library_search ssl $openssl_path
+	then
+		echo "*** Couldn't find libssl"
+		openssl_avail=no
+	fi
+
+	if ! library_search crypto $openssl_path
+	then
+		echo "*** Couldn't find libcrypto"
+		openssl_avail=no
+	fi
+
+	if ! optional_function TLS_method openssl/ssl.h HAS_TLS_method HAS_OPENSSL
+	then
+		if ! optional_function SSLv23_method openssl/ssl.h HAS_SSLv23_method HAS_OPENSSL
+		then
+			openssl_avail=no
+		fi
+	fi
+
+	if [ "${openssl_avail}" = yes ]
+	then
+		openssl_ccflags="-I${openssl_path}/include"
+		openssl_ldflags="-L${openssl_path}/lib -lssl -lcrypto"
+	fi
+fi
+
+report_detection openssl "${openssl_avail}" "${config_openssl_path}" "${openssl_path}"
+
+
+#check for static openssl for cctools binaries (but parrot) in conda environments
+openssl_static_avail=no
+if [ "$openssl_avail" = yes ] && [ "$config_static_openssl" = yes ]
+then
+	openssl_static_avail=yes
+	if ! check_file "${openssl_path}"/lib/libssl.a
+	then
+		openssl_static_avail=no
+	fi
+
+	if ! check_file "${openssl_path}"/lib/libcrypto.a
+	then
+		openssl_static_avail=no
+	fi
+
+	if [ "$openssl_static_avail" = yes ]
+	then
+		openssl_static_ldflags="${openssl_path}/lib/libssl.a ${openssl_path}/lib/libcrypto.a"
+	fi
+
+	report_detection openssl_static "${openssl_static_avail}" auto "${CONDA_PREFIX}"
+fi
+
+
+# from glibc:
+library_search_standard resolv ${base_root}
+library_search_standard socket ${base_root}
+library_search_standard nsl ${base_root}
+
+
+# Finally, add in standard system libraries found everywhere
+
+if [ $BUILD_SYS != DARWIN ]
+then
+	external_libraries="${external_libraries} -lrt"
+fi
+
+external_libraries="${external_libraries} -ldl"
+
+zlib_path=${zlib_path:-${base_root}}
+if library_search z ${zlib_path}
+then
+	external_libraries="${external_libraries} ${library_search_result}"
+	if [ "$zlib_path" != "${base_root}" ]
+	then
+		ccflags="${ccflags} -I${zlib_path}/include"
+		ldflags="${ldflags} -L${zlib_path}/lib"
+	fi
+else
+	# zlib is a hard requirement, thus we immediately exit if we can't find it.
+	echo "*** Sorry, I couldn't find zlib in $zlib_path"
+	echo "*** Check --with-zlib-path and try again."
+	exit 1
+fi
+
+
+if [ "$optstatic" = 1 ]
+then
+	static_libraries="../../dttools/src/libdttools.a ${zlib_path}/lib/libz.a"
+else
+	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lc -lm"
+fi
+
+if [ $BUILD_SYS = DARWIN ]
+then
+	cctools_dynamic_suffix=dylib
+	cctools_dynamic_flag=-dynamiclib
+else
+	cctools_dynamic_suffix=so
+	cctools_dynamic_flag=-shared
+fi
+
+optional_function ppoll       poll.h     HAS_PPOLL
+
+# sqlite3 uses define "HAVE_*"
+optional_function gmtime_r    time.h     HAVE_GMTIME_R
+optional_function fdatasync   unistd.h   HAVE_FDATASYNC
+optional_function isnan       math.h     HAS_ISNAN HAVE_ISNAN SQLITE_HAVE_ISNAN
+optional_function localtime_r time.h     HAVE_LOCALTIME_R
+optional_function localtime_s time.h     HAVE_LOCALTIME_S
+optional_function openat      fcntl.h    HAS_OPENAT
+optional_function pread       unistd.h   HAS_PREAD USE_PREAD
+optional_function pread64     unistd.h   USE_PREAD64
+optional_function pwrite      unistd.h   HAS_PWRITE USE_PWRITE
+optional_function pwrite64    unistd.h   USE_PWRITE64
+optional_function strchrnul   string.h   HAVE_STRCHRNUL
+optional_function strsignal   string.h   HAS_STRSIGNAL
+optional_function usleep      unistd.h   HAS_USLEEP HAVE_USLEEP
+optional_function utime       utime.h    HAS_UTIME HAVE_UTIME
+optional_function utimensat   sys/stat.h HAS_UTIMENSAT
+
+# sqlite3 uses define "HAVE_*"
+
+if [ "$include_package_chirp" = chirp ]
+then
+	optional_include attr/xattr.h HAS_ATTR_XATTR_H
+	optional_include sys/xattr.h  HAS_SYS_XATTR_H
+fi
+
+optional_include ifaddrs.h     HAS_IFADDRS
+optional_include inttypes.h    HAS_INTTYPES_H HAVE_INTTYPES_H
+optional_include stdint.h      HAS_STDINT_H HAVE_STDINT_H
+optional_include sys/statfs.h  HAS_SYS_STATFS_H
+optional_include sys/statvfs.h HAS_SYS_STATVFS_H
+optional_include sys/vfs.h     HAS_SYS_VFS_H
+
+cctools_doctargets=
+if check_path doxygen
+then
+	cctools_doctargets="apipages ${cctools_doctargets}"
+else
+	echo "*** not building API documentation"
+fi
+
+if check_path m4
+then
+	cctools_doctargets="htmlpages mdpages ${cctools_doctargets}"
+	if check_path nroff
+	then
+		cctools_doctargets="manpages ${cctools_doctargets}"
+	else
+		echo "*** not building man pages"
+	fi
+else
+	echo "*** not building html or man pages"
+fi
+
+# Check which packages we can build, according to the results above
+echo "checking for package compatibility..."
+
+if [ "${include_package_chirp}" = chirp ]
+then
+		internal_ccflags="${internal_ccflags} -DCCTOOLS_WITH_CHIRP"
+fi
+
+if [ "$include_package_parrot" = parrot ]
+then
+	if [ -d parrot -a $BUILD_SYS = LINUX ]
+	then
+		if [ $BUILD_CPU = I386 -o $BUILD_CPU = X86_64 ]
+		then
+			:
+		else
+			echo "parrot is NOT supported on ${BUILD_SYS} ${BUILD_CPU}"
+			include_package_parrot=""
+		fi
+	else
+		echo "parrot is NOT supported on ${BUILD_SYS} for any cpu type"
+		include_package_parrot=""
+	fi
+fi
+
+if [ "$include_package_resource_monitor" = resource_monitor ]
+then
+	if [ -d resource_monitor -a $BUILD_SYS = LINUX ]
+	then
+		echo "resource_monitor IS supported on ${BUILD_SYS}"
+		include_package_resource_monitor="resource_monitor"
+	else
+		echo "resource_monitor is NOT supported on ${BUILD_SYS}"
+		include_package_resource_monitor=""
+	fi
+fi
+
+if [ "${include_package_ftplite}" = ftp_lite ]
+then
+	if [ "$optstatic" = 1 ]
+	then
+		echo "ftplite cannot currently be build statically".
+		include_package_ftplite=""
+	fi
+fi
+
+if [ "${include_package_parrot}" = parrot ]
+then
+	if [ "$optstatic" = 1 ]
+	then
+		echo "parrot cannot currently be build statically".
+		include_package_parrot=""
+	fi
+fi
+
+if [ "${include_package_grow}" = grow ]
+then
+	if [ "$optstatic" = 1 ]
+	then
+		echo "grow cannot currently be build statically".
+		include_package_grow=""
+	fi
+
+	if [ "$fuse_avail" != yes ]; then
+		echo "grow_fuse requires FUSE"
+	fi
+fi
+
+potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_dataswarm} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_tlq} ${include_package_doc} poncho"
+
+echo "checking for all the things I know how to build..."
+for p in $potential_packages
+do
+	if [ -d $p ]
+	then
+		echo "package $p found"
+		packages="${packages} $p"
+		if [ -d `pwd`/$p/src ]
+		then
+			internal_ccflags="${internal_ccflags} -I $(pwd)/$p/src"
+		fi
+	else
+		echo "package $p not found (that's ok)"
+	fi
+done
+
+ccflags_append_define \
+	"BUILD_DATE='\"$BUILD_DATE\"'" \
+	"BUILD_HOST='\"$BUILD_HOST\"'" \
+	"BUILD_USER='\"$BUILD_USER\"'" \
+	"CCTOOLS_COMMIT='\"$COMMIT\"'" \
+	"CCTOOLS_CONFIGURE_ARGUMENTS='\"$configure_arguments\"'" \
+	"CCTOOLS_CPU_${BUILD_CPU}" \
+	"CCTOOLS_CVMFS_BUILD_FLAGS='\"${cvmfs_ldflags} ${cvmfs_ccflags}\"'" \
+	"CCTOOLS_OPSYS_${BUILD_SYS}" \
+	"CCTOOLS_RELEASE_DATE='\"$DATE\"'" \
+	"CCTOOLS_SOURCE='\"$SOURCE\"'" \
+	"CCTOOLS_SYSTEM_INFORMATION='\"$system_information\"'" \
+	"CCTOOLS_VERSION='\"$VERSION\"'" \
+	"CCTOOLS_VERSION_MAJOR=$MAJOR" \
+	"CCTOOLS_VERSION_MICRO=$MICRO" \
+	"CCTOOLS_VERSION_MINOR=$MINOR" \
+	"INSTALL_PATH='\"${install_path}\"'" \
+	"_GNU_SOURCE" \
+	"_REENTRANT"
+
+debug_flags="-g"
+ccflags_append "$debug_flags"
+ldflags="${ldflags} ${debug_flags}"
+
+if [ X$include_package_parrot = "Xparrot" ]
+then
+
+	cat <<EOF > libparrot.test.c
+int main() { return 0; }
+EOF
+	echon "testing creation of 64-bit libparrot_helper.so..."
+	$ccompiler $internal_ccflags -m64 libparrot.test.c -o libparrot.test > /dev/null 2>&1
+	if [ $? = 0 ]
+	then
+		build_lib64parrot_helper="yes"
+	else
+		build_lib64parrot_helper="no"
+	fi
+	echo $build_lib64parrot_helper
+
+	echon "testing creation of 32-bit libparrot_helper.so..."
+	$ccompiler $internal_ccflags -m32 libparrot.test.c -o libparrot.test > /dev/null 2>&1
+	if [ $? = 0 ]
+	then
+		build_lib32parrot_helper="yes"
+	else
+		build_lib32parrot_helper="no"
+	fi
+	echo $build_lib32parrot_helper
+
+	rm -f libparrot.test.c libparrot.test
+fi
+
+echo "Creating config.mk..."
+
+if [ "$optdebug" = 1 ]; then
+	CCTOOLS_CC="${ccompiler}"
+	CCTOOLS_CXX="${cxxcompiler}"
+	CCTOOLS_LD="${linker}"
+else
+	CCTOOLS_CC='@echo COMPILE $@;'"${ccompiler}"
+	CCTOOLS_CXX='@echo COMPILE $@;'"${cxxcompiler}"
+	CCTOOLS_LD='@echo LINK $@;'"${linker}"
+fi
+
+swig_workqueue_bindings=""
+swig_chirp_bindings=""
+swig_rmonitor_bindings=""
+if [ "$swig_avail" = yes ]
+then
+	for binding in $swig_bindings
+	do
+		if [ -d work_queue/src/bindings/${binding} ]
+		then
+			swig_workqueue_bindings="$binding $swig_workqueue_bindings"
+		fi
+
+		if [ -d chirp/src/bindings/${binding} ]
+		then
+			swig_chirp_bindings="$binding $swig_chirp_bindings"
+		fi
+
+		if [ -d resource_monitor/src/bindings/${binding} ]
+		then
+			swig_rmonitor_bindings="$binding $swig_rmonitor_bindings"
+		fi
+	done
+fi
+
+source_path=$(pwd)
+
+openssl_default_ldflags_var=CCTOOLS_OPENSSL_STATIC_LDFLAGS
+if [ "${openssl_avail}" = yes ] && [ "${openssl_static_avail}" = no ]
+then
+	openssl_default_ldflags_var=CCTOOLS_OPENSSL_LDFLAGS
+
+	if [ -n "${CONDA_PREFIX}" ]
+	then
+		echo "*** building inside a conda environment without linking static openssl."
+		echo "*** probably this is not what you want. binaries may not work outside the environment"
+	fi
+fi
+
+cat <<EOF >>config.mk
+# Generated at `date` by $USER@`uname -n`
+
+CCTOOLS_HOME=${source_path}
+CCTOOLS_INSTALL_DIR=${install_path}
+
+CCTOOLS_PACKAGES=${packages}
+
+CCTOOLS_CC=${CCTOOLS_CC}
+
+CCTOOLS_BASE_CCFLAGS=${ccflags}
+
+CCTOOLS_INTERNAL_CCFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CCFLAGS} ${c_only_flags}
+
+CCTOOLS_CCFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CCFLAGS} ${c_only_flags}
+
+CCTOOLS_CXX=${CCTOOLS_CXX}
+
+CCTOOLS_BASE_CXXFLAGS=\${CCTOOLS_BASE_CCFLAGS}
+
+CCTOOLS_INTERNAL_CXXFLAGS=${internal_ccflags} \${CCTOOLS_BASE_CCFLAGS}
+
+CCTOOLS_CXXFLAGS=-I\${CCTOOLS_INSTALL_DIR}/include/cctools \${CCTOOLS_BASE_CCFLAGS}
+
+CCTOOLS_LD = ${CCTOOLS_LD}
+
+CCTOOLS_BASE_LDFLAGS = ${ldflags}
+
+CCTOOLS_INTERNAL_LDFLAGS = \$(CCTOOLS_BASE_LDFLAGS) ${internal_ldflags}
+
+CCTOOLS_EXTERNAL_LINKAGE = \$(${openssl_default_ldflags_var}) ${external_libraries}
+CCTOOLS_EXTERNAL_LINKAGE_NO_OPENSSL = ${external_libraries}
+
+CCTOOLS_STATIC_LINKAGE = ${static_libraries}
+
+CCTOOLS_LDFLAGS = -L\$(CCTOOLS_INSTALL_DIR)/lib \$(CCTOOLS_BASE_LDFLAGS)
+
+CCTOOLS_STATIC=${optstatic}
+
+CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
+CCTOOLS_DYNAMIC_FLAG=${cctools_dynamic_flag}
+
+CC=${ccompiler}
+CCFLAGS=\$(CCTOOLS_CCFLAGS)
+LD=${linker}
+LDFLAGS=\$(CCTOOLS_LDFLAGS)
+CXX=${cxxcompiler}
+CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
+
+CCTOOLS_AR=ar
+
+CCTOOLS_CHIRP=${include_package_chirp}
+
+CCTOOLS_READLINE_AVAILABLE=${readline_avail}
+CCTOOLS_READLINE_LDFLAGS=${readline_ldflags}
+
+CCTOOLS_SWIG_AVAILABLE=${swig_avail}
+CCTOOLS_SWIG=${swig_exe}
+CCTOOLS_SWIG_WORKQUEUE_BINDINGS=${swig_workqueue_bindings}
+CCTOOLS_SWIG_CHIRP_BINDINGS=${swig_chirp_bindings}
+CCTOOLS_SWIG_RMONITOR_BINDINGS=${swig_rmonitor_bindings}
+
+CCTOOLS_PERL_AVAILABLE=${perl_avail}
+CCTOOLS_PERL=${perl_exe}
+CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
+CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
+CCTOOLS_PERL_VERSION=${perl_version}
+CCTOOLS_PERL_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/${perl_install_dir}/\$(CCTOOLS_PERL_VERSION)
+
+CCTOOLS_PYTHON_TEST_EXEC=${python_test_exec}
+CCTOOLS_PYTHON_TEST_DIR=${python_test_dir}
+
+CCTOOLS_PYTHON2_AVAILABLE=${python2_avail}
+CCTOOLS_PYTHON2=${python2_exe}
+CCTOOLS_PYTHON2_CCFLAGS=${python2_ccflags}
+CCTOOLS_PYTHON2_LDFLAGS=${python2_ldflags}
+CCTOOLS_PYTHON2_VERSION=${python2_version}
+CCTOOLS_PYTHON2_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON2_VERSION)/site-packages
+
+CCTOOLS_PYTHON3_AVAILABLE=${python3_avail}
+CCTOOLS_PYTHON3=${python3_exe}
+CCTOOLS_PYTHON3_CCFLAGS=-DNDEBUG ${python3_ccflags}
+CCTOOLS_PYTHON3_LDFLAGS=${python3_ldflags}
+CCTOOLS_PYTHON3_VERSION=${python3_version}
+CCTOOLS_PYTHON3_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON3_VERSION)/site-packages
+
+CCTOOLS_PYDOC=$(which pydoc 2> /dev/null || which pydoc2 2> /dev/null || which pydoc3 > /dev/null)
+
+CCTOOLS_SGE_PARAMETERS=$(echo ${sge_parameters} | sed -e 's/\$/\\\$\$/g')
+
+CCTOOLS_DOCTARGETS=${cctools_doctargets}
+
+CCTOOLS_M4_ARGS=-DCCTOOLS_VERSION="${VERSION}" -DCCTOOLS_RELEASE_DATE="${RELEASE_DATE}"
+
+CCTOOLS_BUILD_LIB64PARROT_HELPER=${build_lib64parrot_helper}
+CCTOOLS_BUILD_LIB32PARROT_HELPER=${build_lib32parrot_helper}
+
+CCTOOLS_VERSION=${VERSION}
+CCTOOLS_RELEASEDATE=${RELEASE_DATE}
+
+CCTOOLS_IRODS_AVAILABLE=${irods_avail}
+CCTOOLS_IRODS_LDFLAGS=${irods_ldflags}
+CCTOOLS_IRODS_CCFLAGS=${irods_ccflags}
+
+CCTOOLS_MYSQL_AVAILABLE=${mysql_avail}
+CCTOOLS_MYSQL_LDFLAGS=${mysql_ldflags}
+CCTOOLS_MYSQL_CCFLAGS=${mysql_ccflags}
+
+CCTOOLS_XROOTD_AVAILABLE=${xrootd_avail}
+CCTOOLS_XROOTD_LDFLAGS=${xrootd_ldflags}
+CCTOOLS_XROOTD_CCFLAGS=${xrootd_ccflags}
+
+CCTOOLS_CVMFS_AVAILABLE=${cvmfs_avail}
+CCTOOLS_CVMFS_LDFLAGS=${cvmfs_ldflags}
+CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
+
+CCTOOLS_OPENSSL_AVAILABLE=${openssl_avail}
+CCTOOLS_OPENSSL_LDFLAGS=${openssl_ldflags}
+CCTOOLS_OPENSSL_CCFLAGS=${openssl_ccflags}
+
+CCTOOLS_OPENSSL_STATIC_AVAILABLE=${openssl_static_avail}
+CCTOOLS_OPENSSL_STATIC_LDFLAGS=${openssl_static_ldflags}
+CCTOOLS_OPENSSL_STATIC_CCFLAGS=${openssl_ccflags}
+
+CCTOOLS_EXT2FS_AVAILABLE=${ext2fs_avail}
+CCTOOLS_EXT2FS_LDFLAGS=${ext2fs_ldflags}
+CCTOOLS_EXT2FS_CCFLAGS=${ext2fs_ccflags}
+
+CCTOOLS_FUSE_AVAILABLE=${fuse_avail}
+CCTOOLS_FUSE_LDFLAGS=${fuse_ldflags}
+CCTOOLS_FUSE_CCFLAGS=${fuse_ccflags}
+
+CCTOOLS_MPI_AVAILABLE=${mpi_avail}
+CCTOOLS_MPI_LDFLAGS=${mpi_ldflags}
+CCTOOLS_MPI_CCFLAGS=${mpi_ccflags}
+
+CCTOOLS_CURL_AVAILABLE=${curl_avail}
+CCTOOLS_CURL_LDFLAGS=${curl_ldflags}
+CCTOOLS_CURL_CCFLAGS=${curl_ccflags}
+
+CCTOOLS_GLOBUS_AVAILABLE=${globus_avail}
+CCTOOLS_GLOBUS_LDFLAGS=${globus_ldflags}
+CCTOOLS_GLOBUS_CCFLAGS=${globus_ccflags}
+
+export CCTOOLS_TEST_CCFLAGS=${test_ccflags}
+EOF
+
+echo""
+echo "Optional external systems configured:"
+echo""
+
+echo "General libraries"
+printf "%-15s %3s\n" curl ${curl_avail}
+printf "%-15s %3s\n" ext2fs ${ext2fs_avail}
+printf "%-15s %3s\n" fuse ${fuse_avail}
+printf "%-15s %3s\n" "makeflow mpi" ${mpi_avail}
+printf "%-15s %3s\n" openssl ${openssl_avail}
+printf "%-15s %3s\n" readline ${readline_avail}
+
+echo ""
+echo "Language support:"
+printf "%-15s %3s\n" swig ${swig_avail}
+printf "%-15s %3s\n" golang ${golang_avail}
+printf "%-15s %3s\n" perl ${perl_avail}
+printf "%-15s %3s\n" python2 ${python2_avail}
+printf "%-15s %3s\n" python3 ${python3_avail}
+
+echo ""
+echo "External support configured for parrot:"
+printf "%-15s %3s\n" cvmfs ${cvmfs_avail}
+printf "%-15s %3s\n" globus ${globus_avail}
+printf "%-15s %3s\n" irods ${irods_avail}
+printf "%-15s %3s\n" mysql ${mysql_avail}
+printf "%-15s %3s\n" xrootd ${xrootd_avail}
+
+echo ""
+echo "To re-configure, type './configure.rerun'"
+echo "To build, type '${MAKE}'"
+echo "To build and install, type '${MAKE} install'"
+echo ""
+
+exit 0
+
+
+# vim: set noexpandtab tabstop=4:

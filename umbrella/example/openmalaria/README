@@ -1,0 +1,37 @@
+#openmalaria execution engine test command.
+umbrella \
+--spec openmalaria_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/ctsout.txt=/tmp/umbrella_test/docker_openmalaria/ctsout.txt, /tmp/output.txt=/tmp/umbrella_test/docker_openmalaria/output.txt" \
+--sandbox_mode docker \
+--log umbrella.log \
+run
+
+#ec2
+umbrella \
+--spec openmalaria_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/ctsout.txt=/tmp/umbrella_test/ec2_openmalaria/ctsout.txt, /tmp/output.txt=/tmp/umbrella_test/ec2_openmalaria/output.txt" \
+--sandbox_mode ec2 \
+--ec2_sshkey ~/bin/feb272015.pem \
+--ec2_key feb272015 \
+--ec2_instance_type m3.medium \
+--ec2_log umbrella.log.ec2 \
+--log umbrella.log \
+run
+
+umbrella \
+--spec openmalaria.umbrella \
+--meta file:///afs/crc.nd.edu/user/h/hmeng/git-development/cctools/umbrella/example/openmalaria/meta.json \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/ctsout.txt=/tmp/umbrella_test/docker_openmalaria/ctsout.txt, /tmp/output.txt=/tmp/umbrella_test/docker_openmalaria/output.txt" \
+--sandbox_mode docker \
+--log umbrella.log \
+run
+
+
+#split a self-contained spec into spec and meta:
+umbrella \
+	--spec openmalaria_S.umbrella \
+	--log umbrella.log \
+	split openmalaria.umbrella meta.json 

@@ -1,0 +1,701 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2016- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details. 
+
+# This script defined the MesosScheduler and MakeflowMonitor class.
+#  
+# Three threads are started when batch_job_mesos.c first try to submit tasks 
+# to Mesos. They are,
+# 
+# 1. A simple httpserver, which is responsible for handle file transfer request from  
+# 	 Mesos master.
+# 2. A workflow state monitor(i.e. MakefowMonitor), which will monitor the two files
+#    (i.e. mesos_task_info and mesos_task_state) and synchronize the workflow states
+#    of Makeflow and Mesos. 
+# 3. A Makeflow Mesos Scheduler, which submits ready tasks to Mesos master, resubmits 
+#    failed tasks and write complete tasks' states to mesos_task_state.
+#  
+# In current version, each time when scheduler submit a new task to master a new 
+# executor will be created and binded to the task. The scheduler will be terminated 
+# when the mesos_done_file is created.
+
+import os
+import sys
+import uuid
+import time
+import urllib
+import urllib2
+import tarfile
+import logging
+import threading
+import json
+import imp
+import re
+import SimpleHTTPServer
+import SocketServer
+import socket
+from Queue import Queue
+
+setting_module_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "mf_mesos_setting")
+mms = imp.load_source("mf_mesos_setting", setting_module_path)
+
+# sys.path.insert(0,sys.argv[3])
+
+from mesos.interface import Scheduler
+from mesos.native import MesosSchedulerDriver
+from mesos.interface import mesos_pb2
+
+logger = logging.getLogger('mesos_scheduler')
+logger.setLevel(logging.INFO)
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)03d %(name)s %(levelname)s %(message)s',datefmt='%Y/%m/%d %H:%M:%S')
+console.setFormatter(formatter)
+logger.addHandler(console)
+
+FILE_TASK_INFO = "mesos_task_info"
+FILE_TASK_STATE = "mesos_task_state"
+SLAVE_STDERR = "mesos_slave_stderr"
+MESOS_DONE_FILE = "mesos_done"
+
+MAX_FAILED = 10
+MAX_LOST = 10
+   
+class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
+    '''
+    use a thread pool instead of a new thread on every request
+    we also cache the requests
+    '''
+    queue_size = 128
+    numThreads = 30
+    allow_reuse_address = True 
+
+    def serve_forever(self):
+        '''
+        Handle one request at a time until doomsday.
+        '''
+        # set up the threadpool
+        self.requests = Queue(self.queue_size)
+
+        for x in range(self.numThreads):
+            t = threading.Thread(target = self.process_request_thread)
+            t.setDaemon(1)
+            t.start()
+
+        # server main loop
+        while True:
+            self.handle_request()
+            
+        self.server_close()
+
+    
+    def process_request_thread(self):
+        '''
+        obtain request from queue instead of directly from server socket
+        '''
+        while True:
+            SocketServer.ThreadingMixIn.process_request_thread(self, *self.requests.get())
+
+    
+    def handle_request(self):
+        '''
+        simply collect requests and put them on the queue for the workers.
+        '''
+        try:
+            request, client_address = self.get_request()
+        except socket.error:
+            return
+        if self.verify_request(request, client_address):
+            self.requests.put((request, client_address)) 
+
+def get_open_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("",0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+def start_httpserver(httpd, port):
+    logger.info("Serving a http server at {0} for directory {1}\n".format(port, os.getcwd()))
+    httpd.serve_forever()
+
+# Makeflow mesos scheduler
+class MakeflowScheduler(Scheduler):
+
+    def __init__(self, mf_wk_dir, master_addr, mf_hostname, http_port):
+        self.mf_wk_dir = mf_wk_dir
+        self.master_addr = master_addr
+        self.mf_hostname = mf_hostname
+        self.http_port = http_port
+        self.finished_tasks = 0
+        
+    # Print out the dynamic static information of mesos cluster
+    def print_mesos_info(self, task_id):
+        metrics_snapshot_url = "http://{0}/metrics/snapshot".format(self.master_addr)
+
+        master_metrics = json.load(urllib2.urlopen(metrics_snapshot_url))
+
+        cpu_offered = master_metrics['master/cpus_total'] 
+        cpu_used = master_metrics['master/cpus_used']
+        mem_offered = master_metrics['master/mem_total']
+        mem_used = master_metrics['master/mem_used']
+        disk_offered = master_metrics['master/disk_total']
+        disk_used = master_metrics['master/disk_used'] 
+        self.finished_tasks = 0
+        tasks_running = master_metrics['master/tasks_running']
+        tasks_staging = master_metrics['master/tasks_staging']
+        tasks_starting = master_metrics['master/tasks_starting']
+        tasks_finished = master_metrics['master/tasks_finished']
+
+        # treat running, staging and starting as running
+        num_running_tasks = tasks_running + tasks_staging + tasks_starting
+
+        logger.info("{0} cpu {1} used, {2} memory {3} used, {4} disk {5} used, {6} active tasks, {7} finished tasks".format(cpu_offered, cpu_used, mem_offered, mem_used, disk_offered, disk_used, num_running_tasks, self.finished_tasks))
+        logger.info("{0} tasks are running, {1} are staging, {2} are starting, {3} are finished".format(tasks_running, tasks_staging, tasks_starting, tasks_finished))
+
+    # Create a ExecutorInfo instance for mesos task
+    def new_mesos_executor(self, mf_task, framework_id, hostname, task_cpu, task_mem, task_disk):
+        executor = mesos_pb2.ExecutorInfo()
+        executor.framework_id.value = framework_id
+        executor.executor_id.value = str(uuid.uuid4())
+        cctools_bin_path = os.path.dirname(os.path.realpath(__file__))
+        ld_preload = os.getenv('LD_PRELOAD')
+        python_path = os.getenv('PYTHONPATH')
+        sh_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mf_mesos_executor')
+        task_cmd_sh = "task_{0}_cmd".format(mf_task.task_id)
+        task_cmd_f = open(task_cmd_sh, "w+")
+        task_cmd_f.write(mf_task.cmd)
+        task_cmd_f.close()
+        os.chmod(task_cmd_sh, 0755)
+
+        uri = executor.command.uris.add()
+        uri.value = "http://{0}:{1}/{2}".format(self.mf_hostname, self.http_port, task_cmd_sh)
+        uri.executable = True
+        uri.extract = False
+
+        executor.name = "{0} makeflow mesos executor".format(mf_task.task_id) 
+        executor.source = "python executor"
+        executor.command.value = "{0} \"./{1}\" {2} {3} {4}".format(sh_path, task_cmd_sh, 
+                executor.executor_id.value, executor.framework_id.value, hostname)
+        
+        # add $LD_PRELOAD as the env variables for executor command
+        if ld_preload:
+            logger.info("Add LD_PRELOAD env var with value: {0}".format(ld_preload))
+            ld_preload_env = executor.command.environment.variables.add()
+            ld_preload_env.name = "LD_PRELOAD"
+            ld_preload_env.value = ld_preload
+
+        # add $PYTHONPATH as the env variables for executor command
+        if python_path:
+            logger.info("Add PYTHONPATH env var with value: {0}".format(python_path))
+            python_path_env = executor.command.environment.variables.add()
+            python_path_env.name = "PYTHONPATH"
+            python_path_env.value = python_path
+
+        # add input files list to the executor_info
+        for fn in mf_task.inp_fns:
+
+            logger.info("input file is: {0}".format(fn.strip(' \t\n\r')))
+            uri = executor.command.uris.add()
+
+            # if input file is a directory, compress it
+            if os.path.isdir(fn):
+                logger.info("Input {0} of task {1} is a directory".format(fn, mf_task.task_id))
+                dir_name = os.path.dirname(fn)
+                base_fn = os.path.basename(fn)
+                compressed_fn = "{0}.tar.gz".format(base_fn)
+                if not os.path.exists(compressed_fn):
+                    logger.info("The compressed file for {0} is not exist".format(fn)) 
+                    tar = tarfile.open(compressed_fn, "w:gz")
+                    tar.add(base_fn)
+                    tar.close()
+                else:
+                    logger.info("The compressed file for {0} is exist".format(fn)) 
+                fn = "http://{0}:{1}/{2}".format(self.mf_hostname, self.http_port, compressed_fn)
+                uri.value = fn
+                uri.extract = True
+            else:
+                abs_path = fn.strip(' \t\n\r')
+                base_name = os.path.basename(abs_path)
+                uri.value = "http://{0}:{1}/{2}".format(self.mf_hostname, self.http_port, base_name)
+                uri.extract = False
+                uri.executable = True
+            uri.cache = True
+        return executor
+    
+    # Create a TaskInfo instance
+    def new_mesos_task(self, offer, task_id, task_cores, task_mem, task_disk):
+        mesos_task = mesos_pb2.TaskInfo()
+        mesos_task.task_id.value = task_id
+        mesos_task.slave_id.value = offer.slave_id.value
+        mesos_task.name = "task {0}".format(str(id))
+    
+        cpus = mesos_task.resources.add()
+        cpus.name = "cpus"
+        cpus.type = mesos_pb2.Value.SCALAR
+        cpus.scalar.value = task_cores
+    
+        mem = mesos_task.resources.add()
+        mem.name = "mem"
+        mem.type = mesos_pb2.Value.SCALAR
+        mem.scalar.value = task_mem
+   
+        disk = mesos_task.resources.add()
+        disk.name = "disk"
+        disk.type = mesos_pb2.Value.SCALAR
+        disk.scalar.value = task_disk 
+    
+        return mesos_task
+
+    def launch_mesos_task(self, driver, offer, task_id, cores, mem, disk): 
+
+        mesos_task = self.new_mesos_task(offer, task_id, cores, mem, disk)
+       
+        mf_mesos_task_info = mms.tasks_info_dict[task_id] 
+
+        # initialize a ExecutorInfo instance
+        executor = self.new_mesos_executor(\
+            mf_mesos_task_info, \
+            offer.framework_id.value, \
+            offer.hostname, \
+            cores, mem, disk)
+
+        mesos_task.executor.MergeFrom(executor)
+
+        # TODO for version0 one executor only run with one task, in the future
+        # we may wanna change the number of tasks running by one executor
+        mf_mesos_executor_info = \
+                mms.MfMesosExecutorInfo(\
+                executor.executor_id, \
+                offer.slave_id, offer.hostname)
+
+        mf_mesos_executor_info.tasks.append(task_id)
+
+        mms.executors_info_dict[executor.executor_id.value] = \
+                mf_mesos_executor_info
+
+        # combine mesos TaskInfo with ExecutorInfo
+        mf_mesos_task_info.executor_id = \
+                executor.executor_id.value
+
+        mms.tasks_info_dict[task_id] \
+                = mf_mesos_task_info 
+        
+        # create mesos task and launch it with offer 
+        logger.info("Launching task {0} using offer {1} from {2}.".format(\
+                        task_id, offer.id.value, offer.hostname))
+
+        # one task is corresponding to one executor
+        tasks = [mesos_task]
+
+        driver.launchTasks(offer.id, tasks)
+
+    def resourceOffers(self, driver, offers):
+        logger.info("Received resource offers: {0} from {1}".format(\
+                [o.id.value for o in offers], [o.hostname for o in offers]))
+      
+        num_ready_task = 0
+
+        with mms.lock:
+            for task_info in mms.tasks_info_dict.itervalues():
+                if (task_info.action == "submitted" or task_info.action == "resubmitted"):
+                    num_ready_task += 1
+
+        for offer in offers:
+            if num_ready_task == 0:
+                driver.declineOffer(offer.id)    
+            else:
+                offer_used = False
+                offer_cpus = 0
+                offer_mem = 0
+                offer_disk = 0
+
+                for resource in offer.resources:
+                    if resource.name == "cpus":
+                        offer_cpus += resource.scalar.value
+                    if resource.name == "mem":
+                        offer_mem += resource.scalar.value
+                    if resource.name == "disk":
+                        offer_disk += resource.scalar.value
+
+                logger.info("Received resource offer {0} with cpus {1}, mem: {2} and disk {3} from {4}\
+                    ".format(offer.id.value, offer_cpus, offer_mem, offer_disk, offer.hostname))
+                
+                
+                with mms.lock:
+                    for task_info in mms.tasks_info_dict.itervalues():
+
+                        if (task_info.action == "submitted" or task_info.action == "resubmitted") \
+                            and offer_cpus >= task_info.cores \
+                            and offer_mem >= task_info.mem \
+                            and offer_disk >= task_info.disk:
+                            
+                                task_id = task_info.task_id
+                                mms.tasks_info_dict[task_id].action = "running"
+                               
+                                if task_info.cores == -1 and task_info.mem == -1 and task_info.disk == -1:
+                                    task_info.cores = offer_cpus
+                                    task_info.mem = offer_mem
+                                    task_info.disk = offer_disk 
+                                    logger.info("User did not specify resource requirement, Task {0} will use all available resources".format(task_id))
+                                logger.info("Task {0} will use {1} cores {2} mem {3} disk".format(task_id, task_info.cores, task_info.mem, task_info.disk))
+                                
+                                self.launch_mesos_task(driver, offer, task_id, task_info.cores, task_info.mem, task_info.disk)
+                                offer_used = True
+                                num_ready_task -= 1
+                                break;
+
+                    if offer_used == False: 
+                        logger.info("Resource offer {0} with {1} cpu {2} mem {3} disk is unused.".format(offer.id, offer_cpus, offer_mem, offer_disk))
+                        driver.declineOffer(offer.id)
+
+    def clean_mesos_file(self, task_id): 
+        mf_task = mms.tasks_info_dict[task_id]
+        # TODO do not remove the file, if it is not exist
+        if os.path.isfile("task_{0}_cmd".format(task_id)):
+           os.remove("task_{0}_cmd".format(task_id))
+        #for fn in mf_task.inp_fns:
+        #    if os.path.isdir(fn):
+        #        logger.info("{0} is a directory, remove the tar.gz file".format(fn))
+        #        compressed_fn = "{0}.tar.gz".format(fn)
+        #        if os.path.isfile(compressed_fn):
+        #            os.remove(compressed_fn)
+        
+    def statusUpdate(self, driver, update):
+        if os.path.isfile(FILE_TASK_STATE): 
+            oup_fn = open(FILE_TASK_STATE, "a", 0)
+        else:
+            logger.error("{0} is not created in advanced".format(FILE_TASK_STATE))
+            exit(1)
+
+        with mms.lock:
+            if update.state == mesos_pb2.TASK_STAGING:
+                logger.info("{0} is staging".format(update.task_id.value))
+                self.print_mesos_info(update.task_id.value)
+
+            if update.state == mesos_pb2.TASK_STARTING:
+                logger.info("{0} is starting".format(update.task_id.value))
+                self.print_mesos_info(update.task_id.value)
+
+            if update.state == mesos_pb2.TASK_RUNNING:
+                logger.info("{0} is running".format(update.task_id.value))
+                self.print_mesos_info(update.task_id.value)
+
+            if update.state == mesos_pb2.TASK_FINISHED:
+                # get the resource usage snapshot
+                logger.info("{0} is finished by executor.".format(update.task_id.value))
+                self.print_mesos_info(update.task_id.value)
+
+                stderr_msg = update.data
+
+                if os.path.isfile(SLAVE_STDERR):
+                    with open (SLAVE_STDERR, "a") as stderr_fd:
+                        stderr_fd.write(stderr_msg)
+                else:
+                    with open (SLAVE_STDERR, "w") as stderr_fd:
+                        stderr_fd.write(stderr_msg)
+
+                message = update.message
+                logger.info("Receive message {0}".format(update.message))
+                message_list = message.split()
+
+                if message_list[0].strip(' \t\n\r') == "[EXECUTOR_OUTPUT]":
+
+                    if os.path.isfile(FILE_TASK_STATE): 
+                        oup_fn = open(FILE_TASK_STATE, "a", 0)
+                    else:
+                        logger.error("{0} is not created in advanced".format(FILE_TASK_STATE))
+                        exit(1)
+
+                    output_file_dir = message_list[1].strip(' \t\n\r')
+                    curr_task_id = message_list[3].strip(' \t\n\r')
+
+                    output_fns = mms.tasks_info_dict[curr_task_id].oup_fns
+
+                    for output_fn in output_fns:
+                        output_file_addr = "{0}/{1}".format(output_file_dir, output_fn)
+                        logger.info("The output file address is: {0}".format(\
+                                output_file_addr))
+                        urlretrieve_start = time.time()
+                        urllib.urlretrieve(output_file_addr, output_fn)
+                        urlretrieve_end = time.time()
+
+                        if os.path.exists(output_fn):
+                            output_fn_size = os.stat(output_fn).st_size 
+                            transfer_rate = ((output_fn_size/(urlretrieve_end - urlretrieve_start))/(1024*1024))
+                            logger.info("Task {0} get output file {1} with transfer rate {2} MB/s".format(curr_task_id, \
+                                output_fn, transfer_rate))
+                        else:
+                            logger.error("Task {0} is failed because it cannot get \
+                            output file {1}".format(curr_task_id, output_fn))
+                            oup_fn.write("{0},failed,444\n".format(curr_task_id))  
+                            mms.tasks_info_dict[update.task_id.value].action = "failed"
+                            self.clean_mesos_file(update.task_id.value)  
+                            return 
+               
+			  		# send message to executor to deleting the sandbox directory 
+                    logger.info("sending {0} to {1} at {2}".format("[SCHEDULER_STATE] retrieve done",update.executor_id.value, mms.executors_info_dict[update.executor_id.value].slave_id.value ))
+                    driver.sendFrameworkMessage(update.executor_id, mms.executors_info_dict[update.executor_id.value].slave_id, "[SCHEDULER_STATE] retrieve done")	
+			    
+                    logger.info("{0} is done".format(update.task_id.value))
+                    oup_fn.write("{0},finished\n".format(curr_task_id))
+                    mms.tasks_info_dict[curr_task_id].action = "finished"
+                    self.clean_mesos_file(curr_task_id)
+                    
+                    oup_fn.close()
+
+                self.finished_tasks += 1
+
+            if update.state == mesos_pb2.TASK_FAILED:
+                failed_task_id = update.task_id.value
+                logger.info("Task {0} failed with reason code {1} and exit code {2}.".format(failed_task_id, update.reason, update.message))
+                self.print_mesos_info(update.task_id.value)
+                mms.tasks_info_dict[failed_task_id].action = "failed"
+                oup_fn.write("{0},failed,{1}\n".format(failed_task_id, update.message))
+
+            if update.state == mesos_pb2.TASK_KILLED:
+                oup_fn.write("{0},killed\n".format(update.task_id.value))
+                mms.tasks_info_dict[update.task_id.value].action = "killed"
+                logger.info("{0}".format(update.message))
+                self.clean_mesos_file(update.task_id.value)
+                self.print_mesos_info(update.task_id.value)
+
+            if update.state == mesos_pb2.TASK_LOST:
+                lost_task_id = update.task_id.value
+                logger.error("Task {0} lost with error message: {1}".format(update.task_id.value,\
+                    update.message))
+                self.print_mesos_info(update.task_id.value)
+                if lost_task_id in mms.tasks_lost_time:
+                    if mms.tasks_lost_time[lost_task_id] <= MAX_LOST:
+                        mms.tasks_lost_time[lost_task_id] += 1
+                        mms.tasks_info_dict[lost_task_id].action = "resubmitted"
+                        logger.info("Task {0} has been lost {1} time".format(lost_task_id, mms.tasks_lost_time[lost_task_id]))
+                        logger.info("Try to resubmit lost task {0}".format(lost_task_id))
+                    else:
+                        oup_fn.write("{0},lost\n".format(update.task_id.value))
+                        mms.tasks_info_dict[update.task_id.value].action = "lost"
+                        self.clean_mesos_file(update.task_id.value)
+                else:
+                    mms.tasks_lost_time[lost_task_id] = 1
+                    mms.tasks_info_dict[lost_task_id].action = "resubmitted"
+                    logger.info("Task {0} has been lost 1 time". format(lost_task_id))
+                    logger.info("Try to resubmit lost task {0}".format(lost_task_id))
+                
+
+            if update.state == mesos_pb2.TASK_ERROR:
+                mms.tasks_info_dict[update.task_id.value].action = "resubmitted"
+                logger.info("{0} try to resubmit task {1}".format(update.message,\
+                update.task_id.value))
+                self.print_mesos_info(update.task_id.value)
+                logger.error("Task {0} fail with error message: {1}".format(update.task_id.value,\
+                update.message))
+        
+        oup_fn.close()
+
+    # TODO deprecate the using of this method, since the message transmission is not reliable
+    def frameworkMessage(self, driver, executorId, slaveId, message):
+        logger.info("Receive message {0}".format(message))
+        message_list = message.split()
+        if message_list[0].strip(' \t\n\r') == "[EXECUTOR_STATE]":
+            curr_executor_id = message_list[1].strip(' \t\n\r')
+            curr_executor_state = message_list[2].strip(' \t\n\r')
+             
+            with mms.lock:
+                mms.executors_info_dict[curr_executor_id].state = \
+                        curr_executor_state
+
+                # if a executor is aborted, the corresponding task is aborted
+                if curr_executor_state == "aborted":
+                    curr_task_id = message_list[3].strip(' \t\n\r')
+                    file_task_state = open(FILE_TASK_STATE, "a+")
+                    file_task_state.write("{0},{1}\n".format(curr_task_id,\
+                            curr_executor_state))
+                    file_task_state.close()
+                    os.remove("task_{0}_cmd".format(curr_task_id))
+
+
+class MakefowMonitor(threading.Thread):
+  
+    def __init__(self, driver):
+        threading.Thread.__init__(self)
+        self.driver = driver
+
+    # Check if all tasks done
+    def is_all_executor_stopped(self):
+        
+        with mms.lock:
+            for executor_info in mms.executors_info_dict.itervalues():
+                if executor_info.state == "registered":
+                    return False
+    
+            return True
+
+    # stop all running executors
+    def stop_executors(self):
+        task_action_fn = open(FILE_TASK_INFO, "r")
+        lines = task_action_fn.readlines()
+    
+        with mms.lock:
+            for line in lines:
+                task_info_list = re.split(''',(?=(?:[^'"]|'[^']*'|"[^"]*")*$)''', line)
+                task_id = task_info_list[0]
+                task_action = task_info_list[4]
+                if task_action == "aborting":
+                    mf_task = mms.tasks_info_dict[task_id]
+
+                    self.driver.sendFrameworkMessage( mf_task.executor_id, mms.executors_info_dict[mf_task.executor_id].slave_id, "[SCHEDULER_REQUEST] abort")
+    
+        task_action_fn.close()
+
+    def stop_mesos_scheduler(self):
+
+        # If makeflow creat "makeflow_done" file, stop the scheduler
+        mf_done_fn_path = os.path.join(mms.mf_wk_dir, MESOS_DONE_FILE)
+
+        if os.path.isfile(mf_done_fn_path):
+            mf_done_fn = open(mf_done_fn_path, "r")
+            mf_state = mf_done_fn.readline().strip(' \t\n\r')
+            mf_done_fn.close()
+
+            logger.info("Makeflow workflow is {0}".format(mf_state))
+
+            if mf_state == "aborted":
+                logger.info("Workflow aborted, stopping executors...")
+                self.stop_executors()
+        else: 
+            
+            logger.info("batch job system exited unexpectedly")
+
+        fn_run_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_INFO)
+        fn_finish_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_STATE)
+        fn_slave_stderr = os.path.join(mms.mf_wk_dir, SLAVE_STDERR)
+
+        if os.path.isfile(mf_done_fn_path):
+            os.remove(mf_done_fn_path)
+        if os.path.isfile(fn_run_tks_path):
+            os.remove(fn_run_tks_path)
+        if os.path.isfile(fn_finish_tks_path):
+            os.remove(fn_finish_tks_path)
+        if os.path.isfile(fn_slave_stderr):
+            os.remove(fn_slave_stderr)
+        
+        while(not self.is_all_executor_stopped()):
+            pass
+
+        self.driver.stop()  
+    
+    
+    def abort_mesos_task(self, task_id):
+        logger.info("Makeflow is trying to abort task {0}.".format(task_id))
+       
+        if mms.tasks_info_dict[task_id].action == "finished" or \
+                mms.tasks_info_dict[task_id].action == "failed" or \
+                mms.tasks_info_dict[task_id].action == "aborted":
+                return
+
+        with mms.lock:
+            if mms.tasks_info_dict[task_id].action == "submitted":
+                mms.tasks_info_dict[task_id].action = "aborted"
+            if mms.tasks_info_dict[task_id].action == "running":
+                py_task_id = mesos_pb2.TaskID()
+                py_task_id.value = task_id 
+                self.driver.killTask(py_task_id)
+                mms.tasks_info_dict[task_id].action = "aborted"
+
+        if os.path.isfile(FILE_TASK_STATE): 
+            oup_fn = open(FILE_TASK_STATE, "a", 0)
+        else:
+            logger.error("{0} is not created in advanced".format(FILE_TASK_STATE))
+            exit(1)
+        
+        oup_fn.write("{0},aborted\n".format(task_id))
+        oup_fn.close()
+
+    def run(self):
+
+        while(not os.path.isfile(MESOS_DONE_FILE)):
+
+            # The parent process (i.e. batch_job_mesos) has 
+            # been killed. Stop the scheduler
+
+            task_info_fp = open(FILE_TASK_INFO, "r")
+            lines = task_info_fp.readlines()
+
+            for line in lines:
+                task_info_list = re.split(''',(?=(?:[^'"]|'[^']*'|"[^"]*")*$)''', line)
+                task_id = task_info_list[0].strip(" \t\n\r")
+                task_cmd = task_info_list[1].strip(" \t\n\r")
+                task_inp_fns = task_info_list[2].split()
+                task_oup_fns = task_info_list[3].split()
+                task_cores = int(task_info_list[4].strip(" \t\n\r"))
+                task_mem = int(task_info_list[5].strip(" \t\n\r"))
+                task_disk = int(task_info_list[6].strip(" \t\n\r"))
+                task_action = task_info_list[7].strip(" \t\n\r")
+             
+                with mms.lock:
+                    # find new tasks
+                    if (task_id not in mms.tasks_info_dict):
+                        logger.info("Put task {0} into queue".format(task_id))
+                        mf_mesos_task_info = mms.MfMesosTaskInfo(\
+                                task_id, task_cmd, task_inp_fns, task_oup_fns, \
+                                task_cores, task_mem, task_disk, \
+                                task_action)
+
+                        mms.tasks_info_dict[task_id] \
+                                = mf_mesos_task_info
+                    else:
+                        
+                        if task_action == "aborting":
+                            self.abort_mesos_task(task_id) 
+
+            task_info_fp.close()
+            time.sleep(2)
+       
+        self.stop_mesos_scheduler() 
+
+
+if __name__ == '__main__':
+
+    class ThreadedServer(ThreadPoolMixIn, SocketServer.TCPServer):
+        pass
+
+    # Start the httpserver in the working directory
+    port = get_open_port()
+    Handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+    httpd = ThreadedServer(("", port), Handler)
+    threading.Thread(target=start_httpserver, args=(httpd,port)).start()
+
+    # make us a framework
+    mms.mf_wk_dir = sys.argv[1]
+    mesos_master_addr = sys.argv[2]
+
+    # create the "task_state" and "task_info" file
+    if not os.path.isfile(FILE_TASK_STATE):
+        open(FILE_TASK_STATE, 'w').close()
+    if not os.path.isfile(FILE_TASK_INFO):
+        open(FILE_TASK_INFO, 'w').close()
+
+    # initialize a framework instance
+    framework = mesos_pb2.FrameworkInfo()
+    framework.user = ""  # Have Mesos fill in the current user.
+    framework.name = "Makeflow"
+    mf_hostname = socket.getfqdn()
+
+    driver = MesosSchedulerDriver(
+        MakeflowScheduler(mms.mf_wk_dir, mesos_master_addr, mf_hostname, port),
+        framework,
+        mesos_master_addr  # assumes running on the master
+    )
+
+    # Start the monitor thread 
+    mf_monitor = MakefowMonitor(driver)
+    mf_monitor.start()
+
+    status = 0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1
+
+    httpd.shutdown()
+    sys.exit(status)
+
+# vim: set noexpandtab tabstop=4:

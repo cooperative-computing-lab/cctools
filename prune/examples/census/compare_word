@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+
+import os, sys
+from operator import itemgetter
+
+sys.path.append('./jellyfish')
+import jellyfish
+
+#indata = sys.stdin
+outdata = sys.stdout
+
+indata = open( sys.argv[1], 'r' )
+pos = int(sys.argv[2])
+
+cnt = 0
+counts = []
+values = []
+line=indata.readline()
+while line:
+	if len(line)>1:
+		line = line[0:-1]
+		ar = line.strip().split('|')
+		if len(ar)==3:
+			field, value, cnt_str = ar
+			if len(value)>0:
+				values.append( value )
+				counts.append( int(cnt_str) )
+
+	#cnt += 1
+	#if cnt>1000:
+	#	break
+	line=indata.readline()
+
+#print len(values), 'total fields...\n'
+print('## This file shows the similarity scores for the first entry')
+print('## based on the Jaro-Winkler string comparison algorithm')
+print('#Similarity score|Word A|Frequency|Word B|Frequency')
+
+#max_scores = 200
+max_scores = sys.maxint
+for i in range(pos,len(values)):
+	top_scores = []
+	for j in range(0,len(values)):
+		similarity = jellyfish.jaro_distance(values[i].decode("utf-8"), values[j].decode("utf-8"))
+		if similarity>0.65:
+		#if similarity>0.5:
+			top_scores.append( [ similarity, i, j ] )
+	top_scores.sort(key=lambda x: x[0], reverse=True)
+	#if len(top_scores)>=max_scores:
+	#	top_scores = top_scores[0:max_scores]
+	for ar in top_scores:
+		sim, i, j = ar
+		print('%s|%s|%i|%s|%i' % (sim, values[i], counts[i], values[j], counts[j]))
+	break
+

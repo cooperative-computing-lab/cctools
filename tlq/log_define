@@ -1,0 +1,60 @@
+#!/bin/sh
+
+homehost=$1
+shift
+homeport=$1
+shift
+dir="$1"
+shift
+home="$homehost:$homeport"
+hostname=$(hostname -f)
+
+declare -a logs
+declare -a types
+proc=$(ps -AF | grep "tlq-server" | head -1 | awk '{print $2}')
+port=$(netstat -tlpn 2> /dev/null | grep "$proc/perl" | tail -1 | awk '{print $4}' | cut -d ":" -f 2)
+#Default TLQ server port is 11855
+if [ "$port" = "" ]; then
+    let port="11855"
+fi
+i=0
+j=0
+for arg in "$@"
+do
+    if [ "$arg" = "--" ]; then
+        shift
+        break
+    fi
+    if [ `expr $j % 2` -eq 0 ]; then
+        logs[$i]="$arg"
+        let j="j+1"
+    else
+        types[$i]="$arg"
+        let i="i+1"
+        let j="j+1"
+    fi
+    shift
+done
+cmd=$@
+if [ ! -d $dir ]; then
+    errmsg="Command $cmd aborted at $hostname. No TLQ log server running at working directory $dir."
+    curl -s --data-urlencode "DEPOSIT=$errmsg" http://$home/deposit
+    exit 1
+fi
+j=0
+origcmd=$cmd
+for log in "${logs[@]}"
+do
+    logtype=${types[j]}
+    loguuid=$(uuidgen)
+    cmd="${cmd//$log/$dir/${loguuid}.log}"
+    if [[ "$cmd" == "$origcmd" ]]; then
+        echo "$log $home NONE $logtype $loguuid $cmd" >> "$dir/deposits.log"
+    else
+        echo "$log $home $dir/${loguuid}.log $logtype $loguuid $cmd" >> "$dir/deposits.log"
+    fi
+    let j="j+1"
+done
+
+$cmd
+exit $?

@@ -1,0 +1,59 @@
+# This is a sample Makeflow script that retrieves an image from the web,
+# creates four variations of it, and then combines them into an animation.
+# It produces the same output as example.makeflow, but it introduces the syntax
+# to group rules in sets, called categories. The computational resources needed
+# for a rule in a category can also be optionally specified.
+
+# A Makeflow script is a subset of the Makefile language (see the manual
+# for more information). For example, for convenience we can define the
+# textual substitutions:
+CURL=/usr/bin/curl
+CONVERT=/usr/bin/convert
+URL=http://ccl.cse.nd.edu/images/capitol.jpg
+
+# We specify the set of inputs and outputs. This is not required, but strongly
+# recommended.
+MAKEFLOW_INPUTS=
+MAKEFLOW_OUTPUTS=capitol.montage.gif
+
+# Similar rules can be arbitrarily labeled to form sets, called categories. In
+# this example we define three categories: preprocess, analysis, and merge.
+# Rules belong to the category of the most recent CATEGORY statement.
+.MAKEFLOW NOT_DIRECTIVE unsupported
+
+# To provide accurate assessment of the output size, estimated file sizes can
+# be specified via the .SIZE directive.
+.SIZE capitol.jpg 51274
+
+# Resources needed for a single task in category may be included (optional).
+# MEMORY and DISK in MB.
+.MAKEFLOW CORES 1
+.MAKEFLOW MEMORY 50
+.MAKEFLOW DISK 100
+capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
+	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
+
+.MAKEFLOW CATEGORY analysis
+.MAKEFLOW CORES 1
+.MAKEFLOW MEMORY 10
+.MAKEFLOW DISK 20
+capitol.90.jpg: capitol.jpg
+	$CONVERT -swirl 90 capitol.jpg capitol.90.jpg
+
+capitol.180.jpg: capitol.jpg
+	$CONVERT -swirl 180 capitol.jpg capitol.180.jpg
+
+capitol.270.jpg: capitol.jpg
+	$CONVERT -swirl 270 capitol.jpg capitol.270.jpg
+
+capitol.360.jpg: capitol.jpg
+	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
+
+# If a rule is preceded by LOCAL, it executes at the local site.
+.MAKEFLOW CATEGORY preprocess
+.MAKEFLOW CORES 1
+.MAKEFLOW MEMORY 10
+.MAKEFLOW DISK 20
+capitol.jpg:
+	LOCAL $CURL -o capitol.jpg $URL
+

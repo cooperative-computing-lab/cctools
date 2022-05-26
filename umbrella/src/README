@@ -1,0 +1,52 @@
+Umbrella is a tool for specifying and materializing comprehensive execution environments, from the hardware all the way up to software and data.  A user simply invokes Umbrella with the desired task, and Umbrella determines the minimum mechanism necessary to run the task, whether it be direct execution, a system container, a local virtual machine, or submission to a cloud or grid environment.  We present the overall design of Umbrella and demonstrate its use to precisely execute a high energy physics application and a ray-tracing application across many platforms using a combination of Parrot, Chroot, Docker, VMware, Condor, and Amazon EC2.
+
+Currently, Umbrella supports three execution engines: local, condor, ec2.
+Local execution engine can be further devided into three categories: parrot, docker, chroot.
+Parrot execution engine can be used without any special authority on the host machine; Docker execution engine requires Docker is installed on the host machine and the user is given the right authority to use Docker; Chroot execution engine requires the user to be the root user.
+
+Requirements:
+Umbrella is implemented in Python 2 (>= 2.6).
+
+Here is the specification JSON file for a Ray-Tracing application:
+{
+	"comment": "A ray-tracing application which creates video frames.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.18"
+	},
+	"os": {
+		"name": "Redhat",
+		"version": "5.10"
+	},
+	"software": {
+		"povray-3.6.1-redhat5-x86_64": {
+			"id": "9b7f2362e6b927c8ef08c3f92599e47c",
+			"mountpoint": "/software/povray-3.6.1-redhat5-x86_64",
+			"action": "unpack"
+		}
+	},
+	"data": {
+	},
+	"environ": {
+	}
+}
+
+Once the specification is ready, you can run the application through umbrella:
+
+umbrella \
+	--sandbox_mode parrot \
+	--log umbrella.log \
+	--config povray.umbrella \
+	--inputs '4_cubes.pov=4_cubes.pov,WRC_RubiksCube.inc=WRC_RubiksCube.inc' \
+	--localdir /tmp/umbrella_test/ \
+	--output /tmp/umbrella_test/parrot_povray \
+	run "povray +I4_cubes.pov +Oframe000.png +K.0  -H50 -W50"
+
+For more information of the usage of Umbrella, please check:
+   http://ccl.cse.nd.edu/software/umbrella/database/doc/umbrella.html

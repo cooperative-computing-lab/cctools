@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+
+import os, sys, json
+
+outdata = sys.stdout
+
+
+streams = []
+lines = []
+lowests = []
+for fname in sys.argv[1:]:
+	f = open( fname, 'r' )
+	line = f.readline()
+	#print(line)
+	pos = line.rfind('|')
+	key = line[0:pos]
+	cnt = int( line[pos+1:-1] )
+
+	streams.append( f )
+	lines.append( [key,cnt] )
+
+
+
+c = 0
+while True:
+	lowest = None
+	lowests = []
+	for i,ar in enumerate(lines):
+		if ar:
+			key,cnt = ar
+			if not lowest or key < lowest:
+				lowest = key
+				lowests = [ i ]
+			elif key == lowest:
+				lowests.append( i )
+
+	total = 0
+	if len(lowests)==0:
+		break
+	for i in lowests:
+		total += lines[i][1]
+		line = streams[i].readline()
+		if len(line)>1:
+			pos = line.rfind('|')
+			key = line[0:pos]
+			cnt = int( line[pos+1:-1] )
+			lines[i] = [key,cnt]
+		else:
+			lines[i] = None
+
+	outdata.write( "%s|%i\n" % (lowest, total) )
+	#c += 1
+	#if c>10:
+	#	break

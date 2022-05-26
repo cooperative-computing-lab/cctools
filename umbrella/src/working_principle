@@ -1,0 +1,92 @@
+inputs of local execution engine:
+all the inputs are mounted into the sandbox without being copied into the sandbox in all these three container techniques (chroot, parrot and docker).
+The usage of the mounting mechanism on the execution node allows Umbrella to treat all the stuff created in the sandbox during the execution of the application as the output.
+
+inputs of cloud execution engine:
+Umbrella transfers the packages.json, the specification file, the input files to the home directory of the execution node through `scp`;
+Umbrella changes the Umbrella command to be executed on the remote execution node:
+Required changes:
+	use a python from the archive if the remote execution node does not have the correct python to execute umbrella (not finished)
+	force the usage of the packages.json transferred to the execution node
+	change -c to use the specification under the home directory
+	change -s to be local
+	change -i to set all the actual paths to be the home directory
+Optional changes:
+	change -l to ~/ec2_umbrella
+	change -o to ~/output
+	change --log to ec2_umbrella.log
+Then the local umbrella calls the remote umbrella command through `ssh`.
+
+inputs of grid execution engine:
+Umbrella transfer the packages.json, the specification file, the input files to the scratch directory of the execution node through the `transfer_input_files` attribute of Condor;
+Umbrella changes the Umbrella command to be executed on the remote execution node:
+Required changes:
+	use a python from the archive if the remote execution node does not have the correct python to execute umbrella (not finished)
+	force the usage of the packages.json transferred to the execution node
+	change -c to use the specification under the scratch directory of the condor job
+	change -s to be local
+	change -i to set all the actual paths to be the scratch directory of the condor job
+Optional changes:
+	change -l to condor_umbrella
+	change -o to os.path.basename(tempfile.mkdtemp(dir=os.path.dirname(sandbox_dir))): the limitation of the `transfer_output_files` attribute for transferring a directory forces this change.
+	change --log to condor_umbrella.log
+Then the local umbrella calls`condor_submit`.
+
+outputs of local execution engine:
+all the stuff created in the sandbox during the execution of the application will be finally put into the output_dir.
+Parrot and chroot and Docker: rename sandbox_dir to output_dir
+
+outputs of cloud execution engine:
+the output_dir on the remote execution node is transferred back to the local machine and put into the output_dir set by the user.
+the sandbox on the local machine will be deleted.
+Finally, the instance will be terminated.
+
+outputs of grid execution engine:
+the output_dir on the remote execution node is transferred back to the dir1 the local machine and then dir1 is rename into the output_dir set by the user.
+The semantics of condor_output_files only supports transferring a dir from the execution node back to the current working dir, so we need a two-steps output dir setting.
+the sandbox on the local machine will be deleted.
+
+the execution result (return code, stdout data, stderr data) of all the subprocesses called by Umbrella are written into the umbrella log file.
+
+Phylosophy of Parrot options:
+The usage of Parrot inside Umbrella involves four options:
+ -l,--ld-path=<path>            Path to ld.so to use.                      (PARROT_LDSO_PATH)
+ -m,--ftab-file=<file>          Use this file as a mountlist.             (PARROT_MOUNT_FILE)
+ -M,--mount=/foo=/bar           Mount (redirect) /foo to /bar.          (PARROT_MOUNT_STRING)
+ -p,--proxy=<hst:p>             Use this proxy server for HTTP requests.         (HTTP_PROXY)
+-M option can be merged into -m option.
+For each option, a corresponding environment variable is created to keep the parrot_run command clean.
+
+Phylosophy of global variables in Umbrella:
+Umbrella tries to avoid the usage of any global variable. However, some functions inside Umbrella indeed have very long argument lists. The long argument lists can be shrinked by merging single variable arguments into a single dictionary.
+
+Phylosophy of error handling in Umbrella:
+In Umbrella, the return code, stdout and stderr information of the sub-processes created by subprocess.Popen are checked by the caller.
+all the other critical errors are directly thrown out by the function using sys.exit("error msg"); so the caller does not check the exit code of the called function.
+However, the callee returns the necessary variables to the caller.
+all the execution logic information is recorded into the Umbrella log file.
+
+Exit code from sys.exit([arg]):
+"The optional argument arg can be an integer giving the exit status (defaulting to zero), or another type of object. If it is an integer, zero is considered “successful termination” and any nonzero value is considered “abnormal termination” by shells and the like. Most systems require it to be in the range 0-127, and produce undefined results otherwise. Some systems have a convention for assigning specific meanings to specific exit codes, but these are generally underdeveloped; Unix programs generally use 2 for command line syntax errors and 1 for all other kind of errors. If another type of object is passed, None is equivalent to passing zero, and any other object is printed to stderr and results in an exit code of 1. In particular, sys.exit("some error message") is a quick way to exit a program when an error occurs."
+https://docs.python.org/2/library/sys.html
+sys.exit("error msg") sets the exit code to be 1.
+
+The maintainer of umbrella needs the error msgs to figure out where the program got stuck.
+The user of umbrella (like Prune) may just need to know 1 for failure or 0 for success.
+
+hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ umbrella -h
+...
+hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ echo $?
+0
+
+
+hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ umbrella --log /tmp
+The --log option </tmp> is not a file!
+hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ echo $?
+1
+
+hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ umbrella -r
+Usage: umbrella [options] run "command"
+umbrella: error: no such option: -r
+hmeng@ccl12 ~/git-development/cctools/umbrella/example/povray$ echo $?
+2

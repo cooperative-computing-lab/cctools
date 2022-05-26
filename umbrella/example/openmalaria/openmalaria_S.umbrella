@@ -1,0 +1,109 @@
+{
+	"comment": "OpenMalaria application",
+	"note": "this a self-contained umbrella spec.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "1",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.18"
+	},
+	"os": {
+		"ec2": {
+			"ami": "ami-0b06483b",
+			"region": "us-west-2",
+			"user": "root"
+		},
+		"id": "902703f016e0f930a870eaf9cb31640b",
+		"name": "CentOS",
+		"version": "6.6",
+		"source": [
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/902703f016e0f930a870eaf9cb31640b/centos-6.6-x86_64.tar.gz"
+		],
+		"format": "tgz",
+		"checksum": "902703f016e0f930a870eaf9cb31640b",
+		"uncompressed_size": "212684800",
+		"size": "72213624"
+	},
+	"package_manager": {
+		"name": "yum",
+		"list": "python cmake xerces-c-devel gsl-devel xsd boost-devel zlib zlib-devel",
+		"config": {
+			"epel.repo":{
+				"id": "4cd77946d1b5176987036e8fb382ce2d",
+				"mountpoint": "/etc/yum.repo.d/epel.repo",
+				"source": [
+					"https://curate.nd.edu/downloads/fx719k4458m",
+					"http://ccl.cse.nd.edu/research/data/hep-case-study/4cd77946d1b5176987036e8fb382ce2d/epel.repo"
+				],
+				"format": "plain",
+				"checksum": "4cd77946d1b5176987036e8fb382ce2d",
+				"size": "957"
+			}
+		}
+	},
+	"software": {
+		"openMalaria-32-centos6-x86_64": {
+			"id": "97cff84e58a4172fd8e9d1cb25c6047c",
+			"source": [
+				"https://curate.nd.edu/downloads/ft848p60w7x",
+				"http://ccl.cse.nd.edu/research/data/hep-case-study/97cff84e58a4172fd8e9d1cb25c6047c/openMalaria-32-centos6-x86_64.tar.gz"
+			],
+			"format": "tgz",
+			"checksum": "97cff84e58a4172fd8e9d1cb25c6047c",
+			"mountpoint": "/software/openMalaria-32-centos6-x86_64",
+			"uncompressed_size": "12881920",
+			"size": "2968452"
+		}
+	},
+	"data": {
+		"densities.csv": {
+			"id": "54ea34d38d96c311122642aec045bc40",
+			"mountpoint": "/tmp/densities.csv",
+			"source": [
+				"https://curate.nd.edu/downloads/fn106w94b5c",
+				"http://ccl.cse.nd.edu/research/data/hep-case-study/54ea34d38d96c311122642aec045bc40/densities.csv"
+			],
+			"format": "plain",
+			"checksum": "54ea34d38d96c311122642aec045bc40",
+			"size": "38132"
+		},
+		"scenario_32.xsd": {
+			"id": "bef8a475dbd3765b61995f36b11b0672",
+			"mountpoint": "/tmp/scenario_32.xsd",
+			"source": [
+				"https://curate.nd.edu/downloads/fj23611124x",
+				"http://ccl.cse.nd.edu/research/data/hep-case-study/bef8a475dbd3765b61995f36b11b0672/scenario_32.xsd"
+			],
+			"format": "plain",
+			"checksum": "bef8a475dbd3765b61995f36b11b0672",
+			"size": "200376"
+		},
+		"scenario.xml": {
+			"id": "e28c0c145c801789b0919d175f0afa9c",
+			"mountpoint": "/tmp/scenario.xml",
+			"source": [
+				"https://curate.nd.edu/downloads/fq977s77m61",
+				"http://ccl.cse.nd.edu/research/data/hep-case-study/e28c0c145c801789b0919d175f0afa9c/scenario.xml"
+			],
+			"format": "plain",
+			"checksum": "e28c0c145c801789b0919d175f0afa9c",
+			"size": "8227"
+		}
+	},
+	"environ": {
+		"PWD": "/tmp"
+	},
+	"cmd": "/software/openMalaria-32-centos6-x86_64/bin/openMalaria -s /tmp/scenario.xml",
+	"output": {
+		"files": [
+			"/tmp/ctsout.txt",
+			"/tmp/output.txt"
+		],
+		"dirs": [
+		]
+	}
+}

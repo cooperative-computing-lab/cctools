@@ -1,0 +1,9 @@
+{
+    "rules": [
+                {
+                    "command" : format("python ./simulate.py --parameter %d > output.%d.txt", N, N),
+                    "inputs"  : [ "simulate.py" ],
+                    "outputs" : [ format("output.%d.txt", N) ]
+                } for N in [1, 2, 3]
+             ]
+}

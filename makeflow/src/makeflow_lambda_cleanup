@@ -1,0 +1,47 @@
+#!/bin/sh
+
+if [ "$#" -ne 1 ]; then
+        echo "use: $0 <config-file>"
+        exit 1
+fi
+
+CONFIG_FILE=$1
+
+echo "Loading config file $CONFIG_FILE..."
+if [ ! -f $CONFIG_FILE ]
+then
+        echo "$0: config file $CONFIG_FILE not found"
+        exit 1
+fi
+
+fetch_field()
+{
+	grep $1 $CONFIG_FILE | cut -d " " -f 2
+}
+
+echo "Parsing $CONFIG_FILE..."
+
+ROLE_NAME=$(fetch_field role_name)
+BUCKET_NAME=$(fetch_field bucket_name)
+FUNCTION_NAME=$(fetch_field function_name)
+S3_ROLE_POLICY_ARN=$(fetch_field s3_role_policy_arn)
+LAMBDA_ROLE_POLICY_ARN=$(fetch_field lambda_role_policy_arn)
+
+AWS_CMD="aws"
+
+echo "Deleting function $FUNCTION_NAME..."
+$AWS_CMD lambda delete-function --function-name "$FUNCTION_NAME"
+
+echo "Deleting bucket $BUCKET_NAME..."
+$AWS_CMD s3 rb "s3://$BUCKET_NAME" --force > /dev/null
+
+echo "Deleting role policy $S3_ROLE_POLICY_ARN..."
+$AWS_CMD iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn "$S3_ROLE_POLICY_ARN"
+
+echo "Deleting role policy $LAMBDA_ROLE_POLICY_ARN..."
+$AWS_CMD iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn "$LAMBDA_ROLE_POLICY_ARN"
+
+echo "Deleting role $ROLE_NAME..."
+$AWS_CMD iam delete-role --role-name "$ROLE_NAME"
+
+exit 0

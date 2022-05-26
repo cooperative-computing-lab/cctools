@@ -1,0 +1,81 @@
+{
+    "comment": "A ray-tracing application which creates video frames. The dependencies are from local dirs /tmp/local_data and OSF", 
+    "kernel": {
+        "version": ">=2.6.18", 
+        "name": "linux"
+    }, 
+    "data": {
+        "4_cubes.pov": {
+            "format": "plain", 
+            "checksum": "c65266cd2b672854b821ed93028a877a", 
+            "source": [
+                "/tmp/local_data/4_cubes.pov", 
+                "osf+https://files.osf.io/v1/resources/c5jyn/providers/osfstorage/569febca9ad5a100b15598b7"
+            ], 
+            "action": "none", 
+            "mountpoint": "/tmp/4_cubes.pov", 
+            "id": "c65266cd2b672854b821ed93028a877a", 
+            "size": "1757"
+        }, 
+        "WRC_RubiksCube.inc": {
+            "format": "plain", 
+            "checksum": "2f8afdd09fc3a6177c6f1977bb3bdae7", 
+            "source": [
+                "/tmp/local_data/WRC_RubiksCube.inc", 
+                "osf+https://files.osf.io/v1/resources/c5jyn/providers/osfstorage/569febce9ad5a100b7559c3a"
+            ], 
+            "action": "none", 
+            "mountpoint": "/tmp/WRC_RubiksCube.inc", 
+            "id": "2f8afdd09fc3a6177c6f1977bb3bdae7", 
+            "size": "28499"
+        }
+    }, 
+    "cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50", 
+    "hardware": {
+        "cores": "1", 
+        "disk": "2GB", 
+        "arch": "x86_64", 
+        "memory": "1GB"
+    }, 
+    "environ": {
+        "PWD": "/tmp"
+    }, 
+    "output": {
+        "files": [
+            "/tmp/frame000.png"
+        ], 
+        "dirs": []
+    }, 
+    "os": {
+        "ec2": {
+            "ami": "ami-2cf8901c",
+            "region": "us-west-2",
+            "user": "ec2-user"
+        },
+        "name": "Redhat", 
+        "format": "tgz", 
+        "checksum": "669ab5ef94af84d273f8f92a86b7907a", 
+        "source": [
+            "/tmp/local_data/redhat-6.5-x86_64.tar.gz", 
+            "osf+https://files.osf.io/v1/resources/c5jyn/providers/osfstorage/569febc6594d90006fae3975"
+        ], 
+        "version": "6.5", 
+        "size": "633848940", 
+        "id": "669ab5ef94af84d273f8f92a86b7907a", 
+        "uncompressed_size": "1743656960"
+    }, 
+    "software": {
+        "povray-3.6.1-redhat6-x86_64": {
+            "format": "tgz", 
+            "checksum": "b02ba86dd3081a703b4b01dc463e0499", 
+            "source": [
+                "/tmp/local_data/povray-3.6.1-redhat6-x86_64.tar.gz", 
+                "osf+https://files.osf.io/v1/resources/c5jyn/providers/osfstorage/569febd3594d900074ae38fa"
+            ], 
+            "mountpoint": "/software/povray-3.6.1-redhat6-x86_64", 
+            "size": "1471452", 
+            "id": "b02ba86dd3081a703b4b01dc463e0499", 
+            "uncompressed_size": "3010560"
+        }
+    }
+}

@@ -1,0 +1,42 @@
+#!/usr/bin/env python
+
+import os, sys, json
+import hashlib
+import subprocess
+
+
+fields = ['MD','KY','CY','CS','CC','CT','HS','FM','PN', 'FN','GN','BY','BP','SX', 'RL','ET','RC','AG', 'ID']
+numbers = ['CY', 'HS','FM','PN', 'BY', 'AG']  # These fields should be numerical
+
+indata = sys.stdin
+
+cnt = 0
+line = indata.readline()[:-1]
+last_ar = None
+matching_lines = []
+first_line = ''
+while line:
+    ar = line.split('|')
+    line = '|'.join( ar[2:] )
+
+    #if last_ar:
+        #print last_ar[0], ar[0]
+    if last_ar and last_ar[0] == ar[0]:
+        matching_lines.append( line )
+    else:
+        if len(matching_lines)>0:
+            print(first_line)
+            for l in matching_lines:
+                print(l)
+            print('')
+            matching_lines = []
+        first_line = line
+    cnt += 1
+    #if cnt>100:
+        #sys.exit(0)
+
+    #sys.stdout.write('.')
+    #sys.stdout.flush()
+
+    last_ar = ar
+    line = indata.readline()[:-1]

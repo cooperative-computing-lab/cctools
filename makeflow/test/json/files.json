@@ -1,0 +1,17 @@
+{
+  "rules":[
+    {
+      "command":"echo A > A",
+      "outputs":[{"dag_name": "A"}]
+    },
+    {
+      "command":"cat A > B && echo B >> B",
+      "inputs": [{"dag_name": "A"}],
+      "outputs":[{"dag_name": "B"}]
+    },
+    {
+      "inputs": [{"dag_name": "A"}, {"dag_name": "B"}],
+      "command": "wc -l A | grep 1 && wc -l B | grep 2"
+    }
+  ]
+}

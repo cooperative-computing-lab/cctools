@@ -1,0 +1,12 @@
+{
+	"manager-name": "my_managers.*",
+	"max-workers": 400,
+	"min-workers": 1,
+	"cores":     8,
+	"disk":      500,
+	"memory": cores * 4000,
+	"timeout": 300,
+	"tasks-per-worker": cores,
+	"worker-extra-options": "-dall",
+	"condor-requirements": "(MachineGroup == \"disc\")"
+}

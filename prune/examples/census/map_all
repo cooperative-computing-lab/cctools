@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+
+import os, sys, json
+import hashlib
+import subprocess
+
+
+#key_fields = sys.argv[1].split(',')
+key_fields = ['CS', 'CC', 'CT', 'FN', 'GN', 'BY', 'SX']
+#key_fields = ['CS', 'FN']
+concurrency = int(sys.argv[1])
+#output_prefix = 'mapped/'
+output_prefix = 'result_'
+
+fields = ['CY','CS','CC','CT','HS','FM','PN', 'FN','GN','BY','BP','SX', 'RL','ET','RC','AG', 'ID']
+numbers = ['CY', 'HS','FM','PN', 'BY', 'AG']  # These fields should get sorted numerically (not alpha-numerically)
+
+
+
+key_index = []
+for key in key_fields:
+	key_index.append( fields.index(key) )
+
+indata = sys.stdin
+
+hashes = []
+files = []
+for i in range(0,concurrency):
+	hashes.append( 0 )
+	files.append( open(output_prefix+str(i), 'a') )
+
+cnt = 0
+line = indata.readline()
+while line:
+	ar = line[:-1].split('|')
+	if (len(ar)>1):
+
+		key = ''
+		for f in key_index:
+			key += ar[f] + ':'
+		key = key[:-1]
+		hash_object = hashlib.sha1(key)
+		hex_dig = hash_object.hexdigest()
+		hash_id = int(hex_dig, 16) % concurrency
+		files[ hash_id ].write( hex_dig+'|'+key+'|'+line )
+		#hash_id = key % concurrency
+		#files[ hash_id ].write( key+'|'+line )
+
+		cnt += 1
+		#if cnt>100:
+			#sys.exit(0)
+
+	line = indata.readline()
+
+
+# This takes 50% more time on top of the mapping above (in initial tests).
+for f, file in enumerate(files):
+	file.close()
+	filename  = output_prefix+str(f)
+	p = subprocess.Popen( "sort -t\| -k1 %s -o %s" % (filename,filename), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True )
+	(stdout, stderr) = p.communicate()
+
+
+

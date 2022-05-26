@@ -1,0 +1,16 @@
+umbrella \
+--spec makeflow_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/capitol.montage.gif=/tmp/umbrella_test/parrot_makeflow_S/output.gif" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
+
+umbrella \
+--spec makeflow_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/docker_makeflow_S \
+--output "/tmp/capitol.montage.gif=/tmp/umbrella_test/docker_makeflow_S/output.gif" \
+--sandbox_mode docker \
+--log umbrella.log \
+run

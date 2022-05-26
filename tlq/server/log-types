@@ -1,0 +1,5 @@
+ltrace process,file,envVar,component
+wqlog master,worker,task
+wqlog.tr master,worker,task
+makeflowlog workflow,rule,task
+cctoolsdebug master,worker,workflow,task,file

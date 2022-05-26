@@ -1,0 +1,64 @@
+echo "test umbrella --spec cms_opendata_S.umbrella split f2 db2:"
+umbrella \
+--spec cms_opendata_S.umbrella \
+--log umbrella.log \
+split f2 db2
+#cms_opendata_S.umbrella is self-contained
+#f2 does not include metadata information
+#db2 only includes the dependencies involved in cms_opendata.umbrella
+
+rm -rf /tmp/umbrella_test/parrot_cms_opendata_output
+
+echo "test umbrella --spec f2 --meta db2 run:"
+umbrella \
+--spec f2 \
+--meta file:///afs/crc.nd.edu/user/h/hmeng/git-development/cctools/umbrella/example/cms_opendata/db2 \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/parrot_cms_opendata_output \
+--sandbox_mode parrot \
+--log umbrella.log \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
+run
+
+echo "test umbrella ... expand f1:"
+umbrella \
+--spec cms_opendata.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+--sandbox_mode parrot \
+--log umbrella.log \
+expand f1
+#f1 is self-contained
+
+echo "test umbrella ... filter db1:"
+umbrella \
+--spec cms_opendata.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+--sandbox_mode parrot \
+--log umbrella.log \
+filter db1
+#db1 only includes the dependencies involved in cms_opendata.umbrella
+
+rm -rf /tmp/umbrella_test/parrot_cms_opendata_output
+
+echo "test umbrella --spec cms_opendata.umbrella --meta db1 run ...:"
+umbrella \
+--spec cms_opendata.umbrella \
+--meta file:///afs/crc.nd.edu/user/h/hmeng/git-development/cctools/umbrella/example/cms_opendata/db1 \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/parrot_cms_opendata_output \
+--sandbox_mode parrot \
+--log umbrella.log \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
+run
+
+rm -rf /tmp/umbrella_test/parrot_cms_opendata_output
+
+echo "test umbrella --spec f1 run ...:"
+umbrella \
+--spec f1 \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/parrot_cms_opendata_output \
+--sandbox_mode parrot \
+--log umbrella.log \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
+run

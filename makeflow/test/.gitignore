@@ -1,0 +1,7 @@
+*.makeflowlog
+*.wqlog
+*.wqlog.tr
+*.log
+toplevel.makeflow
+sublevel.makeflow
+input.txt

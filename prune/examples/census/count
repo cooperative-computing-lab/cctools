@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+
+import os, sys, json
+import re
+
+indata = sys.stdin
+outdata = sys.stdout
+
+input_fields = ['CY','CS','CC','CT','HS','FM','PN', 'FN','GN','BY','BP','SX', 'RL','ET','RC','AG','ID', 'FW','BW']
+output_fields = ['CY','CS','CC','CT','HS','FM','PN', 'FN','GN','BY','BP','SX', 'RL','ET','RC','AG']
+output_fields.sort()
+
+output_positions = []
+
+
+counts = []
+for field in output_fields:
+	pos = input_fields.index( field )
+	output_positions.append( pos )
+	counts.append( {} )
+
+pattern = re.compile('[\W_]+')
+
+
+cnt = 0
+line=indata.readline()
+while line:
+	if len(line)>1:
+		line = line[0:-1]
+		fields = line.strip().split('|')
+		for i,pos in enumerate(output_positions):
+			value = pattern.sub( '_', fields[pos] )
+			if value in counts[i]:
+				counts[i][value] += 1
+			else:
+				counts[i][value] = 1
+		#cnt += 1
+		#if cnt>100:
+		#	break
+	line=indata.readline()
+
+for c,cnts in enumerate(counts):
+	field_name = input_fields[output_positions[c]]
+	keys = sorted(cnts.keys())
+	for key in keys:
+		outdata.write( "%s|%s|%i\n" % (field_name, key, cnts[key]) )
+
+

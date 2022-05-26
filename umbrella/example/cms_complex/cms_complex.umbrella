@@ -1,0 +1,53 @@
+{
+	"comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "1",
+		"memory": "1GB",
+		"disk": "2GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.32"
+	},
+	"os": {
+		"ec2": {
+			"ami": "ami-2cf8901c",
+			"region": "us-west-2",
+			"user": "ec2-user"
+		},
+		"id": "669ab5ef94af84d273f8f92a86b7907a",
+		"name": "Redhat",
+		"version": "6.5"
+	},
+	"software": {
+		"cmssw-5.2.5-slc5-amd64": {
+			"mount_env": "CMS_DIR",
+			"mountpoint": "/cvmfs/cms.cern.ch"
+		}
+	},
+	"data": {
+		"final_events_2381.lhe": {
+			"mount_env": "INPUT_FILE",
+			"mountpoint": "/tmp/final_events_2381.lhe",
+			"action": "none"
+		},
+		"cms_complex.sh": {
+			"id": "9f8587e9ef90ab4f5de8b3c9ab5cf0cb",
+			"mountpoint": "/tmp/cms_complex.sh",
+			"action": "none"
+		}
+	},
+	"environ": {
+		"PWD": "/tmp",
+		"CMS_VERSION": "CMSSW_5_2_5",
+		"SCRAM_ARCH": "slc5_amd64_gcc462"
+	},
+	"cmd": "/bin/sh /tmp/cms_complex.sh",
+	"output": {
+		"files": [],
+		"dirs": [
+			"/tmp/sim_job"
+		]
+	}
+}

@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+
+# Copyright (C) 2020- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+# This is a simple dataswarm test program intended to test the
+# basic functionality and work out the detailed user's API.
+# The objective is to process a single large dictionary file
+# by running N tasks, where each task performs a grep to search
+# for words beginning with a different letter.
+
+# Note that this example is not yet correct or complete --
+# it needs to evolve along with the emerging DataSwarm API.
+
+import os
+import sys
+import json
+import time
+
+from dataswarm import DataSwarm
+
+def main():
+    task = {
+        "command": "exit 123"
+    }
+
+    with DataSwarm(host='127.0.0.1', port='1234') as ds:
+        response = ds.task_submit(task)
+        print(response)
+        print(ds.wait(0))
+
+if __name__ == "__main__":
+    main()

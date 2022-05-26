@@ -1,0 +1,248 @@
+DeltaDB User's Manual
+Last edited: May 2014
+The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005- The University of Notre Dame. All rights reserved. This software is distributed under the GNU General Public License. See the file COPYING for details.
+
+
+Overview
+
+ When servers report their status to the catalog server, a log file is created to track those reports. The servers are of different types and are allowed to report any values for any field name. In other words, there is no schema beyond the requirement that each reported item must contain a field and value. The catalog server also creates a daily checkpoint file with the current status of all servers still actively reporting. Samples of data from checkpoints and log files for different types of servers are shown further down in this document. The following scripts operate on this data for the creation of summary reports.
+deltadb_collect: Returns log data for the specified time period. The script takes three arguments. The first argument is a directory where the catalog history files are stored in sub-directories by year. The second argument specifies the start time as a timestamp, date or time in the format YYYY-MM-DD-HH-MM-SS. The third argument (optional) can be a timestamp, duration, or date and time of the same format YYYY-MM-DD-HH-MM-SS. The duration can be in seconds (+180 or s180), minutes (m45), hours (h8), days (d16), weeks (w3), or years (y2).
+deltadb_select_*: Filters streamed data (through standard input) and returns only the objects which satisfy the provided arguments. For example, type=wq_master would only output objects with type wq_master. There are two select tools: deltadb_select_static, deltadb_select_dynamic. The man pages describe the differences between these tools in more detail.
+deltadb_project: Defines desired attributes from a stream of delta logs (standard input), removing the remaining attributes, but no objects.
+deltadb_reduce_temporal Aggregates attribute values (from standard input) over a specified time span.
+deltadb_reduce_spatial Summarizes attribute values (from standard input) over all objects, returning a single object for each timestamp.
+deltadb_pivot Transforms the data into a more plottable format.
+ More details can be found in the man pages and in a paper describing DeltaDB available on the Notre Dame website.
+
+
+Invocation
+ To list the total number of queues, workers, and tasks at 15 minute intervals over the course of one year, the following query can be performed from the command line:
+deltadb_collect /data/catalog.history 2013-02-1@00:00:00 d365 | \
+deltadb_select_static  type=wq_master | \
+deltadb_reduce_temporal m15 workers,MAX task_running,MAX tasks_running,MAX | \
+deltadb_reduce_spatial name,CNT workers.MAX,SUM task_running.MAX,SUM tasks_running.MAX,SUM | \
+deltadb_pivot name.CNT workers.MAX.SUM task_running.MAX.SUM tasks_running.MAX.SUM
+ Or for each month of the year, to list each project run in that month, with the owner and number of tasks dispatched, you might run something like this:
+deltadb_collect /data/catalog.history 2013-02-1@00:00:00 d365 | \
+deltadb_select_static  type=wq_master | \
+deltadb_reduce_temporal d30 workers,MAX total_tasks_dispatched,MAX task_running,MAX tasks_running,MAX | \
+deltadb_pivot owner workers.MAX total_tasks_dispatched.MAX tasks_running.MAX task_running.MAX
+
+
+Sample Data
+
+ For servers where type=wq_master
+
+#Some sample static fields: ['type', 'workers_by_pool', 'workers_init', 'workers', 'workers_busy', 'workers_ready', 'port', 'tasks_complete', 'start_time', 'project', 'address', 'tasks_waiting', 'lastheardfrom', 'version', 'capacity', 'name', 'owner', 'task_running', 'lifetime', 'priority', 'total_tasks_dispatched', 'disk_total', 'tasks_running', 'memory_total', 'starttime', 'cores_total', 'task_running0', 'my_master']
+
+
+#Some sample Dynamic Fields: ['workers_by_pool', 'workers', 'workers_ready', 'tasks_complete', 'total_tasks_dispatched', 'capacity', 'tasks_running', 'workers_busy', 'task_running', 'disk_total', 'memory_total', 'cores_total', 'tasks_waiting', 'workers_init', 'starttime', 'owner', 'my_master', 'project', 'start_time']
+
+ For servers where type=chirp
+
+#Some sample static fields: ['load1', 'load5', 'avail', 'backend', 'port', 'total_ops', 'opsys', 'version', 'memory_avail', 'name', 'owner', 'cpu', 'opsysversion', 'minfree', 'memory_total', 'type', 'starttime', 'load15', 'bytes_written', 'address', 'lastheardfrom', 'cpus', 'bytes_read', 'total', 'url', 'uptime', 'clients']
+
+
+#Some sample dynamic fields: ['load5', 'memory_avail', 'load1', 'avail', 'load15', 'total', 'starttime', 'total_ops', 'bytes_written', 'clients', 'bytes_read', 'opsysversion', 'memory_total', 'backend', 'url', 'version', 'owner']
+
+ For servers where type=wq_pool
+
+
+#Some sample static fields: ['type', 'starttime', 'name', 'owner', 'lifetime', 'port', 'pool_name', 'decision', 'address', 'workers_requested', 'lastheardfrom']
+
+
+#Some sample dynamic fields: ['decision', 'workers_requested']
+
+ For servers where type=catalog
+
+#Some sample static fields: ['type', 'name', 'owner', 'uptime', 'port', 'address', 'lastheardfrom', 'version', 'url', 'starttime']
+
+
+#Some sample dynamic fields: []
+
+ wq_pool sample
+
+key 259.74.246.25:91381:workspace1234.org
+type wq_pool
+starttime 1375886532
+name workspace1234.org
+owner cclosdci
+lifetime 180
+port 91381
+pool_name workspace1234.org-25846
+decision cclosdci:0
+address 259.74.246.25
+workers_requested 0
+lastheardfrom 1376870394
+1376942374 R key
+1376945475 U decision n/a
+1376945496 U decision cclosdci:0
+
+ wq_master sample
+
+key 171.65.257.29:5147:not0rious5678.org
+type wq_master
+workers_by_pool unmanaged:9
+starttime 1376602306
+workers_init 0
+workers 9
+workers_busy 9
+workers_ready 0
+port 5147
+tasks_running 9
+tasks_complete 22
+project forcebalance
+address 171.65.257.29
+tasks_waiting 2
+lastheardfrom 1376870399
+version 3.7.3
+capacity 0
+name not0rious5678.org
+owner kmckiern
+lifetime 300
+priority 0
+total_tasks_dispatched 37
+1376880663 U workers_by_pool unmanaged:7
+1376880663 U workers 7
+1376880663 U workers_busy 7
+1376880663 U tasks_running 7
+1376880663 U tasks_waiting 4
+1376880663 U total_tasks_dispatched 38
+1376880723 U workers_by_pool unmanaged:0
+1376880723 U workers 0
+1376880723 U workers_busy 0
+1376880723 U tasks_running 0
+1376880723 U tasks_waiting 11
+1376880723 U total_tasks_dispatched 42
+1376880783 U workers_by_pool unmanaged:8
+1376880783 U workers 8
+1376880783 U workers_busy 8
+1376880783 U tasks_running 8
+1376880783 U tasks_waiting 3
+1376880843 U workers_by_pool unmanaged:11
+1376880843 U workers 11
+1376880843 U workers_busy 11
+1376880843 U tasks_running 11
+1376880843 U tasks_waiting 0
+1376898613 U workers_by_pool unmanaged:10
+1376898613 U workers 10
+1376898613 U workers_busy 10
+1376898613 U tasks_running 10
+1376898613 U tasks_waiting 1
+1376898933 D
+1376934281 C type wq_master
+1376934281 C workers_by_pool n/a
+1376934281 C starttime 1376934226
+1376934281 C workers_init 0
+1376934281 C workers 0
+1376934281 C workers_busy 0
+1376934281 C workers_ready 0
+1376934281 C port 5147
+1376934281 C tasks_running 0
+1376934281 C tasks_complete 0
+1376934281 C project forcebalance
+1376934281 C address 171.65.102.29
+1376934281 C tasks_waiting 11
+1376934281 C lastheardfrom 1376934281
+1376934281 C version 3.7.3
+1376934281 C capacity 0
+1376934281 C name not0rious.Stanford.EDU
+1376934281 C owner kmckiern
+1376934281 C lifetime 300
+1376934281 C priority 0
+1376934281 C total_tasks_dispatched 11
+1376934341 U workers_by_pool unmanaged:11
+1376934341 U workers 11
+1376934341 U workers_busy 11
+1376934341 U tasks_running 11
+1376934341 U tasks_waiting 0
+1376948443 U workers_busy 10
+1376948443 U workers_ready 1
+1376948443 U tasks_running 10
+1376948443 U tasks_complete 1
+
+ catalog sample
+
+key 188.184.132.31:9097:wq-notary.cern.ch
+type catalog
+name wq-notary.cern.ch
+owner worker
+uptime 2799583
+port 9097
+address 188.184.132.31
+lastheardfrom 1376870370
+version 3.7.1
+url http://wq-notary.cern.ch:9097
+1376942380 R key
+
+ chirp sample
+
+key 129.74.153.171:9094:cclws16.cse.nd.edu
+load1 0.00
+load5 0.00
+avail 385363529728
+backend /var/condor/log/chirp
+port 9094
+total_ops 0
+opsys linux
+version 4.0.2rc1
+memory_avail 3866738688
+name cclws16.cse.nd.edu
+owner unknown
+cpu x86_64
+opsysversion 2.6.32-358.14.1.el6.x86_64
+minfree 1073741824
+memory_total 8193630208
+type chirp
+starttime 1376440078
+load15 0.00
+bytes_written 0
+address 129.74.153.171
+lastheardfrom 1376870109
+cpus 4
+bytes_read 0
+total 407189520384
+url chirp://cclws16.cse.nd.edu:9094
+1376870409 U memory_avail 3866992640
+1376870709 U load1 0.05
+1376870709 U load5 0.01
+1376871010 U load1 0.39
+1376871010 U load5 0.25
+1376871010 U avail 385363525632
+1376871010 U memory_avail 3866611712
+1376871010 U load15 0.09
+1376871310 U load1 0.36
+1376871310 U load5 0.33
+1376871310 U load15 0.16
+1376871610 U load1 0.41
+1376871610 U load5 0.36
+1376871610 U avail 385363521536
+1376871610 U memory_avail 3866484736
+1376871610 U load15 0.21
+1376871910 U load1 0.35
+1376871910 U load5 0.35
+1376871910 U avail 385363517440
+1376871910 U memory_avail 3866357760
+1376871910 U load15 0.24
+1376872210 U load1 0.01
+1376872210 U load5 0.16
+1376872210 U avail 385363513344
+1376872210 U memory_avail 3866484736
+1376872210 U load15 0.18
+1376872510 U load1 0.31
+1376872510 U load5 0.20
+1376872510 U memory_avail 3866357760
+1376872810 U load1 0.04
+1376872810 U load5 0.16
+1376872810 U avail 385363509248
+1376872810 U memory_avail 3866611712
+1376872810 U load15 0.17
+1376873110 U load1 0.01
+1376873110 U load5 0.08
+1376873110 U avail 385363505152
+1376873110 U memory_avail 3866476544
+1376873110 U load15 0.13
+1376873410 U load1 0.00
+1376873410 U load5 0.04
+1376873410 U memory_avail 3866230784
+1376873410 U load15 0.09

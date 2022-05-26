@@ -1,0 +1,45 @@
+The documentation illustrates how to use different execution engines of Umbrella to execute
+a complex CMS application.
+
+When the parrot sandbox mode is used, there exists two options to deliver
+cvmfs. First, if the local machine has cvmfs intalled by FUSE, the
+--use_local_cvmfs option can be used. Second, if the local machine does not
+have cvmfs installed, the --cvmfs_http_proxy option can be used to specified a
+http proxy, and parrot will be used to deliver cvmfs.
+
+#parrot execution engine test command.
+umbrella \
+--spec cms_opendata_git.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/CMSSW_4_2_8=/tmp/umbrella_test/parrot_cms_opendata_git_output" \
+--sandbox_mode parrot \
+--log umbrella.log \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
+run
+
+#Docker execution engine test command. Don't do the docker test under your afs, it will fail due to the ACL of your afs.
+umbrella \
+--spec cms_opendata_git.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/CMSSW_4_2_8=/tmp/umbrella_test/docker_cms_opendata_git_output" \
+--sandbox_mode docker \
+--log umbrella.log \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
+run
+
+#ec2 execution engine
+umbrella \
+--spec cms_opendata_git.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/CMSSW_4_2_8=/tmp/umbrella_test/ec2_cms_opendata_git_output" \
+--sandbox_mode ec2 \
+--ec2_sshkey ~/bin/feb272015.pem \
+--ec2_key feb272015 \
+--ec2_instance_type m3.medium \
+--ec2_log umbrella.log.ec2 \
+--log umbrella.log \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
+run

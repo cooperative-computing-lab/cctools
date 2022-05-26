@@ -1,0 +1,52 @@
+{
+	"comment": "A ray-tracing application which creates video frames.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "2",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.18"
+	},
+	"os": {
+		"ec2": {
+			"ami": "ami-2cf8901c",
+			"region": "us-west-2",
+			"user": "ec2-user"
+		},
+		"id": "669ab5ef94af84d273f8f92a86b7907a",
+		"name": "Redhat",
+		"version": "6.5"
+	},
+	"software": {
+		"povray-3.6.1-redhat6-x86_64": {
+			"id": "b02ba86dd3081a703b4b01dc463e0499",
+			"mountpoint": "/software/povray-3.6.1-redhat6-x86_64"
+		}
+	},
+	"data": {
+		"4_cubes.pov": {
+			"action": "none",
+			"id": "c65266cd2b672854b821ed93028a877a",
+			"mountpoint": "/tmp/4_cubes.pov"
+		},
+		"WRC_RubiksCube.inc": {
+			"action": "none",
+			"id": "2f8afdd09fc3a6177c6f1977bb3bdae7",
+			"mountpoint": "/tmp/WRC_RubiksCube.inc"
+		}
+	},
+	"environ": {
+		"PWD": "/tmp"
+	},
+	"cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50",
+	"output": {
+		"files": [
+			"/tmp/frame000.png"
+		],
+		"dirs": [
+		]
+	}
+}

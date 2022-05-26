@@ -1,0 +1,19 @@
+#
+# Parrot system calls, numbered the same for i386 and x86_64.
+#
+
+1000 parrot parrot_lsalloc sys_parrot_lsalloc
+1001 parrot parrot_mkalloc sys_parrot_mkalloc
+1002 parrot parrot_getacl sys_parrot_getacl
+1003 parrot parrot_setacl sys_parrot_setacl
+1004 parrot parrot_whoami sys_parrot_whoami
+1005 parrot parrot_copyfile sys_parrot_copyfile
+1006 parrot parrot_md5 sys_parrot_md5
+1007 parrot parrot_locate sys_parrot_locate
+1008 parrot parrot_timeout sys_parrot_timeout
+1009 parrot parrot_search sys_parrot_search
+1010 parrot parrot_debug sys_parrot_debug
+1011 parrot parrot_mount sys_parrot_mount
+1012 parrot parrot_unmount sys_parrot_unmount
+1013 parrot parrot_version sys_parrot_version
+1014 parrot parrot_fork_namespace sys_parrot_fork_namespace

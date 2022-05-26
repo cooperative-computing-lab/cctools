@@ -1,0 +1,28 @@
+2019-08-22 11:46:39.673 DEBUG umbrella - main: *******Welcome to Umbrella*******
+2019-08-22 11:46:39.673 DEBUG umbrella - main: Arguments: 
+2019-08-22 11:46:39.673 DEBUG umbrella - main: ['/afs/crc.nd.edu/user/b/btovar/usr/x86_64/redhat7/cctools/bin/umbrella', '--spec', 'umbrella-hello-world.json', '--localdir', '/tmp/umbrella', '--output', '/tmp/frame000.png=/tmp/umbrella/hello.png--sandbox_mode', 'parrot', '--log', 'umbrella.log', 'run']
+2019-08-22 11:46:39.673 DEBUG umbrella - main: Start time: 2019-08-22 11:46:39.673565
+2019-08-22 11:46:39.673 DEBUG umbrella - main: Check the validity of the command ....
+2019-08-22 11:46:39.673 DEBUG umbrella - main: Check the validity of the behavior: parrot
+2019-08-22 11:46:39.673 CRITICAL umbrella - main: parrot is not supported by umbrella!
+2019-08-22 11:48:11.393 DEBUG umbrella - main: *******Welcome to Umbrella*******
+2019-08-22 11:48:11.393 DEBUG umbrella - main: Arguments: 
+2019-08-22 11:48:11.393 DEBUG umbrella - main: ['/afs/crc.nd.edu/user/b/btovar/usr/x86_64/redhat7/cctools/bin/umbrella', '--spec', 'umbrella-hello-world.json', '--localdir', '/tmp/umbrella', '--output', '/tmp/frame000.png=/tmp/umbrella/hello.png--sandbox_mode', 'parrot', '--log', 'umbrella.log', 'run']
+2019-08-22 11:48:11.393 DEBUG umbrella - main: Start time: 2019-08-22 11:48:11.393964
+2019-08-22 11:48:11.394 DEBUG umbrella - main: Check the validity of the command ....
+2019-08-22 11:48:11.394 DEBUG umbrella - main: Check the validity of the behavior: parrot
+2019-08-22 11:48:11.394 CRITICAL umbrella - main: parrot is not supported by umbrella!
+2019-08-22 11:48:15.135 DEBUG umbrella - main: *******Welcome to Umbrella*******
+2019-08-22 11:48:15.135 DEBUG umbrella - main: Arguments: 
+2019-08-22 11:48:15.135 DEBUG umbrella - main: ['/afs/crc.nd.edu/user/b/btovar/usr/x86_64/redhat7/cctools/bin/umbrella', '--spec', 'umbrella-hello-world.json', '--localdir', '/tmp/umbrella', '--output', '/tmp/frame000.png=/tmp/umbrella/hello.png--sandbox_mode', 'parrotx', '--log', 'umbrella.log', 'run']
+2019-08-22 11:48:15.135 DEBUG umbrella - main: Start time: 2019-08-22 11:48:15.135523
+2019-08-22 11:48:15.135 DEBUG umbrella - main: Check the validity of the command ....
+2019-08-22 11:48:15.135 DEBUG umbrella - main: Check the validity of the behavior: parrotx
+2019-08-22 11:48:15.135 CRITICAL umbrella - main: parrotx is not supported by umbrella!
+2019-08-22 11:48:29.818 DEBUG umbrella - main: *******Welcome to Umbrella*******
+2019-08-22 11:48:29.818 DEBUG umbrella - main: Arguments: 
+2019-08-22 11:48:29.818 DEBUG umbrella - main: ['/afs/crc.nd.edu/user/b/btovar/usr/x86_64/redhat7/cctools/bin/umbrella', '--spec', 'umbrella-hello-world.json', '--localdir', '/tmp/umbrella', '--output', '/tmp/frame000.png=/tmp/umbrella/hello.png--sandbox_mode', 'local', '--log', 'umbrella.log', 'run']
+2019-08-22 11:48:29.818 DEBUG umbrella - main: Start time: 2019-08-22 11:48:29.818405
+2019-08-22 11:48:29.818 DEBUG umbrella - main: Check the validity of the command ....
+2019-08-22 11:48:29.818 DEBUG umbrella - main: Check the validity of the behavior: local
+2019-08-22 11:48:29.818 CRITICAL umbrella - main: local is not supported by umbrella!

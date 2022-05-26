@@ -1,0 +1,79 @@
+{
+    "comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.", 
+    "kernel": {
+        "version": ">=2.6.18", 
+        "name": "linux"
+    }, 
+    "os": {
+        "name": "Redhat", 
+        "format": "tgz", 
+        "checksum": "62aa9bc37afe3f738052da5545832c80", 
+        "source": [
+            "http://ccl.cse.nd.edu/research/data/hep-case-study/62aa9bc37afe3f738052da5545832c80/redhat-5.10-x86_64.tar.gz"
+        ], 
+        "version": "5.10", 
+        "uncompressed_size": "1622159360", 
+        "id": "62aa9bc37afe3f738052da5545832c80", 
+        "size": "503195460"
+    }, 
+    "cmd": "/bin/sh /tmp/cms_opendata.sh", 
+    "hardware": {
+        "cores": "1", 
+        "disk": "2GB", 
+        "arch": "x86_64", 
+        "memory": "1GB"
+    }, 
+    "environ": {
+        "PWD": "/tmp", 
+        "CMS_VERSION": "CMSSW_4_2_8", 
+        "SCRAM_ARCH": "slc5_amd64_gcc434"
+    }, 
+    "output": {
+        "files": [], 
+        "dirs": [
+            "/tmp/sim_job"
+        ]
+    }, 
+    "data": {
+        "00459D48-EB70-E011-AF09-90E6BA19A252.root": {
+            "source": [
+                "eospublic.cern.ch//eos/opendata/cms/Run2010B/Mu/AOD/Apr21ReReco-v1/0000/00459D48-EB70-E011-AF09-90E6BA19A252.root"
+            ], 
+            "mount_env": "ROOT_FILE", 
+            "id": "eospublic.cern.ch//eos/opendata/cms/Run2010B/Mu/AOD/Apr21ReReco-v1/0000/00459D48-EB70-E011-AF09-90E6BA19A252.root"
+        }, 
+        "demoanalyzer_cfg.py": {
+            "format": "plain", 
+            "checksum": "b0d3eb7874304ab2f75129646a311b12", 
+            "source": [
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/b0d3eb7874304ab2f75129646a311b12/demoanalyzer_cfg.py"
+            ], 
+            "action": "none", 
+            "mountpoint": "/tmp/demoanalyzer_cfg.py", 
+            "mount_env": "CONFIG_FILE", 
+            "id": "b0d3eb7874304ab2f75129646a311b12", 
+            "size": "623"
+        }, 
+        "cms_opendata.sh": {
+            "format": "plain", 
+            "checksum": "a6f9d99bcc08adb019ed6f3c31d9c090", 
+            "source": [
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/a6f9d99bcc08adb019ed6f3c31d9c090/cms_opendata.sh"
+            ], 
+            "action": "none", 
+            "mountpoint": "/tmp/cms_opendata.sh", 
+            "id": "a6f9d99bcc08adb019ed6f3c31d9c090", 
+            "size": "1444"
+        }
+    }, 
+    "software": {
+        "cmssw-4.2.8-slc5-amd64": {
+            "mountpoint": "/cvmfs/cms.cern.ch", 
+            "mount_env": "CMS_DIR", 
+            "id": "cvmfs://cvmfs/cms.cern.ch", 
+            "source": [
+                "cvmfs://cvmfs/cms.cern.ch"
+            ]
+        }
+    }
+}

@@ -1,0 +1,48 @@
+#!/bin/bash
+
+export GNUPLOT_DEFAULT_GDFONT=inconsolata
+
+job=$(realpath "$1")
+confuga=$(realpath "$2")
+
+data=$(mktemp)
+
+echo $0
+sqlite3 -separator $'\t' > "$data"  <<EOF
+ATTACH 'file://${job}?immutable=1' as Job;
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
+
+SELECT Job.id, Job.time_start, Job.time_finish, MAX(Job.time_finish-Job.time_start, 1)
+	FROM Job.Job
+	WHERE Job.status = 'FINISHED';
+EOF
+cat "$data"
+
+entries=$(wc -l "$data" | cut -f1 -d' ')
+tasks="${entries}"
+
+gnuplot <<EOF
+set terminal postscript eps mono
+set output 'taskspan.eps'
+
+bin(x,s) = s*int(x/s)
+binc(x,s) = s*(int(x/s)+0.5)
+
+binwidth = 10
+
+set title "Taskspan (${tasks} tasks)"
+set xdata time
+set timefmt "%s"
+set format x "%H:%M"
+set xlabel "Time (Minutes)"
+set xtics rotate by -45 offset -.8,0
+
+set ylabel "Frequency"
+set boxwidth binwidth
+
+plot [][-0.25:1] "${data}" u 4:(0.05*rand(0)-.1) title "Jitter", "" using (bin(\$4,binwidth)):(1./(${entries})) title "Task Span" smooth frequency with boxes
+# For normalized histogram:
+# plot [][-0.25:1] "${data}" u 4:(0.05*rand(0)-.1) title "Jitter", "" using (bin(\$4,binwidth)):(1./(binwidth*${entries})) title "Task Span" smooth frequency with boxes
+EOF
+
+# vim: set noexpandtab tabstop=4:

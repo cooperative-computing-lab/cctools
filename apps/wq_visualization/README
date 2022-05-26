@@ -1,0 +1,125 @@
+Author: Ryan Boccabella
+(C) Copyright 2015-  University of Notre Dame (see COPYING)
+
+Built using pythonv2.7
+
+----- TOOL FUNCTIONALITY -------------------------------------------------------
+visualize.py is a python script which creates a gif animation of a work_queue
+process or of a process makes use of work_queue by reading through a FULL log
+file* from the manager machine, and stripping out lines from that file that are
+useful to the state of the process. Looking at these changes in state, changes
+to a PIL image are made and added to the gif animation. Using ffplay or a
+web browser will allow you to view the created gif.
+
+Usage: python visualize.py log_file_name output_gif_name
+
+where the ouput_gif_name should not have the .gif extension
+
+*see the VIABLE LOGS section
+
+----- PURPOSE -----------------------------------------------------------------
+The reason this tool was built is two-fold:
+1.) So that users of work_queue and what is built on work_queue can have a
+	 visual representation of the machines at work when trying to find the
+	 reason for slow or failed executions
+
+2.) So that the developers of work_queue and what is built on work_queue can
+	 look for patterns in the execution of a work_queue process and find bugs
+	 or inefficiencies in work_queue.
+
+----- GIF STRUCTURE -----------------------------------------------------------
+Each frame of the GIF created has the line from the debug log on the bottom,
+a legend on the right, and a field of workers in the middle. Each worker has
+rows on the top which are meant to show the files that that worker owns, and
+rows separated by black lines on the bottom that represent cores, one row per
+core. A colored box in the file rows of the machines represents a single file
+for that machine. When a core is in use for a machine, it will be blue and
+display the name of the executable of the job it is running. The core will be
+red if it has finished a task but is yet to transfer the results back to the
+manager. A core that is white is not in use. The connection between the manager
+and the worker being communicated with in that frame is highlighted red, as is
+the worker machine itself. It is worth noting that the most commonly used
+files migrate to the left of the worker, so that it is easy to recognize
+when a worker may be missing one of the more important files.
+
+The legend on the right contains a mapping of file names to colors, as each
+file should have a distinct color (see LIMITATIONS). It will show only those
+files most commonly mentioned in the log and keeps track of this as it reads
+the log.
+
+----- LIMITATIONS and DEPENDENCIES --------------------------------------------
+Only certain types of logs can be run through visualize.py with sure results
+(see VIABLE LOGS). Unfortunately, very little testing has been done on
+visualize.py in terms of how many logs it has been run on, as very few full
+logs have been kept for work_queue processes in the past.
+
+Further, only small numbers of workers will actually fit on the gif image now
+that the number of cores is represented in the frames. This is the most urgent
+future improvement if the tool is going to fulfill its PURPOSE.
+
+An outside package, 'gifsicle', was used to create the gif and must be
+installed on any machine wishing to run visualize.py.
+
+The Python Imaging Library (PIL) is also imported by visualizer.py, and thus
+needs to be present on your machine to run the visualization tool.
+
+----- VIABLE LOGS -------------------------------------------------------------
+Only full logs from cctools versions 4.4 and up are able to be run through
+visualize.py. Full logs are required because it is otherwise nearly impossible
+to accurately track the state of the involved machines, files and tasks.
+
+Logs from older versions might be able to be converted into a viable format by:
+
+python log_converter.py unviable_log_file_name new_converted_log_file_name
+
+Only keep reading if interested in why log conversion is necessary:
+In cctools versions 4.3 and lower, work_queue did not require the full resource
+report from a worker to come in before that worker was assigned tasks. When
+this was discovered, it was changed so that now the manager reads the entirety
+of a resource report from the worker before continuing. When the resource
+report was not read altogether, the manager would begin transferring files and
+assigning 1-core tasks to workers whose resources were not yet known because
+it asssumed that worker had at least one core. This made it unfeasible to keep
+track of and show the files and tasks a worker had AND show represent the
+number of cores the worker had in the visualization.
+
+----- EFFICIENCY CONSIDERATIONS -----------------------------------------------
+TOOL FUNCTIONALITY glossed over one of the biggest problems met in writing
+this tool, the same reason that caused the  dependency on gifsicle. The problem
+was that so many frames are made that trying to keep all of the frames and
+stitch them together into a single gif at the end of the program would run the
+machine out of memory. gifsicle was selected because it has an option to append
+one gif to another, something not native to PIL or more common video libraries
+like ffmpeg. When using the append option for gifsicle, the program ran
+extremely slowly, because appending is expensive. The solution to this was to
+keep up to GIF_APPEND_THRESHOLD single frame gifs in a temporary directory.
+When there are GIF_APPEND_THRESHOLD frames in that directory, create a
+temporary gif of the frames in the temp directory, and then append that gif
+to the final, growing gif that is the end result of the visualize.py process.
+
+----- FUTURE IMPROVEMENTS -----------------------------------------------------
+For a list of things that can be improved about this code, see TODO.txt and
+the TODO statements within the code for visualizer.py. Also look at the
+LIMITATIONS section. The general goal is to most accurately reflect the
+resources being consumed - time, disk, cores, etc. - in the animation itself.
+
+The most pressing improvements are likely the scalability of the gif, as only
+so many machines can fit on a given image and the logs that we want this to
+run on will likely exceed the screen space, and the problem of the size of
+the gif and how long appending takes, as this is what bounds execution time
+on the gif maker. It could be helped by the real time suggestion in TODO.txt
+
+It is recommended that you use the dev directory to make
+these improvements, where you will find NewLogFormatVisualize.py which
+contains a lot of debugging statements for the developer given in a cheap
+C compiler directive knockoff style:
+	if "debug" in globals():
+		print "debug info"
+with a variety of different variables that are currently commented out.
+There are a few minor differences between NewLogFormatVisualize.py and
+visualize.py at the moment, as visualize.py is production code and has been
+updated since removing the debug "macros"
+
+Refactoring to make better use of object oriented principles, or really just
+separating concerns a little better and breaking it into a few separate files
+might be good, as every class used is defined in visualize.py

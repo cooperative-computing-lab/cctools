@@ -1,0 +1,111 @@
+CATEGORY="demo"
+DISK=3
+
+.SIZE O 1
+O: 
+	dd if=/dev/zero of=O bs=1 count=1; touch alloc.out
+
+.SIZE O_l 1
+
+O_l: O
+	cp O O_l; ls -l | wc -l >> alloc.out
+
+.SIZE O_r 1
+
+O_r: O
+	cp O O_r; ls -l | wc -l >> alloc.out
+
+.SIZE O_l_l 1
+
+O_l_l: O_l
+	cp O_l O_l_l; ls -l | wc -l >> alloc.out
+
+.SIZE O_r_l 1
+
+O_r_l: O_r
+	cp O_r O_r_l; ls -l | wc -l >> alloc.out
+
+.SIZE O_l_r 1
+
+O_l_r: O_l
+	cp O_l O_l_r; ls -l | wc -l >> alloc.out
+
+.SIZE O_r_r 1
+
+O_r_r: O_r
+	cp O_r O_r_r; ls -l | wc -l >> alloc.out
+
+.SIZE O_l_l_l 1
+
+O_l_l_l: O_l_l
+	cp O_l_l O_l_l_l; ls -l | wc -l >> alloc.out
+
+.SIZE O_r_l_l 1
+
+O_r_l_l: O_r_l
+	cp O_r_l O_r_l_l; ls -l | wc -l >> alloc.out
+
+.SIZE O_l_r_l 1
+
+O_l_r_l: O_l_r
+	cp O_l_r O_l_r_l; ls -l | wc -l >> alloc.out
+
+.SIZE O_r_r_l 1
+
+O_r_r_l: O_r_r
+	cp O_r_r O_r_r_l; ls -l | wc -l >> alloc.out
+
+.SIZE O_l_l_r 1
+
+O_l_l_r: O_l_l
+	cp O_l_l O_l_l_r; ls -l | wc -l >> alloc.out
+
+.SIZE O_r_l_r 1
+
+O_r_l_r: O_r_l
+	cp O_r_l O_r_l_r; ls -l | wc -l >> alloc.out
+
+.SIZE O_l_r_r 1
+
+O_l_r_r: O_l_r
+	cp O_l_r O_l_r_r; ls -l | wc -l >> alloc.out
+
+.SIZE O_r_r_r 1
+
+O_r_r_r: O_r_r
+	cp O_r_r O_r_r_r; ls -l | wc -l >> alloc.out
+
+.SIZE T_l_l 1
+
+T_l_l: O_l_l_l O_l_l_r
+	cp O_l_l_l T_l_l; ls -l | wc -l >> alloc.out
+
+.SIZE T_r_l 1
+
+T_r_l: O_r_l_l O_r_l_r
+	cp O_r_l_l T_r_l; ls -l | wc -l >> alloc.out
+
+.SIZE T_l_r 1
+
+T_l_r: O_l_r_l O_l_r_r
+	cp O_l_r_l T_l_r; ls -l | wc -l >> alloc.out
+
+.SIZE T_r_r 1
+
+T_r_r: O_r_r_l O_r_r_r
+	cp O_r_r_l T_r_r; ls -l | wc -l >> alloc.out
+
+.SIZE T_l 1
+
+T_l: T_l_l T_l_r
+	cp T_l_l T_l; ls -l | wc -l >> alloc.out
+
+.SIZE T_r 1
+
+T_r: T_r_l T_r_r
+	cp T_r_l T_r; ls -l | wc -l >> alloc.out
+
+.SIZE T 1
+
+T: T_l T_r
+	cp T_l T; ls -l | wc -l >> alloc.out

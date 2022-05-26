@@ -1,0 +1,7 @@
+
+MAKEFLOW_INPUTS=input/hello
+MAKEFLOW_OUTPUTS=mydir/1.txt mydir/2.txt
+
+# files as target files ( should create directories on their paths if not exist)
+mydir/1.txt mydir/2.txt: input/hello
+	mkdir -p mydir; cp input/hello mydir/1.txt; cp input/hello mydir/2.txt

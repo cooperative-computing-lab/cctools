@@ -1,0 +1,27 @@
+The wq_bowtie program aligns sequences of genomes listed in a fastq file using
+Bowtie. It aligns by partitioning the file into pieces containing one or more
+sequences and running Bowtie to align them individually. The program uses the
+Work Queue framework for distributed execution.
+
+To run:
+
+1. Install CCTools.
+2. Install Bowtie and all its required dependencies. Bowtie can be download from:
+http://bowtie-bio.sourceforge.net/index.shtml
+3. Run './wq_bowtie <REFERENCE_FILE> <FASTQ_FILE>' to align sequences in <FASTQ_FILE>.
+4. Start workers:
+work_queue_worker -d all <HOSTNAME> <PORT>
+where <HOSTNAME> is the name of the host on which the manager is running
+	  <PORT> is the port number on which the manager is listening.
+
+Alternatively, you can also specify a project name for the manager and use that
+to start workers:
+
+1. ./wq_bowtie <REFERENCE_FILE> <FASTQ_FILE> -N WQBOWTIE
+2. work_queue_worker -d all -N WQBOWTIE
+
+For listing the command-line options, do:
+./wq_bowtie -h
+
+When the alignment completes, you will find the output files in the
+same directory from where wq_bowtie was run.

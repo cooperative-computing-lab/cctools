@@ -1,0 +1,9 @@
+export ECHOB=echob
+export ECHOC=$ECHOA
+
+MAKEFLOW_INPUTS=$ECHOA $ECHOC
+MAKEFLOW_OUTPUTS="out.all"
+
+out.all: $ECHOA $ECHOC
+	$ECHOA $ECHOA $ECHOB > out.all; $ECHOC $ECHOC $ECHOB >> out.all	
+

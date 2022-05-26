@@ -1,0 +1,131 @@
+#!/usr/bin/env python
+
+import json
+import sys
+import os
+import uuid
+import subprocess
+
+CIDR_BLOCK="10.0.0.0/16"
+SUBNET_CIDR_BLOCK="10.0.1.0/24"
+UUID = uuid.uuid4()
+KEYPAIR_NAME="kp." + "{}".format(UUID)
+KEYPAIR_FILE = KEYPAIR_NAME + ".pem"
+SECURITY_GROUP_NAME="sg." + "{}".format(UUID)
+
+if __name__ == "__main__":
+
+	if len(sys.argv) != 3:
+		print("use: {}: <config-file> <image-name>").format(sys.argv[0])
+		exit(1)
+
+	CONFIG_FILE=sys.argv[1]
+	IMAGE_NAME=sys.argv[2]
+
+	sys.stdout.write("Checking for aws command in PATH...")
+
+	# if os.system("which aws >/dev/null 2>&1"):
+	if not os.system("which aws >/dev/null 2>&1"):
+		print("okay")
+	else:
+		print("failed")
+		print("{}: The \"aws\" command must be in your path to use this script.").format(sys.argv[0])
+		exit(1)
+
+	sys.stdout.write("Checking for aws configuration...")
+
+	if os.path.isfile(os.path.expanduser("~/.aws/config")):
+		print("okay")
+	else:
+		print("failed")
+		print("{}: You must run \"aws configure\" before using this script.").format(sys.argv[0])
+		# os.echo()
+		exit(1)
+
+	print("Checking for correct credentials...")
+	if not os.system("aws ec2 describe-instances >/dev/null 2>&1"):
+		print("okay")
+	else:
+		print("failed")
+		print("{}: Your Amazon credentials are not set up correctly. Try \"aws ec2 describe-instances\" to troubleshoot.").format(sys.argv[0])
+		exit(1)
+
+	print("Creating virtual private cluster...")
+	vpc_cmd = "aws ec2 create-vpc --cidr-block {} --output json".format(CIDR_BLOCK)
+	vpc_proc = subprocess.Popen(vpc_cmd, stdout=subprocess.PIPE, shell=True)
+	vpc_json = vpc_proc.stdout.read()
+	vpc_array = json.loads(vpc_json.rstrip())
+	vpc_id = vpc_array["Vpc"]["VpcId"]
+
+	print("Creating subnet...")
+	subnet_cmd = "aws ec2 create-subnet --cidr-block {} --vpc-id {} --output json".format(SUBNET_CIDR_BLOCK, vpc_id)
+	subnet_proc  = subprocess.Popen(subnet_cmd, stdout=subprocess.PIPE, shell=True)
+	subnet_json = subnet_proc.stdout.read()
+	subnet_array = json.loads(subnet_json.rstrip())
+	subnet_id = subnet_array["Subnet"]["SubnetId"]
+
+	modify_subnet_cmd = "aws ec2 modify-subnet-attribute --subnet-id {} --map-public-ip-on-launch".format(subnet_id)
+	os.system(modify_subnet_cmd)
+	print("modify attribute of subnet {}".format(subnet_id))
+
+	print("Getting default security group of VPC {}...".format(vpc_id))
+	security_group_cmd = "aws ec2 describe-security-groups --filters Name=vpc-id,Values={} --query 'SecurityGroups[0].GroupId' --output json".format(vpc_id)
+	security_group_proc = subprocess.Popen(security_group_cmd, stdout=subprocess.PIPE, shell=True)
+	security_group_json = security_group_proc.stdout.read()
+	security_group_id = json.loads(security_group_json.rstrip())
+
+	print("Configuring security group {}...".format(security_group_id))
+	# Allow for ssh incoming traffic
+	os.system("aws ec2 authorize-security-group-ingress --group-id {} --port 22 --cidr 0.0.0.0/0 --protocol tcp".format(security_group_id))
+
+	print("Creating internet gateway...")
+	gateway_proc  = subprocess.Popen("aws ec2 create-internet-gateway --output json", stdout=subprocess.PIPE, shell=True)
+	gateway_json = gateway_proc.stdout.read()
+	gateway_array = json.loads(gateway_json.rstrip())
+	gateway_id = gateway_array["InternetGateway"]["InternetGatewayId"]
+
+	print("Attaching internet gateway...")
+	os.system("aws ec2 attach-internet-gateway --internet-gateway-id {} --vpc-id {}".format(gateway_id, vpc_id))
+
+	print("Looking up route table...")
+	route_table_cmd = "aws ec2 describe-route-tables --filters Name=vpc-id,Values={} --query 'RouteTables[0].RouteTableId' --output json".format(vpc_id)
+	route_table_proc = subprocess.Popen(route_table_cmd, stdout=subprocess.PIPE, shell=True)
+	route_table_json = route_table_proc.stdout.read()
+	route_table_id = json.loads(route_table_json.rstrip())
+
+	print("Creating route...")
+	os.system("aws ec2 create-route --route-table-id {} --gateway-id {} --destination-cidr-block 0.0.0.0/0".format(route_table_id, gateway_id))
+
+	print(("Creating keypair {}...").format(KEYPAIR_NAME))
+	# Remove junk from around keypair that confuses ssh.
+	key_pair_cmd = "aws ec2 create-key-pair --key-name {} --output json".format(KEYPAIR_NAME)
+	key_pair_proc = subprocess.Popen(key_pair_cmd, stdout=subprocess.PIPE, shell=True)
+	key_pair_json = key_pair_proc.stdout.read()
+	key_pair_array = json.loads(key_pair_json.rstrip())
+	key_pair_material = key_pair_array["KeyMaterial"]
+
+	f = open(KEYPAIR_FILE,"w")
+	f.write(key_pair_material)
+	f.close()
+
+	# Permissions must be just so for ssh to be happy.
+	os.system("chmod 600 {}".format(KEYPAIR_FILE))
+	
+	# Assigning absolute path to the keypair_file to enable work queue functions
+	KEYPAIR_PATH = os.path.abspath(KEYPAIR_FILE)
+	
+
+	print("Creating {} with all the details...".format(CONFIG_FILE))
+	#print("WARNING: the absolute path of your keypair is assigned to this config file: {}".format(KEYPAIR_PATH))
+	config_f = open(CONFIG_FILE,"w")
+	config_f.write("vpc {}\n".format(vpc_id))
+	config_f.write("subnet {}\n".format(subnet_id))
+	config_f.write("gateway {}\n".format(gateway_id))
+	config_f.write("route_table {}\n".format(route_table_id))
+	config_f.write("security_group_id {}\n".format(security_group_id))
+	config_f.write("security_group_name {}\n".format(SECURITY_GROUP_NAME))
+	config_f.write("keypair_name {}\n".format(KEYPAIR_NAME))
+	config_f.write("ami {}\n".format(IMAGE_NAME))
+	config_f.close()
+
+	print("Done!")

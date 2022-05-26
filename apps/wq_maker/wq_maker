@@ -1,0 +1,601 @@
+#!/usr/bin/env perl
+
+# wq_maker
+# 
+# Copyright (C) 2013- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+# 
+# This program implements elastic genome annotation using the cctools work queue
+# framework and the MAKER annotation pipeline as described in the following
+# paper:
+# 
+# Andrew Thrasher, Zachary Musgrave, Douglas Thain, Scott Emrich,
+#  "Shifting the Bioinformatics Computing Paradigm: A Case Study in
+#   Parallelizing Genome Annotation Using Maker and Work Queue",
+# IEEE International Conference on Computational Advances in Bio and Medical
+# Sciences, February, 2012.
+#
+# Updated by Nick Hazekamp
+# August, 2017
+
+use strict "refs";
+use strict "vars";
+use warnings;
+
+use Cwd;
+use Cwd qw(abs_path);
+use Error qw(:try);
+use Error::Simple;
+use Getopt::Long qw(:config no_ignore_case);
+Getopt::Long::Configure("pass_through");
+use Time::HiRes qw(gettimeofday); 
+use Work_Queue;
+
+#Record starting time.
+my $start_time = time*1000000; 
+
+$| = 1; #turn on autoflush.
+
+my $version = `maker -v`;
+chomp($version);
+if( $version ne "2.31.8"){
+	print "WQ_MAKER supports version 2.31.8. Current version : $version\n";
+}
+
+
+my $maker_help = `maker -h`;
+
+my $genome;
+my $dynamic_env = 0;
+my $augustus;
+my $base_name;
+my $mpi_arg;
+my $resources = 0;
+my $total_tiers = 0;
+my $tasks = 0;
+my $cores  = 1;
+my $disk   = 0;
+my $memory = 0;
+my $tolerable_task_failures = 2;
+my %task_failures;
+my $debug = 0;
+
+my $usage = "$maker_help
+Work Queue Options:
+
+     -port <int>              Sets the port for work_queue to listen on (default: 9135)
+ 
+     -fa   <int>              Sets the work_queue fast abort option with the given multiplier. 
+
+     -contigs-per-split <int> Specify the number of chunks created from FASTA file. 
+
+     -N <project>             Sets the project name to <project>.
+
+     -cores  <int>            Specify the number of cores to be used by each contig. 
+     -disk   <int>            Specify the amount of disk (in MB) to be used by each contig. 
+     -memory <int>            Specify the amount of memory (in MB) to be used by each contig. 
+     
+     -d <level>               Sets the debug flag for Work Queue. For all debugging output, try 'all'.
+     -o <debug file>          Sets the debug file for Work Queue.
+     -debug-size-limit <size> Sets the byte wrap around on the debug file. 0 signifies it is never wrapped. Default it 1M.
+	 
+     -MPI                     Specifies that each task should utilize mpiexec to execute.
+
+     -monitor <dir>           Enables monitoring and specifies the directory each tasks resource monitoring is placed.
+     -monitor-full            Enables full monitoring that creates a time series of tasks, may be extremely large.
+
+     -stats <file>            Specifies the file were Work Queue manager stats are written.
+
+     -dynamic_env             Configures maker EXE at work site. Only for use where maker -EXE correctly locates executables.
+";
+
+#---Process options on the command line 
+my %OPT;
+try{
+    GetOptions("CTL" => sub { `maker -CTL`; exit(0);},
+               "OPTS" => sub { `maker -OPTS`; exit(0);},
+               "BOPTS" => sub { `maker -BOPTS`; exit(0);},
+               "EXE" => sub { `maker -EXE`; exit(0);},
+               "base=s" => \$OPT{base},
+               "genome|g=s" => \$OPT{genome},
+	       "port=i" => \$OPT{port},
+	       "fa=i" => \$OPT{fast_abort},
+	       "N=s" => \$OPT{project},
+	       "d=s" => \$OPT{debug},
+	       "o=s" => \$OPT{debug_file},
+	       "debug-size-limit=i" => \$OPT{debug_size},
+ 	       "cores=i" => \$OPT{cores},
+ 	       "disk=i" => \$OPT{disk},
+ 	       "memory=i" => \$OPT{memory},
+	       "contigs-per-split=i" => \$OPT{contigs_per_split},
+ 	       "bw=i" => \$OPT{bw},
+           "MPI" => sub {$mpi_arg = "mpiexec -n ";},
+           "monitor=s" => \$OPT{"monitor"},
+           "monitor-full" => \$OPT{"monitor-full"},
+           "stats=s" => \$OPT{"stats"},
+           "dynamic_env" => sub {$dynamic_env = 1;},
+	       "help|?" => sub {print $usage; exit(0)}
+	       );
+
+} catch Error::Simple with {
+    my $E = shift;
+    print STDERR $E->{-text};
+    die "Failed to parse command line options.\n";
+};
+
+if(!defined($OPT{"genome"})) {
+	print "Genome file not specified. Using the specification in the CTL files.\n";
+} else {
+	$genome = $OPT{"genome"};
+}
+
+try{
+    #get arguments off the command line
+    if (not (-e "maker_opts.ctl" && -e "maker_bopts.ctl" && -e "maker_exe.ctl")) {
+        print STDERR "Maker control files not found\n";
+        print STDERR $usage;
+        exit(0);
+    }
+	
+    `maker -check @ARGV`;
+
+    #---set up blast databases and indexes for analyisis
+    print STDERR "STATUS: Processing and indexing input FASTA files...\n";
+    
+} catch Error::Simple with {
+    my $E = shift;
+    print STDERR $E->{-text};
+    my $code = 2;
+    $code = $E->{-value} if (defined($E->{-value}));
+    exit($code);
+};
+
+if(defined($OPT{"cores"})) {
+	$cores = $OPT{"cores"}; 
+}
+
+if(defined($OPT{"disk"})) {
+	$disk = $OPT{"disk"}; 
+}
+
+if(defined($OPT{"memory"})) {
+	$memory = $OPT{"memory"}; 
+}
+
+if(defined($mpi_arg)){
+	$mpi_arg .= "$cores ";
+} else {
+	$mpi_arg = "";
+}
+
+#Call main loop here
+main(); 
+
+
+#------------------------------- FUNCTION DEFINITIONS -------------------------------------
+
+sub main {
+	my $start_tier = 0;
+	my $tiers_annotated = 0;
+	my $total_tiers_annotated = 0;
+
+	my $partition_time_start;
+	my $actual_partition_time = 0;
+
+	my $common_input_files = parse_maker_opts();
+	my $input_to_contigs = parse_genome_file();
+
+	if($OPT{"base"}){
+		$base_name = $OPT{"base"};
+	}
+	
+	`maker -dsindex -g $genome -base $base_name`;
+
+	my $output_dirs = parse_contig_dirs();
+
+	###Begin WorkQueue section
+	my $wq_start_time = time; 
+	
+	my $wq = setup_workqueue();
+
+	my $workers_used = 0;	
+
+	my $optimal_tasks = $tasks;
+	my $optimal_tasks_to_submit = $tasks;
+	my $tasks_submitted = 0;
+	submit_tasks($wq, $common_input_files, $output_dirs, $input_to_contigs);
+
+	process_completed_tasks($wq, scalar (keys %$input_to_contigs), 5);	
+
+	`maker -dsindex -g $genome -base $base_name`;
+
+	print "\n".localtime()." :: File $base_name annotated :: ".scalar (keys %$input_to_contigs)." in total \n";
+	if($wq->stats->{total_tasks_failed} > 0){
+		print localtime()." :: Failed to annotate :: \n";
+		foreach my $task (keys %task_failures){
+			if($task_failures{$task} > $tolerable_task_failures){
+				print "\t$task\n";
+			}
+		}
+	}
+	$workers_used = 0;	
+	print "-----------------------------------------------------------------\n";
+	print "Type\tSuccess\tFailure\tAbandon\tTotal\n";
+	print "Tasks\t".$wq->stats->{total_tasks_complete}."\t";
+	print $wq->stats->{total_tasks_failed}."\t";
+	print $wq->stats->{total_tasks_cancelled}."\t";
+	print $wq->stats->{total_tasks_dispatched}."\n";
+	print "-----------------------------------------------------------------\n";
+	print "Workers:\tJoined\tRemoved\tIdled-Out\tLost\n";
+	print $wq->stats->{total_workers_connected}."\t\t";
+	print $wq->stats->{total_workers_joined}."\t";
+	print $wq->stats->{total_workers_removed}."\t";
+	print $wq->stats->{total_workers_idled_out}."\t\t";
+	print $wq->stats->{total_workers_lost}."\n";
+	print "-----------------------------------------------------------------\n";
+	print "\n";
+	my $end_time = time*1000000;
+	my $wall_time = ($end_time - ($wq->stats->{start_time}));
+	my $wq_total_time = $end_time - $wq_start_time;
+	my $total_time = $end_time - $start_time;
+
+	print "WQ-MAKER Start_time:\t";
+	print $start_time."\n";
+	print "WQ-MAKER End_time:\t";
+	print $end_time."\n";
+	print "WQ-MAKER Elapsed:\t";
+	print_time($total_time);
+	print "Work Queue Wall Time:\t";
+	print_time($wall_time);
+	print "Cumulative Task Wall Time:\t";
+	print_time($wq->stats->{total_execute_time});
+	print "Cumulative Task Good Execute Time:\t";
+	print_time($wq->stats->{total_good_execute_time});
+	print "Work Queue Send Time:\t";
+	print_time($wq->stats->{total_send_time});
+	print "Work Queue Receive Time:\t";
+	print_time($wq->stats->{total_receive_time});
+	print "-----------------------------------------------------------------\n";
+	if(defined($mpi_arg)){
+		print "".localtime()." :: MPI used :: Cores ".$cores." :: Memory ".$memory." :: Disk ".$disk." \n";
+	} else {
+		print "".localtime()." :: MPI not used\n";
+	}
+	print "-----------------------------------------------------------------\n";
+	
+
+	
+	exit(0);
+}
+
+sub print_time {
+	my ($time_val) = @_;
+
+	my $sub_sec = $time_val%1000000;
+	$time_val = $time_val/1000000;
+
+	my $days = $time_val/86400;
+	$time_val = $time_val%86400;
+
+	my $hours = $time_val/3600;
+	$time_val = $time_val%3600;
+
+	my $min = $time_val/60;
+	$time_val = $time_val%60;
+
+	printf '%dd %d:%02d:%02d.%06d', int($days), int($hours), int($min), int($time_val), int($sub_sec);
+	print "\n";
+}
+
+sub setup_workqueue {
+	if(defined($OPT{"debug"})){
+		if($OPT{"debug"} eq "maker" or $OPT{"debug"} eq "all"){
+			$debug = 1;
+		}
+		Work_Queue::cctools_debug_flags_set($OPT{"debug"}); 
+		if(defined($OPT{"debug_file"})){
+			Work_Queue::cctools_debug_config_file($OPT{"debug_file"}); 
+			if(defined($OPT{"debug_file"})){
+				Work_Queue::cctools_debug_config_file_size($OPT{"debug_size"});
+			}
+		}
+		print localtime()." :: Work Queue debug flags set :: ".$OPT{"debug"}.".\n";
+	}
+
+	my $port = "9155";
+	if(defined($OPT{"port"})) {
+		$port = $OPT{"port"}; 
+	} 
+
+	my $wq = Work_Queue->new($port);
+	if(defined($wq)) {
+		print localtime()." :: Work Queue listening on port $port.\n";
+	} else {
+		print STDERR "Failed to create Work Queue on port $port.\n"; 
+		exit(0);
+	}
+	if(defined($OPT{"fast_abort"})) {
+		my $multiplier = $OPT{"fast_abort"}; 
+		my $fa = $wq->activate_fast_abort($multiplier); 
+		print localtime()." :: Work Queue fast abort set to $multiplier.\n";
+	}
+	if(defined($OPT{"project"})) {
+		$wq->specify_name($OPT{"project"});
+		print localtime()." :: Work Queue project name set to ".$OPT{"project"}.".\n";
+	}
+
+	if(defined($OPT{"monitor"})) {
+		if(defined($OPT{"monitor-full"})){
+			$wq->enable_monitoring_full($OPT{"monitor"});
+		} else{
+			$wq->enable_monitoring($OPT{"monitor"});
+		}
+	}
+	
+	if(defined($OPT{"stats"})){
+		$wq->specify_log($OPT{"stats"});
+	} else {
+		$wq->specify_log("maker_wq.stats");
+	}
+
+	return $wq;
+}
+
+sub parse_maker_opts {
+	my @files;
+	open my $opts, '<', 'maker_opts.ctl' or die "Could not open maker_opts.ctl $!\n";
+	while (my $line = <$opts>) {
+		chomp $line;
+		my $info = substr($line, 0 , index($line, '#'));
+		if( $info =~ m/^(makergff|est|altest|est_gff|altest_gff|protein|protein_gff|rmlib|repeat_protein|rm_gff|snaphmm|gmhmm|fgenesh_par_file|pred_gff|model_gff|snoscan_rrna|other_gff)=/ ) {
+			my $input = substr($info, index($info, '=')+1);
+			$input =~ s/^\s+|\s+$//g;
+			if(length $input > 0 and not($input =~ m/^\//)){
+				push @files, $input;
+			} elsif ( $input =~ m/^\// ) {
+				print "$input is absolute path, please use relative path within cwd\n";
+				exit(1);
+			} 
+		} elsif ( $info =~ m/^augustus_species=/ and not $augustus ) {
+			my $input = substr($info, index($info, '=')+1);
+			$input =~ s/^\s+|\s+$//g;
+			if(length $input > 0 and not($input =~ m/^\//)){
+				$augustus = $input;
+			} elsif ( $input =~ m/^\// ) {
+				print "$input is absolute path, please use relative path within cwd.\n";
+				exit(1);
+			}
+		} elsif ( $info =~ m/^genome=/ and not $genome ) {
+			my $input = substr($info, index($info, '=')+1);
+			$input =~ s/^\s+|\s+$//g;
+			if(length $input > 0 and not($input =~ m/^\//)){
+				$genome = $input;
+			} elsif ( $input =~ m/^\// ) {
+				print "$input is absolute path, please use relative path within cwd.\n";
+				exit(1);
+			}
+		}
+	}
+	return \@files;
+}
+
+sub parse_genome_file {
+	my $contigs_per_split = 10;
+	my $contigs_currently = 0;
+	my $splits_currently = 0;
+	if($OPT{"contigs_per_split"}){
+		$contigs_per_split = $OPT{"contigs_per_split"};
+	}
+
+	print "Contigs per split : $contigs_per_split\n";
+
+	my $base_dir = substr($genome, 0, rindex($genome, '/')+1);
+	my $name_length = rindex($genome, '.') - (rindex($genome, '/')+1);
+	if($name_length > 0){
+		$base_name = substr($genome, rindex($genome, '/')+1, $name_length);
+	} else {
+		$base_name = substr($genome, rindex($genome, '/')+1);
+	}
+
+	print "Contigs found : ";
+
+	my $inputs_to_contigs = {};
+	open my $genome_file, '<', "$genome" or die "Could not open input Genome $genome $!\n";
+	my $output = sprintf("$genome\_%06d", $splits_currently);
+	open my $genome_output, '>', "$output" or die "Could not open output Genome $output $!\n";
+
+	while (my $line = <$genome_file>) {
+		if( (my $contig) = $line =~ m/^>\s*(\w*)/ ) {
+			if($contigs_currently == $contigs_per_split) {
+				$contigs_currently = 0;
+				$splits_currently += 1;
+				if ($debug) { printf("%d : ", ($contigs_per_split*$splits_currently)); }
+				close($genome_output);
+				$output = sprintf("$genome\_%06d", $splits_currently);
+				open $genome_output, '>', "$output" or die "Could not open output Genome $output $!\n";
+				$inputs_to_contigs->{$output} = [];
+			}
+			push(@{$inputs_to_contigs->{$output}}, $contig);
+			$contigs_currently += 1;
+		}
+		print $genome_output $line;
+	}
+	printf("%d\n", ($contigs_per_split*$splits_currently)+$contigs_currently);
+	if($contigs_currently > 0){
+		$splits_currently += 1;
+	}
+	printf("Total number of input files : %d\n", $splits_currently);
+	$total_tiers = $splits_currently;
+	close($genome_file);
+	close($genome_output);
+
+	return $inputs_to_contigs;
+}
+
+sub parse_contig_dirs {
+	my $output_dirs = {};
+	open my $output_db, '<', "$base_name.maker.output/$base_name\_master_datastore_index.log" or die "Could not open $base_name\_master_datastore_index.log $!\n";
+	while (my $line = <$output_db>) {
+		if ($debug) { 
+			print $line;
+		}
+		if( (my $contig, my $location) = $line =~ m/^(\w*)\s*(.*)\/.*\/\s*STARTED/ ) {
+			#print "Contig found : $contig at $location \n";
+			$output_dirs->{$contig} = $location;
+		}
+	}
+	close($output_db);
+	return $output_dirs;
+}
+
+sub submit_tasks {
+	my($wq, $common_input_files, $output_dirs, $input_to_contigs) = @_;
+	
+	foreach my $genome_chunk (keys %$input_to_contigs) {
+		if ($debug) { 
+			print localtime()." :: Submitting file $genome_chunk for processing.\n";
+		}	
+		submit_task($wq, $genome_chunk, $common_input_files, $output_dirs, $input_to_contigs);
+	}
+}
+
+sub submit_task {
+	my($wq, $genome_chunk, $common_input_files, $output_dirs, $input_to_contigs) = @_;
+
+	my $task_command = "";
+	if($dynamic_env){
+		$task_command .= "maker -EXE; ";
+	}
+	if($augustus){
+		$task_command .= "export AUGUSTUS_CONFIG_PATH=\$PWD/config; ";
+	}
+	$task_command .= "$mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV);
+	
+	my $task = Work_Queue::Task->new($task_command); 
+	my $task_tag = substr($genome_chunk, rindex($genome_chunk, '_')+1, rindex($genome_chunk, '.')-(rindex($genome_chunk, '_')+1)); 
+	$task->specify_tag($task_tag); 
+
+	$task->specify_input_file($genome_chunk); 
+	$task->specify_input_file("maker_opts.ctl"); 
+	$task->specify_input_file("maker_bopts.ctl"); 
+	$task->specify_input_file("maker_exe.ctl"); 
+	submit_input_files($task, $common_input_files);
+	if($augustus){
+		submit_augustus_files($task);
+	}
+	my $contigs = $input_to_contigs->{$genome_chunk};
+	foreach my $contig (@$contigs) {
+		my $location = $output_dirs->{$contig};
+		$task->specify_output_file("$base_name.maker.output/$location"); 
+#		$task->specify_file($task, $base_name.".maker.output/$location/$contig.run.log", $base_name.".maker.output/$location/run.log", 1, 1); 
+	}
+
+	$task->specify_cores($cores);
+	if($disk){
+		$task->specify_disk($disk);
+	}
+	if($memory){
+		$task->specify_memory($memory);
+	}
+
+	my $taskid = $wq->submit($task);
+	if ($debug) { 
+		print localtime()." :: Submitted task $taskid for annotating $genome_chunk with command: $task_command\n";
+	}
+
+	return 1;
+}
+
+sub submit_input_files {
+	my($task, $inputs) = @_;
+	foreach my $input (@$inputs){
+		if(-e $input){
+			if(-d $input){
+				$task->specify_directory($input);
+			} else {
+				$task->specify_input_file($input); 
+			}
+		}
+	}
+}
+
+sub submit_augustus_files {
+	my($task) = @_;
+	$task->specify_input_file("config");
+}
+
+sub call_wq_wait {
+	my($wq, $timeout) = @_;
+
+	my $task_execution_time = 0;
+	my $transfered_bytes= 0;
+	my $transfer_time = 0;
+
+	my $tasktimes_fh;
+	if(defined($OPT{"tasktimes_file"})) {
+		my $tasktimes_file = $OPT{"tasktimes_file"}; 
+		open $tasktimes_fh, ">>$tasktimes_file"; 
+	}
+
+	my $taskoverheads_fh;
+	if(defined($OPT{"taskoverheads_file"})) {
+		my $taskoverheads_file = $OPT{"taskoverheads_file"}; 
+		open $taskoverheads_fh, ">>$taskoverheads_file"; 
+	}
+		
+	my $t = $wq->wait($timeout); 
+	if($t) {
+		my $tasktag = $t->id; 
+
+		$transfer_time = $t->total_transfer_time;
+		$transfered_bytes = $t->total_bytes_transferred;
+		$task_execution_time = $t->cmd_execution_time/1000000;
+
+		#Check if return status indicates failure
+		my $output = $t->output;
+		open (task_outfile, '>>task_outputs.txt'); 
+		print task_outfile "$output\n";
+		print task_outfile "=================================\n\n";
+		close (task_outfile);
+
+		if($output =~ "Maker is now finished!!!"){
+			my $task_result = $t->result; 	
+			print localtime()." :: Finished WQ task for tiers $tasktag with result $task_result.\n";
+		} else { #tier resubmission on failure 
+			$task_failures{$tasktag} += 1; 
+			if($task_failures{$tasktag} <= $tolerable_task_failures){
+				print localtime()." :: Failed, resubmitting WQ task for task $tasktag\n";
+				$wq->submit($t);
+			} else{
+				print localtime()." :: Giving up on task $tasktag since it has failed $tolerable_task_failures times\n"; 
+			}
+		}
+	}		
+	return ($task_execution_time, $transfered_bytes, $transfer_time);
+}
+
+sub process_completed_tasks {
+	my($wq, $tasks_to_retrieve, $timeout) = @_;
+	
+	# Currently ignored, but may need to be addressed later -Nick #somewhere MAKER launches "maintain.pl" which becomes a zombie script, it needs to be reaped before WQ wait. 
+	#Proc::Signal::reap_children_by_name(9, 'maintain.pl');
+
+	my $total_task_execution_times = 0;
+	my $total_transfered_bytes= 0;
+	my $total_transfer_time = 0;
+	
+	my $retrieved_tasks = 0;
+	while ($retrieved_tasks < $tasks_to_retrieve) {
+		my ($task_execution_time, $transfered_bytes, $transfer_time) = call_wq_wait($wq, $timeout); 
+		if($task_execution_time > 0 || $transfered_bytes > 0 || $transfer_time > 0) {
+			$retrieved_tasks++;
+			$total_task_execution_times += $task_execution_time;
+			$total_transfered_bytes += $transfered_bytes;
+			$total_transfer_time += $transfer_time;
+			print localtime()." :: Retrieved $retrieved_tasks so far.\n";
+		}	
+	}	
+}
+
+#/* vim: set noexpandtab tabstop=4: */

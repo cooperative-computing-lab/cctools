@@ -1,0 +1,9 @@
+{
+    "rules": [
+                {
+                    "command" : "python ./simulate.py --parameter 1 > output.txt",
+                    "inputs"  : [ "simulate.py" ],
+                    "outputs" : [ "output.txt" ]
+                }
+             ]
+}

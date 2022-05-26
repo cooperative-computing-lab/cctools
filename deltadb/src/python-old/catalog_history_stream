@@ -1,0 +1,19 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2010- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+# This program filters catalog history data based on the arguments.
+# It reads stdin for input data
+# It accepts as arguments: Filters that determine what information to return.
+# It outputs only the checkpoint and log data specified by the filters.
+
+import sys
+import re
+
+
+
+for line in sys.stdin:
+  line = line.strip()
+  print line

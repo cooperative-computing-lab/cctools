@@ -1,0 +1,14 @@
+* whitespace=space-before-tab,indent-with-non-tab,trailing-space,tabwidth=4
+
+*.gif -whitespace binary
+*.gz -whitespace binary
+*.html whitespace=-indent-with-non-tab
+*.jpg -whitespace binary
+*.m4 whitespace=-indent-with-non-tab
+*.png -whitespace binary
+*.py whitespace=-indent-with-non-tab
+*.xml whitespace=-indent-with-non-tab,cr-at-eol
+
+COPYING -whitespace
+
+configure export-subst

@@ -1,0 +1,18 @@
+
+The wq_bwa program aligns sequences of genomes listed in a fastq file using
+the Burrows-Wheeler Aligner. It aligns by partitioning the file into pieces
+containing one or more sequences and running BWA to align them individually.
+The program uses the Work Queue framework for distributed execution.
+
+This version makes use of the JSON API and the work_queue_server.
+
+To run:
+
+# Build bwa code and setup input files:
+make
+
+# Start the application (and transparently the server)
+./wq_bwa_json 
+
+# Run multiple workers.  If using Condor: 
+condor_submit_workers --cores 2 --memory 4000 --disk 10000 -M wq_bwa_json 10

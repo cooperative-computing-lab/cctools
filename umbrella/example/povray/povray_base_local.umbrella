@@ -1,0 +1,63 @@
+{
+    "comment": "A ray-tracing application which creates video frames. The dependencies are all from local dirs /tmp/local_data",
+    "kernel": {
+        "version": ">=2.6.18",
+        "name": "linux"
+    },
+    "os": {
+        "ec2": {
+            "ami": "ami-2cf8901c",
+            "region": "us-west-2",
+            "user": "ec2-user"
+        },
+        "name": "Redhat",
+        "format": "tgz",
+        "source": [
+            "/tmp/local_data/redhat-6.5-x86_64.tar.gz"
+        ],
+        "version": "6.5"
+    },
+    "cmd": "povray +I/tmp/4_cubes.pov +O/tmp/frame000.png +K.0  -H50 -W50",
+    "hardware": {
+        "cores": "1",
+        "disk": "2GB",
+        "arch": "x86_64",
+        "memory": "1GB"
+    },
+    "environ": {
+        "PWD": "/tmp"
+    },
+    "output": {
+        "files": [
+            "/tmp/frame000.png"
+        ],
+        "dirs": []
+    },
+    "data": {
+        "4_cubes.pov": {
+            "format": "plain",
+            "source": [
+                "/tmp/local_data/4_cubes.pov"
+            ],
+            "action": "none",
+            "mountpoint": "/tmp/4_cubes.pov"
+        },
+        "WRC_RubiksCube.inc": {
+            "format": "plain",
+            "source": [
+                "/tmp/local_data/WRC_RubiksCube.inc"
+            ],
+            "action": "none",
+            "mountpoint": "/tmp/WRC_RubiksCube.inc"
+        }
+    },
+    "software": {
+        "povray-3.6.1-redhat6-x86_64": {
+            "format": "tgz",
+            "source": [
+                "/tmp/local_data/povray-3.6.1-redhat6-x86_64.tar.gz"
+            ],
+            "mountpoint": "/software/povray-3.6.1-redhat6-x86_64"
+        }
+    }
+}

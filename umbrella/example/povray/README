@@ -1,0 +1,150 @@
+The documentation illustrates how to use different execution engines of Umbrella to execute
+a ray-tracing application.
+
+#parrot execution engine test command.
+umbrella \
+--spec povray.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
+
+#Docker execution engine test command. Don't do the docker test under your afs,
+#it will fail due to the ACL of your afs.
+umbrella \
+--spec povray.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/docker_povray/output.png" \
+--sandbox_mode docker \
+--log umbrella.log \
+run
+
+umbrella \
+--spec povray.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+filter db2
+
+umbrella \
+--spec povray.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+expand povray_S.umbrella
+
+umbrella \
+--spec povray_S.umbrella \
+split f1 db1
+
+umbrella \
+--spec povray_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
+
+umbrella \
+--spec povray_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/docker_povray_S \
+--output "/tmp/frame000.png=/tmp/umbrella_test/docker_povray_S/output.png" \
+--sandbox_mode docker \
+--log umbrella.log \
+run
+
+umbrella \
+--spec povray_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/destructive_povray_S \
+--output "/tmp/frame000.png=/tmp/umbrella_test/destructive_povray_S/output.png" \
+--sandbox_mode destructive \
+--log umbrella.log \
+run
+
+umbrella \
+--spec povray_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/ec2_povray_S/output.png" \
+--sandbox_mode ec2 \
+--ec2_log umbrella.log.ec2 \
+--ec2_sshkey ~/bin/feb272015.pem \
+--ec2_key feb272015 \
+--ec2_instance_type m3.medium \
+--log umbrella.log \
+run
+
+#povray_S_local.umbrella: all the dependencies are from local dir. To run this cmd successfully, you need to ensure the specified data exists on your local machine.
+umbrella \
+--spec povray_S_local.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S_local/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
+
+#povray_S_osf.umbrella: all the dependencies are from OSF. To run this cmd successfully, you need to ensure you have the access permission to the OSF data.
+#The interaction between Umbrella and OSF uses the requests package which is not included in Python by default. Please install requests first.
+umbrella \
+--spec povray_S_osf.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S_osf/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+--osf_user <osf_username> \
+--osf_pass <osf_password> \
+run
+
+#The interaction between Umbrella and OSF uses the requests package which is not included in Python by default. Please install requests first.
+#upload the dependencies to OSF.
+umbrella \
+--spec povray_S_local.umbrella \
+--localdir /tmp/umbrella_test/ \
+--log umbrella.log \
+--osf_user <osf_username> \
+--osf_pass <osf_password> \
+--osf_userid <osf_userid> \
+upload osf <osf_project_name> <public_or_private> <target_specpath>
+
+umbrella \
+--spec povray_S_local+osf.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S_local+osf/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
+
+#The interaction between Umbrella and the Amazon S3 uses the boto3 package which is not included in Python by default. Please install boto3 first.
+#upload the dependencies to S3.
+umbrella \
+--spec povray_S_local.umbrella \
+--localdir /tmp/umbrella_test/ \
+--log umbrella.log \
+upload s3 testhmeng public-read newspec.umbrella
+
+umbrella \
+--spec povray_S_osf.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S_osf/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
+
+umbrella \
+--spec povray_S_s3.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S_s3/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
+
+umbrella --spec povray_base_local.umbrella build full.umbrella
+
+umbrella \
+--spec povray_base_local.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/parrot_povray_base_local \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_base_local/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run

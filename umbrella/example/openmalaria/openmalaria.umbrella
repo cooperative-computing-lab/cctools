@@ -1,0 +1,65 @@
+{
+    "comment": "OpenMalaria application", 
+    "kernel": {
+        "version": ">=2.6.18", 
+        "name": "linux"
+    }, 
+    "package_manager": {
+        "config": {
+            "epel.repo": {
+                "mountpoint": "/etc/yum.repo.d/epel.repo", 
+                "id": "4cd77946d1b5176987036e8fb382ce2d"
+            }
+        }, 
+        "list": "python cmake xerces-c-devel gsl-devel xsd boost-devel zlib zlib-devel", 
+        "name": "yum"
+    }, 
+    "os": {
+        "ec2": {
+            "ami": "ami-0b06483b",
+            "region": "us-west-2",
+            "user": "root"
+        },
+        "name": "CentOS", 
+        "version": "6.6", 
+        "id": "902703f016e0f930a870eaf9cb31640b"
+    }, 
+    "cmd": "/software/openMalaria-32-centos6-x86_64/bin/openMalaria -s /tmp/scenario.xml", 
+    "hardware": {
+        "cores": "1", 
+        "disk": "3GB", 
+        "arch": "x86_64", 
+        "memory": "2GB"
+    }, 
+    "note": "this a self-contained umbrella spec.", 
+    "environ": {
+        "PWD": "/tmp"
+    }, 
+    "output": {
+        "files": [
+            "/tmp/ctsout.txt", 
+            "/tmp/output.txt"
+        ], 
+        "dirs": []
+    }, 
+    "data": {
+        "scenario.xml": {
+            "mountpoint": "/tmp/scenario.xml", 
+            "id": "e28c0c145c801789b0919d175f0afa9c"
+        }, 
+        "scenario_32.xsd": {
+            "mountpoint": "/tmp/scenario_32.xsd", 
+            "id": "bef8a475dbd3765b61995f36b11b0672"
+        }, 
+        "densities.csv": {
+            "mountpoint": "/tmp/densities.csv", 
+            "id": "54ea34d38d96c311122642aec045bc40"
+        }
+    }, 
+    "software": {
+        "openMalaria-32-centos6-x86_64": {
+            "mountpoint": "/software/openMalaria-32-centos6-x86_64", 
+            "id": "97cff84e58a4172fd8e9d1cb25c6047c"
+        }
+    }
+}

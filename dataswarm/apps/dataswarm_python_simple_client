@@ -1,0 +1,81 @@
+#!/usr/bin/env python 3
+
+# Copyright (C) 2020- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+# This is a simple dataswarm test program intended to test the
+# basic functionality and work out the detailed user's API.
+# The objective is to process a single large dictionary file
+# by running N tasks, where each task performs a grep to search
+# for words beginning with a different letter.
+
+# Note that this example is not yet correct or complete --
+# it needs to evolve along with the emerging DataSwarm API.
+
+import os
+import sys
+import json
+import time
+
+from dataswarm import DataSwarm
+
+def main():
+    if len(sys.argv) < 2:
+        print("USAGE: dataswarm_test <ntasks>\n")
+        sys.exit(0)
+
+    ntasks = int(sys.argv[1])
+
+    # Here, we are declaring tasks in WQ style.
+    # Instead, we should declare and upload the shared input ile.
+    # Then, declare each output file and task.
+
+    pending_tasks = []
+    for i in range(ntasks):
+        task = {}
+        task["command_line"] = "grep {} dict > output".format(chr(ord('a')))
+
+        task["output_files"] = [
+            {
+                "local_name": "output",
+                "remote_name" : "output.%d" % i,
+                "flags" : { "cache":False, "watch":False }
+            }
+        ]
+
+        task["input_files"] = [
+            {
+                "local_name": "/usr/share/dict/words",
+                "remote_name" : "dict",
+                "flags" : { "cache":True, "watch":False }
+            }
+        ]
+
+        task["cores"] = 1
+        task["memory"] = 1000
+        task["disk"] = 1000
+
+        pending_tasks.append(task)
+
+    start = time.time()
+
+    with DataSwarm(host='127.0.0.1', port='1234') as ds:
+        for t in pending_tasks:
+            t = json.dumps(t)
+            response = ds.task_submit(t)
+            print(response)
+
+        while len(pending_tasks) > 0:
+            response = ds.wait(10)
+            print(response)
+
+    end = time()
+
+    start = float(start)
+    end = float(end)
+
+    print("time: {}".format(end-start-1))
+
+if __name__ == "__main__":
+    main()

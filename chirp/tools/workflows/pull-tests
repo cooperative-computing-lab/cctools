@@ -1,0 +1,19 @@
+#!/bin/bash
+
+source "$(dirname "$0")"/test-common.bash
+
+DIR="pull-tests.workflow"
+
+if ! [ -d "$DIR" ]; then
+	weaver -N -O "$DIR" "$(dirname "$0")/pull-tests.py"
+fi
+
+for pull in $(for g in $((1+32*2**10)) $((1+1*2**20)) $((1+1*2**30)) $((1+2*2**30)) $((1+4*2**30)) $((1+8*2**30)) 0; do printf '%012d\t' "$g"; done); do
+	for scheduler in fifo-0; do
+		for replication in push-async-0; do
+			testrun "$DIR" "$(pwd)/test.${pull}.${scheduler}.${replication}" "scheduler=${scheduler}&replication=${replication}&pull-threshold=${pull}"
+		done
+	done
+done
+
+# vim: set noexpandtab tabstop=4:

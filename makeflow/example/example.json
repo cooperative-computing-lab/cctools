@@ -1,0 +1,75 @@
+{
+  "environment": {
+    "CONVERT": "/usr/bin/convert", 
+    "CURL": "/usr/bin/curl"
+  }, 
+  "rules": [
+    {
+      "outputs": [
+        "capitol.montage.gif"
+      ],
+      "command": "$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif", 
+      "inputs": [
+        "/usr/bin/convert", 
+        "capitol.jpg", 
+        "capitol.90.jpg", 
+        "capitol.180.jpg", 
+        "capitol.270.jpg", 
+        "capitol.360.jpg"
+      ]
+    }, 
+    {
+      "environment": {
+        "URL": "http://ccl.cse.nd.edu/images/capitol.jpg"
+      }, 
+      "outputs": [
+        "capitol.jpg"
+      ], 
+      "local_job": true, 
+      "command": "/usr/bin/curl -o capitol.jpg \"$URL\"", 
+      "inputs": [
+        "/usr/bin/curl"
+      ]
+    }, 
+    {
+      "outputs": [
+        "capitol.90.jpg"
+      ], 
+      "command": "$CONVERT -swirl 90 capitol.jpg capitol.90.jpg", 
+      "inputs": [
+        "/usr/bin/convert",
+        "capitol.jpg"
+      ]
+    }, 
+    {
+      "outputs": [
+        "capitol.180.jpg"
+      ], 
+      "command": "$CONVERT -swirl 180 capitol.jpg capitol.180.jpg", 
+      "inputs": [
+        "/usr/bin/convert", 
+        "capitol.jpg"
+      ]
+    },
+    {
+      "outputs": [
+        "capitol.270.jpg"
+      ], 
+      "command": "$CONVERT -swirl 270 capitol.jpg capitol.270.jpg", 
+      "inputs": [
+        "/usr/bin/convert", 
+        "capitol.jpg"
+      ]
+    }, 
+    {
+      "outputs": [
+        "capitol.360.jpg"
+      ], 
+      "command": "$CONVERT -swirl 360 capitol.jpg capitol.360.jpg", 
+      "inputs": [
+        "/usr/bin/convert", 
+        "capitol.jpg"
+      ]
+    }
+  ]
+}

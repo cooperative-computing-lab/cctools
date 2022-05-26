@@ -1,0 +1,5 @@
+resource_monitor_cluster
+resource_monitor_histograms
+rmonitor_poll_example
+rmonitor_snapshot
+librminimonitor_helper.so

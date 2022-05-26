@@ -1,0 +1,49 @@
+{
+	"comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "1",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.18"
+	},
+	"os": {
+		"id": "62aa9bc37afe3f738052da5545832c80",
+		"name": "Redhat",
+		"version": "5.10"
+	},
+	"software": {
+		"cmssw-4.2.8-slc5-amd64": {
+			"id": "cvmfs://cvmfs/cms.cern.ch",
+			"mount_env": "CMS_DIR",
+			"mountpoint": "/cvmfs/cms.cern.ch"
+		}
+	},
+	"data": {
+		"OutreachExercise2010.git": {
+			"id": "git+https://github.com/ayrodrig/OutreachExercise2010.git",
+			"mount_env": "GIT_REPO_1",
+			"mountpoint": "/data/git_repo/OutreachExercise2010"
+		},
+		"git_protocol.sh": {
+			"action": "none",
+			"id": "518876dbe4dca81bd19e823b6ea1f866",
+			"mountpoint": "/tmp/git_protocol.sh"
+		}
+	},
+	"environ": {
+		"PWD": "/tmp",
+		"CMS_VERSION": "CMSSW_4_2_8",
+		"SCRAM_ARCH": "slc5_amd64_gcc434"
+	},
+	"cmd": "/bin/sh /tmp/git_protocol.sh",
+	"output": {
+		"files": [],
+		"dirs": [
+			"/tmp/CMSSW_4_2_8"
+		]
+	}
+}

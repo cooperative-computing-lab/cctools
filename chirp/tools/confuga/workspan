@@ -1,0 +1,108 @@
+#!/bin/bash
+
+export GNUPLOT_DEFAULT_GDFONT=inconsolata
+
+job=$(realpath "$1")
+confuga=$(realpath "$2")
+
+data_run=$(mktemp)
+data_rec=$(mktemp)
+data_sen=$(mktemp)
+
+echo $0 "$data_run" "$data_rec" "$data_sen"
+
+T=$(mktemp)
+sqlite3 -separator $'\t' > "$T" <<EOF
+ATTACH 'file://${job}?immutable=1' as Job;
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
+
+SELECT COUNT(*) FROM Confuga.StorageNode;
+EOF
+N=$(cat "$T")
+rm "$T"
+
+{
+	sqlite3 -separator $'\t' | awk '$1 != prev {printf "\n"; prev = $1}; {print}' > "$data_run"
+} <<EOF
+ATTACH 'file://${job}?immutable=1' as Job;
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
+
+CREATE TEMPORARY TABLE IDS AS
+	SELECT DISTINCT tag FROM Confuga.TransferJob;
+
+SELECT ConfugaJob.sid, ConfugaJob.time_committed-min, ConfugaJob.time_reaped-min, ConfugaJob.tag, IDS.rowid
+	FROM
+		Job
+		JOIN ConfugaJob ON Job.id = ConfugaJob.id
+		JOIN IDS ON ConfugaJob.tag = IDS.tag,
+		(SELECT MIN(Job.time_create) AS min FROM Job);
+EOF
+
+{
+	sqlite3 -separator $'\t' | awk '$1 != prev {printf "\n"; prev = $1}; {print}' > "$data_rec"
+} <<EOF
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
+
+CREATE TEMPORARY TABLE IDS AS
+	SELECT DISTINCT tag FROM Confuga.TransferJob;
+
+SELECT TransferJob.tsid, TransferJob.time_new-min, TransferJob.time_complete-min, Confuga.TransferJob.tag, IDS.rowid
+	FROM
+		Confuga.TransferJob
+		JOIN IDS ON Confuga.TransferJob.tag = IDS.tag,
+		(SELECT MIN(TransferJob.time_new) AS min FROM TransferJob);
+EOF
+
+{
+	sqlite3 -separator $'\t' | awk '$1 != prev {printf "\n"; prev = $1}; {print}' > "$data_sen"
+} <<EOF
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
+
+CREATE TEMPORARY TABLE IDS AS
+	SELECT DISTINCT tag FROM Confuga.TransferJob;
+
+SELECT TransferJob.fsid, TransferJob.time_new-min, TransferJob.time_complete-min, Confuga.TransferJob.tag, IDS.rowid
+	FROM
+		Confuga.TransferJob
+		JOIN IDS ON Confuga.TransferJob.tag = IDS.tag,
+		(SELECT MIN(TransferJob.time_new) AS min FROM TransferJob);
+EOF
+
+gnuplot <<EOF
+set terminal postscript eps mono
+set output 'workspan.eps'
+
+set style arrow 1 head filled size screen 0.025,30,45 ls 1
+set style line 1 lt 1 lw 8 lc palette z
+set style arrow 2 nohead ls 1
+set style arrow 3 head ls 1
+set style arrow 4 backhead ls 1
+set style arrow 5 heads ls 1
+set style line 2 lt 1 lw 12 lc palette z
+set style arrow 6 nohead ls 2
+
+set auto fix
+set format x "%H:%M"
+set notitle
+set offset graph 0.05, graph 0.05, 1, 1
+set palette defined (1 "red", 2 "green", 3 "blue", 4 "black")
+set timefmt "%s"
+set xdata time
+set xlabel "Time (HH:MM)"
+set xrange ["00:00":]
+set xtics rotate by -45
+set ylabel "Storage Node"
+set yrange [1:]
+set ytics 1,1 offset 0,0.5 rangelimited
+
+unset colorbox
+
+plot "$data_run" u 2:(\$1+.2):(\$3-\$2):(0):5 with vectors arrowstyle 2 notitle, \\
+	 "$data_sen" u 2:(\$1+.5):(\$3-\$2):(0):5 with vectors arrowstyle 2 notitle, \\
+	 "$data_rec" u 2:(\$1+.825):(\$3-\$2):(0):5 with vectors arrowstyle 2 notitle, \\
+	 "$data_run" u 3:(\$1+.2):(3):(0):(4) with vectors arrowstyle 6 notitle, \\
+	 "$data_run" u 2:(\$1+.2):(3):(0):(4) with vectors arrowstyle 6 notitle, \\
+	 for [i=1:${N}] i notitle ls 3
+EOF
+
+# vim: set noexpandtab tabstop=4:

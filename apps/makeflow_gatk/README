@@ -1,0 +1,52 @@
+The makeflow_gatk program performs variant calling on a genome sequences listed in a SAM/BAM
+file against the given fasta reference. It uses the GenomeAnalysisTK, by BroadInstitute. The
+splitting creates sections of the reference and groups the aligned query data with the
+corresponding partition. These sequences are then compared and the variants expressed in a
+VCF file. The program uses the Makeflow and Work Queue frameworks for distributed execution
+on available resources.
+
+To build Makeflow:
+
+1. Install GenomeAnalysisTK.jar and all its required dependencies. GATK can be downloaded from:
+https://www.broadinstitute.org/gatk/download
+2. Install CCTools.
+3. Either copy makeflow_gatk from cctools/bin to the location the makeflow will be executed, or include cctools/bin in your path.
+4. Copy GenomeAnalysisTK.jar to the location the makeflow will be executed.
+5. Due to GenomeAnalysisTK.jar strict Java requirements, when distributing the proper Java version needs to be included. Create jre.zip :
+wget http://javadl.sun.com/webapps/download/AutoDL?BundleId=97800
+tar zxf AutoDL*
+mkdir jre
+mv jre1*/* jre
+rmdir jre1*
+zip -r jre.zip jre/*
+
+6. Run './makeflow_gatk -T HaplotypeCaller --reference-sequence test_ref.fa --input-file test_query.sam --out output.vcf --makeflow Makeflow'
+This produces a file called Makeflow.
+
+To run:
+
+1. Run 'makeflow'
+Note if the --makeflow option is specified with a MAKEFLOWFILE, run
+makeflow <MAKEFLOWFILE>
+
+This step runs the makeflow locally on the machine on which it is executed.
+
+2. If you want to run with a distributed execution engine (Work Queue, Condor,
+or SGE), specify the '-T' option. For example, to run with Work Queue,
+makeflow -T wq
+
+3. Start Workers
+work_queue_workers -d all <HOSTNAME> <PORT>
+where <HOSTNAME> is the name of the host on which the manager is running
+	  <PORT> is the port number on which the manager is listening.
+
+Alternatively, you can also specify a project name for the manager and use that
+to start workers:
+1. makeflow -T wq -N GATK
+2. work_queue_worker -d all -N GATK
+
+For listing the command-line options, do:
+./makeflow_gatk -h
+
+When the alignment completes, you will find the whole output from the individual partitions
+in the directory the makeflow was run in.

@@ -1,0 +1,15 @@
+*.a
+*.dylib
+*.dSYM
+*.gz
+*.o
+*.swp
+cctools.test.log
+cctools.test.tmp
+cctools.test.fail
+configure.rerun
+config.mk
+*.pyc
+site/
+work_queue/src/work_queue_example
+dttools/src/jx_repl

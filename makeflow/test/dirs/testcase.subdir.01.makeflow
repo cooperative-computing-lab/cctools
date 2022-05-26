@@ -1,0 +1,7 @@
+
+MAKEFLOW_INPUTS=input/hello
+MAKEFLOW_OUTPUTS=mydir
+
+# a single directory as a target
+mydir: input/hello
+	mkdir -p mydir; cp input/hello mydir/1.txt; cp input/hello mydir/2.txt; cp input/hello "mydir/3space\ .txt"

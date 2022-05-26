@@ -1,0 +1,10 @@
+
+MAKEFLOW_INPUTS=input
+MAKEFLOW_OUTPUTS=mydir mydir/1.txt mydir/3.txt
+
+# second rule should not have to create 'mydir' in its command
+mydir mydir/1.txt: input
+	mkdir -p mydir; cp input/hello mydir/1.txt; cp input/hello mydir/2.txt
+
+mydir/3.txt: mydir/1.txt
+	echo hello > mydir/3.txt; cat mydir/1.txt > mydir/3.txt

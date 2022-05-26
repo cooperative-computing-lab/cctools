@@ -1,0 +1,35 @@
+#!/bin/sh
+
+. ../../dttools/test/test_runner_common.sh
+
+out_dir="linker_simp_out"
+
+prepare() {
+	cd linker
+	if [ -d "$out_dir" ]; then
+		exit 1
+	fi
+	mkdir "$out_dir"
+
+	exit 0
+}
+
+run() {
+	cd linker
+	../../src/makeflow_analyze -b "$out_dir" simple.mf
+
+	if [ ! -f "$out_dir"/simple.mf ]; then
+		exit 1
+	fi
+	exit 0
+}
+
+clean() {
+	cd linker
+	rm -rf "$out_dir"
+	exit 0
+}
+
+dispatch "$@"
+
+# vim: set noexpandtab tabstop=4:

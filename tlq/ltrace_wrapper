@@ -1,0 +1,11 @@
+#!/bin/sh
+
+tracelog=$1
+shift
+ltrace -f -r -s 4096 -o $tracelog -e *open*+*stat*+*getenv*+*setenv*+*fork*+*clone* $@
+result=$(grep "+++ exited" $tracelog | tail -1 | awk '{print $6}' | cut -d ")" -f 1)
+hostname=$(hostname -f)
+echo "Wrote an ltrace for command: \"$@\" with PID $$ from PPID $PPID on $hostname with result $result" >> $tracelog
+printenv >> $tracelog
+
+exit $result

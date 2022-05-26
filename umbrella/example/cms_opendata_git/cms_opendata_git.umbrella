@@ -1,0 +1,49 @@
+{
+	"comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "1",
+		"memory": "2GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.18"
+	},
+	"os": {
+		"id": "62aa9bc37afe3f738052da5545832c80",
+		"name": "Redhat",
+		"version": "5.10"
+	},
+	"software": {
+		"cmssw-4.2.8-slc5-amd64": {
+			"mount_env": "CMS_DIR",
+			"mountpoint": "/cvmfs/cms.cern.ch"
+		},
+		"git-1.7.9-redhat5-x86_64": {
+			"mountpoint": "/afs/crc.nd.edu/user/h/hmeng/git-1.7.9-redhat5-x86_64"
+		}
+	},
+	"data": {
+		"cms_opendata_git": {
+			"mount_env": "GIT_REPO_1"
+		},
+		"cms_opendata.sh": {
+			"action": "none",
+			"id": "2f2051dff6ca75ff67e71f95e9271857",
+			"mountpoint": "/tmp/cms_opendata.sh"
+		}
+	},
+	"environ": {
+		"PWD": "/tmp",
+		"CMS_VERSION": "CMSSW_4_2_8",
+		"SCRAM_ARCH": "slc5_amd64_gcc434"
+	},
+	"cmd": "/bin/sh /tmp/cms_opendata.sh",
+	"output": {
+		"files": [],
+		"dirs": [
+			"/tmp/CMSSW_4_2_8"
+		]
+	}
+}

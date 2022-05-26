@@ -1,0 +1,77 @@
+#!/bin/sh
+
+SUBMIT_COMMON=$(which work_queue_submit_common)
+if [ -z "$SUBMIT_COMMON" ];
+then
+	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
+	exit 1
+else
+	. $SUBMIT_COMMON
+fi
+
+show_help()
+{
+
+	echo "  -j                       Use job array to submit workers."
+	echo "  -p <parameters>          SLURM sbatch parameters."
+}
+
+use_jobarray=0
+slurm_parameters=""
+
+parse_arguments()
+{
+	if [ -z "$cores" -o "$cores" = 0 ]
+	then
+		slurm_parameters="$slurm_parameters --exclusive"
+	else
+		slurm_parameters="$slurm_parameters --cpus-per-task $cores"
+	fi
+
+    original_count=$#
+
+	while [ $# -gt 0 ]
+	do
+		case $1 in
+			-j)
+			use_jobarray=1
+			;;
+			-p)
+			shift
+			slurm_parameters="$slurm_parameters $1"
+			;;
+			*)
+			break
+			;;
+		esac
+		shift
+	done
+
+    current_count=$#
+    consumed=$((original_count - current_count))
+
+    return $consumed
+}
+
+submit_workers_command()
+{
+	sbatch=`which sbatch 2>/dev/null`
+	if [ $? != 0 ]
+	then
+		echo "$0: please add 'sbatch' to your PATH."
+		exit 1
+	fi
+
+	to_submit=$count
+	while [[ "$to_submit" -gt 0 ]]
+	do
+		to_submit=$((to_submit-1))
+		sbatch --job-name wqWorker --ntasks=1 --nodes=1 $slurm_parameters <<EOF
+#!/bin/sh
+work_queue_worker $arguments $host $port
+EOF
+	done
+
+}
+
+submit_workers "$@"

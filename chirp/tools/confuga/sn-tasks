@@ -1,0 +1,72 @@
+#!/bin/bash
+
+export GNUPLOT_DEFAULT_GDFONT=inconsolata
+
+job=$(realpath "$1")
+confuga=$(realpath "$2")
+
+data=$(mktemp)
+
+echo $0
+sqlite3 -separator $'\t' > "$data"  <<EOF
+ATTACH 'file://${job}?immutable=1' as Job;
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
+
+WITH
+	SendingTJ AS (
+		SELECT StorageNode.id, COUNT(TransferJob.id) AS n
+			FROM
+				Confuga.StorageNode
+				JOIN Confuga.TransferJob ON StorageNode.id = TransferJob.fsid
+			WHERE TransferJob.state = 'COMPLETED'
+			GROUP BY StorageNode.id
+	),
+	ReceivingTJ AS (
+		SELECT StorageNode.id, COUNT(TransferJob.id) AS n
+			FROM
+				Confuga.StorageNode
+				JOIN Confuga.TransferJob ON StorageNode.id = TransferJob.tsid
+			WHERE TransferJob.state = 'COMPLETED'
+			GROUP BY StorageNode.id
+	),
+	ProcessingJ AS (
+		SELECT StorageNode.id, COUNT(ConfugaJob.id) AS n
+			FROM
+				Confuga.StorageNode
+				JOIN Job.ConfugaJob ON StorageNode.id = ConfugaJob.sid
+			WHERE ConfugaJob.state = 'BOUND_OUTPUTS'
+			GROUP BY StorageNode.id
+	)
+SELECT StorageNode.id, CASE WHEN SendingTJ.n IS NULL THEN 0 ELSE SendingTJ.n END, CASE WHEN ReceivingTJ.n IS NULL THEN 0 ELSE ReceivingTJ.n END, CASE WHEN ProcessingJ.n IS NULL THEN 0 ELSE ProcessingJ.n END
+	FROM
+		Confuga.StorageNode
+		LEFT OUTER JOIN SendingTJ ON StorageNode.id = SendingTJ.id
+		LEFT OUTER JOIN ReceivingTJ ON StorageNode.id = ReceivingTJ.id
+		LEFT OUTER JOIN ProcessingJ ON StorageNode.id = ProcessingJ.id
+	--WHERE NOT (SendingTJ.n IS NULL AND ReceivingTJ.n IS NULL AND ProcessingJ.n IS NULL)
+	ORDER BY StorageNode.id;
+EOF
+cat "$data"
+
+gnuplot <<EOF
+set terminal postscript eps mono
+set output 'sn-tasks.eps'
+
+set key outside
+set offset graph 0.05, 0.05
+set style fill pattern
+set style histogram rowstacked
+set style data histograms
+set title "TJ Source, TJ Target, and Job Executor"
+set xlabel "Storage Node"
+set xtics 1
+set xtics rotate out
+set ylabel "Count"
+
+#set size ratio 0.5
+set style fill pattern 2
+
+plot "${data}" using 2:xticlabels(1) title "Source", "" using 3:xticlabels(1) title "Target", "" using 4:xticlabels(1) title "Executor"
+EOF
+
+# vim: set noexpandtab tabstop=4:

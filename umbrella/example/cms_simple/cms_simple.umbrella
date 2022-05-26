@@ -1,0 +1,43 @@
+{
+	"comment": "a simple CMS application whose software and data dependencies are all from CVMFS.",
+	"hardware": {
+		"arch": "x86_64",
+		"cores": "1",
+		"memory": "1GB",
+		"disk": "3GB"
+	},
+	"kernel" : {
+		"name": "linux",
+		"version": ">=2.6.32"
+	},
+	"os": {
+        "id": "669ab5ef94af84d273f8f92a86b7907a", 
+		"name": "Redhat",
+		"version": "6.5"
+	},
+	"software": {
+		"cmssw-5.3.11-slc5-amd64": {
+			"mount_env": "CMS_DIR",
+			"mountpoint": "/cvmfs/cms.cern.ch"
+		}
+	},
+	"data": {
+		"cms_simple.sh": {
+			"action": "none",
+			"id": "9d4b969f93743ded4a4830376b2038b9",
+			"mountpoint": "/tmp/cms_simple.sh"
+		}
+	},
+	"environ": {
+		"PWD":"/tmp",
+		"CMS_VERSION": "CMSSW_5_3_11",
+		"SCRAM_ARCH": "slc5_amd64_gcc462"
+	},
+	"cmd": "/bin/sh /tmp/cms_simple.sh",
+	"output": {
+		"files": [],
+		"dirs": [
+			"/tmp/cmsjob"
+		]
+	}
+}

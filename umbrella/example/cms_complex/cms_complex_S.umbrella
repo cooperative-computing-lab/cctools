@@ -1,0 +1,77 @@
+{
+    "comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.", 
+    "kernel": {
+        "version": ">=2.6.32", 
+        "name": "linux"
+    }, 
+    "os": {
+        "ec2": {
+            "ami": "ami-2cf8901c",
+            "region": "us-west-2",
+            "user": "ec2-user"
+        },
+        "name": "Redhat", 
+        "format": "tgz", 
+        "checksum": "669ab5ef94af84d273f8f92a86b7907a", 
+        "source": [
+            "http://ccl.cse.nd.edu/research/data/hep-case-study/669ab5ef94af84d273f8f92a86b7907a/redhat-6.5-x86_64.tar.gz"
+        ], 
+        "version": "6.5", 
+        "uncompressed_size": "1743656960", 
+        "id": "669ab5ef94af84d273f8f92a86b7907a", 
+        "size": "633848940"
+    }, 
+    "cmd": "/bin/sh /tmp/cms_complex.sh", 
+    "hardware": {
+        "cores": "1", 
+        "disk": "2GB", 
+        "arch": "x86_64", 
+        "memory": "1GB"
+    }, 
+    "environ": {
+        "PWD": "/tmp", 
+        "CMS_VERSION": "CMSSW_5_2_5", 
+        "SCRAM_ARCH": "slc5_amd64_gcc462"
+    }, 
+    "output": {
+        "files": [], 
+        "dirs": [
+            "/tmp/sim_job"
+        ]
+    }, 
+    "data": {
+        "final_events_2381.lhe": {
+            "format": "plain", 
+            "checksum": "cb9878132aad42e7db30eabd214be8e2", 
+            "source": [
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/cb9878132aad42e7db30eabd214be8e2/final_events_2381.lhe"
+            ], 
+            "action": "none", 
+            "mountpoint": "/tmp/final_events_2381.lhe", 
+            "mount_env": "INPUT_FILE", 
+            "id": "cb9878132aad42e7db30eabd214be8e2", 
+            "size": "17840176"
+        }, 
+        "cms_complex.sh": {
+            "format": "plain", 
+            "checksum": "9f8587e9ef90ab4f5de8b3c9ab5cf0cb", 
+            "source": [
+                "http://ccl.cse.nd.edu/research/data/hep-case-study/9f8587e9ef90ab4f5de8b3c9ab5cf0cb/cms_complex.sh"
+            ], 
+            "action": "none", 
+            "mountpoint": "/tmp/cms_complex.sh", 
+            "id": "9f8587e9ef90ab4f5de8b3c9ab5cf0cb", 
+            "size": "399"
+        }
+    }, 
+    "software": {
+        "cmssw-5.2.5-slc5-amd64": {
+            "mountpoint": "/cvmfs/cms.cern.ch", 
+            "mount_env": "CMS_DIR", 
+            "id": "cvmfs://cvmfs/cms.cern.ch", 
+            "source": [
+                "cvmfs://cvmfs/cms.cern.ch"
+            ]
+        }
+    }
+}

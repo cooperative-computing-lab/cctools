@@ -1,0 +1,123 @@
+#!/bin/sh
+#This script can be used to create the mountlist file for executing one pacakge under Parrot.
+package_path=""
+mountlist=""
+show_help()
+{
+	echo "Usage: parrot_package_run --package-path path-of-package [command]"
+	echo "If no command is given, a /bin/sh shell will be returned."
+	echo "Example 1: parrot_package_run --package-path /tmp/pack"
+	echo "If one command is given, run your command within the chroot jail and exit parrot_package_run automatically."
+	echo "Example 2: parrot_package_run --package-path /tmp/pack ls"
+	echo ''
+	echo "Options:"
+	echo "-p, --package-path         The path of the package."
+	echo "-e, --env-list             The path of the environment file, each line is in the format of <key>=<value>. (Default: package-path/env_list)"
+	echo "-h, --help                 Show this help message."
+	exit 1
+}
+
+complete_path() {
+	orig_path="$1"
+	first_ch=$(echo "${orig_path}" | head -c 1)
+	if [ "${first_ch}" != "/" ]; then
+		echo "$(pwd)/${orig_path}"
+	else
+		echo "${orig_path}"
+	fi
+}
+
+while [ "$#" -gt 0 ]
+do
+	case "$1" in
+		-p | --package-path)
+			shift
+			package_path="$(complete_path "$1")"
+			;;
+		-e | --env-list)
+			shift
+			env_path="$(complete_path "$1")"
+			;;
+		-h | --help)
+			show_help
+			;;
+		*)
+			break
+			;;
+	esac
+	shift
+done
+
+if [ -n "${env_path}" ] && [ ! -f "${env_path}" ]; then
+	echo "The --env-list option specified (${env_path}) is not a file!"
+	exit 1
+fi
+
+if [ -z "${env_path}" ]; then
+	env_path="${package_path}/env_list"
+	if [ ! -f "${env_path}" ]; then
+		echo "Warning: you are going to use the environment variable settings from your current shell to run your package."
+		echo "         You can specify an environment variable list file with the --env-list option."
+	fi
+fi
+
+if [ -z "${package_path}" ]; then
+	echo "Please specify package-path!"
+	exit 1
+fi
+
+if [ ! -d "${package_path}" ]; then
+	echo "Please ensure directory ${package_path} exists!"
+	exit 1
+fi
+
+package_path=$(readlink -f "${package_path}")
+cd "${package_path}"
+
+mountlist="mountlist"
+#construct mountlist
+if [ -e "${mountlist}" ]; then
+	rm "${mountlist}"
+fi
+
+echo "/ ${package_path}" >> "${mountlist}"
+echo "${package_path} ${package_path}" >> "${mountlist}"
+
+if [ -f "${package_path}/common-mountlist" ]; then
+	cat "${package_path}/common-mountlist" >> "${mountlist}"
+else
+	echo "/proc /proc" >> "${mountlist}"
+	echo "/dev /dev" >> "${mountlist}"
+fi
+
+if [ -f "${package_path}/common-mountlist" ]; then
+	cat "${package_path}/special_files" >> "${mountlist}"
+fi
+
+cmd_parrot_run=$(which parrot_run)
+
+if [ -z "${cmd_parrot_run}" ]; then
+	echo "Can't find parrot_run! Please add the path of parrot_run into environment varaible  PATH!"
+	exit 1
+fi
+
+#import environment variables
+export_env() {
+	while read -r -d '' line
+	do
+		export "${line}"
+	done < "${env_path}"
+}
+
+if [ -f "${env_path}" ]; then
+	export_env
+fi
+
+ldso_file="$(echo "$(pwd)/$(ldd ${cmd_parrot_run} | grep ld-linux | cut -d' ' -f1)" | sed -e 's/[ \t]//g')"
+
+#initialize the repeat process
+if [ -z "$1" ]; then
+	exec "${cmd_parrot_run}" -m "${mountlist}" -l "${ldso_file}" -w "${PWD}" -- /bin/sh
+else
+	exec "${cmd_parrot_run}" -m "${mountlist}" -l "${ldso_file}" -w "${PWD}" -- "$@"
+fi

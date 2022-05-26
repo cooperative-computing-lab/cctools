@@ -1,0 +1,7 @@
+
+MAKEFLOW_INPUTS=input
+MAKEFLOW_OUTPUTS=mydir mydir/1.txt mydir/2.txt
+
+# specify everything (directories and files) in the target file section
+mydir mydir/1.txt mydir/2.txt: input
+	mkdir -p mydir; cp input/hello mydir/1.txt; cp input/hello mydir/2.txt

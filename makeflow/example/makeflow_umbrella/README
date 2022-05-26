@@ -1,0 +1,44 @@
+This example illustrates how to running makeflow with the help of umbrella.
+
+The user can specify the umbrella binary through the `--umbrella-binary`
+option; and specify the umbrella spec through the `--umbrella-spec` option,
+which will be the default umbrella specifcation for each rule. You can also
+specify an Umbrella specification for a group of rule(s) in the Makefile by
+putting the following directives before the rule(s) you want to apply the Umbrella
+spec to:
+.MAKEFLOW CATEGORY 1
+.UMBRELLA SPEC convert_S.umbrella
+
+In this case, the specified Umbrella spec will be applied to all the following
+rules until a new ".MAKEFLOW CATEGORY..." directive is declared. All the rules
+before the first ".MAKEFLOW CATEGORY ..." directive will use the Umbrella spec
+specified by the `--umbrella-spec` option. If the `--umbrella-spec` option is
+not specified, these rules will run without being wrapped by Umbrella.
+
+To test makeflow with umbrella using local execution engine:
+$ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+
+To test makeflow with umbrella using wq execution engine:
+$ makeflow -T wq --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+
+To test makefile with umbrella (without a default umbrella spec):
+$ makeflow example_in_makefile.makeflow
+
+To test makefile with umbrella (with a default umbrella spec):
+$ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example_in_makefile.makeflow
+
+Usage of the `--umbrella-log-prefix` option of makeflow:
+$ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella --umbrella-log-prefix myumbrella.log example.makeflow
+
+The default value of the `--umbrella-log-prefix` option is "<makefile-name>.umbrella.log".
+After the makeflow completes, the umbrella log file for each rule will be in the format of "<umbrella-log-prefix>.<ruleid>".
+
+
+Usage of the `--umbrella-mode` option of makeflow:
+$ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella --umbrella-mode parrot example.makeflow
+
+Currently, the `--umbrella-mode` option can be set to the following three modes: local, parrot, and docker.
+
+The default value of the `--umbrella-mode` option is local, which first tries
+to utilize the docker mode, and tries to utilize the parrot mode if the docker
+mode is not available.

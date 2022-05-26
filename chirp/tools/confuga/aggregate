@@ -1,0 +1,48 @@
+#!/bin/bash
+
+export GNUPLOT_DEFAULT_GDFONT=inconsolata
+
+job=$(realpath "$1")
+confuga=$(realpath "$2")
+
+data=$(mktemp)
+
+echo $0
+sqlite3 -separator $'\t' > "$data"  <<EOF
+ATTACH 'file://${job}?immutable=1' as Job;
+ATTACH 'file://${confuga}?immutable=1' as Confuga;
+
+SELECT TransferJob.id, TransferJob.time_commit, File.size/(MAX(TransferJob.time_complete-TransferJob.time_commit, 1))
+	FROM Confuga.TransferJob JOIN Confuga.File ON TransferJob.fid = File.id
+	WHERE TransferJob.state = 'COMPLETED'
+UNION ALL
+SELECT TransferJob.id, TransferJob.time_complete+1 /* prevent time_commit == time_complete */, -File.size/(MAX(TransferJob.time_complete-TransferJob.time_commit, 1))
+	FROM Confuga.TransferJob JOIN Confuga.File ON TransferJob.fid = File.id
+	WHERE TransferJob.state = 'COMPLETED'
+;
+EOF
+cat "$data"
+
+gnuplot <<EOF
+set terminal postscript eps mono
+set output 'aggregate.eps'
+
+stats "$data" using 2 prefix "tj" nooutput
+
+set rmargin 4
+
+set xdata time
+set timefmt "%s"
+set format x "%H:%M"
+set xlabel "Time (Minutes)"
+set xrange ["0":]
+set xtics rotate by -45 offset -.8,0
+
+set format y "%0.1e"
+set ylabel "Aggregate Transfer (Bytes/S)"
+set yrange [0:]
+
+plot "${data}" using (\$2-tj_min):3 title "Aggregate Transfer" smooth cumulative
+EOF
+
+# vim: set noexpandtab tabstop=4:

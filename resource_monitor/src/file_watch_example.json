@@ -1,0 +1,32 @@
+{
+    "my.log":
+    {
+        "events":
+        [
+            {
+                "label":"start",
+                "on-create":true,
+                "count":1
+            },
+            {
+                "label":"rotated",
+                "on-truncate":true
+            },
+            {
+                "label":"before-analysis",
+                "on-pattern":"^# ANALYSIS.*"
+            }
+        ]
+    },
+    "myother.log":
+    {
+        "delete-if-found":true,
+        "events":[
+            {
+                "label":"manualsnapshot",
+                "on-create":true
+            }
+        ]
+    }
+}
+

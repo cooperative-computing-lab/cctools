@@ -1,0 +1,107 @@
+This install file goes through the steps needed to include makeflow_bwa and makeflow_gatk as
+tools in a Galaxy instance. The tools currently rely on dependencies in specific locations,
+which is described in the file below. Following the INSTALL instruction from the top provides
+the correct install, and lines can be copied and pasted onto the commandline for easier
+install. Once the installation is successful and the Galaxy instance is restarted the tools are ready.
+
+When running a tool, workers are required in order for the jobs to be completed. The last
+section of this INSTALL show two different methods of creating workers, though the pool is
+recommended to have/create workers for users that are not familiar with Work Queue. To
+understand this better, view Work Queue at http://ccl.cse.nd.edu/software/workqueue/.
+
+# Within galaxy-dist
+cd tool-data/shared/
+# Get recent cctools distribution:
+wget https://github.com/cooperative-computing-lab/cctools/archive/master.zip
+unzip master.zip
+mkdir cctools
+mv cctools-*/* cctools-*/.[^.]* cctools
+cd cctools
+./configure --prefix $PWD
+make install
+# Verify that no errors occurred.
+# Move to galaxy_dist directory
+cd ../../..
+cp ./tool-data/shared/cctools/galaxy/cctools.py ./lib/galaxy/datatypes/
+
+perl ./tool-data/shared/cctools/galaxy/modify_registry.pl ./lib/galaxy/datatypes/registry.py
+mv tmp_registry ./lib/galaxy/datatypes/registry.py
+
+mkdir tools/ndBioapps
+cp ./tool-data/shared/cctools/galaxy/makeflow* ./tools/ndBioapps
+
+perl ./tool-data/shared/cctools/galaxy/modify_tool_conf.pl ./config/tool_conf.xml.sample
+mv tmp_tool_conf ./config/tool_conf.xml.sample
+
+# Change galaxy_pass to your preferred password.
+echo "galaxy_pass" > tool-data/mypwfile
+
+
+# Get GATK from https://www.broadinstitute.org/gatk/download
+# Move to tool-data/shared/jars/gatk/GenomeAnalysisTK.jar
+
+# INSTALL Picard
+cd tool-data/shared
+wget https://github.com/broadinstitute/picard/zipball/master
+unzip master
+mkdir picard
+mv broadinstitute-picard-*/* broadinstitute-picard-*/.[^.]* picard
+cd picard
+git clone https://github.com/samtools/htsjdk.git
+
+# $JAVA_HOME must be pointing to a JDK, preferrably for 1.6, but it is compatible with 1.7
+ant
+
+# Clean
+cd ..
+rm master
+rmdir broadinstitute-picard-*/
+cd ../..
+
+#INSTALL samtools
+cd tool-data/shared
+wget http://sourceforge.net/projects/samtools/files/latest/download
+tar jxf download
+mkdir samtools
+mv samtools-*/* samtools
+cd samtools
+make
+cd ..
+rm download
+rmdir samtools-*/
+cd ../..
+
+# INSTALL VCFTools
+cd tool-data/shared
+wget http://sourceforge.net/projects/vcftools/files/latest/download
+tar zxf download
+mkdir vcftools
+mv vcftools_*/* vcftools
+cd vcftools
+make
+# Should be added to path at startup
+export PERL5LIB=$PWD/perl/
+cd ..
+rm download
+rmdir vcftools_*/
+cd ../..
+
+# INSTALL Java 1.7
+cd tool-data/shared
+mkdir java
+cd java
+wget http://javadl.sun.com/webapps/download/AutoDL?BundleId=97800
+tar zxf AutoDL*
+mkdir jre
+mv jre1*/* jre
+rmdir jre1*
+zip -r jre.zip jre/*
+cd ../../..
+
+Note: You must create workers using the batch utility of your choice for the tools to run.  Work Queue commands are located in the cctools bin directory at tool-data/shared/cctools/bin
+
+Submit workers for a particular job:
+*_submit_workers -N galaxy_\.\* #_of_workers --password path/to/mypwfile
+
+Create worker pool
+work_queue_factory -T batch_system -N galaxy_\.\*  --password path/to/mypwfile –w <minimum workers> -W <maximum workers>

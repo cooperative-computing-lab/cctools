@@ -1,0 +1,49 @@
+site_name: CCTools Documentation
+site_url: https://cctools.readthedocs.io/en/latest
+
+author: Cooperative Computing Lab at the University of Notre Dame
+copyright: Copyright (C) 2021 The University of Notre Dame
+
+nav:
+    - Getting Started:
+        - About: 'about.md'
+        - Installation: 'install/index.md'
+        - Getting Help: 'help.md'
+    - Software:
+        - Makeflow: 'makeflow/index.md'
+        - Work Queue: 'work_queue/index.md' 
+        - JX Language: 'jx/index.md'
+        - Resource Monitor: 'resource_monitor/index.md'
+        - Parrot: 'parrot/index.md'
+        - Chirp: 'chirp/index.md'
+        - Catalog Server: 'catalog/index.md'
+        - Poncho: 'poncho/index.md'
+    - Research Prototypes:
+        - AWE: 'awe/index.md'
+        - Confuga: 'confuga/index.md'
+        - Umbrella: 'umbrella/index.md'
+        - Prune: 'prune/index.md'
+    - Reference:
+        - Man Pages: 'man_pages.md'
+        - Network Configuration: 'network/index.md'
+        - JX Reference: 'jx/index.md'
+        - Chirp Reference: 'chirp/chirp_protocol.md'
+        - API Reference: 'http://ccl.cse.nd.edu/software/manuals/api/html/index.html'
+
+extra_css:
+    - css/tabs.css
+
+markdown_extensions:
+    - toc:
+    - admonition:
+    - pymdownx.tabbed:
+    - pymdownx.superfences:
+    - pymdownx.snippets:
+        base_path: doc/manuals
+
+permalink: True
+
+docs_dir: doc/manuals
+site_dir: doc/mkdocs-site
+
+theme: readthedocs

@@ -1,0 +1,57 @@
+
+The Cooperative Computing Tools (cctools) is a software
+package for enabling large scale distributed computing
+on clusters, clouds, and grids.  It is used primarily for
+attacking large scale problems in science and engineering.
+
+You can read more about this software at:
+   http://ccl.cse.nd.edu/software
+
+The software is developed by members of the Cooperative
+Computing Lab at the University of Notre Dame, led by
+Prof. Douglas Thain.  The file CREDITS lists the many
+people that have contributed to the software over the years.
+
+For complete instructions on how to use the software, see here:
+   https://cctools.readthedocs.io/en/latest/
+
+CCTools can be installed via Conda with:
+
+    conda install -y -c conda-forge ndcctools
+
+You can also install via Spack or build from source.
+Full installation instructions are available here:
+   https://cctools.readthedocs.io/en/latest/install/
+
+If you are impatient, the following commands will build
+and install the software in your home directory:
+
+   ./configure --prefix ${HOME}/cctools
+   make clean
+   make install
+   export PATH=${PATH}:${HOME}/cctools/bin
+   chirp_status
+
+------------------------------------------------------------
+This software package is
+Copyright (c) 2003-2004 Douglas Thain
+Copyright (c) 2005-2019 The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+------------------------------------------------------------
+This product includes software developed by and/or derived
+from the Globus Project (http://www.globus.org/)
+to which the U.S. Government retains certain rights.
+------------------------------------------------------------
+This product includes code derived from the RSA Data
+Security, Inc. MD5 Message-Digest Algorithm.
+------------------------------------------------------------
+This product includes public domain code for the
+SHA1 algorithm written by Peter Gutmann, David Ireland,
+and A. M. Kutchman.
+------------------------------------------------------------
+This product includes the source code for the MT19937-64
+Mersenne Twister pseudorandom number generator, written by 
+Makoto Matsumoto and Takuji Nishimura.
+
+

@@ -1,0 +1,15 @@
+# Configuration file for generating documentation via readthedocs.
+
+# Required
+version: 2
+
+formats: all
+
+mkdocs:
+    configuration: mkdocs.yml
+
+# Additional pip modules needed from doc/requirements.txt
+python:
+    version: 3.7
+    install:
+    - requirements: doc/requirements.txt

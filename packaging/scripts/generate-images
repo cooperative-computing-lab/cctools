@@ -1,0 +1,682 @@
+#! /usr/bin/env perl
+
+# generate base singularity and docker images for cctools
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+use File::Copy;
+use File::Path qw/make_path/;
+use File::Spec::Functions qw/catfile/;
+
+use v5.10;
+
+my @dev_dependencies = qw{
+bzip2
+cc
+cmake
+cplusplus
+curl
+cvmfs
+doxygen
+e2fsprogs
+find
+fuse
+gdb
+gettext
+git
+gmake
+gtar
+image_magick
+libattr
+libffi
+lsb_release
+m4
+mysql
+ncurses
+openssl
+patch
+perl
+pkg_config
+python
+python3
+readline
+strace
+swig
+troff
+unzip
+valgrind
+vim
+wget
+which
+xrootd
+zlib
+};
+
+my $builder = [
+	'mkdir -p /opt/vc3/utils',
+	'mkdir -p /opt/vc3/cctools-deps',
+	'cd /opt/vc3/utils',
+	'curl -O https://raw.githubusercontent.com/vc3-project/vc3-builder/master/vc3-builder',
+	'chmod 755 ./vc3-builder',
+];
+
+my $musl = [
+	'cd /opt/vc3/utils',
+	'./vc3-builder --make-jobs=4 --require musl -- ln -s \$VC3_ROOT_MUSL /opt/vc3/cctools-deps/musl',
+	'./vc3-builder --make-jobs=4 --require musl-zlib -- ln -s \$VC3_ROOT_MUSL_ZLIB /opt/vc3/cctools-deps/musl-zlib',
+];
+
+my $swig = [
+	'cd /opt/vc3/utils',
+	'./vc3-builder --make-jobs=4 --require swig -- ln -s \$VC3_ROOT_SWIG /opt/vc3/cctools-deps/swig',
+];
+
+my $uuid = [
+	'./vc3-builder --make-jobs=4 --require uuid -- ln -s \$VC3_ROOT_UUID /opt/vc3/cctools-deps/uuid',
+];
+
+my $cvmfs = [
+	'cd /opt/vc3/utils',
+	'./vc3-builder --make-jobs=4 --sys gettext:0.19=/usr --sys libffi:3.0=/usr --sys attr:2.4=/usr --require libcvmfs --install /opt/vc3 --distfiles /opt/vc3/distfiles -- ln -s \$VC3_ROOT_LIBCVMFS /opt/vc3/cctools-deps/cvmfs',
+];
+
+my $fuse = [
+	'cd /opt/vc3/utils',
+	'./vc3-builder --make-jobs=4 --require fuse -- ln -s \$VC3_ROOT_FUSE /opt/vc3/cctools-deps/fuse'
+];
+
+my $e2fsprogs = [
+	'cd /opt/vc3/utils',
+	'./vc3-builder --make-jobs=4 --require e2fsprogs -- ln -s \$VC3_ROOT_E2FSPROGS /opt/vc3/cctools-deps/ext2fs'
+];
+
+
+# using builder to provide .a library
+my $mysql = [
+	'cd /opt/vc3/utils',
+	'./vc3-builder --make-jobs=4 --require libmysql -- ln -s \$VC3_ROOT_LIBMYSQL /opt/vc3/cctools-deps/mysql',
+];
+
+# globus does not quite work, errors when linking
+my $globus = [
+	'cd /opt/vc3/utils',
+	'./vc3-builder --make-jobs=1 --require gridftp -- ln -s \$VC3_ROOT_GRIDFTP /opt/vc3/cctools-deps/globus',
+];
+
+
+my $irods = [
+	'cd /opt/vc3/utils',
+	'./vc3-builder --var INSIDE_CONTAINER=yes --make-jobs=4 --require irods --install /opt/vc3 --distfiles /opt/vc3/distfiles -- ln -s \$VC3_ROOT_IRODS /opt/vc3/cctools-deps/irods',
+];
+
+
+my $xrootd = [
+	'cd /opt/vc3/utils',
+	'./vc3-builder --make-jobs=4 --sys fuse:2.9=/usr --sys zlib:1.2=/usr --require xrootd:3:3 --install /opt/vc3 --distfiles /opt/vc3/distfiles -- ln -s \$VC3_ROOT_XROOTD /opt/vc3/cctools-deps/xrootd',
+];
+
+
+my @dependencies = (@dev_dependencies);
+
+# distribution -> list of versions
+my %versions_of; 
+
+# list of name of package in distribution
+my %extras_for;
+
+# distribution -> command to install name of package in distribution
+my %command_for;
+
+# list of shell commands to execute pre installation.
+my %preinstall_for;
+
+# list of shell commands to execute post installation.
+my %postinstall_for;
+
+$versions_of{centos} = [ qw{ 8 7 } ];
+$command_for{centos} = 'yum install -y';
+
+$versions_of{fedora} = [ qw{ 30  } ];
+$command_for{fedora} = 'dnf install -y';
+
+$versions_of{debian} = [ qw{ 9.9 } ];
+$command_for{debian} = 'apt-get install -y';
+
+$versions_of{ubuntu} = [ qw{ 16.04 20.04 } ];
+$command_for{ubuntu} = $command_for{debian};
+
+# e.g., $package_for{distro}{version}{dependency} == 'package'
+my %package_for;
+
+########## CENTOS ########## 
+$package_for{centos}{default} = {
+bzip2                    => 'bzip2',
+cc                       => 'gcc',
+cmake                    => 'cmake',
+cplusplus                => 'gcc-c++',
+curl                     => 'curl',
+cvmfs                    => [],             # from builder
+doxygen                  => 'doxygen',
+e2fsprogs                => [],             # from builder, to get libext2fs.a
+find                     => 'findutils',
+fuse                     => [],             # from builder, to get libfuse.a
+gdb                      => 'gdb',
+gettext                  => 'gettext',
+git                      => 'git',
+gmake                    => 'make',
+gtar                     => 'tar',
+image_magick             => 'ImageMagick',
+libattr                  => 'libattr-devel',
+libffi                   => 'libffi',
+lsb_release              => 'redhat-lsb-core',
+m4                       => 'm4',
+musl					 => [],             # from builder
+mysql                    => [],             # from builder
+ncurses                  => 'ncurses-devel',
+openssl                  => ['openssl', 'openssl-devel'],
+patch                    => 'patch',
+perl                     => ['perl-core', 'perl-devel'],
+pkg_config               => 'pkg-config',
+python                   => [],			    # native (7), or disabled (8)
+python3					 => [],				# from epel (7), or native (8)
+readline                 => 'readline-devel',
+strace                   => 'strace',
+swig                     => [],				# from builder (7), or native (8)
+troff                    => 'groff',
+unzip                    => 'unzip',
+valgrind                 => 'valgrind',
+vim                      => 'vim',
+wget                     => 'wget',
+which                    => 'which',
+xrootd                   => [],             # from builder
+zlib                     => 'zlib-devel',
+};
+
+#$package_for{centos}{6}{python3} = ['python34-devel', 'python34-setuptools'];  centos6 end-of-life
+$package_for{centos}{7}{python}   = ['python', 'python-devel', 'python-setuptools', 'python-tools'];
+$package_for{centos}{7}{python3}  = ['python36-devel', 'python36-setuptools'];
+
+$package_for{centos}{8}{python3}  = ['python38-devel', 'python38-setuptools'];
+$package_for{centos}{8}{swig}     = ['swig'];
+
+$extras_for{centos}{6} = ['libc-devel'];
+$extras_for{centos}{7} = ['libc-devel'];
+$extras_for{centos}{8} = ['glibc-devel'];
+
+$extras_for{centos}{6} = [
+	'nss', # certificate errors
+];
+
+$preinstall_for{centos}{default} = [
+	'yum -y install epel-release',
+	'yum -y install https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm'
+];
+
+$preinstall_for{centos}{8} = [
+	'dnf install -y "dnf-command(config-manager)"',
+	'dnf config-manager -y --set-enabled powertools'  # for doxygen, and groff
+];
+
+$postinstall_for{centos}{7} = [
+	@{$builder},
+	@{$fuse},
+	@{$e2fsprogs},
+	@{$mysql},
+	@{$uuid},
+	@{$swig},
+	'yum -y install cvmfs-devel',
+	'ln -sf /usr/bin/python3.6 /usr/bin/python3',
+	'ln -sf /usr/bin/python3.6-config /usr/bin/python3-config',
+	'yum -y clean all',
+];
+
+$postinstall_for{centos}{8} = [
+	'ln -s /usr/bin/python3 /usr/bin/python',
+	@{$builder},
+	@{$fuse},
+	@{$e2fsprogs},
+	@{$mysql},
+	@{$uuid},
+	'yum -y install cvmfs-devel',
+	'yum -y clean all',
+];
+
+# end-of-life
+#$postinstall_for{centos}{6} = [
+#	'ln -sf /usr/bin/python3.4 /usr/bin/python3',
+#	'ln -sf /usr/bin/python3.4-config /usr/bin/python3-config'
+#];
+
+
+########## FEDORA ##########
+$package_for{fedora}{default}     = { %{$package_for{centos}{default}} };
+
+$package_for{fedora}{default}{lsb_release} = ['redhat-lsb-core'];
+$package_for{fedora}{default}{python}      = ['python2-devel', 'python2-setuptools'];
+$package_for{fedora}{default}{python3}     = ['python3-devel', 'python3-setuptools'];
+
+$extras_for{fedora}{default}      = [ ];
+
+$preinstall_for{fedora}{default}  = [ ];
+
+$postinstall_for{fedora}{default} = [
+	@{$builder},
+	@{$musl},
+];
+
+########## debian ########## 
+$package_for{debian}{default} = {
+bzip2                    => 'bzip2',
+cc                       => 'gcc',
+cmake                    => 'cmake',
+cplusplus                => 'g++',
+curl                     => 'curl',
+cvmfs                    => [],             # from builder
+doxygen                  => 'doxygen',
+e2fsprogs                => [],             # fails linking
+find                     => 'findutils',
+fuse                     => [],          #from builder to get libfuse.a
+gdb                      => 'gdb',
+gettext                  => 'gettext',
+git                      => 'git',
+gmake                    => 'make',
+gtar                     => 'tar',
+image_magick             => 'imagemagick',
+libattr                  => 'attr-dev',
+libffi                   => 'libffi-dev',
+lsb_release              => 'lsb-release',
+m4                       => 'm4',
+mysql                    => [],             # from builder
+ncurses                  => 'libncurses-dev',
+openssl                  => ['openssl', 'libssl-dev'],
+patch                    => 'patch',
+perl                     => 'libperl-dev',
+pkg_config               => 'pkg-config',
+python                   => ['python-dev', 'python-setuptools'],
+python3                  => ['python3-dev', 'python3-setuptools'],
+readline                 => 'libreadline-dev',
+swig                     => 'swig',
+strace                   => 'strace',
+troff                    => 'groff',
+unzip                    => 'unzip',
+valgrind                 => 'valgrind',
+vim                      => 'vim',
+wget                     => 'wget',
+which                    => 'debianutils',
+xrootd                   => [],             # from builder
+zlib                     => 'libz-dev',
+};
+
+$extras_for{debian}{default} = ['tzdata', 'locales', 'apt-transport-https', 'ca-certificates'];
+
+$preinstall_for{debian}{default} = [
+	"apt-get update"
+];
+		
+$postinstall_for{debian}{default} = [
+	'echo en_US.UTF-8 UTF-8 >> /etc/locale.gen',
+	'/usr/sbin/locale-gen',
+
+	@{$builder},
+	@{$fuse},
+	@{$uuid},
+
+	'apt-get install -y python-is-python3 || update-alternatives --install /usr/bin/python python /usr/bin/python3 10',
+
+	# install cvmfs-devel:
+	'apt-get install -y lsb-release',
+	'wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb',
+	'dpkg -i cvmfs-release-latest_all.deb',
+	'rm -f cvmfs-release-latest_all.deb',
+	'apt-get update --allow-unauthenticated',
+	'apt-get install -y cvmfs-dev',
+	'apt-get clean',
+];
+
+########## ubuntu ##########
+$package_for{ubuntu}{default} = $package_for{debian}{default};
+$preinstall_for{ubuntu}{default} = $preinstall_for{debian}{default};
+
+$extras_for{ubuntu}{default} = $extras_for{debian}{default};
+$postinstall_for{ubuntu}{default} = $postinstall_for{debian}{default};
+
+########## ALL ##########
+
+# finishing installation steps for all:
+my $epilogue = [
+];
+
+
+########## END OF CONFIGURATION ##########
+
+unless (caller) {
+    main();
+}
+
+sub main {
+
+	# architecture of current machine.
+    chomp(my $arch = qx(uname -m));
+
+	my $arch_opt = $arch;
+	my $help;
+	my $list;
+	my $build;
+	my $recp;
+	my $all;
+	my @types;
+	my $output_dir = 'images';
+
+	GetOptions(
+		"help", => \$help,
+		"list", => \$list,
+		"recp", => \$recp,
+		"build" => \$build,
+		"arch=s", => \$arch_opt,
+		"all",    => \$all,
+		"output_dir=s", => \$output_dir,
+		"docker"      => sub { push @types, 'docker'; },
+		"singularity" => sub { push @types, 'singularity'; } 
+	) or die "@{[ show_help() ]}\n";
+
+	if($help) {
+		show_help();
+		exit 0;
+	}
+
+	unless($arch eq $arch_opt) {
+		die "Required architecture '$ARGV[0]' is not the architecture of the current machine $arch.\n";
+	}
+
+	if($list) {
+		for my $p (list_known_platforms()) {
+			say $p;
+		}
+		exit 0;
+	}
+
+	if(@{ARGV} > 0 and $all) {
+		die "individual builds cannot be specified with --all=<dir>.\n"; 
+	}
+
+	unless(@types) {
+		@types = ('singularity', 'docker');
+	}
+
+	make_path($output_dir, { mode => 0755 });
+	unless( -d $output_dir && -w $output_dir ) {
+		die "Problem creating '$output_dir': $@";
+	}
+
+	for my $type (@types) {
+		if($all) {
+			generate_all_images($type, $arch, $output_dir, $recp);
+		} else {
+			my ($dist, $version, $output_name) = @{ARGV};
+			generate_image($type, $arch, $dist, $version, $output_dir, $output_name, $recp);
+		}
+	}
+}
+
+sub show_help {
+	say "Use:";
+	say "$0 [options] [distribution version outputprefix]";
+	say "\n Example:\n$0 --arch x86_64 centos 7 Singularity.ccl.x86_64-centos7";
+	say "\nproduces Singularity.ccl.x86_64-centos7.{sin,img}";
+	say "\noptions:";
+	say "\t--help            Show this message.";
+	say "\t--all             Build all known platforms.";
+	say "\t--outputdir=<dir> Build platforms into dir (default ./images).";
+	say "\t--build           Build from previously generated reciped only.";
+	say "\t--arch=<arch>     Othen than x86_64 (the default), nothing has been tested.";
+	say "\t--list            List known platforms.";
+	say "\t--recp            Generate recipes only, not images.";
+	say "\t--docker          Generate docker images.";
+	say "\t--singularity     Generate singularity images.";
+
+	return '';
+}
+
+sub list_known_platforms {
+	my @platforms = ();
+
+	for my $dist (keys %versions_of) {
+		for my $v (@{$versions_of{$dist}}) {
+			push @platforms, "${dist} ${v}";
+		}
+	}
+
+	@platforms = sort { $a cmp $b } @platforms;
+
+	return @platforms;
+}
+
+sub output_name {
+	my ($type, $arch, $dist, $version) = @_;
+
+	return ucfirst($type) . ".ccl.$arch-$dist$version";
+}
+
+sub generate_all_images {
+	my ($type, $arch, $output_dir, $recp) = @_;
+
+	for my $dist (keys %versions_of) {
+		for my $version (@{$versions_of{$dist}}) {
+			generate_image($type, $arch, $dist, $version, $output_dir, output_name($type, $arch, $dist, $version), $recp);
+		}
+	}
+}
+
+sub generate_image {
+	my ($type, $arch, $dist, $version, $output_dir, $output_name, $recp) = @_;
+
+	unless($dist and $version) {
+		show_help();
+		exit 1;
+	}
+
+	unless($versions_of{$dist}) {
+		die "I don't know about the distribution $dist\n";
+	}
+
+	unless($version ~~ @{$versions_of{$dist}}) {
+		warn "I don't know about version $version for the distribution $dist.\nUsing defaults that are not tested!\n";
+	}
+
+	unless($output_name) {
+		$output_name = output_name($type, $arch, $dist, $version);
+		warn "No output prefix given, using $output_name\n";
+	}
+
+	if($type eq 'singularity') {
+		return generate_singularity_image($arch, $dist, $version, $output_dir, $output_name, $recp);
+	} elsif($type eq 'docker') {
+		return generate_docker_image($arch, $dist, $version, $output_dir, $output_name, $recp);
+	} else {
+		die "I don't know how to build images of type '$type'.\n";
+	}
+}
+
+sub generate_singularity_image {
+	my ($arch, $dist, $version, $output_dir, $output_name, $recp) = @_;
+
+	make_path(catfile($output_dir, 'singularity'), { mode => 0755 });
+
+	my $sin_name = catfile($output_dir, 'singularity', "$output_name.sin");
+	my $img_name = catfile($output_dir, 'singularity', "$output_name.img");
+
+	say "Creating Singularity file: $sin_name";
+	open my $sin_fh, '>', $sin_name || croak "Problem with '$sin_name': $@";
+	print { $sin_fh } singularity_file_for($arch, $dist, $version, $img_name, $sin_name);
+	close $sin_fh;
+
+	unless($recp) {
+		my $exit_status;
+
+		say "Building image $img_name from: $sin_name";
+
+		-e "$img_name"     && system(qq(sudo rm -rf "$img_name"));
+		-d "$img_name.sbx" && system(qq(sudo rm -rf "$img_name.sbx"));
+
+		my $output = qx(sudo singularity build --sandbox "$img_name.sbx" "$sin_name");
+		$exit_status = $?;
+
+		unless($exit_status == 0) {
+			die "Could not build image with $sin_name. Output:\n$output\n";
+		}
+
+		$exit_status = system(qq(sudo singularity build "$img_name" "$img_name.sbx"));
+		unless($exit_status == 0) {
+			die "Could not build from $img_name.sbx\n";
+		}
+
+		system(qq(sudo rm -rf $img_name.sbx));
+	}
+}
+
+sub spec_preamble_file_for {
+    my ($dist, $version) = @_;
+    my @packages;
+	
+	@packages = ();
+	for my $d (@dependencies) {
+		my $p = $package_for{$dist}{$version}{$d} || $package_for{$dist}{default}{$d};
+
+		if($p) {
+			push @packages, $p;
+		} else {
+			warn "Undefined dependency $d\n";
+		}
+	}
+
+	if($extras_for{$dist} and $extras_for{$dist}{$version}) {
+		@packages = (@packages, @{$extras_for{$dist}{$version}});
+	}
+
+	if($extras_for{$dist} and $extras_for{$dist}{default}) {
+		@packages = (@packages, @{$extras_for{$dist}{default}});
+	}
+
+	my @steps;
+	push @steps, @{$preinstall_for{$dist}{default} || []};
+	push @steps, @{$preinstall_for{$dist}{$version} || []};
+
+	@packages = map { ref($_) eq 'ARRAY' ? @{$_} : $_ } grep { $_ } @packages;
+
+	push @steps, "$command_for{$dist} @packages";
+
+	push @steps, @{$postinstall_for{$dist}{default} || []};
+	push @steps, @{$postinstall_for{$dist}{$version} || []};
+
+	push @steps, @{$epilogue};
+
+	return @steps;
+}
+
+sub singularity_file_for {
+	my ($arch, $dist, $version, $img_name, $sin_name) = @_;
+
+	my @steps = spec_preamble_file_for($dist, $version);
+
+	my $sinfile = <<EOF;
+# Singularity image VC3 for $dist$version
+# Build as: singularity build $img_name $sin_name
+# Run as:   singularity shell $img_name
+#
+
+Bootstrap: docker
+From: $dist:$version
+
+%post
+	@{[join("\n\t", @steps)]}
+
+EOF
+
+	return $sinfile;
+}
+
+
+sub generate_docker_image {
+	my ($arch, $dist, $version, $output_dir, $output_name, $recp) = @_;
+
+	make_path(catfile($output_dir, 'docker'), { mode => 0755 });
+
+	my $doc_name = catfile($output_dir, 'docker', "$output_name.dockerfile");
+	my $img_name = catfile($output_dir, 'docker', "$output_name.img");
+	my $tag      = "cclnd/cctools-env:$arch-$dist$version";
+
+	say "Creating Docker file: $doc_name";
+	open my $doc_fh, '>', $doc_name || croak "Problem with '$doc_name': $@";
+	print { $doc_fh } dockerfile_for($arch, $dist, $version, $img_name, $doc_name);
+	close $doc_fh;
+
+	unless($recp) {
+		my $exit_status;
+
+		say "Building image from $doc_name to $tag";
+
+		my $context = catfile($output_dir, 'docker', 'context');
+		#-d $context && system(qq(sudo rm -rf $context));
+		-d $context && system(qq(rm -rf $context));
+
+		make_path($context, { mode => 0755 });
+		copy $doc_name,       "$context/Dockerfile";
+		copy 'drop-priviliges.c',   "$context/";
+		copy 'run-with-user', "$context/";
+
+		#-e "$img_name"     && system(qq(sudo rm -rf "$img_name"));
+		-e "$img_name"     && system(qq(rm -rf "$img_name"));
+
+		#qx(sudo docker rmi "$tag");
+		qx(docker rmi "$tag");
+
+		#my $output = qx(sudo docker build  --tag="$tag" --no-cache=true --force-rm $context);
+		$ENV{DOCKER_BUILDKIT} = 1;
+		my $output = qx(docker build  --tag="$tag" --no-cache=true --force-rm $context);
+		$exit_status = $?;
+
+		unless($exit_status == 0) {
+			die "Could not build image with $doc_name. Output:\n$output\n";
+		}
+
+		# retagging for upload:
+		qx(docker tag "$tag" "docker.io/$tag");
+
+		say "Saving image from $tag to $img_name";
+		#$exit_status = system(qq(sudo docker save --output "$img_name" "$tag"));
+		$exit_status = system(qq(docker save --output "$img_name" "$tag"));
+		unless($exit_status == 0) {
+			die "Could not save to $img_name\n";
+		}
+
+		#qx(sudo chmod 755 $img_name);
+		qx(chmod 755 $img_name);
+	}
+}
+
+sub dockerfile_for {
+    my ($arch, $dist, $version, $img_name, $doc_name) = @_;
+
+	my @steps = spec_preamble_file_for($dist, $version);
+
+	my $docfile = <<EOF;
+# Docker image VC3 for $dist$version
+# Build as: docker build --tag="cclnd/ccltools-env:$arch-$dist$version" --no-cache=true --force-rm .
+#           docker save --output $img_name "cclnd/cctools-env:$arch-$dist$version" 
+# Run as:   docker run   -i -t --rm --tag="cclnd/cctools-env:$arch-$dist$version" /bin/sh
+#
+
+FROM $dist:$version
+ARG DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /
+RUN @{[join(' && ', @steps)]}
+
+EOF
+
+	return $docfile;
+}
+
+# vim: set noexpandtab tabstop=4:

@@ -1,0 +1,19 @@
+{
+    "define" : {
+        "RANGE"    : range(1,4),
+        "FILELIST" : [ "output." + N + ".txt" for N in RANGE ],
+    },
+
+    "rules" : [
+                {
+                    "command" : "python ./simulate.py --parameter " + N + " > output."+N+".txt",
+                    "inputs"  : [ "simulate.py" ],
+                    "outputs" : [ "output." + N + ".txt" ]
+                } for N in RANGE,
+                {
+                    "command" : "/bin/cat " + join(FILELIST," ") + " > output.all.txt",
+                    "inputs"  : FILELIST,
+                    "outputs" : [ "output.all.txt" ]
+                }
+              ]
+}
