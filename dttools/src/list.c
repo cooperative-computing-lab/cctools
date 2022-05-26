@@ -119,7 +119,7 @@ struct list_cursor *list_cursor_create(struct list *list) {
 struct list_cursor *list_cursor_create_and_seek(struct list *list, int index)
 {
 	struct list_cursor *cur = list_cursor_create(list);
-	assert(list_seek(cur, index), true);
+	assert(list_seek(cur, index) == true);
 	return cur;
 }
 
@@ -391,6 +391,12 @@ void list_free(struct list *l) {
 		free(item);
 	}
 	list_cursor_destroy(cur);
+}
+
+void list_free_and_delete(struct list *l)
+{
+	list_free(l);
+	list_delete(l);
 }
 
 int list_push_head(struct list *l, void *item) {

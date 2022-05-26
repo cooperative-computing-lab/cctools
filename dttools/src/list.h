@@ -271,6 +271,11 @@ Note that this function does not delete the list itself.
 
 void list_free(struct list *list);
 
+/* Free every item referred to by the list and the list itself.
+ * @param list The list to free.
+ */
+void list_free_and_delete(struct list *list);
+
 /** Splice two lists together.
 @param top A linked list that will be destroyed in the process.
 @param bottom A linked list that will be destroyed in the process.

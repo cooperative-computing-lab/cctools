@@ -37,7 +37,7 @@ void init_default_qbucket_resources(struct qbucket_resources *qbres, double core
 {
     qbres = malloc(sizeof(*qbres));
     qbres->cores = cores;
-    qbres->memory = mem;
+    qbres->mem = mem;
     qbres->disk = disk;
     qbres->gpus = gpus;
     qbres->sig = sig;
@@ -64,9 +64,14 @@ void qbucket_destroy(struct qbucket *qb)
     list_free_and_delete(qb->buckets_mem);
     list_free_and_delete(qb->buckets_disk);
     list_free_and_delete(qb->buckets_gpus);
-    list_free_and_delete(qb->default_request);
-    list_free_and_delete(qb->max_request);
+    qbucket_resources_destroy(qb->default_request);
+    qbucket_resources_destroy(qb->max_request);
     free(qb);
+}
+
+void qbucket_resources_destroy(struct qbucket_resources *qbres)
+{
+    free(qbres);
 }
 
 int init_qbucket(int qbucket_id, struct qbucket *qb)
@@ -85,9 +90,9 @@ int init_qbucket(int qbucket_id, struct qbucket *qb)
     qb->cold_start_phase = 1;
     qb->max_num_tasks = max_num_tasks;
  
-    init_default_qbucket_resources(qb->default_request, qbucket_default_request->cores,
-            qbucket_default_request->mem, qbucket_default_request->disk,
-            qbucket_default_request->gpus, -1);
+    init_default_qbucket_resources(qb->default_request, qbucket_default_request.cores,
+            qbucket_default_request.mem, qbucket_default_request.disk,
+            qbucket_default_request.gpus, -1);
     qb->max_request = NULL;
 
     qb->sorted_cores = list_create();
@@ -95,13 +100,13 @@ int init_qbucket(int qbucket_id, struct qbucket *qb)
     qb->sorted_disk = list_create();
     qb->sorted_gpus = list_create();
     qb->buckets_cores = list_create();
-    qb->bucket_mem = list_create();
-    qb->bucket_disk = list_create();
-    qb->bucket_gpus = list_create();
+    qb->buckets_mem = list_create();
+    qb->buckets_disk = list_create();
+    qb->buckets_gpus = list_create();
     return 0;
 }
 
-struct qbucket_task qbucket_task_create()
+struct qbucket_task *qbucket_task_create()
 {
     struct qbucket_task *qbtask = malloc(sizeof(*qbtask));
     return qbtask;
@@ -137,7 +142,7 @@ static double __partitioning_policy(double p1, double p2, double delim_res, doub
     
     for (j = low_index; j <= i; ++j, list_next(sorted_res_cur))
     {
-        assert(list_get(sorted_res_cur, qbtask), true);
+        assert(list_get(sorted_res_cur, (void **) qbtask) == true);
         sig = (*qbtask)->sig;
         cons = (*qbtask)->measured_cons;
         exp_cons_lq_delim = (sig/all_sig) * cons;
@@ -146,10 +151,10 @@ static double __partitioning_policy(double p1, double p2, double delim_res, doub
     cost_lower_hit = p1 * (p1 * (delim_res - exp_cons_lq_delim));
     cost_lower_miss = p1 * (p2 * (max_res - exp_cons_lq_delim));
 
-    assert(list_seek(sorted_res_cur, i+1), true);
+    assert(list_seek(sorted_res_cur, i+1) == true);
     for (j = i+1; j <= high_index; ++j, list_next(sorted_res_cur))
     {
-        assert(list_get(sorted_res_cur, qbtask), true);
+        assert(list_get(sorted_res_cur, (void **) qbtask) == true);
         sig = (*qbtask)->sig;
         cons = (*qbtask)->measured_cons;
         exp_cons_g_delim = (sig/all_sig) * cons;       
@@ -216,7 +221,7 @@ static struct list *__bucket_partitioning(struct list *sorted_res, int low_index
     
     for (i = low_index; i <= high_index; ++i, list_next(sorted_res_cur))
     {   
-        assert(list_get(sorted_res_cur, qbtask), true);
+        assert(list_get(sorted_res_cur, (void **) qbtask) == true);
         if (i == high_index)
             max_res = (*qbtask)->measured_cons;
         
@@ -228,11 +233,11 @@ static struct list *__bucket_partitioning(struct list *sorted_res, int low_index
     
     cost = -1;
     split_index = -1;
-    assert(list_seek(sorted_res_cur, low_index), true);
+    assert(list_seek(sorted_res_cur, low_index) == true);
      
     for (i = low_index; i <= high_index; ++i, list_next(sorted_res_cur))
     {
-        assert(list_get(sorted_res_cur, qbtask), true);
+        assert(list_get(sorted_res_cur, (void **) qbtask) == true);
         delim_res = (*qbtask)->measured_cons;
         num_tasks_above_delim = num_tasks - (i - low_index + 1);
         p1 = bot_sig[i-low_index]/bot_sig[high_index-low_index];
@@ -324,7 +329,7 @@ static double __get_allocation_resource(struct qbucket *qb, const char *res_type
 
     //get last value in sorted_res
     sorted_res_cur = list_cursor_create_and_seek(sorted_res, -1);
-    assert(list_get(sorted_res_cur, qbtask), true);
+    assert(list_get(sorted_res_cur, (void **) qbtask) == true);
 
     //if task has never been allocated before
     if (last_res == -1)
@@ -351,10 +356,10 @@ static double __get_allocation_resource(struct qbucket *qb, const char *res_type
         
         for (i = 0; i < list_length(buckets_res); ++i, list_next(buckets_res_cur))
         {
-            assert(list_get(buckets_res_cur, tmp_buckets_item), true);
+            assert(list_get(buckets_res_cur, (void **) tmp_buckets_item) == true);
             delim_res_ind = **tmp_buckets_item;
-            assert(list_seek_and_get(sorted_res_cur, delim_res_ind, qbtask), true);
-            delim_res = (*qb_task)->measured_cons;
+            assert(list_cursor_seek_and_get(sorted_res_cur, delim_res_ind, (void **) qbtask) == true);
+            delim_res = (*qbtask)->measured_cons;
             if (res_exceeded)
             {
                 if (last_res >= delim_res)
@@ -376,7 +381,7 @@ static double __get_allocation_resource(struct qbucket *qb, const char *res_type
                 }
             }
         }
-        assert(list_seek_and_get(sorted_res_cur, -1, qbtask), true);
+        assert(list_cursor_seek_and_get(sorted_res_cur, -1, (void **) qbtask) == true);
         if (last_res == (*qbtask)->measured_cons)
         {
             base_index = list_length(buckets_res) - 1;
@@ -389,14 +394,14 @@ static double __get_allocation_resource(struct qbucket *qb, const char *res_type
     for (i = 0; i < num_buckets_resource; ++i)
     {
         bucket_weight = 0;
-        assert(list_seek_and_get(buckets_res_cur, i, tmp_buckets_item), true);
-        assert(list_seek_and_get(sorted_res_cur, **tmp_buckets_item, qbtask), true);
+        assert(list_cursor_seek_and_get(buckets_res_cur, i, (void **) tmp_buckets_item) == true);
+        assert(list_cursor_seek_and_get(sorted_res_cur, **tmp_buckets_item, (void **) qbtask) == true);
         delim_res_ind = (*qbtask)->measured_cons;
         if (last_delim_res_ind == -1)
         {
             for (j = 0; j <= delim_res_ind; ++j)
             {
-                assert(list_seek_and_get(sorted_res_cur, j, qbtask), true);
+                assert(list_cursor_seek_and_get(sorted_res_cur, j, (void **) qbtask) == true);
                 bucket_weight += (*qbtask)->sig;
             }
         }
@@ -404,7 +409,7 @@ static double __get_allocation_resource(struct qbucket *qb, const char *res_type
         {
             for (j = last_delim_res_ind+1; j <= delim_res_ind; ++j)
             {
-                assert(list_seek-and_get(sorted_res_cur, j, qbtask), true);
+                assert(list_cursor_seek_and_get(sorted_res_cur, j, (void **) qbtask) == true);
                 bucket_weight += (*qbtask)->sig;
             }
         }
@@ -421,14 +426,14 @@ static double __get_allocation_resource(struct qbucket *qb, const char *res_type
     twister_init_genrand64(seed);
 
     random_num = twister_genrand64_real1();
-    cumulative density = 0;
+    cumulative_density = 0;
 
     for (i = base_index; i < num_buckets_resource; ++i)
     {
-        if (i == num_buckets-resource - 1)
+        if (i == num_buckets_resource - 1)
         {
-        assert(list_seek_and_get(buckets_res_cur, i, tmp_buckets_item), true);
-        assert(list_seek(sorted_res_cur, **tmp_buckets_item, qbtask), true);
+        assert(list_cursor_seek_and_get(buckets_res_cur, i, (void **) tmp_buckets_item) == true);
+        assert(list_cursor_seek_and_get(sorted_res_cur, **tmp_buckets_item, (void **) qbtask) == true);
         list_cursor_destroy(sorted_res_cur);
         list_cursor_destroy(buckets_res_cur);
         return (*qbtask)->measured_cons;
@@ -438,8 +443,8 @@ static double __get_allocation_resource(struct qbucket *qb, const char *res_type
             cumulative_density += weighted_bucket_resource[i]/total_sample_space_resource;
             if (random_num <= cumulative_density)
             {
-                assert(list_seek_and_get(buckets_res_cur, i, tmp_buckets_item), true);
-                assert(list_seek_and_get(sorted_res_cur, **tmp_buckets_item, qbtask), true);
+                assert(list_cursor_seek_and_get(buckets_res_cur, i, (void **) tmp_buckets_item) == true);
+                assert(list_cursor_seek_and_get(sorted_res_cur, **tmp_buckets_item, (void **) qbtask) == true);
                 list_cursor_destroy(sorted_res_cur);
                 list_cursor_destroy(buckets_res_cur);
                 return (*qbtask)->measured_cons;       
@@ -454,10 +459,10 @@ static double __get_allocation_resource(struct qbucket *qb, const char *res_type
 struct rmsummary *qbucket_res_to_rmsummary(struct qbucket_resources *qbres)
 {
     struct rmsummary *s = rmsummary_create(-1);
-    s->cores = qb_res->cores;
-    s->mem = qb_res->mem;
-    s->disk = qb_res->disk;
-    s->gpus = qb_res->gpus;
+    s->cores = qbres->cores;
+    s->memory = qbres->mem;
+    s->disk = qbres->disk;
+    s->gpus = qbres->gpus;
     return s;
 }
 
@@ -472,8 +477,18 @@ struct qbucket_resources *qbucket_resources_create()
     return qbres;
 }
 
+struct rmsummary *qbucket_res_to_summary(struct qbucket_resources *qbres)
+{
+    struct rmsummary *s = rmsummary_create(-1);
+    s->cores = qbres->cores;
+    s->memory = qbres->mem;
+    s->disk = qbres->disk;
+    s->gpus = qbres->gpus;
+    return s;
+}
+
 //need to maintain task_id -> last_attempt
-struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev_res
+struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev_res,
         struct rmsummary *task_prev_alloc)
 {
     int total_tasks;
@@ -506,12 +521,12 @@ struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev
 
     struct rmsummary *qbsummary;
 
-    int res_exceeded[4]; #cores, mem, disk, gpus
+    int res_exceeded[4]; //cores, mem, disk, gpus
 
     total_tasks = list_length(qb->sorted_cores);
     if (task_prev_res == NULL)
     {
-        if (total_tasks < qb->num_cold_start)
+        if (total_tasks < qb->num_cold_start_tasks)
             return qbucket_res_to_rmsummary(qb->default_request);
         else
         {
@@ -524,24 +539,24 @@ struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev
     else 
     {
         tcore = task_prev_res->cores;
-        tmem = task_prev_res->mem;
+        tmem = task_prev_res->memory;
         tdisk = task_prev_res->disk;
         tgpus = task_prev_res->gpus;
     }
 
-    max_core = qb->max_res->cores;
-    max_mem = qb->max_res->mem;
-    max_disk = qb->max_res->disk;
-    max_gpus = qb->max_res->gpus;
+    max_core = qb->max_request->cores;
+    max_mem = qb->max_request->mem;
+    max_disk = qb->max_request->disk;
+    max_gpus = qb->max_request->gpus;
 
     sorted_cores_cur = list_cursor_create_and_seek(qb->sorted_cores, -1);
-    assert(list_get(sorted_cores_cur, tmp_cores_item), true);
+    assert(list_get(sorted_cores_cur, (void **) tmp_cores_item) == true);
     sorted_mem_cur = list_cursor_create_and_seek(qb->sorted_mem, -1);
-    assert(list_get(sorted_mem_cur, tmp_mem_item), true);
+    assert(list_get(sorted_mem_cur, (void **) tmp_mem_item) == true);
     sorted_disk_cur = list_cursor_create_and_seek(qb->sorted_disk, -1);
-    assert(list_get(sorted_disk_cur, tmp_disk_item), true);
+    assert(list_get(sorted_disk_cur, (void **) tmp_disk_item) == true);
     sorted_gpus_cur = list_cursor_create_and_seek(qb->sorted_gpus, -1);
-    assert(list_get(sorted_gpus_cur, tmp_gpus_item), true);
+    assert(list_get(sorted_gpus_cur, (void **) tmp_gpus_item) == true);
     list_cursor_destroy(sorted_cores_cur);
     list_cursor_destroy(sorted_mem_cur);
     list_cursor_destroy(sorted_disk_cur);
@@ -549,7 +564,7 @@ struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev
     max_out_cond = ((tcore >= (*tmp_cores_item)->measured_cons) && (tmem >= (*tmp_mem_item)->measured_cons) && (tdisk >= (*tmp_disk_item)->measured_cons) && (tgpus >= (*tmp_gpus_item)->measured_cons));
 
     qbres = qbucket_resources_create();
-    if ((total_tasks < qb->num_cold_start) || max_out_cond)
+    if ((total_tasks < qb->num_cold_start_tasks) || max_out_cond)
     {
         qbres->cores = min(tcore * qb->increase_rate, max_core);
         qbres->mem = min(tmem * qb->increase_rate, max_mem);
@@ -559,7 +574,7 @@ struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev
     else
     {
         acore = task_prev_alloc->cores;
-        amem = task_prev_alloc->mem;
+        amem = task_prev_alloc->memory;
         adisk = task_prev_alloc->disk;
         agpus = task_prev_alloc->gpus;
         qbres->cores = __get_allocation_resource(qb, "core", tcore, 1 ? tcore > acore : 0);
@@ -571,17 +586,17 @@ struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev
     return qbsummary;
 }
 
-double qbucket_task_priority(struct qbucket_task qbtask)
+double qbucket_task_priority(struct qbucket_task *qbtask)
 {
     return -qbtask->measured_cons;
 }
 
-int add_task(struct qbucket *qb, struct qbucket_resources qbtask)
+void add_task(struct qbucket *qb, struct qbucket_resources *qbtask)
 {
-    struct qbucket_task qbcore; 
-    struct qbucket_task qbmem; 
-    struct qbucket_task qbdisk; 
-    struct qbucket_task qbgpus; 
+    struct qbucket_task *qbcore; 
+    struct qbucket_task *qbmem; 
+    struct qbucket_task *qbdisk; 
+    struct qbucket_task *qbgpus; 
 
     qbcore = qbucket_task_create();
     qbcore->measured_cons = qbtask->cores;

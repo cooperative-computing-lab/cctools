@@ -117,7 +117,7 @@ int init_qbucket(int qbucket_id, struct qbucket *qb);
 /* Create a qbucket_task structure
  * @return pointer to newly created qbucket_task structure
  */
-struct qbucket_task qbucket_task_create();
+struct qbucket_task *qbucket_task_create();
 
 /* Destroy a qbucket_task struct
  * @param qbtask The pointer to a qbucket_task struct
@@ -183,6 +183,11 @@ static double min(double a, double b);
  */
 struct qbucket_resources *qbucket_resources_create();
 
+/* Destroy a qbucket_resources struct
+ * @param pbres The struct to be destroyed
+ */ 
+void qbucket_resources_destroy(struct qbucket_resources *qbres);
+
 /* Get the allocation of the current task 
  * @param qb The relevant qbucket
  * @param task_prev_res The resource report of previous resource usage of current task
@@ -196,11 +201,11 @@ struct rmsummary *get_allocation(struct qbucket *qb, struct rmsummary *task_prev
  * @param qbtask The current qbtask
  * @return The qbtask's priority
  */
-double qbucket_task_priority(struct qbucket_task qbtask);
+double qbucket_task_priority(struct qbucket_task *qbtask);
 
 /* Add tasks to appropriate structures in a qbucket struct
  * @param qb The relevant qbucket struct
  * @param qbtask the qbucket_resources struct containing resource reports of a successfully completed task
  */
 
-void add_task(struct qbucket *qb, struct qbucket_resources qbtask);
+void add_task(struct qbucket *qb, struct qbucket_resources *qbtask);
