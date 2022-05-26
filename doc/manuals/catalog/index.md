@@ -15,7 +15,7 @@ automatic backup) at Notre Dame:
 
 [catalog.cse.nd.edu:9097](http://catalog.cse.nd.edu:9097)
 
-[backup- catalog.cse.nd.edu:9097](http://backup-catalog.cse.nd.edu:9097)
+[backup-catalog.cse.nd.edu:9097](http://backup-catalog.cse.nd.edu:9097)
 
 The default view for a catalog server is a human-readable HTML summary.
 Machine-readable data is also available as JSON, text, XML, or ClassAds. Many
