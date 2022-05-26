@@ -19,6 +19,25 @@ def my_multiplication(event, response):
 	response["Result"] = result
 	response["StatusCode"] = 200
 
+def my_fact(event, response):
+    import math
+    result = math.factorial(int(event["a"][0]))
+    response["Result"] = result
+    response["StatusCode"] = 200
+
+def my_pair(event, response):
+    result = int(event["a"][0][0]) + int(event["a"][0][1])
+    response["Result"] = [result]
+    response["StatusCode"] = 200
+
+def my_reduce(event, response):
+    result = 0
+    for number in event["a"]:
+        result += int(number)
+    response["Result"] = result
+    response["StatusCode"] = 200
+
+
 
 if __name__ == "__main__":
     # Run workers as:
@@ -40,14 +59,10 @@ if __name__ == "__main__":
 
     q = wq.WorkQueue(9123)
 
-    t = wq.Task("my_sum");
-    t.specify_coprocess("my_coprocess_example")
-    t.specify_buffer(event, "infile")
+    t = wq.RemoteTask("my_sum", event, "my_coprocess_example")
     q.submit(t)
 
-    t = wq.Task("my_multiplication");
-    t.specify_coprocess("my_coprocess_example")
-    t.specify_buffer(event, "infile")
+    t = wq.RemoteTask("my_multiplication", event, "my_coprocess_example")
     q.submit(t)
 
     while not q.empty():

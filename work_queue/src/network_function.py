@@ -3,7 +3,6 @@
 import socket
 import json
 import multiprocessing
-import os
 
 # Note: To change. the actual name of the module (i.e. instead of
 # "coprocess_example") should come from some worker's argument.
