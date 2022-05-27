@@ -3,10 +3,20 @@ A work queue worker coprocess should at a minimum define a get_name() function.
 '''
 def name():
     return "my_coprocess_example"
-import math
+
 def remote_execute(func):
     def remote_wrapper(event):
-        return func(**event)
+        try:
+            response = {
+                "Result": func(**event),
+                "StatusCode": 200
+            }
+        except Exception as e:
+            response = { 
+                "Result": str(e),
+                "StatusCode": 500 
+            }
+        return response
     return remote_wrapper
 
 
@@ -15,34 +25,21 @@ The function signatures should always be the same, but what is actually
 contained in the event will be different. You decide what is in the event, and
 the function body (that you define) will work accordingly.
 '''
-def my_sum(event, response):
-	result = int(event["a"]) + int(event["b"])
-	response["Result"] = result
-	response["StatusCode"] = 200
-
-def my_multiplication(event, response):
-	result = int(event["a"]) * int(event["b"])
-	response["Result"] = result
-	response["StatusCode"] = 200
+@remote_execute
+def my_sum(a, b):
+	return a + b
 
 @remote_execute
-def my_fact(a):
-    response = dict()
-    response["Result"] = [math.factorial(x) for x in a]
-    response["StatusCode"] = 200
-    return response
+def my_multiplication(a, b):
+	return a * b
 
-def my_pair(event, response):
-    result = int(event["a"][0][0]) + int(event["a"][0][1])
-    response["Result"] = [result]
-    response["StatusCode"] = 200
-
-def my_reduce(event, response):
-    result = 0
-    for number in event["a"]:
-        result += int(number)
-    response["Result"] = result
-    response["StatusCode"] = 200
+@remote_execute
+def my_prime(number):
+    import math
+    for factor in range(2, int(math.sqrt(number))):
+        if number % factor == 0:
+            return f"{number} is not prime"
+    return f"{number} is prime"
 
 
 
@@ -62,14 +59,12 @@ if __name__ == "__main__":
     wq = SourceFileLoader("wq", "bindings/python3/work_queue.py").load_module()
     wq.set_debug_flag("all")
 
-    event = json.dumps({"a": 2, "b": 3})
-
     q = wq.WorkQueue(9123)
 
-    t = wq.RemoteTask("my_sum", event, "my_coprocess_example")
+    t = wq.RemoteTask("my_sum", "my_coprocess_example", a=2, b=3)
     q.submit(t)
 
-    t = wq.RemoteTask("my_multiplication", event, "my_coprocess_example")
+    t = wq.RemoteTask("my_multiplication", "my_coprocess_example", a=2, b=3)
     q.submit(t)
 
     while not q.empty():

@@ -36,7 +36,7 @@ def main():
     while True:
         s.listen()
         conn, addr = s.accept()
-        print('Connection from {}'.format(addr))
+        print('Network function: connection from {}'.format(addr), file=sys.stderr)
         while True:
             # peek at message to find newline to get the size
             event_size = None
@@ -52,34 +52,26 @@ def main():
             if event_size:
                 # receive the event itself
                 event = conn.recv(event_size)
-
                 event = json.loads(event)
-                print('event: {}'.format(event))
-                import sys
+                print('Network function: recieved event: {}'.format(event), file=sys.stderr)
                 # create a forked process for function handler
                 p = os.fork()
                 if p == 0:
                     response = getattr(wq_worker_coprocess, function_name)(event)
-                    print("leaving", response, file=sys.stderr)
                     os.write(write, json.dumps(response).encode("utf-8"))
-                    print("exit", file=sys.stderr)
                     os._exit(-1)
-                response = os.read(read, 999999)
-                print("begin wait", file=sys.stderr)
+                response = os.read(read, 9999999999)
                 os.waitid(os.P_PID, p, os.WEXITED)
-                print("end wait", file=sys.stderr)
                 
                 response_size = len(response)
 
                 size_msg = "output {}\n".format(response_size)
 
-                print("begin send", file=sys.stderr)
                 # send the size of response
                 conn.sendall(size_msg.encode('utf-8'))
 
                 # send response
                 conn.sendall(response)
-                print("end send", file=sys.stderr)
 
                 break
     return 0

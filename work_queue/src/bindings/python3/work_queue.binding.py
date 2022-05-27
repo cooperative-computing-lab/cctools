@@ -2060,8 +2060,9 @@ class WorkQueue(object):
 
 class RemoteTask(Task):
 
-    def __init__(self, fn, event, coprocess):
+    def __init__(self, fn, coprocess, **kwargs):
         Task.__init__(self, fn)
+        event = json.dumps(kwargs)
         Task.specify_buffer(self, event, "infile")
         Task.specify_coprocess(self, coprocess)
 
