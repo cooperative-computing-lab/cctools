@@ -211,7 +211,7 @@ static char * load_input_file(struct work_queue_task *t) {
 	size_t fsize = ftell(fp);
 	fseek(fp, 0L, SEEK_SET);
 	// using calloc solves problem of garbage appended to buffer
-	char *buf = calloc(fsize, sizeof(*buf));
+	char *buf = calloc(fsize + 1, sizeof(*buf));
 
 	int bytes_read = full_fread(fp, buf, fsize);
 	if(bytes_read < 0) {
