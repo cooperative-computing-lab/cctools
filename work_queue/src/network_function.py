@@ -48,32 +48,47 @@ def main():
                 input_spec = conn.recv(size).decode('utf-8').split()
                 function_name = input_spec[0]
                 event_size = int(input_spec[1])
+            try:
+                if event_size:
+                    response = ""
+                    # receive the event itself
+                    event = conn.recv(event_size)
+                    event = json.loads(event)
+                    print('Network function: recieved event: {}'.format(event), file=sys.stderr)
+                    # create a forked process for function handler
+                    p = os.fork()
+                    if p == 0:
+                        response = getattr(wq_worker_coprocess, function_name)(event)
+                        os.write(write, json.dumps(response).encode("utf-8"))
+                        os._exit(-1)
+                    elif p < 0:
+                        print('Network function: unable to fork', file=sys.stderr)
+                        response = { 
+                            "Result": "unable to fork",
+                            "StatusCode": 500 
+                        }
+                    else:
+                        chunk = os.read(read, 65536).decode("utf-8")
+                        all_chunks = [chunk]
+                        while (len(chunk) >= 65536):
+                            chunk = os.read(read, 65536).decode("utf-8")
+                            all_chunks.append(chunk)
+                        response = "".join(all_chunks).encode("utf-8")
+                        os.waitid(os.P_PID, p, os.WEXITED)
+                    
+                    response_size = len(response)
 
-            if event_size:
-                # receive the event itself
-                event = conn.recv(event_size)
-                event = json.loads(event)
-                print('Network function: recieved event: {}'.format(event), file=sys.stderr)
-                # create a forked process for function handler
-                p = os.fork()
-                if p == 0:
-                    response = getattr(wq_worker_coprocess, function_name)(event)
-                    os.write(write, json.dumps(response).encode("utf-8"))
-                    os._exit(-1)
-                response = os.read(read, 9999999999)
-                os.waitid(os.P_PID, p, os.WEXITED)
-                
-                response_size = len(response)
+                    size_msg = "output {}\n".format(response_size)
 
-                size_msg = "output {}\n".format(response_size)
+                    # send the size of response
+                    conn.sendall(size_msg.encode('utf-8'))
 
-                # send the size of response
-                conn.sendall(size_msg.encode('utf-8'))
+                    # send response
+                    conn.sendall(response)
 
-                # send response
-                conn.sendall(response)
-
-                break
+                    break
+            except Exception as e:
+                print("Network function encountered exception ", str(e), file=sys.stderr)
     return 0
 
 if __name__ == "__main__":

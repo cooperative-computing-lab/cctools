@@ -34,6 +34,12 @@ def my_multiplication(a, b):
 	return a * b
 
 @remote_execute
+def my_sleep(t):
+    import time
+    time.sleep(t)
+    return "x" * 655390
+
+@remote_execute
 def my_prime(number):
     import math
     for factor in range(2, int(math.sqrt(number))):
