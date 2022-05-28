@@ -6,13 +6,17 @@
 
 
 # Packages and Definitions
+import re
 import sys
 import json
+import pandas as pd
+
 from matplotlib import pyplot as plt
+import bokeh
 from bokeh.layouts import layout
 from bokeh.models import Div, RangeSlider, Spinner
 from bokeh.plotting import figure, show
-
+palette = bokeh.palettes.all_palettes["Viridis"]
 
 
 # Functions
@@ -21,57 +25,93 @@ def usage(status=0):
     sys.exit(status)
 
 
-def get_properties(line):
+def get_info(line):
     return json.loads(line[line.rfind('{'):])
 
 
 def parse_tasks(logfile):
     """
-    Parse the logfile as a dictionary of properties of tasks.
-    { name: properties }
+    Parse the logfile as a table.
+    | taskid | category | wait_time | start_time | end_time | info |
     """
     
-    tasks = {}
-    
+    tasks = pd.DataFrame(columns=[
+        "taskid", "category", "wait_time", "start_time", "end_time", "info"
+    ])
+    tasks.set_index("taskid")
+    # TODO: switch from nested json to flatten table. 
     with open(logfile, 'r') as log:
-        for line in log:
-            if line[0] == '#':
-                continue
-            
-            task_occ = line.find("TASK")
-            done_occ = line.find("DONE")
-            if task_occ != -1 and done_occ != -1:
-                name = line[task_occ:done_occ].split()[1]
-                tasks[name] = get_properties(line)
-                continue
+        p_taskid    = re.compile(r"^[^#].*TASK (\d+) (WAITING|RUNNING|DONE) ")
+        p_info      = re.compile(r" (\{.*\})?$")
+        p_category  = re.compile(r"WAITING (\w+)")
+        p_time      = re.compile(r"^\d+")
+        min_time    = 0
 
+        for line in log:
+            m = p_taskid.findall(line)
+            if not m:
+                continue
+            m, = m
+            taskid  = int(m[0])
+            status  = m[1]
+            time    = int(p_time.findall(line)[0][:10])
+
+            if status == "WAITING":
+                if not min_time:
+                    min_time = time
+                tasks.loc[taskid] = {
+                    "taskid"        : taskid,
+                    "category"      : p_category.findall(line)[0],
+                    "wait_time"     : time - min_time,
+                    "start_time"    : -1,
+                    "end_time"      : -1,
+                    "info"          : ""
+                }
+            elif status == "RUNNING":
+                tasks.loc[taskid, "start_time"] = time - min_time
+            elif status == "DONE":
+                tasks.loc[taskid, "end_time"]   = time - min_time
+                tasks.loc[taskid, "info"]       = p_info.findall(line)
+   
+    print(tasks) 
     return tasks
 
 
 def get_times(tasks): 
-    names = list(tasks.keys())
-    start_times = [tasks[name]["start"][0] for name in names]
-    min_time = min(start_times)
-    start_times = [time - min_time for time in start_times]
-    end_times = [tasks[name]["end"][0] - min_time for name in names]
-    return names, start_times, end_times    
+    taskids     = list(tasks.keys())
+    wait_times  = [tasks[taskid]["wait_time"]   for taskid in taskids]
+    start_times = [tasks[taskid]["start_time"]  for taskid in taskids]
+    end_times   = [tasks[taskid]["end_time"]    for taskid in taskids]
+    return taskids, wait_times, start_times, end_times    
 
 
 def plot(tasks, outfile):
-    names, start_times, end_times  = get_times(tasks)
+    taskids, start_times, end_times  = get_times(tasks)
     durations = [end_times[i] - start_times[i] for i in range(len(tasks))]
     fig, ax = plt.subplots()
-    ax.barh(names, durations, left=start_times)
+    ax.barh(taskids, durations, left=start_times)
     plt.savefig(outfile, format='svg')
     plt.show()
     
 
 def plot_interactive(tasks):
-    names, start_times, end_times = get_times(tasks)
+    # taskids, wait_times, start_times, end_times = get_times(tasks)
+    # print(start_times)
+    # num_tasks = len(taskids)
+    
+    categories  = tasks["category"].unique() 
+    colors      = palette[len(categories)]
     p = figure(title="Tasks Lifetime",
                x_axis_label="time", y_axis_label="task id",
                sizing_mode="stretch_width")
-    p.hbar(y=range(len(names)), left=start_times, right=end_times)
+    tasks = tasks.sort_values(by="start_time")
+    offset = 0
+    for i, category in enumerate(categories):
+        # TODO write this as a iterator
+        # Plot the bars based on the time they started
+        tasks_cat = tasks[tasks["category"] == category]
+        p.hbar(y=range(offset, offset + len(tasks_cat)), left=tasks_cat["start_time"], right=tasks_cat["end_time"], color=colors[i])
+        offset += len(tasks_cat)
     show(p)
 
 
