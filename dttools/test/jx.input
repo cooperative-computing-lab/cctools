@@ -350,4 +350,7 @@ f.floor();
 [{"x": 0, "y": "test", "z": 1.0}].project(x);
 [{"x": 1}, {"x": 2}].select(x>0).project(x).len();
 
+true || error("testing short circuit OR");
+false && error("testing short circuit AND");
+
 #end

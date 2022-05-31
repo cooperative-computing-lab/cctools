@@ -864,3 +864,9 @@ value:      [0]
 expression: [{"x":1},{"x":2}].select(x>0).project(x).len()
 value:      2
 
+expression: true or error("testing short circuit OR")
+value:      true
+
+expression: false and error("testing short circuit AND")
+value:      false
+
