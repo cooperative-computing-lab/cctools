@@ -1,12 +1,12 @@
 '''
 A work queue worker coprocess should at a minimum define a get_name() function.
 '''
+import time, json
 def name():
     return "my_coprocess_example"
 
 def remote_execute(func):
     def remote_wrapper(event, q=None):
-        import sys, json
         if q:
             event = json.loads(event)
             del event["method"]
@@ -41,7 +41,6 @@ def my_multiplication(a, b):
 
 @remote_execute
 def my_sleep(t):
-    import time
     time.sleep(t)
     return "x" * 655
 
