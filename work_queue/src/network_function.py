@@ -4,6 +4,8 @@ import socket
 import json
 import os
 import sys
+import threading
+import queue
 
 # Note: To change. the actual name of the module (i.e. instead of
 # "coprocess_example") should come from some worker's argument.
@@ -50,32 +52,45 @@ def main():
                 event_size = int(input_spec[1])
             try:
                 if event_size:
-                    response = ""
-                    # receive the event itself
-                    event = conn.recv(event_size)
-                    event = json.loads(event)
+                    # receive the bytes containing the event and turn it into a string
+                    event_str = conn.recv(event_size).decode("utf-8")
+                    # turn the event into a python dictionary
+                    event = json.loads(event_str)
+                    # see if the user specified an execution method
+                    method = event.get("method", None)
                     print('Network function: recieved event: {}'.format(event), file=sys.stderr)
-                    # create a forked process for function handler
-                    p = os.fork()
-                    if p == 0:
-                        response = getattr(wq_worker_coprocess, function_name)(event)
-                        os.write(write, json.dumps(response).encode("utf-8"))
-                        os._exit(-1)
-                    elif p < 0:
-                        print('Network function: unable to fork', file=sys.stderr)
-                        response = { 
-                            "Result": "unable to fork",
-                            "StatusCode": 500 
-                        }
+                    if method == "thread":
+                        # create a forked process for function handler
+                        q = queue.Queue()
+                        p = threading.Thread(target=getattr(wq_worker_coprocess, function_name), args=(event_str, q))
+                        p.start()
+                        p.join()
+                        response = json.dumps(q.get()).encode("utf-8")
+                    elif method == "direct":
+                        del event["method"]
+                        response = json.dumps(getattr(wq_worker_coprocess, function_name)(event)).encode("utf-8")
                     else:
-                        chunk = os.read(read, 65536).decode("utf-8")
-                        all_chunks = [chunk]
-                        while (len(chunk) >= 65536):
+                        event.pop("method", None)
+                        p = os.fork()
+                        if p == 0:
+                            response = getattr(wq_worker_coprocess, function_name)(event)
+                            os.write(write, json.dumps(response).encode("utf-8"))
+                            os._exit(-1)
+                        elif p < 0:
+                            print('Network function: unable to fork', file=sys.stderr)
+                            response = { 
+                                "Result": "unable to fork",
+                                "StatusCode": 500 
+                            }
+                        else:
                             chunk = os.read(read, 65536).decode("utf-8")
-                            all_chunks.append(chunk)
-                        response = "".join(all_chunks).encode("utf-8")
-                        os.waitid(os.P_PID, p, os.WEXITED)
-                    
+                            all_chunks = [chunk]
+                            while (len(chunk) >= 65536):
+                                chunk = os.read(read, 65536).decode("utf-8")
+                                all_chunks.append(chunk)
+                            response = "".join(all_chunks).encode("utf-8")
+                            os.waitid(os.P_PID, p, os.WEXITED)
+
                     response_size = len(response)
 
                     size_msg = "output {}\n".format(response_size)

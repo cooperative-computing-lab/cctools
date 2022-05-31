@@ -5,7 +5,11 @@ def name():
     return "my_coprocess_example"
 
 def remote_execute(func):
-    def remote_wrapper(event):
+    def remote_wrapper(event, q=None):
+        import sys, json
+        if q:
+            event = json.loads(event)
+            del event["method"]
         try:
             response = {
                 "Result": func(**event),
@@ -16,7 +20,9 @@ def remote_execute(func):
                 "Result": str(e),
                 "StatusCode": 500 
             }
-        return response
+        if not q:
+            return response
+        q.put(response)
     return remote_wrapper
 
 
@@ -32,6 +38,12 @@ def my_sum(a, b):
 @remote_execute
 def my_multiplication(a, b):
 	return a * b
+
+@remote_execute
+def my_sleep(t):
+    import time
+    time.sleep(t)
+    return "x" * 655
 
 @remote_execute
 def my_prime(number):
