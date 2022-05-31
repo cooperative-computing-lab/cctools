@@ -321,7 +321,20 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 	if (o->type == JX_OP_CALL) return jx_eval_call(o->left, o->right, context);
 
 	left = jx_eval(o->left,context);
+
 	if (jx_istype(left, JX_ERROR)) {
+		result = left;
+		left = NULL;
+		goto DONE;
+	}
+
+	if (o->type == JX_OP_AND && jx_isfalse(left)) {
+		result = left;
+		left = NULL;
+		goto DONE;
+	}
+
+	if (o->type == JX_OP_OR && jx_istrue(left)) {
 		result = left;
 		left = NULL;
 		goto DONE;
@@ -330,6 +343,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 	if (o->type == JX_OP_DOT) return jx_eval_dot(o, left, o->right, context);
 
 	right = jx_eval(o->right,context);
+
 	if (jx_istype(right, JX_ERROR)) {
 		result = right;
 		right = NULL;
