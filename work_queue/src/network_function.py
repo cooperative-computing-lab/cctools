@@ -57,20 +57,20 @@ def main():
                     # turn the event into a python dictionary
                     event = json.loads(event_str)
                     # see if the user specified an execution method
-                    method = event.get("method", None)
+                    exec_method = event.get("exec_method", None)
                     print('Network function: recieved event: {}'.format(event), file=sys.stderr)
-                    if method == "thread":
+                    if exec_method == "thread":
                         # create a forked process for function handler
                         q = queue.Queue()
                         p = threading.Thread(target=getattr(wq_worker_coprocess, function_name), args=(event_str, q))
                         p.start()
                         p.join()
                         response = json.dumps(q.get()).encode("utf-8")
-                    elif method == "direct":
-                        del event["method"]
+                    elif exec_method == "direct":
+                        del event["exec_method"]
                         response = json.dumps(getattr(wq_worker_coprocess, function_name)(event)).encode("utf-8")
                     else:
-                        event.pop("method", None)
+                        event.pop("exec_method", None)
                         p = os.fork()
                         if p == 0:
                             response = getattr(wq_worker_coprocess, function_name)(event)
