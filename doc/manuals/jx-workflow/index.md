@@ -2,9 +2,17 @@
 
 The JX Workflow Language is a language for expressing workflows
 that allows for easy manipulations to the structure and
-partitioning of a workflow.  It makes use of the [JX (JSON Extended)](../jx)
-expression language to create concise and expressive structures.
-Using JX, it is easy to treat a subset of the workflow as if it were an atomic job that can be dispatched as part of a higher-level application.
+partitioning of a workflow.  It makes use of the [JX expression language](../jx)
+to create concise and expressive structures.
+
+For example, you can specify 100 batch jobs compactly like this:
+```
+   {
+      "command" : "python ./simulate.py --parameter " + N + " > output." + N + ".txt",
+      "inputs"  : [ "simulate.py" ],
+      "outputs" : [ "output." + N + ".txt" ]
+   } for N in range(1,100)
+```
 
 ## Getting Started
 

@@ -29,55 +29,51 @@ and when evaluated, will produce the same JSON document.
 
 JX permits the same atomic constant values as in JSON, including boolean values:
 
-```
-true
-false
-```
+>     true
+>     false
 
 Decimal integers:
 
-```
-0
-123
--09631
-```
+>     0
+>     123
+>     09631
 
 Floating point numbers:
 
-```
-3.141592654
-```
+>     3.141592654
 
 Strings:
-```
-"hello\nworld"
-```
 
-And constructors for lists and dictionaries:
-```
-[ 10, 9, 8 ]
-{ "name": "Fred", "age": 47, "temp": 98.6 }
-```
+>     "hello\nworld"
+
+Constructors for lists:
+
+>     [ 10, 9, 8 ]
+
+And constructors for dictionaries:
+
+>     { "name": "Fred", "age": 47, "temp": 98.6 }
 
 ## Symbols
 
 An unquoted name is a symbol, and evaluates to the corresponding value found in the evaluation context.
 If the context is this:
-> { "city": "South Bend", "zipcodes": [ 46601, 46613, 46614, 46615, 46616, 46617, 46619 ] }
+
+>     { "city": "South Bend", "zipcodes": [ 46601, 46613, 46614, 46615, 46616, 46617, 46619 ] }
 
 Then this expression:
-> { "location": city, "count": len(zipcodes) }
+
+>     { "location": city, "count": len(zipcodes) }
 
 Will evaluate to this expression:
-> { "location": "South Bend", "count": 7 }
+
+>     { "location": "South Bend", "count": 7 }
 
 ## Comments
 
-JX supports comments, introduced by the `#` character and continuing for the rest of the line:
+Comments are introduced by the `#` character and continue to the next newline:
 
-```
-10+20    # This is a comment.
-```
+>     10+20    # This is a comment.
 
 ## Operators
 
@@ -86,15 +82,18 @@ usual arithmetic and logical meanings. In the absence of parentheses,
 operators are evaluated left to right in order of precedence.
 From highest to lowest precedence:
 
-| |
-|-|
-| [] , function()
-|*, %, /
-|+, -
-|==, !=, <, <=, >, >=
-|not
-|and
-|or
+| Operator | Symbol |
+|---|---|
+| Negation |-|
+| Lookup, Function Call | [] , () |
+| Multiply, Divide, Remainder | *, /, % |
+| Add, Subtract | +, - |
+| Comparison | ==, !=, <, <=, >, >= |
+| Boolean-Not | not |
+| Boolean-And | and |
+| Boolean-Or  | or  |
+
+
 
 
 ### Negation Prefix
@@ -180,10 +179,10 @@ are of incompatible types, `x == y` returns `false`, and `x != y` return
 For `<`, `<=`, `>`, and `>=` the behaviour depends on the type of its arguments:
 
 | | |
-|-|-|
-integer _or_ double | Compares its operands numerically
-string              | Compares its operands in lexicographical order (as given by strcmp(3))
-|| It is an error to compare a string to an integer or double.
+|---|---|
+| integer _or_ double | Compares its operands numerically |
+| string              | Compares its operands in lexicographical order (as given by strcmp(3)) |
+|| It is an error to compare a string to an integer or double. |
 
 
 ## Functions

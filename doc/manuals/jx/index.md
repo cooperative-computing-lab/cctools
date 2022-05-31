@@ -6,21 +6,29 @@ external data, and ordinary JSON contents to yield a powerful
 data querying and manipulation language.  JX is used throughout
 the CCTools to manage and query unstructured data.
 
-For example, given this JSON data context:
+For example, JX expressions can be used to describe jobs in a workflow:
+```
+{
+    "command" : "collect.exe"
+    "inputs" :  [ "input."+i+".txt" ]
+    "outputs" : [ "output."+i+".txt" ]
+} for i in range(1,100)
 
-> { "temp_c": 17, "city": "Minneapolis", "state": "MN"}
+```
 
-You can write this JX expression:
-> { "temp_f" : (temp_c/0.5556)+32, "location": city + ", " + state }
+Or to write LINQ-style queries on remote data:
 
-Yielding this result:
-> { "temp_f" : 62.57553956834532, "location": "Minneapolis, MN" }
+```
+fetch(url).select(type=="wq_master").select(tasks_submitted>100).project([name,tasks_running+tasks_waiting])
+```
 
-And you can read about the full details here:
-- [JX REPL Tool](repl)
+Read about the full details here:
+
 - [JX Expression Language Reference](reference)
+- [JX REPL Tool](repl)
 
 JX is used as the basic language underlying these tools and systems:
+
 - [JX Workflow Language](../jx-workflow)
 - [Catalog Server Queries](../catalog)
 - [DeltaDB Time Series Database](../man_pages/deltadb_query)
