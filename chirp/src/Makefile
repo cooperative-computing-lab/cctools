@@ -5,7 +5,8 @@ include ../../rules.mk
 # -DSQLITE_TEMP_STORE=3 - only use memory for temporary files.
 # -DSQLITE_THREADSAFE=0 - we only use sqlite3 multi-process (i.e. no threads). This disables somewhat costly mutex locks.
 # -Wno-null-pointer-subtraction - Suppress compiler warning of unusual expression.
-LOCAL_CCFLAGS = -DSQLITE_DEFAULT_MMAP_SIZE=1073741824 -DSQLITE_TEMP_STORE=3 -DSQLITE_THREADSAFE=0 -fstack-protector-all -Wno-null-pointer-subtraction
+# -Wno-unknown-warning - Suppress error on compilers that don't know about the previous warning!
+LOCAL_CCFLAGS = -DSQLITE_DEFAULT_MMAP_SIZE=1073741824 -DSQLITE_TEMP_STORE=3 -DSQLITE_THREADSAFE=0 -fstack-protector-all -Wno-null-pointer-subtraction -Wno-unknown-warning-option
 
 # Globus is needed by all executables via libdttools.a/auth_globus.o
 LOCAL_LINKAGE = $(CCTOOLS_GLOBUS_LDFLAGS)
