@@ -477,6 +477,11 @@ int jx_istrue( struct jx *j )
 	return j && j->type==JX_BOOLEAN && j->u.boolean_value;
 }
 
+int jx_isfalse( struct jx *j )
+{
+	return j && j->type==JX_BOOLEAN && !j->u.boolean_value;
+}
+
 int jx_comprehension_equals(struct jx_comprehension *j, struct jx_comprehension *k) {
 	if (!j && !k) return 1;
 	if (!j || !k) return 0;
