@@ -2,7 +2,6 @@
 A work queue worker coprocess should at a minimum define a get_name() function.
 '''
 import json, tensorflow, sys
-from copy import copy
 
 mnist = tensorflow.keras.datasets.mnist
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
