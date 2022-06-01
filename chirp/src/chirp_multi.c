@@ -653,7 +653,7 @@ INT64_T chirp_multi_statfs(const char *volume, const char *path, struct chirp_st
 	buf->f_bavail = bytes_avail / block_size;
 	buf->f_bfree = bytes_free / block_size;
 	buf->f_files = files_total;
-	buf->f_ffree = files_total;
+	buf->f_ffree = files_free;
 
 	return 0;
 }
