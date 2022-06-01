@@ -182,6 +182,7 @@ void print_total()
 			}\
 		}\
 		print_total();\
+		n = n;\
 	} while (0)
 
 int main(int argc, char *argv[])
