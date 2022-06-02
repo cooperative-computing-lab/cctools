@@ -207,6 +207,8 @@ then
         exit 1
     fi
 
+    source ${UNPACK_TO}/bin/activate
+
     if ! ${UNPACK_TO}/bin/conda-unpack
     then
         errmsg could not relocate environment: ${ENV_NAME}
