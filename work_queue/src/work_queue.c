@@ -1405,7 +1405,7 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 
 		debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 
-        write_transaction_transfer(q, w, t, total_bytes, sum_time, f->remote_name, 0);
+        write_transaction_transfer(q, w, t, total_bytes, sum_time, f->remote_name, WORK_QUEUE_OUTPUT);
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
@@ -3390,7 +3390,7 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 		q->stats->bytes_sent += total_bytes;
 
 		// Write to the transaction log.
-		write_transaction_transfer(q, w, t, total_bytes, elapsed_time, f->remote_name, 1);
+		write_transaction_transfer(q, w, t, total_bytes, elapsed_time, f->remote_name, WORK_QUEUE_INPUT);
 
 		// Avoid division by zero below.
 		if(elapsed_time==0) elapsed_time = 1;
@@ -7549,19 +7549,21 @@ static void write_transaction_worker_resources(struct work_queue *q, struct work
 }
 
 
-static void write_transaction_transfer(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, size_t sizeinmb, int walltime, char* filename, int type){
+static void write_transaction_transfer(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, size_t size_in_bytes, int time_in_usecs, char* filename, work_queue_file_type_t type){
 	struct buffer B;
 	buffer_init(&B);
 	buffer_printf(&B, "TRANSFER ");
-	if (type)
-		buffer_printf(&B, "INPUT");
-	else
-		buffer_printf(&B, "OUTPUT");
-	buffer_printf(&B, " %d", t->taskid);
-	buffer_printf(&B, " %s", w->workerid);
-	buffer_printf(&B, " %ld", sizeinmb);
-	buffer_printf(&B, " %d", walltime);
-	buffer_printf(&B, " %s", filename);
+	if (type == WORK_QUEUE_INPUT){
+		buffer_printf(&B, "INPUT ");
+	}
+	else{
+		buffer_printf(&B, "OUTPUT ");
+	}
+	buffer_printf(&B,  "%d",  t->taskid);
+	buffer_printf(&B, " %s",  w->workerid);
+	buffer_printf(&B, " %ld", size_in_bytes >> 10);
+	buffer_printf(&B, " %f",  time_in_usecs / 1E6);
+	buffer_printf(&B, " %s",  filename);
 
 	write_transaction(q, buffer_tostring(&B));
 	buffer_free(&B);
