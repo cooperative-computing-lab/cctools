@@ -246,7 +246,6 @@ int work_queue_coprocess_check()
 
 char *work_queue_coprocess_run(const char *function_name, const char *function_input, int coprocess_port) {
 	char addr[DOMAIN_NAME_MAX];
-	char buf[BUFSIZ];
 	int len;
 	int timeout = 60000000; // one minute, can be changed
 
@@ -290,8 +289,6 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 		fatal("could not send input data: %s", strerror(errno));
 	}
 
-	memset(buf, 0, sizeof(buf));
-
 	curr_time = timestamp_get();
 	stoptime = curr_time + timeout;
 	// read in the length of the response
@@ -300,11 +297,10 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 	link_readline(link, line, sizeof(line), stoptime);
 	sscanf(line, "output %d", &length);
 
+	char *output = calloc(length + 1, sizeof(char));
+	
 	// read the response
-	link_read(link, buf, length, stoptime);
-
-	char *output = calloc(strlen(buf) + 1, sizeof(char));
-	memcpy(output, buf, strlen(buf));
+	link_read(link, output, length, stoptime);
 
 	return output;
 }

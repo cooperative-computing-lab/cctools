@@ -2058,10 +2058,25 @@ class WorkQueue(object):
 
         return seq[0]
 
+##
+# \class RemoteTask
+#
+# Python RemoteTask object
+#
+# This class is used to create a task that will execute on a worker running a coprocess
 class RemoteTask(Task):
-
-    def __init__(self, fn, event, coprocess):
+    ##
+    # Create a new remote task specification.
+    #
+    # @param self       Reference to the current remote task object.
+    # @param fn         The name of the function to be executed on the coprocess
+    # @param coprocess  The name of the coprocess which has the function you wish to execute. The coprocess should have a name() method that returns this
+    # @param
+    # @param command    The shell command line to be exected by the task.
+    # @param kwargs	    keyword arguments used in function to be executed by task. An optional kwarg exec_method can be specified to one of fork, thread, and direct to choose between those three methods of execution
+    def __init__(self, fn, coprocess, **kwargs):
         Task.__init__(self, fn)
+        event = json.dumps(kwargs)
         Task.specify_buffer(self, event, "infile")
         Task.specify_coprocess(self, coprocess)
 
