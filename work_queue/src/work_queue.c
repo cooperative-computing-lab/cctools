@@ -344,7 +344,7 @@ static void write_transaction(struct work_queue *q, const char *str);
 static void write_transaction_task(struct work_queue *q, struct work_queue_task *t);
 static void write_transaction_category(struct work_queue *q, struct category *c);
 static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving, worker_disconnect_reason reason_leaving);
-static void write_transaction_transfer(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, size_t sizeinmb, int walltime, char* filename, int type);
+static void write_transaction_transfer(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, size_t size_in_bytes, int time_in_usecs, char* filename, work_queue_file_type_t type);
 static void write_transaction_worker_resources(struct work_queue *q, struct work_queue_worker *w);
 
 static void delete_feature(struct work_queue_task *t, const char *name);
@@ -7561,7 +7561,7 @@ static void write_transaction_transfer(struct work_queue *q, struct work_queue_w
 	}
 	buffer_printf(&B,  "%d",  t->taskid);
 	buffer_printf(&B, " %s",  w->workerid);
-	buffer_printf(&B, " %ld", size_in_bytes >> 10);
+	buffer_printf(&B, " %d", size_in_bytes >> 10);
 	buffer_printf(&B, " %f",  time_in_usecs / 1E6);
 	buffer_printf(&B, " %s",  filename);
 
