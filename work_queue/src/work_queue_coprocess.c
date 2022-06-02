@@ -25,7 +25,7 @@ See the file COPYING for details.
 static pid_t coprocess_pid = 0;
 static int coprocess_in[2];
 static int coprocess_out[2];
-static int coprocess_max_timeout = 1000 * 2 * 5; // set max timeout to 5 minutes
+static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
 
 int work_queue_coprocess_write(char *buffer, int len, int timeout)
