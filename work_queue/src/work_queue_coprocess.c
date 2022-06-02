@@ -25,7 +25,7 @@ See the file COPYING for details.
 static pid_t coprocess_pid = 0;
 static int coprocess_in[2];
 static int coprocess_out[2];
-static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
+static int coprocess_max_timeout = 1000 * 2 * 5; // set max timeout to 5 minutes
 
 
 int work_queue_coprocess_write(char *buffer, int len, int timeout)
@@ -67,8 +67,6 @@ int work_queue_coprocess_write(char *buffer, int len, int timeout)
 }
 
 int work_queue_coprocess_read(char *buffer, int len, int timeout){
-	debug(D_WQ, "ISALIVE %d\n", work_queue_coprocess_check());
-	debug(D_WQ, "entering coprocess read");
 	struct pollfd read_poll = {coprocess_out[0], POLLIN, 0};
 	int poll_result = poll(&read_poll, 1, timeout);
 	if (poll_result < 0)
@@ -109,7 +107,6 @@ int work_queue_coprocess_read(char *buffer, int len, int timeout){
 
 char *work_queue_coprocess_setup(int *coprocess_port)
 {
-	debug(D_WQ, "entering coprocesss_setup\n");
 	int json_offset, json_length = -1, cumulative_bytes_read = 0, buffer_offset = 0;
 	char buffer[WORK_QUEUE_LINE_MAX];
 	char *envelope_size = NULL;
@@ -137,7 +134,6 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 			if (json_length == -1)
 			{
 				json_length = atoi(buffer);
-				debug(D_WQ, "json_length %d\n", json_length);
 			}
 			if (json_length != -1)
 			{
@@ -201,7 +197,6 @@ char *work_queue_coprocess_start(char *command, int *coprocess_port) {
 		return NULL;
 	}
 	coprocess_pid = fork();
-	debug(D_WQ, "pid of child %d\n", coprocess_pid);
 	if(coprocess_pid > 0) {
 		char *name = work_queue_coprocess_setup(coprocess_port);
 
@@ -213,7 +208,6 @@ char *work_queue_coprocess_start(char *command, int *coprocess_port) {
         return name;
 	}
     else if(coprocess_pid == 0) {
-		debug(D_WQ, "COMMAND: %s\n", command);
         if ( (close(coprocess_in[1]) < 0) || (close(coprocess_out[0]) < 0) ) {
             fatal("coprocess error: %s\n", strerror(errno));
         }
