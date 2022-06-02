@@ -34,7 +34,12 @@ int work_queue_coprocess_write(char *buffer, int len, int timeout)
 	int poll_result = poll(&read_poll, 1, timeout);
 	if (poll_result < 0)
 	{
-		debug(D_WQ, "Write to coprocess failed: %s\n", strerror(errno));
+		if (errno == EINTR)
+		{
+			debug(D_WQ, "Polling coprocess interrupted, trying again");
+			return 0;
+		}
+		debug(D_WQ, "Polling coprocess pipe failed: %s\n", strerror(errno));
 		return -1;
 	}
 	if (poll_result == 0) // check for timeout
@@ -50,18 +55,30 @@ int work_queue_coprocess_write(char *buffer, int len, int timeout)
 	int bytes_written = write(coprocess_in[1], buffer, len);
 	if (bytes_written < 0)
 	{
-		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
+		if (errno == EINTR)
+		{
+			debug(D_WQ, "Write to coprocess interrupted\n");
+			return 0;
+		}
+		debug(D_WQ, "Write to coprocess failed: %s\n", strerror(errno));
 		return -2;
 	}
 	return bytes_written;
 }
 
 int work_queue_coprocess_read(char *buffer, int len, int timeout){
+	debug(D_WQ, "ISALIVE %d\n", work_queue_coprocess_check());
+	debug(D_WQ, "entering coprocess read");
 	struct pollfd read_poll = {coprocess_out[0], POLLIN, 0};
 	int poll_result = poll(&read_poll, 1, timeout);
 	if (poll_result < 0)
 	{
-		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
+		if (errno == EINTR)
+		{
+			debug(D_WQ, "Polling coprocess interrupted, trying again");
+			return 0;
+		}
+		debug(D_WQ, "Polling coprocess pipe failed: %s\n", strerror(errno));
 		return -1;
 	}
 	if (poll_result == 0) // check for timeout
@@ -78,6 +95,11 @@ int work_queue_coprocess_read(char *buffer, int len, int timeout){
 	int bytes_read = read(coprocess_out[0], buffer, len - 1);
 	if (bytes_read < 0)
 	{
+		if (errno == EINTR)
+		{
+			debug(D_WQ, "Read from coprocess interrupted\n");
+			return 0;
+		}
 		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
 		return -2;
 	}
@@ -87,9 +109,10 @@ int work_queue_coprocess_read(char *buffer, int len, int timeout){
 
 char *work_queue_coprocess_setup(int *coprocess_port)
 {
+	debug(D_WQ, "entering coprocesss_setup\n");
 	int json_offset, json_length = -1, cumulative_bytes_read = 0, buffer_offset = 0;
 	char buffer[WORK_QUEUE_LINE_MAX];
-	char *envelope_size;
+	char *envelope_size = NULL;
     char *name = NULL;
 
 	while (1)
@@ -97,6 +120,10 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 		int curr_bytes_read = work_queue_coprocess_read(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout);
 		if (curr_bytes_read < 0) {
 			fatal("Unable to get information from coprocess\n");
+		}
+		if (curr_bytes_read == 0)
+		{
+			continue;
 		}
 		else if (curr_bytes_read == -3)
 		{
@@ -174,7 +201,7 @@ char *work_queue_coprocess_start(char *command, int *coprocess_port) {
 		return NULL;
 	}
 	coprocess_pid = fork();
-
+	debug(D_WQ, "pid of child %d\n", coprocess_pid);
 	if(coprocess_pid > 0) {
 		char *name = work_queue_coprocess_setup(coprocess_port);
 
@@ -186,6 +213,7 @@ char *work_queue_coprocess_start(char *command, int *coprocess_port) {
         return name;
 	}
     else if(coprocess_pid == 0) {
+		debug(D_WQ, "COMMAND: %s\n", command);
         if ( (close(coprocess_in[1]) < 0) || (close(coprocess_out[0]) < 0) ) {
             fatal("coprocess error: %s\n", strerror(errno));
         }
@@ -197,7 +225,6 @@ char *work_queue_coprocess_start(char *command, int *coprocess_port) {
         if (dup2(coprocess_out[1], 1) < 0) {
             fatal("coprocess could not attach pipe to stdout: %s\n", strerror(errno));
         }
-
         execlp(command, command, (char *) 0);
         fatal("failed to execute %s: %s\n", command, strerror(errno));
 	}
