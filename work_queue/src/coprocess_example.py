@@ -1,11 +1,7 @@
 '''
 A work queue worker coprocess should at a minimum define a get_name() function.
 '''
-import json, tensorflow, sys
-
-mnist = tensorflow.keras.datasets.mnist
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
-x_train, x_test = x_train / 255.0, x_test / 255.0
+import json
 
 def name():
     return "my_coprocess_example"
@@ -43,28 +39,6 @@ def my_sum(a, b):
 @remote_execute
 def my_multiplication(a, b):
 	return a * b
-
-@remote_execute
-def tensorflow_import(t):
-    return tensorflow.reduce_sum(tensorflow.random.normal([t, t])).numpy().tolist()
-
-@remote_execute
-def tensorflow_train(epochs):
-    sys.stdout = sys.stderr
-    model = tensorflow.keras.models.Sequential([
-    tensorflow.keras.layers.Flatten(input_shape=(28, 28)),
-    tensorflow.keras.layers.Dense(128, activation='relu'),
-    tensorflow.keras.layers.Dropout(0.2),
-    tensorflow.keras.layers.Dense(10)
-    ])
-    loss_fn = tensorflow.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-    model.compile(optimizer='adam',
-            loss=loss_fn,
-            metrics=['accuracy'])
-    model.fit(x_train, y_train, epochs=epochs)
-    result = model.evaluate(x_test,  y_test)
-    del model
-    return result
 
 if __name__ == "__main__":
     # Run workers as:
