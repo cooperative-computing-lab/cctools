@@ -139,6 +139,31 @@ def export_env(overrides, imports, extra):
 
     return env
 
+def create_spec(filename, out=None, toplevel=False, function=None, pkg_mapping=[], extra_pkg=[]):
+
+    overrides = {}
+    for a in pkg_mapping:
+        (i, n) = a.split('=')
+        overrides[i] = n
+
+    imports = []
+    source = open(filename, 'r')
+    code = ast.parse(source.read(), filename=filename)
+
+    scan_pkgs()
+    print('done scanning')
+
+    if toplevel:
+        imports += analyze_toplevel(code)
+    elif function:
+        imports += analyze_function(code, function)
+    else:
+        imports += analyze_full(code)
+
+    env = export_env(overrides, imports, extra_pkg)
+
+    return env  
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description=HELPMSG)

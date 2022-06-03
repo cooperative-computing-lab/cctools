@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+
+# Copyright (C) 2022- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+
+from poncho import poncho_package_analyze as analyze
+from poncho import poncho_package_create as create
+import tempfile
+import json
+
+def MakeNetworkFunction(filename, func, keep_data=False):
+	
+	function_name = func.__name__
+	env = analyze.create_spec(filename, function=function_name)
+
+	print(json.dumps(env, indent=4, sort_keys=True))
+
+	with open('tmp.json', 'w') as f:
+		json.dump(env, f, indent=4, sort_keys=True)
+
+	pkg = create.pack_env('tmp.json', 'tmp.tar.gz', serverless=True, function=func)
+
+	return pkg
