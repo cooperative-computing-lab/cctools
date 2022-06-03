@@ -37,20 +37,20 @@ int work_queue_coprocess_write(char *buffer, int len, int timeout)
 		if (errno == EINTR)
 		{
 			debug(D_WQ, "Polling coprocess interrupted, trying again");
-			return 0;
+			return -1;
 		}
 		debug(D_WQ, "Polling coprocess pipe failed: %s\n", strerror(errno));
-		return -1;
+		return -2;
 	}
 	if (poll_result == 0) // check for timeout
 	{
 		debug(D_WQ, "writing to coprocess timed out\n");
-		return -1;
+		return -3;
 	}
 	if ( !(read_poll.revents & POLLOUT)) // check we have data
 	{
 		debug(D_WQ, "Data able to be written to pipe: %s\n", strerror(errno));
-		return -1;
+		return -2;
 	}
 	int bytes_written = write(coprocess_in[1], buffer, len);
 	if (bytes_written < 0)
@@ -74,10 +74,10 @@ int work_queue_coprocess_read(char *buffer, int len, int timeout){
 		if (errno == EINTR)
 		{
 			debug(D_WQ, "Polling coprocess interrupted, trying again");
-			return 0;
+			return -1;
 		}
 		debug(D_WQ, "Polling coprocess pipe failed: %s\n", strerror(errno));
-		return -1;
+		return -2;
 	}
 	if (poll_result == 0) // check for timeout
 	{
@@ -87,7 +87,7 @@ int work_queue_coprocess_read(char *buffer, int len, int timeout){
 	if ( !(read_poll.revents & POLLIN)) // check we have data
 	{
 		debug(D_WQ, "Data not returned from pipe: %s\n", strerror(errno));
-		return -1;
+		return -2;
 	}
 
 	int bytes_read = read(coprocess_out[0], buffer, len - 1);
@@ -118,7 +118,7 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 		if (curr_bytes_read < 0) {
 			fatal("Unable to get information from coprocess\n");
 		}
-		if (curr_bytes_read == 0)
+		if (curr_bytes_read == -1)
 		{
 			continue;
 		}
