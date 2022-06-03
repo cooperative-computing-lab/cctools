@@ -2876,7 +2876,6 @@ int main(int argc, char *argv[])
 			coprocess_command = calloc(PATH_MAX, sizeof(char));
 			path_absolute(optarg, coprocess_command, 1);
 			realloc(coprocess_command, strlen(coprocess_command)+1);
-			printf("%s\n", coprocess_command);
 			break;
 		default:
 			show_help(argv[0]);
