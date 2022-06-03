@@ -2073,10 +2073,16 @@ class RemoteTask(Task):
     # @param coprocess  The name of the coprocess which has the function you wish to execute. The coprocess should have a name() method that returns this
     # @param
     # @param command    The shell command line to be exected by the task.
-    # @param kwargs	    keyword arguments used in function to be executed by task. An optional kwarg exec_method can be specified to one of fork, thread, and direct to choose between those three methods of execution
-    def __init__(self, fn, coprocess, **kwargs):
+    # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
+    # @param kwargs	    keyword arguments used in function to be executed by task. An optional kwarg exec_method can be specified to one of fork, thread, and direct to choose between those three methods of execution. Another optional kwarg is work_queue_argument_dict, which contains a dictionary of keyword arguments for the remote function
+    def __init__(self, fn, coprocess, *args, **kwargs):
         Task.__init__(self, fn)
-        event = json.dumps(kwargs)
+        if kwargs.get("work_queue_argument_dict", None) is None:
+            kwargs["work_queue_positional_args"] = args
+            event = json.dumps(kwargs)
+        else:
+            kwargs["work_queue_argument_dict"]["work_queue_positional_args"] = args
+            event = json.dumps(kwargs["work_queue_argument_dict"])
         Task.specify_buffer(self, event, "infile")
         Task.specify_coprocess(self, coprocess)
 
