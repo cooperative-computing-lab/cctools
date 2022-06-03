@@ -9,12 +9,10 @@
 import re
 import sys
 import json
-import pandas as pd
 
-from matplotlib import pyplot as plt
 import bokeh
 from bokeh.layouts import layout
-from bokeh.models import Div, RangeSlider, Spinner
+from bokeh.models import ColumnDataSource, CDSView, HoverTool, GroupFilter
 from bokeh.plotting import figure, show
 palette = bokeh.palettes.all_palettes["Viridis"]
 
@@ -35,16 +33,7 @@ def parse_tasks(logfile):
     | taskid | category | wait_time | start_time | end_time | info |
     """
 
-    tasks = pd.DataFrame(columns=[
-        "taskid",
-        "category",
-        "wait_time",
-        "start_time",
-        "end_time",
-        "info"
-    ])
-    tasks.set_index("taskid")
-
+    tasks = {}
     with open(logfile, 'r') as log:
         p_task = re.compile(r"(?P<time>\d+) \s+ "
                             r"(?P<pid>\d+) \s+ TASK \s+ "
@@ -64,7 +53,7 @@ def parse_tasks(logfile):
             if state == "WAITING":
                 if not min_time:
                     min_time = time
-                tasks.loc[taskid] = {
+                tasks[taskid] = {
                     "taskid"     : taskid,
                     "category"   : m.group("state_args").split()[0],
                     "wait_time"  : time - min_time,
@@ -73,55 +62,72 @@ def parse_tasks(logfile):
                     "info"       : ""
                 }
             elif state == "RUNNING":
-                tasks.loc[taskid, "start_time"] = time - min_time
+                tasks[taskid]["start_time"] = time - min_time
             elif state == "DONE":
-                tasks.loc[taskid, "end_time"]   = time - min_time
-                tasks.loc[taskid, "info"]       = m.group("state_args")
+                tasks[taskid]["end_time"] = time - min_time
+                tasks[taskid]["info"]     = m.group("state_args")
 
-    tasks["order"] = tasks["start_time"].rank(method="first")
+    taskids = list(tasks.keys())
+    tasks = {
+        "taskid": taskids,
+        **{
+            key: [tasks[taskid][key] for taskid in taskids]
+            for key in tasks[taskids[0]].keys()
+        }
+    }
+
+    tasks["order"] = [sorted(tasks["start_time"]).index(i) for i in tasks["start_time"]]
     return tasks
 
 
-def get_times(tasks):
-    taskids     = list(tasks.keys())
-    wait_times  = [tasks[taskid]["wait_time"]  for taskid in taskids]
-    start_times = [tasks[taskid]["start_time"] for taskid in taskids]
-    end_times   = [tasks[taskid]["end_time"]   for taskid in taskids]
-    return taskids, wait_times, start_times, end_times
-
-
-def plot(tasks):
-    categories = tasks["category"].unique()
+def plot(tasks, outfile):
+    # todo outfile
+    categories = set(tasks["category"])
     colors     = palette[len(categories)]
+    source     = ColumnDataSource(tasks)
+    
     p = figure(
         title="Tasks Lifetime",
-        x_axis_label="time", y_axis_label="task id",
+        x_axis_label="time", y_axis_label="Order of start time",
         sizing_mode="stretch_width"
     )
-    tasks = tasks.sort_values(by="start_time")
 
-    for i, category in enumerate(categories):
-        # TODO write this as a iterator
-        # Plot the bars based on the time they started
-        tasks_cat = tasks[tasks["category"] == category]
-        p.hbar(
-            y=tasks_cat["order"],
-            left=tasks_cat["start_time"], right=tasks_cat["end_time"],
-            color=colors[i]
+    for category, color in zip(categories, colors):
+        view = CDSView(
+            source=source,
+            filters=[GroupFilter(column_name="category", group=category)]
         )
+        p.hbar(
+            y="order",
+            left="start_time", right="end_time",
+            source=source, view=view,
+            color=color
+        )
+
+    TOOLTIPS = [
+        ("taskid",     "@index"),
+        ("category",   "@category"),
+        ("wait_time",  "@wait_time"),
+        ("start_time", "@start_time"),
+        ("end_time",   "@end_time"),
+        ("info",       "@info")
+    ]
     show(p)
 
 
 # Main Executions
 def main():
     logfile = ""
+    outfile = ""
 
     arguments = sys.argv[1:]
     while arguments:
         argument = arguments.pop(0)
         if argument[0] == '-':
-            if argument == '-h':
+            if argument == "-h":
                 usage(0)
+            if argument == "-o":
+                outfile == arguments.pop(0)
             else:
                 usage(1)
         logfile = argument
@@ -129,8 +135,11 @@ def main():
     if not logfile:
         print("No log file specified")
         usage(1)
+    if not outfile:
+        outfile = logfile + ".html"
+
     tasks = parse_tasks(logfile)
-    plot(tasks)
+    plot(tasks, outfile)
 
 
 if __name__ == '__main__':
