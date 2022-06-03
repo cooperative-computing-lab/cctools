@@ -90,20 +90,7 @@ def get_times(tasks):
     return taskids, wait_times, start_times, end_times
 
 
-def plot(tasks, outfile):
-    taskids, start_times, end_times = get_times(tasks)
-    durations = [end_times[i] - start_times[i] for i in range(len(tasks))]
-    fig, ax = plt.subplots()
-    ax.barh(taskids, durations, left=start_times)
-    plt.savefig(outfile, format='svg')
-    plt.show()
-
-
-def plot_interactive(tasks):
-    # taskids, wait_times, start_times, end_times = get_times(tasks)
-    # print(start_times)
-    # num_tasks = len(taskids)
-
+def plot(tasks):
     categories = tasks["category"].unique()
     colors     = palette[len(categories)]
     p = figure(
@@ -128,8 +115,6 @@ def plot_interactive(tasks):
 # Main Executions
 def main():
     logfile = ""
-    outfile = ""
-    interactive = False
 
     arguments = sys.argv[1:]
     while arguments:
@@ -137,23 +122,15 @@ def main():
         if argument[0] == '-':
             if argument == '-h':
                 usage(0)
-            elif argument == '-i':
-                interactive = True
-            elif argument == '-o':
-                outfile = arguments.pop(0)
             else:
                 usage(1)
         logfile = argument
 
     if not logfile:
-        print("Please specify path to the transactions log file.")
+        print("No log file specified")
         usage(1)
-    outfile = logfile + ".svg" if not outfile else outfile
     tasks = parse_tasks(logfile)
-    if interactive:
-        plot_interactive(tasks)
-    else:
-        plot(tasks, outfile)
+    plot(tasks)
 
 
 if __name__ == '__main__':
