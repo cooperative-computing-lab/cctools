@@ -206,6 +206,9 @@ int jx_isatomic( struct jx *j );
 /** Test an expression for the boolean value TRUE.  @param j An expression to test.  @return True if the expression is boolean and true. */
 int jx_istrue( struct jx *j );
 
+/** Test an expression for the boolean value FALSE @param j An expression to test.  @return True if the expression is boolean and false. */
+int jx_isfalse( struct jx *j );
+
 int jx_comprehension_equals(struct jx_comprehension *j, struct jx_comprehension *k);
 int jx_item_equals(struct jx_item *j, struct jx_item *k);
 int jx_pair_equals(struct jx_pair *j, struct jx_pair *k);
