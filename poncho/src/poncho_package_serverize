@@ -5,7 +5,6 @@
 # See the file COPYING for details.
 
 
-from operator import mod
 from poncho import poncho_package_analyze as analyze
 from poncho import poncho_package_create as create
 import argparse
@@ -141,28 +140,61 @@ def main():
             except Exception as e:
                 print("Network function encountered exception ", str(e), file=sys.stderr)
     return 0
+
+'''
+default_name_func = \
+'''def name():
+	return "my_coprocess"
+
+'''
+init_function = \
+'''if __name__ == "__main__":
+	main()
+
 '''
 
-def create_network_function(path, func, dest):
+def create_network_function(path, funcs, dest):
 	absolute_path = os.path.abspath(path)
 	with tempfile.TemporaryDirectory() as temp_package_dir:
+		# get filename from path
 		filename = absolute_path.split("/")[-1].replace(".py", "")
+		# create a temporary directory to turn the users input python file into a module that we can then load
 		os.mkdir(f"{temp_package_dir}/{filename}")
-		path_to_module = shutil.copy(absolute_path, f"{temp_package_dir}/{filename}/{filename}.py")
+		# see if the input valid is valid
+		try: 
+			path_to_module = shutil.copy(absolute_path, f"{temp_package_dir}/{filename}/{filename}.py")
+		except:
+			print("Error, input file does not exist")
+			exit()
+		# create an empty file with the name __init__.py to tell python that there is a module there
 		open(f"{temp_package_dir}/{filename}/__init__.py", "w").close()
+		# load in the module
 		spec = importlib.util.spec_from_file_location(filename, path_to_module)
 		module = importlib.util.module_from_spec(spec)
 		sys.modules["module.name"] = module
 		spec.loader.exec_module(module)
-		name_func = inspect.getsource(getattr(module, "name"))
-		remote_func = inspect.getsource(getattr(module, func))
+		# get the name function that must be defined in the code
+		try:
+			name_func = inspect.getsource(getattr(module, "name"))
+		except:
+			print("No name function found, defaulting to my_coprocess")
+			name_func = default_name_func
+		# create output file
 		output_file = open(dest, "w")
+		# write network code into it
 		output_file.write(network_code)
+		# write name function code into it
 		output_file.write(name_func)
-		output_file.write("@remote_execute\n")
-		output_file.write(remote_func)
-		output_file.write('''if __name__ == "__main__":''')
-		output_file.write("    main()")
+		# iterate over every function the user requested and attempt to put it into the network function
+		for func in funcs:
+			try:
+				remote_func = inspect.getsource(getattr(module, func))
+				output_file.write("@remote_execute\n")
+				output_file.write(remote_func)
+				output_file.write("\n")
+			except:
+				print(f"Function {func} not found in input file, skipping")
+		output_file.write(init_function)
 		output_file.close()
 		
 
@@ -181,11 +213,14 @@ def MakeNetworkFunction(filename, func, keep_data=False):
 	#return pkg
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="Creates a network function based on an input file and function")
-	parser.add_argument('filename', help='Source file that contains the function to be serverized')
-	parser.add_argument('function_name', help='Name of the function in filename to be serverized')
+	parser.add_argument('--source', help='Source file that contains the function to be serverized')
+	parser.add_argument('--function', action='append', help='Name of the function in filename to be serverized')
 	parser.add_argument('--pack', action='store_true', help='Pack network function into an environemnt')
-	parser.add_argument('--dest', help='Output path for network function')
+	parser.add_argument('--out', help='Output file for network function')
 	args = parser.parse_args()
 	print(args)
+	if args.function is None:
+		print("Error, must specify at least one function")
+		exit()
 	if not args.pack:
-		create_network_function(args.filename, args.function_name, args.dest)
+		create_network_function(args.source, args.function, args.out)
