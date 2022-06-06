@@ -2,21 +2,21 @@ include(manual.h)dnl
 HEADER(jx_repl)
 
 SECTION(NAME)
-BOLD(jx_repl) - interactive command line tool to explore the JX language.
+BOLD(jx_repl) - interactive command line tool to explore the JX expression language.
 
 SECTION(SYNOPSIS)
 CODE(jx_repl)
 
 SECTION(DESCRIPTION)
 
-BOLD(jx_repl) is an interactive tool to explore the JX language.  BOLD(jx_repl) will read in a JX expression, evaluate it, print the result, then save both the query and the result to the context.  Results of previous expressions can be referenced via the `out_%d` symbol, and their corresponding query via the `in_%d` symbol.  The program will exit on EOF or when the user enters 'quit' or 'exit'.
+BOLD(jx_repl) is an interactive tool to explore the JX expression language.  BOLD(jx_repl) will read in a JX expression, evaluate it, print the result, then save both the query and the result to the context.  Results of previous expressions can be referenced via the `out_%d` symbol, and their corresponding query via the `in_%d` symbol.  The program will exit on EOF or when the user enters 'quit' or 'exit'.
 PARA
 BOLD(jx_repl) also reserves certain symbols in the context to act as commands when entered:
 
 LIST_ITEM(BOLD(help) display a help message which lists details on reserved commands.)
-LIST_ITEM(BOLD(functions) display a list of functions supported by the JX language.)
-LIST_ITEM(BOLD(values) display a list of values supported by the JX language.)
-LIST_ITEM(BOLD(operators) display a list of operators supported by the JX language.)
+LIST_ITEM(BOLD(functions) display a list of functions supported by JX.)
+LIST_ITEM(BOLD(values) display a list of values supported by JX.)
+LIST_ITEM(BOLD(operators) display a list of operators supported by JX.)
 LIST_ITEM(BOLD(catalog) fetch the catalog data.)
 LIST_ITEM(BOLD(exit) exit the program.)
 LIST_ITEM(BOLD(quit) same as 'exit'.)

@@ -10,7 +10,7 @@
 
 - [**Makeflow**](makeflow) is a workflow system for parallel and distributed
   computing using either the classic Make syntax or the more advanced
-  [JX Workflow Language](jx).   Using Makeflow, you can
+  [JX Workflow Language](jx-workflow).   Using Makeflow, you can
   write simple scripts that easily execute on hundreds or thousands of
   machines. 
 
@@ -69,7 +69,9 @@ or C   ([example](work_queue/examples/work_queue_example.c)|[api](http://ccl.cse
 
 - [**Man Pages**](man_pages.md)
 
-- [**JX Workflow Language**](jx)
+- [**JX Expression Language**](jx)
+
+- [**JX Workflow Language**](jx-workflow)
 
 - [**Chirp Protocol Specification**](chirp/chirp_protocol.md)
 
