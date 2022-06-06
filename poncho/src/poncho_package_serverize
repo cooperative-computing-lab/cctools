@@ -7,19 +7,25 @@
 
 from poncho import poncho_package_analyze as analyze
 from poncho import poncho_package_create as create
-import tempfile
+import argparse
 import json
 
 def MakeNetworkFunction(filename, func, keep_data=False):
 	
 	function_name = func.__name__
-	env = analyze.create_spec(filename, function=function_name)
+	#env = analyze.create_spec(filename, function=function_name)
 
 	print(json.dumps(env, indent=4, sort_keys=True))
 
 	with open('tmp.json', 'w') as f:
 		json.dump(env, f, indent=4, sort_keys=True)
 
-	pkg = create.pack_env('tmp.json', 'tmp.tar.gz', serverless=True, function=func)
+	#pkg = create.pack_env('tmp.json', 'tmp.tar.gz', serverless=True, function=func)
 
-	return pkg
+	#return pkg
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser(description="Creates a network function based on an input file and function")
+	parser.add_argument('filename', help='Source file that contains the function to be serverized')
+	parser.add_argument('function-name', help='Name of the function in filename to be serverized')
+	args = parser.parse_args()
+	print(args)
