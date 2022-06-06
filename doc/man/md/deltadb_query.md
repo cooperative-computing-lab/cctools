@@ -54,10 +54,10 @@ A paper entitled DeltaDB describes the operation of the tools in detail (see ref
 - **----output=_&lt;expr&gt;_**<br /> (multiple) Display this expression on the output.
 
 
-## JX QUERY LANGUAGE
+## JX EXPRESSION LANGUAGE
 
-The --filter, --where, and --output options all make use of the JX query language,
-which is described URL(here,http://cctools.readthedocs.io/jx).
+The --filter, --where, and --output options all make use of the JX expression language,
+which is described [here](http://cctools.readthedocs.io/jx).
 
 In addition, the --output clauses may contain one of the following reduction functions:
 

@@ -1,6 +1,6 @@
 # JX Workflow Language Quick Reference
 
-[Makeflow](../../makeflow) | [JX Tutorial](../jx-tutorial) | [JX Full Reference](../jx)
+[Makeflow](../../makeflow) | [JX Workflow Tutorial](../jx-tutorial) | [JX Workflow Reference](../jx)
 
     
 <table>

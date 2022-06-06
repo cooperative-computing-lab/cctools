@@ -12,7 +12,7 @@ nav:
     - Software:
         - Makeflow: 'makeflow/index.md'
         - Work Queue: 'work_queue/index.md' 
-        - JX Language: 'jx/index.md'
+        - JX Workflow Language: 'jx-workflow/index.md'
         - Resource Monitor: 'resource_monitor/index.md'
         - Parrot: 'parrot/index.md'
         - Chirp: 'chirp/index.md'
@@ -26,7 +26,7 @@ nav:
     - Reference:
         - Man Pages: 'man_pages.md'
         - Network Configuration: 'network/index.md'
-        - JX Reference: 'jx/index.md'
+        - JX Expression Language: 'jx/index.md'
         - Chirp Reference: 'chirp/chirp_protocol.md'
         - API Reference: 'http://ccl.cse.nd.edu/software/manuals/api/html/index.html'
 

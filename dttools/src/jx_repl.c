@@ -32,7 +32,7 @@ The program exits once EOF is reached or after the user enters the `quit` or `ex
 
 
 const char * MSG_WELCOME =
-    "Welcome to the JX Language Explorer.\n"
+    "Welcome to the JX REPL.\n"
     "\n"
     "Type 'help' for help\n"
     "\n";

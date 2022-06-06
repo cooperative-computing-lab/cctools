@@ -1,279 +1,113 @@
-# JX Workflow Language Reference
+# JX Expression Language Reference
 
 ## Overview
 
-[Makeflow](../../makeflow) allows for workflows to be expressed in pure [JSON](http://json.org)
-or in an extended language known as JX which can be evaluated to produce pure
-JSON. This document provides the detailed reference for this language. If you
-are just getting started, see the [JX Tutorial](../jx-tutorial) before
-reading this reference manual.
+The JX Expression language is an extension of the JSON data description language.
+It combines familiar expression operators, function calls,
+external data, and ordinary JSON contents to yield a powerful
+data querying and manipulation language.  JX is used throughout
+the CCTools to manage and query unstructured data.
 
-## JSON Workflow Representation
-
-### Workflow
-
-A workflow is encoded as a JSON object with the following keys:
-
-```json
-{
-    "rules":[ <rule>, <rule>, ... ],
-
-    "define":{ <string>:<string>, <string>:<string>, ... },
-
-    "environment":{ <string>:<string>, <string>:<string>, ... },
-
-    "categories": { <string>:<category>, <string>:<category>, ... },
-
-    "default_category": <string>
-}
-
-```
-
-| Key | Required | Description |
-|-----|:--------:|-------------|
-|[**rules**](#rules)|  yes     | Unordered array of rules comprising the workflow.<br>  Each `<rule>` corresponds to a single job represented as a JSON object to be executed in the workflow.
-|[**define**](#defining-values) | no | Defines [expression substitutions](#jx-expressions) that can be used when defining rules, environments, and categories.
-|[**environment**](#environments) | no | Defines environment variables to be set when executing all rules.
-|[**categories**](#categories)| no  | Rules are grouped into categories. Rules inside a category are run with the same [environment variables values](#environments), and the same resource requirements.
-|default_category | no | Name of the category used if none is specified for a rule. <br>If there is no corresponding category defined, default values will be filled in. If not provided, the default category is `"default"`.
-
-### Rules
-
-There are two types of rules. The first type describes single commands, and the second describes sub-workflows. 
-
-A rule encoding **a single command** is a JSON object with the following keys.
-
-```json
-{
-    "command" : <string>,
-
-    "inputs" : [ <file>, <file>, ... ],
-
-    "outputs" : [ <file>, <file>, ... ],
-    
-    "local_job" : <boolean>,
-    
-    "environment":{ <string>:<string>, <string>:<string>, ... },
-    
-    "category" : <string>,
-    
-    "resources" : <resources>,
-
-    "allocation" : <string>
-}
-```
-
-A rule specifying **a sub-workflow** is a JSON object similar to the one for a
-single command, but it replaces the key `command` with keys `workflow` and
-`args`:
-
-```json
-{
-    "workflow" : <string>,
-
-    "args" : { ... },
-
-    # inputs, outputs, local_job, environment, category, resources, and allocation 
-    # as for a single command.
-
-    ...
-}
-```
-
-| Key | Required | Description |
-|-----|:--------:|-------------|
-| command <br> _or_ <br> workflow | yes | Either `command`, which is a single Unix program to run, or a `workflow` which names another workflow to be run as a sub-job.
-| args      | no | **Only used with workflow key.**  Gives arguments as a JSON array to be passed to a sub-workflow.
-| inputs    | no | An array of [file specifications](#Files) required by the command or sub-workflow.
-| outputs   | no | An array of [file specifications](#Files) produced by the command or sub-workflow.
-| local_job | no | If `true` indicates that the job is best run locally by the workflow manager, rather than dispatched to a distributed system. This is a performance hint provided by the end user and not a functional requirement. Default is `false`.
-| category  | no | Specifies the name of a job category. The name given should correspond to the key of a category object in the global workflow object.
-| resources | no | Specifies the specific [resource requirements](#resources) of this job.
-| allocation | no | Specifies the resource allocation policy: <ul> <li> `first` computes the best "first allocation" based on the prior history of jobs in this category. <li> `max` selects the maximum resources observed by any job in this category. <li> `error` attempts to execute the job and increases the resources offered if an error results. </ul>
-| environment | no | Specifies [environment variables](#environments).
-
-
-### Files
-
-A file is encoded as either a JSON string or a JSON object. If a file is given
-simply as a string, then the string gives the name of the file in all
-contexts. For example:
-
-```json
-"output.txt"
-```
-
-If a file is given as an object, then it the object describes the (possibly
-different) names of the file in the workflow context (DAG context) and the task
-context. The file will be renamed as needed when dispatched from the workflow
-to the task, and vice versa. For example:
-
-```json
-{
-    "dag_name" : "output.5.txt",
-    "task_name" : "output.txt"
-}
-```
-
-
-### Categories
-
-A **category** is encoded as a JSON object with the following keys:
-
-```json
-{
-    "environment": <environment>,
-
-    "resources": <resources>
-}
-```
-
-The category describes the [environment variables](#environments) and
-[resources required](#resources) per rule for all the rules that share that
-category name.
-
-
-### Environments
-
-Environments are encoded as a JSON object where each key/value pair describes
-the name and value of a Unix environment variable:
-
-```json
-{
-    "PATH":"/opt/bin:/bin:/usr/bin",
-    "LC_ALL":C.UTF-8"
-}
-```
-
-
-An environment may be given at the global workflow level, in a category
-description, or in an individual job, where it applies to the corresponding
-object. If the same environment variable appears in multiple places, then the
-job value overrides the category value, and the category value overrides the
-global value.
-
-
-### Resources
-
-Resources are encoded as a JSON object with the following keys:
-
-```json
-{
-    "cores" : <integer>,
-    "memory" : <integer>,
-    "disk" : <integer>,
-    "gpus" : <integer>,
-    "wall-time": <integer>
-}
-```
-
-A resource specification may appear in an individual job or in a category
-description. `"cores"` and `"gpus"` give the number of CPU cores and GPUs,
-respectively, required to execute a rule. `"disk"` gives the disk space
-required, in MB. `"memory"` gives the RAM required, in MB.
-
-`"wall-time"` specifies the maximum allowed running time, in seconds.
-
-`"mpi-processes"` specifies the number of MPI processes the job needs.
-Currently this is only used when submitting SLURM jobs.
-
-
-## JX Expressions
-
-JX is a superset of JSON with additional syntax for dynamically generating
-data. The use case in mind when designing JX was writing job descriptions for
-a workflow manager accepting JSON input.
-
-For workflows with a large number of
-rules with similar structure, it is sometimes necessary to write a script in
-another language like Python to generate the JSON output. It is
-desirable to have a special-purpose language that can dynamically generate
-rules while still bearing a resemblance to JSON, and more importantly, still
-being readable. JX is much lighter than a full-featured language like Python
-or JavaScript, and is suited to embedding in other systems like a workflow
-manager.
-
-Standard JSON syntax is supported, with some additions from Python. JX allows
+Standard JSON syntax is supported, with some additions inspired by Python. JX allows
 for expressions using Python's basic operators. These include the usual
 arithmetic, comparison, and logical operators (e.g. `+`, `<=`, `and`, etc.).
-JX also includes Python's `range()` function for generating sequences of
-numbers.
+A selection of functions is provided for common logical and string operations.
 
-```json
-"123" + "4"
-=> "1234"
-
-123 + 4
-=> 127
-
-"123" + 4
-=> Error{"source":"jx_eval",
-         "name":"mismatched types",
-         "message":"mismatched types for operator",
-         "operator":"123"+4,
-         "code":2}
+## Evaluation Model
 
 ```
+json-result = evaluate( jx-expression, json-context )
+```
+
+A JX expression is evaluated relative to a *context*, which is a JSON document.
+Variable names encountered in the JX expression are bound to their corresponding
+values given by the context document.  The result of the evaluation is a JSON document.
+A JX expression consisting only of constants is a valid JSON document,
+and when evaluated, will produce the same JSON document.
+
+## Constants and Constructors
+
+JX permits the same atomic constant values as in JSON, including boolean values:
+
+>     true
+>     false
+
+Decimal integers:
+
+>     0
+>     123
+>     09631
+
+Floating point numbers:
+
+>     3.141592654
+
+Strings:
+
+>     "hello\nworld"
+
+Constructors for lists:
+
+>     [ 10, 9, 8 ]
+
+And constructors for dictionaries:
+
+>     { "name": "Fred", "age": 47, "temp": 98.6 }
+
+## Symbols
+
+An unquoted name is a symbol, and evaluates to the corresponding value found in the evaluation context.
+If the context is this:
+
+>     { "city": "South Bend", "zipcodes": [ 46601, 46613, 46614, 46615, 46616, 46617, 46619 ] }
+
+Then this expression:
+
+>     { "location": city, "count": len(zipcodes) }
+
+Will evaluate to this expression:
+
+>     { "location": "South Bend", "count": 7 }
+
+## Comments
+
+Comments are introduced by the `#` character and continue to the next newline:
+
+>     10+20    # This is a comment.
+
+## Operators
+
+JX supports the following binary and unary operators, which have the
+usual arithmetic and logical meanings. In the absence of parentheses,
+operators are evaluated left to right in order of precedence.
+From highest to lowest precedence:
+
+| Operator | Symbol |
+|---|---|
+| Negation |-|
+| Lookup, Function Call | [] , () |
+| Multiply, Divide, Remainder | *, /, % |
+| Add, Subtract | +, - |
+| Comparison | ==, !=, <, <=, >, >= |
+| Boolean-Not | not |
+| Boolean-And | and |
+| Boolean-Or  | or  |
 
 
-Evaluation will produce plain JSON types from JX, assuming the evaluation
-succeeded. If an error occurs, evaluation stops and an error is returned to
-the caller. Error objects can include additional information indicating where
-the failure occurred and what the cause was. Details on the syntax and usage
-of Errors are given [below](#errors).
-
-If a non-error type is returned, then evaluation succeeded and the result
-contains only plain JSON types. JX expressions are evaluated in a _context_ ,
-which is an object mapping names to arbitrary JX values. On evaluating a
-variable, the variable's name is looked up in the current context. If found,
-the value from the context is substituted in place of the variable. If the
-variable is not found in the context, an error is returned.
-
-!!! note
-    JX supports comments, introduced by the `#` character and continuing for
-    the rest of the line.
-
-#### Unary Operators
-
-##### Logical Complement
-
->     not <boolean> -> <boolean>
-
-Computes the logical NOT of the given boolean. Unlike C, integers may _not_ be
-used as truth values.
 
 
-#### Negation
+### Negation Prefix
 
 >     -A -> A     where A is <integer> or <double>
 
 Computes the additive inverse of its operand.
 
 
-#### Positive Prefix
+### Positive Prefix
 
 >     +A -> A    where A is <integer>, <double>, or <string>
 
 Returns its operand unmodified.
-
-
-
-### Binary Operators
-
-For complicated expressions, parentheses may be used as grouping symbols. JX
-does not allow tuples. In the absence of parentheses, operators are evaluated
-left to right in order of precedence. From highest to lowest precedence,
-
-| |
-|-|
-|lookup, function call
-|*, %, /
-|+, -
-|==, !=, <, <=, >, >=
-|not
-|and
-|or
-
 
 ### Lookup
 
@@ -306,7 +140,7 @@ range(10)[3:7]
 
 >     A + A -> A    where A is <string>, or <array>
 
-### Arithmetic operators
+### Arithmetic Operators
 
 >     A + A -> A    (addition)
 >     A - A -> A    (subtraction)
@@ -318,13 +152,14 @@ range(10)[3:7]
 Division and modulo by zero generate an error.
 
 
-### Logic operators
+### Boolean Logical Operators
 
 >     <boolean> and <boolean> -> <boolean>    (conjunction)
 >     <boolean> or  <boolean> -> <boolean>    (disjunction)
+>     not <boolean> -> <boolean>              (complement)
 
 
-### Comparison operators
+### Comparison Operators
 
 >     A == B -> <boolean>                     (equality)
 >     A != B -> <boolean>                     (inequality)
@@ -344,16 +179,19 @@ are of incompatible types, `x == y` returns `false`, and `x != y` return
 For `<`, `<=`, `>`, and `>=` the behaviour depends on the type of its arguments:
 
 | | |
-|-|-|
-integer _or_ double | Compares its operands numerically
-string              | Compares its operands in lexicographical order (as given by strcmp(3))
-|| It is an error to compare a string to an integer or double.
+|---|---|
+| integer _or_ double | Compares its operands numerically |
+| string              | Compares its operands in lexicographical order (as given by strcmp(3)) |
+|| It is an error to compare a string to an integer or double. |
 
 
+## Functions
 
-### Functions
+The following functions are built into JX.
+Future implementations of the language may provide additional
+functions or permit external function definitions.
 
-#### range
+### range
 
 >       range(A) -> <array>
 >       range(A, A[, A]) -> <array>
@@ -403,7 +241,7 @@ range(5,0,-1)
     
 Calling with step = 0 is an error.
 
-#### format
+### format
 
 >     format(A, ...) -> String
 >     where A is <string>
@@ -443,7 +281,7 @@ def format(spec, *args):
     return spec % tuple(args)
 ```
 
-#### template
+### template
 
 >       template(A[,B]) -> String
 >       where A = String and B = Object
@@ -469,7 +307,7 @@ template("SM{PLATE}_{ID}.sam", {"PLATE": "10001", "ID": N/2 - 1})
 = "SM10001_23.sam"
 ```
 
-#### len
+### len
 
 >       len([1,2,3]) -> Integer
 
@@ -481,7 +319,7 @@ len([1,2,3])
 = 3
 ```
 
-#### fetch
+### fetch
 
 >       fetch(A) -> Object
 >       where A = URL/path
@@ -494,7 +332,7 @@ fetch("example.json")
 = {"x": 0, "y": "test", "z": 1.0}
 ```
 
-#### select
+### select
 
 >       select([,A], B) -> Array
 >       where A = Object and B = Boolean
@@ -506,7 +344,7 @@ select([{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}], x=
 = [{"x": 1, "y": "example", "z": 0.0}]
 ```
 
-#### project
+### project
 
 >       project([,A], B) -> Array
 >       where A = Object and B = Expression
@@ -518,7 +356,7 @@ project([{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}], x
 = [0, 1]
 ```
 
-#### schema
+### schema
 
 >       schema(A) -> Object
 >       where A = Object
@@ -530,7 +368,7 @@ schema({"x": 0, "y": "test", "z": 1.0})
 = {"x": "integer", "y": "string", "z": "float"}
 ```
 
-#### like
+### like
 
 >       like(A, B) -> Boolean
 >       where A = String (to be matched) and B = String (regex)
@@ -542,13 +380,12 @@ like("test", ".es.*")
 = true
 ```
 
-### Comprehensions
+## List Comprehensions
 
 JX supports list comprehensions for expressing repeated structure. An entry in
 a list can be postfixed with one or more `for` clauses to evaluate the list
 item once for each entry in the specified list. A `for` clause consists of a
 variable and a list, along with an optional condition.
-
     
 ```python
 [x + x for x in ["a", "b", "c"]]
@@ -569,7 +406,7 @@ If multiple clauses are specified, they are evaluated from left to right.
 = [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2], [3, 1]]
 ```
 
-### Functions as Methods
+## Functions as Chained Methods
 
 JX supports a syntax for functions very similar to object methods of the form `object.method()`.
 
@@ -596,7 +433,7 @@ This gives us the following examples:
 = 2
 ```
 
-### Errors
+## Errors
 
 JX has a special type, *Error*, to indicate some kind of failure or exceptional
 condition.
@@ -657,7 +494,7 @@ Errors from "jx_eval" have some additional keys, described below, to aid in
 debugging. Other sources are free to use any structure for their additional
 error data.
 
-#### JX Errors
+### Error Types
 
 The following errors may produced by jx_eval.
 
