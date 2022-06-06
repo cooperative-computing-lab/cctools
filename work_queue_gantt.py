@@ -11,7 +11,6 @@ import sys
 import json
 
 import bokeh
-from bokeh.layouts import layout
 from bokeh.models import ColumnDataSource, CDSView, HoverTool, GroupFilter
 from bokeh.plotting import figure, show
 palette = bokeh.palettes.all_palettes["Viridis"]
@@ -29,17 +28,16 @@ def get_info(line):
 
 def parse_tasks(logfile):
     """
-    Parse the logfile as a table.
-    | taskid | category | wait_time | start_time | end_time | info |
     """
 
     tasks = {}
     with open(logfile, 'r') as log:
-        p_task = re.compile(r"(?P<time>\d+) \s+ "
-                            r"(?P<pid>\d+) \s+ TASK \s+ "
-                            r"(?P<taskid>\d+) \s+ "
-                            r"(?P<state>\S+) \s+ "
-                            r"(?P<state_args>.+)", re.X)
+        p_task   = re.compile(r"(?P<time>\d+) \s+ "
+                              r"(?P<pid>\d+) \s+ TASK \s+ "
+                              r"(?P<taskid>\d+) \s+ "
+                              r"(?P<state>\S+) \s+ "
+                              r"(?P<state_args>.+)", re.X)
+        p_worker = re.compile(r".*RUNNING (?P<worker>\S+)")
         min_time = 0
 
         for line in log:
@@ -63,6 +61,7 @@ def parse_tasks(logfile):
                 }
             elif state == "RUNNING":
                 tasks[taskid]["start_time"] = time - min_time
+                tasks[taskid]["worker"] = p_worker.match(line).group("worker")
             elif state == "DONE":
                 tasks[taskid]["end_time"] = time - min_time
                 tasks[taskid]["info"]     = m.group("state_args")
@@ -76,20 +75,32 @@ def parse_tasks(logfile):
         }
     }
 
-    tasks["order"] = [sorted(tasks["start_time"]).index(i) for i in tasks["start_time"]]
+    tasks["order"] = [sorted(tasks["start_time"]).index(i)
+                      for i in tasks["start_time"]]
+
+    workers = set(tasks["worker"])
+    sorted_times = {worker: sorted([tasks["start_time"][i]
+                                    for i in range(len(taskids)) if tasks["worker"][i] == worker])
+                    for worker in workers}
+    tasks["order_per_worker"] = [
+        sorted_times[worker].index(time)
+        for worker, time in zip(tasks["worker"], tasks["start_time"])
+    ]
     return tasks
 
 
 def plot(tasks, outfile):
-    # todo outfile
+    bokeh.io.output_file(outfile)
+
     categories = set(tasks["category"])
+    workers    = set(tasks["worker"])
     colors     = palette[len(categories)]
     source     = ColumnDataSource(tasks)
-    
+
     p = figure(
         title="Tasks Lifetime",
-        x_axis_label="time", y_axis_label="Order of start time",
-        sizing_mode="stretch_width"
+        x_axis_label="time", y_axis_label="Order of Task Start Time",
+        sizing_mode="stretch_width",
     )
 
     for category, color in zip(categories, colors):
@@ -105,20 +116,75 @@ def plot(tasks, outfile):
         )
 
     TOOLTIPS = [
-        ("taskid",     "@index"),
-        ("category",   "@category"),
-        ("wait_time",  "@wait_time"),
+        ("taskid", "@taskid"),
+        ("category", "@category"),
+        ("wait_time", "@wait_time"),
         ("start_time", "@start_time"),
-        ("end_time",   "@end_time"),
-        ("info",       "@info")
+        ("end_time", "@end_time"),
+        ("info", "@info")
     ]
+    p.add_tools(HoverTool(
+        tooltips=TOOLTIPS,
+    ))
+
     show(p)
+
+
+def plot_worker(tasks, outfile):
+    bokeh.io.output_file(outfile)
+
+    categories = set(tasks["category"])
+    workers    = set(tasks["worker"])
+    colors     = palette[len(categories)]
+    source     = ColumnDataSource(tasks)
+
+    figures = {
+        worker: figure(
+            title=f"Tasks Lifetime for worker {worker}",
+            x_axis_label="time",
+            y_axis_label="Order of Task Start Time per Worker",
+            sizing_mode="stretch_width",
+        ) for worker in workers
+    }
+
+    TOOLTIPS = [
+        ("taskid", "@taskid"),
+        ("category", "@category"),
+        ("wait_time", "@wait_time"),
+        ("start_time", "@start_time"),
+        ("end_time", "@end_time"),
+        ("info", "@info")
+    ]
+
+    for category, color in zip(categories, colors):
+        for worker in workers:
+            p = figures[worker]
+            view = CDSView(
+                source=source,
+                filters=[
+                    GroupFilter(column_name="category", group=category),
+                    GroupFilter(column_name="worker",   group=worker)
+                ]
+            )
+            p.hbar(
+                y="order_per_worker",
+                left="start_time", right="end_time",
+                source=source, view=view,
+                color=color
+            )
+
+            p.add_tools(HoverTool(
+                tooltips=TOOLTIPS,
+            ))
+
+    show(bokeh.layouts.column(*figures.values()))
 
 
 # Main Executions
 def main():
-    logfile = ""
-    outfile = ""
+    logfile      = ""
+    outfile      = ""
+    worker_view  = False
 
     arguments = sys.argv[1:]
     while arguments:
@@ -127,7 +193,9 @@ def main():
             if argument == "-h":
                 usage(0)
             if argument == "-o":
-                outfile == arguments.pop(0)
+                outfile = arguments.pop(0)
+            elif argument == "-w":
+                worker_view = True
             else:
                 usage(1)
         logfile = argument
@@ -139,7 +207,10 @@ def main():
         outfile = logfile + ".html"
 
     tasks = parse_tasks(logfile)
-    plot(tasks, outfile)
+    if worker_view:
+        plot_worker(tasks, outfile)
+    else:
+        plot(tasks, outfile)
 
 
 if __name__ == '__main__':
