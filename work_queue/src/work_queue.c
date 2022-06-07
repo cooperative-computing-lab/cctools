@@ -7400,7 +7400,10 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 		rmsummary_print_buffer(&B, task_min_resources(q, t), 1);
 	} else if(state == WORK_QUEUE_TASK_CANCELED) {
 			/* do not add any info */
-	} else if(state == WORK_QUEUE_TASK_RETRIEVED || state == WORK_QUEUE_TASK_DONE) {
+	} else if(state == WORK_QUEUE_TASK_RETRIEVED) {
+		buffer_printf(&B, " %s ", work_queue_result_str(t->result));
+		buffer_printf(&B, " %d ", t->return_status);
+	} else if(state == WORK_QUEUE_TASK_DONE) {
 		buffer_printf(&B, " %s ", work_queue_result_str(t->result));
 		buffer_printf(&B, " %d ", t->return_status);
 
@@ -7413,7 +7416,14 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 				// no limits broken, thus printing an empty dictionary
 				buffer_printf(&B, " {} ");
 			}
-			rmsummary_print_buffer(&B, t->resources_measured, 1);
+
+			struct jx *m = rmsummary_to_json(t->resources_measured, /* only resources */ 1);
+			jx_insert(m, jx_string("wq_input_size"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
+			jx_insert(m, jx_string("wq_output_size"), jx_arrayv(jx_double(t->bytes_received/((double) MEGABYTE)), jx_string("MB"), NULL));
+			jx_insert(m, jx_string("wq_input_time"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_insert(m, jx_string("wq_output_time"), jx_arrayv(jx_double((t->time_when_done - t->time_when_retrieval)/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_print_buffer(m, &B);
+			jx_delete(m);
 		} else {
 			// no resources measured, one empty dictionary for limits broken, other for resources.
 			buffer_printf(&B, " {} {}");
