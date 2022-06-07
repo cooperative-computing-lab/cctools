@@ -473,8 +473,8 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.workers_removed);
 	buffer_printf(&B, " %d", s.workers_released);
 	buffer_printf(&B, " %d", s.workers_idled_out);
-	buffer_printf(&B, " %d", s.workers_fast_aborted);
 	buffer_printf(&B, " %d", s.workers_blocked);
+	buffer_printf(&B, " %d", s.workers_fast_aborted);
 	buffer_printf(&B, " %d", s.workers_lost);
 
 	/* Stats for the current state of tasks: */
@@ -492,7 +492,6 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.tasks_exhausted_attempts);
 
 	/* Master time statistics: */
-	buffer_printf(&B, " %" PRId64, s.time_when_started);
 	buffer_printf(&B, " %" PRId64, s.time_send);
 	buffer_printf(&B, " %" PRId64, s.time_receive);
 	buffer_printf(&B, " %" PRId64, s.time_send_good);
@@ -7348,7 +7347,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// tasks cumulative
 			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts"
 			// manager time statistics:
-			" time_when_started time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application"
+			" time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application"
 			// workers time statistics:
 			" time_execute time_execute_good time_execute_exhaustion"
 			// bandwidth:
