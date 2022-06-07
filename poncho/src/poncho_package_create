@@ -22,7 +22,7 @@ logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
 
 
-def pack_env(spec, output, serverless, function):
+def pack_env(spec, output):
 
     # record packages installed as editable from pip
     local_pip_pkgs = _find_local_pip()
@@ -40,10 +40,6 @@ def pack_env(spec, output, serverless, function):
 
         logger.info('Fetching http data...')
         http_data(spec, env_dir)
-
-        if serverless:
-            logger.info('Adding serveless component...')
-            add_serverless(function, env_dir)
 
         # create conda environment in temp directory
         logger.info('Populating environment...')
@@ -93,63 +89,6 @@ def _find_local_pip():
         (pkg, version, location) = line.split()
         path_of[pkg] = location
     return path_of
-def add_serverless(function, env_dir, name):
-
-    gd = 'export PONCHO=$1/poncho\n'.format(git_dir, git_dir)
-    with open(env_dir + '/poncho/set_env', 'a') as f:
-        f.write(gd)
-
-    if not os.path.exists('{}/poncho'.format(env_dir)):
-        os.mkdir('{}/poncho/'.format(env_dir))
-
-    os.mkdir('{}/poncho/serverless'.format(env_dir))
-    with open('{}/poncho/serverless/network_function.py'.format(env_dir), 'w') as f:
-
-        f.write(textwrap.dedent('''\
-                import sys
-                import dill
-                import socket
-                import json
-                import os
-
-                poncho_env = os.environ['PONCHO']
-                
-                with open('{}/serverless/function'.format(poncho_env), 'rb') as f:
-                    function = dill.load(f)
-
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        
-                try:
-                        s.bind(('localhost', 45107))
-                except Exception as e:
-                    s.close()
-                    print(e)
-                    exit(1)
-
-                while True:
-                    print('listening on port: {}\n'.format(s.getsockname()[1]))
-                
-                    # receive message from worker
-                    event, addr = s.recvfrom(1024)
-                    event = json.loads(event)
-                    print('received message: {} from {}'.format(event, addr))
-
-                        
-                    result = functionr(args) SERIEALIZE?
-
-                    response = {
-                        "Result": result,
-                        "StatusCode": "200",
-                    }
-                    # respond to worker
-                    s.sendto(json.dumps(response).encode('utf-8'), addr)
-
-                return 0
-                '''))
-
-
-    with open('{}/poncho/serverless/function'.format(env_dir), 'wb') as wf:
-        dill.dump(function, wf, recurse=True)
 
 def git_data(spec, out_dir):
     f = open(spec, 'r')
@@ -297,8 +236,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create a packed environment from a spec.')
     parser.add_argument('spec', help='Read in a spec file, or - for stdin.')
     parser.add_argument('output', help='Write output from conda-pack to the given file.')
-    parser.add_argument('-s', action='store_true', help='add serverless fucntion')
 
 
     args = parser.parse_args()
-    pack_env(args.spec, output=args.output, serverless=args.s, function=None)
+    pack_env(args.spec, output=args.output)
