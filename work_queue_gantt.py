@@ -86,10 +86,10 @@ def parse_tasks(logfile):
 
     workers = set(tasks["worker"])
     sorted_times = {
-        worker: sorted([
+        worker: sorted(
             tasks["start_time"][i] for i in range(len(taskids))
             if tasks["worker"][i] == worker
-        ]) for worker in workers
+        ) for worker in workers
     }
     tasks["order_per_worker"] = [
         sorted_times[worker].index(time)
@@ -108,13 +108,14 @@ def get_binding(tasks):
     binding = []
 
     for i in range(len(tasks["taskid"])):
-        worker     = tasks["worker"][i]
+        index      = tasks["order"].index(i)
+        worker     = tasks["worker"][index]
         slot       = slots[worker]
-        start_time = tasks["start_time"][i]
-        end_time   = tasks["end_time"][i]
+        start_time = tasks["start_time"][index]
+        end_time   = tasks["end_time"][index]
 
         bound = False
-        for j in range(len(slots[worker])):
+        for j in range(len(slot)):
             if not slot[j] or slot[j] < start_time:
                 binding.append(j)
                 slot[j] = end_time
@@ -124,6 +125,7 @@ def get_binding(tasks):
             binding.append(len(slot))
             slot.append(end_time)
 
+    print(binding)
     return {worker: len(slots[worker]) for worker in workers}, binding
 
 
@@ -131,9 +133,9 @@ def plot(tasks, outfile):
     bokeh.io.output_file(outfile)
 
     categories = set(tasks["category"])
-    workers = set(tasks["worker"])
-    colors = palette[len(categories)]
-    source = ColumnDataSource(tasks)
+    workers    = set(tasks["worker"])
+    colors     = palette[len(categories)]
+    source     = ColumnDataSource(tasks)
 
     p = figure(
         title="Tasks Lifetime",
@@ -168,41 +170,49 @@ def plot_worker(tasks, outfile):
 
     # TODO prefix the binding with worker name is just a temporary solution
     #      should be changed for better visualization
-    tasks["binding"] = [
-        f"{worker} - {binding}"
-        for worker, binding in zip(tasks["worker"], tasks["binding"])
-    ]
+    # tasks["binding"] = [
+    #     f"{worker} - {binding}"
+    #     for worker, binding in zip(tasks["worker"], tasks["binding"])
+    # ]
 
     categories = set(tasks["category"])
     workers    = set(tasks["worker"])
     colors     = palette[len(categories)]
     source     = ColumnDataSource(tasks)
 
-    p = figure(
-            title=f"Tasks Lifetime for Tasks",
+    figures = {
+        worker: figure(
+            title=f"Tasks Lifetime for Worker {worker}",
             x_axis_label="time",
-            y_axis_label="Order of Task Start Time per Worker",
-            sizing_mode="stretch_both",
-            y_range=list(set(tasks["binding"])),
-        )
+            y_axis_label="Worker Slots",
+            # sizing_mode="stretch_width",
+            # y_range=list(set(tasks["binding"])),
+            # legend_group="category"
+        ) for worker in workers
+    }
 
     for category, color in zip(categories, colors):
-        view = CDSView(
-            source=source,
-            filters=[GroupFilter(column_name="category", group=category)]
-        )
-        p.hbar(
-            y="order_per_worker",
-            left="start_time", right="end_time",
-            source=source, view=view,
-            color=color
-        )
+        for worker in workers:
+            p = figures[worker]
+            view = CDSView(
+                source=source,
+                filters=[
+                    GroupFilter(column_name="category", group=category),
+                    GroupFilter(column_name="worker",   group=worker),
+                ]
+            )
+            p.hbar(
+                y="binding",
+                left="start_time", right="end_time",
+                source=source, view=view,
+                color=color,
+            )
 
-    p.add_tools(HoverTool(
-        tooltips=TOOLTIPS,
-    ))
+            p.add_tools(HoverTool(
+                tooltips=TOOLTIPS,
+            ))
 
-    show(p)
+    show(bokeh.layouts.column(*figures.values(), sizing_mode="stretch_width"))
 
 
 # Main Executions
