@@ -11,7 +11,7 @@ import sys
 import json
 
 import bokeh
-from bokeh.models import ColumnDataSource, CDSView, HoverTool, GroupFilter
+from bokeh.models import ColumnDataSource, FactorRange, CDSView, HoverTool, GroupFilter
 from bokeh.plotting import figure, show
 
 palette = bokeh.palettes.all_palettes["Viridis"]
@@ -38,11 +38,11 @@ def get_info(line):
 def parse_tasks(logfile):
     tasks = {}
     with open(logfile, 'r') as log:
-        p_task = re.compile(r"(?P<time>\d+) \s+ "
-                            r"(?P<pid>\d+) \s+ TASK \s+ "
-                            r"(?P<taskid>\d+) \s+ "
-                            r"(?P<state>\S+) \s+ "
-                            r"(?P<state_args>.+)", re.X)
+        p_task   = re.compile(r"(?P<time>\d+) \s+ "
+                              r"(?P<pid>\d+) \s+ TASK \s+ "
+                              r"(?P<taskid>\d+) \s+ "
+                              r"(?P<state>\S+) \s+ "
+                              r"(?P<state_args>.+)", re.X)
         p_worker = re.compile(r".*RUNNING (?P<worker>\S+)")
         min_time = 0
 
@@ -50,27 +50,27 @@ def parse_tasks(logfile):
             m = p_task.match(line)
             if not m:
                 continue
-            time = int(m.group("time"))
-            taskid = m.group("taskid")
-            state = m.group("state")
+            time   = int(m.group("time"))
+            taskid = int(m.group("taskid"))
+            state  = m.group("state")
 
             if state == "WAITING":
                 if not min_time:
                     min_time = time
                 tasks[taskid] = {
-                    "taskid": taskid,
-                    "category": m.group("state_args").split()[0],
-                    "wait_time": time - min_time,
-                    "start_time": -1,
-                    "end_time": -1,
-                    "info": ""
+                    "taskid"     : taskid,
+                    "category"   : m.group("state_args").split()[0],
+                    "wait_time"  : time - min_time,
+                    "start_time" : -1,
+                    "end_time"   : -1,
+                    "info"       : ""
                 }
             elif state == "RUNNING":
                 tasks[taskid]["start_time"] = time - min_time
-                tasks[taskid]["worker"] = p_worker.match(line).group("worker")
+                tasks[taskid]["worker"]     = p_worker.match(line).group("worker")
             elif state == "DONE":
                 tasks[taskid]["end_time"] = time - min_time
-                tasks[taskid]["info"] = m.group("state_args")
+                tasks[taskid]["info"]     = m.group("state_args")
 
     taskids = list(tasks.keys())
     tasks = {
@@ -105,7 +105,7 @@ def get_binding(tasks):
     """
     workers = set(tasks["worker"])
     slots   = {worker: [None] for worker in workers}
-    binding = []
+    binding = [None] * len(tasks["taskid"])
 
     for i in range(len(tasks["taskid"])):
         index      = tasks["order"].index(i)
@@ -114,18 +114,21 @@ def get_binding(tasks):
         start_time = tasks["start_time"][index]
         end_time   = tasks["end_time"][index]
 
+        # Debugging
+        if tasks["taskid"][index] == 128:
+            print("Entering 162")
+
         bound = False
         for j in range(len(slot)):
-            if not slot[j] or slot[j] < start_time:
-                binding.append(j)
-                slot[j] = end_time
-                bound = True
+            if not slot[j] or slot[j] <= start_time:
+                binding[index] = j
+                slot[j]        = end_time
+                bound          = True
                 break
         if not bound:
-            binding.append(len(slot))
+            binding[index] = len(slot)
             slot.append(end_time)
 
-    print(binding)
     return {worker: len(slots[worker]) for worker in workers}, binding
 
 
@@ -205,8 +208,11 @@ def plot_worker(tasks, outfile):
                 y="binding",
                 left="start_time", right="end_time",
                 source=source, view=view,
-                color=color,
+                fill_color=color, line_color="black",
+                legend_label=category
             )
+
+            p.legend.click_policy = "hide"
 
             p.add_tools(HoverTool(
                 tooltips=TOOLTIPS,
