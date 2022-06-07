@@ -473,8 +473,8 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.workers_removed);
 	buffer_printf(&B, " %d", s.workers_released);
 	buffer_printf(&B, " %d", s.workers_idled_out);
-	buffer_printf(&B, " %d", s.workers_fast_aborted);
 	buffer_printf(&B, " %d", s.workers_blocked);
+	buffer_printf(&B, " %d", s.workers_fast_aborted);
 	buffer_printf(&B, " %d", s.workers_lost);
 
 	/* Stats for the current state of tasks: */
