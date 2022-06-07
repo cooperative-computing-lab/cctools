@@ -4039,6 +4039,11 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 // be met by the worker. If the task fits in the worker, it returns 0.
 static int is_task_larger_than_worker(struct work_queue *q, struct work_queue_task *t, struct work_queue_worker *w)
 {
+	if(w->resources->tag < 0) {
+		/* quickly return if worker has not sent its resources yet */
+		return 0;
+	}
+
 	int set = 0;
 	struct rmsummary *l = task_worker_box_size(q,w,t);
 
