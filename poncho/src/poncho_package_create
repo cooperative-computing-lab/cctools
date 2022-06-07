@@ -90,6 +90,7 @@ def _find_local_pip():
         path_of[pkg] = location
     return path_of
 
+
 def git_data(spec, out_dir):
     f = open(spec, 'r')
     data = json.load(f)
@@ -236,7 +237,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create a packed environment from a spec.')
     parser.add_argument('spec', help='Read in a spec file, or - for stdin.')
     parser.add_argument('output', help='Write output from conda-pack to the given file.')
-
 
     args = parser.parse_args()
     pack_env(args.spec, output=args.output)

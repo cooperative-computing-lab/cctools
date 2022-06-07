@@ -158,7 +158,7 @@ def create_network_function(path, funcs, dest):
 	absolute_path = os.path.abspath(path)
 	# open the source file, parse the code into an ast, and then unparse the ast import statements and functions back into python code
 	with open(absolute_path, 'r') as source:
-		code = ast.parse(source.read(), filename=path)
+		code = ast.parse(source.read(), filename=absolute_path)
 		for stmt in ast.walk(code):
 			if isinstance(stmt, ast.Import) or isinstance(stmt, ast.ImportFrom):
 				import_modules.append(ast.unparse(stmt))
@@ -198,14 +198,13 @@ def create_network_function_and_pack(path, funcs, envpath, dest):
 	create_network_function(path, funcs, dest)
 
 	env = analyze.create_spec(path)
-
-	print(json.dumps(env, indent=4, sort_keys=True))
-
+	json.dumps(env, indent=4, sort_keys=True)
 	f = open("/tmp/tmp.json", "w")
-	print(env)
 	json.dump(env, f, indent=4, sort_keys=True)
 	f.close()
+
 	pkg = create.pack_env("/tmp/tmp.json", envpath)
+
 	return pkg
 
 if __name__ == "__main__":
