@@ -31,51 +31,48 @@ See the file COPYING for details.
 
 #include "jx_function.h"
 
-
 typedef enum {
-    SINGLE_ARG,
-    DOUBLE_ARG,
-    DEFERRED_EVAL
-} jx_function_type;
+    JX_DOUBLE_ARG=1,    // Function takes two arguments.
+    JX_DEFER_EVAL=2,    // Defer evaluation of second argument.
+    JX_EXTERNAL=4       // Function uses data external to context.
+} jx_function_flags;
 
 typedef union {
     struct jx * (*single_arg)(struct jx *args);
     struct jx * (*double_arg)(struct jx *args, struct jx *ctx);
-    struct jx * (*deferred_eval)(struct jx *args, struct jx *ctx);
 } jx_function_pointer;
-
 
 struct jx_function_info {
     const char *name;
     const char *help_text;
-    jx_function_type type;
+    jx_function_flags flags;
     jx_function_pointer function_pointer;
 };
 
 const struct jx_function_info jx_functions[] = {
-    { "range", "range( start, stop, step )", SINGLE_ARG, { .single_arg = jx_function_range }},
-    { "format", "format( str: %s int: %d float: %f\", \"hello\", 42, 3.14159 )", SINGLE_ARG, { .single_arg = jx_function_format }},
-    { "join", "join( array, delim )", SINGLE_ARG, { .single_arg = jx_function_join }},
-    { "ceil", "ceil( value )", SINGLE_ARG, { .single_arg = jx_function_ceil }},
-    { "floor", "floor( value )", SINGLE_ARG, { .single_arg = jx_function_floor }},
-    { "basename", "basename( path )", SINGLE_ARG, { .single_arg = jx_function_basename }},
-    { "dirname", "dirname( path )", SINGLE_ARG, { .single_arg = jx_function_dirname }},
-    { "listdir", "listdir( path )", SINGLE_ARG, { .single_arg = jx_function_listdir }},
-    { "escape", "escape( string )", SINGLE_ARG, { .single_arg = jx_function_escape }},
-    { "len", "len( array )", SINGLE_ARG, { .single_arg = jx_function_len }},
-    { "fetch", "fetch( URL/path )", SINGLE_ARG, { .single_arg = jx_function_fetch }},
-    { "schema", "schema( object )", SINGLE_ARG, { .single_arg = jx_function_schema }},
-    { "like", "like( object, string )", SINGLE_ARG, { .single_arg = jx_function_like }},
-    { "keys", "keys( object )", SINGLE_ARG, { .single_arg = jx_function_keys }},
-    { "values", "values( object )", SINGLE_ARG, { .single_arg = jx_function_values }},
-    { "items", "items( object )", SINGLE_ARG, { .single_arg = jx_function_items}},
-    { "template", "template( string [,object] )", DOUBLE_ARG, { .double_arg = jx_function_template }},
-    { "select", "select( array, boolean )", DEFERRED_EVAL, { .deferred_eval = jx_function_select }},
-    { "project", "project( array, expression )", DEFERRED_EVAL, { .deferred_eval = jx_function_project }},
+    { "range", "range( start, stop, step )", 0, { .single_arg = jx_function_range }},
+    { "format", "format( str: %s int: %d float: %f\", \"hello\", 42, 3.14159 )", 0,{ .single_arg = jx_function_format }},
+    { "join", "join( array, delim )", 0, { .single_arg = jx_function_join }},
+    { "ceil", "ceil( value )", 0, { .single_arg = jx_function_ceil }},
+    { "floor", "floor( value )", 0, { .single_arg = jx_function_floor }},
+    { "basename", "basename( path )", 0, { .single_arg = jx_function_basename }},
+    { "dirname", "dirname( path )", 0, { .single_arg = jx_function_dirname }},
+    { "listdir", "listdir( path )", JX_EXTERNAL, { .single_arg = jx_function_listdir }},
+    { "escape", "escape( string )", 0, { .single_arg = jx_function_escape }},
+    { "len", "len( array )", 0, { .single_arg = jx_function_len }},
+    { "fetch", "fetch( URL/path )", JX_EXTERNAL, { .single_arg = jx_function_fetch }},
+    { "schema", "schema( object )", 0, { .single_arg = jx_function_schema }},
+    { "like", "like( object, string )", 0, { .single_arg = jx_function_like }},
+    { "keys", "keys( object )", 0, { .single_arg = jx_function_keys }},
+    { "values", "values( object )", 0, { .single_arg = jx_function_values }},
+    { "items", "items( object )", 0, { .single_arg = jx_function_items}},
+    { "template", "template( string [,object] )", JX_DOUBLE_ARG, { .double_arg = jx_function_template }},
+    { "select", "select( array, boolean )", JX_DOUBLE_ARG|JX_DEFER_EVAL, { .double_arg = jx_function_select }},
+    { "project", "project( array, expression )", JX_DOUBLE_ARG|JX_DEFER_EVAL, { .double_arg = jx_function_project }},
     { 0, 0, 0, {0} }
 };
 
-
+ 
 static struct jx *make_error(const char *funcname, struct jx *args, const char *fmt, ...) {
     assert(funcname);
     assert(args);
@@ -96,6 +93,8 @@ static struct jx *make_error(const char *funcname, struct jx *args, const char *
     return err;
 }
 
+extern int __jx_eval_external_functions_flag;
+
 struct jx * jx_function_eval(const char *funcname, struct jx *args, struct jx *ctx) {
     int i = 0;
     struct jx_function_info info;
@@ -105,12 +104,14 @@ struct jx * jx_function_eval(const char *funcname, struct jx *args, struct jx *c
             continue;
         }
 
-        if (info.type == SINGLE_ARG) {
-            return (*info.function_pointer.single_arg)(jx_eval(args, ctx));
-        } else if (info.type == DOUBLE_ARG) {
+	if(info.flags&JX_EXTERNAL && !__jx_eval_external_functions_flag) {
+	    return make_error(funcname,args,"external functions disabled");
+	}
+
+        if (info.flags&JX_DOUBLE_ARG) {
             return (*info.function_pointer.double_arg)(jx_eval(args, ctx), ctx);
         } else {
-            return (*info.function_pointer.deferred_eval)(jx_copy(args), ctx);
+            return (*info.function_pointer.single_arg)(jx_eval(args, ctx));
         }
     }
 
@@ -126,7 +127,7 @@ struct jx * jx_function_sub(const char *funcname, struct jx *args, struct jx *ct
             continue;
         }
 
-        if (info.type == SINGLE_ARG || info.type == DOUBLE_ARG) {
+        if (!(info.flags & JX_DEFER_EVAL)) {
             return jx_sub(args, ctx);
         } else {
             // only sub objlist (ignoring select's boolean and project's expression)
