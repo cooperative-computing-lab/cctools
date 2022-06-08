@@ -34,23 +34,33 @@ int work_queue_coprocess_write(char *buffer, int len, int timeout)
 	int poll_result = poll(&read_poll, 1, timeout);
 	if (poll_result < 0)
 	{
-		debug(D_WQ, "Write to coprocess failed: %s\n", strerror(errno));
-		return -1;
+		if (errno == EINTR)
+		{
+			debug(D_WQ, "Polling coprocess interrupted, trying again");
+			return -1;
+		}
+		debug(D_WQ, "Polling coprocess pipe failed: %s\n", strerror(errno));
+		return -2;
 	}
 	if (poll_result == 0) // check for timeout
 	{
 		debug(D_WQ, "writing to coprocess timed out\n");
-		return -1;
+		return -3;
 	}
 	if ( !(read_poll.revents & POLLOUT)) // check we have data
 	{
 		debug(D_WQ, "Data able to be written to pipe: %s\n", strerror(errno));
-		return -1;
+		return -2;
 	}
 	int bytes_written = write(coprocess_in[1], buffer, len);
 	if (bytes_written < 0)
 	{
-		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
+		if (errno == EINTR)
+		{
+			debug(D_WQ, "Write to coprocess interrupted\n");
+			return 0;
+		}
+		debug(D_WQ, "Write to coprocess failed: %s\n", strerror(errno));
 		return -2;
 	}
 	return bytes_written;
@@ -61,8 +71,13 @@ int work_queue_coprocess_read(char *buffer, int len, int timeout){
 	int poll_result = poll(&read_poll, 1, timeout);
 	if (poll_result < 0)
 	{
-		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
-		return -1;
+		if (errno == EINTR)
+		{
+			debug(D_WQ, "Polling coprocess interrupted, trying again");
+			return -1;
+		}
+		debug(D_WQ, "Polling coprocess pipe failed: %s\n", strerror(errno));
+		return -2;
 	}
 	if (poll_result == 0) // check for timeout
 	{
@@ -72,12 +87,17 @@ int work_queue_coprocess_read(char *buffer, int len, int timeout){
 	if ( !(read_poll.revents & POLLIN)) // check we have data
 	{
 		debug(D_WQ, "Data not returned from pipe: %s\n", strerror(errno));
-		return -1;
+		return -2;
 	}
 
 	int bytes_read = read(coprocess_out[0], buffer, len - 1);
 	if (bytes_read < 0)
 	{
+		if (errno == EINTR)
+		{
+			debug(D_WQ, "Read from coprocess interrupted\n");
+			return 0;
+		}
 		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
 		return -2;
 	}
@@ -89,7 +109,7 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 {
 	int json_offset, json_length = -1, cumulative_bytes_read = 0, buffer_offset = 0;
 	char buffer[WORK_QUEUE_LINE_MAX];
-	char *envelope_size;
+	char *envelope_size = NULL;
     char *name = NULL;
 
 	while (1)
@@ -97,6 +117,10 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 		int curr_bytes_read = work_queue_coprocess_read(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout);
 		if (curr_bytes_read < 0) {
 			fatal("Unable to get information from coprocess\n");
+		}
+		if (curr_bytes_read == -1)
+		{
+			continue;
 		}
 		else if (curr_bytes_read == -3)
 		{
@@ -110,7 +134,6 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 			if (json_length == -1)
 			{
 				json_length = atoi(buffer);
-				debug(D_WQ, "json_length %d\n", json_length);
 			}
 			if (json_length != -1)
 			{
@@ -174,7 +197,6 @@ char *work_queue_coprocess_start(char *command, int *coprocess_port) {
 		return NULL;
 	}
 	coprocess_pid = fork();
-
 	if(coprocess_pid > 0) {
 		char *name = work_queue_coprocess_setup(coprocess_port);
 
@@ -197,7 +219,6 @@ char *work_queue_coprocess_start(char *command, int *coprocess_port) {
         if (dup2(coprocess_out[1], 1) < 0) {
             fatal("coprocess could not attach pipe to stdout: %s\n", strerror(errno));
         }
-
         execlp(command, command, (char *) 0);
         fatal("failed to execute %s: %s\n", command, strerror(errno));
 	}
@@ -225,7 +246,6 @@ int work_queue_coprocess_check()
 
 char *work_queue_coprocess_run(const char *function_name, const char *function_input, int coprocess_port) {
 	char addr[DOMAIN_NAME_MAX];
-	char buf[BUFSIZ];
 	int len;
 	int timeout = 60000000; // one minute, can be changed
 
@@ -269,8 +289,6 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 		fatal("could not send input data: %s", strerror(errno));
 	}
 
-	memset(buf, 0, sizeof(buf));
-
 	curr_time = timestamp_get();
 	stoptime = curr_time + timeout;
 	// read in the length of the response
@@ -279,11 +297,10 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 	link_readline(link, line, sizeof(line), stoptime);
 	sscanf(line, "output %d", &length);
 
+	char *output = calloc(length + 1, sizeof(char));
+	
 	// read the response
-	link_read(link, buf, length, stoptime);
-
-	char *output = calloc(strlen(buf) + 1, sizeof(char));
-	memcpy(output, buf, strlen(buf));
+	link_read(link, output, length, stoptime);
 
 	return output;
 }

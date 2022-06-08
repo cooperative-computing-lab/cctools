@@ -344,6 +344,7 @@ static void write_transaction(struct work_queue *q, const char *str);
 static void write_transaction_task(struct work_queue *q, struct work_queue_task *t);
 static void write_transaction_category(struct work_queue *q, struct category *c);
 static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving, worker_disconnect_reason reason_leaving);
+static void write_transaction_transfer(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, size_t size_in_bytes, int time_in_usecs, char* filename, work_queue_file_type_t type);
 static void write_transaction_worker_resources(struct work_queue *q, struct work_queue_worker *w);
 
 static void delete_feature(struct work_queue_task *t, const char *name);
@@ -472,8 +473,8 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.workers_removed);
 	buffer_printf(&B, " %d", s.workers_released);
 	buffer_printf(&B, " %d", s.workers_idled_out);
-	buffer_printf(&B, " %d", s.workers_fast_aborted);
 	buffer_printf(&B, " %d", s.workers_blocked);
+	buffer_printf(&B, " %d", s.workers_fast_aborted);
 	buffer_printf(&B, " %d", s.workers_lost);
 
 	/* Stats for the current state of tasks: */
@@ -491,7 +492,6 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.tasks_exhausted_attempts);
 
 	/* Master time statistics: */
-	buffer_printf(&B, " %" PRId64, s.time_when_started);
 	buffer_printf(&B, " %" PRId64, s.time_send);
 	buffer_printf(&B, " %" PRId64, s.time_receive);
 	buffer_printf(&B, " %" PRId64, s.time_send_good);
@@ -1403,6 +1403,8 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 		w->total_transfer_time += sum_time;
 
 		debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
+
+        write_transaction_transfer(q, w, t, total_bytes, sum_time, f->remote_name, WORK_QUEUE_OUTPUT);
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
@@ -3386,6 +3388,9 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 
 		q->stats->bytes_sent += total_bytes;
 
+		// Write to the transaction log.
+		write_transaction_transfer(q, w, t, total_bytes, elapsed_time, f->remote_name, WORK_QUEUE_INPUT);
+
 		// Avoid division by zero below.
 		if(elapsed_time==0) elapsed_time = 1;
 
@@ -4044,6 +4049,11 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 // be met by the worker. If the task fits in the worker, it returns 0.
 static int is_task_larger_than_worker(struct work_queue *q, struct work_queue_task *t, struct work_queue_worker *w)
 {
+	if(w->resources->tag < 0) {
+		/* quickly return if worker has not sent its resources yet */
+		return 0;
+	}
+
 	int set = 0;
 	struct rmsummary *l = task_worker_box_size(q,w,t);
 
@@ -7342,7 +7352,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// tasks cumulative
 			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts"
 			// manager time statistics:
-			" time_when_started time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application"
+			" time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application"
 			// workers time statistics:
 			" time_execute time_execute_good time_execute_exhaustion"
 			// bandwidth:
@@ -7394,7 +7404,10 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 		rmsummary_print_buffer(&B, task_min_resources(q, t), 1);
 	} else if(state == WORK_QUEUE_TASK_CANCELED) {
 			/* do not add any info */
-	} else if(state == WORK_QUEUE_TASK_RETRIEVED || state == WORK_QUEUE_TASK_DONE) {
+	} else if(state == WORK_QUEUE_TASK_RETRIEVED) {
+		buffer_printf(&B, " %s ", work_queue_result_str(t->result));
+		buffer_printf(&B, " %d ", t->return_status);
+	} else if(state == WORK_QUEUE_TASK_DONE) {
 		buffer_printf(&B, " %s ", work_queue_result_str(t->result));
 		buffer_printf(&B, " %d ", t->return_status);
 
@@ -7407,7 +7420,14 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 				// no limits broken, thus printing an empty dictionary
 				buffer_printf(&B, " {} ");
 			}
-			rmsummary_print_buffer(&B, t->resources_measured, 1);
+
+			struct jx *m = rmsummary_to_json(t->resources_measured, /* only resources */ 1);
+			jx_insert(m, jx_string("wq_input_size"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
+			jx_insert(m, jx_string("wq_output_size"), jx_arrayv(jx_double(t->bytes_received/((double) MEGABYTE)), jx_string("MB"), NULL));
+			jx_insert(m, jx_string("wq_input_time"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_insert(m, jx_string("wq_output_time"), jx_arrayv(jx_double((t->time_when_done - t->time_when_retrieval)/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_print_buffer(m, &B);
+			jx_delete(m);
 		} else {
 			// no resources measured, one empty dictionary for limits broken, other for resources.
 			buffer_printf(&B, " {} {}");
@@ -7540,6 +7560,27 @@ static void write_transaction_worker_resources(struct work_queue *q, struct work
 	rmsummary_delete(s);
 	buffer_free(&B);
 	free(rjx);
+}
+
+
+static void write_transaction_transfer(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, size_t size_in_bytes, int time_in_usecs, char* filename, work_queue_file_type_t type){
+	struct buffer B;
+	buffer_init(&B);
+	buffer_printf(&B, "TRANSFER ");
+	if (type == WORK_QUEUE_INPUT){
+		buffer_printf(&B, "INPUT ");
+	}
+	else{
+		buffer_printf(&B, "OUTPUT ");
+	}
+	buffer_printf(&B,  "%d", t->taskid);
+	buffer_printf(&B, " %s", w->workerid);
+	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
+	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
+	buffer_printf(&B, " %s", filename);
+
+	write_transaction(q, buffer_tostring(&B));
+	buffer_free(&B);
 }
 
 
