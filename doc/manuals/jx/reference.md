@@ -319,6 +319,23 @@ len([1,2,3])
 = 3
 ```
 
+### listdir
+
+>       listdir(D) -> Array 
+>       where D = local directory
+
+listdir() retries the list of file names within a given
+directory name in the local filesystem.
+
+*Note:** This is an "external" function that accesses data
+outside of the expression environment.  It can be enabled or
+disabled in the C API via jx_eval_enable_external().
+
+```python
+listdir("data")
+= [ "words.txt", "index.txt" ]
+```
+
 ### fetch
 
 >       fetch(A) -> Object
@@ -327,20 +344,25 @@ len([1,2,3])
 fetch() retrieves a JX document at the given URL or path.
 This document is then parsed into a JX object.
 
+**Note:** This is an "external" function that accesses data
+outside of the expression environment.  It can be enabled or
+disabled in the C API via jx_eval_enable_external(). 
+
 ```python
 fetch("example.json")
 = {"x": 0, "y": "test", "z": 1.0}
 ```
 
-### select
+### where / select
 
+>       where([,A], B) -> Array
 >       select([,A], B) -> Array
 >       where A = Object and B = Boolean
 
-select() returns an array of objects for which the boolean expression evaluates to true for that object.
+where() returns an array of objects for which the boolean expression evaluates to true for that object.  select() is a synonym for where().
 
 ```python
-select([{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}], x==1)
+where([{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}], x==1)
 = [{"x": 1, "y": "example", "z": 0.0}]
 ```
 
