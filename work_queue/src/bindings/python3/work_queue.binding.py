@@ -2080,9 +2080,8 @@ class RemoteTask(Task):
     def __init__(self, fn, coprocess, *args, **kwargs):
         Task.__init__(self, fn)
         self._event = ""
-        if ( len(args) + len(kwargs.keys()) ) >= 1:
-            kwargs["work_queue_positional_args"] = args
-            self._event = kwargs
+        kwargs["work_queue_positional_args"] = args
+        self._event = kwargs
         Task.specify_coprocess(self, coprocess)
     ##
     # Specify function arguments as a dictionary argument
