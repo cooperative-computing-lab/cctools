@@ -2076,7 +2076,7 @@ class RemoteTask(Task):
     # @param
     # @param command    The shell command line to be exected by the task.
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
-    # @param kwargs	    keyword arguments used in function to be executed by task. An optional kwarg exec_method can be specified to one of fork, thread, and direct to choose between those three methods of execution. Another optional kwarg is work_queue_argument_dict, which contains a dictionary of keyword arguments for the remote function
+    # @param kwargs	    keyword arguments used in function to be executed by task. 
     def __init__(self, fn, coprocess, *args, **kwargs):
         Task.__init__(self, fn)
         self._event = ""
@@ -2084,9 +2084,18 @@ class RemoteTask(Task):
             kwargs["work_queue_positional_args"] = args
             self._event = kwargs
         Task.specify_coprocess(self, coprocess)
+    ##
+    # Specify function arguments as a dictionary argument
+    # @param self             Reference to the current remote task object
+    # @param *args            Positonal args to passed to the function 
+    # @param argument_dict    A dictionary that contains arguments by keyword. The key is the name of the argument and the value is the value that should be passed to the argument
     def specify_argument_dictionary(self, *args, argument_dict=None):
         argument_dict["work_queue_positional_args"] = args
         self._event = argument_dict
+    ##
+    # Specify how the remote task should execute
+    # @param self                    Reference to the current remote task object
+    # @param work_queue_exec_method  Can be one of "fork", "direct", or "thread". Fork creates a child process to execute the function, direct has the worker directly call the function, and thread spawns a thread to execute the function
     def specify_exec_method(self, work_queue_exec_method):
         if work_queue_exec_method not in ["fork", "direct", "thread"]:
             print("Error, work_queue_exec_method must be one of fork, direct, or thread")
