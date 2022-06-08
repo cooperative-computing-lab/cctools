@@ -1734,6 +1734,8 @@ class WorkQueue(object):
     # @param self   Reference to the current work queue object.
     # @param task   A task description created from @ref work_queue::Task.
     def submit(self, task):
+        if "_event" in task.__dict__:
+            task.specify_buffer(json.dumps(task._event), "infile")
         taskid = work_queue_submit(self._work_queue, task._task)
         self._task_table[taskid] = task
         return taskid
@@ -2077,14 +2079,21 @@ class RemoteTask(Task):
     # @param kwargs	    keyword arguments used in function to be executed by task. An optional kwarg exec_method can be specified to one of fork, thread, and direct to choose between those three methods of execution. Another optional kwarg is work_queue_argument_dict, which contains a dictionary of keyword arguments for the remote function
     def __init__(self, fn, coprocess, *args, **kwargs):
         Task.__init__(self, fn)
-        if kwargs.get("work_queue_argument_dict", None) is None:
+        self._event = ""
+        if ( len(args) + len(kwargs.keys()) ) >= 1:
             kwargs["work_queue_positional_args"] = args
-            event = json.dumps(kwargs)
-        else:
-            kwargs["work_queue_argument_dict"]["work_queue_positional_args"] = args
-            event = json.dumps(kwargs["work_queue_argument_dict"])
-        Task.specify_buffer(self, event, "infile")
+            self._event = kwargs
         Task.specify_coprocess(self, coprocess)
+    def specify_argument_dictionary(self, *args, argument_dict=None):
+        argument_dict["work_queue_positional_args"] = args
+        self._event = argument_dict
+    def specify_exec_method(self, work_queue_exec_method):
+        if work_queue_exec_method not in ["fork", "direct", "thread"]:
+            print("Error, work_queue_exec_method must be one of fork, direct, or thread")
+        self._event["work_queue_exec_method"] = work_queue_exec_method
+        
+
+
 
 # test
 
