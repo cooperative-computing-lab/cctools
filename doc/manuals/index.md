@@ -1,4 +1,4 @@
-![](../logos/cctools-logo.png)
+![](logos/cctools-logo.png)
 
 # Cooperative Computing Tools Documentation
 
