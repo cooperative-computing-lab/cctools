@@ -7574,7 +7574,7 @@ static void write_transaction_transfer(struct work_queue *q, struct work_queue_w
 		buffer_printf(&B, "OUTPUT ");
 	}
 	buffer_printf(&B,  "%d", t->taskid);
-	buffer_printf(&B, " %s", w->workerid);
+	buffer_printf(&B, " %s", w->addrport);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
 	buffer_printf(&B, " %s", filename);
