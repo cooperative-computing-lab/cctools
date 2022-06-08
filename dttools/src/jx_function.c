@@ -105,14 +105,21 @@ struct jx * jx_function_eval(const char *funcname, struct jx *args, struct jx *c
             continue;
         }
 
-	if(info.flags&JX_EXTERNAL && !__jx_eval_external_functions_flag) {
-	    return make_error(funcname,args,"external functions disabled");
-	}
+        if(info.flags&JX_EXTERNAL && !__jx_eval_external_functions_flag) {
+            return make_error(funcname,args,"external functions disabled");
+        }
+
+        struct jx *arg;
+        if(info.flags&JX_DEFER_EVAL) {
+            arg = jx_copy(args);
+        } else {
+            arg = jx_eval(args,ctx);
+        }
 
         if (info.flags&JX_DOUBLE_ARG) {
-            return (*info.function_pointer.double_arg)(jx_eval(args, ctx), ctx);
+            return (*info.function_pointer.double_arg)(arg, ctx);
         } else {
-            return (*info.function_pointer.single_arg)(jx_eval(args, ctx));
+            return (*info.function_pointer.single_arg)(arg);
         }
     }
 
