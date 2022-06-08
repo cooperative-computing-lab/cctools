@@ -31,6 +31,7 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "jx_getopt.h"
 #include "jx_print.h"
+#include "jx_eval.h"
 #include "create_dir.h"
 #include "sha1.h"
 #include "tlq_config.h"
