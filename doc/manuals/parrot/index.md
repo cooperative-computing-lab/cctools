@@ -1,3 +1,5 @@
+![](../logos/parrot-logo.png)
+
 # Parrot User's Manual
 
 ## Overview
