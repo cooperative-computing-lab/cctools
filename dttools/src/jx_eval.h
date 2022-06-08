@@ -33,5 +33,13 @@ If the expression is invalid in some way, an object of type @ref JX_NULL is retu
 */
 struct jx * jx_eval_with_defines( struct jx *j, struct jx* context );
 
+/** Enable external functions.
+A small number of JX functions make use of "external" context,
+For safety, these functions are not enabled unless the user first
+calls jx_eval_enable_external(1).
+@param enable If non-zero, enable external functions, otherwise disable.
+*/
+
+void jx_eval_enable_external( int enable );
 
 #endif

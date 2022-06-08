@@ -21,6 +21,8 @@ The program exits on the first failure or EOF.
 
 int main( int argc, char *argv[] )
 {
+	jx_eval_enable_external(1);
+
 	printf("Enter context expression (or {} for an empty context):\n");
 
 	struct jx_parser *p = jx_parser_create(0);

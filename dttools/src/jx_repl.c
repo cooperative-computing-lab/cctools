@@ -121,6 +121,9 @@ int main(int argc, char *argv[]) {
     char out_prompt[18];
     char line[MAX_LINE];
 
+    // Enable external functions such as "fetch".
+    jx_eval_enable_external(1);
+
     struct jx *context = jx_object(0);
     insert_constants(context);
 
