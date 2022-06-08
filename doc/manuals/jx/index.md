@@ -1,3 +1,5 @@
+![](../logos/jx-logo.png)
+
 # JX Expression Language - Overview
 
 The JX Expression Language is an extension of the JSON data description language.

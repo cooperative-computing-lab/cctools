@@ -1,3 +1,5 @@
+![](../logos/workqueue-logo.png)
+
 # Work Queue User's Manual
 
 ## Overview
