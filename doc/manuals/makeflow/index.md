@@ -1,3 +1,5 @@
+![](../logos/makeflow-logo.png)
+
 # Makeflow User's Manual
 
 ## Overview

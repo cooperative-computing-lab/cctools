@@ -1,3 +1,5 @@
+![](../logos/jx-logo.png)
+
 # The JX Workflow Language
 
 JX (JSON eXtended) is a language for expressing workflows that allows for easy

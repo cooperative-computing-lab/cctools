@@ -1,3 +1,5 @@
+![](../logos/cctools-logo.png)
+
 # Cooperative Computing Tools Documentation
 
 ## Getting Started
