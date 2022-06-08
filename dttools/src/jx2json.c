@@ -53,6 +53,8 @@ int main(int argc, char *argv[]) {
 	void (*print_stream)(struct jx *, FILE *) = jx_print_stream;
 	int do_eval = 1;
 
+	jx_eval_enable_external(1);
+
 	int c;
 	while ((c = getopt_long(argc, argv, "vha:d:pn", long_options, NULL)) > -1) {
 		switch (c) {

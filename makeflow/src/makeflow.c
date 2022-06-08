@@ -31,6 +31,7 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "jx_getopt.h"
 #include "jx_print.h"
+#include "jx_eval.h"
 #include "create_dir.h"
 #include "sha1.h"
 #include "tlq_config.h"
@@ -1404,6 +1405,9 @@ int main(int argc, char *argv[])
 #ifdef CCTOOLS_WITH_MPI
 	MPI_Init(&argc,&argv);
 #endif
+
+	// Enable external functions like fetch and listdir.
+	jx_eval_enable_external(1);
 
 	random_init();
 	debug_config(argv[0]);
