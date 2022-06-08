@@ -1405,6 +1405,9 @@ int main(int argc, char *argv[])
 	MPI_Init(&argc,&argv);
 #endif
 
+	// Enable external functions like fetch and listdir.
+	jx_eval_enable_external(1);
+
 	random_init();
 	debug_config(argv[0]);
 	debug_config_file_size(0);//to set debug file size to "don't delete anything"
