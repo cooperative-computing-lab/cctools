@@ -68,6 +68,7 @@ const struct jx_function_info jx_functions[] = {
     { "items", "items( object )", 0, { .single_arg = jx_function_items}},
     { "template", "template( string [,object] )", JX_DOUBLE_ARG, { .double_arg = jx_function_template }},
     { "select", "select( array, boolean )", JX_DOUBLE_ARG|JX_DEFER_EVAL, { .double_arg = jx_function_select }},
+    { "where", "where( array, boolean )", JX_DOUBLE_ARG|JX_DEFER_EVAL, { .double_arg = jx_function_select }},
     { "project", "project( array, expression )", JX_DOUBLE_ARG|JX_DEFER_EVAL, { .double_arg = jx_function_project }},
     { 0, 0, 0, {0} }
 };
