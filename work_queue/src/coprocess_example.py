@@ -6,14 +6,15 @@ import json
 def name():
     return "my_coprocess_example"
 
-def remote_execute(func):
+def work_queue_remote_execute(func):
     def remote_wrapper(event, q=None):
         if q:
             event = json.loads(event)
-            del event["exec_method"]
+        kwargs = event["fn_kwargs"]
+        args = event["fn_args"]
         try:
             response = {
-                "Result": func(**event),
+                "Result": func(*args, **kwargs),
                 "StatusCode": 200
             }
         except Exception as e:
@@ -27,16 +28,17 @@ def remote_execute(func):
     return remote_wrapper
 
 
+
 '''
 The function signatures should always be the same, but what is actually
 contained in the event will be different. You decide what is in the event, and
 the function body (that you define) will work accordingly.
 '''
-@remote_execute
+@work_queue_remote_execute
 def my_sum(a, b):
 	return a + b
 
-@remote_execute
+@work_queue_remote_execute
 def my_multiplication(a, b):
 	return a * b
 
@@ -56,10 +58,16 @@ if __name__ == "__main__":
 
     q = wq.WorkQueue(9123)
 
-    t = wq.RemoteTask("my_sum", "my_coprocess_example", a=2, b=3, exec_method="fork")
+    t = wq.RemoteTask("my_sum", "my_coprocess_example", a=2, b=3, work_queue_exec_method="fork")
     q.submit(t)
 
-    t = wq.RemoteTask("my_multiplication", "my_coprocess_example", a=2, b=3, exec_method="thread")
+    t = wq.RemoteTask("my_sum", "my_coprocess_example", work_queue_argument_dict={"a":20, "b":30}, work_queue_exec_method="direct")
+    q.submit(t)
+
+    t = wq.RemoteTask("my_multiplication", "my_coprocess_example", 5, 15, work_queue_exec_method="thread")
+    q.submit(t)
+
+    t = wq.RemoteTask("my_multiplication", "my_coprocess_example", 5, b=125, work_queue_exec_method="thread")
     q.submit(t)
 
     while not q.empty():

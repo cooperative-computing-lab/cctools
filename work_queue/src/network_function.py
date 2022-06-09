@@ -57,7 +57,7 @@ def main():
                     # turn the event into a python dictionary
                     event = json.loads(event_str)
                     # see if the user specified an execution method
-                    exec_method = event.get("exec_method", None)
+                    exec_method = event.get("remote_task_exec_method", None)
                     print('Network function: recieved event: {}'.format(event), file=sys.stderr)
                     if exec_method == "thread":
                         # create a forked process for function handler
@@ -67,10 +67,8 @@ def main():
                         p.join()
                         response = json.dumps(q.get()).encode("utf-8")
                     elif exec_method == "direct":
-                        del event["exec_method"]
                         response = json.dumps(getattr(wq_worker_coprocess, function_name)(event)).encode("utf-8")
                     else:
-                        event.pop("exec_method", None)
                         p = os.fork()
                         if p == 0:
                             response = getattr(wq_worker_coprocess, function_name)(event)
