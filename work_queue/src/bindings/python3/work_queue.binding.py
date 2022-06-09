@@ -1734,7 +1734,7 @@ class WorkQueue(object):
     # @param self   Reference to the current work queue object.
     # @param task   A task description created from @ref work_queue::Task.
     def submit(self, task):
-        if "_event" in task.__dict__:
+        if isinstance(task, RemoteTask):
             task.specify_buffer(json.dumps(task._event), "infile")
         taskid = work_queue_submit(self._work_queue, task._task)
         self._task_table[taskid] = task
@@ -1931,7 +1931,7 @@ class WorkQueue(object):
     # @param coprocess  The name of the coprocess that contains the function fn.
     # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
     # @param chunk_size The number of elements to process at once
-    def remote_map(self, fn, array, coprocess, name, chunk_size=1):
+    def remote_map(self, fn,  coprocess, array, chunk_size=1):
         size = math.ceil(len(array)/chunk_size)
         results = [None] * size
         tasks = {}
@@ -1940,8 +1940,8 @@ class WorkQueue(object):
             start = i*chunk_size
             end = min(len(array), start+chunk_size)
 
-            event = json.dumps({name : array[start:end]})
-            p_task = RemoteTask(fn, event, coprocess)
+            p_task = RemoteTask(fn, coprocess)
+            p_task.specify_chunk_arguments(array[start:end])
             
             p_task.specify_tag(str(i))
             self.submit(p_task)
@@ -2080,26 +2080,25 @@ class RemoteTask(Task):
     def __init__(self, fn, coprocess, *args, **kwargs):
         Task.__init__(self, fn)
         self._event = {}
-        self._event["work_queue_kwargs"] = kwargs
-        self._event["work_queue_positional_args"] = args
+        self._event["fn_kwargs"] = kwargs
+        self._event["fn_args"] = args
         Task.specify_coprocess(self, coprocess)
     ##
     # Specify function arguments as a dictionary argument. This function overrides and kwargs and args passed to the task previously
     # @param self             Reference to the current remote task object
     # @param *args            Positonal args to passed to the function 
     # @param argument_dict    A dictionary that contains arguments by keyword. The key is the name of the argument and the value is the value that should be passed to the argument
-    def specify_argument_dictionary(self, *args, argument_dict=None):
-        self._event["work_queue_kwargs"] = argument_dict
-        self._event["work_queue_positional_args"] = args
+    def specify_fn_args(self, args=[], kwargs={}):
+        self._event["fn_kwargs"] = kwargs
+        self._event["fn_args"] = args
     ##
     # Specify how the remote task should execute
-    # @param self                    Reference to the current remote task object
-    # @param work_queue_exec_method  Can be one of "fork", "direct", or "thread". Fork creates a child process to execute the function, direct has the worker directly call the function, and thread spawns a thread to execute the function
-    def specify_exec_method(self, work_queue_exec_method):
-        if work_queue_exec_method not in ["fork", "direct", "thread"]:
+    # @param self                     Reference to the current remote task object
+    # @param remote_task_exec_method  Can be one of "fork", "direct", or "thread". Fork creates a child process to execute the function, direct has the worker directly call the function, and thread spawns a thread to execute the function
+    def specify_exec_method(self, remote_task_exec_method):
+        if remote_task_exec_method not in ["fork", "direct", "thread"]:
             print("Error, work_queue_exec_method must be one of fork, direct, or thread")
-        self._event["work_queue_exec_method"] = work_queue_exec_method
-        
+        self._event["remote_task_exec_method"] = remote_task_exec_method
 
 
 

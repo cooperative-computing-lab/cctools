@@ -10,8 +10,8 @@ def work_queue_remote_execute(func):
     def remote_wrapper(event, q=None):
         if q:
             event = json.loads(event)
-        kwargs = event["work_queue_kwargs"]
-        args = event["work_queue_positional_args"]
+        kwargs = event["fn_kwargs"]
+        args = event["fn_args"]
         try:
             response = {
                 "Result": func(*args, **kwargs),

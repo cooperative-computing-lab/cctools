@@ -57,7 +57,7 @@ def main():
                     # turn the event into a python dictionary
                     event = json.loads(event_str)
                     # see if the user specified an execution method
-                    exec_method = event.get("work_queue_exec_method", None)
+                    exec_method = event.get("remote_task_exec_method", None)
                     print('Network function: recieved event: {}'.format(event), file=sys.stderr)
                     if exec_method == "thread":
                         # create a forked process for function handler
