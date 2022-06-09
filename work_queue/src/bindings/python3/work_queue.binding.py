@@ -1931,7 +1931,7 @@ class WorkQueue(object):
     # @param coprocess  The name of the coprocess that contains the function fn.
     # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
     # @param chunk_size The number of elements to process at once
-    def remote_map(self, fn,  coprocess, array, chunk_size=1):
+    def remote_map(self, fn, array, coprocess, name, chunk_size=1):
         size = math.ceil(len(array)/chunk_size)
         results = [None] * size
         tasks = {}
@@ -1940,8 +1940,8 @@ class WorkQueue(object):
             start = i*chunk_size
             end = min(len(array), start+chunk_size)
 
-            p_task = RemoteTask(fn, coprocess)
-            p_task.specify_chunk_arguments(array[start:end])
+            event = json.dumps({name : array[start:end]})
+            p_task = RemoteTask(fn, event, coprocess)
             
             p_task.specify_tag(str(i))
             self.submit(p_task)
@@ -2084,10 +2084,10 @@ class RemoteTask(Task):
         self._event["fn_args"] = args
         Task.specify_coprocess(self, coprocess)
     ##
-    # Specify function arguments as a dictionary argument. This function overrides and kwargs and args passed to the task previously
+    # Specify function arguments. Accepts arrays and dictionarys. This overrides any arguments passed during task creation
     # @param self             Reference to the current remote task object
-    # @param *args            Positonal args to passed to the function 
-    # @param argument_dict    A dictionary that contains arguments by keyword. The key is the name of the argument and the value is the value that should be passed to the argument
+    # @param args             An array of positional args to be passed to the function
+    # @param kwargs           A dictionary of keyword arguments to be passed to the function
     def specify_fn_args(self, args=[], kwargs={}):
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
