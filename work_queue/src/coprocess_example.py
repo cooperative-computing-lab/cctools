@@ -10,12 +10,11 @@ def work_queue_remote_execute(func):
     def remote_wrapper(event, q=None):
         if q:
             event = json.loads(event)
-            del event["work_queue_exec_method"]
+        kwargs = event["work_queue_kwargs"]
         args = event["work_queue_positional_args"]
-        del event["work_queue_positional_args"]
         try:
             response = {
-                "Result": func(*args, **event),
+                "Result": func(*args, **kwargs),
                 "StatusCode": 200
             }
         except Exception as e:

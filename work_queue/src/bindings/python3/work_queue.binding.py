@@ -2079,18 +2079,18 @@ class RemoteTask(Task):
     # @param kwargs	    keyword arguments used in function to be executed by task. 
     def __init__(self, fn, coprocess, *args, **kwargs):
         Task.__init__(self, fn)
-        self._event = ""
-        kwargs["work_queue_positional_args"] = args
-        self._event = kwargs
+        self._event = {}
+        self._event["work_queue_kwargs"] = kwargs
+        self._event["work_queue_positional_args"] = args
         Task.specify_coprocess(self, coprocess)
     ##
-    # Specify function arguments as a dictionary argument
+    # Specify function arguments as a dictionary argument. This function overrides and kwargs and args passed to the task previously
     # @param self             Reference to the current remote task object
     # @param *args            Positonal args to passed to the function 
     # @param argument_dict    A dictionary that contains arguments by keyword. The key is the name of the argument and the value is the value that should be passed to the argument
     def specify_argument_dictionary(self, *args, argument_dict=None):
-        argument_dict["work_queue_positional_args"] = args
-        self._event = argument_dict
+        self._event["work_queue_kwargs"] = argument_dict
+        self._event["work_queue_positional_args"] = args
     ##
     # Specify how the remote task should execute
     # @param self                    Reference to the current remote task object

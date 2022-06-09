@@ -67,10 +67,8 @@ def main():
                         p.join()
                         response = json.dumps(q.get()).encode("utf-8")
                     elif exec_method == "direct":
-                        del event["work_queue_exec_method"]
                         response = json.dumps(getattr(wq_worker_coprocess, function_name)(event)).encode("utf-8")
                     else:
-                        event.pop("work_queue_exec_method", None)
                         p = os.fork()
                         if p == 0:
                             response = getattr(wq_worker_coprocess, function_name)(event)
