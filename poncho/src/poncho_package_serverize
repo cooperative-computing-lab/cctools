@@ -28,10 +28,11 @@ def remote_execute(func):
     def remote_wrapper(event, q=None):
         if q:
             event = json.loads(event)
-            del event["exec_method"]
+        kwargs = event["fn_kwargs"]
+        args = event["fn_args"]
         try:
             response = {
-                "Result": func(**event),
+                "Result": func(*args, **kwargs),
                 "StatusCode": 200
             }
         except Exception as e:
@@ -43,12 +44,12 @@ def remote_execute(func):
             return response
         q.put(response)
     return remote_wrapper
-
+    
 read, write = os.pipe() 
 
 def send_configuration(config):
     config_string = json.dumps(config)
-    print(len(config_string) + 1, \"\\n\", config_string, flush=True)
+    print(len(config_string) + 1, "\\n", config_string, flush=True)
 
 def main():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -90,23 +91,21 @@ def main():
                     # turn the event into a python dictionary
                     event = json.loads(event_str)
                     # see if the user specified an execution method
-                    exec_method = event.get("exec_method", None)
+                    exec_method = event.get("remote_task_exec_method", None)
                     print('Network function: recieved event: {}'.format(event), file=sys.stderr)
                     if exec_method == "thread":
                         # create a forked process for function handler
                         q = queue.Queue()
-                        p = threading.Thread(globals()[function_name], args=(event_str, q))
+                        p = threading.Thread(target=globals()[function_name], args=(event_str, q))
                         p.start()
                         p.join()
                         response = json.dumps(q.get()).encode("utf-8")
                     elif exec_method == "direct":
-                        del event["exec_method"]
                         response = json.dumps(globals()[function_name](event)).encode("utf-8")
                     else:
-                        event.pop("exec_method", None)
                         p = os.fork()
                         if p == 0:
-                            response = globals()[function_name](event)
+                            response =globals()[function_name](event)
                             os.write(write, json.dumps(response).encode("utf-8"))
                             os._exit(-1)
                         elif p < 0:
