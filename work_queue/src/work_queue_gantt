@@ -7,11 +7,15 @@
 # Packages and Definitions
 import re
 import sys
-import json
 
-import bokeh
-from bokeh.models import ColumnDataSource, CDSView, HoverTool, GroupFilter, Range1d
-from bokeh.plotting import figure, show
+try:
+    import bokeh
+    from bokeh.models import ColumnDataSource, CDSView, HoverTool, GroupFilter, Range1d
+    from bokeh.plotting import figure, show
+except ImportError:
+    print("Bokeh is not installed. Please run the following command to install Bokeh:")
+    print("conda install bokeh")
+    sys.exit(1)
 
 palette = bokeh.palettes.all_palettes["Category20"]
 TOOLTIPS = [
