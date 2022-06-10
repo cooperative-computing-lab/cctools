@@ -31,10 +31,6 @@ def usage(status=0):
     sys.exit(status)
 
 
-def get_info(line):
-    return json.loads(line[line.rfind('{'):])
-
-
 def parse_log(logfile):
     tasks = {}
     with open(logfile, 'r') as log:
@@ -51,12 +47,39 @@ def parse_log(logfile):
         min_time = 0
 
         for line in log:
-            m = p_task.match(line)
-            if not m:
-                m = p_transfer.match(line)
-                if not m:
-                    continue
 
+            # Match for TASK entries
+            m = p_task.match(line)
+            if m:
+                time = int(m.group("time")) / 1e6
+                taskid = int(m.group("taskid"))
+                state = m.group("state")
+
+                if state == "WAITING":
+                    if not min_time:
+                        min_time = time
+                    tasks[taskid] = {
+                        "taskid": taskid,
+                        "category": m.group("state_args").split()[0],
+                        "wait_time": time - min_time,
+                        "start_time": -1,
+                        "end_time": -1,
+                        "input_time": -1,
+                        "output_time": -1,
+                        "info": ""
+                    }
+                elif state == "RUNNING":
+                    tasks[taskid]["start_time"] = time - min_time
+                    tasks[taskid]["worker"] = p_worker.match(line).group("worker")
+                elif state == "DONE":
+                    tasks[taskid]["end_time"] = time - min_time
+                    tasks[taskid]["info"] = m.group("state_args")
+
+                continue
+
+            # Match for TRANSFER entries
+            m = p_transfer.match(line)
+            if m:
                 time   = int(m.group("time"))  / 1e6
                 taskid = int(m.group("taskid"))
                 state  = m.group("state")
@@ -66,30 +89,6 @@ def parse_log(logfile):
                     tasks[taskid]["output_time"] = time - min_time
 
                 continue
-
-            time   = int(m.group("time")) / 1e6
-            taskid = int(m.group("taskid"))
-            state  = m.group("state")
-
-            if state == "WAITING":
-                if not min_time:
-                    min_time = time
-                tasks[taskid] = {
-                    "taskid"     : taskid,
-                    "category"   : m.group("state_args").split()[0],
-                    "wait_time"  : time - min_time,
-                    "start_time" : -1,
-                    "end_time"   : -1,
-                    "input_time" : -1,
-                    "output_time": -1,
-                    "info"       : ""
-                }
-            elif state == "RUNNING":
-                tasks[taskid]["start_time"] = time - min_time
-                tasks[taskid]["worker"]     = p_worker.match(line).group("worker")
-            elif state == "DONE":
-                tasks[taskid]["end_time"] = time - min_time
-                tasks[taskid]["info"]     = m.group("state_args")
 
     taskids = list(tasks.keys())
     tasks = {
@@ -262,12 +261,12 @@ def main():
         outfile = logfile + ".html"
 
     tasks = parse_log(logfile)
-    if gantt_view:
-        plot_gantt(tasks, outfile)
-    elif task_view:
+    if task_view:
         plot_task(tasks, outfile)
     elif worker_view:
         plot_worker(tasks, outfile)
+    elif gantt_view:
+        plot_gantt(tasks, outfile)
 
 
 if __name__ == '__main__':
