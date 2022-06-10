@@ -11,10 +11,10 @@ import sys
 import json
 
 import bokeh
-from bokeh.models import ColumnDataSource, FactorRange, CDSView, HoverTool, GroupFilter
+from bokeh.models import ColumnDataSource, CDSView, HoverTool, GroupFilter, Range1d
 from bokeh.plotting import figure, show
 
-palette = bokeh.palettes.all_palettes["Viridis"]
+palette = bokeh.palettes.all_palettes["Category20"]
 TOOLTIPS = [
     ("taskid", "@taskid"),
     ("category", "@category"),
@@ -35,22 +35,39 @@ def get_info(line):
     return json.loads(line[line.rfind('{'):])
 
 
-def parse_tasks(logfile):
+def parse_log(logfile):
     tasks = {}
     with open(logfile, 'r') as log:
-        p_task   = re.compile(r"(?P<time>\d+) \s+ "
-                              r"(?P<pid>\d+) \s+ TASK \s+ "
-                              r"(?P<taskid>\d+) \s+ "
-                              r"(?P<state>\S+) \s+ "
+        p_task   = re.compile(r"(?P<time>\d+) \s+"
+                              r"(?P<pid>\d+) \s+ TASK \s+"
+                              r"(?P<taskid>\d+) \s+"
+                              r"(?P<state>\S+) \s+"
                               r"(?P<state_args>.+)", re.X)
         p_worker = re.compile(r".*RUNNING (?P<worker>\S+)")
+        p_transfer = re.compile(r"(?P<time>\d+) \s+ .* TRANSFER \s+"
+                                r"(?P<state>\S+) \s+"
+                                r"(?P<taskid>\d+)", re.X)
+
         min_time = 0
 
         for line in log:
             m = p_task.match(line)
             if not m:
+                m = p_transfer.match(line)
+                if not m:
+                    continue
+
+                time   = int(m.group("time"))  / 1e6
+                taskid = int(m.group("taskid"))
+                state  = m.group("state")
+                if state == "INPUT" and tasks[taskid]["input_time"] == -1:
+                    tasks[taskid]["input_time"] = time - min_time
+                if state == "OUTPUT" and tasks[taskid]["output_time"] == -1:
+                    tasks[taskid]["output_time"] = time - min_time
+
                 continue
-            time   = int(m.group("time"))
+
+            time   = int(m.group("time")) / 1e6
             taskid = int(m.group("taskid"))
             state  = m.group("state")
 
@@ -63,6 +80,8 @@ def parse_tasks(logfile):
                     "wait_time"  : time - min_time,
                     "start_time" : -1,
                     "end_time"   : -1,
+                    "input_time" : -1,
+                    "output_time": -1,
                     "info"       : ""
                 }
             elif state == "RUNNING":
@@ -81,20 +100,9 @@ def parse_tasks(logfile):
         }
     }
 
-    tasks["order"] = [sorted(tasks["start_time"]).index(i)
-                      for i in tasks["start_time"]]
+    tasks["order"] = [sorted(tasks["input_time"]).index(i)
+                      for i in tasks["input_time"]]
 
-    workers = set(tasks["worker"])
-    sorted_times = {
-        worker: sorted(
-            tasks["start_time"][i] for i in range(len(taskids))
-            if tasks["worker"][i] == worker
-        ) for worker in workers
-    }
-    tasks["order_per_worker"] = [
-        sorted_times[worker].index(time)
-        for worker, time in zip(tasks["worker"], tasks["start_time"])
-    ]
     return tasks
 
 
@@ -111,16 +119,12 @@ def get_binding(tasks):
         index      = tasks["order"].index(i)
         worker     = tasks["worker"][index]
         slot       = slots[worker]
-        start_time = tasks["start_time"][index]
+        input_time = tasks["input_time"][index]
         end_time   = tasks["end_time"][index]
-
-        # Debugging
-        if tasks["taskid"][index] == 128:
-            print("Entering 162")
 
         bound = False
         for j in range(len(slot)):
-            if not slot[j] or slot[j] <= start_time:
+            if not slot[j] or slot[j] <= input_time:
                 binding[index] = j
                 slot[j]        = end_time
                 bound          = True
@@ -132,11 +136,10 @@ def get_binding(tasks):
     return {worker: len(slots[worker]) for worker in workers}, binding
 
 
-def plot(tasks, outfile):
+def plot_gantt(tasks, outfile):
     bokeh.io.output_file(outfile)
 
     categories = set(tasks["category"])
-    workers    = set(tasks["worker"])
     colors     = palette[len(categories)]
     source     = ColumnDataSource(tasks)
 
@@ -158,39 +161,29 @@ def plot(tasks, outfile):
             color=color
         )
 
-    p.add_tools(HoverTool(
-        tooltips=TOOLTIPS,
-    ))
-
+    p.add_tools(HoverTool(tooltips=TOOLTIPS))
     show(p)
 
 
-def plot_worker(tasks, outfile):
+def plot_task(tasks, outfile):
     bokeh.io.output_file(outfile)
 
     slots, binding   = get_binding(tasks)
     tasks["binding"] = binding
 
-    # TODO prefix the binding with worker name is just a temporary solution
-    #      should be changed for better visualization
-    # tasks["binding"] = [
-    #     f"{worker} - {binding}"
-    #     for worker, binding in zip(tasks["worker"], tasks["binding"])
-    # ]
-
     categories = set(tasks["category"])
     workers    = set(tasks["worker"])
     colors     = palette[len(categories)]
     source     = ColumnDataSource(tasks)
+    min_time   = min(tasks["input_time"])
+    max_time   = max(tasks["end_time"])
 
     figures = {
         worker: figure(
             title=f"Tasks Lifetime for Worker {worker}",
             x_axis_label="time",
             y_axis_label="Worker Slots",
-            # sizing_mode="stretch_width",
-            # y_range=list(set(tasks["binding"])),
-            # legend_group="category"
+            x_range=Range1d(min_time, max_time),
         ) for worker in workers
     }
 
@@ -204,16 +197,25 @@ def plot_worker(tasks, outfile):
                     GroupFilter(column_name="worker",   group=worker),
                 ]
             )
-            p.hbar(
-                y="binding",
-                left="start_time", right="end_time",
-                source=source, view=view,
-                fill_color=color, line_color="black",
-                legend_label=category
-            )
 
+            for left, right, line, hatch in zip(
+                    ["input_time", "start_time",  "output_time"],
+                    ["start_time", "output_time", "end_time"],
+                    ["black",      "black",       "black"],
+                    [None,         '*',           None]
+            ):
+                p.hbar(
+                    y="binding",
+                    left=left, right=right,
+                    source=source, view=view,
+                    fill_color=color, line_color=line, hatch_pattern=hatch,
+                    legend_label=category
+                )
+
+            p.yaxis.ticker = list(range(slots[worker]))
+            p.ygrid.grid_line_alpha = 0.5
+            p.ygrid.grid_line_dash = [6, 4]
             p.legend.click_policy = "hide"
-
             p.add_tools(HoverTool(
                 tooltips=TOOLTIPS,
             ))
@@ -221,19 +223,31 @@ def plot_worker(tasks, outfile):
     show(bokeh.layouts.column(*figures.values(), sizing_mode="stretch_width"))
 
 
+def plot_worker(tasks, outfile):
+    bokeh.io.output_file(outfile)
+
+    workers = set(tasks["worker"])
+
+
 # Main Executions
 def main():
     logfile = ""
     outfile = ""
     worker_view = False
+    task_view   = False
+    gantt_view  = True
 
     arguments = sys.argv[1:]
     while arguments:
         argument = arguments.pop(0)
         if argument[0] == '-':
-            if argument == "-h":
+            if argument == '-t':
+                task_view = True
+            elif argument == "-g":
+                gantt_view = True
+            elif argument == "-h":
                 usage(0)
-            if argument == "-o":
+            elif argument == "-o":
                 outfile = arguments.pop(0)
             elif argument == "-w":
                 worker_view = True
@@ -247,11 +261,13 @@ def main():
     if not outfile:
         outfile = logfile + ".html"
 
-    tasks = parse_tasks(logfile)
-    if worker_view:
+    tasks = parse_log(logfile)
+    if gantt_view:
+        plot_gantt(tasks, outfile)
+    elif task_view:
+        plot_task(tasks, outfile)
+    elif worker_view:
         plot_worker(tasks, outfile)
-    else:
-        plot(tasks, outfile)
 
 
 if __name__ == '__main__':
