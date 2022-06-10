@@ -1734,6 +1734,8 @@ class WorkQueue(object):
     # @param self   Reference to the current work queue object.
     # @param task   A task description created from @ref work_queue::Task.
     def submit(self, task):
+        if isinstance(task, RemoteTask):
+            task.specify_buffer(json.dumps(task._event), "infile")
         taskid = work_queue_submit(self._work_queue, task._task)
         self._task_table[taskid] = task
         return taskid
@@ -2073,12 +2075,32 @@ class RemoteTask(Task):
     # @param coprocess  The name of the coprocess which has the function you wish to execute. The coprocess should have a name() method that returns this
     # @param
     # @param command    The shell command line to be exected by the task.
-    # @param kwargs	    keyword arguments used in function to be executed by task. An optional kwarg exec_method can be specified to one of fork, thread, and direct to choose between those three methods of execution
-    def __init__(self, fn, coprocess, **kwargs):
+    # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
+    # @param kwargs	    keyword arguments used in function to be executed by task. 
+    def __init__(self, fn, coprocess, *args, **kwargs):
         Task.__init__(self, fn)
-        event = json.dumps(kwargs)
-        Task.specify_buffer(self, event, "infile")
+        self._event = {}
+        self._event["fn_kwargs"] = kwargs
+        self._event["fn_args"] = args
         Task.specify_coprocess(self, coprocess)
+    ##
+    # Specify function arguments. Accepts arrays and dictionarys. This overrides any arguments passed during task creation
+    # @param self             Reference to the current remote task object
+    # @param args             An array of positional args to be passed to the function
+    # @param kwargs           A dictionary of keyword arguments to be passed to the function
+    def specify_fn_args(self, args=[], kwargs={}):
+        self._event["fn_kwargs"] = kwargs
+        self._event["fn_args"] = args
+    ##
+    # Specify how the remote task should execute
+    # @param self                     Reference to the current remote task object
+    # @param remote_task_exec_method  Can be one of "fork", "direct", or "thread". Fork creates a child process to execute the function, direct has the worker directly call the function, and thread spawns a thread to execute the function
+    def specify_exec_method(self, remote_task_exec_method):
+        if remote_task_exec_method not in ["fork", "direct", "thread"]:
+            print("Error, work_queue_exec_method must be one of fork, direct, or thread")
+        self._event["remote_task_exec_method"] = remote_task_exec_method
+
+
 
 # test
 

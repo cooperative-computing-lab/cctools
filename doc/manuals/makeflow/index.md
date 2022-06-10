@@ -1,3 +1,5 @@
+![](../logos/makeflow-logo.png)
+
 # Makeflow User's Manual
 
 ## Overview
@@ -47,7 +49,7 @@ Where possible, it runs commands in parallel to reduce the execution time.
 
 Makeflow suppose two ways of writing a workflow: classic Make and JX. Classic
 Make is very easy to learn and get started, but but can very verbose when
-writing large workflows. The [JX workflow language](../jx/jx-tutorial.md) is a
+writing large workflows. The [JX workflow language](../jx-workflow/jx-tutorial.md) is a
 little more complex, but allows for more programmable construction of
 workflows.
 
@@ -125,7 +127,7 @@ Support section](#batch-system-support).
 !!! warning
     You may have to slightly adapt the makeflow workflow file to work across different batch systems. This is because different batch systems have different expectations on whether the underlying filesystem is shared (e.g., slurm and torque), or not (e.g., condor and work queue). 
 
-### JX Language
+### JX Workflow Language
 
 The classic make language is easy to learn and suitable for many purposes, but
 it can get rather verbose for complex workflows. Makeflow also supports the JX
@@ -147,7 +149,7 @@ using JX:
 You can use the JX language with Makeflow by simply using
 the `--jx` argument to any invocation. For example: `makeflow --jx example.jx -T condor`
 
-Learn more about JX [here](../jx).
+Learn more about JX [here](../jx-workflow).
 
 
 ### Resources

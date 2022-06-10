@@ -1,5 +1,6 @@
-# Chirp User's Manual
+![](../logos/chirp-logo.png)
 
+# Chirp User's Manual
 
 ## Overview
 

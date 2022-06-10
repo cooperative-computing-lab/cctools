@@ -473,8 +473,8 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.workers_removed);
 	buffer_printf(&B, " %d", s.workers_released);
 	buffer_printf(&B, " %d", s.workers_idled_out);
-	buffer_printf(&B, " %d", s.workers_fast_aborted);
 	buffer_printf(&B, " %d", s.workers_blocked);
+	buffer_printf(&B, " %d", s.workers_fast_aborted);
 	buffer_printf(&B, " %d", s.workers_lost);
 
 	/* Stats for the current state of tasks: */
@@ -492,7 +492,6 @@ static void log_queue_stats(struct work_queue *q, int force)
 	buffer_printf(&B, " %d", s.tasks_exhausted_attempts);
 
 	/* Master time statistics: */
-	buffer_printf(&B, " %" PRId64, s.time_when_started);
 	buffer_printf(&B, " %" PRId64, s.time_send);
 	buffer_printf(&B, " %" PRId64, s.time_receive);
 	buffer_printf(&B, " %" PRId64, s.time_send_good);
@@ -4050,6 +4049,11 @@ static struct work_queue_worker *find_worker_by_time(struct work_queue *q, struc
 // be met by the worker. If the task fits in the worker, it returns 0.
 static int is_task_larger_than_worker(struct work_queue *q, struct work_queue_task *t, struct work_queue_worker *w)
 {
+	if(w->resources->tag < 0) {
+		/* quickly return if worker has not sent its resources yet */
+		return 0;
+	}
+
 	int set = 0;
 	struct rmsummary *l = task_worker_box_size(q,w,t);
 
@@ -7348,7 +7352,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// tasks cumulative
 			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts"
 			// manager time statistics:
-			" time_when_started time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application"
+			" time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application"
 			// workers time statistics:
 			" time_execute time_execute_good time_execute_exhaustion"
 			// bandwidth:
@@ -7400,7 +7404,10 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 		rmsummary_print_buffer(&B, task_min_resources(q, t), 1);
 	} else if(state == WORK_QUEUE_TASK_CANCELED) {
 			/* do not add any info */
-	} else if(state == WORK_QUEUE_TASK_RETRIEVED || state == WORK_QUEUE_TASK_DONE) {
+	} else if(state == WORK_QUEUE_TASK_RETRIEVED) {
+		buffer_printf(&B, " %s ", work_queue_result_str(t->result));
+		buffer_printf(&B, " %d ", t->return_status);
+	} else if(state == WORK_QUEUE_TASK_DONE) {
 		buffer_printf(&B, " %s ", work_queue_result_str(t->result));
 		buffer_printf(&B, " %d ", t->return_status);
 
@@ -7413,7 +7420,14 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 				// no limits broken, thus printing an empty dictionary
 				buffer_printf(&B, " {} ");
 			}
-			rmsummary_print_buffer(&B, t->resources_measured, 1);
+
+			struct jx *m = rmsummary_to_json(t->resources_measured, /* only resources */ 1);
+			jx_insert(m, jx_string("wq_input_size"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
+			jx_insert(m, jx_string("wq_output_size"), jx_arrayv(jx_double(t->bytes_received/((double) MEGABYTE)), jx_string("MB"), NULL));
+			jx_insert(m, jx_string("wq_input_time"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_insert(m, jx_string("wq_output_time"), jx_arrayv(jx_double((t->time_when_done - t->time_when_retrieval)/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_print_buffer(m, &B);
+			jx_delete(m);
 		} else {
 			// no resources measured, one empty dictionary for limits broken, other for resources.
 			buffer_printf(&B, " {} {}");
@@ -7560,7 +7574,6 @@ static void write_transaction_transfer(struct work_queue *q, struct work_queue_w
 		buffer_printf(&B, "OUTPUT ");
 	}
 	buffer_printf(&B,  "%d", t->taskid);
-	buffer_printf(&B, " %s", w->workerid);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
 	buffer_printf(&B, " %s", filename);
@@ -7586,7 +7599,9 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 		fprintf(q->transactions_logfile, "# time manager_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}\n");
 		fprintf(q->transactions_logfile, "# time manager_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
 		fprintf(q->transactions_logfile, "# time manager_pid TASK taskid WAITING_RETRIEVAL worker_address\n");
-		fprintf(q->transactions_logfile, "# time manager_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n\n");
+		fprintf(q->transactions_logfile, "# time manager_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
+		fprintf(q->transactions_logfile, "# time manager_pid TRANSFER (INPUT|OUTPUT) taskid sizeinmb walltime filename\n");
+		fprintf(q->transactions_logfile, "\n");
 
 		write_transaction(q, "MANAGER START");
 
