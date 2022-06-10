@@ -8,6 +8,11 @@
 import re
 import sys
 
+# Bokeh is an interactive data visualizer, it generates portable static HTML
+# file. Steamlit accepts Bokeh plot as its component, this information might
+# be useful for future developers to implement an interactive dashboard for
+# cctools.
+
 try:
     import bokeh
     from bokeh.models import ColumnDataSource, CDSView, HoverTool, GroupFilter, Range1d
@@ -18,6 +23,7 @@ except ImportError:
     sys.exit(1)
 
 palette = bokeh.palettes.all_palettes["Category20"]
+# Tooltips used in the interactive hover tool.
 TOOLTIPS = [
     ("taskid", "@taskid"),
     ("category", "@category"),
@@ -35,6 +41,13 @@ def usage(status=0):
 
 
 def parse_log(logfile):
+    """
+    Parses the log file and returns a dictionary of lists for each task
+    properties. The output is consistent with Bokeh ColumnDataSource
+    backend.
+    """
+
+    # The keys are task ids, the values are dictionaries for task properties.
     tasks = {}
     with open(logfile, 'r') as log:
         p_task   = re.compile(r"(?P<time>\d+) \s+"
@@ -73,7 +86,8 @@ def parse_log(logfile):
                     }
                 elif state == "RUNNING":
                     tasks[taskid]["start_time"] = time - min_time
-                    tasks[taskid]["worker"] = p_worker.match(line).group("worker")
+                    tasks[taskid]["worker"]     = \
+                        p_worker.match(line).group("worker")
                 elif state == "DONE":
                     tasks[taskid]["end_time"] = time - min_time
                     tasks[taskid]["info"] = m.group("state_args")
@@ -93,6 +107,7 @@ def parse_log(logfile):
 
                 continue
 
+    # Convert the data to a dictionary of lists, which Bokeh can accept.
     taskids = list(tasks.keys())
     tasks = {
         "taskid": taskids,
@@ -102,6 +117,7 @@ def parse_log(logfile):
         }
     }
 
+    # Sort the tasks by input time.
     tasks["order"] = [sorted(tasks["input_time"]).index(i)
                       for i in tasks["input_time"]]
 
@@ -111,12 +127,17 @@ def parse_log(logfile):
 def get_binding(tasks):
     """
     Returns the maximum slots existed in each worker and the binding of tasks
-    with slots of workers.
+    with slots of workers. Slots binding is calculated for the purpose of
+    visualization, which is related to, but not exactly the same as CPU cores
+    in the workers.
     """
+
     workers = set(tasks["worker"])
     slots   = {worker: [None] for worker in workers}
     binding = [None] * len(tasks["taskid"])
 
+    # For each task, find an available slot in the worker, so that the tasks
+    # don't overlap in the visualization.
     for i in range(len(tasks["taskid"])):
         index      = tasks["order"].index(i)
         worker     = tasks["worker"][index]
