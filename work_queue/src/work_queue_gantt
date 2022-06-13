@@ -40,14 +40,7 @@ def usage(status=0):
     sys.exit(status)
 
 
-def parse_log(logfile):
-    """
-    Parses the log file and returns a dictionary of lists for each task
-    properties. The output is consistent with Bokeh ColumnDataSource
-    backend.
-    """
-
-    # The keys are task ids, the values are dictionaries for task properties.
+def parse_tasks(logfile):
     tasks = {}
     with open(logfile, 'r') as log:
         p_task   = re.compile(r"(?P<time>\d+) \s+"
@@ -122,6 +115,49 @@ def parse_log(logfile):
                       for i in tasks["input_time"]]
 
     return tasks
+
+
+def parse_workers(logfile):
+    # addrport is used to identify a worker.
+    p_workers = re.compile(r"(?P<time>\d+) \s+"
+                           r"(?P<pid>\d+) \s+ WORKER \s+"
+                           r"(?P<worker_id>\S+) \s+"
+                           r"(?P<addr>\S+) \s+"
+                           r"(?P<state>CONNECTION|DISCONNECTION)", re.X)
+    p_running = re.compile(r"(?P<time>\d+) .* TASK .* RUNNING \s+"
+                           r"(?P<addr>\S+)", re.X)
+
+    workers  = {}
+    min_time = 0
+    with open(logfile, 'r') as log:
+        for line in log:
+
+            # Match for WORKER entries
+            m = p_workers.match(line)
+            if m:
+                time   = int(m.group("time")) / 1e6
+                worker = m.group("addr")
+                state  = m.group("state")
+                if not min_time:
+                    min_time = time
+                time -= min_time
+
+                if state == "CONNECTION":
+                    workers[worker] = {"arrive": time, "start": -1}
+                elif state == "DISCONNECTION":
+                    workers[worker]["leave"] = time
+                continue
+
+            # Match for RUNNING entries
+            m = p_running.match(line)
+            if m:
+                worker = m.group("addr")
+                if workers[worker]["start"] == -1:
+                    time = int(m.group("time")) / 1e6 - min_time
+                    workers[worker]["start"] = time
+                continue
+
+    return workers
 
 
 def get_binding(tasks):
@@ -246,10 +282,9 @@ def plot_task(tasks, outfile):
     show(bokeh.layouts.column(*figures.values(), sizing_mode="stretch_width"))
 
 
-def plot_worker(tasks, outfile):
+def plot_worker(workers, outfile):
+    # Connected time, Disconnect time, first task start time
     bokeh.io.output_file(outfile)
-
-    workers = set(tasks["worker"])
 
 
 # Main Executions
@@ -284,12 +319,14 @@ def main():
     if not outfile:
         outfile = logfile + ".html"
 
-    tasks = parse_log(logfile)
     if task_view:
+        tasks = parse_tasks(logfile)
         plot_task(tasks, outfile)
     elif worker_view:
-        plot_worker(tasks, outfile)
-    elif gantt_view:
+        workers = parse_workers(logfile)
+        plot_worker(workers, outfile)
+    else:
+        tasks = parse_tasks(logfile)
         plot_gantt(tasks, outfile)
 
 
