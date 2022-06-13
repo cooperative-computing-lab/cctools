@@ -1404,7 +1404,7 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 
 		debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 
-        write_transaction_transfer(q, w, t, total_bytes, sum_time, f->remote_name, WORK_QUEUE_OUTPUT);
+        write_transaction_transfer(q, w, t, f, total_bytes, sum_time);
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
@@ -3389,7 +3389,7 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 		q->stats->bytes_sent += total_bytes;
 
 		// Write to the transaction log.
-		write_transaction_transfer(q, w, t, total_bytes, elapsed_time, f->remote_name, WORK_QUEUE_INPUT);
+		write_transaction_transfer(q, w, t, f, total_bytes, elapsed_time);
 
 		// Avoid division by zero below.
 		if(elapsed_time==0) elapsed_time = 1;
