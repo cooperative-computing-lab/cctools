@@ -7569,6 +7569,7 @@ static void write_transaction_transfer(struct work_queue *q, struct work_queue_w
 	buffer_printf(&B, "TRANSFER ");
 	buffer_printf(&B, f->type == WORK_QUEUE_INPUT ? "INPUT":"OUTPUT");
 	buffer_printf(&B, " %d", t->taskid);
+	buffer_printf(&B, " %d", f->flags & WORK_QUEUE_CACHE);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
 	buffer_printf(&B, " %s", f->remote_name);
