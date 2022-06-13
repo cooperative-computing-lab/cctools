@@ -40,6 +40,24 @@ def usage(status=0):
     sys.exit(status)
 
 
+def flatten(data: dict):
+    """
+    Given a dictionary of data, in each the keys are workers or tasks and the
+    values are the corresponding properties, flatten the dictionary, so that
+    the keys are the names of the properties and the values are lists of the
+    corresponding property values.
+    Bokeh ColumnDataSource accepts a dictionary of lists as its data.
+    """
+    entry_ids = list(data.keys())
+    return {
+        "entry_id": entry_ids,
+        **{
+            key: [data[entry_id][key] for entry_id in entry_ids]
+            for key in data[entry_ids[0]].keys()
+        }
+    }
+
+
 def parse_tasks(logfile):
     tasks = {}
     with open(logfile, 'r') as log:
@@ -100,16 +118,7 @@ def parse_tasks(logfile):
 
                 continue
 
-    # Convert the data to a dictionary of lists, which Bokeh can accept.
-    taskids = list(tasks.keys())
-    tasks = {
-        "taskid": taskids,
-        **{
-            key: [tasks[taskid][key] for taskid in taskids]
-            for key in tasks[taskids[0]].keys()
-        }
-    }
-
+    tasks = flatten(tasks)
     # Sort the tasks by input time.
     tasks["order"] = [sorted(tasks["input_time"]).index(i)
                       for i in tasks["input_time"]]
@@ -157,6 +166,7 @@ def parse_workers(logfile):
                     workers[worker]["start"] = time
                 continue
 
+    workers = flatten(workers)
     return workers
 
 
