@@ -1334,7 +1334,15 @@ optional_function usleep      unistd.h   HAS_USLEEP HAVE_USLEEP
 optional_function utime       utime.h    HAS_UTIME HAVE_UTIME
 optional_function utimensat   sys/stat.h HAS_UTIMENSAT
 
-# sqlite3 uses define "HAVE_*"
+if [ "$BUILD_SYS" = DARWIN ]
+then
+	if ! optional_function fstat64 sys/stat.h
+	then
+		ccflags_append_define "fstat64=fstat"
+		ccflags_append_define "stat64=stat"
+		ccflags_append_define "lstat64=lstat"
+	fi
+fi
 
 if [ "$include_package_chirp" = chirp ]
 then
