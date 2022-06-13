@@ -40,7 +40,7 @@ def usage(status=0):
     sys.exit(status)
 
 
-def flatten(data: dict):
+def flatten(data: dict, identifier: str):
     """
     Given a dictionary of data, in each the keys are workers or tasks and the
     values are the corresponding properties, flatten the dictionary, so that
@@ -50,7 +50,7 @@ def flatten(data: dict):
     """
     entry_ids = list(data.keys())
     return {
-        "entry_id": entry_ids,
+        identifier: entry_ids,
         **{
             key: [data[entry_id][key] for entry_id in entry_ids]
             for key in data[entry_ids[0]].keys()
@@ -118,7 +118,7 @@ def parse_tasks(logfile):
 
                 continue
 
-    tasks = flatten(tasks)
+    tasks = flatten(tasks, "taskid")
     # Sort the tasks by input time.
     tasks["order"] = [sorted(tasks["input_time"]).index(i)
                       for i in tasks["input_time"]]
@@ -152,7 +152,9 @@ def parse_workers(logfile):
                 time -= min_time
 
                 if state == "CONNECTION":
-                    workers[worker] = {"arrive": time, "start": -1}
+                    workers[worker] = {
+                        "arrive": time, "start": -1, "leave": -1
+                    }
                 elif state == "DISCONNECTION":
                     workers[worker]["leave"] = time
                 continue
@@ -166,7 +168,22 @@ def parse_workers(logfile):
                     workers[worker]["start"] = time
                 continue
 
-    workers = flatten(workers)
+    workers = flatten(workers, "addr")
+    # Sort the workers by arrival time.
+    workers["order"] = [sorted(workers["arrive"]).index(t)
+                        for t in workers["arrive"]]
+
+    # For the workers haven't disconnected, use the maximum leave time.
+    max_time = max(workers["leave"])
+    for i, t in enumerate(workers["leave"]):
+        if t == -1:
+            workers["leave"][i] = max_time
+
+    # For the workers haven't started, use their leave time.
+    for i, t in enumerate(workers["start"]):
+        if t == -1:
+            workers["start"][i] = workers["leave"][i]
+
     return workers
 
 
@@ -296,6 +313,29 @@ def plot_worker(workers, outfile):
     # Connected time, Disconnect time, first task start time
     bokeh.io.output_file(outfile)
 
+    colors = palette[4]  # Working or not
+    source = ColumnDataSource(workers)
+
+    p = figure(
+        title="Worker Lifetime",
+        x_axis_label="time", y_axis_label="Order of Worker Connect Time",
+        sizing_mode="stretch_both",
+    )
+
+    p.hbar(
+        y="order",
+        left="arrive", right="start",
+        source=source,
+        color=colors[0]
+    )
+    p.hbar(
+        y="order",
+        left="start", right="leave",
+        source=source,
+        color=colors[1]
+    )
+
+    show(p)
 
 # Main Executions
 def main():
