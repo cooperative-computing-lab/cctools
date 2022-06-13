@@ -906,7 +906,12 @@ if [ $config_perl_path != no ]
 then
 	perl_avail=yes
 	perl_path=${perl_path:-${base_root}}
-	if [ "${swig_avail}" = no ]
+
+	if [ "${BUILD_SYS}" = DARWIN ]
+	then
+		echo "*** perl bindings not available in OSX"
+		perl_avail=no
+	elif [ "${swig_avail}" = no ]
 	then
 		echo "*** swig is needed for perl support"
 		perl_avail=no
@@ -940,19 +945,6 @@ then
 	else
 		echo "*** perl core module ExtUtils::Embed is not available"
 		perl_avail=no
-	fi
-
-	if [ "${perl_avail}" = yes -a "${BUILD_SYS}" = DARWIN ]
-	then
-		# On OSX, the ExtUtils::Embed options contain options
-		# to generate triple-fat binaries, which fails when
-		# we attempt to bring in our thin binaries.
-
-		# To avoid this problem, remove all of the -arch XXX
-		# arguments, so that the compiler produces the default,
-		# which will be compatible with the other objects we compile.
-		perl_ccflags=`echo ${perl_ccflags} | sed 's/-arch [^ ]* *//g'`
-		perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
 	fi
 
 	if [ "${perl_avail}" = yes ]
@@ -1337,7 +1329,15 @@ optional_function usleep      unistd.h   HAS_USLEEP HAVE_USLEEP
 optional_function utime       utime.h    HAS_UTIME HAVE_UTIME
 optional_function utimensat   sys/stat.h HAS_UTIMENSAT
 
-# sqlite3 uses define "HAVE_*"
+if [ "$BUILD_SYS" = DARWIN ]
+then
+	if ! optional_function fstat64 sys/stat.h
+	then
+		ccflags_append_define "fstat64=fstat"
+		ccflags_append_define "stat64=stat"
+		ccflags_append_define "lstat64=lstat"
+	fi
+fi
 
 if [ "$include_package_chirp" = chirp ]
 then
