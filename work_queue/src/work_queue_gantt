@@ -17,12 +17,13 @@ try:
     import bokeh
     from bokeh.models import ColumnDataSource, CDSView, HoverTool, GroupFilter, Range1d
     from bokeh.plotting import figure, show
+    from bokeh.palettes import Category10
 except ImportError:
     print("Bokeh is not installed. Please run the following command to install Bokeh:")
     print("conda install bokeh")
     sys.exit(1)
 
-palette = bokeh.palettes.all_palettes["Category20"]
+palette = Category10
 # Tooltips used in the interactive hover tool.
 TOOLTIPS = [
     ("taskid", "@taskid"),
@@ -302,9 +303,7 @@ def plot_task(tasks, outfile):
             p.ygrid.grid_line_alpha = 0.5
             p.ygrid.grid_line_dash = [6, 4]
             p.legend.click_policy = "hide"
-            p.add_tools(HoverTool(
-                tooltips=TOOLTIPS,
-            ))
+            p.add_tools(HoverTool(tooltips=TOOLTIPS))
 
     show(bokeh.layouts.column(*figures.values(), sizing_mode="stretch_width"))
 
@@ -312,9 +311,13 @@ def plot_task(tasks, outfile):
 def plot_worker(workers, outfile):
     # Connected time, Disconnect time, first task start time
     bokeh.io.output_file(outfile)
-
-    colors = palette[4]  # Working or not
     source = ColumnDataSource(workers)
+    tooltips = [
+        ("Worker",                "@addr"),
+        ("Connected Time",        "@arrive"),
+        ("Disconnected Time",     "@leave"),
+        ("First Task Start Time", "@start"),
+    ]
 
     p = figure(
         title="Worker Lifetime",
@@ -322,20 +325,17 @@ def plot_worker(workers, outfile):
         sizing_mode="stretch_both",
     )
 
-    p.hbar(
-        y="order",
-        left="arrive", right="start",
-        source=source,
-        color=colors[0]
-    )
-    p.hbar(
-        y="order",
-        left="start", right="leave",
-        source=source,
-        color=colors[1]
-    )
+    for left, right, color in zip(
+            ["arrive", "start"], ["start", "leave"], palette[3]):
+        # At least three colors are needed for palette.
+        p.hbar(
+            y="order", left=left, right=right, source=source,
+            color=color, line_color="black"
+        )
 
+    p.add_tools(HoverTool(tooltips=tooltips))
     show(p)
+
 
 # Main Executions
 def main():
