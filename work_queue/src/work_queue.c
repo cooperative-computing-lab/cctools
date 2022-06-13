@@ -344,7 +344,7 @@ static void write_transaction(struct work_queue *q, const char *str);
 static void write_transaction_task(struct work_queue *q, struct work_queue_task *t);
 static void write_transaction_category(struct work_queue *q, struct category *c);
 static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving, worker_disconnect_reason reason_leaving);
-static void write_transaction_transfer(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, size_t size_in_bytes, int time_in_usecs, char* filename, work_queue_file_type_t type);
+static void write_transaction_transfer(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f, size_t size_in_bytes, int time_in_usecs);
 static void write_transaction_worker_resources(struct work_queue *q, struct work_queue_worker *w);
 
 static void delete_feature(struct work_queue_task *t, const char *name);
@@ -7563,20 +7563,15 @@ static void write_transaction_worker_resources(struct work_queue *q, struct work
 }
 
 
-static void write_transaction_transfer(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, size_t size_in_bytes, int time_in_usecs, char* filename, work_queue_file_type_t type){
+static void write_transaction_transfer(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f, size_t size_in_bytes, int time_in_usecs){
 	struct buffer B;
 	buffer_init(&B);
 	buffer_printf(&B, "TRANSFER ");
-	if (type == WORK_QUEUE_INPUT){
-		buffer_printf(&B, "INPUT ");
-	}
-	else{
-		buffer_printf(&B, "OUTPUT ");
-	}
-	buffer_printf(&B,  "%d", t->taskid);
+	buffer_printf(&B, f->type == WORK_QUEUE_INPUT ? "INPUT":"OUTPUT");
+	buffer_printf(&B, " %d", t->taskid);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
-	buffer_printf(&B, " %s", filename);
+	buffer_printf(&B, " %s", f->remote_name);
 
 	write_transaction(q, buffer_tostring(&B));
 	buffer_free(&B);
@@ -7600,7 +7595,7 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 		fprintf(q->transactions_logfile, "# time manager_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
 		fprintf(q->transactions_logfile, "# time manager_pid TASK taskid WAITING_RETRIEVAL worker_address\n");
 		fprintf(q->transactions_logfile, "# time manager_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
-		fprintf(q->transactions_logfile, "# time manager_pid TRANSFER (INPUT|OUTPUT) taskid sizeinmb walltime filename\n");
+		fprintf(q->transactions_logfile, "# time manager_pid TRANSFER (INPUT|OUTPUT) taskid cache_flag sizeinmb walltime filename\n");
 		fprintf(q->transactions_logfile, "\n");
 
 		write_transaction(q, "MANAGER START");
