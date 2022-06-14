@@ -325,14 +325,19 @@ def plot_worker(workers, outfile):
         sizing_mode="stretch_both",
     )
 
-    for left, right, color in zip(
-            ["arrive", "start"], ["start", "leave"], palette[3]):
+    for left, right, label, color in zip(
+            ["arrive", "start"],
+            ["start",  "leave"],
+            ["idling", "working"], palette[3]
+    ):
         # At least three colors are needed for palette.
         p.hbar(
             y="order", left=left, right=right, source=source,
-            color=color, line_color="black"
+            color=color, line_color="black",
+            legend_label=label
         )
 
+    p.legend.click_policy = "hide"
     p.add_tools(HoverTool(tooltips=tooltips))
     show(p)
 
