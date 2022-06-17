@@ -11,7 +11,8 @@ import argparse
 import json
 import os
 import ast
-import tempfile
+import tarfile
+import hashlib
 
 shebang = "#! /usr/bin/env python\n\n"
 
@@ -190,34 +191,65 @@ def create_network_function(path, funcs, dest):
 		output_file.write("\n")
 	output_file.write(init_function)
 	output_file.close()
-		
 
-def create_network_function_and_pack(path, funcs, envpath, dest):
+def sort_spec(spec):
+    sorted_spec = json.load(spec)
+    conda_deps = []
+    nested_deps = []
+    for dep in sorted_spec["dependencies"]:
+        if not isinstance(dep, dict):
+            conda_deps.append(dep)
+        else:
+            nested_deps.append(dep)
+    for dep in nested_deps:
+        for key in dep.keys():
+            dep[key] = dep[key].sort()
+    return json.dumps(sorted(conda_deps) + nested_deps, sort_keys=True).encode("utf-8")
 
-	create_network_function(path, funcs, dest)
+def search_env_for_spec(envpath):
+    if os.path.exists(envpath) and envpath.endswith(".tar.gz"):
+        print("Cached environment found, checking if it is compatiable with new network function")
+        with tarfile.open(envpath) as env_tar:
+            env_spec = None
+            for member in env_tar:
+                if member.name == "conda_spec.yml":
+                    with env_tar.extractfile(member) as f:
+                        env_spec = hashlib.md5(sort_spec(f)).digest()
+                    break
+            if env_spec is None:
+                print("Error, could not find conda_spec.yml in cached environment, creating new environment")
+    else:
+        print("No environment found at output path, creating new environment")
+    return env_spec
 
-	env = analyze.create_spec(path)
-	json.dumps(env, indent=4, sort_keys=True)
-	f = open("/tmp/tmp.json", "w")
-	json.dump(env, f, indent=4, sort_keys=True)
-	f.close()
+def pack_network_function(path, envpath):
+    prev_env_spec = search_env_for_spec(envpath)
 
-	pkg = create.pack_env("/tmp/tmp.json", envpath)
-
-	return pkg
+    new_env = analyze.create_spec(path)
+    with open("/tmp/tmp.json", "w") as f:
+        json.dump(new_env, f, indent=4, sort_keys=True)
+    create.create_conda_spec("/tmp/tmp.json", "/tmp/", create._find_local_pip())
+    with open("/tmp/conda_spec.yml", "rb") as f:
+        new_env_spec = hashlib.md5(sort_spec(f)).digest()
+    if prev_env_spec == new_env_spec:
+        print("Cached environment still usable")
+    else:
+        print("Cached package is out of date, rebuilding")
+        create.pack_env("/tmp/tmp.json", envpath)
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser(description="Creates a network function based on an input file and function")
-	parser.add_argument('--source', help='Source file that contains the function to be serverized')
-	parser.add_argument('--function', action='append', help='Name of the function in filename to be serverized')
-	parser.add_argument('--pack', help='Pack environment into this location')
-	parser.add_argument('--out', help='Output file for network function')
-	args = parser.parse_args()
-	print(args)
-	if args.function is None:
-		print("Error, must specify at least one function")
-		exit()
-	if not args.pack:
-		create_network_function(args.source, args.function, args.out)
-	else:
-		create_network_function_and_pack(args.source, args.function, args.pack, args.out)
+    parser = argparse.ArgumentParser(description="Creates a network function based on an input file and function")
+    parser.add_argument('--src', help='Source file that contains the function to be serverized')
+    parser.add_argument('--function', action='append', help='Name of the function in filename to be serverized')
+    parser.add_argument('--pack', help='Optional argument. If given, will create an environment to run the network function at this path')
+    parser.add_argument('--dest', help='Destination path for the output network function')
+    args = parser.parse_args()
+    
+    if args.function is None:
+        print("Error, must specify at least one function")
+        exit()
+    if not args.pack:
+        create_network_function(args.src, args.function, args.dest)
+    else:
+        create_network_function(args.src, args.function, args.dest)
+        pack_network_function(args.src, args.pack)
