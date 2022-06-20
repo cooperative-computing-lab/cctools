@@ -157,14 +157,15 @@ def parse_workers(logfile):
                         "arrive": time, "start": -1, "leave": -1
                     }
                 elif state == "DISCONNECTION":
-                    workers[worker]["leave"] = time
+                    if worker in workers:
+                        workers[worker]["leave"] = time
                 continue
 
             # Match for RUNNING entries
             m = p_running.match(line)
             if m:
                 worker = m.group("addr")
-                if workers[worker]["start"] == -1:
+                if worker in workers and workers[worker]["start"] == -1:
                     time = int(m.group("time")) / 1e6 - min_time
                     workers[worker]["start"] = time
                 continue
