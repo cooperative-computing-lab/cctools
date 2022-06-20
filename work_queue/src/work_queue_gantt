@@ -6,6 +6,7 @@
 
 # Packages and Definitions
 import re
+import os
 import sys
 
 # Bokeh is an interactive data visualizer, it generates portable static HTML
@@ -36,14 +37,21 @@ TOOLTIPS = [
 
 
 # Functions
-def usage(status=0):
-    print("work_queue_gantt")
+def usage(status=0, prog=os.path.basename(__file__)):
+    print(f"Usage: {prog} [-gtw] [-o outfile] logfile")
+    print("Utilize the bokeh package to analyze work queue transaction log file interactively.")
+    print("""
+  -g  Display lifetime of all tasks. (default)
+  -t  Display lifetime of tasks per worker.
+  -w  Display lifetiem of workers.
+  -o  Specify the output file name, default name is <logfile>.html.
+""")
     sys.exit(status)
 
 
 def flatten(data: dict, identifier: str):
     """
-    Given a dictionary of data, in each the keys are workers or tasks and the
+    Given a dictionary of data, in which the keys are workers or tasks and the
     values are the corresponding properties, flatten the dictionary, so that
     the keys are the names of the properties and the values are lists of the
     corresponding property values.
