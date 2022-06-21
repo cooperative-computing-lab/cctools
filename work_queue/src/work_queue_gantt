@@ -6,18 +6,26 @@
 
 # Packages and Definitions
 import re
+import os
 import sys
+
+# Bokeh is an interactive data visualizer, it generates portable static HTML
+# file. Steamlit accepts Bokeh plot as its component, this information might
+# be useful for future developers to implement an interactive dashboard for
+# cctools.
 
 try:
     import bokeh
     from bokeh.models import ColumnDataSource, CDSView, HoverTool, GroupFilter, Range1d
     from bokeh.plotting import figure, show
+    from bokeh.palettes import Category10
 except ImportError:
     print("Bokeh is not installed. Please run the following command to install Bokeh:")
     print("conda install bokeh")
     sys.exit(1)
 
-palette = bokeh.palettes.all_palettes["Category20"]
+palette = Category10
+# Tooltips used in the interactive hover tool.
 TOOLTIPS = [
     ("taskid", "@taskid"),
     ("category", "@category"),
@@ -29,12 +37,37 @@ TOOLTIPS = [
 
 
 # Functions
-def usage(status=0):
-    print("work_queue_gantt")
+def usage(status=0, prog=os.path.basename(__file__)):
+    print(f"Usage: {prog} [-gtw] [-o outfile] logfile")
+    print("Utilize the bokeh package to analyze work queue transaction log file interactively.")
+    print("""
+  -g  Display lifetime of all tasks. (default)
+  -t  Display lifetime of tasks per worker.
+  -w  Display lifetiem of workers.
+  -o  Specify the output file name, default name is <logfile>.html.
+""")
     sys.exit(status)
 
 
-def parse_log(logfile):
+def flatten(data: dict, identifier: str):
+    """
+    Given a dictionary of data, in which the keys are workers or tasks and the
+    values are the corresponding properties, flatten the dictionary, so that
+    the keys are the names of the properties and the values are lists of the
+    corresponding property values.
+    Bokeh ColumnDataSource accepts a dictionary of lists as its data.
+    """
+    entry_ids = list(data.keys())
+    return {
+        identifier: entry_ids,
+        **{
+            key: [data[entry_id][key] for entry_id in entry_ids]
+            for key in data[entry_ids[0]].keys()
+        }
+    }
+
+
+def parse_tasks(logfile):
     tasks = {}
     with open(logfile, 'r') as log:
         p_task   = re.compile(r"(?P<time>\d+) \s+"
@@ -73,7 +106,8 @@ def parse_log(logfile):
                     }
                 elif state == "RUNNING":
                     tasks[taskid]["start_time"] = time - min_time
-                    tasks[taskid]["worker"] = p_worker.match(line).group("worker")
+                    tasks[taskid]["worker"]     = \
+                        p_worker.match(line).group("worker")
                 elif state == "DONE":
                     tasks[taskid]["end_time"] = time - min_time
                     tasks[taskid]["info"] = m.group("state_args")
@@ -93,30 +127,90 @@ def parse_log(logfile):
 
                 continue
 
-    taskids = list(tasks.keys())
-    tasks = {
-        "taskid": taskids,
-        **{
-            key: [tasks[taskid][key] for taskid in taskids]
-            for key in tasks[taskids[0]].keys()
-        }
-    }
-
+    tasks = flatten(tasks, "taskid")
+    # Sort the tasks by input time.
     tasks["order"] = [sorted(tasks["input_time"]).index(i)
                       for i in tasks["input_time"]]
 
     return tasks
 
 
+def parse_workers(logfile):
+    # addrport is used to identify a worker.
+    p_workers = re.compile(r"(?P<time>\d+) \s+"
+                           r"(?P<pid>\d+) \s+ WORKER \s+"
+                           r"(?P<worker_id>\S+) \s+"
+                           r"(?P<addr>\S+) \s+"
+                           r"(?P<state>CONNECTION|DISCONNECTION)", re.X)
+    p_running = re.compile(r"(?P<time>\d+) .* TASK .* RUNNING \s+"
+                           r"(?P<addr>\S+)", re.X)
+
+    workers  = {}
+    min_time = 0
+    with open(logfile, 'r') as log:
+        for line in log:
+
+            # Match for WORKER entries
+            m = p_workers.match(line)
+            if m:
+                time   = int(m.group("time")) / 1e6
+                worker = m.group("addr")
+                state  = m.group("state")
+                if not min_time:
+                    min_time = time
+                time -= min_time
+
+                if state == "CONNECTION":
+                    workers[worker] = {
+                        "arrive": time, "start": -1, "leave": -1
+                    }
+                elif state == "DISCONNECTION":
+                    if worker in workers:
+                        workers[worker]["leave"] = time
+                continue
+
+            # Match for RUNNING entries
+            m = p_running.match(line)
+            if m:
+                worker = m.group("addr")
+                if worker in workers and workers[worker]["start"] == -1:
+                    time = int(m.group("time")) / 1e6 - min_time
+                    workers[worker]["start"] = time
+                continue
+
+    workers = flatten(workers, "addr")
+    # Sort the workers by arrival time.
+    workers["order"] = [sorted(workers["arrive"]).index(t)
+                        for t in workers["arrive"]]
+
+    # For the workers haven't disconnected, use the maximum leave time.
+    max_time = max(workers["leave"])
+    for i, t in enumerate(workers["leave"]):
+        if t == -1:
+            workers["leave"][i] = max_time
+
+    # For the workers haven't started, use their leave time.
+    for i, t in enumerate(workers["start"]):
+        if t == -1:
+            workers["start"][i] = workers["leave"][i]
+
+    return workers
+
+
 def get_binding(tasks):
     """
     Returns the maximum slots existed in each worker and the binding of tasks
-    with slots of workers.
+    with slots of workers. Slots binding is calculated for the purpose of
+    visualization, which is related to, but not exactly the same as CPU cores
+    in the workers.
     """
+
     workers = set(tasks["worker"])
     slots   = {worker: [None] for worker in workers}
     binding = [None] * len(tasks["taskid"])
 
+    # For each task, find an available slot in the worker, so that the tasks
+    # don't overlap in the visualization.
     for i in range(len(tasks["taskid"])):
         index      = tasks["order"].index(i)
         worker     = tasks["worker"][index]
@@ -218,17 +312,43 @@ def plot_task(tasks, outfile):
             p.ygrid.grid_line_alpha = 0.5
             p.ygrid.grid_line_dash = [6, 4]
             p.legend.click_policy = "hide"
-            p.add_tools(HoverTool(
-                tooltips=TOOLTIPS,
-            ))
+            p.add_tools(HoverTool(tooltips=TOOLTIPS))
 
     show(bokeh.layouts.column(*figures.values(), sizing_mode="stretch_width"))
 
 
-def plot_worker(tasks, outfile):
+def plot_worker(workers, outfile):
+    # Connected time, Disconnect time, first task start time
     bokeh.io.output_file(outfile)
+    source = ColumnDataSource(workers)
+    tooltips = [
+        ("Worker",                "@addr"),
+        ("Connected Time",        "@arrive"),
+        ("Disconnected Time",     "@leave"),
+        ("First Task Start Time", "@start"),
+    ]
 
-    workers = set(tasks["worker"])
+    p = figure(
+        title="Worker Lifetime",
+        x_axis_label="time", y_axis_label="Order of Worker Connect Time",
+        sizing_mode="stretch_both",
+    )
+
+    for left, right, label, color in zip(
+            ["arrive", "start"],
+            ["start",  "leave"],
+            ["idling", "working"], palette[3]
+    ):
+        # At least three colors are needed for palette.
+        p.hbar(
+            y="order", left=left, right=right, source=source,
+            color=color, line_color="black",
+            legend_label=label
+        )
+
+    p.legend.click_policy = "hide"
+    p.add_tools(HoverTool(tooltips=tooltips))
+    show(p)
 
 
 # Main Executions
@@ -263,12 +383,14 @@ def main():
     if not outfile:
         outfile = logfile + ".html"
 
-    tasks = parse_log(logfile)
     if task_view:
+        tasks = parse_tasks(logfile)
         plot_task(tasks, outfile)
     elif worker_view:
-        plot_worker(tasks, outfile)
-    elif gantt_view:
+        workers = parse_workers(logfile)
+        plot_worker(workers, outfile)
+    else:
+        tasks = parse_tasks(logfile)
         plot_gantt(tasks, outfile)
 
 
