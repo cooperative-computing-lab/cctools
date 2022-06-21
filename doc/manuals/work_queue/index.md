@@ -1755,84 +1755,84 @@ $ grep 'TASK \<1\>' my.tr.log
 
 The statistics available are:
 
-| Field | Description
-|-------|------------
-|-      | **Stats for the current state of workers**
-| workers_connected;	   | Number of workers currently connected to the manager.
-| workers_init;          | Number of workers connected, but that have not send their available resources report yet
-| workers_idle;          | Number of workers that are not running a task.
-| workers_busy;          | Number of workers that are running at least one task.
-| workers_able;          | Number of workers on which the largest task can run.
-| 
-|-      | **Cumulative stats for workers**
-| workers_joined;        | Total number of worker connections that were established to the manager.
-| workers_removed;       | Total number of worker connections that were released by the manager, idled-out, fast-aborted, or lost.
-| workers_released;      | Total number of worker connections that were asked by the manager to disconnect.
-| workers_idled_out;     | Total number of worker that disconnected for being idle.
-| workers_fast_aborted;  | Total number of worker connections terminated for being too slow.
-| workers_blacklisted ;  | Total number of workers blacklisted by the manager. (Includes fast-aborted.)
-| workers_lost;          | Total number of worker connections that were unexpectedly lost. (does not include idled-out or fast-aborted)
-| 
-|-      | **Stats for the current state of tasks**
-| tasks_waiting;         | Number of tasks waiting to be dispatched.
-| tasks_on_workers;      | Number of tasks currently dispatched to some worker.
-| tasks_running;         | Number of tasks currently executing at some worker.
-| tasks_with_results;    | Number of tasks with retrieved results and waiting to be returned to user.
-| 
-|-      | **Cumulative stats for tasks**
-| tasks_submitted;            | Total number of tasks submitted to the queue.
-| tasks_dispatched;           | Total number of tasks dispatch to workers.
-| tasks_done;                 | Total number of tasks completed and returned to user. (includes tasks_failed)
-| tasks_failed;               | Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS.
-| tasks_cancelled;            | Total number of tasks cancelled.
-| tasks_exhausted_attempts;   | Total number of task executions that failed given resource exhaustion.
-| 
-| - | **Manager time statistics (in microseconds)**
-| time_when_started;  | Absolute time at which the manager started.
-| time_send;          | Total time spent in sending tasks to workers (tasks descriptions, and input files.).
-| time_receive;       | Total time spent in receiving results from workers (output files.).
-| time_send_good;     | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS.
-| time_receive_good;  | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS.
-| time_status_msgs;   | Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc.
-| time_internal;      | Total time the queue spents in internal processing.
-| time_polling;       | Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message).
-| time_application;   | Total time spent outside work_queue_wait.
-| 
-| - | **Wrokers time statistics (in microseconds)**
-| time_workers_execute;             | Total time workers spent executing done tasks.
-| time_workers_execute_good;        | Total time workers spent executing done tasks with result WQ_RESULT_SUCCESS.
-| time_workers_execute_exhaustion;  | Total time workers spent executing tasks that exhausted resources.
-| 
-| - | **Transfer statistics**
-| bytes_sent;      | Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the manager.
-| bytes_received;  | Total number of file bytes (not including protocol control msg bytes) received from the workers by the manager.
-|  bandwidth;       | Average network bandwidth in MB/S observed by the manager when transferring to workers.
-| 
-| - | **Resources statistics**
-| capacity_tasks;      | The estimated number of tasks that this manager can effectively support.
-| capacity_cores;      | The estimated number of workers' cores that this manager can effectively support.
-| capacity_memory;     | The estimated number of workers' MB of RAM that this manager can effectively support.
-| capacity_disk;       | The estimated number of workers' MB of disk that this manager can effectively support.
-| capacity_instantaneous;       | The estimated number of tasks that this manager can support considering only the most recently completed task.
-| capacity_weighted;   | The estimated number of tasks that this manager can support placing greater weight on the most recently completed task.
-| 
-| total_cores;       | Total number of cores aggregated across the connected workers.
-| total_memory;      | Total memory in MB aggregated across the connected workers.
-| total_disk;	       | Total disk space in MB aggregated across the connected workers.
-| 
-| committed_cores;   | Committed number of cores aggregated across the connected workers.
-| committed_memory;  | Committed memory in MB aggregated across the connected workers.
-| committed_disk;	   | Committed disk space in MB aggregated across the connected workers.
-| 
-| max_cores;         | The highest number of cores observed among the connected workers.
-| max_memory;        | The largest memory size in MB observed among the connected workers.
-| max_disk;          | The largest disk space in MB observed among the connected workers.
-| 
-| min_cores;         | The lowest number of cores observed among the connected workers.
-| min_memory;        | The smallest memory size in MB observed among the connected workers.
-| min_disk;          | The smallest disk space in MB observed among the connected workers.
-| 
-| manager_load;       | In the range of [0,1]. If close to 1, then the manager is at full load and spends most of its time sending and receiving taks, and thus cannot accept connections from new workers. If close to 0, the manager is spending most of its time waiting for something to happen.
+| Field | Description |
+|-------|-------------|
+|       | **Stats for the current state of workers** |
+| workers_connected	    | Number of workers currently connected to the manager |
+| workers_init          | Number of workers connected, but that have not send their available resources report yet |
+| workers_idle          | Number of workers that are not running a task |
+| workers_busy          | Number of workers that are running at least one task |
+| workers_able          | Number of workers on which the largest task can run |
+|||
+|       | **Cumulative stats for workers** |
+| workers_joined        | Total number of worker connections that were established to the manager |
+| workers_removed       | Total number of worker connections that were released by the manager, idled-out, fast-aborted, or lost |
+| workers_released      | Total number of worker connections that were asked by the manager to disconnect |
+| workers_idled_out     | Total number of worker that disconnected for being idle |
+| workers_fast_aborted  | Total number of worker connections terminated for being too slow |
+| workers_blacklisted   | Total number of workers blacklisted by the manager (includes fast-aborted) |
+| workers_lost          | Total number of worker connections that were unexpectedly lost (does not include idled-out or fast-aborted) |
+|||
+|       | **Stats for the current state of tasks** |
+| tasks_waiting         | Number of tasks waiting to be dispatched |
+| tasks_on_workers      | Number of tasks currently dispatched to some worker |
+| tasks_running         | Number of tasks currently executing at some worker |
+| tasks_with_results    | Number of tasks with retrieved results and waiting to be returned to user |
+|||
+|       | **Cumulative stats for tasks** |
+| tasks_submitted            | Total number of tasks submitted to the queue |
+| tasks_dispatched           | Total number of tasks dispatch to workers |
+| tasks_done                 | Total number of tasks completed and returned to user (includes tasks_failed) |
+| tasks_failed               | Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS |
+| tasks_cancelled            | Total number of tasks cancelled |
+| tasks_exhausted_attempts   | Total number of task executions that failed given resource exhaustion |
+|||
+|       | **Manager time statistics (in microseconds)** |
+| time_when_started  | Absolute time at which the manager started |
+| time_send          | Total time spent in sending tasks to workers (tasks descriptions, and input files) |
+| time_receive       | Total time spent in receiving results from workers (output files) |
+| time_send_good     | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS |
+| time_receive_good  | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS |
+| time_status_msgs   | Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. |
+| time_internal      | Total time the queue spents in internal processing |
+| time_polling       | Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message) |
+| time_application   | Total time spent outside work_queue_wait |
+|||
+|       | **Wrokers time statistics (in microseconds)** |
+| time_workers_execute             | Total time workers spent executing done tasks |
+| time_workers_execute_good        | Total time workers spent executing done tasks with result WQ_RESULT_SUCCESS |
+| time_workers_execute_exhaustion  | Total time workers spent executing tasks that exhausted resources |
+|||
+|       | **Transfer statistics** |
+| bytes_sent      | Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the manager |
+| bytes_received  | Total number of file bytes (not including protocol control msg bytes) received from the workers by the manager |
+| bandwidth       | Average network bandwidth in MB/S observed by the manager when transferring to workers |
+|||
+|       | **Resources statistics** |
+| capacity_tasks      | The estimated number of tasks that this manager can effectively support |
+| capacity_cores      | The estimated number of workers' cores that this manager can effectively support |
+| capacity_memory     | The estimated number of workers' MB of RAM that this manager can effectively support |
+| capacity_disk       | The estimated number of workers' MB of disk that this manager can effectively support |
+| capacity_instantaneous       | The estimated number of tasks that this manager can support considering only the most recently completed task |
+| capacity_weighted   | The estimated number of tasks that this manager can support placing greater weight on the most recently completed task |
+|||
+| total_cores       | Total number of cores aggregated across the connected workers |
+| total_memory      | Total memory in MB aggregated across the connected workers |
+| total_disk	    | Total disk space in MB aggregated across the connected workers |
+|||
+| committed_cores   | Committed number of cores aggregated across the connected workers |
+| committed_memory  | Committed memory in MB aggregated across the connected workers |
+| committed_disk    | Committed disk space in MB aggregated across the connected workers |
+|||
+| max_cores         | The highest number of cores observed among the connected workers |
+| max_memory        | The largest memory size in MB observed among the connected workers |
+| max_disk          | The largest disk space in MB observed among the connected workers |
+|||
+| min_cores         | The lowest number of cores observed among the connected workers |
+| min_memory        | The smallest memory size in MB observed among the connected workers |
+| min_disk          | The smallest disk space in MB observed among the connected workers |
+|||
+| manager_load       | In the range of [0,1]. If close to 1, then the manager is at full load <br /> and spends most of its time sending and receiving taks, and thus <br /> cannot accept connections from new workers. If close to 0, the <br /> manager is spending most of its time waiting for something to happen. |
 
 ## Further Information
 
