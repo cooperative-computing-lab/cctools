@@ -1907,6 +1907,12 @@ The statistics available are:
 |||
 | manager_load       | In the range of [0,1]. If close to 1, then the manager is at full load <br /> and spends most of its time sending and receiving taks, and thus <br /> cannot accept connections from new workers. If close to 0, the <br /> manager is spending most of its time waiting for something to happen. |
 
+The script `work_queue_graph_workers` is an interactive visualization tool for
+Work Queue transaction logs based on Python `bokeh` package. It can be used to
+visualize the life time of tasks and workers, as well as diagnosing the effects
+of file transfer time on overall performance. See `man
+work_queue_graph_workers` for detailed information.
+
 ## Further Information
 
 For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
