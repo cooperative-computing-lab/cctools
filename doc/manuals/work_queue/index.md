@@ -1910,8 +1910,9 @@ The statistics available are:
 The script `work_queue_graph_workers` is an interactive visualization tool for
 Work Queue transaction logs based on Python `bokeh` package. It can be used to
 visualize the life time of tasks and workers, as well as diagnosing the effects
-of file transfer time on overall performance. See `man
-work_queue_graph_workers` for detailed information.
+of file transfer time on overall performance. See
+[work_queue_graph_workers(1)](../man_pages/work_queue_graph_workers.md) for
+detailed information.
 
 ## Further Information
 
