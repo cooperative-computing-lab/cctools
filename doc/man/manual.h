@@ -2,7 +2,7 @@ ifdef(`HTML',`include(manual_html.h)')dnl
 ifdef(`MD',`include(manual_md.h)')dnl
 ifdef(`MAN',`include(manual_man.h)')dnl
 changecom(`@@')dnl
-define(COPYRIGHT_BOILERPLATE,The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.)dnl
+define(COPYRIGHT_BOILERPLATE,The Cooperative Computing Tools are Copyright (C) 2005-2022 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.)dnl
 dnl
 define(SEE_ALSO_MAKEFLOW,
 `LIST_BEGIN
