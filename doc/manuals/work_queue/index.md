@@ -1793,17 +1793,18 @@ tasks. It is activated as follows:
 The first few lines of the log document the possible log records:
 
 ```text
-# time master_pid MASTER START|END
-# time master_pid WORKER worker_id host:port CONNECTION
-# time master_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)
-# time master_pid WORKER worker_id RESOURCES {resources}
-# time master_pid CATEGORY name MAX {resources_max_per_task}
-# time master_pid CATEGORY name MIN {resources_min_per_task_per_worker}
-# time master_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
-# time master_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}
-# time master_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
-# time master_pid TASK taskid WAITING_RETRIEVAL worker_address
-# time master_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
+# time manager_pid MANAGER START|END
+# time manager_pid WORKER worker_id host:port CONNECTION
+# time manager_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT
+# time manager_pid WORKER worker_id RESOURCES {resources}
+# time manager_pid CATEGORY name MAX {resources_max_per_task}
+# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}
+# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
+# time manager_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}
+# time manager_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
+# time manager_pid TASK taskid WAITING_RETRIEVAL worker_address
+# time manager_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
+# time manager_pid TRANSFER (INPUT|OUTPUT) taskid cache_flag sizeinmb walltime filename
 ```
 
 Lowercase words indicate values, and uppercase indicate constants. A bar (|) inside parentheses indicate a choice of possible constants. Variables encased in braces {} indicate a JSON dictionary. Here is an example of the first few records of a transactions log:
