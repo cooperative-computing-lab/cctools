@@ -319,7 +319,8 @@ def plot_task(tasks, outfile):
     show(bokeh.layouts.column(*figures.values(), sizing_mode="stretch_width"))
 
 
-def plot_worker(workers, outfile):
+# TODO: we need to know when exactly the worker is working
+def plot_worker(workers, tasks, outfile):
     # Connected time, Disconnect time, first task start time
     bokeh.io.output_file(outfile)
     source = ColumnDataSource(workers)
@@ -385,14 +386,13 @@ def main():
     if not outfile:
         outfile = logfile + ".html"
 
+    tasks = parse_tasks(logfile)
     if task_view:
-        tasks = parse_tasks(logfile)
         plot_task(tasks, outfile)
     elif worker_view:
         workers = parse_workers(logfile)
-        plot_worker(workers, outfile)
+        plot_worker(workers, tasks, outfile)
     else:
-        tasks = parse_tasks(logfile)
         plot_gantt(tasks, outfile)
 
 
