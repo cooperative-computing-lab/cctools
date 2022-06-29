@@ -254,9 +254,11 @@ def plot_gantt(tasks, outfile):
             y="order",
             left="start_time", right="end_time",
             source=source, view=view,
-            color=color
+            color=color,
+            legend_label=category
         )
 
+    p.legend.click_policy = "hide"
     p.add_tools(HoverTool(tooltips=TOOLTIPS))
     show(p)
 
