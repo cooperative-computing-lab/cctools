@@ -142,10 +142,9 @@ def parse_workers(logfile):
                            r"(?P<worker_id>\S+) \s+"
                            r"(?P<addr>\S+) \s+"
                            r"(?P<state>CONNECTION|DISCONNECTION)", re.X)
-    p_running = re.compile(r"(?P<time>\d+) .* TASK .* RUNNING \s+"
-                           r"(?P<addr>\S+)", re.X)
 
     workers  = {}
+    
     min_time = 0
     with open(logfile, 'r') as log:
         for line in log:
@@ -162,7 +161,7 @@ def parse_workers(logfile):
 
                 if state == "CONNECTION":
                     workers[worker] = {
-                        "arrive": time, "start": -1, "leave": -1
+                        "arrive": time,  "leave": -1
                     }
                 elif state == "DISCONNECTION":
                     if worker in workers:
@@ -230,6 +229,59 @@ def get_binding(tasks):
             slot.append(end_time)
 
     return {worker: len(slots[worker]) for worker in workers}, binding
+
+
+def get_idling(workers, tasks):
+    """
+    Maintain a tick points at the latest task end time, then iterate though
+    the tasks. Once the new task starts after the pointer, we know that in
+    between these two tasks the worker is idle.
+    """
+
+    # The idling period of each worker
+    workers["idle"] = [] * len(workers["addr"])
+    # The tick pointing to the end time of the last task iterated
+    workers["tick"] = [start_time for start_time in workers["start"]]
+
+    # Iterate through the tasks based on the start time
+    for task_idx in tasks["order"]:
+        start_time = tasks["start_time"][task_idx]
+        end_time   = tasks["end_time"][task_idx]
+        worker     = tasks["worker"][task_idx]
+        worker_idx = workers["addr"].index(worker)
+
+        # If the new task starts after the tick, the worker is idle
+        if start_time > workers["tick"][worker_idx]:
+            workers["idle"][worker_idx].append(
+                (workers["tick"][worker_idx], start_time)
+            )
+
+        # Update the tick to the end time of the task
+        workers["tick"][worker] = end_time
+
+    # Between the last task and the leave time
+    # Note that in parse_workers, the laeve time is made sure to be valid
+    for i in range(len(workers["addr"])):
+        if workers["leave"][i] > workers["tick"][i]:
+            workers["idle"][i].append(
+                (workers["tick"][i], workers["leave"][i])
+            )
+
+    # For further usage, also calculate the working time here
+    for i in range(len(workers["addr"])):
+        start = workers["start"][i]
+        leave = workers["leave"][i]
+        idle  = workers["idle"][i]
+
+        # Maintain a tick points to the end of a idle inverval
+        tick = start # Initilize the tick as the arrival time of worker
+        for idle_start, idle_end in idle:
+            if start > tick:
+                workers["idle"][i].append((tick, start))
+                tick = end
+            else:
+                tick = end
+    return workers
 
 
 def plot_gantt(tasks, outfile):
