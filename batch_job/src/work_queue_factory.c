@@ -112,6 +112,8 @@ static struct rmsummary *resources = NULL;
 
 static int64_t factory_timeout = 0;
 
+static char *factory_name = NULL;
+
 struct batch_queue *queue = 0;
 
 // Whether workers should use ssl. If using the catalog server and the manager
@@ -1157,7 +1159,8 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_RUN_OS,
 		LONG_OPT_PARENT_DEATH,
 		LONG_OPT_PYTHON_PACKAGE,
-		LONG_OPT_USE_SSL
+		LONG_OPT_USE_SSL,
+		LONG_OPT_FACTORY_NAME
 	};
 
 static const struct option long_options[] = {
@@ -1205,6 +1208,7 @@ static const struct option long_options[] = {
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 	{"ssl",no_argument, 0, LONG_OPT_USE_SSL},
+	{"factory-name",required_argument, 0, LONG_OPT_FACTORY_NAME},
 	{0,0,0,0}
 };
 
@@ -1405,6 +1409,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_USE_SSL:
 				manual_ssl_option=1;
+				break;
+			case LONG_OPT_FACTORY_NAME:
+				factory_name = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);
