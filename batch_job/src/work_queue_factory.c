@@ -737,6 +737,8 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, int, JX_INTEGER, integer_value)
 
+	assign_new_value(new_factory_name, factory_name, factory-name, const char *, JX_STRING, string_value)
+
 	/* first try with old master option, then with manager */
 	assign_new_value(new_project_regex_old_opt, project_regex, master-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_project_regex, project_regex, manager-name, const char *, JX_STRING, string_value)
@@ -821,6 +823,11 @@ int read_config_file(const char *config_file) {
 		condor_requirements = xxstrdup(new_condor_requirements);
 	}
 
+	if(new_factory_name && new_factory_name != factory_name) {
+		free(factory_name);
+		factory_name = xxstrdup(new_factory_name);
+	}
+
 	last_time_modified = new_time_modified;
 	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
@@ -835,6 +842,10 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "tasks-per-worker: %d\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? (int) resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
 	fprintf(stdout, "cores: %s\n", rmsummary_resource_to_str("cores", resources->cores > 0 ? resources->cores : 1, 0));
+
+	if(factory_name) {
+		fprintf(stdout, "factory_name: %s\n", factory_name);
+	}
 
 	if(condor_requirements) {
 		fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
