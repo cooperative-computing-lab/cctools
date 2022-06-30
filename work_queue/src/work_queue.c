@@ -2514,7 +2514,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 }
 
 /*
-queue_to_jx examines the overall queue status and creates
+queue_lean_to_jx examines the overall queue status and creates
 an jx expression which can be sent to the catalog.
 It different from queue_to_jx in that only the minimum information that
 workers, work_queue_status and the work_queue_factory need.
