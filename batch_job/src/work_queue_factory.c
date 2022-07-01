@@ -622,6 +622,7 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	if(using_catalog) {
 		jx_insert_string(j, "project_regex",    project_regex);
 		jx_insert_string(j, "submission_regex", submission_regex);
+		jx_insert_integer(j, "max_workers", workers_max);
 	}
 
 	int to_connect = submitted - connected;
