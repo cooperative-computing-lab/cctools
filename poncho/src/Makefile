@@ -14,8 +14,7 @@ install:
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(ALIASES) $(CCTOOLS_INSTALL_DIR)/bin/
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)/poncho
-	for file in $(PROGRAMS) ; do cp $$file $(CCTOOLS_PYTHON3_PATH)/poncho/$$file.py ; done
-	cp setup.py $(CCTOOLS_PYTHON3_PATH)/poncho/
+	cp -a poncho $(CCTOOLS_PYTHON3_PATH)/
 
 
 .PHONY: all clean install test
