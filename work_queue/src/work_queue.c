@@ -7404,10 +7404,7 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 		rmsummary_print_buffer(&B, task_min_resources(q, t), 1);
 	} else if(state == WORK_QUEUE_TASK_CANCELED) {
 			/* do not add any info */
-	} else if(state == WORK_QUEUE_TASK_RETRIEVED) {
-		buffer_printf(&B, " %s ", work_queue_result_str(t->result));
-		buffer_printf(&B, " %d ", t->return_status);
-	} else if(state == WORK_QUEUE_TASK_DONE) {
+	} else if(state == WORK_QUEUE_TASK_RETRIEVED || state == WORK_QUEUE_TASK_DONE) {
 		buffer_printf(&B, " %s ", work_queue_result_str(t->result));
 		buffer_printf(&B, " %d ", t->return_status);
 
