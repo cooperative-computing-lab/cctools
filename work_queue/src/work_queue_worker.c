@@ -1937,6 +1937,7 @@ static void work_for_manager(struct link *manager) {
 							continue;
 						}
 						p->coprocess_index = coprocess_index;
+						coprocess_info[coprocess_index].state = WORK_QUEUE_COPROCESS_RUNNING;
 					}
 					start_process(p);
 					task_event++;
@@ -3117,6 +3118,7 @@ int main(int argc, char *argv[])
 		}
 		free(coprocess_command);
 		free(coprocess_name);
+		free(coprocess_info);
 	}
 
 	workspace_delete();

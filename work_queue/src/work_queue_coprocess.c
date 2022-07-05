@@ -256,12 +256,11 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 	time_t stoptime = curr_time + timeout;
 
 	int connected = 0;
-	struct link *link;
 	int tries = 0;
 	// retry connection for ~30 seconds
 	while(!connected && tries < 30) {
-		link = link_connect(addr, coprocess->port, stoptime);
-		if(link) {
+		coprocess->link = link_connect(addr, coprocess->port, stoptime);
+		if(coprocess->link) {
 			connected = 1;
 		} else {
 			tries++;
@@ -269,7 +268,7 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 		}
 	}
 	// if we can't connect at all, abort
-	if(!link) {
+	if(!coprocess->link) {
 		fatal("connection error: %s", strerror(errno));
 	}
 
@@ -277,13 +276,13 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 	curr_time = timestamp_get();
 	stoptime = curr_time + timeout;
 	// send the length of the data first
-	int bytes_sent = link_printf(link, stoptime, "%s %d\n", function_name, len);
+	int bytes_sent = link_printf(coprocess->link, stoptime, "%s %d\n", function_name, len);
 	if(bytes_sent < 0) {
 		fatal("could not send input data size: %s", strerror(errno));
 	}
 
 	// send actual data
-	bytes_sent = link_write(link, function_input, len, stoptime);
+	bytes_sent = link_write(coprocess->link, function_input, len, stoptime);
 	if(bytes_sent < 0) {
 		fatal("could not send input data: %s", strerror(errno));
 	}
@@ -293,13 +292,13 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 	// read in the length of the response
 	char line[WORK_QUEUE_LINE_MAX];
 	int length;
-	link_readline(link, line, sizeof(line), stoptime);
+	link_readline(coprocess->link, line, sizeof(line), stoptime);
 	sscanf(line, "output %d", &length);
 
 	char *output = calloc(length + 1, sizeof(char));
 	
 	// read the response
-	link_read(link, output, length, stoptime);
+	link_read(coprocess->link, output, length, stoptime);
 
 	return output;
 }

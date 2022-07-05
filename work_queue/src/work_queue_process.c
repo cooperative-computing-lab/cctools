@@ -107,6 +107,9 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 
 void work_queue_process_delete(struct work_queue_process *p)
 {
+	if(p->coprocess_index != -1) {
+		coprocess_info[p->coprocess_index].state = WORK_QUEUE_COPROCESS_READY;
+	}
 
 	if(p->task)
 		work_queue_task_delete(p->task);
