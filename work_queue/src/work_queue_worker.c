@@ -1286,7 +1286,7 @@ static int do_unlink(const char *path)
 		return 0;
 	}
 
-	trash_file(path);
+	trash_file(cached_path);
 
 	return 1;
 }
