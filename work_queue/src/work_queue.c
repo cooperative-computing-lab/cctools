@@ -1826,7 +1826,7 @@ static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work
 		return MSG_FAILURE;
 
 	if(worker_protocol!=WORK_QUEUE_PROTOCOL_VERSION) {
-		debug(D_WQ|D_NOTICE,"worker (%s) is using work queue protocol %d, but I am using protocol %d",w->addrport,worker_protocol,WORK_QUEUE_PROTOCOL_VERSION);
+		debug(D_WQ|D_NOTICE,"rejecting worker (%s) as it uses protocol %d. The manager is using protocol %d.",w->addrport,worker_protocol,WORK_QUEUE_PROTOCOL_VERSION);
 		work_queue_block_host(q, w->hostname);
 		return MSG_FAILURE;
 	}
