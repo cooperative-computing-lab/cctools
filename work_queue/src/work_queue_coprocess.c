@@ -27,7 +27,6 @@ static int coprocess_in[2];
 static int coprocess_out[2];
 static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
-
 int work_queue_coprocess_write(char *buffer, int len, int timeout)
 {
 	struct pollfd read_poll = {coprocess_in[1], POLLOUT, 0};
@@ -191,20 +190,20 @@ char *work_queue_coprocess_setup(int *coprocess_port)
     return name;
 }
 
-char *work_queue_coprocess_start(char *command, int *coprocess_port) {
+char *work_queue_coprocess_start(char *command, struct work_queue_coprocess *coprocess) {
 	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
 		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
 		return NULL;
 	}
 	coprocess_pid = fork();
 	if(coprocess_pid > 0) {
-		char *name = work_queue_coprocess_setup(coprocess_port);
-
+		char *name = work_queue_coprocess_setup(&coprocess->port);
+		coprocess->name = name;
 		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
 			fatal("coprocess error parent: %s\n", strerror(errno));
 		}
 		debug(D_WQ, "coprocess running command %s\n", command);
-
+		coprocess->state = WORK_QUEUE_COPROCESS_READY;
         return name;
 	}
     else if(coprocess_pid == 0) {
@@ -244,7 +243,7 @@ int work_queue_coprocess_check()
     return 1;
 }
 
-char *work_queue_coprocess_run(const char *function_name, const char *function_input, int coprocess_port) {
+char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess) {
 	char addr[DOMAIN_NAME_MAX];
 	int len;
 	int timeout = 60000000; // one minute, can be changed
@@ -261,7 +260,7 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 	int tries = 0;
 	// retry connection for ~30 seconds
 	while(!connected && tries < 30) {
-		link = link_connect(addr, coprocess_port, stoptime);
+		link = link_connect(addr, coprocess->port, stoptime);
 		if(link) {
 			connected = 1;
 		} else {
@@ -303,5 +302,15 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 	link_read(link, output, length, stoptime);
 
 	return output;
+}
+
+int work_queue_coprocess_find_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses, work_queue_coprocess_state_t state) {
+	for (int i = 0; i < number_of_coprocesses; i++) {
+		if ( (coprocess_info + i)->state == state)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
 

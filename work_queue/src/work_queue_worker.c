@@ -228,7 +228,8 @@ static int tlq_port = 0;
 
 static char *coprocess_command = NULL;
 static char *coprocess_name = NULL;
-static int coprocess_port = -1;
+static int number_of_coprocess_instances = -1;
+struct work_queue_coprocess *coprocess_info = NULL;
 
 __attribute__ (( format(printf,2,3) ))
 static void send_manager_message( struct link *manager, const char *fmt, ... )
@@ -1929,12 +1930,13 @@ static void work_for_manager(struct link *manager) {
 				if(!p) {
 					break;
 				} else if(task_resources_fit_now(p->task)) {
-					// attach the function name, port, and type to process, if applicable
-					if(coprocess_command) {
-						/* for coprocesses, p->task->command_line is the name
-						 * of the function to execute */
-						p->coprocess_name = xxstrdup(coprocess_name);
-						p->coprocess_port = coprocess_port;
+					if (p->task->coprocess) {
+						int coprocess_index = work_queue_coprocess_find_state(coprocess_info, number_of_coprocess_instances, WORK_QUEUE_COPROCESS_READY);
+						if (coprocess_index == -1) {
+							list_push_tail(procs_waiting, p);
+							continue;
+						}
+						p->coprocess_index = coprocess_index;
 					}
 					start_process(p);
 					task_event++;
@@ -2570,6 +2572,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
+	printf( " %-30s Specify the number of coprocesses the worker should maintain.\n", "--num_coprocesses=<number>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2578,7 +2581,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION};
+	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_NUM_COPROCESS, LONG_OPT_PYTHON_FUNCTION};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2626,6 +2629,7 @@ static const struct option long_options[] = {
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
 	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
+	{"num_coprocess",       required_argument,  0,  LONG_OPT_NUM_COPROCESS},
 	{0,0,0,0}
 };
 
@@ -2876,6 +2880,13 @@ int main(int argc, char *argv[])
 			coprocess_command = calloc(PATH_MAX, sizeof(char));
 			path_absolute(optarg, coprocess_command, 1);
 			realloc(coprocess_command, strlen(coprocess_command)+1);
+			// default to one instance if number not specified
+			if (number_of_coprocess_instances == -1) {
+				number_of_coprocess_instances = 1;
+			}
+			break;
+		case LONG_OPT_NUM_COPROCESS:
+			number_of_coprocess_instances = atoi(optarg);
 			break;
 		default:
 			show_help(argv[0]);
@@ -3027,9 +3038,21 @@ int main(int argc, char *argv[])
 		total_resources->gpus.total);
 
 	if(coprocess_command) {
+		coprocess_info = malloc(sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
+		memset(coprocess_info, 0, sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
 		/* start coprocess per manager attempt */
-		coprocess_name = work_queue_coprocess_start(coprocess_command, &coprocess_port);
+		for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
+			coprocess_info[coprocess_num] = (struct work_queue_coprocess) {coprocess_command, NULL, -1, -1, WORK_QUEUE_COPROCESS_UNINITIALIZED, NULL};
+			work_queue_coprocess_start(coprocess_command, &coprocess_info[coprocess_num]);
+		}
+		coprocess_name = xxstrdup(coprocess_info[0].name);
 		hash_table_insert(features, coprocess_name, (void **) 1);
+	}
+	else {
+		if (number_of_coprocess_instances != -1)
+		{
+			fatal("No coprocess specified but number of coprocesses given\n");
+		}
 	}
 
 	while(1) {
@@ -3089,6 +3112,10 @@ int main(int argc, char *argv[])
 
 	if (coprocess_command) {
 		work_queue_coprocess_terminate();
+		for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
+			free(coprocess_info[coprocess_num].name);
+		}
+		free(coprocess_command);
 		free(coprocess_name);
 	}
 
