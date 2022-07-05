@@ -1,6 +1,0 @@
-{
-    "files.associations": {
-        "work_queue_protocol.h": "c",
-        "debug.h": "c"
-    }
-}
