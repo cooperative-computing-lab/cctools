@@ -790,8 +790,8 @@ static int handle_tasks(struct link *manager)
 
 			itable_insert(procs_complete, p->task->taskid, p);
 
-			if (p->coprocess_index != -1) {
-				coprocess_info[p->coprocess_index].state = WORK_QUEUE_COPROCESS_READY;
+			if (p->coprocess != NULL) {
+				( (struct work_queue_coprocess *) p->coprocess )->state = WORK_QUEUE_COPROCESS_READY;
 			}
 
 		}
@@ -1935,13 +1935,13 @@ static void work_for_manager(struct link *manager) {
 					break;
 				} else if(task_resources_fit_now(p->task)) {
 					if (p->task->coprocess) {
-						int coprocess_index = work_queue_coprocess_find_state(coprocess_info, number_of_coprocess_instances, WORK_QUEUE_COPROCESS_READY);
-						if (coprocess_index == -1) {
+						struct work_queue_coprocess *ready_coprocess = work_queue_coprocess_find_state(coprocess_info, number_of_coprocess_instances, WORK_QUEUE_COPROCESS_READY);
+						if (ready_coprocess == NULL) {
 							list_push_tail(procs_waiting, p);
 							continue;
 						}
-						p->coprocess_index = coprocess_index;
-						coprocess_info[coprocess_index].state = WORK_QUEUE_COPROCESS_RUNNING;
+						p->coprocess = ready_coprocess;
+						ready_coprocess->state = WORK_QUEUE_COPROCESS_RUNNING;
 					}
 					start_process(p);
 					task_event++;

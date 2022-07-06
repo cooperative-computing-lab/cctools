@@ -26,14 +26,12 @@ struct work_queue_coprocess {
     struct link *link;
 };
 
-extern struct work_queue_coprocess *coprocess_info;
-
 /* return the name of the coprocess */
 char *work_queue_coprocess_start(struct work_queue_coprocess *coprocess);
 void work_queue_coprocess_terminate(struct work_queue_coprocess *coprocess);
 void work_queue_coprocess_shutdown(struct work_queue_coprocess *coprocess_info, int num_coprocesses);
 int work_queue_coprocess_check(struct work_queue_coprocess *coprocess);
 char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess);
-int work_queue_coprocess_find_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses, work_queue_coprocess_state_t state);
+struct work_queue_coprocess *work_queue_coprocess_find_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses, work_queue_coprocess_state_t state);
 
 #endif

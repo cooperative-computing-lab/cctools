@@ -70,7 +70,7 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 	memset(p, 0, sizeof(*p));
 	p->task = wq_task;
 	p->task->disk_allocation_exhausted = 0;
-	p->coprocess_index = -1;
+	p->coprocess = NULL;
 	//placeholder filesystem until permanent solution
 	char *fs = "ext2";
 
@@ -107,10 +107,6 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 
 void work_queue_process_delete(struct work_queue_process *p)
 {
-	if(p->coprocess_index != -1) {
-		coprocess_info[p->coprocess_index].state = WORK_QUEUE_COPROCESS_READY;
-	}
-
 	if(p->task)
 		work_queue_task_delete(p->task);
 
@@ -279,7 +275,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 		if(result == -1)
 			fatal("could not dup /dev/null to stdin: %s", strerror(errno));
 
-		if (p->task->coprocess == NULL) {
+		if (p->coprocess == NULL) {
 			result = dup2(p->output_fd, STDOUT_FILENO);
 			if(result == -1)
 				fatal("could not dup pipe to stdout: %s", strerror(errno));
@@ -291,10 +287,9 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 		else {
 			// load data from input file
 			char *input = load_input_file(p->task);
-			struct work_queue_coprocess *coprocess = coprocess_info + p->coprocess_index;
 
 			// call invoke_coprocess_function
-		 	char *output = work_queue_coprocess_run(p->task->command_line, input, coprocess);
+		 	char *output = work_queue_coprocess_run(p->task->command_line, input, p->coprocess);
 
 			// write data to output file
 			full_write(p->output_fd, output, strlen(output));

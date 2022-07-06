@@ -310,13 +310,12 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 	return output;
 }
 
-int work_queue_coprocess_find_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses, work_queue_coprocess_state_t state) {
+struct work_queue_coprocess *work_queue_coprocess_find_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses, work_queue_coprocess_state_t state) {
 	for (int i = 0; i < number_of_coprocesses; i++) {
-		if ( (coprocess_info + i)->state == state)
-		{
-			return i;
+		if ( (coprocess_info + i)->state == state) {
+			return coprocess_info + i;
 		}
 	}
-	return -1;
+	return NULL;
 }
 
