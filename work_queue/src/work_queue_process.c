@@ -291,7 +291,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 		else {
 			// load data from input file
 			char *input = load_input_file(p->task);
-			struct work_queue_coprocess *coprocess = &coprocess_info[p->coprocess_index];
+			struct work_queue_coprocess *coprocess = coprocess_info + p->coprocess_index;
 
 			// call invoke_coprocess_function
 		 	char *output = work_queue_coprocess_run(p->task->command_line, input, coprocess);

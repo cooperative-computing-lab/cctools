@@ -22,14 +22,11 @@ See the file COPYING for details.
 #include "process.h"
 #include "stringtools.h"
 
-static pid_t coprocess_pid = 0;
-static int coprocess_in[2];
-static int coprocess_out[2];
 static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
-int work_queue_coprocess_write(char *buffer, int len, int timeout)
+int work_queue_coprocess_write(char *buffer, int len, int timeout, struct work_queue_coprocess *coprocess)
 {
-	struct pollfd read_poll = {coprocess_in[1], POLLOUT, 0};
+	struct pollfd read_poll = {coprocess->pipe_in[1], POLLOUT, 0};
 	int poll_result = poll(&read_poll, 1, timeout);
 	if (poll_result < 0)
 	{
@@ -51,7 +48,7 @@ int work_queue_coprocess_write(char *buffer, int len, int timeout)
 		debug(D_WQ, "Data able to be written to pipe: %s\n", strerror(errno));
 		return -2;
 	}
-	int bytes_written = write(coprocess_in[1], buffer, len);
+	int bytes_written = write(coprocess->pipe_in[1], buffer, len);
 	if (bytes_written < 0)
 	{
 		if (errno == EINTR)
@@ -65,8 +62,8 @@ int work_queue_coprocess_write(char *buffer, int len, int timeout)
 	return bytes_written;
 }
 
-int work_queue_coprocess_read(char *buffer, int len, int timeout){
-	struct pollfd read_poll = {coprocess_out[0], POLLIN, 0};
+int work_queue_coprocess_read(char *buffer, int len, int timeout, struct work_queue_coprocess *coprocess){
+	struct pollfd read_poll = {coprocess->pipe_out[0], POLLIN, 0};
 	int poll_result = poll(&read_poll, 1, timeout);
 	if (poll_result < 0)
 	{
@@ -89,7 +86,7 @@ int work_queue_coprocess_read(char *buffer, int len, int timeout){
 		return -2;
 	}
 
-	int bytes_read = read(coprocess_out[0], buffer, len - 1);
+	int bytes_read = read(coprocess->pipe_out[0], buffer, len - 1);
 	if (bytes_read < 0)
 	{
 		if (errno == EINTR)
@@ -104,7 +101,7 @@ int work_queue_coprocess_read(char *buffer, int len, int timeout){
 	return bytes_read;
 }
 
-char *work_queue_coprocess_setup(int *coprocess_port)
+int work_queue_coprocess_setup(struct work_queue_coprocess *coprocess)
 {
 	int json_offset, json_length = -1, cumulative_bytes_read = 0, buffer_offset = 0;
 	char buffer[WORK_QUEUE_LINE_MAX];
@@ -113,7 +110,7 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 
 	while (1)
 	{
-		int curr_bytes_read = work_queue_coprocess_read(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout);
+		int curr_bytes_read = work_queue_coprocess_read(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout, coprocess);
 		if (curr_bytes_read < 0) {
 			fatal("Unable to get information from coprocess\n");
 		}
@@ -156,7 +153,7 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 
 	if ( ( (envelope_size - buffer + 1) + json_length + 1 ) != cumulative_bytes_read)
 	{
-		return NULL;
+		return -1;
 	}
 
 	struct jx *item, *coprocess_json = jx_parse_string(envelope_size + 1);
@@ -174,7 +171,7 @@ char *work_queue_coprocess_setup(int *coprocess_port)
 		}
 		else if (!strcmp(key, "port")) {
 			char *temp_port = jx_print_string(item);
-			*coprocess_port = atoi(temp_port);
+			coprocess->port = atoi(temp_port);
 			free(temp_port);
 		}
 		else {
@@ -187,39 +184,42 @@ char *work_queue_coprocess_setup(int *coprocess_port)
     if(!name) {
 		fatal("couldn't find \"name\" in coprocess configuration\n");
     }
-    return name;
+
+	coprocess->name = name;
+
+    return 0;
 }
 
-char *work_queue_coprocess_start(char *command, struct work_queue_coprocess *coprocess) {
-	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
+char *work_queue_coprocess_start(struct work_queue_coprocess *coprocess) {
+	if (pipe(coprocess->pipe_in) || pipe(coprocess->pipe_out)) { // create pipes to communicate with the coprocess
 		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
-		return NULL;
 	}
-	coprocess_pid = fork();
-	if(coprocess_pid > 0) {
-		char *name = work_queue_coprocess_setup(&coprocess->port);
-		coprocess->name = name;
-		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
+	coprocess->pid = fork();
+	if(coprocess->pid > 0) {
+		if (work_queue_coprocess_setup(coprocess)) {
+			fatal("Unable to setup coprocess");
+		}
+		if (close(coprocess->pipe_in[0]) || close(coprocess->pipe_out[1])) {
 			fatal("coprocess error parent: %s\n", strerror(errno));
 		}
-		debug(D_WQ, "coprocess running command %s\n", command);
+		debug(D_WQ, "coprocess running command %s\n", coprocess->command);
 		coprocess->state = WORK_QUEUE_COPROCESS_READY;
-        return name;
+        return coprocess->name;
 	}
-    else if(coprocess_pid == 0) {
-        if ( (close(coprocess_in[1]) < 0) || (close(coprocess_out[0]) < 0) ) {
+    else if(coprocess->pid == 0) {
+        if ( (close(coprocess->pipe_in[1]) < 0) || (close(coprocess->pipe_out[0]) < 0) ) {
             fatal("coprocess error: %s\n", strerror(errno));
         }
 
-        if (dup2(coprocess_in[0], 0) < 0) {
+        if (dup2(coprocess->pipe_in[0], 0) < 0) {
             fatal("coprocess could not attach to stdin: %s\n", strerror(errno));
         }
 
-        if (dup2(coprocess_out[1], 1) < 0) {
+        if (dup2(coprocess->pipe_out[1], 1) < 0) {
             fatal("coprocess could not attach pipe to stdout: %s\n", strerror(errno));
         }
-        execlp(command, command, (char *) 0);
-        fatal("failed to execute %s: %s\n", command, strerror(errno));
+        execlp(coprocess->command, coprocess->command, (char *) 0);
+        fatal("failed to execute %s: %s\n", coprocess->command, strerror(errno));
 	}
     else {
         fatal("couldn't create fork coprocess: %s\n", strerror(errno));
@@ -228,13 +228,20 @@ char *work_queue_coprocess_start(char *command, struct work_queue_coprocess *cop
     return NULL;
 }
 
-void work_queue_coprocess_terminate() {
-    process_kill_waitpid(coprocess_pid, 30);
+void work_queue_coprocess_terminate(struct work_queue_coprocess *coprocess) {
+    process_kill_waitpid(coprocess->pid, 30);
+	coprocess->state = WORK_QUEUE_COPROCESS_DEAD;
 }
 
-int work_queue_coprocess_check()
+void work_queue_coprocess_shutdown(struct work_queue_coprocess *coprocess_info, int num_coprocesses) {
+	for (int coprocess_index = 0; coprocess_index < num_coprocesses; coprocess_index++) {
+		work_queue_coprocess_terminate(coprocess_info + coprocess_index);
+	}
+}
+
+int work_queue_coprocess_check(struct work_queue_coprocess *coprocess)
 {
-	struct process_info *p = process_waitpid(coprocess_pid, 0);
+	struct process_info *p = process_waitpid(coprocess->pid, 0);
 	if (!p) {
         return 0;
 	}

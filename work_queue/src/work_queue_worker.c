@@ -790,6 +790,10 @@ static int handle_tasks(struct link *manager)
 
 			itable_insert(procs_complete, p->task->taskid, p);
 
+			if (p->coprocess_index != -1) {
+				coprocess_info[p->coprocess_index].state = WORK_QUEUE_COPROCESS_READY;
+			}
+
 		}
 
 	}
@@ -2630,7 +2634,7 @@ static const struct option long_options[] = {
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
 	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
-	{"num_coprocess",       required_argument,  0,  LONG_OPT_NUM_COPROCESS},
+	{"num_coprocesses",     required_argument,  0,  LONG_OPT_NUM_COPROCESS},
 	{0,0,0,0}
 };
 
@@ -3043,8 +3047,10 @@ int main(int argc, char *argv[])
 		memset(coprocess_info, 0, sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
 		/* start coprocess per manager attempt */
 		for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
-			coprocess_info[coprocess_num] = (struct work_queue_coprocess) {coprocess_command, NULL, -1, -1, WORK_QUEUE_COPROCESS_UNINITIALIZED, NULL};
-			work_queue_coprocess_start(coprocess_command, &coprocess_info[coprocess_num]);
+			coprocess_info[coprocess_num] = 
+			(struct work_queue_coprocess) {NULL, NULL, -1, -1, WORK_QUEUE_COPROCESS_UNINITIALIZED, {-1, -1}, {-1, -1}, NULL};
+			coprocess_info[coprocess_num].command = xxstrdup(coprocess_command);
+			work_queue_coprocess_start(&coprocess_info[coprocess_num]);
 		}
 		coprocess_name = xxstrdup(coprocess_info[0].name);
 		hash_table_insert(features, coprocess_name, (void **) 1);
@@ -3112,9 +3118,10 @@ int main(int argc, char *argv[])
 	}
 
 	if (coprocess_command) {
-		work_queue_coprocess_terminate();
+		work_queue_coprocess_shutdown(coprocess_info, number_of_coprocess_instances);
 		for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
 			free(coprocess_info[coprocess_num].name);
+			free(coprocess_info[coprocess_num].command);
 		}
 		free(coprocess_command);
 		free(coprocess_name);
