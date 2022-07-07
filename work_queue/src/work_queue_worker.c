@@ -708,7 +708,7 @@ and if they have exited, move them into the procs_complete table
 for later processing.
 */
 
-static int handle_tasks(struct link *manager)
+static int handle_completed_tasks(struct link *manager)
 {
 	struct work_queue_process *p;
 	pid_t pid;
@@ -1855,7 +1855,7 @@ static void work_for_manager(struct link *manager) {
 
 		expire_procs_running();
 
-		ok &= handle_tasks(manager);
+		ok &= handle_completed_tasks(manager);
 
 		measure_worker_resources();
 
