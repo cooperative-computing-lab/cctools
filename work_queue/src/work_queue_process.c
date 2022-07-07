@@ -117,7 +117,7 @@ static int transfer_remote_input_files( struct work_queue_process *p )
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
-			if(f->flags&&WORK_QUEUE_URL) {
+			if(f->type==WORK_QUEUE_URL) {
 				char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
 				result = transfer_remote_input_file(p,f->payload,f->remote_name);
 				free(sandbox_name);
