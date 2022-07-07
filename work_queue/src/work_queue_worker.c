@@ -674,7 +674,34 @@ int is_disk_allocation_exhausted( struct work_queue_process *p )
 	return result;
 }
 
+/*
+Move all output files of a completed process back into the proper cache location.
+This function deliberately does not fail.  If any of the desired outputs was not
+created, we still want the task to be marked as completed and sent back to the
+manager.  The manager will handle the consequences of missing output files.
+*/
 
+void transfer_outputs_to_cache( struct work_queue_process *p )
+{
+	struct work_queue_file *f;
+	list_first_item(p->task->output_files);
+	while((f = list_next_item(p->task->output_files))) {
+
+		char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
+
+		debug(D_WQ,"moving output file from %s to %s",sandbox_name,f->payload);
+
+		/* First we try a cheap rename. It that does not work, we try to copy the file. */
+		if(rename(sandbox_name,f->payload) == -1) {
+			debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
+			if(copy_file_to_file(sandbox_name, f->payload)  == -1) {
+				debug(D_WQ, "could not copy output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
+			}
+		}
+		free(sandbox_name);
+	}
+}
+		
 /*
 Scan over all of the processes known by the worker,
 and if they have exited, move them into the procs_complete table
@@ -717,30 +744,10 @@ static int handle_tasks(struct link *manager)
 
 			work_queue_gpus_free(p->task->taskid);
 
+			transfer_outputs_to_cache(p);
+
 			itable_remove(procs_running, p->pid);
 			itable_firstkey(procs_running);
-
-			// Output files must be moved back into the cache directory.
-
-			struct work_queue_file *f;
-			list_first_item(p->task->output_files);
-			while((f = list_next_item(p->task->output_files))) {
-
-				char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
-
-				debug(D_WQ,"moving output file from %s to %s",sandbox_name,f->payload);
-
-				/* First we try a cheap rename. It that does not work, we try to copy the file. */
-				if(rename(sandbox_name,f->payload) == -1) {
-					debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
-					if(copy_file_to_file(sandbox_name, f->payload)  == -1) {
-						debug(D_WQ, "could not copy output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
-					}
-				}
-
-				free(sandbox_name);
-			}
-
 			itable_insert(procs_complete, p->task->taskid, p);
 
 		}
