@@ -36,14 +36,33 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+/*
+Create the task sandbox directory.  If disk allocation is enabled,
+make an allocation, otherwise just make a directory.  Create
+temporary directories inside as well.
+*/
 
-// return 0 on error, 1 otherwise
-static int create_task_directories(struct work_queue_process *p) {
-	char tmpdir_template[1024];
-
+static int create_task_directories( struct work_queue_process *p, int disk_allocation )
+{
 	p->sandbox = string_format("t.%d", p->task->taskid);
-	if(!create_dir(p->sandbox, 0777)) {
-		return 0;
+
+	if(disk_allocation) {
+		work_queue_process_compute_disk_needed(p);
+		if(p->task->resources_requested->disk > 0) {
+			int64_t size = (p->task->resources_requested->disk) * 1024;
+			if(disk_alloc_create(p->sandbox, "ext2", size) == 0) {
+				p->loop_mount = 1;
+				debug(D_WQ, "allocated %"PRId64"MB in %s\n",size,p->sandbox);
+				// keep going and fall through
+			} else {
+				debug(D_WQ, "couldn't allocate %"PRId64"MB in %s\n",size,p->sandbox);
+				return 0;
+			}
+		} else {
+			if(!create_dir(p->sandbox, 0777)) return 0;
+		}
+	} else {
+		if(!create_dir(p->sandbox, 0777)) return 0;
 	}
 
 	char absolute[1024];
@@ -51,6 +70,7 @@ static int create_task_directories(struct work_queue_process *p) {
 	free(p->sandbox);
 	p->sandbox = xxstrdup(absolute);
 
+	char tmpdir_template[1024];
 	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
 	if(mkdtemp(tmpdir_template) == NULL) {
 		return 0;
@@ -64,44 +84,74 @@ static int create_task_directories(struct work_queue_process *p) {
 	return 1;
 }
 
+/*
+Transfer a single input file from a url to a local filename by using /usr/bin/curl.
+*/
+
+static int transfer_remote_input_file( struct work_queue_process *p, const char *url, const char *filename )
+{
+	char * command = string_format("curl -f -o \"%s\" \"%s\"",filename,url);
+	debug(D_WQ,"transfer %s to %s using %s",url,filename,command);
+	int result = system(command);
+	free(command);
+	if(result==0) {
+		debug(D_WQ,"transfer %s success",url);
+		return 1;
+	} else {
+		debug(D_WQ,"transfer %s failed",url);
+		return 0;
+	}
+}
+
+/*
+Transfer all files that have a url source into the local sandbox directory.
+(Later improvement: load these into the cache directory.)
+*/
+
+static int transfer_remote_input_files( struct work_queue_process *p )
+{
+	struct work_queue_task *t = p->task;
+	struct work_queue_file *f;
+	int result;
+	
+	if(t->input_files) {
+		list_first_item(t->input_files);
+		while((f = list_next_item(t->input_files))) {
+			if(f->flags&&WORK_QUEUE_URL) {
+				char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
+				result = transfer_remote_input_file(p,f->payload,f->remote_name);
+				free(sandbox_name);
+				if(!result) return 0;
+			}
+		}
+	}
+
+	return 1;
+}
+
+/*
+Create a work_queue_process and all of its necessary local resources.
+If we cannot set things up, fail first here, rather than in execution.
+*/
+
 struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_task, int disk_allocation)
 {
 	struct work_queue_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 	p->task = wq_task;
 	p->task->disk_allocation_exhausted = 0;
-	//placeholder filesystem until permanent solution
-	char *fs = "ext2";
 
-	if(disk_allocation == 1) {
-		work_queue_process_compute_disk_needed(p);
-		if(p->task->resources_requested->disk > 0) {
-			int64_t size = (p->task->resources_requested->disk) * 1024;
-			p->sandbox = string_format("t.%d", p->task->taskid);
-
-			if(disk_alloc_create(p->sandbox, fs, size) == 0) {
-				p->loop_mount = 1;
-				debug(D_WQ, "disk_alloc: %"PRId64"MB\n", size);
-				return p;
-			}
-		}
-		if(!create_task_directories(p)) {
-			work_queue_process_delete(p);
-			return 0;
-		}
-
-		p->loop_mount = 0;
-		return p;
+	if(!create_task_directories(p,disk_allocation)) {
+		work_queue_process_delete(p);
+		return 0;
 	}
-	else {
-		if(!create_task_directories(p)) {
-			work_queue_process_delete(p);
-			return 0;
-		}
 
-		p->loop_mount = 0;
-		return p;
+	if(!transfer_remote_input_files(p)) {
+		work_queue_process_delete(p);
+		return 0;
 	}
+
+	return p;
 }
 
 void work_queue_process_delete(struct work_queue_process *p)
