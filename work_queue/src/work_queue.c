@@ -271,6 +271,10 @@ struct work_queue_worker {
 										// If -1, means the worker has not reported in. If 0, means no limit.
 };
 
+struct work_queue_factory_info {
+	char *name;
+};
+
 struct work_queue_task_report {
 	timestamp_t transfer_time;
 	timestamp_t exec_time;
