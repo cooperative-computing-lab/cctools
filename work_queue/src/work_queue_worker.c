@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "work_queue_watcher.h"
 #include "work_queue_gpus.h"
 #include "work_queue_coprocess.h"
+#include "work_queue_sandbox.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -129,7 +130,7 @@ static int sigchld_received_flag = 0;
 char *password = 0;
 
 // Allow worker to use symlinks when link() fails.  Enabled by default.
-static int symlinks_enabled = 1;
+int symlinks_enabled = 1;
 
 // Worker id. A unique id for this worker instance.
 static char *worker_id;
@@ -526,17 +527,6 @@ static void report_worker_ready( struct link *manager )
 }
 
 /*
-If a string begins with one or more instances of ./
-return the beginning of the string with those removed.
-*/
-
-static const char *skip_dotslash( const char *s )
-{
-	while(!strncmp(s,"./",2)) s+=2;
-	return s;
-}
-
-/*
 Start executing the given process on the local host,
 accounting for the resources as necessary.
 */
@@ -667,34 +657,6 @@ static int is_disk_allocation_exhausted( struct work_queue_process *p )
 }
 
 /*
-Move all output files of a completed process back into the proper cache location.
-This function deliberately does not fail.  If any of the desired outputs was not
-created, we still want the task to be marked as completed and sent back to the
-manager.  The manager will handle the consequences of missing output files.
-*/
-
-static void transfer_outputs_to_cache( struct work_queue_process *p )
-{
-	struct work_queue_file *f;
-	list_first_item(p->task->output_files);
-	while((f = list_next_item(p->task->output_files))) {
-
-		char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
-
-		debug(D_WQ,"moving output file from %s to %s",sandbox_name,f->payload);
-
-		/* First we try a cheap rename. It that does not work, we try to copy the file. */
-		if(rename(sandbox_name,f->payload) == -1) {
-			debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
-			if(copy_file_to_file(sandbox_name, f->payload)  == -1) {
-				debug(D_WQ, "could not copy output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
-			}
-		}
-		free(sandbox_name);
-	}
-}
-		
-/*
 Scan over all of the processes known by the worker,
 and if they have exited, move them into the procs_complete table
 for later processing.
@@ -736,7 +698,7 @@ static int handle_completed_tasks(struct link *manager)
 
 			work_queue_gpus_free(p->task->taskid);
 
-			transfer_outputs_to_cache(p);
+			work_queue_sandbox_stageout(p);
 
 			itable_remove(procs_running, p->pid);
 			itable_firstkey(procs_running);
@@ -841,50 +803,6 @@ failure:
 }
 
 /*
-For each of the files and directories needed by a task, link
-them into the sandbox.  Return true if successful.
-*/
-
-static int setup_sandbox( struct work_queue_process *p )
-{
-	struct work_queue_file *f;
-
-	list_first_item(p->task->input_files);
-	while((f = list_next_item(p->task->input_files))) {
-
-		char *sandbox_name = string_format("%s/%s",skip_dotslash(p->sandbox),f->remote_name);
-		int result = 0;
-
-		// remote name may contain relative path components, so create them in advance
-		create_dir_parents(sandbox_name,0777);
-
-		if(f->type == WORK_QUEUE_DIRECTORY) {
-			debug(D_WQ,"creating directory %s",sandbox_name);
-			result = create_dir(sandbox_name, 0700);
-			if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_name, strerror(errno));
-		} else {
-			debug(D_WQ,"linking %s to %s",f->payload,sandbox_name);
-			result = link_recursive(skip_dotslash(f->payload),skip_dotslash(sandbox_name),symlinks_enabled);
-			if(!result) {
-				if(errno==EEXIST) {
-					// XXX silently ignore the case where the target file exists.
-					// This happens when managers apps map the same input file twice, or to the same name.
-					// Would be better to reject this at the manager instead.
-					result = 1;
-				} else {
-					debug(D_WQ,"couldn't link %s into sandbox as %s: %s",f->payload,sandbox_name,strerror(errno));
-				}
-			}
-		}
-
-		free(sandbox_name);
-		if(!result) return 0;
-	}
-
-	return 1;
-}
-
-/*
 For a task run locally, if the resources are all set to -1,
 then assume that the task occupies all worker resources.
 Otherwise, just make sure all values are non-zero.
@@ -923,7 +841,6 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 	char category[WORK_QUEUE_LINE_MAX];
 	int flags, length;
 	int64_t n;
-	int disk_alloc = disk_allocation;
 
 	timestamp_t nt;
 
@@ -990,11 +907,8 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 
 	last_task_received = task->taskid;
 
-	struct work_queue_process *p = work_queue_process_create(task, disk_alloc);
-
-	if(!p) {
-		return 0;
-	}
+	struct work_queue_process *p = work_queue_process_create(task, disk_allocation);
+	if(!p) return 0;
 
 	// Every received task goes into procs_table.
 	itable_insert(procs_table,taskid,p);
@@ -1004,7 +918,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 	} else {
 		// XXX sandbox setup should be done in task execution,
 		// so that it can be returned cleanly as a failure to execute.
-		if(!setup_sandbox(p)) {
+		if(!work_queue_sandbox_stagein(p)) {
 			itable_remove(procs_table,taskid);
 			work_queue_process_delete(p);
 			return 0;
@@ -1121,7 +1035,7 @@ static int do_put_dir_internal( struct link *manager, char *dirname )
 
 		int r = 0;
 
-		if(sscanf(line,"put %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
+		if(sscanf(line,"file %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
 
 			url_decode(name_encoded,name,sizeof(name));
 			if(!is_valid_filename(name)) return 0;
