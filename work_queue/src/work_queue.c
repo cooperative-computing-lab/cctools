@@ -827,6 +827,29 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	return timeout;
 }
 
+void update_write_catalog(struct work_queue *q, struct link *foreman_uplink)
+{
+	// Generate the manager status in an jx, and print it to a buffer.
+	struct jx *j = queue_to_jx(q,foreman_uplink);
+	char *str = jx_print_string(j);
+
+	// Send the buffer.
+	debug(D_WQ, "Advertising manager status to the catalog server(s) at %s ...", q->catalog_hosts);
+	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
+
+		// If the send failed b/c the buffer is too big, send the lean version instead.
+		struct jx *lj = queue_lean_to_jx(q,foreman_uplink);
+		char *lstr = jx_print_string(lj);
+		catalog_query_send_update(q->catalog_hosts,lstr);
+		free(lstr);
+		jx_delete(lj);
+	}
+
+	// Clean up.
+	free(str);
+	jx_delete(j);
+}
+
 void update_read_catalog(struct work_queue *q)
 {
 	time_t stoptime = time(0) + 5; // Short timeout for query
@@ -863,25 +886,6 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	// If host and port are not set, pick defaults.
 	if(!q->catalog_hosts) q->catalog_hosts = xxstrdup(CATALOG_HOST);
 
-	// Generate the manager status in an jx, and print it to a buffer.
-	struct jx *j = queue_to_jx(q,foreman_uplink);
-	char *str = jx_print_string(j);
-
-	// Send the buffer.
-	debug(D_WQ, "Advertising manager status to the catalog server(s) at %s ...", q->catalog_hosts);
-	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
-
-		// If the send failed b/c the buffer is too big, send the lean version instead.
-		struct jx *lj = queue_lean_to_jx(q,foreman_uplink);
-		char *lstr = jx_print_string(lj);
-		catalog_query_send_update(q->catalog_hosts,lstr);
-		free(lstr);
-		jx_delete(lj);
-	}
-
-	// Clean up.
-	free(str);
-	jx_delete(j);
 	q->catalog_last_update_time = time(0);
 }
 
