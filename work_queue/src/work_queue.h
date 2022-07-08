@@ -39,8 +39,6 @@ typedef enum {
 	WORK_QUEUE_NOCACHE  = 0, /**< Do not cache file at execution site. */
 	WORK_QUEUE_CACHE    = 1, /**< Cache file at execution site for later use. */
 	WORK_QUEUE_SYMLINK  = 2, /**< Create a symlink to the file rather than copying it, if possible. */
-	WORK_QUEUE_THIRDGET = 8, /**< Access the file on the client from a shared filesystem */
-	WORK_QUEUE_THIRDPUT = 8, /**< Access the file on the client from a shared filesystem (same as WORK_QUEUE_THIRDGET, included for readability) */
 	WORK_QUEUE_WATCH    = 16, /**< Watch the output file and send back changes as the task runs. */
 	WORK_QUEUE_FAILURE_ONLY = 32,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	WORK_QUEUE_SUCCESS_ONLY = 64, /**< Only return this output file if the task succeeded. */
