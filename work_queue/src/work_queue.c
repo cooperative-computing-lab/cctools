@@ -827,18 +827,8 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	return timeout;
 }
 
-void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
+void update_write_catalog(struct work_queue *q, struct link *foreman_uplink)
 {
-	// Only advertise if we have a name.
-	if(!q->name) return;
-
-	// Only advertise every last_update_time seconds.
-	if(!force_update && (time(0) - q->catalog_last_update_time) < WORK_QUEUE_UPDATE_INTERVAL)
-		return;
-
-	// If host and port are not set, pick defaults.
-	if(!q->catalog_hosts) q->catalog_hosts = xxstrdup(CATALOG_HOST);
-
 	// Generate the manager status in an jx, and print it to a buffer.
 	struct jx *j = queue_to_jx(q,foreman_uplink);
 	char *str = jx_print_string(j);
@@ -858,6 +848,48 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	// Clean up.
 	free(str);
 	jx_delete(j);
+}
+
+void update_read_catalog(struct work_queue *q)
+{
+	time_t stoptime = time(0) + 5; // Short timeout for query
+	struct catalog_query *cq;
+
+	debug(D_WQ, "Retrieving info from catalog server(s) at %s ...", q->catalog_hosts);
+	cq = catalog_query_create(q->catalog_hosts, NULL, stoptime);
+	if (!cq){
+		debug(D_WQ, "Failed to retrieve info from catalog server(s) at %s.", q->catalog_hosts);
+		return;
+	}
+
+	// For each expression returned by the query
+	struct jx *j;
+	while((j = catalog_query_read(cq, stoptime))) {
+		{
+			// Further oprations
+		}
+		jx_delete(j);
+	}
+
+	catalog_query_delete(cq);
+}
+
+void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
+{
+	// Only advertise if we have a name.
+	if(!q->name) return;
+
+	// Only advertise every last_update_time seconds.
+	if(!force_update && (time(0) - q->catalog_last_update_time) < WORK_QUEUE_UPDATE_INTERVAL)
+		return;
+
+	// If host and port are not set, pick defaults.
+	if(!q->catalog_hosts) q->catalog_hosts = xxstrdup(CATALOG_HOST);
+
+	// Update the catalog.
+	update_write_catalog(q, foreman_uplink);
+	update_read_catalog(q);
+
 	q->catalog_last_update_time = time(0);
 }
 
