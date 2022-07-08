@@ -543,6 +543,15 @@ static int start_process( struct work_queue_process *p )
 
 	struct work_queue_task *t = p->task;
 
+	if(!work_queue_sandbox_stagein(p)) {
+		p->execution_start = p->execution_end = timestamp_get();
+		// XXX when to use p->task_status versus t->result ?
+		p->task_status = WORK_QUEUE_RESULT_INPUT_MISSING;
+		p->exit_status = 1;
+		itable_insert(procs_complete,p->task->taskid,p);
+		return 0;
+	}
+	
 	cores_allocated += t->resources_requested->cores;
 	memory_allocated += t->resources_requested->memory;
 	disk_allocated += t->resources_requested->disk;
@@ -555,8 +564,8 @@ static int start_process( struct work_queue_process *p )
 	pid = work_queue_process_execute(p);
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
-	itable_insert(procs_running,pid,p);
-
+	itable_insert(procs_running,p->pid,p);
+	
 	return 1;
 }
 
@@ -940,13 +949,6 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 	if(worker_mode==WORKER_MODE_FOREMAN) {
 		work_queue_submit_internal(foreman_q,task);
 	} else {
-		// XXX sandbox setup should be done in task execution,
-		// so that it can be returned cleanly as a failure to execute.
-		if(!work_queue_sandbox_stagein(p)) {
-			itable_remove(procs_table,taskid);
-			work_queue_process_delete(p);
-			return 0;
-		}
 		normalize_resources(p);
 		list_push_tail(procs_waiting,p);
 	}
