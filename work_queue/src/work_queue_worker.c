@@ -600,23 +600,6 @@ static void report_task_complete( struct link *manager, struct work_queue_proces
 }
 
 /*
-Remove one item from an itable, ignoring the key
-*/
-
-static void * itable_pop(struct itable *t )
-{
-	uint64_t key;
-	void *value;
-
-	itable_firstkey(t);
-	if(itable_nextkey(t, &key, (void*)&value)) {
-		return itable_remove(t,key);
-	} else {
-		return 0;
-	}
-}
-
-/*
 For every unreported complete task and watched file,
 send the results to the manager.
 */
