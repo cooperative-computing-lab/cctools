@@ -1061,7 +1061,7 @@ static int do_put_dir_internal( struct link *manager, char *dirname )
 
 		int r = 0;
 
-		if(sscanf(line,"file %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
+		if(sscanf(line,"put %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
 
 			url_decode(name_encoded,name,sizeof(name));
 			if(!is_valid_filename(name)) return 0;
