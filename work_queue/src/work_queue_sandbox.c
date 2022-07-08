@@ -65,8 +65,8 @@ static int transfer_input_file( struct work_queue_process *p, struct work_queue_
 		case WORK_QUEUE_FILE:
 		case WORK_QUEUE_FILE_PIECE:
 		case WORK_QUEUE_BUFFER:
-			debug(D_WQ,"linking %s to %s",f->payload,sandbox_name);
-			result = link_recursive(skip_dotslash(f->payload),skip_dotslash(sandbox_name),symlinks_enabled);
+			debug(D_WQ,"input: file %s -> %s",f->payload,sandbox_name);
+		  	result = link_recursive(skip_dotslash(f->payload),skip_dotslash(sandbox_name),symlinks_enabled);
 			if(!result) {
 				if(errno==EEXIST) {
 					// XXX silently ignore the case where the target file exists.
@@ -82,12 +82,12 @@ static int transfer_input_file( struct work_queue_process *p, struct work_queue_
 			// XXX execute remote command here
 			break;
 		case WORK_QUEUE_DIRECTORY:
-			debug(D_WQ,"creating directory %s",sandbox_name);
+			debug(D_WQ,"input: dir %s",sandbox_name);
 			result = create_dir(sandbox_name, 0700);
 			if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_name, strerror(errno));
 			break;
 		case WORK_QUEUE_URL:
-			// XXX check whether payload is null terminated here, I am not sure...
+			debug(D_WQ,"input: url %s -> %s",f->payload,sandbox_name);
 			result = transfer_input_url(p,f->payload,f->remote_name);
 			break;
 	}
