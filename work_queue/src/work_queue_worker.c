@@ -477,7 +477,8 @@ static int send_tlq_config( struct link *manager )
 	return 1;
 }
 
-static int get_task_tlq_url( struct work_queue_task *task ) {
+static int get_task_tlq_url( struct work_queue_task *task )
+{
 	if(tlq_port && debug_path) {
 		char home_host[WORK_QUEUE_LINE_MAX];
 		char tlq_workdir[WORK_QUEUE_LINE_MAX];
@@ -524,6 +525,10 @@ static void report_worker_ready( struct link *manager )
 	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 }
 
+/*
+If a string begins with one or more instances of ./
+return the beginning of the string with those removed.
+*/
 
 static const char *skip_dotslash( const char *s )
 {
