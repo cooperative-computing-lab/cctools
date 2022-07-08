@@ -5912,6 +5912,13 @@ void work_queue_delete(struct work_queue *q)
 			hash_table_firstkey(q->worker_table);
 		}
 
+		struct work_queue_factory_info *f;
+		hash_table_firstkey(q->factory_table);
+		while(hash_table_nextkey(q->factory_table, &key, (void **) &f)) {
+			remove_factory(f);
+			hash_table_firstkey(q->factory_table);
+		}
+
 		log_queue_stats(q, 1);
 
 		if(q->name) {
@@ -5924,6 +5931,7 @@ void work_queue_delete(struct work_queue *q)
 		if(q->catalog_hosts) free(q->catalog_hosts);
 
 		hash_table_delete(q->worker_table);
+		hash_table_delete(q->factory_table);
 		hash_table_delete(q->worker_blocklist);
 		itable_delete(q->worker_task_map);
 
