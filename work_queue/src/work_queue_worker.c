@@ -529,6 +529,7 @@ static void report_worker_ready( struct link *manager )
 /*
 Start executing the given process on the local host,
 accounting for the resources as necessary.
+Should maintain parallel structure to reap_process() above.
 */
 
 static int start_process( struct work_queue_process *p )
@@ -547,12 +548,34 @@ static int start_process( struct work_queue_process *p )
 	}
 
 	pid = work_queue_process_execute(p);
-
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
 	itable_insert(procs_running,pid,p);
 
 	return 1;
+}
+
+/*
+This process has ended so mark it complete and
+account for the resources as necessary.
+Should maintain parallel structure to start_process() above.
+*/
+
+static void reap_process( struct work_queue_process *p )
+{
+	p->execution_end = timestamp_get();
+
+	cores_allocated  -= p->task->resources_requested->cores;
+	memory_allocated -= p->task->resources_requested->memory;
+	disk_allocated   -= p->task->resources_requested->disk;
+	gpus_allocated   -= p->task->resources_requested->gpus;
+
+	work_queue_gpus_free(p->task->taskid);
+
+	work_queue_sandbox_stageout(p);
+
+	itable_remove(procs_running, p->pid);
+	itable_insert(procs_complete, p->task->taskid, p);
 }
 
 /*
@@ -615,7 +638,8 @@ static void report_tasks_complete( struct link *manager )
 	results_to_be_sent_msg = 0;
 }
 
-static void expire_procs_running() {
+static void expire_procs_running()
+{
 	struct work_queue_process *p;
 	uint64_t pid;
 
@@ -688,22 +712,12 @@ static int handle_completed_tasks(struct link *manager)
 					p->task->disk_allocation_exhausted = 1;
 				}
 			}
+
+			/* collect the resources associated with the process */
+			reap_process(p);
 			
-			p->execution_end = timestamp_get();
-
-			cores_allocated  -= p->task->resources_requested->cores;
-			memory_allocated -= p->task->resources_requested->memory;
-			disk_allocated   -= p->task->resources_requested->disk;
-			gpus_allocated   -= p->task->resources_requested->gpus;
-
-			work_queue_gpus_free(p->task->taskid);
-
-			work_queue_sandbox_stageout(p);
-
-			itable_remove(procs_running, p->pid);
+			/* must reset the table iterator because an item was removed. */
 			itable_firstkey(procs_running);
-			itable_insert(procs_complete, p->task->taskid, p);
-
 		}
 
 	}
