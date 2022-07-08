@@ -275,6 +275,7 @@ struct work_queue_worker {
 
 struct work_queue_factory_info {
 	char *name;
+	int   connected_workers;
 };
 
 struct work_queue_task_report {
@@ -852,10 +853,10 @@ static void update_factory(struct work_queue *q, struct jx *j)
 			debug(D_NOTICE, "Cannot allocate memory for factory %s.", name);
 			return;
 		}
+		f->name = xxstrdup(name);
+		f->connected_workers = 0;
+		hash_table_insert(q->worker_table, f->name, f);
 	}
-
-	f->name = strdup(name);
-	hash_table_insert(q->worker_table, f->name, f);
 
 	return;
 }
