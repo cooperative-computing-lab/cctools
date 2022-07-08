@@ -163,6 +163,8 @@ struct work_queue {
 	struct hash_table *worker_blocklist;
 	struct itable  *worker_task_map;
 
+	struct hash_table *factory_table;
+
 	struct hash_table *categories;
 
 	struct hash_table *workers_with_available_results;
@@ -5585,6 +5587,8 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
+
+	q->factory_table = hash_table_create(0, 0);
 
 	q->measured_local_resources = rmsummary_create(-1);
 	q->current_max_worker       = rmsummary_create(-1);
