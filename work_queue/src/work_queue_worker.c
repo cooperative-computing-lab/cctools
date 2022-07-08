@@ -263,16 +263,16 @@ We track how much time has elapsed since the manager assigned a task.
 If time(0) > idle_stoptime, then the worker will disconnect.
 */
 
-void reset_idle_timer()
+static void reset_idle_timer()
 {
 	idle_stoptime = time(0) + idle_timeout;
 }
 
 /*
-   Measure the disk used by the worker. We only manually measure the cache directory, as processes measure themselves.
-   */
+Measure the disk used by the worker. We only manually measure the cache directory, as processes measure themselves.
+*/
 
-int64_t measure_worker_disk() {
+static int64_t measure_worker_disk() {
 	static struct path_disk_size_info *state = NULL;
 
 	path_disk_size_info_get_r("./cache", max_time_on_measurement, &state);
@@ -308,7 +308,7 @@ Measure only the resources associated with this particular node
 and apply any operations that override.
 */
 
-void measure_worker_resources()
+static void measure_worker_resources()
 {
 	static time_t last_resources_measurement = 0;
 	if(time(0) < last_resources_measurement + check_resources_interval) {
@@ -520,7 +520,7 @@ static void report_worker_ready( struct link *manager )
 }
 
 
-const char *skip_dotslash( const char *s )
+static const char *skip_dotslash( const char *s )
 {
 	while(!strncmp(s,"./",2)) s+=2;
 	return s;
@@ -652,8 +652,7 @@ static void expire_procs_running() {
 Return true if task uses a disk allocation and it was overrun.
 */
 
-
-int is_disk_allocation_exhausted( struct work_queue_process *p )
+static int is_disk_allocation_exhausted( struct work_queue_process *p )
 {
 	int result = 0;
 	FILE *loop_full_check;
@@ -681,7 +680,7 @@ created, we still want the task to be marked as completed and sent back to the
 manager.  The manager will handle the consequences of missing output files.
 */
 
-void transfer_outputs_to_cache( struct work_queue_process *p )
+static void transfer_outputs_to_cache( struct work_queue_process *p )
 {
 	struct work_queue_file *f;
 	list_first_item(p->task->output_files);
@@ -853,7 +852,7 @@ For each of the files and directories needed by a task, link
 them into the sandbox.  Return true if successful.
 */
 
-int setup_sandbox( struct work_queue_process *p )
+static int setup_sandbox( struct work_queue_process *p )
 {
 	struct work_queue_file *f;
 
@@ -1032,7 +1031,7 @@ For example, if it contains a slash, which would escape
 the current working directory.
 */
 
-int is_valid_filename( const char *name )
+static int is_valid_filename( const char *name )
 {
 	if(strchr(name,'/')) return 0;
 	return 1;
