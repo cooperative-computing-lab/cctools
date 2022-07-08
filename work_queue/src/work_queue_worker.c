@@ -234,7 +234,7 @@ static int coprocess_port = -1;
 static char *factory_name = NULL;
 
 __attribute__ (( format(printf,2,3) ))
-static void send_manager_message( struct link *manager, const char *fmt, ... )
+static void send_message( struct link *l, const char *fmt, ... )
 {
 	char debug_msg[2*WORK_QUEUE_LINE_MAX];
 	va_list va;
@@ -242,19 +242,19 @@ static void send_manager_message( struct link *manager, const char *fmt, ... )
 
 	va_start(va,fmt);
 
-	string_nformat(debug_msg, sizeof(debug_msg), "tx to manager: %s", fmt);
+	string_nformat(debug_msg, sizeof(debug_msg), "tx: %s", fmt);
 	va_copy(debug_va, va);
 
 	vdebug(D_WQ, debug_msg, debug_va);
-	link_vprintf(manager, time(0)+active_timeout, fmt, va);
+	link_vprintf(l, time(0)+active_timeout, fmt, va);
 
 	va_end(va);
 }
 
-static int recv_manager_message( struct link *manager, char *line, int length, time_t stoptime )
+static int recv_message( struct link *l, char *line, int length, time_t stoptime )
 {
-	int result = link_readline(manager,line,length,stoptime);
-	if(result) debug(D_WQ,"rx from manager: %s",line);
+	int result = link_readline(l,line,length,stoptime);
+	if(result) debug(D_WQ,"rx: %s",line);
 	return result;
 }
 
@@ -370,7 +370,7 @@ static void send_features(struct link *manager)
 	char fenc[WORK_QUEUE_LINE_MAX];
 	while(hash_table_nextkey(features, &f, &dummy)) {
 		url_encode(f, fenc, WORK_QUEUE_LINE_MAX);
-		send_manager_message(manager, "feature %s\n", fenc);
+		send_message(manager, "feature %s\n", fenc);
 	}
 }
 
@@ -402,7 +402,7 @@ static void send_resource_update(struct link *manager)
 	}
 
 	work_queue_resources_send(manager,total_resources,stoptime);
-	send_manager_message(manager, "info end_of_resource_update %d\n", 0);
+	send_message(manager, "info end_of_resource_update %d\n", 0);
 }
 
 /*
@@ -415,40 +415,40 @@ static void send_stats_update(struct link *manager)
 		struct work_queue_stats s;
 		work_queue_get_stats_hierarchy(foreman_q, &s);
 
-		send_manager_message(manager, "info workers_joined %lld\n", (long long) s.workers_joined);
-		send_manager_message(manager, "info workers_removed %lld\n", (long long) s.workers_removed);
-		send_manager_message(manager, "info workers_released %lld\n", (long long) s.workers_released);
-		send_manager_message(manager, "info workers_idled_out %lld\n", (long long) s.workers_idled_out);
-		send_manager_message(manager, "info workers_fast_aborted %lld\n", (long long) s.workers_fast_aborted);
-		send_manager_message(manager, "info workers_blacklisted %lld\n", (long long) s.workers_blacklisted);
-		send_manager_message(manager, "info workers_lost %lld\n", (long long) s.workers_lost);
+		send_message(manager, "info workers_joined %lld\n", (long long) s.workers_joined);
+		send_message(manager, "info workers_removed %lld\n", (long long) s.workers_removed);
+		send_message(manager, "info workers_released %lld\n", (long long) s.workers_released);
+		send_message(manager, "info workers_idled_out %lld\n", (long long) s.workers_idled_out);
+		send_message(manager, "info workers_fast_aborted %lld\n", (long long) s.workers_fast_aborted);
+		send_message(manager, "info workers_blacklisted %lld\n", (long long) s.workers_blacklisted);
+		send_message(manager, "info workers_lost %lld\n", (long long) s.workers_lost);
 
-		send_manager_message(manager, "info tasks_waiting %lld\n", (long long) s.tasks_waiting);
-		send_manager_message(manager, "info tasks_on_workers %lld\n", (long long) s.tasks_on_workers);
-		send_manager_message(manager, "info tasks_running %lld\n", (long long) s.tasks_running);
-		send_manager_message(manager, "info tasks_waiting %lld\n", (long long) list_size(procs_waiting));
-		send_manager_message(manager, "info tasks_with_results %lld\n", (long long) s.tasks_with_results);
+		send_message(manager, "info tasks_waiting %lld\n", (long long) s.tasks_waiting);
+		send_message(manager, "info tasks_on_workers %lld\n", (long long) s.tasks_on_workers);
+		send_message(manager, "info tasks_running %lld\n", (long long) s.tasks_running);
+		send_message(manager, "info tasks_waiting %lld\n", (long long) list_size(procs_waiting));
+		send_message(manager, "info tasks_with_results %lld\n", (long long) s.tasks_with_results);
 
-		send_manager_message(manager, "info time_send %lld\n", (long long) s.time_send);
-		send_manager_message(manager, "info time_receive %lld\n", (long long) s.time_receive);
-		send_manager_message(manager, "info time_send_good %lld\n", (long long) s.time_send_good);
-		send_manager_message(manager, "info time_receive_good %lld\n", (long long) s.time_receive_good);
+		send_message(manager, "info time_send %lld\n", (long long) s.time_send);
+		send_message(manager, "info time_receive %lld\n", (long long) s.time_receive);
+		send_message(manager, "info time_send_good %lld\n", (long long) s.time_send_good);
+		send_message(manager, "info time_receive_good %lld\n", (long long) s.time_receive_good);
 
-		send_manager_message(manager, "info time_workers_execute %lld\n", (long long) s.time_workers_execute);
-		send_manager_message(manager, "info time_workers_execute_good %lld\n", (long long) s.time_workers_execute_good);
-		send_manager_message(manager, "info time_workers_execute_exhaustion %lld\n", (long long) s.time_workers_execute_exhaustion);
+		send_message(manager, "info time_workers_execute %lld\n", (long long) s.time_workers_execute);
+		send_message(manager, "info time_workers_execute_good %lld\n", (long long) s.time_workers_execute_good);
+		send_message(manager, "info time_workers_execute_exhaustion %lld\n", (long long) s.time_workers_execute_exhaustion);
 
-		send_manager_message(manager, "info bytes_sent %lld\n", (long long) s.bytes_sent);
-		send_manager_message(manager, "info bytes_received %lld\n", (long long) s.bytes_received);
+		send_message(manager, "info bytes_sent %lld\n", (long long) s.bytes_sent);
+		send_message(manager, "info bytes_received %lld\n", (long long) s.bytes_received);
 	}
 	else {
-		send_manager_message(manager, "info tasks_running %lld\n", (long long) itable_size(procs_running));
+		send_message(manager, "info tasks_running %lld\n", (long long) itable_size(procs_running));
 	}
 }
 
 static int send_keepalive(struct link *manager, int force_resources)
 {
-	send_manager_message(manager, "alive\n");
+	send_message(manager, "alive\n");
 
 	/* for regular workers we only send resources on special ocassions, thus
 	 * the force_resources. */
@@ -473,7 +473,7 @@ static int send_tlq_config( struct link *manager )
 	}
 	else if(tlq_port && !debug_path && !tlq_url) debug(D_TLQ, "cannot get worker TLQ URL: no debug log path set");
 
-	if(tlq_url) send_manager_message(manager, "tlq %s\n", tlq_url);
+	if(tlq_url) send_message(manager, "tlq %s\n", tlq_url);
 	return 1;
 }
 
@@ -513,14 +513,15 @@ static void report_worker_ready( struct link *manager )
 {
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
-	send_manager_message(manager,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
-	send_manager_message(manager, "info worker-id %s\n", worker_id);
+	send_message(manager,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
+	send_message(manager, "info worker-id %s\n", worker_id);
 	send_features(manager);
 	send_tlq_config(manager);
 	send_keepalive(manager, 1);
-	send_manager_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
+	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 	if (factory_name)
-		send_manager_message(manager, "info from-factory %s\n", factory_name);
+		send_message(manager, "info from-factory %s\n", factory_name);
+	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 }
 
 
@@ -574,7 +575,7 @@ static void report_task_complete( struct link *manager, struct work_queue_proces
 		fstat(p->output_fd, &st);
 		output_length = st.st_size;
 		lseek(p->output_fd, 0, SEEK_SET);
-		send_manager_message(manager, "result %d %d %lld %llu %d\n", p->task_status, p->exit_status, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
+		send_message(manager, "result %d %d %lld %llu %d\n", p->task_status, p->exit_status, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
 		link_stream_from_fd(manager, p->output_fd, output_length, time(0)+active_timeout);
 
 		total_task_execution_time += (p->execution_end - p->execution_start);
@@ -586,7 +587,7 @@ static void report_task_complete( struct link *manager, struct work_queue_proces
 		} else {
 			output_length = 0;
 		}
-		send_manager_message(manager, "result %d %d %lld %llu %d\n", t->result, t->return_status, (long long) output_length, (unsigned long long) t->time_workers_execute_last, t->taskid);
+		send_message(manager, "result %d %d %lld %llu %d\n", t->result, t->return_status, (long long) output_length, (unsigned long long) t->time_workers_execute_last, t->taskid);
 		if(output_length) {
 			link_putlstring(manager, t->output, output_length, time(0)+active_timeout);
 		}
@@ -614,7 +615,7 @@ static void report_tasks_complete( struct link *manager )
 
 	work_queue_watcher_send_changes(watcher,manager,time(0)+active_timeout);
 
-	send_manager_message(manager, "end\n");
+	send_message(manager, "end\n");
 
 	results_to_be_sent_msg = 0;
 }
@@ -800,7 +801,7 @@ static int stream_output_item(struct link *manager, const char *filename, int re
 		if(!dir) {
 			goto failure;
 		}
-		send_manager_message(manager, "dir %s 0\n", filename);
+		send_message(manager, "dir %s 0\n", filename);
 
 		while(recursive && (dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
@@ -815,7 +816,7 @@ static int stream_output_item(struct link *manager, const char *filename, int re
 		fd = open(cached_filename, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = info.st_size;
-			send_manager_message(manager, "file %s %"PRId64"\n", filename, length );
+			send_message(manager, "file %s %"PRId64"\n", filename, length );
 			actual = link_stream_from_fd(manager, fd, length, time(0) + active_timeout);
 			close(fd);
 			if(actual != length) {
@@ -830,7 +831,7 @@ static int stream_output_item(struct link *manager, const char *filename, int re
 	return 1;
 
 failure:
-	send_manager_message(manager, "missing %s %d\n", filename, errno);
+	send_message(manager, "missing %s %d\n", filename, errno);
 	return 0;
 }
 
@@ -924,7 +925,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 	struct work_queue_task *task = work_queue_task_create(0);
 	task->taskid = taskid;
 
-	while(recv_manager_message(manager,line,sizeof(line),stoptime)) {
+	while(recv_message(manager,line,sizeof(line),stoptime)) {
 		if(!strcmp(line,"end")) {
 			break;
 		} else if(sscanf(line, "category %s",category)) {
@@ -1111,7 +1112,7 @@ static int do_put_dir_internal( struct link *manager, char *dirname )
 	}
 
 	while(1) {
-		if(!recv_manager_message(manager,line,sizeof(line),time(0)+active_timeout)) return 0;
+		if(!recv_message(manager,line,sizeof(line),time(0)+active_timeout)) return 0;
 
 		int r = 0;
 
@@ -1256,7 +1257,7 @@ static int do_unlink(const char *path)
 static int do_get(struct link *manager, const char *filename, int recursive)
 {
 	stream_output_item(manager, filename, recursive);
-	send_manager_message(manager, "end\n");
+	send_message(manager, "end\n");
 	return 1;
 }
 
@@ -1385,7 +1386,7 @@ static int do_thirdput(struct link *manager, int mode, char *filename, const cha
 		break;
 	}
 
-	send_manager_message(manager, "thirdput-complete %d\n", result);
+	send_message(manager, "thirdput-complete %d\n", result);
 
 	return result;
 
@@ -1622,7 +1623,7 @@ static int handle_manager(struct link *manager)
 	int64_t taskid = 0;
 	int mode, r, n;
 
-	if(recv_manager_message(manager, line, sizeof(line), idle_stoptime )) {
+	if(recv_message(manager, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(manager, taskid,time(0)+active_timeout);
 		} else if(sscanf(line,"put %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
@@ -1748,7 +1749,7 @@ static int enforce_worker_limits(struct link *manager)
 		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
 
 		if(manager) {
-			send_manager_message(manager, "info disk_exhausted %lld\n", (long long) local_resources->disk.inuse);
+			send_message(manager, "info disk_exhausted %lld\n", (long long) local_resources->disk.inuse);
 		}
 
 		return 0;
@@ -1758,7 +1759,7 @@ static int enforce_worker_limits(struct link *manager)
 		fprintf(stderr,"work_queue_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.inuse);
 
 		if(manager) {
-			send_manager_message(manager, "info memory_exhausted %lld\n", (long long) local_resources->memory.inuse);
+			send_message(manager, "info memory_exhausted %lld\n", (long long) local_resources->memory.inuse);
 		}
 
 		return 0;
@@ -1776,7 +1777,7 @@ static int enforce_worker_promises(struct link *manager)
 	if(end_time > 0 && timestamp_get() > ((uint64_t) end_time)) {
 		warn(D_NOTICE, "work_queue_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t) manual_wall_time_option);
 		if(manager) {
-			send_manager_message(manager, "info wall_time_exhausted %"PRIu64"\n", (uint64_t) manual_wall_time_option);
+			send_message(manager, "info wall_time_exhausted %"PRIu64"\n", (uint64_t) manual_wall_time_option);
 		}
 		return 0;
 	}
@@ -1785,7 +1786,7 @@ static int enforce_worker_promises(struct link *manager)
 		fprintf(stderr,"work_queue_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
 
 		if(manager) {
-			send_manager_message(manager, "info disk_error %lld\n", (long long) local_resources->disk.total);
+			send_message(manager, "info disk_error %lld\n", (long long) local_resources->disk.total);
 		}
 
 		return 0;
@@ -1816,7 +1817,7 @@ static void work_for_manager(struct link *manager)
 
 		if(time(0) > idle_stoptime) {
 			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", current_manager_address->addr,current_manager_address->port,idle_timeout);
-			send_manager_message(manager, "info idle-disconnecting %lld\n", (long long) idle_timeout);
+			send_message(manager, "info idle-disconnecting %lld\n", (long long) idle_timeout);
 			break;
 		}
 
@@ -1922,7 +1923,7 @@ static void work_for_manager(struct link *manager)
 
 		if(ok && !results_to_be_sent_msg) {
 			if(work_queue_watcher_check(watcher) || itable_size(procs_complete) > 0) {
-				send_manager_message(manager, "available_results\n");
+				send_message(manager, "available_results\n");
 				results_to_be_sent_msg = 1;
 			}
 		}
@@ -1957,7 +1958,7 @@ static void foreman_for_manager(struct link *manager)
 
 		if(time(0) > idle_stoptime && work_queue_empty(foreman_q)) {
 			debug(D_NOTICE, "giving up because did not receive any task in %d seconds.\n", idle_timeout);
-			send_manager_message(manager, "info idle-disconnecting %lld\n", (long long) idle_timeout);
+			send_message(manager, "info idle-disconnecting %lld\n", (long long) idle_timeout);
 			break;
 		}
 
@@ -1982,7 +1983,7 @@ static void foreman_for_manager(struct link *manager)
 
 		if(!results_to_be_sent_msg && itable_size(procs_complete) > 0)
 		{
-			send_manager_message(manager, "available_results\n");
+			send_message(manager, "available_results\n");
 			results_to_be_sent_msg = 1;
 		}
 
@@ -2217,8 +2218,8 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	if(verify_project) {
 		char line[WORK_QUEUE_LINE_MAX];
 		debug(D_WQ, "verifying manager's project name");
-		send_manager_message(manager, "name\n");
-		if(!recv_manager_message(manager,line,sizeof(line),idle_stoptime)) {
+		send_message(manager, "name\n");
+		if(!recv_message(manager,line,sizeof(line),idle_stoptime)) {
 			debug(D_WQ,"no response from manager while verifying name");
 			link_close(manager);
 			return 0;
@@ -2244,7 +2245,7 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	}
 
 	if(abort_signal_received) {
-		send_manager_message(manager, "info vacating %d\n", abort_signal_received);
+		send_message(manager, "info vacating %d\n", abort_signal_received);
 	}
 
 	last_task_received     = 0;
