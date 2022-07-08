@@ -886,6 +886,10 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	// If host and port are not set, pick defaults.
 	if(!q->catalog_hosts) q->catalog_hosts = xxstrdup(CATALOG_HOST);
 
+	// Update the catalog.
+	update_write_catalog(q, foreman_uplink);
+	update_read_catalog(q);
+
 	q->catalog_last_update_time = time(0);
 }
 
