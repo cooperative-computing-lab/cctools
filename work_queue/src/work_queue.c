@@ -833,6 +833,12 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	return timeout;
 }
 
+static void remove_factory(struct work_queue_factory_info *f)
+{
+	free(f->name);
+	free(f);
+}
+
 static void update_factory(struct work_queue *q, struct jx *j)
 {
 	const char *name = jx_lookup_string(j, "factory_name");
