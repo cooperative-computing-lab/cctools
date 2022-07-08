@@ -1118,34 +1118,6 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 	return result;
 }
 
-static int file_from_url(const char *url, const char *filename)
-{
-	debug(D_WQ, "Retrieving %s from (%s)\n", filename, url);
-	char command[WORK_QUEUE_LINE_MAX];
-	string_nformat(command, sizeof(command), "curl -f -o \"%s\" \"%s\"", filename, url);
-
-	if (system(command) == 0) {
-		debug(D_WQ, "Success, file retrieved from %s\n", url);
-	} else {
-		debug(D_WQ, "Failed to retrieve file from %s\n", url);
-		return 0;
-	}
-
-	return 1;
-}
-
-static int do_url(struct link* manager, const char *filename, int length, int mode)
-{
-
-	char url[WORK_QUEUE_LINE_MAX];
-	link_read(manager, url, length, time(0) + active_timeout);
-
-	char cache_name[WORK_QUEUE_LINE_MAX];
-	string_nformat(cache_name, sizeof(cache_name), "cache/%s", filename);
-
-	return file_from_url(url, cache_name);
-}
-
 static int do_tlq_url(const char *manager_tlq_url)
 {
 	debug(D_TLQ, "set manager TLQ URL: %s", manager_tlq_url);
@@ -1178,137 +1150,6 @@ static int do_get(struct link *manager, const char *filename, int recursive)
 	stream_output_item(manager, filename, recursive);
 	send_message(manager, "end\n");
 	return 1;
-}
-
-static int do_thirdget(int mode, char *filename, const char *path)
-{
-	char cmd[WORK_QUEUE_LINE_MAX];
-	char cached_filename[WORK_QUEUE_LINE_MAX];
-	char *cur_pos;
-	char *cmd_tmp;
-	struct stat info;
-
-	if(mode != WORK_QUEUE_FS_CMD) {
-		if(stat(path, &info) != 0) {
-			debug(D_WQ, "Path %s not accessible. (%s)\n", path, strerror(errno));
-			return 0;
-		}
-		if(!strcmp(filename, path)) {
-			debug(D_WQ, "thirdget aborted: filename (%s) and path (%s) are the same\n", filename, path);
-			return 1;
-		}
-	}
-
-	cur_pos = filename;
-
-	while(!strncmp(cur_pos, "./", 2)) {
-		cur_pos += 2;
-	}
-
-	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", cur_pos);
-
-	cur_pos = strrchr(cached_filename, '/');
-	if(cur_pos) {
-		*cur_pos = '\0';
-		if(!create_dir(cached_filename, mode | 0700)) {
-			debug(D_WQ, "Could not create directory - %s (%s)\n", cached_filename, strerror(errno));
-			return 0;
-		}
-		*cur_pos = '/';
-	}
-
-	if(stat(cached_filename, &info) == 0) {
-		/* file is already present */
-		return 1;
-	}
-
-	switch (mode) {
-	case WORK_QUEUE_FS_SYMLINK:
-		if(symlink(path, cached_filename) != 0) {
-			debug(D_WQ, "Could not thirdget %s, symlink (%s) failed. (%s)\n", filename, path, strerror(errno));
-			return 0;
-		}
-		/* falls through */
-	case WORK_QUEUE_FS_PATH:
-		string_nformat(cmd, sizeof(cmd), "/bin/cp %s %s", path, cached_filename);
-		if(system(cmd) != 0) {
-			debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
-			return 0;
-		}
-		break;
-	case WORK_QUEUE_FS_CMD:
-		cmd_tmp = string_replace_percents(path, cached_filename);
-		string_nformat(cmd, sizeof(cmd), "%s", cmd_tmp);
-		free(cmd_tmp);
-		debug(D_WQ, "Transfering %s via cmd: %s", cached_filename, cmd);
-		if(system(cmd) != 0) {
-			debug(D_WQ, "Could not thirdget %s, command (%s) failed. (%s)\n", filename, cmd, strerror(errno));
-			return 0;
-		}
-		break;
-	}
-	return 1;
-}
-
-static int do_thirdput(struct link *manager, int mode, char *filename, const char *path) {
-	struct stat info;
-	char cmd[WORK_QUEUE_LINE_MAX];
-	char cached_filename[WORK_QUEUE_LINE_MAX];
-	char *cur_pos;
-	int result = 1;
-
-	cur_pos = filename;
-
-	while(!strncmp(cur_pos, "./", 2)) {
-		cur_pos += 2;
-	}
-
-	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", cur_pos);
-
-
-	if(stat(cached_filename, &info) != 0) {
-		debug(D_WQ, "File %s not accessible. (%s)\n", cached_filename, strerror(errno));
-		result = 0;
-	}
-
-
-	switch (mode) {
-	case WORK_QUEUE_FS_SYMLINK:
-	case WORK_QUEUE_FS_PATH:
-		if(!strcmp(filename, path)) {
-			debug(D_WQ, "thirdput aborted: filename (%s) and path (%s) are the same\n", filename, path);
-			result = 1;
-		}
-		cur_pos = strrchr(path, '/');
-		if(cur_pos) {
-			*cur_pos = '\0';
-			if(!create_dir(path, mode | 0700)) {
-				debug(D_WQ, "Could not create directory - %s (%s)\n", path, strerror(errno));
-				result = 0;
-				*cur_pos = '/';
-				break;
-			}
-			*cur_pos = '/';
-		}
-		string_nformat(cmd, sizeof(cmd), "/bin/cp -r %s %s", cached_filename, path);
-		if(system(cmd) != 0) {
-			debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", cached_filename, path, strerror(errno));
-			result = 0;
-		}
-		break;
-	case WORK_QUEUE_FS_CMD:
-		string_nformat(cmd, sizeof(cmd), "%s < %s", path, cached_filename);
-		if(system(cmd) != 0) {
-			debug(D_WQ, "Could not thirdput %s, command (%s) failed. (%s)\n", filename, cmd, strerror(errno));
-			result = 0;
-		}
-		break;
-	}
-
-	send_message(manager, "thirdput-complete %d\n", result);
-
-	return result;
-
 }
 
 /*
@@ -1537,7 +1378,6 @@ static int handle_manager(struct link *manager)
 	char filename_encoded[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
 	char manager_tlq_url[WORK_QUEUE_LINE_MAX];
-	char path[WORK_QUEUE_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
 	int mode, r, n;
@@ -1553,9 +1393,6 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_put_dir(manager,filename);
 			reset_idle_timer();
-		} else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
-			r = do_url(manager, filename, length, mode);
-			reset_idle_timer();
 		} else if(sscanf(line, "tlq %s", manager_tlq_url) == 1) {
 			r = do_tlq_url(manager_tlq_url);
 			reset_idle_timer();
@@ -1565,13 +1402,6 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "get %s %d", filename_encoded, &mode) == 2) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_get(manager, filename, mode);
-		} else if(sscanf(line, "thirdget %o %s %[^\n]", &mode, filename_encoded, path) == 3) {
-			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_thirdget(mode, filename, path);
-		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename_encoded, path) == 3) {
-			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_thirdput(manager, mode, filename, path);
-			reset_idle_timer();
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
