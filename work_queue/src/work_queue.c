@@ -833,6 +833,27 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	return timeout;
 }
 
+static void update_factory(struct work_queue *q, struct jx *j)
+{
+	const char *name = jx_lookup_string(j, "factory_name");
+	struct work_queue_factory_info *f;
+
+	if ( !(f = hash_table_lookup(q->factory_table, name)) ) {
+		// Create a new factory
+		debug(D_WQ, "new factory %s detected", name);
+		f = malloc(sizeof(*f));
+		if (!f) {
+			debug(D_NOTICE, "Cannot allocate memory for factory %s.", name);
+			return;
+		}
+	}
+
+	f->name = strdup(name);
+	hash_table_insert(q->worker_table, f->name, f);
+
+	return;
+}
+
 void update_write_catalog(struct work_queue *q, struct link *foreman_uplink)
 {
 	// Generate the manager status in an jx, and print it to a buffer.
