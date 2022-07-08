@@ -272,7 +272,8 @@ static void reset_idle_timer()
 Measure the disk used by the worker. We only manually measure the cache directory, as processes measure themselves.
 */
 
-static int64_t measure_worker_disk() {
+static int64_t measure_worker_disk()
+{
 	static struct path_disk_size_info *state = NULL;
 
 	path_disk_size_info_get_r("./cache", max_time_on_measurement, &state);
@@ -359,7 +360,9 @@ static void measure_worker_resources()
 /*
 Send a message to the manager with user defined features.
 */
-static void send_features(struct link *manager) {
+
+static void send_features(struct link *manager)
+{
 	char *f;
 	void *dummy;
 	hash_table_firstkey(features);
@@ -443,8 +446,8 @@ static void send_stats_update(struct link *manager)
 	}
 }
 
-static int send_keepalive(struct link *manager, int force_resources){
-
+static int send_keepalive(struct link *manager, int force_resources)
+{
 	send_manager_message(manager, "alive\n");
 
 	/* for regular workers we only send resources on special ocassions, thus
@@ -458,7 +461,8 @@ static int send_keepalive(struct link *manager, int force_resources){
 	return 1;
 }
 
-static int send_tlq_config( struct link *manager ) {
+static int send_tlq_config( struct link *manager )
+{
 	//attempt to find local TLQ server to retrieve manager URL
 	if(tlq_port && debug_path && !tlq_url) {
 		debug(D_TLQ, "looking up worker TLQ URL");
@@ -1211,34 +1215,36 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 	return result;
 }
 
-static int file_from_url(const char *url, const char *filename) {
-
-		debug(D_WQ, "Retrieving %s from (%s)\n", filename, url);
-		char command[WORK_QUEUE_LINE_MAX];
-		string_nformat(command, sizeof(command), "curl -f -o \"%s\" \"%s\"", filename, url);
+static int file_from_url(const char *url, const char *filename)
+{
+	debug(D_WQ, "Retrieving %s from (%s)\n", filename, url);
+	char command[WORK_QUEUE_LINE_MAX];
+	string_nformat(command, sizeof(command), "curl -f -o \"%s\" \"%s\"", filename, url);
 
 	if (system(command) == 0) {
-				debug(D_WQ, "Success, file retrieved from %s\n", url);
-		} else {
-				debug(D_WQ, "Failed to retrieve file from %s\n", url);
-				return 0;
-		}
+		debug(D_WQ, "Success, file retrieved from %s\n", url);
+	} else {
+		debug(D_WQ, "Failed to retrieve file from %s\n", url);
+		return 0;
+	}
 
-		return 1;
+	return 1;
 }
 
-static int do_url(struct link* manager, const char *filename, int length, int mode) {
+static int do_url(struct link* manager, const char *filename, int length, int mode)
+{
 
-		char url[WORK_QUEUE_LINE_MAX];
-		link_read(manager, url, length, time(0) + active_timeout);
+	char url[WORK_QUEUE_LINE_MAX];
+	link_read(manager, url, length, time(0) + active_timeout);
 
-		char cache_name[WORK_QUEUE_LINE_MAX];
-		string_nformat(cache_name, sizeof(cache_name), "cache/%s", filename);
+	char cache_name[WORK_QUEUE_LINE_MAX];
+	string_nformat(cache_name, sizeof(cache_name), "cache/%s", filename);
 
-		return file_from_url(url, cache_name);
+	return file_from_url(url, cache_name);
 }
 
-static int do_tlq_url(const char *manager_tlq_url) {
+static int do_tlq_url(const char *manager_tlq_url)
+{
 	debug(D_TLQ, "set manager TLQ URL: %s", manager_tlq_url);
 	return 1;
 }
@@ -1264,13 +1270,15 @@ static int do_unlink(const char *path)
 	return 1;
 }
 
-static int do_get(struct link *manager, const char *filename, int recursive) {
+static int do_get(struct link *manager, const char *filename, int recursive)
+{
 	stream_output_item(manager, filename, recursive);
 	send_manager_message(manager, "end\n");
 	return 1;
 }
 
-static int do_thirdget(int mode, char *filename, const char *path) {
+static int do_thirdget(int mode, char *filename, const char *path)
+{
 	char cmd[WORK_QUEUE_LINE_MAX];
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	char *cur_pos;
@@ -1449,7 +1457,8 @@ If this failed to bring the system back to a fresh state,
 then we need to abort to clean things up.
 */
 
-static void kill_all_tasks() {
+static void kill_all_tasks()
+{
 	struct work_queue_process *p;
 	uint64_t taskid;
 
@@ -1470,10 +1479,12 @@ static void kill_all_tasks() {
 	debug(D_WQ,"all data structures are clean");
 }
 
-/* Remove a file, even when mark as cached. Foreman broadcast this message to
- * foremen down its hierarchy. It is invalid for a worker to receice this message. */
-static int do_invalidate_file(const char *filename) {
-
+/*
+Remove a file, even when mark as cached. Foreman broadcast this message to
+foremen down its hierarchy. It is invalid for a worker to receice this message.
+*/
+static int do_invalidate_file(const char *filename)
+{
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		work_queue_invalidate_cached_file_internal(foreman_q, filename);
 		return 1;
@@ -1482,12 +1493,14 @@ static int do_invalidate_file(const char *filename) {
 	return -1;
 }
 
-static void finish_running_task(struct work_queue_process *p, work_queue_result_t result) {
+static void finish_running_task(struct work_queue_process *p, work_queue_result_t result)
+{
 	p->task_status |= result;
 	kill(p->pid, SIGKILL);
 }
 
-static void finish_running_tasks(work_queue_result_t result) {
+static void finish_running_tasks(work_queue_result_t result)
+{
 	struct work_queue_process *p;
 	pid_t pid;
 
@@ -1497,7 +1510,8 @@ static void finish_running_tasks(work_queue_result_t result) {
 	}
 }
 
-static int enforce_process_limits(struct work_queue_process *p) {
+static int enforce_process_limits(struct work_queue_process *p)
+{
 	/* If the task did not specify disk usage, return right away. */
 	if(p->disk < 1)
 		return 1;
@@ -1514,7 +1528,8 @@ static int enforce_process_limits(struct work_queue_process *p) {
 	return 1;
 }
 
-static int enforce_processes_limits() {
+static int enforce_processes_limits()
+{
 	static time_t last_check_time = 0;
 
 	struct work_queue_process *p;
@@ -1546,9 +1561,13 @@ static int enforce_processes_limits() {
 	return ok;
 }
 
-/* We check maximum_running_time by itself (not in enforce_processes_limits),
- * as other running tasks should not be affected by a task timeout. */
-static void enforce_processes_max_running_time() {
+/*
+We check maximum_running_time by itself (not in enforce_processes_limits),
+as other running tasks should not be affected by a task timeout.
+*/
+
+static void enforce_processes_max_running_time()
+{
 	struct work_queue_process *p;
 	pid_t pid;
 
@@ -1574,14 +1593,15 @@ static void enforce_processes_max_running_time() {
 }
 
 
-static int do_release() {
+static int do_release()
+{
 	debug(D_WQ, "released by manager %s:%d.\n", current_manager_address->addr, current_manager_address->port);
 	released_by_manager = 1;
 	return 0;
 }
 
-static void disconnect_manager(struct link *manager) {
-
+static void disconnect_manager(struct link *manager)
+{
 	debug(D_WQ, "disconnecting from manager %s:%d", current_manager_address->addr, current_manager_address->port);
 	link_close(manager);
 
@@ -1608,7 +1628,8 @@ static void disconnect_manager(struct link *manager) {
 	}
 }
 
-static int handle_manager(struct link *manager) {
+static int handle_manager(struct link *manager)
+{
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename_encoded[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
@@ -1722,8 +1743,8 @@ static int task_resources_fit_eventually(struct work_queue_task *t)
 		(t->resources_requested->gpus   <= r->gpus.largest);
 }
 
-void forsake_waiting_process(struct link *manager, struct work_queue_process *p) {
-
+void forsake_waiting_process(struct link *manager, struct work_queue_process *p)
+{
 	/* the task cannot run in this worker */
 	p->task_status = WORK_QUEUE_RESULT_FORSAKEN;
 	itable_insert(procs_complete, p->task->taskid, p);
@@ -1737,7 +1758,9 @@ void forsake_waiting_process(struct link *manager, struct work_queue_process *p)
 /*
 If 0, the worker is using more resources than promised. 1 if resource usage holds that promise.
 */
-static int enforce_worker_limits(struct link *manager) {
+
+static int enforce_worker_limits(struct link *manager)
+{
 	if( manual_disk_option > 0 && local_resources->disk.inuse > manual_disk_option ) {
 		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
 
@@ -1764,7 +1787,9 @@ static int enforce_worker_limits(struct link *manager) {
 /*
 If 0, the worker has less resources than promised. 1 otherwise.
 */
-static int enforce_worker_promises(struct link *manager) {
+
+static int enforce_worker_promises(struct link *manager)
+{
 	if(end_time > 0 && timestamp_get() > ((uint64_t) end_time)) {
 		warn(D_NOTICE, "work_queue_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t) manual_wall_time_option);
 		if(manager) {
@@ -1786,7 +1811,8 @@ static int enforce_worker_promises(struct link *manager) {
 	return 1;
 }
 
-static void work_for_manager(struct link *manager) {
+static void work_for_manager(struct link *manager)
+{
 	sigset_t mask;
 
 	debug(D_WQ, "working for manager at %s:%d.\n", current_manager_address->addr, current_manager_address->port);
@@ -1930,7 +1956,8 @@ static void work_for_manager(struct link *manager) {
 	}
 }
 
-static void foreman_for_manager(struct link *manager) {
+static void foreman_for_manager(struct link *manager)
+{
 	int manager_active = 0;
 	if(!manager) {
 		return;
@@ -1989,7 +2016,8 @@ static void foreman_for_manager(struct link *manager) {
 workspace_create is done once when the worker starts.
 */
 
-static int workspace_create() {
+static int workspace_create()
+{
 	char absolute[WORK_QUEUE_LINE_MAX];
 
 	// Setup working space(dir)
@@ -2030,7 +2058,8 @@ static int workspace_create() {
 Create a test script and try to execute.
 With this we check the scratch directory allows file execution.
 */
-static int workspace_check() {
+static int workspace_check()
+{
 	int error = 0; /* set 1 on error */
 	char *fname = string_format("%s/test.sh", workspace);
 
@@ -2246,7 +2275,8 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	return 1;
 }
 
-int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl) {
+int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
+{
 	int result = 0;
 
 	/* keep trying managers in the list, until all manager addresses
@@ -2263,8 +2293,8 @@ int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl) 
 	return result;
 }
 
-static struct list *interfaces_to_list(const char *addr, int port, struct jx *ifas) {
-
+static struct list *interfaces_to_list(const char *addr, int port, struct jx *ifas)
+{
 	struct list *l = list_create();
 	struct jx *ifa;
 
@@ -2388,7 +2418,8 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 	}
 }
 
-void set_worker_id() {
+void set_worker_id()
+{
 	srand(time(NULL));
 
 	char *salt_and_pepper = string_format("%d%d%d", getpid(), getppid(), rand());
@@ -2428,7 +2459,8 @@ static void read_resources_env_vars() {
 	read_resources_env_var("GPUS",   &manual_gpus_option);
 }
 
-struct list *parse_manager_addresses(const char *specs, int default_port) {
+struct list *parse_manager_addresses(const char *specs, int default_port)
+{
 	struct list *managers = list_create();
 
 	char *managers_args = xxstrdup(specs);
