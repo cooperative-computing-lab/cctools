@@ -447,6 +447,11 @@ static void send_stats_update(struct link *manager)
 	}
 }
 
+/*
+Send a periodic keepalive message to the manager, otherwise it will
+think that the worker has crashed and gone away. 
+*/
+
 static int send_keepalive(struct link *manager, int force_resources)
 {
 	send_message(manager, "alive\n");
@@ -637,6 +642,11 @@ static void report_tasks_complete( struct link *manager )
 
 	results_to_be_sent_msg = 0;
 }
+
+/*
+Find any processes that have overrun their declared absolute end time,
+and send a kill signal.  The actual exit of the process will be detected at a later time.
+*/
 
 static void expire_procs_running()
 {
@@ -2189,7 +2199,8 @@ static void handle_sigchld(int sig)
 	sigchld_received_flag = 1;
 }
 
-static void read_resources_env_var(const char *name, int64_t *manual_option) {
+static void read_resources_env_var(const char *name, int64_t *manual_option)
+{
 	char *value;
 	value = getenv(name);
 	if(value) {
@@ -2199,7 +2210,8 @@ static void read_resources_env_var(const char *name, int64_t *manual_option) {
 	}
 }
 
-static void read_resources_env_vars() {
+static void read_resources_env_vars()
+{
 	read_resources_env_var("CORES",  &manual_cores_option);
 	read_resources_env_var("MEMORY", &manual_memory_option);
 	read_resources_env_var("DISK",   &manual_disk_option);
