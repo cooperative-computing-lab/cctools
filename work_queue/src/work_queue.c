@@ -827,6 +827,30 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	return timeout;
 }
 
+void update_read_catalog(struct work_queue *q)
+{
+	time_t stoptime = time(0) + 5; // Short timeout for query
+	struct catalog_query *cq;
+
+	debug(D_WQ, "Retrieving info from catalog server(s) at %s ...", q->catalog_hosts);
+	cq = catalog_query_create(q->catalog_hosts, NULL, stoptime);
+	if (!cq){
+		debug(D_WQ, "Failed to retrieve info from catalog server(s) at %s.", q->catalog_hosts);
+		return;
+	}
+
+	// For each expression returned by the query
+	struct jx *j;
+	while((j = catalog_query_read(cq, stoptime))) {
+		{
+			// Further oprations
+		}
+		jx_delete(j);
+	}
+
+	catalog_query_delete(cq);
+}
+
 void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
 	// Only advertise if we have a name.
