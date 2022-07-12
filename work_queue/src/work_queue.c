@@ -1529,8 +1529,9 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 
 	char *summary = monitor_file_name(q, t, ".summary");
 
-	if(t->resources_measured)
+	if(t->resources_measured) {
 		rmsummary_delete(t->resources_measured);
+	}
 
 	t->resources_measured = rmsummary_parse_file_single(summary);
 
@@ -1540,7 +1541,8 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 	} else {
 		/* if no resources were measured, then we don't overwrite the return
 		 * status, and mark the task as with error from monitoring. */
-			update_task_result(t, WORK_QUEUE_RESULT_RMONITOR_ERROR);
+		t->resources_measured = rmsummary_create(-1);
+		update_task_result(t, WORK_QUEUE_RESULT_RMONITOR_ERROR);
 	}
 
 	free(summary);
