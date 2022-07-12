@@ -39,6 +39,7 @@ See the file COPYING for details.
 #include "md5.h"
 #include "url_encode.h"
 #include "jx_print.h"
+#include "jx_parse.h"
 #include "shell.h"
 #include "pattern.h"
 #include "tlq_config.h"
@@ -861,6 +862,44 @@ static void update_factory(struct work_queue *q, struct jx *j)
 	return;
 }
 
+void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
+	struct catalog_query *cq;
+	struct jx *jexpr = NULL;
+	struct jx *j;
+
+	// Iterate through factory_table to create a query filter.
+	int first_name = 1;
+	buffer_t filter;
+	buffer_init(&filter);
+	char **factory_name = NULL;
+	struct work_queue_factory_info **f = NULL;
+	buffer_putfstring(&filter, "type == \"wq_factory\" && (");
+
+	hash_table_firstkey(q->factory_table);
+	while ( hash_table_nextkey(q->factory_table, factory_name, (void **) f) ) {
+		buffer_putfstring(&filter, "%sname == \"%s\"", first_name ? "" : " || " ,*factory_name);
+		first_name = 0;
+	}
+	buffer_putfstring(&filter, ")");
+	jexpr = jx_parse_string(buffer_tolstring(&filter, NULL));
+	buffer_free(&filter);
+
+	// Query the catalog server
+	debug(D_WQ, "Retrieving factory info from catalog server(s) at %s ...", q->catalog_hosts);
+	if ( (cq = catalog_query_create(q->catalog_hosts, jexpr, stoptime)) ) {
+		// Update the table
+		while((j = catalog_query_read(cq, stoptime))) {
+			update_factory(q, j);
+			jx_delete(j);
+		}
+		catalog_query_delete(cq);
+	} else {
+		debug(D_WQ, "Failed to retrieve factory info from catalog server(s) at %s.", q->catalog_hosts);
+	}
+
+	jx_delete(jexpr);
+}
+
 void update_write_catalog(struct work_queue *q, struct link *foreman_uplink)
 {
 	// Generate the manager status in an jx, and print it to a buffer.
@@ -887,25 +926,8 @@ void update_write_catalog(struct work_queue *q, struct link *foreman_uplink)
 void update_read_catalog(struct work_queue *q)
 {
 	time_t stoptime = time(0) + 5; // Short timeout for query
-	struct catalog_query *cq;
 
-	debug(D_WQ, "Retrieving info from catalog server(s) at %s ...", q->catalog_hosts);
-	cq = catalog_query_create(q->catalog_hosts, NULL, stoptime);
-	if (!cq){
-		debug(D_WQ, "Failed to retrieve info from catalog server(s) at %s.", q->catalog_hosts);
-		return;
-	}
-
-	// For each expression returned by the query
-	struct jx *j;
-	while((j = catalog_query_read(cq, stoptime))) {
-		{
-			// Further oprations
-		}
-		jx_delete(j);
-	}
-
-	catalog_query_delete(cq);
+	update_read_catalog_factory(q, stoptime);
 }
 
 void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
