@@ -230,6 +230,8 @@ static char *coprocess_command = NULL;
 static char *coprocess_name = NULL;
 static int coprocess_port = -1;
 
+static char *factory_name = NULL;
+
 __attribute__ (( format(printf,2,3) ))
 static void send_manager_message( struct link *manager, const char *fmt, ... )
 {
@@ -2578,7 +2580,8 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION};
+	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION,
+	  LONG_OPT_FROM_FACTORY};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2626,6 +2629,7 @@ static const struct option long_options[] = {
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
 	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
+	{"from-factory",        required_argument,  0,  LONG_OPT_FROM_FACTORY},
 	{0,0,0,0}
 };
 
@@ -2876,6 +2880,10 @@ int main(int argc, char *argv[])
 			coprocess_command = calloc(PATH_MAX, sizeof(char));
 			path_absolute(optarg, coprocess_command, 1);
 			realloc(coprocess_command, strlen(coprocess_command)+1);
+			break;
+		case LONG_OPT_FROM_FACTORY:
+			if (factory_name) free(factory_name);
+			factory_name = xxstrdup(optarg);
 			break;
 		default:
 			show_help(argv[0]);
