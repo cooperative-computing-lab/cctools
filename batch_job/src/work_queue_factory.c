@@ -385,11 +385,12 @@ static int submit_worker( struct batch_queue *queue )
 
 	if(using_catalog) {
 		cmd = string_format(
-		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s",
+		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s %s",
 		worker,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
+		factory_name ? string_format("--from-factory \"%s\"", factory_name) : "",
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
