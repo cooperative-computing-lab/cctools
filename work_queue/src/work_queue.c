@@ -1111,6 +1111,18 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 	if(w->features)
 		hash_table_delete(w->features);
 
+	if (w->factory_name) {
+		struct work_queue_factory_info *f;
+		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
+			if (f->connected_workers == 1) {
+				hash_table_remove(q->factory_table, w->factory_name);
+				remove_factory(f);
+			} else {
+				f->connected_workers--;
+			}
+		}
+	}
+
 	free(w->stats);
 	free(w->hostname);
 	free(w->os);
