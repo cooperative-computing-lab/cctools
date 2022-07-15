@@ -128,6 +128,9 @@ void work_queue_process_delete(struct work_queue_process *p)
 	if(p->tmpdir)
 		free(p->tmpdir);
 
+	if(p->cache_dir)
+		free(p->cache_dir);
+	
 	free(p);
 }
 
