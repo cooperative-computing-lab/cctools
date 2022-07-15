@@ -881,7 +881,8 @@ static void update_factory(struct work_queue *q, struct jx *j)
 		return;
 	}
 
-	f->max_workers = jx_lookup_integer(j, "max_workers");
+	int max_workers = jx_lookup_integer(j, "max_workers");
+	if (max_workers) f->max_workers = max_workers;
 	f->seen_at_catalog = 1;
 }
 
