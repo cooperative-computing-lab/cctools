@@ -25,6 +25,7 @@ struct work_queue_process {
 	timestamp_t execution_start;
 	timestamp_t execution_end;
 
+	char *cache_dir;
 	char *sandbox;
 	char *tmpdir;                   // TMPDIR per task, expected to be a subdir of sandbox.
 	char *output_file_name;

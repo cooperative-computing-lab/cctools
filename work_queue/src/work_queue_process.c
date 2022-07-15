@@ -42,9 +42,12 @@ make an allocation, otherwise just make a directory.
 Create temporary directories inside as well.
 */
 
+extern char * workspace;
+
 static int create_sandbox_dir( struct work_queue_process *p, int disk_allocation )
 {
-	p->sandbox = string_format("t.%d", p->task->taskid);
+	p->cache_dir = string_format("%s/cache",workspace);
+  	p->sandbox = string_format("%s/t.%d", workspace,p->task->taskid);
 
 	if(disk_allocation) {
 		work_queue_process_compute_disk_needed(p);
@@ -65,12 +68,7 @@ static int create_sandbox_dir( struct work_queue_process *p, int disk_allocation
 		if(!create_dir(p->sandbox, 0777)) return 0;
 	}
 
-	char absolute[1024];
-	path_absolute(p->sandbox, absolute, 1);
-	free(p->sandbox);
-	p->sandbox = xxstrdup(absolute);
-
-char tmpdir_template[1024];
+	char tmpdir_template[1024];
 	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
 	if(mkdtemp(tmpdir_template) == NULL) {
 		return 0;

@@ -13,6 +13,11 @@
 
 extern int symlinks_enabled;
 
+/*
+XXX separate load-to-cache from link-to-sandbox.
+XXX inform manager of size of items in cache when loaded.
+*/
+
 
 /*
 Transfer a single input file from a url to a local filename by using /usr/bin/curl.
@@ -46,53 +51,64 @@ static const char *skip_dotslash( const char *s )
 }
 
 /*
-Transfer a single file into the sandbox.
+Transfer a single input file into the cache directory,
+and then link it into the sandbox location.
 Each type of input binding has a different method.
-Ordinary files are linked from the cache directory,
+Ordinary files were already uploaded by the manager,
 remote urls are loaded over the network, etc.
-
-XXX Later improvement: transferred files should be moved
-into the sandbox directory where they can be shared.
 */
 
 static int transfer_input_file( struct work_queue_process *p, struct work_queue_file *f )
 {
-	char *sandbox_name = string_format("%s/%s",skip_dotslash(p->sandbox),skip_dotslash(f->remote_name));
-	create_dir_parents(sandbox_name,0777);
 	int result = 0;
 	
+	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->cached_name));
+	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
+
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
 		case WORK_QUEUE_FILE_PIECE:
 		case WORK_QUEUE_BUFFER:
-			debug(D_WQ,"input: file %s -> %s",f->payload,sandbox_name);
-		  	result = link_recursive(skip_dotslash(f->payload),skip_dotslash(sandbox_name),symlinks_enabled);
-			if(!result) {
-				if(errno==EEXIST) {
-					// XXX silently ignore the case where the target file exists.
-					// This happens when managers apps map the same input file twice, or to the same name.
-					// Would be better to reject this at the manager instead.
-					result = 1;
-				} else {
-					debug(D_WQ,"couldn't link %s into sandbox as %s: %s",f->payload,sandbox_name,strerror(errno));
-				}
-			}
+			debug(D_WQ,"input: file %s",cache_name);
+			/* file already uploaded by manager directly */
+			result = 1;
 			break;
 		case WORK_QUEUE_REMOTECMD:
-			// XXX execute remote command here
+			debug(D_WQ,"input: command \"%s\" -> %s",f->payload,cache_name);
+			// XXX perform variable substitution
+			result = system(f->payload);
+			// convert result from unix convention to boolean
+			result = (result==0);
 			break;
 		case WORK_QUEUE_DIRECTORY:
+			/* Special clunky case: empty directories are created directly in the sandbox. */
 			debug(D_WQ,"input: dir %s",sandbox_name);
+			create_dir_parents(sandbox_name,0777);
 			result = create_dir(sandbox_name, 0700);
 			if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_name, strerror(errno));
 			break;
 		case WORK_QUEUE_URL:
-			debug(D_WQ,"input: url %s -> %s",f->payload,sandbox_name);
-			result = transfer_input_url(p,f->payload,f->remote_name);
+			debug(D_WQ,"input: url %s -> %s",f->payload,cache_name);
+			result = transfer_input_url(p,f->payload,cache_name);
 			break;
 	}
 
+	if(result) {
+		if(f->type!=WORK_QUEUE_DIRECTORY) {
+			/* If the sandbox name has directory components, create those. */
+			create_dir_parents(sandbox_name,0777);
+
+			/* Now the file is in the cache directory, link it into the sandbox. */
+			debug(D_WQ,"input: link %s -> %s",cache_name,sandbox_name);
+			result = link_recursive(cache_name,sandbox_name,symlinks_enabled);
+			if(!result) debug(D_WQ,"couldn't link %s into sandbox as %s: %s",cache_name,sandbox_name,strerror(errno));
+	
+		}
+	}
+	
+	free(cache_name);
 	free(sandbox_name);
+	
 	return result;
 }
 
@@ -186,4 +202,3 @@ int work_queue_sandbox_stageout( struct work_queue_process *p )
 	// delete of sandbox dir happens in work_queue_process_delete
 	return 1;
 }
-

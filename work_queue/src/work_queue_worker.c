@@ -158,7 +158,7 @@ struct manager_address {
 struct list *manager_addresses;
 struct manager_address *current_manager_address;
 
-static char *workspace;
+char *workspace;
 static char *os_name = NULL;
 static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
