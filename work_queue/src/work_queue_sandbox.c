@@ -100,13 +100,12 @@ static int ensure_input_file( struct work_queue_process *p, struct work_queue_fi
 	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->payload));
 	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
 
-	// XXX consider case of !WORK_QUEUE_CACHE and file already present
-	struct stat info;
-	int result = stat(cache_name,&info);
-	if(result<0) {
-		result = transfer_input_file(p,f,cache_name,sandbox_name);
+	int already_in_cache = (access(cache_name,R_OK)==0);
+
+	if(already_in_cache) {
+		debug(D_WQ,"input: cached %s",cache_name);
 	} else {
-		result = 1;
+		result = transfer_input_file(p,f,cache_name,sandbox_name);
 	}
 	
 	if(result) {
