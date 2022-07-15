@@ -2648,6 +2648,13 @@ EXIT_WITH_FAILURE:
 		batch_queue_delete(local_queue);
 
 	makeflow_log_close(d);
+
+	/* clean up allocated objects to satisfy valgrind */
+	if(logfilename) free(logfilename);
+	if(batchlogfilename) free(batchlogfilename);
+	jx_delete(jx_args);
+	jx_delete(base_hook_args);
+
         
 	exit(exit_value);
         
