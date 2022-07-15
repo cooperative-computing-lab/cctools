@@ -278,6 +278,7 @@ struct work_queue_worker {
 struct work_queue_factory_info {
 	char *name;
 	int   connected_workers;
+	int   max_workers;
 };
 
 struct work_queue_task_report {
@@ -686,6 +687,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 			if (f) {
 				f->name = xxstrdup(w->factory_name);
 				f->connected_workers = 1;
+				f->max_workers = 0;
 				hash_table_insert(q->factory_table, w->factory_name, f);
 			} else {
 				debug(D_WQ, "Failed to allocate memory for factory info");
