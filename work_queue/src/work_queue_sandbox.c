@@ -97,13 +97,23 @@ into the sandbox of the process.
 
 static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f )
 {
-	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->payload));
+	/* XXX Hack: cache name depends upon transfer type */
+	const char *cname;
+	if(f->type==WORK_QUEUE_FILE || f->type==WORK_QUEUE_FILE_PIECE || f->type==WORK_QUEUE_DIRECTORY) {
+		cname = f->payload;
+	} else {
+		cname = f->cached_name;
+	}
+
+	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(cname));
 	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
 
 	int already_in_cache = (access(cache_name,R_OK)==0);
 
+	int result;
 	if(already_in_cache) {
 		debug(D_WQ,"input: cached %s",cache_name);
+		result = 1;
 	} else {
 		result = transfer_input_file(p,f,cache_name,sandbox_name);
 	}
@@ -159,7 +169,14 @@ int work_queue_sandbox_stagein( struct work_queue_process *p )
 
 static int transfer_output_file( struct work_queue_process *p, struct work_queue_file *f )
 {
-	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->payload));
+	const char *cname;
+	if(f->type==WORK_QUEUE_FILE || f->type==WORK_QUEUE_FILE_PIECE || f->type==WORK_QUEUE_DIRECTORY) {
+		cname = f->payload;
+	} else {
+		cname = f->cached_name;
+	}
+
+	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(cname));
 	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
 
 	int result = 0;
