@@ -359,6 +359,8 @@ static void write_transaction_worker_resources(struct work_queue *q, struct work
 
 static void delete_feature(struct work_queue_task *t, const char *name);
 
+static struct work_queue_factory_info* create_factory_info(struct work_queue *q, const char *name);
+
 static void fill_deprecated_queue_stats(struct work_queue *q, struct work_queue_stats *s);
 static void fill_deprecated_tasks_stats(struct work_queue_task *t);
 
@@ -679,20 +681,8 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 		w->end_time = MAX(0, atoll(value));
 	} else if(string_prefix_is(field, "from-factory")) {
 		w->factory_name = xxstrdup(value);
-		struct work_queue_factory_info *f = hash_table_lookup(q->factory_table, w->factory_name);
-		if (f) {
-			f->connected_workers++;
-		} else {
-			f = malloc(sizeof(*f));
-			if (f) {
-				f->name = xxstrdup(w->factory_name);
-				f->connected_workers = 1;
-				f->max_workers = 0;
-				hash_table_insert(q->factory_table, w->factory_name, f);
-			} else {
-				debug(D_WQ, "Failed to allocate memory for factory info");
-			}
-		}
+		struct work_queue_factory_info *f = create_factory_info(q, w->factory_name);
+		f->connected_workers++;
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -851,6 +841,20 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 
 	free(data_source);
 	return timeout;
+}
+
+static struct work_queue_factory_info* create_factory_info(struct work_queue *q, const char *name)
+{
+	struct work_queue_factory_info *f;
+	if ( (f = hash_table_lookup(q->factory_table, name)) ) return f;
+
+	f = malloc(sizeof(*f));
+	f->name = xxstrdup(name);
+	f->connected_workers = 0;
+	f->max_workers = INT_MAX;
+	f->seen_at_catalog = 0;
+	hash_table_insert(q->factory_table, name, f);
+	return f;
 }
 
 static void remove_factory(struct work_queue_factory_info *f)
