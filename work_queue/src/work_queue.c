@@ -860,22 +860,11 @@ static void remove_factory(struct work_queue_factory_info *f)
 static void update_factory(struct work_queue *q, struct jx *j)
 {
 	const char *name = jx_lookup_string(j, "factory_name");
-	struct work_queue_factory_info *f;
-
-	if ( !(f = hash_table_lookup(q->factory_table, name)) ) {
-		// Create a new factory
-		debug(D_WQ, "new factory %s detected", name);
-		f = malloc(sizeof(*f));
-		if (!f) {
-			debug(D_NOTICE, "Cannot allocate memory for factory %s.", name);
-			return;
-		}
-		f->name = xxstrdup(name);
-		f->connected_workers = 0;
-		hash_table_insert(q->worker_table, f->name, f);
+	struct work_queue_factory_info *f = hash_table_lookup(q->factory_table, name);
+	if (!f) {
+		debug(D_WQ, "factory %s not recorded", name);
+		return;
 	}
-
-	return;
 }
 
 void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
