@@ -51,20 +51,16 @@ static const char *skip_dotslash( const char *s )
 }
 
 /*
-Transfer a single input file into the cache directory,
-and then link it into the sandbox location.
+Transfer a single input file into the cache directory.
 Each type of input binding has a different method.
 Ordinary files were already uploaded by the manager,
 remote urls are loaded over the network, etc.
 */
 
-static int transfer_input_file( struct work_queue_process *p, struct work_queue_file *f )
+static int transfer_input_file( struct work_queue_process *p, struct work_queue_file *f, const char *cache_name, const char *sandbox_name )
 {
 	int result = 0;
 	
-	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->cached_name));
-	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
-
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
 		case WORK_QUEUE_FILE_PIECE:
@@ -73,6 +69,10 @@ static int transfer_input_file( struct work_queue_process *p, struct work_queue_
 			/* file already uploaded by manager directly */
 			result = 1;
 			break;
+		case WORK_QUEUE_DIRECTORY:
+			debug(D_WQ,"input: dir %s",sandbox_name);
+			/* empty directories are only created in the sandbox */
+			break;
 		case WORK_QUEUE_REMOTECMD:
 			debug(D_WQ,"input: command \"%s\" -> %s",f->payload,cache_name);
 			// XXX perform variable substitution
@@ -80,25 +80,42 @@ static int transfer_input_file( struct work_queue_process *p, struct work_queue_
 			// convert result from unix convention to boolean
 			result = (result==0);
 			break;
-		case WORK_QUEUE_DIRECTORY:
-			/* Special clunky case: empty directories are created directly in the sandbox. */
-			debug(D_WQ,"input: dir %s",sandbox_name);
-			create_dir_parents(sandbox_name,0777);
-			result = create_dir(sandbox_name, 0700);
-			if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_name, strerror(errno));
-			break;
 		case WORK_QUEUE_URL:
 			debug(D_WQ,"input: url %s -> %s",f->payload,cache_name);
 			result = transfer_input_url(p,f->payload,cache_name);
 			break;
 	}
 
-	if(result) {
-		if(f->type!=WORK_QUEUE_DIRECTORY) {
-			/* If the sandbox name has directory components, create those. */
-			create_dir_parents(sandbox_name,0777);
+	return result;
+}
 
-			/* Now the file is in the cache directory, link it into the sandbox. */
+/*
+Ensure that a given input file/dir/object is present in the cache
+directory, transferring it if needed, and then linked
+into the sandbox of the process.
+*/
+
+static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f )
+{
+	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->cached_name));
+	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
+
+	// XXX consider case of !WORK_QUEUE_CACHE and file already present
+	struct stat info;
+	int result = stat(cache_name,&info);
+	if(result<0) {
+		result = transfer_input_file(p,f,cache_name,sandbox_name);
+	} else {
+		result = 1;
+	}
+	
+	if(result) {
+	    	create_dir_parents(sandbox_name,0777);
+
+		if(f->type==WORK_QUEUE_DIRECTORY) {
+			result = create_dir(sandbox_name, 0700);
+			if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_name, strerror(errno));
+		} else {
 			debug(D_WQ,"input: link %s -> %s",cache_name,sandbox_name);
 			result = link_recursive(cache_name,sandbox_name,symlinks_enabled);
 			if(!result) debug(D_WQ,"couldn't link %s into sandbox as %s: %s",cache_name,sandbox_name,strerror(errno));
@@ -126,7 +143,7 @@ static int transfer_input_files( struct work_queue_process *p )
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
-			result = transfer_input_file(p,f);
+			result = ensure_input_file(p,f);
 			if(!result) break;
 		}
 	}
