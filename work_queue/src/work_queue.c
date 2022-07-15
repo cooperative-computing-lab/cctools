@@ -359,7 +359,8 @@ static void write_transaction_worker_resources(struct work_queue *q, struct work
 
 static void delete_feature(struct work_queue_task *t, const char *name);
 
-static struct work_queue_factory_info* create_factory_info(struct work_queue *q, const char *name);
+static struct work_queue_factory_info *create_factory_info(struct work_queue *q, const char *name);
+static void remove_factory_info(struct work_queue *q, const char *name);
 
 static void fill_deprecated_queue_stats(struct work_queue *q, struct work_queue_stats *s);
 static void fill_deprecated_tasks_stats(struct work_queue_task *t);
@@ -843,7 +844,7 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	return timeout;
 }
 
-static struct work_queue_factory_info* create_factory_info(struct work_queue *q, const char *name)
+static struct work_queue_factory_info *create_factory_info(struct work_queue *q, const char *name)
 {
 	struct work_queue_factory_info *f;
 	if ( (f = hash_table_lookup(q->factory_table, name)) ) return f;
@@ -857,10 +858,16 @@ static struct work_queue_factory_info* create_factory_info(struct work_queue *q,
 	return f;
 }
 
-static void remove_factory(struct work_queue_factory_info *f)
+static void remove_factory_info(struct work_queue *q, const char *name)
 {
-	free(f->name);
-	free(f);
+	struct work_queue_factory_info *f = hash_table_lookup(q->factory_table, name);
+	if (f) {
+		free(f->name);
+		free(f);
+		hash_table_remove(q->factory_table, name);
+	} else {
+		debug(D_WQ, "Failed to remove unrecorded factory %s", name);
+	}
 }
 
 static void update_factory(struct work_queue *q, struct jx *j)
@@ -1112,8 +1119,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 		struct work_queue_factory_info *f;
 		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
 			if (f->connected_workers == 1) {
-				hash_table_remove(q->factory_table, w->factory_name);
-				remove_factory(f);
+				remove_factory_info(q, w->factory_name);
 			} else {
 				f->connected_workers--;
 			}
@@ -5965,7 +5971,7 @@ void work_queue_delete(struct work_queue *q)
 		struct work_queue_factory_info *f;
 		hash_table_firstkey(q->factory_table);
 		while(hash_table_nextkey(q->factory_table, &key, (void **) &f)) {
-			remove_factory(f);
+			remove_factory_info(q, key);
 			hash_table_firstkey(q->factory_table);
 		}
 
