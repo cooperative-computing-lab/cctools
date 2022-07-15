@@ -867,6 +867,8 @@ static void update_factory(struct work_queue *q, struct jx *j)
 		debug(D_WQ, "factory %s not recorded", name);
 		return;
 	}
+
+	f->max_workers = jx_lookup_integer(j, "max_workers");
 }
 
 void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
