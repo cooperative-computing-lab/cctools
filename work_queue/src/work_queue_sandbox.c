@@ -97,7 +97,7 @@ into the sandbox of the process.
 
 static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f )
 {
-	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->cached_name));
+	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->payload));
 	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
 
 	// XXX consider case of !WORK_QUEUE_CACHE and file already present
@@ -160,17 +160,19 @@ int work_queue_sandbox_stagein( struct work_queue_process *p )
 
 static int transfer_output_file( struct work_queue_process *p, struct work_queue_file *f )
 {
-	char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
+	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->payload));
+	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
+
 	int result = 0;
 	
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
-			debug(D_WQ,"moving output file from %s to %s",sandbox_name,f->payload);
+			debug(D_WQ,"moving output file from %s to %s",sandbox_name,cache_name);
 			/* First we try a cheap rename. It that does not work, we try to copy the file. */
-			if(rename(sandbox_name,f->payload)<0) {
-				debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
-				if(copy_file_to_file(sandbox_name, f->payload)  == -1) {
-					debug(D_WQ, "could not copy output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
+			if(rename(sandbox_name,cache_name)<0) {
+				debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,cache_name,strerror(errno));
+				if(copy_file_to_file(sandbox_name, cache_name)  == -1) {
+					debug(D_WQ, "could not copy output file %s to %s: %s",sandbox_name,cache_name,strerror(errno));
 					result = 0;
 				} else {
 					result = 1;
@@ -191,6 +193,8 @@ static int transfer_output_file( struct work_queue_process *p, struct work_queue
 	}
 	
 	free(sandbox_name);
+	free(cache_name);
+	
 	return result;
 }
 

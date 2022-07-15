@@ -899,12 +899,10 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			work_queue_task_specify_coprocess(task,cmd);
 			debug(D_WQ,"rx from manager: %s",cmd);
 			free(cmd);
-		} else if(sscanf(line,"infile %s %s %d", filename, taskname_encoded, &flags)) {
-			string_nformat(localname, sizeof(localname), "cache/%s", filename);
+		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
 			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags);
-		} else if(sscanf(line,"outfile %s %s %d", filename, taskname_encoded, &flags)) {
-			string_nformat(localname, sizeof(localname), "cache/%s", filename);
+		} else if(sscanf(line,"outfile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
 			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
 		} else if(sscanf(line, "dir %s", filename)) {
