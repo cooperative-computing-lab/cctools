@@ -300,6 +300,7 @@ struct blocklist_host_info {
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w, worker_disconnect_reason reason);
+static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w);
 
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
