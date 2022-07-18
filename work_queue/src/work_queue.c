@@ -4535,6 +4535,16 @@ static int receive_one_task( struct work_queue *q )
 		if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
 			w = itable_lookup(q->worker_task_map, taskid);
 			fetch_output_from_worker(q, w, taskid);
+			// Shutdown worker if appropriate.
+			if ( w->factory_name ) {
+				struct work_queue_factory_info *f;
+				f = hash_table_lookup(q->factory_table, w->factory_name);
+				if ( f && f->connected_workers > f->max_workers &&
+						itable_size(w->current_tasks) < 1 ) {
+					debug(D_WQ, "Final task received from worker %s, shutting down.", w->hostname);
+					shut_down_worker(q, w);
+				}
+			}
 			return 1;
 		}
 	}
