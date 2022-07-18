@@ -846,6 +846,40 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	return timeout;
 }
 
+static int factory_trim_workers(struct work_queue *q, struct work_queue_factory_info *f)
+{
+	if (!f) return 0;
+	assert(f->name);
+
+	// Iterate through all workers and shut idle ones down
+	struct work_queue_worker *w;
+	char *key;
+	int trimmed_workers = 0;
+
+	struct hash_table *idle_workers = hash_table_create(0, 0);
+	hash_table_firstkey(q->worker_table);
+	while ( f->connected_workers - trimmed_workers > f->max_workers &&
+			hash_table_nextkey(q->worker_table, &key, (void **) &w) ) {
+		if ( w->factory_name &&
+				!strcmp(f->name, w->factory_name) &&
+				itable_size(w->current_tasks) < 1 ) {
+			hash_table_insert(idle_workers, key, w);
+			trimmed_workers++;
+		}
+	}
+
+	hash_table_firstkey(idle_workers);
+	while (hash_table_nextkey(idle_workers, &key, (void **) &w)) {
+		hash_table_remove(idle_workers, key);
+		hash_table_firstkey(idle_workers);
+		shut_down_worker(q, w);
+	}
+	hash_table_delete(idle_workers);
+
+	debug(D_WQ, "Trimmed %d workers from %s", trimmed_workers, f->name);
+	return trimmed_workers;
+}
+
 static struct work_queue_factory_info *create_factory_info(struct work_queue *q, const char *name)
 {
 	struct work_queue_factory_info *f;
@@ -881,9 +915,17 @@ static void update_factory(struct work_queue *q, struct jx *j)
 		return;
 	}
 
-	int max_workers = jx_lookup_integer(j, "max_workers");
-	if (max_workers) f->max_workers = max_workers;
 	f->seen_at_catalog = 1;
+	int found = 0;
+	struct jx *m = jx_lookup_guard(j, "max_workers", &found);
+	if (found) {
+		int old_max_workers = f->max_workers;
+		f->max_workers = m->u.integer_value;
+		// Trim workers if max_workers reduced.
+		if (f->max_workers < old_max_workers) {
+			factory_trim_workers(q, f);
+		}
+	}
 }
 
 void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
