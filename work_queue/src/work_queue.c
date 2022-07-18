@@ -1122,11 +1122,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 	if (w->factory_name) {
 		struct work_queue_factory_info *f;
 		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
-			if (f->connected_workers == 1) {
-				remove_factory_info(q, w->factory_name);
-			} else {
-				f->connected_workers--;
-			}
+			f->connected_workers--;
 		}
 	}
 
