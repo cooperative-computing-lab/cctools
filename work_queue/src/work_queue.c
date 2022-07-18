@@ -3992,6 +3992,12 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		return 0;
 	}
 
+	if ( w->factory_name ) {
+		struct work_queue_factory_info *f;
+		f = hash_table_lookup(q->factory_table, w->factory_name);
+		if ( f && f->connected_workers > f->max_workers ) return 0;
+	}
+
 	if(w->type != WORKER_TYPE_FOREMAN) {
 		struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
 		if (info && info->blocked) {
