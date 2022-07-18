@@ -902,7 +902,7 @@ void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
 	while ( hash_table_nextkey(q->factory_table, &factory_name, (void **)&f) ) {
 		buffer_putfstring(&filter, "%sfactory_name == \"%s\"", first_name ? "" : " || ", factory_name);
 		first_name = 0;
-		(*f)->seen_at_catalog = 0;
+		f->seen_at_catalog = 0;
 	}
 	buffer_putfstring(&filter, ")");
 	jexpr = jx_parse_string(buffer_tolstring(&filter, NULL));
@@ -922,6 +922,20 @@ void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
 	}
 
 	jx_delete(jexpr);
+
+	// Remove outdated factories
+	struct list *outdated_factories = list_create();
+	hash_table_firstkey(q->factory_table);
+	while ( hash_table_nextkey(q->factory_table, &factory_name, (void **) &f) ) {
+		if ( !f->seen_at_catalog && f->connected_workers < 1 ) {
+			list_push_tail(outdated_factories, f);
+		}
+	}
+	while ( list_size(outdated_factories) ) {
+		f = list_pop_head(outdated_factories);
+		remove_factory_info(q, f->name);
+	}
+	list_delete(outdated_factories);
 }
 
 void update_write_catalog(struct work_queue *q, struct link *foreman_uplink)
