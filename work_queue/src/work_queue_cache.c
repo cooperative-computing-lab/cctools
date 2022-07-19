@@ -29,7 +29,7 @@ struct cache_file * cache_file_create( work_queue_cache_type_t type, const char 
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
-	f->source = xxstrdup(source);
+	if(source) f->source = xxstrdup(source);
 	f->size = size;
 	f->present = present;
 	return f;
