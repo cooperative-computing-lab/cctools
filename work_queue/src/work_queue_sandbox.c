@@ -25,26 +25,26 @@ static int ensure_input_file( struct work_queue_process *p, struct work_queue_fi
 	// XXX Hack: f->cached_name does not have the expected contents, it is encoded twice.
 	char *cname = f->payload;
 
-	char *cache_name = string_format("%s/%s",p->cache_dir,cname);
-	char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
+	char *cache_path = string_format("%s/%s",p->cache_dir,cname);
+	char *sandbox_path = string_format("%s/%s",p->sandbox,f->remote_name);
 
 	int result = 0;
 
 	if(f->type==WORK_QUEUE_DIRECTORY) {
 		/* Special case: empty directories are not cached objects, just create in sandbox */
-		result = create_dir(sandbox_name, 0700);
-		if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_name, strerror(errno));
+		result = create_dir(sandbox_path, 0700);
+		if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
 	} else if(work_queue_cache_ensure(cache,cname)) {
 		/* All other types, link the cached object into the sandbox */
-	    	create_dir_parents(sandbox_name,0777);
-		debug(D_WQ,"input: link %s -> %s",cache_name,sandbox_name);
-		result = link_recursive(cache_name,sandbox_name,symlinks_enabled);
-		if(!result) debug(D_WQ,"couldn't link %s into sandbox as %s: %s",cache_name,sandbox_name,strerror(errno));
+	    	create_dir_parents(sandbox_path,0777);
+		debug(D_WQ,"input: link %s -> %s",cache_path,sandbox_path);
+		result = link_recursive(cache_path,sandbox_path,symlinks_enabled);
+		if(!result) debug(D_WQ,"couldn't link %s into sandbox as %s: %s",cache_path,sandbox_path,strerror(errno));
 	}
 	
-	free(cache_name);
-	free(sandbox_name);
+	free(cache_path);
+	free(sandbox_path);
 	
 	return result;
 }
@@ -84,16 +84,16 @@ static int transfer_output_file( struct work_queue_process *p, struct work_queue
 	// XXX Hack: f->cached_name does not have the expected contents, it is encoded twice.
 	char *cname = f->payload;
 
-	char *cache_name = string_format("%s/%s",p->cache_dir,cname);
-	char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
+	char *cache_path = string_format("%s/%s",p->cache_dir,cname);
+	char *sandbox_path = string_format("%s/%s",p->sandbox,f->remote_name);
 
 	int result = 0;
 	
-	debug(D_WQ,"output: moving %s to %s",sandbox_name,cache_name);
-	if(rename(sandbox_name,cache_name)<0) {
-		debug(D_WQ, "output: move failed, attempting copy of %s to %s: %s",sandbox_name,cache_name,strerror(errno));
-		if(copy_file_to_file(sandbox_name, cache_name)  == -1) {
-			debug(D_WQ, "could not move or copy output file %s to %s: %s",sandbox_name,cache_name,strerror(errno));
+	debug(D_WQ,"output: moving %s to %s",sandbox_path,cache_path);
+	if(rename(sandbox_path,cache_path)<0) {
+		debug(D_WQ, "output: move failed, attempting copy of %s to %s: %s",sandbox_path,cache_path,strerror(errno));
+		if(copy_file_to_file(sandbox_path, cache_path)  == -1) {
+			debug(D_WQ, "could not move or copy output file %s to %s: %s",sandbox_path,cache_path,strerror(errno));
 			result = 0;
 		} else {
 			result = 1;
@@ -105,8 +105,8 @@ static int transfer_output_file( struct work_queue_process *p, struct work_queue
 	// XXX need to check size here
 	if(result) work_queue_cache_addfile(cache,0,cname);
 	
-	free(sandbox_name);
-	free(cache_name);
+	free(sandbox_path);
+	free(cache_path);
 	
 	return result;
 }
