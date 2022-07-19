@@ -915,11 +915,11 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 		} else if(sscanf(line, "dir %s", filename)) {
 			work_queue_task_specify_directory(task, filename, filename, WORK_QUEUE_INPUT, 0700, 0);
 		} else if(sscanf(line,"cores %" PRId64,&n)) {
-				work_queue_task_specify_cores(task, n);
+			work_queue_task_specify_cores(task, n);
 		} else if(sscanf(line,"memory %" PRId64,&n)) {
-				work_queue_task_specify_memory(task, n);
+			work_queue_task_specify_memory(task, n);
 		} else if(sscanf(line,"disk %" PRId64,&n)) {
-				work_queue_task_specify_disk(task, n);
+			work_queue_task_specify_disk(task, n);
 		} else if(sscanf(line,"gpus %" PRId64,&n)) {
 			work_queue_task_specify_gpus(task, n);
 		} else if(sscanf(line,"wall_time %" PRIu64,&nt)) {
