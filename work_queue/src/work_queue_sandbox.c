@@ -15,16 +15,6 @@
 extern int symlinks_enabled;
 
 /*
-If a string begins with one or more instances of ./
-return the beginning of the string with those removed.
-*/
-
-static const char *skip_dotslash( const char *s )
-{
-	while(!strncmp(s,"./",2)) s+=2;
-	return s;
-}
-/*
 Ensure that a given input file/dir/object is present in the cache,
 (which may result in a transfer)
 and then link it into the sandbox at the desired location.
@@ -35,8 +25,8 @@ static int ensure_input_file( struct work_queue_process *p, struct work_queue_fi
 	// XXX Hack: f->cached_name does not have the expected contents, it is encoded twice.
 	char *cname = f->payload;
 
-	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(cname));
-	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
+	char *cache_name = string_format("%s/%s",p->cache_dir,cname);
+	char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
 
 	int result = 0;
 
@@ -94,8 +84,8 @@ static int transfer_output_file( struct work_queue_process *p, struct work_queue
 	// XXX Hack: f->cached_name does not have the expected contents, it is encoded twice.
 	char *cname = f->payload;
 
-	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(cname));
-	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
+	char *cache_name = string_format("%s/%s",p->cache_dir,cname);
+	char *sandbox_name = string_format("%s/%s",p->sandbox,f->remote_name);
 
 	int result = 0;
 	
