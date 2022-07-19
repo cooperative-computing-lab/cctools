@@ -178,3 +178,20 @@ if __name__ == '__main__':
     t = q.wait(20)
     report_task(t, wq.WORK_QUEUE_RESULT_TASK_TIMEOUT, 9)
 
+    # Now generate an input file from a shell command:
+    t = wq.Task("/bin/cat infile")
+    t.specify_file_command("infile","curl http://www.microsoft.com -o %%",cache=True)
+    q.submit(t)
+    t = q.wait(10)
+    report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0)
+
+    # second time should have it cached (though we can't tell from here)
+    t = wq.Task("/bin/cat infile")
+    t.specify_file_command("infile","curl http://www.microsoft.com -o %%",cache=True)
+    q.submit(t)
+    t = q.wait(10)
+    report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0)
+
+
+
+    
