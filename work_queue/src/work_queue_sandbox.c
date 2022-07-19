@@ -25,7 +25,7 @@ Ensure that a given input file/dir/object is present in the cache,
 and then link it into the sandbox at the desired location.
 */
 
-static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache )
+static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache, struct link *manager )
 {
 	char *cache_path = work_queue_cache_full_path(cache,f->cached_name);
 	char *sandbox_path = work_queue_sandbox_full_path(p,f->remote_name);
@@ -37,7 +37,7 @@ static int ensure_input_file( struct work_queue_process *p, struct work_queue_fi
 		result = create_dir(sandbox_path, 0700);
 		if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
-	} else if(work_queue_cache_ensure(cache,f->cached_name)) {
+	} else if(work_queue_cache_ensure(cache,f->cached_name,manager)) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_WQ,"input: link %s -> %s",cache_path,sandbox_path);
@@ -56,7 +56,7 @@ For each input file specified by the process,
 transfer it into the sandbox directory.
 */
 
-int work_queue_sandbox_stagein( struct work_queue_process *p, struct work_queue_cache *cache )
+int work_queue_sandbox_stagein( struct work_queue_process *p, struct work_queue_cache *cache, struct link *manager )
 {
 	struct work_queue_task *t = p->task;
 	struct work_queue_file *f;
@@ -65,7 +65,7 @@ int work_queue_sandbox_stagein( struct work_queue_process *p, struct work_queue_
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
-			result = ensure_input_file(p,f,cache);
+			result = ensure_input_file(p,f,cache,manager);
 			if(!result) break;
 		}
 	}

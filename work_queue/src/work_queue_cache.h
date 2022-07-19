@@ -15,6 +15,8 @@ for file transfers to occur asynchronously of the manager.
 
 #include <stdint.h>
 
+struct link;
+
 typedef enum {
 	WORK_QUEUE_CACHE_FILE,
 	WORK_QUEUE_CACHE_TRANSFER,
@@ -28,7 +30,7 @@ char *work_queue_cache_full_path( struct work_queue_cache *c, const char *cachen
 
 int work_queue_cache_addfile( struct work_queue_cache *c, int64_t size, const char *cachename );
 int work_queue_cache_queue( struct work_queue_cache *c, work_queue_cache_type_t, const char *source, const char *cachename );
-int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename );
+int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, struct link *manager );
 int work_queue_cache_remove( struct work_queue_cache *c, const char *cachename );
 
 #endif

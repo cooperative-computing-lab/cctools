@@ -700,6 +700,45 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	return MSG_PROCESSED;
 }
 
+/*
+A cache-update message coming from the worker means that a requested
+remote transfer or command was successful, and know we know the size
+of the file for the purposes of cache storage management.
+*/
+
+int process_cache_update( struct work_queue *q, struct work_queue_worker *w, const char *line )
+{
+	char cachename[WORK_QUEUE_LINE_MAX];
+	int64_t size;
+	
+	if(sscanf(line,"cache-update %s %" PRId64,cachename,&size)==2) {
+	  struct stat *remote_info = hash_table_lookup(w->current_files,cachename);
+		if(remote_info) {
+			remote_info->st_size = size;
+			remote_info->st_mtime = time(0);
+		}
+	}
+	
+	return MSG_PROCESSED;
+}
+
+/*
+A cache-invalid message coming from the worker means that a requested
+remote transfer or command did not succeed, and the intended file is
+not in the cache.  So, we remove the corresponding note for that worker.
+We should expect to soon receive some failed tasks that were unable
+set up their own input sandboxes.
+*/
+
+int process_cache_invalid( struct work_queue *q, struct work_queue_worker *w, const char *line )
+{
+	char cachename[WORK_QUEUE_LINE_MAX];
+	if(sscanf(line,"cache-invalid %s",cachename)==1) {
+		struct stat *remote_info = hash_table_remove(w->current_files,cachename);
+		if(remote_info) free(remote_info);
+	}
+	return MSG_PROCESSED;
+}
 
 /**
  * This function receives a message from worker and records the time a message is successfully
@@ -752,6 +791,10 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = process_info(q, w, line);
 	} else if (string_prefix_is(line, "tlq")) {
 		result = advertise_tlq_url(q, w, line);
+	} else if (string_prefix_is(line, "cache-update")) {
+		result = process_cache_update(q, w, line);
+	} else if (string_prefix_is(line, "cache-invalid")) {
+		result = process_cache_invalid(q, w, line);
 	} else if( sscanf(line,"GET %s HTTP/%*d.%*d",path)==1) {
 	        result = process_http_request(q,w,path,stoptime);
 	} else {

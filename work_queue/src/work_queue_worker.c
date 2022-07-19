@@ -471,6 +471,16 @@ static int send_keepalive(struct link *manager, int force_resources)
 	return 1;
 }
 
+void send_cache_update( struct link *manager, const char *cachename, int64_t size )
+{
+	send_manager_message(manager,"cache-update %s %" PRId64"\n",cachename,size);
+}
+
+void send_cache_invalid( struct link *manager, const char *cachename )
+{
+	send_manager_message(manager,"cache-invalid %s\n",cachename);
+}
+
 static int send_tlq_config( struct link *manager )
 {
 	//attempt to find local TLQ server to retrieve manager URL
@@ -542,13 +552,13 @@ accounting for the resources as necessary.
 Should maintain parallel structure to reap_process() above.
 */
 
-static int start_process( struct work_queue_process *p )
+static int start_process( struct work_queue_process *p, struct link *manager )
 {
 	pid_t pid;
 
 	struct work_queue_task *t = p->task;
 
-	if(!work_queue_sandbox_stagein(p,global_cache)) {
+	if(!work_queue_sandbox_stagein(p,global_cache,manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
 		// XXX when to use p->task_status versus t->result ?
 		p->task_status = WORK_QUEUE_RESULT_INPUT_MISSING;
@@ -1731,7 +1741,7 @@ static void work_for_manager(struct link *manager)
 						p->coprocess_name = xxstrdup(coprocess_name);
 						p->coprocess_port = coprocess_port;
 					}
-					start_process(p);
+					start_process(p,manager);
 					task_event++;
 				} else if(task_resources_fit_eventually(p->task)) {
 					list_push_tail(procs_waiting, p);

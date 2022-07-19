@@ -6,6 +6,7 @@
 #include "debug.h"
 #include "stringtools.h"
 #include "trash.h"
+#include "link.h"
 
 #include <sys/types.h>
 #include <sys/fcntl.h>
@@ -153,16 +154,25 @@ static int work_queue_cache_do_command( struct work_queue_cache *c, const char *
 Ensure that a given cached entry is fully materialized in the cache,
 downloading files or executing commands as needed.  If present, return
 true, otherwise return false.
+
+It is a little odd that the manager link is passed as an argument here,
+but it is needed in order to send back the necessary update/invalid messages.
 */
 
-int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename )
+int send_cache_update( struct link *manager, const char *cachename, int64_t );
+int send_cache_invalid( struct link *manager, const char *cachename );
+
+int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, struct link *manager )
 {
 	struct cache_file *f = hash_table_lookup(c->table,cachename);
-	if(!f) return 0;
+	if(!f) {
+		debug(D_WQ,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
+		return 0;
+	}
 
 	if(f->present) {
-		  debug(D_WQ,"cache: %s is already present.",cachename);
-		  return 1;
+		debug(D_WQ,"cache: %s is already present.",cachename);
+		return 1;
 	}
 	
 	char *cache_path = work_queue_cache_full_path(c,cachename);
@@ -186,20 +196,38 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename )
 			break;
 	}
 
+	/*
+	Although the prior command may have succeeded, check the actual desired
+	file in the cache to make sure that it is present.
+	*/
+	
 	if(result) {
 		struct stat info;
 		if(stat(cache_path,&info)==0) {
 			f->size = info.st_size;
 			f->present = 1;
 			debug(D_WQ,"cache: created %s with size %lld",cachename,(long long)f->size);
-			// XXX send back to manager size of created file
+			send_cache_update(manager,cachename,f->size);
+			result = 1;
 		} else {
 			debug(D_WQ,"cache: command succeeded but did not create %s",cachename);
+			result = 0;
 		}
 	} else {
 		debug(D_WQ,"cache: unable to create %s",cachename);
-		// In case the command created a partial file, trash it.
+		result = 0;
+	}
+
+	/*
+	If we failed to create the cached file for any reason,
+	then destroy any partial remaining file, and inform
+	the manager that the cached object is invalid.
+	This task will fail in the sandbox setup stage.
+	*/
+	
+	if(!result) {
 		trash_file(cache_path);
+		send_cache_invalid(manager,cachename);
 	}
 	
 	free(cache_path);
