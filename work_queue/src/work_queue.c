@@ -5117,6 +5117,9 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 	tf = work_queue_file_create(file_url, remote_name, WORK_QUEUE_URL, flags);
 	if(!tf) return 0;
 
+	// length of source data is not known yet.
+	tf->length = 0;
+
 	list_push_tail(files, tf);
 
 	return 1;
@@ -5416,6 +5419,9 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 
 	tf = work_queue_file_create(cmd, remote_name, WORK_QUEUE_REMOTECMD, flags);
 	if(!tf) return 0;
+
+	// length of source data is not known yet.
+	tf->length = 0;
 
 	list_push_tail(files, tf);
 
