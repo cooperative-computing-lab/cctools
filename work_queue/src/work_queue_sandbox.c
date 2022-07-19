@@ -14,6 +14,11 @@
 
 extern int symlinks_enabled;
 
+char * work_queue_sandbox_full_path( struct work_queue_process *p, const char *sandbox_name )
+{
+	return string_format("%s/%s",p->sandbox,sandbox_name);
+}
+
 /*
 Ensure that a given input file/dir/object is present in the cache,
 (which may result in a transfer)
@@ -23,8 +28,8 @@ and then link it into the sandbox at the desired location.
 static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache )
 {
 	char *cache_path = work_queue_cache_full_path(cache,f->cached_name);
-	char *sandbox_path = string_format("%s/%s",p->sandbox,f->remote_name);
-
+	char *sandbox_path = work_queue_sandbox_full_path(p,f->remote_name);
+	
 	int result = 0;
 
 	if(f->type==WORK_QUEUE_DIRECTORY) {
@@ -79,7 +84,7 @@ Inform the cache of the added file.
 static int transfer_output_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache )
 {
 	char *cache_path = work_queue_cache_full_path(cache,f->cached_name);
-	char *sandbox_path = string_format("%s/%s",p->sandbox,f->remote_name);
+	char *sandbox_path = work_queue_sandbox_full_path(p,f->remote_name);
 
 	int result = 0;
 	
