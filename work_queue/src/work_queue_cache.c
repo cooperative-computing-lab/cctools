@@ -101,13 +101,16 @@ static int work_queue_cache_do_transfer( struct work_queue_cache *c, const char 
 
 /*
 Create a file by executing a shell command.
-XXX add variable substitution here.
+The command should contain %% which indicates the path
+of the cache file to be created.
 */
 
 static int work_queue_cache_do_command( struct work_queue_cache *c, const char *command, const char *cache_path )
 {
-	debug(D_WQ,"executing: %s",command);
-	int result = system(command);
+	char *full_command = string_replace_percents(command,cache_path);
+	debug(D_WQ,"executing: %s",full_command);
+	int result = system(full_command);
+	free(full_command);
 	// convert result from unix convention to boolean
 	return (result=0);
 }
