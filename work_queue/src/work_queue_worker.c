@@ -1047,7 +1047,7 @@ until "end" is reached.  Note that "put" is used instead of
 of existing code.
 */
 
-static int do_put_dir_internal( struct link *manager, char *dirname )
+static int do_put_dir_internal( struct link *manager, char *dirname, int *totalsize )
 {
 	char line[WORK_QUEUE_LINE_MAX];
 	char name_encoded[WORK_QUEUE_LINE_MAX];
@@ -1075,6 +1075,8 @@ static int do_put_dir_internal( struct link *manager, char *dirname )
 			r = do_put_file_internal(manager,subname,size,mode);
 			free(subname);
 
+			*totalsize += size;
+
 		} else if(sscanf(line,"symlink %s %" SCNd64,name_encoded,&size)==2) {
 
 			url_decode(name_encoded,name,sizeof(name));
@@ -1084,13 +1086,15 @@ static int do_put_dir_internal( struct link *manager, char *dirname )
 			r = do_put_symlink_internal(manager,subname,size);
 			free(subname);
 
+			*totalsize += size;
+
 		} else if(sscanf(line,"dir %s",name_encoded)==1) {
 
 			url_decode(name_encoded,name,sizeof(name));
 			if(!is_valid_filename(name)) return 0;
 
 			char *subname = string_format("%s/%s",dirname,name);
-			r = do_put_dir_internal(manager,subname);
+			r = do_put_dir_internal(manager,subname,totalsize);
 			free(subname);
 
 		} else if(!strcmp(line,"end")) {
@@ -1107,12 +1111,13 @@ static int do_put_dir( struct link *manager, char *dirname )
 {
 	if(!is_valid_filename(dirname)) return 0;
 
+	int totalsize = 0;
+
 	char * cachename = string_format("cache/%s",dirname);
-	int result = do_put_dir_internal(manager,cachename);
+	int result = do_put_dir_internal(manager,cachename,&totalsize);
 	free(cachename);
 
-	// XXX measure size of file here
-	if(result) work_queue_cache_addfile(global_cache,0,dirname);
+	if(result) work_queue_cache_addfile(global_cache,totalsize,dirname);
 
 	return result;
 }
