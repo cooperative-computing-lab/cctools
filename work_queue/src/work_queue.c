@@ -684,8 +684,17 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 		w->end_time = MAX(0, atoll(value));
 	} else if(string_prefix_is(field, "from-factory")) {
 		w->factory_name = xxstrdup(value);
-		struct work_queue_factory_info *f = create_factory_info(q, w->factory_name);
-		f->connected_workers++;
+		struct work_queue_factory_info *f;
+		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
+			if (f->connected_workers + 1 > f->max_workers) {
+				shut_down_worker(q, w);
+			} else {
+				f->connected_workers++;
+			}
+		} else {
+			f = create_factory_info(q, w->factory_name);
+			f->connected_workers++;
+		}
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
