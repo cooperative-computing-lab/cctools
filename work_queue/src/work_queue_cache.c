@@ -29,7 +29,7 @@ struct cache_file * cache_file_create( work_queue_cache_type_t type, const char 
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
-	if(source) f->source = xxstrdup(source);
+	f->source = xxstrdup(source);
 	f->size = size;
 	f->present = present;
 	return f;
@@ -58,7 +58,7 @@ void work_queue_cache_delete( struct work_queue_cache *c )
 
 int work_queue_cache_addfile( struct work_queue_cache *c, int64_t size, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(WORK_QUEUE_CACHE_FILE,0,size,1);
+	struct cache_file *f = cache_file_create(WORK_QUEUE_CACHE_FILE,"manager",size,1);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
