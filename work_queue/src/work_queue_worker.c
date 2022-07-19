@@ -1158,6 +1158,28 @@ static int do_tlq_url(const char *manager_tlq_url)
 }
 
 /*
+Accept a url specification and queue it for later transfer.
+XXX should use the length parameter as an upper bound on the allocated size.
+XXX should save the mode parameter to set the mode when done.
+*/
+
+static int do_put_url( const char *cache_name, int64_t length, int mode, const char *source )
+{
+	return work_queue_cache_queue(global_cache,WORK_QUEUE_CACHE_TRANSFER,source,cache_name);
+}
+
+/*
+Accept a url specification and queue it for later transfer.
+XXX should use the length parameter as an upper bound on the allocated size.
+XXX should save the mode parameter to set the mode when done.
+*/
+
+static int do_put_cmd( const char *cache_name, int64_t length, int mode, const char *source )
+{
+	return work_queue_cache_queue(global_cache,WORK_QUEUE_CACHE_COMMAND,source,cache_name);
+}
+
+/*
 The manager has requested the deletion of a file in the cache
 directory.  If the request is valid, then move the file to the
 trash and deal with it there.
@@ -1410,6 +1432,8 @@ static int handle_manager(struct link *manager)
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename_encoded[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
+	char source_encoded[WORK_QUEUE_LINE_MAX];
+	char source[WORK_QUEUE_LINE_MAX];
 	char manager_tlq_url[WORK_QUEUE_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
@@ -1425,6 +1449,16 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "dir %s", filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_put_dir(manager,filename);
+			reset_idle_timer();
+		} else if(sscanf(line, "url %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
+			url_decode(filename_encoded,filename,sizeof(filename));
+			url_decode(source_encoded,source,sizeof(source));
+			r = do_put_url(filename,length,mode,source);
+			reset_idle_timer();
+		} else if(sscanf(line, "cmd %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
+			url_decode(filename_encoded,filename,sizeof(filename));
+			url_decode(source_encoded,source,sizeof(source));
+			r = do_put_cmd(filename,length,mode,source);
 			reset_idle_timer();
 		} else if(sscanf(line, "tlq %s", manager_tlq_url) == 1) {
 			r = do_tlq_url(manager_tlq_url);

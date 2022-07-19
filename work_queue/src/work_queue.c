@@ -3397,6 +3397,34 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 	return expanded_name;
 }
 
+/*
+Send a url or remote command used to generate a cached file,
+if it has not already been cached there.  Note that the length
+may be an estimate at this point and will be updated by return
+message once the object is actually loaded into the cache.
+*/
+
+static work_queue_result_code_t send_special_if_not_cached( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *typestring )
+{
+	if(hash_table_lookup(w->current_files,tf->cached_name)) return WQ_SUCCESS;
+
+	char source_encoded[WORK_QUEUE_LINE_MAX];
+	char cached_name_encoded[WORK_QUEUE_LINE_MAX];
+
+	url_encode(tf->payload,source_encoded,sizeof(source_encoded));
+	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
+
+	send_worker_msg(q,w,"%s %s %s %d %o\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777);
+
+	if(tf->flags & WORK_QUEUE_CACHE) {
+		struct stat *remote_info = malloc(sizeof(*remote_info));
+		memset(remote_info,0,sizeof(*remote_info));
+		hash_table_insert(w->current_files,tf->cached_name,remote_info);
+	}
+
+	return WQ_SUCCESS;
+}
+
 static work_queue_result_code_t send_input_file(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f)
 {
 
@@ -3421,17 +3449,17 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 
 	case WORK_QUEUE_REMOTECMD:
 		debug(D_WQ, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->payload);
-		// Do nothing.  Remote commands are run at task execution time.
+		result = send_special_if_not_cached(q,w,t,f,"cmd");
 		break;
 
 	case WORK_QUEUE_URL:
-		debug(D_WQ, "%s (%s) will get %s from url %s (length %d)", w->hostname, w->addrport, f->remote_name, f->payload, f->length);
-		// Do nothing.  Remote urls are downloaded at task execution time.
+		debug(D_WQ, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->payload);
+		result = send_special_if_not_cached(q,w,t,f,"url");
 		break;
 
 	case WORK_QUEUE_DIRECTORY:
 		debug(D_WQ, "%s (%s) will create directory %s", w->hostname, w->addrport, f->remote_name);
-	  		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as WORK_QUEUE_FILEs
+  		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as WORK_QUEUE_FILEs
 		break;
 
 	case WORK_QUEUE_FILE:
