@@ -22,7 +22,7 @@ and then link it into the sandbox at the desired location.
 
 static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache )
 {
-	char *cache_path = string_format("%s/%s",p->cache_dir,f->cached_name);
+	char *cache_path = work_queue_cache_full_path(cache,f->cached_name);
 	char *sandbox_path = string_format("%s/%s",p->sandbox,f->remote_name);
 
 	int result = 0;
@@ -78,7 +78,7 @@ Inform the cache of the added file.
 
 static int transfer_output_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache )
 {
-	char *cache_path = string_format("%s/%s",p->cache_dir,f->cached_name);
+	char *cache_path = work_queue_cache_full_path(cache,f->cached_name);
 	char *sandbox_path = string_format("%s/%s",p->sandbox,f->remote_name);
 
 	int result = 0;

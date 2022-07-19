@@ -66,6 +66,17 @@ void work_queue_cache_delete( struct work_queue_cache *c )
 }
 
 /*
+Get the full path to a file name within the cache.
+This result must be freed.
+*/
+
+char * work_queue_cache_full_path( struct work_queue_cache *c, const char *cachename )
+{
+	return string_format("%s/%s",c->cache_dir,cachename);
+}
+	
+
+/*
 Add a file to the cache manager (already created in the proper place) and note its size.
 */
 
@@ -97,13 +108,14 @@ int work_queue_cache_remove( struct work_queue_cache *c, const char *cachename )
 	struct cache_file *f = hash_table_remove(c->table,cachename);
 	if(!f) return 0;
 	
-	char *cache_path = string_format("%s/%s",c->cache_dir,cachename);
+	char *cache_path = work_queue_cache_full_path(c,cachename);
 	trash_file(cache_path);
 	free(cache_path);
 
 	cache_file_delete(f);
 	
 	return 1;
+
 }
 
 /*
@@ -153,7 +165,7 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename )
 		  return 1;
 	}
 	
-	char *cache_path = string_format("%s/%s",c->cache_dir,cachename);
+	char *cache_path = work_queue_cache_full_path(c,cachename);
 
 	int result = 0;
 
