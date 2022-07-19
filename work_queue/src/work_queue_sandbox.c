@@ -14,8 +14,6 @@
 
 extern int symlinks_enabled;
 
-extern struct work_queue_cache *thecache;
-
 /*
 If a string begins with one or more instances of ./
 return the beginning of the string with those removed.
@@ -32,7 +30,7 @@ Ensure that a given input file/dir/object is present in the cache,
 and then link it into the sandbox at the desired location.
 */
 
-static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f )
+static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache )
 {
 	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->cached_name));
 	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
@@ -43,7 +41,8 @@ static int ensure_input_file( struct work_queue_process *p, struct work_queue_fi
 		/* Special case: empty directories are not cached objects, just create in sandbox */
 		result = create_dir(sandbox_name, 0700);
 		if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_name, strerror(errno));
-	} else if(work_queue_cache_ensure(thecache,f->cached_name)) {
+
+	} else if(work_queue_cache_ensure(cache,f->cached_name)) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_name,0777);
 		debug(D_WQ,"input: link %s -> %s",cache_name,sandbox_name);
@@ -62,7 +61,7 @@ For each input file specified by the process,
 transfer it into the sandbox directory.
 */
 
-int work_queue_sandbox_stagein( struct work_queue_process *p )
+int work_queue_sandbox_stagein( struct work_queue_process *p, struct work_queue_cache *cache )
 {
 	struct work_queue_task *t = p->task;
 	struct work_queue_file *f;
@@ -71,7 +70,7 @@ int work_queue_sandbox_stagein( struct work_queue_process *p )
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
-			result = ensure_input_file(p,f);
+			result = ensure_input_file(p,f,cache);
 			if(!result) break;
 		}
 	}
@@ -84,9 +83,10 @@ Move a given output file back to the target cache location.
 First attempt a cheap rename.
 If that does not work (perhaps due to crossing filesystems)
 then attempt a recursive copy.
+Inform the cache of the added file.
 */
 
-static int transfer_output_file( struct work_queue_process *p, struct work_queue_file *f )
+static int transfer_output_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache )
 {
 	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->cached_name));
 	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
@@ -105,6 +105,9 @@ static int transfer_output_file( struct work_queue_process *p, struct work_queue
 	} else {
 		result = 1;
 	}
+
+	// XXX need to check size here
+	if(result) work_queue_cache_addfile(cache,0,f->cached_name);
 	
 	free(sandbox_name);
 	free(cache_name);
@@ -119,12 +122,12 @@ created, we still want the task to be marked as completed and sent back to the
 manager.  The manager will handle the consequences of missing output files.
 */
 
-int work_queue_sandbox_stageout( struct work_queue_process *p )
+int work_queue_sandbox_stageout( struct work_queue_process *p, struct work_queue_cache *cache )
 {
 	struct work_queue_file *f;
 	list_first_item(p->task->output_files);
 	while((f = list_next_item(p->task->output_files))) {
-		transfer_output_file(p,f);
+		transfer_output_file(p,f,cache);
 	}
 
 	return 1;

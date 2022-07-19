@@ -234,6 +234,8 @@ static int coprocess_port = -1;
 
 static char *factory_name = NULL;
 
+struct work_queue_cache *global_cache = 0;
+
 __attribute__ (( format(printf,2,3) ))
 static void send_message( struct link *l, const char *fmt, ... )
 {
@@ -543,7 +545,7 @@ static int start_process( struct work_queue_process *p )
 
 	struct work_queue_task *t = p->task;
 
-	if(!work_queue_sandbox_stagein(p)) {
+	if(!work_queue_sandbox_stagein(p,global_cache)) {
 		p->execution_start = p->execution_end = timestamp_get();
 		// XXX when to use p->task_status versus t->result ?
 		p->task_status = WORK_QUEUE_RESULT_INPUT_MISSING;
@@ -586,7 +588,7 @@ static void reap_process( struct work_queue_process *p )
 
 	work_queue_gpus_free(p->task->taskid);
 
-	work_queue_sandbox_stageout(p);
+	work_queue_sandbox_stageout(p,global_cache);
 
 	itable_remove(procs_running, p->pid);
 	itable_insert(procs_complete, p->task->taskid, p);
@@ -1104,6 +1106,9 @@ static int do_put_dir( struct link *manager, char *dirname )
 	int result = do_put_dir_internal(manager,cachename);
 	free(cachename);
 
+	// XXX measure size of file here
+	if(result) work_queue_cache_addfile(global_cache,0,dirname);
+
 	return result;
 }
 
@@ -1139,6 +1144,9 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 
 	free(cached_filename);
 
+	// XXX measure size of file here
+	if(result) work_queue_cache_addfile(global_cache,length,filename);
+
 	return result;
 }
 
@@ -1164,7 +1172,7 @@ static int do_unlink(const char *path)
 		return 0;
 	}
 
-	trash_file(cached_path);
+	work_queue_cache_remove(global_cache,path);
 
 	return 1;
 }
@@ -1863,6 +1871,7 @@ static int workspace_prepare()
 
 	char *cachedir = string_format("%s/cache",workspace);
 	int result = create_dir(cachedir,0777);
+	global_cache = work_queue_cache_create(cachedir);
 	free(cachedir);
 
 	char *tmp_name = string_format("%s/cache/tmp", workspace);
@@ -1898,6 +1907,8 @@ static void workspace_cleanup()
 		closedir(dir);
 	}
 	trash_empty();
+
+	work_queue_cache_delete(global_cache);
 }
 
 /*
