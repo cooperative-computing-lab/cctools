@@ -51,6 +51,7 @@ struct work_queue_cache * work_queue_cache_create( const char *cache_dir )
 
 void work_queue_cache_delete( struct work_queue_cache *c )
 {
+	hash_table_clear(c->table,(void*)cache_file_delete);
 	hash_table_delete(c->table);
 	free(c->cache_dir);
 	free(c);

@@ -7419,7 +7419,7 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 	}
 
 	if(features) {
-		hash_table_clear(features);
+		hash_table_clear(features,0);
 	}
 
 	hash_table_firstkey(q->worker_table);
