@@ -447,6 +447,20 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 */
 int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags, int recursive);
 
+/** Add a url as an input for a task.
+@param t A task object.
+@param url The source URL to be accessed to provide the file.
+@param remote_name The name of the file as seen by the task.
+@param type Must be one of the following values:
+- @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
+- @ref WORK_QUEUE_OUTPUT is not currently supported.
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
+- @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
+- @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+@return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
+*/
+int work_queue_task_specify_url(struct work_queue_task *t, const char *url, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags);
+
 /** Gets/puts file at remote_name using cmd at worker.
 @param t A task object.
 @param remote_name The name of the file as seen by the task.
