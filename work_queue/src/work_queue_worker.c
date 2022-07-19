@@ -236,6 +236,8 @@ static char *factory_name = NULL;
 
 struct work_queue_cache *global_cache = 0;
 
+extern int wq_hack_do_not_compute_cached_name;
+
 __attribute__ (( format(printf,2,3) ))
 static void send_manager_message( struct link *l, const char *fmt, ... )
 {
@@ -904,10 +906,12 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
-			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags);
+			wq_hack_do_not_compute_cached_name = 1;
+			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags );
 		} else if(sscanf(line,"outfile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
-			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
+			wq_hack_do_not_compute_cached_name = 1;
+			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags );
 		} else if(sscanf(line, "dir %s", filename)) {
 			work_queue_task_specify_directory(task, filename, filename, WORK_QUEUE_INPUT, 0700, 0);
 		} else if(sscanf(line,"cores %" PRId64,&n)) {

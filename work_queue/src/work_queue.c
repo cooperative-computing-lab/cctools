@@ -139,6 +139,9 @@ int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blocklist_slow_workers_timeout = 900;
 
+/* Internal use: when the worker uses the client library, do not recompute cached names. */
+int wq_hack_do_not_compute_cached_name = 0;
+
 /* time threshold to check when tasks are larger than connected workers */
 static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
 
@@ -5048,8 +5051,12 @@ struct work_queue_file *work_queue_file_create(const char *payload, const char *
 		f->length  = strlen(payload);
 	}
 
-	f->cached_name = make_cached_name(f);
-
+	if(wq_hack_do_not_compute_cached_name) {
+  		f->cached_name = xxstrdup(f->payload);
+	} else {
+		f->cached_name = make_cached_name(f);
+	}
+	
 	return f;
 }
 
