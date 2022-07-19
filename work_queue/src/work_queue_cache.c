@@ -113,7 +113,7 @@ static int work_queue_cache_do_command( struct work_queue_cache *c, const char *
 	int result = system(full_command);
 	free(full_command);
 	// convert result from unix convention to boolean
-	return (result=0);
+	return (result==0);
 }
 
 int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename )
