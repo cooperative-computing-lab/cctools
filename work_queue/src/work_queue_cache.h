@@ -1,6 +1,18 @@
 #ifndef WORK_QUEUE_CACHE_H
 #define WORK_QUEUE_CACHE_H
 
+/*
+The cache module keeps track of the intention and state of objects
+in the worker cache.  This includes plain files which have been
+sent directly by the manager, as well as requests to create files
+by transferring urls or executing Unix commands.  Requests for
+transfers or commands are queued and not executed immediately.
+When a task is about to be executed, each input file is checked
+via work_queue_cache_ensure and downloaded if needed.  This allow
+for file transfers to occur asynchronously of the manager.
+*/
+
+
 #include <stdint.h>
 
 typedef enum {

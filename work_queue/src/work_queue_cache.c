@@ -41,6 +41,10 @@ void cache_file_delete( struct cache_file *f )
 	free(f);
 }
 
+/*
+Create the cache manager structure for a given cache directory.
+*/
+
 struct work_queue_cache * work_queue_cache_create( const char *cache_dir )
 {
 	struct work_queue_cache *c = malloc(sizeof(*c));
@@ -48,6 +52,10 @@ struct work_queue_cache * work_queue_cache_create( const char *cache_dir )
 	c->table = hash_table_create(0,0);
 	return c;
 }
+
+/*
+Delete the cache manager structure, though not the underlying files.
+*/
 
 void work_queue_cache_delete( struct work_queue_cache *c )
 {
@@ -57,6 +65,10 @@ void work_queue_cache_delete( struct work_queue_cache *c )
 	free(c);
 }
 
+/*
+Add a file to the cache manager (already created in the proper place) and note its size.
+*/
+
 int work_queue_cache_addfile( struct work_queue_cache *c, int64_t size, const char *cachename )
 {
 	struct cache_file *f = cache_file_create(WORK_QUEUE_CACHE_FILE,"manager",size,1);
@@ -64,12 +76,21 @@ int work_queue_cache_addfile( struct work_queue_cache *c, int64_t size, const ch
 	return 1;
 }
 
+/*
+Queue a remote file transfer or command execution to produce a file.
+This entry will be materialized later in work_queue_cache_ensure.
+*/
+
 int work_queue_cache_queue( struct work_queue_cache *c, work_queue_cache_type_t type, const char *source, const char *cachename )
 {
 	struct cache_file *f = cache_file_create(type,source,0,0);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
+
+/*
+Remove a named item from the cache, regardless of its type.
+*/
 
 int work_queue_cache_remove( struct work_queue_cache *c, const char *cachename )
 {
@@ -115,6 +136,12 @@ static int work_queue_cache_do_command( struct work_queue_cache *c, const char *
 	// convert result from unix convention to boolean
 	return (result==0);
 }
+
+/*
+Ensure that a given cached entry is fully materialized in the cache,
+downloading files or executing commands as needed.  If present, return
+true, otherwise return false.
+*/
 
 int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename )
 {
