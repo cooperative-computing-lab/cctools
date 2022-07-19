@@ -32,7 +32,10 @@ and then link it into the sandbox at the desired location.
 
 static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache )
 {
-	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->cached_name));
+	// XXX Hack: f->cached_name does not have the expected contents, it is encoded twice.
+	char *cname = f->payload;
+
+	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(cname));
 	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
 
 	int result = 0;
@@ -42,7 +45,7 @@ static int ensure_input_file( struct work_queue_process *p, struct work_queue_fi
 		result = create_dir(sandbox_name, 0700);
 		if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_name, strerror(errno));
 
-	} else if(work_queue_cache_ensure(cache,f->cached_name)) {
+	} else if(work_queue_cache_ensure(cache,cname)) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_name,0777);
 		debug(D_WQ,"input: link %s -> %s",cache_name,sandbox_name);
@@ -88,7 +91,10 @@ Inform the cache of the added file.
 
 static int transfer_output_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache )
 {
-	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(f->cached_name));
+	// XXX Hack: f->cached_name does not have the expected contents, it is encoded twice.
+	char *cname = f->payload;
+
+	char *cache_name = string_format("%s/%s",p->cache_dir,skip_dotslash(cname));
 	char *sandbox_name = string_format("%s/%s",p->sandbox,skip_dotslash(f->remote_name));
 
 	int result = 0;
@@ -107,7 +113,7 @@ static int transfer_output_file( struct work_queue_process *p, struct work_queue
 	}
 
 	// XXX need to check size here
-	if(result) work_queue_cache_addfile(cache,0,f->cached_name);
+	if(result) work_queue_cache_addfile(cache,0,cname);
 	
 	free(sandbox_name);
 	free(cache_name);
