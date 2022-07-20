@@ -918,6 +918,7 @@ static void remove_factory_info(struct work_queue *q, const char *name)
 static void update_factory(struct work_queue *q, struct jx *j)
 {
 	const char *name = jx_lookup_string(j, "factory_name");
+	if (!name) return;
 	struct work_queue_factory_info *f = hash_table_lookup(q->factory_table, name);
 	if (!f) {
 		debug(D_WQ, "factory %s not recorded", name);
