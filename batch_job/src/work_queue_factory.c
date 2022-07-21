@@ -623,6 +623,7 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 		jx_insert_string(j, "project_regex",    project_regex);
 		jx_insert_string(j, "submission_regex", submission_regex);
 		jx_insert_integer(j, "max_workers", workers_max);
+		if (factory_name) jx_insert_string(j, "factory_name", factory_name);
 	}
 
 	int to_connect = submitted - connected;
