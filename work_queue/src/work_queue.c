@@ -4439,19 +4439,19 @@ static void print_large_tasks_warning(struct work_queue *q)
 	}
 
 	if(unfit_core) {
-		notice(D_WQ,"    %d waiting task(s) need more than %s", unfit_core, rmsummary_resource_to_str("cores", largest_unfit_task, 1));
+		notice(D_WQ,"    %d waiting task(s) need more than %s", unfit_core, rmsummary_resource_to_str("cores", largest_unfit_task->cores, 1));
 	}
 
 	if(unfit_mem) {
-		notice(D_WQ,"    %d waiting task(s) need more than %s of memory", unfit_mem, rmsummary_resource_to_str("memory", largest_unfit_task, 1));
+		notice(D_WQ,"    %d waiting task(s) need more than %s of memory", unfit_mem, rmsummary_resource_to_str("memory", largest_unfit_task->memory, 1));
 	}
 
 	if(unfit_disk) {
-		notice(D_WQ,"    %d waiting task(s) need more than %s of disk", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task, 1));
+		notice(D_WQ,"    %d waiting task(s) need more than %s of disk", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task->disk, 1));
 	}
 
 	if(unfit_gpu) {
-		notice(D_WQ,"    %d waiting task(s) need more than %s", unfit_gpu, rmsummary_resource_to_str("gpus", largest_unfit_task, 1));
+		notice(D_WQ,"    %d waiting task(s) need more than %s", unfit_gpu, rmsummary_resource_to_str("gpus", largest_unfit_task->gpus, 1));
 	}
 
 	rmsummary_delete(largest_unfit_task);
