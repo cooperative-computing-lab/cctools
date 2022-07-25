@@ -77,7 +77,7 @@ if __name__ == '__main__':
     os.chmod(path.join(test_dir, exec_file), stat.S_IRWXU)
 
 
-    q = wq.WorkQueue(port=0, ssl_key=args.ssl_key, ssl_cert=args.ssl_cert)
+    q = wq.WorkQueue(port=0, ssl_key=args.ssl_key, ssl_cert=args.ssl_cert, debug_log="manager.log")
 
     with open(args.port_file, 'w') as f:
         print('Writing port {port} to file {file}'.format(port=q.port, file=args.port_file))
