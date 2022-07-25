@@ -8,12 +8,14 @@
 #include "trash.h"
 #include "link.h"
 #include "timestamp.h"
+#include "copy_stream.h"
 
 #include <sys/types.h>
 #include <sys/fcntl.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 struct work_queue_cache {
 	struct hash_table *table;
@@ -125,17 +127,55 @@ int work_queue_cache_remove( struct work_queue_cache *c, const char *cachename )
 }
 
 /*
-Transfer a single input file from a url to a local filename by using /usr/bin/curl.
+Execute a shell command via popen and capture its output.
+On success, return true.
+On failure, return false with the string error_message filled in.
 */
 
-static int work_queue_cache_do_transfer( struct work_queue_cache *c, const char *source_url, const char *cache_path )
+
+static int do_internal_command( struct work_queue_cache *c, const char *command, char **error_message )
 {
-	char * command = string_format("curl -f -o \"%s\" \"%s\"",cache_path,source_url);
+	int result = 0;
+	*error_message = 0;
+	
 	debug(D_WQ,"executing: %s",command);
-	int result = system(command);
+		
+	FILE *stream = popen(command,"r");
+	if(stream) {
+		copy_stream_to_buffer(stream,error_message,0);
+	  	int exit_status = pclose(stream);
+		if(exit_status==0) {
+			if(*error_message) {
+				free(*error_message);
+				*error_message = 0;
+			}
+			result = 1;
+		} else {
+			debug(D_WQ,"command failed with output: %s",*error_message);
+			result = 0;
+		}
+	} else {
+		*error_message = string_format("couldn't execute \"%s\": %s",command,strerror(errno));
+		result = 0;
+	}
+
+	return result;
+}
+
+/*
+Transfer a single input file from a url to a local filename by using /usr/bin/curl.
+-s Do not show progress bar.  (Also disables errors.)
+-S Show errors.
+-L Follow redirects as needed.
+--stderr Send errors to /dev/stdout so that they are observed by popen.
+*/
+
+static int do_transfer( struct work_queue_cache *c, const char *source_url, const char *cache_path, char **error_message )
+{
+	char * command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"",cache_path,source_url);
+	int result = do_internal_command(c,command,error_message);
 	free(command);
-	// convert result from unix convention to boolean
-	return (result==0);
+	return result;
 }
 
 /*
@@ -143,14 +183,12 @@ Create a file by executing a shell command.
 The command should contain %% which indicates the path of the cache file to be created.
 */
 
-static int work_queue_cache_do_command( struct work_queue_cache *c, const char *command, const char *cache_path )
+static int do_command( struct work_queue_cache *c, const char *command, const char *cache_path, char **error_message )
 {
 	char *full_command = string_replace_percents(command,cache_path);
-	debug(D_WQ,"executing: %s",full_command);
-	int result = system(full_command);
+	int result = do_internal_command(c,full_command,error_message);
 	free(full_command);
-	// convert result from unix convention to boolean
-	return (result==0);
+	return result;
 }
 
 /*
@@ -179,6 +217,7 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, 
 	}
 	
 	char *cache_path = work_queue_cache_full_path(c,cachename);
+	char *error_message = 0;
 
 	int result = 0;
 
@@ -192,12 +231,12 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, 
 		  
 		case WORK_QUEUE_CACHE_TRANSFER:
 			debug(D_WQ,"cache: transferring %s to %s",f->source,cachename);
-			result = work_queue_cache_do_transfer(c,f->source,cache_path);
+			result = do_transfer(c,f->source,cache_path,&error_message);
 			break;
 
 		case WORK_QUEUE_CACHE_COMMAND:
 			debug(D_WQ,"cache: creating %s via shell command",cachename);
-			result = work_queue_cache_do_command(c,f->source,cache_path);
+			result = do_command(c,f->source,cache_path,&error_message);
 			break;
 	}
 
@@ -239,9 +278,10 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, 
 	
 	if(!result) {
 		trash_file(cache_path);
-		send_cache_invalid(manager,cachename,"failed");
+		send_cache_invalid(manager,cachename,error_message);
 	}
 	
+	if(error_message) free(error_message);
 	free(cache_path);
 	return result;
 }
