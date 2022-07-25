@@ -33,7 +33,7 @@ def report_task(task, expected_result, expected_exit_code, expected_outpus=None)
         print("result: {as_str} {as_int}".format(as_str=t.result_str, as_int=t.result))
         print("exit code: {status}".format(status=t.return_status))
         if t.output:
-            print("stderr:\n+++\n{stderr}---".format(stderr=t.output))
+            print("stderr:\n+++\n{stderr}---".format(stderr=t.output.encode('ascii','replace')))
         if task.result != expected_result:
             error = True
             print("Should have finished with result '{result}', but got '{real}'.".format(result=expected_result, real=task.result))
