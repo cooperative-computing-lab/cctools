@@ -137,6 +137,7 @@ HEADERS_PUBLIC = \
 	debug.h \
 	envtools.h \
 	fast_popen.h \
+	file_link_recursive.h \
 	full_io.h \
 	getopt.h \
 	getopt_aux.h \
@@ -149,7 +150,6 @@ HEADERS_PUBLIC = \
 	jx.h \
 	jx_match.h \
 	link.h \
-	link_recursive.h \
 	list.h \
 	load_average.h \
 	md5.h \
