@@ -1463,12 +1463,12 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_put_dir(manager,filename);
 			reset_idle_timer();
-		} else if(sscanf(line, "url %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
+		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_url(filename,length,mode,source);
 			reset_idle_timer();
-		} else if(sscanf(line, "cmd %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
+		} else if(sscanf(line, "putcmd %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_cmd(filename,length,mode,source);

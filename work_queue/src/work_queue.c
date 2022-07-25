@@ -3497,12 +3497,12 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 
 	case WORK_QUEUE_REMOTECMD:
 		debug(D_WQ, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->payload);
-		result = send_special_if_not_cached(q,w,t,f,"cmd");
+		result = send_special_if_not_cached(q,w,t,f,"putcmd");
 		break;
 
 	case WORK_QUEUE_URL:
 		debug(D_WQ, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->payload);
-		result = send_special_if_not_cached(q,w,t,f,"url");
+		result = send_special_if_not_cached(q,w,t,f,"puturl");
 		break;
 
 	case WORK_QUEUE_DIRECTORY:
