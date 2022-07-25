@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 extern int symlinks_enabled;
 
@@ -101,8 +102,16 @@ static int transfer_output_file( struct work_queue_process *p, struct work_queue
 		result = 1;
 	}
 
-	// XXX need to check size here
-	if(result) work_queue_cache_addfile(cache,0,f->cached_name);
+	if(result) {
+		struct stat info;
+		if(stat(cache_path,&info)==0) {
+			work_queue_cache_addfile(cache,info.st_size,f->cached_name);
+		} else {
+			// This seems implausible given that the rename/copy succeded, but we still have to check...
+			debug(D_WQ,"output: failed to stat %s: %s",cache_path,strerror(errno));
+			result = 0;
+		}
+	}
 	
 	free(sandbox_path);
 	free(cache_path);
