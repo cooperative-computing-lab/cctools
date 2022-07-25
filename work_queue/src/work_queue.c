@@ -974,8 +974,6 @@ void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
 		debug(D_WQ, "Failed to retrieve factory info from catalog server(s) at %s.", q->catalog_hosts);
 	}
 
-	jx_delete(jexpr);
-
 	// Remove outdated factories
 	struct list *outdated_factories = list_create();
 	hash_table_firstkey(q->factory_table);
