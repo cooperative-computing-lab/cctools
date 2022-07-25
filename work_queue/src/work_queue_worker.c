@@ -560,7 +560,6 @@ static int start_process( struct work_queue_process *p, struct link *manager )
 
 	if(!work_queue_sandbox_stagein(p,global_cache,manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
-		// XXX when to use p->task_status versus t->result ?
 		p->task_status = WORK_QUEUE_RESULT_INPUT_MISSING;
 		p->exit_status = 1;
 		itable_insert(procs_complete,p->task->taskid,p);
@@ -601,7 +600,10 @@ static void reap_process( struct work_queue_process *p )
 
 	work_queue_gpus_free(p->task->taskid);
 
-	work_queue_sandbox_stageout(p,global_cache);
+	if(!work_queue_sandbox_stageout(p,global_cache)) {
+		p->task_status = WORK_QUEUE_RESULT_OUTPUT_MISSING;
+		p->exit_status = 1;
+	}
 
 	itable_remove(procs_running, p->pid);
 	itable_insert(procs_complete, p->task->taskid, p);
