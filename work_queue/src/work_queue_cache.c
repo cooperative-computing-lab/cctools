@@ -24,15 +24,17 @@ struct cache_file {
 	work_queue_cache_type_t type;
 	char *source;
 	int64_t size;
+	int mode;
 	int present;
 };
 
-struct cache_file * cache_file_create( work_queue_cache_type_t type, const char *source, int64_t size, int present )
+struct cache_file * cache_file_create( work_queue_cache_type_t type, const char *source, int64_t size, int mode, int present )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
 	f->source = xxstrdup(source);
 	f->size = size;
+	f->mode = mode;
 	f->present = present;
 	return f;
 }
@@ -84,7 +86,7 @@ Add a file to the cache manager (already created in the proper place) and note i
 
 int work_queue_cache_addfile( struct work_queue_cache *c, int64_t size, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(WORK_QUEUE_CACHE_FILE,"manager",size,1);
+	struct cache_file *f = cache_file_create(WORK_QUEUE_CACHE_FILE,"manager",size,0777,1);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -94,9 +96,9 @@ Queue a remote file transfer or command execution to produce a file.
 This entry will be materialized later in work_queue_cache_ensure.
 */
 
-int work_queue_cache_queue( struct work_queue_cache *c, work_queue_cache_type_t type, const char *source, const char *cachename )
+int work_queue_cache_queue( struct work_queue_cache *c, work_queue_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode )
 {
-	struct cache_file *f = cache_file_create(type,source,0,0);
+	struct cache_file *f = cache_file_create(type,source,size,mode,0);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -196,6 +198,9 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, 
 			result = work_queue_cache_do_command(c,f->source,cache_path);
 			break;
 	}
+
+	// Set the permissions as originally indicated.	
+	chmod(cache_path,f->mode);
 
 	timestamp_t transfer_end = timestamp_get();
 	timestamp_t transfer_time = transfer_end - transfer_start;

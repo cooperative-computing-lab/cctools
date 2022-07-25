@@ -1166,7 +1166,6 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 
 	free(cached_filename);
 
-	// XXX measure size of file here
 	if(result) work_queue_cache_addfile(global_cache,length,filename);
 
 	return result;
@@ -1180,24 +1179,20 @@ static int do_tlq_url(const char *manager_tlq_url)
 
 /*
 Accept a url specification and queue it for later transfer.
-XXX should use the length parameter as an upper bound on the allocated size.
-XXX should save the mode parameter to set the mode when done.
 */
 
-static int do_put_url( const char *cache_name, int64_t length, int mode, const char *source )
+static int do_put_url( const char *cache_name, int64_t size, int mode, const char *source )
 {
-	return work_queue_cache_queue(global_cache,WORK_QUEUE_CACHE_TRANSFER,source,cache_name);
+	return work_queue_cache_queue(global_cache,WORK_QUEUE_CACHE_TRANSFER,source,cache_name,size,mode);
 }
 
 /*
 Accept a url specification and queue it for later transfer.
-XXX should use the length parameter as an upper bound on the allocated size.
-XXX should save the mode parameter to set the mode when done.
 */
 
-static int do_put_cmd( const char *cache_name, int64_t length, int mode, const char *source )
+static int do_put_cmd( const char *cache_name, int64_t size, int mode, const char *source )
 {
-	return work_queue_cache_queue(global_cache,WORK_QUEUE_CACHE_COMMAND,source,cache_name);
+	return work_queue_cache_queue(global_cache,WORK_QUEUE_CACHE_COMMAND,source,cache_name,size,mode);
 }
 
 /*
