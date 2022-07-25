@@ -542,8 +542,6 @@ static void report_worker_ready( struct link *manager )
 	send_manager_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 	if (factory_name)
 		send_manager_message(manager, "info from-factory %s\n", factory_name);
-	send_manager_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
-	send_manager_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 }
 
 /*
