@@ -206,5 +206,12 @@ if __name__ == '__main__':
     t = q.wait(10)
     report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0)
 
+    # generate an invalid remote input file, should get an input missing error.
+    t = wq.Task("/bin/cat infile")
+    t.specify_url("http://pretty-sure-this-is-not-a-valid-url.com","infile",cache=True)
+    q.submit(t)
+    t = q.wait(10)
+    report_task(t, wq.WORK_QUEUE_RESULT_INPUT_MISSING, 1)
+
 
     
