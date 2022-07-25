@@ -5401,7 +5401,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 	return 1;
 }
 
-int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, work_queue_file_type_t type, work_queue_file_flags_t flags)
+int work_queue_task_specify_file_command(struct work_queue_task *t, const char *cmd, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags)
 {
 	struct list *files;
 	struct work_queue_file *tf;

@@ -259,9 +259,9 @@ class Task(object):
     # a cacheable file that can be shared among multiple tasks.
     #
     # @param self           Reference to the current task object.
-    # @param remote_name    The name of the file as seen by the task.
     # @param command        The shell command which will produce the file.
     #                       The command must contain the string %% which will be replaced with the cached location of the file.
+    # @param remote_name    The name of the file as seen by the task.
     # @param type           Must be @ref WORK_QUEUE_INPUT
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
@@ -271,10 +271,10 @@ class Task(object):
     #
     # For example:
     # @code
-    # >>> task.specify_file_command("infile","curl http://www.example.com/mydata.gz | gunzip > %%",type=WORK_QUEUE_INPUT,flags=WORK_QUEUE_CACHE);
+    # >>> task.specify_file_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",type=WORK_QUEUE_INPUT,flags=WORK_QUEUE_CACHE);
     # @endcode
 
-    def specify_file_command(self, remote_name, cmd, type=None, flags=None, cache=None, failure_only=None):
+    def specify_file_command(self, cmd, remote_name, type=None, flags=None, cache=None, failure_only=None):
         if type is None:
             type = WORK_QUEUE_INPUT
 
@@ -283,7 +283,7 @@ class Task(object):
             remote_name = str(remote_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return work_queue_task_specify_file_command(self._task, remote_name, cmd, type, flags)
+        return work_queue_task_specify_file_command(self._task, cmd, remote_name, type, flags)
 
     ##
     # Add a file piece to the task.

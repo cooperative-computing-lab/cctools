@@ -463,8 +463,8 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *url, cons
 
 /** Gets/puts file at remote_name using cmd at worker.
 @param t A task object.
-@param remote_name The name of the file as seen by the task.
 @param cmd The shell command to transfer the file. For input files, it should read the contents from remote_name via stdin. For output files, it should write the contents to stdout.
+@param remote_name The name of the file as seen by the task.
 @param type Must be one of the following values:
 - @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
@@ -473,7 +473,7 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *url, cons
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, work_queue_file_type_t type, work_queue_file_flags_t flags);
+int work_queue_task_specify_file_command(struct work_queue_task *t, const char *cmd, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags);
 
 /** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result WORK_QUEUE_RESULT_MAX_RETRIES.
 @param t A task object.
