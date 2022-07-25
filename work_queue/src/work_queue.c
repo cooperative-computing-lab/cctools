@@ -727,7 +727,9 @@ int process_cache_update( struct work_queue *q, struct work_queue_worker *w, con
 /*
 A cache-invalid message coming from the worker means that a requested
 remote transfer or command did not succeed, and the intended file is
-not in the cache.  So, we remove the corresponding note for that worker.
+not in the cache.  It is accompanied by a (presumably short) string
+message that further explains the failure.
+So, we remove the corresponding note for that worker and log the error.
 We should expect to soon receive some failed tasks that were unable
 set up their own input sandboxes.
 */
@@ -735,7 +737,22 @@ set up their own input sandboxes.
 int process_cache_invalid( struct work_queue *q, struct work_queue_worker *w, const char *line )
 {
 	char cachename[WORK_QUEUE_LINE_MAX];
-	if(sscanf(line,"cache-invalid %s",cachename)==1) {
+	int length;
+	if(sscanf(line,"cache-invalid %s %d",cachename,&length)==2) {
+
+		char *message = malloc(length+1);
+		time_t stoptime = time(0) + q->long_timeout;
+		
+		int actual = link_read(w->link,message,length,stoptime);
+		if(actual!=length) {
+			free(message);
+			return MSG_FAILURE;
+		}
+		
+		message[length] = 0;
+		debug(D_WQ,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
+		free(message);
+		
 		struct stat *remote_info = hash_table_remove(w->current_files,cachename);
 		if(remote_info) free(remote_info);
 	}

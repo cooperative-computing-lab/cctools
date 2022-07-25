@@ -470,14 +470,24 @@ static int send_keepalive(struct link *manager, int force_resources)
 	return 1;
 }
 
+/*
+Send an asynchronmous message to the manager indicating that an item was successfully loaded into the cache, along with its size in bytes and transfer time in usec.
+*/
+
 void send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
 {
 	send_manager_message(manager,"cache-update %s %lld %lld\n",cachename,(long long)size,(long long)transfer_time);
 }
 
-void send_cache_invalid( struct link *manager, const char *cachename )
+/*
+Send an asynchronous message to the manager indicating that an item previously queued in the cache is invalid because it could not be loaded.  Accompanied by a corresponding error message.
+*/
+
+void send_cache_invalid( struct link *manager, const char *cachename, const char *message )
 {
-	send_manager_message(manager,"cache-invalid %s\n",cachename);
+	int length = strlen(message);
+	send_manager_message(manager,"cache-invalid %s %d\n",cachename,length);
+	link_write(manager,message,length,time(0)+active_timeout);
 }
 
 static int send_tlq_config( struct link *manager )

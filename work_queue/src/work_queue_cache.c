@@ -163,7 +163,7 @@ but it is needed in order to send back the necessary update/invalid messages.
 */
 
 int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
-int send_cache_invalid( struct link *manager, const char *cachename );
+int send_cache_invalid( struct link *manager, const char *cachename, const char *message );
 
 int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, struct link *manager )
 {
@@ -239,7 +239,7 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, 
 	
 	if(!result) {
 		trash_file(cache_path);
-		send_cache_invalid(manager,cachename);
+		send_cache_invalid(manager,cachename,"failed");
 	}
 	
 	free(cache_path);
