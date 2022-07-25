@@ -1,7 +1,7 @@
-#ifndef LINK_RECURSIVE_H
-#define LINK_RECURSIVE_H
+#ifndef FILE_LINK_RECURSIVE_H
+#define FILE_LINK_RECURSIVE_H
 
-/** @file link_recursive.h Make deep links to directories. */
+/** @file file_link_recursive.h Make deep links to directories. */
 
 /** Make a hard link from source to target.
 If source is a directory, do it recursively.
@@ -11,6 +11,6 @@ If source is a directory, do it recursively.
 @return 1 on success, 0 on failure.
 */
 
-int link_recursive( const char *source, const char *target, int allow_symlink );
+int file_link_recursive( const char *source, const char *target, int allow_symlink );
 
 #endif

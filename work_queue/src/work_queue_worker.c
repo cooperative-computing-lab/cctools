@@ -40,7 +40,6 @@ See the file COPYING for details.
 #include "getopt_aux.h"
 #include "create_dir.h"
 #include "unlink_recursive.h"
-#include "link_recursive.h"
 #include "itable.h"
 #include "random.h"
 #include "url_encode.h"

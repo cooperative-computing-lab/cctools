@@ -6,7 +6,7 @@
 #include "debug.h"
 #include "copy_stream.h"
 #include "create_dir.h"
-#include "link_recursive.h"
+#include "file_link_recursive.h"
 
 #include <unistd.h>
 #include <errno.h>
@@ -42,7 +42,7 @@ static int ensure_input_file( struct work_queue_process *p, struct work_queue_fi
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_WQ,"input: link %s -> %s",cache_path,sandbox_path);
-		result = link_recursive(cache_path,sandbox_path,symlinks_enabled);
+		result = file_link_recursive(cache_path,sandbox_path,symlinks_enabled);
 		if(!result) debug(D_WQ,"couldn't link %s into sandbox as %s: %s",cache_path,sandbox_path,strerror(errno));
 	}
 	

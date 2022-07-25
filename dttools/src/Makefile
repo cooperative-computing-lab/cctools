@@ -43,6 +43,7 @@ SOURCES = \
 	fast_popen.c \
 	fd.c \
 	file_cache.c \
+	file_link_recursive.c \
 	full_io.c \
 	get_canonical_path.c \
 	get_line.c \
@@ -73,7 +74,6 @@ SOURCES = \
 	jx_function.c \
 	link.c \
 	link_auth.c \
-	link_recursive.c \
 	list.c \
 	load_average.c \
 	md5.c \

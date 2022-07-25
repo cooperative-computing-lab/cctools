@@ -1,4 +1,4 @@
-#include "link_recursive.h"
+#include "file_file_link_recursive.h"
 #include "stringtools.h"
 #include "path.h"
 
@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-int link_recursive( const char *source, const char *target, int allow_symlinks )
+int file_link_recursive( const char *source, const char *target, int allow_symlinks )
 {
 	struct stat info;
 
@@ -30,7 +30,7 @@ int link_recursive( const char *source, const char *target, int allow_symlinks )
 			char *subsource = string_format("%s/%s",source,d->d_name);
 			char *subtarget = string_format("%s/%s",target,d->d_name);
 
-			result = link_recursive(subsource,subtarget,allow_symlinks);
+			result = file_link_recursive(subsource,subtarget,allow_symlinks);
 
 			free(subsource);
 			free(subtarget);
