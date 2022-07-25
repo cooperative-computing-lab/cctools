@@ -1393,12 +1393,12 @@ tasks that require it:
     ```
 
 === "Perl"
-    ```python
+    ```perl
     $t->specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", flags=wq.WORK_QUEUE_CACHE)
     ```
 
 === "C"
-    ```python
+    ```c
     work_queue_task_specify_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", WORK_QUEUE_CACHE)
     ```
 
@@ -1417,12 +1417,12 @@ a URL and then unpack into the directory `data`:
     ```
 
 === "Perl"
-    ```python
+    ```perl
     $t->specify_file_command("curl http://somewhere.com/data.txt | tar cvzf -", "data", flags=wq.WORK_QUEUE_CACHE)
     ```
 
 === "C"
-    ```python
+    ```c
     work_queue_task_specify_url(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", WORK_QUEUE_CACHE)
     ```
 
