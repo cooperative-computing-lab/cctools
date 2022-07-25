@@ -1378,6 +1378,54 @@ warranted:
     }
     ```
 
+### Fetching Input Data via URL
+
+Tasks can fetch remote data named by a URL into the worker's cache.
+For example, if you have a large dataset provided by a web server,
+use `specify_url` to attach the URL to a local file.  The data
+will be downloaded once per worker and then shared among all
+tasks that require it:
+
+
+=== "Python"
+    ```python
+    t.specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", cache=True)
+    ```
+
+=== "Perl"
+    ```python
+    $t->specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", flags=wq.WORK_QUEUE_CACHE)
+    ```
+
+=== "C"
+    ```python
+    work_queue_task_specify_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", WORK_QUEUE_CACHE)
+    ```
+
+### Fetching Input Data via Command
+
+Input data for tasks can also be produced at the worker by arbitrary
+shell commands.  The output of these commands can be cached and shared
+among multiple tasks. This is particularly useful for unpacking or
+post-processing downloaded data.  For example, to download `data.tar.gz` from
+a URL and then unpack into the directory `data`:
+
+
+=== "Python"
+    ```python
+    t.specify_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , cache=True)
+    ```
+
+=== "Perl"
+    ```python
+    $t->specify_file_command("curl http://somewhere.com/data.txt | tar cvzf -", "data", flags=wq.WORK_QUEUE_CACHE)
+    ```
+
+=== "C"
+    ```python
+    work_queue_task_specify_url(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", WORK_QUEUE_CACHE)
+    ```
+
 ### Watching Output Files
 
 If you would like to see the output of a task as it is produced, add
