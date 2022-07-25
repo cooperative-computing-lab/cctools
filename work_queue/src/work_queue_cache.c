@@ -23,17 +23,19 @@ struct work_queue_cache {
 struct cache_file {
 	work_queue_cache_type_t type;
 	char *source;
-	int64_t size;
+	int64_t expected_size;
+	int64_t actual_size;
 	int mode;
 	int present;
 };
 
-struct cache_file * cache_file_create( work_queue_cache_type_t type, const char *source, int64_t size, int mode, int present )
+struct cache_file * cache_file_create( work_queue_cache_type_t type, const char *source, int64_t expected_size, int64_t actual_size, int mode, int present )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
 	f->source = xxstrdup(source);
-	f->size = size;
+	f->expected_size = expected_size;
+	f->actual_size = actual_size;
 	f->mode = mode;
 	f->present = present;
 	return f;
@@ -86,7 +88,7 @@ Add a file to the cache manager (already created in the proper place) and note i
 
 int work_queue_cache_addfile( struct work_queue_cache *c, int64_t size, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(WORK_QUEUE_CACHE_FILE,"manager",size,0777,1);
+	struct cache_file *f = cache_file_create(WORK_QUEUE_CACHE_FILE,"manager",size,size,0777,1);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -98,7 +100,7 @@ This entry will be materialized later in work_queue_cache_ensure.
 
 int work_queue_cache_queue( struct work_queue_cache *c, work_queue_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode )
 {
-	struct cache_file *f = cache_file_create(type,source,size,mode,0);
+	struct cache_file *f = cache_file_create(type,source,size,0,mode,0);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -213,10 +215,11 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, 
 	if(result) {
 		struct stat info;
 		if(stat(cache_path,&info)==0) {
-			f->size = info.st_size;
+			f->actual_size = info.st_size;
+			f->expected_size = f->actual_size;
 			f->present = 1;
-			debug(D_WQ,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->size,(long long)transfer_time);
-			send_cache_update(manager,cachename,f->size,transfer_time);
+			debug(D_WQ,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
+			send_cache_update(manager,cachename,f->actual_size,transfer_time);
 			result = 1;
 		} else {
 			debug(D_WQ,"cache: command succeeded but did not create %s",cachename);
