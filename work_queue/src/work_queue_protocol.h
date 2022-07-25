@@ -21,7 +21,7 @@ This file should not be installed and should only be included by .c files.
 /* 8: worker send feature message. */
 /* 9: recursive send/recv and filename encoding. */
 /* 10: added coprocess message. */
-/* 11: added url as a file source, removed special url commands. */
+/* 11: added url/command as a file source, added cache-update/invalidate */
 
 #define WORK_QUEUE_PROTOCOL_VERSION 11
 
