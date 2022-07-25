@@ -7,6 +7,7 @@
 #include "stringtools.h"
 #include "trash.h"
 #include "link.h"
+#include "timestamp.h"
 
 #include <sys/types.h>
 #include <sys/fcntl.h>
@@ -121,7 +122,6 @@ int work_queue_cache_remove( struct work_queue_cache *c, const char *cachename )
 
 /*
 Transfer a single input file from a url to a local filename by using /usr/bin/curl.
-XXX add time and performance here.
 */
 
 static int work_queue_cache_do_transfer( struct work_queue_cache *c, const char *source_url, const char *cache_path )
@@ -136,8 +136,7 @@ static int work_queue_cache_do_transfer( struct work_queue_cache *c, const char 
 
 /*
 Create a file by executing a shell command.
-The command should contain %% which indicates the path
-of the cache file to be created.
+The command should contain %% which indicates the path of the cache file to be created.
 */
 
 static int work_queue_cache_do_command( struct work_queue_cache *c, const char *command, const char *cache_path )
@@ -159,7 +158,7 @@ It is a little odd that the manager link is passed as an argument here,
 but it is needed in order to send back the necessary update/invalid messages.
 */
 
-int send_cache_update( struct link *manager, const char *cachename, int64_t );
+int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
 int send_cache_invalid( struct link *manager, const char *cachename );
 
 int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, struct link *manager )
@@ -179,6 +178,8 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, 
 
 	int result = 0;
 
+	timestamp_t transfer_start = timestamp_get();
+	
 	switch(f->type) {
 		case WORK_QUEUE_CACHE_FILE:
 			debug(D_WQ,"error: file %s should already be present!",cachename);
@@ -196,6 +197,9 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, 
 			break;
 	}
 
+	timestamp_t transfer_end = timestamp_get();
+	timestamp_t transfer_time = transfer_end - transfer_start;
+	
 	/*
 	Although the prior command may have succeeded, check the actual desired
 	file in the cache to make sure that it is present.
@@ -206,8 +210,8 @@ int work_queue_cache_ensure( struct work_queue_cache *c, const char *cachename, 
 		if(stat(cache_path,&info)==0) {
 			f->size = info.st_size;
 			f->present = 1;
-			debug(D_WQ,"cache: created %s with size %lld",cachename,(long long)f->size);
-			send_cache_update(manager,cachename,f->size);
+			debug(D_WQ,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->size,(long long)transfer_time);
+			send_cache_update(manager,cachename,f->size,transfer_time);
 			result = 1;
 		} else {
 			debug(D_WQ,"cache: command succeeded but did not create %s",cachename);

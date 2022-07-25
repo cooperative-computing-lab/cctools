@@ -709,13 +709,15 @@ of the file for the purposes of cache storage management.
 int process_cache_update( struct work_queue *q, struct work_queue_worker *w, const char *line )
 {
 	char cachename[WORK_QUEUE_LINE_MAX];
-	int64_t size;
+	long long size;
+	long long transfer_time;
 	
-	if(sscanf(line,"cache-update %s %" PRId64,cachename,&size)==2) {
-	  struct stat *remote_info = hash_table_lookup(w->current_files,cachename);
+	if(sscanf(line,"cache-update %s %lld %lld",cachename,&size,&transfer_time)==3) {
+		struct stat *remote_info = hash_table_lookup(w->current_files,cachename);
 		if(remote_info) {
 			remote_info->st_size = size;
 			remote_info->st_mtime = time(0);
+			// XXX store the transfer time once we have a better structure here
 		}
 	}
 	

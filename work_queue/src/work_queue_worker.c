@@ -471,9 +471,9 @@ static int send_keepalive(struct link *manager, int force_resources)
 	return 1;
 }
 
-void send_cache_update( struct link *manager, const char *cachename, int64_t size )
+void send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
 {
-	send_manager_message(manager,"cache-update %s %" PRId64"\n",cachename,size);
+	send_manager_message(manager,"cache-update %s %lld %lld\n",cachename,(long long)size,(long long)transfer_time);
 }
 
 void send_cache_invalid( struct link *manager, const char *cachename )
