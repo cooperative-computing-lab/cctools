@@ -208,7 +208,7 @@ void * itable_pop( struct itable *t )
 	void *value;
 
 	itable_firstkey(t);
-	if(itable_nextkey(t, &key, (void*)&value)) {
+	if(itable_nextkey(t, &key, (void**)&value)) {
 		return itable_remove(t,key);
 	} else {
 		return 0;
