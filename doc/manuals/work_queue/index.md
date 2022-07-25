@@ -1389,18 +1389,20 @@ tasks that require it:
 
 === "Python"
     ```python
-    t.specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", cache=True)
+    t.specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=WORK_QUEUE_INPUT, cache=True)
     ```
 
 === "Perl"
     ```perl
-    $t->specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", flags=wq.WORK_QUEUE_CACHE)
+    $t->specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=WORK_QUEUE_INPUT, flags=wq.WORK_QUEUE_CACHE)
     ```
 
 === "C"
     ```c
-    work_queue_task_specify_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", WORK_QUEUE_CACHE)
+    work_queue_task_specify_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
     ```
+
+(Note that `specify_url` does not currently support output data.)
 
 ### Fetching Input Data via Command
 
@@ -1413,18 +1415,20 @@ a URL and then unpack into the directory `data`:
 
 === "Python"
     ```python
-    t.specify_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , cache=True)
+    t.specify_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , type=WORK_QUEUE_INPUT, cache=True)
     ```
 
 === "Perl"
     ```perl
-    $t->specify_file_command("curl http://somewhere.com/data.txt | tar cvzf -", "data", flags=wq.WORK_QUEUE_CACHE)
+    $t->specify_file_command("curl http://somewhere.com/data.txt | tar cvzf -", "data", type=wq.WORK_QUEUE_INPUT, flags=wq.WORK_QUEUE_CACHE)
     ```
 
 === "C"
     ```c
-    work_queue_task_specify_url(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", WORK_QUEUE_CACHE)
+    work_queue_task_specify_file_command(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
     ```
+
+(Note that `specify_file_command` does not currently support output data.)
 
 ### Watching Output Files
 

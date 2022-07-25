@@ -226,7 +226,7 @@ class Task(object):
     # @param self           Reference to the current task object.
     # @param url            The url of the file to provide.
     # @param remote_name    The name of the file as seen by the task.
-    # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
+    # @param type           Must be @ref WORK_QUEUE_INPUT.  (Output is not currently supported.)
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE (default)
@@ -239,9 +239,13 @@ class Task(object):
     # @endcode
 
     def specify_url(self, url, remote_name, type=None, flags=None, cache=None, failure_only=None):
+
         if type is None:
             type = WORK_QUEUE_INPUT
 
+        if type==WORK_QUEUE_OUTPUT:
+            raise ValueError("specify_url does not currently support output files.")
+        
         # swig expects strings
         if remote_name:
             remote_name = str(remote_name)
@@ -262,7 +266,7 @@ class Task(object):
     # @param command        The shell command which will produce the file.
     #                       The command must contain the string %% which will be replaced with the cached location of the file.
     # @param remote_name    The name of the file as seen by the task.
-    # @param type           Must be @ref WORK_QUEUE_INPUT
+    # @param type           Must be @ref WORK_QUEUE_INPUT.  (Output is not currently supported.)
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE (default)
@@ -277,6 +281,9 @@ class Task(object):
     def specify_file_command(self, cmd, remote_name, type=None, flags=None, cache=None, failure_only=None):
         if type is None:
             type = WORK_QUEUE_INPUT
+
+        if type==WORK_QUEUE_OUTPUT:
+            raise ValueError("specify_file_command does not currently support output files.")
 
         # swig expects strings
         if remote_name:

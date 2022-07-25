@@ -5138,25 +5138,8 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 			}
 		}
 	} else {
-		files = t->output_files;
-
-		//check if two different different remote names map to the same url for outputs.
-		list_first_item(t->output_files);
-		while((tf = (struct work_queue_file*)list_next_item(files))) {
-			if(!strcmp(file_url, tf->payload) && strcmp(remote_name, tf->remote_name)) {
-				fprintf(stderr, "Error: output url remote name %s conflicts with another output pointing to same url (%s).\n", remote_name, file_url);
-				return 0;
-			}
-		}
-
-		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: output url %s conflicts with an input pointing to same remote name (%s).\n", file_url, remote_name);
-				return 0;
-			}
-		}
+		fprintf(stderr, "Error: work_queue_specify_url does not yet support output files.\n");
+	  	return 0;
 	}
 
 	tf = work_queue_file_create(file_url, remote_name, WORK_QUEUE_URL, flags);
@@ -5437,25 +5420,8 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 			}
 		}
 	} else {
-		files = t->output_files;
-
-		//check if two different different remote names map to the same local name for outputs.
-		list_first_item(files);
-		while((tf = (struct work_queue_file*)list_next_item(files))) {
-			if(!strcmp(cmd, tf->payload) && strcmp(remote_name, tf->remote_name)) {
-				fprintf(stderr, "Error: output file command %s conflicts with another output pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: output file command %s conflicts with an input pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;
-			}
-		}
+		fprintf(stderr, "Error: work_queue_specify_file_command does not yet support output files.\n");
+	  	return 0;
 	}
 
 	if(strstr(cmd, "%%") == NULL) {
