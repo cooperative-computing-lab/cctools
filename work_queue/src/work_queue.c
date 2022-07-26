@@ -2674,6 +2674,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"tasks_total_memory",total->memory);
 	jx_insert_integer(j,"tasks_total_disk",total->disk);
 	jx_insert_integer(j,"tasks_total_gpus",total->gpus);
+	rmsummary_delete(total);
 
 	return j;
 }
