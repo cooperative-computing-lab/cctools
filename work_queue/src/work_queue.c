@@ -7209,7 +7209,7 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "wait_retrieve_many")){
+	} else if(!strcmp(name, "wait-retrieve-many")){
 		q->wait_retrieve_many = MAX(0, (int)value);
 
 	} else if(!strcmp(name, "force-proportional-resources")){
