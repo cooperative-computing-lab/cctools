@@ -43,6 +43,7 @@ SOURCES = \
 	fast_popen.c \
 	fd.c \
 	file_cache.c \
+	file_link_recursive.c \
 	full_io.c \
 	get_canonical_path.c \
 	get_line.c \
@@ -136,6 +137,7 @@ HEADERS_PUBLIC = \
 	debug.h \
 	envtools.h \
 	fast_popen.h \
+	file_link_recursive.h \
 	full_io.h \
 	getopt.h \
 	getopt_aux.h \

@@ -139,6 +139,9 @@ int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blocklist_slow_workers_timeout = 900;
 
+/* Internal use: when the worker uses the client library, do not recompute cached names. */
+int wq_hack_do_not_compute_cached_name = 0;
+
 /* time threshold to check when tasks are larger than connected workers */
 static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
 
@@ -697,6 +700,64 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	return MSG_PROCESSED;
 }
 
+/*
+A cache-update message coming from the worker means that a requested
+remote transfer or command was successful, and know we know the size
+of the file for the purposes of cache storage management.
+*/
+
+int process_cache_update( struct work_queue *q, struct work_queue_worker *w, const char *line )
+{
+	char cachename[WORK_QUEUE_LINE_MAX];
+	long long size;
+	long long transfer_time;
+	
+	if(sscanf(line,"cache-update %s %lld %lld",cachename,&size,&transfer_time)==3) {
+		struct stat *remote_info = hash_table_lookup(w->current_files,cachename);
+		if(remote_info) {
+			remote_info->st_size = size;
+			remote_info->st_mtime = time(0);
+			// XXX store the transfer time once we have a better structure here
+		}
+	}
+	
+	return MSG_PROCESSED;
+}
+
+/*
+A cache-invalid message coming from the worker means that a requested
+remote transfer or command did not succeed, and the intended file is
+not in the cache.  It is accompanied by a (presumably short) string
+message that further explains the failure.
+So, we remove the corresponding note for that worker and log the error.
+We should expect to soon receive some failed tasks that were unable
+set up their own input sandboxes.
+*/
+
+int process_cache_invalid( struct work_queue *q, struct work_queue_worker *w, const char *line )
+{
+	char cachename[WORK_QUEUE_LINE_MAX];
+	int length;
+	if(sscanf(line,"cache-invalid %s %d",cachename,&length)==2) {
+
+		char *message = malloc(length+1);
+		time_t stoptime = time(0) + q->long_timeout;
+		
+		int actual = link_read(w->link,message,length,stoptime);
+		if(actual!=length) {
+			free(message);
+			return MSG_FAILURE;
+		}
+		
+		message[length] = 0;
+		debug(D_WQ,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
+		free(message);
+		
+		struct stat *remote_info = hash_table_remove(w->current_files,cachename);
+		if(remote_info) free(remote_info);
+	}
+	return MSG_PROCESSED;
+}
 
 /**
  * This function receives a message from worker and records the time a message is successfully
@@ -749,6 +810,10 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = process_info(q, w, line);
 	} else if (string_prefix_is(line, "tlq")) {
 		result = advertise_tlq_url(q, w, line);
+	} else if (string_prefix_is(line, "cache-update")) {
+		result = process_cache_update(q, w, line);
+	} else if (string_prefix_is(line, "cache-invalid")) {
+		result = process_cache_invalid(q, w, line);
 	} else if( sscanf(line,"GET %s HTTP/%*d.%*d",path)==1) {
 	        result = process_http_request(q,w,path,stoptime);
 	} else {
@@ -1458,33 +1523,6 @@ char *make_cached_name( const struct work_queue_file *f )
 }
 
 /*
-This function stores an output file from the remote cache directory
-to a third-party location, which can be either a remote filesystem
-(WORK_QUEUE_FS_PATH) or a command to run (WORK_QUEUE_FS_CMD).
-Returns 1 on success at worker and 0 on invalid message from worker.
-*/
-static int do_thirdput( struct work_queue *q, struct work_queue_worker *w,  const char *cached_name, const char *payload, int command )
-{
-	char line[WORK_QUEUE_LINE_MAX];
-	int result;
-
-	send_worker_msg(q,w,"thirdput %d %s %s\n",command,cached_name,payload);
-
-	work_queue_msg_code_t mcode;
-	mcode = recv_worker_msg_retry(q, w, line, WORK_QUEUE_LINE_MAX);
-	if(mcode!=MSG_NOT_PROCESSED) {
-		return WQ_WORKER_FAILURE;
-	}
-
-	if(sscanf(line, "thirdput-complete %d", &result)) {
-		return result;
-	} else {
-		debug(D_WQ, "Error: invalid message received (%s)\n", line);
-		return WQ_WORKER_FAILURE;
-	}
-}
-
-/*
 Get a single output file, located at the worker under 'cached_name'.
 */
 static work_queue_result_code_t get_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f )
@@ -1494,18 +1532,7 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 
 	timestamp_t open_time = timestamp_get();
 
-	if(f->flags & WORK_QUEUE_THIRDPUT) {
-		if(!strcmp(f->cached_name, f->payload)) {
-			debug(D_WQ, "output file %s already on shared filesystem", f->cached_name);
-			f->flags |= WORK_QUEUE_PREEXIST;
-		} else {
-			result = do_thirdput(q,w,f->cached_name,f->payload,WORK_QUEUE_FS_PATH);
-		}
-	} else if(f->type == WORK_QUEUE_REMOTECMD) {
-		result = do_thirdput(q,w,f->cached_name,f->payload,WORK_QUEUE_FS_CMD);
-	} else {
-		result = get_file_or_directory(q, w, t, f->cached_name, f->payload, &total_bytes);
-	}
+	result = get_file_or_directory(q, w, t, f->cached_name, f->payload, &total_bytes);
 
 	timestamp_t close_time = timestamp_get();
 	timestamp_t sum_time = close_time - open_time;
@@ -1551,6 +1578,9 @@ static work_queue_result_code_t get_output_files( struct work_queue *q, struct w
 	if(t->output_files) {
 		list_first_item(t->output_files);
 		while((f = list_next_item(t->output_files))) {
+			// non-file objects are handled by the worker.
+			if(f->type!=WORK_QUEUE_FILE) continue;
+		     
 			int task_succeeded = (t->result==WORK_QUEUE_RESULT_SUCCESS && t->return_status==0);
 
 			// skip failure-only files on success 
@@ -3432,6 +3462,34 @@ static char *expand_envnames(struct work_queue_worker *w, const char *payload)
 	return expanded_name;
 }
 
+/*
+Send a url or remote command used to generate a cached file,
+if it has not already been cached there.  Note that the length
+may be an estimate at this point and will be updated by return
+message once the object is actually loaded into the cache.
+*/
+
+static work_queue_result_code_t send_special_if_not_cached( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *typestring )
+{
+	if(hash_table_lookup(w->current_files,tf->cached_name)) return WQ_SUCCESS;
+
+	char source_encoded[WORK_QUEUE_LINE_MAX];
+	char cached_name_encoded[WORK_QUEUE_LINE_MAX];
+
+	url_encode(tf->payload,source_encoded,sizeof(source_encoded));
+	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
+
+	send_worker_msg(q,w,"%s %s %s %d %o\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777);
+
+	if(tf->flags & WORK_QUEUE_CACHE) {
+		struct stat *remote_info = malloc(sizeof(*remote_info));
+		memset(remote_info,0,sizeof(*remote_info));
+		hash_table_insert(w->current_files,tf->cached_name,remote_info);
+	}
+
+	return WQ_SUCCESS;
+}
+
 static work_queue_result_code_t send_input_file(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *f)
 {
 
@@ -3455,44 +3513,31 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 		break;
 
 	case WORK_QUEUE_REMOTECMD:
-		debug(D_WQ, "%s (%s) needs %s from remote filesystem using %s", w->hostname, w->addrport, f->remote_name, f->payload);
-		send_worker_msg(q,w, "thirdget %d %s %s\n",WORK_QUEUE_FS_CMD, f->cached_name, f->payload);
+		debug(D_WQ, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->payload);
+		result = send_special_if_not_cached(q,w,t,f,"putcmd");
 		break;
 
 	case WORK_QUEUE_URL:
-		debug(D_WQ, "%s (%s) needs %s from the url, %s %d", w->hostname, w->addrport, f->cached_name, f->payload, f->length);
-		send_worker_msg(q,w, "url %s %d 0%o %d\n",f->cached_name, f->length, 0777, f->flags);
-		link_putlstring(w->link, f->payload, f->length, time(0) + q->short_timeout);
+		debug(D_WQ, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->payload);
+		result = send_special_if_not_cached(q,w,t,f,"puturl");
 		break;
 
 	case WORK_QUEUE_DIRECTORY:
-		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as WORK_QUEUE_FILEs
+		debug(D_WQ, "%s (%s) will create directory %s", w->hostname, w->addrport, f->remote_name);
+  		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as WORK_QUEUE_FILEs
 		break;
 
 	case WORK_QUEUE_FILE:
-	case WORK_QUEUE_FILE_PIECE:
-		if(f->flags & WORK_QUEUE_THIRDGET) {
-			debug(D_WQ, "%s (%s) needs %s from shared filesystem as %s", w->hostname, w->addrport, f->payload, f->remote_name);
-
-			if(!strcmp(f->remote_name, f->payload)) {
-				f->flags |= WORK_QUEUE_PREEXIST;
-			} else {
-				if(f->flags & WORK_QUEUE_SYMLINK) {
-					send_worker_msg(q,w, "thirdget %d %s %s\n", WORK_QUEUE_FS_SYMLINK, f->cached_name, f->payload);
-				} else {
-					send_worker_msg(q,w, "thirdget %d %s %s\n", WORK_QUEUE_FS_PATH, f->cached_name, f->payload);
-				}
-			}
+	case WORK_QUEUE_FILE_PIECE: {
+		char *expanded_payload = expand_envnames(w, f->payload);
+		if(expanded_payload) {
+			result = send_item_if_not_cached(q,w,t,f,expanded_payload,&total_bytes);
+			free(expanded_payload);
 		} else {
-			char *expanded_payload = expand_envnames(w, f->payload);
-			if(expanded_payload) {
-				result = send_item_if_not_cached(q,w,t,f,expanded_payload,&total_bytes);
-				free(expanded_payload);
-			} else {
-				result = WQ_APP_FAILURE; //signal app-level failure.
-			}
+			result = WQ_APP_FAILURE; //signal app-level failure.
 		}
 		break;
+		}
 	}
 
 	if(result == WQ_SUCCESS) {
@@ -5068,8 +5113,12 @@ struct work_queue_file *work_queue_file_create(const char *payload, const char *
 		f->length  = strlen(payload);
 	}
 
-	f->cached_name = make_cached_name(f);
-
+	if(wq_hack_do_not_compute_cached_name) {
+  		f->cached_name = xxstrdup(f->payload);
+	} else {
+		f->cached_name = make_cached_name(f);
+	}
+	
 	return f;
 }
 
@@ -5106,29 +5155,15 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 			}
 		}
 	} else {
-		files = t->output_files;
-
-		//check if two different different remote names map to the same url for outputs.
-		list_first_item(t->output_files);
-		while((tf = (struct work_queue_file*)list_next_item(files))) {
-			if(!strcmp(file_url, tf->payload) && strcmp(remote_name, tf->remote_name)) {
-				fprintf(stderr, "Error: output url remote name %s conflicts with another output pointing to same url (%s).\n", remote_name, file_url);
-				return 0;
-			}
-		}
-
-		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: output url %s conflicts with an input pointing to same remote name (%s).\n", file_url, remote_name);
-				return 0;
-			}
-		}
+		fprintf(stderr, "Error: work_queue_specify_url does not yet support output files.\n");
+	  	return 0;
 	}
 
 	tf = work_queue_file_create(file_url, remote_name, WORK_QUEUE_URL, flags);
 	if(!tf) return 0;
+
+	// length of source data is not known yet.
+	tf->length = 0;
 
 	list_push_tail(files, tf);
 
@@ -5366,7 +5401,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 	return 1;
 }
 
-int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, work_queue_file_type_t type, work_queue_file_flags_t flags)
+int work_queue_task_specify_file_command(struct work_queue_task *t, const char *cmd, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags)
 {
 	struct list *files;
 	struct work_queue_file *tf;
@@ -5402,25 +5437,8 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 			}
 		}
 	} else {
-		files = t->output_files;
-
-		//check if two different different remote names map to the same local name for outputs.
-		list_first_item(files);
-		while((tf = (struct work_queue_file*)list_next_item(files))) {
-			if(!strcmp(cmd, tf->payload) && strcmp(remote_name, tf->remote_name)) {
-				fprintf(stderr, "Error: output file command %s conflicts with another output pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: output file command %s conflicts with an input pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;
-			}
-		}
+		fprintf(stderr, "Error: work_queue_specify_file_command does not yet support output files.\n");
+	  	return 0;
 	}
 
 	if(strstr(cmd, "%%") == NULL) {
@@ -5429,6 +5447,9 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 
 	tf = work_queue_file_create(cmd, remote_name, WORK_QUEUE_REMOTECMD, flags);
 	if(!tf) return 0;
+
+	// length of source data is not known yet.
+	tf->length = 0;
 
 	list_push_tail(files, tf);
 
@@ -7439,7 +7460,7 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 	}
 
 	if(features) {
-		hash_table_clear(features);
+		hash_table_clear(features,0);
 	}
 
 	hash_table_firstkey(q->worker_table);

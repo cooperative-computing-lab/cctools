@@ -221,38 +221,76 @@ class Task(object):
         return work_queue_task_specify_file(self._task, local_name, remote_name, type, flags)
 
     ##
-    # Add a file to the task which will be transfered with a command at the worker.
+    # Add a url to the task which will be provided as an input file.
     #
     # @param self           Reference to the current task object.
+    # @param url            The url of the file to provide.
     # @param remote_name    The name of the file as seen by the task.
-    # @param cmd            The shell command to transfer the file. Any
-    #                       occurance of the string %% will be replaced with the
-    #                       internal name that work queue uses for the file.
-    # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
+    # @param type           Must be @ref WORK_QUEUE_INPUT.  (Output is not currently supported.)
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE (default)
     #                       - @ref WORK_QUEUE_CACHE
-    #                       - @ref WORK_QUEUE_WATCH
-    #                       - @ref WORK_QUEUE_FAILURE_ONLY
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     #
     # For example:
     # @code
-    # # The following are equivalent
-    # >>> task.specify_file_command("my.result", "chirp_put %% chirp://somewhere/result.file", type=WORK_QUEUE_OUTPUT)
+    # >>> task.specify_url("http://www.google.com/","google.txt",type=WORK_QUEUE_INPUT,flags=WORK_QUEUE_CACHE);
     # @endcode
-    def specify_file_command(self, remote_name, cmd, type=None, flags=None, cache=None, failure_only=None):
+
+    def specify_url(self, url, remote_name, type=None, flags=None, cache=None, failure_only=None):
+
         if type is None:
             type = WORK_QUEUE_INPUT
+
+        if type==WORK_QUEUE_OUTPUT:
+            raise ValueError("specify_url does not currently support output files.")
+        
+        # swig expects strings
+        if remote_name:
+            remote_name = str(remote_name)
+
+        if url:
+            url = str(url)
+
+        flags = Task._determine_file_flags(flags, cache, failure_only)
+        return work_queue_task_specify_url(self._task, url, remote_name, type, flags)
+
+
+    ##
+    # Add an input file produced by a Unix shell command.
+    # The command will be executed at the worker and produce
+    # a cacheable file that can be shared among multiple tasks.
+    #
+    # @param self           Reference to the current task object.
+    # @param command        The shell command which will produce the file.
+    #                       The command must contain the string %% which will be replaced with the cached location of the file.
+    # @param remote_name    The name of the file as seen by the task.
+    # @param type           Must be @ref WORK_QUEUE_INPUT.  (Output is not currently supported.)
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref work_queue_file_flags_t or'd together The most common are:
+    #                       - @ref WORK_QUEUE_NOCACHE (default)
+    #                       - @ref WORK_QUEUE_CACHE
+    # @param cache         Whether the file should be cached at workers (True/False)
+    #
+    # For example:
+    # @code
+    # >>> task.specify_file_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",type=WORK_QUEUE_INPUT,flags=WORK_QUEUE_CACHE);
+    # @endcode
+
+    def specify_file_command(self, cmd, remote_name, type=None, flags=None, cache=None, failure_only=None):
+        if type is None:
+            type = WORK_QUEUE_INPUT
+
+        if type==WORK_QUEUE_OUTPUT:
+            raise ValueError("specify_file_command does not currently support output files.")
 
         # swig expects strings
         if remote_name:
             remote_name = str(remote_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return work_queue_task_specify_file_command(self._task, remote_name, cmd, type, flags)
+        return work_queue_task_specify_file_command(self._task, cmd, remote_name, type, flags)
 
     ##
     # Add a file piece to the task.

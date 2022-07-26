@@ -39,8 +39,6 @@ typedef enum {
 	WORK_QUEUE_NOCACHE  = 0, /**< Do not cache file at execution site. */
 	WORK_QUEUE_CACHE    = 1, /**< Cache file at execution site for later use. */
 	WORK_QUEUE_SYMLINK  = 2, /**< Create a symlink to the file rather than copying it, if possible. */
-	WORK_QUEUE_THIRDGET = 8, /**< Access the file on the client from a shared filesystem */
-	WORK_QUEUE_THIRDPUT = 8, /**< Access the file on the client from a shared filesystem (same as WORK_QUEUE_THIRDGET, included for readability) */
 	WORK_QUEUE_WATCH    = 16, /**< Watch the output file and send back changes as the task runs. */
 	WORK_QUEUE_FAILURE_ONLY = 32,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	WORK_QUEUE_SUCCESS_ONLY = 64, /**< Only return this output file if the task succeeded. */
@@ -449,10 +447,24 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 */
 int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags, int recursive);
 
+/** Add a url as an input for a task.
+@param t A task object.
+@param url The source URL to be accessed to provide the file.
+@param remote_name The name of the file as seen by the task.
+@param type Must be one of the following values:
+- @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
+- @ref WORK_QUEUE_OUTPUT is not currently supported.
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
+- @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
+- @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+@return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
+*/
+int work_queue_task_specify_url(struct work_queue_task *t, const char *url, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags);
+
 /** Gets/puts file at remote_name using cmd at worker.
 @param t A task object.
-@param remote_name The name of the file as seen by the task.
 @param cmd The shell command to transfer the file. For input files, it should read the contents from remote_name via stdin. For output files, it should write the contents to stdout.
+@param remote_name The name of the file as seen by the task.
 @param type Must be one of the following values:
 - @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
@@ -461,7 +473,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, work_queue_file_type_t type, work_queue_file_flags_t flags);
+int work_queue_task_specify_file_command(struct work_queue_task *t, const char *cmd, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags);
 
 /** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result WORK_QUEUE_RESULT_MAX_RETRIES.
 @param t A task object.

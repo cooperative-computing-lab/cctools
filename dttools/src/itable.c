@@ -202,6 +202,19 @@ void *itable_remove(struct itable *h, UINT64_T key)
 	return 0;
 }
 
+void * itable_pop( struct itable *t )
+{
+	UINT64_T key;
+	void *value;
+
+	itable_firstkey(t);
+	if(itable_nextkey(t, &key, (void**)&value)) {
+		return itable_remove(t,key);
+	} else {
+		return 0;
+	}
+}
+
 void itable_firstkey(struct itable *h)
 {
 	h->ientry = 0;

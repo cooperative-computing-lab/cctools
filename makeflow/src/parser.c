@@ -96,7 +96,6 @@ struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct j
 		case DAG_SYNTAX_JX: //Evaluates the pending JX Variables from args file
 			jx_tmp = jx_eval_with_defines(dag,args);
 			jx_delete(dag);
-			jx_delete(args);
 			dag = jx_tmp;
 			 //Intentional fall-through as JX and JSON both use dag_parse_jx
 			/* falls through */
