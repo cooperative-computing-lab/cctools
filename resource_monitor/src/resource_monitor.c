@@ -2150,6 +2150,7 @@ int main(int argc, char **argv) {
     char *opened_path  = NULL;
 
 	char *sh_cmd_line = NULL;
+	char *argv_sh[] = { "/bin/sh", "-c", sh_cmd_line, 0 };  //sh_cmd_line to be replace if given as arg
 
     int use_series   = 0;
     int use_inotify  = 0;
@@ -2451,7 +2452,7 @@ int main(int argc, char **argv) {
 		argc = 3;
 		optind = 0;
 
-		char *argv_sh[] = { "/bin/sh", "-c", sh_cmd_line, 0 };
+		argv_sh[2] = sh_cmd_line;
 		argv = argv_sh;
 
 		/* for pretty printing in the summary. */
