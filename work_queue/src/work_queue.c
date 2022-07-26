@@ -999,7 +999,6 @@ void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
 		debug(D_WQ, "Failed to retrieve factory info from catalog server(s) at %s.", q->catalog_hosts);
 	}
 
-	jx_delete(jexpr);
 }
 
 void update_write_catalog(struct work_queue *q, struct link *foreman_uplink)
