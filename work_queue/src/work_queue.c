@@ -292,14 +292,35 @@ struct work_queue_task_report {
 	struct rmsummary *resources;
 };
 
-static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
-
 struct blocklist_host_info {
 	int    blocked;
 	int    times_blocked;
 	time_t release_at;
 };
 
+struct remote_file_info {
+	work_queue_file_t type;
+	int64_t           size;
+	time_t            mtime;
+	timestamp_t       transfer_time;
+};
+
+struct remote_file_info * remote_file_info_create( work_queue_file_t type, int64_t size, time_t mtime )
+{
+	struct remote_file_info *rinfo = malloc(sizeof(*rinfo));
+	rinfo->type = type;
+	rinfo->size = size;
+	rinfo->mtime = mtime;
+	rinfo->transfer_time = 0;
+	return rinfo;
+}
+
+void remote_file_info_delete( struct remote_file_info *rinfo )
+{
+	free(rinfo);
+}
+
+static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w, worker_disconnect_reason reason);
@@ -714,11 +735,10 @@ int process_cache_update( struct work_queue *q, struct work_queue_worker *w, con
 	long long transfer_time;
 	
 	if(sscanf(line,"cache-update %s %lld %lld",cachename,&size,&transfer_time)==3) {
-		struct stat *remote_info = hash_table_lookup(w->current_files,cachename);
+		struct remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
 		if(remote_info) {
-			remote_info->st_size = size;
-			remote_info->st_mtime = time(0);
-			// XXX store the transfer time once we have a better structure here
+			remote_info->size = size;
+			remote_info->transfer_time = transfer_time;
 		}
 	}
 	
@@ -754,8 +774,8 @@ int process_cache_invalid( struct work_queue *q, struct work_queue_worker *w, co
 		debug(D_WQ,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
 		free(message);
 		
-		struct stat *remote_info = hash_table_remove(w->current_files,cachename);
-		if(remote_info) free(remote_info);
+		struct remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
+		if(remote_info) remote_file_info_delete(remote_info);
 	}
 	return MSG_PROCESSED;
 }
@@ -1556,12 +1576,7 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 	if(result == WQ_SUCCESS && f->flags & WORK_QUEUE_CACHE) {
 		struct stat local_info;
 		if (stat(f->payload,&local_info) == 0) {
-			struct stat *remote_info = malloc(sizeof(*remote_info));
-			if(!remote_info) {
-				debug(D_NOTICE, "Cannot allocate memory for cache entry for output file %s at %s (%s)", f->payload, w->hostname, w->addrport);
-				return WQ_APP_FAILURE;
-			}
-			memcpy(remote_info, &local_info, sizeof(local_info));
+			struct remote_file_info *remote_info = remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
 			hash_table_insert(w->current_files, f->cached_name, remote_info);
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno));
@@ -3361,9 +3376,9 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 		return WQ_APP_FAILURE;
 	}
 
-	struct stat *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
+	struct remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
-	if(remote_info && (remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size)) {
+	if(remote_info && (remote_info->mtime != local_info.st_mtime || remote_info->size != local_info.st_size)) {
 		debug(D_NOTICE|D_WQ, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
 		return WQ_SUCCESS;
 	} else if(!remote_info) {
@@ -3371,18 +3386,15 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 		if(tf->offset==0 && tf->length==0) {
 			debug(D_WQ, "%s (%s) needs file %s as '%s'", w->hostname, w->addrport, expanded_local_name, tf->cached_name);
 		} else {
-		  debug(D_WQ, "%s (%s) needs file %s (offset %lld length %lld) as '%s'", w->hostname, w->addrport, expanded_local_name, (long long) tf->offset, (long long) tf->length, tf->cached_name );
+			debug(D_WQ, "%s (%s) needs file %s (offset %lld length %lld) as '%s'", w->hostname, w->addrport, expanded_local_name, (long long) tf->offset, (long long) tf->length, tf->cached_name );
 		}
 
 		work_queue_result_code_t result;
 		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
 
 		if(result == WQ_SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
-			remote_info = xxmalloc(sizeof(*remote_info));
-			if(remote_info) {
-				memcpy(remote_info, &local_info, sizeof(local_info));
-				hash_table_insert(w->current_files, tf->cached_name, remote_info);
-			}
+			remote_info = remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
+			hash_table_insert(w->current_files, tf->cached_name, remote_info);
 		}
 
 		return result;
@@ -3483,8 +3495,7 @@ static work_queue_result_code_t send_special_if_not_cached( struct work_queue *q
 	send_worker_msg(q,w,"%s %s %s %d %o\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777);
 
 	if(tf->flags & WORK_QUEUE_CACHE) {
-		struct stat *remote_info = malloc(sizeof(*remote_info));
-		memset(remote_info,0,sizeof(*remote_info));
+		struct remote_file_info *remote_info = remote_file_info_create(tf->type,tf->length,time(0));
 		hash_table_insert(w->current_files,tf->cached_name,remote_info);
 	}
 
@@ -4053,7 +4064,7 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 	struct work_queue_worker *best_worker = 0;
 	int64_t most_task_cached_bytes = 0;
 	int64_t task_cached_bytes;
-	struct stat *remote_info;
+	struct remote_file_info *remote_info;
 	struct work_queue_file *tf;
 
 	hash_table_firstkey(q->worker_table);
@@ -4065,7 +4076,7 @@ static struct work_queue_worker *find_worker_by_files(struct work_queue *q, stru
 				if((tf->type == WORK_QUEUE_FILE || tf->type == WORK_QUEUE_FILE_PIECE) && (tf->flags & WORK_QUEUE_CACHE)) {
 					remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 					if(remote_info)
-						task_cached_bytes += remote_info->st_size;
+						task_cached_bytes += remote_info->size;
 				}
 			}
 
