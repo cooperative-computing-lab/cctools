@@ -807,55 +807,57 @@ static int stream_output_item(struct link *manager, const char *filename, int re
 {
 	DIR *dir;
 	struct dirent *dent;
-	char dentline[WORK_QUEUE_LINE_MAX];
-	char cached_filename[WORK_QUEUE_LINE_MAX];
 	struct stat info;
 	int64_t actual, length;
 	int fd;
 
-	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", filename);
-
-	if(stat(cached_filename, &info) != 0) {
-		goto failure;
+	char *cached_path = work_queue_cache_full_path(global_cache,filename);
+	
+	if(stat(cached_path, &info) != 0) {
+		goto access_failure;
 	}
 
 	if(S_ISDIR(info.st_mode)) {
 		// stream a directory
-		dir = opendir(cached_filename);
-		if(!dir) {
-			goto failure;
-		}
+		dir = opendir(cached_path);
+		if(!dir) goto access_failure;
+
 		send_manager_message(manager, "dir %s 0\n", filename);
 
 		while(recursive && (dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
-			string_nformat(dentline, sizeof(dentline), "%s/%s", filename, dent->d_name);
-			stream_output_item(manager, dentline, recursive);
+			char *subfilename = string_format("%s/%s", filename, dent->d_name);
+			stream_output_item(manager, subfilename, recursive);
+			free(subfilename);
 		}
 
 		closedir(dir);
 	} else {
 		// stream a file
-		fd = open(cached_filename, O_RDONLY, 0);
+		fd = open(cached_path, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = info.st_size;
 			send_manager_message(manager, "file %s %"PRId64"\n", filename, length );
 			actual = link_stream_from_fd(manager, fd, length, time(0) + active_timeout);
 			close(fd);
-			if(actual != length) {
-				debug(D_WQ, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
-				return 0;
-			}
+			if(actual != length) goto send_failure;
 		} else {
-			goto failure;
+			goto access_failure;
 		}
 	}
 
+	free(cached_path);
 	return 1;
 
-failure:
+access_failure:
+	free(cached_path);
 	send_manager_message(manager, "missing %s %d\n", filename, errno);
+	return 0;
+
+send_failure:
+	free(cached_path);
+	debug(D_WQ, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
 	return 0;
 }
 
@@ -1132,9 +1134,9 @@ static int do_put_dir( struct link *manager, char *dirname )
 
 	int totalsize = 0;
 
-	char * cachename = string_format("cache/%s",dirname);
-	int result = do_put_dir_internal(manager,cachename,&totalsize);
-	free(cachename);
+	char *cached_path = work_queue_cache_full_path(global_cache,dirname);
+	int result = do_put_dir_internal(manager,cached_path,&totalsize);
+	free(cached_path);
 
 	if(result) work_queue_cache_addfile(global_cache,totalsize,dirname);
 
@@ -1157,21 +1159,21 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 		return 0;
 	}
 
-	char * cached_filename = string_format("cache/%s",filename);
-
+	char * cached_path = work_queue_cache_full_path(global_cache,filename);
+	
 	if(strchr(filename,'/')) {
 		char dirname[WORK_QUEUE_LINE_MAX];
 		path_dirname(filename,dirname);
 		if(!create_dir(dirname,0777)) {
 			debug(D_WQ, "could not create directory %s: %s",dirname,strerror(errno));
-			free(cached_filename);
+			free(cached_path);
 			return 0;
 		}
 	}
 
-	int result = do_put_file_internal(manager,cached_filename,length,mode);
+	int result = do_put_file_internal(manager,cached_path,length,mode);
 
-	free(cached_filename);
+	free(cached_path);
 
 	if(result) work_queue_cache_addfile(global_cache,length,filename);
 
@@ -1210,17 +1212,20 @@ trash and deal with it there.
 
 static int do_unlink(const char *path)
 {
-	char cached_path[WORK_QUEUE_LINE_MAX];
-	string_nformat(cached_path, sizeof(cached_path), "cache/%s", path);
-
-	if(!path_within_dir(cached_path, workspace)) {
+	char *cached_path = work_queue_cache_full_path(global_cache,path);
+  
+	int result = 0;
+	
+	if(path_within_dir(cached_path, workspace)) {
+		work_queue_cache_remove(global_cache,path);
+		result = 1;
+	} else {
 		debug(D_WQ, "%s is not within workspace %s",cached_path,workspace);
-		return 0;
+		result = 0;
 	}
 
-	work_queue_cache_remove(global_cache,path);
-
-	return 1;
+	free(cached_path);
+	return result;
 }
 
 static int do_get(struct link *manager, const char *filename, int recursive)
