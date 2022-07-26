@@ -232,6 +232,7 @@ struct work_queue {
 	char *tlq_url;
 
 	int wait_retrieve_many;
+	int force_proportional_resources;
 };
 
 struct work_queue_worker {
@@ -3472,7 +3473,7 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 	int use_whole_worker = 1;
 
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
-	if(c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
+	if(q->force_proportional_resources || c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
 		double max_proportion = -1;
 		if(w->resources->cores.largest > 0) {
 			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.largest);
@@ -3499,10 +3500,17 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 		}
 		else if(max_proportion > 0) {
 			use_whole_worker = 0;
+
+			// adjust max_proportion so that an integer number of tasks fit the
+			// worker.
+			if(q->force_proportional_resources) {
+				max_proportion = 1.0/(floor(1.0/max_proportion));
+			}
+
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
 			 * Otherwise they get a proportion according to specified
 			 * resources. Tasks will get at least one core. */
-			if(limits->cores < 0) {
+			if(q->force_proportional_resources || limits->cores < 0) {
 				if(limits->gpus > 0) {
 					limits->cores = 0;
 				} else {
@@ -3515,11 +3523,11 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 				limits->gpus = 0;
 			}
 
-			if(limits->memory < 0) {
+			if(q->force_proportional_resources || limits->memory < 0) {
 				limits->memory = MAX(1, floor(w->resources->memory.largest * max_proportion));
 			}
 
-			if(limits->disk < 0) {
+			if(q->force_proportional_resources || limits->disk < 0) {
 				limits->disk = MAX(1, floor(w->resources->disk.largest * max_proportion));
 			}
 		}
@@ -7031,8 +7039,11 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "wait_retrieve_many")){
+	} else if(!strcmp(name, "wait-retrieve-many")){
 		q->wait_retrieve_many = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "force-proportional-resources")){
+		q->force_proportional_resources = MAX(0, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
