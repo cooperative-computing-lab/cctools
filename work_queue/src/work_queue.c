@@ -887,13 +887,13 @@ void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
 	int first_name = 1;
 	buffer_t filter;
 	buffer_init(&filter);
-	char **factory_name = NULL;
-	struct work_queue_factory_info **f = NULL;
+	char *factory_name = NULL;
+	struct work_queue_factory_info *f = NULL;
 	buffer_putfstring(&filter, "type == \"wq_factory\" && (");
 
 	hash_table_firstkey(q->factory_table);
-	while ( hash_table_nextkey(q->factory_table, factory_name, (void **) f) ) {
-		buffer_putfstring(&filter, "%sname == \"%s\"", first_name ? "" : " || " ,*factory_name);
+	while ( hash_table_nextkey(q->factory_table, &factory_name, (void **)&f) ) {
+		buffer_putfstring(&filter, "%sfactory_name == \"%s\"", first_name ? "" : " || ", factory_name);
 		first_name = 0;
 	}
 	buffer_putfstring(&filter, ")");
