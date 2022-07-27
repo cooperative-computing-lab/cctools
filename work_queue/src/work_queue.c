@@ -235,6 +235,8 @@ struct work_queue {
 	char *tlq_url;
 
 	int wait_retrieve_many;
+
+	int fetch_factory;
 };
 
 struct work_queue_worker {
@@ -683,6 +685,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	} else if(string_prefix_is(field, "worker-end-time")) {
 		w->end_time = MAX(0, atoll(value));
 	} else if(string_prefix_is(field, "from-factory")) {
+		q->fetch_factory = 1;
 		w->factory_name = xxstrdup(value);
 		struct work_queue_factory_info *f;
 		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
@@ -991,6 +994,9 @@ void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
 
 void update_write_catalog(struct work_queue *q, struct link *foreman_uplink)
 {
+	// Only write if we have a name.
+	if (!q->name) return; 
+
 	// Generate the manager status in an jx, and print it to a buffer.
 	struct jx *j = queue_to_jx(q,foreman_uplink);
 	char *str = jx_print_string(j);
@@ -1016,15 +1022,14 @@ void update_read_catalog(struct work_queue *q)
 {
 	time_t stoptime = time(0) + 5; // Short timeout for query
 
-	update_read_catalog_factory(q, stoptime);
+	if (q->fetch_factory) {
+		update_read_catalog_factory(q, stoptime);
+	}
 }
 
 void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
-	// Only advertise if we have a name.
-	if(!q->name) return;
-
-	// Only advertise every last_update_time seconds.
+	// Only update every last_update_time seconds.
 	if(!force_update && (time(0) - q->catalog_last_update_time) < WORK_QUEUE_UPDATE_INTERVAL)
 		return;
 
@@ -5754,6 +5759,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->worker_task_map = itable_create(0);
 
 	q->factory_table = hash_table_create(0, 0);
+	q->fetch_factory = 0;
 
 	q->measured_local_resources = rmsummary_create(-1);
 	q->current_max_worker       = rmsummary_create(-1);
