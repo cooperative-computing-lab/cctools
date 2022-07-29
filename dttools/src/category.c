@@ -428,7 +428,7 @@ int64_t category_first_allocation_max_seen(struct histogram *h, int64_t top_reso
     double rounded = max_seen;
     double bucket_size = histogram_bucket_size(h);
 
-    rounded = histogram_round_up(h, rounded + floor(bucket_size/2));
+    rounded = histogram_round_up(h, rounded + floor(bucket_size/3));
 
     double to_cmp = -1;
     if(max_explicit > -1 && max_worker > -1) {
@@ -552,7 +552,6 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
     }
 
 	const struct rmsummary *max  = c->max_allocation;
-	const struct rmsummary *seen = c->max_resources_seen;
 
     int new_maximum = 0;
     if(!c->steady_state) {
@@ -567,7 +566,9 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
                 continue;
             }
 
-            if(rmsummary_get_by_offset(rs, o) > rmsummary_get_by_offset(seen, o)) {
+            struct histogram *h = itable_lookup(c->histograms, o);
+            double max_seen = histogram_round_up(h, histogram_max_value(h));
+            if(rmsummary_get_by_offset(rs, o) > max_seen) {
                 // the measured is larger than what we have seen, thus we need
                 // to reset the first allocation.
                 new_maximum = 1;
@@ -721,6 +722,9 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
          * In max mode, max seen is the first allocation, and next allocation
          * is to use whole workers. */
         rmsummary_merge_override(internal, c->max_resources_seen);
+
+        /* Never go below what first_allocation computer */
+        rmsummary_merge_max(internal, c->first_allocation);
     }
 
     /* load explicit category max values */
@@ -750,7 +754,6 @@ const struct rmsummary *category_dynamic_task_min_resources(struct category *c, 
 
 	/* load seen values */
 	struct rmsummary *seen = c->max_resources_seen;
-
 	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED) {
         size_t i;
         for(i = 0; labeled_resources[i]; i++) {

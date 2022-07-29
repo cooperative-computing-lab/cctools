@@ -844,6 +844,12 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 */
 void work_queue_get_stats_category(struct work_queue *q, const char *c, struct work_queue_stats *s);
 
+/** Get queue information as json
+@param q A work queue object.
+@param request One of: queue, tasks, workers, or categories
+*/
+char *work_queue_status(struct work_queue *q, const char *request);
+
 
 /** Summary data for all workers in buffer.
 @param q A work queue object.
