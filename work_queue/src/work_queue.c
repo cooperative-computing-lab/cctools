@@ -7466,6 +7466,7 @@ void work_queue_get_stats_category(struct work_queue *q, const char *category, s
 	s->tasks_running      = task_state_count(q, category, WORK_QUEUE_TASK_RUNNING);
 	s->tasks_with_results = task_state_count(q, category, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 	s->tasks_on_workers   = s->tasks_running + s->tasks_with_results;
+	s->tasks_submitted    = c->total_tasks + s->tasks_waiting + s->tasks_on_workers;
 
 	s->workers_able  = count_workers_for_waiting_tasks(q, largest_seen_resources(q, c->name));
 }
