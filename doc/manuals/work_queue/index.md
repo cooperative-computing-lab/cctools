@@ -1721,7 +1721,9 @@ q.treeReduce(fn, arry, chunk_size)
 
 Below is an example of all three abstractions, and their expected output:
 
+```
 --8<-- "work_queue/examples/wq_python_abstractions.py"
+```
 
 Run:
 ```
