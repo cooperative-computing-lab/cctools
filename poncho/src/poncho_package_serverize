@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+from poncho import package_serverize as serverize
+import argparse
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Creates a network function based on an input file and function")
+    parser.add_argument('--src', help='Source file that contains the function to be serverized')
+    parser.add_argument('--function', action='append', help='Name of the function in filename to be serverized')
+    parser.add_argument('--pack', help='Optional argument. If given, will create an environment to run the network function at this path')
+    parser.add_argument('--dest', help='Destination path for the output network function')
+    args = parser.parse_args()
+    
+    if args.function is None:
+        print("Error, must specify at least one function")
+        exit()
+    if not args.pack:
+        serverize.create_network_function(args.src, args.function, args.dest)
+    else:
+        serverize.create_network_function(args.src, args.function, args.dest)
+        serverize.pack_network_function(args.src, args.pack)
