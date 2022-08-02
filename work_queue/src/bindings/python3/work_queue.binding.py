@@ -1858,6 +1858,7 @@ class WorkQueue(object):
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
     def pair(self, fn, seq1, seq2, chunk_size=1, env=None):
+        def fpairs(fn, s):
             results = []
 
             for p in s:    
