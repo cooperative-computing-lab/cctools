@@ -236,6 +236,8 @@ struct work_queue {
 	char *debug_path;
 	int tlq_port;
 	char *tlq_url;
+  
+	int fetch_factory;
 
 	int wait_retrieve_many;
 	int force_proportional_resources;
@@ -282,6 +284,8 @@ struct work_queue_worker {
 struct work_queue_factory_info {
 	char *name;
 	int   connected_workers;
+	int   max_workers;
+	int   seen_at_catalog;
 };
 
 struct work_queue_task_report {
@@ -324,6 +328,7 @@ static void handle_failure(struct work_queue *q, struct work_queue_worker *w, st
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w, worker_disconnect_reason reason);
+static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w);
 
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
@@ -382,6 +387,9 @@ static void write_transaction_transfer(struct work_queue *q, struct work_queue_w
 static void write_transaction_worker_resources(struct work_queue *q, struct work_queue_worker *w);
 
 static void delete_feature(struct work_queue_task *t, const char *name);
+
+static struct work_queue_factory_info *create_factory_info(struct work_queue *q, const char *name);
+static void remove_factory_info(struct work_queue *q, const char *name);
 
 static void fill_deprecated_queue_stats(struct work_queue *q, struct work_queue_stats *s);
 static void fill_deprecated_tasks_stats(struct work_queue_task *t);
@@ -702,19 +710,18 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	} else if(string_prefix_is(field, "worker-end-time")) {
 		w->end_time = MAX(0, atoll(value));
 	} else if(string_prefix_is(field, "from-factory")) {
+		q->fetch_factory = 1;
 		w->factory_name = xxstrdup(value);
-		struct work_queue_factory_info *f = hash_table_lookup(q->factory_table, w->factory_name);
-		if (f) {
-			f->connected_workers++;
-		} else {
-			f = malloc(sizeof(*f));
-			if (f) {
-				f->name = xxstrdup(w->factory_name);
-				f->connected_workers = 1;
-				hash_table_insert(q->factory_table, w->factory_name, f);
+		struct work_queue_factory_info *f;
+		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
+			if (f->connected_workers + 1 > f->max_workers) {
+				shut_down_worker(q, w);
 			} else {
-				debug(D_WQ, "Failed to allocate memory for factory info");
+				f->connected_workers++;
 			}
+		} else {
+			f = create_factory_info(q, w->factory_name);
+			f->connected_workers++;
 		}
 	}
 
@@ -937,31 +944,87 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	return timeout;
 }
 
-static void remove_factory(struct work_queue_factory_info *f)
+static int factory_trim_workers(struct work_queue *q, struct work_queue_factory_info *f)
 {
-	free(f->name);
-	free(f);
+	if (!f) return 0;
+	assert(f->name);
+
+	// Iterate through all workers and shut idle ones down
+	struct work_queue_worker *w;
+	char *key;
+	int trimmed_workers = 0;
+
+	struct hash_table *idle_workers = hash_table_create(0, 0);
+	hash_table_firstkey(q->worker_table);
+	while ( f->connected_workers - trimmed_workers > f->max_workers &&
+			hash_table_nextkey(q->worker_table, &key, (void **) &w) ) {
+		if ( w->factory_name &&
+				!strcmp(f->name, w->factory_name) &&
+				itable_size(w->current_tasks) < 1 ) {
+			hash_table_insert(idle_workers, key, w);
+			trimmed_workers++;
+		}
+	}
+
+	hash_table_firstkey(idle_workers);
+	while (hash_table_nextkey(idle_workers, &key, (void **) &w)) {
+		hash_table_remove(idle_workers, key);
+		hash_table_firstkey(idle_workers);
+		shut_down_worker(q, w);
+	}
+	hash_table_delete(idle_workers);
+
+	debug(D_WQ, "Trimmed %d workers from %s", trimmed_workers, f->name);
+	return trimmed_workers;
+}
+
+static struct work_queue_factory_info *create_factory_info(struct work_queue *q, const char *name)
+{
+	struct work_queue_factory_info *f;
+	if ( (f = hash_table_lookup(q->factory_table, name)) ) return f;
+
+	f = malloc(sizeof(*f));
+	f->name = xxstrdup(name);
+	f->connected_workers = 0;
+	f->max_workers = INT_MAX;
+	f->seen_at_catalog = 0;
+	hash_table_insert(q->factory_table, name, f);
+	return f;
+}
+
+static void remove_factory_info(struct work_queue *q, const char *name)
+{
+	struct work_queue_factory_info *f = hash_table_lookup(q->factory_table, name);
+	if (f) {
+		free(f->name);
+		free(f);
+		hash_table_remove(q->factory_table, name);
+	} else {
+		debug(D_WQ, "Failed to remove unrecorded factory %s", name);
+	}
 }
 
 static void update_factory(struct work_queue *q, struct jx *j)
 {
 	const char *name = jx_lookup_string(j, "factory_name");
-	struct work_queue_factory_info *f;
-
-	if ( !(f = hash_table_lookup(q->factory_table, name)) ) {
-		// Create a new factory
-		debug(D_WQ, "new factory %s detected", name);
-		f = malloc(sizeof(*f));
-		if (!f) {
-			debug(D_NOTICE, "Cannot allocate memory for factory %s.", name);
-			return;
-		}
-		f->name = xxstrdup(name);
-		f->connected_workers = 0;
-		hash_table_insert(q->worker_table, f->name, f);
+	if (!name) return;
+	struct work_queue_factory_info *f = hash_table_lookup(q->factory_table, name);
+	if (!f) {
+		debug(D_WQ, "factory %s not recorded", name);
+		return;
 	}
 
-	return;
+	f->seen_at_catalog = 1;
+	int found = 0;
+	struct jx *m = jx_lookup_guard(j, "max_workers", &found);
+	if (found) {
+		int old_max_workers = f->max_workers;
+		f->max_workers = m->u.integer_value;
+		// Trim workers if max_workers reduced.
+		if (f->max_workers < old_max_workers) {
+			factory_trim_workers(q, f);
+		}
+	}
 }
 
 void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
@@ -973,14 +1036,15 @@ void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
 	int first_name = 1;
 	buffer_t filter;
 	buffer_init(&filter);
-	char **factory_name = NULL;
-	struct work_queue_factory_info **f = NULL;
+	char *factory_name = NULL;
+	struct work_queue_factory_info *f = NULL;
 	buffer_putfstring(&filter, "type == \"wq_factory\" && (");
 
 	hash_table_firstkey(q->factory_table);
-	while ( hash_table_nextkey(q->factory_table, factory_name, (void **) f) ) {
-		buffer_putfstring(&filter, "%sname == \"%s\"", first_name ? "" : " || " ,*factory_name);
+	while ( hash_table_nextkey(q->factory_table, &factory_name, (void **)&f) ) {
+		buffer_putfstring(&filter, "%sfactory_name == \"%s\"", first_name ? "" : " || ", factory_name);
 		first_name = 0;
+		f->seen_at_catalog = 0;
 	}
 	buffer_putfstring(&filter, ")");
 	jexpr = jx_parse_string(buffer_tolstring(&filter, NULL));
@@ -999,10 +1063,26 @@ void update_read_catalog_factory(struct work_queue *q, time_t stoptime) {
 		debug(D_WQ, "Failed to retrieve factory info from catalog server(s) at %s.", q->catalog_hosts);
 	}
 
+	// Remove outdated factories
+	struct list *outdated_factories = list_create();
+	hash_table_firstkey(q->factory_table);
+	while ( hash_table_nextkey(q->factory_table, &factory_name, (void **) &f) ) {
+		if ( !f->seen_at_catalog && f->connected_workers < 1 ) {
+			list_push_tail(outdated_factories, f);
+		}
+	}
+	while ( list_size(outdated_factories) ) {
+		f = list_pop_head(outdated_factories);
+		remove_factory_info(q, f->name);
+	}
+	list_delete(outdated_factories);
 }
 
 void update_write_catalog(struct work_queue *q, struct link *foreman_uplink)
 {
+	// Only write if we have a name.
+	if (!q->name) return; 
+
 	// Generate the manager status in an jx, and print it to a buffer.
 	struct jx *j = queue_to_jx(q,foreman_uplink);
 	char *str = jx_print_string(j);
@@ -1028,15 +1108,14 @@ void update_read_catalog(struct work_queue *q)
 {
 	time_t stoptime = time(0) + 5; // Short timeout for query
 
-	update_read_catalog_factory(q, stoptime);
+	if (q->fetch_factory) {
+		update_read_catalog_factory(q, stoptime);
+	}
 }
 
 void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
-	// Only advertise if we have a name.
-	if(!q->name) return;
-
-	// Only advertise every last_update_time seconds.
+	// Only update every last_update_time seconds.
 	if(!force_update && (time(0) - q->catalog_last_update_time) < WORK_QUEUE_UPDATE_INTERVAL)
 		return;
 
@@ -1199,12 +1278,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 	if (w->factory_name) {
 		struct work_queue_factory_info *f;
 		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
-			if (f->connected_workers == 1) {
-				hash_table_remove(q->factory_table, w->factory_name);
-				remove_factory(f);
-			} else {
-				f->connected_workers--;
-			}
+			f->connected_workers--;
 		}
 	}
 
@@ -3996,6 +4070,12 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		return 0;
 	}
 
+	if ( w->factory_name ) {
+		struct work_queue_factory_info *f;
+		f = hash_table_lookup(q->factory_table, w->factory_name);
+		if ( f && f->connected_workers > f->max_workers ) return 0;
+	}
+
 	if(w->type != WORKER_TYPE_FOREMAN) {
 		struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
 		if (info && info->blocked) {
@@ -4533,6 +4613,16 @@ static int receive_one_task( struct work_queue *q )
 		if( task_state_is(q, taskid, WORK_QUEUE_TASK_WAITING_RETRIEVAL) ) {
 			w = itable_lookup(q->worker_task_map, taskid);
 			fetch_output_from_worker(q, w, taskid);
+			// Shutdown worker if appropriate.
+			if ( w->factory_name ) {
+				struct work_queue_factory_info *f;
+				f = hash_table_lookup(q->factory_table, w->factory_name);
+				if ( f && f->connected_workers > f->max_workers &&
+						itable_size(w->current_tasks) < 1 ) {
+					debug(D_WQ, "Final task received from worker %s, shutting down.", w->hostname);
+					shut_down_worker(q, w);
+				}
+			}
 			return 1;
 		}
 	}
@@ -5710,6 +5800,7 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->worker_task_map = itable_create(0);
 
 	q->factory_table = hash_table_create(0, 0);
+	q->fetch_factory = 0;
 
 	q->measured_local_resources = rmsummary_create(-1);
 	q->current_max_worker       = rmsummary_create(-1);
@@ -6008,7 +6099,7 @@ void work_queue_delete(struct work_queue *q)
 		struct work_queue_factory_info *f;
 		hash_table_firstkey(q->factory_table);
 		while(hash_table_nextkey(q->factory_table, &key, (void **) &f)) {
-			remove_factory(f);
+			remove_factory_info(q, key);
 			hash_table_firstkey(q->factory_table);
 		}
 
