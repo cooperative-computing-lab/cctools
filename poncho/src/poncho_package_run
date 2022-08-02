@@ -207,6 +207,8 @@ then
         exit 1
     fi
 
+    source ${UNPACK_TO}/bin/activate
+
     if ! ${UNPACK_TO}/bin/conda-unpack
     then
         errmsg could not relocate environment: ${ENV_NAME}
@@ -214,7 +216,6 @@ then
     fi
 
     /bin/date > "${UNPACK_TO}"/.poncho_package_run_expanded
-    /bin/sync "${UNPACK_TO}"
 else
     logmsg directory ${UNPACK_TO} is not empty. Not expanding environment file again
 fi

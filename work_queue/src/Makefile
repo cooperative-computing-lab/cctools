@@ -12,7 +12,10 @@ SOURCES_LIBRARY = \
 	work_queue_json.c
 
 SOURCES_WORKER = \
+	work_queue_sandbox.o \
+	work_queue_cache.o \
 	work_queue_process.o \
+	work_queue_coprocess.o \
 	work_queue_watcher.o \
 	work_queue_gpus.o
 

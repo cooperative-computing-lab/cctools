@@ -602,8 +602,11 @@ int deltadb_query_execute_dir( struct deltadb_query *query, const char *logdir, 
 	int stopday = stoptm->tm_yday;
 
 	char *filename = string_format("%s/%d/%d.ckpt",logdir,year,day);
-	checkpoint_read(query,filename);
+	int ret = checkpoint_read(query,filename);
 	free(filename);
+	if (!ret) {
+		return 0;
+	}
 
 	while(1) {
 		char *filename = string_format("%s/%d/%d.log",logdir,year,day);
@@ -612,8 +615,9 @@ int deltadb_query_execute_dir( struct deltadb_query *query, const char *logdir, 
 			file_errors += 1;
 			fprintf(stderr,"couldn't open %s: %s\n",filename,strerror(errno));
 			free(filename);
-			if (file_errors>5)
-				break;
+			if (file_errors>5) {
+				return 0;
+			}
 
 		} else {
 			free(filename);

@@ -112,6 +112,8 @@ static struct rmsummary *resources = NULL;
 
 static int64_t factory_timeout = 0;
 
+static char *factory_name = NULL;
+
 struct batch_queue *queue = 0;
 
 // Whether workers should use ssl. If using the catalog server and the manager
@@ -385,11 +387,12 @@ static int submit_worker( struct batch_queue *queue )
 
 	if(using_catalog) {
 		cmd = string_format(
-		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s",
+		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s %s",
 		worker,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
+		factory_name ? string_format("--from-factory \"%s\"", factory_name) : "",
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
@@ -734,6 +737,8 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, int, JX_INTEGER, integer_value)
 
+	assign_new_value(new_factory_name, factory_name, factory-name, const char *, JX_STRING, string_value)
+
 	/* first try with old master option, then with manager */
 	assign_new_value(new_project_regex_old_opt, project_regex, master-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_project_regex, project_regex, manager-name, const char *, JX_STRING, string_value)
@@ -818,6 +823,11 @@ int read_config_file(const char *config_file) {
 		condor_requirements = xxstrdup(new_condor_requirements);
 	}
 
+	if(new_factory_name && new_factory_name != factory_name) {
+		free(factory_name);
+		factory_name = xxstrdup(new_factory_name);
+	}
+
 	last_time_modified = new_time_modified;
 	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
@@ -832,6 +842,10 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "tasks-per-worker: %d\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? (int) resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
 	fprintf(stdout, "cores: %s\n", rmsummary_resource_to_str("cores", resources->cores > 0 ? resources->cores : 1, 0));
+
+	if(factory_name) {
+		fprintf(stdout, "factory_name: %s\n", factory_name);
+	}
 
 	if(condor_requirements) {
 		fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
@@ -1117,7 +1131,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
 	printf(" %-30s Use runos tool to create environment (ND only).\n","--runos=<img>");
-	printf(" %-30s Run each worker inside this python package.\n","--python-package");
+	printf(" %-30s Run each worker inside this python environment.\n","--python-env=<file.tar.gz>");
 
 	printf("\nOptions specific to batch systems:\n");
 	printf(" %-30s Generic batch system options.\n", "-B,--batch-options=<options>");
@@ -1156,7 +1170,8 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_RUN_OS,
 		LONG_OPT_PARENT_DEATH,
 		LONG_OPT_PYTHON_PACKAGE,
-		LONG_OPT_USE_SSL
+		LONG_OPT_USE_SSL,
+		LONG_OPT_FACTORY_NAME
 	};
 
 static const struct option long_options[] = {
@@ -1191,7 +1206,8 @@ static const struct option long_options[] = {
 	{"min-workers", required_argument, 0, 'w'},
 	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 	{"password", required_argument, 0, 'P'},
-	{"python-package", required_argument, 0, LONG_OPT_PYTHON_PACKAGE},
+	{"python-env", required_argument, 0, LONG_OPT_PYTHON_PACKAGE},
+	{"python-package", required_argument, 0, LONG_OPT_PYTHON_PACKAGE}, //same as python-env, kept for compatibility
 	{"run-factory-as-manager", no_argument, 0, LONG_OPT_RUN_AS_MANAGER},
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{"scratch-dir", required_argument, 0, 'S' },
@@ -1203,6 +1219,7 @@ static const struct option long_options[] = {
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 	{"ssl",no_argument, 0, LONG_OPT_USE_SSL},
+	{"factory-name",required_argument, 0, LONG_OPT_FACTORY_NAME},
 	{0,0,0,0}
 };
 
@@ -1403,6 +1420,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_USE_SSL:
 				manual_ssl_option=1;
+				break;
+			case LONG_OPT_FACTORY_NAME:
+				factory_name = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);

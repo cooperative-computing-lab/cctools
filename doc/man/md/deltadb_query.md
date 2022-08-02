@@ -54,10 +54,10 @@ A paper entitled DeltaDB describes the operation of the tools in detail (see ref
 - **----output=_&lt;expr&gt;_**<br /> (multiple) Display this expression on the output.
 
 
-## JX QUERY LANGUAGE
+## JX EXPRESSION LANGUAGE
 
-The --filter, --where, and --output options all make use of the JX query language,
-which is described URL(here,http://cctools.readthedocs.io/jx).
+The --filter, --where, and --output options all make use of the JX expression language,
+which is described [here](http://cctools.readthedocs.io/jx).
 
 In addition, the --output clauses may contain one of the following reduction functions:
 
@@ -147,7 +147,7 @@ The raw event output of a query can be saved to a file, and then queried using t
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2022 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 

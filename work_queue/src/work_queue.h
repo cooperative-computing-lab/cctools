@@ -39,8 +39,6 @@ typedef enum {
 	WORK_QUEUE_NOCACHE  = 0, /**< Do not cache file at execution site. */
 	WORK_QUEUE_CACHE    = 1, /**< Cache file at execution site for later use. */
 	WORK_QUEUE_SYMLINK  = 2, /**< Create a symlink to the file rather than copying it, if possible. */
-	WORK_QUEUE_THIRDGET = 8, /**< Access the file on the client from a shared filesystem */
-	WORK_QUEUE_THIRDPUT = 8, /**< Access the file on the client from a shared filesystem (same as WORK_QUEUE_THIRDGET, included for readability) */
 	WORK_QUEUE_WATCH    = 16, /**< Watch the output file and send back changes as the task runs. */
 	WORK_QUEUE_FAILURE_ONLY = 32,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	WORK_QUEUE_SUCCESS_ONLY = 64, /**< Only return this output file if the task succeeded. */
@@ -95,25 +93,23 @@ typedef enum {
 } work_queue_file_t;
 
 
-/** Here we repeat the category_mode_t declaration but with work_queue names.
- * This is needed to generate uniform names in the API and bindings. */
+// Here we repeat the category_mode_t declaration but with work_queue names.
+// This is needed to generate uniform names in the API and bindings:
+
 typedef enum {
-/**< When monitoring is disabled, all tasks run as
-  WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
-  exhaustion occurs for specified resources values, then the task permanently fails. */
-    WORK_QUEUE_ALLOCATION_MODE_FIXED          = CATEGORY_ALLOCATION_MODE_FIXED,
-/**< When monitoring is enabled, tasks are tried with maximum specified values
-of cores, memory, disk or gpus until enough statistics are collected. Then,
-further tasks are first tried using the maximum values observed, and in case of
-resource exhaustion, they are retried using the maximum specified values. The
-task permanently fails when there is an exhaustion using the maximum values. If
-no maximum values are specified, the task will wait until a larger worker
-connects. */
-    WORK_QUEUE_ALLOCATION_MODE_MAX            = CATEGORY_ALLOCATION_MODE_MAX,
-/**< As above, but tasks are first tried with an automatically computed allocation to minimize resource waste. */
-    WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE      = CATEGORY_ALLOCATION_MODE_MIN_WASTE,
-/**< As above, but maximizing throughput. */
-    WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
+    WORK_QUEUE_ALLOCATION_MODE_FIXED          = CATEGORY_ALLOCATION_MODE_FIXED, /**< When monitoring is disabled, all tasks run as
+                                                                                  WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
+                                                                                  exhaustion occurs for specified resources values, then the task permanently fails. */
+    WORK_QUEUE_ALLOCATION_MODE_MAX            = CATEGORY_ALLOCATION_MODE_MAX, /**< When monitoring is enabled, tasks are tried with maximum specified values
+                                                                                of cores, memory, disk or gpus until enough statistics are collected. Then,
+                                                                                further tasks are first tried using the maximum values observed, and in case of
+                                                                                resource exhaustion, they are retried using the maximum specified values. The
+                                                                                task permanently fails when there is an exhaustion using the maximum values. If
+                                                                                no maximum values are specified, the task will wait until a larger worker
+                                                                                connects. */
+    WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE      = CATEGORY_ALLOCATION_MODE_MIN_WASTE, /**< As above, but tasks are first tried with an automatically
+                                                                                      computed allocation to minimize resource waste. */
+    WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT /**< As above, but maximizing throughput. */
 } work_queue_category_mode_t;
 
 
@@ -140,6 +136,8 @@ struct work_queue_task {
 	work_queue_result_t result;                       /**< The result of the task (see @ref work_queue_result_t */
 	char *host;                                       /**< The address and port of the host on which it ran. */
 	char *hostname;                                   /**< The name of the host on which it ran. */
+
+	char *coprocess;                                  /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
 
 	char *category;                         /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
 	category_allocation_t resource_request; /**< See @ref category_allocation_t */
@@ -361,8 +359,9 @@ struct work_queue;
 /** Create a new task object.
 Once created and elaborated with functions such as @ref work_queue_task_specify_file
 and @ref work_queue_task_specify_buffer, the task should be passed to @ref work_queue_submit.
-@param full_command The shell command line to be executed by the task.  If null,
-the command will be given later by @ref work_queue_task_specify_command
+@param full_command The shell command line or coprocess functions to be
+executed by the task.  If null, the command will be given later by @ref
+work_queue_task_specify_command
 @return A new task object, or null if it could not be created.
 */
 struct work_queue_task *work_queue_task_create(const char *full_command);
@@ -379,6 +378,13 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
 @param cmd The command to be executed.  This string will be duplicated by this call, so the argument may be freed or re-used afterward.
 */
 void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd );
+
+/** Indicate the command to be executed.
+@param t A task object.
+@param cmd The coprocess name that will execute the command at the worker. The task
+will only be sent to workers running the coprocess.
+*/
+void work_queue_task_specify_coprocess( struct work_queue_task *t, const char *coprocess_name );
 
 /** Add a file to a task.
 @param t A task object.
@@ -441,10 +447,24 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 */
 int work_queue_task_specify_directory(struct work_queue_task *t, const char *local_name, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags, int recursive);
 
+/** Add a url as an input for a task.
+@param t A task object.
+@param url The source URL to be accessed to provide the file.
+@param remote_name The name of the file as seen by the task.
+@param type Must be one of the following values:
+- @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
+- @ref WORK_QUEUE_OUTPUT is not currently supported.
+@param flags	May be zero to indicate no special handling or any of @ref work_queue_file_flags_t or'd together. The most common are:
+- @ref WORK_QUEUE_CACHE indicates that the file should be cached for later tasks. (recommended)
+- @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
+@return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
+*/
+int work_queue_task_specify_url(struct work_queue_task *t, const char *url, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags);
+
 /** Gets/puts file at remote_name using cmd at worker.
 @param t A task object.
-@param remote_name The name of the file as seen by the task.
 @param cmd The shell command to transfer the file. For input files, it should read the contents from remote_name via stdin. For output files, it should write the contents to stdout.
+@param remote_name The name of the file as seen by the task.
 @param type Must be one of the following values:
 - @ref WORK_QUEUE_INPUT to indicate an input file to be consumed by the task
 - @ref WORK_QUEUE_OUTPUT to indicate an output file to be produced by the task
@@ -453,7 +473,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 - @ref WORK_QUEUE_NOCACHE indicates that the file should not be cached for later tasks.
 @return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
 */
-int work_queue_task_specify_file_command(struct work_queue_task *t, const char *remote_name, const char *cmd, work_queue_file_type_t type, work_queue_file_flags_t flags);
+int work_queue_task_specify_file_command(struct work_queue_task *t, const char *cmd, const char *remote_name, work_queue_file_type_t type, work_queue_file_flags_t flags);
 
 /** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result WORK_QUEUE_RESULT_MAX_RETRIES.
 @param t A task object.

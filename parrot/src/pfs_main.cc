@@ -1210,8 +1210,8 @@ int main( int argc, char *argv[] )
 		for (int i = 0; environ[i]; i++)
 			fprintf(fp, "%s%c", environ[i], '\0');
 		char working_dir[PATH_MAX];
-		::getcwd(working_dir,sizeof(working_dir));
-		if(working_dir == NULL)
+		char *r = ::getcwd(working_dir,sizeof(working_dir));
+		if(!r)
 			fatal("Can not obtain the current working directory!");
 		fprintf(fp, "PWD=%s\n", working_dir);
 		fclose(fp);

@@ -126,6 +126,16 @@ class Task(object):
     def specify_command(self, command):
         return work_queue_task_specify_command(self._task, command)
 
+
+    ##
+    # Set the coprocess at the worker that should execute the task's command.
+    # This is not needed for regular tasks.
+    #
+    # @param self       Reference to the current task object.
+    # @param coprocess  The name of the coprocess.
+    def specify_coprocess(self, coprocess):
+        return work_queue_task_specify_coprocess(self._task, coprocess)
+
     ##
     # Set the worker selection algorithm for task.
     #
@@ -211,38 +221,76 @@ class Task(object):
         return work_queue_task_specify_file(self._task, local_name, remote_name, type, flags)
 
     ##
-    # Add a file to the task which will be transfered with a command at the worker.
+    # Add a url to the task which will be provided as an input file.
     #
     # @param self           Reference to the current task object.
+    # @param url            The url of the file to provide.
     # @param remote_name    The name of the file as seen by the task.
-    # @param cmd            The shell command to transfer the file. Any
-    #                       occurance of the string %% will be replaced with the
-    #                       internal name that work queue uses for the file.
-    # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
+    # @param type           Must be @ref WORK_QUEUE_INPUT.  (Output is not currently supported.)
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE (default)
     #                       - @ref WORK_QUEUE_CACHE
-    #                       - @ref WORK_QUEUE_WATCH
-    #                       - @ref WORK_QUEUE_FAILURE_ONLY
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     #
     # For example:
     # @code
-    # # The following are equivalent
-    # >>> task.specify_file_command("my.result", "chirp_put %% chirp://somewhere/result.file", type=WORK_QUEUE_OUTPUT)
+    # >>> task.specify_url("http://www.google.com/","google.txt",type=WORK_QUEUE_INPUT,flags=WORK_QUEUE_CACHE);
     # @endcode
-    def specify_file_command(self, remote_name, cmd, type=None, flags=None, cache=None, failure_only=None):
+
+    def specify_url(self, url, remote_name, type=None, flags=None, cache=None, failure_only=None):
+
         if type is None:
             type = WORK_QUEUE_INPUT
+
+        if type==WORK_QUEUE_OUTPUT:
+            raise ValueError("specify_url does not currently support output files.")
+        
+        # swig expects strings
+        if remote_name:
+            remote_name = str(remote_name)
+
+        if url:
+            url = str(url)
+
+        flags = Task._determine_file_flags(flags, cache, failure_only)
+        return work_queue_task_specify_url(self._task, url, remote_name, type, flags)
+
+
+    ##
+    # Add an input file produced by a Unix shell command.
+    # The command will be executed at the worker and produce
+    # a cacheable file that can be shared among multiple tasks.
+    #
+    # @param self           Reference to the current task object.
+    # @param command        The shell command which will produce the file.
+    #                       The command must contain the string %% which will be replaced with the cached location of the file.
+    # @param remote_name    The name of the file as seen by the task.
+    # @param type           Must be @ref WORK_QUEUE_INPUT.  (Output is not currently supported.)
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref work_queue_file_flags_t or'd together The most common are:
+    #                       - @ref WORK_QUEUE_NOCACHE (default)
+    #                       - @ref WORK_QUEUE_CACHE
+    # @param cache         Whether the file should be cached at workers (True/False)
+    #
+    # For example:
+    # @code
+    # >>> task.specify_file_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",type=WORK_QUEUE_INPUT,flags=WORK_QUEUE_CACHE);
+    # @endcode
+
+    def specify_file_command(self, cmd, remote_name, type=None, flags=None, cache=None, failure_only=None):
+        if type is None:
+            type = WORK_QUEUE_INPUT
+
+        if type==WORK_QUEUE_OUTPUT:
+            raise ValueError("specify_file_command does not currently support output files.")
 
         # swig expects strings
         if remote_name:
             remote_name = str(remote_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return work_queue_task_specify_file_command(self._task, remote_name, cmd, type, flags)
+        return work_queue_task_specify_file_command(self._task, cmd, remote_name, type, flags)
 
     ##
     # Add a file piece to the task.
@@ -953,7 +1001,7 @@ class PythonTask(Task):
 
             self.specify_input_file(self._env_file, cache=True)
             self.specify_input_file(self._pp_run, cache=True)
-    
+
     specify_package = specify_environment
 
     def __del__(self):
@@ -1724,6 +1772,8 @@ class WorkQueue(object):
     # @param self   Reference to the current work queue object.
     # @param task   A task description created from @ref work_queue::Task.
     def submit(self, task):
+        if isinstance(task, RemoteTask):
+            task.specify_buffer(json.dumps(task._event), "infile")
         taskid = work_queue_submit(self._work_queue, task._task)
         self._task_table[taskid] = task
         return taskid
@@ -1756,7 +1806,7 @@ class WorkQueue(object):
             task = self._task_table[int(task_pointer.taskid)]
             del self._task_table[task_pointer.taskid]
             return task
-        return None
+        return None            
 
     ##
     # Maps a function to elements in a sequence using work_queue
@@ -1781,16 +1831,22 @@ class WorkQueue(object):
                 p_task = PythonTask(map, fn, array[start:])
             else:
                 p_task = PythonTask(map, fn, array[start:end])
-
+            
+            p_task.specify_tag(str(i))
             self.submit(p_task)
             tasks[p_task.id] = i
+               
+        n = 0
+        for i in range(size+1):
+            while not self.empty() and n < size:
 
-        while not self.empty():
-            t = self.wait()
-            results[tasks[t.id]] = list(t.output)
+                t = self.wait_for_tag(str(i), 1)                
+                if t:
+                    results[tasks[t.id]] = list(t.output)
+                    n += 1
+                    break
 
         return [item for elem in results for item in elem]
-
 
     ##
     # Returns the values for a function of each pair from 2 sequences
@@ -1802,11 +1858,10 @@ class WorkQueue(object):
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
     def pair(self, fn, seq1, seq2, chunk_size=1, env=None):
-        def fpairs(fn, List):
             results = []
 
-            for item in List:
-                results.append(fn(item))
+            for p in s:    
+                results.append(fn(p))
 
             return results
        
@@ -1818,15 +1873,15 @@ class WorkQueue(object):
         num_task = 0
 
         for item in itertools.product(seq1, seq2):
+
             if num == chunk_size:
                 p_task = PythonTask(fpairs, fn, task)
-
                 if env:
                     p_task.specify_environment(env)
                 
+                p_task.specify_tag(str(num_task))
                 self.submit(p_task)
-                tasks[p_task.id] = num_task
-                
+                tasks[p_task.id] = num_task                
                 num = 0
                 num_task += 1
                 task.clear()
@@ -1836,13 +1891,22 @@ class WorkQueue(object):
 
         if len(task) > 0:
             p_task = PythonTask(fpairs, fn, task)
+            p_task.specify_tag(str(num_task))
             self.submit(p_task)
             tasks[p_task.id] = num_task
+            num_task += 1
 
-        while not self.empty():
-            t = self.wait()
-            results[tasks[t.id]] = t.output
+        n = 0
+        for i in range(num_task):
 
+            while not self.empty() and n < num_task:
+                t = self.wait_for_tag(str(i), 10)
+
+                if t:
+                    results[tasks[t.id]] = t.output
+                    n += 1
+                    break
+ 
         return [item for elem in results for item in elem]
 
 
@@ -1861,12 +1925,9 @@ class WorkQueue(object):
     # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
 
     def tree_reduce(self, fn, seq, chunk_size=2): 
-
-        # parallel function
         tasks = {}
         
         while len(seq) > 1:
-
             size = math.ceil(len(seq)/chunk_size)
             results = [None] * size
         
@@ -1879,17 +1940,206 @@ class WorkQueue(object):
                 else:
                     p_task = PythonTask(fn, seq[start:end])
 
+                p_task.specify_tag(str(i))
                 self.submit(p_task)
                 tasks[p_task.id] = i
 
-            while not self.empty():
-                t = self.wait()
-                results[tasks[t.id]] = t.output
+            n = 0
+            for i in range(size+1):
+
+                while not self.empty() and n < size:
+                    t = self.wait_for_tag(str(i), 10)
+
+                    if t:
+                        results[tasks[t.id]] = t.output
+                        n += 1
+                        break
 
             seq = results
 
         return seq[0]
-           
+
+    ##
+    # Maps a function to elements in a sequence using work_queue remote task 
+    #
+    # Similar to regular map function in python, but creates a task to execute each function on a worker running a coprocess
+    #
+    # @param self       Reference to the current work queue object.
+    # @param fn         The function that will be called on each element. This function exists in coprocess.
+    # @param seq        The sequence that will call the function
+    # @param coprocess  The name of the coprocess that contains the function fn.
+    # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
+    # @param chunk_size The number of elements to process at once
+    def remote_map(self, fn, array, coprocess, name, chunk_size=1):
+        size = math.ceil(len(array)/chunk_size)
+        results = [None] * size
+        tasks = {}
+
+        for i in range(size):
+            start = i*chunk_size
+            end = min(len(array), start+chunk_size)
+
+            event = json.dumps({name : array[start:end]})
+            p_task = RemoteTask(fn, event, coprocess)
+            
+            p_task.specify_tag(str(i))
+            self.submit(p_task)
+            tasks[p_task.id] = i
+               
+        n = 0
+        for i in range(size+1):
+            while not self.empty() and n < size:
+                t = self.wait_for_tag(str(i), 1)                
+                if t:
+                    results[tasks[t.id]] = list(json.loads(t.output)["Result"])
+                    n += 1
+                    break
+
+        return [item for elem in results for item in elem]
+
+
+    ##
+    # Returns the values for a function of each pair from 2 sequences using remote task
+    #
+    # The pairs that are passed into the function are generated by itertools
+    #
+    # @param self     Reference to the current work queue object.
+    # @param fn       The function that will be called on each element. This function exists in coprocess.
+    # @param seq1     The first seq that will be used to generate pairs
+    # @param seq2     The second seq that will be used to generate pairs
+    # @param coprocess  The name of the coprocess that contains the function fn.
+    # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
+    # @param chunk_size The number of elements to process at once
+    def remote_pair(self, fn, seq1, seq2, coprocess, name, chunk_size=1):
+        size = math.ceil((len(seq1) * len(seq2))/chunk_size)
+        results = [None] * size
+        tasks = {}
+        task = []
+        num = 0
+        num_task = 0
+
+        for item in itertools.product(seq1, seq2):
+            if num == chunk_size:
+                event = json.dumps({name : task})
+                p_task = RemoteTask(fn, event, coprocess)
+                p_task.specify_tag(str(num_task))
+                self.submit(p_task)
+                tasks[p_task.id] = num_task                
+                num = 0
+                num_task += 1
+                task.clear()
+
+            task.append(item)
+            num += 1
+
+        if len(task) > 0:
+            event = json.dumps({name : task})
+            p_task = RemoteTask(fn, event, coprocess)
+            p_task.specify_tag(str(num_task))
+            self.submit(p_task)
+            tasks[p_task.id] = num_task
+            num_task += 1
+
+        n = 0
+        for i in range(num_task):
+            while not self.empty() and n < num_task:
+                t = self.wait_for_tag(str(i), 10)
+                if t:
+                    results[tasks[t.id]] = json.loads(t.output)["Result"]
+                    n += 1
+                    break
+         
+        return [item for elem in results for item in elem]
+    
+    ##
+    # Reduces a sequence until only one value is left, and then returns that value.
+    # The sequence is reduced by passing a pair of elements into a function and
+    # then stores the result. It then makes a sequence from the results, and
+    # reduces again until one value is left. Executes on coprocess
+    #
+    # If the sequence has an odd length, the last element gets reduced at the
+    # end.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param fn         The function that will be called on each element. Exists on the coprocess
+    # @param seq        The seq that will be reduced
+    # @param coprocess  The name of the coprocess that contains the function fn.
+    # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
+    # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
+    def remote_tree_reduce(self, fn, seq, coprocess, name, chunk_size=2): 
+        tasks = {}
+        
+        while len(seq) > 1:
+            size = math.ceil(len(seq)/chunk_size)
+            results = [None] * size
+
+            for i in range(size):
+                start = i*chunk_size
+                end = min(len(seq), start+chunk_size)
+
+                event = json.dumps({name : seq[start:end]})
+                p_task = RemoteTask(fn, event, coprocess)
+
+                p_task.specify_tag(str(i))
+                self.submit(p_task)
+                tasks[p_task.id] = i
+
+            n = 0
+            for i in range(size+1):
+
+                while not self.empty() and n < size:
+                    t = self.wait_for_tag(str(i), 10)
+
+                    if t:
+                        results[tasks[t.id]] = json.loads(t.output)["Result"]
+                        n += 1
+                        break
+
+            seq = results
+
+        return seq[0]
+
+##
+# \class RemoteTask
+#
+# Python RemoteTask object
+#
+# This class is used to create a task that will execute on a worker running a coprocess
+class RemoteTask(Task):
+    ##
+    # Create a new remote task specification.
+    #
+    # @param self       Reference to the current remote task object.
+    # @param fn         The name of the function to be executed on the coprocess
+    # @param coprocess  The name of the coprocess which has the function you wish to execute. The coprocess should have a name() method that returns this
+    # @param
+    # @param command    The shell command line to be exected by the task.
+    # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
+    # @param kwargs	    keyword arguments used in function to be executed by task. 
+    def __init__(self, fn, coprocess, *args, **kwargs):
+        Task.__init__(self, fn)
+        self._event = {}
+        self._event["fn_kwargs"] = kwargs
+        self._event["fn_args"] = args
+        Task.specify_coprocess(self, coprocess)
+    ##
+    # Specify function arguments. Accepts arrays and dictionarys. This overrides any arguments passed during task creation
+    # @param self             Reference to the current remote task object
+    # @param args             An array of positional args to be passed to the function
+    # @param kwargs           A dictionary of keyword arguments to be passed to the function
+    def specify_fn_args(self, args=[], kwargs={}):
+        self._event["fn_kwargs"] = kwargs
+        self._event["fn_args"] = args
+    ##
+    # Specify how the remote task should execute
+    # @param self                     Reference to the current remote task object
+    # @param remote_task_exec_method  Can be one of "fork", "direct", or "thread". Fork creates a child process to execute the function, direct has the worker directly call the function, and thread spawns a thread to execute the function
+    def specify_exec_method(self, remote_task_exec_method):
+        if remote_task_exec_method not in ["fork", "direct", "thread"]:
+            print("Error, work_queue_exec_method must be one of fork, direct, or thread")
+        self._event["remote_task_exec_method"] = remote_task_exec_method
+
+
 
 # test
 
@@ -1944,6 +2194,7 @@ class Factory(object):
         "mesos-preload",
         "min-workers",
         "password",
+        "python-env",
         "python-package",
         "run-factory-as-manager",
         "runos",
@@ -2003,6 +2254,8 @@ class Factory(object):
         self._set_manager(manager_name, manager_host_port)
         self._opts['batch-type'] = batch_type
         self._opts['worker-binary'] = self._find_exe(worker_binary, 'work_queue_worker')
+        self._opts['scratch-dir'] = None
+
         self._factory_binary = self._find_exe(factory_binary, 'work_queue_factory')
 
     def _set_manager(self, manager_name, manager_host_port):

@@ -1,3 +1,5 @@
+![](../logos/workqueue-logo.png)
+
 # Work Queue User's Manual
 
 ## Overview
@@ -1376,6 +1378,58 @@ warranted:
     }
     ```
 
+### Fetching Input Data via URL
+
+Tasks can fetch remote data named by a URL into the worker's cache.
+For example, if you have a large dataset provided by a web server,
+use `specify_url` to attach the URL to a local file.  The data
+will be downloaded once per worker and then shared among all
+tasks that require it:
+
+
+=== "Python"
+    ```python
+    t.specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=WORK_QUEUE_INPUT, cache=True)
+    ```
+
+=== "Perl"
+    ```perl
+    $t->specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=WORK_QUEUE_INPUT, flags=wq.WORK_QUEUE_CACHE)
+    ```
+
+=== "C"
+    ```c
+    work_queue_task_specify_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
+    ```
+
+(Note that `specify_url` does not currently support output data.)
+
+### Fetching Input Data via Command
+
+Input data for tasks can also be produced at the worker by arbitrary
+shell commands.  The output of these commands can be cached and shared
+among multiple tasks. This is particularly useful for unpacking or
+post-processing downloaded data.  For example, to download `data.tar.gz` from
+a URL and then unpack into the directory `data`:
+
+
+=== "Python"
+    ```python
+    t.specify_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , type=WORK_QUEUE_INPUT, cache=True)
+    ```
+
+=== "Perl"
+    ```perl
+    $t->specify_file_command("curl http://somewhere.com/data.txt | tar cvzf -", "data", type=wq.WORK_QUEUE_INPUT, flags=wq.WORK_QUEUE_CACHE)
+    ```
+
+=== "C"
+    ```c
+    work_queue_task_specify_file_command(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
+    ```
+
+(Note that `specify_file_command` does not currently support output data.)
+
 ### Watching Output Files
 
 If you would like to see the output of a task as it is produced, add
@@ -1667,7 +1721,9 @@ q.treeReduce(fn, arry, chunk_size)
 
 Below is an example of all three abstractions, and their expected output:
 
+```
 --8<-- "work_queue/examples/wq_python_abstractions.py"
+```
 
 Run:
 ```
@@ -1791,17 +1847,18 @@ tasks. It is activated as follows:
 The first few lines of the log document the possible log records:
 
 ```text
-# time master_pid MASTER START|END
-# time master_pid WORKER worker_id host:port CONNECTION
-# time master_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)
-# time master_pid WORKER worker_id RESOURCES {resources}
-# time master_pid CATEGORY name MAX {resources_max_per_task}
-# time master_pid CATEGORY name MIN {resources_min_per_task_per_worker}
-# time master_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
-# time master_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}
-# time master_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
-# time master_pid TASK taskid WAITING_RETRIEVAL worker_address
-# time master_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
+# time manager_pid MANAGER START|END
+# time manager_pid WORKER worker_id host:port CONNECTION
+# time manager_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT
+# time manager_pid WORKER worker_id RESOURCES {resources}
+# time manager_pid CATEGORY name MAX {resources_max_per_task}
+# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}
+# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
+# time manager_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}
+# time manager_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
+# time manager_pid TASK taskid WAITING_RETRIEVAL worker_address
+# time manager_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
+# time manager_pid TRANSFER (INPUT|OUTPUT) taskid cache_flag sizeinmb walltime filename
 ```
 
 Lowercase words indicate values, and uppercase indicate constants. A bar (|) inside parentheses indicate a choice of possible constants. Variables encased in braces {} indicate a JSON dictionary. Here is an example of the first few records of a transactions log:
@@ -1826,84 +1883,123 @@ $ grep 'TASK \<1\>' my.tr.log
 
 The statistics available are:
 
-| Field | Description
-|-------|------------
-|-      | **Stats for the current state of workers**
-| workers_connected;	   | Number of workers currently connected to the manager.
-| workers_init;          | Number of workers connected, but that have not send their available resources report yet
-| workers_idle;          | Number of workers that are not running a task.
-| workers_busy;          | Number of workers that are running at least one task.
-| workers_able;          | Number of workers on which the largest task can run.
-| 
-|-      | **Cumulative stats for workers**
-| workers_joined;        | Total number of worker connections that were established to the manager.
-| workers_removed;       | Total number of worker connections that were released by the manager, idled-out, fast-aborted, or lost.
-| workers_released;      | Total number of worker connections that were asked by the manager to disconnect.
-| workers_idled_out;     | Total number of worker that disconnected for being idle.
-| workers_fast_aborted;  | Total number of worker connections terminated for being too slow.
-| workers_blacklisted ;  | Total number of workers blacklisted by the manager. (Includes fast-aborted.)
-| workers_lost;          | Total number of worker connections that were unexpectedly lost. (does not include idled-out or fast-aborted)
-| 
-|-      | **Stats for the current state of tasks**
-| tasks_waiting;         | Number of tasks waiting to be dispatched.
-| tasks_on_workers;      | Number of tasks currently dispatched to some worker.
-| tasks_running;         | Number of tasks currently executing at some worker.
-| tasks_with_results;    | Number of tasks with retrieved results and waiting to be returned to user.
-| 
-|-      | **Cumulative stats for tasks**
-| tasks_submitted;            | Total number of tasks submitted to the queue.
-| tasks_dispatched;           | Total number of tasks dispatch to workers.
-| tasks_done;                 | Total number of tasks completed and returned to user. (includes tasks_failed)
-| tasks_failed;               | Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS.
-| tasks_cancelled;            | Total number of tasks cancelled.
-| tasks_exhausted_attempts;   | Total number of task executions that failed given resource exhaustion.
-| 
-| - | **Manager time statistics (in microseconds)**
-| time_when_started;  | Absolute time at which the manager started.
-| time_send;          | Total time spent in sending tasks to workers (tasks descriptions, and input files.).
-| time_receive;       | Total time spent in receiving results from workers (output files.).
-| time_send_good;     | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS.
-| time_receive_good;  | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS.
-| time_status_msgs;   | Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc.
-| time_internal;      | Total time the queue spents in internal processing.
-| time_polling;       | Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message).
-| time_application;   | Total time spent outside work_queue_wait.
-| 
-| - | **Wrokers time statistics (in microseconds)**
-| time_workers_execute;             | Total time workers spent executing done tasks.
-| time_workers_execute_good;        | Total time workers spent executing done tasks with result WQ_RESULT_SUCCESS.
-| time_workers_execute_exhaustion;  | Total time workers spent executing tasks that exhausted resources.
-| 
-| - | **Transfer statistics**
-| bytes_sent;      | Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the manager.
-| bytes_received;  | Total number of file bytes (not including protocol control msg bytes) received from the workers by the manager.
-|  bandwidth;       | Average network bandwidth in MB/S observed by the manager when transferring to workers.
-| 
-| - | **Resources statistics**
-| capacity_tasks;      | The estimated number of tasks that this manager can effectively support.
-| capacity_cores;      | The estimated number of workers' cores that this manager can effectively support.
-| capacity_memory;     | The estimated number of workers' MB of RAM that this manager can effectively support.
-| capacity_disk;       | The estimated number of workers' MB of disk that this manager can effectively support.
-| capacity_instantaneous;       | The estimated number of tasks that this manager can support considering only the most recently completed task.
-| capacity_weighted;   | The estimated number of tasks that this manager can support placing greater weight on the most recently completed task.
-| 
-| total_cores;       | Total number of cores aggregated across the connected workers.
-| total_memory;      | Total memory in MB aggregated across the connected workers.
-| total_disk;	       | Total disk space in MB aggregated across the connected workers.
-| 
-| committed_cores;   | Committed number of cores aggregated across the connected workers.
-| committed_memory;  | Committed memory in MB aggregated across the connected workers.
-| committed_disk;	   | Committed disk space in MB aggregated across the connected workers.
-| 
-| max_cores;         | The highest number of cores observed among the connected workers.
-| max_memory;        | The largest memory size in MB observed among the connected workers.
-| max_disk;          | The largest disk space in MB observed among the connected workers.
-| 
-| min_cores;         | The lowest number of cores observed among the connected workers.
-| min_memory;        | The smallest memory size in MB observed among the connected workers.
-| min_disk;          | The smallest disk space in MB observed among the connected workers.
-| 
-| manager_load;       | In the range of [0,1]. If close to 1, then the manager is at full load and spends most of its time sending and receiving taks, and thus cannot accept connections from new workers. If close to 0, the manager is spending most of its time waiting for something to happen.
+| Field | Description |
+|-------|-------------|
+|       | **Stats for the current state of workers** |
+| workers_connected	    | Number of workers currently connected to the manager |
+| workers_init          | Number of workers connected, but that have not send their available resources report yet |
+| workers_idle          | Number of workers that are not running a task |
+| workers_busy          | Number of workers that are running at least one task |
+| workers_able          | Number of workers on which the largest task can run |
+|||
+|       | **Cumulative stats for workers** |
+| workers_joined        | Total number of worker connections that were established to the manager |
+| workers_removed       | Total number of worker connections that were released by the manager, idled-out, fast-aborted, or lost |
+| workers_released      | Total number of worker connections that were asked by the manager to disconnect |
+| workers_idled_out     | Total number of worker that disconnected for being idle |
+| workers_fast_aborted  | Total number of worker connections terminated for being too slow |
+| workers_blacklisted   | Total number of workers blacklisted by the manager (includes fast-aborted) |
+| workers_lost          | Total number of worker connections that were unexpectedly lost (does not include idled-out or fast-aborted) |
+|||
+|       | **Stats for the current state of tasks** |
+| tasks_waiting         | Number of tasks waiting to be dispatched |
+| tasks_on_workers      | Number of tasks currently dispatched to some worker |
+| tasks_running         | Number of tasks currently executing at some worker |
+| tasks_with_results    | Number of tasks with retrieved results and waiting to be returned to user |
+|||
+|       | **Cumulative stats for tasks** |
+| tasks_submitted            | Total number of tasks submitted to the queue |
+| tasks_dispatched           | Total number of tasks dispatch to workers |
+| tasks_done                 | Total number of tasks completed and returned to user (includes tasks_failed) |
+| tasks_failed               | Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS |
+| tasks_cancelled            | Total number of tasks cancelled |
+| tasks_exhausted_attempts   | Total number of task executions that failed given resource exhaustion |
+|||
+|       | **Manager time statistics (in microseconds)** |
+| time_when_started  | Absolute time at which the manager started |
+| time_send          | Total time spent in sending tasks to workers (tasks descriptions, and input files) |
+| time_receive       | Total time spent in receiving results from workers (output files) |
+| time_send_good     | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS |
+| time_receive_good  | Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS |
+| time_status_msgs   | Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. |
+| time_internal      | Total time the queue spents in internal processing |
+| time_polling       | Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message) |
+| time_application   | Total time spent outside work_queue_wait |
+|||
+|       | **Wrokers time statistics (in microseconds)** |
+| time_workers_execute             | Total time workers spent executing done tasks |
+| time_workers_execute_good        | Total time workers spent executing done tasks with result WQ_RESULT_SUCCESS |
+| time_workers_execute_exhaustion  | Total time workers spent executing tasks that exhausted resources |
+|||
+|       | **Transfer statistics** |
+| bytes_sent      | Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the manager |
+| bytes_received  | Total number of file bytes (not including protocol control msg bytes) received from the workers by the manager |
+| bandwidth       | Average network bandwidth in MB/S observed by the manager when transferring to workers |
+|||
+|       | **Resources statistics** |
+| capacity_tasks      | The estimated number of tasks that this manager can effectively support |
+| capacity_cores      | The estimated number of workers' cores that this manager can effectively support |
+| capacity_memory     | The estimated number of workers' MB of RAM that this manager can effectively support |
+| capacity_disk       | The estimated number of workers' MB of disk that this manager can effectively support |
+| capacity_instantaneous       | The estimated number of tasks that this manager can support considering only the most recently completed task |
+| capacity_weighted   | The estimated number of tasks that this manager can support placing greater weight on the most recently completed task |
+|||
+| total_cores       | Total number of cores aggregated across the connected workers |
+| total_memory      | Total memory in MB aggregated across the connected workers |
+| total_disk	    | Total disk space in MB aggregated across the connected workers |
+|||
+| committed_cores   | Committed number of cores aggregated across the connected workers |
+| committed_memory  | Committed memory in MB aggregated across the connected workers |
+| committed_disk    | Committed disk space in MB aggregated across the connected workers |
+|||
+| max_cores         | The highest number of cores observed among the connected workers |
+| max_memory        | The largest memory size in MB observed among the connected workers |
+| max_disk          | The largest disk space in MB observed among the connected workers |
+|||
+| min_cores         | The lowest number of cores observed among the connected workers |
+| min_memory        | The smallest memory size in MB observed among the connected workers |
+| min_disk          | The smallest disk space in MB observed among the connected workers |
+|||
+| manager_load       | In the range of [0,1]. If close to 1, then the manager is at full load <br /> and spends most of its time sending and receiving taks, and thus <br /> cannot accept connections from new workers. If close to 0, the <br /> manager is spending most of its time waiting for something to happen. |
+
+The script `work_queue_graph_workers` is an interactive visualization tool for
+Work Queue transaction logs based on Python `bokeh` package. It can be used to
+visualize the life time of tasks and workers, as well as diagnosing the effects
+of file transfer time on overall performance. See
+[work_queue_graph_workers(1)](../man_pages/work_queue_graph_workers.md) for
+detailed information.
+
+## Specialized and Experimental Settings
+
+The behaviour of Work Queue can be tuned by the following parameters. We advise
+caution when using these parameters, as the standard behaviour may drastically
+change.
+
+| Parameter | Description | Default Value |
+|-----------|-------------|---------------|
+| category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes<br>after encountering a new resource maximum. | 25 |
+| force-proportional-resources | When task with requirement r of resources is allocated in a worker,<br>divide the resources of the worker evenly so that only a whole number<br> of tasks with requirement r fit in the worker. <br> Use in conjunction with [task resources](#task-resources) | 0 |
+| hungry-minimum          | Smallest number of waiting tasks in the queue before declaring it hungry | 10 |
+| resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
+| wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
+| wait-retrieve-many      | Rather than immediately returning when a task is done, `q.wait(timeout)` retrieves and dispatches as many tasks<br> as `timeout` allows. Warning: This may exceed the capacity of the manager to receive results. | 0 |
+
+=== "Python"
+    ```python
+    q.tune("hungry-minumum", 20)
+    ```
+
+=== "Perl"
+    ```perl
+    $q->tune("hungry-minumum", 20)
+    ```
+
+=== "C"
+    ```
+    work_queue_tune(q, "hungry-minumum", 20)
+    ```
+
+
 
 ## Further Information
 

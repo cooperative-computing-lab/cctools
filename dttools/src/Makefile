@@ -43,6 +43,7 @@ SOURCES = \
 	fast_popen.c \
 	fd.c \
 	file_cache.c \
+	file_link_recursive.c \
 	full_io.c \
 	get_canonical_path.c \
 	get_line.c \
@@ -136,6 +137,7 @@ HEADERS_PUBLIC = \
 	debug.h \
 	envtools.h \
 	fast_popen.h \
+	file_link_recursive.h \
 	full_io.h \
 	getopt.h \
 	getopt_aux.h \
@@ -190,6 +192,12 @@ all: $(TARGETS) catalog_query
 libdttools.a: $(OBJECTS)
 
 $(MOST_PROGRAMS) $(TEST_PROGRAMS): libdttools.a
+
+jx_parse.o: jx_parse.c
+	$(CCTOOLS_CC) -O3 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
+
+jx.o: jx.c
+	$(CCTOOLS_CC) -O3 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
 
 jx_repl: jx_repl.o libdttools.a
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE) $(CCTOOLS_READLINE_LDFLAGS)

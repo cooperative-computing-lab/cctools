@@ -83,7 +83,7 @@ and involving 84 replicas in the temperature range 278 to 400K using the sample 
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2022 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 

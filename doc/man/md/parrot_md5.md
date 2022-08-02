@@ -55,7 +55,7 @@ To retrieve the **MD5** checksum of a file stored on a **chirp** server:
 
 ## COPYRIGHT
 
-The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2022 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 

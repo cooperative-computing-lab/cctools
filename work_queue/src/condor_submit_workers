@@ -118,7 +118,7 @@ error = worker.\$(PROCESS).error
 log = workers.log
 +JobMaxSuspendTime = 0
 
-$(printf ${class_ads})
+$(printf "%b" "${class_ads}" 2> /dev/null)
 
 # Some programs assume some variables are set, like HOME, so we export the
 # environment variables with the job.  Comment the next line if you do not want

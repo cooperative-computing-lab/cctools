@@ -2,7 +2,7 @@ site_name: CCTools Documentation
 site_url: https://cctools.readthedocs.io/en/latest
 
 author: Cooperative Computing Lab at the University of Notre Dame
-copyright: Copyright (C) 2021 The University of Notre Dame
+copyright: Copyright (C) 2022 The University of Notre Dame
 
 nav:
     - Getting Started:
@@ -12,7 +12,7 @@ nav:
     - Software:
         - Makeflow: 'makeflow/index.md'
         - Work Queue: 'work_queue/index.md' 
-        - JX Language: 'jx/index.md'
+        - JX Workflow Language: 'jx-workflow/index.md'
         - Resource Monitor: 'resource_monitor/index.md'
         - Parrot: 'parrot/index.md'
         - Chirp: 'chirp/index.md'
@@ -26,7 +26,7 @@ nav:
     - Reference:
         - Man Pages: 'man_pages.md'
         - Network Configuration: 'network/index.md'
-        - JX Reference: 'jx/index.md'
+        - JX Expression Language: 'jx/index.md'
         - Chirp Reference: 'chirp/chirp_protocol.md'
         - API Reference: 'http://ccl.cse.nd.edu/software/manuals/api/html/index.html'
 

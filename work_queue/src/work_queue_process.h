@@ -25,6 +25,7 @@ struct work_queue_process {
 	timestamp_t execution_start;
 	timestamp_t execution_end;
 
+	char *cache_dir;
 	char *sandbox;
 	char *tmpdir;                   // TMPDIR per task, expected to be a subdir of sandbox.
 	char *output_file_name;
@@ -43,6 +44,10 @@ struct work_queue_process {
 
 	/* state between complete disk measurements. */
 	struct path_disk_size_info *disk_measurement_state;
+
+	/* variables for coprocess funciton calls */
+	char *coprocess_name;
+	int coprocess_port;
 };
 
 struct work_queue_process * work_queue_process_create( struct work_queue_task *task, int disk_allocation );

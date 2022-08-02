@@ -32,7 +32,7 @@ The program exits once EOF is reached or after the user enters the `quit` or `ex
 
 
 const char * MSG_WELCOME =
-    "Welcome to the JX Language Explorer.\n"
+    "Welcome to the JX REPL.\n"
     "\n"
     "Type 'help' for help\n"
     "\n";
@@ -120,6 +120,9 @@ int main(int argc, char *argv[]) {
     char in_prompt[18];
     char out_prompt[18];
     char line[MAX_LINE];
+
+    // Enable external functions such as "fetch".
+    jx_eval_enable_external(1);
 
     struct jx *context = jx_object(0);
     insert_constants(context);

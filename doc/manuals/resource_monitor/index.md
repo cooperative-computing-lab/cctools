@@ -1,3 +1,5 @@
+![](../logos/resource-monitor-logo.png)
+
 # Resource Monitor User's Manual
 
 ## Overview

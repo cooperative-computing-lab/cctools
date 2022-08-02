@@ -31,6 +31,7 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "jx_getopt.h"
 #include "jx_print.h"
+#include "jx_eval.h"
 #include "create_dir.h"
 #include "sha1.h"
 #include "tlq_config.h"
@@ -1405,6 +1406,9 @@ int main(int argc, char *argv[])
 	MPI_Init(&argc,&argv);
 #endif
 
+	// Enable external functions like fetch and listdir.
+	jx_eval_enable_external(1);
+
 	random_init();
 	debug_config(argv[0]);
 	debug_config_file_size(0);//to set debug file size to "don't delete anything"
@@ -2644,6 +2648,13 @@ EXIT_WITH_FAILURE:
 		batch_queue_delete(local_queue);
 
 	makeflow_log_close(d);
+
+	/* clean up allocated objects to satisfy valgrind */
+	if(logfilename) free(logfilename);
+	if(batchlogfilename) free(batchlogfilename);
+	jx_delete(jx_args);
+	jx_delete(base_hook_args);
+
         
 	exit(exit_value);
         

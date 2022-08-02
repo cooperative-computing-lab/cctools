@@ -98,6 +98,28 @@ struct process_info *process_waitpid( pid_t pid, int timeout)
 	return 0;
 }
 
+int process_kill_waitpid(pid_t pid, int timeout)
+{
+	int current_signal = SIGTERM; // start by sending SIGTERM, move on to SIGKILL
+	struct process_info* p; // return value from process_waitpid
+	while (kill(pid, current_signal) == 0) { // send signal to process
+		if (current_signal == SIGKILL) { // if we have already attempted to send SIGTERM and SIGKILL, we should give up
+			break;
+		}
+		current_signal = SIGKILL; // on the next attempt, we will send a SIGKILL to the child process
+		p = process_waitpid(pid, timeout);
+		if (p) { // successfully waited process with given PID 
+			free(p);
+			return 1;
+		}
+		else // if 0 is returned, no such PID was waited for in timeout seconds
+		{
+			continue;
+		}
+	}
+	return 0;
+}
+
 void process_putback(struct process_info *p)
 {
 	if(!complete_list)

@@ -122,7 +122,7 @@ Worker environment options:
 - **--wrapper=_&lt;cmd&gt;_**<br />
  Wrap factory with this command prefix.
 - **--wrapper-input=_&lt;file&gt;_**<br /> Add this input file needed by the wrapper.
-- **--python-package=_&lt;pkg&gt;_**<br /> Run each worker inside this python package.
+- **--python-env=_&lt;file.tar.gz&gt;_**<br /> Run each worker inside this python environment.
 
 
 Options  specific to batch systems:
@@ -211,7 +211,7 @@ The capacity measurement currently assumes single-core tasks running on single-c
 workers, and behaves unexpectedly with multi-core tasks or multi-core workers.
 
 ## COPYRIGHT
-The Cooperative Computing Tools are Copyright (C) 2005-2021 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2005-2022 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 
