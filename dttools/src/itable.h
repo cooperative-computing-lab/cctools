@@ -95,6 +95,13 @@ void *itable_lookup(struct itable *h, UINT64_T key);
 
 void *itable_remove(struct itable *h, UINT64_T key);
 
+/** Remove any one value.
+@param h A pointer to an integer table.
+@return One object removed from the table.
+*/
+
+void * itable_pop( struct itable *t );
+
 /** Begin iteration over all keys.
 This function begins a new iteration over an integer table,
 allowing you to visit every key and value in the table.

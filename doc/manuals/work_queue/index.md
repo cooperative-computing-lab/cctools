@@ -1378,6 +1378,58 @@ warranted:
     }
     ```
 
+### Fetching Input Data via URL
+
+Tasks can fetch remote data named by a URL into the worker's cache.
+For example, if you have a large dataset provided by a web server,
+use `specify_url` to attach the URL to a local file.  The data
+will be downloaded once per worker and then shared among all
+tasks that require it:
+
+
+=== "Python"
+    ```python
+    t.specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=WORK_QUEUE_INPUT, cache=True)
+    ```
+
+=== "Perl"
+    ```perl
+    $t->specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=WORK_QUEUE_INPUT, flags=wq.WORK_QUEUE_CACHE)
+    ```
+
+=== "C"
+    ```c
+    work_queue_task_specify_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
+    ```
+
+(Note that `specify_url` does not currently support output data.)
+
+### Fetching Input Data via Command
+
+Input data for tasks can also be produced at the worker by arbitrary
+shell commands.  The output of these commands can be cached and shared
+among multiple tasks. This is particularly useful for unpacking or
+post-processing downloaded data.  For example, to download `data.tar.gz` from
+a URL and then unpack into the directory `data`:
+
+
+=== "Python"
+    ```python
+    t.specify_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , type=WORK_QUEUE_INPUT, cache=True)
+    ```
+
+=== "Perl"
+    ```perl
+    $t->specify_file_command("curl http://somewhere.com/data.txt | tar cvzf -", "data", type=wq.WORK_QUEUE_INPUT, flags=wq.WORK_QUEUE_CACHE)
+    ```
+
+=== "C"
+    ```c
+    work_queue_task_specify_file_command(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
+    ```
+
+(Note that `specify_file_command` does not currently support output data.)
+
 ### Watching Output Files
 
 If you would like to see the output of a task as it is produced, add
@@ -1669,7 +1721,9 @@ q.treeReduce(fn, arry, chunk_size)
 
 Below is an example of all three abstractions, and their expected output:
 
+```
 --8<-- "work_queue/examples/wq_python_abstractions.py"
+```
 
 Run:
 ```
@@ -1914,6 +1968,38 @@ visualize the life time of tasks and workers, as well as diagnosing the effects
 of file transfer time on overall performance. See
 [work_queue_graph_workers(1)](../man_pages/work_queue_graph_workers.md) for
 detailed information.
+
+## Specialized and Experimental Settings
+
+The behaviour of Work Queue can be tuned by the following parameters. We advise
+caution when using these parameters, as the standard behaviour may drastically
+change.
+
+| Parameter | Description | Default Value |
+|-----------|-------------|---------------|
+| category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes<br>after encountering a new resource maximum. | 25 |
+| force-proportional-resources | When task with requirement r of resources is allocated in a worker,<br>divide the resources of the worker evenly so that only a whole number<br> of tasks with requirement r fit in the worker. <br> Use in conjunction with [task resources](#task-resources) | 0 |
+| hungry-minimum          | Smallest number of waiting tasks in the queue before declaring it hungry | 10 |
+| resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
+| wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
+| wait-retrieve-many      | Rather than immediately returning when a task is done, `q.wait(timeout)` retrieves and dispatches as many tasks<br> as `timeout` allows. Warning: This may exceed the capacity of the manager to receive results. | 0 |
+
+=== "Python"
+    ```python
+    q.tune("hungry-minumum", 20)
+    ```
+
+=== "Perl"
+    ```perl
+    $q->tune("hungry-minumum", 20)
+    ```
+
+=== "C"
+    ```
+    work_queue_tune(q, "hungry-minumum", 20)
+    ```
+
+
 
 ## Further Information
 

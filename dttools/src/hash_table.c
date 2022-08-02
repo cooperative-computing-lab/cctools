@@ -55,7 +55,7 @@ struct hash_table *hash_table_create(int bucket_count, hash_func_t func)
 	return h;
 }
 
-void hash_table_clear(struct hash_table *h)
+void hash_table_clear(struct hash_table *h, void (*delete_func) ( void *) )
 {
 	struct entry *e, *f;
 	int i;
@@ -64,6 +64,7 @@ void hash_table_clear(struct hash_table *h)
 		e = h->buckets[i];
 		while(e) {
 			f = e->next;
+			if(delete_func) delete_func(e->value);
 			free(e->key);
 			free(e);
 			e = f;
@@ -78,7 +79,7 @@ void hash_table_clear(struct hash_table *h)
 
 void hash_table_delete(struct hash_table *h)
 {
-	hash_table_clear(h);
+	hash_table_clear(h,0);
 	free(h->buckets);
 	free(h);
 }

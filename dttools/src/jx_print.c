@@ -145,7 +145,7 @@ void jx_print_subexpr( struct jx *j, jx_operator_t parent, buffer_t *b )
 
 	int do_parens = 0;
 
-	if(j->type==JX_OPERATOR && jx_operator_precedence(parent) < jx_operator_precedence(j->u.oper.type)) {
+	if(j->type==JX_OPERATOR && jx_operator_precedence(parent) > jx_operator_precedence(j->u.oper.type)) {
 		do_parens = 1;
 	} else {
 		do_parens = 0;

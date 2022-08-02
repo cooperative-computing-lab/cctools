@@ -201,8 +201,8 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 				set_first_element(down_hosts);
 				while((n = set_next_element(down_hosts))) {
 					if(!strcmp(n, h->host)) {
-						free(n);
 						set_remove(down_hosts, n);
+						free(n);
 						break;
 					}
 				}
