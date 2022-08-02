@@ -43,6 +43,7 @@ typedef enum {
 	WORK_QUEUE_FAILURE_ONLY = 32,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	WORK_QUEUE_SUCCESS_ONLY = 64, /**< Only return this output file if the task succeeded. */
 
+	WORK_QUEUE_TEMPORARY = 128,  /**< This file will be left at the worker to be consumed by a later task. */
 	WORK_QUEUE_PREEXIST = 4 /**< If the filename already exists on the host, use it in place. (Warning: Internal work queue use only.) */
 } work_queue_file_flags_t;
 

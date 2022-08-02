@@ -300,15 +300,17 @@ struct blocklist_host_info {
 
 struct remote_file_info {
 	work_queue_file_t type;
+	work_queue_file_flags_t flags;
 	int64_t           size;
 	time_t            mtime;
 	timestamp_t       transfer_time;
 };
 
-struct remote_file_info * remote_file_info_create( work_queue_file_t type, int64_t size, time_t mtime )
+struct remote_file_info * remote_file_info_create( work_queue_file_t type, work_queue_file_flags_t flags, int64_t size, time_t mtime )
 {
 	struct remote_file_info *rinfo = malloc(sizeof(*rinfo));
 	rinfo->type = type;
+	rinfo->flags = flags;
 	rinfo->size = size;
 	rinfo->mtime = mtime;
 	rinfo->transfer_time = 0;
@@ -1575,7 +1577,7 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 	if(result == WQ_SUCCESS && f->flags & WORK_QUEUE_CACHE) {
 		struct stat local_info;
 		if (stat(f->payload,&local_info) == 0) {
-			struct remote_file_info *remote_info = remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
+			struct remote_file_info *remote_info = remote_file_info_create(f->type,f->flags,local_info.st_size,local_info.st_mtime);
 			hash_table_insert(w->current_files, f->cached_name, remote_info);
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno));
@@ -1604,6 +1606,9 @@ static work_queue_result_code_t get_output_files( struct work_queue *q, struct w
  			// skip success-only files on failure
 			if(f->flags&WORK_QUEUE_SUCCESS_ONLY && !task_succeeded) continue;
 
+			// skip temporary output files that stay on worker
+			if(f->flags&WORK_QUEUE_TEMPORARY) continue;
+			
 			// otherwise, get the file.
 			result = get_output_file(q,w,t,f);
 
@@ -1670,8 +1675,8 @@ static void delete_task_output_files(struct work_queue *q, struct work_queue_wor
 
 static void delete_uncacheable_files( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
 {
-	delete_worker_files(q, w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
-	delete_worker_files(q, w, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+	delete_worker_files(q, w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_TEMPORARY | WORK_QUEUE_PREEXIST);
+	delete_worker_files(q, w, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_TEMPORARY | WORK_QUEUE_PREEXIST);
 }
 
 char *monitor_file_name(struct work_queue *q, struct work_queue_task *t, const char *ext) {
@@ -3393,7 +3398,7 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
 
 		if(result == WQ_SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
-			remote_info = remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
+			remote_info = remote_file_info_create(tf->type,tf->flags,local_info.st_size,local_info.st_mtime);
 			hash_table_insert(w->current_files, tf->cached_name, remote_info);
 		}
 
@@ -3495,7 +3500,7 @@ static work_queue_result_code_t send_special_if_not_cached( struct work_queue *q
 	send_worker_msg(q,w,"%s %s %s %d %o\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777);
 
 	if(tf->flags & WORK_QUEUE_CACHE) {
-		struct remote_file_info *remote_info = remote_file_info_create(tf->type,tf->length,time(0));
+		struct remote_file_info *remote_info = remote_file_info_create(tf->type,tf->flags,tf->length,time(0));
 		hash_table_insert(w->current_files,tf->cached_name,remote_info);
 	}
 
