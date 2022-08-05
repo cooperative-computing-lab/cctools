@@ -4,35 +4,35 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-""" Python-WorkQueue test """
+""" Python-DataSwarm test """
 
-from work_queue import Task, WorkQueue, set_debug_flag
-from work_queue import WORK_QUEUE_SCHEDULE_FCFS, WORK_QUEUE_SCHEDULE_FILES
-from work_queue import WORK_QUEUE_RANDOM_PORT
-from work_queue import WORK_QUEUE_OUTPUT
-#from workqueue import WORK_QUEUE_MASTER_MODE_STANDALONE, WORK_QUEUE_WORKER_MODE_SHARED
-from work_queue import WORK_QUEUE_TASK_ORDER_LIFO
+from work_queue import Task, DataSwarm, set_debug_flag
+from work_queue import DS_SCHEDULE_FCFS, DS_SCHEDULE_FILES
+from work_queue import DS_RANDOM_PORT
+from work_queue import DS_OUTPUT
+#from dataswarm import DS_MASTER_MODE_STANDALONE, DS_WORKER_MODE_SHARED
+from work_queue import DS_TASK_ORDER_LIFO
 
 import os
 import sys
 import time
 
 set_debug_flag('debug')
-set_debug_flag('wq')
+set_debug_flag('ds')
 
-wq = WorkQueue(WORK_QUEUE_RANDOM_PORT, name='workqueue_example', catalog=True, exclusive=False)
+ds = DataSwarm(DS_RANDOM_PORT, name='dataswarm_example', catalog=True, exclusive=False)
 os.environ['PATH'] = '../../../work_queue/src:' + os.environ['PATH']
-os.system('work_queue_worker -d all localhost %d &' % wq.port)
+os.system('ds_worker -d all localhost %d &' % ds.port)
 
-print wq.name
+print ds.name
 
-wq.specify_algorithm(WORK_QUEUE_SCHEDULE_FCFS)
-#wq.specify_name('workqueue_example')
-#wq.specify_manager_mode(WORK_QUEUE_MASTER_MODE_STANDALONE)
-#wq.specify_worker_mode(WORK_QUEUE_WORKER_MODE_SHARED)
-wq.specify_task_order(WORK_QUEUE_TASK_ORDER_LIFO)
+ds.specify_algorithm(DS_SCHEDULE_FCFS)
+#ds.specify_name('dataswarm_example')
+#ds.specify_manager_mode(DS_MASTER_MODE_STANDALONE)
+#ds.specify_worker_mode(DS_WORKER_MODE_SHARED)
+ds.specify_task_order(DS_TASK_ORDER_LIFO)
 
-if wq.empty():
+if ds.empty():
     print 'work queue is empty'
 
 outputs = []
@@ -45,43 +45,43 @@ for i in range(5):
     task.specify_tag(str(time.time()))
     print task.command, task.tag
 
-    task.specify_algorithm(WORK_QUEUE_SCHEDULE_FILES)
+    task.specify_algorithm(DS_SCHEDULE_FILES)
     print task.command, task.algorithm
 
     task.specify_buffer('hello from %d' % i, ifile, cache=False)
     if i % 2:
 	task.specify_output_file(ofile, cache=False)
     else:
-	task.specify_file(ofile, type=WORK_QUEUE_OUTPUT, cache=False)
+	task.specify_file(ofile, type=DS_OUTPUT, cache=False)
 
     outputs.append(ofile)
-    wq.submit(task)
+    ds.submit(task)
 
-if wq.empty():
+if ds.empty():
     print 'work queue is empty'
 
-while not wq.empty():
-    t = wq.wait(10)
+while not ds.empty():
+    t = ds.wait(10)
     if t:
 	print t.tag
 
-    print wq.stats.workers_init, wq.stats.workers_ready, wq.stats.workers_busy, \
-	  wq.stats.tasks_running, wq.stats.tasks_waiting, wq.stats.tasks_complete
+    print ds.stats.workers_init, ds.stats.workers_ready, ds.stats.workers_busy, \
+	  ds.stats.tasks_running, ds.stats.tasks_waiting, ds.stats.tasks_complete
 
 map(os.unlink, outputs)
 
 for i in range(5):
     task = Task('hostname && date +%s.%N')
     task.specify_input_file('/bin/hostname')
-    wq.submit(task)
+    ds.submit(task)
 
-if wq.hungry():
+if ds.hungry():
     print 'work queue is hungry'
 
-wq.activate_fast_abort(1.5)
+ds.activate_fast_abort(1.5)
 
-while not wq.empty():
-    t = wq.wait(1)
+while not ds.empty():
+    t = ds.wait(1)
     if t:
 	print t.id, t.return_status, t.result, t.host
 	print t.submit_time, t.finish_time, t.app_delay
@@ -92,12 +92,12 @@ while not wq.empty():
 	print t.cmd_execution_time
 	print t.output
 
-    print wq.stats.workers_init, wq.stats.workers_ready, wq.stats.workers_busy, \
-	  wq.stats.tasks_running, wq.stats.tasks_waiting, wq.stats.tasks_complete
+    print ds.stats.workers_init, ds.stats.workers_ready, ds.stats.workers_busy, \
+	  ds.stats.tasks_running, ds.stats.tasks_waiting, ds.stats.tasks_complete
 
-wq.shutdown_workers(0)
+ds.shutdown_workers(0)
 
-print wq.stats.total_tasks_dispatched, wq.stats.total_tasks_complete, \
-      wq.stats.total_workers_joined, wq.stats.total_workers_removed
+print ds.stats.total_tasks_dispatched, ds.stats.total_tasks_complete, \
+      ds.stats.total_workers_joined, ds.stats.total_workers_removed
 
 # vim: sts=4 sw=4 ts=8 ft=python

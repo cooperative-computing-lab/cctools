@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "work_queue.h"
+#include "ds_manager.h"
 
 #include "cctools.h"
 #include "debug.h"
@@ -25,26 +25,26 @@ See the file COPYING for details.
 #include <unistd.h>
 
 
-void work_queue_mainloop( struct work_queue *q )
+void ds_mainloop( struct ds_manager *q )
 {
-	struct work_queue_task *t;
+	struct ds_task *t;
 	int i;
 
 	for(i=0;i<10;i++) {
 		char output[256];
 		sprintf(output,"output.%d",i);
-		t = work_queue_task_create("./trickle.sh");
-		work_queue_task_specify_file(t, "trickle.sh", "trickle.sh", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE );
-		work_queue_task_specify_file(t, output, "output", WORK_QUEUE_OUTPUT, WORK_QUEUE_WATCH );
-		work_queue_submit(q, t);
+		t = ds_task_create("./trickle.sh");
+		ds_task_specify_file(t, "trickle.sh", "trickle.sh", DS_INPUT, DS_CACHE );
+		ds_task_specify_file(t, output, "output", DS_OUTPUT, DS_WATCH );
+		ds_submit(q, t);
 	}
 
 
-	work_queue_submit(q,t);
+	ds_submit(q,t);
 
-	while(!work_queue_empty(q)) {
-		t = work_queue_wait(q,5);
-		if(t) work_queue_task_delete(t);
+	while(!ds_empty(q)) {
+		t = ds_wait(q,5);
+		if(t) ds_task_delete(t);
 	}
 }
 

@@ -6,8 +6,8 @@ set -e
 python=${CCTOOLS_PYTHON_TEST_EXEC}
 python_dir=${CCTOOLS_PYTHON_TEST_DIR}
 
-STATUS_FILE=wq.status
-PORT_FILE=wq.port
+STATUS_FILE=ds.status
+PORT_FILE=ds.port
 
 
 check_needed()
@@ -36,14 +36,14 @@ prepare()
 run()
 {
 	# send makeflow to the background, saving its exit status.
-	(PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} wq_test.py $PORT_FILE; echo $? > $STATUS_FILE) &
+	(PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} ds_test.py $PORT_FILE; echo $? > $STATUS_FILE) &
 
-	# wait at most 15 seconds for wq to find a port.
+	# wait at most 15 seconds for ds to find a port.
 	wait_for_file_creation $PORT_FILE 15
 
 	run_local_worker $PORT_FILE worker.log
 
-	# wait for wq to exit.
+	# wait for ds to exit.
 	wait_for_file_creation $STATUS_FILE 15
 
 	# retrieve makeflow exit status

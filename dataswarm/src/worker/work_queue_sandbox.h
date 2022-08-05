@@ -1,11 +1,11 @@
-#ifndef WORK_QUEUE_SANDBOX_H
-#define WORK_QUEUE_SANDBOX_H
+#ifndef DS_SANDBOX_H
+#define DS_SANDBOX_H
 
-#include "work_queue_process.h"
-#include "work_queue_cache.h"
+#include "ds_process.h"
+#include "ds_cache.h"
 #include "link.h"
 
-int work_queue_sandbox_stagein( struct work_queue_process *p, struct work_queue_cache *c, struct link *manager );
-int work_queue_sandbox_stageout( struct work_queue_process *p, struct work_queue_cache *c );
+int ds_sandbox_stagein( struct ds_process *p, struct ds_cache *c, struct link *manager );
+int ds_sandbox_stageout( struct ds_process *p, struct ds_cache *c );
 
 #endif

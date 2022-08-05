@@ -1,9 +1,9 @@
-#include "work_queue_gpus.h"
-#include "work_queue_resources.h"
+#include "ds_gpus.h"
+#include "ds_resources.h"
 #include "buffer.h"
 #include "debug.h"
 
-extern struct work_queue_resources *total_resources;
+extern struct ds_resources *total_resources;
 
 /* Array tracks which task is assigned to each GPU. */
 static int *gpu_to_task = 0;
@@ -14,7 +14,7 @@ Note that this may be called many times,
 but should only initialized once.
 */
 
-void work_queue_gpus_init( int ngpus )
+void ds_gpus_init( int ngpus )
 {
 	if(!gpu_to_task) gpu_to_task = calloc(ngpus,sizeof(int));
 }
@@ -23,7 +23,7 @@ void work_queue_gpus_init( int ngpus )
 Display the GPUs associated with each task.
 */
 
-void work_queue_gpus_debug()
+void ds_gpus_debug()
 {
 	buffer_t b;
 	buffer_init(&b);
@@ -41,7 +41,7 @@ void work_queue_gpus_debug()
 Free all of the GPUs associated with this taskid.
 */
 
-void work_queue_gpus_free( int taskid )
+void ds_gpus_free( int taskid )
 {
 	int i;
 	for(i=0;i<total_resources->gpus.total;i++) {
@@ -58,7 +58,7 @@ accurately tracked: this function will fatal()
 if not enough are available.
 */
 
-void work_queue_gpus_allocate( int n, int task )
+void ds_gpus_allocate( int n, int task )
 {
 	int i;
 	for(i=0;i<total_resources->gpus.total && n>0;i++) {
@@ -68,9 +68,9 @@ void work_queue_gpus_allocate( int n, int task )
 		}
 	}
 
-	if(n>0) fatal("work_queue_gpus_allocate: accounting error: ran out of gpus to assign!");
+	if(n>0) fatal("ds_gpus_allocate: accounting error: ran out of gpus to assign!");
 
-	work_queue_gpus_debug();
+	ds_gpus_debug();
 }
 
 /*
@@ -79,7 +79,7 @@ For example, if GPUs 1 and 3 are allocated, return "1,3"
 This string must be freed after use.
 */
 
-char *work_queue_gpus_to_string( int taskid )
+char *ds_gpus_to_string( int taskid )
 {
 	int i;
 	int first = 1;

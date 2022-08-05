@@ -4,7 +4,7 @@ ulimit -c 400000000
 # Benchmark Parameters
 
 # Name of this benchmark. The generated makeflow would be $proj.makeflow.  The
-# project name returned by work_queue_status would be $user-$proj-$worker.
+# project name returned by ds_status would be $user-$proj-$worker.
 # $user is the unix login username and $worker is the number of workers are
 # provided for the corresponding run.
 proj="load1"
@@ -92,10 +92,10 @@ gen_makeflow () {
 	fi
 }
 
-gen_wqlog_gnuplot () {
+gen_dslog_gnuplot () {
 	# Generate gnuplot script
 	echo "set terminal png
-	set output \"$wqlogplot\"
+	set output \"$dslogplot\"
 
 	set title \"In: $in $unit.B. Exe: $exe sec Out: $out $unit.B. Tasks: $num Workers $1 \"
 
@@ -108,15 +108,15 @@ gen_wqlog_gnuplot () {
 
 	set yrange [0:${yrange_max}]
 
-	plot \"$makeflow.wqlog.queue\" using (\$2 / 1000000):(\$3+\$4+\$5) title \"workers connected\" with lines lt 1 lw 3 , \\
-		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):6 title \"task running\" with lines lt 2 lw 3, \\
-		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):(\$15 * 100) title \"calculated efficiency\" with lines lt 3 lw 3, \\
-		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):(\$16 * 100) title \"idle percentage\" with lines lt 4 lw 3, \\
-		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):17 title \"estimated capacity\" with lines lt 5 lw 3, \\
-		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):18 title \"reliable capacity\" with lines lt 6 lw 3, \\
-		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):19 title \"workers joined\" with lines lt 7 lw 3, \\
-		 \"$makeflow.wqlog.queue\" using (\$2 / 1000000):20 title \"workers removed\" with lines lt 8 lw 3
-	" > $wqloggnuplot
+	plot \"$makeflow.dslog.queue\" using (\$2 / 1000000):(\$3+\$4+\$5) title \"workers connected\" with lines lt 1 lw 3 , \\
+		 \"$makeflow.dslog.queue\" using (\$2 / 1000000):6 title \"task running\" with lines lt 2 lw 3, \\
+		 \"$makeflow.dslog.queue\" using (\$2 / 1000000):(\$15 * 100) title \"calculated efficiency\" with lines lt 3 lw 3, \\
+		 \"$makeflow.dslog.queue\" using (\$2 / 1000000):(\$16 * 100) title \"idle percentage\" with lines lt 4 lw 3, \\
+		 \"$makeflow.dslog.queue\" using (\$2 / 1000000):17 title \"estimated capacity\" with lines lt 5 lw 3, \\
+		 \"$makeflow.dslog.queue\" using (\$2 / 1000000):18 title \"reliable capacity\" with lines lt 6 lw 3, \\
+		 \"$makeflow.dslog.queue\" using (\$2 / 1000000):19 title \"workers joined\" with lines lt 7 lw 3, \\
+		 \"$makeflow.dslog.queue\" using (\$2 / 1000000):20 title \"workers removed\" with lines lt 8 lw 3
+	" > $dsloggnuplot
 }
 
 gen_runtime_gnuplot () {
@@ -171,19 +171,19 @@ run_experiments () {
 		for i in "${workers[@]}"; do
 			name=lyu2-$proj-$i
 			if [ "$auto_worker_pool" = "yes" ]; then
-				work_queue_factory -T condor -f -a -N $name $i
+				ds_factory -T condor -f -a -N $name $i
 			fi
-			makeflow -T wq -d all -a -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
+			makeflow -T ds -d all -a -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
 			# Custom catalog server version: (replace the above 2 commands with the below ones)
-			# work_queue_factory -T condor -f -a -C cclweb01.cse.nd.edu:9097 -N $name $i
-			# makeflow -T wq -d all -a -C cclweb01.cse.nd.edu:9097 -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
+			# ds_factory -T condor -f -a -C cclweb01.cse.nd.edu:9097 -N $name $i
+			# makeflow -T ds -d all -a -C cclweb01.cse.nd.edu:9097 -N $name -r $retry_max $arg $makeflow &> $makeflow.stdout.stderr
 
 			# Get turnaround time
 			started=`grep 'STARTED' $makeflowlog | awk '{print $3}'`
 			completed=`grep 'COMPLETED' $makeflowlog | awk '{print $3}'`
 			duration=`bc <<< "$completed - $started"`
 			# Get observed efficiendy
-			efficiency=`tail -1 $wqlog.queue | awk '{print $15}'`
+			efficiency=`tail -1 $dslog.queue | awk '{print $15}'`
 			# Do some statistics
 			echo $in $exe $out $num $i $duration $efficiency >> $statistics
 
@@ -191,7 +191,7 @@ run_experiments () {
 			rm -rf $dir
 			mkdir -p ${dir}
 
-			mv $makeflow.stdout.stderr $makeflowlog $wqlog $dir/
+			mv $makeflow.stdout.stderr $makeflowlog $dslog $dir/
 			cp $makeflow $dir/
 
 			makeflow -c $makeflow
@@ -225,11 +225,11 @@ gen_plots () {
 			dir=$in.$exe.$out.$num.$arg_name.w$i
 			cd $dir
 
-			cat $wqlog | grep QUEUE > $wqlog.queue
-			gen_wqlog_gnuplot $i
-			gnuplot < $wqloggnuplot
+			cat $dslog | grep QUEUE > $dslog.queue
+			gen_dslog_gnuplot $i
+			gnuplot < $dsloggnuplot
 
-			mv $wqlogplot ../$plotdir/$i.png
+			mv $dslogplot ../$plotdir/$i.png
 			cd ..
 		done
 		cd ..
@@ -249,9 +249,9 @@ projresult="$proj.result"
 makeflow="$proj.$in.$exe.$out.$num.makeflow"
 makeflowlog="$makeflow.makeflowlog"
 
-wqlog="$makeflow.wqlog"
-wqloggnuplot="$wqlog.gnuplot"
-wqlogplot="$wqlog.png"
+dslog="$makeflow.dslog"
+dsloggnuplot="$dslog.gnuplot"
+dslogplot="$dslog.png"
 
 runtimegnuplot="$proj.$in.$exe.$out.$num.runtimes.gnuplot"
 runtimeplot="$proj.$in.$exe.$out.$num.runtimes.png"
@@ -275,7 +275,7 @@ run_experiments
 gen_plots
 
 # Clean Up
-rm -rf $wqloggnuplot $makeflow
+rm -rf $dsloggnuplot $makeflow
 
 
 # vim: set noexpandtab tabstop=4:

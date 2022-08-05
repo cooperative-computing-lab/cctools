@@ -5,12 +5,12 @@ import os
 
 work_queue.set_debug_flag('all')
 
-wq = work_queue.WorkQueue(port=work_queue.WORK_QUEUE_RANDOM_PORT, exclusive=False, shutdown=True)
-wq.specify_name('test')
+ds = work_queue.DataSwarm(port=work_queue.DS_RANDOM_PORT, exclusive=False, shutdown=True)
+ds.specify_name('test')
 
 for i in range(5):
     task = work_queue.Task('date')
-    task.specify_algorithm(work_queue.WORK_QUEUE_SCHEDULE_FCFS)
+    task.specify_algorithm(work_queue.DS_SCHEDULE_FCFS)
     task.specify_tag('current date/time [%d]' % i)
     task.specify_input_file('/bin/date')
 
@@ -19,14 +19,14 @@ for i in range(5):
     print task.command
     print task.tag
 
-    wq.submit(task)
+    ds.submit(task)
 
 os.environ['PATH'] = '../../../work_queue/src:' + os.environ['PATH']
-os.system('work_queue_worker -d all -t 5 localhost %d &' % wq.port)
+os.system('ds_worker -d all -t 5 localhost %d &' % ds.port)
 
-while not wq.empty():
+while not ds.empty():
     print '** wait for task'
-    task = wq.wait(1)
+    task = ds.wait(1)
     if task:
 	print 'task'
 	print 'algorithm', task.algorithm
@@ -51,22 +51,22 @@ while not wq.empty():
 	print task.cmd_execution_time
 	del task
     print '** work queue'
-    print wq.stats.workers_init
-    print wq.stats.workers_ready
-    print wq.stats.workers_busy
-    print wq.stats.tasks_running
-    print wq.stats.tasks_waiting
-    print wq.stats.tasks_complete
-    print wq.stats.total_tasks_dispatched
-    print wq.stats.total_tasks_complete
-    print wq.stats.total_workers_joined
-    print wq.stats.total_workers_removed
-    print wq.stats.total_bytes_sent
-    print wq.stats.total_bytes_received
-    print wq.stats.total_send_time
-    print wq.stats.total_receive_time
-    print wq.stats.efficiency
-    print wq.stats.idle_percentage
-    print wq.stats.capacity
-    print wq.stats.avg_capacity
-    print wq.stats.total_workers_connected
+    print ds.stats.workers_init
+    print ds.stats.workers_ready
+    print ds.stats.workers_busy
+    print ds.stats.tasks_running
+    print ds.stats.tasks_waiting
+    print ds.stats.tasks_complete
+    print ds.stats.total_tasks_dispatched
+    print ds.stats.total_tasks_complete
+    print ds.stats.total_workers_joined
+    print ds.stats.total_workers_removed
+    print ds.stats.total_bytes_sent
+    print ds.stats.total_bytes_received
+    print ds.stats.total_send_time
+    print ds.stats.total_receive_time
+    print ds.stats.efficiency
+    print ds.stats.idle_percentage
+    print ds.stats.capacity
+    print ds.stats.avg_capacity
+    print ds.stats.total_workers_connected

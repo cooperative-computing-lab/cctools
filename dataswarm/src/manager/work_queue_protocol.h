@@ -4,15 +4,15 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-/** @file work_queue_protocol.h
+/** @file ds_protocol.h
 This file describes a handful of constants that are necessary for
 a common implementation of the work queue protocol between the manager,
 worker, and catalog, but should not be visible to the WQ user API.
 This file should not be installed and should only be included by .c files.
 */
 
-#ifndef WORK_QUEUE_PROTOCOL_H
-#define WORK_QUEUE_PROTOCOL_H
+#ifndef DS_PROTOCOL_H
+#define DS_PROTOCOL_H
 
 /* 4: added invalidate-file message, for cache management.    */
 /* 5: added wall_time, end_time messages, for task maximum running time. */
@@ -23,12 +23,12 @@ This file should not be installed and should only be included by .c files.
 /* 10: added coprocess message. */
 /* 11: added url/command as a file source, added cache-update/invalidate */
 
-#define WORK_QUEUE_PROTOCOL_VERSION 11
+#define DS_PROTOCOL_VERSION 11
 
-#define WORK_QUEUE_LINE_MAX 4096       /**< Maximum length of a work queue message line. */
-#define WORK_QUEUE_POOL_NAME_MAX 128   /**< Maximum length of a work queue pool name. */
+#define DS_LINE_MAX 4096       /**< Maximum length of a work queue message line. */
+#define DS_POOL_NAME_MAX 128   /**< Maximum length of a work queue pool name. */
 #define WORKER_WORKSPACE_NAME_MAX 2048   /**< Maximum length of a work queue worker's workspace name. */
 
-#define WORK_QUEUE_PROTOCOL_FIELD_MAX 256
+#define DS_PROTOCOL_FIELD_MAX 256
 
 #endif

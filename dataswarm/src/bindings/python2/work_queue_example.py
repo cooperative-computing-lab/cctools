@@ -4,7 +4,7 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-# This program is a very simple example of how to use Work Queue.
+# This program is a very simple example of how to use Data Swarm.
 # It accepts a list of files on the command line.
 # Each file is compressed with gzip and returned to the user.
 
@@ -16,7 +16,7 @@ import sys
 # Main program
 if __name__ == '__main__':
   if len(sys.argv) < 2:
-    print("work_queue_example <file1> [file2] [file3] ...")
+    print("ds_example <file1> [file2] [file3] ...")
     print("Each file given on the command line will be compressed using a remote worker.")
     sys.exit(1)
 
@@ -37,9 +37,9 @@ if __name__ == '__main__':
   # been used by another program, you can try setting port = 0 to use an
   # available port.
   try:
-      q = WorkQueue(port = WORK_QUEUE_DEFAULT_PORT)
+      q = DataSwarm(port = DS_DEFAULT_PORT)
   except:
-      print("Instantiation of Work Queue failed!")
+      print("Instantiation of Data Swarm failed!")
       sys.exit(1)
 
   print("listening on port %d..." % q.port)
@@ -59,13 +59,13 @@ if __name__ == '__main__':
       # Note that when specifying a file, we have to name its local name
       # (e.g. gzip_path), and its remote name (e.g. "gzip"). Unlike the
       # following line, more often than not these are the same.
-      t.specify_file(gzip_path, "gzip", WORK_QUEUE_INPUT, cache=True)
+      t.specify_file(gzip_path, "gzip", DS_INPUT, cache=True)
 
       # files to be compressed are different across all tasks, so we do not
       # cache them. This is, of course, application specific. Sometimes you may
       # want to cache an output file if is the input of a later task.
-      t.specify_file(infile, infile, WORK_QUEUE_INPUT, cache=False)
-      t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=False)
+      t.specify_file(infile, infile, DS_INPUT, cache=False)
+      t.specify_file(outfile, outfile, DS_OUTPUT, cache=False)
 
       # Once all files has been specified, we are ready to submit the task to the queue.
       taskid = q.submit(t)

@@ -3,5 +3,5 @@ _work_queue.so
 Python.framework
 work_queue.py
 work_queue.binding.py*
-work_queue_example.py*
-work_queue_wrap.*
+ds_example.py*
+ds_wrap.*

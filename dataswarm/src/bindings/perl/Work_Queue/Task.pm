@@ -17,7 +17,7 @@ use Carp qw(croak);
 
 sub Work_Queue::Task::new {
 	my ($class, $command) = @_;
-	my $_task = work_queue_task_create($command);
+	my $_task = ds_task_create($command);
 
 	croak "Could not create task." unless $_task;
 
@@ -30,7 +30,7 @@ sub DESTROY {
 	my $id = eval { $self->id };
 	if(!$@) {
 	# Ignore possible message in global cleanup.
-	eval { work_queue_task_delete($self->{_task}) };
+	eval { ds_task_delete($self->{_task}) };
 	}
 }
 
@@ -41,11 +41,11 @@ sub _determine_file_flags {
 	return $flags if defined $flags;
 
     if($cache) {
-        $flags |= $WORK_QUEUE_CACHE;
+        $flags |= $DS_CACHE;
     }
 
     if($failure_only) {
-        $flags |= $WORK_QUEUE_FAILURE_ONLY;
+        $flags |= $DS_FAILURE_ONLY;
     }
 
 	return $flags;
@@ -53,41 +53,41 @@ sub _determine_file_flags {
 
 sub specify_tag {
 	my ($self, $tag) = @_;
-	return work_queue_task_specify_tag($self->{_task}, $tag);;
+	return ds_task_specify_tag($self->{_task}, $tag);;
 }
 
 sub specify_category {
 	my ($self, $name) = @_;
-	return work_queue_task_specify_category($self->{_task}, $name);;
+	return ds_task_specify_category($self->{_task}, $name);;
 }
 
 sub specify_feature {
 	my ($self, $name) = @_;
-	return work_queue_task_specify_feature($self->{_task}, $name);
+	return ds_task_specify_feature($self->{_task}, $name);
 }
 
 sub clone {
 	my ($self) = @_;
 	my $copy = $self;
 
-	$copy->{_task} = work_queue_task_clone($self->{_task});
+	$copy->{_task} = ds_task_clone($self->{_task});
 
 	return $copy;
 }
 
 sub specify_command {
 	my ($self) = @_;
-	return work_queue_task_specify_command($self->{_task});;
+	return ds_task_specify_command($self->{_task});;
 }
 
 sub specify_algorithm {
 	my ($self, $algorithm) = @_;
-	return work_queue_task_specify_algorithm($self->{_task}, $algorithm);
+	return ds_task_specify_algorithm($self->{_task}, $algorithm);
 }
 
 sub specify_preferred_host {
 	my ($self, $host) = @_;
-	return work_queue_task_specify_preferred_host($self->{_task}, $host);
+	return ds_task_specify_preferred_host($self->{_task}, $host);
 }
 
 sub specify_file {
@@ -97,12 +97,12 @@ sub specify_file {
 	croak "At least local_name should be specified." unless $args{local_name};
 
 	$args{remote_name} //= $args{local_name};
-	$args{type}        //= $WORK_QUEUE_INPUT;
+	$args{type}        //= $DS_INPUT;
 	$args{cache}       //= 1;
 	$args{failure_only} //= 0;
 	$args{flags}         = _determine_file_flags($args{flags}, $args{cache}, $args{failure_only});
 
-	return work_queue_task_specify_file($self->{_task},
+	return ds_task_specify_file($self->{_task},
 					$args{local_name},
 					$args{remote_name},
 					$args{type},
@@ -115,12 +115,12 @@ sub specify_file_command {
 
 	croak "At least remote_name and cmd should be specified." unless $args{remote_name} and $args{cmd};
 
-	$args{type}        //= $WORK_QUEUE_INPUT;
+	$args{type}        //= $DS_INPUT;
 	$args{cache}       //= 1;
 	$args{failure_only} //= 0;
 	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
 
-	return work_queue_task_specify_file_command($self->{_task},
+	return ds_task_specify_file_command($self->{_task},
 					$args{remote_name},
 					$args{cmd},
 					$args{type},
@@ -136,12 +136,12 @@ sub specify_file_piece {
 	$args{remote_name} //= $args{local_name};
 	$args{start_byte}  //= 0;
 	$args{end_byte}    //= 0;
-	$args{type}        //= $WORK_QUEUE_INPUT;
+	$args{type}        //= $DS_INPUT;
 	$args{cache}       //= 1;
 	$args{failure_only} //= 0;
 	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
 
-	return work_queue_task_specify_file_piece($self->{_task},
+	return ds_task_specify_file_piece($self->{_task},
 						  $args{local_name},
 						  $args{remote_name},
 						  $args{start_byte},
@@ -157,7 +157,7 @@ sub specify_input_file {
 
 	return $self->specify_file(local_name  => $args{local_name},
 				   remote_name => $args{remote_name},
-				   type        => $WORK_QUEUE_INPUT,
+				   type        => $DS_INPUT,
 				   flags       => $args{flags},
 				   cache       => $args{cache},
 				   failure_only => 0);
@@ -171,7 +171,7 @@ sub specify_output_file {
 
 	return $self->specify_file(local_name  => $args{local_name},
 				   remote_name => $args{remote_name},
-				   type        => $WORK_QUEUE_OUTPUT,
+				   type        => $DS_OUTPUT,
 				   flags       => $args{flags},
 				   cache       => $args{cache},
 				   failure_only => $args{failure_only});
@@ -183,14 +183,14 @@ sub specify_directory {
 	croak "At least local_name should be specified." unless $args{local_name};
 
 	$args{remote_name} //= $args{local_name};
-	$args{type}        //= $WORK_QUEUE_INPUT;
+	$args{type}        //= $DS_INPUT;
 	$args{recursive}   //= 0;
 
 	$args{cache}       //= 1;
 	$args{failure_only} //= 0;
 	$args{flags}         = _determine_file_flags($args{flags}, $args{cache}, $args{failure_only});
 
-	return work_queue_task_specify_directory($self->{_task},
+	return ds_task_specify_directory($self->{_task},
 						 $args{local_name},
 						 $args{type},
 						 $args{flags},
@@ -208,7 +208,7 @@ sub specify_buffer {
 	$args{failure_only} //= 0;
 	$args{flags}         = _determine_file_flags($args{flags}, $args{cache}, $args{failure_only});
 
-	return work_queue_task_specify_buffer($self->{_task},
+	return ds_task_specify_buffer($self->{_task},
 					  $args{buffer},
 					  $args{remote_name},
 					  $args{flags},
@@ -221,67 +221,67 @@ sub specify_snapshot_file {
 
 	croak "The snapshot file should be specified." unless $filename;
 
-	return work_queue_specify_snapshot_file($self->{_task}, $filename);
+	return ds_specify_snapshot_file($self->{_task}, $filename);
 }
 
 sub specify_max_retries {
 	my ($self, $retries) = @_;
-	return work_queue_task_specify_max_retries($self->{_task}, $retries);
+	return ds_task_specify_max_retries($self->{_task}, $retries);
 }
 
 sub specify_cores {
 	my ($self, $cores) = @_;
-	return work_queue_task_specify_cores($self->{_task}, $cores);
+	return ds_task_specify_cores($self->{_task}, $cores);
 }
 
 sub specify_memory {
 	my ($self, $memory) = @_;
-	return work_queue_task_specify_memory($self->{_task}, $memory);
+	return ds_task_specify_memory($self->{_task}, $memory);
 }
 
 sub specify_disk {
 	my ($self, $disk) = @_;
-	return work_queue_task_specify_disk($self->{_task}, $disk);
+	return ds_task_specify_disk($self->{_task}, $disk);
 }
 
 sub specify_gpus {
 	my ($self, $gpus) = @_;
-	return work_queue_task_specify_gpus($self->{_task}, $gpus);
+	return ds_task_specify_gpus($self->{_task}, $gpus);
 }
 
 sub specify_end_time {
 	my ($self, $useconds) = @_;
-	return work_queue_task_specify_end_time($self->{_task}, $useconds);
+	return ds_task_specify_end_time($self->{_task}, $useconds);
 }
 
 sub specify_running_time {
 	my ($self, $useconds) = @_;
-	return work_queue_task_specify_running_time($self->{_task}, $useconds);
+	return ds_task_specify_running_time($self->{_task}, $useconds);
 }
 
 sub specify_running_time_max {
 	my ($self, $seconds) = @_;
-	return work_queue_task_specify_running_time_max($self->{_task}, $seconds);
+	return ds_task_specify_running_time_max($self->{_task}, $seconds);
 }
 
 sub specify_running_time_min {
 	my ($self, $seconds) = @_;
-	return work_queue_task_specify_running_time_min($self->{_task}, $seconds);
+	return ds_task_specify_running_time_min($self->{_task}, $seconds);
 }
 sub specify_priority {
 	my ($self, $priority) = @_;
-	return work_queue_task_specify_priority($self->{_task}, $priority);
+	return ds_task_specify_priority($self->{_task}, $priority);
 }
 
 
 sub specify_environment_variable {
 	my ($self, $name, $value) = @_;
-	return work_queue_task_specify_environment_variable($self->{_task}, $name, $value);
+	return ds_task_specify_environment_variable($self->{_task}, $name, $value);
 }
 
 sub specify_monitor_output {
 	my ($self, $directory) = @_;
-	return work_queue_task_specify_monitor_output($self->{_task}, $directory);
+	return ds_task_specify_monitor_output($self->{_task}, $directory);
 }
 
 sub tag {
@@ -326,7 +326,7 @@ sub result {
 
 sub result_str {
 	my ($self) = @_;
-	return work_queuec::work_queue_result_str($self->{_task}->{result});
+	return work_queuec::ds_result_str($self->{_task}->{result});
 }
 
 sub total_submissions {
@@ -463,12 +463,12 @@ __END__
 
 =head1 NAME
 
-Work_Queue::Task - Perl Work Queue Task bindings.
+Work_Queue::Task - Perl Data Swarm Task bindings.
 
 =head1 SYNOPSIS
 
 The objects and methods provided by this package correspond to the
-native C API in work_queue.h for task creation and manipulation. This
+native C API in ds_manager.h for task creation and manipulation. This
 module is automatically loaded with C<< Work_Queue >>.
 
 		use Work_Queue;
@@ -567,13 +567,13 @@ One of the following algorithms to use in assigning a task to a worker:
 
 =over 24
 
-=item WORK_QUEUE_SCHEDULE_FCFS
+=item DS_SCHEDULE_FCFS
 
-=item WORK_QUEUE_SCHEDULE_FILES
+=item DS_SCHEDULE_FILES
 
-=item WORK_QUEUE_SCHEDULE_TIME
+=item DS_SCHEDULE_TIME
 
-=item WORK_QUEUE_SCHEDULE_RAND
+=item DS_SCHEDULE_RAND
 
 =back
 
@@ -607,7 +607,7 @@ The name of the file at the execution site.
 
 =item type
 
-Must be one of the following values: $Work_Queue::WORK_QUEUE_INPUT or $Work_Queue::WORK_QUEUE_OUTPUT
+Must be one of the following values: $Work_Queue::DS_INPUT or $Work_Queue::DS_OUTPUT
 
 =item flags
 
@@ -615,13 +615,13 @@ May be zero to indicate no special handling, or any of the following or'd togeth
 
 =over 24
 
-=item $Work_Queue::WORK_QUEUE_NOCACHE
+=item $Work_Queue::DS_NOCACHE
 
-=item $Work_Queue::WORK_QUEUE_CACHE
+=item $Work_Queue::DS_CACHE
 
-=item $Work_Queue::WORK_QUEUE_WATCH
+=item $Work_Queue::DS_WATCH
 
-=item $Work_Queue::WORK_QUEUE_FAILURE_ONLY
+=item $Work_Queue::DS_FAILURE_ONLY
 
 =back
 
@@ -654,7 +654,7 @@ replaced with the internal name that work queue uses for the file.
 
 =item type
 
-Must be one of the following values: $Work_Queue::WORK_QUEUE_INPUT or $Work_Queue::WORK_QUEUE_OUTPUT
+Must be one of the following values: $Work_Queue::DS_INPUT or $Work_Queue::DS_OUTPUT
 
 =item flags
 
@@ -662,11 +662,11 @@ May be zero to indicate no special handling, or any of the following or'd togeth
 
 =over 24
 
-=item $Work_Queue::WORK_QUEUE_NOCACHE
+=item $Work_Queue::DS_NOCACHE
 
-=item $Work_Queue::WORK_QUEUE_CACHE
+=item $Work_Queue::DS_CACHE
 
-=item $Work_Queue::WORK_QUEUE_FAILURE_ONLY
+=item $Work_Queue::DS_FAILURE_ONLY
 
 =back
 
@@ -680,7 +680,7 @@ For output files only, whether the file should be retrieved only when the task f
 
 =back
 
-        $t->specify_file_command("my.result", "chirp_put %% chirp://somewhere/result.file", type=$Work_Queue::WORK_QUEUE_OUTPUT)
+        $t->specify_file_command("my.result", "chirp_put %% chirp://somewhere/result.file", type=$Work_Queue::DS_OUTPUT)
 
 =head3 C<specify_file_piece>
 
@@ -706,8 +706,8 @@ The ending byte offset of the file piece to be transferred.
 
 =item type
 
-Must be one of the following values: $Work_Queue::WORK_QUEUE_INPUT or
-$Work_Queue::WORK_QUEUE_OUTPUT.
+Must be one of the following values: $Work_Queue::DS_INPUT or
+$Work_Queue::DS_OUTPUT.
 
 =item flags
 
@@ -734,7 +734,7 @@ For output files only, whether the file should be retrieved only when the task f
 Add a input file to the task.
 
 This is just a wrapper for Work_Queue::Task->specify_file with type
-set to $Work_Queue::WORK_QUEUE_INPUT. If only one argument is given,
+set to $Work_Queue::DS_INPUT. If only one argument is given,
 it defaults to both local_name and remote_name.
 
 =head3 C<specify_output_file>
@@ -742,7 +742,7 @@ it defaults to both local_name and remote_name.
 Add a output file to the task.
 
 This is just a wrapper for Work_Queue::Task->specify_file with type
-set to $Work_Queue::WORK_QUEUE_OUTPUT. If only one argument is given,
+set to $Work_Queue::DS_OUTPUT. If only one argument is given,
 then it defaults to both local_name and remote_name.
 
 =head3 C<specify_directory>
@@ -762,7 +762,7 @@ The name of the directory at the remote execution site.
 
 =item type
 
-Must be one of $Work_Queue::WORK_QUEUE_INPUT or $Work_Queue::WORK_QUEUE_OUTPUT.
+Must be one of $Work_Queue::DS_INPUT or $Work_Queue::DS_OUTPUT.
 
 =item flags May be zero to indicate no special handling. See Work_Queue::Task->specify_file.
 
@@ -871,7 +871,7 @@ Exactly one of on-create, on-truncate, or on-pattern should be specified. For mo
 
 Specify the number of times this task is retried on worker errors. If less than
 one, the task is retried indefinitely (this the default).  A task that did not
-succeed after the given number of retries is returned with result $WORK_QUEUE_RESULT_MAX_RETRIES.
+succeed after the given number of retries is returned with result $DS_RESULT_MAX_RETRIES.
 
 =over 12
 
@@ -1104,7 +1104,7 @@ Must be called only after the task completes execution.
 
 =head3 C<time_app_delay>
 
-Get the time spent in upper-level application (outside of work_queue_wait).
+Get the time spent in upper-level application (outside of ds_wait).
 
 Must be called only after the task completes execution.
 

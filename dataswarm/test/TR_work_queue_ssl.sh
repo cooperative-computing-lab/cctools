@@ -6,8 +6,8 @@ set -e
 python=${CCTOOLS_PYTHON_TEST_EXEC}
 python_dir=${CCTOOLS_PYTHON_TEST_DIR}
 
-STATUS_FILE=wq.status
-PORT_FILE=wq.port
+STATUS_FILE=ds.status
+PORT_FILE=ds.port
 
 KEY_FILE=key.pem
 CERT_FILE=cert.pem
@@ -43,7 +43,7 @@ prepare()
 run()
 {
 	# send command to the background, saving its exit status.
-	(PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} wq_test.py $PORT_FILE --ssl_key ${KEY_FILE} --ssl_cert ${CERT_FILE}; echo $? > $STATUS_FILE) &
+	(PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} ds_test.py $PORT_FILE --ssl_key ${KEY_FILE} --ssl_cert ${CERT_FILE}; echo $? > $STATUS_FILE) &
 
 	# wait at most 15 seconds for the command to find a port.
 	wait_for_file_creation $PORT_FILE 15

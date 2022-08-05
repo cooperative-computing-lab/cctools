@@ -4,7 +4,7 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 #
-# This program is a very simple example of how to use Work Queue.
+# This program is a very simple example of how to use Data Swarm.
 # It accepts a list of files on the command line.
 # Each file is compressed with gzip and returned to the user.
 
@@ -16,7 +16,7 @@ use Work_Queue;
 
 # Main program:
 unless (@ARGV) {
-	die "work_queue_example <file1> [file2] [file3] ...\nEach file given on the command line will be compressed using a remote worker.\n";
+	die "ds_example <file1> [file2] [file3] ...\nEach file given on the command line will be compressed using a remote worker.\n";
 }
 
 # Usually, we can execute the gzip utility by simply typing its name at a
@@ -30,7 +30,7 @@ my $gzip_path = find_executable('gzip') || die "Could not find gzip anywhere in 
 # been used by another program, you can try setting port = 0 to use an
 # available port.
 
-my $q = Work_Queue->new(port => $Work_Queue::WORK_QUEUE_DEFAULT_PORT) || die "Instantiation of Work Queue failed! ($!)\n";
+my $q = Work_Queue->new(port => $Work_Queue::DS_DEFAULT_PORT) || die "Instantiation of Data Swarm failed! ($!)\n";
 
 print "listening on port @{[$q->port]}...\n";
 
@@ -55,8 +55,8 @@ for my $infile (@ARGV) {
 	# specific. Sometimes you may want to cache an output file if is
 	# the input of a later task. Note that remote_name defaults to
 	# local_name when absent.
-	$t->specify_input_file(local_name => $infile,   cache => $Work_Queue::WORK_QUEUE_NOCACHE);
-	$t->specify_output_file(local_name => $outfile, cache => $Work_Queue::WORK_QUEUE_NOCACHE);
+	$t->specify_input_file(local_name => $infile,   cache => $Work_Queue::DS_NOCACHE);
+	$t->specify_output_file(local_name => $outfile, cache => $Work_Queue::DS_NOCACHE);
 
 	# Once all files has been specified, we are ready to submit the
 	# task to the queue.

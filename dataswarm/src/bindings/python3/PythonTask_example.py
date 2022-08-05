@@ -4,8 +4,8 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-# Example on how to execute python code with a Work Queue task.
-# The class PythonTask allows users to execute python functions as Work Queue
+# Example on how to execute python code with a Data Swarm task.
+# The class PythonTask allows users to execute python functions as Data Swarm
 # commands. Functions and their arguments are pickled to a file and executed
 # utilizing a wrapper script to execut the function. the output of the executed
 # function is then written to a file as an output file and read when neccesary
@@ -35,16 +35,16 @@
 # conda run -p my-minimal-env conda-pack
 
 
-import work_queue as wq
+import work_queue as ds
 
 def divide(dividend, divisor):
     import math
     return dividend/math.sqrt(divisor)
 
 def main():
-    q = wq.WorkQueue(9123)
+    q = ds.DataSwarm(9123)
     for i in range(1, 16):
-        p_task = wq.PythonTask(divide, 1, i**2)
+        p_task = ds.PythonTask(divide, 1, i**2)
 
         # if python environment is missing at worker...
         #p_task.specify_environment("env.tar.gz")
@@ -56,7 +56,7 @@ def main():
         t = q.wait(5)
         if t:
             x = t.output
-            if isinstance(x, wq.PythonTaskNoResult):
+            if isinstance(x, ds.PythonTaskNoResult):
                 print("Task {} failed and did not generate a result.".format(t.id))
             else:
                 sum += x

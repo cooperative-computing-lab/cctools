@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "work_queue_resources.h"
+#include "ds_resources.h"
 
 #include "link.h"
 #include "load_average.h"
@@ -18,21 +18,21 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-struct work_queue_resources * work_queue_resources_create()
+struct ds_resources * ds_resources_create()
 {
-	struct work_queue_resources *r = malloc(sizeof(*r));
-	memset(r, 0, sizeof(struct work_queue_resources));
+	struct ds_resources *r = malloc(sizeof(*r));
+	memset(r, 0, sizeof(struct ds_resources));
 
 	r->tag = -1;
 	return r;
 }
 
-void work_queue_resources_delete( struct work_queue_resources *r )
+void ds_resources_delete( struct ds_resources *r )
 {
 	free(r);
 }
 
-void work_queue_resources_measure_locally( struct work_queue_resources *r, const char *disk_path )
+void ds_resources_measure_locally( struct ds_resources *r, const char *disk_path )
 {
 	static int gpu_check = 0;
 
@@ -64,46 +64,46 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 	r->workers.largest = r->workers.smallest = r->workers.total;
 }
 
-static void work_queue_resource_debug( struct work_queue_resource *r, const char *name )
+static void ds_resource_debug( struct ds_resource *r, const char *name )
 {
 	debug(D_WQ,"%8s %6"PRId64" inuse %6"PRId64" total %6"PRId64" smallest %6"PRId64" largest",name, r->inuse, r->total, r->smallest, r->largest);
 }
 
 
-static void work_queue_resource_send( struct link *manager, struct work_queue_resource *r, const char *name, time_t stoptime )
+static void ds_resource_send( struct link *manager, struct ds_resource *r, const char *name, time_t stoptime )
 {
-	work_queue_resource_debug(r, name);
+	ds_resource_debug(r, name);
 	link_printf(manager, stoptime, "resource %s %"PRId64" %"PRId64" %"PRId64"\n", name, r->total, r->smallest, r->largest );
 }
 
-void work_queue_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime )
+void ds_resources_send( struct link *manager, struct ds_resources *r, time_t stoptime )
 {
 	debug(D_WQ, "Sending resource description to manager:");
-	work_queue_resource_send(manager, &r->workers, "workers",stoptime);
-	work_queue_resource_send(manager, &r->disk,    "disk",   stoptime);
-	work_queue_resource_send(manager, &r->memory,  "memory", stoptime);
-	work_queue_resource_send(manager, &r->gpus,    "gpus",   stoptime);
-	work_queue_resource_send(manager, &r->cores,   "cores",  stoptime);
+	ds_resource_send(manager, &r->workers, "workers",stoptime);
+	ds_resource_send(manager, &r->disk,    "disk",   stoptime);
+	ds_resource_send(manager, &r->memory,  "memory", stoptime);
+	ds_resource_send(manager, &r->gpus,    "gpus",   stoptime);
+	ds_resource_send(manager, &r->cores,   "cores",  stoptime);
 
 	/* send the tag last, the manager knows when the resource update is complete */
 	link_printf(manager, stoptime, "resource tag %"PRId64"\n", r->tag);
 }
 
-void work_queue_resources_debug( struct work_queue_resources *r )
+void ds_resources_debug( struct ds_resources *r )
 {
-	work_queue_resource_debug(&r->workers, "workers");
-	work_queue_resource_debug(&r->disk,    "disk");
-	work_queue_resource_debug(&r->memory,  "memory");
-	work_queue_resource_debug(&r->gpus,    "gpus");
-	work_queue_resource_debug(&r->cores,   "cores");
+	ds_resource_debug(&r->workers, "workers");
+	ds_resource_debug(&r->disk,    "disk");
+	ds_resource_debug(&r->memory,  "memory");
+	ds_resource_debug(&r->gpus,    "gpus");
+	ds_resource_debug(&r->cores,   "cores");
 }
 
-void work_queue_resources_clear( struct work_queue_resources *r )
+void ds_resources_clear( struct ds_resources *r )
 {
 	memset(r,0,sizeof(*r));
 }
 
-static void work_queue_resource_add( struct work_queue_resource *total, struct work_queue_resource *r )
+static void ds_resource_add( struct ds_resource *total, struct ds_resource *r )
 {
 	total->inuse += r->inuse;
 	total->total += r->total;
@@ -111,16 +111,16 @@ static void work_queue_resource_add( struct work_queue_resource *total, struct w
 	total->largest = MAX(total->largest,r->largest);
 }
 
-void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r )
+void ds_resources_add( struct ds_resources *total, struct ds_resources *r )
 {
-	work_queue_resource_add(&total->workers, &r->workers);
-	work_queue_resource_add(&total->memory,  &r->memory);
-	work_queue_resource_add(&total->disk,    &r->disk);
-	work_queue_resource_add(&total->gpus,    &r->gpus);
-	work_queue_resource_add(&total->cores,   &r->cores);
+	ds_resource_add(&total->workers, &r->workers);
+	ds_resource_add(&total->memory,  &r->memory);
+	ds_resource_add(&total->disk,    &r->disk);
+	ds_resource_add(&total->gpus,    &r->gpus);
+	ds_resource_add(&total->cores,   &r->cores);
 }
 
-void work_queue_resources_add_to_jx( struct work_queue_resources *r, struct jx *nv )
+void ds_resources_add_to_jx( struct ds_resources *r, struct jx *nv )
 {
 	jx_insert_integer(nv, "workers_inuse",   r->workers.inuse);
 	jx_insert_integer(nv, "workers_total",   r->workers.total);

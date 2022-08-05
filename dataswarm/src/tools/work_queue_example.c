@@ -5,12 +5,12 @@
  * */
 
 /*
- * This program is a very simple example of how to use the Work Queue.
+ * This program is a very simple example of how to use the Data Swarm.
  * It accepts a list of files on the command line.
  * Each file is compressed with gzip and returned to the user.
  * */
 
-#include "work_queue.h"
+#include "ds_manager.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,14 +20,14 @@
 
 int main(int argc, char *argv[])
 {
-	struct work_queue *q;
-	struct work_queue_task *t;
+	struct ds_manager *q;
+	struct ds_task *t;
 	int taskid;
 	int i;
 	char *gzip_path;
 
 	if(argc < 2) {
-		printf("work_queue_example <file1> [file2] [file3] ...\n");
+		printf("ds_example <file1> [file2] [file3] ...\n");
 		printf("Each file given on the command line will be compressed using a remote worker.\n");
 		return 0;
 	}
@@ -52,13 +52,13 @@ int main(int argc, char *argv[])
 
 	/* We create the tasks queue using the default port. If this port is
 	 * already been used by another program, you can try changing the argument
-	 * to work_queue_create to 0 to use an available port.  */
-	q = work_queue_create(WORK_QUEUE_DEFAULT_PORT);
+	 * to ds_create to 0 to use an available port.  */
+	q = ds_create(DS_DEFAULT_PORT);
 	if(!q) {
 		printf("couldn't create queue: %s\n", strerror(errno));
 		return 1;
 	}
-	printf("listening on port %d...\n", work_queue_port(q));
+	printf("listening on port %d...\n", ds_port(q));
 
 	/* We create and dispatch a task for each filename given in the argument list */
 	for(i = 1; i < argc; i++) {
@@ -72,34 +72,34 @@ int main(int argc, char *argv[])
 		 * we are using is the one being sent to the workers. */
 		sprintf(command, "./gzip < %s > %s", infile, outfile);
 
-		t = work_queue_task_create(command);
+		t = ds_task_create(command);
 
 		/* gzip is the same across all tasks, so we can cache it in the
 		 * workers. Note that when specifying a file, we have to name its local
 		 * name (e.g. gzip_path), and its remote name (e.g. "gzip"). Unlike the
 		 * following line, more often than not these are the same. */
-		work_queue_task_specify_file(t, gzip_path, "gzip", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+		ds_task_specify_file(t, gzip_path, "gzip", DS_INPUT, DS_CACHE);
 
 		/* files to be compressed are different across all tasks, so we do not
 		 * cache them. This is, of course, application specific. Sometimes you
 		 * may want to cache an output file if is the input of a later task.*/
-		work_queue_task_specify_file(t, infile, infile, WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
-		work_queue_task_specify_file(t, outfile, outfile, WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+		ds_task_specify_file(t, infile, infile, DS_INPUT, DS_NOCACHE);
+		ds_task_specify_file(t, outfile, outfile, DS_OUTPUT, DS_NOCACHE);
 
 		/* Once all files has been specified, we are ready to submit the task to the queue. */
-		taskid = work_queue_submit(q, t);
+		taskid = ds_submit(q, t);
 
 		printf("submitted task (id# %d): %s\n", taskid, t->command_line);
 	}
 
 	printf("waiting for tasks to complete...\n");
 
-	while(!work_queue_empty(q)) {
+	while(!ds_empty(q)) {
 
 		/* Application specific code goes here ... */
 
-		/* work_queue_wait waits at most 5 seconds for some task to return. */
-		t = work_queue_wait(q, 5);
+		/* ds_wait waits at most 5 seconds for some task to return. */
+		t = ds_wait(q, 5);
 
 		if(t) {
 			printf("task (id# %d) complete: %s (return code %d)\n", t->taskid, t->command_line, t->return_status);
@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
 				/* The task failed. Error handling (e.g., resubmit with new parameters) here. */
 			}
 
-			work_queue_task_delete(t);
+			ds_task_delete(t);
 		}
 
 		/* Application specific code goes here ... */
@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 
 	printf("all tasks complete!\n");
 
-	work_queue_delete(q);
+	ds_delete(q);
 
 	return 0;
 }

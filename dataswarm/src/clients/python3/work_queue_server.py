@@ -8,12 +8,12 @@ import json
 from time import sleep
 from subprocess import Popen, PIPE
 
-class WorkQueueServer:
+class DataSwarmServer:
 
     def __init__(self):
         self.socket = socket.socket()
         self.id = 1
-        self.wq = None
+        self.ds = None
 
     def send_recv(self, request):
         request = json.dumps(request)
@@ -26,7 +26,7 @@ class WorkQueueServer:
         return response
 
     def connect(self, address, server_port, worker_port, project_name):
-        args = ['./work_queue_server', '-s', "%d" % server_port, '-p', "%d" % worker_port, '-N', project_name ]
+        args = ['./ds_server', '-s', "%d" % server_port, '-p', "%d" % worker_port, '-N', project_name ]
         self.server = Popen(args, stdout=PIPE)
 
         server_port = self.server.stdout.readline()

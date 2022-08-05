@@ -46,7 +46,7 @@ show_help_common()
 	echo "  --cores <num>             Set the number of cores each worker should use (0=auto). (default=1)"
 	echo "  --memory <size>           Manually set the amonut of memory (in MB) reported by this worker."
 	echo "  --disk <size>             Manually set the amount of disk (in MB) reported by this worker."
-	echo "  -E,--worker-options <str> Extra options passed to work_queue_worker"
+	echo "  -E,--worker-options <str> Extra options passed to ds_worker"
 	echo "  -h,--help                 Show this help message."
 	echo ""
 	echo "batch specific options:"
@@ -213,10 +213,10 @@ set_up_working_directory()
 	# Copy the worker executable into the temporary directory,
 	# for similar reasons.
 
-	worker=`which work_queue_worker 2>/dev/null`
+	worker=`which ds_worker 2>/dev/null`
 	if [ $? != 0 ]
 	then
-		echo "$0: please add 'work_queue_worker' to your PATH." 1>&2
+		echo "$0: please add 'ds_worker' to your PATH." 1>&2
 		exit 1
 	fi
 
@@ -273,7 +273,7 @@ submit_workers()
 	exit $?
 }
 
-if [ "${script_name##*/}" = work_queue_submit_common ]
+if [ "${script_name##*/}" = ds_submit_common ]
 then
 	echo "This script provides support functions for the work queue"
 	echo "workers submission scripts, and cannot be executed by itself."

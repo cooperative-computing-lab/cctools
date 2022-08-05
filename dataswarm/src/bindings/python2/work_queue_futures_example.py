@@ -1,7 +1,7 @@
-from work_queue_futures import WorkQueueFutures, FutureTask, FutureTaskError
+from ds_futures import DataSwarmFutures, FutureTask, FutureTaskError
 
-q = WorkQueueFutures(port = 9123, local_worker = {'cores':1, 'memory':512, 'disk':10000})
-#q = WorkQueueFutures(port = 9123)
+q = DataSwarmFutures(port = 9123, local_worker = {'cores':1, 'memory':512, 'disk':10000})
+#q = DataSwarmFutures(port = 9123)
 
 # without callbacks, append task to a list and then wait for them
 tasks = []

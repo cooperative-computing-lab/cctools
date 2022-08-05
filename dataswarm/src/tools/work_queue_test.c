@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "work_queue.h"
+#include "ds_manager.h"
 
 #include "cctools.h"
 #include "debug.h"
@@ -24,7 +24,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <unistd.h>
 
-int submit_tasks(struct work_queue *q, int input_size, int run_time, int output_size, int count, char *category )
+int submit_tasks(struct ds_manager *q, int input_size, int run_time, int output_size, int count, char *category )
 {
 	static int ntasks=0;
 	char output_file[128];
@@ -49,30 +49,30 @@ int submit_tasks(struct work_queue *q, int input_size, int run_time, int output_
 
 		ntasks++;
 
-		struct work_queue_task *t = work_queue_task_create(command);
-		work_queue_task_specify_file(t, input_file, "infile", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
-		work_queue_task_specify_file(t, output_file, "outfile", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
-		work_queue_task_specify_cores(t,1);
+		struct ds_task *t = ds_task_create(command);
+		ds_task_specify_file(t, input_file, "infile", DS_INPUT, DS_CACHE);
+		ds_task_specify_file(t, output_file, "outfile", DS_OUTPUT, DS_NOCACHE);
+		ds_task_specify_cores(t,1);
 
 		if(category && strlen(category) > 0)
-			work_queue_task_specify_category(t, category);
+			ds_task_specify_category(t, category);
 
-		work_queue_submit(q, t);
+		ds_submit(q, t);
 	}
 
 	return 1;
 }
 
-void wait_for_all_tasks( struct work_queue *q )
+void wait_for_all_tasks( struct ds_manager *q )
 {
-	struct work_queue_task *t;
-	while(!work_queue_empty(q)) {
-		t = work_queue_wait(q,5);
-		if(t) work_queue_task_delete(t);
+	struct ds_task *t;
+	while(!ds_empty(q)) {
+		t = ds_wait(q,5);
+		if(t) ds_task_delete(t);
 	}
 }
 
-void work_queue_mainloop( struct work_queue *q )
+void ds_mainloop( struct ds_manager *q )
 {
 	char line[1024];
 	char category[1024];
@@ -80,7 +80,7 @@ void work_queue_mainloop( struct work_queue *q )
 	int sleep_time, run_time, input_size, output_size, count;
 
 	while(1) {
-		printf("work_queue_test > ");
+		printf("ds_test > ");
 		fflush(stdout);
 
 		if(!fgets(line,sizeof(line),stdin)) break;

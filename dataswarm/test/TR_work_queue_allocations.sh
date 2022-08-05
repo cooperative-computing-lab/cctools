@@ -6,8 +6,8 @@ set -ex
 python=${CCTOOLS_PYTHON_TEST_EXEC}
 python_dir=${CCTOOLS_PYTHON_TEST_DIR}
 
-STATUS_FILE=wq.status
-PORT_FILE=wq.port
+STATUS_FILE=ds.status
+PORT_FILE=ds.port
 
 check_needed()
 {
@@ -24,7 +24,7 @@ prepare()
 
 run()
 {
-	# worker resources (used by worker in factory in wq_alloc_test.py):
+	# worker resources (used by worker in factory in ds_alloc_test.py):
 	cores=4
 	memory=200
 	disk=200
@@ -36,9 +36,9 @@ run()
 	export PATH=/bin:/usr/bin
 	export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
 	export PYTHONPATH=$(pwd)/../src/bindings/${python_dir}
-	${python} wq_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
+	${python} ds_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
 
-	# retrieve wq script exit status
+	# retrieve ds script exit status
 	status=$(cat $STATUS_FILE)
 	if [ $status -ne 0 ]
 	then

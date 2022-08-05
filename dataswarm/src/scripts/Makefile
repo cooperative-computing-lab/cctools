@@ -1,7 +1,7 @@
 include ../../../config.mk
 include ../../../rules.mk
 
-SCRIPTS = work_queue_submit_common condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers slurm_submit_workers work_queue_graph_log
+SCRIPTS = ds_submit_common condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers slurm_submit_workers ds_graph_log
 
 all: $(SCRIPTS)
 

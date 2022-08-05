@@ -2,10 +2,10 @@
 
 SGE_WARNING=1
 
-SUBMIT_COMMON=$(which work_queue_submit_common)
+SUBMIT_COMMON=$(which ds_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
 then
-	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
+	echo "Please add 'ds_submit_common' to your PATH." 1>&2
 	exit 1
 else
 	. $SUBMIT_COMMON
@@ -60,7 +60,7 @@ submit_workers_command()
 	cat >worker.sh <<EOF
 #!/bin/sh
 SGE_CUSTOM_PARAMETERS
-./work_queue_worker $arguments $host $port
+./ds_worker $arguments $host $port
 EOF
 
 	chmod 755 worker.sh

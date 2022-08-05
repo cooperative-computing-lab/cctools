@@ -1,9 +1,9 @@
 #!/bin/sh
 
-SUBMIT_COMMON=$(which work_queue_submit_common)
+SUBMIT_COMMON=$(which ds_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
 then
-	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
+	echo "Please add 'ds_submit_common' to your PATH." 1>&2
 	exit 1
 else
 	. $SUBMIT_COMMON
@@ -66,9 +66,9 @@ submit_workers_command()
 	while [[ "$to_submit" -gt 0 ]]
 	do
 		to_submit=$((to_submit-1))
-		sbatch --job-name wqWorker --ntasks=1 --nodes=1 $slurm_parameters <<EOF
+		sbatch --job-name dsWorker --ntasks=1 --nodes=1 $slurm_parameters <<EOF
 #!/bin/sh
-work_queue_worker $arguments $host $port
+ds_worker $arguments $host $port
 EOF
 	done
 

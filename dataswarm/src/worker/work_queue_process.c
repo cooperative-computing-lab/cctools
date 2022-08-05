@@ -1,10 +1,10 @@
 
-#include "work_queue_process.h"
-#include "work_queue.h"
-#include "work_queue_internal.h"
-#include "work_queue_gpus.h"
-#include "work_queue_protocol.h"
-#include "work_queue_coprocess.h"
+#include "ds_process.h"
+#include "ds_manager.h"
+#include "ds_internal.h"
+#include "ds_gpus.h"
+#include "ds_protocol.h"
+#include "ds_coprocess.h"
 
 #include "debug.h"
 #include "errno.h"
@@ -44,13 +44,13 @@ Create temporary directories inside as well.
 
 extern char * workspace;
 
-static int create_sandbox_dir( struct work_queue_process *p, int disk_allocation )
+static int create_sandbox_dir( struct ds_process *p, int disk_allocation )
 {
 	p->cache_dir = string_format("%s/cache",workspace);
   	p->sandbox = string_format("%s/t.%d", workspace,p->task->taskid);
 
 	if(disk_allocation) {
-		work_queue_process_compute_disk_needed(p);
+		ds_process_compute_disk_needed(p);
 		if(p->task->resources_requested->disk > 0) {
 			int64_t size = (p->task->resources_requested->disk) * 1024;
 			if(disk_alloc_create(p->sandbox, "ext2", size) == 0) {
@@ -83,29 +83,29 @@ static int create_sandbox_dir( struct work_queue_process *p, int disk_allocation
 }
 
 /*
-Create a work_queue_process and all of the information necessary for invocation.
+Create a ds_process and all of the information necessary for invocation.
 However, do not allocate substantial resources at this point.
 */
 
-struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_task, int disk_allocation)
+struct ds_process *ds_process_create(struct ds_task *ds_task, int disk_allocation)
 {
-	struct work_queue_process *p = malloc(sizeof(*p));
+	struct ds_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
-	p->task = wq_task;
+	p->task = ds_task;
 	p->task->disk_allocation_exhausted = 0;
 
 	if(!create_sandbox_dir(p,disk_allocation)) {
-		work_queue_process_delete(p);
+		ds_process_delete(p);
 		return 0;
 	}
 	return p;
 }
 
 
-void work_queue_process_delete(struct work_queue_process *p)
+void ds_process_delete(struct ds_process *p)
 {
 	if(p->task)
-		work_queue_task_delete(p->task);
+		ds_task_delete(p->task);
 
 	if(p->output_fd) {
 		close(p->output_fd);
@@ -144,7 +144,7 @@ static void clear_environment() {
 
 }
 
-static void export_environment( struct work_queue_process *p )
+static void export_environment( struct ds_process *p )
 {
 	struct list *env_list = p->task->env_list;
 	char *name;
@@ -171,13 +171,13 @@ static void export_environment( struct work_queue_process *p )
 	}
 }
 
-static void specify_integer_env_var( struct work_queue_process *p, const char *name, int64_t value) {
+static void specify_integer_env_var( struct ds_process *p, const char *name, int64_t value) {
 	char *value_str = string_format("%" PRId64, value);
-	work_queue_task_specify_environment_variable(p->task, name, value_str);
+	ds_task_specify_environment_variable(p->task, name, value_str);
 	free(value_str);
 }
 
-static void specify_resources_vars(struct work_queue_process *p) {
+static void specify_resources_vars(struct ds_process *p) {
 	if(p->task->resources_requested->cores > 0) {
 		specify_integer_env_var(p, "CORES", p->task->resources_requested->cores);
 		specify_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
@@ -193,15 +193,15 @@ static void specify_resources_vars(struct work_queue_process *p) {
 
 	if(p->task->resources_requested->gpus > 0) {
 		specify_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
-		char *str = work_queue_gpus_to_string(p->task->taskid);
-		work_queue_task_specify_environment_variable(p->task,"CUDA_VISIBLE_DEVICES",str);
+		char *str = ds_gpus_to_string(p->task->taskid);
+		ds_task_specify_environment_variable(p->task,"CUDA_VISIBLE_DEVICES",str);
 		free(str);
 	}
 }
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
-static char * load_input_file(struct work_queue_task *t) {
+static char * load_input_file(struct ds_task *t) {
 	FILE *fp = fopen("infile", "r");
 	if(!fp) {
 		fatal("coprocess could not open file 'infile' for reading: %s", strerror(errno));
@@ -221,7 +221,7 @@ static char * load_input_file(struct work_queue_task *t) {
 	return buf;
 }
 
-pid_t work_queue_process_execute(struct work_queue_process *p )
+pid_t ds_process_execute(struct ds_process *p )
 {
 	// make warning
 
@@ -237,7 +237,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 	if(p->loop_mount) {
 		char *buf = malloc(PATH_MAX);
 		char *pwd = getcwd(buf, PATH_MAX);
-		char *filename = work_queue_generate_disk_alloc_full_filename(pwd, p->task->taskid);
+		char *filename = ds_generate_disk_alloc_full_filename(pwd, p->task->taskid);
 		p->task->command_line = string_format("export CCTOOLS_DISK_ALLOC=%s; %s", filename, p->task->command_line);
 		free(buf);
 	}
@@ -289,7 +289,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 			char *input = load_input_file(p->task);
 
 			// call invoke_coprocess_function
-		 	char *output = work_queue_coprocess_run(p->task->command_line, input, p->coprocess_port);
+		 	char *output = ds_coprocess_run(p->task->command_line, input, p->coprocess_port);
 
 			// write data to output file
 			full_write(p->output_fd, output, strlen(output));
@@ -313,7 +313,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p )
 	return 0;
 }
 
-void work_queue_process_kill(struct work_queue_process *p)
+void ds_process_kill(struct ds_process *p)
 {
 	//make sure a few seconds have passed since child process was created to avoid sending a signal
 	//before it has been fully initialized. Else, the signal sent to that process gets lost.
@@ -338,9 +338,9 @@ void work_queue_process_kill(struct work_queue_process *p)
  * files). In this way, we can only measure the size of the sandbox when
  * enforcing limits on the process, as a task should never write directly to
  * the cache. */
-void  work_queue_process_compute_disk_needed( struct work_queue_process *p ) {
-	struct work_queue_task *t = p->task;
-	struct work_queue_file *f;
+void  ds_process_compute_disk_needed( struct ds_process *p ) {
+	struct ds_task *t = p->task;
+	struct ds_file *f;
 	struct stat s;
 
 	p->disk = t->resources_requested->disk;
@@ -352,7 +352,7 @@ void  work_queue_process_compute_disk_needed( struct work_queue_process *p ) {
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
-			if(f->type != WORK_QUEUE_FILE && f->type != WORK_QUEUE_FILE_PIECE)
+			if(f->type != DS_FILE && f->type != DS_FILE_PIECE)
 					continue;
 
 			if(stat(f->cached_name, &s) < 0)
@@ -369,7 +369,7 @@ void  work_queue_process_compute_disk_needed( struct work_queue_process *p ) {
 
 }
 
-int work_queue_process_measure_disk(struct work_queue_process *p, int max_time_on_measurement) {
+int ds_process_measure_disk(struct ds_process *p, int max_time_on_measurement) {
 	/* we can't have pointers to struct members, thus we create temp variables here */
 
 	struct path_disk_size_info *state = p->disk_measurement_state;

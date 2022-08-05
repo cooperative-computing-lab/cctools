@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "work_queue_json.h"
+#include "ds_json.h"
 
 #include "jx.h"
 #include "jx_parse.h"
@@ -14,7 +14,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-static const char *work_queue_properties[] = { "name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "manager_link",
+static const char *ds_properties[] = { "name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "manager_link",
 	"poll_table", "poll_table_size", "tasks", "task_state_map", "ready_list", "worker_table",
 	"worker_blacklist", "worker_task_map", "categories", "workers_with_available_results",
 	"stats", "stats_measure", "stats_disconnected_workers", "time_last_wait",
@@ -29,7 +29,7 @@ static const char *work_queue_properties[] = { "name", "port", "priority", "num_
 	"current_max_worker", "password", "bandwidth", NULL
 };
 
-static const char *work_queue_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", "environment",
+static const char *ds_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", "environment",
 	"output_files", "env_list", "taskid", "return_status", "result", "host", "hostname",
 	"category", "resource_request", "priority", "max_retries", "try_count",
 	"exhausted_attempts", "time_when_submitted", "time_when_done",
@@ -88,7 +88,7 @@ static int validate_json(struct jx *json, const char **array)
 
 }
 
-static int specify_files(int input, struct jx *files, struct work_queue_task *task)
+static int specify_files(int input, struct jx *files, struct ds_task *task)
 {
 
 	void *i = NULL;
@@ -120,11 +120,11 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 					bool flag_value = flag->value->u.boolean_value;
 					if(!strcmp(flag_key, "cache")) {
 						if(flag_value) {
-							flags |= WORK_QUEUE_CACHE;
+							flags |= DS_CACHE;
 						}
 					} else if(!strcmp(flag_key, "watch")) {
 						if(flag_value) {
-							flags |= WORK_QUEUE_WATCH;
+							flags |= DS_WATCH;
 						}
 					} else {
 						printf("KEY ERROR: %s not valid\n", flag_key);
@@ -143,9 +143,9 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 		}
 
 		if(input) {
-			work_queue_task_specify_file(task, local, remote, WORK_QUEUE_INPUT, flags);
+			ds_task_specify_file(task, local, remote, DS_INPUT, flags);
 		} else {
-			work_queue_task_specify_file(task, local, remote, WORK_QUEUE_OUTPUT, flags);
+			ds_task_specify_file(task, local, remote, DS_OUTPUT, flags);
 		}
 
 		arr = jx_iterate_array(files, &i);
@@ -156,7 +156,7 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 
 }
 
-static int specify_environment(struct jx *environment, struct work_queue_task *task)
+static int specify_environment(struct jx *environment, struct ds_task *task)
 {
 	void *j = NULL;
 	void *i = NULL;
@@ -164,7 +164,7 @@ static int specify_environment(struct jx *environment, struct work_queue_task *t
 	struct jx *value = jx_iterate_values(environment, &i);
 
 	while(key != NULL) {
-		work_queue_task_specify_environment_variable(task, key, value->u.string_value);
+		ds_task_specify_environment_variable(task, key, value->u.string_value);
 		key = jx_iterate_keys(environment, &j);
 		value = jx_iterate_values(environment, &i);
 	}
@@ -174,7 +174,7 @@ static int specify_environment(struct jx *environment, struct work_queue_task *t
 
 
 
-static struct work_queue_task *create_task(const char *str)
+static struct ds_task *create_task(const char *str)
 {
 
 	char *command_line = NULL;
@@ -188,7 +188,7 @@ static struct work_queue_task *create_task(const char *str)
 		return NULL;
 	}
 	//validate json
-	if(validate_json(json, work_queue_task_properties)) {
+	if(validate_json(json, ds_task_properties)) {
 		return NULL;
 	}
 	//get command from json
@@ -222,10 +222,10 @@ static struct work_queue_task *create_task(const char *str)
 
 	}
 
-	//call work_queue_task_create
+	//call ds_task_create
 	if(command_line) {
 
-		struct work_queue_task *task = work_queue_task_create(command_line);
+		struct ds_task *task = ds_task_create(command_line);
 
 		if(!task) {
 			return NULL;
@@ -244,15 +244,15 @@ static struct work_queue_task *create_task(const char *str)
 		}
 
 		if(cores) {
-			work_queue_task_specify_cores(task, cores);
+			ds_task_specify_cores(task, cores);
 		}
 
 		if(memory) {
-			work_queue_task_specify_memory(task, memory);
+			ds_task_specify_memory(task, memory);
 		}
 
 		if(disk) {
-			work_queue_task_specify_disk(task, disk);
+			ds_task_specify_disk(task, disk);
 		}
 		return task;
 
@@ -262,7 +262,7 @@ static struct work_queue_task *create_task(const char *str)
 
 }
 
-struct work_queue *work_queue_json_create(const char *str)
+struct ds_manager *ds_json_create(const char *str)
 {
 
 
@@ -274,7 +274,7 @@ struct work_queue *work_queue_json_create(const char *str)
 		return NULL;
 	}
 	//validate json
-	if(validate_json(json, work_queue_properties)) {
+	if(validate_json(json, ds_properties)) {
 		return NULL;
 	}
 
@@ -302,20 +302,20 @@ struct work_queue *work_queue_json_create(const char *str)
 
 	if(port >= 0) {
 
-		struct work_queue *workqueue = work_queue_create(port);
+		struct ds_manager *dataswarm = ds_create(port);
 
-		if(!workqueue) {
+		if(!dataswarm) {
 			return NULL;
 		}
 
 		if(name) {
-			work_queue_specify_name(workqueue, name);
+			ds_specify_name(dataswarm, name);
 		}
 		if(priority) {
-			work_queue_specify_priority(workqueue, priority);
+			ds_specify_priority(dataswarm, priority);
 		}
 
-		return workqueue;
+		return dataswarm;
 
 	}
 
@@ -323,29 +323,29 @@ struct work_queue *work_queue_json_create(const char *str)
 
 }
 
-int work_queue_json_submit(struct work_queue *q, const char *str)
+int ds_json_submit(struct ds_manager *q, const char *str)
 {
 
-	struct work_queue_task *task;
+	struct ds_task *task;
 
 	task = create_task(str);
 
 	if(task) {
-		return work_queue_submit(q, task);
+		return ds_submit(q, task);
 	} else {
 		return -1;
 	}
 
 }
 
-char *work_queue_json_wait(struct work_queue *q, int timeout)
+char *ds_json_wait(struct ds_manager *q, int timeout)
 {
 
 	char *task;
 	struct jx *j;
 	struct jx_pair *command_line, *taskid, *return_status, *output, *result;
 
-	struct work_queue_task *t = work_queue_wait(q, timeout);
+	struct ds_task *t = ds_wait(q, timeout);
 
 	if(!t) {
 		return NULL;
@@ -369,14 +369,14 @@ char *work_queue_json_wait(struct work_queue *q, int timeout)
 	return task;
 }
 
-char *work_queue_json_remove(struct work_queue *q, int id)
+char *ds_json_remove(struct ds_manager *q, int id)
 {
 
 	char *task;
 	struct jx *j;
 	struct jx_pair *command_line, *taskid;
 
-	struct work_queue_task *t = work_queue_cancel_by_taskid(q, id);
+	struct ds_task *t = ds_cancel_by_taskid(q, id);
 
 	if(!t) {
 		return NULL;
@@ -393,14 +393,14 @@ char *work_queue_json_remove(struct work_queue *q, int id)
 
 }
 
-char *work_queue_json_get_status(struct work_queue *q)
+char *ds_json_get_status(struct ds_manager *q)
 {
 	char *status;
-	struct work_queue_stats s;
+	struct ds_stats s;
 	struct jx *j;
 	struct jx_pair *workers_connected, *workers_idle, *workers_busy, *tasks_waiting, *tasks_on_workers, *tasks_running, *tasks_with_results, *tasks_submitted, *tasks_done, *tasks_failed, *bytes_sent, *bytes_received;
 
-	work_queue_get_stats(q, &s);
+	ds_get_stats(q, &s);
 
 	workers_connected = jx_pair(jx_string("workers_connected"), jx_integer(s.workers_connected), NULL);
 	workers_idle = jx_pair(jx_string("workers_idle"), jx_integer(s.workers_idle), workers_connected);

@@ -4,9 +4,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "work_queue.h"
-#include "work_queue_catalog.h"
-#include "work_queue_protocol.h"
+#include "ds_manager.h"
+#include "ds_catalog.h"
+#include "ds_protocol.h"
 
 #include "cctools.h"
 #include "debug.h"
@@ -44,7 +44,7 @@ typedef enum {
 
 static format_t format_mode = FORMAT_TABLE;
 static query_t query_mode = NO_QUERY;
-static int work_queue_status_timeout = 30;
+static int ds_status_timeout = 30;
 static char *catalog_host = NULL;
 int catalog_size = CATALOG_SIZE;
 static struct jx **global_catalog = NULL; //pointer to an array of jx pointers
@@ -144,12 +144,12 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT\n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug <flag>");
 	fprintf(stdout, " %-30s Filter results by this expression.\n", "   --where=<expr>");
-	fprintf(stdout, " %-30s RPC timeout (default is %ds).\n", "-t,--timeout=<time>", work_queue_status_timeout);
+	fprintf(stdout, " %-30s RPC timeout (default is %ds).\n", "-t,--timeout=<time>", ds_status_timeout);
 	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr,\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s or :stdout)\n", "");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Use SSL when directly connecting to a manager.", "--ssl");
-	fprintf(stdout, " %-30s Show work_queue_status version.\n", "-v,--version");
+	fprintf(stdout, " %-30s Show ds_status version.\n", "-v,--version");
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
@@ -159,7 +159,7 @@ enum {
 	LONG_OPT_USE_SSL
 };
 
-static void work_queue_status_parse_command_line_arguments(int argc, char *argv[], const char **manager_host, int *manager_port, const char **project_name)
+static void ds_status_parse_command_line_arguments(int argc, char *argv[], const char **manager_host, int *manager_port, const char **project_name)
 {
 	static const struct option long_options[] = {
 		{"project-name", required_argument, 0, 'M'},
@@ -229,7 +229,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			debug_config_file_size(string_metric_parse(optarg));
 			break;
 		case 't':
-			work_queue_status_timeout = strtol(optarg, NULL, 10);
+			ds_status_timeout = strtol(optarg, NULL, 10);
 			break;
 		case 'h':
 			show_help(argv[0]);
@@ -285,7 +285,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 	}
 
 	if(optind < argc) {
-		fprintf(stderr,"work_queue_status: Too many arguments.  Try the -h option for help.\n");
+		fprintf(stderr,"ds_status: Too many arguments.  Try the -h option for help.\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -321,12 +321,12 @@ int get_managers( time_t stoptime )
 				jx_operator(
 					JX_OP_EQ,
 					jx_symbol("type"),
-					jx_string("wq_manager")
+					jx_string("ds_manager")
 				),
 				jx_operator(
 					JX_OP_EQ,
 					jx_symbol("type"),
-					jx_string("wq_master")
+					jx_string("ds_master")
 				)));
 
 	cq = catalog_query_create(catalog_host, jexpr, stoptime );
@@ -377,7 +377,7 @@ void add_child_relation(const char *name, int spaces, char *buffer, size_t max_s
 int find_child_relations(int spaces, const char *host, int port, struct jx_table *headers, time_t stoptime)
 {
 	int i = 0; //global_catalog iterator
-	char full_address[WORK_QUEUE_LINE_MAX];
+	char full_address[DS_LINE_MAX];
 
 	if(!domain_name_cache_lookup(host, full_address))
 	{
@@ -549,17 +549,17 @@ int main(int argc, char *argv[])
 {
 	const char *manager_host  = NULL;
 	const char *project_name = NULL;
-	int manager_port = WORK_QUEUE_DEFAULT_PORT;
+	int manager_port = DS_DEFAULT_PORT;
 
 	debug_config(argv[0]);
 
-	work_queue_status_parse_command_line_arguments(argc, argv, &manager_host, &manager_port, &project_name);
+	ds_status_parse_command_line_arguments(argc, argv, &manager_host, &manager_port, &project_name);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
 	columns = terminal_columns(1);
 
-	time_t stoptime = time(0) + work_queue_status_timeout;
+	time_t stoptime = time(0) + ds_status_timeout;
 
 	if(manager_host) {
 		return do_direct_query(manager_host,manager_port,stoptime);

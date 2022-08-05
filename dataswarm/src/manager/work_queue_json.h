@@ -4,30 +4,30 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef WORK_QUEUE_JSON_H
-#define WORK_QUEUE_JSON_H
+#ifndef DS_JSON_H
+#define DS_JSON_H
 
-/** @file work_queue_json.h A manager-worker library.
+/** @file ds_json.h A manager-worker library.
  The work queue provides an implementation of the manager-worker computing model
  using TCP sockets, Unix applications, and files as intermediate buffers.  A
- manager process uses @ref work_queue_json_create to create a queue, then @ref
- work_queue_json_submit to submit tasks. Once tasks are running, call @ref
- work_queue_json_wait to wait for completion.
+ manager process uses @ref ds_json_create to create a queue, then @ref
+ ds_json_submit to submit tasks. Once tasks are running, call @ref
+ ds_json_wait to wait for completion.
 */
 
-#include "work_queue.h"
+#include "ds_manager.h"
 
 /** Create a new work_queue object.
 @param str A json document with properties to configure a new queue. Allowed properties are port, name, and priority.
 @return A new work queue, or null if it could not be created.
  */
-struct work_queue *work_queue_json_create(const char *str);
+struct ds_manager *ds_json_create(const char *str);
 
 /** Submit a task to a queue.
 Once a task is submitted to a queue, it is not longer under the user's
-control and should not be inspected until returned via @ref work_queue_wait.
+control and should not be inspected until returned via @ref ds_wait.
 Once returned, it is safe to re-submit the same take object via
-@ref work_queue_submit.
+@ref ds_submit.
 @param q A work queue object.
 @param str A JSON description of a task.
 
@@ -60,13 +60,13 @@ environment document:
 
 @return An integer taskid assigned to the submitted task.
 */
-int work_queue_json_submit(struct work_queue *q, const char *str);
+int ds_json_submit(struct ds_manager *q, const char *str);
 
 /** Wait for a task to complete.
 @param q A work queue object.
 @param timeout The number of seconds to wait for a completed task before
 returning. Use an integer time to set the timeout or the constant
-@ref WORK_QUEUE_WAITFORTASK to block until a task has completed.
+@ref DS_WAITFORTASK to block until a task has completed.
 @return A JSON description of the completed task or the
  timeout was reached without a completed task, or there is completed child
 process (call @ref process_wait to retrieve the status of the completed
@@ -76,7 +76,7 @@ child process). Return string should be freed using free().
 <i>integer</i> , "return_status" : <i>integer</i> , "result" : <i>integer</i> }
 
 */
-char *work_queue_json_wait(struct work_queue *q, int timeout);
+char *ds_json_wait(struct ds_manager *q, int timeout);
 
 
 /** Remove a task from the queue.
@@ -84,12 +84,12 @@ char *work_queue_json_wait(struct work_queue *q, int timeout);
 @param id The id of the task to be removed from the queue.
 @return A JSON description of the removed task.
 */
-char *work_queue_json_remove(struct work_queue *q, int id);
+char *ds_json_remove(struct ds_manager *q, int id);
 
 /** Get the status for a given work queue.
 @param q A work queue object.
 @return A JSON description of the stats of the given work queue object.
 */
-char *work_queue_json_get_status(struct work_queue *q);
+char *ds_json_get_status(struct ds_manager *q);
 
 #endif

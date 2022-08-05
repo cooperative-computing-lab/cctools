@@ -3,14 +3,14 @@ include ../../../rules.mk
 
 SOURCES = \
 	work_queue.c \
-	work_queue_catalog.c \
-	work_queue_resources.c \
-	work_queue_json.c
+	ds_catalog.c \
+	ds_resources.c \
+	ds_json.c
 
-PUBLIC_HEADERS = work_queue.h
+PUBLIC_HEADERS = ds_manager.h
 
 OBJECTS = $(SOURCES:%.c=%.o)
-PUBLIC_HEADERS = work_queue.h work_queue_catalog.h work_queue_json.h
+PUBLIC_HEADERS = ds_manager.h ds_catalog.h ds_json.h
 LIBRARIES = libwork_queue.a
 TARGETS = $(LIBRARIES)
 

@@ -1,4 +1,4 @@
-This directory contains the Work Queue Golang API. 
-To compile the `work_queue_example.go`, make sure 
+This directory contains the Data Swarm Golang API. 
+To compile the `ds_example.go`, make sure 
 Go v1.10+ is installed and run 
-`make work_queue_example`
+`make ds_example`

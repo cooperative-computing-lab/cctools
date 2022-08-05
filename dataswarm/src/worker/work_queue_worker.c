@@ -4,16 +4,16 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "work_queue.h"
-#include "work_queue_protocol.h"
-#include "work_queue_internal.h"
-#include "work_queue_resources.h"
-#include "work_queue_process.h"
-#include "work_queue_catalog.h"
-#include "work_queue_watcher.h"
-#include "work_queue_gpus.h"
-#include "work_queue_coprocess.h"
-#include "work_queue_sandbox.h"
+#include "ds_manager.h"
+#include "ds_protocol.h"
+#include "ds_internal.h"
+#include "ds_resources.h"
+#include "ds_process.h"
+#include "ds_catalog.h"
+#include "ds_watcher.h"
+#include "ds_gpus.h"
+#include "ds_coprocess.h"
+#include "ds_sandbox.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -163,11 +163,11 @@ static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
 static timestamp_t worker_start_time = 0;
 
-static struct work_queue_watcher * watcher = 0;
+static struct ds_watcher * watcher = 0;
 
-static struct work_queue_resources * local_resources = 0;
-struct work_queue_resources * total_resources = 0;
-struct work_queue_resources * total_resources_last = 0;
+static struct ds_resources * local_resources = 0;
+struct ds_resources * total_resources = 0;
+struct ds_resources * total_resources_last = 0;
 
 static int64_t last_task_received  = 0;
 
@@ -193,7 +193,7 @@ static int64_t files_counted = 0;
 static int check_resources_interval = 5;
 static int max_time_on_measurement  = 3;
 
-static struct work_queue *foreman_q = NULL;
+static struct ds_manager *foreman_q = NULL;
 
 // Table of all processes in any state, indexed by taskid.
 // Processes should be created/deleted when added/removed from this table.
@@ -233,14 +233,14 @@ static int coprocess_port = -1;
 
 static char *factory_name = NULL;
 
-struct work_queue_cache *global_cache = 0;
+struct ds_cache *global_cache = 0;
 
-extern int wq_hack_do_not_compute_cached_name;
+extern int ds_hack_do_not_compute_cached_name;
 
 __attribute__ (( format(printf,2,3) ))
 static void send_manager_message( struct link *l, const char *fmt, ... )
 {
-	char debug_msg[2*WORK_QUEUE_LINE_MAX];
+	char debug_msg[2*DS_LINE_MAX];
 	va_list va;
 	va_list debug_va;
 
@@ -293,7 +293,7 @@ static int64_t measure_worker_disk()
 		/* if a complete measurement has been done, then update
 		 * for the found value, and add the known values of the processes. */
 
-		struct work_queue_process *p;
+		struct ds_process *p;
 		uint64_t taskid;
 
 		itable_firstkey(procs_table);
@@ -320,9 +320,9 @@ static void measure_worker_resources()
 		return;
 	}
 
-	struct work_queue_resources *r = local_resources;
+	struct ds_resources *r = local_resources;
 
-	work_queue_resources_measure_locally(r,workspace);
+	ds_resources_measure_locally(r,workspace);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		aggregate_workers_resources(foreman_q, total_resources, features);
@@ -353,10 +353,10 @@ static void measure_worker_resources()
 		total_resources->tag        = last_task_received;
 	} else {
 		/* in a regular worker, total and local resources are the same. */
-		memcpy(total_resources, r, sizeof(struct work_queue_resources));
+		memcpy(total_resources, r, sizeof(struct ds_resources));
 	}
 
-	work_queue_gpus_init(r->gpus.total);
+	ds_gpus_init(r->gpus.total);
 
 	last_resources_measurement = time(0);
 }
@@ -371,9 +371,9 @@ static void send_features(struct link *manager)
 	void *dummy;
 	hash_table_firstkey(features);
 
-	char fenc[WORK_QUEUE_LINE_MAX];
+	char fenc[DS_LINE_MAX];
 	while(hash_table_nextkey(features, &f, &dummy)) {
-		url_encode(f, fenc, WORK_QUEUE_LINE_MAX);
+		url_encode(f, fenc, DS_LINE_MAX);
 		send_manager_message(manager, "feature %s\n", fenc);
 	}
 }
@@ -405,7 +405,7 @@ static void send_resource_update(struct link *manager)
 		}
 	}
 
-	work_queue_resources_send(manager,total_resources,stoptime);
+	ds_resources_send(manager,total_resources,stoptime);
 	send_manager_message(manager, "info end_of_resource_update %d\n", 0);
 }
 
@@ -416,8 +416,8 @@ Send a message to the manager with my current statistics information.
 static void send_stats_update(struct link *manager)
 {
 	if(worker_mode == WORKER_MODE_FOREMAN) {
-		struct work_queue_stats s;
-		work_queue_get_stats_hierarchy(foreman_q, &s);
+		struct ds_stats s;
+		ds_get_stats_hierarchy(foreman_q, &s);
 
 		send_manager_message(manager, "info workers_joined %lld\n", (long long) s.workers_joined);
 		send_manager_message(manager, "info workers_removed %lld\n", (long long) s.workers_removed);
@@ -506,12 +506,12 @@ static int send_tlq_config( struct link *manager )
 	return 1;
 }
 
-static int get_task_tlq_url( struct work_queue_task *task )
+static int get_task_tlq_url( struct ds_task *task )
 {
 	if(tlq_port && debug_path) {
-		char home_host[WORK_QUEUE_LINE_MAX];
-		char tlq_workdir[WORK_QUEUE_LINE_MAX];
-		char log_path[WORK_QUEUE_LINE_MAX];
+		char home_host[DS_LINE_MAX];
+		char tlq_workdir[DS_LINE_MAX];
+		char log_path[DS_LINE_MAX];
 		int home_port;
 		debug(D_TLQ, "looking up task %d TLQ URL", task->taskid);
 		//Command is assumed to be wrapped by log_define script from TLQ
@@ -543,7 +543,7 @@ static void report_worker_ready( struct link *manager )
 {
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
-	send_manager_message(manager,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
+	send_manager_message(manager,"dataswarm %d %s %s %s %d.%d.%d\n",DS_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_manager_message(manager, "info worker-id %s\n", worker_id);
 	send_features(manager);
 	send_tlq_config(manager);
@@ -559,15 +559,15 @@ accounting for the resources as necessary.
 Should maintain parallel structure to reap_process() above.
 */
 
-static int start_process( struct work_queue_process *p, struct link *manager )
+static int start_process( struct ds_process *p, struct link *manager )
 {
 	pid_t pid;
 
-	struct work_queue_task *t = p->task;
+	struct ds_task *t = p->task;
 
-	if(!work_queue_sandbox_stagein(p,global_cache,manager)) {
+	if(!ds_sandbox_stagein(p,global_cache,manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
-		p->task_status = WORK_QUEUE_RESULT_INPUT_MISSING;
+		p->task_status = DS_RESULT_INPUT_MISSING;
 		p->exit_status = 1;
 		itable_insert(procs_complete,p->task->taskid,p);
 		return 0;
@@ -579,10 +579,10 @@ static int start_process( struct work_queue_process *p, struct link *manager )
 	gpus_allocated += t->resources_requested->gpus;
 
 	if(t->resources_requested->gpus>0) {
-		work_queue_gpus_allocate(t->resources_requested->gpus,t->taskid);
+		ds_gpus_allocate(t->resources_requested->gpus,t->taskid);
 	}
 
-	pid = work_queue_process_execute(p);
+	pid = ds_process_execute(p);
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
 	itable_insert(procs_running,p->pid,p);
@@ -596,7 +596,7 @@ account for the resources as necessary.
 Should maintain parallel structure to start_process() above.
 */
 
-static void reap_process( struct work_queue_process *p )
+static void reap_process( struct ds_process *p )
 {
 	p->execution_end = timestamp_get();
 
@@ -605,10 +605,10 @@ static void reap_process( struct work_queue_process *p )
 	disk_allocated   -= p->task->resources_requested->disk;
 	gpus_allocated   -= p->task->resources_requested->gpus;
 
-	work_queue_gpus_free(p->task->taskid);
+	ds_gpus_free(p->task->taskid);
 
-	if(!work_queue_sandbox_stageout(p,global_cache)) {
-		p->task_status = WORK_QUEUE_RESULT_OUTPUT_MISSING;
+	if(!ds_sandbox_stageout(p,global_cache)) {
+		p->task_status = DS_RESULT_OUTPUT_MISSING;
 		p->exit_status = 1;
 	}
 
@@ -622,7 +622,7 @@ If a local worker, stream the output from disk.
 If a foreman, send the outputs contained in the task structure.
 */
 
-static void report_task_complete( struct link *manager, struct work_queue_process *p )
+static void report_task_complete( struct link *manager, struct ds_process *p )
 {
 	int64_t output_length;
 	struct stat st;
@@ -637,7 +637,7 @@ static void report_task_complete( struct link *manager, struct work_queue_proces
 		total_task_execution_time += (p->execution_end - p->execution_start);
 		total_tasks_executed++;
 	} else {
-		struct work_queue_task *t = p->task;
+		struct ds_task *t = p->task;
 		if(t->output) {
 			output_length = strlen(t->output);
 		} else {
@@ -663,13 +663,13 @@ send the results to the manager.
 
 static void report_tasks_complete( struct link *manager )
 {
-	struct work_queue_process *p;
+	struct ds_process *p;
 
 	while((p=itable_pop(procs_complete))) {
 		report_task_complete(manager,p);
 	}
 
-	work_queue_watcher_send_changes(watcher,manager,time(0)+active_timeout);
+	ds_watcher_send_changes(watcher,manager,time(0)+active_timeout);
 
 	send_manager_message(manager, "end\n");
 
@@ -683,7 +683,7 @@ and send a kill signal.  The actual exit of the process will be detected at a la
 
 static void expire_procs_running()
 {
-	struct work_queue_process *p;
+	struct ds_process *p;
 	uint64_t pid;
 
 	double current_time = timestamp_get() / USECOND;
@@ -692,7 +692,7 @@ static void expire_procs_running()
 	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
-			p->task_status = WORK_QUEUE_RESULT_TASK_TIMEOUT;
+			p->task_status = DS_RESULT_TASK_TIMEOUT;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -702,12 +702,12 @@ static void expire_procs_running()
 Return true if task uses a disk allocation and it was overrun.
 */
 
-static int is_disk_allocation_exhausted( struct work_queue_process *p )
+static int is_disk_allocation_exhausted( struct ds_process *p )
 {
 	int result = 0;
 	FILE *loop_full_check;
 	char *buf = malloc(PATH_MAX);
-	char *disk_alloc_filename = work_queue_generate_disk_alloc_full_filename(p->sandbox,p->task->taskid);
+	char *disk_alloc_filename = ds_generate_disk_alloc_full_filename(p->sandbox,p->task->taskid);
 	
 	if(p->loop_mount == 1 && (loop_full_check = fopen(disk_alloc_filename, "r"))) {
 		fclose(loop_full_check);
@@ -731,7 +731,7 @@ for later processing.
 
 static int handle_completed_tasks(struct link *manager)
 {
-	struct work_queue_process *p;
+	struct ds_process *p;
 	pid_t pid;
 	int status;
 
@@ -751,7 +751,7 @@ static int handle_completed_tasks(struct link *manager)
 				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
 
 				if(is_disk_allocation_exhausted(p)) {
-					p->task_status = WORK_QUEUE_RESULT_DISK_ALLOC_FULL;
+					p->task_status = DS_RESULT_DISK_ALLOC_FULL;
 					p->task->disk_allocation_exhausted = 1;
 				}
 			}
@@ -811,7 +811,7 @@ static int stream_output_item(struct link *manager, const char *filename, int re
 	int64_t actual, length;
 	int fd;
 
-	char *cached_path = work_queue_cache_full_path(global_cache,filename);
+	char *cached_path = ds_cache_full_path(global_cache,filename);
 	
 	if(stat(cached_path, &info) != 0) {
 		goto access_failure;
@@ -867,9 +867,9 @@ then assume that the task occupies all worker resources.
 Otherwise, just make sure all values are non-zero.
 */
 
-static void normalize_resources( struct work_queue_process *p )
+static void normalize_resources( struct ds_process *p )
 {
-	struct work_queue_task *t = p->task;
+	struct ds_task *t = p->task;
 
 	if(t->resources_requested->cores < 0 && t->resources_requested->memory < 0 && t->resources_requested->disk < 0 && t->resources_requested->gpus < 0) {
 		t->resources_requested->cores = local_resources->cores.total;
@@ -886,67 +886,67 @@ static void normalize_resources( struct work_queue_process *p )
 
 /*
 Handle an incoming task message from the manager.
-Generate a work_queue_process wrapped around a work_queue_task,
+Generate a ds_process wrapped around a ds_task,
 and deposit it into the waiting list or the foreman_q as appropriate.
 */
 
 static int do_task( struct link *manager, int taskid, time_t stoptime )
 {
-	char line[WORK_QUEUE_LINE_MAX];
-	char filename[WORK_QUEUE_LINE_MAX];
-	char localname[WORK_QUEUE_LINE_MAX];
-	char taskname[WORK_QUEUE_LINE_MAX];
-	char taskname_encoded[WORK_QUEUE_LINE_MAX];
-	char category[WORK_QUEUE_LINE_MAX];
+	char line[DS_LINE_MAX];
+	char filename[DS_LINE_MAX];
+	char localname[DS_LINE_MAX];
+	char taskname[DS_LINE_MAX];
+	char taskname_encoded[DS_LINE_MAX];
+	char category[DS_LINE_MAX];
 	int flags, length;
 	int64_t n;
 
 	timestamp_t nt;
 
-	struct work_queue_task *task = work_queue_task_create(0);
+	struct ds_task *task = ds_task_create(0);
 	task->taskid = taskid;
 
 	while(recv_manager_message(manager,line,sizeof(line),stoptime)) {
 		if(!strcmp(line,"end")) {
 			break;
 		} else if(sscanf(line, "category %s",category)) {
-			work_queue_task_specify_category(task, category);
+			ds_task_specify_category(task, category);
 		} else if(sscanf(line,"cmd %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
-			work_queue_task_specify_command(task,cmd);
+			ds_task_specify_command(task,cmd);
 			debug(D_WQ,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"coprocess %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
-			work_queue_task_specify_coprocess(task,cmd);
+			ds_task_specify_coprocess(task,cmd);
 			debug(D_WQ,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
-			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
-			wq_hack_do_not_compute_cached_name = 1;
-			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags );
+			url_decode(taskname_encoded, taskname, DS_LINE_MAX);
+			ds_hack_do_not_compute_cached_name = 1;
+			ds_task_specify_file(task, localname, taskname, DS_INPUT, flags );
 		} else if(sscanf(line,"outfile %s %s %d", localname, taskname_encoded, &flags)) {
-			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
-			wq_hack_do_not_compute_cached_name = 1;
-			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags );
+			url_decode(taskname_encoded, taskname, DS_LINE_MAX);
+			ds_hack_do_not_compute_cached_name = 1;
+			ds_task_specify_file(task, localname, taskname, DS_OUTPUT, flags );
 		} else if(sscanf(line, "dir %s", filename)) {
-			work_queue_task_specify_directory(task, filename, filename, WORK_QUEUE_INPUT, 0700, 0);
+			ds_task_specify_directory(task, filename, filename, DS_INPUT, 0700, 0);
 		} else if(sscanf(line,"cores %" PRId64,&n)) {
-			work_queue_task_specify_cores(task, n);
+			ds_task_specify_cores(task, n);
 		} else if(sscanf(line,"memory %" PRId64,&n)) {
-			work_queue_task_specify_memory(task, n);
+			ds_task_specify_memory(task, n);
 		} else if(sscanf(line,"disk %" PRId64,&n)) {
-			work_queue_task_specify_disk(task, n);
+			ds_task_specify_disk(task, n);
 		} else if(sscanf(line,"gpus %" PRId64,&n)) {
-			work_queue_task_specify_gpus(task, n);
+			ds_task_specify_gpus(task, n);
 		} else if(sscanf(line,"wall_time %" PRIu64,&nt)) {
-			work_queue_task_specify_running_time_max(task, nt);
+			ds_task_specify_running_time_max(task, nt);
 		} else if(sscanf(line,"end_time %" PRIu64,&nt)) {
-			work_queue_task_specify_end_time(task, nt * USECOND); //end_time needs it usecs
+			ds_task_specify_end_time(task, nt * USECOND); //end_time needs it usecs
 		} else if(sscanf(line,"env %d",&length)==1) {
 			char *env = malloc(length+2); /* +2 for \n and \0 */
 			link_read(manager, env, length+1, stoptime);
@@ -955,7 +955,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			if(value) {
 				*value = 0;
 				value++;
-				work_queue_task_specify_environment_variable(task,env,value);
+				ds_task_specify_environment_variable(task,env,value);
 			}
 			free(env);
 		} else {
@@ -966,20 +966,20 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 
 	last_task_received = task->taskid;
 
-	struct work_queue_process *p = work_queue_process_create(task, disk_allocation);
+	struct ds_process *p = ds_process_create(task, disk_allocation);
 	if(!p) return 0;
 
 	// Every received task goes into procs_table.
 	itable_insert(procs_table,taskid,p);
 
 	if(worker_mode==WORKER_MODE_FOREMAN) {
-		work_queue_submit_internal(foreman_q,task);
+		ds_submit_internal(foreman_q,task);
 	} else {
 		normalize_resources(p);
 		list_push_tail(procs_waiting,p);
 	}
 
-	work_queue_watcher_add_process(watcher,p);
+	ds_watcher_add_process(watcher,p);
 
 	return 1;
 }
@@ -1070,9 +1070,9 @@ of existing code.
 
 static int do_put_dir_internal( struct link *manager, char *dirname, int *totalsize )
 {
-	char line[WORK_QUEUE_LINE_MAX];
-	char name_encoded[WORK_QUEUE_LINE_MAX];
-	char name[WORK_QUEUE_LINE_MAX];
+	char line[DS_LINE_MAX];
+	char name_encoded[DS_LINE_MAX];
+	char name[DS_LINE_MAX];
 	int64_t size;
 	int mode;
 
@@ -1134,11 +1134,11 @@ static int do_put_dir( struct link *manager, char *dirname )
 
 	int totalsize = 0;
 
-	char *cached_path = work_queue_cache_full_path(global_cache,dirname);
+	char *cached_path = ds_cache_full_path(global_cache,dirname);
 	int result = do_put_dir_internal(manager,cached_path,&totalsize);
 	free(cached_path);
 
-	if(result) work_queue_cache_addfile(global_cache,totalsize,dirname);
+	if(result) ds_cache_addfile(global_cache,totalsize,dirname);
 
 	return result;
 }
@@ -1159,10 +1159,10 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 		return 0;
 	}
 
-	char * cached_path = work_queue_cache_full_path(global_cache,filename);
+	char * cached_path = ds_cache_full_path(global_cache,filename);
 	
 	if(strchr(filename,'/')) {
-		char dirname[WORK_QUEUE_LINE_MAX];
+		char dirname[DS_LINE_MAX];
 		path_dirname(filename,dirname);
 		if(!create_dir(dirname,0777)) {
 			debug(D_WQ, "could not create directory %s: %s",dirname,strerror(errno));
@@ -1175,7 +1175,7 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 
 	free(cached_path);
 
-	if(result) work_queue_cache_addfile(global_cache,length,filename);
+	if(result) ds_cache_addfile(global_cache,length,filename);
 
 	return result;
 }
@@ -1192,7 +1192,7 @@ Accept a url specification and queue it for later transfer.
 
 static int do_put_url( const char *cache_name, int64_t size, int mode, const char *source )
 {
-	return work_queue_cache_queue(global_cache,WORK_QUEUE_CACHE_TRANSFER,source,cache_name,size,mode);
+	return ds_cache_queue(global_cache,DS_CACHE_TRANSFER,source,cache_name,size,mode);
 }
 
 /*
@@ -1201,7 +1201,7 @@ Accept a url specification and queue it for later transfer.
 
 static int do_put_cmd( const char *cache_name, int64_t size, int mode, const char *source )
 {
-	return work_queue_cache_queue(global_cache,WORK_QUEUE_CACHE_COMMAND,source,cache_name,size,mode);
+	return ds_cache_queue(global_cache,DS_CACHE_COMMAND,source,cache_name,size,mode);
 }
 
 /*
@@ -1212,12 +1212,12 @@ trash and deal with it there.
 
 static int do_unlink(const char *path)
 {
-	char *cached_path = work_queue_cache_full_path(global_cache,path);
+	char *cached_path = ds_cache_full_path(global_cache,path);
   
 	int result = 0;
 	
 	if(path_within_dir(cached_path, workspace)) {
-		work_queue_cache_remove(global_cache,path);
+		ds_cache_remove(global_cache,path);
 		result = 1;
 	} else {
 		debug(D_WQ, "%s is not within workspace %s",cached_path,workspace);
@@ -1245,7 +1245,7 @@ remove all of the associated files and other state.
 
 static int do_kill(int taskid)
 {
-	struct work_queue_process *p;
+	struct ds_process *p;
 
 	p = itable_remove(procs_table, taskid);
 	if(!p) {
@@ -1254,24 +1254,24 @@ static int do_kill(int taskid)
 	}
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
-		work_queue_cancel_by_taskid(foreman_q, taskid);
+		ds_cancel_by_taskid(foreman_q, taskid);
 	} else {
 		if(itable_remove(procs_running, p->pid)) {
-			work_queue_process_kill(p);
+			ds_process_kill(p);
 			cores_allocated -= p->task->resources_requested->cores;
 			memory_allocated -= p->task->resources_requested->memory;
 			disk_allocated -= p->task->resources_requested->disk;
 			gpus_allocated -= p->task->resources_requested->gpus;
-			work_queue_gpus_free(taskid);
+			ds_gpus_free(taskid);
 		}
 	}
 
 	itable_remove(procs_complete, p->task->taskid);
 	list_remove(procs_waiting,p);
 
-	work_queue_watcher_remove_process(watcher,p);
+	ds_watcher_remove_process(watcher,p);
 
-	work_queue_process_delete(p);
+	ds_process_delete(p);
 
 	return 1;
 }
@@ -1286,7 +1286,7 @@ then we need to abort to clean things up.
 
 static void kill_all_tasks()
 {
-	struct work_queue_process *p;
+	struct ds_process *p;
 	uint64_t taskid;
 
 	itable_firstkey(procs_table);
@@ -1313,22 +1313,22 @@ foremen down its hierarchy. It is invalid for a worker to receice this message.
 static int do_invalidate_file(const char *filename)
 {
 	if(worker_mode == WORKER_MODE_FOREMAN) {
-		work_queue_invalidate_cached_file_internal(foreman_q, filename);
+		ds_invalidate_cached_file_internal(foreman_q, filename);
 		return 1;
 	}
 
 	return -1;
 }
 
-static void finish_running_task(struct work_queue_process *p, work_queue_result_t result)
+static void finish_running_task(struct ds_process *p, ds_result_t result)
 {
 	p->task_status |= result;
 	kill(p->pid, SIGKILL);
 }
 
-static void finish_running_tasks(work_queue_result_t result)
+static void finish_running_tasks(ds_result_t result)
 {
-	struct work_queue_process *p;
+	struct ds_process *p;
 	pid_t pid;
 
 	itable_firstkey(procs_running);
@@ -1337,13 +1337,13 @@ static void finish_running_tasks(work_queue_result_t result)
 	}
 }
 
-static int enforce_process_limits(struct work_queue_process *p)
+static int enforce_process_limits(struct ds_process *p)
 {
 	/* If the task did not specify disk usage, return right away. */
 	if(p->disk < 1)
 		return 1;
 
-	work_queue_process_measure_disk(p, max_time_on_measurement);
+	ds_process_measure_disk(p, max_time_on_measurement);
 	if(p->sandbox_size > p->task->resources_requested->disk) {
 		debug(D_WQ,"Task %d went over its disk size limit: %s > %s\n",
 				p->task->taskid,
@@ -1359,7 +1359,7 @@ static int enforce_processes_limits()
 {
 	static time_t last_check_time = 0;
 
-	struct work_queue_process *p;
+	struct ds_process *p;
 	pid_t pid;
 
 	int ok = 1;
@@ -1370,7 +1370,7 @@ static int enforce_processes_limits()
 	itable_firstkey(procs_table);
 	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
 		if(!enforce_process_limits(p)) {
-			finish_running_task(p, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+			finish_running_task(p, DS_RESULT_RESOURCE_EXHAUSTION);
 
 			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
 			if(p->loop_mount == 1) {
@@ -1395,7 +1395,7 @@ as other running tasks should not be affected by a task timeout.
 
 static void enforce_processes_max_running_time()
 {
-	struct work_queue_process *p;
+	struct ds_process *p;
 	pid_t pid;
 
 	timestamp_t now = timestamp_get();
@@ -1411,7 +1411,7 @@ static void enforce_processes_max_running_time()
 					p->task->taskid,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
-			p->task_status = WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME;
+			p->task_status = DS_RESULT_TASK_MAX_RUN_TIME;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -1457,12 +1457,12 @@ static void disconnect_manager(struct link *manager)
 
 static int handle_manager(struct link *manager)
 {
-	char line[WORK_QUEUE_LINE_MAX];
-	char filename_encoded[WORK_QUEUE_LINE_MAX];
-	char filename[WORK_QUEUE_LINE_MAX];
-	char source_encoded[WORK_QUEUE_LINE_MAX];
-	char source[WORK_QUEUE_LINE_MAX];
-	char manager_tlq_url[WORK_QUEUE_LINE_MAX];
+	char line[DS_LINE_MAX];
+	char filename_encoded[DS_LINE_MAX];
+	char filename[DS_LINE_MAX];
+	char source_encoded[DS_LINE_MAX];
+	char source[DS_LINE_MAX];
+	char manager_tlq_url[DS_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
 	int mode, r, n;
@@ -1510,13 +1510,13 @@ static int handle_manager(struct link *manager)
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
-			work_queue_broadcast_message(foreman_q, "exit\n");
+			ds_broadcast_message(foreman_q, "exit\n");
 			abort_flag = 1;
 			r = 1;
 		} else if(!strncmp(line, "check", 6)) {
 			r = send_keepalive(manager, 0);
 		} else if(!strncmp(line, "auth", 4)) {
-			fprintf(stderr,"work_queue_worker: this manager requires a password. (use the -P option)\n");
+			fprintf(stderr,"ds_worker: this manager requires a password. (use the -P option)\n");
 			r = 0;
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
@@ -1537,7 +1537,7 @@ static int handle_manager(struct link *manager)
 Return true if this task can run with the resources currently available.
 */
 
-static int task_resources_fit_now(struct work_queue_task *t)
+static int task_resources_fit_now(struct ds_task *t)
 {
 	return
 		(cores_allocated  + t->resources_requested->cores  <= local_resources->cores.total) &&
@@ -1553,9 +1553,9 @@ option, and the free available memory of the system is consumed by some other
 process.
 */
 
-static int task_resources_fit_eventually(struct work_queue_task *t)
+static int task_resources_fit_eventually(struct ds_task *t)
 {
-	struct work_queue_resources *r;
+	struct ds_resources *r;
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		r = total_resources;
@@ -1571,10 +1571,10 @@ static int task_resources_fit_eventually(struct work_queue_task *t)
 		(t->resources_requested->gpus   <= r->gpus.largest);
 }
 
-void forsake_waiting_process(struct link *manager, struct work_queue_process *p)
+void forsake_waiting_process(struct link *manager, struct ds_process *p)
 {
 	/* the task cannot run in this worker */
-	p->task_status = WORK_QUEUE_RESULT_FORSAKEN;
+	p->task_status = DS_RESULT_FORSAKEN;
 	itable_insert(procs_complete, p->task->taskid, p);
 
 	debug(D_WQ, "Waiting task %d has been forsaken.", p->task->taskid);
@@ -1590,7 +1590,7 @@ If 0, the worker is using more resources than promised. 1 if resource usage hold
 static int enforce_worker_limits(struct link *manager)
 {
 	if( manual_disk_option > 0 && local_resources->disk.inuse > manual_disk_option ) {
-		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
+		fprintf(stderr,"ds_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
 
 		if(manager) {
 			send_manager_message(manager, "info disk_exhausted %lld\n", (long long) local_resources->disk.inuse);
@@ -1600,7 +1600,7 @@ static int enforce_worker_limits(struct link *manager)
 	}
 
 	if(manual_memory_option > 0 && local_resources->memory.inuse > manual_memory_option) {
-		fprintf(stderr,"work_queue_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.inuse);
+		fprintf(stderr,"ds_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.inuse);
 
 		if(manager) {
 			send_manager_message(manager, "info memory_exhausted %lld\n", (long long) local_resources->memory.inuse);
@@ -1619,7 +1619,7 @@ If 0, the worker has less resources than promised. 1 otherwise.
 static int enforce_worker_promises(struct link *manager)
 {
 	if(end_time > 0 && timestamp_get() > ((uint64_t) end_time)) {
-		warn(D_NOTICE, "work_queue_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t) manual_wall_time_option);
+		warn(D_NOTICE, "ds_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t) manual_wall_time_option);
 		if(manager) {
 			send_manager_message(manager, "info wall_time_exhausted %"PRIu64"\n", (uint64_t) manual_wall_time_option);
 		}
@@ -1627,7 +1627,7 @@ static int enforce_worker_promises(struct link *manager)
 	}
 
 	if( manual_disk_option > 0 && local_resources->disk.total < manual_disk_option) {
-		fprintf(stderr,"work_queue_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
+		fprintf(stderr,"ds_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
 
 		if(manager) {
 			send_manager_message(manager, "info disk_error %lld\n", (long long) local_resources->disk.total);
@@ -1667,7 +1667,7 @@ static void work_for_manager(struct link *manager)
 
 		if(worker_volatility && time(0) > volatile_stoptime) {
 			if( (double)rand()/(double)RAND_MAX < worker_volatility) {
-				debug(D_NOTICE, "work_queue_worker: disconnect from manager due to volatility check.\n");
+				debug(D_NOTICE, "ds_worker: disconnect from manager due to volatility check.\n");
 				break;
 			} else {
 				volatile_stoptime = time(0) + 60;
@@ -1713,7 +1713,7 @@ static void work_for_manager(struct link *manager)
 		measure_worker_resources();
 
 		if(!enforce_worker_promises(manager)) {
-			finish_running_tasks(WORK_QUEUE_RESULT_FORSAKEN);
+			finish_running_tasks(DS_RESULT_FORSAKEN);
 			abort_flag = 1;
 			break;
 		}
@@ -1727,14 +1727,14 @@ static void work_for_manager(struct link *manager)
 		/* end running processes if worker resources are exhasusted, and marked
 		 * them as FORSAKEN, so they can be resubmitted somewhere else. */
 		if(!enforce_worker_limits(manager)) {
-			finish_running_tasks(WORK_QUEUE_RESULT_FORSAKEN);
+			finish_running_tasks(DS_RESULT_FORSAKEN);
 			// finish all tasks, disconnect from manager, but don't kill the worker (no abort_flag = 1)
 			break;
 		}
 
 		int task_event = 0;
 		if(ok) {
-			struct work_queue_process *p;
+			struct ds_process *p;
 			int visited;
 			int waiting = list_size(procs_waiting);
 
@@ -1766,7 +1766,7 @@ static void work_for_manager(struct link *manager)
 		}
 
 		if(ok && !results_to_be_sent_msg) {
-			if(work_queue_watcher_check(watcher) || itable_size(procs_complete) > 0) {
+			if(ds_watcher_check(watcher) || itable_size(procs_complete) > 0) {
 				send_manager_message(manager, "available_results\n");
 				results_to_be_sent_msg = 1;
 			}
@@ -1798,9 +1798,9 @@ static void foreman_for_manager(struct link *manager)
 	int prev_num_workers = 0;
 	while(!abort_flag) {
 		int result = 1;
-		struct work_queue_task *task = NULL;
+		struct ds_task *task = NULL;
 
-		if(time(0) > idle_stoptime && work_queue_empty(foreman_q)) {
+		if(time(0) > idle_stoptime && ds_empty(foreman_q)) {
 			debug(D_NOTICE, "giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			send_manager_message(manager, "info idle-disconnecting %lld\n", (long long) idle_timeout);
 			break;
@@ -1815,10 +1815,10 @@ static void foreman_for_manager(struct link *manager)
 		}
 		prev_num_workers = curr_num_workers;
 
-		task = work_queue_wait_internal(foreman_q, foreman_internal_timeout, manager, &manager_active, NULL);
+		task = ds_wait_internal(foreman_q, foreman_internal_timeout, manager, &manager_active, NULL);
 
 		if(task) {
-			struct work_queue_process *p;
+			struct ds_process *p;
 			p = itable_lookup(procs_table,task->taskid);
 			if(!p) fatal("no entry in procs table for taskid %d",task->taskid);
 			itable_insert(procs_complete, task->taskid, p);
@@ -1846,7 +1846,7 @@ workspace_create is done once when the worker starts.
 
 static int workspace_create()
 {
-	char absolute[WORK_QUEUE_LINE_MAX];
+	char absolute[DS_LINE_MAX];
 
 	// Setup working space(dir)
 	const char *workdir;
@@ -1869,7 +1869,7 @@ static int workspace_create()
 		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
 
-	printf( "work_queue_worker: creating workspace %s\n", workspace);
+	printf( "ds_worker: creating workspace %s\n", workspace);
 
 	if(!create_dir(workspace,0777)) {
 		return 0;
@@ -1934,7 +1934,7 @@ static int workspace_prepare()
 
 	char *cachedir = string_format("%s/cache",workspace);
 	int result = create_dir(cachedir,0777);
-	global_cache = work_queue_cache_create(cachedir);
+	global_cache = ds_cache_create(cachedir);
 	free(cachedir);
 
 	char *tmp_name = string_format("%s/cache/tmp", workspace);
@@ -1971,7 +1971,7 @@ static void workspace_cleanup()
 	}
 	trash_empty();
 
-	work_queue_cache_delete(global_cache);
+	ds_cache_delete(global_cache);
 }
 
 /*
@@ -1986,15 +1986,15 @@ static void workspace_delete()
 	if(os_name) free(os_name);
 	if(arch_name) free(arch_name);
 
-	if(foreman_q)          work_queue_delete(foreman_q);
+	if(foreman_q)          ds_delete(foreman_q);
 	if(procs_running)      itable_delete(procs_running);
 	if(procs_table)        itable_delete(procs_table);
 	if(procs_complete)     itable_delete(procs_complete);
 	if(procs_waiting)      list_delete(procs_waiting);
 
-	if(watcher)            work_queue_watcher_delete(watcher);
+	if(watcher)            ds_watcher_delete(watcher);
 
-	printf( "work_queue_worker: deleting workspace %s\n", workspace);
+	printf( "ds_worker: deleting workspace %s\n", workspace);
 
 	/*
 	Note that we cannot use trash_file here because the trash dir
@@ -2033,12 +2033,12 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	}
 
 	if(manual_ssl_option && !use_ssl) {
-		fprintf(stderr,"work_queue_worker: --ssl was given, but manager %s:%d is not using ssl.\n",host,port);
+		fprintf(stderr,"ds_worker: --ssl was given, but manager %s:%d is not using ssl.\n",host,port);
 		link_close(manager);
 		return 0;
 	} else if(manual_ssl_option || use_ssl) {
 		if(link_ssl_wrap_connect(manager) < 1) {
-			fprintf(stderr,"work_queue_worker: could not setup ssl connection.\n");
+			fprintf(stderr,"ds_worker: could not setup ssl connection.\n");
 			link_close(manager);
 			return 0;
 		}
@@ -2056,14 +2056,14 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	if(password) {
 		debug(D_WQ,"authenticating to manager");
 		if(!link_auth_password(manager,password,idle_stoptime)) {
-			fprintf(stderr,"work_queue_worker: wrong password for manager %s:%d\n",host,port);
+			fprintf(stderr,"ds_worker: wrong password for manager %s:%d\n",host,port);
 			link_close(manager);
 			return 0;
 		}
 	}
 
 	if(verify_project) {
-		char line[WORK_QUEUE_LINE_MAX];
+		char line[DS_LINE_MAX];
 		debug(D_WQ, "verifying manager's project name");
 		send_manager_message(manager, "name\n");
 		if(!recv_manager_message(manager,line,sizeof(line),idle_stoptime)) {
@@ -2073,7 +2073,7 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 		}
 
 		if(strcmp(line,verify_project)) {
-			fprintf(stderr, "work_queue_worker: manager has project %s instead of %s\n", line, verify_project);
+			fprintf(stderr, "ds_worker: manager has project %s instead of %s\n", line, verify_project);
 			link_close(manager);
 			return 0;
 		}
@@ -2166,7 +2166,7 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 
 static int serve_manager_by_name( const char *catalog_hosts, const char *project_regex )
 {
-	struct list *managers_list = work_queue_catalog_query_cached(catalog_hosts,-1,project_regex);
+	struct list *managers_list = ds_catalog_query_cached(catalog_hosts,-1,project_regex);
 
 	debug(D_WQ,"project name %s matches %d managers",project_regex,list_size(managers_list));
 
@@ -2515,8 +2515,8 @@ int main(int argc, char *argv[])
 				foreman_port = atoi(low_port);
 				break;
 			}
-			setenv("WORK_QUEUE_LOW_PORT", low_port, 0);
-			setenv("WORK_QUEUE_HIGH_PORT", high_port, 0);
+			setenv("DS_LOW_PORT", low_port, 0);
+			setenv("DS_HIGH_PORT", high_port, 0);
 			foreman_port = -1;
 			break;
 		}
@@ -2594,7 +2594,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'P':
 			if(copy_file_to_buffer(optarg, &password, NULL) < 0) {
-				fprintf(stderr,"work_queue_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
+				fprintf(stderr,"ds_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
 				exit(EXIT_FAILURE);
 			}
 			break;
@@ -2606,10 +2606,10 @@ int main(int argc, char *argv[])
 			worker_volatility = atof(optarg);
 			break;
 		case LONG_OPT_BANDWIDTH:
-			setenv("WORK_QUEUE_BANDWIDTH", optarg, 1);
+			setenv("DS_BANDWIDTH", optarg, 1);
 			break;
 		case LONG_OPT_DEBUG_RELEASE:
-			setenv("WORK_QUEUE_RESET_DEBUG_FILE", "yes", 1);
+			setenv("DS_RESET_DEBUG_FILE", "yes", 1);
 			break;
 		case LONG_OPT_CORES:
 			if(!strncmp(optarg, "all", 3)) {
@@ -2763,7 +2763,7 @@ int main(int argc, char *argv[])
 	random_init();
 
 	if(!workspace_create()) {
-		fprintf(stderr, "work_queue_worker: failed to setup workspace at %s.\n", workspace);
+		fprintf(stderr, "ds_worker: failed to setup workspace at %s.\n", workspace);
 		exit(1);
 	}
 
@@ -2771,9 +2771,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	// set $WORK_QUEUE_SANDBOX to workspace.
-	debug(D_WQ, "WORK_QUEUE_SANDBOX set to %s.\n", workspace);
-	setenv("WORK_QUEUE_SANDBOX", workspace, 0);
+	// set $DS_SANDBOX to workspace.
+	debug(D_WQ, "DS_SANDBOX set to %s.\n", workspace);
+	setenv("DS_SANDBOX", workspace, 0);
 
 	//get absolute pathnames of port and log file.
 	char temp_abs_path[PATH_MAX];
@@ -2794,40 +2794,40 @@ int main(int argc, char *argv[])
 	chdir(workspace);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
-		char foreman_string[WORK_QUEUE_LINE_MAX];
+		char foreman_string[DS_LINE_MAX];
 
 		free(os_name); //free the os string obtained from uname
 		os_name = xxstrdup("foreman");
 
 		string_nformat(foreman_string, sizeof(foreman_string), "%s-foreman", argv[0]);
 		debug_config(foreman_string);
-		foreman_q = work_queue_create(foreman_port);
+		foreman_q = ds_create(foreman_port);
 
 		if(!foreman_q) {
-			fprintf(stderr, "work_queue_worker-foreman: failed to create foreman queue.  Terminating.\n");
+			fprintf(stderr, "ds_worker-foreman: failed to create foreman queue.  Terminating.\n");
 			exit(1);
 		}
 
-		printf( "work_queue_worker-foreman: listening on port %d\n", work_queue_port(foreman_q));
+		printf( "ds_worker-foreman: listening on port %d\n", ds_port(foreman_q));
 
 		if(port_file)
-		{	opts_write_port_file(port_file, work_queue_port(foreman_q));	}
+		{	opts_write_port_file(port_file, ds_port(foreman_q));	}
 
 		if(foreman_name) {
-			work_queue_specify_name(foreman_q, foreman_name);
-			work_queue_specify_manager_mode(foreman_q, WORK_QUEUE_MANAGER_MODE_CATALOG);
+			ds_specify_name(foreman_q, foreman_name);
+			ds_specify_manager_mode(foreman_q, DS_MANAGER_MODE_CATALOG);
 		}
 
 		if(password) {
-			work_queue_specify_password(foreman_q,password);
+			ds_specify_password(foreman_q,password);
 		}
 
-		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
-		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);
-		work_queue_specify_category_mode(foreman_q, NULL, WORK_QUEUE_ALLOCATION_MODE_FIXED);
+		ds_specify_estimate_capacity_on(foreman_q, enable_capacity);
+		ds_activate_fast_abort(foreman_q, fast_abort_multiplier);
+		ds_specify_category_mode(foreman_q, NULL, DS_ALLOCATION_MODE_FIXED);
 
 		if(foreman_stats_filename) {
-			work_queue_specify_log(foreman_q, foreman_stats_filename);
+			ds_specify_log(foreman_q, foreman_stats_filename);
 		}
 	}
 
@@ -2836,11 +2836,11 @@ int main(int argc, char *argv[])
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
 
-	watcher = work_queue_watcher_create();
+	watcher = ds_watcher_create();
 
-	local_resources = work_queue_resources_create();
-	total_resources = work_queue_resources_create();
-	total_resources_last = work_queue_resources_create();
+	local_resources = ds_resources_create();
+	total_resources = ds_resources_create();
+	total_resources_last = ds_resources_create();
 
 	if(manual_cores_option < 1) {
 		manual_cores_option = load_average_get_cpus();
@@ -2850,7 +2850,7 @@ int main(int argc, char *argv[])
 	connect_stoptime = time(0) + connect_timeout;
 
 	measure_worker_resources();
-	printf("work_queue_worker: using %"PRId64 " cores, %"PRId64 " MB memory, %"PRId64 " MB disk, %"PRId64 " gpus\n",
+	printf("ds_worker: using %"PRId64 " cores, %"PRId64 " MB memory, %"PRId64 " MB disk, %"PRId64 " gpus\n",
 		total_resources->cores.total,
 		total_resources->memory.total,
 		total_resources->disk.total,
@@ -2858,7 +2858,7 @@ int main(int argc, char *argv[])
 
 	if(coprocess_command) {
 		/* start coprocess per manager attempt */
-		coprocess_name = work_queue_coprocess_start(coprocess_command, &coprocess_port);
+		coprocess_name = ds_coprocess_start(coprocess_command, &coprocess_port);
 		hash_table_insert(features, coprocess_name, (void **) 1);
 	}
 
@@ -2918,7 +2918,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (coprocess_command) {
-		work_queue_coprocess_terminate();
+		ds_coprocess_terminate();
 		free(coprocess_name);
 	}
 

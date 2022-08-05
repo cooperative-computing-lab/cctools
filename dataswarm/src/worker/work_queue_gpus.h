@@ -1,10 +1,10 @@
-#ifndef WORK_QUEUE_GPUS_H
-#define WORK_QUEUE_GPUS_H
+#ifndef DS_GPUS_H
+#define DS_GPUS_H
 
-void work_queue_gpus_init( int ngpus );
-void work_queue_gpus_debug();
-void work_queue_gpus_free( int taskid );
-void work_queue_gpus_allocate( int n, int task );
-char *work_queue_gpus_to_string( int taskid );
+void ds_gpus_init( int ngpus );
+void ds_gpus_debug();
+void ds_gpus_free( int taskid );
+void ds_gpus_allocate( int n, int task );
+char *ds_gpus_to_string( int taskid );
 
 #endif

@@ -1,6 +1,6 @@
-#include "work_queue_sandbox.h"
-#include "work_queue_cache.h"
-#include "work_queue_internal.h"
+#include "ds_sandbox.h"
+#include "ds_cache.h"
+#include "ds_internal.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -15,7 +15,7 @@
 
 extern int symlinks_enabled;
 
-char * work_queue_sandbox_full_path( struct work_queue_process *p, const char *sandbox_name )
+char * ds_sandbox_full_path( struct ds_process *p, const char *sandbox_name )
 {
 	return string_format("%s/%s",p->sandbox,sandbox_name);
 }
@@ -26,19 +26,19 @@ Ensure that a given input file/dir/object is present in the cache,
 and then link it into the sandbox at the desired location.
 */
 
-static int ensure_input_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache, struct link *manager )
+static int ensure_input_file( struct ds_process *p, struct ds_file *f, struct ds_cache *cache, struct link *manager )
 {
-	char *cache_path = work_queue_cache_full_path(cache,f->cached_name);
-	char *sandbox_path = work_queue_sandbox_full_path(p,f->remote_name);
+	char *cache_path = ds_cache_full_path(cache,f->cached_name);
+	char *sandbox_path = ds_sandbox_full_path(p,f->remote_name);
 	
 	int result = 0;
 
-	if(f->type==WORK_QUEUE_DIRECTORY) {
+	if(f->type==DS_DIRECTORY) {
 		/* Special case: empty directories are not cached objects, just create in sandbox */
 		result = create_dir(sandbox_path, 0700);
 		if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
-	} else if(work_queue_cache_ensure(cache,f->cached_name,manager)) {
+	} else if(ds_cache_ensure(cache,f->cached_name,manager)) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_WQ,"input: link %s -> %s",cache_path,sandbox_path);
@@ -57,10 +57,10 @@ For each input file specified by the process,
 transfer it into the sandbox directory.
 */
 
-int work_queue_sandbox_stagein( struct work_queue_process *p, struct work_queue_cache *cache, struct link *manager )
+int ds_sandbox_stagein( struct ds_process *p, struct ds_cache *cache, struct link *manager )
 {
-	struct work_queue_task *t = p->task;
-	struct work_queue_file *f;
+	struct ds_task *t = p->task;
+	struct ds_file *f;
 	int result=1;
 	
 	if(t->input_files) {
@@ -82,10 +82,10 @@ then attempt a recursive copy.
 Inform the cache of the added file.
 */
 
-static int transfer_output_file( struct work_queue_process *p, struct work_queue_file *f, struct work_queue_cache *cache )
+static int transfer_output_file( struct ds_process *p, struct ds_file *f, struct ds_cache *cache )
 {
-	char *cache_path = work_queue_cache_full_path(cache,f->cached_name);
-	char *sandbox_path = work_queue_sandbox_full_path(p,f->remote_name);
+	char *cache_path = ds_cache_full_path(cache,f->cached_name);
+	char *sandbox_path = ds_sandbox_full_path(p,f->remote_name);
 
 	int result = 0;
 	
@@ -105,7 +105,7 @@ static int transfer_output_file( struct work_queue_process *p, struct work_queue
 	if(result) {
 		struct stat info;
 		if(stat(cache_path,&info)==0) {
-			work_queue_cache_addfile(cache,info.st_size,f->cached_name);
+			ds_cache_addfile(cache,info.st_size,f->cached_name);
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
 			debug(D_WQ,"output: failed to stat %s: %s",cache_path,strerror(errno));
@@ -126,9 +126,9 @@ created, we still want the task to be marked as completed and sent back to the
 manager.  The manager will handle the consequences of missing output files.
 */
 
-int work_queue_sandbox_stageout( struct work_queue_process *p, struct work_queue_cache *cache )
+int ds_sandbox_stageout( struct ds_process *p, struct ds_cache *cache )
 {
-	struct work_queue_file *f;
+	struct ds_file *f;
 	list_first_item(p->task->output_files);
 	while((f = list_next_item(p->task->output_files))) {
 		transfer_output_file(p,f,cache);

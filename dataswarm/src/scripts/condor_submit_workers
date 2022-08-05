@@ -1,9 +1,9 @@
 #!/bin/sh
 
-SUBMIT_COMMON=$(which work_queue_submit_common)
+SUBMIT_COMMON=$(which ds_submit_common)
 if [ -z "$SUBMIT_COMMON" ];
 then
-	echo "Please add 'work_queue_submit_common' to your PATH." 1>&2
+	echo "Please add 'ds_submit_common' to your PATH." 1>&2
 	exit 1
 else
 	. $SUBMIT_COMMON
@@ -24,7 +24,7 @@ show_help()
 
 requirements=""
 class_ads=""
-transfer_input_files="work_queue_worker, cctools_gpu_autodetect"
+transfer_input_files="ds_worker, cctools_gpu_autodetect"
 
 parse_arguments()
 {
@@ -108,7 +108,7 @@ EOF
     fi
 
 	cat >> condor_submit_file <<EOF
-executable = work_queue_worker
+executable = ds_worker
 arguments = $arguments $host $port
 transfer_input_files = ${transfer_input_files}
 should_transfer_files = yes

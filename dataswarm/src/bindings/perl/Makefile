@@ -9,19 +9,19 @@ LOCAL_LINKAGE = $(CCTOOLS_PERL_LDFLAGS) -lz
 EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 WQPERLSO = work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
 LIBRARIES = work_queue.pm $(WQPERLSO)
-OBJECTS = work_queue_wrap.o
+OBJECTS = ds_wrap.o
 TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
-work_queue_wrap.c work_queue.pm: work_queue.i $(EXTERNAL_DEPENDENCIES)
+ds_wrap.c work_queue.pm: work_queue.i $(EXTERNAL_DEPENDENCIES)
 	@echo "SWIG work_queue.i (perl5)"
-	@$(CCTOOLS_SWIG) -o work_queue_wrap.c -perl5 -exportall -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src work_queue.i
+	@$(CCTOOLS_SWIG) -o ds_wrap.c -perl5 -exportall -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src work_queue.i
 
 $(WQPERLSO): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) *.o work_queue_wrap.c
+	rm -f $(OBJECTS) $(TARGETS) *.o ds_wrap.c
 
 test: all
 
@@ -31,5 +31,5 @@ install: all
 	cp Work_Queue.pm      $(CCTOOLS_PERL_PATH)
 	cp Work_Queue/Task.pm $(CCTOOLS_PERL_PATH)/Work_Queue
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	chmod 755 work_queue_example.pl
-	cp work_queue_example.pl $(CCTOOLS_INSTALL_DIR)/doc/
+	chmod 755 ds_example.pl
+	cp ds_example.pl $(CCTOOLS_INSTALL_DIR)/doc/

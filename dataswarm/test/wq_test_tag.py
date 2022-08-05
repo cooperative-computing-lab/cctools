@@ -4,7 +4,7 @@
 # tests for missing/recursive inputs/outputs.
 
 import sys
-import work_queue as wq
+import work_queue as ds
 
 port_file = None
 try:
@@ -17,14 +17,14 @@ desired_tag_order = "7 5 9 6 3 8 2 1".split()
 alpha_order = sorted(desired_tag_order)
 done_order = []
 
-q = wq.WorkQueue(port=0, debug_log='lala.log')
+q = ds.DataSwarm(port=0, debug_log='lala.log')
 with open(port_file, 'w') as f:
     print('Writing port {port} to file {file}'.format(port=q.port, file=port_file))
     f.write(str(q.port))
-print(wq.__file__)
+print(ds.__file__)
 
 for tag in alpha_order:
-    t = wq.Task("/bin/echo hello tag {}".format(tag))
+    t = ds.Task("/bin/echo hello tag {}".format(tag))
     t.specify_tag(tag)
     q.submit(t)
 

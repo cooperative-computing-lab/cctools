@@ -4,9 +4,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "work_queue_watcher.h"
-#include "work_queue_process.h"
-#include "work_queue_internal.h"
+#include "ds_watcher.h"
+#include "ds_process.h"
+#include "ds_internal.h"
 
 #include "list.h"
 #include "debug.h"
@@ -28,7 +28,7 @@ the taskid and logical path, so that it can send back enough
 info for the manager to match the updates up with the right file.
 */
 
-struct work_queue_watcher {
+struct ds_watcher {
 	struct list *watchlist;
 };
 
@@ -58,14 +58,14 @@ static struct entry * entry_create( int64_t taskid, char *physical_path, char *l
 	return e;
 }
 
-struct work_queue_watcher * work_queue_watcher_create()
+struct ds_watcher * ds_watcher_create()
 {
-	struct work_queue_watcher *w = malloc(sizeof(*w));
+	struct ds_watcher *w = malloc(sizeof(*w));
 	w->watchlist = list_create();
 	return w;
 }
 
-void work_queue_watcher_delete( struct work_queue_watcher *w )
+void ds_watcher_delete( struct ds_watcher *w )
 {
 	struct entry *e;
 
@@ -84,13 +84,13 @@ Note that the path of the watched file is relative to the sandbox
 directory chosen for the running process.
 */
 
-void work_queue_watcher_add_process( struct work_queue_watcher *w, struct work_queue_process *p )
+void ds_watcher_add_process( struct ds_watcher *w, struct ds_process *p )
 {
-	struct work_queue_file *f;
+	struct ds_file *f;
 
 	list_first_item(p->task->output_files);
 	while((f=list_next_item(p->task->output_files))) {
-		if(f->flags & WORK_QUEUE_WATCH) {
+		if(f->flags & DS_WATCH) {
 
 			struct entry *e;
 			e = entry_create(
@@ -108,7 +108,7 @@ void work_queue_watcher_add_process( struct work_queue_watcher *w, struct work_q
 Remove any watched files associated with the given process.
 */
 
-void work_queue_watcher_remove_process( struct work_queue_watcher *w, struct work_queue_process *p )
+void ds_watcher_remove_process( struct ds_watcher *w, struct ds_process *p )
 {
 	struct entry *e;
 	int size = list_size(w->watchlist);
@@ -128,13 +128,13 @@ void work_queue_watcher_remove_process( struct work_queue_watcher *w, struct wor
 /*
 Check to see if any watched files have changed since the last look.
 If any one file has changed, it is not necessary to look for any more,
-since the files will be rescanned in work_queue_watcher_send_results.
+since the files will be rescanned in ds_watcher_send_results.
 Also, note that the debug message does not specify the specific file;
 we don't want the user to be thrown off by missing messages about
 files not examined.
 */
 
-int work_queue_watcher_check( struct work_queue_watcher *w )
+int ds_watcher_check( struct ds_watcher *w )
 {
 	struct entry *e;
 
@@ -165,7 +165,7 @@ In all cases, the complete file is sent back in the normal way
 when the task ends, to ensure reliable output.
 */
 
-int work_queue_watcher_send_changes( struct work_queue_watcher *w, struct link *manager, time_t stoptime )
+int ds_watcher_send_changes( struct ds_watcher *w, struct link *manager, time_t stoptime )
 {
 	struct entry *e;
 

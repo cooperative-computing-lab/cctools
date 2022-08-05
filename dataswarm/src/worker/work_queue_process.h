@@ -1,7 +1,7 @@
-#ifndef WORK_QUEUE_PROCESS_H
-#define WORK_QUEUE_PROCESS_H
+#ifndef DS_PROCESS_H
+#define DS_PROCESS_H
 
-#include "work_queue.h"
+#include "ds_manager.h"
 #include "timestamp.h"
 #include "path_disk_size_info.h"
 
@@ -12,13 +12,13 @@
 #define MAX_BUFFER_SIZE 4096
 
 /*
-work_queue_process is a running instance of a work_queue_task.
-This object is private to the work_queue_worker.
+ds_process is a running instance of a ds_task.
+This object is private to the ds_worker.
 */
 
-struct work_queue_process {
+struct ds_process {
 	pid_t pid;
-	int task_status;                // Any of WORK_QUEUE_RESULT_*
+	int task_status;                // Any of DS_RESULT_*
 	int exit_status;                // Exit code, or signal number to task process.
 
 	struct rusage rusage;
@@ -31,7 +31,7 @@ struct work_queue_process {
 	char *output_file_name;
 	int output_fd;
 
-	struct work_queue_task *task;
+	struct ds_task *task;
 
 	/* expected disk usage by the process. If no cache is used, it is the same as in task. */
 	int64_t disk;
@@ -50,12 +50,12 @@ struct work_queue_process {
 	int coprocess_port;
 };
 
-struct work_queue_process * work_queue_process_create( struct work_queue_task *task, int disk_allocation );
-pid_t work_queue_process_execute( struct work_queue_process *p );
-void  work_queue_process_kill( struct work_queue_process *p );
-void  work_queue_process_delete( struct work_queue_process *p );
-void  work_queue_process_compute_disk_needed( struct work_queue_process *p );
+struct ds_process * ds_process_create( struct ds_task *task, int disk_allocation );
+pid_t ds_process_execute( struct ds_process *p );
+void  ds_process_kill( struct ds_process *p );
+void  ds_process_delete( struct ds_process *p );
+void  ds_process_compute_disk_needed( struct ds_process *p );
 
-int work_queue_process_measure_disk(struct work_queue_process *p, int max_time_on_measurement);
+int ds_process_measure_disk(struct ds_process *p, int max_time_on_measurement);
 
 #endif

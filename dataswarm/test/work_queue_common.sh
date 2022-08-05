@@ -18,7 +18,7 @@ quit
 EOF
 
 	echo "starting master"
-	work_queue_test -d all -o master.log -Z master.port < master.script &
+	ds_test -d all -o master.log -Z master.port < master.script &
 
 	echo "waiting for master to get ready"
 	wait_for_file_creation master.port 5
@@ -26,7 +26,7 @@ EOF
 	port=`cat master.port`
 
 	echo "starting worker"
-	work_queue_worker -d all -o worker.log localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
+	ds_worker -d all -o worker.log localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
 
 	echo "checking for output"
 	i=0

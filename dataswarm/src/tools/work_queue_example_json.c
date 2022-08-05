@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "work_queue_json.h"
+#include "ds_json.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,12 +12,12 @@ See the file COPYING for details.
 #include <errno.h>
 #include <unistd.h>
 
-char *workqueue = "{ \"name\" : \"json_example_wq\" , \"port\" : 1234 }";
+char *dataswarm = "{ \"name\" : \"json_example_ds\" , \"port\" : 1234 }";
 
 int main(int argc, char *argv[])
 {
 
-	struct work_queue *q;
+	struct ds_manager *q;
 	int taskid;
 	char *task, *t;
 	size_t len = 0;
@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	q = work_queue_json_create(workqueue);
+	q = ds_json_create(dataswarm);
 	if(!q) {
 		return 1;
 	}
@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 
 	while((read = getline(&task, &len, fp)) != -1) {
 
-		taskid = work_queue_json_submit(q, task);
+		taskid = ds_json_submit(q, task);
 
 		if(taskid < 0) {
 			return 1;
@@ -57,9 +57,9 @@ int main(int argc, char *argv[])
 
 	printf("waiting for tasks to complete...\n");
 
-	while(!work_queue_empty(q)) {
+	while(!ds_empty(q)) {
 
-		t = work_queue_json_wait(q, 5);
+		t = ds_json_wait(q, 5);
         if(t) {
             printf("%s\n", t);
         }
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 
 	printf("all tasks complete!\n");
 
-	work_queue_delete(q);
+	ds_delete(q);
 
 	return 0;
 

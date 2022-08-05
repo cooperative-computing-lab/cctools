@@ -1,12 +1,12 @@
-## @package work_queue_futures
-# Python Work Queue bindings.
+## @package ds_futures
+# Python Data Swarm bindings.
 #
 # This is a library on top of work_queue which replaces q.wait with the concept
 # of futures.
 #
 # This is experimental.
 #
-# - @ref work_queue_futures::WorkQueue
+# - @ref ds_futures::DataSwarm
 # - @ref work_queue::Task
 
 import work_queue
@@ -31,11 +31,11 @@ except ImportError:
 
 
 ##
-# Python Work Queue object
+# Python Data Swarm object
 #
-# Implements an asynchronous WorkQueueFutures object.
-# @ref work_queue_futures::WorkQueueFutures.
-class WorkQueueFutures(object):
+# Implements an asynchronous DataSwarmFutures object.
+# @ref ds_futures::DataSwarmFutures.
+class DataSwarmFutures(object):
     def __init__(self, *args, **kwargs):
 
         local_worker_args = kwargs.get('local_worker', None)
@@ -47,7 +47,7 @@ class WorkQueueFutures(object):
                 # 1000MB of disk)
                 local_worker_args = {}
 
-        # calls to synchronous WorkQueueFutures are coordinated with _queue_lock
+        # calls to synchronous DataSwarmFutures are coordinated with _queue_lock
         self._queue_lock       = threading.Lock()
         self._stop_queue_event = threading.Event()
 
@@ -65,7 +65,7 @@ class WorkQueueFutures(object):
 
         self._local_worker = None
 
-        self._queue = work_queue.WorkQueue(*args, **kwargs)
+        self._queue = work_queue.DataSwarm(*args, **kwargs)
 
         if local_worker_args:
             self._local_worker = Worker(self.port, **local_worker_args)
@@ -76,7 +76,7 @@ class WorkQueueFutures(object):
         atexit.register(self._terminate)
 
 
-    # methods not explicitly defined we route to synchronous WorkQueue, using a lock.
+    # methods not explicitly defined we route to synchronous DataSwarm, using a lock.
     def __getattr__(self, name):
         attr = getattr(self._queue, name)
 
@@ -100,7 +100,7 @@ class WorkQueueFutures(object):
         if isinstance(future_task, FutureTask):
             self._tasks_to_submit.put(future_task, False)
         else:
-            raise TypeError("{} is not a WorkQueue.Task")
+            raise TypeError("{} is not a DataSwarm.Task")
 
     ##
     # Disable wait when using the futures interface
@@ -328,7 +328,7 @@ class FutureTask(work_queue.Task):
 
     def set_result_or_exception(self):
         result = self._task.result
-        if result == work_queue.WORK_QUEUE_RESULT_SUCCESS and self.return_status == 0:
+        if result == work_queue.DS_RESULT_SUCCESS and self.return_status == 0:
             self.set_result(True)
         else:
             self.set_exception(FutureTaskError(self))
@@ -358,18 +358,18 @@ class FutureTask(work_queue.Task):
             conda_env = 'conda_env.tar.gz'
             self.specify_input_file(filename, conda_env, cache = True)
             command = 'mkdir -p conda_env && tar xf {} -C conda_env && source conda_env/bin/activate && {}'.format(conda_env, self.command)
-            _work_queue.work_queue_task_command_line_set(self._task, command)
+            _work_queue.ds_task_command_line_set(self._task, command)
         elif type == 'singularity':
             sin_env = 'sin_env.img'
             self.specify_input_file(filename, sin_env, cache = True)
-            command = 'singularity exec -B $(pwd):/wq-sandbox --pwd /wq-sandbox {} -- {}'.format(sin_env, self.command)
-            _work_queue.work_queue_task_command_line_set(self._task, command)
+            command = 'singularity exec -B $(pwd):/ds-sandbox --pwd /ds-sandbox {} -- {}'.format(sin_env, self.command)
+            _work_queue.ds_task_command_line_set(self._task, command)
 
 
 
 
 class Worker(object):
-    def __init__(self, port, executable='work_queue_worker', cores=1, memory=512, disk=1000):
+    def __init__(self, port, executable='ds_worker', cores=1, memory=512, disk=1000):
         self._proc = None
         self._port = port
 
@@ -430,18 +430,18 @@ class Worker(object):
 
 class FutureTaskError(Exception):
     _state_to_msg = {
-        work_queue.WORK_QUEUE_RESULT_SUCCESS:             'Success',
-        work_queue.WORK_QUEUE_RESULT_INPUT_MISSING:       'Input file is missing',
-        work_queue.WORK_QUEUE_RESULT_OUTPUT_MISSING:      'Output file is missing',
-        work_queue.WORK_QUEUE_RESULT_STDOUT_MISSING:      'stdout is missing',
-        work_queue.WORK_QUEUE_RESULT_SIGNAL:              'Signal received',
-        work_queue.WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION: 'Resources exhausted',
-        work_queue.WORK_QUEUE_RESULT_TASK_TIMEOUT:        'Task timed-out before completion',
-        work_queue.WORK_QUEUE_RESULT_UNKNOWN:             'Unknown error',
-        work_queue.WORK_QUEUE_RESULT_FORSAKEN:            'Internal error',
-        work_queue.WORK_QUEUE_RESULT_MAX_RETRIES:         'Maximum number of retries reached',
-        work_queue.WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:   'Task did not finish before deadline',
-        work_queue.WORK_QUEUE_RESULT_DISK_ALLOC_FULL:     'Disk allocation for the task is full'
+        work_queue.DS_RESULT_SUCCESS:             'Success',
+        work_queue.DS_RESULT_INPUT_MISSING:       'Input file is missing',
+        work_queue.DS_RESULT_OUTPUT_MISSING:      'Output file is missing',
+        work_queue.DS_RESULT_STDOUT_MISSING:      'stdout is missing',
+        work_queue.DS_RESULT_SIGNAL:              'Signal received',
+        work_queue.DS_RESULT_RESOURCE_EXHAUSTION: 'Resources exhausted',
+        work_queue.DS_RESULT_TASK_TIMEOUT:        'Task timed-out before completion',
+        work_queue.DS_RESULT_UNKNOWN:             'Unknown error',
+        work_queue.DS_RESULT_FORSAKEN:            'Internal error',
+        work_queue.DS_RESULT_MAX_RETRIES:         'Maximum number of retries reached',
+        work_queue.DS_RESULT_TASK_MAX_RUN_TIME:   'Task did not finish before deadline',
+        work_queue.DS_RESULT_DISK_ALLOC_FULL:     'Disk allocation for the task is full'
     }
 
     def __init__(self, task, exception = None):
@@ -465,7 +465,7 @@ class FutureTaskError(Exception):
         if not msg:
             return str(self.state)
 
-        if self.state != work_queue.WORK_QUEUE_RESULT_SUCCESS or self.exit_status == 0:
+        if self.state != work_queue.DS_RESULT_SUCCESS or self.exit_status == 0:
             return msg
         else:
             return 'Execution completed with exit status {}'.format(self.exit_status)

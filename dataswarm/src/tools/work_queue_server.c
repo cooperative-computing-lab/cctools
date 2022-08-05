@@ -20,7 +20,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "cctools.h"
 
-#include "work_queue_json.h"
+#include "ds_json.h"
 
 int timeout = 25;
 
@@ -62,7 +62,7 @@ void reply(struct link *client, char *method, char *message, int id)
 
 }
 
-void mainloop(struct work_queue *queue, struct link *client)
+void mainloop(struct ds_manager *queue, struct link *client)
 {
 	char message[BUFSIZ];
 	char msg[BUFSIZ];
@@ -131,7 +131,7 @@ void mainloop(struct work_queue *queue, struct link *client)
 		//submit or wait
 		if(!strcmp(method, "submit")) {
 			char *task = val->u.string_value;
-			int taskid = work_queue_json_submit(queue, task);
+			int taskid = ds_json_submit(queue, task);
 			if(taskid < 0) {
 				error = "Could not submit task";
 				reply(client, "error", error, id);
@@ -140,7 +140,7 @@ void mainloop(struct work_queue *queue, struct link *client)
 			}
 		} else if(!strcmp(method, "wait")) {
 			int time_out = val->u.integer_value;
-			char *task = work_queue_json_wait(queue, time_out);
+			char *task = ds_json_wait(queue, time_out);
 			if(!task) {
 				error = "timeout reached with no task returned";
 				reply(client, "error", error, id);
@@ -149,7 +149,7 @@ void mainloop(struct work_queue *queue, struct link *client)
 			}
 		} else if(!strcmp(method, "remove")) {
 			int taskid = val->u.integer_value;
-			char *task = work_queue_json_remove(queue, taskid);
+			char *task = ds_json_remove(queue, taskid);
 			if(!task) {
 				error = "task not able to be removed from queue";
 				reply(client, "error", error, id);
@@ -160,14 +160,14 @@ void mainloop(struct work_queue *queue, struct link *client)
 			reply(client, method, "Successfully disconnected.", id);
 			break;
 		} else if(!strcmp(method, "empty")) {
-			int empty = work_queue_empty(queue);
+			int empty = ds_empty(queue);
 			if(empty) {
 				reply(client, method, "Empty", id);
 			} else {
 				reply(client, method, "Not Empty", id);
 			}
 		} else if(!strcmp(method, "status")) {
-            char *status = work_queue_json_get_status(queue);
+            char *status = ds_json_get_status(queue);
             reply(client, method, status, id);
         } else {
 			error = "Method not recognized";
@@ -213,7 +213,7 @@ int main(int argc, char *argv[])
 {
 	int port = 0;
 	int server_port = 0;
-	char *project_name = "wq_server";
+	char *project_name = "ds_server";
 
 	int c;
 	while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0)) != -1) {
@@ -249,13 +249,13 @@ int main(int argc, char *argv[])
 
 	char *config = string_format("{ \"name\":\"%s\", \"port\":%d }", project_name, port);
 
-	struct work_queue *queue = work_queue_json_create(config);
+	struct ds_manager *queue = ds_json_create(config);
 	if(!queue) {
 		fprintf(stderr, "could not listen on port %d: %s\n", port, strerror(errno));
 		return 1;
 	}
 	// what is the port chosen for the queue?
-	port = work_queue_port(queue);
+	port = ds_port(queue);
 
 	struct link *server_link = link_serve(server_port);
 	if(!server_link) {
