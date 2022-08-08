@@ -217,6 +217,9 @@ void category_delete(struct hash_table *categories, const char *name) {
 	if(c->wq_stats)
 		free(c->wq_stats);
 
+	if(c->ds_stats)
+		free(c->ds_stats);
+
 	category_delete_histograms(c);
 
 	rmsummary_delete(c->max_allocation);
