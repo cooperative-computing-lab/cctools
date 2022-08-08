@@ -2,21 +2,21 @@ include ../../../config.mk
 include ../../../rules.mk
 
 SOURCES = \
-	work_queue.c \
+	ds_manager.c \
 	ds_catalog.c \
 	ds_resources.c \
 	ds_json.c
 
-PUBLIC_HEADERS = ds_manager.h
+PUBLIC_HEADERS = dataswarm.h ds_manager.h
 
 OBJECTS = $(SOURCES:%.c=%.o)
 PUBLIC_HEADERS = ds_manager.h ds_catalog.h ds_json.h
-LIBRARIES = libwork_queue.a
+LIBRARIES = libdataswarm.a
 TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
-libwork_queue.a: $(OBJECTS)
+libdataswarm.a: $(OBJECTS)
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
