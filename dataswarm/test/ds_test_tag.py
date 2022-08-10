@@ -4,7 +4,7 @@
 # tests for missing/recursive inputs/outputs.
 
 import sys
-import work_queue as ds
+import dataswarm as ds
 
 port_file = None
 try:

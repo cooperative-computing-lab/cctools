@@ -13,7 +13,7 @@ import shutil
 import stat
 import time
 
-import work_queue as ds
+import dataswarm as ds
 
 test_dir    = tempfile.mkdtemp(prefix='ds.test', dir=".")
 input_file  = 'input.file'

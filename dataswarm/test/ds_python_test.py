@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import sys
-import work_queue as ds
+import dataswarm as ds
 
 port_file = None
 try:
