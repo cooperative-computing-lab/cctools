@@ -2,7 +2,7 @@
 
 . ../../dttools/test/test_runner_common.sh
 
-export PATH=../src:$PATH
+export PATH=../src/tools:../src/worker:$PATH
 
 prepare()
 {

@@ -18,6 +18,8 @@ then
 	fi
 fi
 
+CCTOOLS_PACKAGES_TEST=dataswarm
+
 if [ -z "$CCTOOLS_TEST_LOG" ]; then
 	CCTOOLS_TEST_LOG="./cctools.test.log"
 fi
