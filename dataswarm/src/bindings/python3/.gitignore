@@ -1,7 +1,5 @@
-__pycache__
-_work_queue.so
-Python.framework
-work_queue.py
-work_queue.binding.py*
-ds_example.py*
+cctools.test.log
 ds_wrap.*
+dataswarm.py
+Python.framework
+*.so

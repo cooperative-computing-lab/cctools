@@ -1,5 +1,5 @@
-/* work_queue.i */
-%module work_queue
+/* dataswarm.i */
+%module dataswarm
 
 %include carrays.i
 %array_functions(struct rmsummary *, rmsummayArray);
