@@ -1,9 +1,8 @@
 include ../../../config.mk
 include ../../../rules.mk
 
-LIBDTTOOLS = ${CCTOOLS_HOME}/dttools/src/libdttools.a
-EXTERNALS = $(LIBDTTOOLS) ../manager/libwork_queue.a
-EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
+LOCAL_LINKAGE+=${CCTOOLS_HOME}/dataswarm/src/manager/libdataswarm.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
+LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/dataswarm/src/manager
 
 PROGRAMS = ds_status ds_server
 TEST_PROGRAMS = ds_example ds_test ds_test_watch ds_priority_test ds_example_json

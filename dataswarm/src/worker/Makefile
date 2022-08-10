@@ -1,6 +1,9 @@
 include ../../../config.mk
 include ../../../rules.mk
 
+LOCAL_LINKAGE+=${CCTOOLS_HOME}/dataswarm/src/manager/libdataswarm.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
+LOCAL_CCFLAGS=-I ${CCTOOLS_HOME}/dataswarm/src/manager
+
 SOURCES = \
 	ds_sandbox.c \
 	ds_cache.c \
@@ -10,10 +13,6 @@ SOURCES = \
 	ds_gpus.c
 
 OBJECTS = $(SOURCES:%.c=%.o)
-
-LIBDTTOOLS = ${CCTOOLS_HOME}/dttools/src/libdttools.a
-EXTERNALS = $(LIBDTTOOLS) ../manager/libwork_queue.a
-EXTERNAL_DEPENDENCIES = ../../../dttools/src/libdttools.a 
 PROGRAMS = ds_worker
 TARGETS = $(PROGRAMS)
 
