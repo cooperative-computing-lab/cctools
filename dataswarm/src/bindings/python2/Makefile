@@ -1,15 +1,14 @@
-include ../../../../../config.mk
+include ../../../../config.mk
 include $(CCTOOLS_HOME)/rules.mk
 
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX = so
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
 LOCAL_CCFLAGS = -fPIC -w $(CCTOOLS_PYTHON2_CCFLAGS)
-LOCAL_LINKAGE = $(CCTOOLS_PYTHON2_LDFLAGS) -lz
+LOCAL_LINKAGE = $(CCTOOLS_PYTHON2_LDFLAGS) $(CCTOOLS_HOME)/dataswarm/src/manager/libdataswarm.a $(CCTOOLS_HOME)/dttools/src/libdttools.a  -lz
 
-EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
-WQPYTHONSO = _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
-LIBRARIES = $(WQPYTHONSO)
+DSPYTHONSO = _dataswarm.$(CCTOOLS_DYNAMIC_SUFFIX)
+LIBRARIES = $(DSPYTHONSO)
 OBJECTS = ds_wrap.o
 TARGETS = $(LIBRARIES)
 
@@ -17,22 +16,22 @@ all: $(TARGETS)
 
 # The odd symlink in the following rule is necessary to overcome a problem
 # in the framework search path emitted by the Python configuration on macOS.
-ds_wrap.c work_queue.py: work_queue.i work_queue.binding.py
-	@echo "SWIG work_queue.i (python)"
-	@$(CCTOOLS_SWIG) -o ds_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src/ -I$(CCTOOLS_HOME)/work_queue/src work_queue.i
-	@cat work_queue.binding.py >> work_queue.py
+ds_wrap.c dataswarm.py: dataswarm.i dataswarm.binding.py
+	@echo "SWIG dataswarm.i (python)"
+	@$(CCTOOLS_SWIG) -o ds_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src/ -I$(CCTOOLS_HOME)/dataswarm/src/manager dataswarm.i
+	@cat dataswarm.binding.py >> dataswarm.py
 	ln -sf /System/Library/Frameworks/Python.framework .
 
-$(WQPYTHONSO): ds_wrap.o $(EXTERNAL_DEPENDENCIES)
+$(DSPYTHONSO): ds_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) Python.framework work_queue.py ds_wrap.c *.pyc
+	rm -f $(OBJECTS) $(TARGETS) Python.framework dataswarm.py ds_wrap.c *.pyc
 
 test:
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON2_PATH)
 	chmod 755 ds_example.py
-	cp work_queue.py ds_futures.py $(WQPYTHONSO) $(CCTOOLS_PYTHON2_PATH)
+	cp dataswarm.py ds_futures.py $(DSPYTHONSO) $(CCTOOLS_PYTHON2_PATH)
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 
