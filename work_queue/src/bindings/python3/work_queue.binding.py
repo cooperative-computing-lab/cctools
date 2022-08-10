@@ -13,7 +13,6 @@
 # - @ref work_queue::Factory
 
 import itertools
-import math
 import copy
 import os
 import sys
@@ -1091,14 +1090,16 @@ class WorkQueue(object):
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
     # @param ssl_key    SSL key in pem format (If not given, then TSL is not activated).
     # @param ssl_cert   SSL cert in pem format (If not given, then TSL is not activated).
+    # @param status_display_interval Number of seconds between updates to the jupyter status display. None, or less than 1 disables it.
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl_key=None, ssl_cert=None):
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl_key=None, ssl_cert=None, status_display_interval=None):
         self._shutdown = shutdown
         self._work_queue = None
         self._stats = None
         self._stats_hierarchy = None
         self._task_table = {}
+        self._info_widget = None
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -1111,6 +1112,9 @@ class WorkQueue(object):
             pass
         except ValueError:
             raise ValueError('port should be a single integer, or a sequence of two integers')
+
+        if status_display_interval and status_display_interval >= 1:
+            self._info_widget = JupyterDisplay(interval=status_display_interval)
 
         try:
             if debug_log:
@@ -1132,20 +1136,39 @@ class WorkQueue(object):
         except Exception as e:
             raise Exception('Unable to create internal Work Queue structure: {}'.format(e))
 
+        self._update_status_display()
+
 
     def _free_queue(self):
         try:
             if self._work_queue:
                 if self._shutdown:
                     self.shutdown_workers(0)
+                self._update_status_display(force=True)
                 work_queue_delete(self._work_queue)
                 self._work_queue = None
         except:
             #ignore exceptions, as we are going away...
             pass
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._update_status_display(force=True)
+        return self
+
     def __del__(self):
         self._free_queue()
+
+    def _update_status_display(self, force=False):
+        try:
+            if self._info_widget and self._info_widget.active():
+                self._info_widget.update(self, force)
+        except Exception as e:
+            # no exception should cause the queue to fail
+            print(f"status display error {e}", file=sys.stderr)
+            raise
 
     ##
     # Get the project name of the queue.
@@ -1816,12 +1839,16 @@ class WorkQueue(object):
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
     def wait_for_tag(self, tag, timeout=WORK_QUEUE_WAITFORTASK):
+        self._update_status_display()
         task_pointer = work_queue_wait_for_tag(self._work_queue, tag, timeout)
         if task_pointer:
+            if self.empty():
+                # if last task in queue, update display
+                self._update_status_display(force=True)
             task = self._task_table[int(task_pointer.taskid)]
             del self._task_table[task_pointer.taskid]
             return task
-        return None            
+        return None
 
     ##
     # Maps a function to elements in a sequence using work_queue
@@ -2155,9 +2182,27 @@ class RemoteTask(Task):
             print("Error, work_queue_exec_method must be one of fork, direct, or thread")
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
+    ##
+    # Should return a dictionary with information for the status display.
+    # This method is meant to be overriden by custom applications.
+    #
+    # The dictionary should be of the form:
+    #
+    # { "application_info" : {"values" : dict, "units" : dict} }
+    #
+    # where "units" is an optional dictionary that indicates the units of the
+    # corresponding key in "values".
+    #
+    # @param self       Reference to the current work queue object.
+    #
+    # For example:
+    # @code
+    # >>> myapp.application_info()
+    # {'application_info': {'values': {'size_max_output': 0.361962, 'current_chunksize': 65536}, 'units': {'size_max_output': 'MB'}}}
+    # @endcode
+    def application_info(self):
+        return None
 
-
-# test
 
 ##
 # \class Factory
