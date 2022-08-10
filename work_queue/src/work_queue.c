@@ -375,6 +375,7 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 
 const struct rmsummary *task_max_resources(struct work_queue *q, struct work_queue_task *t);
 const struct rmsummary *task_min_resources(struct work_queue *q, struct work_queue_task *t);
+static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 
 void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t);
 struct category *work_queue_category_lookup_or_create(struct work_queue *q, const char *name);
@@ -1776,6 +1777,13 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 	if(t->resources_measured) {
 		t->resources_measured->category = xxstrdup(t->category);
 		t->return_status = t->resources_measured->exit_status;
+
+		/* cleanup noise in cores value, otherwise small fluctuations trigger new
+		* maximums */
+		if(t->resources_measured->cores > 0) {
+			t->resources_measured->cores = MIN(t->resources_measured->cores, ceil(t->resources_measured->cores - 0.1));
+		}
+
 	} else {
 		/* if no resources were measured, then we don't overwrite the return
 		 * status, and mark the task as with error from monitoring. */
@@ -2521,33 +2529,59 @@ void category_jx_insert_max(struct jx *j, struct category *c, const char *field,
 		char *max_str = string_format("~%s", rmsummary_resource_to_str(field, m, 0));
 		jx_insert_string(j, field_str, max_str);
 		free(max_str);
+	} else {
+		jx_insert_string(j, field_str, "na");
 	}
 
 	free(field_str);
 }
 
+/* create dummy task to obtain first allocation that category would get if using largest worker */
+static struct rmsummary *category_alloc_info(struct work_queue *q, struct category *c, category_allocation_t request) {
+	struct work_queue_task *t = work_queue_task_create("nop");
+	work_queue_task_specify_category(t, c->name);
+	t->resource_request = request;
+
+	struct work_queue_worker *w = malloc(sizeof(*w));
+	w->resources = work_queue_resources_create();
+	w->resources->cores.largest = q->current_max_worker->cores;
+	w->resources->memory.largest = q->current_max_worker->memory;
+	w->resources->disk.largest = q->current_max_worker->disk;
+	w->resources->gpus.largest = q->current_max_worker->gpus;
+
+	struct rmsummary *allocation = task_worker_box_size(q, w, t);
+
+	work_queue_task_delete(t);
+	work_queue_resources_delete(w->resources);
+	free(w);
+
+	return allocation;
+}
+
+static struct jx * alloc_to_jx(struct work_queue *q, struct category *c, struct rmsummary *resources) {
+	struct jx *j = jx_object(0);
+
+	jx_insert_double(j, "cores", resources->cores);
+	jx_insert_integer(j, "memory", resources->memory);
+	jx_insert_integer(j, "disk", resources->disk);
+	jx_insert_integer(j, "gpus", resources->gpus);
+
+	return j;
+}
 
 static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	struct work_queue_stats s;
 	struct category *c = NULL;
 	const struct rmsummary *largest = largest_seen_resources(q, category);
 
-	if(category) {
-		c = work_queue_category_lookup_or_create(q, category);
-		work_queue_get_stats_category(q, category, &s);
-	} else {
-		work_queue_get_stats(q, &s);
-		category = "whole queue";
-	}
+	c = work_queue_category_lookup_or_create(q, category);
+	work_queue_get_stats_category(q, category, &s);
 
 	if(s.tasks_waiting + s.tasks_on_workers + s.tasks_done < 1) {
-		return 0;
+		return NULL;
 	}
 
 	struct jx *j = jx_object(0);
-	if(!j) {
-		return 0;
-	}
 
 	jx_insert_string(j,  "category",         category);
 	jx_insert_integer(j, "tasks_waiting",    s.tasks_waiting);
@@ -2562,22 +2596,25 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	category_jx_insert_max(j, c, "cores",  largest);
 	category_jx_insert_max(j, c, "memory", largest);
 	category_jx_insert_max(j, c, "disk",   largest);
+	category_jx_insert_max(j, c, "gpus",   largest);
 
-	if(c && c->first_allocation) {
-		if(c->first_allocation->cores > -1)
-			jx_insert_integer(j, "first_cores", c->first_allocation->cores);
-		if(c->first_allocation->memory > -1)
-			jx_insert_integer(j, "first_memory", c->first_allocation->memory);
-		if(c->first_allocation->disk > -1)
-			jx_insert_integer(j, "first_disk", c->first_allocation->disk);
+	struct rmsummary *first_allocation = category_alloc_info(q, c, CATEGORY_ALLOCATION_FIRST);
+	struct jx *jr = alloc_to_jx(q, c, first_allocation);
+	rmsummary_delete(first_allocation);
+	jx_insert(j, jx_string("first_allocation"), jr);
 
-		jx_insert_integer(j, "first_allocation_count", task_request_count(q, c->name, CATEGORY_ALLOCATION_FIRST));
-		jx_insert_integer(j, "max_allocation_count",   task_request_count(q, c->name, CATEGORY_ALLOCATION_MAX));
-	} else {
-		jx_insert_integer(j, "first_allocation_count", 0);
-		jx_insert_integer(j, "max_allocation_count", s.tasks_waiting + s.tasks_running + s.tasks_on_workers);
+	struct rmsummary *max_allocation = category_alloc_info(q, c, CATEGORY_ALLOCATION_MAX);
+	jr = alloc_to_jx(q, c, max_allocation);
+	rmsummary_delete(max_allocation);
+	jx_insert(j, jx_string("max_allocation"), jr);
+
+	if(q->monitor_mode) {
+		jr = alloc_to_jx(q, c, c->max_resources_seen);
+		jx_insert(j, jx_string("max_seen"), jr);
 	}
 
+	jx_insert_integer(j, "first_allocation_count", task_request_count(q, c->name, CATEGORY_ALLOCATION_FIRST));
+	jx_insert_integer(j, "max_allocation_count",   task_request_count(q, c->name, CATEGORY_ALLOCATION_MAX));
 
 	return j;
 }
@@ -2593,12 +2630,6 @@ static struct jx *categories_to_jx(struct work_queue *q) {
 		if(j) {
 			jx_array_insert(a, j);
 		}
-	}
-
-	//overall queue
-	struct jx *j = category_to_jx(q, NULL);
-	if(j) {
-		jx_array_insert(a, j);
 	}
 
 	return a;
