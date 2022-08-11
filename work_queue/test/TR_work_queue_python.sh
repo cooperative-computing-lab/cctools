@@ -3,8 +3,10 @@ set -e
 
 . ../../dttools/test/test_runner_common.sh
 
-python=${CCTOOLS_PYTHON_TEST_EXEC}
-python_dir=${CCTOOLS_PYTHON_TEST_DIR}
+import_config_val CCTOOLS_PYTHON_TEST_EXEC
+import_config_val CCTOOLS_PYTHON_TEST_DIR
+
+export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
 STATUS_FILE=wq.status
 PORT_FILE=wq.port
@@ -12,7 +14,7 @@ PORT_FILE=wq.port
 
 check_needed()
 {
-	[ -n "${python}" ] || return 1
+	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 }
 
 prepare()
@@ -36,7 +38,7 @@ prepare()
 run()
 {
 	# send makeflow to the background, saving its exit status.
-	(PYTHONPATH=$(pwd)/../src/bindings/${python_dir} ${python} wq_test.py $PORT_FILE; echo $? > $STATUS_FILE) &
+	(${CCTOOLS_PYTHON_TEST_EXEC} wq_test.py $PORT_FILE; echo $? > $STATUS_FILE) &
 
 	# wait at most 15 seconds for wq to find a port.
 	wait_for_file_creation $PORT_FILE 15
