@@ -4,6 +4,16 @@ export CC=${CC:-gcc}
 
 # Tests sometimes chdir, so we get the full path now. `pwd` is annoying to portable.
 WORK_QUEUE_WORKER=$(cd "$(dirname "$0")/../../work_queue/src/"; pwd)/work_queue_worker
+DS_WORKER=$(cd "$(dirname "$0")/../../dataswarm/src/worker"; pwd)/ds_worker
+
+# Obtain a config value from the master config file.
+
+import_config_val()
+{
+	name=$1
+	value=$(grep $name ../../config.mk | cut -d = -f 2)
+	export ${name}=${value}
+}
 
 dispatch()
 {
