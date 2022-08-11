@@ -1096,14 +1096,12 @@ void ds_manager_preferred_connection(struct ds_manager *q, const char *preferred
 @param name The name of the parameter to tune
  - "resource-submit-multiplier" Treat each worker as having ({cores,memory,gpus} * multiplier) when submitting tasks. This allows for tasks to wait at a worker rather than the manager. (default = 1.0)
  - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
- - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
  - "transfer-outlier-factor" Transfer that are this many times slower than the average will be aborted.  (default=10x)
  - "default-transfer-rate" The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
  - "fast-abort-multiplier" Set the multiplier of the average task time at which point to abort; if negative or zero fast_abort is deactivated. (default=0)
  - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
  - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
  - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
- - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
  - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
  - "hungry-minimum" Mimimum number of tasks to consider queue not hungry. (default=10)
  - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)

@@ -120,7 +120,6 @@ typedef enum {
 	WORKER_TYPE_UNKNOWN = 1,
 	WORKER_TYPE_WORKER  = 2,
 	WORKER_TYPE_STATUS  = 4,
-	WORKER_TYPE_FOREMAN = 8
 } worker_type;
 
 
@@ -184,14 +183,12 @@ struct ds_manager {
 	int process_pending_check;
 
 	int short_timeout;		// timeout to send/recv a brief message from worker
-	int long_timeout;		// timeout to send/recv a brief message from a foreman
-
+	int long_timeout;		// timeout if in the middle of an incomplete message.
 	struct list *task_reports;	      /* list of last N ds_task_reports. */
 
 	double resource_submit_multiplier; /* Times the resource value, but disk */
 
 	int minimum_transfer_timeout;
-	int foreman_transfer_timeout;
 	int transfer_outlier_factor;
 	int default_transfer_rate;
 
@@ -252,7 +249,7 @@ struct ds_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 
-	worker_type type;                         // unknown, regular worker, status worker, foreman
+	worker_type type;                         // unknown, regular worker, status worker
 
 	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
 
@@ -368,8 +365,8 @@ static ds_msg_code_t process_queue_status(struct ds_manager *q, struct ds_worker
 static ds_msg_code_t process_resource(struct ds_manager *q, struct ds_worker *w, const char *line);
 static ds_msg_code_t process_feature(struct ds_manager *q, struct ds_worker *w, const char *line);
 
-static struct jx * queue_to_jx( struct ds_manager *q, struct link *foreman_uplink );
-static struct jx * queue_lean_to_jx( struct ds_manager *q, struct link *foreman_uplink );
+static struct jx * queue_to_jx( struct ds_manager *q );
+static struct jx * queue_lean_to_jx( struct ds_manager *q );
 
 char *ds_monitor_wrap(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct rmsummary *limits);
 
@@ -608,11 +605,7 @@ static int send_worker_msg( struct ds_manager *q, struct ds_worker *w, const cha
 
 	debug(D_WQ, "tx to %s (%s): %s", w->hostname, w->addrport, buffer_tostring(B));
 
-	//If foreman, then we wait until foreman gives the manager some attention.
-	if(w->type == WORKER_TYPE_FOREMAN)
-		stoptime = time(0) + q->long_timeout;
-	else
-		stoptime = time(0) + q->short_timeout;
+	stoptime = time(0) + q->short_timeout;
 
 	int result = link_putlstring(w->link, buffer_tostring(B), buffer_pos(B), stoptime);
 
@@ -794,11 +787,7 @@ int process_cache_invalid( struct ds_manager *q, struct ds_worker *w, const char
 static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker *w, char *line, size_t length )
 {
 	time_t stoptime;
-	//If foreman, then we wait until foreman gives the manager some attention.
-	if(w->type == WORKER_TYPE_FOREMAN)
-		stoptime = time(0) + q->long_timeout;
-	else
-		stoptime = time(0) + q->short_timeout;
+	stoptime = time(0) + q->short_timeout;
 
 	int result = link_readline(w->link, line, length, stoptime);
 
@@ -903,8 +892,6 @@ The overall effect is to reject transfers that are 10x slower than what has been
 
 Two exceptions are made:
 - The transfer time cannot be below a configurable minimum time.
-- A foreman must have a high minimum, because its attention is divided
-  between the manager and the workers that it serves.
 */
 
 static int get_transfer_wait_time(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, int64_t length)
@@ -924,13 +911,8 @@ static int get_transfer_wait_time(struct ds_manager *q, struct ds_worker *w, str
 
 	int timeout = length / tolerable_transfer_rate;
 
-	if(w->type == WORKER_TYPE_FOREMAN) {
-		// A foreman must have a much larger minimum timeout, b/c it does not respond immediately to the manager.
-		timeout = MAX(q->foreman_transfer_timeout,timeout);
-	} else {
-		// An ordinary manager has a lower minimum timeout b/c it responds immediately to the manager.
-		timeout = MAX(q->minimum_transfer_timeout,timeout);
-	}
+	// An ordinary manager has a lower minimum timeout b/c it responds immediately to the manager.
+	timeout = MAX(q->minimum_transfer_timeout,timeout);
 
 	/* Don't bother printing anything for transfers of less than 1MB, to avoid excessive output. */
 
@@ -1078,13 +1060,13 @@ void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 	list_delete(outdated_factories);
 }
 
-void update_write_catalog(struct ds_manager *q, struct link *foreman_uplink)
+void update_write_catalog(struct ds_manager *q )
 {
 	// Only write if we have a name.
 	if (!q->name) return; 
 
 	// Generate the manager status in an jx, and print it to a buffer.
-	struct jx *j = queue_to_jx(q,foreman_uplink);
+	struct jx *j = queue_to_jx(q);
 	char *str = jx_print_string(j);
 
 	// Send the buffer.
@@ -1092,7 +1074,7 @@ void update_write_catalog(struct ds_manager *q, struct link *foreman_uplink)
 	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
 
 		// If the send failed b/c the buffer is too big, send the lean version instead.
-		struct jx *lj = queue_lean_to_jx(q,foreman_uplink);
+		struct jx *lj = queue_lean_to_jx(q);
 		char *lstr = jx_print_string(lj);
 		catalog_query_send_update(q->catalog_hosts,lstr);
 		free(lstr);
@@ -1113,7 +1095,7 @@ void update_read_catalog(struct ds_manager *q)
 	}
 }
 
-void update_catalog(struct ds_manager *q, struct link *foreman_uplink, int force_update )
+void update_catalog(struct ds_manager *q, int force_update )
 {
 	// Only update every last_update_time seconds.
 	if(!force_update && (time(0) - q->catalog_last_update_time) < DS_UPDATE_INTERVAL)
@@ -1123,7 +1105,7 @@ void update_catalog(struct ds_manager *q, struct link *foreman_uplink, int force
 	if(!q->catalog_hosts) q->catalog_hosts = xxstrdup(CATALOG_HOST);
 
 	// Update the catalog.
-	update_write_catalog(q, foreman_uplink);
+	update_write_catalog(q);
 	update_read_catalog(q);
 
 	q->catalog_last_update_time = time(0);
@@ -1250,7 +1232,7 @@ static void remove_worker(struct ds_manager *q, struct ds_worker *w, worker_disc
 
 	debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
 
-	if(w->type == WORKER_TYPE_WORKER || w->type == WORKER_TYPE_FOREMAN) {
+	if(w->type == WORKER_TYPE_WORKER) {
 		q->stats->workers_removed++;
 	}
 
@@ -1293,7 +1275,7 @@ static void remove_worker(struct ds_manager *q, struct ds_worker *w, worker_disc
 	/* update the largest worker seen */
 	find_max_worker(q);
 
-	debug(D_WQ, "%d workers connected in total now", count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN));
+	debug(D_WQ, "%d workers connected in total now", count_workers(q, WORKER_TYPE_WORKER));
 }
 
 static int release_worker(struct ds_manager *q, struct ds_worker *w)
@@ -2083,15 +2065,10 @@ static ds_msg_code_t process_dataswarm(struct ds_manager *q, struct ds_worker *w
 	w->arch     = strdup(items[2]);
 	w->version  = strdup(items[3]);
 
-	if(!strcmp(w->os, "foreman"))
-	{
-		w->type = WORKER_TYPE_FOREMAN;
-	} else {
-		w->type = WORKER_TYPE_WORKER;
-	}
+	w->type = WORKER_TYPE_WORKER;
 
 	q->stats->workers_joined++;
-	debug(D_WQ, "%d workers are connected in total now", count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN));
+	debug(D_WQ, "%d workers are connected in total now", count_workers(q, WORKER_TYPE_WORKER));
 
 
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
@@ -2610,7 +2587,7 @@ an jx expression which can be sent directly to the
 user that connects via ds_status.
 */
 
-static struct jx * queue_to_jx( struct ds_manager *q, struct link *foreman_uplink )
+static struct jx * queue_to_jx( struct ds_manager *q )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
@@ -2720,24 +2697,6 @@ static struct jx * queue_to_jx( struct ds_manager *q, struct link *foreman_uplin
 	aggregate_workers_resources(q,&r,NULL);
 	ds_resources_add_to_jx(&r,j);
 
-	// If this is a foreman, add the manager address and the disk resources
-	if(foreman_uplink) {
-		int port;
-		char address[LINK_ADDRESS_MAX];
-		char addrport[DS_LINE_MAX];
-
-		link_address_remote(foreman_uplink,address,&port);
-		sprintf(addrport,"%s:%d",address,port);
-		jx_insert_string(j,"my_manager",addrport);
-
-		// get foreman local resources and overwrite disk usage
-		struct ds_resources local_resources;
-		ds_resources_measure_locally(&local_resources,q->workingdir);
-		r.disk.total = local_resources.disk.total;
-		r.disk.inuse = local_resources.disk.inuse;
-		ds_resources_add_to_jx(&r,j);
-	}
-
 	//add the stats per category
 	jx_insert(j, jx_string("categories"), categories_to_jx(q));
 
@@ -2759,7 +2718,7 @@ It different from queue_to_jx in that only the minimum information that
 workers, ds_status and the ds_factory need.
 */
 
-static struct jx * queue_lean_to_jx( struct ds_manager *q, struct link *foreman_uplink )
+static struct jx * queue_lean_to_jx( struct ds_manager *q )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
@@ -2831,17 +2790,6 @@ static struct jx * queue_lean_to_jx( struct ds_manager *q, struct link *foreman_
 	struct jx *blocklist = blocked_to_json(q);
 	if(blocklist) {
 		jx_insert(j,jx_string("workers_blocked"), blocklist);   //danger! unbounded field
-	}
-
-	// Add information about the foreman
-	if(foreman_uplink) {
-		int port;
-		char address[LINK_ADDRESS_MAX];
-		char addrport[DS_LINE_MAX];
-
-		link_address_remote(foreman_uplink,address,&port);
-		sprintf(addrport,"%s:%d",address,port);
-		jx_insert_string(j,"my_manager",addrport);
 	}
 
 	return j;
@@ -3027,7 +2975,7 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
 	if(!strcmp(line, "queue_status")) {
-		struct jx *j = queue_to_jx( q, 0 );
+		struct jx *j = queue_to_jx(q);
 		if(j) {
 			jx_array_insert(a, j);
 		}
@@ -3081,7 +3029,7 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 		jx_delete(a);
 		a = categories_to_jx(q);
 	} else if(!strcmp(line, "resources_status")) {
-		struct jx *j = queue_to_jx( q, 0 );
+		struct jx *j = queue_to_jx(q);
 		if(j) {
 			jx_array_insert(a, j);
 		}
@@ -3206,7 +3154,7 @@ static ds_result_code_t handle_worker(struct ds_manager *q, struct link *l)
 	return WQ_SUCCESS;
 }
 
-static int build_poll_table(struct ds_manager *q, struct link *manager)
+static int build_poll_table(struct ds_manager *q )
 {
 	int n = 0;
 	char *key;
@@ -3226,14 +3174,6 @@ static int build_poll_table(struct ds_manager *q, struct link *manager)
 	q->poll_table[0].events = LINK_READ;
 	q->poll_table[0].revents = 0;
 	n = 1;
-
-	if(manager) {
-		/* foreman uplink */
-		q->poll_table[1].link = manager;
-		q->poll_table[1].events = LINK_READ;
-		q->poll_table[1].revents = 0;
-		n++;
-	}
 
 	// For every worker in the hash table, add an item to the poll table
 	hash_table_firstkey(q->worker_table);
@@ -3847,7 +3787,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker *w
 
 	long long cmd_len = strlen(command_line);
 	send_worker_msg(q,w, "cmd %lld\n", (long long) cmd_len);
-	link_putlstring(w->link, command_line, cmd_len, /* stoptime */ time(0) + (w->type == WORKER_TYPE_FOREMAN ? q->long_timeout : q->short_timeout));
+	link_putlstring(w->link, command_line, cmd_len, time(0) + q->short_timeout);
 	debug(D_WQ, "%s\n", command_line);
 	free(command_line);
 
@@ -3855,7 +3795,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker *w
 	if(t->coprocess) {
 		cmd_len = strlen(t->coprocess);
 		send_worker_msg(q,w, "coprocess %lld\n", (long long) cmd_len);
-		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + (w->type == WORKER_TYPE_FOREMAN ? q->long_timeout : q->short_timeout));
+		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + q->short_timeout);
 	}
 
 	send_worker_msg(q,w, "category %s\n", t->category);
@@ -4076,11 +4016,9 @@ static int check_hand_against_task(struct ds_manager *q, struct ds_worker *w, st
 		if ( f && f->connected_workers > f->max_workers ) return 0;
 	}
 
-	if(w->type != WORKER_TYPE_FOREMAN) {
-		struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
-		if (info && info->blocked) {
-			return 0;
-		}
+	struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
+	if (info && info->blocked) {
+		return 0;
 	}
 
 	struct rmsummary *l = task_worker_box_size(q, w, t);
@@ -5624,10 +5562,6 @@ void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filena
 		if(!hash_table_lookup(w->current_files, filename))
 			continue;
 
-		if(w->type == WORKER_TYPE_FOREMAN) {
-			send_worker_msg(q, w, "invalidate-file %s\n", filename);
-		}
-
 		struct ds_task *t;
 		uint64_t taskid;
 
@@ -5852,7 +5786,6 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 	q->resource_submit_multiplier = 1.0;
 
 	q->minimum_transfer_timeout = 60;
-	q->foreman_transfer_timeout = 3600;
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1*MEGABYTE;
 
@@ -6106,7 +6039,7 @@ void ds_delete(struct ds_manager *q)
 		log_queue_stats(q, 1);
 
 		if(q->name) {
-			update_catalog(q, NULL, 1);
+			update_catalog(q,1);
 		}
 
 		/* we call this function here before any of the structures are freed. */
@@ -6740,15 +6673,15 @@ struct ds_task *ds_wait_for_tag(struct ds_manager *q, const char *tag, int timeo
 		timeout = 5;
 	}
 
-	return ds_wait_internal(q, timeout, NULL, NULL, tag);
+	return ds_wait_internal(q, timeout, tag);
 }
 
 /* return number of workers that failed */
-static int poll_active_workers(struct ds_manager *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
+static int poll_active_workers(struct ds_manager *q, int stoptime )
 {
 	BEGIN_ACCUM_TIME(q, time_polling);
 
-	int n = build_poll_table(q, foreman_uplink);
+	int n = build_poll_table(q);
 
 	// We poll in at most small time segments (of a second). This lets
 	// promptly dispatch tasks, while avoiding busy waiting.
@@ -6769,21 +6702,11 @@ static int poll_active_workers(struct ds_manager *q, int stoptime, struct link *
 	link_poll(q->poll_table, n, msec);
 	q->link_poll_end = timestamp_get();
 
-	int i, j = 1;
-	// Consider the foreman_uplink passed into the function and disregard if inactive.
-	if(foreman_uplink) {
-		if(q->poll_table[1].revents) {
-			*foreman_uplink_active = 1; //signal that the manager link saw activity
-		} else {
-			*foreman_uplink_active = 0;
-		}
-		j++;
-	}
-
 	END_ACCUM_TIME(q, time_polling);
 
 	BEGIN_ACCUM_TIME(q, time_status_msgs);
 
+	int i, j = 1;
 	int workers_failed = 0;
 	// Then consider all existing active workers
 	for(i = j; i < n; i++) {
@@ -6829,7 +6752,7 @@ static int connect_new_workers(struct ds_manager *q, int stoptime, int max_new_w
 }
 
 
-struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active, const char *tag)
+struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag)
 {
 /*
    - compute stoptime
@@ -6896,7 +6819,7 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link 
 
 		// update catalog if appropriate
 		if(q->name) {
-			update_catalog(q, foreman_uplink, 0);
+			update_catalog(q,0);
 		}
 
 		if(q->monitor_mode)
@@ -6905,7 +6828,7 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link 
 		END_ACCUM_TIME(q, time_internal);
 
 		// retrieve worker status messages
-		if(poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active) > 0) {
+		if(poll_active_workers(q, stoptime) > 0) {
 			//at least one worker was removed.
 			events++;
 			// note we keep going, and we do not restart the loop as we do in
@@ -7002,7 +6925,7 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link 
 		// in this wait.
 		if(events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !task_state_any(q, DS_TASK_RUNNING) && !task_state_any(q, DS_TASK_READY) && !task_state_any(q, DS_TASK_WAITING_RETRIEVAL) && !(foreman_uplink);
+			int done = !task_state_any(q, DS_TASK_RUNNING) && !task_state_any(q, DS_TASK_READY) && !task_state_any(q, DS_TASK_WAITING_RETRIEVAL);
 			END_ACCUM_TIME(q, time_internal);
 
 			if(done) {
@@ -7016,11 +6939,6 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link 
 		// we set the busy_waiting flag so that link_poll waits for some time
 		// the next time around.
 		q->busy_waiting_flag = 1;
-
-		// If the foreman_uplink is active then break so the caller can handle it.
-		if(foreman_uplink) {
-			break;
-		}
 	}
 
 	if(events > 0) {
@@ -7299,9 +7217,6 @@ int ds_tune(struct ds_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "min-transfer-timeout")) {
 		q->minimum_transfer_timeout = (int)value;
 
-	} else if(!strcmp(name, "foreman-transfer-timeout")) {
-		q->foreman_transfer_timeout = (int)value;
-
 	} else if(!strcmp(name, "default-transfer-rate")) {
 		q->default_transfer_rate = value;
 
@@ -7422,7 +7337,7 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 	memcpy(s, qs, sizeof(*s));
 
 	//info about workers
-	s->workers_connected = count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN);
+	s->workers_connected = count_workers(q, WORKER_TYPE_WORKER);
 	s->workers_init      = count_workers(q, DS_TASK_UNKNOWN);
 	s->workers_busy      = workers_with_tasks(q);
 	s->workers_idle      = s->workers_connected - s->workers_busy;
@@ -7491,27 +7406,6 @@ void ds_get_stats_hierarchy(struct ds_manager *q, struct ds_stats *s)
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->type == WORKER_TYPE_FOREMAN)
-		{
-			accumulate_stat(s, w->stats, workers_joined);
-			accumulate_stat(s, w->stats, workers_removed);
-			accumulate_stat(s, w->stats, workers_idled_out);
-			accumulate_stat(s, w->stats, workers_fast_aborted);
-			accumulate_stat(s, w->stats, workers_lost);
-
-			accumulate_stat(s, w->stats, time_send);
-			accumulate_stat(s, w->stats, time_receive);
-			accumulate_stat(s, w->stats, time_send_good);
-			accumulate_stat(s, w->stats, time_receive_good);
-
-			accumulate_stat(s, w->stats, time_workers_execute);
-			accumulate_stat(s, w->stats, time_workers_execute_good);
-			accumulate_stat(s, w->stats, time_workers_execute_exhaustion);
-
-			accumulate_stat(s, w->stats, bytes_sent);
-			accumulate_stat(s, w->stats, bytes_received);
-		}
-
 		accumulate_stat(s, w->stats, tasks_waiting);
 		accumulate_stat(s, w->stats, tasks_running);
 	}

@@ -21,7 +21,7 @@ struct ds_file {
 	char *cached_name;	// name on remote machine in cached directory.
 };
 
-struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active, const char *tag);
+struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag );
 
 /* Adds (arithmetically) all the workers resources (cores, memory, disk) */
 void aggregate_workers_resources( struct ds_manager *q, struct ds_resources *r, struct hash_table *categories );
@@ -44,7 +44,7 @@ void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filena
 
 void release_all_workers(struct ds_manager *q);
 
-void update_catalog(struct ds_manager *q, struct link *foreman_uplink, int force_update );
+void update_catalog(struct ds_manager *q, int force_update );
 
 /** Send msg to all the workers in the queue. **/
 void ds_broadcast_message(struct ds_manager *q, const char *msg);
