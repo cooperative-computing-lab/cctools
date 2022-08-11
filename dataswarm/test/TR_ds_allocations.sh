@@ -34,7 +34,7 @@ run()
 
 	# send makeflow to the background, saving its exit status.
 	export PATH=/bin:/usr/bin
-	export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
+	export PATH=$(pwd)/../src/manager:$(pwd)/../../batch_job/src:$PATH
 	export PYTHONPATH=$(pwd)/../src/bindings/${python_dir}
 	${python} ds_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
 
