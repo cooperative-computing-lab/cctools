@@ -42,7 +42,6 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "shell.h"
 #include "pattern.h"
-#include "tlq_config.h"
 #include "host_disk_info.h"
 
 #include <unistd.h>
@@ -230,10 +229,6 @@ struct ds_manager {
 
 	double bandwidth;
 
-	char *debug_path;
-	int tlq_port;
-	char *tlq_url;
-  
 	int fetch_factory;
 
 	int wait_retrieve_many;
@@ -637,31 +632,6 @@ ds_msg_code_t process_name(struct ds_manager *q, struct ds_worker *w, char *line
 	return MSG_PROCESSED;
 }
 
-ds_msg_code_t advertise_tlq_url(struct ds_manager *q, struct ds_worker *w, char *line)
-{
-	//attempt to find local TLQ server to retrieve manager URL
-	if(q->tlq_port && q->debug_path && !q->tlq_url) {
-		debug(D_TLQ, "looking up manager TLQ URL");
-		time_t config_stoptime = time(0) + 10;
-		q->tlq_url = tlq_config_url(q->tlq_port, q->debug_path, config_stoptime);
-		if(q->tlq_url) debug(D_TLQ, "set manager TLQ URL: %s", q->tlq_url);
-		else debug(D_TLQ, "error setting manager TLQ URL");
-	}
-	else if(q->tlq_port && !q->debug_path && !q->tlq_url) debug(D_TLQ, "cannot get manager TLQ URL: no debug log path set");
-
-	char worker_url[DS_LINE_MAX];
-	int n = sscanf(line, "tlq %s", worker_url);
-	if(n != 1) debug(D_TLQ, "empty TLQ URL received from worker (%s)", w->addrport);
-	else debug(D_TLQ, "received worker (%s) TLQ URL %s", w->addrport, worker_url);
-
-	//send manager TLQ URL if there is one
-	if(q->tlq_url) {
-		debug(D_TLQ, "sending manager TLQ URL to worker (%s)", w->addrport);
-		send_worker_msg(q, w, "tlq %s\n", q->tlq_url);
-	}
-	return MSG_PROCESSED;
-}
-
 ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker *w, char *line)
 {
 	char field[DS_LINE_MAX];
@@ -825,8 +795,6 @@ static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker *w, 
 		result = process_name(q, w, line);
 	} else if (string_prefix_is(line, "info")) {
 		result = process_info(q, w, line);
-	} else if (string_prefix_is(line, "tlq")) {
-		result = advertise_tlq_url(q, w, line);
 	} else if (string_prefix_is(line, "cache-update")) {
 		result = process_cache_update(q, w, line);
 	} else if (string_prefix_is(line, "cache-invalid")) {
@@ -2689,8 +2657,6 @@ static struct jx * queue_to_jx( struct ds_manager *q )
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 	jx_insert_integer(j,"manager_load",info.manager_load);
-
-	if(q->tlq_url) jx_insert_string(j,"tlq_url",q->tlq_url);
 
 	// Add the resources computed from tributary workers.
 	struct ds_resources r;
@@ -5941,22 +5907,6 @@ void ds_specify_name(struct ds_manager *q, const char *name)
 	} else {
 		q->name = 0;
 	}
-}
-
-void ds_specify_debug_path(struct ds_manager *q, const char *path)
-{
-	if(q->debug_path) free(q->debug_path);
-	if(path) {
-		q->debug_path = xxstrdup(path);
-		setenv("DS_DEBUG_PATH", q->debug_path, 1);
-	} else {
-		q->debug_path = 0;
-	}
-}
-
-void ds_specify_tlq_port(struct ds_manager *q, int port)
-{
-	q->tlq_port = port;
 }
 
 const char *ds_name(struct ds_manager *q)

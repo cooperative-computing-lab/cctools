@@ -48,7 +48,6 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "pattern.h"
 #include "gpu_info.h"
-#include "tlq_config.h"
 #include "stringtools.h"
 #include "trash.h"
 #include "process.h"
@@ -210,10 +209,7 @@ static int total_tasks_executed = 0;
 static const char *project_regex = 0;
 static int released_by_manager = 0;
 
-static char *tlq_url = NULL;
-static char *debug_path = NULL;
 static char *catalog_hosts = NULL;
-static int tlq_port = 0;
 
 static char *coprocess_command = NULL;
 static char *coprocess_name = NULL;
@@ -423,50 +419,6 @@ void send_cache_invalid( struct link *manager, const char *cachename, const char
 	link_write(manager,message,length,time(0)+active_timeout);
 }
 
-static int send_tlq_config( struct link *manager )
-{
-	//attempt to find local TLQ server to retrieve manager URL
-	if(tlq_port && debug_path && !tlq_url) {
-		debug(D_TLQ, "looking up worker TLQ URL");
-		time_t config_stoptime = time(0) + 10;
-		tlq_url = tlq_config_url(tlq_port, debug_path, config_stoptime);
-		if(tlq_url) debug(D_TLQ, "set worker TLQ URL: %s", tlq_url);
-		else debug(D_TLQ, "error setting worker TLQ URL");
-	}
-	else if(tlq_port && !debug_path && !tlq_url) debug(D_TLQ, "cannot get worker TLQ URL: no debug log path set");
-
-	if(tlq_url) send_manager_message(manager, "tlq %s\n", tlq_url);
-	return 1;
-}
-
-static int get_task_tlq_url( struct ds_task *task )
-{
-	if(tlq_port && debug_path) {
-		char home_host[DS_LINE_MAX];
-		char tlq_workdir[DS_LINE_MAX];
-		char log_path[DS_LINE_MAX];
-		int home_port;
-		debug(D_TLQ, "looking up task %d TLQ URL", task->taskid);
-		//Command is assumed to be wrapped by log_define script from TLQ
-		if(sscanf(task->command_line,"sh log_define %s %d %s %s", home_host, &home_port, tlq_workdir, log_path) == 4) {
-			time_t config_stoptime = time(0) + 10;
-			char *task_url = tlq_config_url(tlq_port, log_path, config_stoptime);
-			if(!task_url) {
-				debug(D_TLQ, "error setting task %d TLQ URL", task->taskid);
-				return 0;
-			}
-			debug(D_TLQ, "set task %d TLQ URL: %s", task->taskid, task_url);
-			return 1;
-		}
-		else {
-			debug(D_TLQ, "could not find task %d debug log", task->taskid);
-			return 0;
-		}
-		return 1;
-	}
-	else return 0;
-}
-
 /*
 Send the initial "ready" message to the manager with the version and so forth.
 The manager will not start sending tasks until this message is recevied.
@@ -479,7 +431,6 @@ static void report_worker_ready( struct link *manager )
 	send_manager_message(manager,"dataswarm %d %s %s %s %d.%d.%d\n",DS_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_manager_message(manager, "info worker-id %s\n", worker_id);
 	send_features(manager);
-	send_tlq_config(manager);
 	send_keepalive(manager, 1);
 	send_manager_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 	if (factory_name)
@@ -568,7 +519,6 @@ static void report_task_complete( struct link *manager, struct ds_process *p )
 	total_task_execution_time += (p->execution_end - p->execution_start);
 	total_tasks_executed++;
 
-	get_task_tlq_url(p->task);
 	send_stats_update(manager);
 }
 
@@ -1092,12 +1042,6 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 	return result;
 }
 
-static int do_tlq_url(const char *manager_tlq_url)
-{
-	debug(D_TLQ, "set manager TLQ URL: %s", manager_tlq_url);
-	return 1;
-}
-
 /*
 Accept a url specification and queue it for later transfer.
 */
@@ -1345,7 +1289,6 @@ static int handle_manager(struct link *manager)
 	char filename[DS_LINE_MAX];
 	char source_encoded[DS_LINE_MAX];
 	char source[DS_LINE_MAX];
-	char manager_tlq_url[DS_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
 	int mode, r, n;
@@ -1370,9 +1313,6 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded,filename,sizeof(filename));
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_cmd(filename,length,mode,source);
-			reset_idle_timer();
-		} else if(sscanf(line, "tlq %s", manager_tlq_url) == 1) {
-			r = do_tlq_url(manager_tlq_url);
 			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
@@ -2196,7 +2136,6 @@ static void show_help(const char *cmd)
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
-	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
 }
 
@@ -2205,7 +2144,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
-	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
+	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
 	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION,
 	  LONG_OPT_FROM_FACTORY};
 
@@ -2242,7 +2181,6 @@ static const struct option long_options[] = {
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
 	{"feature",             required_argument,  0,  LONG_OPT_FEATURE},
-	{"tlq",					required_argument,	0,  LONG_OPT_TLQ},
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
@@ -2297,7 +2235,6 @@ int main(int argc, char *argv[])
 			connect_timeout = string_time_parse(optarg);
 			break;
 		case 'o':
-			debug_path = xxstrdup(optarg);
 			debug_config_file(optarg);
 			break;
 		case 'M':
@@ -2431,9 +2368,6 @@ int main(int argc, char *argv[])
 		}
 		case LONG_OPT_FEATURE:
 			hash_table_insert(features, optarg, (void **) 1);
-			break;
-		case LONG_OPT_TLQ:
-			tlq_port = atoi(optarg);
 			break;
 		case LONG_OPT_PARENT_DEATH:
 			initial_ppid = getppid();

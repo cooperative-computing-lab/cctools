@@ -970,18 +970,6 @@ const char *ds_name(struct ds_manager *q);
 */
 void ds_specify_name(struct ds_manager *q, const char *name);
 
-/** Change the debug log path for a given queue (used by TLQ).
-@param q A work queue object.
-@param path The debug log path.
-*/
-void ds_specify_debug_path(struct ds_manager *q, const char *path);
-
-/** Change the home host and port for a given queue (used by TLQ).
-@param q A work queue object.
-@param port New local port for the TLQ URL.
-*/
-void ds_specify_tlq_port(struct ds_manager *q, int port);
-
 /** Change the priority for a given queue.
 @param q A work queue object.
 @param priority The new priority of the queue.  Higher priority managers will attract workers first.
