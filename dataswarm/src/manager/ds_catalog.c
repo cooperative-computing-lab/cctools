@@ -22,32 +22,8 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <errno.h>
 
-// Deprecated
-int ds_catalog_parse( char *server_string, char **host, int *port )
-{
-	char *colon;
-
-	colon = strchr(server_string, ':');
-
-	if(!colon) {
-		*host = NULL;
-		*port = 0;
-		return 0;
-	}
-
-	*colon = '\0';
-
-	*host = strdup(server_string);
-	*port = atoi(colon + 1);
-
-	*colon = ':';
-
-	// if (*port) == 0, parsing failed, thus return 0
-	return *port;
-}
-
 /*
-Query the catalog for all WQ managers whose project name matches the given regex.
+Query the catalog for all DS managers whose project name matches the given regex.
 Return a linked list of jx expressions describing the managers.
 */
 
