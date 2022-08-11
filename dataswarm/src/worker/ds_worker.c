@@ -103,9 +103,6 @@ static int max_backoff_interval = 60;
 // Absolute end time (in useconds) for worker, worker is killed after this point.
 static timestamp_t end_time = 0;
 
-// Chance that a worker will decide to shut down each minute without warning, to simulate failure.
-static double worker_volatility = 0.0;
-
 // If flag is set, then the worker proceeds to immediately cleanup and shut down.
 // This can be set by Ctrl-C or by any condition that prevents further progress.
 static int abort_flag = 0;
@@ -1469,7 +1466,6 @@ static void work_for_manager(struct link *manager)
 
 	reset_idle_timer();
 
-	time_t volatile_stoptime = time(0) + 60;
 	// Start serving managers
 	while(!abort_flag) {
 
@@ -1477,15 +1473,6 @@ static void work_for_manager(struct link *manager)
 			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", current_manager_address->addr,current_manager_address->port,idle_timeout);
 			send_manager_message(manager, "info idle-disconnecting %lld\n", (long long) idle_timeout);
 			break;
-		}
-
-		if(worker_volatility && time(0) > volatile_stoptime) {
-			if( (double)rand()/(double)RAND_MAX < worker_volatility) {
-				debug(D_NOTICE, "ds_worker: disconnect from manager due to volatility check.\n");
-				break;
-			} else {
-				volatile_stoptime = time(0) + 60;
-			}
 		}
 
 		if (initial_ppid != 0 && getppid() != initial_ppid) {
@@ -2135,11 +2122,10 @@ static void show_help(const char *cmd)
 
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
-	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
 }
 
-enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
+enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DEBUG_RELEASE, LONG_OPT_CORES, LONG_OPT_MEMORY,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
@@ -2171,7 +2157,6 @@ static const struct option long_options[] = {
 	{"arch",                required_argument,  0,  'A'},
 	{"os",                  required_argument,  0,  'O'},
 	{"workdir",             required_argument,  0,  's'},
-	{"volatility",          required_argument,  0,  LONG_OPT_VOLATILITY},
 	{"bandwidth",           required_argument,  0,  LONG_OPT_BANDWIDTH},
 	{"cores",               required_argument,  0,  LONG_OPT_CORES},
 	{"memory",              required_argument,  0,  LONG_OPT_MEMORY},
@@ -2288,9 +2273,6 @@ int main(int argc, char *argv[])
 				fprintf(stderr,"ds_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
 				exit(EXIT_FAILURE);
 			}
-			break;
-		case LONG_OPT_VOLATILITY:
-			worker_volatility = atof(optarg);
 			break;
 		case LONG_OPT_BANDWIDTH:
 			setenv("DS_BANDWIDTH", optarg, 1);
