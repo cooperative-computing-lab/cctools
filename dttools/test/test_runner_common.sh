@@ -4,7 +4,7 @@ export CC=${CC:-gcc}
 
 # Tests sometimes chdir, so we get the full path now. `pwd` is annoying to portable.
 WORK_QUEUE_WORKER=$(cd "$(dirname "$0")/../../work_queue/src/"; pwd)/work_queue_worker
-DS_WORKER=$(cd "$(dirname "$0")/../../dataswarm/src/worker"; pwd)/ds_worker
+DATASWARM_WORKER=$(cd "$(dirname "$0")/../../dataswarm/src/worker"; pwd)/ds_worker
 
 # Obtain a config value from the master config file.
 
@@ -109,6 +109,36 @@ run_local_worker()
 	fi
 	echo "Running worker."
 	if ! "$WORK_QUEUE_WORKER" --single-shot --timeout=10s --cores ${cores:-1} --memory ${memory:-250} --disk ${disk:-250} --gpus ${gpus:-0} --debug=all --debug-file="$log" $* localhost $(cat "$port_file"); then
+		echo "ERROR: could not start worker"
+		exit 1
+	fi
+	echo "Worker completed."
+	return 0
+}
+
+run_local_ds_worker()
+{
+	local port_file=$1
+	shift
+	local log=$1
+	shift
+
+	local timeout=15
+
+	if [ -z "$log" ]; then
+		log=worker.log
+	fi
+
+	echo "Waiting for manager to be ready."
+	if wait_for_file_creation $port_file $timeout
+	then
+		echo "Master is ready on port `cat $port_file` "
+	else
+		echo "ERROR: Master failed to respond in $timeout seconds."
+		exit 1
+	fi
+	echo "Running worker."
+	if ! "$DATASWARM_WORKER" --single-shot --timeout=10s --cores ${cores:-1} --memory ${memory:-250} --disk ${disk:-250} --gpus ${gpus:-0} --debug=all --debug-file="$log" $* localhost $(cat "$port_file"); then
 		echo "ERROR: could not start worker"
 		exit 1
 	fi
