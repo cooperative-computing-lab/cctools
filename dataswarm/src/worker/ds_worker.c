@@ -230,7 +230,7 @@ static void send_manager_message( struct link *l, const char *fmt, ... )
 	string_nformat(debug_msg, sizeof(debug_msg), "tx: %s", fmt);
 	va_copy(debug_va, va);
 
-	vdebug(D_WQ, debug_msg, debug_va);
+	vdebug(D_DS, debug_msg, debug_va);
 	link_vprintf(l, time(0)+active_timeout, fmt, va);
 
 	va_end(va);
@@ -239,7 +239,7 @@ static void send_manager_message( struct link *l, const char *fmt, ... )
 static int recv_manager_message( struct link *l, char *line, int length, time_t stoptime )
 {
 	int result = link_readline(l,line,length,stoptime);
-	if(result) debug(D_WQ,"rx: %s",line);
+	if(result) debug(D_DS,"rx: %s",line);
 	return result;
 }
 
@@ -604,14 +604,14 @@ static int handle_completed_tasks(struct link *manager)
 		if(result==0) {
 			// pid is still going
 		} else if(result<0) {
-			debug(D_WQ, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
+			debug(D_DS, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
 		} else if(result>0) {
 			if (!WIFEXITED(status)){
 				p->exit_status = WTERMSIG(status);
-				debug(D_WQ, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_status);
+				debug(D_DS, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_status);
 			} else {
 				p->exit_status = WEXITSTATUS(status);
-				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
+				debug(D_DS, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
 
 				if(is_disk_allocation_exhausted(p)) {
 					p->task_status = DS_RESULT_DISK_ALLOC_FULL;
@@ -720,7 +720,7 @@ access_failure:
 
 send_failure:
 	free(cached_path);
-	debug(D_WQ, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
+	debug(D_DS, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
 	return 0;
 }
 
@@ -779,14 +779,14 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
 			ds_task_specify_command(task,cmd);
-			debug(D_WQ,"rx: %s",cmd);
+			debug(D_DS,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"coprocess %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
 			ds_task_specify_coprocess(task,cmd);
-			debug(D_WQ,"rx: %s",cmd);
+			debug(D_DS,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, DS_LINE_MAX);
@@ -822,7 +822,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			}
 			free(env);
 		} else {
-			debug(D_WQ|D_NOTICE,"invalid command from manager: %s",line);
+			debug(D_DS|D_NOTICE,"invalid command from manager: %s",line);
 			return 0;
 		}
 	}
@@ -875,7 +875,7 @@ static int do_put_symlink_internal( struct link *manager, char *filename, int le
 
 	int result = symlink(target,filename);
 	if(result<0) {
-		debug(D_WQ,"could not create symlink %s: %s",filename,strerror(errno));
+		debug(D_DS,"could not create symlink %s: %s",filename,strerror(errno));
 		free(target);
 		return 0;
 	}
@@ -895,7 +895,7 @@ name for validity.
 static int do_put_file_internal( struct link *manager, char *filename, int64_t length, int mode )
 {
 	if(!check_disk_space_for_filesize(".", length, 0)) {
-		debug(D_WQ, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
+		debug(D_DS, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
 
@@ -904,14 +904,14 @@ static int do_put_file_internal( struct link *manager, char *filename, int64_t l
 
 	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd<0) {
-		debug(D_WQ, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
+		debug(D_DS, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
 		return 0;
 	}
 
 	int64_t actual = link_stream_to_fd(manager, fd, length, time(0) + active_timeout);
 	close(fd);
 	if(actual!=length) {
-		debug(D_WQ, "Failed to put file - %s (%s)\n", filename, strerror(errno));
+		debug(D_DS, "Failed to put file - %s (%s)\n", filename, strerror(errno));
 		return 0;
 	}
 
@@ -937,7 +937,7 @@ static int do_put_dir_internal( struct link *manager, char *dirname, int *totals
 
 	int result = mkdir(dirname,0777);
 	if(result<0) {
-		debug(D_WQ,"unable to create %s: %s",dirname,strerror(errno));
+		debug(D_DS,"unable to create %s: %s",dirname,strerror(errno));
 		return 0;
 	}
 
@@ -1014,7 +1014,7 @@ protocol (above) is preferred instead.
 static int do_put_single_file( struct link *manager, char *filename, int64_t length, int mode )
 {
 	if(!path_within_dir(filename, workspace)) {
-		debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
+		debug(D_DS, "Path - %s is not within workspace %s.", filename, workspace);
 		return 0;
 	}
 
@@ -1024,7 +1024,7 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 		char dirname[DS_LINE_MAX];
 		path_dirname(filename,dirname);
 		if(!create_dir(dirname,0777)) {
-			debug(D_WQ, "could not create directory %s: %s",dirname,strerror(errno));
+			debug(D_DS, "could not create directory %s: %s",dirname,strerror(errno));
 			free(cached_path);
 			return 0;
 		}
@@ -1073,7 +1073,7 @@ static int do_unlink(const char *path)
 		ds_cache_remove(global_cache,path);
 		result = 1;
 	} else {
-		debug(D_WQ, "%s is not within workspace %s",cached_path,workspace);
+		debug(D_DS, "%s is not within workspace %s",cached_path,workspace);
 		result = 0;
 	}
 
@@ -1102,7 +1102,7 @@ static int do_kill(int taskid)
 
 	p = itable_remove(procs_table, taskid);
 	if(!p) {
-		debug(D_WQ,"manager requested kill of task %d which does not exist!",taskid);
+		debug(D_DS,"manager requested kill of task %d which does not exist!",taskid);
 		return 1;
 	}
 
@@ -1152,7 +1152,7 @@ static void kill_all_tasks()
 	assert(disk_allocated==0);
 	assert(gpus_allocated==0);
 
-	debug(D_WQ,"all data structures are clean");
+	debug(D_DS,"all data structures are clean");
 }
 
 static void finish_running_task(struct ds_process *p, ds_result_t result)
@@ -1180,7 +1180,7 @@ static int enforce_process_limits(struct ds_process *p)
 
 	ds_process_measure_disk(p, max_time_on_measurement);
 	if(p->sandbox_size > p->task->resources_requested->disk) {
-		debug(D_WQ,"Task %d went over its disk size limit: %s > %s\n",
+		debug(D_DS,"Task %d went over its disk size limit: %s > %s\n",
 				p->task->taskid,
 				rmsummary_resource_to_str(p->sandbox_size, /* with units */ 1),
 				rmsummary_resource_to_str(p->task->resources_requested->disk, 1));
@@ -1242,7 +1242,7 @@ static void enforce_processes_max_running_time()
 			continue;
 
 		if(now > p->execution_start + (1e6 * p->task->resources_requested->wall_time)) {
-			debug(D_WQ,"Task %d went over its running time limit: %s > %s\n",
+			debug(D_DS,"Task %d went over its running time limit: %s > %s\n",
 					p->task->taskid,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
@@ -1257,17 +1257,17 @@ static void enforce_processes_max_running_time()
 
 static int do_release()
 {
-	debug(D_WQ, "released by manager %s:%d.\n", current_manager_address->addr, current_manager_address->port);
+	debug(D_DS, "released by manager %s:%d.\n", current_manager_address->addr, current_manager_address->port);
 	released_by_manager = 1;
 	return 0;
 }
 
 static void disconnect_manager(struct link *manager)
 {
-	debug(D_WQ, "disconnecting from manager %s:%d", current_manager_address->addr, current_manager_address->port);
+	debug(D_DS, "disconnecting from manager %s:%d", current_manager_address->addr, current_manager_address->port);
 	link_close(manager);
 
-	debug(D_WQ, "killing all outstanding tasks");
+	debug(D_DS, "killing all outstanding tasks");
 	kill_all_tasks();
 
 	if(released_by_manager) {
@@ -1338,11 +1338,11 @@ static int handle_manager(struct link *manager)
 			report_tasks_complete(manager);
 			r = 1;
 		} else {
-			debug(D_WQ, "Unrecognized manager message: %s.\n", line);
+			debug(D_DS, "Unrecognized manager message: %s.\n", line);
 			r = 0;
 		}
 	} else {
-		debug(D_WQ, "Failed to read from manager.\n");
+		debug(D_DS, "Failed to read from manager.\n");
 		r = 0;
 	}
 
@@ -1388,7 +1388,7 @@ void forsake_waiting_process(struct link *manager, struct ds_process *p)
 	p->task_status = DS_RESULT_FORSAKEN;
 	itable_insert(procs_complete, p->task->taskid, p);
 
-	debug(D_WQ, "Waiting task %d has been forsaken.", p->task->taskid);
+	debug(D_DS, "Waiting task %d has been forsaken.", p->task->taskid);
 
 	/* we also send updated resources to the manager. */
 	send_keepalive(manager, 1);
@@ -1454,7 +1454,7 @@ static void work_for_manager(struct link *manager)
 {
 	sigset_t mask;
 
-	debug(D_WQ, "working for manager at %s:%d.\n", current_manager_address->addr, current_manager_address->port);
+	debug(D_DS, "working for manager at %s:%d.\n", current_manager_address->addr, current_manager_address->port);
 
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
@@ -1675,7 +1675,7 @@ workspace_prepare is called every time we connect to a new manager,
 
 static int workspace_prepare()
 {
-	debug(D_WQ,"preparing workspace %s",workspace);
+	debug(D_DS,"preparing workspace %s",workspace);
 
 	char *cachedir = string_format("%s/cache",workspace);
 	int result = create_dir(cachedir,0777);
@@ -1702,7 +1702,7 @@ directories (except trash) and move them to the trash directory.
 
 static void workspace_cleanup()
 {
-	debug(D_WQ,"cleaning workspace %s",workspace);
+	debug(D_DS,"cleaning workspace %s",workspace);
 	DIR *dir = opendir(workspace);
 	if(dir) {
 		struct dirent *d;
@@ -1795,10 +1795,10 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	link_address_local(manager, local_addr, &local_port);
 
 	printf("connected to manager %s:%d via local address %s:%d\n", host, port, local_addr, local_port);
-	debug(D_WQ, "connected to manager %s:%d via local address %s:%d", host, port, local_addr, local_port);
+	debug(D_DS, "connected to manager %s:%d via local address %s:%d", host, port, local_addr, local_port);
 
 	if(password) {
-		debug(D_WQ,"authenticating to manager");
+		debug(D_DS,"authenticating to manager");
 		if(!link_auth_password(manager,password,idle_stoptime)) {
 			fprintf(stderr,"ds_worker: wrong password for manager %s:%d\n",host,port);
 			link_close(manager);
@@ -1808,10 +1808,10 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 
 	if(verify_project) {
 		char line[DS_LINE_MAX];
-		debug(D_WQ, "verifying manager's project name");
+		debug(D_DS, "verifying manager's project name");
 		send_manager_message(manager, "name\n");
 		if(!recv_manager_message(manager,line,sizeof(line),idle_stoptime)) {
-			debug(D_WQ,"no response from manager while verifying name");
+			debug(D_DS,"no response from manager while verifying name");
 			link_close(manager);
 			return 0;
 		}
@@ -1908,7 +1908,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 {
 	struct list *managers_list = ds_catalog_query_cached(catalog_hosts,-1,project_regex);
 
-	debug(D_WQ,"project name %s matches %d managers",project_regex,list_size(managers_list));
+	debug(D_DS,"project name %s matches %d managers",project_regex,list_size(managers_list));
 
 	if(list_size(managers_list)==0) return 0;
 
@@ -1946,7 +1946,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 
 					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
 					connect_stoptime = idle_stoptime;
-					debug(D_WQ,"Previous idle disconnection from only manager available project=%s name=%s addr=%s port=%d",project,name,addr,port);
+					debug(D_DS,"Previous idle disconnection from only manager available project=%s name=%s addr=%s port=%d",project,name,addr,port);
 
 					return 0;
 				} else {
@@ -1959,13 +1959,13 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 		int result;
 
 		if(pref && strcmp(pref, "by_hostname") == 0) {
-			debug(D_WQ,"selected manager with project=%s hostname=%s addr=%s port=%d",project,name,addr,port);
+			debug(D_DS,"selected manager with project=%s hostname=%s addr=%s port=%d",project,name,addr,port);
 			manager_addresses = interfaces_to_list(name, port, NULL);
 		} else if(pref && strcmp(pref, "by_apparent_ip") == 0) {
-			debug(D_WQ,"selected manager with project=%s apparent_addr=%s port=%d",project,addr,port);
+			debug(D_DS,"selected manager with project=%s apparent_addr=%s port=%d",project,addr,port);
 			manager_addresses = interfaces_to_list(addr, port, NULL);
 		} else {
-			debug(D_WQ,"selected manager with project=%s addr=%s port=%d",project,addr,port);
+			debug(D_DS,"selected manager with project=%s addr=%s port=%d",project,addr,port);
 			manager_addresses = interfaces_to_list(addr, port, ifas);
 		}
 
@@ -2343,7 +2343,7 @@ int main(int argc, char *argv[])
 			free(abs_path_preloader);
 			if(preload_result) {
 				timestamp_t preload_fail_time = timestamp_get();
-				debug(D_WQ|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed at: %"PRId64"", preload_fail_time);
+				debug(D_DS|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed at: %"PRId64"", preload_fail_time);
 			}
 			disk_allocation = 1;
 			break;
@@ -2424,7 +2424,7 @@ int main(int argc, char *argv[])
 	}
 
 	// set $DS_SANDBOX to workspace.
-	debug(D_WQ, "DS_SANDBOX set to %s.\n", workspace);
+	debug(D_DS, "DS_SANDBOX set to %s.\n", workspace);
 	setenv("DS_SANDBOX", workspace, 0);
 
 	// change to workspace

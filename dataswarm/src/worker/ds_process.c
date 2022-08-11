@@ -55,10 +55,10 @@ static int create_sandbox_dir( struct ds_process *p, int disk_allocation )
 			int64_t size = (p->task->resources_requested->disk) * 1024;
 			if(disk_alloc_create(p->sandbox, "ext2", size) == 0) {
 				p->loop_mount = 1;
-				debug(D_WQ, "allocated %"PRId64"MB in %s\n",size,p->sandbox);
+				debug(D_DS, "allocated %"PRId64"MB in %s\n",size,p->sandbox);
 				// keep going and fall through
 			} else {
-				debug(D_WQ, "couldn't allocate %"PRId64"MB in %s\n",size,p->sandbox);
+				debug(D_DS, "couldn't allocate %"PRId64"MB in %s\n",size,p->sandbox);
 				return 0;
 			}
 		} else {
@@ -230,7 +230,7 @@ pid_t ds_process_execute(struct ds_process *p )
 	p->output_file_name = strdup(task_output_template);
 	p->output_fd = mkstemp(p->output_file_name);
 	if(p->output_fd == -1) {
-		debug(D_WQ, "Could not open worker stdout: %s", strerror(errno));
+		debug(D_DS, "Could not open worker stdout: %s", strerror(errno));
 		return 0;
 	}
 
@@ -252,12 +252,12 @@ pid_t ds_process_execute(struct ds_process *p )
 		// This is currently used by kill_task().
 		setpgid(p->pid, 0);
 
-		debug(D_WQ, "started process %d: %s", p->pid, p->task->command_line);
+		debug(D_DS, "started process %d: %s", p->pid, p->task->command_line);
 		return p->pid;
 
 	} else if(p->pid < 0) {
 
-		debug(D_WQ, "couldn't create new process: %s\n", strerror(errno));
+		debug(D_DS, "couldn't create new process: %s\n", strerror(errno));
 		unlink(p->output_file_name);
 		close(p->output_fd);
 		return p->pid;
@@ -322,7 +322,7 @@ void ds_process_kill(struct ds_process *p)
 	if(elapsed_time_execution_start / 1000000 < 3)
 		sleep(3 - (elapsed_time_execution_start / 1000000));
 
-	debug(D_WQ, "terminating task %d pid %d", p->task->taskid, p->pid);
+	debug(D_DS, "terminating task %d pid %d", p->task->taskid, p->pid);
 
 	// Send signal to process group of child which is denoted by -ve value of child pid.
 	// This is done to ensure delivery of signal to processes forked by the child.

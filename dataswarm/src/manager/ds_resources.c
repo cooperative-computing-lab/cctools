@@ -66,7 +66,7 @@ void ds_resources_measure_locally( struct ds_resources *r, const char *disk_path
 
 static void ds_resource_debug( struct ds_resource *r, const char *name )
 {
-	debug(D_WQ,"%8s %6"PRId64" inuse %6"PRId64" total %6"PRId64" smallest %6"PRId64" largest",name, r->inuse, r->total, r->smallest, r->largest);
+	debug(D_DS,"%8s %6"PRId64" inuse %6"PRId64" total %6"PRId64" smallest %6"PRId64" largest",name, r->inuse, r->total, r->smallest, r->largest);
 }
 
 
@@ -78,7 +78,7 @@ static void ds_resource_send( struct link *manager, struct ds_resource *r, const
 
 void ds_resources_send( struct link *manager, struct ds_resources *r, time_t stoptime )
 {
-	debug(D_WQ, "Sending resource description to manager:");
+	debug(D_DS, "Sending resource description to manager:");
 	ds_resource_send(manager, &r->workers, "workers",stoptime);
 	ds_resource_send(manager, &r->disk,    "disk",   stoptime);
 	ds_resource_send(manager, &r->memory,  "memory", stoptime);

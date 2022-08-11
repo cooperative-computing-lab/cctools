@@ -93,10 +93,10 @@ struct list *ds_catalog_query_cached( const char *catalog_host, int catalog_port
 	}
 
 	while(1) {
-		debug(D_WQ,"querying catalog for managers with project=%s",project_regex);
+		debug(D_DS,"querying catalog for managers with project=%s",project_regex);
 		managers_list = ds_catalog_query(catalog_host,catalog_port,project_regex);
 		if(managers_list) break;
-		debug(D_WQ,"unable to contact catalog, still trying...");
+		debug(D_DS,"unable to contact catalog, still trying...");
 		sleep(5);
 	}
 

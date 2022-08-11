@@ -138,7 +138,7 @@ static int do_internal_command( struct ds_cache *c, const char *command, char **
 	int result = 0;
 	*error_message = 0;
 	
-	debug(D_WQ,"executing: %s",command);
+	debug(D_DS,"executing: %s",command);
 		
 	FILE *stream = popen(command,"r");
 	if(stream) {
@@ -151,7 +151,7 @@ static int do_internal_command( struct ds_cache *c, const char *command, char **
 			}
 			result = 1;
 		} else {
-			debug(D_WQ,"command failed with output: %s",*error_message);
+			debug(D_DS,"command failed with output: %s",*error_message);
 			result = 0;
 		}
 	} else {
@@ -207,12 +207,12 @@ int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *man
 {
 	struct cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
-		debug(D_WQ,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
+		debug(D_DS,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
 		return 0;
 	}
 
 	if(f->present) {
-		debug(D_WQ,"cache: %s is already present.",cachename);
+		debug(D_DS,"cache: %s is already present.",cachename);
 		return 1;
 	}
 	
@@ -225,17 +225,17 @@ int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *man
 	
 	switch(f->type) {
 		case DS_CACHE_FILE:
-			debug(D_WQ,"error: file %s should already be present!",cachename);
+			debug(D_DS,"error: file %s should already be present!",cachename);
 			result = 0;
 			break;
 		  
 		case DS_CACHE_TRANSFER:
-			debug(D_WQ,"cache: transferring %s to %s",f->source,cachename);
+			debug(D_DS,"cache: transferring %s to %s",f->source,cachename);
 			result = do_transfer(c,f->source,cache_path,&error_message);
 			break;
 
 		case DS_CACHE_COMMAND:
-			debug(D_WQ,"cache: creating %s via shell command",cachename);
+			debug(D_DS,"cache: creating %s via shell command",cachename);
 			result = do_command(c,f->source,cache_path,&error_message);
 			break;
 	}
@@ -257,15 +257,15 @@ int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *man
 			f->actual_size = info.st_size;
 			f->expected_size = f->actual_size;
 			f->present = 1;
-			debug(D_WQ,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
+			debug(D_DS,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
 			send_cache_update(manager,cachename,f->actual_size,transfer_time);
 			result = 1;
 		} else {
-			debug(D_WQ,"cache: command succeeded but did not create %s",cachename);
+			debug(D_DS,"cache: command succeeded but did not create %s",cachename);
 			result = 0;
 		}
 	} else {
-		debug(D_WQ,"cache: unable to create %s",cachename);
+		debug(D_DS,"cache: unable to create %s",cachename);
 		result = 0;
 	}
 
