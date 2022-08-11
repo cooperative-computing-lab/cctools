@@ -44,7 +44,6 @@ See the file COPYING for details.
 #include "random.h"
 #include "url_encode.h"
 #include "md5.h"
-#include "disk_alloc.h"
 #include "hash_table.h"
 #include "pattern.h"
 #include "gpu_info.h"
@@ -170,9 +169,6 @@ static int64_t cores_allocated = 0;
 static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
-
-// Allow worker to use disk_alloc loop devices for task sandbox. Disabled by default.
-static int disk_allocation = 0;
 
 static int64_t files_counted = 0;
 
@@ -562,31 +558,6 @@ static void expire_procs_running()
 }
 
 /*
-Return true if task uses a disk allocation and it was overrun.
-*/
-
-static int is_disk_allocation_exhausted( struct ds_process *p )
-{
-	int result = 0;
-	FILE *loop_full_check;
-	char *buf = malloc(PATH_MAX);
-	char *disk_alloc_filename = ds_generate_disk_alloc_full_filename(p->sandbox,p->task->taskid);
-	
-	if(p->loop_mount == 1 && (loop_full_check = fopen(disk_alloc_filename, "r"))) {
-		fclose(loop_full_check);
-		trash_file(disk_alloc_filename);
-		result = 1;
-	} else {
-		result = 0;
-	}
-
-	free(buf);
-	free(disk_alloc_filename);
-
-	return result;
-}
-
-/*
 Scan over all of the processes known by the worker,
 and if they have exited, move them into the procs_complete table
 for later processing.
@@ -612,11 +583,6 @@ static int handle_completed_tasks(struct link *manager)
 			} else {
 				p->exit_status = WEXITSTATUS(status);
 				debug(D_DS, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
-
-				if(is_disk_allocation_exhausted(p)) {
-					p->task_status = DS_RESULT_DISK_ALLOC_FULL;
-					p->task->disk_allocation_exhausted = 1;
-				}
 			}
 
 			/* collect the resources associated with the process */
@@ -829,7 +795,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 
 	last_task_received = task->taskid;
 
-	struct ds_process *p = ds_process_create(task, disk_allocation);
+	struct ds_process *p = ds_process_create(task);
 	if(!p) return 0;
 
 	// Every received task goes into procs_table.
@@ -1206,13 +1172,7 @@ static int enforce_processes_limits()
 	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
 		if(!enforce_process_limits(p)) {
 			finish_running_task(p, DS_RESULT_RESOURCE_EXHAUSTION);
-
-			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
-			if(p->loop_mount == 1) {
-				disk_alloc_delete(p->sandbox);
-			} else {
-				trash_file(p->sandbox);
-			}
+			trash_file(p->sandbox);
 
 			ok = 0;
 		}
@@ -2129,7 +2089,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DEBUG_RELEASE, LONG_OPT_CORES, LONG_OPT_MEMORY,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
-	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
+	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
 	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION,
 	  LONG_OPT_FROM_FACTORY};
@@ -2140,7 +2100,6 @@ static const struct option long_options[] = {
 	{"debug",               required_argument,  0,  'd'},
 	{"debug-file",          required_argument,  0,  'o'},
 	{"debug-rotate-max",    required_argument,  0,  LONG_OPT_DEBUG_FILESIZE},
-	{"disk-allocation",     no_argument,  		0,  LONG_OPT_DISK_ALLOCATION},
 	{"manager-name",        required_argument,  0,  'M'},
 	{"master-name",         required_argument,  0,  'M'},
 	{"password",            required_argument,  0,  'P'},
@@ -2324,30 +2283,6 @@ int main(int argc, char *argv[])
 		case 'h':
 			show_help(argv[0]);
 			return 0;
-		case LONG_OPT_DISK_ALLOCATION:
-		{
-			char *abs_path_preloader = string_format("%s/lib/libforce_halt_enospc.so", INSTALL_PATH);
-			int preload_result;
-			char *curr_ld_preload = getenv("LD_PRELOAD");
-			if(curr_ld_preload && abs_path_preloader) {
-				char *new_ld_preload = string_format("%s:%s", curr_ld_preload, abs_path_preloader);
-				preload_result = setenv("LD_PRELOAD", new_ld_preload, 1);
-				free(new_ld_preload);
-			}
-			else if(abs_path_preloader) {
-				preload_result = setenv("LD_PRELOAD", abs_path_preloader, 1);
-			}
-			else {
-				preload_result = 1;
-			}
-			free(abs_path_preloader);
-			if(preload_result) {
-				timestamp_t preload_fail_time = timestamp_get();
-				debug(D_DS|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed at: %"PRId64"", preload_fail_time);
-			}
-			disk_allocation = 1;
-			break;
-		}
 		case LONG_OPT_FEATURE:
 			hash_table_insert(features, optarg, (void **) 1);
 			break;

@@ -12,7 +12,6 @@
 #include "stringtools.h"
 #include "create_dir.h"
 #include "list.h"
-#include "disk_alloc.h"
 #include "path.h"
 #include "xxmalloc.h"
 #include "trash.h"
@@ -37,36 +36,18 @@
 #include <sys/types.h>
 
 /*
-Create the task sandbox directory.  If disk allocation is enabled,
-make an allocation, otherwise just make a directory.
+Create the task sandbox directory.
 Create temporary directories inside as well.
 */
 
 extern char * workspace;
 
-static int create_sandbox_dir( struct ds_process *p, int disk_allocation )
+static int create_sandbox_dir( struct ds_process *p )
 {
 	p->cache_dir = string_format("%s/cache",workspace);
   	p->sandbox = string_format("%s/t.%d", workspace,p->task->taskid);
 
-	if(disk_allocation) {
-		ds_process_compute_disk_needed(p);
-		if(p->task->resources_requested->disk > 0) {
-			int64_t size = (p->task->resources_requested->disk) * 1024;
-			if(disk_alloc_create(p->sandbox, "ext2", size) == 0) {
-				p->loop_mount = 1;
-				debug(D_DS, "allocated %"PRId64"MB in %s\n",size,p->sandbox);
-				// keep going and fall through
-			} else {
-				debug(D_DS, "couldn't allocate %"PRId64"MB in %s\n",size,p->sandbox);
-				return 0;
-			}
-		} else {
-			if(!create_dir(p->sandbox, 0777)) return 0;
-		}
-	} else {
-		if(!create_dir(p->sandbox, 0777)) return 0;
-	}
+	if(!create_dir(p->sandbox, 0777)) return 0;
 
 	char tmpdir_template[1024];
 	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
@@ -87,14 +68,12 @@ Create a ds_process and all of the information necessary for invocation.
 However, do not allocate substantial resources at this point.
 */
 
-struct ds_process *ds_process_create(struct ds_task *ds_task, int disk_allocation)
+struct ds_process *ds_process_create(struct ds_task *ds_task )
 {
 	struct ds_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 	p->task = ds_task;
-	p->task->disk_allocation_exhausted = 0;
-
-	if(!create_sandbox_dir(p,disk_allocation)) {
+	if(!create_sandbox_dir(p)) {
 		ds_process_delete(p);
 		return 0;
 	}
@@ -117,11 +96,7 @@ void ds_process_delete(struct ds_process *p)
 	}
 
 	if(p->sandbox) {
-		if(p->loop_mount == 1) {
-			disk_alloc_delete(p->sandbox);
-		} else {
-			trash_file(p->sandbox);
-		}
+		trash_file(p->sandbox);
 		free(p->sandbox);
 	}
 
@@ -232,14 +207,6 @@ pid_t ds_process_execute(struct ds_process *p )
 	if(p->output_fd == -1) {
 		debug(D_DS, "Could not open worker stdout: %s", strerror(errno));
 		return 0;
-	}
-
-	if(p->loop_mount) {
-		char *buf = malloc(PATH_MAX);
-		char *pwd = getcwd(buf, PATH_MAX);
-		char *filename = ds_generate_disk_alloc_full_filename(pwd, p->task->taskid);
-		p->task->command_line = string_format("export CCTOOLS_DISK_ALLOC=%s; %s", filename, p->task->command_line);
-		free(buf);
 	}
 
 	p->execution_start = timestamp_get();

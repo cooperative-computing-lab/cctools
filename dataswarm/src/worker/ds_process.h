@@ -35,8 +35,6 @@ struct ds_process {
 
 	/* expected disk usage by the process. If no cache is used, it is the same as in task. */
 	int64_t disk;
-	/* 1 if the task sandbox was mounted on a loop device. 0 otherwise. */
-	int loop_mount;
 
 	/* disk size and number of files found in the process sandbox. */
 	int64_t sandbox_size;
@@ -50,7 +48,7 @@ struct ds_process {
 	int coprocess_port;
 };
 
-struct ds_process * ds_process_create( struct ds_task *task, int disk_allocation );
+struct ds_process * ds_process_create( struct ds_task *task );
 pid_t ds_process_execute( struct ds_process *p );
 void  ds_process_kill( struct ds_process *p );
 void  ds_process_delete( struct ds_process *p );
