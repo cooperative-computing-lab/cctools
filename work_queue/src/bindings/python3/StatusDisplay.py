@@ -84,7 +84,7 @@ class StatusDisplay():
 
             larger_worker = self.resources_check_limits(c["max_allocation"], largest_worker)
             if larger_worker:
-                ct.append(["current workers too small!"] + larger_worker)
+                ct.append(["current workers are too small!"] + larger_worker)
 
             allocs = [
                     ("max_seen", "largest seen", "na"),
