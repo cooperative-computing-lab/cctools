@@ -89,7 +89,7 @@ class StatusDisplay():
             allocs = [
                     ("max_seen", "largest seen", "na"),
                     ("first_allocation", "current allocation", "whole worker"),
-                    ("max_allocation", "maximum allocation worker", "whole worker"),
+                    ("max_allocation", "maximum allocation", "whole worker"),
                     ]
 
             for (k, l, na) in allocs:
