@@ -11,7 +11,7 @@ DATASWARM_WORKER=$(cd "$(dirname "$0")/../../dataswarm/src/worker"; pwd)/ds_work
 import_config_val()
 {
 	name=$1
-	value=$(grep $name ../../config.mk | cut -d = -f 2)
+	value=$(grep "^${name}=" ../../config.mk | cut -d = -f 2)
 	export ${name}=${value}
 }
 
