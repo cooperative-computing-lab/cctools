@@ -23,7 +23,7 @@ struct ds_task {
 	struct list *output_files;                        /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
 	struct list *env_list;                            /**< Environment variables applied to the task. */
 	int taskid;                                       /**< A unique task id number. */
-	int return_status;                                /**< The exit code of the command line. */
+	int exit_code;                                   /**< The exit code of the command line. */
 	ds_result_t result;                       /**< The result of the task (see @ref ds_result_t */
 	char *host;                                       /**< The address and port of the host on which it ran. */
 	char *hostname;                                   /**< The name of the host on which it ran. */

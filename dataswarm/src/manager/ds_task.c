@@ -36,7 +36,7 @@ struct ds_task *ds_task_create(const char *command_line)
 	t->input_files = list_create();
 	t->output_files = list_create();
 	t->env_list = list_create();
-	t->return_status = -1;
+	t->exit_code = -1;
 
 	t->result = DS_RESULT_UNKNOWN;
 
@@ -769,7 +769,7 @@ const char * ds_task_get_output( struct ds_task *t )
 
 int ds_task_get_exit_code( struct ds_task *t )
 {
-	return t->return_status;
+	return t->exit_code;
 }
 
 ds_result_t ds_task_get_result( struct ds_task *t )

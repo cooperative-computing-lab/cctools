@@ -444,8 +444,8 @@ static int start_process( struct ds_process *p, struct link *manager )
 
 	if(!ds_sandbox_stagein(p,global_cache,manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
-		p->task_status = DS_RESULT_INPUT_MISSING;
-		p->exit_status = 1;
+		p->result = DS_RESULT_INPUT_MISSING;
+		p->exit_code = 1;
 		itable_insert(procs_complete,p->task->taskid,p);
 		return 0;
 	}
@@ -485,8 +485,8 @@ static void reap_process( struct ds_process *p )
 	ds_gpus_free(p->task->taskid);
 
 	if(!ds_sandbox_stageout(p,global_cache)) {
-		p->task_status = DS_RESULT_OUTPUT_MISSING;
-		p->exit_status = 1;
+		p->result = DS_RESULT_OUTPUT_MISSING;
+		p->exit_code = 1;
 	}
 
 	itable_remove(procs_running, p->pid);
@@ -506,7 +506,7 @@ static void report_task_complete( struct link *manager, struct ds_process *p )
 	fstat(p->output_fd, &st);
 	output_length = st.st_size;
 	lseek(p->output_fd, 0, SEEK_SET);
-	send_manager_message(manager, "result %d %d %lld %llu %d\n", p->task_status, p->exit_status, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
+	send_manager_message(manager, "result %d %d %lld %llu %d\n", p->result, p->exit_code, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
 	link_stream_from_fd(manager, p->output_fd, output_length, time(0)+active_timeout);
 
 	total_task_execution_time += (p->execution_end - p->execution_start);
@@ -551,7 +551,7 @@ static void expire_procs_running()
 	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
-			p->task_status = DS_RESULT_TASK_TIMEOUT;
+			p->result = DS_RESULT_TASK_TIMEOUT;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -578,11 +578,11 @@ static int handle_completed_tasks(struct link *manager)
 			debug(D_DS, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
 		} else if(result>0) {
 			if (!WIFEXITED(status)){
-				p->exit_status = WTERMSIG(status);
-				debug(D_DS, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_status);
+				p->exit_code = WTERMSIG(status);
+				debug(D_DS, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_code);
 			} else {
-				p->exit_status = WEXITSTATUS(status);
-				debug(D_DS, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
+				p->exit_code = WEXITSTATUS(status);
+				debug(D_DS, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_code);
 			}
 
 			/* collect the resources associated with the process */
@@ -1123,7 +1123,7 @@ static void kill_all_tasks()
 
 static void finish_running_task(struct ds_process *p, ds_result_t result)
 {
-	p->task_status |= result;
+	p->result |= result;
 	kill(p->pid, SIGKILL);
 }
 
@@ -1206,7 +1206,7 @@ static void enforce_processes_max_running_time()
 					p->task->taskid,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
-			p->task_status = DS_RESULT_TASK_MAX_RUN_TIME;
+			p->result = DS_RESULT_TASK_MAX_RUN_TIME;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -1345,7 +1345,7 @@ static int task_resources_fit_eventually(struct ds_task *t)
 void forsake_waiting_process(struct link *manager, struct ds_process *p)
 {
 	/* the task cannot run in this worker */
-	p->task_status = DS_RESULT_FORSAKEN;
+	p->result = DS_RESULT_FORSAKEN;
 	itable_insert(procs_complete, p->task->taskid, p);
 
 	debug(D_DS, "Waiting task %d has been forsaken.", p->task->taskid);

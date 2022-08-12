@@ -20,8 +20,8 @@ This object is private to the ds_worker.
 
 struct ds_process {
 	pid_t pid;
-	int task_status;                // Any of DS_RESULT_*
-	int exit_status;                // Exit code, or signal number to task process.
+	ds_result_t result;                // Any of DS_RESULT_*
+	int exit_code;                 // Exit code, or signal number to task process.
 
 	struct rusage rusage;
 	timestamp_t execution_start;

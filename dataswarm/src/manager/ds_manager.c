@@ -1506,7 +1506,7 @@ static ds_result_code_t get_output_files( struct ds_manager *q, struct ds_worker
 			// non-file objects are handled by the worker.
 			if(f->type!=DS_FILE) continue;
 		     
-			int task_succeeded = (t->result==DS_RESULT_SUCCESS && t->return_status==0);
+			int task_succeeded = (t->result==DS_RESULT_SUCCESS && t->exit_code==0);
 
 			// skip failure-only files on success 
 			if(f->flags&DS_FAILURE_ONLY && task_succeeded) continue;
@@ -1611,7 +1611,7 @@ void read_measured_resources(struct ds_manager *q, struct ds_task *t) {
 
 	if(t->resources_measured) {
 		t->resources_measured->category = xxstrdup(t->category);
-		t->return_status = t->resources_measured->exit_status;
+		t->exit_code = t->resources_measured->exit_status;
 	} else {
 		/* if no resources were measured, then we don't overwrite the return
 		 * status, and mark the task as with error from monitoring. */
@@ -1786,20 +1786,20 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 
 	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
 	if(t->result == DS_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
-		switch(t->return_status) {
+		switch(t->exit_code) {
 			case(126):
-				warn(D_DS, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->return_status);
+				warn(D_DS, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->exit_code);
 				warn(D_DS, "This usually means that the task's command is not an executable,\n");
 				warn(D_DS, "or that the worker's scratch directory is on a no-exec partition.\n");
 				break;
 			case(127):
-				warn(D_DS, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->return_status);
+				warn(D_DS, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->exit_code);
 				warn(D_DS, "This usually means that the task's command could not be found, or that\n");
 				warn(D_DS, "it uses a shared library not available at the worker, or that\n");
 				warn(D_DS, "it uses a version of the glibc different than the one at the worker.\n");
 				break;
 			case(139):
-				warn(D_DS, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->return_status);
+				warn(D_DS, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->exit_code);
 				warn(D_DS, "This usually means that the task's command had a segmentation fault,\n");
 				warn(D_DS, "either because it has a memory access error (segfault), or because\n");
 				warn(D_DS, "it uses a version of a shared library different from the one at the worker.\n");
@@ -2130,7 +2130,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 		t->output[actual] = 0;
 
 	t->result        = task_status;
-	t->return_status = exit_status;
+	t->exit_code = exit_status;
 
 	q->stats->time_workers_execute += t->time_workers_execute_last;
 
@@ -2138,9 +2138,9 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 
 	// Convert resource_monitor status into work queue status if needed.
 	if(q->monitor_mode) {
-		if(t->return_status == RM_OVERFLOW) {
+		if(t->exit_code == RM_OVERFLOW) {
 			update_task_result(t, DS_RESULT_RESOURCE_EXHAUSTION);
-		} else if(t->return_status == RM_TIME_EXPIRE) {
+		} else if(t->exit_code == RM_TIME_EXPIRE) {
 			update_task_result(t, DS_RESULT_TASK_TIMEOUT);
 		}
 	}
@@ -6477,7 +6477,7 @@ static void write_transaction_task(struct ds_manager *q, struct ds_task *t) {
 			/* do not add any info */
 	} else if(state == DS_TASK_RETRIEVED || state == DS_TASK_DONE) {
 		buffer_printf(&B, " %s ", ds_result_str(t->result));
-		buffer_printf(&B, " %d ", t->return_status);
+		buffer_printf(&B, " %d ", t->exit_code);
 
 		if(t->resources_measured) {
 			if(t->result == DS_RESULT_RESOURCE_EXHAUSTION) {
