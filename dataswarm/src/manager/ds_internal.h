@@ -11,6 +11,10 @@ See the file COPYING for details.
 #include "list.h"
 #include "hash_table.h"
 
+#define RESOURCE_MONITOR_TASK_LOCAL_NAME "ds-%d-task-%d"
+#define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
+#define RESOURCE_MONITOR_REMOTE_NAME_EVENTS RESOURCE_MONITOR_REMOTE_NAME "events.json"
+
 struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag );
 
 /* Adds (arithmetically) all the workers resources (cores, memory, disk) */

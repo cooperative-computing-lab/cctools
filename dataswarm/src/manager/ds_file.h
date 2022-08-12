@@ -23,6 +23,7 @@ struct ds_file {
 };
 
 struct ds_file * ds_file_create( const char *source, const char *remote_name, ds_file_t type, ds_file_flags_t flags );
+struct ds_file *ds_file_clone( const struct ds_file *file );
 void ds_file_delete( struct ds_file *f );
 
 #endif

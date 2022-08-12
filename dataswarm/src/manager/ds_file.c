@@ -116,6 +116,11 @@ struct ds_file *ds_file_create(const char *payload, const char *remote_name, ds_
 	return f;
 }
 
+struct ds_file *ds_file_clone(const struct ds_file *file)
+{
+	return ds_file_create(file->payload,file->remote_name,file->type,file->flags);
+}
+
 void ds_file_delete(struct ds_file *tf)
 {
 	if(tf->payload)

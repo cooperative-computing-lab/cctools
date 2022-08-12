@@ -6,6 +6,7 @@ SOURCES = \
 	ds_catalog.c \
 	ds_resources.c \
 	ds_json.c \
+	ds_task.c \
 	ds_file.c \
 	ds_remote_file_info.c
 

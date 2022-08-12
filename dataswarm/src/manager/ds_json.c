@@ -5,6 +5,8 @@ See the file COPYING for details.
 */
 
 #include "ds_json.h"
+#include "ds_file.h"
+#include "ds_task.h"
 
 #include "jx.h"
 #include "jx_parse.h"
