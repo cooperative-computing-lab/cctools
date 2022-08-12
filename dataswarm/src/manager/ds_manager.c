@@ -1580,8 +1580,8 @@ static void delete_task_output_files(struct ds_manager *q, struct ds_worker *w, 
 
 static void delete_uncacheable_files( struct ds_manager *q, struct ds_worker *w, struct ds_task *t )
 {
-	delete_worker_files(q, w, t->input_files, DS_CACHE | DS_PREEXIST);
-	delete_worker_files(q, w, t->output_files, DS_CACHE | DS_PREEXIST);
+	delete_worker_files(q, w, t->input_files, DS_CACHE );
+	delete_worker_files(q, w, t->output_files, DS_CACHE );
 }
 
 char *monitor_file_name(struct ds_manager *q, struct ds_task *t, const char *ext) {
@@ -2048,7 +2048,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 
 	if(task_status == DS_RESULT_FORSAKEN) {
 		// Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_files, DS_CACHE | DS_PREEXIST);
+		delete_worker_files(q, w, t->input_files, DS_CACHE );
 
 		/* task will be resubmitted, so we do not update any of the execution stats */
 		reap_task_from_worker(q, w, t, DS_TASK_READY);
@@ -4626,7 +4626,7 @@ static int cancel_task_on_worker(struct ds_manager *q, struct ds_task *t, ds_tas
 		debug(D_DS, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 
 		//Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_files, DS_CACHE | DS_PREEXIST);
+		delete_worker_files(q, w, t->input_files, DS_CACHE );
 
 		//Delete all output files since they are not needed as the task was aborted.
 		delete_worker_files(q, w, t->output_files, 0);
@@ -6105,7 +6105,7 @@ struct list * ds_cancel_all_tasks(struct ds_manager *q) {
 		itable_firstkey(w->current_tasks);
 		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
 			//Delete any input files that are not to be cached.
-			delete_worker_files(q, w, t->input_files, DS_CACHE | DS_PREEXIST);
+			delete_worker_files(q, w, t->input_files, DS_CACHE );
 
 			//Delete all output files since they are not needed as the task was aborted.
 			delete_worker_files(q, w, t->output_files, 0);

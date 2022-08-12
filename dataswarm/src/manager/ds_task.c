@@ -747,3 +747,35 @@ void ds_task_delete(struct ds_task *t)
 	}
 }
 
+const char * ds_task_get_command( struct ds_task *t )
+{
+	return t->command_line;
+}
+
+const char * ds_task_get_tag( struct ds_task *t )
+{
+	return t->tag;
+}
+
+int ds_task_get_taskid( struct ds_task *t )
+{
+	return t->taskid;
+}
+
+const char * ds_task_get_output( struct ds_task *t )
+{
+	return t->output;
+}
+
+int ds_task_get_exit_code( struct ds_task *t )
+{
+	return t->return_status;
+}
+
+ds_result_t ds_task_get_result( struct ds_task *t )
+{
+	return t->result;
+}
+
+
+

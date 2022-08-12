@@ -42,8 +42,6 @@ typedef enum {
 	DS_WATCH    = 16, /**< Watch the output file and send back changes as the task runs. */
 	DS_FAILURE_ONLY = 32,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	DS_SUCCESS_ONLY = 64, /**< Only return this output file if the task succeeded. */
-
-	DS_PREEXIST = 4 /**< If the filename already exists on the host, use it in place. (Warning: Internal use only.) */
 } ds_file_flags_t;
 
 typedef enum {
@@ -1003,11 +1001,66 @@ void ds_specify_category_first_allocation_guess(struct ds_manager *m,  const cha
 void ds_initialize_categories(struct ds_manager *m, struct rmsummary *max, const char *summaries_file);
 
 
+/** Get the command line of the task.
+@param t A task object.
+@return The command line set by @ref ds_task_create.
+*/
+
+const char * ds_task_get_command( struct ds_task *t );
+
+/** Get the tag associated with the task.
+@param t A task object.
+@return The tag string set by @ref ds_task_specify_tag.
+*/
+
+const char * ds_task_get_tag( struct ds_task *t );
+
+/** Get the unique ID of the task.
+@param t A task object.
+@return The integer task ID assigned at creation time.
+*/
+
+int ds_task_get_taskid( struct ds_task *t );
+
+/** Get the end result of the task.
+If the result is @ref DS_RESULT_SUCCESS, then the
+task ran to completion and the exit code of the process
+can be obtained from @ref ds_task_get_exit_code.
+For any other result, the task could not be run to
+completion.  Use @ref ds_result_str to convert the
+result code into a readable string.
+@param t A task object.
+@return The result of the task as a ds_result_t.
+*/
+
+ds_result_t ds_task_get_result( struct ds_task *t );
+
 /** Explain result codes from tasks.
 @param result Result from a task returned by @ref ds_wait.
 @return String representation of task result code.
 */
 const char *ds_result_str(ds_result_t result);
+
+
+/** Get the Unix exit code of the task.
+@param t A task object.
+@return If the task ran to completion and the result
+is @ref DS_RESULT_SUCCESS, then this function returns
+the Unix exit code of the process, which by custom
+is zero to indicate success, and non-zero to indicate failure.
+*/
+
+int ds_task_get_exit_code( struct ds_task *t );
+
+/** Get the standard output of the task.
+@param t A task object.
+@return A null-terminated string containing the standard
+output of the task.  If the task did not run to completion,
+then this function returns null.
+*/
+
+const char * ds_task_get_output( struct ds_task *t );
+
 
 //@}
 

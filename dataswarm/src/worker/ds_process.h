@@ -2,6 +2,8 @@
 #define DS_PROCESS_H
 
 #include "ds_manager.h"
+#include "ds_task.h"
+
 #include "timestamp.h"
 #include "path_disk_size_info.h"
 

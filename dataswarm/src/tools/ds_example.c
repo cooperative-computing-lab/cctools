@@ -89,8 +89,8 @@ int main(int argc, char *argv[])
 		/* Once all files has been specified, we are ready to submit the task to the queue. */
 		taskid = ds_submit(q, t);
 
-		printf("submitted task (id# %d): %s\n", taskid, t->command_line);
-	}
+		printf("submitted task (id# %d): %s\n", taskid, ds_task_get_command(t) );
+}
 
 	printf("waiting for tasks to complete...\n");
 
@@ -102,8 +102,12 @@ int main(int argc, char *argv[])
 		t = ds_wait(q, 5);
 
 		if(t) {
-			printf("task (id# %d) complete: %s (return code %d)\n", t->taskid, t->command_line, t->return_status);
-			if(t->return_status != 0)
+			printf("task (id# %d) complete: %s (return code %d)\n",
+				ds_task_get_taskid(t),
+				ds_task_get_command(t),
+				ds_task_get_result(t) );
+
+			if( ds_task_get_result(t) != 0)
 			{
 				/* The task failed. Error handling (e.g., resubmit with new parameters) here. */
 			}

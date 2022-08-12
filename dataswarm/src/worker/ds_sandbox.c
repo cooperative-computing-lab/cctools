@@ -1,6 +1,7 @@
 #include "ds_sandbox.h"
 #include "ds_cache.h"
 #include "ds_internal.h"
+#include "ds_task.h"
 
 #include "stringtools.h"
 #include "debug.h"
