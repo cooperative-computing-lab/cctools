@@ -41,7 +41,7 @@ run()
 
 	wait_for_file_creation manager.port 5
 
-	run_local_worker manager.port worker.log
+	run_wq_worker manager.port worker.log
 
 	require_identical_files output.txt expected.txt
 

@@ -82,9 +82,12 @@ struct category {
 	/* category is somewhat confident of the maximum seen value. */
 	int steady_state;
 
-	/* stats for wq */
+	/* stats for work queue */
 	uint64_t average_task_time;
 	struct work_queue_stats *wq_stats;
+
+	/* stats for dataswarm */
+	struct ds_stats *ds_stats;
 
 	/* variables for makeflow */
 	/* Mappings between variable names defined in the makeflow file and their values. */

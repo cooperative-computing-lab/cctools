@@ -3,15 +3,18 @@ set -ex
 
 . ../../dttools/test/test_runner_common.sh
 
-python=${CCTOOLS_PYTHON_TEST_EXEC}
-python_dir=${CCTOOLS_PYTHON_TEST_DIR}
+import_config_val CCTOOLS_PYTHON_TEST_EXEC
+import_config_val CCTOOLS_PYTHON_TEST_DIR
+
+export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
+export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
 STATUS_FILE=wq.status
 PORT_FILE=wq.port
 
 check_needed()
 {
-	[ -n "${python}" ] || return 1
+	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 }
 
 prepare()
@@ -30,13 +33,8 @@ run()
 	disk=200
 	gpus=8
 
-	echo $(pwd) ${python}
-
 	# send makeflow to the background, saving its exit status.
-	export PATH=/bin:/usr/bin
-	export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
-	export PYTHONPATH=$(pwd)/../src/bindings/${python_dir}
-	${python} wq_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
+	${CCTOOLS_PYTHON_TEST_EXEC} wq_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
 
 	# retrieve wq script exit status
 	status=$(cat $STATUS_FILE)

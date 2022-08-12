@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -e
+set -x
 
 . ../../dttools/test/test_runner_common.sh
 . ./chirp-common.sh
@@ -9,17 +9,19 @@ c="./hostport.$PPID"
 
 ticket=my.ticket
 
-python=${CCTOOLS_PYTHON_TEST_EXEC}
-python_dir=${CCTOOLS_PYTHON_TEST_DIR}
+import_config_val CCTOOLS_PYTHON_TEST_EXEC
+import_config_val CCTOOLS_PYTHON_TEST_DIR
+
+export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
 check_needed()
 {
-	[ -n "${python}" ] || return 1
+	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 }
 
 prepare()
 {
-	[ -n "$python" ] || return 1
+	[ -n "$CCTOOLS_PYTHON_TEST_EXEC" ] || return 1
 
 	chirp_start local --auth=ticket
 	echo "$hostport" > "$c"
@@ -34,9 +36,8 @@ run()
 	hostport=$(cat "$c")
 
 	chirp -d all -a unix "$hostport" ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` / write
-
-	base=$(pwd)/../src/bindings/${python_dir}/
-	PYTHONPATH=${base} ${python} ${base}/chirp_python_example.py $hostport $ticket
+ 
+	${CCTOOLS_PYTHON_TEST_EXEC} $(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}/chirp_python_example.py $hostport $ticket
 
 
 	return 0
