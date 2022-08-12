@@ -1529,6 +1529,7 @@ else
 	CCTOOLS_LD='@echo LINK $@;'"${linker}"
 fi
 
+swig_dataswarm_bindings=""
 swig_workqueue_bindings=""
 swig_chirp_bindings=""
 swig_rmonitor_bindings=""
@@ -1536,6 +1537,11 @@ if [ "$swig_avail" = yes ]
 then
 	for binding in $swig_bindings
 	do
+		if [ -d dataswarm/src/bindings/${binding} ]
+		then
+			swig_dataswarm_bindings="$binding $swig_dataswarm_bindings"
+		fi
+
 		if [ -d work_queue/src/bindings/${binding} ]
 		then
 			swig_workqueue_bindings="$binding $swig_workqueue_bindings"
@@ -1625,6 +1631,7 @@ CCTOOLS_READLINE_LDFLAGS=${readline_ldflags}
 
 CCTOOLS_SWIG_AVAILABLE=${swig_avail}
 CCTOOLS_SWIG=${swig_exe}
+CCTOOLS_SWIG_DATASWARM_BINDINGS=${swig_dataswarm_bindings}
 CCTOOLS_SWIG_WORKQUEUE_BINDINGS=${swig_workqueue_bindings}
 CCTOOLS_SWIG_CHIRP_BINDINGS=${swig_chirp_bindings}
 CCTOOLS_SWIG_RMONITOR_BINDINGS=${swig_rmonitor_bindings}
