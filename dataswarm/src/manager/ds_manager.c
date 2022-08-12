@@ -86,10 +86,10 @@ See the file COPYING for details.
 
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
-	WQ_SUCCESS = 0,
-	WQ_WORKER_FAILURE,
-	WQ_APP_FAILURE,
-	WQ_MGR_FAILURE
+	DS_SUCCESS = 0,
+	DS_WORKER_FAILURE,
+	DS_APP_FAILURE,
+	DS_MGR_FAILURE
 } ds_result_code_t;
 
 typedef enum {
@@ -1354,7 +1354,7 @@ static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, str
 		if(!create_dir(dirname, 0777)) {
 			debug(D_DS, "Could not create directory - %s (%s)", dirname, strerror(errno));
 			link_soak(w->link, length, stoptime);
-			return WQ_MGR_FAILURE;
+			return DS_MGR_FAILURE;
 		}
 	}
 
@@ -1363,14 +1363,14 @@ static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, str
 	// Check if there is space for incoming file at manager
 	if(!check_disk_space_for_filesize(dirname, length, disk_avail_threshold)) {
 		debug(D_DS, "Could not receive file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
-		return WQ_MGR_FAILURE;
+		return DS_MGR_FAILURE;
 	}
 
 	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
 		link_soak(w->link, length, stoptime);
-		return WQ_MGR_FAILURE;
+		return DS_MGR_FAILURE;
 	}
 
 	// Write the data on the link to file.
@@ -1379,13 +1379,13 @@ static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, str
 	if(close(fd) < 0) {
 		warn(D_DS, "Could not write file %s: %s\n", local_name, strerror(errno));
 		unlink(local_name);
-		return WQ_MGR_FAILURE;
+		return DS_MGR_FAILURE;
 	}
 
 	if(actual != length) {
 		debug(D_DS, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
 		unlink(local_name);
-		return WQ_WORKER_FAILURE;
+		return DS_WORKER_FAILURE;
 	}
 
 	*total_bytes += length;
@@ -1396,7 +1396,7 @@ static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, str
 		usleep(effective_stoptime - current_time);
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 /*
@@ -1416,7 +1416,7 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, remote_name, local_name);
 	send_worker_msg(q,w, "get %s 1\n",remote_name);
 
-	ds_result_code_t result = WQ_SUCCESS; //return success unless something fails below
+	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below
 
 	char *tmp_remote_path = NULL;
 	char *length_str      = NULL;
@@ -1435,7 +1435,7 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 		ds_msg_code_t mcode;
 		mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
 		if(mcode!=MSG_NOT_PROCESSED) {
-			result = WQ_WORKER_FAILURE;
+			result = DS_WORKER_FAILURE;
 			break;
 		}
 
@@ -1444,7 +1444,7 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 			int result_dir = create_dir(tmp_local_name,0777);
 			if(!result_dir) {
 				debug(D_DS, "Could not create directory - %s (%s)", tmp_local_name, strerror(errno));
-				result = WQ_APP_FAILURE;
+				result = DS_APP_FAILURE;
 				free(tmp_local_name);
 				break;
 			}
@@ -1455,7 +1455,7 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
 			free(tmp_local_name);
 			//Return if worker failure. Else wait for end message from worker.
-			if((result == WQ_WORKER_FAILURE) || (result == WQ_MGR_FAILURE)) {
+			if((result == DS_WORKER_FAILURE) || (result == DS_MGR_FAILURE)) {
 				break;
 			}
 		} else if(pattern_match(line, "^missing (.+) (%d+)$", &tmp_remote_path, &errnum_str) >= 0) {
@@ -1467,14 +1467,14 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 			update_task_result(t, DS_RESULT_OUTPUT_MISSING);
 		} else if(!strcmp(line,"end")) {
 			// We have to return on receiving an end message.
-			if (result == WQ_SUCCESS) {
+			if (result == DS_SUCCESS) {
 				return result;
 			} else {
 				break;
 			}
 		} else {
 			debug(D_DS, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
-			result = WQ_WORKER_FAILURE; //signal sys-level failure
+			result = DS_WORKER_FAILURE; //signal sys-level failure
 			break;
 		}
 	}
@@ -1486,9 +1486,9 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 	// failure which causes this function to return failure and the task
 	// to be returned to the queue to be attempted elsewhere.
 	debug(D_DS, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, remote_name, local_name);
-	if(result == WQ_APP_FAILURE) {
+	if(result == DS_APP_FAILURE) {
 		update_task_result(t, DS_RESULT_OUTPUT_MISSING);
-	} else if(result == WQ_MGR_FAILURE) {
+	} else if(result == DS_MGR_FAILURE) {
 		update_task_result(t, DS_RESULT_OUTPUT_TRANSFER_ERROR);
 	}
 
@@ -1566,7 +1566,7 @@ Get a single output file, located at the worker under 'cached_name'.
 static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct ds_file *f )
 {
 	int64_t total_bytes = 0;
-	ds_result_code_t result = WQ_SUCCESS; //return success unless something fails below.
+	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below.
 
 	timestamp_t open_time = timestamp_get();
 
@@ -1590,7 +1590,7 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker 
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
-	if(result == WQ_SUCCESS && f->flags & DS_CACHE) {
+	if(result == DS_SUCCESS && f->flags & DS_CACHE) {
 		struct stat local_info;
 		if (stat(f->payload,&local_info) == 0) {
 			struct remote_file_info *remote_info = remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
@@ -1606,7 +1606,7 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker 
 static ds_result_code_t get_output_files( struct ds_manager *q, struct ds_worker *w, struct ds_task *t )
 {
 	struct ds_file *f;
-	ds_result_code_t result = WQ_SUCCESS;
+	ds_result_code_t result = DS_SUCCESS;
 
 	if(t->output_files) {
 		list_first_item(t->output_files);
@@ -1627,7 +1627,7 @@ static ds_result_code_t get_output_files( struct ds_manager *q, struct ds_worker
 
 			//if success or app-level failure, continue to get other files.
 			//if worker failure, return.
-			if(result == WQ_WORKER_FAILURE) {
+			if(result == DS_WORKER_FAILURE) {
 				break;
 			}
 		}
@@ -1642,7 +1642,7 @@ static ds_result_code_t get_output_files( struct ds_manager *q, struct ds_worker
 static ds_result_code_t get_monitor_output_file( struct ds_manager *q, struct ds_worker *w, struct ds_task *t )
 {
 	struct ds_file *f;
-	ds_result_code_t result = WQ_SUCCESS;
+	ds_result_code_t result = DS_SUCCESS;
 
 	const char *summary_name = RESOURCE_MONITOR_REMOTE_NAME ".summary";
 
@@ -1800,12 +1800,12 @@ void resource_monitor_compress_logs(struct ds_manager *q, struct ds_task *t) {
 static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, int taskid)
 {
 	struct ds_task *t;
-	ds_result_code_t result = WQ_SUCCESS;
+	ds_result_code_t result = DS_SUCCESS;
 
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
 		debug(D_DS, "Failed to find task %d at worker %s (%s).", taskid, w->hostname, w->addrport);
-		handle_failure(q, w, t, WQ_WORKER_FAILURE);
+		handle_failure(q, w, t, DS_WORKER_FAILURE);
 		return;
 	}
 
@@ -1818,12 +1818,12 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 		result = get_output_files(q,w,t);
 	}
 
-	if(result != WQ_SUCCESS) {
+	if(result != DS_SUCCESS) {
 		debug(D_DS, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
 	}
 
-	if(result == WQ_WORKER_FAILURE) {
+	if(result == DS_WORKER_FAILURE) {
 		// Finish receiving output:
 		t->time_when_done = timestamp_get();
 
@@ -1994,7 +1994,7 @@ static void handle_worker_failure(struct ds_manager *q, struct ds_worker *w)
 
 static void handle_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, ds_result_code_t fail_type)
 {
-	if(fail_type == WQ_APP_FAILURE) {
+	if(fail_type == DS_APP_FAILURE) {
 		handle_app_failure(q, w, t);
 	} else {
 		handle_worker_failure(q, w);
@@ -2062,14 +2062,14 @@ static ds_result_code_t get_update( struct ds_manager *q, struct ds_worker *w, c
 	int n = sscanf(line,"update %"PRId64" %s %"PRId64" %"PRId64,&taskid,path,&offset,&length);
 	if(n!=4) {
 		debug(D_DS,"Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line );
-		return WQ_WORKER_FAILURE;
+		return DS_WORKER_FAILURE;
 	}
 
 	struct ds_task *t = itable_lookup(w->current_tasks,taskid);
 	if(!t) {
 		debug(D_DS,"worker %s (%s) sent output for unassigned task %"PRId64, w->hostname, w->addrport, taskid);
 		link_soak(w->link,length,time(0)+get_transfer_wait_time(q,w,0,length));
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
 
@@ -2089,14 +2089,14 @@ static ds_result_code_t get_update( struct ds_manager *q, struct ds_worker *w, c
 	if(!local_name) {
 		debug(D_DS,"worker %s (%s) sent output for unwatched file %s",w->hostname,w->addrport,path);
 		link_soak(w->link,length,stoptime);
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
 	int fd = open(local_name,O_WRONLY|O_CREAT,0777);
 	if(fd<0) {
 		debug(D_DS,"unable to update watched file %s: %s",local_name,strerror(errno));
 		link_soak(w->link,length,stoptime);
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
 	lseek(fd,offset,SEEK_SET);
@@ -2105,10 +2105,10 @@ static ds_result_code_t get_update( struct ds_manager *q, struct ds_worker *w, c
 
 	if(close(fd) < 0) {
 		debug(D_DS, "unable to update watched file %s: %s\n", local_name, strerror(errno));
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 /*
@@ -2118,7 +2118,7 @@ output files of the task.
 static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, const char *line) {
 
 	if(!q || !w || !line) 
-		return WQ_WORKER_FAILURE;
+		return DS_WORKER_FAILURE;
 
 	struct ds_task *t;
 
@@ -2139,7 +2139,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 
 	if(n < 5) {
 		debug(D_DS, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		return WQ_WORKER_FAILURE;
+		return DS_WORKER_FAILURE;
 	}
 
 	task_status = atoi(items[0]);
@@ -2151,7 +2151,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 		debug(D_DS, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
 	if(task_status == DS_RESULT_FORSAKEN) {
@@ -2161,7 +2161,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 		/* task will be resubmitted, so we do not update any of the execution stats */
 		reap_task_from_worker(q, w, t, DS_TASK_READY);
 
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
 	observed_execution_time = timestamp_get() - t->time_when_commit_end;
@@ -2209,7 +2209,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 		if(actual != retrieved_output_length) {
 			debug(D_DS, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
 			t->output[actual] = '\0';
-			return WQ_WORKER_FAILURE;
+			return DS_WORKER_FAILURE;
 		}
 		debug(D_DS, "Retrieved %"PRId64" bytes from %s (%s)", actual, w->hostname, w->addrport);
 
@@ -2255,7 +2255,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 
 	change_task_state(q, t, DS_TASK_WAITING_RETRIEVAL);
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_worker *w)
@@ -2268,34 +2268,34 @@ static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_wo
 	char line[DS_LINE_MAX];
 	int i = 0;
 
-	ds_result_code_t result = WQ_SUCCESS; //return success unless something fails below.
+	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below.
 
 	while(1) {
 		ds_msg_code_t mcode;
 		mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
 		if(mcode!=MSG_NOT_PROCESSED) {
-			result = WQ_WORKER_FAILURE;
+			result = DS_WORKER_FAILURE;
 			break;
 		}
 
 		if(string_prefix_is(line,"result")) {
 			result = get_result(q, w, line);
-			if(result != WQ_SUCCESS) break;
+			if(result != DS_SUCCESS) break;
 			i++;
 		} else if(string_prefix_is(line,"update")) {
 			result = get_update(q,w,line);
-			if(result != WQ_SUCCESS) break;
+			if(result != DS_SUCCESS) break;
 		} else if(!strcmp(line,"end")) {
 			//Only return success if last message is end.
 			break;
 		} else {
 			debug(D_DS, "%s (%s): sent invalid response to send_results: %s",w->hostname,w->addrport,line);
-			result = WQ_WORKER_FAILURE;
+			result = DS_WORKER_FAILURE;
 			break;
 		}
 	}
 
-	if(result != WQ_SUCCESS) {
+	if(result != DS_SUCCESS) {
 		handle_worker_failure(q, w);
 	}
 
@@ -3089,29 +3089,29 @@ static ds_result_code_t handle_worker(struct ds_manager *q, struct link *l)
 	switch(mcode) {
 		case MSG_PROCESSED:
 			// A status message was received and processed.
-			return WQ_SUCCESS;
+			return DS_SUCCESS;
 			break;
 
 		case MSG_PROCESSED_DISCONNECT:
 			// A status query was received and processed, so disconnect.
 			remove_worker(q, w, WORKER_DISCONNECT_STATUS_WORKER);
-			return WQ_SUCCESS;
+			return DS_SUCCESS;
 
 		case MSG_NOT_PROCESSED:
 			debug(D_DS, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 			q->stats->workers_lost++;
 			remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
-			return WQ_WORKER_FAILURE;
+			return DS_WORKER_FAILURE;
 			break;
 
 		case MSG_FAILURE:
 			debug(D_DS, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
 			q->stats->workers_lost++;
 			remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
-			return WQ_WORKER_FAILURE;
+			return DS_WORKER_FAILURE;
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 static int build_poll_table(struct ds_manager *q )
@@ -3169,7 +3169,7 @@ static int send_symlink( struct ds_manager *q, struct ds_worker *w, struct ds_ta
 	char target[DS_LINE_MAX];
 
 	int length = readlink(localname,target,sizeof(target));
-	if(length<0) return WQ_APP_FAILURE;
+	if(length<0) return DS_APP_FAILURE;
 
 	char remotename_encoded[DS_LINE_MAX];
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
@@ -3180,7 +3180,7 @@ static int send_symlink( struct ds_manager *q, struct ds_worker *w, struct ds_ta
 
 	*total_bytes += length;
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 /*
@@ -3205,7 +3205,7 @@ static int send_file( struct ds_manager *q, struct ds_worker *w, struct ds_task 
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s: %s", localname, strerror(errno));
-		return WQ_APP_FAILURE;
+		return DS_APP_FAILURE;
 	}
 
 	/* If we are sending only a piece of the file, seek there first. */
@@ -3214,12 +3214,12 @@ static int send_file( struct ds_manager *q, struct ds_worker *w, struct ds_task 
 		if(lseek(fd, offset, SEEK_SET) == -1) {
 			debug(D_NOTICE, "Cannot seek file %s to offset %lld: %s", localname, (long long) offset, strerror(errno));
 			close(fd);
-			return WQ_APP_FAILURE;
+			return DS_APP_FAILURE;
 		}
 	} else {
 		debug(D_NOTICE, "File specification %s (%lld:%lld) is invalid", localname, (long long) offset, (long long) offset+length);
 		close(fd);
-		return WQ_APP_FAILURE;
+		return DS_APP_FAILURE;
 	}
 
 	if(q->bandwidth) {
@@ -3237,14 +3237,14 @@ static int send_file( struct ds_manager *q, struct ds_worker *w, struct ds_task 
 
 	*total_bytes += actual;
 
-	if(actual != length) return WQ_WORKER_FAILURE;
+	if(actual != length) return DS_WORKER_FAILURE;
 
 	timestamp_t current_time = timestamp_get();
 	if(effective_stoptime && effective_stoptime > current_time) {
 		usleep(effective_stoptime - current_time);
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 /* Need prototype here to address mutually recursive code. */
@@ -3262,10 +3262,10 @@ static ds_result_code_t send_directory( struct ds_manager *q, struct ds_worker *
 	DIR *dir = opendir(localname);
 	if(!dir) {
 		debug(D_NOTICE, "Cannot open dir %s: %s", localname, strerror(errno));
-		return WQ_APP_FAILURE;
+		return DS_APP_FAILURE;
 	}
 
-	ds_result_code_t result = WQ_SUCCESS;
+	ds_result_code_t result = DS_SUCCESS;
 
 	char remotename_encoded[DS_LINE_MAX];
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
@@ -3282,7 +3282,7 @@ static ds_result_code_t send_directory( struct ds_manager *q, struct ds_worker *
 
 		free(localpath);
 
-		if(result != WQ_SUCCESS) break;
+		if(result != DS_SUCCESS) break;
 	}
 
 	send_worker_msg(q,w,"end\n");
@@ -3308,7 +3308,7 @@ and internal links are not followed, they are sent natively.
 static ds_result_code_t send_item( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links )
 {
 	struct stat info;
-	int result = WQ_SUCCESS;
+	int result = DS_SUCCESS;
 
 	if(follow_links) {
 		result = stat(localpath,&info);
@@ -3328,7 +3328,7 @@ static ds_result_code_t send_item( struct ds_manager *q, struct ds_worker *w, st
 		}
 	} else {
 		debug(D_NOTICE, "cannot stat file %s: %s", localpath, strerror(errno));
-		result = WQ_APP_FAILURE;
+		result = DS_APP_FAILURE;
 	}
 
 	return result;
@@ -3347,14 +3347,14 @@ static ds_result_code_t send_item_if_not_cached( struct ds_manager *q, struct ds
 	struct stat local_info;
 	if(lstat(expanded_local_name, &local_info) < 0) {
 		debug(D_NOTICE, "Cannot stat file %s: %s", expanded_local_name, strerror(errno));
-		return WQ_APP_FAILURE;
+		return DS_APP_FAILURE;
 	}
 
 	struct remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
 	if(remote_info && (remote_info->mtime != local_info.st_mtime || remote_info->size != local_info.st_size)) {
 		debug(D_NOTICE|D_DS, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	} else if(!remote_info) {
 
 		if(tf->offset==0 && tf->length==0) {
@@ -3366,7 +3366,7 @@ static ds_result_code_t send_item_if_not_cached( struct ds_manager *q, struct ds
 		ds_result_code_t result;
 		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
 
-		if(result == WQ_SUCCESS && tf->flags & DS_CACHE) {
+		if(result == DS_SUCCESS && tf->flags & DS_CACHE) {
 			remote_info = remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
 			hash_table_insert(w->current_files, tf->cached_name, remote_info);
 		}
@@ -3374,7 +3374,7 @@ static ds_result_code_t send_item_if_not_cached( struct ds_manager *q, struct ds
 		return result;
 	} else {
 		/* Up-to-date file on the worker, we do nothing. */
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 }
 
@@ -3458,7 +3458,7 @@ message once the object is actually loaded into the cache.
 
 static ds_result_code_t send_special_if_not_cached( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct ds_file *tf, const char *typestring )
 {
-	if(hash_table_lookup(w->current_files,tf->cached_name)) return WQ_SUCCESS;
+	if(hash_table_lookup(w->current_files,tf->cached_name)) return DS_SUCCESS;
 
 	char source_encoded[DS_LINE_MAX];
 	char cached_name_encoded[DS_LINE_MAX];
@@ -3473,7 +3473,7 @@ static ds_result_code_t send_special_if_not_cached( struct ds_manager *q, struct
 		hash_table_insert(w->current_files,tf->cached_name,remote_info);
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct ds_file *f)
@@ -3481,7 +3481,7 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *
 
 	int64_t total_bytes = 0;
 	int64_t actual = 0;
-	ds_result_code_t result = WQ_SUCCESS; //return success unless something fails below
+	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below
 
 	timestamp_t open_time = timestamp_get();
 
@@ -3493,7 +3493,7 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *
 		send_worker_msg(q,w, "put %s %d %o\n",f->cached_name, f->length, 0777 );
 		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
 		if(actual!=f->length) {
-			result = WQ_WORKER_FAILURE;
+			result = DS_WORKER_FAILURE;
 		}
 		total_bytes = actual;
 		break;
@@ -3520,13 +3520,13 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *
 			result = send_item_if_not_cached(q,w,t,f,expanded_payload,&total_bytes);
 			free(expanded_payload);
 		} else {
-			result = WQ_APP_FAILURE; //signal app-level failure.
+			result = DS_APP_FAILURE; //signal app-level failure.
 		}
 		break;
 		}
 	}
 
-	if(result == WQ_SUCCESS) {
+	if(result == DS_SUCCESS) {
 		timestamp_t close_time = timestamp_get();
 		timestamp_t elapsed_time = close_time-open_time;
 
@@ -3561,7 +3561,7 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *
 			f->type == DS_BUFFER ? "literal data" : f->payload,
 			total_bytes);
 
-		if(result == WQ_APP_FAILURE) {
+		if(result == DS_APP_FAILURE) {
 			update_task_result(t, DS_RESULT_INPUT_MISSING);
 		}
 	}
@@ -3583,13 +3583,13 @@ static ds_result_code_t send_input_files( struct ds_manager *q, struct ds_worker
 				char * expanded_payload = expand_envnames(w, f->payload);
 				if(!expanded_payload) {
 					update_task_result(t, DS_RESULT_INPUT_MISSING);
-					return WQ_APP_FAILURE;
+					return DS_APP_FAILURE;
 				}
 				if(stat(expanded_payload, &s) != 0) {
 					debug(D_DS,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
 					free(expanded_payload);
 					update_task_result(t, DS_RESULT_INPUT_MISSING);
-					return WQ_APP_FAILURE;
+					return DS_APP_FAILURE;
 				}
 				free(expanded_payload);
 			}
@@ -3602,13 +3602,13 @@ static ds_result_code_t send_input_files( struct ds_manager *q, struct ds_worker
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
 			ds_result_code_t result = send_input_file(q,w,t,f);
-			if(result != WQ_SUCCESS) {
+			if(result != DS_SUCCESS) {
 				return result;
 			}
 		}
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 static struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker *w, struct ds_task *t) {
@@ -3738,7 +3738,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker *w
 
 	ds_result_code_t result = send_input_files(q, w, t);
 
-	if (result != WQ_SUCCESS) {
+	if (result != DS_SUCCESS) {
 		free(command_line);
 		return result;
 	}
@@ -3819,11 +3819,11 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker *w
 	if(result_msg > -1)
 	{
 		debug(D_DS, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 	else
 	{
-		return WQ_WORKER_FAILURE;
+		return DS_WORKER_FAILURE;
 	}
 }
 
@@ -4379,7 +4379,7 @@ static void commit_task_to_worker(struct ds_manager *q, struct ds_worker *w, str
 
 	count_worker_resources(q, w);
 
-	if(result != WQ_SUCCESS) {
+	if(result != DS_SUCCESS) {
 		debug(D_DS, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
 	}
@@ -6574,7 +6574,7 @@ static int poll_active_workers(struct ds_manager *q, int stoptime )
 	// Then consider all existing active workers
 	for(i = j; i < n; i++) {
 		if(q->poll_table[i].revents) {
-			if(handle_worker(q, q->poll_table[i].link) == WQ_WORKER_FAILURE) {
+			if(handle_worker(q, q->poll_table[i].link) == DS_WORKER_FAILURE) {
 				workers_failed++;
 			}
 		}

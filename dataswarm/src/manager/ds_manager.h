@@ -211,7 +211,7 @@ struct ds_stats {
 	int tasks_submitted;           /**< Total number of tasks submitted to the queue. */
 	int tasks_dispatched;          /**< Total number of tasks dispatch to workers. */
 	int tasks_done;                /**< Total number of tasks completed and returned to user. (includes tasks_failed) */
-	int tasks_failed;              /**< Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS. */
+	int tasks_failed;              /**< Total number of tasks completed and returned to user with result other than DS_RESULT_SUCCESS. */
 	int tasks_cancelled;           /**< Total number of tasks cancelled. */
 	int tasks_exhausted_attempts;  /**< Total number of task executions that failed given resource exhaustion. */
 
@@ -222,8 +222,8 @@ struct ds_stats {
 	timestamp_t time_when_started; /**< Absolute time at which the manager started. */
 	timestamp_t time_send;         /**< Total time spent in sending tasks to workers (tasks descriptions, and input files.). */
 	timestamp_t time_receive;      /**< Total time spent in receiving results from workers (output files.). */
-	timestamp_t time_send_good;    /**< Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS. */
-	timestamp_t time_receive_good; /**< Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS. */
+	timestamp_t time_send_good;    /**< Total time spent in sending data to workers for tasks with result DS_RESULT_SUCCESS. */
+	timestamp_t time_receive_good; /**< Total time spent in sending data to workers for tasks with result DS_RESULT_SUCCESS. */
 	timestamp_t time_status_msgs;  /**< Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. */
 	timestamp_t time_internal;     /**< Total time the queue spents in internal processing. */
 	timestamp_t time_polling;      /**< Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message). */
@@ -231,7 +231,7 @@ struct ds_stats {
 
 	/* Workers time statistics: */
 	timestamp_t time_workers_execute;            /**< Total time workers spent executing done tasks. */
-	timestamp_t time_workers_execute_good;       /**< Total time workers spent executing done tasks with result WQ_RESULT_SUCCESS. */
+	timestamp_t time_workers_execute_good;       /**< Total time workers spent executing done tasks with result DS_RESULT_SUCCESS. */
 	timestamp_t time_workers_execute_exhaustion; /**< Total time workers spent executing tasks that exhausted resources. */
 
 	/* BW statistics */
