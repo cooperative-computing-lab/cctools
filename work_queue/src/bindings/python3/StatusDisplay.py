@@ -1,7 +1,9 @@
 import numbers
-import re
-from string import Template
+import time
+import sys
+import math
 from datetime import timedelta
+from string import Template
 
 
 class StatusDisplay():
@@ -12,7 +14,7 @@ class StatusDisplay():
         self._last_update_report = 0
 
     def active(self):
-        raise NotImplemented
+        raise NotImplementedError
 
     def update(self, queue=None, force=False):
         now = time.time()
@@ -25,7 +27,7 @@ class StatusDisplay():
         self.update_display(q_info, rw_info, rc_info, app_info)
 
     def update_display(self, queue_info, resources_worker_info, resources_category_info, app_info):
-        raise NotImplemented
+        raise NotImplementedError
 
     def generate_table_data(self, queue=None):
         queue_s = None
@@ -46,7 +48,6 @@ class StatusDisplay():
         app_info = self.generate_app_table(app_s)
 
         return (q_info, rw_info, rc_info, app_info)
-
 
     def generate_resource_worker_tables(self, queue_s):
         if not queue_s:
@@ -83,12 +84,12 @@ class StatusDisplay():
 
             larger_worker = self.resources_check_limits(c["max_allocation"], largest_worker)
             if larger_worker:
-                ct.append(["current workers too small!"] + larger_worker)
+                ct.append(["current workers are too small!"] + larger_worker)
 
             allocs = [
                     ("max_seen", "largest seen", "na"),
                     ("first_allocation", "current allocation", "whole worker"),
-                    ("max_allocation", "maximum allocation worker", "whole worker"),
+                    ("max_allocation", "maximum allocation", "whole worker"),
                     ]
 
             for (k, l, na) in allocs:
@@ -110,7 +111,7 @@ class StatusDisplay():
         stats = ["port",
                 "tasks_done", "tasks_waiting", "tasks_running",
                 "tasks_exhausted_attempts",
-                "workers_connected", "workers_busy",]
+                "workers_connected", "workers_busy", ]
 
         pairs = list((key.replace("_", " "), str(queue_s[key])) for key in stats)
 
@@ -122,7 +123,6 @@ class StatusDisplay():
         pairs.append(("total good task time", str(timedelta(seconds=math.ceil(queue_s["time_workers_execute_good"]/1e6)))))
         pairs.append(("total task time", str(timedelta(seconds=math.ceil(queue_s["time_workers_execute"]/1e6)))))
         pairs.append(("runtime", str(timedelta(seconds=math.ceil(time.time() - queue_s["time_when_started"]/1e6)))))
-
 
         return pairs
 
@@ -149,7 +149,7 @@ class StatusDisplay():
                     value = f"{value} {unit}"
                 else:
                     value = str(value)
-                pairs.append((key.replace("_", " "), value))
+                pairs.append((name, value))
         except Exception as e:
             pairs = [("internal error reading status", str(e))]
 
@@ -185,7 +185,6 @@ class StatusDisplay():
         if limits_broken:
             return rs
         return None
-
 
     def with_units(self, resource, value, na):
         if value is None:
@@ -252,7 +251,6 @@ class JupyterDisplay(StatusDisplay):
     cell_over_fmt = Template('<td class="over"> $value </td>')
     row_fmt = Template('<tr> $cells </tr>')
 
-
     def __init__(self, interval=10):
         super().__init__(interval)
 
@@ -261,14 +259,14 @@ class JupyterDisplay(StatusDisplay):
             import IPython
             import ipywidgets as ws
             if 'IPKernelApp' in IPython.get_ipython().config:
-                self._queue_display = ws.HTML(value = "")
-                self._app_display = ws.HTML(value = "")
-                self._worker_display = ws.HTML(value = "")
-                self._category_display = ws.HTML(value = "")
+                self._queue_display = ws.HTML(value="")
+                self._app_display = ws.HTML(value="")
+                self._worker_display = ws.HTML(value="")
+                self._category_display = ws.HTML(value="")
 
                 self._output = ws.GridspecLayout(1, 8, grid_gap="20px")
-                self._output[0,:3] = ws.VBox([self._app_display, self._queue_display])
-                self._output[0,3:] = ws.VBox([self._worker_display, self._category_display])
+                self._output[0, :3] = ws.VBox([self._app_display, self._queue_display])
+                self._output[0, 3:] = ws.VBox([self._worker_display, self._category_display])
                 IPython.display.display(self._output)
 
         except (ImportError, AttributeError):
@@ -320,4 +318,3 @@ class JupyterDisplay(StatusDisplay):
                 pass
         cells = map(lambda v: fmt(v), cells_info)
         return JupyterDisplay.row_fmt.substitute(cells=" ".join(cells))
-

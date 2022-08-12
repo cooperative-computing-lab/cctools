@@ -1797,7 +1797,6 @@ class WorkQueue(object):
             task = self._task_table[int(task_pointer.taskid)]
             del self._task_table[task_pointer.taskid]
             return task
-
         return None
 
     ##
@@ -1971,6 +1970,7 @@ class WorkQueue(object):
     # @endcode
     def application_info(self):
         return None
+
 
 
 ##
