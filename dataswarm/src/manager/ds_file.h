@@ -13,7 +13,7 @@ See the file COPYING for details.
 
 struct ds_file {
 	ds_file_t type;
-	int flags;		// DS_CACHE or others in the future.
+	ds_file_flags_t flags;	// DS_CACHE or others in the future.
 	int length;		// length of payload, only used for non-file objects like buffers and urls
 	off_t offset;		// file offset for DS_FILE_PIECE
 	off_t piece_length;	// file piece length for DS_FILE_PIECE
