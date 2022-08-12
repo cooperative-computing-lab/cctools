@@ -382,9 +382,6 @@ static void delete_feature(struct ds_task *t, const char *name);
 static struct ds_factory_info *create_factory_info(struct ds_manager *q, const char *name);
 static void remove_factory_info(struct ds_manager *q, const char *name);
 
-static void fill_deprecated_queue_stats(struct ds_manager *q, struct ds_stats *s);
-static void fill_deprecated_tasks_stats(struct ds_task *t);
-
 /** Clone a @ref ds_file
 This performs a deep copy of the file struct.
 @param file The file to clone.
@@ -1120,8 +1117,6 @@ static void clean_task_state(struct ds_task *t, int full_clean) {
 			rmsummary_delete(t->resources_allocated);
 			rmsummary_delete(t->resources_measured);
 		}
-
-		fill_deprecated_tasks_stats(t);
 
 		/* If result is never updated, then it is mark as a failure. */
 		t->result = DS_RESULT_UNKNOWN;
@@ -2575,7 +2570,7 @@ static struct jx * queue_to_jx( struct ds_manager *q )
 	jx_insert_string(j,"owner",owner);
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
 	jx_insert_integer(j,"port",ds_port(q));
-	jx_insert_integer(j,"priority",info.priority);
+	jx_insert_integer(j,"priority",q->priority);
 	jx_insert_string(j,"manager_preferred_connection",q->manager_preferred_connection);
 
 	int use_ssl = 0;
@@ -6167,34 +6162,6 @@ ds_task_state_t ds_task_state(struct ds_manager *q, int taskid) {
 	return (int)(uintptr_t)itable_lookup(q->task_state_map, taskid);
 }
 
-static void fill_deprecated_tasks_stats(struct ds_task *t) {
-	t->time_task_submit = t->time_when_submitted;
-	t->time_task_finish = t->time_when_done;
-	t->time_committed   = t->time_when_commit_start;
-
-	t->time_send_input_start      = t->time_when_commit_start;
-	t->time_send_input_finish     = t->time_when_commit_end;
-	t->time_receive_result_start  = t->time_when_retrieval;
-	t->time_receive_result_finish = t->time_when_done;
-	t->time_receive_output_start  = t->time_when_retrieval;
-	t->time_receive_output_finish = t->time_when_done;
-
-	t->time_execute_cmd_start  = t->time_when_commit_start;
-	t->time_execute_cmd_finish = t->time_when_retrieval;
-
-	t->total_transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
-
-	t->cmd_execution_time = t->time_workers_execute_last;
-	t->total_cmd_execution_time = t->time_workers_execute_all;
-	t->total_cmd_exhausted_execute_time = t->time_workers_execute_exhaustion;
-	t->total_time_until_worker_failure = t->time_workers_execute_failure;
-
-	t->total_bytes_received = t->bytes_received;
-	t->total_bytes_sent = t->bytes_sent;
-	t->total_bytes_transferred = t->bytes_transferred;
-}
-
-
 /* Changes task state. Returns old state */
 /* State of the task. One of DS_TASK(UNKNOWN|READY|RUNNING|WAITING_RETRIEVAL|RETRIEVED|DONE) */
 static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state ) {
@@ -6219,7 +6186,6 @@ static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *
 		case DS_TASK_DONE:
 		case DS_TASK_CANCELED:
 			/* tasks are freed when returned to user, thus we remove them from our local record */
-			fill_deprecated_tasks_stats(t);
 			itable_remove(q->tasks, t->taskid);
 			break;
 		default:
@@ -7179,53 +7145,6 @@ double ds_get_effective_bandwidth(struct ds_manager *q)
 	return queue_bandwidth;
 }
 
-static void fill_deprecated_queue_stats(struct ds_manager *q, struct ds_stats *s) {
-	s->total_workers_connected = s->workers_connected;
-	s->total_workers_joined = s->workers_joined;
-	s->total_workers_removed = s->workers_removed;
-	s->total_workers_lost = s->workers_lost;
-	s->total_workers_idled_out = s->workers_idled_out;
-	s->total_workers_fast_aborted = s->workers_fast_aborted;
-
-	s->tasks_complete = s->tasks_with_results;
-
-	s->total_tasks_dispatched = s->tasks_dispatched;
-	s->total_tasks_complete = s->tasks_done;
-	s->total_tasks_failed = s->tasks_failed;
-	s->total_tasks_cancelled = s->tasks_cancelled;
-	s->total_exhausted_attempts = s->tasks_exhausted_attempts;
-
-	s->start_time = s->time_when_started;
-	s->total_send_time = s->time_send;
-	s->total_receive_time = s->time_receive;
-	s->total_good_transfer_time = s->time_send_good + s->time_receive_good;
-
-	s->total_execute_time = s->time_workers_execute;
-	s->total_good_execute_time = s->time_workers_execute_good;
-	s->total_exhausted_execute_time = s->time_workers_execute_exhaustion;
-
-	s->total_bytes_sent = s->bytes_sent;
-	s-> total_bytes_received = s->bytes_received;
-
-	s->capacity = s->capacity_cores;
-
-	s->port = q->port;
-	s->priority = q->priority;
-	s->workers_ready = s->workers_idle;
-	s->workers_full  = s->workers_busy;
-	s->total_worker_slots = s->tasks_dispatched;
-	s->avg_capacity = s->capacity_cores;
-
-	timestamp_t wall_clock_time = timestamp_get() - q->stats->time_when_started;
-	if(wall_clock_time > 0 && s->workers_connected > 0) {
-		s->efficiency = (double) (q->stats->time_workers_execute_good) / (wall_clock_time * s->workers_connected);
-	}
-
-	if(wall_clock_time>0) {
-		s->idle_percentage = (double) q->stats->time_polling / wall_clock_time;
-	}
-}
-
 void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 {
 	struct ds_stats *qs;
@@ -7286,8 +7205,6 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 	s->max_gpus = r.gpus.largest;
 
 	s->workers_able = count_workers_for_waiting_tasks(q, largest_seen_resources(q, NULL));
-
-	fill_deprecated_queue_stats(q, s);
 }
 
 void ds_get_stats_hierarchy(struct ds_manager *q, struct ds_stats *s)
@@ -7333,8 +7250,6 @@ void ds_get_stats_hierarchy(struct ds_manager *q, struct ds_stats *s)
 
 	s->bytes_sent      += q->stats_disconnected_workers->bytes_sent;
 	s->bytes_received  += q->stats_disconnected_workers->bytes_received;
-
-	fill_deprecated_queue_stats(q, s);
 }
 
 void ds_get_stats_category(struct ds_manager *q, const char *category, struct ds_stats *s)

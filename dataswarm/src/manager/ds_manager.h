@@ -180,36 +180,6 @@ struct ds_task {
 
 	char *monitor_snapshot_file;                          /**< Filename the monitor checks to produce snapshots. */
 	struct list *features;                                /**< User-defined features this task requires. (See ds_worker's --feature option.) */
-
-	/* deprecated fields */
-	//int total_submissions;                                 /**< @deprecated Use try_count. */
-
-	timestamp_t time_task_submit;                          /**< @deprecated Use time_when_submitted. */
-	timestamp_t time_task_finish;                          /**< @deprecated Use time_when_done. */
-	timestamp_t time_committed;                            /**< @deprecated Use time_when_commit_start. */
-
-	timestamp_t time_send_input_start;                     /**< @deprecated Use time_when_commit_start. */
-	timestamp_t time_send_input_finish;                    /**< @deprecated Use time_when_commit_end. */
-	timestamp_t time_receive_result_start;                 /**< @deprecated Use time_when_retrieval instead. */
-	timestamp_t time_receive_result_finish;                /**< @deprecated Use time_when_done instead. */
-	timestamp_t time_receive_output_start;                 /**< @deprecated Use time_when_retrieval. */
-	timestamp_t time_receive_output_finish;                /**< @deprecated Use time_when_done instead. */
-
-	timestamp_t time_execute_cmd_start;                    /**< @deprecated Use time_when_commit_end instead. */
-	timestamp_t time_execute_cmd_finish;                   /**< @deprecated Use time_when_retrieval instead. */
-
-	timestamp_t total_transfer_time;                       /**< @deprecated Use (time_when_commit_end - time_when_commit_start) + (time_when_done - time_when_retrieval). */
-
-	timestamp_t cmd_execution_time;                        /**< @deprecated Use time_workers_execute_last instead. */
-	timestamp_t total_cmd_execution_time;                  /**< @deprecated Use time_workers_execute_all instead. */
-	timestamp_t total_cmd_exhausted_execute_time;          /**< @deprecated Use time_workers_execute_exhaustion instead. */
-	timestamp_t total_time_until_worker_failure;           /**< @deprecated Use time_workers_execute_failure instead. */
-
-	int64_t total_bytes_received;                          /**< @deprecated Use bytes_received instead. */
-	int64_t total_bytes_sent;                              /**< @deprecated Use bytes_sent instead. */
-	int64_t total_bytes_transferred;                       /**< @deprecated Use bytes_transferred instead. */
-
-	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of ds_wait). */
 };
 
 /** Statistics describing a manager. */
@@ -281,70 +251,29 @@ struct ds_stats {
 	int64_t total_cores;      /**< Total number of cores aggregated across the connected workers. */
 	int64_t total_memory;     /**< Total memory in MB aggregated across the connected workers. */
 	int64_t total_disk;	      /**< Total disk space in MB aggregated across the connected workers. */
-
+	int64_t total_gpus;       /**< Total number of gpus aggregated across the connected workers. */
+  
 	int64_t committed_cores;  /**< Committed number of cores aggregated across the connected workers. */
 	int64_t committed_memory; /**< Committed memory in MB aggregated across the connected workers. */
 	int64_t committed_disk;	  /**< Committed disk space in MB aggregated across the connected workers. */
+	int64_t committed_gpus;   /**< Committed number of gpus aggregated across the connected workers. */
 
 	int64_t max_cores;        /**< The highest number of cores observed among the connected workers. */
 	int64_t max_memory;       /**< The largest memory size in MB observed among the connected workers. */
 	int64_t max_disk;         /**< The largest disk space in MB observed among the connected workers. */
+	int64_t max_gpus;         /**< The highest number of gpus observed among the connected workers. */
 
 	int64_t min_cores;        /**< The lowest number of cores observed among the connected workers. */
 	int64_t min_memory;       /**< The smallest memory size in MB observed among the connected workers. */
 	int64_t min_disk;         /**< The smallest disk space in MB observed among the connected workers. */
+	int64_t min_gpus;         /**< The smallest number of gpus observed among the connected workers. */
 
-    double manager_load;      /**< In the range of [0,1]. If close to 1, then
+	double manager_load;      /**< In the range of [0,1]. If close to 1, then
                                 the manager is at full load and spends most
                                 of its time sending and receiving taks, and
                                 thus cannot accept connections from new
                                 workers. If close to 0, the manager is spending
                                 most of its time waiting for something to happen. */
-
-	/**< deprecated fields: */
-	int total_workers_connected;    /**< @deprecated Use workers_connected instead. */
-	int total_workers_joined;       /**< @deprecated Use workers_joined instead. */
-	int total_workers_removed;      /**< @deprecated Use workers_removed instead. */
-	int total_workers_lost;         /**< @deprecated Use workers_lost instead. */
-	int total_workers_idled_out;    /**< @deprecated Use workers_idled_out instead. */
-	int total_workers_fast_aborted; /**< @deprecated Use workers_fast_aborted instead. */
-
-	int tasks_complete;             /**< @deprecated Use tasks_with_results. */
-
-	int total_tasks_dispatched;     /**< @deprecated Use tasks_dispatched instead. */
-	int total_tasks_complete;       /**< @deprecated Use tasks_done instead. */
-	int total_tasks_failed;         /**< @deprecated Use tasks_failed instead. */
-	int total_tasks_cancelled;      /**< @deprecated Use tasks_cancelled instead. */
-	int total_exhausted_attempts;   /**< @deprecated Use tasks_exhausted_attempts instead. */
-	timestamp_t start_time;               /**< @deprecated Use time_when_started. */
-	timestamp_t total_send_time;          /**< @deprecated Use time_send.    */
-	timestamp_t total_receive_time;       /**< @deprecated Use time_receive. */
-	timestamp_t total_good_transfer_time; /**< @deprecated Use time_send_good + time_receive_good. */
-
-	timestamp_t total_execute_time;           /**< @deprecated Use time_workers_execute. */
-	timestamp_t total_good_execute_time;      /**< @deprecated Use time_workers_execute_good. */
-	timestamp_t total_exhausted_execute_time; /**< @deprecated Use time_workers_execute_exhaustion. */
-
-	int64_t total_bytes_sent;     /**< @deprecated Use bytes_sent. */
-	int64_t total_bytes_received; /**< @deprecated Use bytes_received. */
-
-	double capacity; /**< @deprecated Use capacity_cores. */
-
-	double efficiency;      /**< @deprecated. broken. */
-	double idle_percentage; /**< @deprecated. */
-
-	int64_t total_gpus;       /**< @deprecated: broken. */
-	int64_t committed_gpus;   /**< @deprecated: broken. */
-	int64_t max_gpus;         /**< @deprecated: broken. */
-	int64_t min_gpus;         /**< @deprecated: broken. */
-
-	int port;                       /**< @deprecated Use @ref ds_port Port of the queue. */
-	int priority;                   /**< @deprecated Not used. */
-	int workers_ready;              /**< @deprecated Use workers_idle instead. */
-	int workers_full;               /**< @deprecated Use workers_busy insead. */
-	int total_worker_slots;         /**< @deprecated Use tasks_running instead. */
-	int avg_capacity;               /**< @deprecated Use capacity_cores instead. */
-	int workers_blacklisted;         /**< @deprecated Use workers_blocked instead. */
 };
 
 
