@@ -5,7 +5,8 @@ SOURCES = \
 	ds_manager.c \
 	ds_catalog.c \
 	ds_resources.c \
-	ds_json.c
+	ds_json.c \
+	ds_file.c
 
 PUBLIC_HEADERS = dataswarm.h ds_manager.h
 

@@ -6,20 +6,10 @@ See the file COPYING for details.
 
 #include "ds_manager.h"
 #include "ds_resources.h"
+#include "ds_file.h"
 
 #include "list.h"
 #include "hash_table.h"
-
-struct ds_file {
-	ds_file_t type;
-	int flags;		// DS_CACHE or others in the future.
-	int length;		// length of payload, only used for non-file objects like buffers and urls
-	off_t offset;		// file offset for DS_FILE_PIECE
-	off_t piece_length;	// file piece length for DS_FILE_PIECE
-	char *payload;		// name on master machine or buffer of data.
-	char *remote_name;	// name on remote machine.
-	char *cached_name;	// name on remote machine in cached directory.
-};
 
 struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag );
 
