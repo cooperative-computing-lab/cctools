@@ -711,7 +711,7 @@ resources_measured from ds_task is updated.  @return 1 on success, 0 if
 @param watchdog if not 0, kill tasks that exhaust declared resources.
 @return 1 on success, o if monitoring was not enabled.
 */
-int ds_enable_monitoring(struct ds_manager *q, char *monitor_output_directory, int watchdog);
+int ds_enable_monitoring(struct ds_manager *m, char *monitor_output_directory, int watchdog);
 
 /** Enables resource monitoring on the give manager.
 As @ref ds_enable_monitoring, but it generates a time series and a
@@ -722,7 +722,7 @@ gigabyte sizes. This function is mostly used for debugging.)
 @param watchdog if not 0, kill tasks that exhaust declared resources.
 @return 1 on success, 0 if monitoring was not enabled.
 */
-int ds_enable_monitoring_full(struct ds_manager *q, char *monitor_output_directory, int watchdog);
+int ds_enable_monitoring_full(struct ds_manager *m, char *monitor_output_directory, int watchdog);
 
 /** Submit a task to a manager.
 Once a task is submitted to a manager, it is not longer under the user's
@@ -732,7 +732,7 @@ Once returned, it is safe to re-submit the same take object via @ref ds_submit.
 @param t A task object returned from @ref ds_task_create.
 @return An integer taskid assigned to the submitted task.
 */
-int ds_submit(struct ds_manager *q, struct ds_task *t);
+int ds_submit(struct ds_manager *m, struct ds_task *t);
 
 
 /** Set the minimum taskid of future submitted tasks.
@@ -745,13 +745,13 @@ provided is ignored.
 @param minid Minimum desired taskid
 @return Returns the actual minimum taskid for future tasks.
 */
-int ds_specify_min_taskid(struct ds_manager *q, int minid);
+int ds_specify_min_taskid(struct ds_manager *m, int minid);
 
 /** Block workers in hostname from working for manager q.
 @param q A ds_manager object
 @param hostname A string for hostname.
 */
-void ds_block_host(struct ds_manager *q, const char *hostname);
+void ds_block_host(struct ds_manager *m, const char *hostname);
 
 /** Block workers in hostname from a manager, but remove block after timeout seconds.
   If timeout is less than 1, then the hostname is blocked indefinitely, as
@@ -760,19 +760,19 @@ void ds_block_host(struct ds_manager *q, const char *hostname);
   @param hostname A string for hostname.
   @param seconds Number of seconds to the hostname will be blocked.
   */
-void ds_block_host_with_timeout(struct ds_manager *q, const char *hostname, time_t seconds);
+void ds_block_host_with_timeout(struct ds_manager *m, const char *hostname, time_t seconds);
 
 
 /** Unblock host from a manager.
 @param q A ds_manager object
 @param hostname A string for hostname.
 */
-void ds_unblock_host(struct ds_manager *q, const char *hostname);
+void ds_unblock_host(struct ds_manager *m, const char *hostname);
 
 /** Unblock all host.
 @param q A ds_manager object
 */
-void ds_unblock_all(struct ds_manager *q);
+void ds_unblock_all(struct ds_manager *m);
 
 /** Invalidate cached file.
 The file or directory with the given local name specification is deleted from
@@ -787,7 +787,7 @@ not affected.
 - @ref DS_DIRECTORY
 - @ref DS_URL
 */
-void ds_invalidate_cached_file(struct ds_manager *q, const char *local_name, ds_file_t type);
+void ds_invalidate_cached_file(struct ds_manager *m, const char *local_name, ds_file_t type);
 
 
 /** Wait for a task to complete.
@@ -804,7 +804,7 @@ If the task could not, then the <tt>result</tt> field will be non-zero and the
 @param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref DS_WAITFORTASK to block until a task has completed.
 @returns A completed task description, or null if the manager is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
 */
-struct ds_task *ds_wait(struct ds_manager *q, int timeout);
+struct ds_task *ds_wait(struct ds_manager *m, int timeout);
 
 
 /** Wait for a task with a given task to complete.
@@ -814,7 +814,7 @@ Similar to @ref ds_wait, but guarantees that the returned task has the specified
 @param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref DS_WAITFORTASK to block until a task has completed.
 @returns A completed task description, or null if the manager is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
 */
-struct ds_task *ds_wait_for_tag(struct ds_manager *q, const char *tag, int timeout);
+struct ds_task *ds_wait_for_tag(struct ds_manager *m, const char *tag, int timeout);
 
 /** Determine whether the manager is 'hungry' for more tasks.
 While the Data Swarm can handle a very large number of tasks,
@@ -827,7 +827,7 @@ via @ref ds_wait.
 @returns The number of additional tasks that can be efficiently submitted,
 or zero if the manager has enough to work with right now.
 */
-int ds_hungry(struct ds_manager *q);
+int ds_hungry(struct ds_manager *m);
 
 /** Determine whether the manager is empty.
 When all of the desired tasks have been submitted to the manager,
@@ -836,7 +836,7 @@ this function returns true.
 @param q A ds_manager object
 @returns True if the manager is completely empty, false otherwise.
 */
-int ds_empty(struct ds_manager *q);
+int ds_empty(struct ds_manager *m);
 
 /** Get the listening port of the manager.
 As noted in @ref ds_create, there are many controls that affect what TCP port the manager will listen on.
@@ -844,52 +844,52 @@ Rather than assuming a specific port, the user should simply call this function 
 @param q A ds_manager object
 @return The port the manager is listening on.
 */
-int ds_port(struct ds_manager *q);
+int ds_port(struct ds_manager *m);
 
 /** Get manager statistics (only from manager).
 @param q A ds_manager object
 @param s A pointer to a buffer that will be filed with statistics.
 */
-void ds_get_stats(struct ds_manager *q, struct ds_stats *s);
+void ds_get_stats(struct ds_manager *m, struct ds_stats *s);
 
 /** Get statistics of the manager.
 @param q A ds_manager object
 @param s A pointer to a buffer that will be filed with statistics.
 */
-void ds_get_stats_hierarchy(struct ds_manager *q, struct ds_stats *s);
+void ds_get_stats_hierarchy(struct ds_manager *m, struct ds_stats *s);
 
 /** Get the task statistics for the given category.
 @param q A ds_manager object
 @param c A category name.
 @param s A pointer to a buffer that will be filed with statistics.
 */
-void ds_get_stats_category(struct ds_manager *q, const char *c, struct ds_stats *s);
+void ds_get_stats_category(struct ds_manager *m, const char *c, struct ds_stats *s);
 
 
 /** Summary data for all workers in buffer.
 @param q A ds_manager object
 @return A null terminated array of struct rmsummary. Each summary s indicates the number of s->workers with a certain number of s->cores, s->memory, and s->disk. The array and summaries need to be freed after use to avoid memory leaks.
 */
-struct rmsummary **ds_workers_summary(struct ds_manager *q);
+struct rmsummary **ds_workers_summary(struct ds_manager *m);
 
 /** Get the current state of the task.
 @param q A ds_manager object
 @param taskid The taskid of the task.
 @return One of: DS_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
 */
-ds_task_state_t ds_task_state(struct ds_manager *q, int taskid);
+ds_task_state_t ds_task_state(struct ds_manager *m, int taskid);
 
 /** Limit the manager bandwidth when transferring files to and from workers.
 @param q A ds_manager object
 @param bandwidth The bandwidth limit in bytes per second.
 */
-void ds_set_bandwidth_limit(struct ds_manager *q, const char *bandwidth);
+void ds_set_bandwidth_limit(struct ds_manager *m, const char *bandwidth);
 
 /** Get current manager bandwidth.
 @param q A ds_manager object
 @return The average bandwidth in MB/s measured by the manager.
 */
-double ds_get_effective_bandwidth(struct ds_manager *q);
+double ds_get_effective_bandwidth(struct ds_manager *m);
 
 /** Summarize workers.
 This function summarizes the workers currently connected to the manager,
@@ -897,7 +897,7 @@ indicating how many from each worker pool are attached.
 @param q A ds_manager object
 @return A newly allocated string describing the distribution of workers by pool.  The caller must release this string via free().
 */
-char * ds_get_worker_summary( struct ds_manager *q );
+char * ds_get_worker_summary( struct ds_manager *m );
 
 /** Turn on or off fast abort functionality for a given manager for tasks without
 an explicit category. Given the multiplier, abort a task which running time is
@@ -908,7 +908,7 @@ ds_activate_fast_abort_category was not explicitely called.
 @param multiplier The multiplier of the average task time at which point to abort; if less than zero, fast_abort is deactivated (the default).
 @returns 0 if activated, 1 if deactivated.
 */
-int ds_activate_fast_abort(struct ds_manager *q, double multiplier);
+int ds_activate_fast_abort(struct ds_manager *m, double multiplier);
 
 
 /** Turn on or off fast abort functionality for a given category. Given the
@@ -920,7 +920,7 @@ multiplier.  The value specified here applies only to tasks in the given categor
 @param multiplier The multiplier of the average task time at which point to abort; if zero, fast_abort is deactivated. If less than zero (default), use the fast abort of the "default" category.
 @returns 0 if activated, 1 if deactivated.
 */
-int ds_activate_fast_abort_category(struct ds_manager *q, const char *category, double multiplier);
+int ds_activate_fast_abort_category(struct ds_manager *m, const char *category, double multiplier);
 
 
 /** Set the draining mode per worker hostname.
@@ -931,7 +931,7 @@ int ds_activate_fast_abort_category(struct ds_manager *q, const char *category, 
   @param hostname The hostname running the worker.
   @param drain_flag Draining mode.
   */
-int ds_specify_draining_by_hostname(struct ds_manager *q, const char *hostname, int drain_flag);
+int ds_specify_draining_by_hostname(struct ds_manager *m, const char *hostname, int drain_flag);
 
 /** Turn on or off first-allocation labeling for a given category. By default, cores, memory, and disk are labeled, and gpus are unlabeled. Turn on/off other specific resources use @ref ds_enable_category_resource
 @param q A ds_manager object
@@ -939,7 +939,7 @@ int ds_specify_draining_by_hostname(struct ds_manager *q, const char *hostname, 
 @param mode     One of @ref ds_category_mode_t.
 @returns 1 if mode is valid, 0 otherwise.
 */
-int ds_specify_category_mode(struct ds_manager *q, const char *category, ds_category_mode_t mode);
+int ds_specify_category_mode(struct ds_manager *m, const char *category, ds_category_mode_t mode);
 
 /** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref ds_specify_category_mode.
 @param q A ds_manager object
@@ -948,32 +948,32 @@ int ds_specify_category_mode(struct ds_manager *q, const char *category, ds_cate
 @param autolabel 0 off, 1 on.
 @returns 1 if resource is valid, 0 otherwise.
 */
-int ds_enable_category_resource(struct ds_manager *q, const char *category, const char *resource, int autolabel);
+int ds_enable_category_resource(struct ds_manager *m, const char *category, const char *resource, int autolabel);
 
 /** Change the worker selection algorithm.
 This function controls which <b>worker</b> will be selected for a given task.
 @param q A ds_manager object
 @param algorithm The algorithm to use in assigning a task to a worker. See @ref ds_schedule_t for possible values.
 */
-void ds_specify_algorithm(struct ds_manager *q, ds_schedule_t algorithm);
+void ds_specify_algorithm(struct ds_manager *m, ds_schedule_t algorithm);
 
 /** Get the project name of the manager.
 @param q A ds_manager object
 @return The project name of the manager.
 */
-const char *ds_name(struct ds_manager *q);
+const char *ds_name(struct ds_manager *m);
 
 /** Change the project name for a given manager.
 @param q A ds_manager object
 @param name The new project name.
 */
-void ds_specify_name(struct ds_manager *q, const char *name);
+void ds_specify_name(struct ds_manager *m, const char *name);
 
 /** Change the priority for a given manager.
 @param q A ds_manager object
 @param priority The new priority of the manager.  Higher priority managers will attract workers first.
 */
-void ds_specify_priority(struct ds_manager *q, int priority);
+void ds_specify_priority(struct ds_manager *m, int priority);
 
 /** Specify the number of tasks not yet submitted to the manager.
 	It is used by ds_factory to determine the number of workers to launch.
@@ -983,73 +983,73 @@ void ds_specify_priority(struct ds_manager *q, int priority);
   @param q A ds_manager object
   @param ntasks Number of tasks yet to be submitted.
   */
-void ds_specify_num_tasks_left(struct ds_manager *q, int ntasks);
+void ds_specify_num_tasks_left(struct ds_manager *m, int ntasks);
 
 /** Specify the catalog server the manager should report to.
 @param q A ds_manager object
 @param hostname The catalog server's hostname.
 @param port The port the catalog server is listening on.
 */
-void ds_specify_catalog_server(struct ds_manager *q, const char *hostname, int port);
+void ds_specify_catalog_server(struct ds_manager *m, const char *hostname, int port);
 
 /** Specify the catalog server(s) the manager should report to.
 @param q A ds_manager object
 @param hosts The catalog servers given as a comma delimited list of hostnames or hostname:port
 */
-void ds_specify_catalog_servers(struct ds_manager *q, const char *hosts);
+void ds_specify_catalog_servers(struct ds_manager *m, const char *hosts);
 
 /** Cancel a submitted task using its task id and remove it from manager.
 @param q A ds_manager object
 @param id The taskid returned from @ref ds_submit.
 @return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref ds_task_delete or resubmitted with @ref ds_submit.
 */
-struct ds_task *ds_cancel_by_taskid(struct ds_manager *q, int id);
+struct ds_task *ds_cancel_by_taskid(struct ds_manager *m, int id);
 
 /** Cancel a submitted task using its tag and remove it from manager.
 @param q A ds_manager object
 @param tag The tag name assigned to task using @ref ds_task_specify_tag.
 @return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref ds_task_delete or resubmitted with @ref ds_submit.
 */
-struct ds_task *ds_cancel_by_tasktag(struct ds_manager *q, const char *tag);
+struct ds_task *ds_cancel_by_tasktag(struct ds_manager *m, const char *tag);
 
 /** Cancel all submitted tasks and remove them from the manager.
 @param q A ds_manager object
 @return A struct list of all of the tasks canceled.  Each task must be deleted with @ref ds_task_delete or resubmitted with @ref ds_submit.
 */
-struct list * ds_cancel_all_tasks(struct ds_manager *q);
+struct list * ds_cancel_all_tasks(struct ds_manager *m);
 
 /** Shut down workers connected to the manager. Gives a best effort and then returns the number of workers given the shut down order.
 @param q A ds_manager object
 @param n The number to shut down. All workers if given "0".
 */
-int ds_shut_down_workers(struct ds_manager *q, int n);
+int ds_shut_down_workers(struct ds_manager *m, int n);
 
 /** Delete a manager.
 This function should only be called after @ref ds_empty returns true.
 @param q A manager to delete.
 */
-void ds_delete(struct ds_manager *q);
+void ds_delete(struct ds_manager *m);
 
 /** Add a log file that records cummulative statistics of the connected workers and submitted tasks.
 @param q A ds_manager object
 @param logfile The filename.
 @return 1 if logfile was opened, 0 otherwise.
 */
-int ds_specify_log(struct ds_manager *q, const char *logfile);
+int ds_specify_log(struct ds_manager *m, const char *logfile);
 
 /** Add a log file that records the states of the connected workers and tasks.
 @param q A ds_manager object
 @param logfile The filename.
 @return 1 if logfile was opened, 0 otherwise.
 */
-int ds_specify_transactions_log(struct ds_manager *q, const char *logfile);
+int ds_specify_transactions_log(struct ds_manager *m, const char *logfile);
 
 /** Add a mandatory password that each worker must present.
 @param q A ds_manager object
 @param password The password to require.
 */
 
-void ds_specify_password( struct ds_manager *q, const char *password );
+void ds_specify_password( struct ds_manager *m, const char *password );
 
 /** Add a mandatory password file that each worker must present.
 @param q A ds_manager object
@@ -1057,26 +1057,26 @@ void ds_specify_password( struct ds_manager *q, const char *password );
 @return True if the password was loaded, false otherwise.
 */
 
-int ds_specify_password_file( struct ds_manager *q, const char *file );
+int ds_specify_password_file( struct ds_manager *m, const char *file );
 
 /** Change the keepalive interval for a given manager.
 @param q A ds_manager object
 @param interval The minimum number of seconds to wait before sending new keepalive checks to workers.
 */
-void ds_specify_keepalive_interval(struct ds_manager *q, int interval);
+void ds_specify_keepalive_interval(struct ds_manager *m, int interval);
 
 /** Change the keepalive timeout for identifying dead workers for a given manager.
 @param q A ds_manager object
 @param timeout The minimum number of seconds to wait for a keepalive response from worker before marking it as dead.
 */
-void ds_specify_keepalive_timeout(struct ds_manager *q, int timeout);
+void ds_specify_keepalive_timeout(struct ds_manager *m, int timeout);
 
 /** Set the preference for using hostname over IP address to connect.
 'by_ip' uses IP addresses from the network interfaces of the manager (standard behavior), 'by_hostname' to use the hostname at the manager, or 'by_apparent_ip' to use the address of the manager as seen by the catalog server.
 @param q A ds_manager object
 @param preferred_connection An string to indicate using 'by_ip' or a 'by_hostname'.
 */
-void ds_manager_preferred_connection(struct ds_manager *q, const char *preferred_connection);
+void ds_manager_preferred_connection(struct ds_manager *m, const char *preferred_connection);
 
 /** Tune advanced parameters for manager.
 @param q A ds_manager object
@@ -1096,49 +1096,49 @@ void ds_manager_preferred_connection(struct ds_manager *q, const char *preferred
 @param value The value to set the parameter to.
 @return 0 on succes, -1 on failure.
 */
-int ds_tune(struct ds_manager *q, const char *name, double value);
+int ds_tune(struct ds_manager *m, const char *name, double value);
 
 /** Sets the maximum resources a task without an explicit category ("default" category).
 rm specifies the maximum resources a task in the default category may use.
 @param q  Reference to the current manager object.
 @param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
-void ds_specify_max_resources(struct ds_manager *q,  const struct rmsummary *rm);
+void ds_specify_max_resources(struct ds_manager *m,  const struct rmsummary *rm);
 
 /** Sets the minimum resources a task without an explicit category ("default" category).
 rm specifies the maximum resources a task in the default category may use.
 @param q  Reference to the current manager object.
 @param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
-void ds_specify_min_resources(struct ds_manager *q,  const struct rmsummary *rm);
+void ds_specify_min_resources(struct ds_manager *m,  const struct rmsummary *rm);
 
 /** Sets the maximum resources a task in the category may use.
 @param q         Reference to the current manager object.
 @param category  Name of the category.
 @param rm Structure indicating minimum values. See @ref rmsummary for possible fields.
 */
-void ds_specify_category_max_resources(struct ds_manager *q,  const char *category, const struct rmsummary *rm);
+void ds_specify_category_max_resources(struct ds_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Sets the minimum resources a task in the category may use.
 @param q         Reference to the current manager object.
 @param category  Name of the category.
 @param rm Structure indicating minimum values. See @ref rmsummary for possible fields.
 */
-void ds_specify_category_min_resources(struct ds_manager *q,  const char *category, const struct rmsummary *rm);
+void ds_specify_category_min_resources(struct ds_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Set the initial guess for resource autolabeling for the given category.
 @param q         Reference to the current manager object.
 @param category  Name of the category.
 @param rm Structure indicating maximum values. Autolabeling available for cores, memory, disk, and gpus
 */
-void ds_specify_category_first_allocation_guess(struct ds_manager *q,  const char *category, const struct rmsummary *rm);
+void ds_specify_category_first_allocation_guess(struct ds_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Initialize first value of categories
 @param q     Reference to the current manager object.
 @param max Structure indicating maximum values. Autolabeling available for cores, memory, disk, and gpus
 @param summaries_file JSON file with resource summaries.
 */
-void ds_initialize_categories(struct ds_manager *q, struct rmsummary *max, const char *summaries_file);
+void ds_initialize_categories(struct ds_manager *m, struct rmsummary *max, const char *summaries_file);
 
 
 /** Explain result codes from tasks.
@@ -1162,7 +1162,7 @@ const char *ds_result_str(ds_result_t result);
 - @ref DS_TASK_ORDER_LIFO
 - @ref DS_TASK_ORDER_FIFO
 */
-void ds_specify_task_order(struct ds_manager *q, int order);
+void ds_specify_task_order(struct ds_manager *m, int order);
 
 
 #define DS_MANAGER_MODE_STANDALONE 0 /**< Data Swarm manager does not report to the catalog server. */
@@ -1175,7 +1175,7 @@ void ds_specify_task_order(struct ds_manager *q, int order);
 - @ref DS_MANAGER_MODE_CATALOG - catalog mode. In this mode the manager report itself to a catalog server where workers get managers' information and select a manager to serve.
 @deprecated Enabled automatically when @ref ds_specify_name is used.
 */
-void ds_specify_manager_mode(struct ds_manager *q, int mode);
+void ds_specify_manager_mode(struct ds_manager *m, int mode);
 
 
 /** Change whether to estimate manager capacity for a given manager.
@@ -1183,7 +1183,7 @@ void ds_specify_manager_mode(struct ds_manager *q, int mode);
 @param estimate_capacity_on if the value of this parameter is 1, then manager should estimate the manager capacity. If the value is 0, then manager would not estimate its manager capacity.
 @deprecated This feature is always enabled.
 */
-void ds_specify_estimate_capacity_on(struct ds_manager *q, int estimate_capacity_on);
+void ds_specify_estimate_capacity_on(struct ds_manager *m, int estimate_capacity_on);
 
 /** Add an input buffer to a task.
 @param t The task to which to add parameters
