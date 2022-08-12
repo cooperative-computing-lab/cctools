@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "ds_protocol.h"
 #include "ds_internal.h"
 #include "ds_resources.h"
+#include "ds_remote_file_info.h"
 
 #include "cctools.h"
 #include "int_sizes.h"
@@ -288,28 +289,6 @@ struct blocklist_host_info {
 	int    times_blocked;
 	time_t release_at;
 };
-
-struct remote_file_info {
-	ds_file_t type;
-	int64_t           size;
-	time_t            mtime;
-	timestamp_t       transfer_time;
-};
-
-struct remote_file_info * remote_file_info_create( ds_file_t type, int64_t size, time_t mtime )
-{
-	struct remote_file_info *rinfo = malloc(sizeof(*rinfo));
-	rinfo->type = type;
-	rinfo->size = size;
-	rinfo->mtime = mtime;
-	rinfo->transfer_time = 0;
-	return rinfo;
-}
-
-void remote_file_info_delete( struct remote_file_info *rinfo )
-{
-	free(rinfo);
-}
 
 static void handle_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, ds_result_code_t fail_type);
 static void handle_worker_failure(struct ds_manager *q, struct ds_worker *w);
@@ -697,7 +676,7 @@ int process_cache_update( struct ds_manager *q, struct ds_worker *w, const char 
 	long long transfer_time;
 	
 	if(sscanf(line,"cache-update %s %lld %lld",cachename,&size,&transfer_time)==3) {
-		struct remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
+		struct ds_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
 		if(remote_info) {
 			remote_info->size = size;
 			remote_info->transfer_time = transfer_time;
@@ -736,8 +715,8 @@ int process_cache_invalid( struct ds_manager *q, struct ds_worker *w, const char
 		debug(D_DS,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
 		free(message);
 		
-		struct remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
-		if(remote_info) remote_file_info_delete(remote_info);
+		struct ds_remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
+		if(remote_info) ds_remote_file_info_delete(remote_info);
 	}
 	return MSG_PROCESSED;
 }
@@ -1524,7 +1503,7 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker 
 	if(result == DS_SUCCESS && f->flags & DS_CACHE) {
 		struct stat local_info;
 		if (stat(f->payload,&local_info) == 0) {
-			struct remote_file_info *remote_info = remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
+			struct ds_remote_file_info *remote_info = ds_remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
 			hash_table_insert(w->current_files, f->cached_name, remote_info);
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno));
@@ -3281,7 +3260,7 @@ static ds_result_code_t send_item_if_not_cached( struct ds_manager *q, struct ds
 		return DS_APP_FAILURE;
 	}
 
-	struct remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
+	struct ds_remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
 	if(remote_info && (remote_info->mtime != local_info.st_mtime || remote_info->size != local_info.st_size)) {
 		debug(D_NOTICE|D_DS, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
@@ -3298,7 +3277,7 @@ static ds_result_code_t send_item_if_not_cached( struct ds_manager *q, struct ds
 		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
 
 		if(result == DS_SUCCESS && tf->flags & DS_CACHE) {
-			remote_info = remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
+			remote_info = ds_remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
 			hash_table_insert(w->current_files, tf->cached_name, remote_info);
 		}
 
@@ -3400,7 +3379,7 @@ static ds_result_code_t send_special_if_not_cached( struct ds_manager *q, struct
 	send_worker_msg(q,w,"%s %s %s %d %o\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777);
 
 	if(tf->flags & DS_CACHE) {
-		struct remote_file_info *remote_info = remote_file_info_create(tf->type,tf->length,time(0));
+		struct ds_remote_file_info *remote_info = ds_remote_file_info_create(tf->type,tf->length,time(0));
 		hash_table_insert(w->current_files,tf->cached_name,remote_info);
 	}
 
@@ -3973,7 +3952,7 @@ static struct ds_worker *find_worker_by_files(struct ds_manager *q, struct ds_ta
 	struct ds_worker *best_worker = 0;
 	int64_t most_task_cached_bytes = 0;
 	int64_t task_cached_bytes;
-	struct remote_file_info *remote_info;
+	struct ds_remote_file_info *remote_info;
 	struct ds_file *tf;
 
 	hash_table_firstkey(q->worker_table);
