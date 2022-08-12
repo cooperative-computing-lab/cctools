@@ -17,8 +17,6 @@ This file should not be installed and should only be included by .c files.
 #define DS_PROTOCOL_VERSION 1
 
 #define DS_LINE_MAX 4096       /**< Maximum length of a ds message line. */
-#define DS_PROJECT_NAME_MAX 128   /**< Maximum length of a ds project name. */
-#define WORKER_WORKSPACE_NAME_MAX 2048   /**< Maximum length of a work queue worker's workspace name. */
 
 #define DS_PROTOCOL_FIELD_MAX 256
 
