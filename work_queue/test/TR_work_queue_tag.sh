@@ -33,7 +33,7 @@ run()
 	# wait at most 15 seconds for wq to find a port.
 	wait_for_file_creation $PORT_FILE 15
 
-	run_local_worker $PORT_FILE worker.log
+	run_wq_worker $PORT_FILE worker.log
 
 	# wait for wq to exit.
 	wait_for_file_creation $STATUS_FILE 15

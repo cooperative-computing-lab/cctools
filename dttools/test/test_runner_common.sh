@@ -86,7 +86,7 @@ wait_for_file_modification()
 	done
 }
 
-run_local_worker()
+run_wq_worker()
 {
 	local port_file=$1
 	shift
@@ -116,7 +116,7 @@ run_local_worker()
 	return 0
 }
 
-run_local_ds_worker()
+run_ds_worker()
 {
 	local port_file=$1
 	shift
