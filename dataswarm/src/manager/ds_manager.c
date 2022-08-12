@@ -178,7 +178,6 @@ struct ds_manager {
 	timestamp_t time_last_log_stats;
 	timestamp_t time_last_large_tasks_check;
 	int worker_selection_algorithm;
-	int task_ordering;
 	int process_pending_check;
 
 	int short_timeout;		// timeout to send/recv a brief message from worker
@@ -4929,11 +4928,6 @@ void ds_task_specify_environment_variable( struct ds_task *t, const char *name, 
 	}
 }
 
-/* same as above, but with a typo. can't remove as it is part of already published api. */
-void ds_task_specify_enviroment_variable( struct ds_task *t, const char *name, const char *value ) {
-	ds_task_specify_environment_variable(t, name, value);
-}
-
 void ds_task_specify_max_retries( struct ds_task *t, int64_t max_retries ) {
 	if(max_retries < 1) {
 		t->max_retries = 0;
@@ -5608,34 +5602,6 @@ void ds_task_delete(struct ds_task *t)
 	}
 }
 
-/** DEPRECATED FUNCTIONS **/
-int ds_task_specify_output_file(struct ds_task *t, const char *rname, const char *fname)
-{
-	return ds_task_specify_file(t, fname, rname, DS_OUTPUT, DS_CACHE);
-}
-
-int ds_task_specify_output_file_do_not_cache(struct ds_task *t, const char *rname, const char *fname)
-{
-	return ds_task_specify_file(t, fname, rname, DS_OUTPUT, DS_NOCACHE);
-}
-
-int ds_task_specify_input_buf(struct ds_task *t, const char *buf, int length, const char *rname)
-{
-	return ds_task_specify_buffer(t, buf, length, rname, DS_NOCACHE);
-}
-
-int ds_task_specify_input_file(struct ds_task *t, const char *fname, const char *rname)
-{
-	return ds_task_specify_file(t, fname, rname, DS_INPUT, DS_CACHE);
-}
-
-int ds_task_specify_input_file_do_not_cache(struct ds_task *t, const char *fname, const char *rname)
-{
-	return ds_task_specify_file(t, fname, rname, DS_INPUT, DS_NOCACHE);
-}
-
-
-
 /******************************************************/
 /********** work_queue public functions **********/
 /******************************************************/
@@ -5764,10 +5730,6 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 		}
 	}
 
-	//Deprecated:
-	q->task_ordering = DS_TASK_ORDER_FIFO;
-	//
-
 	log_queue_stats(q, 1);
 
 	q->time_last_wait = timestamp_get();
@@ -5883,19 +5845,9 @@ int ds_port(struct ds_manager *q)
 	}
 }
 
-void ds_specify_estimate_capacity_on(struct ds_manager *q, int value)
-{
-	// always on
-}
-
 void ds_specify_algorithm(struct ds_manager *q, ds_schedule_t algorithm)
 {
 	q->worker_selection_algorithm = algorithm;
-}
-
-void ds_specify_task_order(struct ds_manager *q, int order)
-{
-	q->task_ordering = order;
 }
 
 void ds_specify_name(struct ds_manager *q, const char *name)
@@ -5927,11 +5879,6 @@ void ds_specify_num_tasks_left(struct ds_manager *q, int ntasks)
 	else {
 		q->num_tasks_left = ntasks;
 	}
-}
-
-void ds_specify_manager_mode(struct ds_manager *q, int mode)
-{
-	// Deprecated: Report to the catalog if a name is given.
 }
 
 void ds_specify_catalog_server(struct ds_manager *q, const char *hostname, int port)
@@ -7885,15 +7832,6 @@ struct category *ds_category_lookup_or_create(struct ds_manager *q, const char *
 	}
 
 	return c;
-}
-
-char *ds_generate_disk_alloc_full_filename(char *pwd, int taskid) {
-
-	path_remove_trailing_slashes(pwd);
-	if(!taskid) {
-		return string_format("%s/cctools_disk_allocation_exhausted.log", pwd);
-	}
-	return string_format("%s/cctools_disk_allocation_exhausted.%d.log", pwd, taskid);
 }
 
 int ds_specify_min_taskid(struct ds_manager *q, int minid) {
