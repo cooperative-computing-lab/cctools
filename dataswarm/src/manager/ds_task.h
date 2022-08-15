@@ -15,41 +15,46 @@ See the file COPYING for details.
 #include <stdint.h>
 
 struct ds_task {
-	char *tag;                                        /**< An optional user-defined logical name for the task. */
-	char *command_line;                               /**< The program(s) to execute, as a shell command line. */
-	ds_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
-	char *output;                                     /**< The standard output of the task. */
-	struct list *input_files;                         /**< The files to transfer to the worker and place in the executing directory. */
-	struct list *output_files;                        /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
-	struct list *env_list;                            /**< Environment variables applied to the task. */
-	int taskid;                                       /**< A unique task id number. */
-	int exit_code;                                   /**< The exit code of the command line. */
-	ds_result_t result;                       /**< The result of the task (see @ref ds_result_t */
-	char *host;                                       /**< The address and port of the host on which it ran. */
-	char *hostname;                                   /**< The name of the host on which it ran. */
 
-	char *coprocess;                                  /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
+        /***** Fixed properties of task at submit time. ******/
 
-	char *category;                         /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref ds_task_specify_category. If no explicit category is given, the label "default" is used. **/
+        int taskid;                  /**< A unique task id number. */
+	char *command_line;          /**< The program(s) to execute, as a shell command line. */
+	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
+
+	struct list *input_files;    /**< The files to transfer to the worker and place in the executing directory. */
+	struct list *output_files;   /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
+	struct list *env_list;       /**< Environment variables applied to the task. */
+	struct list *features;       /**< User-defined features this task requires. (See ds_worker's --feature option.) */
+
+	char *tag;                   /**< An optional user-defined logical name for the task. */
+	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref ds_task_specify_category. If no explicit category is given, the label "default" is used. **/
+
 	category_allocation_t resource_request; /**< See @ref category_allocation_t */
+	ds_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
+	double priority;             /**< The priority of this task relative to others in the queue: higher number run earlier. */
+	int max_retries;             /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
+	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see ds_worker --wall-time)*/
 
-	double priority;        /**< The priority of this task relative to others in the queue: higher number run earlier. */
-	int max_retries;        /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
+	/***** Results of task once it has reached completion. *****/
+  
+	ds_result_t result;          /**< The result of the task (see @ref ds_result_t */
+	int exit_code;               /**< The exit code of the command line. */
+	char *output;                /**< The standard output of the task. */
+	char *host;                  /**< The address and port of the host on which it ran. */
+	char *hostname;              /**< The name of the host on which it ran. */
 
-	int try_count;          /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref DS_RESULT_MAX_RETRIES. */
-	int exhausted_attempts; /**< Number of times the task failed given exhausted resources. */
-	int fast_abort_count; /**< Number of times this task has been terminated for running too long. */
+	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref DS_RESULT_MAX_RETRIES. */
+	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
+	int fast_abort_count;        /**< Number of times this task has been terminated for running too long. */
 
+	/***** Time and resource metrics accumulated during execution.  *****/
 	/* All times in microseconds */
 	/* A time_when_* refers to an instant in time, otherwise it refers to a length of time. */
+
 	timestamp_t time_when_submitted;    /**< The time at which this task was added to the queue. */
 	timestamp_t time_when_done;         /**< The time at which the task is mark as retrieved, after transfering output files and other final processing. */
 
-	int disk_allocation_exhausted;                        /**< Non-zero if a task filled its loop device allocation, zero otherwise. */
-
-	int64_t min_running_time;           /**< Minimum time (in seconds) the task needs to run. (see ds_worker --wall-time)*/
-
-    /**< All fields of the form time_* in microseconds. */
 	timestamp_t time_when_commit_start; /**< The time when the task starts to be transfered to a worker. */
 	timestamp_t time_when_commit_end;   /**< The time when the task is completely transfered to a worker. */
 
@@ -67,10 +72,9 @@ struct ds_task {
 	struct rmsummary *resources_allocated;                 /**< Resources allocated to the task its latest attempt. */
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task in its latest attempt. */
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
-	char *monitor_output_directory;                        /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref ds_enable_monitoring */
 
+	char *monitor_output_directory;			      /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref ds_enable_monitoring */
 	char *monitor_snapshot_file;                          /**< Filename the monitor checks to produce snapshots. */
-	struct list *features;                                /**< User-defined features this task requires. (See ds_worker's --feature option.) */
 };
 
 /** Create a new task object.
