@@ -16,6 +16,7 @@
 #include <malloc.h>
 #include <stdint.h>
 #include <assert.h>
+#include <string.h>
 
 struct ds_task *ds_task_create(const char *command_line)
 {
@@ -777,5 +778,21 @@ ds_result_t ds_task_get_result( struct ds_task *t )
 	return t->result;
 }
 
+#define METRIC(x) if(!strcmp(name,#x)) return t->x;
 
-
+int64_t ds_task_get_metric( struct ds_task *t, const char *name )
+{
+	METRIC(time_when_submitted);
+	METRIC(time_when_done);
+	METRIC(time_when_commit_start);
+	METRIC(time_when_commit_end);
+	METRIC(time_when_retrieval);
+	METRIC(time_workers_execute_last);
+	METRIC(time_workers_execute_all);
+	METRIC(time_workers_execute_exhaustion);
+	METRIC(time_workers_execute_failure);
+	METRIC(bytes_received);
+	METRIC(bytes_sent);
+	METRIC(bytes_transferred);
+	return 0;
+}
