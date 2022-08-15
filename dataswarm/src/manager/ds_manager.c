@@ -1044,8 +1044,6 @@ static void clean_task_state(struct ds_task *t, int full_clean) {
 		t->bytes_received = 0;
 		t->bytes_transferred = 0;
 
-		t->disk_allocation_exhausted = 0;
-
 		if(t->output) {
 			free(t->output);
 			t->output = NULL;
@@ -2062,13 +2060,6 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 	t->time_workers_execute_last = observed_execution_time > execution_time ? execution_time : observed_execution_time;
 
 	t->time_workers_execute_all += t->time_workers_execute_last;
-
-	if(task_status == DS_RESULT_DISK_ALLOC_FULL) {
-		t->disk_allocation_exhausted = 1;
-	}
-	else {
-		t->disk_allocation_exhausted = 0;
-	}
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
