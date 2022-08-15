@@ -447,7 +447,7 @@ Specify an environment variable to be added to the task.
 @param t A task object
 @param name Name of the variable.
 @param value Value of the variable.
- */
+*/
 void ds_task_specify_environment_variable( struct ds_task *t, const char *name, const char *value );
 
 /** Select the scheduling algorithm for a single task.
@@ -463,6 +463,75 @@ void ds_task_specify_algorithm(struct ds_task *t, ds_schedule_t algorithm);
 */
 
 void ds_task_specify_monitor_output(struct ds_task *t, const char *monitor_output);
+
+/** Get the command line of the task.
+@param t A task object.
+@return The command line set by @ref ds_task_create.
+*/
+
+const char * ds_task_get_command( struct ds_task *t );
+
+/** Get the tag associated with the task.
+@param t A task object.
+@return The tag string set by @ref ds_task_specify_tag.
+*/
+
+const char * ds_task_get_tag( struct ds_task *t );
+
+/** Get the unique ID of the task.
+@param t A task object.
+@return The integer task ID assigned at creation time.
+*/
+
+int ds_task_get_taskid( struct ds_task *t );
+
+/** Get the end result of the task.
+If the result is @ref DS_RESULT_SUCCESS, then the
+task ran to completion and the exit code of the process
+can be obtained from @ref ds_task_get_exit_code.
+For any other result, the task could not be run to
+completion.  Use @ref ds_result_str to convert the
+result code into a readable string.
+@param t A task object.
+@return The result of the task as a ds_result_t.
+*/
+
+ds_result_t ds_task_get_result( struct ds_task *t );
+
+/** Explain result codes from tasks.
+@param result Result from a task returned by @ref ds_wait.
+@return String representation of task result code.
+*/
+const char *ds_result_str(ds_result_t result);
+
+
+/** Get the Unix exit code of the task.
+@param t A task object.
+@return If the task ran to completion and the result
+is @ref DS_RESULT_SUCCESS, then this function returns
+the Unix exit code of the process, which by custom
+is zero to indicate success, and non-zero to indicate failure.
+*/
+
+int ds_task_get_exit_code( struct ds_task *t );
+
+/** Get the standard output of the task.
+@param t A task object.
+@return A null-terminated string containing the standard
+output of the task.  If the task did not run to completion,
+then this function returns null.
+*/
+
+const char * ds_task_get_output( struct ds_task *t );
+
+/** Get a performance metric of a completed task.
+@param t A task object.
+@param name The name of a performance metric:
+@return The metric value, or zero if an invalid name is given.
+*/
+
+int64_t ds_task_get_metric( struct ds_task *t, const char *name );
+
 
 /** Delete a task.
 This may be called on tasks after they are returned from @ref ds_wait.
@@ -999,67 +1068,6 @@ void ds_specify_category_first_allocation_guess(struct ds_manager *m,  const cha
 @param summaries_file JSON file with resource summaries.
 */
 void ds_initialize_categories(struct ds_manager *m, struct rmsummary *max, const char *summaries_file);
-
-
-/** Get the command line of the task.
-@param t A task object.
-@return The command line set by @ref ds_task_create.
-*/
-
-const char * ds_task_get_command( struct ds_task *t );
-
-/** Get the tag associated with the task.
-@param t A task object.
-@return The tag string set by @ref ds_task_specify_tag.
-*/
-
-const char * ds_task_get_tag( struct ds_task *t );
-
-/** Get the unique ID of the task.
-@param t A task object.
-@return The integer task ID assigned at creation time.
-*/
-
-int ds_task_get_taskid( struct ds_task *t );
-
-/** Get the end result of the task.
-If the result is @ref DS_RESULT_SUCCESS, then the
-task ran to completion and the exit code of the process
-can be obtained from @ref ds_task_get_exit_code.
-For any other result, the task could not be run to
-completion.  Use @ref ds_result_str to convert the
-result code into a readable string.
-@param t A task object.
-@return The result of the task as a ds_result_t.
-*/
-
-ds_result_t ds_task_get_result( struct ds_task *t );
-
-/** Explain result codes from tasks.
-@param result Result from a task returned by @ref ds_wait.
-@return String representation of task result code.
-*/
-const char *ds_result_str(ds_result_t result);
-
-
-/** Get the Unix exit code of the task.
-@param t A task object.
-@return If the task ran to completion and the result
-is @ref DS_RESULT_SUCCESS, then this function returns
-the Unix exit code of the process, which by custom
-is zero to indicate success, and non-zero to indicate failure.
-*/
-
-int ds_task_get_exit_code( struct ds_task *t );
-
-/** Get the standard output of the task.
-@param t A task object.
-@return A null-terminated string containing the standard
-output of the task.  If the task did not run to completion,
-then this function returns null.
-*/
-
-const char * ds_task_get_output( struct ds_task *t );
 
 
 //@}
