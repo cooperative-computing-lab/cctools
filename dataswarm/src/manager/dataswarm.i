@@ -15,8 +15,8 @@
 	#include "debug.h"
 	#include "int_sizes.h"
 	#include "timestamp.h"
-	#include "ds_manager.h"
 	#include "rmsummary.h"
+	#include "dataswarm.h"
 %}
 
 /* We compile with -D__LARGE64_FILES, thus off_t is at least 64bit.
@@ -37,8 +37,8 @@ long long int is guaranteed to be at least 64bit. */
 %include "debug.h"
 %include "int_sizes.h"
 %include "timestamp.h"
-%include "ds_manager.h"
 %include "rmsummary.h"
 %include "category.h"
+%include "dataswarm.h"
 
 
