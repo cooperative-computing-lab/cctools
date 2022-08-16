@@ -1028,6 +1028,7 @@ class PythonTask(Task):
 
         command = '{py_exec} {wrapper} {function} {args} {out}'.format(
                 py_exec=py_exec,
+                wrapper=os.path.basename(self._wrapper),
                 function=os.path.basename(self._func_file),
                 args=os.path.basename(self._args_file),
                 out=os.path.basename(self._out_file))
