@@ -1088,12 +1088,12 @@ class WorkQueue(object):
     # @param transactions_log  The name of a file to write the queue's transactions log.
     # @param debug_log  The name of a file to write the queue's debug log.
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
-    # @param ssl_key    SSL key in pem format (If not given, then TSL is not activated).
-    # @param ssl_cert   SSL cert in pem format (If not given, then TSL is not activated).
+    # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
+    #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
     # @param status_display_interval Number of seconds between updates to the jupyter status display. None, or less than 1 disables it.
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl_key=None, ssl_cert=None, status_display_interval=None):
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl=None, status_display_interval=None):
         self._shutdown = shutdown
         self._work_queue = None
         self._stats = None
@@ -1121,6 +1121,8 @@ class WorkQueue(object):
                 specify_debug_log(debug_log)
             self._stats = work_queue_stats()
             self._stats_hierarchy = work_queue_stats()
+
+            ssl_key, ssl_cert = self._setup_ssl(ssl)
             self._work_queue = work_queue_ssl_create(port, ssl_key, ssl_cert)
             if not self._work_queue:
                 raise Exception('Could not create queue on port {}'.format(port))
@@ -1161,6 +1163,32 @@ class WorkQueue(object):
     def __del__(self):
         self._free_queue()
 
+    def _setup_ssl(self, ssl):
+        if not ssl:
+            return (None, None)
+
+        if ssl is not True:
+            return ssl
+
+        (tmp, key) = tempfile.mkstemp(
+                dir=staging_directory,
+                prefix='key')
+        os.close(tmp)
+        (tmp, cert) = tempfile.mkstemp(
+                dir=staging_directory,
+                prefix='cert')
+        os.close(tmp)
+
+        cmd=f"openssl req -x509 -newkey rsa:4096 -keyout {key} -out {cert} x-sha256 -days 365 -nodes -batch".split()
+
+        output=""
+        try:
+            output=subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"could not create temporary SSL key and cert {e}.\n{output}")
+            raise e
+        return (key, cert)
+
     def _update_status_display(self, force=False):
         try:
             if self._info_widget and self._info_widget.active():
@@ -1168,7 +1196,6 @@ class WorkQueue(object):
         except Exception as e:
             # no exception should cause the queue to fail
             print(f"status display error {e}", file=sys.stderr)
-            raise
 
     ##
     # Get the project name of the queue.
