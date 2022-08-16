@@ -1020,7 +1020,8 @@ class PythonTask(Task):
 
 
     def _python_function_command(self):
-        command = 'python {wrapper} {function} {args} {out}'.format(
+        command = 'python{version} {wrapper} {function} {args} {out}'.format(
+                version=sys.version_info[0],
                 wrapper=os.path.basename(self._wrapper),
                 function=os.path.basename(self._func_file),
                 args=os.path.basename(self._args_file),
