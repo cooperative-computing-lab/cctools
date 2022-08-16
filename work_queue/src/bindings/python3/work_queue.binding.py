@@ -1054,8 +1054,13 @@ class PythonTask(Task):
     def _create_wrapper(self):
         with open(self._wrapper, 'w') as f:
             f.write(textwrap.dedent('''\
-                import sys
-                import dill
+                try:
+                    import sys
+                    import dill
+                except ImportError:
+                    print("Could not execute PythonTask function because a needed module for Work Queue was not available.")
+                    raise
+
                 (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
                 with open (fn , 'rb') as f:
                     exec_function = dill.load(f)
