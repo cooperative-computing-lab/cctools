@@ -1130,7 +1130,7 @@ class WorkQueue(object):
                 prefix='cert')
         os.close(tmp)
 
-        cmd=f"openssl req -x509 -newkey rsa:4096 -keyout {key} -out {cert} x-sha256 -days 365 -nodes -batch".split()
+        cmd=f"openssl req -x509 -newkey rsa:4096 -keyout {key} -out {cert} -sha256 -days 365 -nodes -batch".split()
 
         output=""
         try:
