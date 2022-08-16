@@ -1257,8 +1257,11 @@ creating the queue:
     ```python
     # Import the Work Queue library
     import work_queue as wq
+    q = wq.WorkQueue(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
 
-    q = wq.WorkQueue(port=9123, ssl_key='MY_KEY.pem', ssl_cert='MY_CERT.pem')
+    # Alternatively, you can set ssl=True and let the python API generate
+    # temporary ssl credentials for the queue:
+    q = wq.WorkQueue(port=9123, ssl=True)
     ```
 
 === "C"
