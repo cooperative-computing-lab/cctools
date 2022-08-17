@@ -22,8 +22,7 @@ Chirp.py: chirp_wrap.c CChirp.py
 chirp_wrap.c CChirp.py: chirp.i chirp.binding.py
 	@echo "SWIG chirp.i (python)"
 	@$(CCTOOLS_SWIG) -o chirp_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src/ -I$(CCTOOLS_HOME)/chirp/src chirp.i
-	@cat CChirp.py > Chirp.py
-	@cat chirp.binding.py >> Chirp.py
+	@cat -u CChirp.py chirp.binding.py > Chirp.py
 	ln -sf /System/Library/Frameworks/Python.framework .
 
 $(CHIRPPYTHONSO): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)

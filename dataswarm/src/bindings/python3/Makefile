@@ -19,7 +19,7 @@ all: $(TARGETS)
 ds_wrap.c dataswarm.py: dataswarm.i dataswarm.binding.py
 	@echo "SWIG dataswarm.i (python)"
 	@$(CCTOOLS_SWIG) -o ds_wrap.c -python -py3 -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/dataswarm/src/manager dataswarm.i
-	@cat dataswarm.binding.py >> dataswarm.py
+	@cat -u dataswarm.binding.py >> dataswarm.py
 	ln -sf /System/Library/Frameworks/Python.framework .
 
 $(DSPYTHONSO): ds_wrap.o $(EXTERNAL_DEPENDENCIES)
