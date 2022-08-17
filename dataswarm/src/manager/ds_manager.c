@@ -3015,23 +3015,15 @@ Process a queue status request which returns raw JSON.
 This could come via the HTTP interface, or via a plain request.
 */
 
-static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worker *target, const char *line, time_t stoptime )
-{
-	struct link *l = target->link;
-
+static struct jx *construct_status_message( struct ds_manager *q, const char *request ) {
 	struct jx *a = jx_array(NULL);
 
-	target->type = WORKER_TYPE_STATUS;
-
-	free(target->hostname);
-	target->hostname = xxstrdup("QUEUE_STATUS");
-
-	if(!strcmp(line, "queue_status")) {
+	if(!strcmp(request, "queue_status") || !strcmp(request, "queue") || !strcmp(request, "resources_status")) {
 		struct jx *j = queue_to_jx( q, 0 );
 		if(j) {
 			jx_array_insert(a, j);
 		}
-	} else if(!strcmp(line, "task_status")) {
+	} else if(!strcmp(request, "task_status") || !strcmp(request, "tasks")) {
 		struct ds_task *t;
 		struct ds_worker *w;
 		struct jx *j;
@@ -3063,7 +3055,7 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 				}
 			}
 		}
-	} else if(!strcmp(line, "worker_status")) {
+	} else if(!strcmp(request, "worker_status") || !strcmp(request, "workers")) {
 		struct ds_worker *w;
 		struct jx *j;
 		char *key;
@@ -3077,17 +3069,30 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 				jx_array_insert(a, j);
 			}
 		}
-	} else if(!strcmp(line, "wable_status")) {
+	} else if(!strcmp(request, "wable_status") || !strcmp(request, "categories")) {
 		jx_delete(a);
 		a = categories_to_jx(q);
-	} else if(!strcmp(line, "resources_status")) {
-		struct jx *j = queue_to_jx( q, 0 );
-		if(j) {
-			jx_array_insert(a, j);
-		}
 	} else {
-		debug(D_WQ, "Unknown status request: '%s'", line);
+		debug(D_WQ, "Unknown status request: '%s'", request);
 		jx_delete(a);
+		a = NULL;
+	}
+
+	return a;
+}
+
+static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worker *target, const char *line, time_t stoptime )
+{
+	struct link *l = target->link;
+
+	struct jx *a = construct_status_message(q, line);
+	target->type = WORKER_TYPE_STATUS;
+
+	free(target->hostname);
+	target->hostname = xxstrdup("QUEUE_STATUS");
+
+	if(!a) {
+		debug(D_WQ, "Unknown status request: '%s'", line);
 		return MSG_FAILURE;
 	}
 
@@ -3096,6 +3101,7 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 
 	return MSG_PROCESSED_DISCONNECT;
 }
+
 
 static ds_msg_code_t process_resource( struct ds_manager *q, struct ds_worker *w, const char *line )
 {
@@ -7560,6 +7566,20 @@ void ds_get_stats_category(struct ds_manager *q, const char *category, struct ds
 	s->tasks_submitted    = c->total_tasks + s->tasks_waiting + s->tasks_on_workers;
 
 	s->workers_able  = count_workers_for_waiting_tasks(q, largest_seen_resources(q, c->name));
+}
+
+char *ds_status(struct ds_manager *q, const char *request) {
+	struct jx *a = construct_status_message(q, request);
+
+	if(!a) {
+		return "[]";
+	}
+
+	char *result = jx_print_string(a);
+
+	jx_delete(a);
+
+	return result;
 }
 
 void aggregate_workers_resources( struct ds_manager *q, struct ds_resources *total, struct hash_table *features)

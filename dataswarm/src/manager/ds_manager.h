@@ -866,6 +866,11 @@ void ds_get_stats_hierarchy(struct ds_manager *q, struct ds_stats *s);
 */
 void ds_get_stats_category(struct ds_manager *q, const char *c, struct ds_stats *s);
 
+/** Get queue information as json
+@param q A work queue object.
+@param request One of: queue, tasks, workers, or categories
+*/
+char *ds_status(struct ds_manager *q, const char *request);
 
 /** Summary data for all workers in buffer.
 @param q A work queue object.

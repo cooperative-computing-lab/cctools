@@ -1224,6 +1224,21 @@ class DataSwarm(object):
         return stats
 
     ##
+    # Get queue information as list of dictionaries
+    # @param self Reference to the current work queue object
+    # @param request One of: "queue", "tasks", "workers", or "categories"
+    # For example:
+    # @code
+    # import json
+    # tasks_info = q.status("tasks")
+    # @endcode
+    def status(self, request):
+        info_raw = ds_status(self._work_queue, request)
+        info_json = json.loads(info_raw)
+        del info_raw
+        return info_json
+
+    ##
     # Get resource statistics of workers connected.
     #
     # @param self 	Reference to the current work queue object.
