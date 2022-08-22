@@ -67,7 +67,7 @@ Once created, this package can be moved to another machine for execution.
 Then, to run a program in the environment:
 
 ```
-poncho_package_run -e package.tar.gz python example.py
+poncho_package_run -e package.tar.gz -- example.py
 ```
 
 ## Specification File
