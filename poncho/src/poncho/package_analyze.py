@@ -123,11 +123,14 @@ def export_env(overrides, imports, extra):
 
     conda_pkgs = sorted(list(conda_pkgs))
     pip_pkgs = sorted(list(pip_pkgs))
+
     channels = env.pop('channels', [])
-    if pip_pkgs:
-        env['pip'] = pip_pkgs
+
     if conda_pkgs:
-        env['conda'] = {'channels': channels, 'packages':conda_pkgs}
+        env['conda'] = {'channels': channels, 'dependencies': conda_pkgs}
+        if pip_pkgs:
+            pip_set = {'pip':pip_pkgs}
+            env['conda']['dependencies'].append(pip_set)
 
     return env
 
