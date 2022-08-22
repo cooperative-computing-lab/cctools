@@ -197,24 +197,51 @@ def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
     local_reqs = set()
     
     if 'conda' in poncho_spec:
+
         conda_spec['channels'] = poncho_spec['conda'].get('channels', ['conda-forge', 'defaults'])
 
-        conda_spec['dependencies'] = poncho_spec['conda'].get('dependencies', [])
+        if 'depdnedencies' in poncho_spec['conda']:
 
-        for dep in list(conda_spec['dependencies']):
-            if isinstance(dep, dict) and 'pip' in dep:
-                for pip_dep in list(dep['pip']):
-                    only_name = re.sub("[!~=<>].*$", "", pip_dep)  # remove possible version from spec
+            conda_spec['dependencies'] = poncho_spec['conda'].get('dependencies', [])
+
+            for dep in list(conda_spec['dependencies']):
+                if isinstance(dep, dict) and 'pip' in dep:
+                    for pip_dep in list(dep['pip']):
+                        only_name = re.sub("[!~=<>].*$", "", pip_dep)  # remove possible version from spec
+                        if only_name in local_pip_pkgs:
+                            local_reqs.add(only_name)
+                            dep['pip'].remove(pip_dep)
+                else:
+                    only_name = re.sub("[!~=<>].*$", "", dep)  # remove possible version from spec
                     if only_name in local_pip_pkgs:
                         local_reqs.add(only_name)
-                        dep['pip'].remove(pip_dep)
-            else:
+                        conda_spec['dependencies'].remove(dep)
+
+            conda_spec['dependencies'] = list(conda_spec['dependencies'])
+        
+        # OLD FORMAT
+        else:
+
+            conda_spec['dependencies'] = set(poncho_spec['conda'].get('packages', []))
+
+            for dep in list(conda_spec['dependencies']):
                 only_name = re.sub("[!~=<>].*$", "", dep)  # remove possible version from spec
                 if only_name in local_pip_pkgs:
                     local_reqs.add(only_name)
                     conda_spec['dependencies'].remove(dep)
+            conda_spec['dependencies'] = list(conda_spec['dependencies'])
 
-        conda_spec['dependencies'] = list(conda_spec['dependencies'])
+
+            pip_pkgs = set(poncho_spec.get('pip', []))
+            
+            for dep in list(pip_pkgs):
+                only_name = re.sub("[!~=<>].*$", "", dep)  # remove possible version from spec
+                if only_name in local_pip_pkgs:
+                    local_reqs.add(only_name)
+                    pip_pkgs.remove(dep)
+
+            conda_spec['dependencies'].append({'pip': list(pip_pkgs)})
+
 
     for (pip_name, location) in local_pip_pkgs.items():
         if pip_name not in local_reqs:

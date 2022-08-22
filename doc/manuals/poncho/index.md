@@ -182,6 +182,33 @@ It is also sometimes necessary to work with locally available packages
 If a local pip package is listed within the specification, the pip package must be installed
 into the user's current environment to be included.
 
+
+The previous format of the specifition is accepted to use aswell.
+
+```
+{
+
+"conda": {
+
+        "channels": [
+            "conda-forge"
+        ],
+
+        "packages": [
+            "matplotlib=3.5.1=py310h06a4308_1",
+            "numpy=1.23.1=py310h1794996_0",
+            "pip=22.1.2=py310h06a4308_0",
+            "python=3.10.4=h12debd9_0"
+        ]
+        },
+
+        "pip": [
+            "bs4==0.0.1"
+        ]
+}
+
+```
+
 ### Git Repository
 
 ```
