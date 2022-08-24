@@ -1,15 +1,15 @@
 ## @package ds_futures
 # Python Data Swarm bindings.
 #
-# This is a library on top of work_queue which replaces q.wait with the concept
+# This is a library on top of dataswarm which replaces q.wait with the concept
 # of futures.
 #
 # This is experimental.
 #
 # - @ref ds_futures::DataSwarm
-# - @ref work_queue::Task
+# - @ref dataswarm::Task
 
-import work_queue
+import dataswarm
 import multiprocessing
 import os
 import subprocess
@@ -65,7 +65,7 @@ class DataSwarmFutures(object):
 
         self._local_worker = None
 
-        self._queue = work_queue.DataSwarm(*args, **kwargs)
+        self._queue = dataswarm.DataSwarm(*args, **kwargs)
 
         if local_worker_args:
             self._local_worker = Worker(self.port, **local_worker_args)
@@ -95,7 +95,7 @@ class DataSwarmFutures(object):
     # Submit a task to the queue.
     #
     # @param self   Reference to the current work queue object.
-    # @param task   A task description created from @ref work_queue::Task.
+    # @param task   A task description created from @ref dataswarm::Task.
     def submit(self, future_task):
         if isinstance(future_task, FutureTask):
             self._tasks_to_submit.put(future_task, False)
@@ -226,7 +226,7 @@ class DataSwarmFutures(object):
     def __del__(self):
         self._terminate()
 
-class FutureTask(work_queue.Task):
+class FutureTask(dataswarm.Task):
     valid_runtime_envs = ['conda', 'singularity']
 
     def __init__(self, command):
@@ -328,7 +328,7 @@ class FutureTask(work_queue.Task):
 
     def set_result_or_exception(self):
         result = self._task.result
-        if result == work_queue.DS_RESULT_SUCCESS and self.return_status == 0:
+        if result == dataswarm.DS_RESULT_SUCCESS and self.return_status == 0:
             self.set_result(True)
         else:
             self.set_exception(FutureTaskError(self))
@@ -348,7 +348,7 @@ class FutureTask(work_queue.Task):
         self._invoke_callbacks()
 
     def specify_runtime_env(self, type, filename):
-        import _work_queue
+        import _dataswarm
         if type not in FutureTask.valid_runtime_envs:
             raise FutureTaskError("Runtime '{}' type is not one of {}".format(type, FutureTask.valid_runtime_envs))
 
@@ -358,12 +358,12 @@ class FutureTask(work_queue.Task):
             conda_env = 'conda_env.tar.gz'
             self.specify_input_file(filename, conda_env, cache = True)
             command = 'mkdir -p conda_env && tar xf {} -C conda_env && source conda_env/bin/activate && {}'.format(conda_env, self.command)
-            _work_queue.ds_task_command_line_set(self._task, command)
+            _dataswarm.ds_task_command_line_set(self._task, command)
         elif type == 'singularity':
             sin_env = 'sin_env.img'
             self.specify_input_file(filename, sin_env, cache = True)
             command = 'singularity exec -B $(pwd):/ds-sandbox --pwd /ds-sandbox {} -- {}'.format(sin_env, self.command)
-            _work_queue.ds_task_command_line_set(self._task, command)
+            _dataswarm.ds_task_command_line_set(self._task, command)
 
 
 
@@ -430,18 +430,18 @@ class Worker(object):
 
 class FutureTaskError(Exception):
     _state_to_msg = {
-        work_queue.DS_RESULT_SUCCESS:             'Success',
-        work_queue.DS_RESULT_INPUT_MISSING:       'Input file is missing',
-        work_queue.DS_RESULT_OUTPUT_MISSING:      'Output file is missing',
-        work_queue.DS_RESULT_STDOUT_MISSING:      'stdout is missing',
-        work_queue.DS_RESULT_SIGNAL:              'Signal received',
-        work_queue.DS_RESULT_RESOURCE_EXHAUSTION: 'Resources exhausted',
-        work_queue.DS_RESULT_TASK_TIMEOUT:        'Task timed-out before completion',
-        work_queue.DS_RESULT_UNKNOWN:             'Unknown error',
-        work_queue.DS_RESULT_FORSAKEN:            'Internal error',
-        work_queue.DS_RESULT_MAX_RETRIES:         'Maximum number of retries reached',
-        work_queue.DS_RESULT_TASK_MAX_RUN_TIME:   'Task did not finish before deadline',
-        work_queue.DS_RESULT_DISK_ALLOC_FULL:     'Disk allocation for the task is full'
+        dataswarm.DS_RESULT_SUCCESS:             'Success',
+        dataswarm.DS_RESULT_INPUT_MISSING:       'Input file is missing',
+        dataswarm.DS_RESULT_OUTPUT_MISSING:      'Output file is missing',
+        dataswarm.DS_RESULT_STDOUT_MISSING:      'stdout is missing',
+        dataswarm.DS_RESULT_SIGNAL:              'Signal received',
+        dataswarm.DS_RESULT_RESOURCE_EXHAUSTION: 'Resources exhausted',
+        dataswarm.DS_RESULT_TASK_TIMEOUT:        'Task timed-out before completion',
+        dataswarm.DS_RESULT_UNKNOWN:             'Unknown error',
+        dataswarm.DS_RESULT_FORSAKEN:            'Internal error',
+        dataswarm.DS_RESULT_MAX_RETRIES:         'Maximum number of retries reached',
+        dataswarm.DS_RESULT_TASK_MAX_RUN_TIME:   'Task did not finish before deadline',
+        dataswarm.DS_RESULT_DISK_ALLOC_FULL:     'Disk allocation for the task is full'
     }
 
     def __init__(self, task, exception = None):
@@ -465,7 +465,7 @@ class FutureTaskError(Exception):
         if not msg:
             return str(self.state)
 
-        if self.state != work_queue.DS_RESULT_SUCCESS or self.exit_status == 0:
+        if self.state != dataswarm.DS_RESULT_SUCCESS or self.exit_status == 0:
             return msg
         else:
             return 'Execution completed with exit status {}'.format(self.exit_status)
