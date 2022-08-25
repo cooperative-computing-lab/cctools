@@ -339,6 +339,7 @@ char *ds_monitor_wrap(struct ds_manager *q, struct ds_worker *w, struct ds_task 
 
 const struct rmsummary *task_max_resources(struct ds_manager *q, struct ds_task *t);
 const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t);
+static struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker *w, struct ds_task *t);
 
 void ds_accumulate_task(struct ds_manager *q, struct ds_task *t);
 struct category *ds_category_lookup_or_create(struct ds_manager *q, const char *name);
@@ -357,7 +358,7 @@ static void remove_factory_info(struct ds_manager *q, const char *name);
 void ds_disable_monitoring(struct ds_manager *q);
 
 /******************************************************/
-/********** work_queue internal functions *************/
+/********** ds_manager internal functions *************/
 /******************************************************/
 
 static int64_t overcommitted_resource_total(struct ds_manager *q, int64_t total) {
@@ -1610,6 +1611,13 @@ void read_measured_resources(struct ds_manager *q, struct ds_task *t) {
 	if(t->resources_measured) {
 		t->resources_measured->category = xxstrdup(t->category);
 		t->exit_code = t->resources_measured->exit_status;
+		t->return_status = t->resources_measured->exit_status;
+
+		/* cleanup noise in cores value, otherwise small fluctuations trigger new
+		 * maximums */
+		if(t->resources_measured->cores > 0) {
+			t->resources_measured->cores = MIN(t->resources_measured->cores, ceil(t->resources_measured->cores - 0.1));
+		}
 	} else {
 		/* if no resources were measured, then we don't overwrite the return
 		 * status, and mark the task as with error from monitoring. */
@@ -2343,33 +2351,59 @@ void category_jx_insert_max(struct jx *j, struct category *c, const char *field,
 		char *max_str = string_format("~%s", rmsummary_resource_to_str(field, m, 0));
 		jx_insert_string(j, field_str, max_str);
 		free(max_str);
+	} else {
+		jx_insert_string(j, field_str, "na");
 	}
 
 	free(field_str);
 }
 
+/* create dummy task to obtain first allocation that category would get if using largest worker */
+static struct rmsummary *category_alloc_info(struct ds_manager *q, struct category *c, category_allocation_t request) {
+	struct ds_task *t = ds_task_create("nop");
+	ds_task_specify_category(t, c->name);
+	t->resource_request = request;
+
+	struct ds_worker *w = malloc(sizeof(*w));
+	w->resources = ds_resources_create();
+	w->resources->cores.largest = q->current_max_worker->cores;
+	w->resources->memory.largest = q->current_max_worker->memory;
+	w->resources->disk.largest = q->current_max_worker->disk;
+	w->resources->gpus.largest = q->current_max_worker->gpus;
+
+	struct rmsummary *allocation = task_worker_box_size(q, w, t);
+
+	ds_task_delete(t);
+	ds_resources_delete(w->resources);
+	free(w);
+
+	return allocation;
+}
+
+static struct jx * alloc_to_jx(struct ds_manager *q, struct category *c, struct rmsummary *resources) {
+	struct jx *j = jx_object(0);
+
+	jx_insert_double(j, "cores", resources->cores);
+	jx_insert_integer(j, "memory", resources->memory);
+	jx_insert_integer(j, "disk", resources->disk);
+	jx_insert_integer(j, "gpus", resources->gpus);
+
+	return j;
+}
 
 static struct jx * category_to_jx(struct ds_manager *q, const char *category) {
 	struct ds_stats s;
 	struct category *c = NULL;
 	const struct rmsummary *largest = largest_seen_resources(q, category);
 
-	if(category) {
-		c = ds_category_lookup_or_create(q, category);
-		ds_get_stats_category(q, category, &s);
-	} else {
-		ds_get_stats(q, &s);
-		category = "whole queue";
-	}
+	c = ds_category_lookup_or_create(q, category);
+	ds_get_stats_category(q, category, &s);
 
 	if(s.tasks_waiting + s.tasks_on_workers + s.tasks_done < 1) {
-		return 0;
+		return NULL;
 	}
 
 	struct jx *j = jx_object(0);
-	if(!j) {
-		return 0;
-	}
 
 	jx_insert_string(j,  "category",         category);
 	jx_insert_integer(j, "tasks_waiting",    s.tasks_waiting);
@@ -2384,22 +2418,25 @@ static struct jx * category_to_jx(struct ds_manager *q, const char *category) {
 	category_jx_insert_max(j, c, "cores",  largest);
 	category_jx_insert_max(j, c, "memory", largest);
 	category_jx_insert_max(j, c, "disk",   largest);
+	category_jx_insert_max(j, c, "gpus",   largest);
 
-	if(c && c->first_allocation) {
-		if(c->first_allocation->cores > -1)
-			jx_insert_integer(j, "first_cores", c->first_allocation->cores);
-		if(c->first_allocation->memory > -1)
-			jx_insert_integer(j, "first_memory", c->first_allocation->memory);
-		if(c->first_allocation->disk > -1)
-			jx_insert_integer(j, "first_disk", c->first_allocation->disk);
+	struct rmsummary *first_allocation = category_alloc_info(q, c, CATEGORY_ALLOCATION_FIRST);
+	struct jx *jr = alloc_to_jx(q, c, first_allocation);
+	rmsummary_delete(first_allocation);
+	jx_insert(j, jx_string("first_allocation"), jr);
 
-		jx_insert_integer(j, "first_allocation_count", task_request_count(q, c->name, CATEGORY_ALLOCATION_FIRST));
-		jx_insert_integer(j, "max_allocation_count",   task_request_count(q, c->name, CATEGORY_ALLOCATION_MAX));
-	} else {
-		jx_insert_integer(j, "first_allocation_count", 0);
-		jx_insert_integer(j, "max_allocation_count", s.tasks_waiting + s.tasks_running + s.tasks_on_workers);
+	struct rmsummary *max_allocation = category_alloc_info(q, c, CATEGORY_ALLOCATION_MAX);
+	jr = alloc_to_jx(q, c, max_allocation);
+	rmsummary_delete(max_allocation);
+	jx_insert(j, jx_string("max_allocation"), jr);
+
+	if(q->monitor_mode) {
+		jr = alloc_to_jx(q, c, c->max_resources_seen);
+		jx_insert(j, jx_string("max_seen"), jr);
 	}
 
+	jx_insert_integer(j, "first_allocation_count", task_request_count(q, c->name, CATEGORY_ALLOCATION_FIRST));
+	jx_insert_integer(j, "max_allocation_count",   task_request_count(q, c->name, CATEGORY_ALLOCATION_MAX));
 
 	return j;
 }
@@ -2806,23 +2843,15 @@ Process a queue status request which returns raw JSON.
 This could come via the HTTP interface, or via a plain request.
 */
 
-static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worker *target, const char *line, time_t stoptime )
-{
-	struct link *l = target->link;
-
+static struct jx *construct_status_message( struct ds_manager *q, const char *request ) {
 	struct jx *a = jx_array(NULL);
 
-	target->type = WORKER_TYPE_STATUS;
-
-	free(target->hostname);
-	target->hostname = xxstrdup("QUEUE_STATUS");
-
-	if(!strcmp(line, "queue_status")) {
-		struct jx *j = queue_to_jx(q);
+	if(!strcmp(request, "queue_status") || !strcmp(request, "queue") || !strcmp(request, "resources_status")) {
+		struct jx *j = queue_to_jx( q, 0 );
 		if(j) {
 			jx_array_insert(a, j);
 		}
-	} else if(!strcmp(line, "task_status")) {
+	} else if(!strcmp(request, "task_status") || !strcmp(request, "tasks")) {
 		struct ds_task *t;
 		struct ds_worker *w;
 		struct jx *j;
@@ -2854,7 +2883,7 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 				}
 			}
 		}
-	} else if(!strcmp(line, "worker_status")) {
+	} else if(!strcmp(request, "worker_status") || !strcmp(request, "workers")) {
 		struct ds_worker *w;
 		struct jx *j;
 		char *key;
@@ -2868,17 +2897,30 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 				jx_array_insert(a, j);
 			}
 		}
-	} else if(!strcmp(line, "wable_status")) {
+	} else if(!strcmp(request, "wable_status") || !strcmp(request, "categories")) {
 		jx_delete(a);
 		a = categories_to_jx(q);
-	} else if(!strcmp(line, "resources_status")) {
-		struct jx *j = queue_to_jx(q);
-		if(j) {
-			jx_array_insert(a, j);
-		}
 	} else {
-		debug(D_DS, "Unknown status request: '%s'", line);
+		debug(D_WQ, "Unknown status request: '%s'", request);
 		jx_delete(a);
+		a = NULL;
+	}
+
+	return a;
+}
+
+static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worker *target, const char *line, time_t stoptime )
+{
+	struct link *l = target->link;
+
+	struct jx *a = construct_status_message(q, line);
+	target->type = WORKER_TYPE_STATUS;
+
+	free(target->hostname);
+	target->hostname = xxstrdup("QUEUE_STATUS");
+
+	if(!a) {
+		debug(D_WQ, "Unknown status request: '%s'", line);
 		return MSG_FAILURE;
 	}
 
@@ -2887,6 +2929,7 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 
 	return MSG_PROCESSED_DISCONNECT;
 }
+
 
 static ds_msg_code_t process_resource( struct ds_manager *q, struct ds_worker *w, const char *line )
 {
@@ -4846,7 +4889,7 @@ int ds_enable_monitoring(struct ds_manager *q, char *monitor_output_directory, i
 
 	if(!q->monitor_exe)
 	{
-		warn(D_DS, "Could not find the resource monitor executable. Disabling monitoring.\n");
+		warn(D_WQ, "Could not find the resource monitor executable. Disabling monitoring.\n");
 		return 0;
 	}
 
@@ -5138,7 +5181,7 @@ void ds_disable_monitoring(struct ds_manager *q) {
 		}
 
 		struct jx *extra = jx_object(
-				jx_pair(jx_string("type"), jx_string("work_queue"),
+				jx_pair(jx_string("type"), jx_string("ds_manager"),
 					jx_pair(jx_string("user"), jx_string(user_name),
 						NULL)));
 
@@ -5907,7 +5950,7 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *
 
 //check if workers' resources are available to execute more tasks
 //queue should have at least q->hungry_minimum ready tasks
-//@param: 	struct work_queue* - pointer to queue
+//@param: 	struct ds_manager* - pointer to queue
 //@return: 	1 if hungry, 0 otherwise
 int ds_hungry(struct ds_manager *q)
 {
@@ -6358,6 +6401,20 @@ void ds_get_stats_category(struct ds_manager *q, const char *category, struct ds
 	s->tasks_submitted    = c->total_tasks + s->tasks_waiting + s->tasks_on_workers;
 
 	s->workers_able  = count_workers_for_waiting_tasks(q, largest_seen_resources(q, c->name));
+}
+
+char *ds_status(struct ds_manager *q, const char *request) {
+	struct jx *a = construct_status_message(q, request);
+
+	if(!a) {
+		return "[]";
+	}
+
+	char *result = jx_print_string(a);
+
+	jx_delete(a);
+
+	return result;
 }
 
 void aggregate_workers_resources( struct ds_manager *q, struct ds_resources *total, struct hash_table *features)

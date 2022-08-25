@@ -1,6 +1,6 @@
 # Poncho Packaging Utilities
 
-The Poncho packaging utilities allow users to easily analyze their Python scripts and create Conda environments that are specifically built to contain the necessary dependencies required for their application to run. In distributed computing systems such as Work Queue, it is often difficult to maintain homogenous work environments for their Python applications, as the scripts utilize a large number of outside resources at runtime, such as Python interpreters and imported libraries. The Python packaging collection provides three easy-to-use tools that solve this problem, helping users to analyze their Python programs and build the appropriate Conda environments that ensure consistent runtimes within the Work Queue system. 
+The Poncho packaging utilities allow users to easily analyze their Python scripts and create Conda environments that are specifically built to contain the necessary dependencies required for their application to run. In distributed computing systems, it is often difficult to maintain homogenous work environments for their Python applications, as the scripts utilize a large number of outside resources at runtime, such as Python interpreters and imported libraries. The Python packaging collection provides three easy-to-use tools that solve this problem, helping users to analyze their Python programs and build the appropriate Conda environments that ensure consistent runtimes within the Work Queue system. 
 
 ## Commands
 
@@ -20,6 +20,7 @@ import os
 import sys
 import pickle
 import matplotlib
+import numpy
 
 
 if __name__ == "__main__":
@@ -42,10 +43,15 @@ This will create `package.json` with contents similar to this:
 			"defaults"
 			"conda-forge"
 		]
-		"packages":[
+		"dependencies":[
                 	"python=3.8.5=h7579374_1"
 	        	"matplotlib=3.3.4=py38h06a4308_0",
 			"pip=20.2.4=py38h06a4308_0",
+			{
+				"pip":[
+					numpy==1.21
+				]
+			}
 		]
 	}
 }
@@ -56,9 +62,6 @@ Then to create a complete package from the specification:
 ```
 poncho_package_create package.json
 ```
-
-The outputed tarball will be put into a directory named `envs` if a specific 
-cache directory is not specified.
 
 Once created, this package can be moved to another machine for execution.
 Then, to run a program in the environment:
@@ -100,18 +103,23 @@ or system-specific details where possible.
 
 ```
 {
-	"conda": {
+	"conda":{
 		"channels":[
-                        "defaults",
-			"conda-forge" 
-		],
-		"packages":[
-			"python=3.7",
-			"numpy=1.20.0=py38h18fd61f_0",
-			"ndcctools"
+			"defaults"
+			"conda-forge"
+		]
+		"dependencies":[
+                	"python=3.8.5=h7579374_1"
+	        	"matplotlib=3.3.4=py38h06a4308_0",
+			"pip=20.2.4=py38h06a4308_0",
+			{
+				"pip":[
+					numpy==1.21
+				]
+			}
 		]
 	}
-}
+
 ```
 
 The `"conda"` key, if present, gives a list of channels and packages.
@@ -148,14 +156,14 @@ it should not be necessary to perform any channel configuration.
 
 ```
 {
-	"pip": {
+	"pip": [
 		"parsl",
 		"ipython==7.20.0"
-	}
+	]
 }
 ```
 
-The `"pip"` key, if present, gives a list of Pip package specifications.
+The `"pip"` key is listed within the dpendencies list for conda packages. This is to reflect Conda's own specifaction style. It gives a list of Pip package specifications.
 Pip specifications SHOULD include the exact version if coming from an
 existing user install. Package specifications are given as strings,
 which must conform to
@@ -173,6 +181,33 @@ It is also sometimes necessary to work with locally available packages
 (often installed via `pip install -e .`).
 If a local pip package is listed within the specification, the pip package must be installed
 into the user's current environment to be included.
+
+
+The previous format of the specifition is accepted to use aswell.
+
+```
+{
+
+"conda": {
+
+        "channels": [
+            "conda-forge"
+        ],
+
+        "packages": [
+            "matplotlib=3.5.1=py310h06a4308_1",
+            "numpy=1.23.1=py310h1794996_0",
+            "pip=22.1.2=py310h06a4308_0",
+            "python=3.10.4=h12debd9_0"
+        ]
+        },
+
+        "pip": [
+            "bs4==0.0.1"
+        ]
+}
+
+```
 
 ### Git Repository
 

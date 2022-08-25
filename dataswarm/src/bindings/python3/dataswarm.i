@@ -27,6 +27,9 @@ long long int is guaranteed to be at least 64bit. */
 %ignore vdebug;
 %ignore debug;
 
+/* returns a char*, enable automatic free */
+%newobject work_queue_status;
+
 /* These return pointers to lists defined in list.h. We aren't
  * wrapping methods in list.h and so ignore these. */
 %ignore ds_cancel_all_tasks;
