@@ -1611,7 +1611,6 @@ void read_measured_resources(struct ds_manager *q, struct ds_task *t) {
 	if(t->resources_measured) {
 		t->resources_measured->category = xxstrdup(t->category);
 		t->exit_code = t->resources_measured->exit_status;
-		t->return_status = t->resources_measured->exit_status;
 
 		/* cleanup noise in cores value, otherwise small fluctuations trigger new
 		 * maximums */
@@ -2847,7 +2846,7 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 	struct jx *a = jx_array(NULL);
 
 	if(!strcmp(request, "queue_status") || !strcmp(request, "queue") || !strcmp(request, "resources_status")) {
-		struct jx *j = queue_to_jx( q, 0 );
+		struct jx *j = queue_to_jx( q );
 		if(j) {
 			jx_array_insert(a, j);
 		}
