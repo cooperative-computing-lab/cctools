@@ -49,7 +49,7 @@ struct ds_task {
 	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
 	int fast_abort_count;        /**< Number of times this task has been terminated for running too long. */
 
-	/***** Metrics available to the user at completion through ds_task_get_metric.  *****.
+	/***** Metrics available to the user at completion through ds_task_get_metric.  *****/
 	/* All times in microseconds */
 	/* A time_when_* refers to an instant in time, otherwise it refers to a length of time. */
 
