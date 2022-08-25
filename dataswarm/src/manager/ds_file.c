@@ -13,7 +13,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "path.h"
 
-#include <malloc.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
 

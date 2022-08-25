@@ -13,7 +13,7 @@
 
 #include <stdint.h>
 #include <unistd.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
 #include <string.h>
