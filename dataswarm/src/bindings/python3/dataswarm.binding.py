@@ -1654,7 +1654,7 @@ class DataSwarm(object):
         task = None
         task_pointer = ds_cancel_by_taskid(self._dataswarm, id)
         if task_pointer:
-            task = self._task_table.pop(int(task_pointer.taskid))
+            task = self._task_table.pop(int(id))
         return task
 
     ##
@@ -1666,7 +1666,7 @@ class DataSwarm(object):
         task = None
         task_pointer = ds_cancel_by_tasktag(self._dataswarm, tag)
         if task_pointer:
-            task = self._task_table.pop(int(task_pointer.taskid))
+            task = self._task_table.pop(int(id))
         return task
 
     ##
@@ -1838,8 +1838,8 @@ class DataSwarm(object):
     def wait_for_tag(self, tag, timeout=DS_WAITFORTASK):
         task_pointer = ds_wait_for_tag(self._dataswarm, tag, timeout)
         if task_pointer:
-            task = self._task_table[int(task_pointer.taskid)]
-            del self._task_table[task_pointer.taskid]
+            task = self._task_table[ds_task_get_taskid(task_pointer)]
+            del self._task_table[ds_task_get_taskid(task_pointer)]
             return task
         return None            
 
@@ -1877,7 +1877,7 @@ class DataSwarm(object):
 
                 t = self.wait_for_tag(str(i), 1)                
                 if t:
-                    results[tasks[t.id]] = list(t.output)
+                    results[tasks[ds_task_get_taskid(t)]] = list(ds_task_get_output(t))
                     n += 1
                     break
 
@@ -1939,7 +1939,7 @@ class DataSwarm(object):
                 t = self.wait_for_tag(str(i), 10)
 
                 if t:
-                    results[tasks[t.id]] = t.output
+                    results[tasks[ds_task_get_taskid(t)]] = ds_task_get_output(t)
                     n += 1
                     break
  
@@ -1987,7 +1987,7 @@ class DataSwarm(object):
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
-                        results[tasks[t.id]] = t.output
+                        results[tasks[ds_task_get_taskid(t)]] = ds_task_get_output(t)
                         n += 1
                         break
 
@@ -2027,7 +2027,7 @@ class DataSwarm(object):
             while not self.empty() and n < size:
                 t = self.wait_for_tag(str(i), 1)                
                 if t:
-                    results[tasks[t.id]] = list(json.loads(t.output)["Result"])
+                    results[tasks[ds_task_get_taskid(t)]] = list(json.loads(ds_task_get_output(t))["Result"])
                     n += 1
                     break
 
@@ -2081,7 +2081,7 @@ class DataSwarm(object):
             while not self.empty() and n < num_task:
                 t = self.wait_for_tag(str(i), 10)
                 if t:
-                    results[tasks[t.id]] = json.loads(t.output)["Result"]
+                    results[tasks[ds_task_get_taskid(t)]] = json.loads(ds_task_get_output(t))["Result"]
                     n += 1
                     break
          
@@ -2127,7 +2127,7 @@ class DataSwarm(object):
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
-                        results[tasks[t.id]] = json.loads(t.output)["Result"]
+                        results[tasks[ds_task_get_taskid(t)]] = json.loads(ds_task_get_output(t))["Result"]
                         n += 1
                         break
 
