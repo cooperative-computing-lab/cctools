@@ -530,7 +530,7 @@ class Task(object):
     # @endcode
     @property
     def tag(self):
-        return self._task.tag
+        return ds_task_get_tag(self._task)
 
     ##
     # Get the category name for the task.
@@ -540,8 +540,8 @@ class Task(object):
     # @endcode
     @property
     def category(self):
-        return self._task.category
-
+        return ds_task_get_category(self._task)
+    
     ##
     # Get the shell command executed by the task.
     # @code
@@ -549,26 +549,7 @@ class Task(object):
     # @endcode
     @property
     def command(self):
-        return self._task.command_line
-
-    ##
-    # Get the priority of the task.
-    # @code
-    # >>> print(t.priority)
-    # @endcode
-    @property
-    def priority(self):
-        return self._task.priority
-
-    ##
-    # Get the algorithm for choosing worker to run the task.
-    # @code
-    # >>> print(t.algorithm)
-    # @endcode
-    @property
-    def algorithm(self):
-        return self._task.worker_selection_algorithm
-
+        return ds_task_get_command(self._task)
 
     ##
     # Get the standard output of the task. Must be called only after the task
@@ -578,8 +559,8 @@ class Task(object):
     # @endcode
     @property
     def std_output(self):
-        return self._task.output  # note we use .output, see below.)
-
+        return ds_task_get_output(self._task)
+    
     ##
     # Get the standard output of the task. (Same as t.std_output for regular
     # work queue tasks) Must be called only after the task completes execution.
@@ -588,7 +569,7 @@ class Task(object):
     # @endcode
     @property
     def output(self):
-        return self._task.output
+        return ds_task_get_output(self._task)
 
     ##
     # Get the task id number. Must be called only after the task was submitted.
@@ -597,7 +578,7 @@ class Task(object):
     # @endcode
     @property
     def id(self):
-        return self._task.taskid
+        return ds_task_get_taskid(self._task)
 
     ##
     # Get the exit code of the command executed by the task. Must be called only
@@ -606,9 +587,9 @@ class Task(object):
     # >>> print(t.return_status)
     # @endcode
     @property
-    def return_status(self):
-        return self._task.return_status
-
+    def exit_code(self):
+        return ds_task_get_exit_code(self._task)
+    
     ##
     # Get the result of the task as an integer code, such as successful, missing file, etc.
     # See @ref ds_result_t for possible values.  Must be called only
@@ -619,7 +600,7 @@ class Task(object):
     # @endcode
     @property
     def result(self):
-        return self._task.result
+        return ds_task_get_result(self._task)
 
     ##
     # Return a string that explains the result of a task.
@@ -630,7 +611,7 @@ class Task(object):
     # @endcode
     @property
     def result_str(self):
-        return ds_result_str(self._task.result)
+        return ds_result_str(ds_task_get_result(self._task))
 
     ##
     # Get the number of times the task has been resubmitted internally.
@@ -640,7 +621,7 @@ class Task(object):
     # @endcode
     @property
     def total_submissions(self):
-        return self._task.total_submissions
+        return ds_task_get_metric(self._task,"total_submissions")
 
     ##
     # Get the number of times the task has been failed given resource exhaustion.
@@ -649,7 +630,7 @@ class Task(object):
     # @endcode
     @property
     def exhausted_attempts(self):
-        return self._task.exhausted_attempts
+        return ds_task_get_metric(self._task,"exhausted_attempts")
 
     ##
     # Get the address and port of the host on which the task ran.
@@ -658,8 +639,8 @@ class Task(object):
     # >>> print(t.host)
     # @endcode
     @property
-    def host(self):
-        return self._task.host
+    def hostport(self):
+        return ds_task_get_hostport(self._task)
 
     ##
     # Get the name of the host on which the task ran.
@@ -689,7 +670,7 @@ class Task(object):
     # @endcode
     @property
     def finish_time(self):
-        return self._task.time_task_finish
+        return ds_task_get_metric(self._task,"time_task_finish")
 
     ##
     # Get the total time the task executed and failed given resource exhaustion.
@@ -698,7 +679,7 @@ class Task(object):
     # @endcode
     @property
     def total_cmd_exhausted_execute_time(self):
-        return self._task.total_cmd_exhausted_execute_time
+        return ds_task_get_metric(self._task,"total_cmd_exhausted_execute_time")
 
     ##
     # Get the time spent in upper-level application (outside of ds_wait).
@@ -1673,7 +1654,7 @@ class DataSwarm(object):
         task = None
         task_pointer = ds_cancel_by_taskid(self._dataswarm, id)
         if task_pointer:
-            task = self._task_table.pop(int(task_pointer.taskid))
+            task = self._task_table.pop(int(id))
         return task
 
     ##
@@ -1685,7 +1666,7 @@ class DataSwarm(object):
         task = None
         task_pointer = ds_cancel_by_tasktag(self._dataswarm, tag)
         if task_pointer:
-            task = self._task_table.pop(int(task_pointer.taskid))
+            task = self._task_table.pop(int(id))
         return task
 
     ##
@@ -1857,8 +1838,8 @@ class DataSwarm(object):
     def wait_for_tag(self, tag, timeout=DS_WAITFORTASK):
         task_pointer = ds_wait_for_tag(self._dataswarm, tag, timeout)
         if task_pointer:
-            task = self._task_table[int(task_pointer.taskid)]
-            del self._task_table[task_pointer.taskid]
+            task = self._task_table[ds_task_get_taskid(task_pointer)]
+            del self._task_table[ds_task_get_taskid(task_pointer)]
             return task
         return None            
 
@@ -1896,7 +1877,7 @@ class DataSwarm(object):
 
                 t = self.wait_for_tag(str(i), 1)                
                 if t:
-                    results[tasks[t.id]] = list(t.output)
+                    results[tasks[ds_task_get_taskid(t)]] = list(ds_task_get_output(t))
                     n += 1
                     break
 
@@ -1958,7 +1939,7 @@ class DataSwarm(object):
                 t = self.wait_for_tag(str(i), 10)
 
                 if t:
-                    results[tasks[t.id]] = t.output
+                    results[tasks[ds_task_get_taskid(t)]] = ds_task_get_output(t)
                     n += 1
                     break
  
@@ -2006,7 +1987,7 @@ class DataSwarm(object):
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
-                        results[tasks[t.id]] = t.output
+                        results[tasks[ds_task_get_taskid(t)]] = ds_task_get_output(t)
                         n += 1
                         break
 
@@ -2046,7 +2027,7 @@ class DataSwarm(object):
             while not self.empty() and n < size:
                 t = self.wait_for_tag(str(i), 1)                
                 if t:
-                    results[tasks[t.id]] = list(json.loads(t.output)["Result"])
+                    results[tasks[ds_task_get_taskid(t)]] = list(json.loads(ds_task_get_output(t))["Result"])
                     n += 1
                     break
 
@@ -2100,7 +2081,7 @@ class DataSwarm(object):
             while not self.empty() and n < num_task:
                 t = self.wait_for_tag(str(i), 10)
                 if t:
-                    results[tasks[t.id]] = json.loads(t.output)["Result"]
+                    results[tasks[ds_task_get_taskid(t)]] = json.loads(ds_task_get_output(t))["Result"]
                     n += 1
                     break
          
@@ -2146,7 +2127,7 @@ class DataSwarm(object):
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
-                        results[tasks[t.id]] = json.loads(t.output)["Result"]
+                        results[tasks[ds_task_get_taskid(t)]] = json.loads(ds_task_get_output(t))["Result"]
                         n += 1
                         break
 

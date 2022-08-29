@@ -6,8 +6,11 @@ See the file COPYING for details.
 
 #include "ds_manager.h"
 #include "ds_protocol.h"
-#include "ds_internal.h"
+#include "ds_task.h"
+#include "ds_file.h"
 #include "ds_resources.h"
+#include "ds_remote_file_info.h"
+#include "ds_internal.h"
 
 #include "cctools.h"
 #include "int_sizes.h"
@@ -36,13 +39,11 @@ See the file COPYING for details.
 #include "random.h"
 #include "process.h"
 #include "path.h"
-#include "md5.h"
 #include "url_encode.h"
 #include "jx_print.h"
 #include "jx_parse.h"
 #include "shell.h"
 #include "pattern.h"
-#include "tlq_config.h"
 #include "host_disk_info.h"
 
 #include <unistd.h>
@@ -77,20 +78,16 @@ See the file COPYING for details.
 #define WORKER_ADDRPORT_MAX 64
 #define WORKER_HASHKEY_MAX 32
 
-#define RESOURCE_MONITOR_TASK_LOCAL_NAME "ds-%d-task-%d"
-#define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
-#define RESOURCE_MONITOR_REMOTE_NAME_EVENTS RESOURCE_MONITOR_REMOTE_NAME "events.json"
-
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
 #define MAX_NEW_WORKERS 10
 
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
-	WQ_SUCCESS = 0,
-	WQ_WORKER_FAILURE,
-	WQ_APP_FAILURE,
-	WQ_MGR_FAILURE
+	DS_SUCCESS = 0,
+	DS_WORKER_FAILURE,
+	DS_APP_FAILURE,
+	DS_MGR_FAILURE
 } ds_result_code_t;
 
 typedef enum {
@@ -120,7 +117,6 @@ typedef enum {
 	WORKER_TYPE_UNKNOWN = 1,
 	WORKER_TYPE_WORKER  = 2,
 	WORKER_TYPE_STATUS  = 4,
-	WORKER_TYPE_FOREMAN = 8
 } worker_type;
 
 
@@ -138,9 +134,6 @@ int ds_option_scheduler = DS_SCHEDULE_TIME;
 
 /* default timeout for slow workers to come back to the pool */
 double ds_option_blocklist_slow_workers_timeout = 900;
-
-/* Internal use: when the worker uses the client library, do not recompute cached names. */
-int ds_hack_do_not_compute_cached_name = 0;
 
 /* time threshold to check when tasks are larger than connected workers */
 static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
@@ -180,18 +173,15 @@ struct ds_manager {
 	timestamp_t time_last_log_stats;
 	timestamp_t time_last_large_tasks_check;
 	int worker_selection_algorithm;
-	int task_ordering;
 	int process_pending_check;
 
 	int short_timeout;		// timeout to send/recv a brief message from worker
-	int long_timeout;		// timeout to send/recv a brief message from a foreman
-
+	int long_timeout;		// timeout if in the middle of an incomplete message.
 	struct list *task_reports;	      /* list of last N ds_task_reports. */
 
 	double resource_submit_multiplier; /* Times the resource value, but disk */
 
 	int minimum_transfer_timeout;
-	int foreman_transfer_timeout;
 	int transfer_outlier_factor;
 	int default_transfer_rate;
 
@@ -233,10 +223,6 @@ struct ds_manager {
 
 	double bandwidth;
 
-	char *debug_path;
-	int tlq_port;
-	char *tlq_url;
-  
 	int fetch_factory;
 
 	int wait_retrieve_many;
@@ -252,7 +238,7 @@ struct ds_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 
-	worker_type type;                         // unknown, regular worker, status worker, foreman
+	worker_type type;                         // unknown, regular worker, status worker
 
 	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
 
@@ -302,28 +288,6 @@ struct blocklist_host_info {
 	time_t release_at;
 };
 
-struct remote_file_info {
-	ds_file_t type;
-	int64_t           size;
-	time_t            mtime;
-	timestamp_t       transfer_time;
-};
-
-struct remote_file_info * remote_file_info_create( ds_file_t type, int64_t size, time_t mtime )
-{
-	struct remote_file_info *rinfo = malloc(sizeof(*rinfo));
-	rinfo->type = type;
-	rinfo->size = size;
-	rinfo->mtime = mtime;
-	rinfo->transfer_time = 0;
-	return rinfo;
-}
-
-void remote_file_info_delete( struct remote_file_info *rinfo )
-{
-	free(rinfo);
-}
-
 static void handle_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, ds_result_code_t fail_type);
 static void handle_worker_failure(struct ds_manager *q, struct ds_worker *w);
 static void handle_app_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t);
@@ -368,8 +332,8 @@ static ds_msg_code_t process_queue_status(struct ds_manager *q, struct ds_worker
 static ds_msg_code_t process_resource(struct ds_manager *q, struct ds_worker *w, const char *line);
 static ds_msg_code_t process_feature(struct ds_manager *q, struct ds_worker *w, const char *line);
 
-static struct jx * queue_to_jx( struct ds_manager *q, struct link *foreman_uplink );
-static struct jx * queue_lean_to_jx( struct ds_manager *q, struct link *foreman_uplink );
+static struct jx * queue_to_jx( struct ds_manager *q );
+static struct jx * queue_lean_to_jx( struct ds_manager *q );
 
 char *ds_monitor_wrap(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct rmsummary *limits);
 
@@ -387,27 +351,8 @@ static void write_transaction_worker(struct ds_manager *q, struct ds_worker *w, 
 static void write_transaction_transfer(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type);
 static void write_transaction_worker_resources(struct ds_manager *q, struct ds_worker *w);
 
-static void delete_feature(struct ds_task *t, const char *name);
-
 static struct ds_factory_info *create_factory_info(struct ds_manager *q, const char *name);
 static void remove_factory_info(struct ds_manager *q, const char *name);
-
-static void fill_deprecated_queue_stats(struct ds_manager *q, struct ds_stats *s);
-static void fill_deprecated_tasks_stats(struct ds_task *t);
-
-/** Clone a @ref ds_file
-This performs a deep copy of the file struct.
-@param file The file to clone.
-@return A newly allocated file.
-*/
-static struct ds_file *ds_file_clone(const struct ds_file *file);
-
-/** Clone a list of @ref ds_file structs
-This performs a deep copy of the file list.
-@param list The list to clone.
-@return A newly allocated list of files.
-*/
-static struct list *ds_task_file_list_clone(struct list *list);
 
 /** Write manager's resources to resource summary file and close the file **/
 void ds_disable_monitoring(struct ds_manager *q);
@@ -489,7 +434,7 @@ static void log_queue_stats(struct ds_manager *q, int force)
 	}
 
 	ds_get_stats(q, &s);
-	debug(D_WQ, "workers connections -- known: %d, connecting: %d, available: %d.",
+	debug(D_DS, "workers connections -- known: %d, connecting: %d, available: %d.",
 			s.workers_connected,
 			s.workers_init,
 			available_workers(q));
@@ -607,13 +552,9 @@ static int send_worker_msg( struct ds_manager *q, struct ds_worker *w, const cha
 	buffer_putvfstring(B, fmt, va);
 	va_end(va);
 
-	debug(D_WQ, "tx to %s (%s): %s", w->hostname, w->addrport, buffer_tostring(B));
+	debug(D_DS, "tx to %s (%s): %s", w->hostname, w->addrport, buffer_tostring(B));
 
-	//If foreman, then we wait until foreman gives the manager some attention.
-	if(w->type == WORKER_TYPE_FOREMAN)
-		stoptime = time(0) + q->long_timeout;
-	else
-		stoptime = time(0) + q->short_timeout;
+	stoptime = time(0) + q->short_timeout;
 
 	int result = link_putlstring(w->link, buffer_tostring(B), buffer_pos(B), stoptime);
 
@@ -637,36 +578,11 @@ void ds_broadcast_message(struct ds_manager *q, const char *msg) {
 
 ds_msg_code_t process_name(struct ds_manager *q, struct ds_worker *w, char *line)
 {
-	debug(D_WQ, "Sending project name to worker (%s)", w->addrport);
+	debug(D_DS, "Sending project name to worker (%s)", w->addrport);
 
 	//send project name (q->name) if there is one. otherwise send blank line
 	send_worker_msg(q, w, "%s\n", q->name ? q->name : "");
 
-	return MSG_PROCESSED;
-}
-
-ds_msg_code_t advertise_tlq_url(struct ds_manager *q, struct ds_worker *w, char *line)
-{
-	//attempt to find local TLQ server to retrieve manager URL
-	if(q->tlq_port && q->debug_path && !q->tlq_url) {
-		debug(D_TLQ, "looking up manager TLQ URL");
-		time_t config_stoptime = time(0) + 10;
-		q->tlq_url = tlq_config_url(q->tlq_port, q->debug_path, config_stoptime);
-		if(q->tlq_url) debug(D_TLQ, "set manager TLQ URL: %s", q->tlq_url);
-		else debug(D_TLQ, "error setting manager TLQ URL");
-	}
-	else if(q->tlq_port && !q->debug_path && !q->tlq_url) debug(D_TLQ, "cannot get manager TLQ URL: no debug log path set");
-
-	char worker_url[DS_LINE_MAX];
-	int n = sscanf(line, "tlq %s", worker_url);
-	if(n != 1) debug(D_TLQ, "empty TLQ URL received from worker (%s)", w->addrport);
-	else debug(D_TLQ, "received worker (%s) TLQ URL %s", w->addrport, worker_url);
-
-	//send manager TLQ URL if there is one
-	if(q->tlq_url) {
-		debug(D_TLQ, "sending manager TLQ URL to worker (%s)", w->addrport);
-		send_worker_msg(q, w, "tlq %s\n", q->tlq_url);
-	}
 	return MSG_PROCESSED;
 }
 
@@ -743,7 +659,7 @@ int process_cache_update( struct ds_manager *q, struct ds_worker *w, const char 
 	long long transfer_time;
 	
 	if(sscanf(line,"cache-update %s %lld %lld",cachename,&size,&transfer_time)==3) {
-		struct remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
+		struct ds_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
 		if(remote_info) {
 			remote_info->size = size;
 			remote_info->transfer_time = transfer_time;
@@ -779,11 +695,11 @@ int process_cache_invalid( struct ds_manager *q, struct ds_worker *w, const char
 		}
 		
 		message[length] = 0;
-		debug(D_WQ,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
+		debug(D_DS,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
 		free(message);
 		
-		struct remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
-		if(remote_info) remote_file_info_delete(remote_info);
+		struct ds_remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
+		if(remote_info) ds_remote_file_info_delete(remote_info);
 	}
 	return MSG_PROCESSED;
 }
@@ -795,11 +711,7 @@ int process_cache_invalid( struct ds_manager *q, struct ds_worker *w, const char
 static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker *w, char *line, size_t length )
 {
 	time_t stoptime;
-	//If foreman, then we wait until foreman gives the manager some attention.
-	if(w->type == WORKER_TYPE_FOREMAN)
-		stoptime = time(0) + q->long_timeout;
-	else
-		stoptime = time(0) + q->short_timeout;
+	stoptime = time(0) + q->short_timeout;
 
 	int result = link_readline(w->link, line, length, stoptime);
 
@@ -809,7 +721,7 @@ static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker *w, 
 
 	w->last_msg_recv_time = timestamp_get();
 
-	debug(D_WQ, "rx from %s (%s): %s", w->hostname, w->addrport, line);
+	debug(D_DS, "rx from %s (%s): %s", w->hostname, w->addrport, line);
 
 	char path[length];
 
@@ -828,17 +740,15 @@ static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker *w, 
 	} else if (string_prefix_is(line, "feature")) {
 		result = process_feature(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
-		debug(D_WQ|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
+		debug(D_DS|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
 		result = MSG_FAILURE;
 	} else if (string_prefix_is(line,"ready")) {
-		debug(D_WQ|D_NOTICE,"worker (%s) is an older worker that is not compatible with this manager.",w->addrport);
+		debug(D_DS|D_NOTICE,"worker (%s) is an older worker that is not compatible with this manager.",w->addrport);
 		result = MSG_FAILURE;
 	} else if (string_prefix_is(line, "name")) {
 		result = process_name(q, w, line);
 	} else if (string_prefix_is(line, "info")) {
 		result = process_info(q, w, line);
-	} else if (string_prefix_is(line, "tlq")) {
-		result = advertise_tlq_url(q, w, line);
 	} else if (string_prefix_is(line, "cache-update")) {
 		result = process_cache_update(q, w, line);
 	} else if (string_prefix_is(line, "cache-invalid")) {
@@ -904,8 +814,6 @@ The overall effect is to reject transfers that are 10x slower than what has been
 
 Two exceptions are made:
 - The transfer time cannot be below a configurable minimum time.
-- A foreman must have a high minimum, because its attention is divided
-  between the manager and the workers that it serves.
 */
 
 static int get_transfer_wait_time(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, int64_t length)
@@ -925,20 +833,15 @@ static int get_transfer_wait_time(struct ds_manager *q, struct ds_worker *w, str
 
 	int timeout = length / tolerable_transfer_rate;
 
-	if(w->type == WORKER_TYPE_FOREMAN) {
-		// A foreman must have a much larger minimum timeout, b/c it does not respond immediately to the manager.
-		timeout = MAX(q->foreman_transfer_timeout,timeout);
-	} else {
-		// An ordinary manager has a lower minimum timeout b/c it responds immediately to the manager.
-		timeout = MAX(q->minimum_transfer_timeout,timeout);
-	}
+	// An ordinary manager has a lower minimum timeout b/c it responds immediately to the manager.
+	timeout = MAX(q->minimum_transfer_timeout,timeout);
 
 	/* Don't bother printing anything for transfers of less than 1MB, to avoid excessive output. */
 
 	if( length >= 1048576 ) {
-		debug(D_WQ,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
+		debug(D_DS,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
 
-		debug(D_WQ, "%s (%s) will try up to %d seconds to transfer this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
+		debug(D_DS, "%s (%s) will try up to %d seconds to transfer this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
 	}
 
 	free(data_source);
@@ -975,7 +878,7 @@ static int factory_trim_workers(struct ds_manager *q, struct ds_factory_info *f)
 	}
 	hash_table_delete(idle_workers);
 
-	debug(D_WQ, "Trimmed %d workers from %s", trimmed_workers, f->name);
+	debug(D_DS, "Trimmed %d workers from %s", trimmed_workers, f->name);
 	return trimmed_workers;
 }
 
@@ -1001,7 +904,7 @@ static void remove_factory_info(struct ds_manager *q, const char *name)
 		free(f);
 		hash_table_remove(q->factory_table, name);
 	} else {
-		debug(D_WQ, "Failed to remove unrecorded factory %s", name);
+		debug(D_DS, "Failed to remove unrecorded factory %s", name);
 	}
 }
 
@@ -1011,7 +914,7 @@ static void update_factory(struct ds_manager *q, struct jx *j)
 	if (!name) return;
 	struct ds_factory_info *f = hash_table_lookup(q->factory_table, name);
 	if (!f) {
-		debug(D_WQ, "factory %s not recorded", name);
+		debug(D_DS, "factory %s not recorded", name);
 		return;
 	}
 
@@ -1052,7 +955,7 @@ void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 	buffer_free(&filter);
 
 	// Query the catalog server
-	debug(D_WQ, "Retrieving factory info from catalog server(s) at %s ...", q->catalog_hosts);
+	debug(D_DS, "Retrieving factory info from catalog server(s) at %s ...", q->catalog_hosts);
 	if ( (cq = catalog_query_create(q->catalog_hosts, jexpr, stoptime)) ) {
 		// Update the table
 		while((j = catalog_query_read(cq, stoptime))) {
@@ -1061,7 +964,7 @@ void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 		}
 		catalog_query_delete(cq);
 	} else {
-		debug(D_WQ, "Failed to retrieve factory info from catalog server(s) at %s.", q->catalog_hosts);
+		debug(D_DS, "Failed to retrieve factory info from catalog server(s) at %s.", q->catalog_hosts);
 	}
 
 	// Remove outdated factories
@@ -1079,21 +982,21 @@ void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 	list_delete(outdated_factories);
 }
 
-void update_write_catalog(struct ds_manager *q, struct link *foreman_uplink)
+void update_write_catalog(struct ds_manager *q )
 {
 	// Only write if we have a name.
 	if (!q->name) return; 
 
 	// Generate the manager status in an jx, and print it to a buffer.
-	struct jx *j = queue_to_jx(q,foreman_uplink);
+	struct jx *j = queue_to_jx(q);
 	char *str = jx_print_string(j);
 
 	// Send the buffer.
-	debug(D_WQ, "Advertising manager status to the catalog server(s) at %s ...", q->catalog_hosts);
+	debug(D_DS, "Advertising manager status to the catalog server(s) at %s ...", q->catalog_hosts);
 	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
 
 		// If the send failed b/c the buffer is too big, send the lean version instead.
-		struct jx *lj = queue_lean_to_jx(q,foreman_uplink);
+		struct jx *lj = queue_lean_to_jx(q);
 		char *lstr = jx_print_string(lj);
 		catalog_query_send_update(q->catalog_hosts,lstr);
 		free(lstr);
@@ -1114,7 +1017,7 @@ void update_read_catalog(struct ds_manager *q)
 	}
 }
 
-void update_catalog(struct ds_manager *q, struct link *foreman_uplink, int force_update )
+void update_catalog(struct ds_manager *q, int force_update )
 {
 	// Only update every last_update_time seconds.
 	if(!force_update && (time(0) - q->catalog_last_update_time) < DS_UPDATE_INTERVAL)
@@ -1124,7 +1027,7 @@ void update_catalog(struct ds_manager *q, struct link *foreman_uplink, int force
 	if(!q->catalog_hosts) q->catalog_hosts = xxstrdup(CATALOG_HOST);
 
 	// Update the catalog.
-	update_write_catalog(q, foreman_uplink);
+	update_write_catalog(q);
 	update_read_catalog(q);
 
 	q->catalog_last_update_time = time(0);
@@ -1141,8 +1044,6 @@ static void clean_task_state(struct ds_task *t, int full_clean) {
 		t->bytes_sent = 0;
 		t->bytes_received = 0;
 		t->bytes_transferred = 0;
-
-		t->disk_allocation_exhausted = 0;
 
 		if(t->output) {
 			free(t->output);
@@ -1172,8 +1073,6 @@ static void clean_task_state(struct ds_task *t, int full_clean) {
 			rmsummary_delete(t->resources_allocated);
 			rmsummary_delete(t->resources_measured);
 		}
-
-		fill_deprecated_tasks_stats(t);
 
 		/* If result is never updated, then it is mark as a failure. */
 		t->result = DS_RESULT_UNKNOWN;
@@ -1249,9 +1148,9 @@ static void remove_worker(struct ds_manager *q, struct ds_worker *w, worker_disc
 {
 	if(!q || !w) return;
 
-	debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
+	debug(D_DS, "worker %s (%s) removed", w->hostname, w->addrport);
 
-	if(w->type == WORKER_TYPE_WORKER || w->type == WORKER_TYPE_FOREMAN) {
+	if(w->type == WORKER_TYPE_WORKER) {
 		q->stats->workers_removed++;
 	}
 
@@ -1294,7 +1193,7 @@ static void remove_worker(struct ds_manager *q, struct ds_worker *w, worker_disc
 	/* update the largest worker seen */
 	find_max_worker(q);
 
-	debug(D_WQ, "%d workers connected in total now", count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN));
+	debug(D_DS, "%d workers connected in total now", count_workers(q, WORKER_TYPE_WORKER));
 }
 
 static int release_worker(struct ds_manager *q, struct ds_worker *w)
@@ -1331,13 +1230,13 @@ static void add_worker(struct ds_manager *q)
 		return;
 	}
 
-	debug(D_WQ,"worker %s:%d connected",addr,port);
+	debug(D_DS,"worker %s:%d connected",addr,port);
 
 	if(q->ssl_enabled) {
 		if(link_ssl_wrap_accept(link,q->ssl_key,q->ssl_cert)) {
-			debug(D_WQ,"worker %s:%d completed ssl connection",addr,port);
+			debug(D_DS,"worker %s:%d completed ssl connection",addr,port);
 		} else {
-			debug(D_WQ,"worker %s:%d failed ssl connection",addr,port);
+			debug(D_DS,"worker %s:%d failed ssl connection",addr,port);
 			link_close(link);
 			return;
 		}
@@ -1346,9 +1245,9 @@ static void add_worker(struct ds_manager *q)
 	}
 
 	if(q->password) {
-		debug(D_WQ,"worker %s:%d authenticating",addr,port);
+		debug(D_DS,"worker %s:%d authenticating",addr,port);
 		if(!link_auth_password(link,q->password,time(0)+q->short_timeout)) {
-			debug(D_WQ|D_NOTICE,"worker %s:%d presented the wrong password",addr,port);
+			debug(D_DS|D_NOTICE,"worker %s:%d presented the wrong password",addr,port);
 			link_close(link);
 			return;
 		}
@@ -1409,40 +1308,40 @@ static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, str
 	path_dirname(local_name,dirname);
 	if(strchr(local_name,'/')) {
 		if(!create_dir(dirname, 0777)) {
-			debug(D_WQ, "Could not create directory - %s (%s)", dirname, strerror(errno));
+			debug(D_DS, "Could not create directory - %s (%s)", dirname, strerror(errno));
 			link_soak(w->link, length, stoptime);
-			return WQ_MGR_FAILURE;
+			return DS_MGR_FAILURE;
 		}
 	}
 
 	// Create the local file.
-	debug(D_WQ, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
+	debug(D_DS, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
 	// Check if there is space for incoming file at manager
 	if(!check_disk_space_for_filesize(dirname, length, disk_avail_threshold)) {
-		debug(D_WQ, "Could not receive file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
-		return WQ_MGR_FAILURE;
+		debug(D_DS, "Could not receive file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
+		return DS_MGR_FAILURE;
 	}
 
 	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
 		link_soak(w->link, length, stoptime);
-		return WQ_MGR_FAILURE;
+		return DS_MGR_FAILURE;
 	}
 
 	// Write the data on the link to file.
 	int64_t actual = link_stream_to_fd(w->link, fd, length, stoptime);
 
 	if(close(fd) < 0) {
-		warn(D_WQ, "Could not write file %s: %s\n", local_name, strerror(errno));
+		warn(D_DS, "Could not write file %s: %s\n", local_name, strerror(errno));
 		unlink(local_name);
-		return WQ_MGR_FAILURE;
+		return DS_MGR_FAILURE;
 	}
 
 	if(actual != length) {
-		debug(D_WQ, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
+		debug(D_DS, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
 		unlink(local_name);
-		return WQ_WORKER_FAILURE;
+		return DS_WORKER_FAILURE;
 	}
 
 	*total_bytes += length;
@@ -1453,7 +1352,7 @@ static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, str
 		usleep(effective_stoptime - current_time);
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 /*
@@ -1470,10 +1369,10 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 	int remote_name_len = strlen(remote_name);
 
 	// Send the name of the file/dir name to fetch
-	debug(D_WQ, "%s (%s) sending back %s to %s", w->hostname, w->addrport, remote_name, local_name);
+	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, remote_name, local_name);
 	send_worker_msg(q,w, "get %s 1\n",remote_name);
 
-	ds_result_code_t result = WQ_SUCCESS; //return success unless something fails below
+	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below
 
 	char *tmp_remote_path = NULL;
 	char *length_str      = NULL;
@@ -1492,7 +1391,7 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 		ds_msg_code_t mcode;
 		mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
 		if(mcode!=MSG_NOT_PROCESSED) {
-			result = WQ_WORKER_FAILURE;
+			result = DS_WORKER_FAILURE;
 			break;
 		}
 
@@ -1500,8 +1399,8 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 			char *tmp_local_name = string_format("%s%s",local_name, (tmp_remote_path + remote_name_len));
 			int result_dir = create_dir(tmp_local_name,0777);
 			if(!result_dir) {
-				debug(D_WQ, "Could not create directory - %s (%s)", tmp_local_name, strerror(errno));
-				result = WQ_APP_FAILURE;
+				debug(D_DS, "Could not create directory - %s (%s)", tmp_local_name, strerror(errno));
+				result = DS_APP_FAILURE;
 				free(tmp_local_name);
 				break;
 			}
@@ -1512,7 +1411,7 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
 			free(tmp_local_name);
 			//Return if worker failure. Else wait for end message from worker.
-			if((result == WQ_WORKER_FAILURE) || (result == WQ_MGR_FAILURE)) {
+			if((result == DS_WORKER_FAILURE) || (result == DS_MGR_FAILURE)) {
 				break;
 			}
 		} else if(pattern_match(line, "^missing (.+) (%d+)$", &tmp_remote_path, &errnum_str) >= 0) {
@@ -1520,18 +1419,18 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 			// but we continue and consider the transfer a 'success' so that other
 			// outputs are transferred and the task is given back to the caller.
 			int errnum = atoi(errnum_str);
-			debug(D_WQ, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,remote_name,strerror(errnum));
+			debug(D_DS, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,remote_name,strerror(errnum));
 			update_task_result(t, DS_RESULT_OUTPUT_MISSING);
 		} else if(!strcmp(line,"end")) {
 			// We have to return on receiving an end message.
-			if (result == WQ_SUCCESS) {
+			if (result == DS_SUCCESS) {
 				return result;
 			} else {
 				break;
 			}
 		} else {
-			debug(D_WQ, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
-			result = WQ_WORKER_FAILURE; //signal sys-level failure
+			debug(D_DS, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
+			result = DS_WORKER_FAILURE; //signal sys-level failure
 			break;
 		}
 	}
@@ -1542,79 +1441,14 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 	// If we failed to *transfer* the output file, then that is a hard
 	// failure which causes this function to return failure and the task
 	// to be returned to the queue to be attempted elsewhere.
-	debug(D_WQ, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, remote_name, local_name);
-	if(result == WQ_APP_FAILURE) {
+	debug(D_DS, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, remote_name, local_name);
+	if(result == DS_APP_FAILURE) {
 		update_task_result(t, DS_RESULT_OUTPUT_MISSING);
-	} else if(result == WQ_MGR_FAILURE) {
+	} else if(result == DS_MGR_FAILURE) {
 		update_task_result(t, DS_RESULT_OUTPUT_TRANSFER_ERROR);
 	}
 
 	return result;
-}
-
-/*
-For a given task and file, generate the name under which the file
-should be stored in the remote cache directory.
-
-The basic strategy is to construct a name that is unique to the
-namespace from where the file is drawn, so that tasks sharing
-the same input file can share the same copy.
-
-In the common case of files, the cached name is based on the
-hash of the local path, with the basename of the local path
-included simply to assist with debugging.
-
-In each of the other file types, a similar approach is taken,
-including a hash and a name where one is known, or another
-unique identifier where no name is available.
-*/
-
-char *make_cached_name( const struct ds_file *f )
-{
-	static unsigned int file_count = 0;
-	file_count++;
-
-	/* Default of payload is remote name (needed only for directories) */
-	char *payload = f->payload ? f->payload : f->remote_name;
-
-	unsigned char digest[MD5_DIGEST_LENGTH];
-	char payload_enc[PATH_MAX];
-
-	if(f->type == DS_BUFFER) {
-		//dummy digest for buffers
-		md5_buffer("buffer", 6, digest);
-	} else {
-		md5_buffer(payload,strlen(payload),digest);
-		url_encode(path_basename(payload), payload_enc, PATH_MAX);
-	}
-
-	/* 0 for cache files, file_count for non-cache files. With this, non-cache
-	 * files cannot be shared among tasks, and can be safely deleted once a
-	 * task finishes. */
-	unsigned int cache_file_id = 0;
-	if(!(f->flags & DS_CACHE)) {
-		cache_file_id = file_count;
-	}
-
-	switch(f->type) {
-		case DS_FILE:
-		case DS_DIRECTORY:
-			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), payload_enc);
-			break;
-		case DS_FILE_PIECE:
-			return string_format("piece-%d-%s-%s-%lld-%lld",cache_file_id, md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
-			break;
-		case DS_REMOTECMD:
-			return string_format("cmd-%d-%s", cache_file_id, md5_string(digest));
-			break;
-		case DS_URL:
-			return string_format("url-%d-%s", cache_file_id, md5_string(digest));
-			break;
-		case DS_BUFFER:
-		default:
-			return string_format("buffer-%d-%s", cache_file_id, md5_string(digest));
-			break;
-	}
 }
 
 /*
@@ -1623,7 +1457,7 @@ Get a single output file, located at the worker under 'cached_name'.
 static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct ds_file *f )
 {
 	int64_t total_bytes = 0;
-	ds_result_code_t result = WQ_SUCCESS; //return success unless something fails below.
+	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below.
 
 	timestamp_t open_time = timestamp_get();
 
@@ -1641,16 +1475,16 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker 
 		w->total_bytes_transferred += total_bytes;
 		w->total_transfer_time += sum_time;
 
-		debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
+		debug(D_DS, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 
         write_transaction_transfer(q, w, t, f, total_bytes, sum_time, DS_OUTPUT);
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
-	if(result == WQ_SUCCESS && f->flags & DS_CACHE) {
+	if(result == DS_SUCCESS && f->flags & DS_CACHE) {
 		struct stat local_info;
 		if (stat(f->payload,&local_info) == 0) {
-			struct remote_file_info *remote_info = remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
+			struct ds_remote_file_info *remote_info = ds_remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
 			hash_table_insert(w->current_files, f->cached_name, remote_info);
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno));
@@ -1663,7 +1497,7 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker 
 static ds_result_code_t get_output_files( struct ds_manager *q, struct ds_worker *w, struct ds_task *t )
 {
 	struct ds_file *f;
-	ds_result_code_t result = WQ_SUCCESS;
+	ds_result_code_t result = DS_SUCCESS;
 
 	if(t->output_files) {
 		list_first_item(t->output_files);
@@ -1671,7 +1505,7 @@ static ds_result_code_t get_output_files( struct ds_manager *q, struct ds_worker
 			// non-file objects are handled by the worker.
 			if(f->type!=DS_FILE) continue;
 		     
-			int task_succeeded = (t->result==DS_RESULT_SUCCESS && t->return_status==0);
+			int task_succeeded = (t->result==DS_RESULT_SUCCESS && t->exit_code==0);
 
 			// skip failure-only files on success 
 			if(f->flags&DS_FAILURE_ONLY && task_succeeded) continue;
@@ -1684,7 +1518,7 @@ static ds_result_code_t get_output_files( struct ds_manager *q, struct ds_worker
 
 			//if success or app-level failure, continue to get other files.
 			//if worker failure, return.
-			if(result == WQ_WORKER_FAILURE) {
+			if(result == DS_WORKER_FAILURE) {
 				break;
 			}
 		}
@@ -1699,7 +1533,7 @@ static ds_result_code_t get_output_files( struct ds_manager *q, struct ds_worker
 static ds_result_code_t get_monitor_output_file( struct ds_manager *q, struct ds_worker *w, struct ds_task *t )
 {
 	struct ds_file *f;
-	ds_result_code_t result = WQ_SUCCESS;
+	ds_result_code_t result = DS_SUCCESS;
 
 	const char *summary_name = RESOURCE_MONITOR_REMOTE_NAME ".summary";
 
@@ -1745,8 +1579,8 @@ static void delete_task_output_files(struct ds_manager *q, struct ds_worker *w, 
 
 static void delete_uncacheable_files( struct ds_manager *q, struct ds_worker *w, struct ds_task *t )
 {
-	delete_worker_files(q, w, t->input_files, DS_CACHE | DS_PREEXIST);
-	delete_worker_files(q, w, t->output_files, DS_CACHE | DS_PREEXIST);
+	delete_worker_files(q, w, t->input_files, DS_CACHE );
+	delete_worker_files(q, w, t->output_files, DS_CACHE );
 }
 
 char *monitor_file_name(struct ds_manager *q, struct ds_task *t, const char *ext) {
@@ -1776,7 +1610,7 @@ void read_measured_resources(struct ds_manager *q, struct ds_task *t) {
 
 	if(t->resources_measured) {
 		t->resources_measured->category = xxstrdup(t->category);
-		t->return_status = t->resources_measured->exit_status;
+		t->exit_code = t->resources_measured->exit_status;
 
 		/* cleanup noise in cores value, otherwise small fluctuations trigger new
 		 * maximums */
@@ -1863,12 +1697,12 @@ void resource_monitor_compress_logs(struct ds_manager *q, struct ds_task *t) {
 static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, int taskid)
 {
 	struct ds_task *t;
-	ds_result_code_t result = WQ_SUCCESS;
+	ds_result_code_t result = DS_SUCCESS;
 
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
-		debug(D_WQ, "Failed to find task %d at worker %s (%s).", taskid, w->hostname, w->addrport);
-		handle_failure(q, w, t, WQ_WORKER_FAILURE);
+		debug(D_DS, "Failed to find task %d at worker %s (%s).", taskid, w->hostname, w->addrport);
+		handle_failure(q, w, t, DS_WORKER_FAILURE);
 		return;
 	}
 
@@ -1881,12 +1715,12 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 		result = get_output_files(q,w,t);
 	}
 
-	if(result != WQ_SUCCESS) {
-		debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
+	if(result != DS_SUCCESS) {
+		debug(D_DS, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
 	}
 
-	if(result == WQ_WORKER_FAILURE) {
+	if(result == DS_WORKER_FAILURE) {
 		// Finish receiving output:
 		t->time_when_done = timestamp_get();
 
@@ -1926,7 +1760,7 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 			struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
 			if(j) {
 				char *str = jx_print_string(j);
-				debug(D_WQ, "Task %d exhausted resources on %s (%s): %s\n",
+				debug(D_DS, "Task %d exhausted resources on %s (%s): %s\n",
 						t->taskid,
 						w->hostname,
 						w->addrport,
@@ -1935,7 +1769,7 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 				jx_delete(j);
 			}
 		} else {
-				debug(D_WQ, "Task %d exhausted resources on %s (%s), but not resource usage was available.\n",
+				debug(D_DS, "Task %d exhausted resources on %s (%s), but not resource usage was available.\n",
 						t->taskid,
 						w->hostname,
 						w->addrport);
@@ -1945,10 +1779,10 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 		category_allocation_t next = category_next_label(c, t->resource_request, /* resource overflow */ 1, t->resources_requested, t->resources_measured);
 
 		if(next == CATEGORY_ALLOCATION_ERROR) {
-			debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
+			debug(D_DS, "Task %d failed given max resource exhaustion.\n", t->taskid);
 		}
 		else {
-			debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
+			debug(D_DS, "Task %d resubmitted using new resource allocation.\n", t->taskid);
 			t->resource_request = next;
 			change_task_state(q, t, DS_TASK_READY);
 			return;
@@ -1957,23 +1791,23 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 
 	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
 	if(t->result == DS_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
-		switch(t->return_status) {
+		switch(t->exit_code) {
 			case(126):
-				warn(D_WQ, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->return_status);
-				warn(D_WQ, "This usually means that the task's command is not an executable,\n");
-				warn(D_WQ, "or that the worker's scratch directory is on a no-exec partition.\n");
+				warn(D_DS, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->exit_code);
+				warn(D_DS, "This usually means that the task's command is not an executable,\n");
+				warn(D_DS, "or that the worker's scratch directory is on a no-exec partition.\n");
 				break;
 			case(127):
-				warn(D_WQ, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->return_status);
-				warn(D_WQ, "This usually means that the task's command could not be found, or that\n");
-				warn(D_WQ, "it uses a shared library not available at the worker, or that\n");
-				warn(D_WQ, "it uses a version of the glibc different than the one at the worker.\n");
+				warn(D_DS, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->exit_code);
+				warn(D_DS, "This usually means that the task's command could not be found, or that\n");
+				warn(D_DS, "it uses a shared library not available at the worker, or that\n");
+				warn(D_DS, "it uses a version of the glibc different than the one at the worker.\n");
 				break;
 			case(139):
-				warn(D_WQ, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->return_status);
-				warn(D_WQ, "This usually means that the task's command had a segmentation fault,\n");
-				warn(D_WQ, "either because it has a memory access error (segfault), or because\n");
-				warn(D_WQ, "it uses a version of a shared library different from the one at the worker.\n");
+				warn(D_DS, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->exit_code);
+				warn(D_DS, "This usually means that the task's command had a segmentation fault,\n");
+				warn(D_DS, "either because it has a memory access error (segfault), or because\n");
+				warn(D_DS, "it uses a version of a shared library different from the one at the worker.\n");
 				break;
 			default:
 				break;
@@ -1981,7 +1815,7 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 	}
 
 	add_task_report(q, t);
-	debug(D_WQ, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
+	debug(D_DS, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
 			w->hostname,
 			w->addrport,
 			(t->time_when_done - t->time_when_commit_start) / 1000000.0,
@@ -2057,7 +1891,7 @@ static void handle_worker_failure(struct ds_manager *q, struct ds_worker *w)
 
 static void handle_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, ds_result_code_t fail_type)
 {
-	if(fail_type == WQ_APP_FAILURE) {
+	if(fail_type == DS_APP_FAILURE) {
 		handle_app_failure(q, w, t);
 	} else {
 		handle_worker_failure(q, w);
@@ -2075,7 +1909,7 @@ static ds_msg_code_t process_dataswarm(struct ds_manager *q, struct ds_worker *w
 		return MSG_FAILURE;
 
 	if(worker_protocol!=DS_PROTOCOL_VERSION) {
-		debug(D_WQ|D_NOTICE,"rejecting worker (%s) as it uses protocol %d. The manager is using protocol %d.",w->addrport,worker_protocol,DS_PROTOCOL_VERSION);
+		debug(D_DS|D_NOTICE,"rejecting worker (%s) as it uses protocol %d. The manager is using protocol %d.",w->addrport,worker_protocol,DS_PROTOCOL_VERSION);
 		ds_block_host(q, w->hostname);
 		return MSG_FAILURE;
 	}
@@ -2090,18 +1924,13 @@ static ds_msg_code_t process_dataswarm(struct ds_manager *q, struct ds_worker *w
 	w->arch     = strdup(items[2]);
 	w->version  = strdup(items[3]);
 
-	if(!strcmp(w->os, "foreman"))
-	{
-		w->type = WORKER_TYPE_FOREMAN;
-	} else {
-		w->type = WORKER_TYPE_WORKER;
-	}
+	w->type = WORKER_TYPE_WORKER;
 
 	q->stats->workers_joined++;
-	debug(D_WQ, "%d workers are connected in total now", count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN));
+	debug(D_DS, "%d workers are connected in total now", count_workers(q, WORKER_TYPE_WORKER));
 
 
-	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
+	debug(D_DS, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
 
 	if(cctools_version_cmp(CCTOOLS_VERSION, w->version) != 0) {
 		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s, and manager is version %s", w->hostname, w->addrport, w->version, CCTOOLS_VERSION);
@@ -2129,15 +1958,15 @@ static ds_result_code_t get_update( struct ds_manager *q, struct ds_worker *w, c
 
 	int n = sscanf(line,"update %"PRId64" %s %"PRId64" %"PRId64,&taskid,path,&offset,&length);
 	if(n!=4) {
-		debug(D_WQ,"Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line );
-		return WQ_WORKER_FAILURE;
+		debug(D_DS,"Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line );
+		return DS_WORKER_FAILURE;
 	}
 
 	struct ds_task *t = itable_lookup(w->current_tasks,taskid);
 	if(!t) {
-		debug(D_WQ,"worker %s (%s) sent output for unassigned task %"PRId64, w->hostname, w->addrport, taskid);
+		debug(D_DS,"worker %s (%s) sent output for unassigned task %"PRId64, w->hostname, w->addrport, taskid);
 		link_soak(w->link,length,time(0)+get_transfer_wait_time(q,w,0,length));
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
 
@@ -2155,16 +1984,16 @@ static ds_result_code_t get_update( struct ds_manager *q, struct ds_worker *w, c
 	}
 
 	if(!local_name) {
-		debug(D_WQ,"worker %s (%s) sent output for unwatched file %s",w->hostname,w->addrport,path);
+		debug(D_DS,"worker %s (%s) sent output for unwatched file %s",w->hostname,w->addrport,path);
 		link_soak(w->link,length,stoptime);
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
 	int fd = open(local_name,O_WRONLY|O_CREAT,0777);
 	if(fd<0) {
-		debug(D_WQ,"unable to update watched file %s: %s",local_name,strerror(errno));
+		debug(D_DS,"unable to update watched file %s: %s",local_name,strerror(errno));
 		link_soak(w->link,length,stoptime);
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
 	lseek(fd,offset,SEEK_SET);
@@ -2172,11 +2001,11 @@ static ds_result_code_t get_update( struct ds_manager *q, struct ds_worker *w, c
 	ftruncate(fd,offset+length);
 
 	if(close(fd) < 0) {
-		debug(D_WQ, "unable to update watched file %s: %s\n", local_name, strerror(errno));
-		return WQ_SUCCESS;
+		debug(D_DS, "unable to update watched file %s: %s\n", local_name, strerror(errno));
+		return DS_SUCCESS;
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 /*
@@ -2186,7 +2015,7 @@ output files of the task.
 static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, const char *line) {
 
 	if(!q || !w || !line) 
-		return WQ_WORKER_FAILURE;
+		return DS_WORKER_FAILURE;
 
 	struct ds_task *t;
 
@@ -2206,8 +2035,8 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 	int n = sscanf(line, "result %s %s %s %s %" SCNd64"", items[0], items[1], items[2], items[3], &taskid);
 
 	if(n < 5) {
-		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
-		return WQ_WORKER_FAILURE;
+		debug(D_DS, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+		return DS_WORKER_FAILURE;
 	}
 
 	task_status = atoi(items[0]);
@@ -2216,20 +2045,20 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
-		debug(D_WQ, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
+		debug(D_DS, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
 		stoptime = time(0) + get_transfer_wait_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
 	if(task_status == DS_RESULT_FORSAKEN) {
 		// Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_files, DS_CACHE | DS_PREEXIST);
+		delete_worker_files(q, w, t->input_files, DS_CACHE );
 
 		/* task will be resubmitted, so we do not update any of the execution stats */
 		reap_task_from_worker(q, w, t, DS_TASK_READY);
 
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 
 	observed_execution_time = timestamp_get() - t->time_when_commit_end;
@@ -2238,13 +2067,6 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 	t->time_workers_execute_last = observed_execution_time > execution_time ? execution_time : observed_execution_time;
 
 	t->time_workers_execute_all += t->time_workers_execute_last;
-
-	if(task_status == DS_RESULT_DISK_ALLOC_FULL) {
-		t->disk_allocation_exhausted = 1;
-	}
-	else {
-		t->disk_allocation_exhausted = 0;
-	}
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
@@ -2269,21 +2091,21 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 	}
 
 	if(retrieved_output_length > 0) {
-		debug(D_WQ, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, retrieved_output_length, w->addrport, w->hostname);
+		debug(D_DS, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, retrieved_output_length, w->addrport, w->hostname);
 
 		//First read the bytes we keep.
 		stoptime = time(0) + get_transfer_wait_time(q, w, t, retrieved_output_length);
 		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
 		if(actual != retrieved_output_length) {
-			debug(D_WQ, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
+			debug(D_DS, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
 			t->output[actual] = '\0';
-			return WQ_WORKER_FAILURE;
+			return DS_WORKER_FAILURE;
 		}
-		debug(D_WQ, "Retrieved %"PRId64" bytes from %s (%s)", actual, w->hostname, w->addrport);
+		debug(D_DS, "Retrieved %"PRId64" bytes from %s (%s)", actual, w->hostname, w->addrport);
 
 		//Then read the bytes we need to throw away.
 		if(output_length > retrieved_output_length) {
-			debug(D_WQ, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_STORAGE), taskid, MAX_TASK_STDOUT_STORAGE);
+			debug(D_DS, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_STORAGE), taskid, MAX_TASK_STDOUT_STORAGE);
 			stoptime = time(0) + get_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
 			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
 
@@ -2306,7 +2128,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 		t->output[actual] = 0;
 
 	t->result        = task_status;
-	t->return_status = exit_status;
+	t->exit_code = exit_status;
 
 	q->stats->time_workers_execute += t->time_workers_execute_last;
 
@@ -2314,16 +2136,16 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker *w, co
 
 	// Convert resource_monitor status into work queue status if needed.
 	if(q->monitor_mode) {
-		if(t->return_status == RM_OVERFLOW) {
+		if(t->exit_code == RM_OVERFLOW) {
 			update_task_result(t, DS_RESULT_RESOURCE_EXHAUSTION);
-		} else if(t->return_status == RM_TIME_EXPIRE) {
+		} else if(t->exit_code == RM_TIME_EXPIRE) {
 			update_task_result(t, DS_RESULT_TASK_TIMEOUT);
 		}
 	}
 
 	change_task_state(q, t, DS_TASK_WAITING_RETRIEVAL);
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_worker *w)
@@ -2331,39 +2153,39 @@ static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_wo
 
 	//max_count == -1, tells the worker to send all available results.
 	send_worker_msg(q, w, "send_results %d\n", -1);
-	debug(D_WQ, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
+	debug(D_DS, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
 	char line[DS_LINE_MAX];
 	int i = 0;
 
-	ds_result_code_t result = WQ_SUCCESS; //return success unless something fails below.
+	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below.
 
 	while(1) {
 		ds_msg_code_t mcode;
 		mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
 		if(mcode!=MSG_NOT_PROCESSED) {
-			result = WQ_WORKER_FAILURE;
+			result = DS_WORKER_FAILURE;
 			break;
 		}
 
 		if(string_prefix_is(line,"result")) {
 			result = get_result(q, w, line);
-			if(result != WQ_SUCCESS) break;
+			if(result != DS_SUCCESS) break;
 			i++;
 		} else if(string_prefix_is(line,"update")) {
 			result = get_update(q,w,line);
-			if(result != WQ_SUCCESS) break;
+			if(result != DS_SUCCESS) break;
 		} else if(!strcmp(line,"end")) {
 			//Only return success if last message is end.
 			break;
 		} else {
-			debug(D_WQ, "%s (%s): sent invalid response to send_results: %s",w->hostname,w->addrport,line);
-			result = WQ_WORKER_FAILURE;
+			debug(D_DS, "%s (%s): sent invalid response to send_results: %s",w->hostname,w->addrport,line);
+			result = DS_WORKER_FAILURE;
 			break;
 		}
 	}
 
-	if(result != WQ_SUCCESS) {
+	if(result != DS_SUCCESS) {
 		handle_worker_failure(q, w);
 	}
 
@@ -2646,7 +2468,7 @@ an jx expression which can be sent directly to the
 user that connects via ds_status.
 */
 
-static struct jx * queue_to_jx( struct ds_manager *q, struct link *foreman_uplink )
+static struct jx * queue_to_jx( struct ds_manager *q )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
@@ -2667,7 +2489,7 @@ static struct jx * queue_to_jx( struct ds_manager *q, struct link *foreman_uplin
 	jx_insert_string(j,"owner",owner);
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
 	jx_insert_integer(j,"port",ds_port(q));
-	jx_insert_integer(j,"priority",info.priority);
+	jx_insert_integer(j,"priority",q->priority);
 	jx_insert_string(j,"manager_preferred_connection",q->manager_preferred_connection);
 
 	int use_ssl = 0;
@@ -2749,30 +2571,10 @@ static struct jx * queue_to_jx( struct ds_manager *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 	jx_insert_integer(j,"manager_load",info.manager_load);
 
-	if(q->tlq_url) jx_insert_string(j,"tlq_url",q->tlq_url);
-
 	// Add the resources computed from tributary workers.
 	struct ds_resources r;
 	aggregate_workers_resources(q,&r,NULL);
 	ds_resources_add_to_jx(&r,j);
-
-	// If this is a foreman, add the manager address and the disk resources
-	if(foreman_uplink) {
-		int port;
-		char address[LINK_ADDRESS_MAX];
-		char addrport[DS_LINE_MAX];
-
-		link_address_remote(foreman_uplink,address,&port);
-		sprintf(addrport,"%s:%d",address,port);
-		jx_insert_string(j,"my_manager",addrport);
-
-		// get foreman local resources and overwrite disk usage
-		struct ds_resources local_resources;
-		ds_resources_measure_locally(&local_resources,q->workingdir);
-		r.disk.total = local_resources.disk.total;
-		r.disk.inuse = local_resources.disk.inuse;
-		ds_resources_add_to_jx(&r,j);
-	}
 
 	//add the stats per category
 	jx_insert(j, jx_string("categories"), categories_to_jx(q));
@@ -2795,7 +2597,7 @@ It different from queue_to_jx in that only the minimum information that
 workers, ds_status and the ds_factory need.
 */
 
-static struct jx * queue_lean_to_jx( struct ds_manager *q, struct link *foreman_uplink )
+static struct jx * queue_lean_to_jx( struct ds_manager *q )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
@@ -2867,17 +2669,6 @@ static struct jx * queue_lean_to_jx( struct ds_manager *q, struct link *foreman_
 	struct jx *blocklist = blocked_to_json(q);
 	if(blocklist) {
 		jx_insert(j,jx_string("workers_blocked"), blocklist);   //danger! unbounded field
-	}
-
-	// Add information about the foreman
-	if(foreman_uplink) {
-		int port;
-		char address[LINK_ADDRESS_MAX];
-		char addrport[DS_LINE_MAX];
-
-		link_address_remote(foreman_uplink,address,&port);
-		sprintf(addrport,"%s:%d",address,port);
-		jx_insert_string(j,"my_manager",addrport);
 	}
 
 	return j;
@@ -3055,7 +2846,7 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 	struct jx *a = jx_array(NULL);
 
 	if(!strcmp(request, "queue_status") || !strcmp(request, "queue") || !strcmp(request, "resources_status")) {
-		struct jx *j = queue_to_jx( q, 0 );
+		struct jx *j = queue_to_jx( q );
 		if(j) {
 			jx_array_insert(a, j);
 		}
@@ -3199,7 +2990,7 @@ static ds_msg_code_t process_feature( struct ds_manager *q, struct ds_worker *w,
 
 	url_decode(feature, fdec, DS_LINE_MAX);
 
-	debug(D_WQ, "Feature found: %s\n", fdec);
+	debug(D_DS, "Feature found: %s\n", fdec);
 
 	hash_table_insert(w->features, fdec, (void **) 1);
 
@@ -3223,32 +3014,32 @@ static ds_result_code_t handle_worker(struct ds_manager *q, struct link *l)
 	switch(mcode) {
 		case MSG_PROCESSED:
 			// A status message was received and processed.
-			return WQ_SUCCESS;
+			return DS_SUCCESS;
 			break;
 
 		case MSG_PROCESSED_DISCONNECT:
 			// A status query was received and processed, so disconnect.
 			remove_worker(q, w, WORKER_DISCONNECT_STATUS_WORKER);
-			return WQ_SUCCESS;
+			return DS_SUCCESS;
 
 		case MSG_NOT_PROCESSED:
-			debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
+			debug(D_DS, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 			q->stats->workers_lost++;
 			remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
-			return WQ_WORKER_FAILURE;
+			return DS_WORKER_FAILURE;
 			break;
 
 		case MSG_FAILURE:
-			debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
+			debug(D_DS, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
 			q->stats->workers_lost++;
 			remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
-			return WQ_WORKER_FAILURE;
+			return DS_WORKER_FAILURE;
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
-static int build_poll_table(struct ds_manager *q, struct link *manager)
+static int build_poll_table(struct ds_manager *q )
 {
 	int n = 0;
 	char *key;
@@ -3268,14 +3059,6 @@ static int build_poll_table(struct ds_manager *q, struct link *manager)
 	q->poll_table[0].events = LINK_READ;
 	q->poll_table[0].revents = 0;
 	n = 1;
-
-	if(manager) {
-		/* foreman uplink */
-		q->poll_table[1].link = manager;
-		q->poll_table[1].events = LINK_READ;
-		q->poll_table[1].revents = 0;
-		n++;
-	}
 
 	// For every worker in the hash table, add an item to the poll table
 	hash_table_firstkey(q->worker_table);
@@ -3311,7 +3094,7 @@ static int send_symlink( struct ds_manager *q, struct ds_worker *w, struct ds_ta
 	char target[DS_LINE_MAX];
 
 	int length = readlink(localname,target,sizeof(target));
-	if(length<0) return WQ_APP_FAILURE;
+	if(length<0) return DS_APP_FAILURE;
 
 	char remotename_encoded[DS_LINE_MAX];
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
@@ -3322,7 +3105,7 @@ static int send_symlink( struct ds_manager *q, struct ds_worker *w, struct ds_ta
 
 	*total_bytes += length;
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 /*
@@ -3347,7 +3130,7 @@ static int send_file( struct ds_manager *q, struct ds_worker *w, struct ds_task 
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s: %s", localname, strerror(errno));
-		return WQ_APP_FAILURE;
+		return DS_APP_FAILURE;
 	}
 
 	/* If we are sending only a piece of the file, seek there first. */
@@ -3356,12 +3139,12 @@ static int send_file( struct ds_manager *q, struct ds_worker *w, struct ds_task 
 		if(lseek(fd, offset, SEEK_SET) == -1) {
 			debug(D_NOTICE, "Cannot seek file %s to offset %lld: %s", localname, (long long) offset, strerror(errno));
 			close(fd);
-			return WQ_APP_FAILURE;
+			return DS_APP_FAILURE;
 		}
 	} else {
 		debug(D_NOTICE, "File specification %s (%lld:%lld) is invalid", localname, (long long) offset, (long long) offset+length);
 		close(fd);
-		return WQ_APP_FAILURE;
+		return DS_APP_FAILURE;
 	}
 
 	if(q->bandwidth) {
@@ -3379,14 +3162,14 @@ static int send_file( struct ds_manager *q, struct ds_worker *w, struct ds_task 
 
 	*total_bytes += actual;
 
-	if(actual != length) return WQ_WORKER_FAILURE;
+	if(actual != length) return DS_WORKER_FAILURE;
 
 	timestamp_t current_time = timestamp_get();
 	if(effective_stoptime && effective_stoptime > current_time) {
 		usleep(effective_stoptime - current_time);
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 /* Need prototype here to address mutually recursive code. */
@@ -3404,10 +3187,10 @@ static ds_result_code_t send_directory( struct ds_manager *q, struct ds_worker *
 	DIR *dir = opendir(localname);
 	if(!dir) {
 		debug(D_NOTICE, "Cannot open dir %s: %s", localname, strerror(errno));
-		return WQ_APP_FAILURE;
+		return DS_APP_FAILURE;
 	}
 
-	ds_result_code_t result = WQ_SUCCESS;
+	ds_result_code_t result = DS_SUCCESS;
 
 	char remotename_encoded[DS_LINE_MAX];
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
@@ -3424,7 +3207,7 @@ static ds_result_code_t send_directory( struct ds_manager *q, struct ds_worker *
 
 		free(localpath);
 
-		if(result != WQ_SUCCESS) break;
+		if(result != DS_SUCCESS) break;
 	}
 
 	send_worker_msg(q,w,"end\n");
@@ -3450,7 +3233,7 @@ and internal links are not followed, they are sent natively.
 static ds_result_code_t send_item( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links )
 {
 	struct stat info;
-	int result = WQ_SUCCESS;
+	int result = DS_SUCCESS;
 
 	if(follow_links) {
 		result = stat(localpath,&info);
@@ -3470,7 +3253,7 @@ static ds_result_code_t send_item( struct ds_manager *q, struct ds_worker *w, st
 		}
 	} else {
 		debug(D_NOTICE, "cannot stat file %s: %s", localpath, strerror(errno));
-		result = WQ_APP_FAILURE;
+		result = DS_APP_FAILURE;
 	}
 
 	return result;
@@ -3489,34 +3272,34 @@ static ds_result_code_t send_item_if_not_cached( struct ds_manager *q, struct ds
 	struct stat local_info;
 	if(lstat(expanded_local_name, &local_info) < 0) {
 		debug(D_NOTICE, "Cannot stat file %s: %s", expanded_local_name, strerror(errno));
-		return WQ_APP_FAILURE;
+		return DS_APP_FAILURE;
 	}
 
-	struct remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
+	struct ds_remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
 	if(remote_info && (remote_info->mtime != local_info.st_mtime || remote_info->size != local_info.st_size)) {
-		debug(D_NOTICE|D_WQ, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
-		return WQ_SUCCESS;
+		debug(D_NOTICE|D_DS, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
+		return DS_SUCCESS;
 	} else if(!remote_info) {
 
 		if(tf->offset==0 && tf->length==0) {
-			debug(D_WQ, "%s (%s) needs file %s as '%s'", w->hostname, w->addrport, expanded_local_name, tf->cached_name);
+			debug(D_DS, "%s (%s) needs file %s as '%s'", w->hostname, w->addrport, expanded_local_name, tf->cached_name);
 		} else {
-			debug(D_WQ, "%s (%s) needs file %s (offset %lld length %lld) as '%s'", w->hostname, w->addrport, expanded_local_name, (long long) tf->offset, (long long) tf->length, tf->cached_name );
+			debug(D_DS, "%s (%s) needs file %s (offset %lld length %lld) as '%s'", w->hostname, w->addrport, expanded_local_name, (long long) tf->offset, (long long) tf->length, tf->cached_name );
 		}
 
 		ds_result_code_t result;
 		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
 
-		if(result == WQ_SUCCESS && tf->flags & DS_CACHE) {
-			remote_info = remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
+		if(result == DS_SUCCESS && tf->flags & DS_CACHE) {
+			remote_info = ds_remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
 			hash_table_insert(w->current_files, tf->cached_name, remote_info);
 		}
 
 		return result;
 	} else {
 		/* Up-to-date file on the worker, we do nothing. */
-		return WQ_SUCCESS;
+		return DS_SUCCESS;
 	}
 }
 
@@ -3586,7 +3369,7 @@ static char *expand_envnames(struct ds_worker *w, const char *payload)
 
 	free(str);
 
-	debug(D_WQ, "File name %s expanded to %s for %s (%s).", payload, expanded_name, w->hostname, w->addrport);
+	debug(D_DS, "File name %s expanded to %s for %s (%s).", payload, expanded_name, w->hostname, w->addrport);
 
 	return expanded_name;
 }
@@ -3600,7 +3383,7 @@ message once the object is actually loaded into the cache.
 
 static ds_result_code_t send_special_if_not_cached( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct ds_file *tf, const char *typestring )
 {
-	if(hash_table_lookup(w->current_files,tf->cached_name)) return WQ_SUCCESS;
+	if(hash_table_lookup(w->current_files,tf->cached_name)) return DS_SUCCESS;
 
 	char source_encoded[DS_LINE_MAX];
 	char cached_name_encoded[DS_LINE_MAX];
@@ -3611,11 +3394,11 @@ static ds_result_code_t send_special_if_not_cached( struct ds_manager *q, struct
 	send_worker_msg(q,w,"%s %s %s %d %o\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777);
 
 	if(tf->flags & DS_CACHE) {
-		struct remote_file_info *remote_info = remote_file_info_create(tf->type,tf->length,time(0));
+		struct ds_remote_file_info *remote_info = ds_remote_file_info_create(tf->type,tf->length,time(0));
 		hash_table_insert(w->current_files,tf->cached_name,remote_info);
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct ds_file *f)
@@ -3623,35 +3406,35 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *
 
 	int64_t total_bytes = 0;
 	int64_t actual = 0;
-	ds_result_code_t result = WQ_SUCCESS; //return success unless something fails below
+	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below
 
 	timestamp_t open_time = timestamp_get();
 
 	switch (f->type) {
 
 	case DS_BUFFER:
-		debug(D_WQ, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
+		debug(D_DS, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, f->length);
 		send_worker_msg(q,w, "put %s %d %o\n",f->cached_name, f->length, 0777 );
 		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
 		if(actual!=f->length) {
-			result = WQ_WORKER_FAILURE;
+			result = DS_WORKER_FAILURE;
 		}
 		total_bytes = actual;
 		break;
 
 	case DS_REMOTECMD:
-		debug(D_WQ, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->payload);
+		debug(D_DS, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->payload);
 		result = send_special_if_not_cached(q,w,t,f,"putcmd");
 		break;
 
 	case DS_URL:
-		debug(D_WQ, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->payload);
+		debug(D_DS, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->payload);
 		result = send_special_if_not_cached(q,w,t,f,"puturl");
 		break;
 
 	case DS_DIRECTORY:
-		debug(D_WQ, "%s (%s) will create directory %s", w->hostname, w->addrport, f->remote_name);
+		debug(D_DS, "%s (%s) will create directory %s", w->hostname, w->addrport, f->remote_name);
   		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as DS_FILEs
 		break;
 
@@ -3662,13 +3445,13 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *
 			result = send_item_if_not_cached(q,w,t,f,expanded_payload,&total_bytes);
 			free(expanded_payload);
 		} else {
-			result = WQ_APP_FAILURE; //signal app-level failure.
+			result = DS_APP_FAILURE; //signal app-level failure.
 		}
 		break;
 		}
 	}
 
-	if(result == WQ_SUCCESS) {
+	if(result == DS_SUCCESS) {
 		timestamp_t close_time = timestamp_get();
 		timestamp_t elapsed_time = close_time-open_time;
 
@@ -3687,7 +3470,7 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *
 		if(elapsed_time==0) elapsed_time = 1;
 
 		if(total_bytes > 0) {
-			debug(D_WQ, "%s (%s) received %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s",
+			debug(D_DS, "%s (%s) received %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s",
 				w->hostname,
 				w->addrport,
 				total_bytes / 1000000.0,
@@ -3697,13 +3480,13 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *
 			);
 		}
 	} else {
-		debug(D_WQ, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
+		debug(D_DS, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
 			w->hostname,
 			w->addrport,
 			f->type == DS_BUFFER ? "literal data" : f->payload,
 			total_bytes);
 
-		if(result == WQ_APP_FAILURE) {
+		if(result == DS_APP_FAILURE) {
 			update_task_result(t, DS_RESULT_INPUT_MISSING);
 		}
 	}
@@ -3725,13 +3508,13 @@ static ds_result_code_t send_input_files( struct ds_manager *q, struct ds_worker
 				char * expanded_payload = expand_envnames(w, f->payload);
 				if(!expanded_payload) {
 					update_task_result(t, DS_RESULT_INPUT_MISSING);
-					return WQ_APP_FAILURE;
+					return DS_APP_FAILURE;
 				}
 				if(stat(expanded_payload, &s) != 0) {
-					debug(D_WQ,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
+					debug(D_DS,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
 					free(expanded_payload);
 					update_task_result(t, DS_RESULT_INPUT_MISSING);
-					return WQ_APP_FAILURE;
+					return DS_APP_FAILURE;
 				}
 				free(expanded_payload);
 			}
@@ -3744,13 +3527,13 @@ static ds_result_code_t send_input_files( struct ds_manager *q, struct ds_worker
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
 			ds_result_code_t result = send_input_file(q,w,t,f);
-			if(result != WQ_SUCCESS) {
+			if(result != DS_SUCCESS) {
 				return result;
 			}
 		}
 	}
 
-	return WQ_SUCCESS;
+	return DS_SUCCESS;
 }
 
 static struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker *w, struct ds_task *t) {
@@ -3880,7 +3663,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker *w
 
 	ds_result_code_t result = send_input_files(q, w, t);
 
-	if (result != WQ_SUCCESS) {
+	if (result != DS_SUCCESS) {
 		free(command_line);
 		return result;
 	}
@@ -3889,15 +3672,15 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker *w
 
 	long long cmd_len = strlen(command_line);
 	send_worker_msg(q,w, "cmd %lld\n", (long long) cmd_len);
-	link_putlstring(w->link, command_line, cmd_len, /* stoptime */ time(0) + (w->type == WORKER_TYPE_FOREMAN ? q->long_timeout : q->short_timeout));
-	debug(D_WQ, "%s\n", command_line);
+	link_putlstring(w->link, command_line, cmd_len, time(0) + q->short_timeout);
+	debug(D_DS, "%s\n", command_line);
 	free(command_line);
 
 
 	if(t->coprocess) {
 		cmd_len = strlen(t->coprocess);
 		send_worker_msg(q,w, "coprocess %lld\n", (long long) cmd_len);
-		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + (w->type == WORKER_TYPE_FOREMAN ? q->long_timeout : q->short_timeout));
+		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + q->short_timeout);
 	}
 
 	send_worker_msg(q,w, "category %s\n", t->category);
@@ -3960,12 +3743,12 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker *w
 
 	if(result_msg > -1)
 	{
-		debug(D_WQ, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
-		return WQ_SUCCESS;
+		debug(D_DS, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
+		return DS_SUCCESS;
 	}
 	else
 	{
-		return WQ_WORKER_FAILURE;
+		return DS_WORKER_FAILURE;
 	}
 }
 
@@ -4118,11 +3901,9 @@ static int check_hand_against_task(struct ds_manager *q, struct ds_worker *w, st
 		if ( f && f->connected_workers > f->max_workers ) return 0;
 	}
 
-	if(w->type != WORKER_TYPE_FOREMAN) {
-		struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
-		if (info && info->blocked) {
-			return 0;
-		}
+	struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
+	if (info && info->blocked) {
+		return 0;
 	}
 
 	struct rmsummary *l = task_worker_box_size(q, w, t);
@@ -4186,7 +3967,7 @@ static struct ds_worker *find_worker_by_files(struct ds_manager *q, struct ds_ta
 	struct ds_worker *best_worker = 0;
 	int64_t most_task_cached_bytes = 0;
 	int64_t task_cached_bytes;
-	struct remote_file_info *remote_info;
+	struct ds_remote_file_info *remote_info;
 	struct ds_file *tf;
 
 	hash_table_firstkey(q->worker_table);
@@ -4523,8 +4304,8 @@ static void commit_task_to_worker(struct ds_manager *q, struct ds_worker *w, str
 
 	count_worker_resources(q, w);
 
-	if(result != WQ_SUCCESS) {
-		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
+	if(result != DS_SUCCESS) {
+		debug(D_DS, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
 	}
 }
@@ -4535,7 +4316,7 @@ static void reap_task_from_worker(struct ds_manager *q, struct ds_worker *w, str
 
 	if(wr != w)
 	{
-		debug(D_WQ, "Cannot reap task %d from worker. It is not being run by %s (%s)\n", t->taskid, w->hostname, w->addrport);
+		debug(D_DS, "Cannot reap task %d from worker. It is not being run by %s (%s)\n", t->taskid, w->hostname, w->addrport);
 	} else {
 		w->total_task_time += t->time_workers_execute_last;
 	}
@@ -4621,23 +4402,23 @@ static void print_large_tasks_warning(struct ds_manager *q)
 	}
 
 	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
-		notice(D_WQ,"There are tasks that cannot fit any currently connected worker:\n");
+		notice(D_DS,"There are tasks that cannot fit any currently connected worker:\n");
 	}
 
 	if(unfit_core) {
-		notice(D_WQ,"    %d waiting task(s) need more than %s", unfit_core, rmsummary_resource_to_str("cores", largest_unfit_task->cores, 1));
+		notice(D_DS,"    %d waiting task(s) need more than %s", unfit_core, rmsummary_resource_to_str("cores", largest_unfit_task->cores, 1));
 	}
 
 	if(unfit_mem) {
-		notice(D_WQ,"    %d waiting task(s) need more than %s of memory", unfit_mem, rmsummary_resource_to_str("memory", largest_unfit_task->memory, 1));
+		notice(D_DS,"    %d waiting task(s) need more than %s of memory", unfit_mem, rmsummary_resource_to_str("memory", largest_unfit_task->memory, 1));
 	}
 
 	if(unfit_disk) {
-		notice(D_WQ,"    %d waiting task(s) need more than %s of disk", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task->disk, 1));
+		notice(D_DS,"    %d waiting task(s) need more than %s of disk", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task->disk, 1));
 	}
 
 	if(unfit_gpu) {
-		notice(D_WQ,"    %d waiting task(s) need more than %s", unfit_gpu, rmsummary_resource_to_str("gpus", largest_unfit_task->gpus, 1));
+		notice(D_DS,"    %d waiting task(s) need more than %s", unfit_gpu, rmsummary_resource_to_str("gpus", largest_unfit_task->gpus, 1));
 	}
 
 	rmsummary_delete(largest_unfit_task);
@@ -4661,7 +4442,7 @@ static int receive_one_task( struct ds_manager *q )
 				f = hash_table_lookup(q->factory_table, w->factory_name);
 				if ( f && f->connected_workers > f->max_workers &&
 						itable_size(w->current_tasks) < 1 ) {
-					debug(D_WQ, "Final task received from worker %s, shutting down.", w->hostname);
+					debug(D_DS, "Final task received from worker %s, shutting down.", w->hostname);
 					shut_down_worker(q, w);
 				}
 			}
@@ -4686,7 +4467,7 @@ static void ask_for_workers_updates(struct ds_manager *q) {
 			 * simply check again its start_time. */
 			if(!strcmp(w->hostname, "unknown")){
 				if ((int)((current_time - w->start_time)/1000000) >= q->keepalive_timeout) {
-					debug(D_WQ, "Removing worker %s (%s): hasn't sent its initialization in more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
+					debug(D_DS, "Removing worker %s (%s): hasn't sent its initialization in more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
 					handle_worker_failure(q, w);
 				}
 				continue;
@@ -4699,10 +4480,10 @@ static void ask_for_workers_updates(struct ds_manager *q) {
 				int64_t last_update_elapsed_time = (int64_t)(current_time - w->last_update_msg_time)/1000000;
 				if(last_update_elapsed_time >= q->keepalive_interval) {
 					if(send_worker_msg(q,w, "check\n")<0) {
-						debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
+						debug(D_DS, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
 						handle_worker_failure(q, w);
 					} else {
-						debug(D_WQ, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
+						debug(D_DS, "Sent keepalive check to worker %s (%s)", w->hostname, w->addrport);
 						w->last_update_msg_time = current_time;
 					}
 				}
@@ -4711,7 +4492,7 @@ static void ask_for_workers_updates(struct ds_manager *q) {
 				// since we last polled link for responses has exceeded keepalive timeout. If so, remove worker.
 				if (q->link_poll_end > w->last_update_msg_time) {
 					if ((int)((q->link_poll_end - w->last_update_msg_time)/1000000) >= q->keepalive_timeout) {
-						debug(D_WQ, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
+						debug(D_DS, "Removing worker %s (%s): hasn't responded to keepalive check for more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
 						handle_worker_failure(q, w);
 					}
 				}
@@ -4791,7 +4572,7 @@ static int abort_slow_workers(struct ds_manager *q)
 			w = itable_lookup(q->worker_task_map, t->taskid);
 			if(w && (w->type == WORKER_TYPE_WORKER))
 			{
-				debug(D_WQ, "Task %d is taking too long. Removing from worker.", t->taskid);
+				debug(D_DS, "Task %d is taking too long. Removing from worker.", t->taskid);
 				cancel_task_on_worker(q, t, DS_TASK_READY);
 				t->fast_abort_count++;
 
@@ -4805,7 +4586,7 @@ static int abort_slow_workers(struct ds_manager *q)
 					 * abort, therefore we have evidence that this a slow
 					 * worker (rather than a task) */
 
-					debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
+					debug(D_DS, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
 					ds_block_host_with_timeout(q, w->hostname, ds_option_blocklist_slow_workers_timeout);
 					remove_worker(q, w, WORKER_DISCONNECT_FAST_ABORT);
 
@@ -4875,10 +4656,10 @@ static int cancel_task_on_worker(struct ds_manager *q, struct ds_task *t, ds_tas
 	if (w) {
 		//send message to worker asking to kill its task.
 		send_worker_msg(q,w, "kill %d\n",t->taskid);
-		debug(D_WQ, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
+		debug(D_DS, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 
 		//Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_files, DS_CACHE | DS_PREEXIST);
+		delete_worker_files(q, w, t->input_files, DS_CACHE );
 
 		//Delete all output files since they are not needed as the task was aborted.
 		delete_worker_files(q, w, t->output_files, 0);
@@ -4908,749 +4689,6 @@ static struct ds_task *find_task_by_tag(struct ds_manager *q, const char *taskta
 }
 
 
-static struct ds_file *ds_file_clone(const struct ds_file *file) {
-  const int file_t_size = sizeof(struct ds_file);
-  struct ds_file *new = xxmalloc(file_t_size);
-
-  memcpy(new, file, file_t_size);
-  //allocate new memory for strings so we don't segfault when the original
-  //memory is freed.
-  new->payload     = xxstrdup(file->payload);
-  new->remote_name = xxstrdup(file->remote_name);
-
-  if(file->cached_name)
-	  new->cached_name = xxstrdup(file->cached_name);
-
-  return new;
-}
-
-
-static struct list *ds_task_file_list_clone(struct list *list) {
-  struct list *new = list_create();
-  struct ds_file *old_file, *new_file;
-
-  list_first_item(list);
-  while ((old_file = list_next_item(list))) {
-	new_file = ds_file_clone(old_file);
-	list_push_tail(new, new_file);
-  }
-  return new;
-}
-
-static struct list *ds_task_env_list_clone(struct list *env_list) {
-	struct list *new = list_create();
-	char *var;
-	list_first_item(env_list);
-	while((var=list_next_item(env_list))) {
-		list_push_tail(new, xxstrdup(var));
-	}
-
-	return new;
-}
-
-
-/******************************************************/
-/********** ds_task public functions **********/
-/******************************************************/
-
-struct ds_task *ds_task_create(const char *command_line)
-{
-	struct ds_task *t = malloc(sizeof(*t));
-	if(!t) {
-		fprintf(stderr, "Error: failed to allocate memory for task.\n");
-		return NULL;
-	}
-	memset(t, 0, sizeof(*t));
-
-	/* REMEMBER: Any memory allocation done in this function should have a
-	 * corresponding copy in ds_task_clone. Otherwise we get
-	 * double-free segfaults. */
-
-	if(command_line) t->command_line = xxstrdup(command_line);
-
-	t->worker_selection_algorithm = DS_SCHEDULE_UNSET;
-	t->input_files = list_create();
-	t->output_files = list_create();
-	t->env_list = list_create();
-	t->return_status = -1;
-
-	t->result = DS_RESULT_UNKNOWN;
-
-	t->resource_request   = CATEGORY_ALLOCATION_FIRST;
-
-	/* In the absence of additional information, a task consumes an entire worker. */
-	t->resources_requested = rmsummary_create(-1);
-	t->resources_measured  = rmsummary_create(-1);
-	t->resources_allocated = rmsummary_create(-1);
-
-	t->category = xxstrdup("default");
-
-	return t;
-}
-
-
-struct ds_task *ds_task_clone(const struct ds_task *task)
-{
-	struct ds_task *new = ds_task_create(task->command_line);
-
-	if(task->tag) {
-		ds_task_specify_tag(new, task->tag);
-	}
-
-	if(task->category) {
-		ds_task_specify_category(new, task->category);
-	}
-
-	ds_task_specify_algorithm(new, task->worker_selection_algorithm);
-	ds_task_specify_priority(new, task->priority);
-	ds_task_specify_max_retries(new, task->max_retries);
-	ds_task_specify_running_time_min(new, task->min_running_time);
-
-
-	if(task->monitor_output_directory) {
-		ds_task_specify_monitor_output(new, task->monitor_output_directory);
-	}
-
-	if(task->monitor_snapshot_file) {
-		ds_specify_snapshot_file(new, task->monitor_snapshot_file);
-	}
-
-	new->input_files  = ds_task_file_list_clone(task->input_files);
-	new->output_files = ds_task_file_list_clone(task->output_files);
-	new->env_list     = ds_task_env_list_clone(task->env_list);
-
-	if(task->features) {
-		new->features = list_create();
-		char *req;
-		list_first_item(task->features);
-		while((req = list_next_item(task->features))) {
-			list_push_tail(new->features, xxstrdup(req));
-		}
-	}
-
-	if(task->resources_requested) {
-		new->resources_requested = rmsummary_copy(task->resources_requested, 0);
-	}
-
-
-	return new;
-}
-
-
-void ds_task_specify_command( struct ds_task *t, const char *cmd )
-{
-	if(t->command_line) free(t->command_line);
-	t->command_line = xxstrdup(cmd);
-}
-
-void ds_task_specify_coprocess( struct ds_task *t, const char *coprocess )
-{
-	if(t->coprocess) {
-		delete_feature(t, t->coprocess);
-		free(t->coprocess);
-		t->coprocess = NULL;
-	}
-
-	if(coprocess) {
-		t->coprocess = string_format("ds_worker_coprocess:%s", coprocess);
-		ds_task_specify_feature(t, t->coprocess);
-	}
-}
-
-void ds_task_specify_environment_variable( struct ds_task *t, const char *name, const char *value )
-{
-	if(value) {
-		list_push_tail(t->env_list,string_format("%s=%s",name,value));
-	} else {
-		/* Specifications without = indicate variables to me unset. */
-		list_push_tail(t->env_list,string_format("%s",name));
-	}
-}
-
-/* same as above, but with a typo. can't remove as it is part of already published api. */
-void ds_task_specify_enviroment_variable( struct ds_task *t, const char *name, const char *value ) {
-	ds_task_specify_environment_variable(t, name, value);
-}
-
-void ds_task_specify_max_retries( struct ds_task *t, int64_t max_retries ) {
-	if(max_retries < 1) {
-		t->max_retries = 0;
-	}
-	else {
-		t->max_retries = max_retries;
-	}
-}
-
-void ds_task_specify_memory( struct ds_task *t, int64_t memory )
-{
-	if(memory < 0)
-	{
-		t->resources_requested->memory = -1;
-	}
-	else
-	{
-		t->resources_requested->memory = memory;
-	}
-}
-
-void ds_task_specify_disk( struct ds_task *t, int64_t disk )
-{
-	if(disk < 0)
-	{
-		t->resources_requested->disk = -1;
-	}
-	else
-	{
-		t->resources_requested->disk = disk;
-	}
-}
-
-void ds_task_specify_cores( struct ds_task *t, int cores )
-{
-	if(cores < 0)
-	{
-		t->resources_requested->cores = -1;
-	}
-	else
-	{
-		t->resources_requested->cores = cores;
-	}
-}
-
-void ds_task_specify_gpus( struct ds_task *t, int gpus )
-{
-	if(gpus < 0)
-	{
-		t->resources_requested->gpus = -1;
-	}
-	else
-	{
-		t->resources_requested->gpus = gpus;
-	}
-}
-
-void ds_task_specify_end_time( struct ds_task *t, int64_t useconds )
-{
-	if(useconds < 1)
-	{
-		t->resources_requested->end = -1;
-	}
-	else
-	{
-		t->resources_requested->end = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
-	}
-}
-
-void ds_task_specify_start_time_min( struct ds_task *t, int64_t useconds )
-{
-	if(useconds < 1)
-	{
-		t->resources_requested->start = -1;
-	}
-	else
-	{
-		t->resources_requested->start = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
-	}
-}
-
-void ds_task_specify_running_time( struct ds_task *t, int64_t useconds )
-{
-	if(useconds < 1)
-	{
-		t->resources_requested->wall_time = -1;
-	}
-	else
-	{
-		t->resources_requested->wall_time = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
-	}
-}
-
-void ds_task_specify_running_time_max( struct ds_task *t, int64_t seconds )
-{
-	ds_task_specify_running_time(t, seconds);
-}
-
-void ds_task_specify_running_time_min( struct ds_task *t, int64_t seconds )
-{
-	if(seconds < 1)
-	{
-		t->min_running_time = -1;
-	}
-	else
-	{
-		t->min_running_time = seconds;
-	}
-}
-
-void ds_task_specify_resources(struct ds_task *t, const struct rmsummary *rm) {
-	if(!rm)
-		return;
-
-	ds_task_specify_cores(t,        rm->cores);
-	ds_task_specify_memory(t,       rm->memory);
-	ds_task_specify_disk(t,         rm->disk);
-	ds_task_specify_gpus(t,         rm->gpus);
-	ds_task_specify_running_time(t, rm->wall_time);
-	ds_task_specify_running_time_max(t, rm->wall_time);
-	ds_task_specify_running_time_min(t, t->min_running_time);
-	ds_task_specify_end_time(t,     rm->end);
-}
-
-void ds_task_specify_tag(struct ds_task *t, const char *tag)
-{
-	if(t->tag)
-		free(t->tag);
-	t->tag = xxstrdup(tag);
-}
-
-void ds_task_specify_category(struct ds_task *t, const char *category)
-{
-	if(t->category)
-		free(t->category);
-
-	t->category = xxstrdup(category ? category : "default");
-}
-
-void ds_task_specify_feature(struct ds_task *t, const char *name)
-{
-	if(!name) {
-		return;
-	}
-
-	if(!t->features) {
-		t->features = list_create();
-	}
-
-	list_push_tail(t->features, xxstrdup(name));
-}
-
-static void delete_feature(struct ds_task *t, const char *name)
-{
-	if(!t->features) {
-		return;
-	}
-
-	struct list_cursor *c = list_cursor_create(t->features);
-
-	char *feature;
-	for(list_seek(c, 0); list_get(c, (void **) &feature); list_next(c)) {
-		if(name && feature && (strcmp(name, feature) == 0)) {
-			list_drop(c);
-		}
-	}
-
-	list_cursor_destroy(c);
-}
-
-struct ds_file *ds_file_create(const char *payload, const char *remote_name, ds_file_t type, ds_file_flags_t flags)
-{
-	struct ds_file *f;
-
-	f = malloc(sizeof(*f));
-	if(!f) {
-		debug(D_NOTICE, "Cannot allocate memory for file %s.\n", remote_name);
-		return NULL;
-	}
-
-	memset(f, 0, sizeof(*f));
-
-	f->remote_name = xxstrdup(remote_name);
-	f->type = type;
-	f->flags = flags;
-
-	/* DS_BUFFER needs to set these after the current function returns */
-	if(payload) {
-		f->payload = xxstrdup(payload);
-		f->length  = strlen(payload);
-	}
-
-	if(ds_hack_do_not_compute_cached_name) {
-  		f->cached_name = xxstrdup(f->payload);
-	} else {
-		f->cached_name = make_cached_name(f);
-	}
-	
-	return f;
-}
-
-int ds_task_specify_url(struct ds_task *t, const char *file_url, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
-{
-	struct list *files;
-	struct ds_file *tf;
-
-	if(!t || !file_url || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task, url, and remote name not allowed in specify_url.\n");
-		return 0;
-	}
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-	if(type == DS_INPUT) {
-		files = t->input_files;
-
-		//check if two different urls map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(file_url, tf->payload)) {
-				fprintf(stderr, "Error: input url %s conflicts with another input pointing to same remote name (%s).\n", file_url, remote_name);
-				return 0;
-			}
-		}
-		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: input url %s conflicts with an output pointing to same remote name (%s).\n", file_url, remote_name);
-				return 0;
-			}
-		}
-	} else {
-		fprintf(stderr, "Error: ds_specify_url does not yet support output files.\n");
-	  	return 0;
-	}
-
-	tf = ds_file_create(file_url, remote_name, DS_URL, flags);
-	if(!tf) return 0;
-
-	// length of source data is not known yet.
-	tf->length = 0;
-
-	list_push_tail(files, tf);
-
-	return 1;
-}
-
-int ds_task_specify_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
-{
-	struct list *files;
-	struct ds_file *tf;
-
-	if(!t || !local_name || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task, local name, and remote name not allowed in specify_file.\n");
-		return 0;
-	}
-
-	// @param remote_name is the path of the file as on the worker machine. In
-	// the Data Swarm framework, workers are prohibited from writing to paths
-	// outside of their workspaces. When a task is specified, the workspace of
-	// the worker(the worker on which the task will be executed) is unlikely to
-	// be known. Thus @param remote_name should not be an absolute path.
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-
-	if(type == DS_INPUT) {
-		files = t->input_files;
-
-		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
-				fprintf(stderr, "Error: input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-	} else {
-		files = t->output_files;
-
-		//check if two different different remote names map to the same local name for outputs.
-		list_first_item(files);
-		while((tf = (struct ds_file*)list_next_item(files))) {
-			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
-				fprintf(stderr, "Error: output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-	}
-
-	tf = ds_file_create(local_name, remote_name, DS_FILE, flags);
-	if(!tf) return 0;
-
-	list_push_tail(files, tf);
-	return 1;
-}
-
-int ds_task_specify_directory(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags, int recursive) {
-	struct list *files;
-	struct ds_file *tf;
-
-	if(!t || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task and remote name not allowed in specify_directory.\n");
-		return 0;
-	}
-
-	// @param remote_name is the path of the file as on the worker machine. In
-	// the Data Swarm framework, workers are prohibited from writing to paths
-	// outside of their workspaces. When a task is specified, the workspace of
-	// the worker(the worker on which the task will be executed) is unlikely to
-	// be known. Thus @param remote_name should not be an absolute path.
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-	if(type == DS_OUTPUT || recursive) {
-		return ds_task_specify_file(t, local_name, remote_name, type, flags);
-	}
-
-	files = t->input_files;
-
-	list_first_item(files);
-	while((tf = (struct ds_file*)list_next_item(files))) {
-		if(!strcmp(remote_name, tf->remote_name))
-		{	return 0;	}
-	}
-
-	//KNOWN HACK: Every file passes through make_cached_name() which expects the
-	//payload field to be set. So we simply set the payload to remote name if
-	//local name is null. This doesn't affect the behavior of the file transfers.
-	const char *payload = local_name ? local_name : remote_name;
-
-	tf = ds_file_create(payload, remote_name, DS_DIRECTORY, flags);
-	if(!tf) return 0;
-
-	list_push_tail(files, tf);
-	return 1;
-
-}
-
-int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, ds_file_type_t type, ds_file_flags_t flags)
-{
-	struct list *files;
-	struct ds_file *tf;
-	if(!t || !local_name || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task, local name, and remote name not allowed in specify_file_piece.\n");
-		return 0;
-	}
-
-	// @param remote_name should not be an absolute path. @see
-	// ds_task_specify_file
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-	if(end_byte < start_byte) {
-		fprintf(stderr, "Error: End byte lower than start byte for %s.\n", remote_name);
-		return 0;
-	}
-
-	if(type == DS_INPUT) {
-		files = t->input_files;
-
-		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
-				fprintf(stderr, "Error: piece of input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: piece of input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-	} else {
-		files = t->output_files;
-
-		//check if two different different remote names map to the same local name for outputs.
-		list_first_item(files);
-		while((tf = (struct ds_file*)list_next_item(files))) {
-			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
-				fprintf(stderr, "Error: piece of output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: piece of output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-	}
-
-	tf = ds_file_create(local_name, remote_name, DS_FILE_PIECE, flags);
-	if(!tf) return 0;
-
-	tf->offset = start_byte;
-	tf->piece_length = end_byte - start_byte + 1;
-
-	list_push_tail(files, tf);
-	return 1;
-}
-
-int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags)
-{
-	struct ds_file *tf;
-	if(!t || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task and remote name not allowed in specify_buffer.\n");
-		return 0;
-	}
-
-	// @param remote_name should not be an absolute path. @see
-	// ds_task_specify_file
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-	list_first_item(t->input_files);
-	while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-		if(!strcmp(remote_name, tf->remote_name)) {
-			fprintf(stderr, "Error: buffer conflicts with another input pointing to same remote name (%s).\n", remote_name);
-			return 0;
-		}
-	}
-
-	list_first_item(t->output_files);
-	while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-		if(!strcmp(remote_name, tf->remote_name)) {
-			fprintf(stderr, "Error: buffer conflicts with an output pointing to same remote name (%s).\n", remote_name);
-			return 0;
-		}
-	}
-
-	tf = ds_file_create(NULL, remote_name, DS_BUFFER, flags);
-	if(!tf) return 0;
-
-	tf->payload = malloc(length);
-	if(!tf->payload) {
-		fprintf(stderr, "Error: failed to allocate memory for buffer with remote name %s and length %d bytes.\n", remote_name, length);
-		return 0;
-	}
-
-	tf->length  = length;
-
-	memcpy(tf->payload, data, length);
-	list_push_tail(t->input_files, tf);
-
-	return 1;
-}
-
-int ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
-{
-	struct list *files;
-	struct ds_file *tf;
-	if(!t || !remote_name || !cmd) {
-		fprintf(stderr, "Error: Null arguments for task, remote name, and command not allowed in specify_file_command.\n");
-		return 0;
-	}
-
-	// @param remote_name should not be an absolute path. @see
-	// ds_task_specify_file
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-	if(type == DS_INPUT) {
-		files = t->input_files;
-
-		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(cmd, tf->payload)){
-				fprintf(stderr, "Error: input file command %s conflicts with another input pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)) {
-				fprintf(stderr, "Error: input file command %s conflicts with an output pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;
-			}
-		}
-	} else {
-		fprintf(stderr, "Error: ds_specify_file_command does not yet support output files.\n");
-	  	return 0;
-	}
-
-	if(strstr(cmd, "%%") == NULL) {
-		fatal("command to transfer file does not contain %%%% specifier: %s", cmd);
-	}
-
-	tf = ds_file_create(cmd, remote_name, DS_REMOTECMD, flags);
-	if(!tf) return 0;
-
-	// length of source data is not known yet.
-	tf->length = 0;
-
-	list_push_tail(files, tf);
-
-	return 1;
-}
-
-int ds_specify_snapshot_file(struct ds_task *t, const char *monitor_snapshot_file) {
-
-	assert(monitor_snapshot_file);
-
-	free(t->monitor_snapshot_file);
-	t->monitor_snapshot_file = xxstrdup(monitor_snapshot_file);
-
-	return ds_task_specify_file(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, DS_INPUT, DS_CACHE);
-
-}
-
-void ds_task_specify_algorithm(struct ds_task *t, ds_schedule_t algorithm)
-{
-	t->worker_selection_algorithm = algorithm;
-}
-
-void ds_task_specify_priority( struct ds_task *t, double priority )
-{
-	t->priority = priority;
-}
-
-void ds_task_specify_monitor_output(struct ds_task *t, const char *monitor_output_directory) {
-
-	if(!monitor_output_directory) {
-		fatal("Error: no monitor_output_file was specified.");
-	}
-
-	if(t->monitor_output_directory) {
-		free(t->monitor_output_directory);
-	}
-
-	t->monitor_output_directory = xxstrdup(monitor_output_directory);
-}
-
-void ds_file_delete(struct ds_file *tf) {
-	if(tf->payload)
-		free(tf->payload);
-	if(tf->remote_name)
-		free(tf->remote_name);
-	if(tf->cached_name)
-		free(tf->cached_name);
-	free(tf);
-}
-
 void ds_invalidate_cached_file(struct ds_manager *q, const char *local_name, ds_file_t type) {
 	struct ds_file *f = ds_file_create(local_name, local_name, type, DS_CACHE);
 
@@ -5665,10 +4703,6 @@ void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filena
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
 		if(!hash_table_lookup(w->current_files, filename))
 			continue;
-
-		if(w->type == WORKER_TYPE_FOREMAN) {
-			send_worker_msg(q, w, "invalidate-file %s\n", filename);
-		}
 
 		struct ds_task *t;
 		uint64_t taskid;
@@ -5697,89 +4731,8 @@ void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filena
 	}
 }
 
-
-void ds_task_delete(struct ds_task *t)
-{
-	struct ds_file *tf;
-	if(t) {
-
-		free(t->command_line);
-		free(t->coprocess);
-		free(t->tag);
-		free(t->category);
-		free(t->output);
-
-		if(t->input_files) {
-			while((tf = list_pop_tail(t->input_files))) {
-				ds_file_delete(tf);
-			}
-			list_delete(t->input_files);
-		}
-		if(t->output_files) {
-			while((tf = list_pop_tail(t->output_files))) {
-				ds_file_delete(tf);
-			}
-			list_delete(t->output_files);
-		}
-		if(t->env_list) {
-			char *var;
-			while((var=list_pop_tail(t->env_list))) {
-				free(var);
-			}
-			list_delete(t->env_list);
-		}
-
-		if(t->features) {
-			char *feature;
-			while((feature=list_pop_tail(t->features))) {
-				free(feature);
-			}
-			list_delete(t->features);
-		}
-
-		free(t->hostname);
-		free(t->host);
-
-		rmsummary_delete(t->resources_requested);
-		rmsummary_delete(t->resources_measured);
-		rmsummary_delete(t->resources_allocated);
-
-		free(t->monitor_output_directory);
-		free(t->monitor_snapshot_file);
-		free(t);
-	}
-}
-
-/** DEPRECATED FUNCTIONS **/
-int ds_task_specify_output_file(struct ds_task *t, const char *rname, const char *fname)
-{
-	return ds_task_specify_file(t, fname, rname, DS_OUTPUT, DS_CACHE);
-}
-
-int ds_task_specify_output_file_do_not_cache(struct ds_task *t, const char *rname, const char *fname)
-{
-	return ds_task_specify_file(t, fname, rname, DS_OUTPUT, DS_NOCACHE);
-}
-
-int ds_task_specify_input_buf(struct ds_task *t, const char *buf, int length, const char *rname)
-{
-	return ds_task_specify_buffer(t, buf, length, rname, DS_NOCACHE);
-}
-
-int ds_task_specify_input_file(struct ds_task *t, const char *fname, const char *rname)
-{
-	return ds_task_specify_file(t, fname, rname, DS_INPUT, DS_CACHE);
-}
-
-int ds_task_specify_input_file_do_not_cache(struct ds_task *t, const char *fname, const char *rname)
-{
-	return ds_task_specify_file(t, fname, rname, DS_INPUT, DS_NOCACHE);
-}
-
-
-
 /******************************************************/
-/********** ds public functions **********/
+/********** work_queue public functions **********/
 /******************************************************/
 
 struct ds_manager *ds_create(int port) {
@@ -5814,7 +4767,7 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 
 	q->manager_link = link_serve(port);
 	if(!q->manager_link) {
-		debug(D_NOTICE, "Could not create ds on port %i.", port);
+		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
 		free(q);
 		return 0;
 	} else {
@@ -5894,7 +4847,6 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 	q->resource_submit_multiplier = 1.0;
 
 	q->minimum_transfer_timeout = 60;
-	q->foreman_transfer_timeout = 3600;
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1*MEGABYTE;
 
@@ -5907,20 +4859,16 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 		}
 	}
 
-	//Deprecated:
-	q->task_ordering = DS_TASK_ORDER_FIFO;
-	//
-
 	log_queue_stats(q, 1);
 
 	q->time_last_wait = timestamp_get();
 
 	char hostname[DOMAIN_NAME_MAX];
 	if(domain_name_cache_guess(hostname)) {
-		debug(D_WQ, "Master advertising as %s:%d", hostname, q->port);
+		debug(D_DS, "Master advertising as %s:%d", hostname, q->port);
 	}
 	else {
-		debug(D_WQ, "Data Swarm is listening on port %d.", q->port);
+		debug(D_DS, "Data Swarm is listening on port %d.", q->port);
 	}
 	return q;
 }
@@ -5993,15 +4941,15 @@ int ds_activate_fast_abort_category(struct ds_manager *q, const char *category, 
 	struct category *c = ds_category_lookup_or_create(q, category);
 
 	if(multiplier >= 1) {
-		debug(D_WQ, "Enabling fast abort multiplier for '%s': %3.3lf\n", category, multiplier);
+		debug(D_DS, "Enabling fast abort multiplier for '%s': %3.3lf\n", category, multiplier);
 		c->fast_abort = multiplier;
 		return 0;
 	} else if(multiplier == 0) {
-		debug(D_WQ, "Disabling fast abort multiplier for '%s'.\n", category);
+		debug(D_DS, "Disabling fast abort multiplier for '%s'.\n", category);
 		c->fast_abort = 0;
 		return 1;
 	} else {
-		debug(D_WQ, "Using default fast abort multiplier for '%s'.\n", category);
+		debug(D_DS, "Using default fast abort multiplier for '%s'.\n", category);
 		c->fast_abort = -1;
 		return 0;
 	}
@@ -6026,19 +4974,9 @@ int ds_port(struct ds_manager *q)
 	}
 }
 
-void ds_specify_estimate_capacity_on(struct ds_manager *q, int value)
-{
-	// always on
-}
-
 void ds_specify_algorithm(struct ds_manager *q, ds_schedule_t algorithm)
 {
 	q->worker_selection_algorithm = algorithm;
-}
-
-void ds_specify_task_order(struct ds_manager *q, int order)
-{
-	q->task_ordering = order;
 }
 
 void ds_specify_name(struct ds_manager *q, const char *name)
@@ -6050,22 +4988,6 @@ void ds_specify_name(struct ds_manager *q, const char *name)
 	} else {
 		q->name = 0;
 	}
-}
-
-void ds_specify_debug_path(struct ds_manager *q, const char *path)
-{
-	if(q->debug_path) free(q->debug_path);
-	if(path) {
-		q->debug_path = xxstrdup(path);
-		setenv("DS_DEBUG_PATH", q->debug_path, 1);
-	} else {
-		q->debug_path = 0;
-	}
-}
-
-void ds_specify_tlq_port(struct ds_manager *q, int port)
-{
-	q->tlq_port = port;
 }
 
 const char *ds_name(struct ds_manager *q)
@@ -6086,11 +5008,6 @@ void ds_specify_num_tasks_left(struct ds_manager *q, int ntasks)
 	else {
 		q->num_tasks_left = ntasks;
 	}
-}
-
-void ds_specify_manager_mode(struct ds_manager *q, int mode)
-{
-	// Deprecated: Report to the catalog if a name is given.
 }
 
 void ds_specify_catalog_server(struct ds_manager *q, const char *hostname, int port)
@@ -6148,7 +5065,7 @@ void ds_delete(struct ds_manager *q)
 		log_queue_stats(q, 1);
 
 		if(q->name) {
-			update_catalog(q, NULL, 1);
+			update_catalog(q,1);
 		}
 
 		/* we call this function here before any of the structures are freed. */
@@ -6206,7 +5123,7 @@ void ds_delete(struct ds_manager *q)
 			write_transaction(q, "MANAGER END");
 
 			if(fclose(q->transactions_logfile) != 0) {
-				debug(D_WQ, "unable to write transactions log: %s\n", strerror(errno));
+				debug(D_DS, "unable to write transactions log: %s\n", strerror(errno));
 			}
 		}
 
@@ -6279,7 +5196,7 @@ void ds_disable_monitoring(struct ds_manager *q) {
 		close(summs_fd);
 
 		if(fclose(final) != 0) {
-			debug(D_WQ, "unable to update monitor report to final destination file: %s\n", strerror(errno));
+			debug(D_DS, "unable to update monitor report to final destination file: %s\n", strerror(errno));
 		}
 
 		if(rename(template, q->monitor_summary_filename) < 0) {
@@ -6379,34 +5296,6 @@ ds_task_state_t ds_task_state(struct ds_manager *q, int taskid) {
 	return (int)(uintptr_t)itable_lookup(q->task_state_map, taskid);
 }
 
-static void fill_deprecated_tasks_stats(struct ds_task *t) {
-	t->time_task_submit = t->time_when_submitted;
-	t->time_task_finish = t->time_when_done;
-	t->time_committed   = t->time_when_commit_start;
-
-	t->time_send_input_start      = t->time_when_commit_start;
-	t->time_send_input_finish     = t->time_when_commit_end;
-	t->time_receive_result_start  = t->time_when_retrieval;
-	t->time_receive_result_finish = t->time_when_done;
-	t->time_receive_output_start  = t->time_when_retrieval;
-	t->time_receive_output_finish = t->time_when_done;
-
-	t->time_execute_cmd_start  = t->time_when_commit_start;
-	t->time_execute_cmd_finish = t->time_when_retrieval;
-
-	t->total_transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
-
-	t->cmd_execution_time = t->time_workers_execute_last;
-	t->total_cmd_execution_time = t->time_workers_execute_all;
-	t->total_cmd_exhausted_execute_time = t->time_workers_execute_exhaustion;
-	t->total_time_until_worker_failure = t->time_workers_execute_failure;
-
-	t->total_bytes_received = t->bytes_received;
-	t->total_bytes_sent = t->bytes_sent;
-	t->total_bytes_transferred = t->bytes_transferred;
-}
-
-
 /* Changes task state. Returns old state */
 /* State of the task. One of DS_TASK(UNKNOWN|READY|RUNNING|WAITING_RETRIEVAL|RETRIEVED|DONE) */
 static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state ) {
@@ -6421,7 +5310,7 @@ static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *
 	}
 
 	// insert to corresponding table
-	debug(D_WQ, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
+	debug(D_DS, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
 
 	switch(new_state) {
 		case DS_TASK_READY:
@@ -6431,7 +5320,6 @@ static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *
 		case DS_TASK_DONE:
 		case DS_TASK_CANCELED:
 			/* tasks are freed when returned to user, thus we remove them from our local record */
-			fill_deprecated_tasks_stats(t);
 			itable_remove(q->tasks, t->taskid);
 			break;
 		default:
@@ -6675,10 +5563,10 @@ void ds_block_host_with_timeout(struct ds_manager *q, const char *hostname, time
 	info->blocked = 1;
 
 	if(timeout > 0) {
-		debug(D_WQ, "Blocking host %s by %" PRIu64 " seconds (blocked %d times).\n", hostname, (uint64_t) timeout, info->times_blocked);
+		debug(D_DS, "Blocking host %s by %" PRIu64 " seconds (blocked %d times).\n", hostname, (uint64_t) timeout, info->times_blocked);
 		info->release_at = time(0) + timeout;
 	} else {
-		debug(D_WQ, "Blocking host %s indefinitely.\n", hostname);
+		debug(D_DS, "Blocking host %s indefinitely.\n", hostname);
 		info->release_at = -1;
 	}
 
@@ -6718,7 +5606,7 @@ static void ds_unblock_all_by_time(struct ds_manager *q, time_t deadline)
 		if(deadline > 0 && info->release_at > deadline)
 			continue;
 
-		debug(D_WQ, "Clearing hostname %s from blocklist.\n", hostname);
+		debug(D_DS, "Clearing hostname %s from blocklist.\n", hostname);
 		ds_unblock_host(q, hostname);
 	}
 }
@@ -6778,19 +5666,19 @@ struct ds_task *ds_wait_for_tag(struct ds_manager *q, const char *tag, int timeo
 	}
 
 	if(timeout != DS_WAITFORTASK && timeout < 0) {
-		debug(D_NOTICE|D_WQ, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
+		debug(D_NOTICE|D_DS, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
 		timeout = 5;
 	}
 
-	return ds_wait_internal(q, timeout, NULL, NULL, tag);
+	return ds_wait_internal(q, timeout, tag);
 }
 
 /* return number of workers that failed */
-static int poll_active_workers(struct ds_manager *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
+static int poll_active_workers(struct ds_manager *q, int stoptime )
 {
 	BEGIN_ACCUM_TIME(q, time_polling);
 
-	int n = build_poll_table(q, foreman_uplink);
+	int n = build_poll_table(q);
 
 	// We poll in at most small time segments (of a second). This lets
 	// promptly dispatch tasks, while avoiding busy waiting.
@@ -6811,26 +5699,16 @@ static int poll_active_workers(struct ds_manager *q, int stoptime, struct link *
 	link_poll(q->poll_table, n, msec);
 	q->link_poll_end = timestamp_get();
 
-	int i, j = 1;
-	// Consider the foreman_uplink passed into the function and disregard if inactive.
-	if(foreman_uplink) {
-		if(q->poll_table[1].revents) {
-			*foreman_uplink_active = 1; //signal that the manager link saw activity
-		} else {
-			*foreman_uplink_active = 0;
-		}
-		j++;
-	}
-
 	END_ACCUM_TIME(q, time_polling);
 
 	BEGIN_ACCUM_TIME(q, time_status_msgs);
 
+	int i, j = 1;
 	int workers_failed = 0;
 	// Then consider all existing active workers
 	for(i = j; i < n; i++) {
 		if(q->poll_table[i].revents) {
-			if(handle_worker(q, q->poll_table[i].link) == WQ_WORKER_FAILURE) {
+			if(handle_worker(q, q->poll_table[i].link) == DS_WORKER_FAILURE) {
 				workers_failed++;
 			}
 		}
@@ -6871,7 +5749,7 @@ static int connect_new_workers(struct ds_manager *q, int stoptime, int max_new_w
 }
 
 
-struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active, const char *tag)
+struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag)
 {
 /*
    - compute stoptime
@@ -6938,7 +5816,7 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link 
 
 		// update catalog if appropriate
 		if(q->name) {
-			update_catalog(q, foreman_uplink, 0);
+			update_catalog(q,0);
 		}
 
 		if(q->monitor_mode)
@@ -6947,7 +5825,7 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link 
 		END_ACCUM_TIME(q, time_internal);
 
 		// retrieve worker status messages
-		if(poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active) > 0) {
+		if(poll_active_workers(q, stoptime) > 0) {
 			//at least one worker was removed.
 			events++;
 			// note we keep going, and we do not restart the loop as we do in
@@ -6985,7 +5863,7 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link 
 
 		if(q->wait_for_workers <= hash_table_size(q->worker_table)) {
 			if(q->wait_for_workers > 0) {
-				debug(D_WQ, "Target number of workers reached (%d).", q->wait_for_workers);
+				debug(D_DS, "Target number of workers reached (%d).", q->wait_for_workers);
 				q->wait_for_workers = 0;
 			}
 			// tasks waiting to be dispatched?
@@ -7044,7 +5922,7 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link 
 		// in this wait.
 		if(events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
-			int done = !task_state_any(q, DS_TASK_RUNNING) && !task_state_any(q, DS_TASK_READY) && !task_state_any(q, DS_TASK_WAITING_RETRIEVAL) && !(foreman_uplink);
+			int done = !task_state_any(q, DS_TASK_RUNNING) && !task_state_any(q, DS_TASK_READY) && !task_state_any(q, DS_TASK_WAITING_RETRIEVAL);
 			END_ACCUM_TIME(q, time_internal);
 
 			if(done) {
@@ -7058,11 +5936,6 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link 
 		// we set the busy_waiting flag so that link_poll waits for some time
 		// the next time around.
 		q->busy_waiting_flag = 1;
-
-		// If the foreman_uplink is active then break so the caller can handle it.
-		if(foreman_uplink) {
-			break;
-		}
 	}
 
 	if(events > 0) {
@@ -7207,7 +6080,7 @@ struct ds_task *ds_cancel_by_taskid(struct ds_manager *q, int taskid) {
 	matched_task = itable_lookup(q->tasks, taskid);
 
 	if(!matched_task) {
-		debug(D_WQ, "Task with id %d is not found in queue.", taskid);
+		debug(D_DS, "Task with id %d is not found in queue.", taskid);
 		return NULL;
 	}
 
@@ -7234,7 +6107,7 @@ struct ds_task *ds_cancel_by_tasktag(struct ds_manager *q, const char* tasktag) 
 
 	}
 
-	debug(D_WQ, "Task with tag %s is not found in queue.", tasktag);
+	debug(D_DS, "Task with tag %s is not found in queue.", tasktag);
 	return NULL;
 }
 
@@ -7265,7 +6138,7 @@ struct list * ds_cancel_all_tasks(struct ds_manager *q) {
 		itable_firstkey(w->current_tasks);
 		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
 			//Delete any input files that are not to be cached.
-			delete_worker_files(q, w, t->input_files, DS_CACHE | DS_PREEXIST);
+			delete_worker_files(q, w, t->input_files, DS_CACHE );
 
 			//Delete all output files since they are not needed as the task was aborted.
 			delete_worker_files(q, w, t->output_files, 0);
@@ -7341,9 +6214,6 @@ int ds_tune(struct ds_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "min-transfer-timeout")) {
 		q->minimum_transfer_timeout = (int)value;
 
-	} else if(!strcmp(name, "foreman-transfer-timeout")) {
-		q->foreman_transfer_timeout = (int)value;
-
 	} else if(!strcmp(name, "default-transfer-rate")) {
 		q->default_transfer_rate = value;
 
@@ -7381,7 +6251,7 @@ int ds_tune(struct ds_manager *q, const char *name, double value)
 		q->force_proportional_resources = MAX(0, (int)value);
 
 	} else {
-		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
+		debug(D_NOTICE|D_DS, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
 	}
 
@@ -7409,53 +6279,6 @@ double ds_get_effective_bandwidth(struct ds_manager *q)
 	return queue_bandwidth;
 }
 
-static void fill_deprecated_queue_stats(struct ds_manager *q, struct ds_stats *s) {
-	s->total_workers_connected = s->workers_connected;
-	s->total_workers_joined = s->workers_joined;
-	s->total_workers_removed = s->workers_removed;
-	s->total_workers_lost = s->workers_lost;
-	s->total_workers_idled_out = s->workers_idled_out;
-	s->total_workers_fast_aborted = s->workers_fast_aborted;
-
-	s->tasks_complete = s->tasks_with_results;
-
-	s->total_tasks_dispatched = s->tasks_dispatched;
-	s->total_tasks_complete = s->tasks_done;
-	s->total_tasks_failed = s->tasks_failed;
-	s->total_tasks_cancelled = s->tasks_cancelled;
-	s->total_exhausted_attempts = s->tasks_exhausted_attempts;
-
-	s->start_time = s->time_when_started;
-	s->total_send_time = s->time_send;
-	s->total_receive_time = s->time_receive;
-	s->total_good_transfer_time = s->time_send_good + s->time_receive_good;
-
-	s->total_execute_time = s->time_workers_execute;
-	s->total_good_execute_time = s->time_workers_execute_good;
-	s->total_exhausted_execute_time = s->time_workers_execute_exhaustion;
-
-	s->total_bytes_sent = s->bytes_sent;
-	s-> total_bytes_received = s->bytes_received;
-
-	s->capacity = s->capacity_cores;
-
-	s->port = q->port;
-	s->priority = q->priority;
-	s->workers_ready = s->workers_idle;
-	s->workers_full  = s->workers_busy;
-	s->total_worker_slots = s->tasks_dispatched;
-	s->avg_capacity = s->capacity_cores;
-
-	timestamp_t wall_clock_time = timestamp_get() - q->stats->time_when_started;
-	if(wall_clock_time > 0 && s->workers_connected > 0) {
-		s->efficiency = (double) (q->stats->time_workers_execute_good) / (wall_clock_time * s->workers_connected);
-	}
-
-	if(wall_clock_time>0) {
-		s->idle_percentage = (double) q->stats->time_polling / wall_clock_time;
-	}
-}
-
 void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 {
 	struct ds_stats *qs;
@@ -7464,7 +6287,7 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 	memcpy(s, qs, sizeof(*s));
 
 	//info about workers
-	s->workers_connected = count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN);
+	s->workers_connected = count_workers(q, WORKER_TYPE_WORKER);
 	s->workers_init      = count_workers(q, DS_TASK_UNKNOWN);
 	s->workers_busy      = workers_with_tasks(q);
 	s->workers_idle      = s->workers_connected - s->workers_busy;
@@ -7516,8 +6339,6 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 	s->max_gpus = r.gpus.largest;
 
 	s->workers_able = count_workers_for_waiting_tasks(q, largest_seen_resources(q, NULL));
-
-	fill_deprecated_queue_stats(q, s);
 }
 
 void ds_get_stats_hierarchy(struct ds_manager *q, struct ds_stats *s)
@@ -7533,27 +6354,6 @@ void ds_get_stats_hierarchy(struct ds_manager *q, struct ds_stats *s)
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->type == WORKER_TYPE_FOREMAN)
-		{
-			accumulate_stat(s, w->stats, workers_joined);
-			accumulate_stat(s, w->stats, workers_removed);
-			accumulate_stat(s, w->stats, workers_idled_out);
-			accumulate_stat(s, w->stats, workers_fast_aborted);
-			accumulate_stat(s, w->stats, workers_lost);
-
-			accumulate_stat(s, w->stats, time_send);
-			accumulate_stat(s, w->stats, time_receive);
-			accumulate_stat(s, w->stats, time_send_good);
-			accumulate_stat(s, w->stats, time_receive_good);
-
-			accumulate_stat(s, w->stats, time_workers_execute);
-			accumulate_stat(s, w->stats, time_workers_execute_good);
-			accumulate_stat(s, w->stats, time_workers_execute_exhaustion);
-
-			accumulate_stat(s, w->stats, bytes_sent);
-			accumulate_stat(s, w->stats, bytes_received);
-		}
-
 		accumulate_stat(s, w->stats, tasks_waiting);
 		accumulate_stat(s, w->stats, tasks_running);
 	}
@@ -7584,8 +6384,6 @@ void ds_get_stats_hierarchy(struct ds_manager *q, struct ds_stats *s)
 
 	s->bytes_sent      += q->stats_disconnected_workers->bytes_sent;
 	s->bytes_received  += q->stats_disconnected_workers->bytes_received;
-
-	fill_deprecated_queue_stats(q, s);
 }
 
 void ds_get_stats_category(struct ds_manager *q, const char *category, struct ds_stats *s)
@@ -7687,10 +6485,10 @@ int ds_specify_log(struct ds_manager *q, const char *logfile)
 			"\n"
 			);
 		log_queue_stats(q, 1);
-		debug(D_WQ, "log enabled and is being written to %s\n", logfile);
+		debug(D_DS, "log enabled and is being written to %s\n", logfile);
 		return 1;
 	} else {
-		debug(D_NOTICE | D_WQ, "couldn't open logfile %s: %s\n", logfile, strerror(errno));
+		debug(D_NOTICE | D_DS, "couldn't open logfile %s: %s\n", logfile, strerror(errno));
 		return 0;
 	}
 }
@@ -7726,7 +6524,7 @@ static void write_transaction_task(struct ds_manager *q, struct ds_task *t) {
 			/* do not add any info */
 	} else if(state == DS_TASK_RETRIEVED || state == DS_TASK_DONE) {
 		buffer_printf(&B, " %s ", ds_result_str(t->result));
-		buffer_printf(&B, " %d ", t->return_status);
+		buffer_printf(&B, " %d ", t->exit_code);
 
 		if(t->resources_measured) {
 			if(t->result == DS_RESULT_RESOURCE_EXHAUSTION) {
@@ -7900,7 +6698,7 @@ int ds_specify_transactions_log(struct ds_manager *q, const char *logfile) {
 	q->transactions_logfile =fopen(logfile, "a");
 	if(q->transactions_logfile) {
 		setvbuf(q->transactions_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
-		debug(D_WQ, "transactions log enabled and is being written to %s\n", logfile);
+		debug(D_DS, "transactions log enabled and is being written to %s\n", logfile);
 
 		fprintf(q->transactions_logfile, "# time manager_pid MANAGER START|END\n");
 		fprintf(q->transactions_logfile, "# time manager_pid WORKER worker_id host:port CONNECTION\n");
@@ -7922,7 +6720,7 @@ int ds_specify_transactions_log(struct ds_manager *q, const char *logfile) {
 	}
 	else
 	{
-		debug(D_NOTICE | D_WQ, "couldn't open transactions logfile %s: %s\n", logfile, strerror(errno));
+		debug(D_NOTICE | D_DS, "couldn't open transactions logfile %s: %s\n", logfile, strerror(errno));
 		return 0;
 	}
 }
@@ -8028,7 +6826,7 @@ int ds_specify_category_mode(struct ds_manager *q, const char *category, ds_cate
 		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
 			break;
 		default:
-			notice(D_WQ, "Unknown category mode specified.");
+			notice(D_DS, "Unknown category mode specified.");
 			return 0;
 			break;
 	}
@@ -8097,15 +6895,6 @@ struct category *ds_category_lookup_or_create(struct ds_manager *q, const char *
 	}
 
 	return c;
-}
-
-char *ds_generate_disk_alloc_full_filename(char *pwd, int taskid) {
-
-	path_remove_trailing_slashes(pwd);
-	if(!taskid) {
-		return string_format("%s/cctools_disk_allocation_exhausted.log", pwd);
-	}
-	return string_format("%s/cctools_disk_allocation_exhausted.%d.log", pwd, taskid);
 }
 
 int ds_specify_min_taskid(struct ds_manager *q, int minid) {

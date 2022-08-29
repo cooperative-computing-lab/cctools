@@ -2,6 +2,8 @@
 #define DS_PROCESS_H
 
 #include "ds_manager.h"
+#include "ds_task.h"
+
 #include "timestamp.h"
 #include "path_disk_size_info.h"
 
@@ -18,8 +20,8 @@ This object is private to the ds_worker.
 
 struct ds_process {
 	pid_t pid;
-	int task_status;                // Any of DS_RESULT_*
-	int exit_status;                // Exit code, or signal number to task process.
+	ds_result_t result;                // Any of DS_RESULT_*
+	int exit_code;                 // Exit code, or signal number to task process.
 
 	struct rusage rusage;
 	timestamp_t execution_start;
@@ -35,8 +37,6 @@ struct ds_process {
 
 	/* expected disk usage by the process. If no cache is used, it is the same as in task. */
 	int64_t disk;
-	/* 1 if the task sandbox was mounted on a loop device. 0 otherwise. */
-	int loop_mount;
 
 	/* disk size and number of files found in the process sandbox. */
 	int64_t sandbox_size;
@@ -50,7 +50,7 @@ struct ds_process {
 	int coprocess_port;
 };
 
-struct ds_process * ds_process_create( struct ds_task *task, int disk_allocation );
+struct ds_process * ds_process_create( struct ds_task *task );
 pid_t ds_process_execute( struct ds_process *p );
 void  ds_process_kill( struct ds_process *p );
 void  ds_process_delete( struct ds_process *p );

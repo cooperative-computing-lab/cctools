@@ -44,11 +44,9 @@ See the file COPYING for details.
 #include "random.h"
 #include "url_encode.h"
 #include "md5.h"
-#include "disk_alloc.h"
 #include "hash_table.h"
 #include "pattern.h"
 #include "gpu_info.h"
-#include "tlq_config.h"
 #include "stringtools.h"
 #include "trash.h"
 #include "process.h"
@@ -76,11 +74,6 @@ See the file COPYING for details.
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
-typedef enum {
-	WORKER_MODE_WORKER,
-	WORKER_MODE_FOREMAN
-} worker_mode_t;
-
 // In single shot mode, immediately quit when disconnected.
 // Useful for accelerating the test suite.
 static int single_shot_mode = 0;
@@ -100,9 +93,6 @@ static int connect_timeout = 900;
 // Maximum time to attempt sending/receiving any given file or message.
 static const int active_timeout = 3600;
 
-// Maximum time for the foreman to spend waiting in its internal loop
-static const int foreman_internal_timeout = 5;
-
 // Initial value for backoff interval (in seconds) when worker fails to connect to a manager.
 static int init_backoff_interval = 1;
 
@@ -111,9 +101,6 @@ static int max_backoff_interval = 60;
 
 // Absolute end time (in useconds) for worker, worker is killed after this point.
 static timestamp_t end_time = 0;
-
-// Chance that a worker will decide to shut down each minute without warning, to simulate failure.
-static double worker_volatility = 0.0;
 
 // If flag is set, then the worker proceeds to immediately cleanup and shut down.
 // This can be set by Ctrl-C or by any condition that prevents further progress.
@@ -146,8 +133,6 @@ int manual_ssl_option = 0;
 // pid of the worker's parent process. If different from zero, worker will be
 // terminated when its parent process changes.
 static pid_t initial_ppid = 0;
-
-static worker_mode_t worker_mode = WORKER_MODE_WORKER;
 
 struct manager_address {
 	char host[DOMAIN_NAME_MAX];
@@ -185,15 +170,10 @@ static int64_t memory_allocated = 0;
 static int64_t disk_allocated = 0;
 static int64_t gpus_allocated = 0;
 
-// Allow worker to use disk_alloc loop devices for task sandbox. Disabled by default.
-static int disk_allocation = 0;
-
 static int64_t files_counted = 0;
 
 static int check_resources_interval = 5;
 static int max_time_on_measurement  = 3;
-
-static struct ds_manager *foreman_q = NULL;
 
 // Table of all processes in any state, indexed by taskid.
 // Processes should be created/deleted when added/removed from this table.
@@ -222,10 +202,7 @@ static int total_tasks_executed = 0;
 static const char *project_regex = 0;
 static int released_by_manager = 0;
 
-static char *tlq_url = NULL;
-static char *debug_path = NULL;
 static char *catalog_hosts = NULL;
-static int tlq_port = 0;
 
 static char *coprocess_command = NULL;
 static char *coprocess_name = NULL;
@@ -249,7 +226,7 @@ static void send_manager_message( struct link *l, const char *fmt, ... )
 	string_nformat(debug_msg, sizeof(debug_msg), "tx: %s", fmt);
 	va_copy(debug_va, va);
 
-	vdebug(D_WQ, debug_msg, debug_va);
+	vdebug(D_DS, debug_msg, debug_va);
 	link_vprintf(l, time(0)+active_timeout, fmt, va);
 
 	va_end(va);
@@ -258,7 +235,7 @@ static void send_manager_message( struct link *l, const char *fmt, ... )
 static int recv_manager_message( struct link *l, char *line, int length, time_t stoptime )
 {
 	int result = link_readline(l,line,length,stoptime);
-	if(result) debug(D_WQ,"rx: %s",line);
+	if(result) debug(D_DS,"rx: %s",line);
 	return result;
 }
 
@@ -324,16 +301,12 @@ static void measure_worker_resources()
 
 	ds_resources_measure_locally(r,workspace);
 
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		aggregate_workers_resources(foreman_q, total_resources, features);
-	} else {
-		if(manual_cores_option > 0)
-			r->cores.total = manual_cores_option;
-		if(manual_memory_option > 0)
-			r->memory.total = manual_memory_option;
-		if(manual_gpus_option > -1)
-			r->gpus.total = manual_gpus_option;
-	}
+	if(manual_cores_option > 0)
+		r->cores.total = manual_cores_option;
+	if(manual_memory_option > 0)
+		r->memory.total = manual_memory_option;
+	if(manual_gpus_option > -1)
+		r->gpus.total = manual_gpus_option;
 
 	if(manual_disk_option > 0) {
 		r->disk.total = MIN(r->disk.total, manual_disk_option);
@@ -347,14 +320,7 @@ static void measure_worker_resources()
 	r->disk.inuse = measure_worker_disk();
 	r->tag = last_task_received;
 
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		total_resources->disk.total = r->disk.total;
-		total_resources->disk.inuse = r->disk.inuse;
-		total_resources->tag        = last_task_received;
-	} else {
-		/* in a regular worker, total and local resources are the same. */
-		memcpy(total_resources, r, sizeof(struct ds_resources));
-	}
+	memcpy(total_resources, r, sizeof(struct ds_resources));
 
 	ds_gpus_init(r->gpus.total);
 
@@ -387,22 +353,17 @@ static void send_resource_update(struct link *manager)
 {
 	time_t stoptime = time(0) + active_timeout;
 
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		total_resources->disk.total = local_resources->disk.total;
-		total_resources->disk.inuse = local_resources->disk.inuse;
-	} else {
-		total_resources->memory.total    = MAX(0, local_resources->memory.total);
-		total_resources->memory.largest  = MAX(0, local_resources->memory.largest);
-		total_resources->memory.smallest = MAX(0, local_resources->memory.smallest);
+	total_resources->memory.total    = MAX(0, local_resources->memory.total);
+	total_resources->memory.largest  = MAX(0, local_resources->memory.largest);
+	total_resources->memory.smallest = MAX(0, local_resources->memory.smallest);
 
-		total_resources->disk.total    = MAX(0, local_resources->disk.total);
-		total_resources->disk.largest  = MAX(0, local_resources->disk.largest);
-		total_resources->disk.smallest = MAX(0, local_resources->disk.smallest);
+	total_resources->disk.total    = MAX(0, local_resources->disk.total);
+	total_resources->disk.largest  = MAX(0, local_resources->disk.largest);
+	total_resources->disk.smallest = MAX(0, local_resources->disk.smallest);
 
-		//if workers are set to expire in some time, send the expiration time to manager
-		if(manual_wall_time_option > 0) {
-			end_time = worker_start_time + (manual_wall_time_option * 1e6);
-		}
+	//if workers are set to expire in some time, send the expiration time to manager
+	if(manual_wall_time_option > 0) {
+		end_time = worker_start_time + (manual_wall_time_option * 1e6);
 	}
 
 	ds_resources_send(manager,total_resources,stoptime);
@@ -415,39 +376,7 @@ Send a message to the manager with my current statistics information.
 
 static void send_stats_update(struct link *manager)
 {
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		struct ds_stats s;
-		ds_get_stats_hierarchy(foreman_q, &s);
-
-		send_manager_message(manager, "info workers_joined %lld\n", (long long) s.workers_joined);
-		send_manager_message(manager, "info workers_removed %lld\n", (long long) s.workers_removed);
-		send_manager_message(manager, "info workers_released %lld\n", (long long) s.workers_released);
-		send_manager_message(manager, "info workers_idled_out %lld\n", (long long) s.workers_idled_out);
-		send_manager_message(manager, "info workers_fast_aborted %lld\n", (long long) s.workers_fast_aborted);
-		send_manager_message(manager, "info workers_blacklisted %lld\n", (long long) s.workers_blacklisted);
-		send_manager_message(manager, "info workers_lost %lld\n", (long long) s.workers_lost);
-
-		send_manager_message(manager, "info tasks_waiting %lld\n", (long long) s.tasks_waiting);
-		send_manager_message(manager, "info tasks_on_workers %lld\n", (long long) s.tasks_on_workers);
-		send_manager_message(manager, "info tasks_running %lld\n", (long long) s.tasks_running);
-		send_manager_message(manager, "info tasks_waiting %lld\n", (long long) list_size(procs_waiting));
-		send_manager_message(manager, "info tasks_with_results %lld\n", (long long) s.tasks_with_results);
-
-		send_manager_message(manager, "info time_send %lld\n", (long long) s.time_send);
-		send_manager_message(manager, "info time_receive %lld\n", (long long) s.time_receive);
-		send_manager_message(manager, "info time_send_good %lld\n", (long long) s.time_send_good);
-		send_manager_message(manager, "info time_receive_good %lld\n", (long long) s.time_receive_good);
-
-		send_manager_message(manager, "info time_workers_execute %lld\n", (long long) s.time_workers_execute);
-		send_manager_message(manager, "info time_workers_execute_good %lld\n", (long long) s.time_workers_execute_good);
-		send_manager_message(manager, "info time_workers_execute_exhaustion %lld\n", (long long) s.time_workers_execute_exhaustion);
-
-		send_manager_message(manager, "info bytes_sent %lld\n", (long long) s.bytes_sent);
-		send_manager_message(manager, "info bytes_received %lld\n", (long long) s.bytes_received);
-	}
-	else {
-		send_manager_message(manager, "info tasks_running %lld\n", (long long) itable_size(procs_running));
-	}
+	send_manager_message(manager, "info tasks_running %lld\n", (long long) itable_size(procs_running));
 }
 
 /*
@@ -458,15 +387,8 @@ think that the worker has crashed and gone away.
 static int send_keepalive(struct link *manager, int force_resources)
 {
 	send_manager_message(manager, "alive\n");
-
-	/* for regular workers we only send resources on special ocassions, thus
-	 * the force_resources. */
-	if(force_resources || worker_mode == WORKER_MODE_FOREMAN) {
-		send_resource_update(manager);
-	}
-
+	send_resource_update(manager);
 	send_stats_update(manager);
-
 	return 1;
 }
 
@@ -490,50 +412,6 @@ void send_cache_invalid( struct link *manager, const char *cachename, const char
 	link_write(manager,message,length,time(0)+active_timeout);
 }
 
-static int send_tlq_config( struct link *manager )
-{
-	//attempt to find local TLQ server to retrieve manager URL
-	if(tlq_port && debug_path && !tlq_url) {
-		debug(D_TLQ, "looking up worker TLQ URL");
-		time_t config_stoptime = time(0) + 10;
-		tlq_url = tlq_config_url(tlq_port, debug_path, config_stoptime);
-		if(tlq_url) debug(D_TLQ, "set worker TLQ URL: %s", tlq_url);
-		else debug(D_TLQ, "error setting worker TLQ URL");
-	}
-	else if(tlq_port && !debug_path && !tlq_url) debug(D_TLQ, "cannot get worker TLQ URL: no debug log path set");
-
-	if(tlq_url) send_manager_message(manager, "tlq %s\n", tlq_url);
-	return 1;
-}
-
-static int get_task_tlq_url( struct ds_task *task )
-{
-	if(tlq_port && debug_path) {
-		char home_host[DS_LINE_MAX];
-		char tlq_workdir[DS_LINE_MAX];
-		char log_path[DS_LINE_MAX];
-		int home_port;
-		debug(D_TLQ, "looking up task %d TLQ URL", task->taskid);
-		//Command is assumed to be wrapped by log_define script from TLQ
-		if(sscanf(task->command_line,"sh log_define %s %d %s %s", home_host, &home_port, tlq_workdir, log_path) == 4) {
-			time_t config_stoptime = time(0) + 10;
-			char *task_url = tlq_config_url(tlq_port, log_path, config_stoptime);
-			if(!task_url) {
-				debug(D_TLQ, "error setting task %d TLQ URL", task->taskid);
-				return 0;
-			}
-			debug(D_TLQ, "set task %d TLQ URL: %s", task->taskid, task_url);
-			return 1;
-		}
-		else {
-			debug(D_TLQ, "could not find task %d debug log", task->taskid);
-			return 0;
-		}
-		return 1;
-	}
-	else return 0;
-}
-
 /*
 Send the initial "ready" message to the manager with the version and so forth.
 The manager will not start sending tasks until this message is recevied.
@@ -546,7 +424,6 @@ static void report_worker_ready( struct link *manager )
 	send_manager_message(manager,"dataswarm %d %s %s %s %d.%d.%d\n",DS_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_manager_message(manager, "info worker-id %s\n", worker_id);
 	send_features(manager);
-	send_tlq_config(manager);
 	send_keepalive(manager, 1);
 	send_manager_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 	if (factory_name)
@@ -567,8 +444,8 @@ static int start_process( struct ds_process *p, struct link *manager )
 
 	if(!ds_sandbox_stagein(p,global_cache,manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
-		p->task_status = DS_RESULT_INPUT_MISSING;
-		p->exit_status = 1;
+		p->result = DS_RESULT_INPUT_MISSING;
+		p->exit_code = 1;
 		itable_insert(procs_complete,p->task->taskid,p);
 		return 0;
 	}
@@ -608,8 +485,8 @@ static void reap_process( struct ds_process *p )
 	ds_gpus_free(p->task->taskid);
 
 	if(!ds_sandbox_stageout(p,global_cache)) {
-		p->task_status = DS_RESULT_OUTPUT_MISSING;
-		p->exit_status = 1;
+		p->result = DS_RESULT_OUTPUT_MISSING;
+		p->exit_code = 1;
 	}
 
 	itable_remove(procs_running, p->pid);
@@ -619,7 +496,6 @@ static void reap_process( struct ds_process *p )
 /*
 Transmit the results of the given process to the manager.
 If a local worker, stream the output from disk.
-If a foreman, send the outputs contained in the task structure.
 */
 
 static void report_task_complete( struct link *manager, struct ds_process *p )
@@ -627,32 +503,15 @@ static void report_task_complete( struct link *manager, struct ds_process *p )
 	int64_t output_length;
 	struct stat st;
 
-	if(worker_mode==WORKER_MODE_WORKER) {
-		fstat(p->output_fd, &st);
-		output_length = st.st_size;
-		lseek(p->output_fd, 0, SEEK_SET);
-		send_manager_message(manager, "result %d %d %lld %llu %d\n", p->task_status, p->exit_status, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
-		link_stream_from_fd(manager, p->output_fd, output_length, time(0)+active_timeout);
+	fstat(p->output_fd, &st);
+	output_length = st.st_size;
+	lseek(p->output_fd, 0, SEEK_SET);
+	send_manager_message(manager, "result %d %d %lld %llu %d\n", p->result, p->exit_code, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
+	link_stream_from_fd(manager, p->output_fd, output_length, time(0)+active_timeout);
 
-		total_task_execution_time += (p->execution_end - p->execution_start);
-		total_tasks_executed++;
-	} else {
-		struct ds_task *t = p->task;
-		if(t->output) {
-			output_length = strlen(t->output);
-		} else {
-			output_length = 0;
-		}
-		send_manager_message(manager, "result %d %d %lld %llu %d\n", t->result, t->return_status, (long long) output_length, (unsigned long long) t->time_workers_execute_last, t->taskid);
-		if(output_length) {
-			link_putlstring(manager, t->output, output_length, time(0)+active_timeout);
-		}
+	total_task_execution_time += (p->execution_end - p->execution_start);
+	total_tasks_executed++;
 
-		total_task_execution_time += t->time_workers_execute_last;
-		total_tasks_executed++;
-	}
-
-	get_task_tlq_url(p->task);
 	send_stats_update(manager);
 }
 
@@ -692,35 +551,10 @@ static void expire_procs_running()
 	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
-			p->task_status = DS_RESULT_TASK_TIMEOUT;
+			p->result = DS_RESULT_TASK_TIMEOUT;
 			kill(pid, SIGKILL);
 		}
 	}
-}
-
-/*
-Return true if task uses a disk allocation and it was overrun.
-*/
-
-static int is_disk_allocation_exhausted( struct ds_process *p )
-{
-	int result = 0;
-	FILE *loop_full_check;
-	char *buf = malloc(PATH_MAX);
-	char *disk_alloc_filename = ds_generate_disk_alloc_full_filename(p->sandbox,p->task->taskid);
-	
-	if(p->loop_mount == 1 && (loop_full_check = fopen(disk_alloc_filename, "r"))) {
-		fclose(loop_full_check);
-		trash_file(disk_alloc_filename);
-		result = 1;
-	} else {
-		result = 0;
-	}
-
-	free(buf);
-	free(disk_alloc_filename);
-
-	return result;
 }
 
 /*
@@ -741,19 +575,14 @@ static int handle_completed_tasks(struct link *manager)
 		if(result==0) {
 			// pid is still going
 		} else if(result<0) {
-			debug(D_WQ, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
+			debug(D_DS, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
 		} else if(result>0) {
 			if (!WIFEXITED(status)){
-				p->exit_status = WTERMSIG(status);
-				debug(D_WQ, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_status);
+				p->exit_code = WTERMSIG(status);
+				debug(D_DS, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_code);
 			} else {
-				p->exit_status = WEXITSTATUS(status);
-				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
-
-				if(is_disk_allocation_exhausted(p)) {
-					p->task_status = DS_RESULT_DISK_ALLOC_FULL;
-					p->task->disk_allocation_exhausted = 1;
-				}
+				p->exit_code = WEXITSTATUS(status);
+				debug(D_DS, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_code);
 			}
 
 			/* collect the resources associated with the process */
@@ -857,7 +686,7 @@ access_failure:
 
 send_failure:
 	free(cached_path);
-	debug(D_WQ, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
+	debug(D_DS, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
 	return 0;
 }
 
@@ -887,7 +716,7 @@ static void normalize_resources( struct ds_process *p )
 /*
 Handle an incoming task message from the manager.
 Generate a ds_process wrapped around a ds_task,
-and deposit it into the waiting list or the foreman_q as appropriate.
+and deposit it into the waiting list.
 */
 
 static int do_task( struct link *manager, int taskid, time_t stoptime )
@@ -916,14 +745,14 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
 			ds_task_specify_command(task,cmd);
-			debug(D_WQ,"rx: %s",cmd);
+			debug(D_DS,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"coprocess %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
 			ds_task_specify_coprocess(task,cmd);
-			debug(D_WQ,"rx: %s",cmd);
+			debug(D_DS,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, DS_LINE_MAX);
@@ -959,25 +788,21 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			}
 			free(env);
 		} else {
-			debug(D_WQ|D_NOTICE,"invalid command from manager: %s",line);
+			debug(D_DS|D_NOTICE,"invalid command from manager: %s",line);
 			return 0;
 		}
 	}
 
 	last_task_received = task->taskid;
 
-	struct ds_process *p = ds_process_create(task, disk_allocation);
+	struct ds_process *p = ds_process_create(task);
 	if(!p) return 0;
 
 	// Every received task goes into procs_table.
 	itable_insert(procs_table,taskid,p);
 
-	if(worker_mode==WORKER_MODE_FOREMAN) {
-		ds_submit_internal(foreman_q,task);
-	} else {
-		normalize_resources(p);
-		list_push_tail(procs_waiting,p);
-	}
+	normalize_resources(p);
+	list_push_tail(procs_waiting,p);
 
 	ds_watcher_add_process(watcher,p);
 
@@ -1016,7 +841,7 @@ static int do_put_symlink_internal( struct link *manager, char *filename, int le
 
 	int result = symlink(target,filename);
 	if(result<0) {
-		debug(D_WQ,"could not create symlink %s: %s",filename,strerror(errno));
+		debug(D_DS,"could not create symlink %s: %s",filename,strerror(errno));
 		free(target);
 		return 0;
 	}
@@ -1036,7 +861,7 @@ name for validity.
 static int do_put_file_internal( struct link *manager, char *filename, int64_t length, int mode )
 {
 	if(!check_disk_space_for_filesize(".", length, 0)) {
-		debug(D_WQ, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
+		debug(D_DS, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
 
@@ -1045,14 +870,14 @@ static int do_put_file_internal( struct link *manager, char *filename, int64_t l
 
 	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd<0) {
-		debug(D_WQ, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
+		debug(D_DS, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
 		return 0;
 	}
 
 	int64_t actual = link_stream_to_fd(manager, fd, length, time(0) + active_timeout);
 	close(fd);
 	if(actual!=length) {
-		debug(D_WQ, "Failed to put file - %s (%s)\n", filename, strerror(errno));
+		debug(D_DS, "Failed to put file - %s (%s)\n", filename, strerror(errno));
 		return 0;
 	}
 
@@ -1078,7 +903,7 @@ static int do_put_dir_internal( struct link *manager, char *dirname, int *totals
 
 	int result = mkdir(dirname,0777);
 	if(result<0) {
-		debug(D_WQ,"unable to create %s: %s",dirname,strerror(errno));
+		debug(D_DS,"unable to create %s: %s",dirname,strerror(errno));
 		return 0;
 	}
 
@@ -1155,7 +980,7 @@ protocol (above) is preferred instead.
 static int do_put_single_file( struct link *manager, char *filename, int64_t length, int mode )
 {
 	if(!path_within_dir(filename, workspace)) {
-		debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
+		debug(D_DS, "Path - %s is not within workspace %s.", filename, workspace);
 		return 0;
 	}
 
@@ -1165,7 +990,7 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 		char dirname[DS_LINE_MAX];
 		path_dirname(filename,dirname);
 		if(!create_dir(dirname,0777)) {
-			debug(D_WQ, "could not create directory %s: %s",dirname,strerror(errno));
+			debug(D_DS, "could not create directory %s: %s",dirname,strerror(errno));
 			free(cached_path);
 			return 0;
 		}
@@ -1178,12 +1003,6 @@ static int do_put_single_file( struct link *manager, char *filename, int64_t len
 	if(result) ds_cache_addfile(global_cache,length,filename);
 
 	return result;
-}
-
-static int do_tlq_url(const char *manager_tlq_url)
-{
-	debug(D_TLQ, "set manager TLQ URL: %s", manager_tlq_url);
-	return 1;
 }
 
 /*
@@ -1220,7 +1039,7 @@ static int do_unlink(const char *path)
 		ds_cache_remove(global_cache,path);
 		result = 1;
 	} else {
-		debug(D_WQ, "%s is not within workspace %s",cached_path,workspace);
+		debug(D_DS, "%s is not within workspace %s",cached_path,workspace);
 		result = 0;
 	}
 
@@ -1249,21 +1068,17 @@ static int do_kill(int taskid)
 
 	p = itable_remove(procs_table, taskid);
 	if(!p) {
-		debug(D_WQ,"manager requested kill of task %d which does not exist!",taskid);
+		debug(D_DS,"manager requested kill of task %d which does not exist!",taskid);
 		return 1;
 	}
 
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		ds_cancel_by_taskid(foreman_q, taskid);
-	} else {
-		if(itable_remove(procs_running, p->pid)) {
-			ds_process_kill(p);
-			cores_allocated -= p->task->resources_requested->cores;
-			memory_allocated -= p->task->resources_requested->memory;
-			disk_allocated -= p->task->resources_requested->disk;
-			gpus_allocated -= p->task->resources_requested->gpus;
-			ds_gpus_free(taskid);
-		}
+	if(itable_remove(procs_running, p->pid)) {
+		ds_process_kill(p);
+		cores_allocated -= p->task->resources_requested->cores;
+		memory_allocated -= p->task->resources_requested->memory;
+		disk_allocated -= p->task->resources_requested->disk;
+		gpus_allocated -= p->task->resources_requested->gpus;
+		ds_gpus_free(taskid);
 	}
 
 	itable_remove(procs_complete, p->task->taskid);
@@ -1303,26 +1118,12 @@ static void kill_all_tasks()
 	assert(disk_allocated==0);
 	assert(gpus_allocated==0);
 
-	debug(D_WQ,"all data structures are clean");
-}
-
-/*
-Remove a file, even when mark as cached. Foreman broadcast this message to
-foremen down its hierarchy. It is invalid for a worker to receice this message.
-*/
-static int do_invalidate_file(const char *filename)
-{
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		ds_invalidate_cached_file_internal(foreman_q, filename);
-		return 1;
-	}
-
-	return -1;
+	debug(D_DS,"all data structures are clean");
 }
 
 static void finish_running_task(struct ds_process *p, ds_result_t result)
 {
-	p->task_status |= result;
+	p->result |= result;
 	kill(p->pid, SIGKILL);
 }
 
@@ -1345,7 +1146,7 @@ static int enforce_process_limits(struct ds_process *p)
 
 	ds_process_measure_disk(p, max_time_on_measurement);
 	if(p->sandbox_size > p->task->resources_requested->disk) {
-		debug(D_WQ,"Task %d went over its disk size limit: %s > %s\n",
+		debug(D_DS,"Task %d went over its disk size limit: %s > %s\n",
 				p->task->taskid,
 				rmsummary_resource_to_str(p->sandbox_size, /* with units */ 1),
 				rmsummary_resource_to_str(p->task->resources_requested->disk, 1));
@@ -1371,13 +1172,7 @@ static int enforce_processes_limits()
 	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
 		if(!enforce_process_limits(p)) {
 			finish_running_task(p, DS_RESULT_RESOURCE_EXHAUSTION);
-
-			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
-			if(p->loop_mount == 1) {
-				disk_alloc_delete(p->sandbox);
-			} else {
-				trash_file(p->sandbox);
-			}
+			trash_file(p->sandbox);
 
 			ok = 0;
 		}
@@ -1407,11 +1202,11 @@ static void enforce_processes_max_running_time()
 			continue;
 
 		if(now > p->execution_start + (1e6 * p->task->resources_requested->wall_time)) {
-			debug(D_WQ,"Task %d went over its running time limit: %s > %s\n",
+			debug(D_DS,"Task %d went over its running time limit: %s > %s\n",
 					p->task->taskid,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
-			p->task_status = DS_RESULT_TASK_MAX_RUN_TIME;
+			p->result = DS_RESULT_TASK_MAX_RUN_TIME;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -1422,29 +1217,18 @@ static void enforce_processes_max_running_time()
 
 static int do_release()
 {
-	debug(D_WQ, "released by manager %s:%d.\n", current_manager_address->addr, current_manager_address->port);
+	debug(D_DS, "released by manager %s:%d.\n", current_manager_address->addr, current_manager_address->port);
 	released_by_manager = 1;
 	return 0;
 }
 
 static void disconnect_manager(struct link *manager)
 {
-	debug(D_WQ, "disconnecting from manager %s:%d", current_manager_address->addr, current_manager_address->port);
+	debug(D_DS, "disconnecting from manager %s:%d", current_manager_address->addr, current_manager_address->port);
 	link_close(manager);
 
-	debug(D_WQ, "killing all outstanding tasks");
+	debug(D_DS, "killing all outstanding tasks");
 	kill_all_tasks();
-
-	//KNOWN HACK: We remove all workers on a manager disconnection to avoid
-	//returning old tasks to a new manager.
-	if(foreman_q) {
-		debug(D_WQ, "Disconnecting all workers...\n");
-		release_all_workers(foreman_q);
-
-		if(project_regex) {
-			update_catalog(foreman_q, manager, 1);
-		}
-	}
 
 	if(released_by_manager) {
 		released_by_manager = 0;
@@ -1462,7 +1246,6 @@ static int handle_manager(struct link *manager)
 	char filename[DS_LINE_MAX];
 	char source_encoded[DS_LINE_MAX];
 	char source[DS_LINE_MAX];
-	char manager_tlq_url[DS_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
 	int mode, r, n;
@@ -1488,9 +1271,6 @@ static int handle_manager(struct link *manager)
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_cmd(filename,length,mode,source);
 			reset_idle_timer();
-		} else if(sscanf(line, "tlq %s", manager_tlq_url) == 1) {
-			r = do_tlq_url(manager_tlq_url);
-			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_unlink(filename);
@@ -1504,13 +1284,9 @@ static int handle_manager(struct link *manager)
 				kill_all_tasks();
 				r = 1;
 			}
-		} else if(sscanf(line, "invalidate-file %s", filename_encoded) == 1) {
-			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_invalidate_file(filename);
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
-			ds_broadcast_message(foreman_q, "exit\n");
 			abort_flag = 1;
 			r = 1;
 		} else if(!strncmp(line, "check", 6)) {
@@ -1522,11 +1298,11 @@ static int handle_manager(struct link *manager)
 			report_tasks_complete(manager);
 			r = 1;
 		} else {
-			debug(D_WQ, "Unrecognized manager message: %s.\n", line);
+			debug(D_DS, "Unrecognized manager message: %s.\n", line);
 			r = 0;
 		}
 	} else {
-		debug(D_WQ, "Failed to read from manager.\n");
+		debug(D_DS, "Failed to read from manager.\n");
 		r = 0;
 	}
 
@@ -1557,12 +1333,7 @@ static int task_resources_fit_eventually(struct ds_task *t)
 {
 	struct ds_resources *r;
 
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		r = total_resources;
-	}
-	else {
-		r = local_resources;
-	}
+	r = local_resources;
 
 	return
 		(t->resources_requested->cores  <= r->cores.largest) &&
@@ -1574,10 +1345,10 @@ static int task_resources_fit_eventually(struct ds_task *t)
 void forsake_waiting_process(struct link *manager, struct ds_process *p)
 {
 	/* the task cannot run in this worker */
-	p->task_status = DS_RESULT_FORSAKEN;
+	p->result = DS_RESULT_FORSAKEN;
 	itable_insert(procs_complete, p->task->taskid, p);
 
-	debug(D_WQ, "Waiting task %d has been forsaken.", p->task->taskid);
+	debug(D_DS, "Waiting task %d has been forsaken.", p->task->taskid);
 
 	/* we also send updated resources to the manager. */
 	send_keepalive(manager, 1);
@@ -1643,7 +1414,7 @@ static void work_for_manager(struct link *manager)
 {
 	sigset_t mask;
 
-	debug(D_WQ, "working for manager at %s:%d.\n", current_manager_address->addr, current_manager_address->port);
+	debug(D_DS, "working for manager at %s:%d.\n", current_manager_address->addr, current_manager_address->port);
 
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
@@ -1655,7 +1426,6 @@ static void work_for_manager(struct link *manager)
 
 	reset_idle_timer();
 
-	time_t volatile_stoptime = time(0) + 60;
 	// Start serving managers
 	while(!abort_flag) {
 
@@ -1663,15 +1433,6 @@ static void work_for_manager(struct link *manager)
 			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", current_manager_address->addr,current_manager_address->port,idle_timeout);
 			send_manager_message(manager, "info idle-disconnecting %lld\n", (long long) idle_timeout);
 			break;
-		}
-
-		if(worker_volatility && time(0) > volatile_stoptime) {
-			if( (double)rand()/(double)RAND_MAX < worker_volatility) {
-				debug(D_NOTICE, "ds_worker: disconnect from manager due to volatility check.\n");
-				break;
-			} else {
-				volatile_stoptime = time(0) + 60;
-			}
 		}
 
 		if (initial_ppid != 0 && getppid() != initial_ppid) {
@@ -1784,62 +1545,6 @@ static void work_for_manager(struct link *manager)
 	}
 }
 
-static void foreman_for_manager(struct link *manager)
-{
-	int manager_active = 0;
-	if(!manager) {
-		return;
-	}
-
-	debug(D_WQ, "working for manager at %s:%d as foreman.\n", current_manager_address->addr, current_manager_address->port);
-
-	reset_idle_timer();
-
-	int prev_num_workers = 0;
-	while(!abort_flag) {
-		int result = 1;
-		struct ds_task *task = NULL;
-
-		if(time(0) > idle_stoptime && ds_empty(foreman_q)) {
-			debug(D_NOTICE, "giving up because did not receive any task in %d seconds.\n", idle_timeout);
-			send_manager_message(manager, "info idle-disconnecting %lld\n", (long long) idle_timeout);
-			break;
-		}
-
-		measure_worker_resources();
-
-		/* if the number of workers changed by more than %10, send an status update */
-		int curr_num_workers = total_resources->workers.total;
-		if(10*abs(curr_num_workers - prev_num_workers) > prev_num_workers) {
-			send_keepalive(manager, 0);
-		}
-		prev_num_workers = curr_num_workers;
-
-		task = ds_wait_internal(foreman_q, foreman_internal_timeout, manager, &manager_active, NULL);
-
-		if(task) {
-			struct ds_process *p;
-			p = itable_lookup(procs_table,task->taskid);
-			if(!p) fatal("no entry in procs table for taskid %d",task->taskid);
-			itable_insert(procs_complete, task->taskid, p);
-			result = 1;
-		}
-
-		if(!results_to_be_sent_msg && itable_size(procs_complete) > 0)
-		{
-			send_manager_message(manager, "available_results\n");
-			results_to_be_sent_msg = 1;
-		}
-
-		if(manager_active) {
-			result &= handle_manager(manager);
-			reset_idle_timer();
-		}
-
-		if(!result) break;
-	}
-}
-
 /*
 workspace_create is done once when the worker starts.
 */
@@ -1930,7 +1635,7 @@ workspace_prepare is called every time we connect to a new manager,
 
 static int workspace_prepare()
 {
-	debug(D_WQ,"preparing workspace %s",workspace);
+	debug(D_DS,"preparing workspace %s",workspace);
 
 	char *cachedir = string_format("%s/cache",workspace);
 	int result = create_dir(cachedir,0777);
@@ -1957,7 +1662,7 @@ directories (except trash) and move them to the trash directory.
 
 static void workspace_cleanup()
 {
-	debug(D_WQ,"cleaning workspace %s",workspace);
+	debug(D_DS,"cleaning workspace %s",workspace);
 	DIR *dir = opendir(workspace);
 	if(dir) {
 		struct dirent *d;
@@ -1986,7 +1691,6 @@ static void workspace_delete()
 	if(os_name) free(os_name);
 	if(arch_name) free(arch_name);
 
-	if(foreman_q)          ds_delete(foreman_q);
 	if(procs_running)      itable_delete(procs_running);
 	if(procs_table)        itable_delete(procs_table);
 	if(procs_complete)     itable_delete(procs_complete);
@@ -2051,10 +1755,10 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	link_address_local(manager, local_addr, &local_port);
 
 	printf("connected to manager %s:%d via local address %s:%d\n", host, port, local_addr, local_port);
-	debug(D_WQ, "connected to manager %s:%d via local address %s:%d", host, port, local_addr, local_port);
+	debug(D_DS, "connected to manager %s:%d via local address %s:%d", host, port, local_addr, local_port);
 
 	if(password) {
-		debug(D_WQ,"authenticating to manager");
+		debug(D_DS,"authenticating to manager");
 		if(!link_auth_password(manager,password,idle_stoptime)) {
 			fprintf(stderr,"ds_worker: wrong password for manager %s:%d\n",host,port);
 			link_close(manager);
@@ -2064,10 +1768,10 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 
 	if(verify_project) {
 		char line[DS_LINE_MAX];
-		debug(D_WQ, "verifying manager's project name");
+		debug(D_DS, "verifying manager's project name");
 		send_manager_message(manager, "name\n");
 		if(!recv_manager_message(manager,line,sizeof(line),idle_stoptime)) {
-			debug(D_WQ,"no response from manager while verifying name");
+			debug(D_DS,"no response from manager while verifying name");
 			link_close(manager);
 			return 0;
 		}
@@ -2085,11 +1789,7 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 
 	report_worker_ready(manager);
 
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		foreman_for_manager(manager);
-	} else {
-		work_for_manager(manager);
-	}
+	work_for_manager(manager);
 
 	if(abort_signal_received) {
 		send_manager_message(manager, "info vacating %d\n", abort_signal_received);
@@ -2168,7 +1868,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 {
 	struct list *managers_list = ds_catalog_query_cached(catalog_hosts,-1,project_regex);
 
-	debug(D_WQ,"project name %s matches %d managers",project_regex,list_size(managers_list));
+	debug(D_DS,"project name %s matches %d managers",project_regex,list_size(managers_list));
 
 	if(list_size(managers_list)==0) return 0;
 
@@ -2206,7 +1906,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 
 					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
 					connect_stoptime = idle_stoptime;
-					debug(D_WQ,"Previous idle disconnection from only manager available project=%s name=%s addr=%s port=%d",project,name,addr,port);
+					debug(D_DS,"Previous idle disconnection from only manager available project=%s name=%s addr=%s port=%d",project,name,addr,port);
 
 					return 0;
 				} else {
@@ -2219,13 +1919,13 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 		int result;
 
 		if(pref && strcmp(pref, "by_hostname") == 0) {
-			debug(D_WQ,"selected manager with project=%s hostname=%s addr=%s port=%d",project,name,addr,port);
+			debug(D_DS,"selected manager with project=%s hostname=%s addr=%s port=%d",project,name,addr,port);
 			manager_addresses = interfaces_to_list(name, port, NULL);
 		} else if(pref && strcmp(pref, "by_apparent_ip") == 0) {
-			debug(D_WQ,"selected manager with project=%s apparent_addr=%s port=%d",project,addr,port);
+			debug(D_DS,"selected manager with project=%s apparent_addr=%s port=%d",project,addr,port);
 			manager_addresses = interfaces_to_list(addr, port, NULL);
 		} else {
-			debug(D_WQ,"selected manager with project=%s addr=%s port=%d",project,addr,port);
+			debug(D_DS,"selected manager with project=%s addr=%s port=%d",project,addr,port);
 			manager_addresses = interfaces_to_list(addr, port, ifas);
 		}
 
@@ -2346,14 +2046,6 @@ static void show_help(const char *cmd)
 	printf( " %-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
 	printf( " %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
 	printf( " %-30s Use SSL to connect to the manager. (Not needed if using -M)", "--ssl");
-	printf( " %-30s Set worker to run as a foreman.\n", "--foreman");
-	printf( " %-30s Run as a foreman, and advertise to the catalog server with <name>.\n", "-f,--foreman-name=<name>");
-	printf( " %-30s\n", "--foreman-port=<port>[:<highport>]");
-	printf( " %-30s Set the port for the foreman to listen on.  If <highport> is specified\n", "");
-	printf( " %-30s the port is chosen from the range port:highport.  Implies --foreman.\n", "");
-	printf( " %-30s Select port to listen to at random and write to this file.  Implies --foreman.\n", "-Z,--foreman-port-file=<file>");
-	printf( " %-30s Set the fast abort multiplier for foreman (default=disabled).\n", "-F,--fast-abort=<mult>");
-	printf( " %-30s Send statistics about foreman to this file.\n", "--specify-log=<logfile>");
 	printf( " %-30s Password file for authenticating to the manager.\n", "-P,--password=<pwfile>");
 	printf( " %-30s Set both --idle-timeout and --connect-timeout.\n", "-t,--timeout=<time>");
 	printf( " %-30s Disconnect after this time if manager sends no work. (default=%ds)\n", "   --idle-timeout=<time>", idle_timeout);
@@ -2369,8 +2061,6 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set operating system string for the worker to report to manager instead\n", "-O,--os=<os>");
 	printf( " %-30s of the value in uname (%s).\n", "", os_name);
 	printf( " %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
-	printf( " %-30s Set the maximum bandwidth the foreman will consume in bytes per second. Example: 100M for 100MBps. (default=unlimited)\n", "--bandwidth=<Bps>");
-
 	printf( " %-30s Set the number of cores reported by this worker. If not given, or less than 1,\n", "--cores=<n>");
 	printf( " %-30s then try to detect cores available.\n", "");
 
@@ -2392,17 +2082,15 @@ static void show_help(const char *cmd)
 
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
-	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
-	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
 }
 
-enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
-	  LONG_OPT_DEBUG_RELEASE, LONG_OPT_SPECIFY_LOG, LONG_OPT_CORES, LONG_OPT_MEMORY,
-	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
+enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_BANDWIDTH,
+	  LONG_OPT_DEBUG_RELEASE, LONG_OPT_CORES, LONG_OPT_MEMORY,
+	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
-	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
-	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
+	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME,
+	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
 	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION,
 	  LONG_OPT_FROM_FACTORY};
 
@@ -2412,14 +2100,6 @@ static const struct option long_options[] = {
 	{"debug",               required_argument,  0,  'd'},
 	{"debug-file",          required_argument,  0,  'o'},
 	{"debug-rotate-max",    required_argument,  0,  LONG_OPT_DEBUG_FILESIZE},
-	{"disk-allocation",     no_argument,  		0,  LONG_OPT_DISK_ALLOCATION},
-	{"foreman",             no_argument,        0,  LONG_OPT_FOREMAN},
-	{"foreman-port",        required_argument,  0,  LONG_OPT_FOREMAN_PORT},
-	{"foreman-port-file",   required_argument,  0,  'Z'},
-	{"foreman-name",        required_argument,  0,  'f'},
-	{"measure-capacity",    no_argument,        0,  'c'},
-	{"fast-abort",          required_argument,  0,  'F'},
-	{"specify-log",         required_argument,  0,  LONG_OPT_SPECIFY_LOG},
 	{"manager-name",        required_argument,  0,  'M'},
 	{"master-name",         required_argument,  0,  'M'},
 	{"password",            required_argument,  0,  'P'},
@@ -2436,7 +2116,6 @@ static const struct option long_options[] = {
 	{"arch",                required_argument,  0,  'A'},
 	{"os",                  required_argument,  0,  'O'},
 	{"workdir",             required_argument,  0,  's'},
-	{"volatility",          required_argument,  0,  LONG_OPT_VOLATILITY},
 	{"bandwidth",           required_argument,  0,  LONG_OPT_BANDWIDTH},
 	{"cores",               required_argument,  0,  LONG_OPT_CORES},
 	{"memory",              required_argument,  0,  LONG_OPT_MEMORY},
@@ -2446,7 +2125,6 @@ static const struct option long_options[] = {
 	{"help",                no_argument,        0,  'h'},
 	{"version",             no_argument,        0,  'v'},
 	{"feature",             required_argument,  0,  LONG_OPT_FEATURE},
-	{"tlq",					required_argument,	0,  LONG_OPT_TLQ},
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
@@ -2459,13 +2137,7 @@ int main(int argc, char *argv[])
 {
 	int c;
 	int w;
-	int foreman_port = -1;
-	char * foreman_name = NULL;
-	char * port_file = NULL;
 	struct utsname uname_data;
-	int enable_capacity = 1; // enabled by default
-	double fast_abort_multiplier = 0;
-	char *foreman_stats_filename = NULL;
 
 	catalog_hosts = CATALOG_HOST;
 
@@ -2479,12 +2151,11 @@ int main(int argc, char *argv[])
 	uname(&uname_data);
 	os_name = xxstrdup(uname_data.sysname);
 	arch_name = xxstrdup(uname_data.machine);
-	worker_mode = WORKER_MODE_WORKER;
 
 	debug_config(argv[0]);
 	read_resources_env_vars();
 
-	while((c = getopt_long(argc, argv, "acC:d:f:F:t:o:p:M:N:P:w:i:b:z:A:O:s:vZ:h", long_options, 0)) != -1) {
+	while((c = getopt_long(argc, argv, "aC:d:t:o:p:M:N:P:w:i:b:z:A:O:s:v:h", long_options, 0)) != -1) {
 		switch (c) {
 		case 'a':
 			//Left here for backwards compatibility
@@ -2498,38 +2169,6 @@ int main(int argc, char *argv[])
 		case LONG_OPT_DEBUG_FILESIZE:
 			debug_config_file_size(MAX(0, string_metric_parse(optarg)));
 			break;
-		case 'f':
-			worker_mode = WORKER_MODE_FOREMAN;
-			foreman_name = xxstrdup(optarg);
-			break;
-		case LONG_OPT_FOREMAN_PORT:
-		{	char *low_port = optarg;
-			char *high_port= strchr(optarg, ':');
-
-			worker_mode = WORKER_MODE_FOREMAN;
-
-			if(high_port) {
-				*high_port = '\0';
-				high_port++;
-			} else {
-				foreman_port = atoi(low_port);
-				break;
-			}
-			setenv("DS_LOW_PORT", low_port, 0);
-			setenv("DS_HIGH_PORT", high_port, 0);
-			foreman_port = -1;
-			break;
-		}
-		case 'c':
-			// This option is deprecated. Capacity estimation is now on by default for the foreman.
-			enable_capacity = 1;
-			break;
-		case 'F':
-			fast_abort_multiplier = atof(optarg);
-			break;
-		case LONG_OPT_SPECIFY_LOG:
-			foreman_stats_filename = xxstrdup(optarg);
-			break;
 		case 't':
 			connect_timeout = idle_timeout = string_time_parse(optarg);
 			break;
@@ -2540,11 +2179,7 @@ int main(int argc, char *argv[])
 			connect_timeout = string_time_parse(optarg);
 			break;
 		case 'o':
-			debug_path = xxstrdup(optarg);
 			debug_config_file(optarg);
-			break;
-		case LONG_OPT_FOREMAN:
-			worker_mode = WORKER_MODE_FOREMAN;
 			break;
 		case 'M':
 		case 'N':
@@ -2598,13 +2233,6 @@ int main(int argc, char *argv[])
 				exit(EXIT_FAILURE);
 			}
 			break;
-		case 'Z':
-			port_file = xxstrdup(optarg);
-			worker_mode = WORKER_MODE_FOREMAN;
-			break;
-		case LONG_OPT_VOLATILITY:
-			worker_volatility = atof(optarg);
-			break;
 		case LONG_OPT_BANDWIDTH:
 			setenv("DS_BANDWIDTH", optarg, 1);
 			break;
@@ -2655,35 +2283,8 @@ int main(int argc, char *argv[])
 		case 'h':
 			show_help(argv[0]);
 			return 0;
-		case LONG_OPT_DISK_ALLOCATION:
-		{
-			char *abs_path_preloader = string_format("%s/lib/libforce_halt_enospc.so", INSTALL_PATH);
-			int preload_result;
-			char *curr_ld_preload = getenv("LD_PRELOAD");
-			if(curr_ld_preload && abs_path_preloader) {
-				char *new_ld_preload = string_format("%s:%s", curr_ld_preload, abs_path_preloader);
-				preload_result = setenv("LD_PRELOAD", new_ld_preload, 1);
-				free(new_ld_preload);
-			}
-			else if(abs_path_preloader) {
-				preload_result = setenv("LD_PRELOAD", abs_path_preloader, 1);
-			}
-			else {
-				preload_result = 1;
-			}
-			free(abs_path_preloader);
-			if(preload_result) {
-				timestamp_t preload_fail_time = timestamp_get();
-				debug(D_WQ|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed at: %"PRId64"", preload_fail_time);
-			}
-			disk_allocation = 1;
-			break;
-		}
 		case LONG_OPT_FEATURE:
 			hash_table_insert(features, optarg, (void **) 1);
-			break;
-		case LONG_OPT_TLQ:
-			tlq_port = atoi(optarg);
 			break;
 		case LONG_OPT_PARENT_DEATH:
 			initial_ppid = getppid();
@@ -2714,20 +2315,6 @@ int main(int argc, char *argv[])
 	}
 
 	cctools_version_debug(D_DEBUG, argv[0]);
-
-	// for backwards compatibility with the old syntax for specifying a worker's project name
-	if(worker_mode != WORKER_MODE_FOREMAN && foreman_name) {
-		if(foreman_name) {
-			project_regex = foreman_name;
-		}
-	}
-
-	//checks that the foreman has a unique name from the manager
-	if(worker_mode == WORKER_MODE_FOREMAN && foreman_name){
-		if(project_regex && strcmp(foreman_name,project_regex) == 0) {
-			fatal("Foreman (%s) and Master (%s) share a name. Ensure that these are unique.\n",foreman_name,project_regex);
-		}
-	}
 
 	if(!project_regex) {
 		if((argc - optind) < 1 || (argc - optind) > 2) {
@@ -2772,64 +2359,11 @@ int main(int argc, char *argv[])
 	}
 
 	// set $DS_SANDBOX to workspace.
-	debug(D_WQ, "DS_SANDBOX set to %s.\n", workspace);
+	debug(D_DS, "DS_SANDBOX set to %s.\n", workspace);
 	setenv("DS_SANDBOX", workspace, 0);
-
-	//get absolute pathnames of port and log file.
-	char temp_abs_path[PATH_MAX];
-	if(port_file)
-	{
-		path_absolute(port_file, temp_abs_path, 0);
-		free(port_file);
-		port_file = xxstrdup(temp_abs_path);
-	}
-	if(foreman_stats_filename)
-	{
-		path_absolute(foreman_stats_filename, temp_abs_path, 0);
-		free(foreman_stats_filename);
-		foreman_stats_filename = xxstrdup(temp_abs_path);
-	}
 
 	// change to workspace
 	chdir(workspace);
-
-	if(worker_mode == WORKER_MODE_FOREMAN) {
-		char foreman_string[DS_LINE_MAX];
-
-		free(os_name); //free the os string obtained from uname
-		os_name = xxstrdup("foreman");
-
-		string_nformat(foreman_string, sizeof(foreman_string), "%s-foreman", argv[0]);
-		debug_config(foreman_string);
-		foreman_q = ds_create(foreman_port);
-
-		if(!foreman_q) {
-			fprintf(stderr, "ds_worker-foreman: failed to create foreman queue.  Terminating.\n");
-			exit(1);
-		}
-
-		printf( "ds_worker-foreman: listening on port %d\n", ds_port(foreman_q));
-
-		if(port_file)
-		{	opts_write_port_file(port_file, ds_port(foreman_q));	}
-
-		if(foreman_name) {
-			ds_specify_name(foreman_q, foreman_name);
-			ds_specify_manager_mode(foreman_q, DS_MANAGER_MODE_CATALOG);
-		}
-
-		if(password) {
-			ds_specify_password(foreman_q,password);
-		}
-
-		ds_specify_estimate_capacity_on(foreman_q, enable_capacity);
-		ds_activate_fast_abort(foreman_q, fast_abort_multiplier);
-		ds_specify_category_mode(foreman_q, NULL, DS_ALLOCATION_MODE_FIXED);
-
-		if(foreman_stats_filename) {
-			ds_specify_log(foreman_q, foreman_stats_filename);
-		}
-	}
 
 	procs_running  = itable_create(0);
 	procs_table    = itable_create(0);

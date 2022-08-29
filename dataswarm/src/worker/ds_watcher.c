@@ -144,7 +144,7 @@ int ds_watcher_check( struct ds_watcher *w )
 		if(e->do_not_watch) continue;
 		if(stat(e->physical_path,&info)==0) {
 			if(info.st_size != e->size) {
-				debug(D_WQ,"watched files have changed");
+				debug(D_DS,"watched files have changed");
 				return 1;
 			}
 		}
@@ -177,10 +177,10 @@ int ds_watcher_send_changes( struct ds_watcher *w, struct link *manager, time_t 
 			if(info.st_size>e->size) {
 				int64_t offset = e->size;
 				int64_t length = info.st_size - e->size;
-				debug(D_WQ,"%s increased from %"PRId64" to %"PRId64" bytes",e->physical_path,offset,offset+length);
+				debug(D_DS,"%s increased from %"PRId64" to %"PRId64" bytes",e->physical_path,offset,offset+length);
 				int fd = open(e->physical_path,O_RDONLY);
 				if(fd<0) {
-					debug(D_WQ,"unable to open %s: %s",e->physical_path,strerror(errno));
+					debug(D_DS,"unable to open %s: %s",e->physical_path,strerror(errno));
 					continue;
 				}
 
@@ -191,8 +191,8 @@ int ds_watcher_send_changes( struct ds_watcher *w, struct link *manager, time_t 
 				if(actual!=length) return 0;
 				e->size = info.st_size;
 			} else if(info.st_size<e->size) {
-				debug(D_WQ,"%s unexpectedly shrank from %"PRId64" to %"PRId64" bytes",e->physical_path,(int64_t)e->size,(int64_t)info.st_size);
-				debug(D_WQ,"%s will no longer be watched for changes",e->physical_path);
+				debug(D_DS,"%s unexpectedly shrank from %"PRId64" to %"PRId64" bytes",e->physical_path,(int64_t)e->size,(int64_t)info.st_size);
+				debug(D_DS,"%s will no longer be watched for changes",e->physical_path);
 				e->do_not_watch = 1;
 			}
 

@@ -6,22 +6,16 @@ See the file COPYING for details.
 
 #include "ds_manager.h"
 #include "ds_resources.h"
+#include "ds_file.h"
 
 #include "list.h"
 #include "hash_table.h"
 
-struct ds_file {
-	ds_file_t type;
-	int flags;		// DS_CACHE or others in the future.
-	int length;		// length of payload, only used for non-file objects like buffers and urls
-	off_t offset;		// file offset for DS_FILE_PIECE
-	off_t piece_length;	// file piece length for DS_FILE_PIECE
-	char *payload;		// name on master machine or buffer of data.
-	char *remote_name;	// name on remote machine.
-	char *cached_name;	// name on remote machine in cached directory.
-};
+#define RESOURCE_MONITOR_TASK_LOCAL_NAME "ds-%d-task-%d"
+#define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
+#define RESOURCE_MONITOR_REMOTE_NAME_EVENTS RESOURCE_MONITOR_REMOTE_NAME "events.json"
 
-struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active, const char *tag);
+struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag );
 
 /* Adds (arithmetically) all the workers resources (cores, memory, disk) */
 void aggregate_workers_resources( struct ds_manager *q, struct ds_resources *r, struct hash_table *categories );
@@ -44,7 +38,7 @@ void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filena
 
 void release_all_workers(struct ds_manager *q);
 
-void update_catalog(struct ds_manager *q, struct link *foreman_uplink, int force_update );
+void update_catalog(struct ds_manager *q, int force_update );
 
 /** Send msg to all the workers in the queue. **/
 void ds_broadcast_message(struct ds_manager *q, const char *msg);

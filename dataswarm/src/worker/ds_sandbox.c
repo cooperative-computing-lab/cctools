@@ -1,6 +1,7 @@
 #include "ds_sandbox.h"
 #include "ds_cache.h"
 #include "ds_internal.h"
+#include "ds_task.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -36,14 +37,14 @@ static int ensure_input_file( struct ds_process *p, struct ds_file *f, struct ds
 	if(f->type==DS_DIRECTORY) {
 		/* Special case: empty directories are not cached objects, just create in sandbox */
 		result = create_dir(sandbox_path, 0700);
-		if(!result) debug(D_WQ,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
+		if(!result) debug(D_DS,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
 	} else if(ds_cache_ensure(cache,f->cached_name,manager)) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
-		debug(D_WQ,"input: link %s -> %s",cache_path,sandbox_path);
+		debug(D_DS,"input: link %s -> %s",cache_path,sandbox_path);
 		result = file_link_recursive(cache_path,sandbox_path,symlinks_enabled);
-		if(!result) debug(D_WQ,"couldn't link %s into sandbox as %s: %s",cache_path,sandbox_path,strerror(errno));
+		if(!result) debug(D_DS,"couldn't link %s into sandbox as %s: %s",cache_path,sandbox_path,strerror(errno));
 	}
 	
 	free(cache_path);
@@ -89,11 +90,11 @@ static int transfer_output_file( struct ds_process *p, struct ds_file *f, struct
 
 	int result = 0;
 	
-	debug(D_WQ,"output: moving %s to %s",sandbox_path,cache_path);
+	debug(D_DS,"output: moving %s to %s",sandbox_path,cache_path);
 	if(rename(sandbox_path,cache_path)<0) {
-		debug(D_WQ, "output: move failed, attempting copy of %s to %s: %s",sandbox_path,cache_path,strerror(errno));
+		debug(D_DS, "output: move failed, attempting copy of %s to %s: %s",sandbox_path,cache_path,strerror(errno));
 		if(copy_file_to_file(sandbox_path, cache_path)  == -1) {
-			debug(D_WQ, "could not move or copy output file %s to %s: %s",sandbox_path,cache_path,strerror(errno));
+			debug(D_DS, "could not move or copy output file %s to %s: %s",sandbox_path,cache_path,strerror(errno));
 			result = 0;
 		} else {
 			result = 1;
@@ -108,7 +109,7 @@ static int transfer_output_file( struct ds_process *p, struct ds_file *f, struct
 			ds_cache_addfile(cache,info.st_size,f->cached_name);
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
-			debug(D_WQ,"output: failed to stat %s: %s",cache_path,strerror(errno));
+			debug(D_DS,"output: failed to stat %s: %s",cache_path,strerror(errno));
 			result = 0;
 		}
 	}

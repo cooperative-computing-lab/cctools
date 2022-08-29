@@ -5,6 +5,8 @@ See the file COPYING for details.
 */
 
 #include "ds_json.h"
+#include "ds_file.h"
+#include "ds_task.h"
 
 #include "jx.h"
 #include "jx_parse.h"
@@ -30,7 +32,7 @@ static const char *ds_properties[] = { "name", "port", "priority", "num_tasks_le
 };
 
 static const char *ds_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", "environment",
-	"output_files", "env_list", "taskid", "return_status", "result", "host", "hostname",
+	"output_files", "env_list", "taskid", "exit_code", "result", "host", "hostname",
 	"category", "resource_request", "priority", "max_retries", "try_count",
 	"exhausted_attempts", "time_when_submitted", "time_when_done",
 	"disk_allocation_exhausted", "time_when_commit_start", "time_when_commit_end",
@@ -343,7 +345,7 @@ char *ds_json_wait(struct ds_manager *q, int timeout)
 
 	char *task;
 	struct jx *j;
-	struct jx_pair *command_line, *taskid, *return_status, *output, *result;
+	struct jx_pair *command_line, *taskid, *exit_code, *output, *result;
 
 	struct ds_task *t = ds_wait(q, timeout);
 
@@ -353,8 +355,8 @@ char *ds_json_wait(struct ds_manager *q, int timeout)
 
 	command_line = jx_pair(jx_string("command_line"), jx_string(t->command_line), NULL);
 	taskid = jx_pair(jx_string("taskid"), jx_integer(t->taskid), command_line);
-	return_status = jx_pair(jx_string("return_status"), jx_integer(t->return_status), taskid);
-	result = jx_pair(jx_string("result"), jx_integer(t->result), return_status);
+	exit_code = jx_pair(jx_string("exit_code"), jx_integer(t->exit_code), taskid);
+	result = jx_pair(jx_string("result"), jx_integer(t->result), exit_code);
 
 	if(t->output) {
 		output = jx_pair(jx_string("output"), jx_string(t->output), result);

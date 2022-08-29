@@ -31,15 +31,15 @@ def report_task(task, expected_result, expected_exit_code, expected_outpus=None)
         print("It was not completed by a worker.")
     else:
         print("result: {as_str} {as_int}".format(as_str=t.result_str, as_int=t.result))
-        print("exit code: {status}".format(status=t.return_status))
+        print("exit code: {status}".format(status=t.result))
         if t.output:
             print("stderr:\n+++\n{stderr}---".format(stderr=t.output.encode('ascii','replace')))
         if task.result != expected_result:
             error = True
             print("Should have finished with result '{result}', but got '{real}'.".format(result=expected_result, real=task.result))
-        elif task.return_status != expected_exit_code:
+        elif task.exit_code != expected_exit_code:
             error = True
-            print("Should have finished with exit_code {status}, but got {real}.".format(status=str(expected_exit_code), real=str(task.return_status)))
+            print("Should have finished with exit_code {status}, but got {real}.".format(status=str(expected_exit_code), real=str(task.result)))
         elif expected_outpus:
             for out in expected_outpus:
                 if not path.isfile(out):
