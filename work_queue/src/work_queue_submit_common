@@ -43,6 +43,7 @@ show_help_common()
 	echo "  -O,--os <os>              Set operating system string for the worker to report to manager instead of the value in uname."
 	echo "  -s,--workdir <path>       Set the location for creating the working directory of the worker."
 	echo "  -P,--password <pwfile>    Password file to authenticate workers to manager."
+	echo "  --ssl                     Use ssl to communicate with manager."
 	echo "  --cores <num>             Set the number of cores each worker should use (0=auto). (default=1)"
 	echo "  --memory <size>           Manually set the amonut of memory (in MB) reported by this worker."
 	echo "  --disk <size>             Manually set the amount of disk (in MB) reported by this worker."
@@ -127,6 +128,9 @@ parse_arguments_common()
 			shift
 			pwfile=$1
 			arguments="$arguments -P $pwfile"
+			;;
+            --ssl)
+			arguments="$arguments --ssl"
 			;;
 			--cores)
 			shift
@@ -228,8 +232,10 @@ set_up_working_directory()
 		cp $gpu_detection ${submit_dir}
 	fi
 
+    cp $worker ${submit_dir}
+	set_up_password_file_common
+
 	cd ${submit_dir}
-	cp $worker .
 }
 
 set_up_password_file()
@@ -267,7 +273,6 @@ submit_workers()
 {
 	parse_arguments_common "$@"
 	set_up_working_directory
-	set_up_password_file_common
 	submit_workers_command
 
 	exit $?

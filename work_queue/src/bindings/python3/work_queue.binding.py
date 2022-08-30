@@ -971,7 +971,13 @@ class PythonTask(Task):
 
 
     def _python_function_command(self):
-        command = 'python {wrapper} {function} {args} {out}'.format(
+        if self._env_file:
+            py_exec="python"
+        else:
+            py_exec=f"python{sys.version_info[0]}"
+
+        command = '{py_exec} {wrapper} {function} {args} {out}'.format(
+                py_exec=py_exec,
                 wrapper=os.path.basename(self._wrapper),
                 function=os.path.basename(self._func_file),
                 args=os.path.basename(self._args_file),
@@ -999,8 +1005,13 @@ class PythonTask(Task):
     def _create_wrapper(self):
         with open(self._wrapper, 'w') as f:
             f.write(textwrap.dedent('''\
-                import sys
-                import dill
+                try:
+                    import sys
+                    import dill
+                except ImportError:
+                    print("Could not execute PythonTask function because a needed module for Work Queue was not available.")
+                    raise
+
                 (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
                 with open (fn , 'rb') as f:
                     exec_function = dill.load(f)
