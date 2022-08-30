@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "catalog_query.h"
 #include "link.h"
+#include "link_auth.h"
 #include "list.h"
 #include "get_line.h"
 #include "getopt.h"
@@ -93,11 +94,12 @@ static char *resource_args=0;
 static int abort_flag = 0;
 static pid_t initial_ppid = 0;
 static const char *scratch_dir = 0;
-static const char *password_file = 0;
 static char *config_file = 0;
 static char *amazon_config = NULL;
 static char *condor_requirements = NULL;
 static char *batch_submit_options = NULL;
+static const char *password_file = 0;
+char *password;
 
 static char *wrapper_command = 0;
 
@@ -243,6 +245,23 @@ struct list* do_direct_query( const char *manager_host, int manager_port )
 	if(!l) {
 		fprintf(stderr,"couldn't connect to %s port %d: %s\n",manager_host,manager_port,strerror(errno));
 		return 0;
+	}
+
+	if(manual_ssl_option) {
+		if(link_ssl_wrap_connect(l) < 1) {
+			fprintf(stderr,"work_queue_factory: could not setup ssl connection.\n");
+			link_close(l);
+			return 0;
+		}
+	}
+
+	if(password) {
+		debug(D_WQ,"authenticating to manager");
+		if(!link_auth_password(l,password,stoptime)) {
+			fprintf(stderr,"work_queue_factory: wrong password for manager.\n");
+			link_close(l);
+			return 0;
+		}
 	}
 
 	link_printf(l,stoptime,"%s_status\n",query_string);
@@ -1367,6 +1386,10 @@ int main(int argc, char *argv[])
 				break;
 			case 'P':
 				password_file = optarg;
+				if(copy_file_to_buffer(optarg, &password, NULL) < 0) {
+					fprintf(stderr,"work_queue_factory: couldn't load password from %s: %s\n",optarg,strerror(errno));
+					exit(EXIT_FAILURE);
+				}
 				break;
 			case 'S':
 				scratch_dir = optarg;
