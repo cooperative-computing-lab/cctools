@@ -228,8 +228,10 @@ set_up_working_directory()
 		cp $gpu_detection ${submit_dir}
 	fi
 
+    cp $worker ${submit_dir}
+	set_up_password_file_common
+
 	cd ${submit_dir}
-	cp $worker .
 }
 
 set_up_password_file()
@@ -267,7 +269,6 @@ submit_workers()
 {
 	parse_arguments_common "$@"
 	set_up_working_directory
-	set_up_password_file_common
 	submit_workers_command
 
 	exit $?
