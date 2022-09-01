@@ -36,21 +36,39 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+/*
+Create the task sandbox directory.  If disk allocation is enabled,
+make an allocation, otherwise just make a directory.
+Create temporary directories inside as well.
+*/
 
-// return 0 on error, 1 otherwise
-static int create_task_directories(struct work_queue_process *p) {
-	char tmpdir_template[1024];
+extern char * workspace;
 
-	p->sandbox = string_format("t.%d", p->task->taskid);
-	if(!create_dir(p->sandbox, 0777)) {
-		return 0;
+static int create_sandbox_dir( struct work_queue_process *p, int disk_allocation )
+{
+	p->cache_dir = string_format("%s/cache",workspace);
+  	p->sandbox = string_format("%s/t.%d", workspace,p->task->taskid);
+
+	if(disk_allocation) {
+		work_queue_process_compute_disk_needed(p);
+		if(p->task->resources_requested->disk > 0) {
+			int64_t size = (p->task->resources_requested->disk) * 1024;
+			if(disk_alloc_create(p->sandbox, "ext2", size) == 0) {
+				p->loop_mount = 1;
+				debug(D_WQ, "allocated %"PRId64"MB in %s\n",size,p->sandbox);
+				// keep going and fall through
+			} else {
+				debug(D_WQ, "couldn't allocate %"PRId64"MB in %s\n",size,p->sandbox);
+				return 0;
+			}
+		} else {
+			if(!create_dir(p->sandbox, 0777)) return 0;
+		}
+	} else {
+		if(!create_dir(p->sandbox, 0777)) return 0;
 	}
 
-	char absolute[1024];
-	path_absolute(p->sandbox, absolute, 1);
-	free(p->sandbox);
-	p->sandbox = xxstrdup(absolute);
-
+	char tmpdir_template[1024];
 	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
 	if(mkdtemp(tmpdir_template) == NULL) {
 		return 0;
@@ -64,6 +82,11 @@ static int create_task_directories(struct work_queue_process *p) {
 	return 1;
 }
 
+/*
+Create a work_queue_process and all of the information necessary for invocation.
+However, do not allocate substantial resources at this point.
+*/
+
 struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_task, int disk_allocation)
 {
 	struct work_queue_process *p = malloc(sizeof(*p));
@@ -71,39 +94,15 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 	p->task = wq_task;
 	p->task->disk_allocation_exhausted = 0;
 	p->coprocess = NULL;
-	//placeholder filesystem until permanent solution
-	char *fs = "ext2";
 
-	if(disk_allocation == 1) {
-		work_queue_process_compute_disk_needed(p);
-		if(p->task->resources_requested->disk > 0) {
-			int64_t size = (p->task->resources_requested->disk) * 1024;
-			p->sandbox = string_format("t.%d", p->task->taskid);
 
-			if(disk_alloc_create(p->sandbox, fs, size) == 0) {
-				p->loop_mount = 1;
-				debug(D_WQ, "disk_alloc: %"PRId64"MB\n", size);
-				return p;
-			}
-		}
-		if(!create_task_directories(p)) {
-			work_queue_process_delete(p);
-			return 0;
-		}
-
-		p->loop_mount = 0;
-		return p;
+	if(!create_sandbox_dir(p,disk_allocation)) {
+		work_queue_process_delete(p);
+		return 0;
 	}
-	else {
-		if(!create_task_directories(p)) {
-			work_queue_process_delete(p);
-			return 0;
-		}
-
-		p->loop_mount = 0;
-		return p;
-	}
+	return p;
 }
+
 
 void work_queue_process_delete(struct work_queue_process *p)
 {
@@ -131,6 +130,9 @@ void work_queue_process_delete(struct work_queue_process *p)
 	if(p->tmpdir)
 		free(p->tmpdir);
 
+	if(p->cache_dir)
+		free(p->cache_dir);
+	
 	free(p);
 }
 

@@ -1,18 +1,12 @@
 include ../config.mk
 include ../rules.mk
 
-PHONY_TARGETS ?= common manager worker
+PHONY_TARGETS ?= src
 TARGETS ?= $(PHONY_TARGETS)
 
 all: $(TARGETS)
 
-common:
-	@$(MAKE) -C $@
-
-manager: common
-	@$(MAKE) -C $@
-
-worker: common
+$(TARGETS):
 	@$(MAKE) -C $@
 
 CLEAN_TARGETS = $(TARGETS:%=clean-%)
@@ -30,4 +24,4 @@ $(TEST_TARGETS):
 	@$(MAKE) -C $(@:test-%=%) test
 test: $(TEST_TARGETS)
 
-.PHONY: $(PHONY_TARGETS) $(CLEAN_TARGETS) $(INSTALL_TARGETS) $(TEST_TARGETS) clean install test
+.PHONY: $(PHONY_TARGETS) $(CLEAN_TARGETS) $(INSTALL_TARGETS) $(TEST_TARGETS) all clean install test

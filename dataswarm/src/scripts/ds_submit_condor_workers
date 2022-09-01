@@ -1,0 +1,147 @@
+#!/bin/sh
+
+SUBMIT_COMMON=$(which ds_submit_common)
+if [ -z "$SUBMIT_COMMON" ];
+then
+	echo "Please add 'ds_submit_common' to your PATH." 1>&2
+	exit 1
+else
+	. $SUBMIT_COMMON
+fi
+
+
+show_help()
+{
+	echo "  -r,--requirements <reqs>  Condor requirements expression."
+	echo "  --class-ad <ad>           Extra condor class ad. May be specified multiple times."
+	echo "  --autosize                Condor will automatically size the worker to the slot."
+    echo "  --docker-universe <image> Run worker inside <image> using condor's docker universe"
+}
+
+# This dummy requirement inhibits Condor from adding its own Memory expression,
+# which causes long-running workers to eventually sit idle in the queue.
+# The user can still add their own expression via the -r option.
+
+requirements=""
+class_ads=""
+transfer_input_files="ds_worker, cctools_gpu_autodetect"
+
+parse_arguments()
+{
+	# set default values:
+	cores=${cores:-1}
+	memory=${memory:-512}   # MB, e.g. 0.5 GB
+	disk=${disk:-1024}      # MB, e.g. 1   GB
+
+	# convert disk to kB to make what follows easier, as condor want disk in kB
+	disk=$((disk*1024))
+
+    original_count=$#
+
+	while [ $# -gt 0 ]
+	do
+		case $1 in
+			-r|--requirements)
+			shift
+			requirements="$requirements $1"
+			;;
+
+			--class-ad)
+			shift
+			class_ads="$class_ads\n$1"
+			;;
+
+			--autosize)
+				cores="ifThenElse($cores > TotalSlotCpus, $cores, TotalSlotCpus)"
+				memory="ifThenElse($memory > TotalSlotMemory, $memory, TotalSlotMemory)"
+				disk="ifThenElse($disk > TotalSlotDisk, $disk, TotalSlotDisk)"
+			;;
+
+            --docker-universe)
+            shift
+            docker_universe="$1"
+            ;;
+
+			*)
+			break
+			;;
+		esac
+		shift
+	done
+
+	submit_dir=/tmp/${USER}-workers
+
+    current_count=$#
+    consumed=$((original_count - current_count))
+
+    return $consumed
+}
+
+set_up_password_file()
+{
+	transfer_input_files="${transfer_input_files}, $pwfile"
+}
+
+submit_workers_command()
+{
+	# check if host is localhost - if so then notify the user of an error
+	if [ "$host" = "localhost" ]
+	then
+		echo "Using localhost with condor workers may lead to unintended consequences, please specify the IP address instead" 1>&2
+		exit 1
+	fi
+
+	# rewrite cores, memory, disk with size of given slot. (sometimes the slot
+	# given is larger than the minimum requested).
+	arguments="--cores \$\$([TARGET.Cpus]) --memory \$\$([TARGET.Memory]) --disk \$\$([TARGET.Disk/1024]) $arguments"
+
+    if [ -n "${docker_universe}" ]
+    then
+        cat > condor_submit_file <<EOF
+universe = docker
+docker_image = ${docker_universe}
+EOF
+    else
+        cat > condor_submit_file <<EOF
+universe = vanilla
+EOF
+    fi
+
+	cat >> condor_submit_file <<EOF
+executable = ds_worker
+arguments = $arguments $host $port
+transfer_input_files = ${transfer_input_files}
+should_transfer_files = yes
+when_to_transfer_output = on_exit
+output = worker.\$(PROCESS).output
+error = worker.\$(PROCESS).error
+log = workers.log
++JobMaxSuspendTime = 0
+
+$(printf "%b" "${class_ads}" 2> /dev/null)
+
+# Some programs assume some variables are set, like HOME, so we export the
+# environment variables with the job.  Comment the next line if you do not want
+# the environment exported.
+getenv = true
+EOF
+
+	if [ ! -z "$requirements" ]; then
+		echo "requirements = ${requirements}" >> condor_submit_file
+	fi
+
+	echo "request_cpus = ${cores}" >> condor_submit_file
+
+	#Memory in megabytes
+	echo "request_memory = ${memory}" >> condor_submit_file
+
+	#Disk in kilobytes
+	echo "request_disk = ${disk}" >> condor_submit_file
+
+
+	echo "queue $count" >> condor_submit_file
+
+	condor_submit condor_submit_file
+}
+
+submit_workers "$@"

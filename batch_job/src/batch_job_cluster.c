@@ -35,7 +35,7 @@ int batch_job_verbose_jobnames = 0;
 int batch_job_disable_heartbeat = 0;
 
 static int heartbeat_rate =  30;	//in seconds. rate at which hearbeats are written to the log.
-static int heartbeat_max  = 120;	//in seconds. maximum wait for a heartbeat before gibing up on the job.
+static int heartbeat_max  = 120;	//in seconds. maximum wait for a heartbeat before giving up on the job.
 
 
 /*

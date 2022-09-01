@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "catalog_query.h"
 #include "link.h"
+#include "link_auth.h"
 #include "list.h"
 #include "get_line.h"
 #include "getopt.h"
@@ -93,11 +94,12 @@ static char *resource_args=0;
 static int abort_flag = 0;
 static pid_t initial_ppid = 0;
 static const char *scratch_dir = 0;
-static const char *password_file = 0;
 static char *config_file = 0;
 static char *amazon_config = NULL;
 static char *condor_requirements = NULL;
 static char *batch_submit_options = NULL;
+static const char *password_file = 0;
+char *password;
 
 static char *wrapper_command = 0;
 
@@ -111,6 +113,8 @@ static char *runos_os = 0;
 static struct rmsummary *resources = NULL;
 
 static int64_t factory_timeout = 0;
+
+static char *factory_name = NULL;
 
 struct batch_queue *queue = 0;
 
@@ -241,6 +245,23 @@ struct list* do_direct_query( const char *manager_host, int manager_port )
 	if(!l) {
 		fprintf(stderr,"couldn't connect to %s port %d: %s\n",manager_host,manager_port,strerror(errno));
 		return 0;
+	}
+
+	if(manual_ssl_option) {
+		if(link_ssl_wrap_connect(l) < 1) {
+			fprintf(stderr,"work_queue_factory: could not setup ssl connection.\n");
+			link_close(l);
+			return 0;
+		}
+	}
+
+	if(password) {
+		debug(D_WQ,"authenticating to manager");
+		if(!link_auth_password(l,password,stoptime)) {
+			fprintf(stderr,"work_queue_factory: wrong password for manager.\n");
+			link_close(l);
+			return 0;
+		}
 	}
 
 	link_printf(l,stoptime,"%s_status\n",query_string);
@@ -385,11 +406,12 @@ static int submit_worker( struct batch_queue *queue )
 
 	if(using_catalog) {
 		cmd = string_format(
-		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s",
+		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s %s",
 		worker,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
+		factory_name ? string_format("--from-factory \"%s\"", factory_name) : "",
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
@@ -619,6 +641,8 @@ struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submit
 	if(using_catalog) {
 		jx_insert_string(j, "project_regex",    project_regex);
 		jx_insert_string(j, "submission_regex", submission_regex);
+		jx_insert_integer(j, "max_workers", workers_max);
+		if (factory_name) jx_insert_string(j, "factory_name", factory_name);
 	}
 
 	int to_connect = submitted - connected;
@@ -734,6 +758,8 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, int, JX_INTEGER, integer_value)
 
+	assign_new_value(new_factory_name, factory_name, factory-name, const char *, JX_STRING, string_value)
+
 	/* first try with old master option, then with manager */
 	assign_new_value(new_project_regex_old_opt, project_regex, master-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_project_regex, project_regex, manager-name, const char *, JX_STRING, string_value)
@@ -818,6 +844,11 @@ int read_config_file(const char *config_file) {
 		condor_requirements = xxstrdup(new_condor_requirements);
 	}
 
+	if(new_factory_name && new_factory_name != factory_name) {
+		free(factory_name);
+		factory_name = xxstrdup(new_factory_name);
+	}
+
 	last_time_modified = new_time_modified;
 	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
@@ -832,6 +863,10 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "tasks-per-worker: %d\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? (int) resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
 	fprintf(stdout, "cores: %s\n", rmsummary_resource_to_str("cores", resources->cores > 0 ? resources->cores : 1, 0));
+
+	if(factory_name) {
+		fprintf(stdout, "factory_name: %s\n", factory_name);
+	}
 
 	if(condor_requirements) {
 		fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
@@ -1156,7 +1191,8 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_RUN_OS,
 		LONG_OPT_PARENT_DEATH,
 		LONG_OPT_PYTHON_PACKAGE,
-		LONG_OPT_USE_SSL
+		LONG_OPT_USE_SSL,
+		LONG_OPT_FACTORY_NAME
 	};
 
 static const struct option long_options[] = {
@@ -1204,6 +1240,7 @@ static const struct option long_options[] = {
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 	{"ssl",no_argument, 0, LONG_OPT_USE_SSL},
+	{"factory-name",required_argument, 0, LONG_OPT_FACTORY_NAME},
 	{0,0,0,0}
 };
 
@@ -1349,6 +1386,10 @@ int main(int argc, char *argv[])
 				break;
 			case 'P':
 				password_file = optarg;
+				if(copy_file_to_buffer(optarg, &password, NULL) < 0) {
+					fprintf(stderr,"work_queue_factory: couldn't load password from %s: %s\n",optarg,strerror(errno));
+					exit(EXIT_FAILURE);
+				}
 				break;
 			case 'S':
 				scratch_dir = optarg;
@@ -1404,6 +1445,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_USE_SSL:
 				manual_ssl_option=1;
+				break;
+			case LONG_OPT_FACTORY_NAME:
+				factory_name = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);

@@ -43,7 +43,7 @@ run()
 {
 	../src/makeflow -d all -T wq -Z "$PORT_FILE" "$MAKE_FILE" &
 
-	run_local_worker "$PORT_FILE" "$WORKER_LOG"
+	run_wq_worker "$PORT_FILE" "$WORKER_LOG"
 
 	require_identical_files out.actual out.expected
 }

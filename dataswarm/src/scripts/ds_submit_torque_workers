@@ -1,0 +1,88 @@
+#!/bin/sh
+
+SUBMIT_COMMON=$(which ds_submit_common)
+if [ -z "$SUBMIT_COMMON" ];
+then
+	echo "Please add 'ds_submit_common' to your PATH." 1>&2
+	exit 1
+else
+	. $SUBMIT_COMMON
+fi
+
+show_help()
+{
+	echo "  -j               Use job array to submit workers."
+	echo "  -p <parameters>  Torque qsub parameters."
+}
+
+use_jobarray=0
+torque_parameters=""
+
+parse_arguments()
+{
+	if [ -z "$cores" -o "$cores" = 0 ]
+	then
+		cores=1
+	fi
+
+    original_count=$#
+
+	while [ $# -gt 0 ]
+	do
+		case $1 in
+			-j)
+			use_jobarray=1
+			;;
+			-p)
+			shift
+			torque_parameters="$torque_parameters $1"
+			;;
+			*)
+			break
+			;;
+		esac
+		shift
+	done
+
+    current_count=$#
+    consumed=$((original_count - current_count))
+
+    return $consumed
+}
+
+
+
+
+submit_workers_command()
+{
+
+	qsub=`which qsub 2>/dev/null`
+	if [ $? != 0 ]
+	then
+		echo "$0: please add 'qsub' to your PATH."
+		exit 1
+	fi
+
+	cat >worker.sh <<EOF
+#!/bin/sh
+#PBS -l nodes=1:ppn=$cores
+
+cd $PWD
+
+./ds_worker $arguments $host $port
+EOF
+
+	chmod 755 worker.sh
+
+	if [ $use_jobarray = 1 ]
+	then
+		qsub -t 1-$count:1 $torque_parameters worker.sh
+	else
+		for n in `seq 1 $count`
+		do
+			qsub $torque_parameters worker.sh
+		done
+	fi
+}
+
+submit_workers "$@"

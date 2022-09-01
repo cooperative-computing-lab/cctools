@@ -61,10 +61,10 @@ jobs:
           tag: ${{ github.event.inputs.tag }}
 
   build-osx:
-    runs-on: macos-10.15
+    runs-on: macos-11
     timeout-minutes: 30
     env:
-      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-10.15') }}
+      CCTOOLS_OUTPUT: ${{ format('cctools-{0}-x86_64-{1}.tar.gz', github.event.inputs.version, 'osx-11') }}
     steps:
       - name: checkout CCTools from branch head
         if: github.event_name != 'workflow_dispatch'

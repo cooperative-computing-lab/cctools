@@ -17,10 +17,11 @@ all: $(TARGETS)
 
 # The odd symlink in the following rule is necessary to overcome a problem
 # in the framework search path emitted by the Python configuration on macOS.
-work_queue_wrap.c work_queue.py: work_queue.i work_queue.binding.py
+work_queue_wrap.c work_queue.py: work_queue.i work_queue.binding.py StatusDisplay.py
 	@echo "SWIG work_queue.i (python)"
 	@$(CCTOOLS_SWIG) -o work_queue_wrap.c -python -py3 -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src work_queue.i
-	@cat work_queue.binding.py >> work_queue.py
+	@cat -u work_queue.binding.py >> work_queue.py
+	@cat -u StatusDisplay.py >> work_queue.py
 	ln -sf /System/Library/Frameworks/Python.framework .
 
 $(WQPYTHONSO): work_queue_wrap.o $(EXTERNAL_DEPENDENCIES)

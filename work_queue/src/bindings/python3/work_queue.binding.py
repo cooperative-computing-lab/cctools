@@ -13,7 +13,6 @@
 # - @ref work_queue::Factory
 
 import itertools
-import math
 import copy
 import os
 import sys
@@ -221,38 +220,76 @@ class Task(object):
         return work_queue_task_specify_file(self._task, local_name, remote_name, type, flags)
 
     ##
-    # Add a file to the task which will be transfered with a command at the worker.
+    # Add a url to the task which will be provided as an input file.
     #
     # @param self           Reference to the current task object.
+    # @param url            The url of the file to provide.
     # @param remote_name    The name of the file as seen by the task.
-    # @param cmd            The shell command to transfer the file. Any
-    #                       occurance of the string %% will be replaced with the
-    #                       internal name that work queue uses for the file.
-    # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
+    # @param type           Must be @ref WORK_QUEUE_INPUT.  (Output is not currently supported.)
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE (default)
     #                       - @ref WORK_QUEUE_CACHE
-    #                       - @ref WORK_QUEUE_WATCH
-    #                       - @ref WORK_QUEUE_FAILURE_ONLY
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     #
     # For example:
     # @code
-    # # The following are equivalent
-    # >>> task.specify_file_command("my.result", "chirp_put %% chirp://somewhere/result.file", type=WORK_QUEUE_OUTPUT)
+    # >>> task.specify_url("http://www.google.com/","google.txt",type=WORK_QUEUE_INPUT,flags=WORK_QUEUE_CACHE);
     # @endcode
-    def specify_file_command(self, remote_name, cmd, type=None, flags=None, cache=None, failure_only=None):
+
+    def specify_url(self, url, remote_name, type=None, flags=None, cache=None, failure_only=None):
+
         if type is None:
             type = WORK_QUEUE_INPUT
+
+        if type==WORK_QUEUE_OUTPUT:
+            raise ValueError("specify_url does not currently support output files.")
+        
+        # swig expects strings
+        if remote_name:
+            remote_name = str(remote_name)
+
+        if url:
+            url = str(url)
+
+        flags = Task._determine_file_flags(flags, cache, failure_only)
+        return work_queue_task_specify_url(self._task, url, remote_name, type, flags)
+
+
+    ##
+    # Add an input file produced by a Unix shell command.
+    # The command will be executed at the worker and produce
+    # a cacheable file that can be shared among multiple tasks.
+    #
+    # @param self           Reference to the current task object.
+    # @param command        The shell command which will produce the file.
+    #                       The command must contain the string %% which will be replaced with the cached location of the file.
+    # @param remote_name    The name of the file as seen by the task.
+    # @param type           Must be @ref WORK_QUEUE_INPUT.  (Output is not currently supported.)
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref work_queue_file_flags_t or'd together The most common are:
+    #                       - @ref WORK_QUEUE_NOCACHE (default)
+    #                       - @ref WORK_QUEUE_CACHE
+    # @param cache         Whether the file should be cached at workers (True/False)
+    #
+    # For example:
+    # @code
+    # >>> task.specify_file_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",type=WORK_QUEUE_INPUT,flags=WORK_QUEUE_CACHE);
+    # @endcode
+
+    def specify_file_command(self, cmd, remote_name, type=None, flags=None, cache=None, failure_only=None):
+        if type is None:
+            type = WORK_QUEUE_INPUT
+
+        if type==WORK_QUEUE_OUTPUT:
+            raise ValueError("specify_file_command does not currently support output files.")
 
         # swig expects strings
         if remote_name:
             remote_name = str(remote_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return work_queue_task_specify_file_command(self._task, remote_name, cmd, type, flags)
+        return work_queue_task_specify_file_command(self._task, cmd, remote_name, type, flags)
 
     ##
     # Add a file piece to the task.
@@ -983,7 +1020,13 @@ class PythonTask(Task):
 
 
     def _python_function_command(self):
-        command = 'python {wrapper} {function} {args} {out}'.format(
+        if self._env_file:
+            py_exec="python"
+        else:
+            py_exec=f"python{sys.version_info[0]}"
+
+        command = '{py_exec} {wrapper} {function} {args} {out}'.format(
+                py_exec=py_exec,
                 wrapper=os.path.basename(self._wrapper),
                 function=os.path.basename(self._func_file),
                 args=os.path.basename(self._args_file),
@@ -1011,8 +1054,13 @@ class PythonTask(Task):
     def _create_wrapper(self):
         with open(self._wrapper, 'w') as f:
             f.write(textwrap.dedent('''\
-                import sys
-                import dill
+                try:
+                    import sys
+                    import dill
+                except ImportError:
+                    print("Could not execute PythonTask function because a needed module for Work Queue was not available.")
+                    raise
+
                 (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
                 with open (fn , 'rb') as f:
                     exec_function = dill.load(f)
@@ -1051,16 +1099,18 @@ class WorkQueue(object):
     # @param transactions_log  The name of a file to write the queue's transactions log.
     # @param debug_log  The name of a file to write the queue's debug log.
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
-    # @param ssl_key    SSL key in pem format (If not given, then TSL is not activated).
-    # @param ssl_cert   SSL cert in pem format (If not given, then TSL is not activated).
+    # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
+    #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
+    # @param status_display_interval Number of seconds between updates to the jupyter status display. None, or less than 1 disables it.
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl_key=None, ssl_cert=None):
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl=None, status_display_interval=None):
         self._shutdown = shutdown
         self._work_queue = None
         self._stats = None
         self._stats_hierarchy = None
         self._task_table = {}
+        self._info_widget = None
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -1074,11 +1124,16 @@ class WorkQueue(object):
         except ValueError:
             raise ValueError('port should be a single integer, or a sequence of two integers')
 
+        if status_display_interval and status_display_interval >= 1:
+            self._info_widget = JupyterDisplay(interval=status_display_interval)
+
         try:
             if debug_log:
                 specify_debug_log(debug_log)
             self._stats = work_queue_stats()
             self._stats_hierarchy = work_queue_stats()
+
+            ssl_key, ssl_cert = self._setup_ssl(ssl)
             self._work_queue = work_queue_ssl_create(port, ssl_key, ssl_cert)
             if not self._work_queue:
                 raise Exception('Could not create queue on port {}'.format(port))
@@ -1094,20 +1149,64 @@ class WorkQueue(object):
         except Exception as e:
             raise Exception('Unable to create internal Work Queue structure: {}'.format(e))
 
+        self._update_status_display()
+
 
     def _free_queue(self):
         try:
             if self._work_queue:
                 if self._shutdown:
                     self.shutdown_workers(0)
+                self._update_status_display(force=True)
                 work_queue_delete(self._work_queue)
                 self._work_queue = None
         except:
             #ignore exceptions, as we are going away...
             pass
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._update_status_display(force=True)
+        return self
+
     def __del__(self):
         self._free_queue()
+
+    def _setup_ssl(self, ssl):
+        if not ssl:
+            return (None, None)
+
+        if ssl is not True:
+            return ssl
+
+        (tmp, key) = tempfile.mkstemp(
+                dir=staging_directory,
+                prefix='key')
+        os.close(tmp)
+        (tmp, cert) = tempfile.mkstemp(
+                dir=staging_directory,
+                prefix='cert')
+        os.close(tmp)
+
+        cmd=f"openssl req -x509 -newkey rsa:4096 -keyout {key} -out {cert} x-sha256 -days 365 -nodes -batch".split()
+
+        output=""
+        try:
+            output=subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"could not create temporary SSL key and cert {e}.\n{output}")
+            raise e
+        return (key, cert)
+
+    def _update_status_display(self, force=False):
+        try:
+            if self._info_widget and self._info_widget.active():
+                self._info_widget.update(self, force)
+        except Exception as e:
+            # no exception should cause the queue to fail
+            print(f"status display error {e}", file=sys.stderr)
 
     ##
     # Get the project name of the queue.
@@ -1173,6 +1272,21 @@ class WorkQueue(object):
         stats = work_queue_stats()
         work_queue_get_stats_category(self._work_queue, category, stats)
         return stats
+
+    ##
+    # Get queue information as list of dictionaries
+    # @param self Reference to the current work queue object
+    # @param request One of: "queue", "tasks", "workers", or "categories"
+    # For example:
+    # @code
+    # import json
+    # tasks_info = q.status("tasks")
+    # @endcode
+    def status(self, request):
+        info_raw = work_queue_status(self._work_queue, request)
+        info_json = json.loads(info_raw)
+        del info_raw
+        return info_json
 
     ##
     # Get resource statistics of workers connected.
@@ -1763,12 +1877,16 @@ class WorkQueue(object):
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
     def wait_for_tag(self, tag, timeout=WORK_QUEUE_WAITFORTASK):
+        self._update_status_display()
         task_pointer = work_queue_wait_for_tag(self._work_queue, tag, timeout)
         if task_pointer:
+            if self.empty():
+                # if last task in queue, update display
+                self._update_status_display(force=True)
             task = self._task_table[int(task_pointer.taskid)]
             del self._task_table[task_pointer.taskid]
             return task
-        return None            
+        return None
 
     ##
     # Maps a function to elements in a sequence using work_queue
@@ -1819,8 +1937,7 @@ class WorkQueue(object):
     # @param fn       The function that will be called on each element
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
-    def pair(self, fn, seq1, seq2, chunk_size=1):
-
+    def pair(self, fn, seq1, seq2, chunk_size=1, env=None):
         def fpairs(fn, s):
             results = []
 
@@ -1840,6 +1957,9 @@ class WorkQueue(object):
 
             if num == chunk_size:
                 p_task = PythonTask(fpairs, fn, task)
+                if env:
+                    p_task.specify_environment(env)
+                
                 p_task.specify_tag(str(num_task))
                 self.submit(p_task)
                 tasks[p_task.id] = num_task                
@@ -2100,9 +2220,27 @@ class RemoteTask(Task):
             print("Error, work_queue_exec_method must be one of fork, direct, or thread")
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
+    ##
+    # Should return a dictionary with information for the status display.
+    # This method is meant to be overriden by custom applications.
+    #
+    # The dictionary should be of the form:
+    #
+    # { "application_info" : {"values" : dict, "units" : dict} }
+    #
+    # where "units" is an optional dictionary that indicates the units of the
+    # corresponding key in "values".
+    #
+    # @param self       Reference to the current work queue object.
+    #
+    # For example:
+    # @code
+    # >>> myapp.application_info()
+    # {'application_info': {'values': {'size_max_output': 0.361962, 'current_chunksize': 65536}, 'units': {'size_max_output': 'MB'}}}
+    # @endcode
+    def application_info(self):
+        return None
 
-
-# test
 
 ##
 # \class Factory

@@ -32,10 +32,10 @@ A workflow is encoded as a JSON object with the following keys:
 | Key | Required | Description |
 |-----|:--------:|-------------|
 |[**rules**](#rules)|  yes     | Unordered array of rules comprising the workflow.<br>  Each `<rule>` corresponds to a single job represented as a JSON object to be executed in the workflow.
-|[**define**](#defining-values) | no | Defines [expression substitutions](#jx-expressions) that can be used when defining rules, environments, and categories.
-|[**environment**](#environments) | no | Defines environment variables to be set when executing all rules.
-|[**categories**](#categories)| no  | Rules are grouped into categories. Rules inside a category are run with the same [environment variables values](#environments), and the same resource requirements.
-|default_category | no | Name of the category used if none is specified for a rule. <br>If there is no corresponding category defined, default values will be filled in. If not provided, the default category is `"default"`.
+|[**define**](#defining-values) | no | Defines [expression substitutions](#jx-expressions) that can be used when defining rules, environments, and categories.|
+|[**environment**](#environments) | no | Defines environment variables to be set when executing all rules.|
+|[**categories**](#categories)| no  | Rules are grouped into categories. Rules inside a category are run with the same [environment variables values](#environments), and the same resource requirements.|
+|default_category | no | Name of the category used if none is specified for a rule. <br>If there is no corresponding category defined, default values will be filled in. If not provided, the default category is `"default"`.|
 
 ### Rules
 

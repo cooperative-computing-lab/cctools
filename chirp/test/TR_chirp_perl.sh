@@ -5,15 +5,17 @@ set -e
 . ../../dttools/test/test_runner_common.sh
 . ./chirp-common.sh
 
+import_config_val CCTOOLS_PERL
+
+export PERL5LIB="$(pwd)/../src/bindings/perl"
+
 c="./hostport.$PPID"
 
 ticket=my.ticket
 
-perl=${CCTOOLS_PERL}
-
 check_needed()
 {
-	[ -n "${perl}" ] || return 1
+	[ -n "${CCTOOLS_PERL}" ] || return 1
 	command -v openssl >/dev/null 2>&1
 }
 
@@ -33,7 +35,7 @@ run()
 
 	chirp -d all -a unix "$hostport" ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` / write
 
-	PERL5LIB="$(pwd)/../src/bindings/perl" ${perl} ../src/bindings/perl/chirp_perl_example.pl $hostport $ticket
+	PERL5LIB=$(pwd)/../src/bindings/perl ${CCTOOLS_PERL} ../src/bindings/perl/chirp_perl_example.pl $hostport $ticket
 
 	return 0
 }
