@@ -11,6 +11,8 @@ See the file COPYING for details.
 
 #include "work_queue_coprocess.h"
 #include "work_queue_protocol.h"
+#include "rmsummary.h"
+#include "rmonitor_poll.h"
 
 #include "debug.h"
 #include "domain_name_cache.h"
@@ -319,3 +321,84 @@ struct work_queue_coprocess *work_queue_coprocess_find_state(struct work_queue_c
 	return NULL;
 }
 
+void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses) {
+	for (int i = 0; i < number_of_coprocesses; i++)
+	{
+		if (coprocess_info[i].state == WORK_QUEUE_COPROCESS_DEAD || coprocess_info[i].state == WORK_QUEUE_COPROCESS_UNINITIALIZED) {
+			continue;
+		}
+		struct rmsummary *resources = rmonitor_measure_process(coprocess_info[i].pid);
+
+		fprintf(stdout, "Measuring resources of coprocess with pid %d\n", coprocess_info[i].pid);
+		fprintf(stdout, "cores: %f, memory: %f, disk: %f, gpus: %f\n",    resources->cores, 
+																		  resources->memory + resources->swap_memory,
+																		  resources->disk,
+																		  resources->gpus);
+		fprintf(stdout, "Max resources available to coprocess:\ncores: %ld memory: %ld disk: %ld gpus: %ld\n",  
+																				coprocess_info[i].coprocess_resources->cores.total,
+																				coprocess_info[i].coprocess_resources->memory.total,
+																				coprocess_info[i].coprocess_resources->disk.total,
+																				coprocess_info[i].coprocess_resources->gpus.total);
+		coprocess_info[i].coprocess_resources->cores.inuse = resources->cores;
+		coprocess_info[i].coprocess_resources->memory.inuse = resources->memory + resources->swap_memory;
+		coprocess_info[i].coprocess_resources->disk.inuse = resources->disk;
+		coprocess_info[i].coprocess_resources->gpus.inuse = resources->gpus;
+
+	}
+}
+
+int work_queue_coprocess_enforce_limit(struct work_queue_coprocess *coprocess) {
+	if (coprocess == NULL || coprocess->state == WORK_QUEUE_COPROCESS_DEAD || coprocess->state == WORK_QUEUE_COPROCESS_UNINITIALIZED) {
+		return 1;
+	}
+	else if (coprocess->coprocess_resources->cores.inuse  > coprocess->coprocess_resources->cores.total ||
+	    coprocess->coprocess_resources->memory.inuse > coprocess->coprocess_resources->memory.total ||
+		coprocess->coprocess_resources->disk.inuse   > coprocess->coprocess_resources->disk.total ||
+		coprocess->coprocess_resources->gpus.inuse   > coprocess->coprocess_resources->gpus.total) {
+		fprintf(stdout, "Coprocess with pid %d has exceeded limits, killing coprocess\n", coprocess->pid);
+		work_queue_coprocess_terminate(coprocess);
+		return 0;
+	}
+	else {
+		return 1;
+	}
+}
+
+void work_queue_coprocess_update_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses) {
+	
+	/*
+	for (int i = 0; i < number_of_coprocesses; i++) {
+		if (work_queue_coprocess_check(coprocess_info + i)) {
+			int status;
+			int result = waitpid(coprocess_info[i].pid, &status, 0);
+			if(result==0) {
+				fatal("Coprocess instace %d has both terminated and not terminated\n", i);
+			} else if(result<0) {
+				debug(D_WQ, "Waiting on coprocess with pid %d returned an error: %s", coprocess_info[i].pid, strerror(errno));
+			} else if(result>0) {
+				if (!WIFEXITED(status)){
+					debug(D_WQ, "Coprocess instance %d (pid %d) exited abnormally with signal %d", i, coprocess_info[i].pid, WTERMSIG(status));
+				}
+				else {
+					debug(D_WQ, "Coprocess instance %d (pid %d) exited normally with exit code %d", i, coprocess_info[i].pid, WEXITSTATUS(status));
+				}
+			}
+			coprocess_info[i].state = WORK_QUEUE_COPROCESS_DEAD;
+		}
+	}
+	for (int i = 0; i < number_of_coprocesses; i++)
+	{
+		if (coprocess_info[i].state == WORK_QUEUE_COPROCESS_DEAD) {
+			if (coprocess_info[i].num_restart_attempts >= 10) {
+				debug(D_WQ, "Coprocess instance %d has died more than 10 times, no longer attempting to restart\n", i);
+			}
+			if (close(coprocess_info[i].pipe_in[1]) || close(coprocess_info[i].pipe_out[0])) {
+				fatal("Unable to close pipes from dead coprocess: %s\n", strerror(errno));
+			}
+			debug(D_WQ, "Attempting to restart coprocess instance %d\n", i);
+			work_queue_coprocess_start(coprocess_info + i);
+			coprocess_info[i].num_restart_attempts++;
+		}
+	}
+	*/
+}

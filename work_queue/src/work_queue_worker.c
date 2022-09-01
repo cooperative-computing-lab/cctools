@@ -231,6 +231,11 @@ static char *coprocess_name = NULL;
 static int number_of_coprocess_instances = -1;
 struct work_queue_coprocess *coprocess_info = NULL;
 
+static int coprocess_cores = -1;
+static int coprocess_memory = -1;
+static int coprocess_disk = -1;
+static int coprocess_gpus = -1;
+
 __attribute__ (( format(printf,2,3) ))
 static void send_manager_message( struct link *manager, const char *fmt, ... )
 {
@@ -350,6 +355,10 @@ void measure_worker_resources()
 	}
 
 	work_queue_gpus_init(r->gpus.total);
+
+	if (coprocess_command != NULL && coprocess_info != NULL) {
+		work_queue_coprocess_measure_resources(coprocess_info, number_of_coprocess_instances);
+	}
 
 	last_resources_measurement = time(0);
 }
@@ -790,7 +799,7 @@ static int handle_tasks(struct link *manager)
 
 			itable_insert(procs_complete, p->task->taskid, p);
 
-			if (p->coprocess != NULL) {
+			if (p->coprocess != NULL && ( (struct work_queue_coprocess *) p->coprocess )->state == WORK_QUEUE_COPROCESS_RUNNING) {
 				( (struct work_queue_coprocess *) p->coprocess )->state = WORK_QUEUE_COPROCESS_READY;
 			}
 
@@ -1572,7 +1581,7 @@ static int enforce_processes_limits() {
 
 	itable_firstkey(procs_table);
 	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
-		if(!enforce_process_limits(p)) {
+		if(!enforce_process_limits(p) || !work_queue_coprocess_enforce_limit(p->coprocess)) {
 			finish_running_task(p, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
 			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
@@ -1922,6 +1931,8 @@ static void work_for_manager(struct link *manager) {
 			// finish all tasks, disconnect from manager, but don't kill the worker (no abort_flag = 1)
 			break;
 		}
+
+		//work_queue_coprocess_update_state(coprocess_info, number_of_coprocess_instances);
 
 		int task_event = 0;
 		if(ok) {
@@ -2586,7 +2597,8 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_NUM_COPROCESS, LONG_OPT_PYTHON_FUNCTION};
+	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_NUM_COPROCESS, LONG_OPT_COPROCESS_CORES, 
+	  LONG_OPT_COPROCESS_MEMORY, LONG_OPT_COPROCESS_DISK, LONG_OPT_COPROCESS_GPUS, LONG_OPT_PYTHON_FUNCTION};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2635,6 +2647,10 @@ static const struct option long_options[] = {
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
 	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
 	{"num_coprocesses",     required_argument,  0,  LONG_OPT_NUM_COPROCESS},
+	{"coprocess_cores",     required_argument,  0,  LONG_OPT_COPROCESS_CORES},
+	{"coprocess_memory",    required_argument,  0,  LONG_OPT_COPROCESS_MEMORY},
+	{"coprocess_disk",      required_argument,  0,  LONG_OPT_COPROCESS_DISK},
+	{"coprocess_gpus",      required_argument,  0,  LONG_OPT_COPROCESS_GPUS},
 	{0,0,0,0}
 };
 
@@ -2893,6 +2909,18 @@ int main(int argc, char *argv[])
 		case LONG_OPT_NUM_COPROCESS:
 			number_of_coprocess_instances = atoi(optarg);
 			break;
+		case LONG_OPT_COPROCESS_CORES:
+			coprocess_cores = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_MEMORY:
+			coprocess_memory = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_DISK:
+			coprocess_disk = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_GPUS:
+			coprocess_gpus = atoi(optarg);
+			break;
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -3043,13 +3071,24 @@ int main(int argc, char *argv[])
 		total_resources->gpus.total);
 
 	if(coprocess_command) {
+
+		int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : total_resources->cores.total) / number_of_coprocess_instances;
+		int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : total_resources->memory.total) / number_of_coprocess_instances;
+		int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : total_resources->disk.total) / number_of_coprocess_instances;
+		int coprocess_gpus_normalized   = ( (coprocess_gpus > 0)   ? coprocess_gpus   : total_resources->gpus.total) / number_of_coprocess_instances;
+
 		coprocess_info = malloc(sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
 		memset(coprocess_info, 0, sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
 		/* start coprocess per manager attempt */
 		for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
 			coprocess_info[coprocess_num] = 
-			(struct work_queue_coprocess) {NULL, NULL, -1, -1, WORK_QUEUE_COPROCESS_UNINITIALIZED, {-1, -1}, {-1, -1}, NULL};
+			(struct work_queue_coprocess) {NULL, NULL, -1, -1, WORK_QUEUE_COPROCESS_UNINITIALIZED, {-1, -1}, {-1, -1}, NULL, 0, NULL};
 			coprocess_info[coprocess_num].command = xxstrdup(coprocess_command);
+			coprocess_info[coprocess_num].coprocess_resources = work_queue_resources_create();
+			coprocess_info[coprocess_num].coprocess_resources->cores.total  = coprocess_cores_normalized;
+			coprocess_info[coprocess_num].coprocess_resources->memory.total = coprocess_memory_normalized;
+			coprocess_info[coprocess_num].coprocess_resources->disk.total   = coprocess_disk_normalized;
+			coprocess_info[coprocess_num].coprocess_resources->gpus.total   = coprocess_gpus_normalized;
 			work_queue_coprocess_start(&coprocess_info[coprocess_num]);
 		}
 		coprocess_name = xxstrdup(coprocess_info[0].name);
@@ -3122,6 +3161,7 @@ int main(int argc, char *argv[])
 		for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
 			free(coprocess_info[coprocess_num].name);
 			free(coprocess_info[coprocess_num].command);
+			work_queue_resources_delete(coprocess_info[coprocess_num].coprocess_resources);
 		}
 		free(coprocess_command);
 		free(coprocess_name);

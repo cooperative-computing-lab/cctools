@@ -7,6 +7,7 @@ See the file COPYING for details.
 #ifndef WORK_QUEUE_COPROCESS_H
 #define WORK_QUEUE_COPROCESS_H
 #include "link.h"
+#include "work_queue_resources.h"
 
 typedef enum {
 	WORK_QUEUE_COPROCESS_UNINITIALIZED, /**< worker has not yet created coprocess instance **/
@@ -24,6 +25,8 @@ struct work_queue_coprocess {
     int pipe_in[2];
     int pipe_out[2];
     struct link *link;
+    int num_restart_attempts;
+    struct work_queue_resources *coprocess_resources;
 };
 
 /* return the name of the coprocess */
@@ -33,5 +36,8 @@ void work_queue_coprocess_shutdown(struct work_queue_coprocess *coprocess_info, 
 int work_queue_coprocess_check(struct work_queue_coprocess *coprocess);
 char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess);
 struct work_queue_coprocess *work_queue_coprocess_find_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses, work_queue_coprocess_state_t state);
+void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses);
+int work_queue_coprocess_enforce_limit(struct work_queue_coprocess *coprocess);
+void work_queue_coprocess_update_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses);
 
 #endif
