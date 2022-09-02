@@ -36,6 +36,8 @@ void work_queue_coprocess_shutdown(struct work_queue_coprocess *coprocess_info, 
 int work_queue_coprocess_check(struct work_queue_coprocess *coprocess);
 char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess);
 struct work_queue_coprocess *work_queue_coprocess_find_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses, work_queue_coprocess_state_t state);
+struct work_queue_coprocess *work_queue_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct work_queue_resources *total_resources, char *coprocess_command, int number_of_coprocess_instances); 
+void work_queue_coprocess_shutdown_all_coprocesses(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses);
 void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses);
 int work_queue_coprocess_enforce_limit(struct work_queue_coprocess *coprocess);
 void work_queue_coprocess_update_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses);

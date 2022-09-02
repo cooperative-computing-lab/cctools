@@ -2905,26 +2905,7 @@ int main(int argc, char *argv[])
 		total_resources->gpus.total);
 
 	if(coprocess_command) {
-
-		int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : total_resources->cores.total);
-		int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : total_resources->memory.total);
-		int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : total_resources->disk.total);
-		int coprocess_gpus_normalized   = ( (coprocess_gpus > 0)   ? coprocess_gpus   : total_resources->gpus.total);
-
-		coprocess_info = malloc(sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
-		memset(coprocess_info, 0, sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
-		/* start coprocess per manager attempt */
-		for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
-			coprocess_info[coprocess_num] = 
-			(struct work_queue_coprocess) {NULL, NULL, -1, -1, WORK_QUEUE_COPROCESS_UNINITIALIZED, {-1, -1}, {-1, -1}, NULL, 0, NULL};
-			coprocess_info[coprocess_num].command = xxstrdup(coprocess_command);
-			coprocess_info[coprocess_num].coprocess_resources = work_queue_resources_create();
-			coprocess_info[coprocess_num].coprocess_resources->cores.total  = coprocess_cores_normalized;
-			coprocess_info[coprocess_num].coprocess_resources->memory.total = coprocess_memory_normalized;
-			coprocess_info[coprocess_num].coprocess_resources->disk.total   = coprocess_disk_normalized;
-			coprocess_info[coprocess_num].coprocess_resources->gpus.total   = coprocess_gpus_normalized;
-			work_queue_coprocess_start(&coprocess_info[coprocess_num]);
-		}
+		coprocess_info = work_queue_coprocess_initalize_all_coprocesses(coprocess_cores, coprocess_memory, coprocess_disk, coprocess_gpus, total_resources, coprocess_command, number_of_coprocess_instances);
 		coprocess_name = xxstrdup(coprocess_info[0].name);
 		hash_table_insert(features, coprocess_name, (void **) 1);
 	}
@@ -2991,15 +2972,9 @@ int main(int argc, char *argv[])
 	}
 
 	if (coprocess_command) {
-		work_queue_coprocess_shutdown(coprocess_info, number_of_coprocess_instances);
-		for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
-			free(coprocess_info[coprocess_num].name);
-			free(coprocess_info[coprocess_num].command);
-			work_queue_resources_delete(coprocess_info[coprocess_num].coprocess_resources);
-		}
+		work_queue_coprocess_shutdown_all_coprocesses(coprocess_info, number_of_coprocess_instances);
 		free(coprocess_command);
 		free(coprocess_name);
-		free(coprocess_info);
 	}
 
 	workspace_delete();

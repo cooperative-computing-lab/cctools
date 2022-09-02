@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <string.h>
 
 #include "work_queue_coprocess.h"
+#include "work_queue_resources.h"
 #include "work_queue_protocol.h"
 #include "rmsummary.h"
 #include "rmonitor_poll.h"
@@ -23,6 +24,7 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "process.h"
 #include "stringtools.h"
+#include "xxmalloc.h"
 
 static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
@@ -321,6 +323,37 @@ struct work_queue_coprocess *work_queue_coprocess_find_state(struct work_queue_c
 	return NULL;
 }
 
+struct work_queue_coprocess *work_queue_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct work_queue_resources *total_resources, char *coprocess_command, int number_of_coprocess_instances) {
+	int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : total_resources->cores.total);
+	int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : total_resources->memory.total);
+	int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : total_resources->disk.total);
+	int coprocess_gpus_normalized   = ( (coprocess_gpus > 0)   ? coprocess_gpus   : total_resources->gpus.total);
+
+	struct work_queue_coprocess * coprocess_info = malloc(sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
+	memset(coprocess_info, 0, sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
+	for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
+		coprocess_info[coprocess_num] = (struct work_queue_coprocess) {NULL, NULL, -1, -1, WORK_QUEUE_COPROCESS_UNINITIALIZED, {-1, -1}, {-1, -1}, NULL, 0, NULL};
+		coprocess_info[coprocess_num].command = xxstrdup(coprocess_command);
+		coprocess_info[coprocess_num].coprocess_resources = work_queue_resources_create();
+		coprocess_info[coprocess_num].coprocess_resources->cores.total  = coprocess_cores_normalized;
+		coprocess_info[coprocess_num].coprocess_resources->memory.total = coprocess_memory_normalized;
+		coprocess_info[coprocess_num].coprocess_resources->disk.total   = coprocess_disk_normalized;
+		coprocess_info[coprocess_num].coprocess_resources->gpus.total   = coprocess_gpus_normalized;
+		work_queue_coprocess_start(&coprocess_info[coprocess_num]);
+	}
+	return coprocess_info;
+}
+
+void work_queue_coprocess_shutdown_all_coprocesses(struct work_queue_coprocess *coprocess_info, int number_of_coprocess_instances) {
+	work_queue_coprocess_shutdown(coprocess_info, number_of_coprocess_instances);
+	for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
+		free(coprocess_info[coprocess_num].name);
+		free(coprocess_info[coprocess_num].command);
+		work_queue_resources_delete(coprocess_info[coprocess_num].coprocess_resources);
+	}
+	free(coprocess_info);
+}
+
 void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses) {
 	for (int i = 0; i < number_of_coprocesses; i++)
 	{
@@ -330,10 +363,10 @@ void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coproce
 		struct rmsummary *resources = rmonitor_measure_process(coprocess_info[i].pid);
 
 		debug(D_WQ, "Measuring resources of coprocess with pid %d\n", coprocess_info[i].pid);
-		debug(D_WQ, "cores: %f, memory: %f, disk: %f, gpus: %f\n",    resources->cores, 
-																		  resources->memory + resources->swap_memory,
-																		  resources->disk,
-																		  resources->gpus);
+		debug(D_WQ, "cores: %lf, memory: %lf, disk: %lf, gpus: %lf\n",    	resources->cores, 
+																			resources->memory + resources->swap_memory,
+																			resources->disk,
+																			resources->gpus);
 		debug(D_WQ, "Max resources available to coprocess:\ncores: %ld memory: %ld disk: %ld gpus: %ld\n",  
 																				coprocess_info[i].coprocess_resources->cores.total,
 																				coprocess_info[i].coprocess_resources->memory.total,
@@ -351,8 +384,9 @@ int work_queue_coprocess_enforce_limit(struct work_queue_coprocess *coprocess) {
 	if (coprocess == NULL || coprocess->state == WORK_QUEUE_COPROCESS_DEAD || coprocess->state == WORK_QUEUE_COPROCESS_UNINITIALIZED) {
 		return 1;
 	}
-	else if (coprocess->coprocess_resources->cores.inuse  > coprocess->coprocess_resources->cores.total ||
-	    coprocess->coprocess_resources->memory.inuse > coprocess->coprocess_resources->memory.total ||
+	else if (
+		coprocess->coprocess_resources->cores.inuse  > coprocess->coprocess_resources->cores.total || 
+		coprocess->coprocess_resources->memory.inuse > coprocess->coprocess_resources->memory.total ||
 		coprocess->coprocess_resources->disk.inuse   > coprocess->coprocess_resources->disk.total ||
 		coprocess->coprocess_resources->gpus.inuse   > coprocess->coprocess_resources->gpus.total) {
 		fprintf(stdout, "Coprocess with pid %d has exceeded limits, killing coprocess\n", coprocess->pid);
