@@ -367,7 +367,7 @@ void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coproce
 																			resources->memory + resources->swap_memory,
 																			resources->disk,
 																			resources->gpus);
-		debug(D_WQ, "Max resources available to coprocess:\ncores: %ld memory: %ld disk: %ld gpus: %ld\n",  
+		debug(D_WQ, "Max resources available to coprocess:\ncores: %lld memory: %lld disk: %lld gpus: %lld\n",  
 																				coprocess_info[i].coprocess_resources->cores.total,
 																				coprocess_info[i].coprocess_resources->memory.total,
 																				coprocess_info[i].coprocess_resources->disk.total,
