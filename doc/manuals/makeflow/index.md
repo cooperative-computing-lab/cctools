@@ -519,13 +519,13 @@ $ makeflow -T mesos --mesos-master localhost:5050 --mesos-path /path/to/mesos-0.
 ### Kubernetes
 
 Makeflow can be run on [Kubernetes](https://kubernetes.io/) cluster. To run
-Makeflow with Kuberenetes, give the batch mode via `-T k8s` and indicate the
+Makeflow with Kubernetes, give the batch mode via `-T k8s` and indicate the
 desired Docker image with the `--k8s-image` option. The Kubernetes mode is
 depend on kubectl, before starting Makeflow, make sure kubectl has been
 [installed and correctly set up](https://kubernetes.io/docs/tasks/tools/install-kubectl/) to access the
 desired Kubernetes cluster.
 
-Following is an example of running Makeflow on a Kuberenetes cluster using
+Following is an example of running Makeflow on a Kubernetes cluster using
 centos image.
 
 ```sh
