@@ -415,6 +415,10 @@ static void send_resource_update(struct link *manager)
 		}
 	}
 
+	if (coprocess_info != NULL) {
+		work_queue_coprocess_resources_send(manager,coprocess_info->coprocess_resources,stoptime);
+	}
+
 	work_queue_resources_send(manager,total_resources,stoptime);
 	send_manager_message(manager, "info end_of_resource_update %d\n", 0);
 }
@@ -765,7 +769,12 @@ static int handle_completed_tasks(struct link *manager)
 					p->task->disk_allocation_exhausted = 1;
 				}
 			}
-
+			
+			if (p->coprocess != NULL) {
+				struct work_queue_coprocess *cop= (struct work_queue_coprocess *) p->coprocess;
+				cop->state = WORK_QUEUE_COPROCESS_READY;
+			}
+			
 			/* collect the resources associated with the process */
 			reap_process(p);
 			
@@ -1744,14 +1753,11 @@ static void work_for_manager(struct link *manager)
 			break;
 		}
 
-		//work_queue_coprocess_update_state(coprocess_info, number_of_coprocess_instances);
-
 		int task_event = 0;
 		if(ok) {
 			struct work_queue_process *p;
 			int visited;
 			int waiting = list_size(procs_waiting);
-
 			for(visited = 0; visited < waiting; visited++) {
 				p = list_pop_head(procs_waiting);
 				if(!p) {
@@ -2420,7 +2426,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION, LONG_OPT_FROM_FACTORY, LONG_OPT_COPROCESS
+	  LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION, LONG_OPT_FROM_FACTORY, LONG_OPT_COPROCESS,
 	  LONG_OPT_NUM_COPROCESS, LONG_OPT_COPROCESS_CORES, 
 	  LONG_OPT_COPROCESS_MEMORY, LONG_OPT_COPROCESS_DISK, LONG_OPT_COPROCESS_GPUS};
 
@@ -2900,10 +2906,10 @@ int main(int argc, char *argv[])
 
 	if(coprocess_command) {
 
-		int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : total_resources->cores.total) / number_of_coprocess_instances;
-		int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : total_resources->memory.total) / number_of_coprocess_instances;
-		int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : total_resources->disk.total) / number_of_coprocess_instances;
-		int coprocess_gpus_normalized   = ( (coprocess_gpus > 0)   ? coprocess_gpus   : total_resources->gpus.total) / number_of_coprocess_instances;
+		int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : total_resources->cores.total);
+		int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : total_resources->memory.total);
+		int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : total_resources->disk.total);
+		int coprocess_gpus_normalized   = ( (coprocess_gpus > 0)   ? coprocess_gpus   : total_resources->gpus.total);
 
 		coprocess_info = malloc(sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
 		memset(coprocess_info, 0, sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);

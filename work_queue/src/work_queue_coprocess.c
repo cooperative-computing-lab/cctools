@@ -329,12 +329,12 @@ void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coproce
 		}
 		struct rmsummary *resources = rmonitor_measure_process(coprocess_info[i].pid);
 
-		fprintf(stdout, "Measuring resources of coprocess with pid %d\n", coprocess_info[i].pid);
-		fprintf(stdout, "cores: %f, memory: %f, disk: %f, gpus: %f\n",    resources->cores, 
+		debug(D_WQ, "Measuring resources of coprocess with pid %d\n", coprocess_info[i].pid);
+		debug(D_WQ, "cores: %f, memory: %f, disk: %f, gpus: %f\n",    resources->cores, 
 																		  resources->memory + resources->swap_memory,
 																		  resources->disk,
 																		  resources->gpus);
-		fprintf(stdout, "Max resources available to coprocess:\ncores: %ld memory: %ld disk: %ld gpus: %ld\n",  
+		debug(D_WQ, "Max resources available to coprocess:\ncores: %ld memory: %ld disk: %ld gpus: %ld\n",  
 																				coprocess_info[i].coprocess_resources->cores.total,
 																				coprocess_info[i].coprocess_resources->memory.total,
 																				coprocess_info[i].coprocess_resources->disk.total,
@@ -365,8 +365,6 @@ int work_queue_coprocess_enforce_limit(struct work_queue_coprocess *coprocess) {
 }
 
 void work_queue_coprocess_update_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses) {
-	
-	/*
 	for (int i = 0; i < number_of_coprocesses; i++) {
 		if (work_queue_coprocess_check(coprocess_info + i)) {
 			int status;
@@ -400,5 +398,4 @@ void work_queue_coprocess_update_state(struct work_queue_coprocess *coprocess_in
 			coprocess_info[i].num_restart_attempts++;
 		}
 	}
-	*/
 }
