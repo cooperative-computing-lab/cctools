@@ -483,7 +483,7 @@ Donload the example file for the language of your choice:
 
 ### Language Specific Setup
 
-Before running the ication, you may need some
+Before running the application, you may need some
 additional setup, depending on the language in use:
 
 #### Python Setup
