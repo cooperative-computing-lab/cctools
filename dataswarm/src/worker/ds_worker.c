@@ -1310,6 +1310,48 @@ static int handle_manager(struct link *manager)
 }
 
 /*
+Handle messages arriving on a peer connection.
+*/
+
+static int handle_peer( struct link *peer_link )
+{
+	char line[DS_LINE_MAX];
+	char filename_encoded[DS_LINE_MAX];
+	char filename[DS_LINE_MAX];
+
+	int r = 0;
+
+	// XXX rethink this timeout
+	time_t stoptime = time(0) + 5;
+	
+	if(link_readline(peer_link,line,sizeof(line),stoptime)) {
+		if(sscanf(line,"get %s",filename_encoded)==1) {
+			url_decode(filename_encoded,filename,sizeof(filename));
+			do_get(peer_link,filename,1);
+			r  = 1;
+		} else {
+			debug(D_DS,"Unrecognized transfer message: %s\n",line);
+			r = 0;
+		}
+	} else {
+		r = 0;
+	}
+
+	return r;
+}
+
+static void handle_peer_connection( struct link *peer_link )
+{
+	// XXX rethink this timeout
+	time_t stoptime = time(0) + 5;
+	struct link *p = link_accept(peer_link,stoptime);
+	if(p) {
+		handle_peer(p);
+		link_close(p);
+	}
+}
+
+/*
 Return true if this task can run with the resources currently available.
 */
 
@@ -1410,7 +1452,7 @@ static int enforce_worker_promises(struct link *manager)
 	return 1;
 }
 
-static void work_for_manager(struct link *manager)
+static void work_for_manager( struct link *manager, struct link *peer_transfer_link )
 {
 	sigset_t mask;
 
@@ -1459,14 +1501,31 @@ static void work_for_manager(struct link *manager)
 			sigchld_received_flag = 0;
 		}
 
-		int manager_activity = link_usleep_mask(manager, wait_msec*1000, &mask, 1, 0);
-		if(manager_activity < 0) break;
+
+		struct link_info poll_table[2];
+		poll_table[0].link = manager;
+		poll_table[0].events = LINK_READ;
+		poll_table[0].revents = 0;
+		poll_table[1].link = peer_transfer_link;
+		poll_table[1].events = LINK_READ;
+		poll_table[1].revents = 0;
+
+		//XXX need to handle signal mask here
+		link_poll(poll_table,2,wait_msec);
+		
+		int manager_activity = poll_table[0].revents;
+		int peer_activity = poll_table[1].revents;
 
 		int ok = 1;
 		if(manager_activity) {
 			ok &= handle_manager(manager);
 		}
 
+		if(peer_activity) {
+			// success of this is irrelevant to what comes after
+			handle_peer_connection(peer_transfer_link);
+		}
+		
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
@@ -1789,8 +1848,12 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 
 	report_worker_ready(manager);
 
-	work_for_manager(manager);
+	struct link *peer_transfer_link = link_serve(0);
 
+	work_for_manager(manager,peer_transfer_link);
+
+	link_close(peer_transfer_link);
+	
 	if(abort_signal_received) {
 		send_manager_message(manager, "info vacating %d\n", abort_signal_received);
 	}
