@@ -641,7 +641,7 @@ static int handle_completed_tasks(struct link *manager)
  *
  */
 
-static int stream_output_item(struct link *manager, const char *filename, int recursive)
+static int stream_output_item(struct link *lnk, const char *filename, int recursive)
 {
 	DIR *dir;
 	struct dirent *dent;
@@ -660,13 +660,13 @@ static int stream_output_item(struct link *manager, const char *filename, int re
 		dir = opendir(cached_path);
 		if(!dir) goto access_failure;
 
-		send_message(manager, "dir %s 0\n", filename);
+		send_message(lnk, "dir %s 0\n", filename);
 
 		while(recursive && (dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
 			char *subfilename = string_format("%s/%s", filename, dent->d_name);
-			stream_output_item(manager, subfilename, recursive);
+			stream_output_item(lnk, subfilename, recursive);
 			free(subfilename);
 		}
 
@@ -676,8 +676,8 @@ static int stream_output_item(struct link *manager, const char *filename, int re
 		fd = open(cached_path, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = info.st_size;
-			send_message(manager, "file %s %"PRId64"\n", filename, length );
-			actual = link_stream_from_fd(manager, fd, length, time(0) + active_timeout);
+			send_message(lnk, "file %s %"PRId64"\n", filename, length );
+			actual = link_stream_from_fd(lnk, fd, length, time(0) + active_timeout);
 			close(fd);
 			if(actual != length) goto send_failure;
 		} else {
@@ -690,7 +690,7 @@ static int stream_output_item(struct link *manager, const char *filename, int re
 
 access_failure:
 	free(cached_path);
-	send_message(manager, "missing %s %d\n", filename, errno);
+	send_message(lnk, "missing %s %d\n", filename, errno);
 	return 0;
 
 send_failure:
