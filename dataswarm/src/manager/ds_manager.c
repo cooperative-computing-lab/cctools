@@ -238,6 +238,10 @@ struct ds_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 
+	char transfer_addr[LINK_ADDRESS_MAX];
+	int transfer_port;
+	int transfer_port_active;
+  
 	worker_type type;                         // unknown, regular worker, status worker
 
 	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
@@ -704,6 +708,21 @@ int process_cache_invalid( struct ds_manager *q, struct ds_worker *w, const char
 	return MSG_PROCESSED;
 }
 
+/*
+A transfer-address message indicates that the worker is listening
+on its own port to receive get requests from other workers.
+*/
+
+int process_transfer_address( struct ds_manager *q, struct ds_worker *w, const char *line )
+{
+	if(sscanf(line,"transfer-address %s %d",w->transfer_addr,&w->transfer_port)) {
+		w->transfer_port_active = 1;
+		return MSG_PROCESSED;
+	} else {
+		return MSG_FAILURE;
+	}
+}
+
 /**
  * This function receives a message from worker and records the time a message is successfully
  * received. This timestamp is used in keepalive timeout computations.
@@ -753,6 +772,8 @@ static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker *w, 
 		result = process_cache_update(q, w, line);
 	} else if (string_prefix_is(line, "cache-invalid")) {
 		result = process_cache_invalid(q, w, line);
+	} else if (string_prefix_is(line, "transfer-address")) {
+		result = process_transfer_address(q, w, line);
 	} else if( sscanf(line,"GET %s HTTP/%*d.%*d",path)==1) {
 	        result = process_http_request(q,w,path,stoptime);
 	} else {
