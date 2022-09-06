@@ -412,12 +412,20 @@ void send_cache_invalid( struct link *manager, const char *cachename, const char
 	link_write(manager,message,length,time(0)+active_timeout);
 }
 
+void send_transfer_address( struct link *manager, struct link *transfer_link )
+{
+	char addr[LINK_ADDRESS_MAX];
+	int port;
+	link_address_local(transfer_link,addr,&port);
+	send_manager_message(manager, "transfer-address %s %d\n",addr,port);
+}
+
 /*
 Send the initial "ready" message to the manager with the version and so forth.
 The manager will not start sending tasks until this message is recevied.
 */
 
-static void report_worker_ready( struct link *manager )
+static void report_worker_ready( struct link *manager, struct link *transfer_link )
 {
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
@@ -425,6 +433,7 @@ static void report_worker_ready( struct link *manager )
 	send_manager_message(manager, "info worker-id %s\n", worker_id);
 	send_features(manager);
 	send_keepalive(manager, 1);
+	send_transfer_address(manager,transfer_link);
 	send_manager_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 	if (factory_name)
 		send_manager_message(manager, "info from-factory %s\n", factory_name);
@@ -1846,10 +1855,9 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 
 	measure_worker_resources();
 
-	report_worker_ready(manager);
-
 	struct link *peer_transfer_link = link_serve(0);
 
+	report_worker_ready(manager,peer_transfer_link);
 	work_for_manager(manager,peer_transfer_link);
 
 	link_close(peer_transfer_link);
