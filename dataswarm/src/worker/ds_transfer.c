@@ -223,6 +223,7 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 	char name[DS_LINE_MAX];
 	int64_t size;
 	int mode;
+	int errornum;
 
 	if(!recv_message(lnk,line,sizeof(line),stoptime)) return 0;
 
@@ -258,6 +259,11 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 		char *subname = string_format("%s/%s",dirname,name);
 		r = ds_transfer_get_dir_internal(lnk,subname,totalsize,stoptime);
 		free(subname);
+
+	} else if(sscanf(line,"missing %s %d",name_encoded,&errornum)==2) {
+
+		debug(D_DS,"unable to transfer %s: %s",name_encoded,strerror(errornum));
+		r = 0;
 
 	} else if(!strcmp(line,"end")) {
 		r = 2;
