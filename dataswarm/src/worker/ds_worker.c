@@ -968,11 +968,18 @@ static int handle_manager(struct link *manager)
 			r = do_task(manager, taskid,time(0)+active_timeout);
 		} else if(sscanf(line,"file %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = ds_transfer_recv_file(manager, filename, length, mode);
+			char * cached_path = ds_cache_full_path(global_cache,filename);
+			r = ds_transfer_get_file(manager, cached_path, length, mode);
+			free(cached_path);
+			if(r) ds_cache_addfile(global_cache,length,filename);
 			reset_idle_timer();
 		} else if(sscanf(line, "dir %s", filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = ds_transfer_recv_dir(manager,filename);
+			char * cached_path = ds_cache_full_path(global_cache,filename);
+			int64_t totalsize = 0;
+			r = ds_transfer_get_dir(manager,filename,&totalsize);
+			free(cached_path);
+			if(r) ds_cache_addfile(global_cache,totalsize,filename);
 			reset_idle_timer();
 		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
 			url_decode(filename_encoded,filename,sizeof(filename));
@@ -989,7 +996,9 @@ static int handle_manager(struct link *manager)
 			r = do_unlink(filename);
 		} else if(sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = ds_transfer_send_any(manager,filename);
+			char *cached_path = ds_cache_full_path(global_cache,filename);
+			r = ds_transfer_put_any(manager,cached_path);
+			free(cached_path);
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
@@ -1040,7 +1049,7 @@ static int handle_peer( struct link *peer_link )
 	if(link_readline(peer_link,line,sizeof(line),stoptime)) {
 		if(sscanf(line,"get %s",filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			ds_transfer_send_any(peer_link,filename);
+			ds_transfer_put_any(peer_link,filename);
 			r  = 1;
 		} else {
 			debug(D_DS,"Unrecognized transfer message: %s\n",line);
