@@ -3177,7 +3177,7 @@ static int send_file( struct ds_manager *q, struct ds_worker *w, struct ds_task 
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
 
 	stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
-	send_worker_msg(q,w, "put %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
+	send_worker_msg(q,w, "file %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 
@@ -3436,7 +3436,7 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *
 	case DS_BUFFER:
 		debug(D_DS, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, f->length);
-		send_worker_msg(q,w, "put %s %d %o\n",f->cached_name, f->length, 0777 );
+		send_worker_msg(q,w, "file %s %d %o\n",f->cached_name, f->length, 0777 );
 		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
 		if(actual!=f->length) {
 			result = DS_WORKER_FAILURE;

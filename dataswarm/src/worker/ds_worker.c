@@ -896,10 +896,8 @@ static int do_put_file_internal( struct link *manager, char *filename, int64_t l
 /*
 Handle an incoming directory inside the recursive dir protocol.
 Notice that we have already checked the dirname for validity,
-and now we process "put" and "dir" commands within the list
-until "end" is reached.  Note that "put" is used instead of
-"file" for historical reasons, to support recursive reuse
-of existing code.
+and now we process "file" and "dir" commands within the list
+until "end" is reached.
 */
 
 static int do_put_dir_internal( struct link *manager, char *dirname, int *totalsize )
@@ -921,7 +919,7 @@ static int do_put_dir_internal( struct link *manager, char *dirname, int *totals
 
 		int r = 0;
 
-		if(sscanf(line,"put %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
+		if(sscanf(line,"file %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
 
 			url_decode(name_encoded,name,sizeof(name));
 			if(!is_valid_filename(name)) return 0;
@@ -1262,7 +1260,7 @@ static int handle_manager(struct link *manager)
 	if(recv_message(manager, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(manager, taskid,time(0)+active_timeout);
-		} else if(sscanf(line,"put %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
+		} else if(sscanf(line,"file %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_put_single_file(manager, filename, length, mode);
 			reset_idle_timer();
