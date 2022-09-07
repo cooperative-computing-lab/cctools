@@ -6439,11 +6439,6 @@ static void print_password_warning( struct work_queue *q )
 		fprintf(stdout,"warning: you should set a password with the --password option.\n");
 	}
 
-	if(!q->ssl_enabled) {
-		fprintf(stdout,"warning: using plain-text when communicating with workers.\n");
-		fprintf(stdout,"warning: use encryption with a key and cert when creating the manager.\n");
-	}
-
 	did_password_warning = 1;
 }
 
