@@ -1391,7 +1391,7 @@ static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_w
 
 	// Send the name of the file/dir name to fetch
 	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, remote_name, local_name);
-	send_worker_msg(q,w, "get %s 1\n",remote_name);
+	send_worker_msg(q,w, "get %s\n",remote_name);
 
 	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below
 

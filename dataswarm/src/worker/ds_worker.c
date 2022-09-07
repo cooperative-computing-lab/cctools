@@ -641,7 +641,7 @@ static int handle_completed_tasks(struct link *manager)
  *
  */
 
-static int stream_output_item(struct link *lnk, const char *filename, int recursive)
+static int stream_output_item(struct link *lnk, const char *filename )
 {
 	DIR *dir;
 	struct dirent *dent;
@@ -662,11 +662,11 @@ static int stream_output_item(struct link *lnk, const char *filename, int recurs
 
 		send_message(lnk, "dir %s 0\n", filename);
 
-		while(recursive && (dent = readdir(dir))) {
+		while((dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
 			char *subfilename = string_format("%s/%s", filename, dent->d_name);
-			stream_output_item(lnk, subfilename, recursive);
+			stream_output_item(lnk, subfilename);
 			free(subfilename);
 		}
 
@@ -1056,9 +1056,9 @@ static int do_unlink(const char *path)
 	return result;
 }
 
-static int do_get(struct link *manager, const char *filename, int recursive)
+static int do_get(struct link *manager, const char *filename)
 {
-	stream_output_item(manager, filename, recursive);
+	stream_output_item(manager, filename);
 	send_message(manager, "end\n");
 	return 1;
 }
@@ -1283,9 +1283,9 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_unlink(filename);
-		} else if(sscanf(line, "get %s %d", filename_encoded, &mode) == 2) {
+		} else if(sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_get(manager, filename, mode);
+			r = do_get(manager, filename);
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
@@ -1336,7 +1336,7 @@ static int handle_peer( struct link *peer_link )
 	if(link_readline(peer_link,line,sizeof(line),stoptime)) {
 		if(sscanf(line,"get %s",filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			do_get(peer_link,filename,1);
+			do_get(peer_link,filename);
 			r  = 1;
 		} else {
 			debug(D_DS,"Unrecognized transfer message: %s\n",line);
