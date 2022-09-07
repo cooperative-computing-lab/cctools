@@ -969,7 +969,7 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line,"file %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			char * cached_path = ds_cache_full_path(global_cache,filename);
-			r = ds_transfer_get_file(manager, cached_path, length, mode);
+			r = ds_transfer_get_file(manager, cached_path, length, mode, time(0)+active_timeout);
 			free(cached_path);
 			if(r) ds_cache_addfile(global_cache,length,filename);
 			reset_idle_timer();
@@ -977,7 +977,7 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded,filename,sizeof(filename));
 			char * cached_path = ds_cache_full_path(global_cache,filename);
 			int64_t totalsize = 0;
-			r = ds_transfer_get_dir(manager,filename,&totalsize);
+			r = ds_transfer_get_dir(manager,filename,&totalsize,time(0)+active_timeout);
 			free(cached_path);
 			if(r) ds_cache_addfile(global_cache,totalsize,filename);
 			reset_idle_timer();
@@ -997,7 +997,7 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			char *cached_path = ds_cache_full_path(global_cache,filename);
-			r = ds_transfer_put_any(manager,cached_path);
+			r = ds_transfer_put_any(manager,cached_path,time(0)+active_timeout);
 			free(cached_path);
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
@@ -1049,7 +1049,7 @@ static int handle_peer( struct link *peer_link )
 	if(link_readline(peer_link,line,sizeof(line),stoptime)) {
 		if(sscanf(line,"get %s",filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			ds_transfer_put_any(peer_link,filename);
+			ds_transfer_put_any(peer_link,filename,time(0)+active_timeout);
 			r  = 1;
 		} else {
 			debug(D_DS,"Unrecognized transfer message: %s\n",line);

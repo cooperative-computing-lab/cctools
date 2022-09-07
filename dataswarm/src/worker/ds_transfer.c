@@ -19,8 +19,6 @@
 
 /* Temporary hacks to access global values. */
 
-extern int active_timeout;
-
 __attribute__ (( format(printf,2,3) )) void send_message( struct link *l, const char *fmt, ... );
 int recv_message( struct link *l, char *line, int length, time_t stoptime );
 
@@ -31,7 +29,7 @@ making it efficient to move large directory trees without
 multiple round trips needed for remote procedure calls.
 
 Each file, directory, or symlink is represented by a single
-header line giving the name, length, and mode of the entry.
+header line giving the name and length of the entry.
 Files and symlinks are followed by the raw contents of the file
 or link, respectively, while directories are followed by more
 lines containing the contents of the directory, until an "end"
@@ -50,17 +48,17 @@ For example, the following directory tree:
 Is represented as follows:
 
 dir mydir
-file 1.txt 35291 0700
+file 1.txt 35291
   (35291 bytes of 1.txt)
-file 2.txt 502 0700
+file 2.txt 502
   (502 bytes of 2.txt)
 dir mysubdir
-file a.txt 321 0700
+file a.txt 321
   (321 bytes of a.txt)
-file b.txt 456 0700
+file b.txt 456
   (456 bytes of a.txt)
 end
-file z.jpg 40001 0700
+file z.jpg 40001
   (40001 bytes of z.jpg)
 end
 
@@ -78,7 +76,7 @@ static int is_valid_filename( const char *name )
 	return 1;
 }
 
-static int ds_transfer_put_internal( struct link *lnk, const char *full_name, const char *relative_name )
+static int ds_transfer_put_internal( struct link *lnk, const char *full_name, const char *relative_name, time_t stoptime )
 {
 	struct stat info;
 	int64_t actual, length;
@@ -98,7 +96,7 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
 			char *sub_full_name = string_format("%s/%s", full_name, dent->d_name);
-			ds_transfer_put_internal(lnk, sub_full_name, dent->d_name);
+			ds_transfer_put_internal(lnk, sub_full_name, dent->d_name, stoptime);
 			free(sub_full_name);
 		}
 		closedir(dir);
@@ -109,7 +107,7 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 		if(fd >= 0) {
 			length = info.st_size;
 			send_message(lnk, "file %s %"PRId64"\n", relative_name, length );
-			actual = link_stream_from_fd(lnk, fd, length, time(0) + active_timeout);
+			actual = link_stream_from_fd(lnk, fd, length, stoptime);
 			close(fd);
 			if(actual != length) goto send_failure;
 		} else {
@@ -120,7 +118,7 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 		int result = readlink(full_name,link_target,sizeof(link_target));
 		if(result>0) {
 			send_message(lnk, "symlink %s %d\n",relative_name,result);
-			link_write(lnk,link_target,result,time(0)+active_timeout);
+			link_write(lnk,link_target,result,stoptime);
 		} else {
 			goto access_failure;
 		}
@@ -139,9 +137,9 @@ send_failure:
 	return 0;
 }
 
-int ds_transfer_put_any( struct link *lnk, const char *filename )
+int ds_transfer_put_any( struct link *lnk, const char *filename, time_t stoptime)
 {
-	int r = ds_transfer_put_internal(lnk,filename,path_basename(filename));
+	int r = ds_transfer_put_internal(lnk,filename,path_basename(filename),stoptime);
 	return r;
 }
 
@@ -154,11 +152,11 @@ must be read off of the wire.  The symlink target does not
 need to be url_decoded because it is sent in the body.
 */
 
-static int ds_transfer_get_symlink_internal( struct link *lnk, char *filename, int length )
+static int ds_transfer_get_symlink_internal( struct link *lnk, char *filename, int length, time_t stoptime )
 {
 	char *target = malloc(length);
 
-	int actual = link_read(lnk,target,length,time(0)+active_timeout);
+	int actual = link_read(lnk,target,length,stoptime);
 	if(actual!=length) {
 		free(target);
 		return 0;
@@ -183,7 +181,7 @@ the necessary parent directories and checked the
 name for validity.
 */
 
-static int ds_transfer_get_file_internal( struct link *lnk, const char *filename, int64_t length, int mode )
+static int ds_transfer_get_file_internal( struct link *lnk, const char *filename, int64_t length, int mode, time_t stoptime )
 {
 	if(!check_disk_space_for_filesize(".", length, 0)) {
 		debug(D_DS, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
@@ -199,7 +197,7 @@ static int ds_transfer_get_file_internal( struct link *lnk, const char *filename
 		return 0;
 	}
 
-	int64_t actual = link_stream_to_fd(lnk, fd, length, time(0) + active_timeout);
+	int64_t actual = link_stream_to_fd(lnk, fd, length, stoptime);
 	close(fd);
 	if(actual!=length) {
 		debug(D_DS, "Failed to put file - %s (%s)\n", filename, strerror(errno));
@@ -209,7 +207,7 @@ static int ds_transfer_get_file_internal( struct link *lnk, const char *filename
 	return 1;
 }
 
-static int ds_transfer_get_dir_internal( struct link *lnk, const char *dirname, int64_t *totalsize );
+static int ds_transfer_get_dir_internal( struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime );
 
 /*
 Receive a single item of unknown type into the directory "dirname".
@@ -218,7 +216,7 @@ Returns 1 on successful transfer of one item.
 Returns 2 on successful receipt of "end" of list.
 */
 
-static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, int64_t *totalsize )
+static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime )
 {
 	char line[DS_LINE_MAX];
 	char name_encoded[DS_LINE_MAX];
@@ -226,7 +224,7 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 	int64_t size;
 	int mode;
 
-	if(!recv_message(lnk,line,sizeof(line),time(0)+active_timeout)) return 0;
+	if(!recv_message(lnk,line,sizeof(line),stoptime)) return 0;
 
 	int r = 0;
 
@@ -236,7 +234,7 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 		if(!is_valid_filename(name)) return 0;
 
 		char *subname = string_format("%s/%s",dirname,name);
-		r = ds_transfer_get_file_internal(lnk,subname,size,mode);
+		r = ds_transfer_get_file_internal(lnk,subname,size,mode,stoptime);
 		free(subname);
 
 		*totalsize += size;
@@ -247,7 +245,7 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 		if(!is_valid_filename(name)) return 0;
 
 		char *subname = string_format("%s/%s",dirname,name);
-		r = ds_transfer_get_symlink_internal(lnk,subname,size);
+		r = ds_transfer_get_symlink_internal(lnk,subname,size,stoptime);
 		free(subname);
 
 		*totalsize += size;
@@ -258,7 +256,7 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 		if(!is_valid_filename(name)) return 0;
 
 		char *subname = string_format("%s/%s",dirname,name);
-		r = ds_transfer_get_dir_internal(lnk,subname,totalsize);
+		r = ds_transfer_get_dir_internal(lnk,subname,totalsize,stoptime);
 		free(subname);
 
 	} else if(!strcmp(line,"end")) {
@@ -276,7 +274,7 @@ and now we process "file" and "dir" commands within the list
 until "end" is reached.
 */
 
-static int ds_transfer_get_dir_internal( struct link *lnk, const char *dirname, int64_t *totalsize )
+static int ds_transfer_get_dir_internal( struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime )
 {
 	int result = mkdir(dirname,0777);
 	if(result<0) {
@@ -285,7 +283,7 @@ static int ds_transfer_get_dir_internal( struct link *lnk, const char *dirname, 
 	}
 
 	while(1) {
-		int r = ds_transfer_get_any_internal(lnk,dirname,totalsize);
+		int r = ds_transfer_get_any_internal(lnk,dirname,totalsize,stoptime);
 		if(r==1) {
 			// Successfully received one item. 	
 			continue;
@@ -301,21 +299,21 @@ static int ds_transfer_get_dir_internal( struct link *lnk, const char *dirname, 
 	return 0;
 }
 
-int ds_transfer_get_dir( struct link *lnk, const char *dirname, int64_t *totalsize )
+int ds_transfer_get_dir( struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime )
 {
-	return ds_transfer_get_dir_internal(lnk,dirname,totalsize);
+	return ds_transfer_get_dir_internal(lnk,dirname,totalsize,stoptime);
 }
 
-int ds_transfer_get_file( struct link *lnk, const char *filename, int64_t length, int mode )
+int ds_transfer_get_file( struct link *lnk, const char *filename, int64_t length, int mode, time_t stoptime)
 {
-	return ds_transfer_get_file_internal(lnk,filename,length,mode);
+	return ds_transfer_get_file_internal(lnk,filename,length,mode,stoptime);
 }
 
-int ds_transfer_get( struct link *lnk, const char *dirname, const char *filename )
+int ds_transfer_get( struct link *lnk, const char *dirname, const char *filename, time_t stoptime )
 {
 	int64_t totalsize = 0;
 	send_message(lnk,"get %s\n",filename);
-	return ds_transfer_get_any_internal(lnk,dirname,&totalsize);
+	return ds_transfer_get_any_internal(lnk,dirname,&totalsize,stoptime);
 }
 
 
