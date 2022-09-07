@@ -1,0 +1,347 @@
+#include "ds_transfer.h"
+#include "ds_cache.h"
+#include "ds_protocol.h"
+
+#include "link.h"
+#include "debug.h"
+#include "url_encode.h"
+#include "path.h"
+#include "host_disk_info.h"
+#include "stringtools.h"
+
+#include <stdlib.h>
+#include <fcntl.h>
+#include <string.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
+/* Temporary hacks to access global values. */
+
+extern struct ds_cache *global_cache;
+extern int active_timeout;
+
+__attribute__ (( format(printf,2,3) )) void send_message( struct link *l, const char *fmt, ... );
+int recv_message( struct link *l, char *line, int length, time_t stoptime );
+
+
+/*
+This module implements the streaming directory transfer,
+making it efficient to move large directory trees without
+multiple round trips needed for remote procedure calls.
+
+Each file, directory, or symlink is represented by a single
+header line giving the name, length, and mode of the entry.
+Files and symlinks are followed by the raw contents of the file
+or link, respectively, while directories are followed by more
+lines containing the contents of the directory, until an "end"
+is received.
+
+For example, the following directory tree:
+
+- mydir
+-- 1.txt
+-- 2.txt
+-- mysubdir
+--- a.txt
+--- b.txt
+-- z.jpb
+
+Is represented as follows:
+
+dir mydir
+file 1.txt 35291 0700
+  (35291 bytes of 1.txt)
+file 2.txt 502 0700
+  (502 bytes of 2.txt)
+dir mysubdir
+file a.txt 321 0700
+  (321 bytes of a.txt)
+file b.txt 456 0700
+  (456 bytes of a.txt)
+end
+file z.jpg 40001 0700
+  (40001 bytes of z.jpg)
+end
+
+*/
+
+/*
+Return false if name is invalid as a simple filename.
+For example, if it contains a slash, which would escape
+the current working directory.
+*/
+
+static int is_valid_filename( const char *name )
+{
+	if(strchr(name,'/')) return 0;
+	return 1;
+}
+
+static int ds_transfer_send_internal( struct link *lnk, const char *full_name, const char *relative_name )
+{
+	struct stat info;
+	int64_t actual, length;
+
+	if(stat(full_name, &info) != 0) {
+		goto access_failure;
+	}
+
+	if(S_ISDIR(info.st_mode)) {
+		DIR *dir = opendir(full_name);
+		if(!dir) goto access_failure;
+
+		send_message(lnk, "dir %s 0\n",relative_name);
+
+		struct dirent *dent;
+		while((dent = readdir(dir))) {
+			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
+				continue;
+			char *sub_full_name = string_format("%s/%s", full_name, dent->d_name);
+			ds_transfer_send_internal(lnk, sub_full_name, dent->d_name);
+			free(sub_full_name);
+		}
+		closedir(dir);
+		send_message(lnk, "end\n");
+
+	} else if(S_ISREG(info.st_mode)) {
+		int fd = open(full_name, O_RDONLY, 0);
+		if(fd >= 0) {
+			length = info.st_size;
+			send_message(lnk, "file %s %"PRId64"\n", relative_name, length );
+			actual = link_stream_from_fd(lnk, fd, length, time(0) + active_timeout);
+			close(fd);
+			if(actual != length) goto send_failure;
+		} else {
+			goto access_failure;
+		}
+	} else if(S_ISLNK(info.st_mode)) {
+		char link_target[DS_LINE_MAX];
+		int result = readlink(full_name,link_target,sizeof(link_target));
+		if(result>0) {
+			send_message(lnk, "symlink %s %d\n",relative_name,result);
+			link_write(lnk,link_target,result,time(0)+active_timeout);
+		} else {
+			goto access_failure;
+		}
+	} else {
+		goto access_failure;
+	}
+
+	return 1;
+
+access_failure:
+	send_message(lnk, "missing %s %d\n", relative_name, errno);
+	return 0;
+
+send_failure:
+	debug(D_DS, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", full_name, length, actual);
+	return 0;
+}
+
+int ds_transfer_send_any( struct link *lnk, const char *filename )
+{
+	char *cached_path = ds_cache_full_path(global_cache,filename);
+	int r = ds_transfer_send_internal(lnk,cached_path,filename);
+	free(cached_path);
+	return r;
+}
+
+
+/*
+Handle an incoming symbolic link inside the rput protocol.
+The filename of the symlink was already given in the message,
+and the target of the symlink is given as the "body" which
+must be read off of the wire.  The symlink target does not
+need to be url_decoded because it is sent in the body.
+*/
+
+static int ds_transfer_recv_symlink_internal( struct link *lnk, char *filename, int length )
+{
+	char *target = malloc(length);
+
+	int actual = link_read(lnk,target,length,time(0)+active_timeout);
+	if(actual!=length) {
+		free(target);
+		return 0;
+	}
+
+	int result = symlink(target,filename);
+	if(result<0) {
+		debug(D_DS,"could not create symlink %s: %s",filename,strerror(errno));
+		free(target);
+		return 0;
+	}
+
+	free(target);
+
+	return 1;
+}
+
+/*
+Handle an incoming file inside the rput protocol.
+Notice that we trust the caller to have created
+the necessary parent directories and checked the
+name for validity.
+*/
+
+static int ds_transfer_recv_file_internal( struct link *lnk, char *filename, int64_t length, int mode )
+{
+	if(!check_disk_space_for_filesize(".", length, 0)) {
+		debug(D_DS, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
+		return 0;
+	}
+
+	/* Ensure that worker can access the file! */
+	mode = mode | 0600;
+
+	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
+	if(fd<0) {
+		debug(D_DS, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
+		return 0;
+	}
+
+	int64_t actual = link_stream_to_fd(lnk, fd, length, time(0) + active_timeout);
+	close(fd);
+	if(actual!=length) {
+		debug(D_DS, "Failed to put file - %s (%s)\n", filename, strerror(errno));
+		return 0;
+	}
+
+	return 1;
+}
+
+static int ds_transfer_recv_dir_internal( struct link *lnk, char *dirname, int *totalsize );
+
+/*
+Receive a single item of unknown type into the directory "dirname".
+Returns 0 on failure to transfer.
+Returns 1 on successful transfer of one item.
+Returns 2 on successful receipt of "end" of list.
+*/
+
+static int ds_transfer_recv_any_internal( struct link *lnk, const char *dirname, int *totalsize )
+{
+	char line[DS_LINE_MAX];
+	char name_encoded[DS_LINE_MAX];
+	char name[DS_LINE_MAX];
+	int64_t size;
+	int mode;
+
+	if(!recv_message(lnk,line,sizeof(line),time(0)+active_timeout)) return 0;
+
+	int r = 0;
+
+	if(sscanf(line,"file %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
+
+		url_decode(name_encoded,name,sizeof(name));
+		if(!is_valid_filename(name)) return 0;
+
+		char *subname = string_format("%s/%s",dirname,name);
+		r = ds_transfer_recv_file_internal(lnk,subname,size,mode);
+		free(subname);
+
+		*totalsize += size;
+
+	} else if(sscanf(line,"symlink %s %" SCNd64,name_encoded,&size)==2) {
+
+		url_decode(name_encoded,name,sizeof(name));
+		if(!is_valid_filename(name)) return 0;
+
+		char *subname = string_format("%s/%s",dirname,name);
+		r = ds_transfer_recv_symlink_internal(lnk,subname,size);
+		free(subname);
+
+		*totalsize += size;
+
+	} else if(sscanf(line,"dir %s",name_encoded)==1) {
+
+		url_decode(name_encoded,name,sizeof(name));
+		if(!is_valid_filename(name)) return 0;
+
+		char *subname = string_format("%s/%s",dirname,name);
+		r = ds_transfer_recv_dir_internal(lnk,subname,totalsize);
+		free(subname);
+
+	} else if(!strcmp(line,"end")) {
+		r = 2;
+	}
+
+	return r;
+}
+
+
+/*
+Handle an incoming directory inside the recursive dir protocol.
+Notice that we have already checked the dirname for validity,
+and now we process "file" and "dir" commands within the list
+until "end" is reached.
+*/
+
+static int ds_transfer_recv_dir_internal( struct link *lnk, char *dirname, int *totalsize )
+{
+	int result = mkdir(dirname,0777);
+	if(result<0) {
+		debug(D_DS,"unable to create %s: %s",dirname,strerror(errno));
+		return 0;
+	}
+
+	while(1) {
+		int r = ds_transfer_recv_any_internal(lnk,dirname,totalsize);
+		if(r==1) {
+			// Successfully received one item. 	
+			continue;
+		} else if(r==2) {
+			// Sucessfully got end of sequence. 
+			return 1;
+		} else {
+			// Failed to receive item.
+			return 0;
+		}
+	}
+
+	return 0;
+}
+
+int ds_transfer_recv_dir( struct link *lnk, char *dirname )
+{
+	if(!is_valid_filename(dirname)) return 0;
+
+	int totalsize = 0;
+
+	char *cached_path = ds_cache_full_path(global_cache,dirname);
+	int result = ds_transfer_recv_dir_internal(lnk,cached_path,&totalsize);
+	free(cached_path);
+
+	if(result) ds_cache_addfile(global_cache,totalsize,dirname);
+
+	return result;
+}
+
+int ds_transfer_recv_file( struct link *lnk, char *filename, int64_t length, int mode )
+{
+	if(!is_valid_filename(filename)) return 0;
+
+	char * cached_path = ds_cache_full_path(global_cache,filename);
+	int result = ds_transfer_recv_file_internal(lnk,cached_path,length,mode);
+	free(cached_path);
+
+	if(result) ds_cache_addfile(global_cache,length,filename);
+
+	return result;
+}
+
+int ds_transfer_get( struct link *lnk, const char *filename )
+{
+	int totalsize = 0;
+	send_message(lnk,"get %s\n",filename);
+	// This is a bit clunky -- just get the cache directory path.
+	char *dirname = ds_cache_full_path(global_cache,"");
+	int r = ds_transfer_recv_any_internal(lnk,dirname,&totalsize);
+	free(dirname);
+	return r;
+}
+
+

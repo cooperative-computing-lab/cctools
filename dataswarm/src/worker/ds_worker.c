@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "ds_gpus.h"
 #include "ds_coprocess.h"
 #include "ds_sandbox.h"
+#include "ds_transfer.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -91,7 +92,7 @@ static time_t connect_stoptime = 0;
 static int connect_timeout = 900;
 
 // Maximum time to attempt sending/receiving any given file or message.
-static const int active_timeout = 3600;
+int active_timeout = 3600;
 
 // Initial value for backoff interval (in seconds) when worker fails to connect to a manager.
 static int init_backoff_interval = 1;
@@ -215,7 +216,7 @@ struct ds_cache *global_cache = 0;
 extern int ds_hack_do_not_compute_cached_name;
 
 __attribute__ (( format(printf,2,3) ))
-static void send_message( struct link *l, const char *fmt, ... )
+void send_message( struct link *l, const char *fmt, ... )
 {
 	char debug_msg[2*DS_LINE_MAX];
 	va_list va;
@@ -232,7 +233,7 @@ static void send_message( struct link *l, const char *fmt, ... )
 	va_end(va);
 }
 
-static int recv_message( struct link *l, char *line, int length, time_t stoptime )
+int recv_message( struct link *l, char *line, int length, time_t stoptime )
 {
 	int result = link_readline(l,line,length,stoptime);
 	if(result) debug(D_DS,"rx: %s",line);
@@ -605,100 +606,6 @@ static int handle_completed_tasks(struct link *manager)
 	return 1;
 }
 
-/**
- * Stream file/directory contents for the recursive get/put protocol.
- * Format:
- * 		for a directory: a new line in the format of "dir $DIR_NAME 0"
- * 		for a file: a new line in the format of "file $FILE_NAME $FILE_LENGTH"
- * 					then file contents.
- * 		string "end" at the end of the stream (on a new line).
- *
- * Example:
- * Assume we have the following directory structure:
- * mydir
- * 		-- 1.txt
- * 		-- 2.txt
- * 		-- mysubdir
- * 			-- a.txt
- * 			-- b.txt
- * 		-- z.jpg
- *
- * The stream contents would be:
- *
- * dir mydir 0
- * file 1.txt $file_len
- * $$ FILE 1.txt's CONTENTS $$
- * file 2.txt $file_len
- * $$ FILE 2.txt's CONTENTS $$
- * dir mysubdir 0
- * file mysubdir/a.txt $file_len
- * $$ FILE mysubdir/a.txt's CONTENTS $$
- * file mysubdir/b.txt $file_len
- * $$ FILE mysubdir/b.txt's CONTENTS $$
- * file z.jpg $file_len
- * $$ FILE z.jpg's CONTENTS $$
- * end
- *
- */
-
-static int stream_output_item(struct link *lnk, const char *filename )
-{
-	DIR *dir;
-	struct dirent *dent;
-	struct stat info;
-	int64_t actual, length;
-	int fd;
-
-	char *cached_path = ds_cache_full_path(global_cache,filename);
-	
-	if(stat(cached_path, &info) != 0) {
-		goto access_failure;
-	}
-
-	if(S_ISDIR(info.st_mode)) {
-		// stream a directory
-		dir = opendir(cached_path);
-		if(!dir) goto access_failure;
-
-		send_message(lnk, "dir %s 0\n", filename);
-
-		while((dent = readdir(dir))) {
-			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
-				continue;
-			char *subfilename = string_format("%s/%s", filename, dent->d_name);
-			stream_output_item(lnk, subfilename);
-			free(subfilename);
-		}
-
-		closedir(dir);
-	} else {
-		// stream a file
-		fd = open(cached_path, O_RDONLY, 0);
-		if(fd >= 0) {
-			length = info.st_size;
-			send_message(lnk, "file %s %"PRId64"\n", filename, length );
-			actual = link_stream_from_fd(lnk, fd, length, time(0) + active_timeout);
-			close(fd);
-			if(actual != length) goto send_failure;
-		} else {
-			goto access_failure;
-		}
-	}
-
-	free(cached_path);
-	return 1;
-
-access_failure:
-	free(cached_path);
-	send_message(lnk, "missing %s %d\n", filename, errno);
-	return 0;
-
-send_failure:
-	free(cached_path);
-	debug(D_DS, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
-	return 0;
-}
-
 /*
 For a task run locally, if the resources are all set to -1,
 then assume that the task occupies all worker resources.
@@ -819,200 +726,6 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 }
 
 /*
-Return false if name is invalid as a simple filename.
-For example, if it contains a slash, which would escape
-the current working directory.
-*/
-
-static int is_valid_filename( const char *name )
-{
-	if(strchr(name,'/')) return 0;
-	return 1;
-}
-
-/*
-Handle an incoming symbolic link inside the rput protocol.
-The filename of the symlink was already given in the message,
-and the target of the symlink is given as the "body" which
-must be read off of the wire.  The symlink target does not
-need to be url_decoded because it is sent in the body.
-*/
-
-static int do_put_symlink_internal( struct link *manager, char *filename, int length )
-{
-	char *target = malloc(length);
-
-	int actual = link_read(manager,target,length,time(0)+active_timeout);
-	if(actual!=length) {
-		free(target);
-		return 0;
-	}
-
-	int result = symlink(target,filename);
-	if(result<0) {
-		debug(D_DS,"could not create symlink %s: %s",filename,strerror(errno));
-		free(target);
-		return 0;
-	}
-
-	free(target);
-
-	return 1;
-}
-
-/*
-Handle an incoming file inside the rput protocol.
-Notice that we trust the caller to have created
-the necessary parent directories and checked the
-name for validity.
-*/
-
-static int do_put_file_internal( struct link *manager, char *filename, int64_t length, int mode )
-{
-	if(!check_disk_space_for_filesize(".", length, 0)) {
-		debug(D_DS, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
-		return 0;
-	}
-
-	/* Ensure that worker can access the file! */
-	mode = mode | 0600;
-
-	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
-	if(fd<0) {
-		debug(D_DS, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
-		return 0;
-	}
-
-	int64_t actual = link_stream_to_fd(manager, fd, length, time(0) + active_timeout);
-	close(fd);
-	if(actual!=length) {
-		debug(D_DS, "Failed to put file - %s (%s)\n", filename, strerror(errno));
-		return 0;
-	}
-
-	return 1;
-}
-
-/*
-Handle an incoming directory inside the recursive dir protocol.
-Notice that we have already checked the dirname for validity,
-and now we process "file" and "dir" commands within the list
-until "end" is reached.
-*/
-
-static int do_put_dir_internal( struct link *manager, char *dirname, int *totalsize )
-{
-	char line[DS_LINE_MAX];
-	char name_encoded[DS_LINE_MAX];
-	char name[DS_LINE_MAX];
-	int64_t size;
-	int mode;
-
-	int result = mkdir(dirname,0777);
-	if(result<0) {
-		debug(D_DS,"unable to create %s: %s",dirname,strerror(errno));
-		return 0;
-	}
-
-	while(1) {
-		if(!recv_message(manager,line,sizeof(line),time(0)+active_timeout)) return 0;
-
-		int r = 0;
-
-		if(sscanf(line,"file %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
-
-			url_decode(name_encoded,name,sizeof(name));
-			if(!is_valid_filename(name)) return 0;
-
-			char *subname = string_format("%s/%s",dirname,name);
-			r = do_put_file_internal(manager,subname,size,mode);
-			free(subname);
-
-			*totalsize += size;
-
-		} else if(sscanf(line,"symlink %s %" SCNd64,name_encoded,&size)==2) {
-
-			url_decode(name_encoded,name,sizeof(name));
-			if(!is_valid_filename(name)) return 0;
-
-			char *subname = string_format("%s/%s",dirname,name);
-			r = do_put_symlink_internal(manager,subname,size);
-			free(subname);
-
-			*totalsize += size;
-
-		} else if(sscanf(line,"dir %s",name_encoded)==1) {
-
-			url_decode(name_encoded,name,sizeof(name));
-			if(!is_valid_filename(name)) return 0;
-
-			char *subname = string_format("%s/%s",dirname,name);
-			r = do_put_dir_internal(manager,subname,totalsize);
-			free(subname);
-
-		} else if(!strcmp(line,"end")) {
-			break;
-		}
-
-		if(!r) return 0;
-	}
-
-	return 1;
-}
-
-static int do_put_dir( struct link *manager, char *dirname )
-{
-	if(!is_valid_filename(dirname)) return 0;
-
-	int totalsize = 0;
-
-	char *cached_path = ds_cache_full_path(global_cache,dirname);
-	int result = do_put_dir_internal(manager,cached_path,&totalsize);
-	free(cached_path);
-
-	if(result) ds_cache_addfile(global_cache,totalsize,dirname);
-
-	return result;
-}
-
-/*
-This is the old method for sending a single file.
-It works, but it has the deficiency that the manager
-expects the worker to create all parent directories
-for the file, which is horrifically expensive when
-sending a large directory tree.  The direction put
-protocol (above) is preferred instead.
-*/
-
-static int do_put_single_file( struct link *manager, char *filename, int64_t length, int mode )
-{
-	if(!path_within_dir(filename, workspace)) {
-		debug(D_DS, "Path - %s is not within workspace %s.", filename, workspace);
-		return 0;
-	}
-
-	char * cached_path = ds_cache_full_path(global_cache,filename);
-	
-	if(strchr(filename,'/')) {
-		char dirname[DS_LINE_MAX];
-		path_dirname(filename,dirname);
-		if(!create_dir(dirname,0777)) {
-			debug(D_DS, "could not create directory %s: %s",dirname,strerror(errno));
-			free(cached_path);
-			return 0;
-		}
-	}
-
-	int result = do_put_file_internal(manager,cached_path,length,mode);
-
-	free(cached_path);
-
-	if(result) ds_cache_addfile(global_cache,length,filename);
-
-	return result;
-}
-
-/*
 Accept a url specification and queue it for later transfer.
 */
 
@@ -1052,13 +765,6 @@ static int do_unlink(const char *path)
 
 	free(cached_path);
 	return result;
-}
-
-static int do_get(struct link *manager, const char *filename)
-{
-	stream_output_item(manager, filename);
-	send_message(manager, "end\n");
-	return 1;
 }
 
 /*
@@ -1262,11 +968,11 @@ static int handle_manager(struct link *manager)
 			r = do_task(manager, taskid,time(0)+active_timeout);
 		} else if(sscanf(line,"file %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_put_single_file(manager, filename, length, mode);
+			r = ds_transfer_recv_file(manager, filename, length, mode);
 			reset_idle_timer();
 		} else if(sscanf(line, "dir %s", filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_put_dir(manager,filename);
+			r = ds_transfer_recv_dir(manager,filename);
 			reset_idle_timer();
 		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
 			url_decode(filename_encoded,filename,sizeof(filename));
@@ -1283,7 +989,7 @@ static int handle_manager(struct link *manager)
 			r = do_unlink(filename);
 		} else if(sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_get(manager, filename);
+			r = ds_transfer_send_any(manager,filename);
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
@@ -1334,7 +1040,7 @@ static int handle_peer( struct link *peer_link )
 	if(link_readline(peer_link,line,sizeof(line),stoptime)) {
 		if(sscanf(line,"get %s",filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			do_get(peer_link,filename);
+			ds_transfer_send_any(peer_link,filename);
 			r  = 1;
 		} else {
 			debug(D_DS,"Unrecognized transfer message: %s\n",line);
