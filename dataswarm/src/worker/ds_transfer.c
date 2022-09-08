@@ -120,8 +120,9 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 	return 1;
 
 access_failure:
+	// A missing message is not a failure from our perspective, keep going.
 	send_message(lnk, "missing %s %d\n", relative_name, errno);
-	return 0;
+	return 1;
 
 send_failure:
 	debug(D_DS, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", full_name, length, actual);
