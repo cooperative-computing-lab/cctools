@@ -109,7 +109,7 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 		int fd = open(full_name, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = info.st_size;
-			send_message(lnk, "file %s %"PRId64" %o\n", relative_name, length, mode );
+			send_message(lnk, "file %s %"PRId64" 0%o\n", relative_name, length, mode );
 			actual = link_stream_from_fd(lnk, fd, length, stoptime);
 			close(fd);
 			if(actual != length) goto send_failure;
@@ -231,7 +231,7 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 
 	int r = 0;
 
-	if(sscanf(line,"file %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
+	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
 
 		url_decode(name_encoded,name,sizeof(name));
 		if(!is_valid_filename(name)) return 0;
