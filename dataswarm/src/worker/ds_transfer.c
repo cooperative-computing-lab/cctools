@@ -64,18 +64,6 @@ end
 
 */
 
-/*
-Return false if name is invalid as a simple filename.
-For example, if it contains a slash, which would escape
-the current working directory.
-*/
-
-static int is_valid_filename( const char *name )
-{
-	if(strchr(name,'/')) return 0;
-	return 1;
-}
-
 static int ds_transfer_put_internal( struct link *lnk, const char *full_name, const char *relative_name, time_t stoptime )
 {
 	struct stat info;
@@ -234,7 +222,6 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
 
 		url_decode(name_encoded,name,sizeof(name));
-		if(!is_valid_filename(name)) return 0;
 
 		char *subname = string_format("%s/%s",dirname,name);
 		r = ds_transfer_get_file_internal(lnk,subname,size,mode,stoptime);
@@ -245,7 +232,6 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 	} else if(sscanf(line,"symlink %s %" SCNd64,name_encoded,&size)==2) {
 
 		url_decode(name_encoded,name,sizeof(name));
-		if(!is_valid_filename(name)) return 0;
 
 		char *subname = string_format("%s/%s",dirname,name);
 		r = ds_transfer_get_symlink_internal(lnk,subname,size,stoptime);
@@ -256,7 +242,6 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 	} else if(sscanf(line,"dir %s",name_encoded)==1) {
 
 		url_decode(name_encoded,name,sizeof(name));
-		if(!is_valid_filename(name)) return 0;
 
 		char *subname = string_format("%s/%s",dirname,name);
 		r = ds_transfer_get_dir_internal(lnk,subname,totalsize,stoptime);
