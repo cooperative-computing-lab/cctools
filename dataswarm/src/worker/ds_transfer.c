@@ -315,12 +315,14 @@ int ds_transfer_get_file( struct link *lnk, struct ds_cache *cache, const char *
 }
 
 
-int ds_transfer_get( struct link *lnk, struct ds_cache *cache, const char *dirname, const char *filename, time_t stoptime )
+int ds_transfer_get_any( struct link *lnk, struct ds_cache *cache, const char *filename, time_t stoptime )
 {
 	int64_t totalsize = 0;
 	send_message(lnk,"get %s\n",filename);
-	int r = ds_transfer_get_any_internal(lnk,dirname,&totalsize,stoptime);
+	char * cache_root = ds_cache_full_path(cache,"");
+	int r = ds_transfer_get_any_internal(lnk,cache_root,&totalsize,stoptime);
 	if(r) ds_cache_addfile(cache,totalsize,filename);
+	free(cache_root);
 	return r;
 }
 
