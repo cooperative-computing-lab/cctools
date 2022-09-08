@@ -87,8 +87,12 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
 			char *sub_full_name = string_format("%s/%s", full_name, dent->d_name);
-			ds_transfer_put_internal(lnk, sub_full_name, dent->d_name, stoptime);
+			int sub_result = ds_transfer_put_internal(lnk, sub_full_name, dent->d_name, stoptime);
 			free(sub_full_name);
+
+			// Bail out of transfer if we cannot send any more
+			if(!sub_result) break;
+
 		}
 		closedir(dir);
 		send_message(lnk, "end\n");
