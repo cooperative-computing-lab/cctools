@@ -977,7 +977,7 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded,filename,sizeof(filename));
 			char * cached_path = ds_cache_full_path(global_cache,filename);
 			int64_t totalsize = 0;
-			r = ds_transfer_get_dir(manager,filename,&totalsize,time(0)+active_timeout);
+			r = ds_transfer_get_dir(manager,cached_path,&totalsize,time(0)+active_timeout);
 			free(cached_path);
 			if(r) ds_cache_addfile(global_cache,totalsize,filename);
 			reset_idle_timer();
