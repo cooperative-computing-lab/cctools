@@ -1312,8 +1312,11 @@ static void add_worker(struct ds_manager *q)
 }
 
 /*
-Get a single file from a remote worker.
+Receive the contents of a single file from a worker.
+The "file" header has already been received, just
+bring back the streaming data within various constraints.
 */
+
 static ds_result_code_t get_file_contents( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *local_name, int64_t length, int mode )
 {
 	// If a bandwidth limit is in effect, choose the effective stoptime.
@@ -1378,6 +1381,12 @@ static ds_result_code_t get_file_contents( struct ds_manager *q, struct ds_worke
 	return DS_SUCCESS;
 }
 
+/*
+Get the contents of a symlink back from the worker,
+after the "symlink" header has already been received.
+*/
+
+
 static ds_result_code_t get_symlink_contents( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *filename, int length )
 {
         char *target = malloc(length);
@@ -1404,15 +1413,18 @@ static ds_result_code_t get_symlink_contents( struct ds_manager *q, struct ds_wo
 static ds_result_code_t get_dir_contents( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *dirname, int64_t *totalsize );
 
 /*
-This function implements the recursive get protocol.
-The manager sends a single get message, then the worker
-responds with a continuous stream of dir and file message
-that indicate the entire contents of the directory.
-This makes it efficient to move deep directory hierarchies with
-high throughput and low latency.
+Get a single item (file, dir, symlink, etc) back
+from the worker by observing the header and then
+pulling the appropriate data on the stream.
+Note that if forced_name is non-null, then the item
+is stored under that filename.  Otherwise, it is placed
+in the directory dirname with the filename given by the
+worker.  This allows this function to handle both the
+top-level case of renamed files as well as interior files
+within a directory.
 */
 
-static ds_result_code_t get_any( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *dirname, int64_t *totalsize )
+static ds_result_code_t get_any( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *dirname, const char *forced_name, int64_t *totalsize )
 {
 	char line[DS_LINE_MAX];
 	char name_encoded[DS_LINE_MAX];
@@ -1430,7 +1442,12 @@ static ds_result_code_t get_any( struct ds_manager *q, struct ds_worker *w, stru
 
 		url_decode(name_encoded,name,sizeof(name));
 
-		char *subname = string_format("%s/%s",dirname,name);
+		char *subname;
+		if(forced_name) {
+			subname = strdup(forced_name);
+		} else {
+			subname = string_format("%s/%s",dirname,name);
+		}
 		r = get_file_contents(q,w,t,subname,size,mode);
 		free(subname);
 
@@ -1440,7 +1457,12 @@ static ds_result_code_t get_any( struct ds_manager *q, struct ds_worker *w, stru
 
 		url_decode(name_encoded,name,sizeof(name));
 
-		char *subname = string_format("%s/%s",dirname,name);
+		char *subname;
+		if(forced_name) {
+			subname = strdup(forced_name);
+		} else {
+			subname = string_format("%s/%s",dirname,name);
+		}
 		r = get_symlink_contents(q,w,t,subname,size);
 		free(subname);
 
@@ -1450,7 +1472,12 @@ static ds_result_code_t get_any( struct ds_manager *q, struct ds_worker *w, stru
 
 		url_decode(name_encoded,name,sizeof(name));
 
-		char *subname = string_format("%s/%s",dirname,name);
+		char *subname;
+		if(forced_name) {
+			subname = strdup(forced_name);
+		} else {
+			subname = string_format("%s/%s",dirname,name);
+		}
 		r = get_dir_contents(q,w,t,subname,totalsize);
 		free(subname);
 
@@ -1477,10 +1504,9 @@ static ds_result_code_t get_any( struct ds_manager *q, struct ds_worker *w, stru
 }
 
 /*
-Handle an incoming directory inside the recursive dir protocol.
-Notice that we have already checked the dirname for validity,
-and now we process "file" and "dir" commands within the list
-until "end" is reached.
+Retrieve the contents of a directory by creating the local
+dir, then receiving each item in the directory until an "end"
+header is received.
 */
 
 static ds_result_code_t get_dir_contents( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *dirname, int64_t *totalsize )
@@ -1492,7 +1518,7 @@ static ds_result_code_t get_dir_contents( struct ds_manager *q, struct ds_worker
 	}
 
 	while(1) {
-		int r = get_any(q,w,t,dirname,totalsize);
+		int r = get_any(q,w,t,dirname,0,totalsize);
 		if(r==DS_SUCCESS) {
 			// Successfully received one item. 	
 			continue;
@@ -1519,7 +1545,7 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker 
 	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, f->cached_name, f->payload);
 	send_worker_msg(q,w, "get %s\n",f->cached_name);
 
-	result = get_any(q, w, t, f->payload, &total_bytes);
+	result = get_any(q, w, t, 0, f->payload, &total_bytes);
 
 	timestamp_t close_time = timestamp_get();
 	timestamp_t sum_time = close_time - open_time;
