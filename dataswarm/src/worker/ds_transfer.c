@@ -29,7 +29,7 @@ making it efficient to move large directory trees without
 multiple round trips needed for remote procedure calls.
 
 Each file, directory, or symlink is represented by a single
-header line giving the name and length of the entry.
+header line giving the name, length, and mode of the entry.
 Files and symlinks are followed by the raw contents of the file
 or link, respectively, while directories are followed by more
 lines containing the contents of the directory, until an "end"
@@ -48,17 +48,17 @@ For example, the following directory tree:
 Is represented as follows:
 
 dir mydir
-file 1.txt 35291
+file 1.txt 35291 0600
   (35291 bytes of 1.txt)
-file 2.txt 502
+file 2.txt 502 0666
   (502 bytes of 2.txt)
 dir mysubdir
-file a.txt 321
+file a.txt 321 0600
   (321 bytes of a.txt)
-file b.txt 456
+file b.txt 456 0600
   (456 bytes of a.txt)
 end
-file z.jpg 40001
+file z.jpg 40001 0644
   (40001 bytes of z.jpg)
 end
 
@@ -80,10 +80,13 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 {
 	struct stat info;
 	int64_t actual, length;
+	int mode;
 
 	if(stat(full_name, &info) != 0) {
 		goto access_failure;
 	}
+
+	mode = info.st_mode & 0777;
 
 	if(S_ISDIR(info.st_mode)) {
 		DIR *dir = opendir(full_name);
@@ -106,7 +109,7 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 		int fd = open(full_name, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = info.st_size;
-			send_message(lnk, "file %s %"PRId64"\n", relative_name, length );
+			send_message(lnk, "file %s %"PRId64" %o\n", relative_name, length, mode );
 			actual = link_stream_from_fd(lnk, fd, length, stoptime);
 			close(fd);
 			if(actual != length) goto send_failure;
@@ -188,10 +191,7 @@ static int ds_transfer_get_file_internal( struct link *lnk, const char *filename
 		return 0;
 	}
 
-	/* Ensure that worker can access the file! */
-	mode = mode | 0600;
-
-	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
+	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
 	if(fd<0) {
 		debug(D_DS, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
 		return 0;
@@ -203,6 +203,8 @@ static int ds_transfer_get_file_internal( struct link *lnk, const char *filename
 		debug(D_DS, "Failed to put file - %s (%s)\n", filename, strerror(errno));
 		return 0;
 	}
+
+	chmod(filename,mode);
 
 	return 1;
 }
