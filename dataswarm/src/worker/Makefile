@@ -8,6 +8,7 @@ SOURCES = \
 	ds_sandbox.c \
 	ds_cache.c \
 	ds_transfer.c \
+	ds_transfer_server.c \
 	ds_process.c \
 	ds_coprocess.c \
 	ds_watcher.c \

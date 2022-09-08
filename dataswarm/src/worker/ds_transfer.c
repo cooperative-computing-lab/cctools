@@ -129,6 +129,10 @@ send_failure:
 	return 0;
 }
 
+/*
+Send a cached object of any type down the wire.
+*/
+
 int ds_transfer_put_any( struct link *lnk, struct ds_cache *cache, const char *filename, time_t stoptime)
 {
 	char * cached_path = ds_cache_full_path(cache,filename);
@@ -139,7 +143,7 @@ int ds_transfer_put_any( struct link *lnk, struct ds_cache *cache, const char *f
 
 
 /*
-Handle an incoming symbolic link inside the rput protocol.
+Handle an incoming symbolic link inside the recursive protocol.
 The filename of the symlink was already given in the message,
 and the target of the symlink is given as the "body" which
 must be read off of the wire.  The symlink target does not
@@ -169,7 +173,7 @@ static int ds_transfer_get_symlink_internal( struct link *lnk, char *filename, i
 }
 
 /*
-Handle an incoming file inside the rput protocol.
+Handle an incoming file inside the recursive protocol.
 Notice that we trust the caller to have created
 the necessary parent directories and checked the
 name for validity.

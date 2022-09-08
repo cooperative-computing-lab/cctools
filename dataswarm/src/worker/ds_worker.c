@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include "ds_coprocess.h"
 #include "ds_sandbox.h"
 #include "ds_transfer.h"
+#include "ds_transfer_server.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -413,11 +414,11 @@ void send_cache_invalid( struct link *manager, const char *cachename, const char
 	link_write(manager,message,length,time(0)+active_timeout);
 }
 
-void send_transfer_address( struct link *manager, struct link *transfer_link )
+void send_transfer_address( struct link *manager )
 {
 	char addr[LINK_ADDRESS_MAX];
 	int port;
-	link_address_local(transfer_link,addr,&port);
+	ds_transfer_server_address(addr,&port);
 	send_message(manager, "transfer-address %s %d\n",addr,port);
 }
 
@@ -426,7 +427,7 @@ Send the initial "ready" message to the manager with the version and so forth.
 The manager will not start sending tasks until this message is recevied.
 */
 
-static void report_worker_ready( struct link *manager, struct link *transfer_link )
+static void report_worker_ready( struct link *manager )
 {
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
@@ -434,7 +435,7 @@ static void report_worker_ready( struct link *manager, struct link *transfer_lin
 	send_message(manager, "info worker-id %s\n", worker_id);
 	send_features(manager);
 	send_keepalive(manager, 1);
-	send_transfer_address(manager,transfer_link);
+	send_transfer_address(manager);
 	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 	if (factory_name)
 		send_message(manager, "info from-factory %s\n", factory_name);
@@ -1023,48 +1024,6 @@ static int handle_manager(struct link *manager)
 }
 
 /*
-Handle messages arriving on a peer connection.
-*/
-
-static int handle_peer( struct link *peer_link )
-{
-	char line[DS_LINE_MAX];
-	char filename_encoded[DS_LINE_MAX];
-	char filename[DS_LINE_MAX];
-
-	int r = 0;
-
-	// XXX rethink this timeout
-	time_t stoptime = time(0) + 5;
-	
-	if(link_readline(peer_link,line,sizeof(line),stoptime)) {
-		if(sscanf(line,"get %s",filename_encoded)==1) {
-			url_decode(filename_encoded,filename,sizeof(filename));
-			ds_transfer_put_any(peer_link,global_cache,filename,time(0)+active_timeout);
-			r  = 1;
-		} else {
-			debug(D_DS,"Unrecognized transfer message: %s\n",line);
-			r = 0;
-		}
-	} else {
-		r = 0;
-	}
-
-	return r;
-}
-
-static void handle_peer_connection( struct link *peer_link )
-{
-	// XXX rethink this timeout
-	time_t stoptime = time(0) + 5;
-	struct link *p = link_accept(peer_link,stoptime);
-	if(p) {
-		handle_peer(p);
-		link_close(p);
-	}
-}
-
-/*
 Return true if this task can run with the resources currently available.
 */
 
@@ -1165,7 +1124,7 @@ static int enforce_worker_promises(struct link *manager)
 	return 1;
 }
 
-static void work_for_manager( struct link *manager, struct link *peer_transfer_link )
+static void work_for_manager( struct link *manager )
 {
 	sigset_t mask;
 
@@ -1214,31 +1173,14 @@ static void work_for_manager( struct link *manager, struct link *peer_transfer_l
 			sigchld_received_flag = 0;
 		}
 
-
-		struct link_info poll_table[2];
-		poll_table[0].link = manager;
-		poll_table[0].events = LINK_READ;
-		poll_table[0].revents = 0;
-		poll_table[1].link = peer_transfer_link;
-		poll_table[1].events = LINK_READ;
-		poll_table[1].revents = 0;
-
-		//XXX need to handle signal mask here
-		link_poll(poll_table,2,wait_msec);
-		
-		int manager_activity = poll_table[0].revents;
-		int peer_activity = poll_table[1].revents;
+		int manager_activity = link_usleep_mask(manager, wait_msec*1000, &mask, 1, 0);
+ 		if(manager_activity < 0) break;
 
 		int ok = 1;
 		if(manager_activity) {
 			ok &= handle_manager(manager);
 		}
 
-		if(peer_activity) {
-			// success of this is irrelevant to what comes after
-			handle_peer_connection(peer_transfer_link);
-		}
-		
 		expire_procs_running();
 
 		ok &= handle_completed_tasks(manager);
@@ -1402,7 +1344,9 @@ static int workspace_check()
 }
 
 /*
-workspace_prepare is called every time we connect to a new manager,
+workspace_prepare is called every time we connect to a new manager.
+The peer transfer server is associated with a particular cache
+directory, and so gets created (and deleted) with the corresponding cache.
 */
 
 static int workspace_prepare()
@@ -1423,6 +1367,8 @@ static int workspace_prepare()
 	trash_setup(trash_dir);
 	free(trash_dir);
 
+	ds_transfer_server_start(global_cache);
+
 	return result;
 }
 
@@ -1435,6 +1381,9 @@ directories (except trash) and move them to the trash directory.
 static void workspace_cleanup()
 {
 	debug(D_DS,"cleaning workspace %s",workspace);
+
+	ds_transfer_server_stop();
+
 	DIR *dir = opendir(workspace);
 	if(dir) {
 		struct dirent *d;
@@ -1559,13 +1508,9 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 
 	measure_worker_resources();
 
-	struct link *peer_transfer_link = link_serve(0);
+	report_worker_ready(manager);
+	work_for_manager(manager);
 
-	report_worker_ready(manager,peer_transfer_link);
-	work_for_manager(manager,peer_transfer_link);
-
-	link_close(peer_transfer_link);
-	
 	if(abort_signal_received) {
 		send_message(manager, "info vacating %d\n", abort_signal_received);
 	}
