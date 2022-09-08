@@ -129,9 +129,11 @@ send_failure:
 	return 0;
 }
 
-int ds_transfer_put_any( struct link *lnk, const char *filename, time_t stoptime)
+int ds_transfer_put_any( struct link *lnk, struct ds_cache *cache, const char *filename, time_t stoptime)
 {
-	int r = ds_transfer_put_internal(lnk,filename,path_basename(filename),stoptime);
+	char * cached_path = ds_cache_full_path(cache,filename);
+	int r = ds_transfer_put_internal(lnk,cached_path,path_basename(filename),stoptime);
+	free(cached_path);
 	return r;
 }
 
@@ -293,21 +295,33 @@ static int ds_transfer_get_dir_internal( struct link *lnk, const char *dirname, 
 	return 0;
 }
 
-int ds_transfer_get_dir( struct link *lnk, const char *dirname, int64_t *totalsize, time_t stoptime )
+int ds_transfer_get_dir( struct link *lnk, struct ds_cache *cache, const char *dirname, time_t stoptime )
 {
-	return ds_transfer_get_dir_internal(lnk,dirname,totalsize,stoptime);
+	int64_t totalsize = 0;
+	char * cached_path = ds_cache_full_path(cache,dirname);
+	int r = ds_transfer_get_dir_internal(lnk,cached_path,&totalsize,stoptime);
+	if(r) ds_cache_addfile(cache,totalsize,dirname);
+	free(cached_path);
+	return r;
 }
 
-int ds_transfer_get_file( struct link *lnk, const char *filename, int64_t length, int mode, time_t stoptime)
+int ds_transfer_get_file( struct link *lnk, struct ds_cache *cache, const char *filename, int64_t length, int mode, time_t stoptime)
 {
-	return ds_transfer_get_file_internal(lnk,filename,length,mode,stoptime);
+	char * cached_path = ds_cache_full_path(cache,filename);
+	int r = ds_transfer_get_file_internal(lnk,cached_path,length,mode,stoptime);
+	if(r) ds_cache_addfile(cache,length,filename);
+	free(cached_path);
+	return r;
 }
 
-int ds_transfer_get( struct link *lnk, const char *dirname, const char *filename, time_t stoptime )
+
+int ds_transfer_get( struct link *lnk, struct ds_cache *cache, const char *dirname, const char *filename, time_t stoptime )
 {
 	int64_t totalsize = 0;
 	send_message(lnk,"get %s\n",filename);
-	return ds_transfer_get_any_internal(lnk,dirname,&totalsize,stoptime);
+	int r = ds_transfer_get_any_internal(lnk,dirname,&totalsize,stoptime);
+	if(r) ds_cache_addfile(cache,totalsize,filename);
+	return r;
 }
 
 
