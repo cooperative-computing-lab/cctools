@@ -120,10 +120,10 @@ typedef enum {
 } worker_disconnect_reason;
 
 typedef enum {
-	WORKER_TYPE_UNKNOWN = 1,
-	WORKER_TYPE_WORKER  = 2,
-	WORKER_TYPE_STATUS  = 4,
-} worker_type;
+	DS_WORKER_TYPE_UNKNOWN = 1,
+	DS_WORKER_TYPE_WORKER  = 2,
+	DS_WORKER_TYPE_STATUS  = 4,
+} ds_worker_type_t;
 
 
 typedef enum {
@@ -157,7 +157,7 @@ struct ds_worker {
 	int transfer_port;
 	int transfer_port_active;
   
-	worker_type type;                         // unknown, regular worker, status worker
+	ds_worker_type_t type;                         // unknown, regular worker, status worker
 
 	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
 
@@ -1086,7 +1086,7 @@ static void remove_worker(struct ds_manager *q, struct ds_worker *w, worker_disc
 
 	debug(D_DS, "worker %s (%s) removed", w->hostname, w->addrport);
 
-	if(w->type == WORKER_TYPE_WORKER) {
+	if(w->type == DS_WORKER_TYPE_WORKER) {
 		q->stats->workers_removed++;
 	}
 
@@ -1129,7 +1129,7 @@ static void remove_worker(struct ds_manager *q, struct ds_worker *w, worker_disc
 	/* update the largest worker seen */
 	find_max_worker(q);
 
-	debug(D_DS, "%d workers connected in total now", count_workers(q, WORKER_TYPE_WORKER));
+	debug(D_DS, "%d workers connected in total now", count_workers(q, DS_WORKER_TYPE_WORKER));
 }
 
 static int release_worker(struct ds_manager *q, struct ds_worker *w)
@@ -1201,7 +1201,7 @@ static void add_worker(struct ds_manager *q)
 	w->os = strdup("unknown");
 	w->arch = strdup("unknown");
 	w->version = strdup("unknown");
-	w->type = WORKER_TYPE_UNKNOWN;
+	w->type = DS_WORKER_TYPE_UNKNOWN;
 	w->draining = 0;
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
@@ -1937,10 +1937,10 @@ static ds_msg_code_t process_dataswarm(struct ds_manager *q, struct ds_worker *w
 	w->arch     = strdup(items[2]);
 	w->version  = strdup(items[3]);
 
-	w->type = WORKER_TYPE_WORKER;
+	w->type = DS_WORKER_TYPE_WORKER;
 
 	q->stats->workers_joined++;
-	debug(D_DS, "%d workers are connected in total now", count_workers(q, WORKER_TYPE_WORKER));
+	debug(D_DS, "%d workers are connected in total now", count_workers(q, DS_WORKER_TYPE_WORKER));
 
 
 	debug(D_DS, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
@@ -2926,7 +2926,7 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 	struct link *l = target->link;
 
 	struct jx *a = construct_status_message(q, line);
-	target->type = WORKER_TYPE_STATUS;
+	target->type = DS_WORKER_TYPE_STATUS;
 
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
@@ -4583,7 +4583,7 @@ static int abort_slow_workers(struct ds_manager *q)
 
 		if(runtime >= (average_task_time * (multiplier + t->fast_abort_count))) {
 			w = itable_lookup(q->worker_task_map, t->taskid);
-			if(w && (w->type == WORKER_TYPE_WORKER))
+			if(w && (w->type == DS_WORKER_TYPE_WORKER))
 			{
 				debug(D_DS, "Task %d is taking too long. Removing from worker.", t->taskid);
 				cancel_task_on_worker(q, t, DS_TASK_READY);
@@ -6300,7 +6300,7 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 	memcpy(s, qs, sizeof(*s));
 
 	//info about workers
-	s->workers_connected = count_workers(q, WORKER_TYPE_WORKER);
+	s->workers_connected = count_workers(q, DS_WORKER_TYPE_WORKER);
 	s->workers_init      = count_workers(q, DS_TASK_UNKNOWN);
 	s->workers_busy      = workers_with_tasks(q);
 	s->workers_idle      = s->workers_connected - s->workers_busy;
