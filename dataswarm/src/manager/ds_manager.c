@@ -150,7 +150,7 @@ struct ds_task_report {
 	struct rmsummary *resources;
 };
 
-struct blocklist_host_info {
+struct ds_blocklist_host_info {
 	int    blocked;
 	int    times_blocked;
 	time_t release_at;
@@ -2145,7 +2145,7 @@ static struct jx *blocked_to_json( struct ds_manager  *q ) {
 	struct jx *j = jx_array(0);
 
 	char *hostname;
-	struct blocklist_host_info *info;
+	struct ds_blocklist_host_info *info;
 
 	hash_table_firstkey(q->worker_blocklist);
 	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
@@ -3822,7 +3822,7 @@ static int check_hand_against_task(struct ds_manager *q, struct ds_worker *w, st
 		if ( f && f->connected_workers > f->max_workers ) return 0;
 	}
 
-	struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
+	struct ds_blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
 	if (info && info->blocked) {
 		return 0;
 	}
@@ -5467,10 +5467,10 @@ int ds_submit(struct ds_manager *q, struct ds_task *t)
 
 void ds_block_host_with_timeout(struct ds_manager *q, const char *hostname, time_t timeout)
 {
-	struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, hostname);
+	struct ds_blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, hostname);
 
 	if(!info) {
-		info = malloc(sizeof(struct blocklist_host_info));
+		info = malloc(sizeof(struct ds_blocklist_host_info));
 		info->times_blocked = 0;
 		info->blocked       = 0;
 	}
@@ -5501,7 +5501,7 @@ void ds_block_host(struct ds_manager *q, const char *hostname)
 
 void ds_unblock_host(struct ds_manager *q, const char *hostname)
 {
-	struct blocklist_host_info *info = hash_table_remove(q->worker_blocklist, hostname);
+	struct ds_blocklist_host_info *info = hash_table_remove(q->worker_blocklist, hostname);
 	if(info) {
 		info->blocked = 0;
 		info->release_at  = 0;
@@ -5512,7 +5512,7 @@ void ds_unblock_host(struct ds_manager *q, const char *hostname)
 static void ds_unblock_all_by_time(struct ds_manager *q, time_t deadline)
 {
 	char *hostname;
-	struct blocklist_host_info *info;
+	struct ds_blocklist_host_info *info;
 
 	hash_table_firstkey(q->worker_blocklist);
 	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
