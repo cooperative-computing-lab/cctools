@@ -87,7 +87,8 @@ typedef enum {
 	DS_SUCCESS = 0,
 	DS_WORKER_FAILURE,
 	DS_APP_FAILURE,
-	DS_MGR_FAILURE
+	DS_MGR_FAILURE,
+	DS_END_OF_LIST,
 } ds_result_code_t;
 
 typedef enum {
@@ -238,6 +239,10 @@ struct ds_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 
+	char transfer_addr[LINK_ADDRESS_MAX];
+	int transfer_port;
+	int transfer_port_active;
+  
 	worker_type type;                         // unknown, regular worker, status worker
 
 	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
@@ -704,6 +709,21 @@ int process_cache_invalid( struct ds_manager *q, struct ds_worker *w, const char
 	return MSG_PROCESSED;
 }
 
+/*
+A transfer-address message indicates that the worker is listening
+on its own port to receive get requests from other workers.
+*/
+
+int process_transfer_address( struct ds_manager *q, struct ds_worker *w, const char *line )
+{
+	if(sscanf(line,"transfer-address %s %d",w->transfer_addr,&w->transfer_port)) {
+		w->transfer_port_active = 1;
+		return MSG_PROCESSED;
+	} else {
+		return MSG_FAILURE;
+	}
+}
+
 /**
  * This function receives a message from worker and records the time a message is successfully
  * received. This timestamp is used in keepalive timeout computations.
@@ -753,6 +773,8 @@ static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker *w, 
 		result = process_cache_update(q, w, line);
 	} else if (string_prefix_is(line, "cache-invalid")) {
 		result = process_cache_invalid(q, w, line);
+	} else if (string_prefix_is(line, "transfer-address")) {
+		result = process_transfer_address(q, w, line);
 	} else if( sscanf(line,"GET %s HTTP/%*d.%*d",path)==1) {
 	        result = process_http_request(q,w,path,stoptime);
 	} else {
@@ -1290,9 +1312,12 @@ static void add_worker(struct ds_manager *q)
 }
 
 /*
-Get a single file from a remote worker.
+Receive the contents of a single file from a worker.
+The "file" header has already been received, just
+bring back the streaming data within various constraints.
 */
-static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *local_name, int64_t length, int64_t * total_bytes)
+
+static ds_result_code_t get_file_contents( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *local_name, int64_t length, int mode )
 {
 	// If a bandwidth limit is in effect, choose the effective stoptime.
 	timestamp_t effective_stoptime = 0;
@@ -1316,6 +1341,7 @@ static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, str
 
 	// Create the local file.
 	debug(D_DS, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
+
 	// Check if there is space for incoming file at manager
 	if(!check_disk_space_for_filesize(dirname, length, disk_avail_threshold)) {
 		debug(D_DS, "Could not receive file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
@@ -1332,6 +1358,8 @@ static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, str
 	// Write the data on the link to file.
 	int64_t actual = link_stream_to_fd(w->link, fd, length, stoptime);
 
+	fchmod(fd,mode);
+
 	if(close(fd) < 0) {
 		warn(D_DS, "Could not write file %s: %s\n", local_name, strerror(errno));
 		unlink(local_name);
@@ -1344,8 +1372,6 @@ static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, str
 		return DS_WORKER_FAILURE;
 	}
 
-	*total_bytes += length;
-
 	// If the transfer was too fast, slow things down.
 	timestamp_t current_time = timestamp_get();
 	if(effective_stoptime && effective_stoptime > current_time) {
@@ -1356,99 +1382,154 @@ static ds_result_code_t get_file( struct ds_manager *q, struct ds_worker *w, str
 }
 
 /*
-This function implements the recursive get protocol.
-The manager sends a single get message, then the worker
-responds with a continuous stream of dir and file message
-that indicate the entire contents of the directory.
-This makes it efficient to move deep directory hierarchies with
-high throughput and low latency.
+Get the contents of a symlink back from the worker,
+after the "symlink" header has already been received.
 */
-static ds_result_code_t get_file_or_directory( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *remote_name, const char *local_name, int64_t * total_bytes)
+
+
+static ds_result_code_t get_symlink_contents( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *filename, int length )
 {
-	// Remember the length of the specified remote path so it can be chopped from the result.
-	int remote_name_len = strlen(remote_name);
+        char *target = malloc(length);
 
-	// Send the name of the file/dir name to fetch
-	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, remote_name, local_name);
-	send_worker_msg(q,w, "get %s 1\n",remote_name);
+        int actual = link_read(w->link,target,length,time(0)+q->short_timeout);
+        if(actual!=length) {
+                free(target);
+                return DS_WORKER_FAILURE;
+        }
 
-	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below
+        int result = symlink(target,filename);
+        if(result<0) {
+                debug(D_DS,"could not create symlink %s: %s",filename,strerror(errno));
+                free(target);
+                return DS_MGR_FAILURE;
+        }
 
-	char *tmp_remote_path = NULL;
-	char *length_str      = NULL;
-	char *errnum_str      = NULL;
+        free(target);
 
-	// Process the recursive file/dir responses as they are sent.
-	while(1) {
-		char line[DS_LINE_MAX];
+        return DS_SUCCESS;
+}
 
-		free(tmp_remote_path);
-		free(length_str);
 
-		tmp_remote_path = NULL;
-		length_str      = NULL;
+static ds_result_code_t get_dir_contents( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *dirname, int64_t *totalsize );
 
-		ds_msg_code_t mcode;
-		mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
-		if(mcode!=MSG_NOT_PROCESSED) {
-			result = DS_WORKER_FAILURE;
-			break;
-		}
+/*
+Get a single item (file, dir, symlink, etc) back
+from the worker by observing the header and then
+pulling the appropriate data on the stream.
+Note that if forced_name is non-null, then the item
+is stored under that filename.  Otherwise, it is placed
+in the directory dirname with the filename given by the
+worker.  This allows this function to handle both the
+top-level case of renamed files as well as interior files
+within a directory.
+*/
 
-		if(pattern_match(line, "^dir (%S+) (%d+)$", &tmp_remote_path, &length_str) >= 0) {
-			char *tmp_local_name = string_format("%s%s",local_name, (tmp_remote_path + remote_name_len));
-			int result_dir = create_dir(tmp_local_name,0777);
-			if(!result_dir) {
-				debug(D_DS, "Could not create directory - %s (%s)", tmp_local_name, strerror(errno));
-				result = DS_APP_FAILURE;
-				free(tmp_local_name);
-				break;
-			}
-			free(tmp_local_name);
-		} else if(pattern_match(line, "^file (.+) (%d+)$", &tmp_remote_path, &length_str) >= 0) {
-			int64_t length = strtoll(length_str, NULL, 10);
-			char *tmp_local_name = string_format("%s%s",local_name, (tmp_remote_path + remote_name_len));
-			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
-			free(tmp_local_name);
-			//Return if worker failure. Else wait for end message from worker.
-			if((result == DS_WORKER_FAILURE) || (result == DS_MGR_FAILURE)) {
-				break;
-			}
-		} else if(pattern_match(line, "^missing (.+) (%d+)$", &tmp_remote_path, &errnum_str) >= 0) {
-			// If the output file is missing, we make a note of that in the task result,
-			// but we continue and consider the transfer a 'success' so that other
-			// outputs are transferred and the task is given back to the caller.
-			int errnum = atoi(errnum_str);
-			debug(D_DS, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,remote_name,strerror(errnum));
-			update_task_result(t, DS_RESULT_OUTPUT_MISSING);
-		} else if(!strcmp(line,"end")) {
-			// We have to return on receiving an end message.
-			if (result == DS_SUCCESS) {
-				return result;
-			} else {
-				break;
-			}
+static ds_result_code_t get_any( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *dirname, const char *forced_name, int64_t *totalsize )
+{
+	char line[DS_LINE_MAX];
+	char name_encoded[DS_LINE_MAX];
+	char name[DS_LINE_MAX];
+	int64_t size;
+	int mode;
+	int errornum;
+
+	ds_result_code_t r = DS_WORKER_FAILURE;
+
+	ds_msg_code_t mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
+	if(mcode!=MSG_NOT_PROCESSED) return DS_WORKER_FAILURE;
+
+	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
+
+		url_decode(name_encoded,name,sizeof(name));
+
+		char *subname;
+		if(forced_name) {
+			subname = strdup(forced_name);
 		} else {
-			debug(D_DS, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
-			result = DS_WORKER_FAILURE; //signal sys-level failure
-			break;
+			subname = string_format("%s/%s",dirname,name);
+		}
+		r = get_file_contents(q,w,t,subname,size,mode);
+		free(subname);
+
+		if(r==DS_SUCCESS) *totalsize += size;
+
+	} else if(sscanf(line,"symlink %s %" SCNd64,name_encoded,&size)==2) {
+
+		url_decode(name_encoded,name,sizeof(name));
+
+		char *subname;
+		if(forced_name) {
+			subname = strdup(forced_name);
+		} else {
+			subname = string_format("%s/%s",dirname,name);
+		}
+		r = get_symlink_contents(q,w,t,subname,size);
+		free(subname);
+
+		if(r==DS_SUCCESS) *totalsize += size;
+
+	} else if(sscanf(line,"dir %s",name_encoded)==1) {
+
+		url_decode(name_encoded,name,sizeof(name));
+
+		char *subname;
+		if(forced_name) {
+			subname = strdup(forced_name);
+		} else {
+			subname = string_format("%s/%s",dirname,name);
+		}
+		r = get_dir_contents(q,w,t,subname,totalsize);
+		free(subname);
+
+	} else if(sscanf(line,"missing %s %d",name_encoded,&errornum)==2) {
+
+		// If the output file is missing, we make a note of that in the task result,
+		// but we continue and consider the transfer a 'success' so that other
+		// outputs are transferred and the task is given back to the caller.
+		url_decode(name_encoded,name,sizeof(name));
+		debug(D_DS, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,name,strerror(errornum));
+		update_task_result(t, DS_RESULT_OUTPUT_MISSING);
+
+		r = DS_SUCCESS;
+
+	} else if(!strcmp(line,"end")) {
+		r = DS_END_OF_LIST;
+
+	} else {
+		debug(D_DS, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
+		r = DS_WORKER_FAILURE;
+	}
+
+	return r;
+}
+
+/*
+Retrieve the contents of a directory by creating the local
+dir, then receiving each item in the directory until an "end"
+header is received.
+*/
+
+static ds_result_code_t get_dir_contents( struct ds_manager *q, struct ds_worker *w, struct ds_task *t, const char *dirname, int64_t *totalsize )
+{
+	int result = mkdir(dirname,0777);
+	if(result<0) {
+		debug(D_DS,"unable to create %s: %s",dirname,strerror(errno));
+		return DS_APP_FAILURE;
+	}
+
+	while(1) {
+		int r = get_any(q,w,t,dirname,0,totalsize);
+		if(r==DS_SUCCESS) {
+			// Successfully received one item. 	
+			continue;
+		} else if(r==DS_END_OF_LIST) {
+			// Sucessfully got end of sequence. 
+			return DS_SUCCESS;
+		} else {
+			// Failed to receive item.
+			return r;
 		}
 	}
-
-	free(tmp_remote_path);
-	free(length_str);
-
-	// If we failed to *transfer* the output file, then that is a hard
-	// failure which causes this function to return failure and the task
-	// to be returned to the queue to be attempted elsewhere.
-	debug(D_DS, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, remote_name, local_name);
-	if(result == DS_APP_FAILURE) {
-		update_task_result(t, DS_RESULT_OUTPUT_MISSING);
-	} else if(result == DS_MGR_FAILURE) {
-		update_task_result(t, DS_RESULT_OUTPUT_TRANSFER_ERROR);
-	}
-
-	return result;
 }
 
 /*
@@ -1461,7 +1542,10 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker 
 
 	timestamp_t open_time = timestamp_get();
 
-	result = get_file_or_directory(q, w, t, f->cached_name, f->payload, &total_bytes);
+	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, f->cached_name, f->payload);
+	send_worker_msg(q,w, "get %s\n",f->cached_name);
+
+	result = get_any(q, w, t, 0, f->payload, &total_bytes);
 
 	timestamp_t close_time = timestamp_get();
 	timestamp_t sum_time = close_time - open_time;
@@ -1478,6 +1562,21 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker 
 		debug(D_DS, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 
         write_transaction_transfer(q, w, t, f, total_bytes, sum_time, DS_OUTPUT);
+	}
+
+	// If we failed to *transfer* the output file, then that is a hard
+	// failure which causes this function to return failure and the task
+	// to be returned to the queue to be attempted elsewhere.
+	// But if we failed to *store* the file, that is a manager failure.
+
+	if(result!=DS_SUCCESS) {
+		debug(D_DS, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, f->cached_name, f->payload );
+
+		if(result == DS_APP_FAILURE) {
+			update_task_result(t, DS_RESULT_OUTPUT_MISSING);
+		} else if(result == DS_MGR_FAILURE) {
+			update_task_result(t, DS_RESULT_OUTPUT_TRANSFER_ERROR);
+		}
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
@@ -3156,7 +3255,7 @@ static int send_file( struct ds_manager *q, struct ds_worker *w, struct ds_task 
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
 
 	stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
-	send_worker_msg(q,w, "put %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
+	send_worker_msg(q,w, "file %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 
@@ -3415,7 +3514,7 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker *
 	case DS_BUFFER:
 		debug(D_DS, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, f->length);
-		send_worker_msg(q,w, "put %s %d %o\n",f->cached_name, f->length, 0777 );
+		send_worker_msg(q,w, "file %s %d %o\n",f->cached_name, f->length, 0777 );
 		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
 		if(actual!=f->length) {
 			result = DS_WORKER_FAILURE;

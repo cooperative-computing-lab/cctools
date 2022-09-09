@@ -14,6 +14,8 @@ See the file COPYING for details.
 #include "ds_gpus.h"
 #include "ds_coprocess.h"
 #include "ds_sandbox.h"
+#include "ds_transfer.h"
+#include "ds_transfer_server.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -91,7 +93,7 @@ static time_t connect_stoptime = 0;
 static int connect_timeout = 900;
 
 // Maximum time to attempt sending/receiving any given file or message.
-static const int active_timeout = 3600;
+int active_timeout = 3600;
 
 // Initial value for backoff interval (in seconds) when worker fails to connect to a manager.
 static int init_backoff_interval = 1;
@@ -215,7 +217,7 @@ struct ds_cache *global_cache = 0;
 extern int ds_hack_do_not_compute_cached_name;
 
 __attribute__ (( format(printf,2,3) ))
-static void send_manager_message( struct link *l, const char *fmt, ... )
+void send_message( struct link *l, const char *fmt, ... )
 {
 	char debug_msg[2*DS_LINE_MAX];
 	va_list va;
@@ -232,7 +234,7 @@ static void send_manager_message( struct link *l, const char *fmt, ... )
 	va_end(va);
 }
 
-static int recv_manager_message( struct link *l, char *line, int length, time_t stoptime )
+int recv_message( struct link *l, char *line, int length, time_t stoptime )
 {
 	int result = link_readline(l,line,length,stoptime);
 	if(result) debug(D_DS,"rx: %s",line);
@@ -340,7 +342,7 @@ static void send_features(struct link *manager)
 	char fenc[DS_LINE_MAX];
 	while(hash_table_nextkey(features, &f, &dummy)) {
 		url_encode(f, fenc, DS_LINE_MAX);
-		send_manager_message(manager, "feature %s\n", fenc);
+		send_message(manager, "feature %s\n", fenc);
 	}
 }
 
@@ -367,7 +369,7 @@ static void send_resource_update(struct link *manager)
 	}
 
 	ds_resources_send(manager,total_resources,stoptime);
-	send_manager_message(manager, "info end_of_resource_update %d\n", 0);
+	send_message(manager, "info end_of_resource_update %d\n", 0);
 }
 
 /*
@@ -376,7 +378,7 @@ Send a message to the manager with my current statistics information.
 
 static void send_stats_update(struct link *manager)
 {
-	send_manager_message(manager, "info tasks_running %lld\n", (long long) itable_size(procs_running));
+	send_message(manager, "info tasks_running %lld\n", (long long) itable_size(procs_running));
 }
 
 /*
@@ -386,7 +388,7 @@ think that the worker has crashed and gone away.
 
 static int send_keepalive(struct link *manager, int force_resources)
 {
-	send_manager_message(manager, "alive\n");
+	send_message(manager, "alive\n");
 	send_resource_update(manager);
 	send_stats_update(manager);
 	return 1;
@@ -398,7 +400,7 @@ Send an asynchronmous message to the manager indicating that an item was success
 
 void send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
 {
-	send_manager_message(manager,"cache-update %s %lld %lld\n",cachename,(long long)size,(long long)transfer_time);
+	send_message(manager,"cache-update %s %lld %lld\n",cachename,(long long)size,(long long)transfer_time);
 }
 
 /*
@@ -408,8 +410,16 @@ Send an asynchronous message to the manager indicating that an item previously q
 void send_cache_invalid( struct link *manager, const char *cachename, const char *message )
 {
 	int length = strlen(message);
-	send_manager_message(manager,"cache-invalid %s %d\n",cachename,length);
+	send_message(manager,"cache-invalid %s %d\n",cachename,length);
 	link_write(manager,message,length,time(0)+active_timeout);
+}
+
+void send_transfer_address( struct link *manager )
+{
+	char addr[LINK_ADDRESS_MAX];
+	int port;
+	ds_transfer_server_address(addr,&port);
+	send_message(manager, "transfer-address %s %d\n",addr,port);
 }
 
 /*
@@ -421,13 +431,14 @@ static void report_worker_ready( struct link *manager )
 {
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
-	send_manager_message(manager,"dataswarm %d %s %s %s %d.%d.%d\n",DS_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
-	send_manager_message(manager, "info worker-id %s\n", worker_id);
+	send_message(manager,"dataswarm %d %s %s %s %d.%d.%d\n",DS_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
+	send_message(manager, "info worker-id %s\n", worker_id);
 	send_features(manager);
 	send_keepalive(manager, 1);
-	send_manager_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
+	send_transfer_address(manager);
+	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 	if (factory_name)
-		send_manager_message(manager, "info from-factory %s\n", factory_name);
+		send_message(manager, "info from-factory %s\n", factory_name);
 }
 
 /*
@@ -506,7 +517,7 @@ static void report_task_complete( struct link *manager, struct ds_process *p )
 	fstat(p->output_fd, &st);
 	output_length = st.st_size;
 	lseek(p->output_fd, 0, SEEK_SET);
-	send_manager_message(manager, "result %d %d %lld %llu %d\n", p->result, p->exit_code, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
+	send_message(manager, "result %d %d %lld %llu %d\n", p->result, p->exit_code, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
 	link_stream_from_fd(manager, p->output_fd, output_length, time(0)+active_timeout);
 
 	total_task_execution_time += (p->execution_end - p->execution_start);
@@ -530,7 +541,7 @@ static void report_tasks_complete( struct link *manager )
 
 	ds_watcher_send_changes(watcher,manager,time(0)+active_timeout);
 
-	send_manager_message(manager, "end\n");
+	send_message(manager, "end\n");
 
 	results_to_be_sent_msg = 0;
 }
@@ -596,100 +607,6 @@ static int handle_completed_tasks(struct link *manager)
 	return 1;
 }
 
-/**
- * Stream file/directory contents for the recursive get/put protocol.
- * Format:
- * 		for a directory: a new line in the format of "dir $DIR_NAME 0"
- * 		for a file: a new line in the format of "file $FILE_NAME $FILE_LENGTH"
- * 					then file contents.
- * 		string "end" at the end of the stream (on a new line).
- *
- * Example:
- * Assume we have the following directory structure:
- * mydir
- * 		-- 1.txt
- * 		-- 2.txt
- * 		-- mysubdir
- * 			-- a.txt
- * 			-- b.txt
- * 		-- z.jpg
- *
- * The stream contents would be:
- *
- * dir mydir 0
- * file 1.txt $file_len
- * $$ FILE 1.txt's CONTENTS $$
- * file 2.txt $file_len
- * $$ FILE 2.txt's CONTENTS $$
- * dir mysubdir 0
- * file mysubdir/a.txt $file_len
- * $$ FILE mysubdir/a.txt's CONTENTS $$
- * file mysubdir/b.txt $file_len
- * $$ FILE mysubdir/b.txt's CONTENTS $$
- * file z.jpg $file_len
- * $$ FILE z.jpg's CONTENTS $$
- * end
- *
- */
-
-static int stream_output_item(struct link *manager, const char *filename, int recursive)
-{
-	DIR *dir;
-	struct dirent *dent;
-	struct stat info;
-	int64_t actual, length;
-	int fd;
-
-	char *cached_path = ds_cache_full_path(global_cache,filename);
-	
-	if(stat(cached_path, &info) != 0) {
-		goto access_failure;
-	}
-
-	if(S_ISDIR(info.st_mode)) {
-		// stream a directory
-		dir = opendir(cached_path);
-		if(!dir) goto access_failure;
-
-		send_manager_message(manager, "dir %s 0\n", filename);
-
-		while(recursive && (dent = readdir(dir))) {
-			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
-				continue;
-			char *subfilename = string_format("%s/%s", filename, dent->d_name);
-			stream_output_item(manager, subfilename, recursive);
-			free(subfilename);
-		}
-
-		closedir(dir);
-	} else {
-		// stream a file
-		fd = open(cached_path, O_RDONLY, 0);
-		if(fd >= 0) {
-			length = info.st_size;
-			send_manager_message(manager, "file %s %"PRId64"\n", filename, length );
-			actual = link_stream_from_fd(manager, fd, length, time(0) + active_timeout);
-			close(fd);
-			if(actual != length) goto send_failure;
-		} else {
-			goto access_failure;
-		}
-	}
-
-	free(cached_path);
-	return 1;
-
-access_failure:
-	free(cached_path);
-	send_manager_message(manager, "missing %s %d\n", filename, errno);
-	return 0;
-
-send_failure:
-	free(cached_path);
-	debug(D_DS, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", filename, length, actual);
-	return 0;
-}
-
 /*
 For a task run locally, if the resources are all set to -1,
 then assume that the task occupies all worker resources.
@@ -735,7 +652,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 	struct ds_task *task = ds_task_create(0);
 	task->taskid = taskid;
 
-	while(recv_manager_message(manager,line,sizeof(line),stoptime)) {
+	while(recv_message(manager,line,sizeof(line),stoptime)) {
 		if(!strcmp(line,"end")) {
 			break;
 		} else if(sscanf(line, "category %s",category)) {
@@ -810,202 +727,6 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 }
 
 /*
-Return false if name is invalid as a simple filename.
-For example, if it contains a slash, which would escape
-the current working directory.
-*/
-
-static int is_valid_filename( const char *name )
-{
-	if(strchr(name,'/')) return 0;
-	return 1;
-}
-
-/*
-Handle an incoming symbolic link inside the rput protocol.
-The filename of the symlink was already given in the message,
-and the target of the symlink is given as the "body" which
-must be read off of the wire.  The symlink target does not
-need to be url_decoded because it is sent in the body.
-*/
-
-static int do_put_symlink_internal( struct link *manager, char *filename, int length )
-{
-	char *target = malloc(length);
-
-	int actual = link_read(manager,target,length,time(0)+active_timeout);
-	if(actual!=length) {
-		free(target);
-		return 0;
-	}
-
-	int result = symlink(target,filename);
-	if(result<0) {
-		debug(D_DS,"could not create symlink %s: %s",filename,strerror(errno));
-		free(target);
-		return 0;
-	}
-
-	free(target);
-
-	return 1;
-}
-
-/*
-Handle an incoming file inside the rput protocol.
-Notice that we trust the caller to have created
-the necessary parent directories and checked the
-name for validity.
-*/
-
-static int do_put_file_internal( struct link *manager, char *filename, int64_t length, int mode )
-{
-	if(!check_disk_space_for_filesize(".", length, 0)) {
-		debug(D_DS, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
-		return 0;
-	}
-
-	/* Ensure that worker can access the file! */
-	mode = mode | 0600;
-
-	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
-	if(fd<0) {
-		debug(D_DS, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
-		return 0;
-	}
-
-	int64_t actual = link_stream_to_fd(manager, fd, length, time(0) + active_timeout);
-	close(fd);
-	if(actual!=length) {
-		debug(D_DS, "Failed to put file - %s (%s)\n", filename, strerror(errno));
-		return 0;
-	}
-
-	return 1;
-}
-
-/*
-Handle an incoming directory inside the recursive dir protocol.
-Notice that we have already checked the dirname for validity,
-and now we process "put" and "dir" commands within the list
-until "end" is reached.  Note that "put" is used instead of
-"file" for historical reasons, to support recursive reuse
-of existing code.
-*/
-
-static int do_put_dir_internal( struct link *manager, char *dirname, int *totalsize )
-{
-	char line[DS_LINE_MAX];
-	char name_encoded[DS_LINE_MAX];
-	char name[DS_LINE_MAX];
-	int64_t size;
-	int mode;
-
-	int result = mkdir(dirname,0777);
-	if(result<0) {
-		debug(D_DS,"unable to create %s: %s",dirname,strerror(errno));
-		return 0;
-	}
-
-	while(1) {
-		if(!recv_manager_message(manager,line,sizeof(line),time(0)+active_timeout)) return 0;
-
-		int r = 0;
-
-		if(sscanf(line,"put %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
-
-			url_decode(name_encoded,name,sizeof(name));
-			if(!is_valid_filename(name)) return 0;
-
-			char *subname = string_format("%s/%s",dirname,name);
-			r = do_put_file_internal(manager,subname,size,mode);
-			free(subname);
-
-			*totalsize += size;
-
-		} else if(sscanf(line,"symlink %s %" SCNd64,name_encoded,&size)==2) {
-
-			url_decode(name_encoded,name,sizeof(name));
-			if(!is_valid_filename(name)) return 0;
-
-			char *subname = string_format("%s/%s",dirname,name);
-			r = do_put_symlink_internal(manager,subname,size);
-			free(subname);
-
-			*totalsize += size;
-
-		} else if(sscanf(line,"dir %s",name_encoded)==1) {
-
-			url_decode(name_encoded,name,sizeof(name));
-			if(!is_valid_filename(name)) return 0;
-
-			char *subname = string_format("%s/%s",dirname,name);
-			r = do_put_dir_internal(manager,subname,totalsize);
-			free(subname);
-
-		} else if(!strcmp(line,"end")) {
-			break;
-		}
-
-		if(!r) return 0;
-	}
-
-	return 1;
-}
-
-static int do_put_dir( struct link *manager, char *dirname )
-{
-	if(!is_valid_filename(dirname)) return 0;
-
-	int totalsize = 0;
-
-	char *cached_path = ds_cache_full_path(global_cache,dirname);
-	int result = do_put_dir_internal(manager,cached_path,&totalsize);
-	free(cached_path);
-
-	if(result) ds_cache_addfile(global_cache,totalsize,dirname);
-
-	return result;
-}
-
-/*
-This is the old method for sending a single file.
-It works, but it has the deficiency that the manager
-expects the worker to create all parent directories
-for the file, which is horrifically expensive when
-sending a large directory tree.  The direction put
-protocol (above) is preferred instead.
-*/
-
-static int do_put_single_file( struct link *manager, char *filename, int64_t length, int mode )
-{
-	if(!path_within_dir(filename, workspace)) {
-		debug(D_DS, "Path - %s is not within workspace %s.", filename, workspace);
-		return 0;
-	}
-
-	char * cached_path = ds_cache_full_path(global_cache,filename);
-	
-	if(strchr(filename,'/')) {
-		char dirname[DS_LINE_MAX];
-		path_dirname(filename,dirname);
-		if(!create_dir(dirname,0777)) {
-			debug(D_DS, "could not create directory %s: %s",dirname,strerror(errno));
-			free(cached_path);
-			return 0;
-		}
-	}
-
-	int result = do_put_file_internal(manager,cached_path,length,mode);
-
-	free(cached_path);
-
-	if(result) ds_cache_addfile(global_cache,length,filename);
-
-	return result;
-}
-
-/*
 Accept a url specification and queue it for later transfer.
 */
 
@@ -1045,13 +766,6 @@ static int do_unlink(const char *path)
 
 	free(cached_path);
 	return result;
-}
-
-static int do_get(struct link *manager, const char *filename, int recursive)
-{
-	stream_output_item(manager, filename, recursive);
-	send_manager_message(manager, "end\n");
-	return 1;
 }
 
 /*
@@ -1250,16 +964,16 @@ static int handle_manager(struct link *manager)
 	int64_t taskid = 0;
 	int mode, r, n;
 
-	if(recv_manager_message(manager, line, sizeof(line), idle_stoptime )) {
+	if(recv_message(manager, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(manager, taskid,time(0)+active_timeout);
-		} else if(sscanf(line,"put %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
+		} else if(sscanf(line,"file %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_put_single_file(manager, filename, length, mode);
+			r = ds_transfer_get_file(manager, global_cache, filename, length, mode, time(0)+active_timeout);
 			reset_idle_timer();
 		} else if(sscanf(line, "dir %s", filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_put_dir(manager,filename);
+			r = ds_transfer_get_dir(manager,global_cache,filename,time(0)+active_timeout);
 			reset_idle_timer();
 		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
 			url_decode(filename_encoded,filename,sizeof(filename));
@@ -1274,9 +988,9 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_unlink(filename);
-		} else if(sscanf(line, "get %s %d", filename_encoded, &mode) == 2) {
+		} else if(sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_get(manager, filename, mode);
+			r = ds_transfer_put_any(manager,global_cache,filename,time(0)+active_timeout);
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
@@ -1364,7 +1078,7 @@ static int enforce_worker_limits(struct link *manager)
 		fprintf(stderr,"ds_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
 
 		if(manager) {
-			send_manager_message(manager, "info disk_exhausted %lld\n", (long long) local_resources->disk.inuse);
+			send_message(manager, "info disk_exhausted %lld\n", (long long) local_resources->disk.inuse);
 		}
 
 		return 0;
@@ -1374,7 +1088,7 @@ static int enforce_worker_limits(struct link *manager)
 		fprintf(stderr,"ds_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.inuse);
 
 		if(manager) {
-			send_manager_message(manager, "info memory_exhausted %lld\n", (long long) local_resources->memory.inuse);
+			send_message(manager, "info memory_exhausted %lld\n", (long long) local_resources->memory.inuse);
 		}
 
 		return 0;
@@ -1392,7 +1106,7 @@ static int enforce_worker_promises(struct link *manager)
 	if(end_time > 0 && timestamp_get() > ((uint64_t) end_time)) {
 		warn(D_NOTICE, "ds_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t) manual_wall_time_option);
 		if(manager) {
-			send_manager_message(manager, "info wall_time_exhausted %"PRIu64"\n", (uint64_t) manual_wall_time_option);
+			send_message(manager, "info wall_time_exhausted %"PRIu64"\n", (uint64_t) manual_wall_time_option);
 		}
 		return 0;
 	}
@@ -1401,7 +1115,7 @@ static int enforce_worker_promises(struct link *manager)
 		fprintf(stderr,"ds_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
 
 		if(manager) {
-			send_manager_message(manager, "info disk_error %lld\n", (long long) local_resources->disk.total);
+			send_message(manager, "info disk_error %lld\n", (long long) local_resources->disk.total);
 		}
 
 		return 0;
@@ -1410,7 +1124,7 @@ static int enforce_worker_promises(struct link *manager)
 	return 1;
 }
 
-static void work_for_manager(struct link *manager)
+static void work_for_manager( struct link *manager )
 {
 	sigset_t mask;
 
@@ -1431,7 +1145,7 @@ static void work_for_manager(struct link *manager)
 
 		if(time(0) > idle_stoptime) {
 			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", current_manager_address->addr,current_manager_address->port,idle_timeout);
-			send_manager_message(manager, "info idle-disconnecting %lld\n", (long long) idle_timeout);
+			send_message(manager, "info idle-disconnecting %lld\n", (long long) idle_timeout);
 			break;
 		}
 
@@ -1460,7 +1174,7 @@ static void work_for_manager(struct link *manager)
 		}
 
 		int manager_activity = link_usleep_mask(manager, wait_msec*1000, &mask, 1, 0);
-		if(manager_activity < 0) break;
+ 		if(manager_activity < 0) break;
 
 		int ok = 1;
 		if(manager_activity) {
@@ -1528,7 +1242,7 @@ static void work_for_manager(struct link *manager)
 
 		if(ok && !results_to_be_sent_msg) {
 			if(ds_watcher_check(watcher) || itable_size(procs_complete) > 0) {
-				send_manager_message(manager, "available_results\n");
+				send_message(manager, "available_results\n");
 				results_to_be_sent_msg = 1;
 			}
 		}
@@ -1630,7 +1344,9 @@ static int workspace_check()
 }
 
 /*
-workspace_prepare is called every time we connect to a new manager,
+workspace_prepare is called every time we connect to a new manager.
+The peer transfer server is associated with a particular cache
+directory, and so gets created (and deleted) with the corresponding cache.
 */
 
 static int workspace_prepare()
@@ -1651,6 +1367,8 @@ static int workspace_prepare()
 	trash_setup(trash_dir);
 	free(trash_dir);
 
+	ds_transfer_server_start(global_cache);
+
 	return result;
 }
 
@@ -1663,6 +1381,9 @@ directories (except trash) and move them to the trash directory.
 static void workspace_cleanup()
 {
 	debug(D_DS,"cleaning workspace %s",workspace);
+
+	ds_transfer_server_stop();
+
 	DIR *dir = opendir(workspace);
 	if(dir) {
 		struct dirent *d;
@@ -1769,8 +1490,8 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	if(verify_project) {
 		char line[DS_LINE_MAX];
 		debug(D_DS, "verifying manager's project name");
-		send_manager_message(manager, "name\n");
-		if(!recv_manager_message(manager,line,sizeof(line),idle_stoptime)) {
+		send_message(manager, "name\n");
+		if(!recv_message(manager,line,sizeof(line),idle_stoptime)) {
 			debug(D_DS,"no response from manager while verifying name");
 			link_close(manager);
 			return 0;
@@ -1788,11 +1509,10 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	measure_worker_resources();
 
 	report_worker_ready(manager);
-
 	work_for_manager(manager);
 
 	if(abort_signal_received) {
-		send_manager_message(manager, "info vacating %d\n", abort_signal_received);
+		send_message(manager, "info vacating %d\n", abort_signal_received);
 	}
 
 	last_task_received     = 0;
