@@ -2,6 +2,7 @@
 #define DS_WORKER_H
 
 #include "dataswarm.h"
+#include "ds_resources.h"
 
 #include "hash_table.h"
 #include "link.h"
@@ -57,5 +58,8 @@ struct ds_worker {
 	int64_t end_time;                   // epoch time (in seconds) at which the worker terminates
 										// If -1, means the worker has not reported in. If 0, means no limit.
 };
+
+struct ds_worker * ds_worker_create( struct link * lnk );
+void ds_worker_delete( struct ds_worker *w );
 
 #endif

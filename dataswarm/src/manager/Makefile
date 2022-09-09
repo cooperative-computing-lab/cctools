@@ -3,6 +3,7 @@ include ../../../rules.mk
 
 SOURCES = \
 	ds_manager.c \
+	ds_worker.c \
 	ds_catalog.c \
 	ds_resources.c \
 	ds_json.c \
