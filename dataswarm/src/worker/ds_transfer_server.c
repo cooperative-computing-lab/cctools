@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2022- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 
 #include "ds_transfer_server.h"
 #include "ds_protocol.h"

@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "ds_manager.h"
+#include "ds_worker.h"
 #include "ds_protocol.h"
 #include "ds_task.h"
 #include "ds_file.h"
@@ -53,7 +54,6 @@ See the file COPYING for details.
 #include <sys/wait.h>
 #include <assert.h>
 #include <errno.h>
-#include <limits.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -75,8 +75,11 @@ See the file COPYING for details.
 // Seconds between measurement of manager local resources
 #define DS_RESOURCE_MEASUREMENT_INTERVAL 30
 
-#define WORKER_ADDRPORT_MAX 64
-#define WORKER_HASHKEY_MAX 32
+/**< Default value for Data Swarm keepalive interval in seconds. */
+#define DS_DEFAULT_KEEPALIVE_INTERVAL 120
+
+/**< Default value for Data Swarm keepalive timeout in seconds. */
+#define DS_DEFAULT_KEEPALIVE_TIMEOUT  30
 
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
@@ -92,41 +95,34 @@ typedef enum {
 } ds_result_code_t;
 
 typedef enum {
-	MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */
-	MSG_PROCESSED_DISCONNECT, /* Message was processed and disconnect now expected. */
-	MSG_NOT_PROCESSED,        /* Message was not processed, waiting to be consumed. */
-	MSG_FAILURE               /* Message not received, connection failure. */
+	DS_MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */
+	DS_MSG_PROCESSED_DISCONNECT, /* Message was processed and disconnect now expected. */
+	DS_MSG_NOT_PROCESSED,        /* Message was not processed, waiting to be consumed. */
+	DS_MSG_FAILURE               /* Message not received, connection failure. */
 } ds_msg_code_t;
 
 typedef enum {
-	MON_DISABLED = 0,
-	MON_SUMMARY  = 1,   /* generate only summary. */
-	MON_FULL     = 2,   /* generate summary, series and monitoring debug output. */
-	MON_WATCHDOG = 4    /* kill tasks that exhaust resources */
-} ds_monitoring_mode;
+	DS_MON_DISABLED = 0,
+	DS_MON_SUMMARY  = 1,   /* generate only summary. */
+	DS_MON_FULL     = 2,   /* generate summary, series and monitoring debug output. */
+	DS_MON_WATCHDOG = 4    /* kill tasks that exhaust resources */
+} ds_monitoring_mode_t;
 
 typedef enum {
-	WORKER_DISCONNECT_UNKNOWN  = 0,
-	WORKER_DISCONNECT_EXPLICIT,
-	WORKER_DISCONNECT_STATUS_WORKER,
-	WORKER_DISCONNECT_IDLE_OUT,
-	WORKER_DISCONNECT_FAST_ABORT,
-	WORKER_DISCONNECT_FAILURE
-} worker_disconnect_reason;
-
-typedef enum {
-	WORKER_TYPE_UNKNOWN = 1,
-	WORKER_TYPE_WORKER  = 2,
-	WORKER_TYPE_STATUS  = 4,
-} worker_type;
-
+	DS_WORKER_DISCONNECT_UNKNOWN  = 0,
+	DS_WORKER_DISCONNECT_EXPLICIT,
+	DS_WORKER_DISCONNECT_STATUS_WORKER,
+	DS_WORKER_DISCONNECT_IDLE_OUT,
+	DS_WORKER_DISCONNECT_FAST_ABORT,
+	DS_WORKER_DISCONNECT_FAILURE
+} ds_worker_disconnect_reason_t;
 
 typedef enum {
 	CORES_BIT = (1 << 0),
 	MEMORY_BIT = (1 << 1),
 	DISK_BIT = (1 << 2),
 	GPUS_BIT = (1 << 3),
-} resource_bitmask;
+} ds_resource_bitmask_t;
 
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
@@ -138,139 +134,6 @@ double ds_option_blocklist_slow_workers_timeout = 900;
 
 /* time threshold to check when tasks are larger than connected workers */
 static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
-
-struct ds_manager {
-	char *name;
-	int port;
-	int priority;
-	int num_tasks_left;
-
-	int next_taskid;
-
-	char workingdir[PATH_MAX];
-
-	struct link      *manager_link;   // incoming tcp connection for workers.
-	struct link_info *poll_table;
-	int poll_table_size;
-
-	struct itable *tasks;           // taskid -> task
-	struct itable *task_state_map;  // taskid -> state
-	struct list   *ready_list;      // ready to be sent to a worker
-
-	struct hash_table *worker_table;
-	struct hash_table *worker_blocklist;
-	struct itable  *worker_task_map;
-
-	struct hash_table *factory_table;
-
-	struct hash_table *categories;
-
-	struct hash_table *workers_with_available_results;
-
-	struct ds_stats *stats;
-	struct ds_stats *stats_measure;
-	struct ds_stats *stats_disconnected_workers;
-	timestamp_t time_last_wait;
-	timestamp_t time_last_log_stats;
-	timestamp_t time_last_large_tasks_check;
-	int worker_selection_algorithm;
-	int process_pending_check;
-
-	int short_timeout;		// timeout to send/recv a brief message from worker
-	int long_timeout;		// timeout if in the middle of an incomplete message.
-	struct list *task_reports;	      /* list of last N ds_task_reports. */
-
-	double resource_submit_multiplier; /* Times the resource value, but disk */
-
-	int minimum_transfer_timeout;
-	int transfer_outlier_factor;
-	int default_transfer_rate;
-
-	char *catalog_hosts;
-
-	time_t catalog_last_update_time;
-	time_t resources_last_update_time;
-	int    busy_waiting_flag;
-
-	int hungry_minimum;               /* minimum number of waiting tasks to consider queue not hungry. */;
-
-	int wait_for_workers;             /* wait for these many workers before dispatching tasks at start of execution. */
-
-	ds_category_mode_t allocation_default_mode;
-
-	FILE *logfile;
-	FILE *transactions_logfile;
-	int keepalive_interval;
-	int keepalive_timeout;
-	timestamp_t link_poll_end;	//tracks when we poll link; used to timeout unacknowledged keepalive checks
-
-    char *manager_preferred_connection;
-
-	int monitor_mode;
-	FILE *monitor_file;
-
-	char *monitor_output_directory;
-	char *monitor_summary_filename;
-
-	char *monitor_exe;
-	struct rmsummary *measured_local_resources;
-	struct rmsummary *current_max_worker;
-	struct rmsummary *max_task_resources_requested;
-
-	char *password;
-	char *ssl_key;
-	char *ssl_cert;
-	int ssl_enabled;
-
-	double bandwidth;
-
-	int fetch_factory;
-
-	int wait_retrieve_many;
-	int force_proportional_resources;
-};
-
-struct ds_worker {
-	char *hostname;
-	char *os;
-	char *arch;
-	char *version;
-	char *factory_name;
-	char addrport[WORKER_ADDRPORT_MAX];
-	char hashkey[WORKER_HASHKEY_MAX];
-
-	char transfer_addr[LINK_ADDRESS_MAX];
-	int transfer_port;
-	int transfer_port_active;
-  
-	worker_type type;                         // unknown, regular worker, status worker
-
-	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
-
-	int  fast_abort_alarm;                    // if 1, no task has finished since a task triggered fast abort.
-	                                          // 0 otherwise. A 2nd task triggering fast abort will cause the worker to disconnect
-
-	struct ds_stats     *stats;
-	struct ds_resources *resources;
-	struct hash_table           *features;
-
-	char *workerid;
-
-	struct hash_table *current_files;
-	struct link *link;
-	struct itable *current_tasks;
-	struct itable *current_tasks_boxes;
-	int finished_tasks;
-	int64_t total_tasks_complete;
-	int64_t total_bytes_transferred;
-	timestamp_t total_task_time;
-	timestamp_t total_transfer_time;
-	timestamp_t start_time;
-	timestamp_t last_msg_recv_time;
-	timestamp_t last_update_msg_time;
-	int64_t end_time;                   // epoch time (in seconds) at which the worker terminates
-										// If -1, means the worker has not reported in. If 0, means no limit.
-};
 
 struct ds_factory_info {
 	char *name;
@@ -287,7 +150,7 @@ struct ds_task_report {
 	struct rmsummary *resources;
 };
 
-struct blocklist_host_info {
+struct ds_blocklist_host_info {
 	int    blocked;
 	int    times_blocked;
 	time_t release_at;
@@ -296,7 +159,7 @@ struct blocklist_host_info {
 static void handle_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, ds_result_code_t fail_type);
 static void handle_worker_failure(struct ds_manager *q, struct ds_worker *w);
 static void handle_app_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t);
-static void remove_worker(struct ds_manager *q, struct ds_worker *w, worker_disconnect_reason reason);
+static void remove_worker(struct ds_manager *q, struct ds_worker *w, ds_worker_disconnect_reason_t reason);
 static int shut_down_worker(struct ds_manager *q, struct ds_worker *w);
 
 static void add_task_report(struct ds_manager *q, struct ds_task *t );
@@ -352,7 +215,7 @@ struct category *ds_category_lookup_or_create(struct ds_manager *q, const char *
 static void write_transaction(struct ds_manager *q, const char *str);
 static void write_transaction_task(struct ds_manager *q, struct ds_task *t);
 static void write_transaction_category(struct ds_manager *q, struct category *c);
-static void write_transaction_worker(struct ds_manager *q, struct ds_worker *w, int leaving, worker_disconnect_reason reason_leaving);
+static void write_transaction_worker(struct ds_manager *q, struct ds_worker *w, int leaving, ds_worker_disconnect_reason_t reason_leaving);
 static void write_transaction_transfer(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type);
 static void write_transaction_worker_resources(struct ds_manager *q, struct ds_worker *w);
 
@@ -588,7 +451,7 @@ ds_msg_code_t process_name(struct ds_manager *q, struct ds_worker *w, char *line
 	//send project name (q->name) if there is one. otherwise send blank line
 	send_worker_msg(q, w, "%s\n", q->name ? q->name : "");
 
-	return MSG_PROCESSED;
+	return DS_MSG_PROCESSED;
 }
 
 ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker *w, char *line)
@@ -599,7 +462,7 @@ ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker *w, char *line
 	int n = sscanf(line,"info %s %[^\n]", field, value);
 
 	if(n != 2)
-		return MSG_FAILURE;
+		return DS_MSG_FAILURE;
 
 	if(string_prefix_is(field, "workers_joined")) {
 		w->stats->workers_joined = atoll(value);
@@ -620,7 +483,7 @@ ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker *w, char *line
 	} else if(string_prefix_is(field, "tasks_running")) {
 		w->stats->tasks_running = atoll(value);
 	} else if(string_prefix_is(field, "idle-disconnecting")) {
-		remove_worker(q, w, WORKER_DISCONNECT_IDLE_OUT);
+		remove_worker(q, w, DS_WORKER_DISCONNECT_IDLE_OUT);
 		q->stats->workers_idled_out++;
 	} else if(string_prefix_is(field, "end_of_resource_update")) {
 		count_worker_resources(q, w);
@@ -648,7 +511,7 @@ ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker *w, char *line
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
-	return MSG_PROCESSED;
+	return DS_MSG_PROCESSED;
 }
 
 /*
@@ -671,7 +534,7 @@ int process_cache_update( struct ds_manager *q, struct ds_worker *w, const char 
 		}
 	}
 	
-	return MSG_PROCESSED;
+	return DS_MSG_PROCESSED;
 }
 
 /*
@@ -696,7 +559,7 @@ int process_cache_invalid( struct ds_manager *q, struct ds_worker *w, const char
 		int actual = link_read(w->link,message,length,stoptime);
 		if(actual!=length) {
 			free(message);
-			return MSG_FAILURE;
+			return DS_MSG_FAILURE;
 		}
 		
 		message[length] = 0;
@@ -706,7 +569,7 @@ int process_cache_invalid( struct ds_manager *q, struct ds_worker *w, const char
 		struct ds_remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
 		if(remote_info) ds_remote_file_info_delete(remote_info);
 	}
-	return MSG_PROCESSED;
+	return DS_MSG_PROCESSED;
 }
 
 /*
@@ -718,9 +581,9 @@ int process_transfer_address( struct ds_manager *q, struct ds_worker *w, const c
 {
 	if(sscanf(line,"transfer-address %s %d",w->transfer_addr,&w->transfer_port)) {
 		w->transfer_port_active = 1;
-		return MSG_PROCESSED;
+		return DS_MSG_PROCESSED;
 	} else {
-		return MSG_FAILURE;
+		return DS_MSG_FAILURE;
 	}
 }
 
@@ -736,7 +599,7 @@ static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker *w, 
 	int result = link_readline(w->link, line, length, stoptime);
 
 	if (result <= 0) {
-		return MSG_FAILURE;
+		return DS_MSG_FAILURE;
 	}
 
 	w->last_msg_recv_time = timestamp_get();
@@ -747,24 +610,24 @@ static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker *w, 
 
 	// Check for status updates that can be consumed here.
 	if(string_prefix_is(line, "alive")) {
-		result = MSG_PROCESSED;
+		result = DS_MSG_PROCESSED;
 	} else if(string_prefix_is(line, "dataswarm")) {
 		result = process_dataswarm(q, w, line);
 	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status") || string_prefix_is(line, "wable_status") || string_prefix_is(line, "resources_status")) {
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
-		result = MSG_PROCESSED;
+		result = DS_MSG_PROCESSED;
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
 	} else if (string_prefix_is(line, "feature")) {
 		result = process_feature(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
 		debug(D_DS|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
-		result = MSG_FAILURE;
+		result = DS_MSG_FAILURE;
 	} else if (string_prefix_is(line,"ready")) {
 		debug(D_DS|D_NOTICE,"worker (%s) is an older worker that is not compatible with this manager.",w->addrport);
-		result = MSG_FAILURE;
+		result = DS_MSG_FAILURE;
 	} else if (string_prefix_is(line, "name")) {
 		result = process_name(q, w, line);
 	} else if (string_prefix_is(line, "info")) {
@@ -779,7 +642,7 @@ static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker *w, 
 	        result = process_http_request(q,w,path,stoptime);
 	} else {
 		// Message is not a status update: return it to the user.
-		result = MSG_NOT_PROCESSED;
+		result = DS_MSG_NOT_PROCESSED;
 	}
 
 	return result;
@@ -793,11 +656,11 @@ an asynchronous update message like 'keepalive' or 'resource'.
 
 ds_msg_code_t recv_worker_msg_retry( struct ds_manager *q, struct ds_worker *w, char *line, int length )
 {
-	ds_msg_code_t result = MSG_PROCESSED;
+	ds_msg_code_t result = DS_MSG_PROCESSED;
 
 	do {
 		result = recv_worker_msg(q, w,line,length);
-	} while(result == MSG_PROCESSED);
+	} while(result == DS_MSG_PROCESSED);
 
 	return result;
 }
@@ -1166,13 +1029,13 @@ static void record_removed_worker_stats(struct ds_manager *q, struct ds_worker *
 	qs->workers_removed = ws->workers_joined;
 }
 
-static void remove_worker(struct ds_manager *q, struct ds_worker *w, worker_disconnect_reason reason)
+static void remove_worker(struct ds_manager *q, struct ds_worker *w, ds_worker_disconnect_reason_t reason)
 {
 	if(!q || !w) return;
 
 	debug(D_DS, "worker %s (%s) removed", w->hostname, w->addrport);
 
-	if(w->type == WORKER_TYPE_WORKER) {
+	if(w->type == DS_WORKER_TYPE_WORKER) {
 		q->stats->workers_removed++;
 	}
 
@@ -1185,18 +1048,6 @@ static void remove_worker(struct ds_manager *q, struct ds_worker *w, worker_disc
 
 	record_removed_worker_stats(q, w);
 
-	if(w->link)
-		link_close(w->link);
-
-	itable_delete(w->current_tasks);
-	itable_delete(w->current_tasks_boxes);
-	hash_table_delete(w->current_files);
-	ds_resources_delete(w->resources);
-	free(w->workerid);
-
-	if(w->features)
-		hash_table_delete(w->features);
-
 	if (w->factory_name) {
 		struct ds_factory_info *f;
 		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
@@ -1204,18 +1055,12 @@ static void remove_worker(struct ds_manager *q, struct ds_worker *w, worker_disc
 		}
 	}
 
-	free(w->stats);
-	free(w->hostname);
-	free(w->os);
-	free(w->arch);
-	free(w->version);
-	free(w->factory_name);
-	free(w);
+	ds_worker_delete(w);
 
 	/* update the largest worker seen */
 	find_max_worker(q);
 
-	debug(D_DS, "%d workers connected in total now", count_workers(q, WORKER_TYPE_WORKER));
+	debug(D_DS, "%d workers connected in total now", count_workers(q, DS_WORKER_TYPE_WORKER));
 }
 
 static int release_worker(struct ds_manager *q, struct ds_worker *w)
@@ -1225,7 +1070,7 @@ static int release_worker(struct ds_manager *q, struct ds_worker *w)
 
 	send_worker_msg(q,w,"release\n");
 
-	remove_worker(q, w, WORKER_DISCONNECT_EXPLICIT);
+	remove_worker(q, w, DS_WORKER_DISCONNECT_EXPLICIT);
 
 	q->stats->workers_released++;
 
@@ -1234,12 +1079,10 @@ static int release_worker(struct ds_manager *q, struct ds_worker *w)
 
 static void add_worker(struct ds_manager *q)
 {
-	struct link *link;
-	struct ds_worker *w;
 	char addr[LINK_ADDRESS_MAX];
 	int port;
 
-	link = link_accept(q->manager_link, time(0) + q->short_timeout);
+	struct link *link = link_accept(q->manager_link, time(0) + q->short_timeout);
 	if(!link) {
 		return;
 	}
@@ -1275,41 +1118,19 @@ static void add_worker(struct ds_manager *q)
 		}
 	}
 
-	w = malloc(sizeof(*w));
+	struct ds_worker *w = ds_worker_create(link);
 	if(!w) {
 		debug(D_NOTICE, "Cannot allocate memory for worker %s:%d.", addr, port);
 		link_close(link);
 		return;
 	}
 
-	memset(w, 0, sizeof(*w));
-	w->hostname = strdup("unknown");
-	w->os = strdup("unknown");
-	w->arch = strdup("unknown");
-	w->version = strdup("unknown");
-	w->type = WORKER_TYPE_UNKNOWN;
-	w->draining = 0;
-	w->link = link;
-	w->current_files = hash_table_create(0, 0);
-	w->current_tasks = itable_create(0);
-	w->current_tasks_boxes = itable_create(0);
-	w->finished_tasks = 0;
-	w->start_time = timestamp_get();
-	w->end_time = -1;
-
-	w->last_update_msg_time = w->start_time;
-
-	w->resources = ds_resources_create();
-
-	w->workerid = NULL;
-
-	w->stats     = calloc(1, sizeof(struct ds_stats));
 	link_to_hash_key(link, w->hashkey);
 	sprintf(w->addrport, "%s:%d", addr, port);
-	hash_table_insert(q->worker_table, w->hashkey, w);
 
-	return;
+	hash_table_insert(q->worker_table, w->hashkey, w);
 }
+
 
 /*
 Receive the contents of a single file from a worker.
@@ -1436,7 +1257,7 @@ static ds_result_code_t get_any( struct ds_manager *q, struct ds_worker *w, stru
 	ds_result_code_t r = DS_WORKER_FAILURE;
 
 	ds_msg_code_t mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
-	if(mcode!=MSG_NOT_PROCESSED) return DS_WORKER_FAILURE;
+	if(mcode!=DS_MSG_NOT_PROCESSED) return DS_WORKER_FAILURE;
 
 	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
 
@@ -1728,7 +1549,7 @@ void read_measured_resources(struct ds_manager *q, struct ds_task *t) {
 
 void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t)
 {
-	if(q->monitor_mode == MON_DISABLED)
+	if(q->monitor_mode == DS_MON_DISABLED)
 		return;
 
 	char *summary = monitor_file_name(q, t, ".summary");
@@ -1766,7 +1587,7 @@ void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t)
 	if(t->monitor_output_directory)
 		keep = 1;
 
-	if(q->monitor_mode & MON_FULL && q->monitor_output_directory)
+	if(q->monitor_mode & DS_MON_FULL && q->monitor_output_directory)
 		keep = 1;
 
 	if(!keep)
@@ -1834,7 +1655,7 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 		read_measured_resources(q, t);
 
 		/* Further, if we got debug and series files, gzip them. */
-		if(q->monitor_mode & MON_FULL)
+		if(q->monitor_mode & DS_MON_FULL)
 			resource_monitor_compress_logs(q, t);
 	}
 
@@ -1984,7 +1805,7 @@ static void handle_worker_failure(struct ds_manager *q, struct ds_worker *w)
 {
 	//WQ failures happen in the manager-worker interactions. In this case, we
 	//remove the worker and retry the tasks dispatched to it elsewhere.
-	remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
+	remove_worker(q, w, DS_WORKER_DISCONNECT_FAILURE);
 	return;
 }
 
@@ -2005,12 +1826,12 @@ static ds_msg_code_t process_dataswarm(struct ds_manager *q, struct ds_worker *w
 
 	int n = sscanf(line,"dataswarm %d %s %s %s %s",&worker_protocol,items[0],items[1],items[2],items[3]);
 	if(n != 5)
-		return MSG_FAILURE;
+		return DS_MSG_FAILURE;
 
 	if(worker_protocol!=DS_PROTOCOL_VERSION) {
 		debug(D_DS|D_NOTICE,"rejecting worker (%s) as it uses protocol %d. The manager is using protocol %d.",w->addrport,worker_protocol,DS_PROTOCOL_VERSION);
 		ds_block_host(q, w->hostname);
-		return MSG_FAILURE;
+		return DS_MSG_FAILURE;
 	}
 
 	if(w->hostname) free(w->hostname);
@@ -2023,10 +1844,10 @@ static ds_msg_code_t process_dataswarm(struct ds_manager *q, struct ds_worker *w
 	w->arch     = strdup(items[2]);
 	w->version  = strdup(items[3]);
 
-	w->type = WORKER_TYPE_WORKER;
+	w->type = DS_WORKER_TYPE_WORKER;
 
 	q->stats->workers_joined++;
-	debug(D_DS, "%d workers are connected in total now", count_workers(q, WORKER_TYPE_WORKER));
+	debug(D_DS, "%d workers are connected in total now", count_workers(q, DS_WORKER_TYPE_WORKER));
 
 
 	debug(D_DS, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
@@ -2036,7 +1857,7 @@ static ds_msg_code_t process_dataswarm(struct ds_manager *q, struct ds_worker *w
 	}
 
 
-	return MSG_PROCESSED;
+	return DS_MSG_PROCESSED;
 }
 
 /*
@@ -2262,7 +2083,7 @@ static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_wo
 	while(1) {
 		ds_msg_code_t mcode;
 		mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
-		if(mcode!=MSG_NOT_PROCESSED) {
+		if(mcode!=DS_MSG_NOT_PROCESSED) {
 			result = DS_WORKER_FAILURE;
 			break;
 		}
@@ -2324,7 +2145,7 @@ static struct jx *blocked_to_json( struct ds_manager  *q ) {
 	struct jx *j = jx_array(0);
 
 	char *hostname;
-	struct blocklist_host_info *info;
+	struct ds_blocklist_host_info *info;
 
 	hash_table_firstkey(q->worker_blocklist);
 	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
@@ -2462,6 +2283,7 @@ static struct rmsummary *category_alloc_info(struct ds_manager *q, struct catego
 	ds_task_specify_category(t, c->name);
 	t->resource_request = request;
 
+	// XXX not sure if regular worker constructor should happen here
 	struct ds_worker *w = malloc(sizeof(*w));
 	w->resources = ds_resources_create();
 	w->resources->cores.largest = q->current_max_worker->cores;
@@ -2933,7 +2755,7 @@ static ds_msg_code_t process_http_request( struct ds_manager *q, struct ds_worke
 	}
 
 	// Return success but require a disconnect now.
-	return MSG_PROCESSED_DISCONNECT;
+	return DS_MSG_PROCESSED_DISCONNECT;
 }
 
 /*
@@ -3012,20 +2834,20 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 	struct link *l = target->link;
 
 	struct jx *a = construct_status_message(q, line);
-	target->type = WORKER_TYPE_STATUS;
+	target->type = DS_WORKER_TYPE_STATUS;
 
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
 	if(!a) {
 		debug(D_WQ, "Unknown status request: '%s'", line);
-		return MSG_FAILURE;
+		return DS_MSG_FAILURE;
 	}
 
 	jx_print_link(a,l,stoptime);
 	jx_delete(a);
 
-	return MSG_PROCESSED_DISCONNECT;
+	return DS_MSG_PROCESSED_DISCONNECT;
 }
 
 
@@ -3067,10 +2889,10 @@ static ds_msg_code_t process_resource( struct ds_manager *q, struct ds_worker *w
 			w->resources->workers.inuse = inuse;
 		}
 	} else {
-		return MSG_FAILURE;
+		return DS_MSG_FAILURE;
 	}
 
-	return MSG_PROCESSED;
+	return DS_MSG_PROCESSED;
 }
 
 static ds_msg_code_t process_feature( struct ds_manager *q, struct ds_worker *w, const char *line )
@@ -3081,7 +2903,7 @@ static ds_msg_code_t process_feature( struct ds_manager *q, struct ds_worker *w,
 	int n = sscanf(line, "feature %s", feature);
 
 	if(n != 1) {
-		return MSG_FAILURE;
+		return DS_MSG_FAILURE;
 	}
 
 	if(!w->features)
@@ -3093,7 +2915,7 @@ static ds_msg_code_t process_feature( struct ds_manager *q, struct ds_worker *w,
 
 	hash_table_insert(w->features, fdec, (void **) 1);
 
-	return MSG_PROCESSED;
+	return DS_MSG_PROCESSED;
 }
 
 static ds_result_code_t handle_worker(struct ds_manager *q, struct link *l)
@@ -3111,27 +2933,27 @@ static ds_result_code_t handle_worker(struct ds_manager *q, struct link *l)
 	// We only expect asynchronous status queries and updates here.
 
 	switch(mcode) {
-		case MSG_PROCESSED:
+		case DS_MSG_PROCESSED:
 			// A status message was received and processed.
 			return DS_SUCCESS;
 			break;
 
-		case MSG_PROCESSED_DISCONNECT:
+		case DS_MSG_PROCESSED_DISCONNECT:
 			// A status query was received and processed, so disconnect.
-			remove_worker(q, w, WORKER_DISCONNECT_STATUS_WORKER);
+			remove_worker(q, w, DS_WORKER_DISCONNECT_STATUS_WORKER);
 			return DS_SUCCESS;
 
-		case MSG_NOT_PROCESSED:
+		case DS_MSG_NOT_PROCESSED:
 			debug(D_DS, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 			q->stats->workers_lost++;
-			remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
+			remove_worker(q, w, DS_WORKER_DISCONNECT_FAILURE);
 			return DS_WORKER_FAILURE;
 			break;
 
-		case MSG_FAILURE:
+		case DS_MSG_FAILURE:
 			debug(D_DS, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
 			q->stats->workers_lost++;
-			remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
+			remove_worker(q, w, DS_WORKER_DISCONNECT_FAILURE);
 			return DS_WORKER_FAILURE;
 	}
 
@@ -3790,7 +3612,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker *w
 	send_worker_msg(q,w, "disk %s\n",   rmsummary_resource_to_str("disk", limits->disk, 0));
 
 	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
-	if(q->monitor_mode == MON_DISABLED) {
+	if(q->monitor_mode == DS_MON_DISABLED) {
 		if(limits->end > 0) {
 			send_worker_msg(q,w, "end_time %s\n",  rmsummary_resource_to_str("end", limits->end, 0));
 		}
@@ -4000,7 +3822,7 @@ static int check_hand_against_task(struct ds_manager *q, struct ds_worker *w, st
 		if ( f && f->connected_workers > f->max_workers ) return 0;
 	}
 
-	struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
+	struct ds_blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
 	if (info && info->blocked) {
 		return 0;
 	}
@@ -4669,7 +4491,7 @@ static int abort_slow_workers(struct ds_manager *q)
 
 		if(runtime >= (average_task_time * (multiplier + t->fast_abort_count))) {
 			w = itable_lookup(q->worker_task_map, t->taskid);
-			if(w && (w->type == WORKER_TYPE_WORKER))
+			if(w && (w->type == DS_WORKER_TYPE_WORKER))
 			{
 				debug(D_DS, "Task %d is taking too long. Removing from worker.", t->taskid);
 				cancel_task_on_worker(q, t, DS_TASK_READY);
@@ -4687,7 +4509,7 @@ static int abort_slow_workers(struct ds_manager *q)
 
 					debug(D_DS, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
 					ds_block_host_with_timeout(q, w->hostname, ds_option_blocklist_slow_workers_timeout);
-					remove_worker(q, w, WORKER_DISCONNECT_FAST_ABORT);
+					remove_worker(q, w, DS_WORKER_DISCONNECT_FAST_ABORT);
 
 					q->stats->workers_fast_aborted++;
 					removed++;
@@ -4706,7 +4528,7 @@ static int shut_down_worker(struct ds_manager *q, struct ds_worker *w)
 	if(!w) return 0;
 
 	send_worker_msg(q,w,"exit\n");
-	remove_worker(q, w, WORKER_DISCONNECT_EXPLICIT);
+	remove_worker(q, w, DS_WORKER_DISCONNECT_EXPLICIT);
 	q->stats->workers_released++;
 
 	return 1;
@@ -4928,7 +4750,7 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 	q->keepalive_interval = DS_DEFAULT_KEEPALIVE_INTERVAL;
 	q->keepalive_timeout = DS_DEFAULT_KEEPALIVE_TIMEOUT;
 
-	q->monitor_mode = MON_DISABLED;
+	q->monitor_mode = DS_MON_DISABLED;
 
 	q->hungry_minimum = 10;
 
@@ -4977,7 +4799,7 @@ int ds_enable_monitoring(struct ds_manager *q, char *monitor_output_directory, i
 	if(!q)
 		return 0;
 
-	q->monitor_mode = MON_DISABLED;
+	q->monitor_mode = DS_MON_DISABLED;
 	q->monitor_exe = resource_monitor_locate(NULL);
 
 	if(q->monitor_output_directory) {
@@ -5012,10 +4834,10 @@ int ds_enable_monitoring(struct ds_manager *q, char *monitor_output_directory, i
 		rmsummary_delete(q->measured_local_resources);
 
 	q->measured_local_resources = rmonitor_measure_process(getpid());
-	q->monitor_mode = MON_SUMMARY;
+	q->monitor_mode = DS_MON_SUMMARY;
 
 	if(watchdog) {
-		q->monitor_mode |= MON_WATCHDOG;
+		q->monitor_mode |= DS_MON_WATCHDOG;
 	}
 
 	return 1;
@@ -5025,10 +4847,10 @@ int ds_enable_monitoring_full(struct ds_manager *q, char *monitor_output_directo
 	int status = ds_enable_monitoring(q, monitor_output_directory, 1);
 
 	if(status) {
-		q->monitor_mode = MON_FULL;
+		q->monitor_mode = DS_MON_FULL;
 
 		if(watchdog) {
-			q->monitor_mode |= MON_WATCHDOG;
+			q->monitor_mode |= DS_MON_WATCHDOG;
 		}
 	}
 
@@ -5245,7 +5067,7 @@ void update_resource_report(struct ds_manager *q) {
 }
 
 void ds_disable_monitoring(struct ds_manager *q) {
-	if(q->monitor_mode == MON_DISABLED)
+	if(q->monitor_mode == DS_MON_DISABLED)
 		return;
 
 	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
@@ -5318,7 +5140,7 @@ void ds_monitor_add_files(struct ds_manager *q, struct ds_task *t) {
 	ds_task_specify_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", DS_OUTPUT, DS_NOCACHE);
 	free(summary);
 
-	if(q->monitor_mode & MON_FULL && (q->monitor_output_directory || t->monitor_output_directory)) {
+	if(q->monitor_mode & DS_MON_FULL && (q->monitor_output_directory || t->monitor_output_directory)) {
 		char *debug  = monitor_file_name(q, t, ".debug");
 		char *series = monitor_file_name(q, t, ".series");
 
@@ -5345,11 +5167,11 @@ char *ds_monitor_wrap(struct ds_manager *q, struct ds_worker *w, struct ds_task 
 		buffer_printf(&b, " --snapshot-events %s", RESOURCE_MONITOR_REMOTE_NAME_EVENTS);
 	}
 
-	if(!(q->monitor_mode & MON_WATCHDOG)) {
+	if(!(q->monitor_mode & DS_MON_WATCHDOG)) {
 		buffer_printf(&b, " --measure-only");
 	}
 
-	int extra_files = (q->monitor_mode & MON_FULL);
+	int extra_files = (q->monitor_mode & DS_MON_FULL);
 
 	char *monitor_cmd = resource_monitor_write_command("./" RESOURCE_MONITOR_REMOTE_NAME, RESOURCE_MONITOR_REMOTE_NAME, limits, /* extra options */ buffer_tostring(&b), /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0, /* measure_dir */ NULL);
 	char *wrap_cmd  = string_wrap_command(t->command_line, monitor_cmd);
@@ -5615,7 +5437,7 @@ int ds_submit_internal(struct ds_manager *q, struct ds_task *t)
 	t->time_when_submitted = timestamp_get();
 	q->stats->tasks_submitted++;
 
-	if(q->monitor_mode != MON_DISABLED)
+	if(q->monitor_mode != DS_MON_DISABLED)
 		ds_monitor_add_files(q, t);
 
 	rmsummary_merge_max(q->max_task_resources_requested, t->resources_requested);
@@ -5645,10 +5467,10 @@ int ds_submit(struct ds_manager *q, struct ds_task *t)
 
 void ds_block_host_with_timeout(struct ds_manager *q, const char *hostname, time_t timeout)
 {
-	struct blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, hostname);
+	struct ds_blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, hostname);
 
 	if(!info) {
-		info = malloc(sizeof(struct blocklist_host_info));
+		info = malloc(sizeof(struct ds_blocklist_host_info));
 		info->times_blocked = 0;
 		info->blocked       = 0;
 	}
@@ -5679,7 +5501,7 @@ void ds_block_host(struct ds_manager *q, const char *hostname)
 
 void ds_unblock_host(struct ds_manager *q, const char *hostname)
 {
-	struct blocklist_host_info *info = hash_table_remove(q->worker_blocklist, hostname);
+	struct ds_blocklist_host_info *info = hash_table_remove(q->worker_blocklist, hostname);
 	if(info) {
 		info->blocked = 0;
 		info->release_at  = 0;
@@ -5690,7 +5512,7 @@ void ds_unblock_host(struct ds_manager *q, const char *hostname)
 static void ds_unblock_all_by_time(struct ds_manager *q, time_t deadline)
 {
 	char *hostname;
-	struct blocklist_host_info *info;
+	struct ds_blocklist_host_info *info;
 
 	hash_table_firstkey(q->worker_blocklist);
 	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
@@ -6386,7 +6208,7 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 	memcpy(s, qs, sizeof(*s));
 
 	//info about workers
-	s->workers_connected = count_workers(q, WORKER_TYPE_WORKER);
+	s->workers_connected = count_workers(q, DS_WORKER_TYPE_WORKER);
 	s->workers_init      = count_workers(q, DS_TASK_UNKNOWN);
 	s->workers_busy      = workers_with_tasks(q);
 	s->workers_idle      = s->workers_connected - s->workers_busy;
@@ -6715,7 +6537,7 @@ static void write_transaction_category(struct ds_manager *q, struct category *c)
 	buffer_free(&B);
 }
 
-static void write_transaction_worker(struct ds_manager *q, struct ds_worker *w, int leaving, worker_disconnect_reason reason_leaving) {
+static void write_transaction_worker(struct ds_manager *q, struct ds_worker *w, int leaving, ds_worker_disconnect_reason_t reason_leaving) {
 	struct buffer B;
 	buffer_init(&B);
 
@@ -6724,22 +6546,22 @@ static void write_transaction_worker(struct ds_manager *q, struct ds_worker *w, 
 	if(leaving) {
 		buffer_printf(&B, " DISCONNECTION");
 		switch(reason_leaving) {
-			case WORKER_DISCONNECT_IDLE_OUT:
+			case DS_WORKER_DISCONNECT_IDLE_OUT:
 				buffer_printf(&B, " IDLE_OUT");
 				break;
-			case WORKER_DISCONNECT_FAST_ABORT:
+			case DS_WORKER_DISCONNECT_FAST_ABORT:
 				buffer_printf(&B, " FAST_ABORT");
 				break;
-			case WORKER_DISCONNECT_FAILURE:
+			case DS_WORKER_DISCONNECT_FAILURE:
 				buffer_printf(&B, " FAILURE");
 				break;
-			case WORKER_DISCONNECT_STATUS_WORKER:
+			case DS_WORKER_DISCONNECT_STATUS_WORKER:
 				buffer_printf(&B, " STATUS_WORKER");
 				break;
-			case WORKER_DISCONNECT_EXPLICIT:
+			case DS_WORKER_DISCONNECT_EXPLICIT:
 				buffer_printf(&B, " EXPLICIT");
 				break;
-			case WORKER_DISCONNECT_UNKNOWN:
+			case DS_WORKER_DISCONNECT_UNKNOWN:
 			default:
 				buffer_printf(&B, " UNKNOWN");
 				break;
