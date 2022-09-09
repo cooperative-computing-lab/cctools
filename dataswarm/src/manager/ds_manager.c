@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "ds_manager.h"
+#include "ds_worker.h"
 #include "ds_protocol.h"
 #include "ds_task.h"
 #include "ds_file.h"
@@ -80,9 +81,6 @@ See the file COPYING for details.
 /**< Default value for Data Swarm keepalive timeout in seconds. */
 #define DS_DEFAULT_KEEPALIVE_TIMEOUT  30
 
-#define WORKER_ADDRPORT_MAX 64
-#define WORKER_HASHKEY_MAX 32
-
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
 #define MAX_NEW_WORKERS 10
@@ -120,13 +118,6 @@ typedef enum {
 } worker_disconnect_reason;
 
 typedef enum {
-	DS_WORKER_TYPE_UNKNOWN = 1,
-	DS_WORKER_TYPE_WORKER  = 2,
-	DS_WORKER_TYPE_STATUS  = 4,
-} ds_worker_type_t;
-
-
-typedef enum {
 	CORES_BIT = (1 << 0),
 	MEMORY_BIT = (1 << 1),
 	DISK_BIT = (1 << 2),
@@ -143,48 +134,6 @@ double ds_option_blocklist_slow_workers_timeout = 900;
 
 /* time threshold to check when tasks are larger than connected workers */
 static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
-
-struct ds_worker {
-	char *hostname;
-	char *os;
-	char *arch;
-	char *version;
-	char *factory_name;
-	char addrport[WORKER_ADDRPORT_MAX];
-	char hashkey[WORKER_HASHKEY_MAX];
-
-	char transfer_addr[LINK_ADDRESS_MAX];
-	int transfer_port;
-	int transfer_port_active;
-  
-	ds_worker_type_t type;                         // unknown, regular worker, status worker
-
-	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
-
-	int  fast_abort_alarm;                    // if 1, no task has finished since a task triggered fast abort.
-	                                          // 0 otherwise. A 2nd task triggering fast abort will cause the worker to disconnect
-
-	struct ds_stats     *stats;
-	struct ds_resources *resources;
-	struct hash_table           *features;
-
-	char *workerid;
-
-	struct hash_table *current_files;
-	struct link *link;
-	struct itable *current_tasks;
-	struct itable *current_tasks_boxes;
-	int finished_tasks;
-	int64_t total_tasks_complete;
-	int64_t total_bytes_transferred;
-	timestamp_t total_task_time;
-	timestamp_t total_transfer_time;
-	timestamp_t start_time;
-	timestamp_t last_msg_recv_time;
-	timestamp_t last_update_msg_time;
-	int64_t end_time;                   // epoch time (in seconds) at which the worker terminates
-										// If -1, means the worker has not reported in. If 0, means no limit.
-};
 
 struct ds_factory_info {
 	char *name;
