@@ -24,7 +24,9 @@ struct work_queue_coprocess {
     work_queue_coprocess_state_t state;
     int pipe_in[2];
     int pipe_out[2];
-    struct link *link;
+    struct link *read_link;
+    struct link *write_link;
+    struct link *network_link;
     int num_restart_attempts;
     struct work_queue_resources *coprocess_resources;
 };

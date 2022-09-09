@@ -28,139 +28,82 @@ See the file COPYING for details.
 
 static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
-int work_queue_coprocess_write(char *buffer, int len, int timeout, struct work_queue_coprocess *coprocess)
+int work_queue_coprocess_write_to_link(char *buffer, int len, int timeout, struct link* link)
 {
-	struct pollfd read_poll = {coprocess->pipe_in[1], POLLOUT, 0};
-	int poll_result = poll(&read_poll, 1, timeout);
-	if (poll_result < 0)
-	{
-		if (errno == EINTR)
-		{
-			debug(D_WQ, "Polling coprocess interrupted, trying again");
-			return -1;
-		}
-		debug(D_WQ, "Polling coprocess pipe failed: %s\n", strerror(errno));
-		return -2;
+	timestamp_t curr_time = timestamp_get();
+	timestamp_t stoptime = curr_time + timeout;
+
+	int bytes_sent = link_printf(link, stoptime, "%s %d\n", buffer, len);
+	if(bytes_sent < 0) {
+		fatal("could not send input data size: %s", strerror(errno));
 	}
-	if (poll_result == 0) // check for timeout
-	{
-		debug(D_WQ, "writing to coprocess timed out\n");
-		return -3;
+
+	// send actual data
+	bytes_sent = link_write(link, buffer, len, stoptime);
+	if(bytes_sent < 0) {
+		fatal("could not send input data: %s", strerror(errno));
 	}
-	if ( !(read_poll.revents & POLLOUT)) // check we have data
-	{
-		debug(D_WQ, "Data able to be written to pipe: %s\n", strerror(errno));
-		return -2;
-	}
-	int bytes_written = write(coprocess->pipe_in[1], buffer, len);
-	if (bytes_written < 0)
-	{
-		if (errno == EINTR)
-		{
-			debug(D_WQ, "Write to coprocess interrupted\n");
-			return 0;
-		}
-		debug(D_WQ, "Write to coprocess failed: %s\n", strerror(errno));
-		return -2;
-	}
-	return bytes_written;
+	return bytes_sent;
 }
 
-int work_queue_coprocess_read(char *buffer, int len, int timeout, struct work_queue_coprocess *coprocess){
-	struct pollfd read_poll = {coprocess->pipe_out[0], POLLIN, 0};
-	int poll_result = poll(&read_poll, 1, timeout);
-	if (poll_result < 0)
+int work_queue_coprocess_read_from_link(char *buffer, int len, int timeout, struct link* link){
+
+	timestamp_t curr_time = timestamp_get();
+	timestamp_t stoptime = curr_time + timeout;
+
+	char len_buffer[WORK_QUEUE_LINE_MAX];
+	int length, poll_result, bytes_read = 0;
+
+	struct link_info coprocess_link_info[] = {{link, LINK_READ, stoptime}};
+	poll_result = link_poll(coprocess_link_info, sizeof(coprocess_link_info) / sizeof(coprocess_link_info[0]), stoptime);
+	if (poll_result == 0) {
+		debug(D_WQ, "No data to read from coprocess\n");
+		return 0;
+	}
+	
+	link_readline(link, len_buffer, WORK_QUEUE_LINE_MAX, stoptime);
+	sscanf(len_buffer, "%d", &length);
+	
+	int current_bytes_read = 0;
+	while (1)
 	{
-		if (errno == EINTR)
-		{
-			debug(D_WQ, "Polling coprocess interrupted, trying again");
+		current_bytes_read = link_read(link, buffer + bytes_read, length - bytes_read, stoptime);
+		if (current_bytes_read < 0) {
+			debug(D_WQ, "Read from coprocess link failed\n");
 			return -1;
 		}
-		debug(D_WQ, "Polling coprocess pipe failed: %s\n", strerror(errno));
-		return -2;
-	}
-	if (poll_result == 0) // check for timeout
-	{
-		debug(D_WQ, "reading from coprocess timed out\n");
-		return -3;
-	}
-	if ( !(read_poll.revents & POLLIN)) // check we have data
-	{
-		debug(D_WQ, "Data not returned from pipe: %s\n", strerror(errno));
-		return -2;
+		else if (current_bytes_read == 0) {
+			debug(D_WQ, "Read from coprocess link failed: pipe closed\n");
+			return -1;
+		}
+		bytes_read += current_bytes_read;
+		if (bytes_read == length) {
+			break;
+		}
 	}
 
-	int bytes_read = read(coprocess->pipe_out[0], buffer, len - 1);
 	if (bytes_read < 0)
 	{
-		if (errno == EINTR)
-		{
-			debug(D_WQ, "Read from coprocess interrupted\n");
-			return 0;
-		}
 		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
-		return -2;
+		return -1;
 	}
 	buffer[bytes_read] = '\0';
+
 	return bytes_read;
 }
 
 int work_queue_coprocess_setup(struct work_queue_coprocess *coprocess)
 {
-	int json_offset, json_length = -1, cumulative_bytes_read = 0, buffer_offset = 0;
+	int bytes_read = 0;
 	char buffer[WORK_QUEUE_LINE_MAX];
-	char *envelope_size = NULL;
     char *name = NULL;
 
-	while (1)
-	{
-		int curr_bytes_read = work_queue_coprocess_read(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout, coprocess);
-		if (curr_bytes_read < 0) {
-			fatal("Unable to get information from coprocess\n");
-		}
-		if (curr_bytes_read == -1)
-		{
-			continue;
-		}
-		else if (curr_bytes_read == -3)
-		{
-			break;
-		}
-		cumulative_bytes_read += curr_bytes_read;
-
-		envelope_size = memchr(buffer, '\n', cumulative_bytes_read);
-		if ( envelope_size != NULL )
-		{
-			if (json_length == -1)
-			{
-				json_length = atoi(buffer);
-			}
-			if (json_length != -1)
-			{
-				json_offset = (int) (envelope_size - buffer) + 1;
-				while ( json_offset < cumulative_bytes_read )
-				{
-					if (buffer[json_offset] == '\n')
-					{
-						buffer_offset = -1;
-					}
-					json_offset++;
-				}
-			}
-		}
-		if (buffer_offset == -1)
-		{
-			break;
-		}
-		buffer_offset += curr_bytes_read;
+	bytes_read = work_queue_coprocess_read_from_link(buffer, WORK_QUEUE_LINE_MAX, coprocess_max_timeout, coprocess->read_link);
+	if (bytes_read < 0) {
+		fatal("Unable to get information from coprocess\n");
 	}
 
-	if ( ( (envelope_size - buffer + 1) + json_length + 1 ) != cumulative_bytes_read)
-	{
-		return -1;
-	}
-
-	struct jx *item, *coprocess_json = jx_parse_string(envelope_size + 1);
+	struct jx *item, *coprocess_json = jx_parse_string(buffer);
 	void *i = NULL;
 	const char *key;
 	while ((item = jx_iterate_values(coprocess_json, &i))) {
@@ -200,6 +143,8 @@ char *work_queue_coprocess_start(struct work_queue_coprocess *coprocess) {
 	}
 	coprocess->pid = fork();
 	if(coprocess->pid > 0) {
+		coprocess->read_link = link_attach_to_fd(coprocess->pipe_out[0]);
+		coprocess->write_link = link_attach_to_fd(coprocess->pipe_in[1]);
 		if (work_queue_coprocess_setup(coprocess)) {
 			fatal("Unable to setup coprocess");
 		}
@@ -256,7 +201,6 @@ int work_queue_coprocess_check(struct work_queue_coprocess *coprocess)
 
 char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess) {
 	char addr[DOMAIN_NAME_MAX];
-	int len;
 	int timeout = 60000000; // one minute, can be changed
 
 	if(!domain_name_lookup("localhost", addr)) {
@@ -270,8 +214,8 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 	int tries = 0;
 	// retry connection for ~30 seconds
 	while(!connected && tries < 30) {
-		coprocess->link = link_connect(addr, coprocess->port, stoptime);
-		if(coprocess->link) {
+		coprocess->network_link = link_connect(addr, coprocess->port, stoptime);
+		if(coprocess->network_link) {
 			connected = 1;
 		} else {
 			tries++;
@@ -279,39 +223,28 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 		}
 	}
 	// if we can't connect at all, abort
-	if(!coprocess->link) {
+	if(!coprocess->network_link) {
 		fatal("connection error: %s", strerror(errno));
 	}
 
-	len = strlen(function_input);
 	curr_time = timestamp_get();
 	stoptime = curr_time + timeout;
-	// send the length of the data first
-	int bytes_sent = link_printf(coprocess->link, stoptime, "%s %d\n", function_name, len);
+	int bytes_sent = link_printf(coprocess->network_link, stoptime, "%s %ld\n", function_name, strlen(function_input));
 	if(bytes_sent < 0) {
 		fatal("could not send input data size: %s", strerror(errno));
 	}
 
-	// send actual data
-	bytes_sent = link_write(coprocess->link, function_input, len, stoptime);
-	if(bytes_sent < 0) {
-		fatal("could not send input data: %s", strerror(errno));
+	char *buffer = calloc(WORK_QUEUE_LINE_MAX, sizeof(char));
+	strcpy(buffer, function_input);
+	work_queue_coprocess_write_to_link(buffer, strlen(function_input), timeout, coprocess->network_link);
+
+	memset(buffer, 0, WORK_QUEUE_LINE_MAX * sizeof(char));
+	if (work_queue_coprocess_read_from_link(buffer, WORK_QUEUE_LINE_MAX, timeout, coprocess->network_link) < 0) {
+		free(buffer);
+		return NULL;
 	}
 
-	curr_time = timestamp_get();
-	stoptime = curr_time + timeout;
-	// read in the length of the response
-	char line[WORK_QUEUE_LINE_MAX];
-	int length;
-	link_readline(coprocess->link, line, sizeof(line), stoptime);
-	sscanf(line, "output %d", &length);
-
-	char *output = calloc(length + 1, sizeof(char));
-	
-	// read the response
-	link_read(coprocess->link, output, length, stoptime);
-
-	return output;
+	return buffer;
 }
 
 struct work_queue_coprocess *work_queue_coprocess_find_state(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses, work_queue_coprocess_state_t state) {
@@ -332,14 +265,15 @@ struct work_queue_coprocess *work_queue_coprocess_initalize_all_coprocesses(int 
 	struct work_queue_coprocess * coprocess_info = malloc(sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
 	memset(coprocess_info, 0, sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
 	for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
-		coprocess_info[coprocess_num] = (struct work_queue_coprocess) {NULL, NULL, -1, -1, WORK_QUEUE_COPROCESS_UNINITIALIZED, {-1, -1}, {-1, -1}, NULL, 0, NULL};
-		coprocess_info[coprocess_num].command = xxstrdup(coprocess_command);
-		coprocess_info[coprocess_num].coprocess_resources = work_queue_resources_create();
-		coprocess_info[coprocess_num].coprocess_resources->cores.total  = coprocess_cores_normalized;
-		coprocess_info[coprocess_num].coprocess_resources->memory.total = coprocess_memory_normalized;
-		coprocess_info[coprocess_num].coprocess_resources->disk.total   = coprocess_disk_normalized;
-		coprocess_info[coprocess_num].coprocess_resources->gpus.total   = coprocess_gpus_normalized;
-		work_queue_coprocess_start(&coprocess_info[coprocess_num]);
+		struct work_queue_coprocess *curr_coprocess = &coprocess_info[coprocess_num];
+		coprocess_info[coprocess_num] = (struct work_queue_coprocess) {NULL, NULL, -1, -1, WORK_QUEUE_COPROCESS_UNINITIALIZED, {-1, -1}, {-1, -1}, NULL, NULL, NULL, 0, NULL};
+		curr_coprocess->command = xxstrdup(coprocess_command);
+		curr_coprocess->coprocess_resources = work_queue_resources_create();
+		curr_coprocess->coprocess_resources->cores.total  = coprocess_cores_normalized;
+		curr_coprocess->coprocess_resources->memory.total = coprocess_memory_normalized;
+		curr_coprocess->coprocess_resources->disk.total   = coprocess_disk_normalized;
+		curr_coprocess->coprocess_resources->gpus.total   = coprocess_gpus_normalized;
+		work_queue_coprocess_start(curr_coprocess);
 	}
 	return coprocess_info;
 }
@@ -347,9 +281,13 @@ struct work_queue_coprocess *work_queue_coprocess_initalize_all_coprocesses(int 
 void work_queue_coprocess_shutdown_all_coprocesses(struct work_queue_coprocess *coprocess_info, int number_of_coprocess_instances) {
 	work_queue_coprocess_shutdown(coprocess_info, number_of_coprocess_instances);
 	for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
-		free(coprocess_info[coprocess_num].name);
-		free(coprocess_info[coprocess_num].command);
-		work_queue_resources_delete(coprocess_info[coprocess_num].coprocess_resources);
+		struct work_queue_coprocess *curr_coprocess = &coprocess_info[coprocess_num];
+		link_detach(curr_coprocess->read_link);
+		link_detach(curr_coprocess->write_link);
+		link_detach(curr_coprocess->network_link);
+		free(curr_coprocess->name);
+		free(curr_coprocess->command);
+		work_queue_resources_delete(curr_coprocess->coprocess_resources);
 	}
 	free(coprocess_info);
 }
@@ -357,25 +295,26 @@ void work_queue_coprocess_shutdown_all_coprocesses(struct work_queue_coprocess *
 void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses) {
 	for (int i = 0; i < number_of_coprocesses; i++)
 	{
-		if (coprocess_info[i].state == WORK_QUEUE_COPROCESS_DEAD || coprocess_info[i].state == WORK_QUEUE_COPROCESS_UNINITIALIZED) {
+		struct work_queue_coprocess *curr_coprocess = &coprocess_info[i];
+		if (curr_coprocess->state == WORK_QUEUE_COPROCESS_DEAD || curr_coprocess->state == WORK_QUEUE_COPROCESS_UNINITIALIZED) {
 			continue;
 		}
-		struct rmsummary *resources = rmonitor_measure_process(coprocess_info[i].pid);
+		struct rmsummary *resources = rmonitor_measure_process(curr_coprocess->pid);
 
-		debug(D_WQ, "Measuring resources of coprocess with pid %d\n", coprocess_info[i].pid);
+		debug(D_WQ, "Measuring resources of coprocess with pid %d\n", curr_coprocess->pid);
 		debug(D_WQ, "cores: %lf, memory: %lf, disk: %lf, gpus: %lf\n",    	resources->cores, 
 																			resources->memory + resources->swap_memory,
 																			resources->disk,
 																			resources->gpus);
 		debug(D_WQ, "Max resources available to coprocess:\ncores: %"PRId64 " memory: %"PRId64 " disk: %"PRId64 " gpus: %"PRId64 "\n",  
-																				coprocess_info[i].coprocess_resources->cores.total,
-																				coprocess_info[i].coprocess_resources->memory.total,
-																				coprocess_info[i].coprocess_resources->disk.total,
-																				coprocess_info[i].coprocess_resources->gpus.total);
-		coprocess_info[i].coprocess_resources->cores.inuse = resources->cores;
-		coprocess_info[i].coprocess_resources->memory.inuse = resources->memory + resources->swap_memory;
-		coprocess_info[i].coprocess_resources->disk.inuse = resources->disk;
-		coprocess_info[i].coprocess_resources->gpus.inuse = resources->gpus;
+																				curr_coprocess->coprocess_resources->cores.total,
+																				curr_coprocess->coprocess_resources->memory.total,
+																				curr_coprocess->coprocess_resources->disk.total,
+																				curr_coprocess->coprocess_resources->gpus.total);
+		curr_coprocess->coprocess_resources->cores.inuse = resources->cores;
+		curr_coprocess->coprocess_resources->memory.inuse = resources->memory + resources->swap_memory;
+		curr_coprocess->coprocess_resources->disk.inuse = resources->disk;
+		curr_coprocess->coprocess_resources->gpus.inuse = resources->gpus;
 
 	}
 }
