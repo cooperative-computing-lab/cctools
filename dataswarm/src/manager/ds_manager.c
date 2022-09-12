@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "ds_resources.h"
 #include "ds_remote_file_info.h"
 #include "ds_factory_info.h"
+#include "ds_task_report.h"
 #include "ds_internal.h"
 #include "ds_blocklist.h"
 
@@ -63,13 +64,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-// The default tasks capacity reported before information is available.
-// Default capacity also implies 1 core, 1024 MB of disk and 512 memory per task.
-#define DS_DEFAULT_CAPACITY_TASKS 10
-
-// The minimum number of task reports to keep
-#define DS_TASK_REPORT_MIN_SIZE 50
 
 // Seconds between updates to the catalog
 #define DS_UPDATE_INTERVAL 60
@@ -137,21 +131,11 @@ double ds_option_blocklist_slow_workers_timeout = 900;
 /* time threshold to check when tasks are larger than connected workers */
 static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
 
-struct ds_task_report {
-	timestamp_t transfer_time;
-	timestamp_t exec_time;
-	timestamp_t manager_time;
-
-	struct rmsummary *resources;
-};
-
 static void handle_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, ds_result_code_t fail_type);
 static void handle_worker_failure(struct ds_manager *q, struct ds_worker *w);
 static void handle_app_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t);
 static void remove_worker(struct ds_manager *q, struct ds_worker *w, ds_worker_disconnect_reason_t reason);
 static int shut_down_worker(struct ds_manager *q, struct ds_worker *w);
-
-static void add_task_report(struct ds_manager *q, struct ds_task *t );
 
 static void commit_task_to_worker(struct ds_manager *q, struct ds_worker *w, struct ds_task *t);
 static void reap_task_from_worker(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, ds_task_state_t new_state);
@@ -1683,7 +1667,8 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 		}
 	}
 
-	add_task_report(q, t);
+	ds_task_report_add(q,t);
+
 	debug(D_DS, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
 			w->hostname,
 			w->addrport,
@@ -3602,120 +3587,6 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker *w
 	}
 }
 
-/*
-Store a report summarizing the performance of a completed task.
-Keep a list of reports equal to the number of workers connected.
-Used for computing queue capacity below.
-*/
-
-static void task_report_delete(struct ds_task_report *tr) {
-	rmsummary_delete(tr->resources);
-	free(tr);
-}
-
-static void add_task_report(struct ds_manager *q, struct ds_task *t)
-{
-	struct ds_task_report *tr;
-	struct ds_stats s;
-	ds_get_stats(q, &s);
-
-	if(!t->resources_allocated) {
-		return;
-	}
-
-	// Create a new report object and add it to the list.
-	tr = calloc(1, sizeof(struct ds_task_report));
-
-	tr->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
-	tr->exec_time     = t->time_workers_execute_last;
-	tr->manager_time  = (((t->time_when_done - t->time_when_commit_start) - tr->transfer_time) - tr->exec_time);
-	tr->resources     = rmsummary_copy(t->resources_allocated, 0);
-
-	list_push_tail(q->task_reports, tr);
-
-	// Trim the list, but never below its previous size.
-	static int count = DS_TASK_REPORT_MIN_SIZE;
-	count = MAX(count, 2*q->stats->tasks_on_workers);
-
-	while(list_size(q->task_reports) >= count) {
-	  tr = list_pop_head(q->task_reports);
-	  task_report_delete(tr);
-	}
-
-	resource_monitor_append_report(q, t);
-}
-
-/*
-Compute queue capacity based on stored task reports
-and the summary of manager activity.
-*/
-
-static void compute_capacity(const struct ds_manager *q, struct ds_stats *s)
-{
-	struct ds_task_report *capacity = calloc(1, sizeof(*capacity));
-	capacity->resources = rmsummary_create(0);
-
-	struct ds_task_report *tr;
-	double alpha = 0.05;
-	int count = list_size(q->task_reports);
-	int capacity_instantaneous = 0;
-
-	// Compute the average task properties.
-	if(count < 1) {
-		capacity->resources->cores  = 1;
-		capacity->resources->memory = 512;
-		capacity->resources->disk   = 1024;
-		capacity->resources->gpus   = 0;
-
-		capacity->exec_time     = DS_DEFAULT_CAPACITY_TASKS;
-		capacity->transfer_time = 1;
-
-		q->stats->capacity_weighted = DS_DEFAULT_CAPACITY_TASKS;
-		capacity_instantaneous = DS_DEFAULT_CAPACITY_TASKS;
-
-		count = 1;
-	} else {
-		// Sum up the task reports available.
-		list_first_item(q->task_reports);
-		while((tr = list_next_item(q->task_reports))) {
-			capacity->transfer_time += tr->transfer_time;
-			capacity->exec_time     += tr->exec_time;
-			capacity->manager_time   += tr->manager_time;
-
-			if(tr->resources) {
-				capacity->resources->cores  += tr->resources ? tr->resources->cores  : 1;
-				capacity->resources->memory += tr->resources ? tr->resources->memory : 512;
-				capacity->resources->disk   += tr->resources ? tr->resources->disk   : 1024;
-				capacity->resources->gpus   += tr->resources ? tr->resources->gpus   : 0;
-			}
-		}
-
-		tr = list_peek_tail(q->task_reports);
-		if(tr->transfer_time > 0) {
-			capacity_instantaneous = DIV_INT_ROUND_UP(tr->exec_time, (tr->transfer_time + tr->manager_time));
-			q->stats->capacity_weighted = (int) ceil((alpha * (float) capacity_instantaneous) + ((1.0 - alpha) * q->stats->capacity_weighted));
-			time_t ts;
-			time(&ts);
-		}
-	}
-
-	capacity->transfer_time = MAX(1, capacity->transfer_time);
-	capacity->exec_time     = MAX(1, capacity->exec_time);
-	capacity->manager_time   = MAX(1, capacity->manager_time);
-
-	// Never go below the default capacity
-	int64_t ratio = MAX(DS_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->manager_time)));
-
-	q->stats->capacity_tasks  = ratio;
-	q->stats->capacity_cores  = DIV_INT_ROUND_UP(capacity->resources->cores  * ratio, count);
-	q->stats->capacity_memory = DIV_INT_ROUND_UP(capacity->resources->memory * ratio, count);
-	q->stats->capacity_disk   = DIV_INT_ROUND_UP(capacity->resources->disk   * ratio, count);
-	q->stats->capacity_gpus   = DIV_INT_ROUND_UP(capacity->resources->gpus   * ratio, count);
-	q->stats->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
-
-	task_report_delete(capacity);
-}
-
 void compute_manager_load(struct ds_manager *q, int task_activity) {
 
 	double alpha = 0.05;
@@ -4942,7 +4813,7 @@ void ds_delete(struct ds_manager *q)
 		struct ds_task_report *tr;
 		list_first_item(q->task_reports);
 		while((tr = list_next_item(q->task_reports))) {
-			task_report_delete(tr);
+			ds_task_report_delete(tr);
 		}
 		list_delete(q->task_reports);
 
@@ -6106,7 +5977,7 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 		s->tasks_running = MIN(s->tasks_running, s->tasks_on_workers);
 	}
 
-	compute_capacity(q, s);
+	ds_task_report_compute_capacity(q, s);
 
 	//info about resources
 	s->bandwidth = ds_get_effective_bandwidth(q);

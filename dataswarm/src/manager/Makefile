@@ -11,6 +11,7 @@ SOURCES = \
 	ds_file.c \
 	ds_remote_file_info.c \
 	ds_factory_info.c \
+	ds_task_report.c \
 	ds_blocklist.c
 
 PUBLIC_HEADERS = dataswarm.h ds_manager.h
