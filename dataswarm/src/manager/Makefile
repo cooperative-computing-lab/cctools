@@ -9,7 +9,8 @@ SOURCES = \
 	ds_json.c \
 	ds_task.c \
 	ds_file.c \
-	ds_remote_file_info.c
+	ds_remote_file_info.c \
+	ds_factory_info.c
 
 PUBLIC_HEADERS = dataswarm.h ds_manager.h
 

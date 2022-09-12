@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "ds_file.h"
 #include "ds_resources.h"
 #include "ds_remote_file_info.h"
+#include "ds_factory_info.h"
 #include "ds_internal.h"
 
 #include "cctools.h"
@@ -85,7 +86,7 @@ See the file COPYING for details.
 
 #define MAX_NEW_WORKERS 10
 
-// Result codes for signaling the completion of operations in WQ
+// Result codes for signaling the completion of operations
 typedef enum {
 	DS_SUCCESS = 0,
 	DS_WORKER_FAILURE,
@@ -134,13 +135,6 @@ double ds_option_blocklist_slow_workers_timeout = 900;
 
 /* time threshold to check when tasks are larger than connected workers */
 static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
-
-struct ds_factory_info {
-	char *name;
-	int   connected_workers;
-	int   max_workers;
-	int   seen_at_catalog;
-};
 
 struct ds_task_report {
 	timestamp_t transfer_time;
@@ -218,9 +212,6 @@ static void write_transaction_category(struct ds_manager *q, struct category *c)
 static void write_transaction_worker(struct ds_manager *q, struct ds_worker *w, int leaving, ds_worker_disconnect_reason_t reason_leaving);
 static void write_transaction_transfer(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type);
 static void write_transaction_worker_resources(struct ds_manager *q, struct ds_worker *w);
-
-static struct ds_factory_info *create_factory_info(struct ds_manager *q, const char *name);
-static void remove_factory_info(struct ds_manager *q, const char *name);
 
 /** Write manager's resources to resource summary file and close the file **/
 void ds_disable_monitoring(struct ds_manager *q);
@@ -497,16 +488,10 @@ ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker *w, char *line
 	} else if(string_prefix_is(field, "from-factory")) {
 		q->fetch_factory = 1;
 		w->factory_name = xxstrdup(value);
-		struct ds_factory_info *f;
-		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
-			if (f->connected_workers + 1 > f->max_workers) {
-				shut_down_worker(q, w);
-			} else {
-				f->connected_workers++;
-			}
-		} else {
-			f = create_factory_info(q, w->factory_name);
-			f->connected_workers++;
+
+		struct ds_factory_info *f = ds_factory_info_lookup(q, w->factory_name);
+		if(f->connected_workers+1 > f->max_workers) {
+			shut_down_worker(q, w);
 		}
 	}
 
@@ -767,41 +752,12 @@ static int factory_trim_workers(struct ds_manager *q, struct ds_factory_info *f)
 	return trimmed_workers;
 }
 
-static struct ds_factory_info *create_factory_info(struct ds_manager *q, const char *name)
-{
-	struct ds_factory_info *f;
-	if ( (f = hash_table_lookup(q->factory_table, name)) ) return f;
-
-	f = malloc(sizeof(*f));
-	f->name = xxstrdup(name);
-	f->connected_workers = 0;
-	f->max_workers = INT_MAX;
-	f->seen_at_catalog = 0;
-	hash_table_insert(q->factory_table, name, f);
-	return f;
-}
-
-static void remove_factory_info(struct ds_manager *q, const char *name)
-{
-	struct ds_factory_info *f = hash_table_lookup(q->factory_table, name);
-	if (f) {
-		free(f->name);
-		free(f);
-		hash_table_remove(q->factory_table, name);
-	} else {
-		debug(D_DS, "Failed to remove unrecorded factory %s", name);
-	}
-}
-
 static void update_factory(struct ds_manager *q, struct jx *j)
 {
 	const char *name = jx_lookup_string(j, "factory_name");
 	if (!name) return;
-	struct ds_factory_info *f = hash_table_lookup(q->factory_table, name);
-	if (!f) {
-		debug(D_DS, "factory %s not recorded", name);
-		return;
-	}
+
+	struct ds_factory_info *f = ds_factory_info_lookup(q,name);
 
 	f->seen_at_catalog = 1;
 	int found = 0;
@@ -862,7 +818,7 @@ void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 	}
 	while ( list_size(outdated_factories) ) {
 		f = list_pop_head(outdated_factories);
-		remove_factory_info(q, f->name);
+		ds_factory_info_remove(q,f->name);
 	}
 	list_delete(outdated_factories);
 }
@@ -1049,10 +1005,8 @@ static void remove_worker(struct ds_manager *q, struct ds_worker *w, ds_worker_d
 	record_removed_worker_stats(q, w);
 
 	if (w->factory_name) {
-		struct ds_factory_info *f;
-		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
-			f->connected_workers--;
-		}
+		struct ds_factory_info *f = ds_factory_info_lookup(q,w->factory_name);
+		if(f) f->connected_workers--;
 	}
 
 	ds_worker_delete(w);
@@ -3817,8 +3771,7 @@ static int check_hand_against_task(struct ds_manager *q, struct ds_worker *w, st
 	}
 
 	if ( w->factory_name ) {
-		struct ds_factory_info *f;
-		f = hash_table_lookup(q->factory_table, w->factory_name);
+		struct ds_factory_info *f = ds_factory_info_lookup(q,w->factory_name);
 		if ( f && f->connected_workers > f->max_workers ) return 0;
 	}
 
@@ -4359,8 +4312,7 @@ static int receive_one_task( struct ds_manager *q )
 			fetch_output_from_worker(q, w, taskid);
 			// Shutdown worker if appropriate.
 			if ( w->factory_name ) {
-				struct ds_factory_info *f;
-				f = hash_table_lookup(q->factory_table, w->factory_name);
+				struct ds_factory_info *f = ds_factory_info_lookup(q,w->factory_name);
 				if ( f && f->connected_workers > f->max_workers &&
 						itable_size(w->current_tasks) < 1 ) {
 					debug(D_DS, "Final task received from worker %s, shutting down.", w->hostname);
@@ -4976,12 +4928,6 @@ void ds_delete(struct ds_manager *q)
 			hash_table_firstkey(q->worker_table);
 		}
 
-		struct ds_factory_info *f;
-		hash_table_firstkey(q->factory_table);
-		while(hash_table_nextkey(q->factory_table, &key, (void **) &f)) {
-			remove_factory_info(q, key);
-			hash_table_firstkey(q->factory_table);
-		}
 
 		log_queue_stats(q, 1);
 
@@ -4995,6 +4941,7 @@ void ds_delete(struct ds_manager *q)
 		if(q->catalog_hosts) free(q->catalog_hosts);
 
 		hash_table_delete(q->worker_table);
+		hash_table_clear(q->factory_table,(void*)ds_factory_info_delete);
 		hash_table_delete(q->factory_table);
 		hash_table_delete(q->worker_blocklist);
 		itable_delete(q->worker_task_map);
