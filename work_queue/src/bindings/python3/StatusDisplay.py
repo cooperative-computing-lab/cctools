@@ -270,7 +270,6 @@ class JupyterDisplay(StatusDisplay):
                 IPython.display.display(self._output)
 
         except (ImportError, AttributeError):
-            raise
             pass
 
     def active(self):
