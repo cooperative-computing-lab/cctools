@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "ds_remote_file_info.h"
 #include "ds_factory_info.h"
 #include "ds_internal.h"
+#include "ds_blocklist.h"
 
 #include "cctools.h"
 #include "int_sizes.h"
@@ -142,12 +143,6 @@ struct ds_task_report {
 	timestamp_t manager_time;
 
 	struct rmsummary *resources;
-};
-
-struct ds_blocklist_host_info {
-	int    blocked;
-	int    times_blocked;
-	time_t release_at;
 };
 
 static void handle_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, ds_result_code_t fail_type);
@@ -2091,26 +2086,6 @@ static int update_task_result(struct ds_task *t, ds_result_t new_result) {
 	return t->result;
 }
 
-static struct jx *blocked_to_json( struct ds_manager  *q ) {
-	if(hash_table_size(q->worker_blocklist) < 1) {
-		return NULL;
-	}
-
-	struct jx *j = jx_array(0);
-
-	char *hostname;
-	struct ds_blocklist_host_info *info;
-
-	hash_table_firstkey(q->worker_blocklist);
-	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
-		if(info->blocked) {
-			jx_array_insert(j, jx_string(hostname));
-		}
-	}
-
-	return j;
-}
-
 static struct rmsummary  *total_resources_needed(struct ds_manager *q) {
 
 	struct ds_task *t;
@@ -2396,7 +2371,7 @@ static struct jx * queue_to_jx( struct ds_manager *q )
 	jx_insert_integer(j,"workers_lost",info.workers_lost);
 
 	//workers_blocked adds host names, not a count
-	struct jx *blocklist = blocked_to_json(q);
+	struct jx *blocklist = ds_blocklist_to_jx(q);
 	if(blocklist) {
 		jx_insert(j,jx_string("workers_blocked"), blocklist);
 	}
@@ -2541,7 +2516,7 @@ static struct jx * queue_lean_to_jx( struct ds_manager *q )
 
 
 	//additional worker information the factory needs
-	struct jx *blocklist = blocked_to_json(q);
+	struct jx *blocklist = ds_blocklist_to_jx(q);
 	if(blocklist) {
 		jx_insert(j,jx_string("workers_blocked"), blocklist);   //danger! unbounded field
 	}
@@ -3775,8 +3750,7 @@ static int check_hand_against_task(struct ds_manager *q, struct ds_worker *w, st
 		if ( f && f->connected_workers > f->max_workers ) return 0;
 	}
 
-	struct ds_blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
-	if (info && info->blocked) {
+	if( ds_blocklist_is_blocked(q,w->hostname) ) {
 		return 0;
 	}
 
@@ -4941,9 +4915,13 @@ void ds_delete(struct ds_manager *q)
 		if(q->catalog_hosts) free(q->catalog_hosts);
 
 		hash_table_delete(q->worker_table);
+
 		hash_table_clear(q->factory_table,(void*)ds_factory_info_delete);
 		hash_table_delete(q->factory_table);
+
+		hash_table_clear(q->worker_blocklist,(void*)ds_blocklist_info_delete);
 		hash_table_delete(q->worker_blocklist);
+
 		itable_delete(q->worker_task_map);
 
 		struct category *c;
@@ -5414,74 +5392,22 @@ int ds_submit(struct ds_manager *q, struct ds_task *t)
 
 void ds_block_host_with_timeout(struct ds_manager *q, const char *hostname, time_t timeout)
 {
-	struct ds_blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, hostname);
-
-	if(!info) {
-		info = malloc(sizeof(struct ds_blocklist_host_info));
-		info->times_blocked = 0;
-		info->blocked       = 0;
-	}
-
-	q->stats->workers_blocked++;
-
-	/* count the times the worker goes from active to blocked. */
-	if(!info->blocked)
-		info->times_blocked++;
-
-	info->blocked = 1;
-
-	if(timeout > 0) {
-		debug(D_DS, "Blocking host %s by %" PRIu64 " seconds (blocked %d times).\n", hostname, (uint64_t) timeout, info->times_blocked);
-		info->release_at = time(0) + timeout;
-	} else {
-		debug(D_DS, "Blocking host %s indefinitely.\n", hostname);
-		info->release_at = -1;
-	}
-
-	hash_table_insert(q->worker_blocklist, hostname, (void *) info);
+	return ds_blocklist_block(q,hostname,timeout);
 }
 
 void ds_block_host(struct ds_manager *q, const char *hostname)
 {
-	ds_block_host_with_timeout(q, hostname, -1);
+	ds_blocklist_block(q, hostname, -1);
 }
 
 void ds_unblock_host(struct ds_manager *q, const char *hostname)
 {
-	struct ds_blocklist_host_info *info = hash_table_remove(q->worker_blocklist, hostname);
-	if(info) {
-		info->blocked = 0;
-		info->release_at  = 0;
-	}
-}
-
-/* deadline < 1 means release all, regardless of release_at time. */
-static void ds_unblock_all_by_time(struct ds_manager *q, time_t deadline)
-{
-	char *hostname;
-	struct ds_blocklist_host_info *info;
-
-	hash_table_firstkey(q->worker_blocklist);
-	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
-		if(!info->blocked)
-			continue;
-
-		/* do not clear if blocked indefinitely, and we are not clearing the whole list. */
-		if(info->release_at < 1 && deadline > 0)
-			continue;
-
-		/* do not clear if the time for this host has not meet the deadline. */
-		if(deadline > 0 && info->release_at > deadline)
-			continue;
-
-		debug(D_DS, "Clearing hostname %s from blocklist.\n", hostname);
-		ds_unblock_host(q, hostname);
-	}
+	ds_blocklist_unblock(q,hostname);
 }
 
 void ds_unblock_all(struct ds_manager *q)
 {
-	ds_unblock_all_by_time(q, -1);
+	ds_blocklist_unblock_all_by_time(q, -1);
 }
 
 static void print_password_warning( struct ds_manager *q )
@@ -5756,7 +5682,7 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result  = abort_slow_workers(q);
 		result += abort_drained_workers(q);
-		ds_unblock_all_by_time(q, time(0));
+		ds_blocklist_unblock_all_by_time(q, time(0));
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
 			// removed at least one worker
