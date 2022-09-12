@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_WORKER_H
-#define DS_WORKER_H
+#ifndef DS_WORKER_INFO_H
+#define DS_WORKER_INFO_H
 
 #include "dataswarm.h"
 #include "ds_resources.h"

@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_worker.h"
+#include "ds_worker_info.h"
 
 struct ds_worker * ds_worker_create( struct link * lnk )
 {

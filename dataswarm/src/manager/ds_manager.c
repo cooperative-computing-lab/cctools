@@ -5,11 +5,11 @@ See the file COPYING for details.
 */
 
 #include "ds_manager.h"
-#include "ds_worker.h"
 #include "ds_protocol.h"
 #include "ds_task.h"
 #include "ds_file.h"
 #include "ds_resources.h"
+#include "ds_worker_info.h"
 #include "ds_remote_file_info.h"
 #include "ds_factory_info.h"
 #include "ds_task_info.h"
