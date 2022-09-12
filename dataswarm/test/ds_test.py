@@ -95,6 +95,12 @@ if __name__ == '__main__':
     t = q.wait(wait_time)
     report_task(t, ds.DS_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
 
+    # same task as above, but testing resubmission on final state
+    for i in range(3):
+        q.submit(t)
+        t = q.wait(5)
+    report_task(t, ds.DS_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
+
     # same simple task, but now we send the directory as an input
     output = output_file()
     t = ds.Task("cd my_dir && ./{exe} {input} 2>&1 > {output}".format(exe=exec_file, input=input_file, output=output))
