@@ -12,7 +12,7 @@ See the file COPYING for details.
 #include "ds_resources.h"
 #include "ds_remote_file_info.h"
 #include "ds_factory_info.h"
-#include "ds_task_report.h"
+#include "ds_task_info.h"
 #include "ds_internal.h"
 #include "ds_blocklist.h"
 
@@ -1667,7 +1667,7 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 		}
 	}
 
-	ds_task_report_add(q,t);
+	ds_task_info_add(q,t);
 
 	debug(D_DS, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
 			w->hostname,
@@ -4810,10 +4810,10 @@ void ds_delete(struct ds_manager *q)
 
 		hash_table_delete(q->workers_with_available_results);
 
-		struct ds_task_report *tr;
+		struct ds_task_info *tr;
 		list_first_item(q->task_reports);
 		while((tr = list_next_item(q->task_reports))) {
-			ds_task_report_delete(tr);
+			ds_task_info_delete(tr);
 		}
 		list_delete(q->task_reports);
 
@@ -5977,7 +5977,7 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 		s->tasks_running = MIN(s->tasks_running, s->tasks_on_workers);
 	}
 
-	ds_task_report_compute_capacity(q, s);
+	ds_task_info_compute_capacity(q, s);
 
 	//info about resources
 	s->bandwidth = ds_get_effective_bandwidth(q);
