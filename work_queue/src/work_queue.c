@@ -1144,20 +1144,17 @@ static void clean_task_state(struct work_queue_task *t, int full_clean) {
 
 		t->disk_allocation_exhausted = 0;
 
-		if(t->output) {
-			free(t->output);
-			t->output = NULL;
-		}
+		free(t->output);
+		t->output = NULL;
 
-		if(t->hostname) {
-			free(t->hostname);
-			t->hostname = NULL;
-		}
+		free(t->hostname);
+		t->hostname = NULL;
 
-		if(t->host) {
-			free(t->host);
-			t->host = NULL;
-		}
+		free(t->host);
+		t->host = NULL;
+
+		t->return_status = -1;
+		t->result = WORK_QUEUE_RESULT_UNKNOWN;
 
 		if(full_clean) {
 			t->resource_request = CATEGORY_ALLOCATION_FIRST;
@@ -1169,8 +1166,10 @@ static void clean_task_state(struct work_queue_task *t, int full_clean) {
 			t->time_workers_execute_exhaustion = 0;
 			t->time_workers_execute_failure = 0;
 
-			rmsummary_delete(t->resources_allocated);
 			rmsummary_delete(t->resources_measured);
+			rmsummary_delete(t->resources_allocated);
+			t->resources_measured  = rmsummary_create(-1);
+			t->resources_allocated = rmsummary_create(-1);
 		}
 
 		fill_deprecated_tasks_stats(t);
