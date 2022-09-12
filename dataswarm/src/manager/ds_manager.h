@@ -101,4 +101,6 @@ struct ds_manager {
 	int force_proportional_resources;
 };
 
+void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t);
+
 #endif

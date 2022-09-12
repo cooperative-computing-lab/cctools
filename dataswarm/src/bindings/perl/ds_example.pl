@@ -11,7 +11,7 @@
 use strict;
 use warnings;
 
-use Work_Queue;
+use Data_Swarm;
 
 
 # Main program:
@@ -30,7 +30,7 @@ my $gzip_path = find_executable('gzip') || die "Could not find gzip anywhere in 
 # been used by another program, you can try setting port = 0 to use an
 # available port.
 
-my $q = Work_Queue->new(port => $Work_Queue::DS_DEFAULT_PORT) || die "Instantiation of Data Swarm failed! ($!)\n";
+my $q = Data_Swarm->new(port => $Data_Swarm::DS_DEFAULT_PORT) || die "Instantiation of Data Swarm failed! ($!)\n";
 
 print "listening on port @{[$q->port]}...\n";
 
@@ -41,7 +41,7 @@ for my $infile (@ARGV) {
 	# Note that we write ./gzip here, to guarantee that the gzip
 	# version we are using is the one being sent to the workers.
 	my $command = "./gzip <$infile >$outfile";
-	my $t = Work_Queue::Task->new($command);
+	my $t = Data_Swarm::Task->new($command);
 
 	# gzip is the same across all tasks, so we can cache (the default)
 	# it in the workers.  Note that when specifying a file, we have
@@ -55,8 +55,8 @@ for my $infile (@ARGV) {
 	# specific. Sometimes you may want to cache an output file if is
 	# the input of a later task. Note that remote_name defaults to
 	# local_name when absent.
-	$t->specify_input_file(local_name => $infile,   cache => $Work_Queue::DS_NOCACHE);
-	$t->specify_output_file(local_name => $outfile, cache => $Work_Queue::DS_NOCACHE);
+	$t->specify_input_file(local_name => $infile,   cache => $Data_Swarm::DS_NOCACHE);
+	$t->specify_output_file(local_name => $outfile, cache => $Data_Swarm::DS_NOCACHE);
 
 	# Once all files has been specified, we are ready to submit the
 	# task to the queue.

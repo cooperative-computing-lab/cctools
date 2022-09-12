@@ -5,13 +5,16 @@ See the file COPYING for details.
 */
 
 #include "ds_manager.h"
-#include "ds_worker.h"
 #include "ds_protocol.h"
 #include "ds_task.h"
 #include "ds_file.h"
 #include "ds_resources.h"
+#include "ds_worker_info.h"
 #include "ds_remote_file_info.h"
+#include "ds_factory_info.h"
+#include "ds_task_info.h"
 #include "ds_internal.h"
+#include "ds_blocklist.h"
 
 #include "cctools.h"
 #include "int_sizes.h"
@@ -62,13 +65,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
-// The default tasks capacity reported before information is available.
-// Default capacity also implies 1 core, 1024 MB of disk and 512 memory per task.
-#define DS_DEFAULT_CAPACITY_TASKS 10
-
-// The minimum number of task reports to keep
-#define DS_TASK_REPORT_MIN_SIZE 50
-
 // Seconds between updates to the catalog
 #define DS_UPDATE_INTERVAL 60
 
@@ -85,7 +81,7 @@ See the file COPYING for details.
 
 #define MAX_NEW_WORKERS 10
 
-// Result codes for signaling the completion of operations in WQ
+// Result codes for signaling the completion of operations
 typedef enum {
 	DS_SUCCESS = 0,
 	DS_WORKER_FAILURE,
@@ -135,34 +131,11 @@ double ds_option_blocklist_slow_workers_timeout = 900;
 /* time threshold to check when tasks are larger than connected workers */
 static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
 
-struct ds_factory_info {
-	char *name;
-	int   connected_workers;
-	int   max_workers;
-	int   seen_at_catalog;
-};
-
-struct ds_task_report {
-	timestamp_t transfer_time;
-	timestamp_t exec_time;
-	timestamp_t manager_time;
-
-	struct rmsummary *resources;
-};
-
-struct ds_blocklist_host_info {
-	int    blocked;
-	int    times_blocked;
-	time_t release_at;
-};
-
 static void handle_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, ds_result_code_t fail_type);
 static void handle_worker_failure(struct ds_manager *q, struct ds_worker *w);
 static void handle_app_failure(struct ds_manager *q, struct ds_worker *w, struct ds_task *t);
 static void remove_worker(struct ds_manager *q, struct ds_worker *w, ds_worker_disconnect_reason_t reason);
 static int shut_down_worker(struct ds_manager *q, struct ds_worker *w);
-
-static void add_task_report(struct ds_manager *q, struct ds_task *t );
 
 static void commit_task_to_worker(struct ds_manager *q, struct ds_worker *w, struct ds_task *t);
 static void reap_task_from_worker(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, ds_task_state_t new_state);
@@ -218,9 +191,6 @@ static void write_transaction_category(struct ds_manager *q, struct category *c)
 static void write_transaction_worker(struct ds_manager *q, struct ds_worker *w, int leaving, ds_worker_disconnect_reason_t reason_leaving);
 static void write_transaction_transfer(struct ds_manager *q, struct ds_worker *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type);
 static void write_transaction_worker_resources(struct ds_manager *q, struct ds_worker *w);
-
-static struct ds_factory_info *create_factory_info(struct ds_manager *q, const char *name);
-static void remove_factory_info(struct ds_manager *q, const char *name);
 
 /** Write manager's resources to resource summary file and close the file **/
 void ds_disable_monitoring(struct ds_manager *q);
@@ -497,16 +467,10 @@ ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker *w, char *line
 	} else if(string_prefix_is(field, "from-factory")) {
 		q->fetch_factory = 1;
 		w->factory_name = xxstrdup(value);
-		struct ds_factory_info *f;
-		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
-			if (f->connected_workers + 1 > f->max_workers) {
-				shut_down_worker(q, w);
-			} else {
-				f->connected_workers++;
-			}
-		} else {
-			f = create_factory_info(q, w->factory_name);
-			f->connected_workers++;
+
+		struct ds_factory_info *f = ds_factory_info_lookup(q, w->factory_name);
+		if(f->connected_workers+1 > f->max_workers) {
+			shut_down_worker(q, w);
 		}
 	}
 
@@ -767,41 +731,12 @@ static int factory_trim_workers(struct ds_manager *q, struct ds_factory_info *f)
 	return trimmed_workers;
 }
 
-static struct ds_factory_info *create_factory_info(struct ds_manager *q, const char *name)
-{
-	struct ds_factory_info *f;
-	if ( (f = hash_table_lookup(q->factory_table, name)) ) return f;
-
-	f = malloc(sizeof(*f));
-	f->name = xxstrdup(name);
-	f->connected_workers = 0;
-	f->max_workers = INT_MAX;
-	f->seen_at_catalog = 0;
-	hash_table_insert(q->factory_table, name, f);
-	return f;
-}
-
-static void remove_factory_info(struct ds_manager *q, const char *name)
-{
-	struct ds_factory_info *f = hash_table_lookup(q->factory_table, name);
-	if (f) {
-		free(f->name);
-		free(f);
-		hash_table_remove(q->factory_table, name);
-	} else {
-		debug(D_DS, "Failed to remove unrecorded factory %s", name);
-	}
-}
-
 static void update_factory(struct ds_manager *q, struct jx *j)
 {
 	const char *name = jx_lookup_string(j, "factory_name");
 	if (!name) return;
-	struct ds_factory_info *f = hash_table_lookup(q->factory_table, name);
-	if (!f) {
-		debug(D_DS, "factory %s not recorded", name);
-		return;
-	}
+
+	struct ds_factory_info *f = ds_factory_info_lookup(q,name);
 
 	f->seen_at_catalog = 1;
 	int found = 0;
@@ -862,7 +797,7 @@ void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 	}
 	while ( list_size(outdated_factories) ) {
 		f = list_pop_head(outdated_factories);
-		remove_factory_info(q, f->name);
+		ds_factory_info_remove(q,f->name);
 	}
 	list_delete(outdated_factories);
 }
@@ -1045,10 +980,8 @@ static void remove_worker(struct ds_manager *q, struct ds_worker *w, ds_worker_d
 	record_removed_worker_stats(q, w);
 
 	if (w->factory_name) {
-		struct ds_factory_info *f;
-		if ( (f = hash_table_lookup(q->factory_table, w->factory_name)) ) {
-			f->connected_workers--;
-		}
+		struct ds_factory_info *f = ds_factory_info_lookup(q,w->factory_name);
+		if(f) f->connected_workers--;
 	}
 
 	ds_worker_delete(w);
@@ -1730,7 +1663,8 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker *w, 
 		}
 	}
 
-	add_task_report(q, t);
+	ds_task_info_add(q,t);
+
 	debug(D_DS, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
 			w->hostname,
 			w->addrport,
@@ -2133,26 +2067,6 @@ static int update_task_result(struct ds_task *t, ds_result_t new_result) {
 	return t->result;
 }
 
-static struct jx *blocked_to_json( struct ds_manager  *q ) {
-	if(hash_table_size(q->worker_blocklist) < 1) {
-		return NULL;
-	}
-
-	struct jx *j = jx_array(0);
-
-	char *hostname;
-	struct ds_blocklist_host_info *info;
-
-	hash_table_firstkey(q->worker_blocklist);
-	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
-		if(info->blocked) {
-			jx_array_insert(j, jx_string(hostname));
-		}
-	}
-
-	return j;
-}
-
 static struct rmsummary  *total_resources_needed(struct ds_manager *q) {
 
 	struct ds_task *t;
@@ -2438,7 +2352,7 @@ static struct jx * queue_to_jx( struct ds_manager *q )
 	jx_insert_integer(j,"workers_lost",info.workers_lost);
 
 	//workers_blocked adds host names, not a count
-	struct jx *blocklist = blocked_to_json(q);
+	struct jx *blocklist = ds_blocklist_to_jx(q);
 	if(blocklist) {
 		jx_insert(j,jx_string("workers_blocked"), blocklist);
 	}
@@ -2583,7 +2497,7 @@ static struct jx * queue_lean_to_jx( struct ds_manager *q )
 
 
 	//additional worker information the factory needs
-	struct jx *blocklist = blocked_to_json(q);
+	struct jx *blocklist = ds_blocklist_to_jx(q);
 	if(blocklist) {
 		jx_insert(j,jx_string("workers_blocked"), blocklist);   //danger! unbounded field
 	}
@@ -3669,120 +3583,6 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker *w
 	}
 }
 
-/*
-Store a report summarizing the performance of a completed task.
-Keep a list of reports equal to the number of workers connected.
-Used for computing queue capacity below.
-*/
-
-static void task_report_delete(struct ds_task_report *tr) {
-	rmsummary_delete(tr->resources);
-	free(tr);
-}
-
-static void add_task_report(struct ds_manager *q, struct ds_task *t)
-{
-	struct ds_task_report *tr;
-	struct ds_stats s;
-	ds_get_stats(q, &s);
-
-	if(!t->resources_allocated) {
-		return;
-	}
-
-	// Create a new report object and add it to the list.
-	tr = calloc(1, sizeof(struct ds_task_report));
-
-	tr->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
-	tr->exec_time     = t->time_workers_execute_last;
-	tr->manager_time  = (((t->time_when_done - t->time_when_commit_start) - tr->transfer_time) - tr->exec_time);
-	tr->resources     = rmsummary_copy(t->resources_allocated, 0);
-
-	list_push_tail(q->task_reports, tr);
-
-	// Trim the list, but never below its previous size.
-	static int count = DS_TASK_REPORT_MIN_SIZE;
-	count = MAX(count, 2*q->stats->tasks_on_workers);
-
-	while(list_size(q->task_reports) >= count) {
-	  tr = list_pop_head(q->task_reports);
-	  task_report_delete(tr);
-	}
-
-	resource_monitor_append_report(q, t);
-}
-
-/*
-Compute queue capacity based on stored task reports
-and the summary of manager activity.
-*/
-
-static void compute_capacity(const struct ds_manager *q, struct ds_stats *s)
-{
-	struct ds_task_report *capacity = calloc(1, sizeof(*capacity));
-	capacity->resources = rmsummary_create(0);
-
-	struct ds_task_report *tr;
-	double alpha = 0.05;
-	int count = list_size(q->task_reports);
-	int capacity_instantaneous = 0;
-
-	// Compute the average task properties.
-	if(count < 1) {
-		capacity->resources->cores  = 1;
-		capacity->resources->memory = 512;
-		capacity->resources->disk   = 1024;
-		capacity->resources->gpus   = 0;
-
-		capacity->exec_time     = DS_DEFAULT_CAPACITY_TASKS;
-		capacity->transfer_time = 1;
-
-		q->stats->capacity_weighted = DS_DEFAULT_CAPACITY_TASKS;
-		capacity_instantaneous = DS_DEFAULT_CAPACITY_TASKS;
-
-		count = 1;
-	} else {
-		// Sum up the task reports available.
-		list_first_item(q->task_reports);
-		while((tr = list_next_item(q->task_reports))) {
-			capacity->transfer_time += tr->transfer_time;
-			capacity->exec_time     += tr->exec_time;
-			capacity->manager_time   += tr->manager_time;
-
-			if(tr->resources) {
-				capacity->resources->cores  += tr->resources ? tr->resources->cores  : 1;
-				capacity->resources->memory += tr->resources ? tr->resources->memory : 512;
-				capacity->resources->disk   += tr->resources ? tr->resources->disk   : 1024;
-				capacity->resources->gpus   += tr->resources ? tr->resources->gpus   : 0;
-			}
-		}
-
-		tr = list_peek_tail(q->task_reports);
-		if(tr->transfer_time > 0) {
-			capacity_instantaneous = DIV_INT_ROUND_UP(tr->exec_time, (tr->transfer_time + tr->manager_time));
-			q->stats->capacity_weighted = (int) ceil((alpha * (float) capacity_instantaneous) + ((1.0 - alpha) * q->stats->capacity_weighted));
-			time_t ts;
-			time(&ts);
-		}
-	}
-
-	capacity->transfer_time = MAX(1, capacity->transfer_time);
-	capacity->exec_time     = MAX(1, capacity->exec_time);
-	capacity->manager_time   = MAX(1, capacity->manager_time);
-
-	// Never go below the default capacity
-	int64_t ratio = MAX(DS_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->manager_time)));
-
-	q->stats->capacity_tasks  = ratio;
-	q->stats->capacity_cores  = DIV_INT_ROUND_UP(capacity->resources->cores  * ratio, count);
-	q->stats->capacity_memory = DIV_INT_ROUND_UP(capacity->resources->memory * ratio, count);
-	q->stats->capacity_disk   = DIV_INT_ROUND_UP(capacity->resources->disk   * ratio, count);
-	q->stats->capacity_gpus   = DIV_INT_ROUND_UP(capacity->resources->gpus   * ratio, count);
-	q->stats->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
-
-	task_report_delete(capacity);
-}
-
 void compute_manager_load(struct ds_manager *q, int task_activity) {
 
 	double alpha = 0.05;
@@ -3813,13 +3613,11 @@ static int check_hand_against_task(struct ds_manager *q, struct ds_worker *w, st
 	}
 
 	if ( w->factory_name ) {
-		struct ds_factory_info *f;
-		f = hash_table_lookup(q->factory_table, w->factory_name);
+		struct ds_factory_info *f = ds_factory_info_lookup(q,w->factory_name);
 		if ( f && f->connected_workers > f->max_workers ) return 0;
 	}
 
-	struct ds_blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, w->hostname);
-	if (info && info->blocked) {
+	if( ds_blocklist_is_blocked(q,w->hostname) ) {
 		return 0;
 	}
 
@@ -4355,8 +4153,7 @@ static int receive_one_task( struct ds_manager *q )
 			fetch_output_from_worker(q, w, taskid);
 			// Shutdown worker if appropriate.
 			if ( w->factory_name ) {
-				struct ds_factory_info *f;
-				f = hash_table_lookup(q->factory_table, w->factory_name);
+				struct ds_factory_info *f = ds_factory_info_lookup(q,w->factory_name);
 				if ( f && f->connected_workers > f->max_workers &&
 						itable_size(w->current_tasks) < 1 ) {
 					debug(D_DS, "Final task received from worker %s, shutting down.", w->hostname);
@@ -4972,12 +4769,6 @@ void ds_delete(struct ds_manager *q)
 			hash_table_firstkey(q->worker_table);
 		}
 
-		struct ds_factory_info *f;
-		hash_table_firstkey(q->factory_table);
-		while(hash_table_nextkey(q->factory_table, &key, (void **) &f)) {
-			remove_factory_info(q, key);
-			hash_table_firstkey(q->factory_table);
-		}
 
 		log_queue_stats(q, 1);
 
@@ -4991,8 +4782,13 @@ void ds_delete(struct ds_manager *q)
 		if(q->catalog_hosts) free(q->catalog_hosts);
 
 		hash_table_delete(q->worker_table);
+
+		hash_table_clear(q->factory_table,(void*)ds_factory_info_delete);
 		hash_table_delete(q->factory_table);
+
+		hash_table_clear(q->worker_blocklist,(void*)ds_blocklist_info_delete);
 		hash_table_delete(q->worker_blocklist);
+
 		itable_delete(q->worker_task_map);
 
 		struct category *c;
@@ -5010,10 +4806,10 @@ void ds_delete(struct ds_manager *q)
 
 		hash_table_delete(q->workers_with_available_results);
 
-		struct ds_task_report *tr;
+		struct ds_task_info *tr;
 		list_first_item(q->task_reports);
 		while((tr = list_next_item(q->task_reports))) {
-			task_report_delete(tr);
+			ds_task_info_delete(tr);
 		}
 		list_delete(q->task_reports);
 
@@ -5463,74 +5259,22 @@ int ds_submit(struct ds_manager *q, struct ds_task *t)
 
 void ds_block_host_with_timeout(struct ds_manager *q, const char *hostname, time_t timeout)
 {
-	struct ds_blocklist_host_info *info = hash_table_lookup(q->worker_blocklist, hostname);
-
-	if(!info) {
-		info = malloc(sizeof(struct ds_blocklist_host_info));
-		info->times_blocked = 0;
-		info->blocked       = 0;
-	}
-
-	q->stats->workers_blocked++;
-
-	/* count the times the worker goes from active to blocked. */
-	if(!info->blocked)
-		info->times_blocked++;
-
-	info->blocked = 1;
-
-	if(timeout > 0) {
-		debug(D_DS, "Blocking host %s by %" PRIu64 " seconds (blocked %d times).\n", hostname, (uint64_t) timeout, info->times_blocked);
-		info->release_at = time(0) + timeout;
-	} else {
-		debug(D_DS, "Blocking host %s indefinitely.\n", hostname);
-		info->release_at = -1;
-	}
-
-	hash_table_insert(q->worker_blocklist, hostname, (void *) info);
+	return ds_blocklist_block(q,hostname,timeout);
 }
 
 void ds_block_host(struct ds_manager *q, const char *hostname)
 {
-	ds_block_host_with_timeout(q, hostname, -1);
+	ds_blocklist_block(q, hostname, -1);
 }
 
 void ds_unblock_host(struct ds_manager *q, const char *hostname)
 {
-	struct ds_blocklist_host_info *info = hash_table_remove(q->worker_blocklist, hostname);
-	if(info) {
-		info->blocked = 0;
-		info->release_at  = 0;
-	}
-}
-
-/* deadline < 1 means release all, regardless of release_at time. */
-static void ds_unblock_all_by_time(struct ds_manager *q, time_t deadline)
-{
-	char *hostname;
-	struct ds_blocklist_host_info *info;
-
-	hash_table_firstkey(q->worker_blocklist);
-	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
-		if(!info->blocked)
-			continue;
-
-		/* do not clear if blocked indefinitely, and we are not clearing the whole list. */
-		if(info->release_at < 1 && deadline > 0)
-			continue;
-
-		/* do not clear if the time for this host has not meet the deadline. */
-		if(deadline > 0 && info->release_at > deadline)
-			continue;
-
-		debug(D_DS, "Clearing hostname %s from blocklist.\n", hostname);
-		ds_unblock_host(q, hostname);
-	}
+	ds_blocklist_unblock(q,hostname);
 }
 
 void ds_unblock_all(struct ds_manager *q)
 {
-	ds_unblock_all_by_time(q, -1);
+	ds_blocklist_unblock_all_by_time(q, -1);
 }
 
 static void print_password_warning( struct ds_manager *q )
@@ -5805,7 +5549,7 @@ struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *
 		BEGIN_ACCUM_TIME(q, time_internal);
 		result  = abort_slow_workers(q);
 		result += abort_drained_workers(q);
-		ds_unblock_all_by_time(q, time(0));
+		ds_blocklist_unblock_all_by_time(q, time(0));
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
 			// removed at least one worker
@@ -6229,7 +5973,7 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 		s->tasks_running = MIN(s->tasks_running, s->tasks_on_workers);
 	}
 
-	compute_capacity(q, s);
+	ds_task_info_compute_capacity(q, s);
 
 	//info about resources
 	s->bandwidth = ds_get_effective_bandwidth(q);

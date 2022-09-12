@@ -26,10 +26,10 @@ clean:
 test: all
 
 install: all
-	mkdir -p $(CCTOOLS_PERL_PATH)/Work_Queue
+	mkdir -p $(CCTOOLS_PERL_PATH)/Data_Swarm
 	cp $(LIBRARIES)       $(CCTOOLS_PERL_PATH)/
-	cp Work_Queue.pm      $(CCTOOLS_PERL_PATH)
-	cp Work_Queue/Task.pm $(CCTOOLS_PERL_PATH)/Work_Queue
+	cp Data_Swarm.pm      $(CCTOOLS_PERL_PATH)
+	cp Data_Swarm/Task.pm $(CCTOOLS_PERL_PATH)/Data_Swarm
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	chmod 755 ds_example.pl
 	cp ds_example.pl $(CCTOOLS_INSTALL_DIR)/doc/
