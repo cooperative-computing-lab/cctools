@@ -81,45 +81,6 @@ See the file COPYING for details.
 
 #define MAX_NEW_WORKERS 10
 
-// Result codes for signaling the completion of operations
-typedef enum {
-	DS_SUCCESS = 0,
-	DS_WORKER_FAILURE,
-	DS_APP_FAILURE,
-	DS_MGR_FAILURE,
-	DS_END_OF_LIST,
-} ds_result_code_t;
-
-typedef enum {
-	DS_MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */
-	DS_MSG_PROCESSED_DISCONNECT, /* Message was processed and disconnect now expected. */
-	DS_MSG_NOT_PROCESSED,        /* Message was not processed, waiting to be consumed. */
-	DS_MSG_FAILURE               /* Message not received, connection failure. */
-} ds_msg_code_t;
-
-typedef enum {
-	DS_MON_DISABLED = 0,
-	DS_MON_SUMMARY  = 1,   /* generate only summary. */
-	DS_MON_FULL     = 2,   /* generate summary, series and monitoring debug output. */
-	DS_MON_WATCHDOG = 4    /* kill tasks that exhaust resources */
-} ds_monitoring_mode_t;
-
-typedef enum {
-	DS_WORKER_DISCONNECT_UNKNOWN  = 0,
-	DS_WORKER_DISCONNECT_EXPLICIT,
-	DS_WORKER_DISCONNECT_STATUS_WORKER,
-	DS_WORKER_DISCONNECT_IDLE_OUT,
-	DS_WORKER_DISCONNECT_FAST_ABORT,
-	DS_WORKER_DISCONNECT_FAILURE
-} ds_worker_disconnect_reason_t;
-
-typedef enum {
-	CORES_BIT = (1 << 0),
-	MEMORY_BIT = (1 << 1),
-	DISK_BIT = (1 << 2),
-	GPUS_BIT = (1 << 3),
-} ds_resource_bitmask_t;
-
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
 
