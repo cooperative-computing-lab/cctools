@@ -145,7 +145,7 @@ struct ds_manager {
 	int wait_retrieve_many;       /* If true, main loop consumes multiple completed tasks at once. */
 	int force_proportional_resources;  /* If true, tasks divide worker resources proportionally. */
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
-	double bandwidth;             /* Artificial limit on bandwidth of manager<->worker transfers. */
+	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
 };
 
 void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t);

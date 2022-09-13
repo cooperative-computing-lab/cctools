@@ -1032,8 +1032,8 @@ static ds_result_code_t get_file_contents( struct ds_manager *q, struct ds_worke
 {
 	// If a bandwidth limit is in effect, choose the effective stoptime.
 	timestamp_t effective_stoptime = 0;
-	if(q->bandwidth) {
-		effective_stoptime = (length/q->bandwidth)*1000000 + timestamp_get();
+	if(q->bandwidth_limit) {
+		effective_stoptime = (length/q->bandwidth_limit)*1000000 + timestamp_get();
 	}
 
 	// Choose the actual stoptime.
@@ -1879,8 +1879,8 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 
 	t->time_workers_execute_all += t->time_workers_execute_last;
 
-	if(q->bandwidth) {
-		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
+	if(q->bandwidth_limit) {
+		effective_stoptime = (output_length/q->bandwidth_limit)*1000000 + timestamp_get();
 	}
 
 	if(output_length <= MAX_TASK_STDOUT_STORAGE) {
@@ -2939,8 +2939,8 @@ static int send_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_
 		return DS_APP_FAILURE;
 	}
 
-	if(q->bandwidth) {
-		effective_stoptime = (length/q->bandwidth)*1000000 + timestamp_get();
+	if(q->bandwidth_limit) {
+		effective_stoptime = (length/q->bandwidth_limit)*1000000 + timestamp_get();
 	}
 
 	/* filenames are url-encoded to avoid problems with spaces, etc */
@@ -4528,9 +4528,9 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 	q->manager_preferred_connection = xxstrdup("by_ip");
 
 	if( (envstring  = getenv("DS_BANDWIDTH")) ) {
-		q->bandwidth = string_metric_parse(envstring);
-		if(q->bandwidth < 0) {
-			q->bandwidth = 0;
+		q->bandwidth_limit = string_metric_parse(envstring);
+		if(q->bandwidth_limit < 0) {
+			q->bandwidth_limit = 0;
 		}
 	}
 
@@ -5892,7 +5892,7 @@ char * ds_get_worker_summary( struct ds_manager *q )
 
 void ds_set_bandwidth_limit(struct ds_manager *q, const char *bandwidth)
 {
-	q->bandwidth = string_metric_parse(bandwidth);
+	q->bandwidth_limit = string_metric_parse(bandwidth);
 }
 
 double ds_get_effective_bandwidth(struct ds_manager *q)
