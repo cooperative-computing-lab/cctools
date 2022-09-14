@@ -7,10 +7,11 @@ See the file COPYING for details.
 
 #include "ds_process.h"
 #include "ds_manager.h"
-#include "ds_internal.h"
 #include "ds_gpus.h"
 #include "ds_protocol.h"
 #include "ds_coprocess.h"
+
+#include "ds_file.h"
 
 #include "debug.h"
 #include "errno.h"

@@ -6,8 +6,8 @@ See the file COPYING for details.
 
 #include "ds_sandbox.h"
 #include "ds_cache.h"
-#include "ds_internal.h"
 #include "ds_task.h"
+#include "ds_file.h"
 
 #include "stringtools.h"
 #include "debug.h"

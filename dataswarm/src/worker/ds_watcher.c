@@ -6,7 +6,7 @@ See the file COPYING for details.
 
 #include "ds_watcher.h"
 #include "ds_process.h"
-#include "ds_internal.h"
+#include "ds_file.h"
 
 #include "list.h"
 #include "debug.h"
