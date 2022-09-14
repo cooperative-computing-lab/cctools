@@ -94,13 +94,13 @@ int ds_option_scheduler = DS_SCHEDULE_TIME;
 /* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
 double ds_option_blocklist_slow_workers_timeout = 900;
 
+/* Forward prototypes for functions that are called out of order. */
+/* Many of these should be removed if forward declaration is not needed. */
+
 static void handle_failure(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, ds_result_code_t fail_type);
-static void handle_worker_failure(struct ds_manager *q, struct ds_worker_info *w);
-static void handle_app_failure(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t);
 static void remove_worker(struct ds_manager *q, struct ds_worker_info *w, ds_worker_disconnect_reason_t reason);
 static int shut_down_worker(struct ds_manager *q, struct ds_worker_info *w);
 
-static void commit_task_to_worker(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t);
 static void reap_task_from_worker(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, ds_task_state_t new_state);
 static int cancel_task_on_worker(struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state);
 static void count_worker_resources(struct ds_manager *q, struct ds_worker_info *w);
@@ -108,26 +108,12 @@ static void count_worker_resources(struct ds_manager *q, struct ds_worker_info *
 static void find_max_worker(struct ds_manager *q);
 static void update_max_worker(struct ds_manager *q, struct ds_worker_info *w);
 
-static void push_task_to_ready_list( struct ds_manager *q, struct ds_task *t );
-
-/* returns old state */
 static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state);
 
-const char *ds_task_state_string(ds_task_state_t state);
-
-/* 1, 0 whether t is in state */
 static int task_state_is( struct ds_manager *q, uint64_t taskid, ds_task_state_t state);
-/* pointer to first task found with state. NULL if no such task */
-static struct ds_task *task_state_any(struct ds_manager *q, ds_task_state_t state);
-/* number of tasks with state */
 static int task_state_count( struct ds_manager *q, const char *category, ds_task_state_t state);
-/* number of tasks with the resource allocation request */
 static int task_request_count( struct ds_manager *q, const char *category, category_allocation_t request);
 
-static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *w, const char *line);
-static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_worker_info *w);
-
-static void handle_data_index( struct ds_manager *q, struct ds_worker_info *w, time_t stoptime );
 static ds_msg_code_t handle_http_request( struct ds_manager *q, struct ds_worker_info *w, const char *path, time_t stoptime );
 static ds_msg_code_t handle_dataswarm(struct ds_manager *q, struct ds_worker_info *w, const char *line);
 static ds_msg_code_t handle_queue_status(struct ds_manager *q, struct ds_worker_info *w, const char *line, time_t stoptime);
@@ -139,38 +125,18 @@ static struct jx * queue_lean_to_jx( struct ds_manager *q );
 
 char *ds_monitor_wrap(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct rmsummary *limits);
 
-const struct rmsummary *task_max_resources(struct ds_manager *q, struct ds_task *t);
-const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t);
-struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t);
-
 void ds_accumulate_task(struct ds_manager *q, struct ds_task *t);
 struct category *ds_category_lookup_or_create(struct ds_manager *q, const char *name);
 
-/** Write manager's resources to resource summary file and close the file **/
 void ds_disable_monitoring(struct ds_manager *q);
-
 static void aggregate_workers_resources( struct ds_manager *q, struct ds_resources *total, struct hash_table *features);
-
 static struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag);
-
 static void release_all_workers( struct ds_manager *q );
 
-/******************************************************/
-/********** ds_manager internal functions *************/
-/******************************************************/
+/* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
-int64_t overcommitted_resource_total(struct ds_manager *q, int64_t total) {
-	int64_t r = 0;
-	if(total != 0)
-	{
-		r = ceil(total * q->resource_submit_multiplier);
-	}
-
-	return r;
-}
-
-//Returns count of workers according to type
-static int count_workers(struct ds_manager *q, int type) {
+static int count_workers( struct ds_manager *q, ds_worker_type_t type )
+{
 	struct ds_worker_info *w;
 	char* id;
 
@@ -186,7 +152,21 @@ static int count_workers(struct ds_manager *q, int type) {
 	return count;
 }
 
-//Returns count of workers that are available to run tasks.
+/* Round up a resource value based on the overcommit multiplier currently in effect. */
+
+int64_t overcommitted_resource_total(struct ds_manager *q, int64_t total)
+{
+	int64_t r = 0;
+	if(total != 0)
+	{
+		r = ceil(total * q->resource_submit_multiplier);
+	}
+
+	return r;
+}
+
+/* Return the number of workers available to run tasks of any size. */
+
 int ds_manager_available_workers(struct ds_manager *q) {
 	struct ds_worker_info *w;
 	char* id;
@@ -204,7 +184,8 @@ int ds_manager_available_workers(struct ds_manager *q) {
 	return available_workers;
 }
 
-//Returns count of workers that are running at least 1 task.
+/* Returns count of workers that are running at least 1 task. */
+
 static int workers_with_tasks(struct ds_manager *q) {
 	struct ds_worker_info *w;
 	char* id;
@@ -222,15 +203,18 @@ static int workers_with_tasks(struct ds_manager *q) {
 	return workers_with_tasks;
 }
 
+/* Convert a link pointer into a string that can be used as a key into a hash table. */
+
 static void link_to_hash_key(struct link *link, char *key)
 {
 	sprintf(key, "0x%p", link);
 }
 
-/**
- * This function sends a message to the worker and records the time the message is
- * successfully sent. This timestamp is used to determine when to send keepalive checks.
- */
+/*
+This function sends a message to the worker and records the time the message is
+successfully sent. This timestamp is used to determine when to send keepalive checks.
+*/
+
 __attribute__ (( format(printf,3,4) ))
 int ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char *fmt, ... )
 {
@@ -256,6 +240,8 @@ int ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char 
 	return result;
 }
 
+/* Handle a name message coming back from the worker, requesting the manager's project name. */
+
 static ds_msg_code_t handle_name(struct ds_manager *q, struct ds_worker_info *w, char *line)
 {
 	debug(D_DS, "Sending project name to worker (%s)", w->addrport);
@@ -265,6 +251,8 @@ static ds_msg_code_t handle_name(struct ds_manager *q, struct ds_worker_info *w,
 
 	return DS_MSG_PROCESSED;
 }
+
+/* Handle an info message coming from the worker that provides a variety of metrics. */
 
 static ds_msg_code_t handle_info(struct ds_manager *q, struct ds_worker_info *w, char *line)
 {
@@ -393,10 +381,11 @@ static int handle_transfer_address( struct ds_manager *q, struct ds_worker_info 
 	}
 }
 
-/**
- * This function receives a message from worker and records the time a message is successfully
- * received. This timestamp is used in keepalive timeout computations.
- */
+/*
+This function receives a message from worker and records the time a message is successfully
+received. This timestamp is used in keepalive timeout computations.
+*/
+
 static ds_msg_code_t ds_manager_recv(struct ds_manager *q, struct ds_worker_info *w, char *line, size_t length )
 {
 	time_t stoptime;
@@ -451,7 +440,6 @@ static ds_msg_code_t ds_manager_recv(struct ds_manager *q, struct ds_worker_info
 	return result;
 }
 
-
 /*
 Call ds_manager_recv and silently retry if the result indicates
 an asynchronous update message like 'keepalive' or 'resource'.
@@ -467,6 +455,11 @@ ds_msg_code_t ds_manager_recv_retry( struct ds_manager *q, struct ds_worker_info
 
 	return result;
 }
+
+/*
+Compute the expected transfer rate of the manage in bytes/second,
+and return the basis of that computation in *data_source.
+*/
 
 static double get_queue_transfer_rate(struct ds_manager *q, char **data_source)
 {
@@ -536,6 +529,11 @@ int ds_manager_transfer_wait_time(struct ds_manager *q, struct ds_worker_info *w
 	return timeout;
 }
 
+/*
+Remove idle workers associated with a given factory, so as to scale down
+cleanly by not cancelling active work.
+*/
+
 static int factory_trim_workers(struct ds_manager *q, struct ds_factory_info *f)
 {
 	if (!f) return 0;
@@ -570,6 +568,13 @@ static int factory_trim_workers(struct ds_manager *q, struct ds_factory_info *f)
 	return trimmed_workers;
 }
 
+/*
+Given a JX description of a factory, update our internal ds_factory_info
+records to match that description.  If the description indicates that
+we have more workers than desired, trim the workers associated with that
+factory.
+*/
+
 static void update_factory(struct ds_manager *q, struct jx *j)
 {
 	const char *name = jx_lookup_string(j, "factory_name");
@@ -589,6 +594,11 @@ static void update_factory(struct ds_manager *q, struct jx *j)
 		}
 	}
 }
+
+/*
+Query the catalog to discover what factories are feeding this manager.
+Update our internal state with the data returned.
+*/
 
 static void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 	struct catalog_query *cq;
@@ -641,6 +651,10 @@ static void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 	list_delete(outdated_factories);
 }
 
+/*
+Send an update to the catalog describing the state of this manager.
+*/
+
 static void update_write_catalog(struct ds_manager *q )
 {
 	// Only write if we have a name.
@@ -667,6 +681,8 @@ static void update_write_catalog(struct ds_manager *q )
 	jx_delete(j);
 }
 
+/* Read from the catalog if fetch_factory is enabled. */
+
 static void update_read_catalog(struct ds_manager *q)
 {
 	time_t stoptime = time(0) + 5; // Short timeout for query
@@ -675,6 +691,8 @@ static void update_read_catalog(struct ds_manager *q)
 		update_read_catalog_factory(q, stoptime);
 	}
 }
+
+/* Send and receive updates from the catalog server as needed. */
 
 static void update_catalog(struct ds_manager *q, int force_update )
 {
@@ -691,6 +709,8 @@ static void update_catalog(struct ds_manager *q, int force_update )
 
 	q->catalog_last_update_time = time(0);
 }
+
+/* Remove all tasks and other associated state from a given worker. */
 
 static void cleanup_worker(struct ds_manager *q, struct ds_worker_info *w)
 {
@@ -758,6 +778,8 @@ static void record_removed_worker_stats(struct ds_manager *q, struct ds_worker_i
 	qs->workers_removed = ws->workers_joined;
 }
 
+/* Remove a worker from this master by removing all remote state, all local state, and disconnecting. */
+
 static void remove_worker(struct ds_manager *q, struct ds_worker_info *w, ds_worker_disconnect_reason_t reason)
 {
 	if(!q || !w) return;
@@ -790,6 +812,8 @@ static void remove_worker(struct ds_manager *q, struct ds_worker_info *w, ds_wor
 	debug(D_DS, "%d workers connected in total now", count_workers(q, DS_WORKER_TYPE_WORKER));
 }
 
+/* Gently release a worker by sending it a release message, and then removing it. */
+
 static int release_worker(struct ds_manager *q, struct ds_worker_info *w)
 {
 	if(!w) return 0;
@@ -803,6 +827,8 @@ static int release_worker(struct ds_manager *q, struct ds_worker_info *w)
 
 	return 1;
 }
+
+/* Check for new connections on the manager's port, and add a worker if one is there. */
 
 static void add_worker(struct ds_manager *q)
 {
@@ -858,6 +884,8 @@ static void add_worker(struct ds_manager *q)
 	hash_table_insert(q->worker_table, w->hashkey, w);
 }
 
+/* Delete a single file on a remote worker. */
+
 static void delete_worker_file( struct ds_manager *q, struct ds_worker_info *w, const char *filename, int flags, int except_flags ) {
 	if(!(flags & except_flags)) {
 		ds_manager_send(q,w, "unlink %s\n", filename);
@@ -865,7 +893,8 @@ static void delete_worker_file( struct ds_manager *q, struct ds_worker_info *w, 
 	}
 }
 
-// Sends "unlink file" for every file in the list except those that match one or more of the "except_flags"
+/* Delete all files in a list except those that match one or more of the "except_flags" */
+
 static void delete_worker_files( struct ds_manager *q, struct ds_worker_info *w, struct list *files, int except_flags ) {
 	struct ds_file *tf;
 
@@ -877,16 +906,22 @@ static void delete_worker_files( struct ds_manager *q, struct ds_worker_info *w,
 	}
 }
 
+/* Delete all output files of a given task. */
+
 static void delete_task_output_files(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t)
 {
 	delete_worker_files(q, w, t->output_files, 0);
 }
+
+/* Delete only the uncacheable output files of a given task. */
 
 static void delete_uncacheable_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t )
 {
 	delete_worker_files(q, w, t->input_files, DS_CACHE );
 	delete_worker_files(q, w, t->output_files, DS_CACHE );
 }
+
+/* Determine the resource monitor file name that should be associated with this task. */
 
 static char *monitor_file_name(struct ds_manager *q, struct ds_task *t, const char *ext) {
 	char *dir;
@@ -902,6 +937,8 @@ static char *monitor_file_name(struct ds_manager *q, struct ds_task *t, const ch
 	return string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME "%s",
 			dir, getpid(), t->taskid, ext ? ext : "");
 }
+
+/* Extract the resources consumed by a task by reading the appropriate resource monitor file. */
 
 static void read_measured_resources(struct ds_manager *q, struct ds_task *t) {
 
@@ -981,6 +1018,8 @@ void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t)
 	free(summary);
 }
 
+/* Compress old time series files so as to avoid accumulating infinite resource monitoring data. */
+
 static void resource_monitor_compress_logs(struct ds_manager *q, struct ds_task *t) {
 	char *series    = monitor_file_name(q, t, ".series");
 	char *debug_log = monitor_file_name(q, t, ".debug");
@@ -998,6 +1037,8 @@ static void resource_monitor_compress_logs(struct ds_manager *q, struct ds_task 
 	free(debug_log);
 	free(command);
 }
+
+/* Get all the relevant output data from a completed task, then clean up unneeded items. */
 
 static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker_info *w, int taskid)
 {
@@ -1133,6 +1174,12 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker_info
 	return;
 }
 
+/*
+Consider the set of tasks that are waiting but not running.
+Cancel those that have exceeded their expressed end time,
+exceeded the maximum number of retries, or other policy issues.
+*/
+
 static int expire_waiting_tasks(struct ds_manager *q)
 {
 	struct ds_task *t;
@@ -1170,6 +1217,7 @@ static int expire_waiting_tasks(struct ds_manager *q)
 This function handles app-level failures. It remove the task from WQ and marks
 the task as complete so it is returned to the application.
 */
+
 static void handle_app_failure(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t)
 {
 	//remove the task from tables that track dispatched tasks.
@@ -1189,13 +1237,22 @@ static void handle_app_failure(struct ds_manager *q, struct ds_worker_info *w, s
 	return;
 }
 
+/*
+Failures happen in the manager-worker interactions. In this case,
+we remove the worker and retry the tasks dispatched to it elsewhere.
+*/
+
 static void handle_worker_failure(struct ds_manager *q, struct ds_worker_info *w)
 {
-	//WQ failures happen in the manager-worker interactions. In this case, we
-	//remove the worker and retry the tasks dispatched to it elsewhere.
 	remove_worker(q, w, DS_WORKER_DISCONNECT_FAILURE);
 	return;
 }
+
+/*
+Handle the failure of a task, taking different actions depending on whether
+this is due to an application-level issue or a problem with the worker alone.
+*/
+
 
 static void handle_failure(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, ds_result_code_t fail_type)
 {
@@ -1206,6 +1263,13 @@ static void handle_failure(struct ds_manager *q, struct ds_worker_info *w, struc
 	}
 	return;
 }
+
+/*
+Handle the initial connection message from a worker, which reports
+basic information about the hostname, operating system, and so forth.
+Once this message is processed, the manager knows it is a valid connection
+and can begin sending tasks and data.
+*/
 
 static ds_msg_code_t handle_dataswarm(struct ds_manager *q, struct ds_worker_info *w, const char *line)
 {
@@ -1320,6 +1384,7 @@ static ds_result_code_t get_update( struct ds_manager *q, struct ds_worker_info 
 Failure to store result is treated as success so we continue to retrieve the
 output files of the task.
 */
+
 static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *w, const char *line) {
 
 	if(!q || !w || !line) 
@@ -1451,6 +1516,12 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 	return DS_SUCCESS;
 }
 
+/*
+Send to this worker a request for task results.
+The worker will respond with all completed tasks and updates
+on watched output files.  Process those results as they come back.
+*/
+
 static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_worker_info *w)
 {
 
@@ -1495,6 +1566,12 @@ static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_wo
 	return result;
 }
 
+/*
+Compute the total quantity of resources needed by all tasks in
+the ready and running states.  This gives us a complete picture
+of the manager's resource consumption for status reporting.
+*/
+
 static struct rmsummary  *total_resources_needed(struct ds_manager *q) {
 
 	struct ds_task *t;
@@ -1527,6 +1604,10 @@ static struct rmsummary  *total_resources_needed(struct ds_manager *q) {
 	return total;
 }
 
+/*
+Compute the largest resource request for any task in a given category.
+*/
+
 static const struct rmsummary *largest_seen_resources(struct ds_manager *q, const char *category) {
 	char *key;
 	struct category *c;
@@ -1542,6 +1623,8 @@ static const struct rmsummary *largest_seen_resources(struct ds_manager *q, cons
 		return q->max_task_resources_requested;
 	}
 }
+
+/* Return true if this worker can satisfy the given resource request. */
 
 static int check_worker_fit(struct ds_worker_info *w, const struct rmsummary *s) {
 
@@ -1577,10 +1660,6 @@ static int count_workers_for_waiting_tasks(struct ds_manager *q, const struct rm
 	return count;
 }
 
-/* category_to_jx creates a jx expression with category statistics that can be
-sent to the catalog.
-*/
-
 static void category_jx_insert_max(struct jx *j, struct category *c, const char *field, const struct rmsummary *largest) {
 
 	double l = rmsummary_get(largest, field);
@@ -1615,13 +1694,15 @@ static void category_jx_insert_max(struct jx *j, struct category *c, const char 
 	free(field_str);
 }
 
-/* create dummy task to obtain first allocation that category would get if using largest worker */
+/* Create a dummy task to obtain first allocation that category would get if using largest worker */
+
 static struct rmsummary *category_alloc_info(struct ds_manager *q, struct category *c, category_allocation_t request) {
 	struct ds_task *t = ds_task_create("nop");
 	ds_task_specify_category(t, c->name);
 	t->resource_request = request;
 
-	// XXX not sure if regular worker constructor should happen here
+	/* XXX this seems like a hack: a ds_worker is being created by malloc instead of ds_worker_create */
+
 	struct ds_worker_info *w = malloc(sizeof(*w));
 	w->resources = ds_resources_create();
 	w->resources->cores.largest = q->current_max_worker->cores;
@@ -1638,6 +1719,8 @@ static struct rmsummary *category_alloc_info(struct ds_manager *q, struct catego
 	return allocation;
 }
 
+/* Convert an allocation of resources into a JX record. */
+
 static struct jx * alloc_to_jx(struct ds_manager *q, struct category *c, struct rmsummary *resources) {
 	struct jx *j = jx_object(0);
 
@@ -1648,6 +1731,8 @@ static struct jx * alloc_to_jx(struct ds_manager *q, struct category *c, struct 
 
 	return j;
 }
+
+/* Convert a resource category into a JX record for reporting to the catalog. */
 
 static struct jx * category_to_jx(struct ds_manager *q, const char *category) {
 	struct ds_stats s;
@@ -1698,6 +1783,8 @@ static struct jx * category_to_jx(struct ds_manager *q, const char *category) {
 
 	return j;
 }
+
+/* Convert all resource categories into a JX record. */
 
 static struct jx *categories_to_jx(struct ds_manager *q) {
 	struct jx *a = jx_array(0);
@@ -2165,6 +2252,11 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 	return a;
 }
 
+/*
+Handle a queue status message by composing a response and sending it.
+*/
+
+
 static ds_msg_code_t handle_queue_status( struct ds_manager *q, struct ds_worker_info *target, const char *line, time_t stoptime )
 {
 	struct link *l = target->link;
@@ -2185,6 +2277,10 @@ static ds_msg_code_t handle_queue_status( struct ds_manager *q, struct ds_worker
 
 	return DS_MSG_PROCESSED_DISCONNECT;
 }
+
+/*
+Handle a resource update message from the worker by updating local structures.
+*/
 
 
 static ds_msg_code_t handle_resource( struct ds_manager *q, struct ds_worker_info *w, const char *line )
@@ -2231,6 +2327,12 @@ static ds_msg_code_t handle_resource( struct ds_manager *q, struct ds_worker_inf
 	return DS_MSG_PROCESSED;
 }
 
+/*
+Handle a feature report from a worker, which describes properties set
+manually by the user, like a particular GPU model, software installed, etc.
+*/
+
+
 static ds_msg_code_t handle_feature( struct ds_manager *q, struct ds_worker_info *w, const char *line )
 {
 	char feature[DS_LINE_MAX];
@@ -2253,6 +2355,12 @@ static ds_msg_code_t handle_feature( struct ds_manager *q, struct ds_worker_info
 
 	return DS_MSG_PROCESSED;
 }
+
+/*
+Handle activity on a network connection by looking up the mapping
+between the link and the ds_worker, then processing on or more
+messages available.
+*/
 
 static ds_result_code_t handle_worker(struct ds_manager *q, struct link *l)
 {
@@ -2295,6 +2403,13 @@ static ds_result_code_t handle_worker(struct ds_manager *q, struct link *l)
 
 	return DS_SUCCESS;
 }
+
+/*
+Construct the table of network links to be considered,
+including the manager's accepting link, and one for
+each active worker.
+*/
+
 
 static int build_poll_table(struct ds_manager *q )
 {
@@ -2450,6 +2565,14 @@ struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_in
 
 	return limits;
 }
+
+/*
+Start one task on a given worker by specializing the task to the worker,
+sending the appropriate input files, and then sending the details of the task.
+Note that the "infile" and "outfile" components of the task refer to
+files that have already been uploaded into the worker's cache by the manager.
+*/
+
 
 static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t)
 {
@@ -2640,6 +2763,13 @@ static void find_max_worker(struct ds_manager *q) {
 	}
 }
 
+/*
+Commit a given task to a worker by sending the task details,
+then updating all auxiliary data structures to note the
+assignment and the new task state.
+*/
+
+
 static void commit_task_to_worker(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t)
 {
 	t->hostname = xxstrdup(w->hostname);
@@ -2665,6 +2795,12 @@ static void commit_task_to_worker(struct ds_manager *q, struct ds_worker_info *w
 	}
 }
 
+/*
+Collect a completed task from a worker, and then update
+all auxiliary data structures to remove the association
+and change the task state.
+*/
+
 static void reap_task_from_worker(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, ds_task_state_t new_state)
 {
 	struct ds_worker_info *wr = itable_lookup(q->worker_task_map, t->taskid);
@@ -2688,6 +2824,12 @@ static void reap_task_from_worker(struct ds_manager *q, struct ds_worker_info *w
 
 	count_worker_resources(q, w);
 }
+
+/*
+Advance the state of the system by selecting one task available
+to run, finding the best worker for that task, and then committing
+the task to the worker.
+*/
 
 static int send_one_task( struct ds_manager *q )
 {
@@ -2715,6 +2857,12 @@ static int send_one_task( struct ds_manager *q )
 
 	return 0;
 }
+
+/*
+Advance the state of the system by finding any task that is
+waiting to be retrieved, then fetch the outputs of that task,
+and mark it as done.
+*/
 
 static int receive_one_task( struct ds_manager *q )
 {
@@ -2744,7 +2892,11 @@ static int receive_one_task( struct ds_manager *q )
 	return 0;
 }
 
-//Sends keepalives to check if connected workers are responsive, and ask for updates If not, removes those workers.
+/*
+Sends keepalives to check if connected workers are responsive,
+and ask for updates If not, removes those workers.
+*/
+
 static void ask_for_workers_updates(struct ds_manager *q) {
 	struct ds_worker_info *w;
 	char *key;
@@ -2791,6 +2943,12 @@ static void ask_for_workers_updates(struct ds_manager *q) {
 		}
 	}
 }
+
+/*
+If fast-abort is enabled, then look for workers that
+have taken too long to execute a task, and disconnect
+them, under the assumption that they are halted or faulty.
+*/
 
 static int abort_slow_workers(struct ds_manager *q)
 {
@@ -2893,6 +3051,8 @@ static int abort_slow_workers(struct ds_manager *q)
 	return removed;
 }
 
+/* Forcibly shutdown a worker by telling it to exit, then disconnect it. */
+
 static int shut_down_worker(struct ds_manager *q, struct ds_worker_info *w)
 {
 	if(!w) return 0;
@@ -2921,8 +3081,8 @@ static int abort_drained_workers(struct ds_manager *q) {
 	return removed;
 }
 
+/* Comparator function for checking if a task matches a given tag. */
 
-//comparator function for checking if a task matches a given tag.
 static int tasktag_comparator(void *t, const void *r) {
 
 	struct ds_task *task_in_queue = t;
@@ -2939,6 +3099,10 @@ static int tasktag_comparator(void *t, const void *r) {
 	return !strcmp(task_in_queue->tag, tasktag);
 }
 
+/*
+Cancel a specific task already running on a worker,
+by sending the appropriate kill message and removing any undesired state.
+*/
 
 static int cancel_task_on_worker(struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state) {
 
@@ -2965,6 +3129,8 @@ static int cancel_task_on_worker(struct ds_manager *q, struct ds_task *t, ds_tas
 	}
 }
 
+/* Search for any one task that matches the given tag string. */
+
 static struct ds_task *find_task_by_tag(struct ds_manager *q, const char *tasktag) {
 	struct ds_task *t;
 	uint64_t taskid;
@@ -2979,6 +3145,11 @@ static struct ds_task *find_task_by_tag(struct ds_manager *q, const char *taskta
 	return NULL;
 }
 
+/*
+Invalidate all remote cached files that match the given name.
+Search for workers with that file, cancel any tasks using that
+file, and then remove it.
+*/
 
 static void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filename) {
 	char *key;
@@ -3336,86 +3507,83 @@ int ds_specify_password_file( struct ds_manager *q, const char *file )
 
 void ds_delete(struct ds_manager *q)
 {
-	if(q) {
-		release_all_workers(q);
+	if(!q) return;
 
-		ds_perf_log_write_update(q, 1);
+	release_all_workers(q);
 
-		if(q->name) {
-			update_catalog(q,1);
-		}
+	ds_perf_log_write_update(q, 1);
 
-		/* we call this function here before any of the structures are freed. */
-		ds_disable_monitoring(q);
+	if(q->name) update_catalog(q,1);
 
-		if(q->catalog_hosts) free(q->catalog_hosts);
+	/* we call this function here before any of the structures are freed. */
+	ds_disable_monitoring(q);
 
-		hash_table_delete(q->worker_table);
+	if(q->catalog_hosts) free(q->catalog_hosts);
 
-		hash_table_clear(q->factory_table,(void*)ds_factory_info_delete);
-		hash_table_delete(q->factory_table);
+	hash_table_delete(q->worker_table);
 
-		hash_table_clear(q->worker_blocklist,(void*)ds_blocklist_info_delete);
-		hash_table_delete(q->worker_blocklist);
+	hash_table_clear(q->factory_table,(void*)ds_factory_info_delete);
+	hash_table_delete(q->factory_table);
 
-		itable_delete(q->worker_task_map);
+	hash_table_clear(q->worker_blocklist,(void*)ds_blocklist_info_delete);
+	hash_table_delete(q->worker_blocklist);
 
-		char *key;
-		struct category *c;
-		hash_table_firstkey(q->categories);
-		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
-			category_delete(q->categories, key);
-		}
-		hash_table_delete(q->categories);
+	itable_delete(q->worker_task_map);
 
-		list_delete(q->ready_list);
-
-		itable_delete(q->tasks);
-
-		itable_delete(q->task_state_map);
-
-		hash_table_delete(q->workers_with_available_results);
-
-		struct ds_task_info *tr;
-		list_first_item(q->task_reports);
-		while((tr = list_next_item(q->task_reports))) {
-			ds_task_info_delete(tr);
-		}
-		list_delete(q->task_reports);
-
-		free(q->stats);
-		free(q->stats_disconnected_workers);
-		free(q->stats_measure);
-
-		if(q->name)
-			free(q->name);
-
-		if(q->manager_preferred_connection)
-			free(q->manager_preferred_connection);
-
-		free(q->poll_table);
-		free(q->ssl_cert);
-		free(q->ssl_key);
-
-		link_close(q->manager_link);
-		if(q->perf_logfile) {
-			fclose(q->perf_logfile);
-		}
-
-		if(q->txn_logfile) {
-			ds_txn_log_write(q, "MANAGER END");
-
-			if(fclose(q->txn_logfile) != 0) {
-				debug(D_DS, "unable to write transactions log: %s\n", strerror(errno));
-			}
-		}
-
-		rmsummary_delete(q->measured_local_resources);
-		rmsummary_delete(q->current_max_worker);
-		rmsummary_delete(q->max_task_resources_requested);
-
-		free(q);
+	char *key;
+	struct category *c;
+	hash_table_firstkey(q->categories);
+	while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
+		category_delete(q->categories, key);
 	}
+	hash_table_delete(q->categories);
+
+	list_delete(q->ready_list);
+	itable_delete(q->tasks);
+
+	itable_delete(q->task_state_map);
+
+	hash_table_delete(q->workers_with_available_results);
+
+	struct ds_task_info *tr;
+	list_first_item(q->task_reports);
+	while((tr = list_next_item(q->task_reports))) {
+		ds_task_info_delete(tr);
+	}
+	list_delete(q->task_reports);
+
+	free(q->stats);
+	free(q->stats_disconnected_workers);
+	free(q->stats_measure);
+
+	if(q->name)
+		free(q->name);
+
+	if(q->manager_preferred_connection)
+		free(q->manager_preferred_connection);
+
+	free(q->poll_table);
+	free(q->ssl_cert);
+	free(q->ssl_key);
+
+	link_close(q->manager_link);
+	if(q->perf_logfile) {
+		fclose(q->perf_logfile);
+	}
+
+	if(q->txn_logfile) {
+		ds_txn_log_write(q, "MANAGER END");
+
+		if(fclose(q->txn_logfile) != 0) {
+			debug(D_DS, "unable to write transactions log: %s\n", strerror(errno));
+		}
+	}
+
+	rmsummary_delete(q->measured_local_resources);
+	rmsummary_delete(q->current_max_worker);
+	rmsummary_delete(q->max_task_resources_requested);
+
+	free(q);
 }
 
 static void update_resource_report(struct ds_manager *q) {
@@ -4492,7 +4660,7 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 
 	//info about workers
 	s->workers_connected = count_workers(q, DS_WORKER_TYPE_WORKER);
-	s->workers_init      = count_workers(q, DS_TASK_UNKNOWN);
+	s->workers_init      = count_workers(q, DS_WORKER_TYPE_UNKNOWN);
 	s->workers_busy      = workers_with_tasks(q);
 	s->workers_idle      = s->workers_connected - s->workers_busy;
 	// s->workers_able computed below.

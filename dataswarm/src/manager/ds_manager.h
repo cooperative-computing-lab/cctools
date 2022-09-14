@@ -7,8 +7,21 @@ See the file COPYING for details.
 #ifndef DS_MANAGER_H
 #define DS_MANAGER_H
 
+/*
+This module defines the structures and types of the manager process.
+Note that these details are internal to the dataswarm library,
+and are not for public consumption.  End users are limited to the
+API described in dataswarm.h
+*/
+
 #include "dataswarm.h"
 #include <limits.h>
+
+/*
+The result of a variety of internal operations, indicating whether
+the operation succeeded, or failed due to the fault of the worker,
+the application, or the manager.
+*/
 
 typedef enum {
 	DS_SUCCESS = 0,
@@ -18,12 +31,19 @@ typedef enum {
 	DS_END_OF_LIST,
 } ds_result_code_t;
 
+/*
+The result of ds_manager_recv{_retry}, indicating whether an
+incoming message was processed, and the expected next state of the connection.
+*/
+
 typedef enum {
 	DS_MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */
 	DS_MSG_PROCESSED_DISCONNECT, /* Message was processed and disconnect now expected. */
 	DS_MSG_NOT_PROCESSED,        /* Message was not processed, waiting to be consumed. */
 	DS_MSG_FAILURE               /* Message not received, connection failure. */
 } ds_msg_code_t;
+
+/* The current resource monitoring configuration of the manager. */
 
 typedef enum {
 	DS_MON_DISABLED = 0,
@@ -32,12 +52,14 @@ typedef enum {
 	DS_MON_WATCHDOG = 4    /* kill tasks that exhaust resources */
 } ds_monitoring_mode_t;
 
+/* The various reasons why a worker process may disconnect from the manager. */
+
 typedef enum {
 	DS_WORKER_DISCONNECT_UNKNOWN  = 0,
 	DS_WORKER_DISCONNECT_EXPLICIT,
 	DS_WORKER_DISCONNECT_STATUS_WORKER,
 	DS_WORKER_DISCONNECT_IDLE_OUT,
-	DS_WORKER_DISCONNECT_FAST_ABORT,
+ 	DS_WORKER_DISCONNECT_FAST_ABORT,
 	DS_WORKER_DISCONNECT_FAILURE
 } ds_worker_disconnect_reason_t;
 
@@ -146,22 +168,33 @@ struct ds_manager {
 	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB */
 };
 
-/* Internal interfaces to ds_manager.c */
+/*
+These are not public API functions, but utility methods that may
+be called on the manager object by other elements of the manager process.
+*/
 
+/* Send a printf-style message to a remote worker. */
 #ifndef SWIG
 __attribute__ (( format(printf,3,4) ))
 #endif
 int ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char *fmt, ... );
+
+/* Receive a line-oriented message from a remote worker. */
 ds_msg_code_t ds_manager_recv_retry( struct ds_manager *q, struct ds_worker_info *w, char *line, int length );
 
+/* Compute the expected wait time for a transfer of length bytes. */
 int ds_manager_transfer_wait_time( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, int64_t length );
+
+/* Give the number of workers available to run tasks at the moment. */
 int ds_manager_available_workers(struct ds_manager *q);
 
+/* Various functions to compute expected properties of tasks. */
 const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t);
 const struct rmsummary *task_max_resources(struct ds_manager *q, struct ds_task *t);
 struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t);
 int64_t overcommitted_resource_total(struct ds_manager *q, int64_t total);
 
+/* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "ds-%d-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
 #define RESOURCE_MONITOR_REMOTE_NAME_EVENTS RESOURCE_MONITOR_REMOTE_NAME "events.json"
