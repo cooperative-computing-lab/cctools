@@ -5,6 +5,8 @@ See the file COPYING for details.
 */
 
 #include "ds_manager.h"
+#include "ds_manager_get.h"
+#include "ds_manager_put.h"
 #include "ds_protocol.h"
 #include "ds_task.h"
 #include "ds_file.h"

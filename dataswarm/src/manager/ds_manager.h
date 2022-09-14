@@ -167,15 +167,4 @@ void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t);
 const char *task_state_str(ds_task_state_t task_state);
 const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t);
 
-
-/* Internal interfaces to ds_manager_get.c */
-
-ds_result_code_t ds_manager_get_output_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f );
-ds_result_code_t ds_manager_get_output_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
-ds_result_code_t ds_manager_get_monitor_output_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
-
-/* Internal interfaces to ds_manager_put.c */
-
-ds_result_code_t ds_manager_put_input_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
-
 #endif
