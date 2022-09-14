@@ -77,6 +77,8 @@ See the file COPYING for details.
 /**< Default value for Data Swarm keepalive timeout in seconds. */
 #define DS_DEFAULT_KEEPALIVE_TIMEOUT  30
 
+#define DS_LARGE_TASK_CHECK_INTERVAL 180000000 // 3 minutes in usecs
+
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
 #define MAX_NEW_WORKERS 10
@@ -85,9 +87,6 @@ int ds_option_scheduler = DS_SCHEDULE_TIME;
 
 /* default timeout for slow workers to come back to the pool */
 double ds_option_blocklist_slow_workers_timeout = 900;
-
-/* time threshold to check when tasks are larger than connected workers */
-static timestamp_t interval_check_for_large_tasks = 180000000; // 3 minutes in usecs
 
 static void handle_failure(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, ds_result_code_t fail_type);
 static void handle_worker_failure(struct ds_manager *q, struct ds_worker_info *w);
@@ -3194,7 +3193,7 @@ static int send_one_task( struct ds_manager *q )
 static void print_large_tasks_warning(struct ds_manager *q)
 {
 	timestamp_t current_time = timestamp_get();
-	if(current_time - q->time_last_large_tasks_check < interval_check_for_large_tasks) {
+	if(current_time - q->time_last_large_tasks_check < DS_LARGE_TASK_CHECK_INTERVAL) {
 		return;
 	}
 
