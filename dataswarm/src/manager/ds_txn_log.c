@@ -1,5 +1,5 @@
 
-#include "ds_transaction.h"
+#include "ds_txn_log.h"
 #include "ds_worker_info.h"
 #include "ds_task.h"
 #include "ds_file.h"
@@ -15,39 +15,39 @@
 #include <stdio.h>
 #include <unistd.h>
 
-void ds_transaction_write_header( struct ds_manager *q )
+void ds_txn_log_write_header( struct ds_manager *q )
 {
-	setvbuf(q->transactions_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
+	setvbuf(q->txn_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
 
-	fprintf(q->transactions_logfile, "# time manager_pid MANAGER START|END\n");
-	fprintf(q->transactions_logfile, "# time manager_pid WORKER worker_id host:port CONNECTION\n");
-	fprintf(q->transactions_logfile, "# time manager_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT\n");
-	fprintf(q->transactions_logfile, "# time manager_pid WORKER worker_id RESOURCES {resources}\n");
-	fprintf(q->transactions_logfile, "# time manager_pid CATEGORY name MAX {resources_max_per_task}\n");
-	fprintf(q->transactions_logfile, "# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}\n");
-	fprintf(q->transactions_logfile, "# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}\n");
-	fprintf(q->transactions_logfile, "# time manager_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}\n");
-	fprintf(q->transactions_logfile, "# time manager_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
-	fprintf(q->transactions_logfile, "# time manager_pid TASK taskid WAITING_RETRIEVAL worker_address\n");
-	fprintf(q->transactions_logfile, "# time manager_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
-	fprintf(q->transactions_logfile, "# time manager_pid TRANSFER (INPUT|OUTPUT) taskid cache_flag sizeinmb walltime filename\n");
-	fprintf(q->transactions_logfile, "\n");
+	fprintf(q->txn_logfile, "# time manager_pid MANAGER START|END\n");
+	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id host:port CONNECTION\n");
+	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT\n");
+	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id RESOURCES {resources}\n");
+	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MAX {resources_max_per_task}\n");
+	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}\n");
+	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK taskid WAITING_RETRIEVAL worker_address\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TRANSFER (INPUT|OUTPUT) taskid cache_flag sizeinmb walltime filename\n");
+	fprintf(q->txn_logfile, "\n");
 }
 
-void ds_transaction_write(struct ds_manager *q, const char *str)
+void ds_txn_log_write(struct ds_manager *q, const char *str)
 {
-	if(!q->transactions_logfile)
+	if(!q->txn_logfile)
 		return;
 
-	fprintf(q->transactions_logfile, "%" PRIu64, timestamp_get());
-	fprintf(q->transactions_logfile, " %d", getpid());
-	fprintf(q->transactions_logfile, " %s", str);
-	fprintf(q->transactions_logfile, "\n");
+	fprintf(q->txn_logfile, "%" PRIu64, timestamp_get());
+	fprintf(q->txn_logfile, " %d", getpid());
+	fprintf(q->txn_logfile, " %s", str);
+	fprintf(q->txn_logfile, "\n");
 }
 
-void ds_transaction_write_task(struct ds_manager *q, struct ds_task *t)
+void ds_txn_log_write_task(struct ds_manager *q, struct ds_task *t)
 {
-	if(!q->transactions_logfile)
+	if(!q->txn_logfile)
 		return;
 
 	struct buffer B;
@@ -109,13 +109,13 @@ void ds_transaction_write_task(struct ds_manager *q, struct ds_task *t)
 		}
 	}
 
-	ds_transaction_write(q, buffer_tostring(&B));
+	ds_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
 }
 
-void ds_transaction_write_category(struct ds_manager *q, struct category *c)
+void ds_txn_log_write_category(struct ds_manager *q, struct category *c)
 {
-	if(!q->transactions_logfile)
+	if(!q->txn_logfile)
 		return;
 
 	if(!c)
@@ -126,12 +126,12 @@ void ds_transaction_write_category(struct ds_manager *q, struct category *c)
 
 	buffer_printf(&B, "CATEGORY %s MAX ", c->name);
 	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX), 1);
-	ds_transaction_write(q, buffer_tostring(&B));
+	ds_txn_log_write(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
 	buffer_printf(&B, "CATEGORY %s MIN ", c->name);
 	rmsummary_print_buffer(&B, category_dynamic_task_min_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
-	ds_transaction_write(q, buffer_tostring(&B));
+	ds_txn_log_write(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
 	const char *mode;
@@ -154,12 +154,12 @@ void ds_transaction_write_category(struct ds_manager *q, struct category *c)
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
 	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
-	ds_transaction_write(q, buffer_tostring(&B));
+	ds_txn_log_write(q, buffer_tostring(&B));
 
 	buffer_free(&B);
 }
 
-void ds_transaction_write_worker(struct ds_manager *q, struct ds_worker_info *w, int leaving, ds_worker_disconnect_reason_t reason_leaving)
+void ds_txn_log_write_worker(struct ds_manager *q, struct ds_worker_info *w, int leaving, ds_worker_disconnect_reason_t reason_leaving)
 {
 	struct buffer B;
 	buffer_init(&B);
@@ -193,12 +193,12 @@ void ds_transaction_write_worker(struct ds_manager *q, struct ds_worker_info *w,
 		buffer_printf(&B, " CONNECTION");
 	}
 
-	ds_transaction_write(q, buffer_tostring(&B));
+	ds_txn_log_write(q, buffer_tostring(&B));
 
 	buffer_free(&B);
 }
 
-void ds_transaction_write_worker_resources(struct ds_manager *q, struct ds_worker_info *w)
+void ds_txn_log_write_worker_resources(struct ds_manager *q, struct ds_worker_info *w)
 {
 
 	struct rmsummary *s = rmsummary_create(-1);
@@ -215,7 +215,7 @@ void ds_transaction_write_worker_resources(struct ds_manager *q, struct ds_worke
 
 	buffer_printf(&B, "WORKER %s RESOURCES %s", w->workerid, rjx);
 
-	ds_transaction_write(q, buffer_tostring(&B));
+	ds_txn_log_write(q, buffer_tostring(&B));
 
 	rmsummary_delete(s);
 	buffer_free(&B);
@@ -223,7 +223,7 @@ void ds_transaction_write_worker_resources(struct ds_manager *q, struct ds_worke
 }
 
 
-void ds_transaction_write_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type)
+void ds_txn_log_write_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type)
 {
 	struct buffer B;
 	buffer_init(&B);
@@ -235,7 +235,7 @@ void ds_transaction_write_transfer(struct ds_manager *q, struct ds_worker_info *
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
 	buffer_printf(&B, " %s", f->remote_name);
 
-	ds_transaction_write(q, buffer_tostring(&B));
+	ds_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
 }
 

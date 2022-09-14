@@ -16,7 +16,7 @@ See the file COPYING for details.
 #include "ds_factory_info.h"
 #include "ds_task_info.h"
 #include "ds_blocklist.h"
-#include "ds_transaction.h"
+#include "ds_txn_log.h"
 #include "ds_perf_log.h"
 
 #include "cctools.h"
@@ -298,11 +298,11 @@ static ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker_info *w
 		q->stats->workers_idled_out++;
 	} else if(string_prefix_is(field, "end_of_resource_update")) {
 		count_worker_resources(q, w);
-		ds_transaction_write_worker_resources(q, w);
+		ds_txn_log_write_worker_resources(q, w);
 	} else if(string_prefix_is(field, "worker-id")) {
 		free(w->workerid);
 		w->workerid = xxstrdup(value);
-		ds_transaction_write_worker(q, w, 0, 0);
+		ds_txn_log_write_worker(q, w, 0, 0);
 	} else if(string_prefix_is(field, "worker-end-time")) {
 		w->end_time = MAX(0, atoll(value));
 	} else if(string_prefix_is(field, "from-factory")) {
@@ -808,7 +808,7 @@ static void remove_worker(struct ds_manager *q, struct ds_worker_info *w, ds_wor
 		q->stats->workers_removed++;
 	}
 
-	ds_transaction_write_worker(q, w, 1, reason);
+	ds_txn_log_write_worker(q, w, 1, reason);
 
 	cleanup_worker(q, w);
 
@@ -3833,14 +3833,14 @@ void ds_delete(struct ds_manager *q)
 		free(q->ssl_key);
 
 		link_close(q->manager_link);
-		if(q->logfile) {
-			fclose(q->logfile);
+		if(q->perf_logfile) {
+			fclose(q->perf_logfile);
 		}
 
-		if(q->transactions_logfile) {
-			ds_transaction_write(q, "MANAGER END");
+		if(q->txn_logfile) {
+			ds_txn_log_write(q, "MANAGER END");
 
-			if(fclose(q->transactions_logfile) != 0) {
+			if(fclose(q->txn_logfile) != 0) {
 				debug(D_DS, "unable to write transactions log: %s\n", strerror(errno));
 			}
 		}
@@ -4046,7 +4046,7 @@ static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *
 	}
 
 	ds_perf_log_write_update(q, 0);
-	ds_transaction_write_task(q, t);
+	ds_txn_log_write_task(q, t);
 
 	return old_state;
 }
@@ -5086,30 +5086,30 @@ static void aggregate_workers_resources( struct ds_manager *q, struct ds_resourc
 	}
 }
 
-int ds_specify_log(struct ds_manager *q, const char *logfile)
+int ds_specify_log(struct ds_manager *q, const char *filename)
 {
-	q->logfile = fopen(logfile, "a");
-	if(q->logfile) {
+	q->perf_logfile = fopen(filename, "a");
+	if(q->perf_logfile) {
 		ds_perf_log_write_header(q);
 		ds_perf_log_write_update(q,1);
-		debug(D_DS, "log enabled and is being written to %s\n", logfile);
+		debug(D_DS, "log enabled and is being written to %s\n", filename);
 		return 1;
 	} else {
-		debug(D_NOTICE | D_DS, "couldn't open logfile %s: %s\n", logfile, strerror(errno));
+		debug(D_NOTICE | D_DS, "couldn't open logfile %s: %s\n", filename, strerror(errno));
 		return 0;
 	}
 }
 
-int ds_specify_transactions_log(struct ds_manager *q, const char *logfile)
+int ds_specify_transactions_log(struct ds_manager *q, const char *filename)
 {
-	q->transactions_logfile = fopen(logfile, "a");
-	if(q->transactions_logfile) {
-		debug(D_DS, "transactions log enabled and is being written to %s\n", logfile);
-		ds_transaction_write_header(q);
-		ds_transaction_write(q, "MANAGER START");
+	q->txn_logfile = fopen(filename, "a");
+	if(q->txn_logfile) {
+		debug(D_DS, "transactions log enabled and is being written to %s\n", filename);
+		ds_txn_log_write_header(q);
+		ds_txn_log_write(q, "MANAGER START");
 		return 1;
 	} else {
-		debug(D_NOTICE | D_DS, "couldn't open transactions logfile %s: %s\n", logfile, strerror(errno));
+		debug(D_NOTICE | D_DS, "couldn't open transactions logfile %s: %s\n", filename, strerror(errno));
 		return 0;
 	}
 }
@@ -5165,7 +5165,7 @@ void ds_accumulate_task(struct ds_manager *q, struct ds_task *t) {
 		case DS_RESULT_DISK_ALLOC_FULL:
 		case DS_RESULT_OUTPUT_TRANSFER_ERROR:
 			if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
-				ds_transaction_write_category(q, c);
+				ds_txn_log_write_category(q, c);
 			}
 			break;
 		case DS_RESULT_INPUT_MISSING:
@@ -5226,7 +5226,7 @@ int ds_specify_category_mode(struct ds_manager *q, const char *category, ds_cate
 	else {
 		struct category *c = ds_category_lookup_or_create(q, category);
 		category_specify_allocation_mode(c, (category_mode_t) mode);
-		ds_transaction_write_category(q, c);
+		ds_txn_log_write_category(q, c);
 	}
 
 	return 1;

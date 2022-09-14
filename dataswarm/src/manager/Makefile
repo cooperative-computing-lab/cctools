@@ -11,7 +11,7 @@ SOURCES = \
 	ds_json.c \
 	ds_task.c \
 	ds_file.c \
-	ds_transaction.c \
+	ds_txn_log.c \
 	ds_perf_log.c \
 	ds_remote_file_info.c \
 	ds_factory_info.c \

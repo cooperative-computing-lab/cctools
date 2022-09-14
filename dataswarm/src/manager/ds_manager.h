@@ -118,8 +118,8 @@ struct ds_manager {
 
 	/* Logging configuration. */
 
-	FILE *logfile;
-	FILE *transactions_logfile;
+	FILE *perf_logfile; /* Performance logfile for tracking metrics by time. */
+	FILE *txn_logfile;  /* Transaction logfile for recording every event of interest. */
 
 	/* Resource monitoring configuration. */
 
