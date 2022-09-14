@@ -5,7 +5,6 @@
 #include "ds_file.h"
 #include "ds_protocol.h"
 #include "ds_remote_file_info.h"
-#include "ds_internal.h"
 #include "ds_transaction.h"
 
 #include "debug.h"

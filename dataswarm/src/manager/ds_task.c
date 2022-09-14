@@ -4,9 +4,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "ds_manager.h"
 #include "ds_task.h"
 #include "ds_file.h"
-#include "ds_internal.h"
 
 #include "list.h"
 #include "rmsummary.h"

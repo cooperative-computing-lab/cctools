@@ -15,7 +15,6 @@ See the file COPYING for details.
 #include "ds_remote_file_info.h"
 #include "ds_factory_info.h"
 #include "ds_task_info.h"
-#include "ds_internal.h"
 #include "ds_blocklist.h"
 #include "ds_transaction.h"
 
@@ -145,6 +144,10 @@ struct category *ds_category_lookup_or_create(struct ds_manager *q, const char *
 
 /** Write manager's resources to resource summary file and close the file **/
 void ds_disable_monitoring(struct ds_manager *q);
+
+static void aggregate_workers_resources( struct ds_manager *q, struct ds_resources *total, struct hash_table *features);
+
+static struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag);
 
 /******************************************************/
 /********** ds_manager internal functions *************/
@@ -3515,14 +3518,7 @@ static struct ds_task *find_task_by_tag(struct ds_manager *q, const char *taskta
 }
 
 
-void ds_invalidate_cached_file(struct ds_manager *q, const char *local_name, ds_file_t type) {
-	struct ds_file *f = ds_file_create(local_name, local_name, type, DS_CACHE);
-
-	ds_invalidate_cached_file_internal(q, f->cached_name);
-	ds_file_delete(f);
-}
-
-void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filename) {
+static void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filename) {
 	char *key;
 	struct ds_worker_info *w;
 	hash_table_firstkey(q->worker_table);
@@ -3555,6 +3551,12 @@ void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filena
 
 		delete_worker_file(q, w, filename, 0, 0);
 	}
+}
+
+void ds_invalidate_cached_file(struct ds_manager *q, const char *local_name, ds_file_t type) {
+	struct ds_file *f = ds_file_create(local_name, local_name, type, DS_CACHE);
+	ds_invalidate_cached_file_internal(q, f->cached_name);
+	ds_file_delete(f);
 }
 
 /******************************************************/
@@ -4524,7 +4526,7 @@ static int connect_new_workers(struct ds_manager *q, int stoptime, int max_new_w
 }
 
 
-struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag)
+static struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag)
 {
 /*
    - compute stoptime
@@ -5191,7 +5193,7 @@ char *ds_status(struct ds_manager *q, const char *request) {
 	return result;
 }
 
-void aggregate_workers_resources( struct ds_manager *q, struct ds_resources *total, struct hash_table *features)
+static void aggregate_workers_resources( struct ds_manager *q, struct ds_resources *total, struct hash_table *features)
 {
 	struct ds_worker_info *w;
 	char *key;

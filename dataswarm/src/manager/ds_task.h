@@ -78,7 +78,8 @@ struct ds_task {
 	char *monitor_snapshot_file;                          /**< Filename the monitor checks to produce snapshots. */
 };
 
-int ds_task_update_result(struct ds_task *t, ds_result_t new_result );
+int  ds_task_update_result(struct ds_task *t, ds_result_t new_result );
+void ds_task_specify_resources(struct ds_task *t, const struct rmsummary *rm);
 
 
 #endif

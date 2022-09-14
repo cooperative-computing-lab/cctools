@@ -167,4 +167,8 @@ void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t);
 const char *task_state_str(ds_task_state_t task_state);
 const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t);
 
+#define RESOURCE_MONITOR_TASK_LOCAL_NAME "ds-%d-task-%d"
+#define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
+#define RESOURCE_MONITOR_REMOTE_NAME_EVENTS RESOURCE_MONITOR_REMOTE_NAME "events.json"
+
 #endif
