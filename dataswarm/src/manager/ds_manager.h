@@ -163,7 +163,6 @@ ds_msg_code_t ds_manager_recv_retry( struct ds_manager *q, struct ds_worker_info
 
 int  ds_manager_transfer_wait_time( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, int64_t length );
 
-void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t);
 const char *task_state_str(ds_task_state_t task_state);
 const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t);
 

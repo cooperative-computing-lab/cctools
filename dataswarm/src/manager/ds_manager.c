@@ -1265,6 +1265,8 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker_info
 
 	ds_task_info_add(q,t);
 
+	resource_monitor_append_report(q, t);
+
 	debug(D_DS, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
 			w->hostname,
 			w->addrport,
