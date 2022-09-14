@@ -691,47 +691,6 @@ static void update_catalog(struct ds_manager *q, int force_update )
 	q->catalog_last_update_time = time(0);
 }
 
-static void clean_task_state(struct ds_task *t, int full_clean) {
-
-		t->time_when_commit_start = 0;
-		t->time_when_commit_end   = 0;
-		t->time_when_retrieval    = 0;
-
-		t->time_workers_execute_last = 0;
-
-		t->bytes_sent = 0;
-		t->bytes_received = 0;
-		t->bytes_transferred = 0;
-
-		free(t->output);
-		t->output = NULL;
-
-		free(t->hostname);
-		t->hostname = NULL;
-
-		free(t->host);
-		t->host = NULL;
-
-		if(full_clean) {
-			t->resource_request = CATEGORY_ALLOCATION_FIRST;
-			t->try_count = 0;
-			t->exhausted_attempts = 0;
-			t->fast_abort_count = 0;
-
-			t->time_workers_execute_all = 0;
-			t->time_workers_execute_exhaustion = 0;
-			t->time_workers_execute_failure = 0;
-
-			rmsummary_delete(t->resources_measured);
-			rmsummary_delete(t->resources_allocated);
-			t->resources_measured  = rmsummary_create(-1);
-			t->resources_allocated = rmsummary_create(-1);
-		}
-
-		/* If result is never updated, then it is mark as a failure. */
-		t->result = DS_RESULT_UNKNOWN;
-}
-
 static void cleanup_worker(struct ds_manager *q, struct ds_worker_info *w)
 {
 	char *key, *value;
@@ -756,7 +715,7 @@ static void cleanup_worker(struct ds_manager *q, struct ds_worker_info *w)
 			t->time_workers_execute_all     += delta_time;
 		}
 
-		clean_task_state(t, 0);
+		ds_task_clean(t, 0);
 		reap_task_from_worker(q, w, t, DS_TASK_READY);
 
 		itable_firstkey(w->current_tasks);
@@ -4006,7 +3965,7 @@ static void push_task_to_ready_list( struct ds_manager *q, struct ds_task *t )
 	}
 
 	/* If the task has been used before, clear out accumulated state. */
-	clean_task_state(t, 0);
+	ds_task_clean(t,0);
 }
 
 
@@ -4217,7 +4176,7 @@ int ds_submit(struct ds_manager *q, struct ds_task *t)
 		if(task_in_terminal_state(q, t)) {
 			/* this task struct has been submitted before. We keep all the
 			 * definitions, but reset all of the stats. */
-			clean_task_state(t, /* full clean */ 1);
+			ds_task_clean(t, /* full clean */ 1);
 		} else {
 			fatal("Task %d has been already submitted and is not in any final state.", t->taskid);
 		}

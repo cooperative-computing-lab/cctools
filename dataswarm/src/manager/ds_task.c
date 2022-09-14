@@ -58,6 +58,45 @@ struct ds_task *ds_task_create(const char *command_line)
 	return t;
 }
 
+void ds_task_clean( struct ds_task *t, int full_clean )
+{
+	t->time_when_commit_start = 0;
+	t->time_when_commit_end   = 0;
+	t->time_when_retrieval    = 0;
+	t->time_workers_execute_last = 0;
+
+	t->bytes_sent = 0;
+	t->bytes_received = 0;
+	t->bytes_transferred = 0;
+
+	free(t->output);
+	t->output = NULL;
+
+	free(t->hostname);
+	t->hostname = NULL;
+
+	free(t->host);
+	t->host = NULL;
+
+	if(full_clean) {
+		t->resource_request = CATEGORY_ALLOCATION_FIRST;
+		t->try_count = 0;
+		t->exhausted_attempts = 0;
+		t->fast_abort_count = 0;
+
+		t->time_workers_execute_all = 0;
+		t->time_workers_execute_exhaustion = 0;
+		t->time_workers_execute_failure = 0;
+
+		rmsummary_delete(t->resources_measured);
+		rmsummary_delete(t->resources_allocated);
+		t->resources_measured  = rmsummary_create(-1);
+		t->resources_allocated = rmsummary_create(-1);
+	}
+
+	/* If result is never updated, then it is mark as a failure. */
+	t->result = DS_RESULT_UNKNOWN;
+}
 
 static struct list *ds_task_file_list_clone(struct list *list)
 {
