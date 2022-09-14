@@ -126,12 +126,12 @@ static int task_request_count( struct ds_manager *q, const char *category, categ
 static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *w, const char *line);
 static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_worker_info *w);
 
-static void process_data_index( struct ds_manager *q, struct ds_worker_info *w, time_t stoptime );
-static ds_msg_code_t process_http_request( struct ds_manager *q, struct ds_worker_info *w, const char *path, time_t stoptime );
-static ds_msg_code_t process_dataswarm(struct ds_manager *q, struct ds_worker_info *w, const char *line);
-static ds_msg_code_t process_queue_status(struct ds_manager *q, struct ds_worker_info *w, const char *line, time_t stoptime);
-static ds_msg_code_t process_resource(struct ds_manager *q, struct ds_worker_info *w, const char *line);
-static ds_msg_code_t process_feature(struct ds_manager *q, struct ds_worker_info *w, const char *line);
+static void handle_data_index( struct ds_manager *q, struct ds_worker_info *w, time_t stoptime );
+static ds_msg_code_t handle_http_request( struct ds_manager *q, struct ds_worker_info *w, const char *path, time_t stoptime );
+static ds_msg_code_t handle_dataswarm(struct ds_manager *q, struct ds_worker_info *w, const char *line);
+static ds_msg_code_t handle_queue_status(struct ds_manager *q, struct ds_worker_info *w, const char *line, time_t stoptime);
+static ds_msg_code_t handle_resource(struct ds_manager *q, struct ds_worker_info *w, const char *line);
+static ds_msg_code_t handle_feature(struct ds_manager *q, struct ds_worker_info *w, const char *line);
 
 static struct jx * queue_to_jx( struct ds_manager *q );
 static struct jx * queue_lean_to_jx( struct ds_manager *q );
@@ -255,7 +255,7 @@ int ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char 
 	return result;
 }
 
-static ds_msg_code_t process_name(struct ds_manager *q, struct ds_worker_info *w, char *line)
+static ds_msg_code_t handle_name(struct ds_manager *q, struct ds_worker_info *w, char *line)
 {
 	debug(D_DS, "Sending project name to worker (%s)", w->addrport);
 
@@ -265,7 +265,7 @@ static ds_msg_code_t process_name(struct ds_manager *q, struct ds_worker_info *w
 	return DS_MSG_PROCESSED;
 }
 
-static ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker_info *w, char *line)
+static ds_msg_code_t handle_info(struct ds_manager *q, struct ds_worker_info *w, char *line)
 {
 	char field[DS_LINE_MAX];
 	char value[DS_LINE_MAX];
@@ -325,7 +325,7 @@ remote transfer or command was successful, and know we know the size
 of the file for the purposes of cache storage management.
 */
 
-static int process_cache_update( struct ds_manager *q, struct ds_worker_info *w, const char *line )
+static int handle_cache_update( struct ds_manager *q, struct ds_worker_info *w, const char *line )
 {
 	char cachename[DS_LINE_MAX];
 	long long size;
@@ -352,7 +352,7 @@ We should expect to soon receive some failed tasks that were unable
 set up their own input sandboxes.
 */
 
-static int process_cache_invalid( struct ds_manager *q, struct ds_worker_info *w, const char *line )
+static int handle_cache_invalid( struct ds_manager *q, struct ds_worker_info *w, const char *line )
 {
 	char cachename[DS_LINE_MAX];
 	int length;
@@ -382,7 +382,7 @@ A transfer-address message indicates that the worker is listening
 on its own port to receive get requests from other workers.
 */
 
-static int process_transfer_address( struct ds_manager *q, struct ds_worker_info *w, const char *line )
+static int handle_transfer_address( struct ds_manager *q, struct ds_worker_info *w, const char *line )
 {
 	if(sscanf(line,"transfer-address %s %d",w->transfer_addr,&w->transfer_port)) {
 		w->transfer_port_active = 1;
@@ -417,31 +417,31 @@ static ds_msg_code_t ds_manager_recv(struct ds_manager *q, struct ds_worker_info
 	if(string_prefix_is(line, "alive")) {
 		result = DS_MSG_PROCESSED;
 	} else if(string_prefix_is(line, "dataswarm")) {
-		result = process_dataswarm(q, w, line);
+		result = handle_dataswarm(q, w, line);
 	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status") || string_prefix_is(line, "wable_status") || string_prefix_is(line, "resources_status")) {
-		result = process_queue_status(q, w, line, stoptime);
+		result = handle_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
 		result = DS_MSG_PROCESSED;
 	} else if (string_prefix_is(line, "resource")) {
-		result = process_resource(q, w, line);
+		result = handle_resource(q, w, line);
 	} else if (string_prefix_is(line, "feature")) {
-		result = process_feature(q, w, line);
+		result = handle_feature(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
 		debug(D_DS|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
 		result = DS_MSG_FAILURE;
 	} else if (string_prefix_is(line, "name")) {
-		result = process_name(q, w, line);
+		result = handle_name(q, w, line);
 	} else if (string_prefix_is(line, "info")) {
-		result = process_info(q, w, line);
+		result = handle_info(q, w, line);
 	} else if (string_prefix_is(line, "cache-update")) {
-		result = process_cache_update(q, w, line);
+		result = handle_cache_update(q, w, line);
 	} else if (string_prefix_is(line, "cache-invalid")) {
-		result = process_cache_invalid(q, w, line);
+		result = handle_cache_invalid(q, w, line);
 	} else if (string_prefix_is(line, "transfer-address")) {
-		result = process_transfer_address(q, w, line);
+		result = handle_transfer_address(q, w, line);
 	} else if( sscanf(line,"GET %s HTTP/%*d.%*d",path)==1) {
-	        result = process_http_request(q,w,path,stoptime);
+	        result = handle_http_request(q,w,path,stoptime);
 	} else {
 		// Message is not a status update: return it to the user.
 		result = DS_MSG_NOT_PROCESSED;
@@ -1206,7 +1206,7 @@ static void handle_failure(struct ds_manager *q, struct ds_worker_info *w, struc
 	return;
 }
 
-static ds_msg_code_t process_dataswarm(struct ds_manager *q, struct ds_worker_info *w, const char *line)
+static ds_msg_code_t handle_dataswarm(struct ds_manager *q, struct ds_worker_info *w, const char *line)
 {
 	char items[4][DS_LINE_MAX];
 	int worker_protocol;
@@ -2043,7 +2043,7 @@ Send a brief human-readable index listing the data
 types that can be queried via this API.
 */
 
-static void process_data_index( struct ds_manager *q, struct ds_worker_info *w, time_t stoptime )
+static void handle_data_index( struct ds_manager *q, struct ds_worker_info *w, time_t stoptime )
 {
 	buffer_t buf;
 	buffer_init(&buf);
@@ -2068,7 +2068,7 @@ This represents a web browser that connected directly
 to the manager to fetch status data.
 */
 
-static ds_msg_code_t process_http_request( struct ds_manager *q, struct ds_worker_info *w, const char *path, time_t stoptime )
+static ds_msg_code_t handle_http_request( struct ds_manager *q, struct ds_worker_info *w, const char *path, time_t stoptime )
 {
 	char line[DS_LINE_MAX];
 
@@ -2081,12 +2081,12 @@ static ds_msg_code_t process_http_request( struct ds_manager *q, struct ds_worke
 	if(!strcmp(path,"/")) {
 	        // Requests to root get a simple human readable index.
 		ds_manager_send(q,w,"Content-type: text/html\n\n");
-		process_data_index(q, w, stoptime );
+		handle_data_index(q, w, stoptime );
 	} else {
 	        // Other requests get raw JSON data.
 		ds_manager_send(q,w,"Access-Control-Allow-Origin: *\n");
 		ds_manager_send(q,w,"Content-type: text/plain\n\n");
-		process_queue_status(q, w, &path[1], stoptime );
+		handle_queue_status(q, w, &path[1], stoptime );
 	}
 
 	// Return success but require a disconnect now.
@@ -2164,7 +2164,7 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 	return a;
 }
 
-static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worker_info *target, const char *line, time_t stoptime )
+static ds_msg_code_t handle_queue_status( struct ds_manager *q, struct ds_worker_info *target, const char *line, time_t stoptime )
 {
 	struct link *l = target->link;
 
@@ -2186,7 +2186,7 @@ static ds_msg_code_t process_queue_status( struct ds_manager *q, struct ds_worke
 }
 
 
-static ds_msg_code_t process_resource( struct ds_manager *q, struct ds_worker_info *w, const char *line )
+static ds_msg_code_t handle_resource( struct ds_manager *q, struct ds_worker_info *w, const char *line )
 {
 	char resource_name[DS_LINE_MAX];
 	struct ds_resource r;
@@ -2230,7 +2230,7 @@ static ds_msg_code_t process_resource( struct ds_manager *q, struct ds_worker_in
 	return DS_MSG_PROCESSED;
 }
 
-static ds_msg_code_t process_feature( struct ds_manager *q, struct ds_worker_info *w, const char *line )
+static ds_msg_code_t handle_feature( struct ds_manager *q, struct ds_worker_info *w, const char *line )
 {
 	char feature[DS_LINE_MAX];
 	char fdec[DS_LINE_MAX];
