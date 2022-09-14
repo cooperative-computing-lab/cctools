@@ -534,9 +534,6 @@ static ds_msg_code_t ds_manager_recv(struct ds_manager *q, struct ds_worker_info
 	} else if (string_prefix_is(line, "auth")) {
 		debug(D_DS|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
 		result = DS_MSG_FAILURE;
-	} else if (string_prefix_is(line,"ready")) {
-		debug(D_DS|D_NOTICE,"worker (%s) is an older worker that is not compatible with this manager.",w->addrport);
-		result = DS_MSG_FAILURE;
 	} else if (string_prefix_is(line, "name")) {
 		result = process_name(q, w, line);
 	} else if (string_prefix_is(line, "info")) {
