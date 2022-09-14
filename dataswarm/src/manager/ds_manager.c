@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "ds_manager.h"
 #include "ds_manager_get.h"
 #include "ds_manager_put.h"
+#include "ds_schedule.h"
 #include "ds_protocol.h"
 #include "ds_task.h"
 #include "ds_file.h"
@@ -78,9 +79,6 @@ See the file COPYING for details.
 /* Default value for keepalive timeout in seconds. */
 #define DS_DEFAULT_KEEPALIVE_TIMEOUT  30
 
-/* How frequently to check for tasks that do not fit any worker. */
-#define DS_LARGE_TASK_CHECK_INTERVAL 180000000 // 3 minutes in usecs
-
 /* Maximum size of standard output from task.  (If larger, send to a separate file.) */
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
@@ -140,7 +138,7 @@ char *ds_monitor_wrap(struct ds_manager *q, struct ds_worker_info *w, struct ds_
 
 const struct rmsummary *task_max_resources(struct ds_manager *q, struct ds_task *t);
 const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t);
-static struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t);
+struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t);
 
 void ds_accumulate_task(struct ds_manager *q, struct ds_task *t);
 struct category *ds_category_lookup_or_create(struct ds_manager *q, const char *name);
@@ -158,7 +156,7 @@ static void release_all_workers( struct ds_manager *q );
 /********** ds_manager internal functions *************/
 /******************************************************/
 
-static int64_t overcommitted_resource_total(struct ds_manager *q, int64_t total) {
+int64_t overcommitted_resource_total(struct ds_manager *q, int64_t total) {
 	int64_t r = 0;
 	if(total != 0)
 	{
@@ -2338,7 +2336,7 @@ static int build_poll_table(struct ds_manager *q )
 	return n;
 }
 
-static struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t) {
+struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t) {
 
 	const struct rmsummary *min = task_min_resources(q, t);
 	const struct rmsummary *max = task_max_resources(q, t);
@@ -2569,338 +2567,6 @@ static void compute_manager_load(struct ds_manager *q, int task_activity) {
 	q->stats->manager_load = load;
 }
 
-static int check_hand_against_task(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t) {
-
-	/* worker has not reported any resources yet */
-	if(w->resources->tag < 0)
-		return 0;
-
-	if(w->resources->workers.total < 1) {
-		return 0;
-	}
-
-	if(w->draining) {
-		return 0;
-	}
-
-	if ( w->factory_name ) {
-		struct ds_factory_info *f = ds_factory_info_lookup(q,w->factory_name);
-		if ( f && f->connected_workers > f->max_workers ) return 0;
-	}
-
-	if( ds_blocklist_is_blocked(q,w->hostname) ) {
-		return 0;
-	}
-
-	struct rmsummary *l = task_worker_box_size(q, w, t);
-	struct ds_resources *r = w->resources;
-
-	int ok = 1;
-
-	if(r->disk.inuse + l->disk > r->disk.total) { /* No overcommit disk */
-		ok = 0;
-	}
-
-	if((l->cores > r->cores.total) || (r->cores.inuse + l->cores > overcommitted_resource_total(q, r->cores.total))) {
-		ok = 0;
-	}
-
-	if((l->memory > r->memory.total) || (r->memory.inuse + l->memory > overcommitted_resource_total(q, r->memory.total))) {
-		ok = 0;
-	}
-
-	if((l->gpus > r->gpus.total) || (r->gpus.inuse + l->gpus > overcommitted_resource_total(q, r->gpus.total))) {
-		ok = 0;
-	}
-
-	//if worker's end time has not been received
-	if(w->end_time < 0){
-		ok = 0;
-	}
-
-	//if wall time for worker is specified and there's not enough time for task, then not ok
-	if(w->end_time > 0){
-		double current_time = timestamp_get() / ONE_SECOND;
-		if(t->resources_requested->end > 0 && w->end_time < t->resources_requested->end) {
-			ok = 0;
-		}
-		if(t->min_running_time > 0 && w->end_time - current_time < t->min_running_time){
-			ok = 0;
-		}
-	}
-
-	rmsummary_delete(l);
-
-	if(t->features) {
-		if(!w->features)
-			return 0;
-
-		char *feature;
-		list_first_item(t->features);
-		while((feature = list_next_item(t->features))) {
-			if(!hash_table_lookup(w->features, feature))
-				return 0;
-		}
-	}
-
-	return ok;
-}
-
-static struct ds_worker_info *find_worker_by_files(struct ds_manager *q, struct ds_task *t)
-{
-	char *key;
-	struct ds_worker_info *w;
-	struct ds_worker_info *best_worker = 0;
-	int64_t most_task_cached_bytes = 0;
-	int64_t task_cached_bytes;
-	struct ds_remote_file_info *remote_info;
-	struct ds_file *tf;
-
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if( check_hand_against_task(q, w, t) ) {
-			task_cached_bytes = 0;
-			list_first_item(t->input_files);
-			while((tf = list_next_item(t->input_files))) {
-				if((tf->type == DS_FILE || tf->type == DS_FILE_PIECE) && (tf->flags & DS_CACHE)) {
-					remote_info = hash_table_lookup(w->current_files, tf->cached_name);
-					if(remote_info)
-						task_cached_bytes += remote_info->size;
-				}
-			}
-
-			if(!best_worker || task_cached_bytes > most_task_cached_bytes) {
-				best_worker = w;
-				most_task_cached_bytes = task_cached_bytes;
-			}
-		}
-	}
-
-	return best_worker;
-}
-
-static struct ds_worker_info *find_worker_by_fcfs(struct ds_manager *q, struct ds_task *t)
-{
-	char *key;
-	struct ds_worker_info *w;
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if( check_hand_against_task(q, w, t) ) {
-			return w;
-		}
-	}
-	return NULL;
-}
-
-static struct ds_worker_info *find_worker_by_random(struct ds_manager *q, struct ds_task *t)
-{
-	char *key;
-	struct ds_worker_info *w = NULL;
-	int random_worker;
-	struct list *valid_workers = list_create();
-
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if(check_hand_against_task(q, w, t)) {
-			list_push_tail(valid_workers, w);
-		}
-	}
-
-	w = NULL;
-	if(list_size(valid_workers) > 0) {
-		random_worker = (rand() % list_size(valid_workers)) + 1;
-
-		while(random_worker && list_size(valid_workers)) {
-			w = list_pop_head(valid_workers);
-			random_worker--;
-		}
-	}
-
-	list_delete(valid_workers);
-	return w;
-}
-
-// 1 if a < b, 0 if a >= b
-static int compare_worst_fit(struct ds_resources *a, struct ds_resources *b)
-{
-	//Total worker order: free cores > free memory > free disk > free gpus
-	if((a->cores.total < b->cores.total))
-		return 1;
-
-	if((a->cores.total > b->cores.total))
-		return 0;
-
-	//Same number of free cores...
-	if((a->memory.total < b->memory.total))
-		return 1;
-
-	if((a->memory.total > b->memory.total))
-		return 0;
-
-	//Same number of free memory...
-	if((a->disk.total < b->disk.total))
-		return 1;
-
-	if((a->disk.total > b->disk.total))
-		return 0;
-
-	//Same number of free disk...
-	if((a->gpus.total < b->gpus.total))
-		return 1;
-
-	if((a->gpus.total > b->gpus.total))
-		return 0;
-
-	//Number of free resources are the same.
-	return 0;
-}
-
-static struct ds_worker_info *find_worker_by_worst_fit(struct ds_manager *q, struct ds_task *t)
-{
-	char *key;
-	struct ds_worker_info *w;
-	struct ds_worker_info *best_worker = NULL;
-
-	struct ds_resources bres;
-	struct ds_resources wres;
-
-	memset(&bres, 0, sizeof(struct ds_resources));
-	memset(&wres, 0, sizeof(struct ds_resources));
-
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if( check_hand_against_task(q, w, t) ) {
-
-			//Use total field on bres, wres to indicate free resources.
-			wres.cores.total   = w->resources->cores.total   - w->resources->cores.inuse;
-			wres.memory.total  = w->resources->memory.total  - w->resources->memory.inuse;
-			wres.disk.total    = w->resources->disk.total    - w->resources->disk.inuse;
-			wres.gpus.total    = w->resources->gpus.total    - w->resources->gpus.inuse;
-
-			if(!best_worker || compare_worst_fit(&bres, &wres))
-			{
-				best_worker = w;
-				memcpy(&bres, &wres, sizeof(struct ds_resources));
-			}
-		}
-	}
-
-	return best_worker;
-}
-
-static struct ds_worker_info *find_worker_by_time(struct ds_manager *q, struct ds_task *t)
-{
-	char *key;
-	struct ds_worker_info *w;
-	struct ds_worker_info *best_worker = 0;
-	double best_time = HUGE_VAL;
-
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(check_hand_against_task(q, w, t)) {
-			if(w->total_tasks_complete > 0) {
-				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
-				if(!best_worker || t < best_time) {
-					best_worker = w;
-					best_time = t;
-				}
-			}
-		}
-	}
-
-	if(best_worker) {
-		return best_worker;
-	} else {
-		return find_worker_by_fcfs(q, t);
-	}
-}
-
-
-// compares the resources needed by a task to a given worker
-// returns a bitmask that indicates which resource of the task, if any, cannot
-// be met by the worker. If the task fits in the worker, it returns 0.
-static int is_task_larger_than_worker(struct ds_manager *q, struct ds_task *t, struct ds_worker_info *w)
-{
-	if(w->resources->tag < 0) {
-		/* quickly return if worker has not sent its resources yet */
-		return 0;
-	}
-
-	int set = 0;
-	struct rmsummary *l = task_worker_box_size(q,w,t);
-
-	// baseline resurce comparison of worker total resources and a task requested resorces
-
-	if((double)w->resources->cores.total < l->cores ) {
-		set = set | CORES_BIT;
-	}
-
-	if((double)w->resources->memory.total < l->memory ) {
-		set = set | MEMORY_BIT;
-	}
-
-	if((double)w->resources->disk.total < l->disk ) {
-		set = set | DISK_BIT;
-	}
-
-	if((double)w->resources->gpus.total < l->gpus ) {
-		set = set | GPUS_BIT;
-	}
-	rmsummary_delete(l);
-
-	return set;
-}
-
-// compares the resources needed by a task to all connected workers.
-// returns 0 if there is worker than can fit the task. Otherwise it returns a bitmask
-// that indicates that there was at least one worker that could not fit that task resource.
-static int is_task_larger_than_connected_workers(struct ds_manager *q, struct ds_task *t)
-{
-	char *key;
-	struct ds_worker_info *w;
-	hash_table_firstkey(q->worker_table);
-
-	int bit_set = 0;
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w))
-	{
-		int new_set = is_task_larger_than_worker(q, t, w);
-		if (new_set == 0){
-			// Task could run on a currently connected worker, immediately
-			// return
-			return 0;
-		}
-
-		// Inherit the unfit criteria for this task
-		bit_set = bit_set | new_set;
-	}
-
-	return bit_set;
-}
-
-// use task-specific algorithm if set, otherwise default to the queue's setting.
-static struct ds_worker_info *find_best_worker(struct ds_manager *q, struct ds_task *t)
-{
-	int a = t->worker_selection_algorithm;
-
-	if(a == DS_SCHEDULE_UNSET) {
-		a = q->worker_selection_algorithm;
-	}
-
-	switch (a) {
-	case DS_SCHEDULE_FILES:
-		return find_worker_by_files(q, t);
-	case DS_SCHEDULE_TIME:
-		return find_worker_by_time(q, t);
-	case DS_SCHEDULE_WORST:
-		return find_worker_by_worst_fit(q, t);
-	case DS_SCHEDULE_FCFS:
-		return find_worker_by_fcfs(q, t);
-	case DS_SCHEDULE_RAND:
-	default:
-		return find_worker_by_random(q, t);
-	}
-}
-
 static void count_worker_resources(struct ds_manager *q, struct ds_worker_info *w)
 {
 	struct rmsummary *box;
@@ -3034,7 +2700,7 @@ static int send_one_task( struct ds_manager *q )
 		if(t->resources_requested->start > now) continue;
 
 		// Find the best worker for the task at the head of the list
-		w = find_best_worker(q,t);
+		w = ds_schedule_task_to_worker(q,t);
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
@@ -3045,69 +2711,6 @@ static int send_one_task( struct ds_manager *q )
 	}
 
 	return 0;
-}
-
-
-static void print_large_tasks_warning(struct ds_manager *q)
-{
-	timestamp_t current_time = timestamp_get();
-	if(current_time - q->time_last_large_tasks_check < DS_LARGE_TASK_CHECK_INTERVAL) {
-		return;
-	}
-
-	q->time_last_large_tasks_check = current_time;
-
-	struct ds_task *t;
-	int unfit_core = 0;
-	int unfit_mem  = 0;
-	int unfit_disk = 0;
-	int unfit_gpu  = 0;
-
-	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
-
-	list_first_item(q->ready_list);
-	while( (t = list_next_item(q->ready_list))){
-		// check each task against the queue of connected workers
-		int bit_set = is_task_larger_than_connected_workers(q, t);
-		if(bit_set) {
-			rmsummary_merge_max(largest_unfit_task, task_max_resources(q, t));
-			rmsummary_merge_max(largest_unfit_task, task_min_resources(q, t));
-		}
-		if (bit_set & CORES_BIT) {
-			unfit_core++;
-		}
-		if (bit_set & MEMORY_BIT) {
-			unfit_mem++;
-		}
-		if (bit_set & DISK_BIT) {
-			unfit_disk++;
-		}
-		if (bit_set & GPUS_BIT) {
-			unfit_gpu++;
-		}
-	}
-
-	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
-		notice(D_DS,"There are tasks that cannot fit any currently connected worker:\n");
-	}
-
-	if(unfit_core) {
-		notice(D_DS,"    %d waiting task(s) need more than %s", unfit_core, rmsummary_resource_to_str("cores", largest_unfit_task->cores, 1));
-	}
-
-	if(unfit_mem) {
-		notice(D_DS,"    %d waiting task(s) need more than %s of memory", unfit_mem, rmsummary_resource_to_str("memory", largest_unfit_task->memory, 1));
-	}
-
-	if(unfit_disk) {
-		notice(D_DS,"    %d waiting task(s) need more than %s of disk", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task->disk, 1));
-	}
-
-	if(unfit_gpu) {
-		notice(D_DS,"    %d waiting task(s) need more than %s", unfit_gpu, rmsummary_resource_to_str("gpus", largest_unfit_task->gpus, 1));
-	}
-
-	rmsummary_delete(largest_unfit_task);
 }
 
 static int receive_one_task( struct ds_manager *q )
@@ -4524,7 +4127,7 @@ static struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const
 			}
 		}
 
-		print_large_tasks_warning(q);
+		ds_schedule_check_for_large_tasks(q);
 
 		// if we got here, no events were triggered.
 		// we set the busy_waiting flag so that link_poll waits for some time

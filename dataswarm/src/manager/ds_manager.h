@@ -41,13 +41,6 @@ typedef enum {
 	DS_WORKER_DISCONNECT_FAILURE
 } ds_worker_disconnect_reason_t;
 
-typedef enum {
-	CORES_BIT = (1 << 0),
-	MEMORY_BIT = (1 << 1),
-	DISK_BIT = (1 << 2),
-	GPUS_BIT = (1 << 3),
-} ds_resource_bitmask_t;
-
 struct ds_worker_info;
 struct ds_task;
 struct ds_file;
@@ -165,6 +158,9 @@ int ds_manager_transfer_wait_time( struct ds_manager *q, struct ds_worker_info *
 int ds_manager_available_workers(struct ds_manager *q);
 
 const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t);
+const struct rmsummary *task_max_resources(struct ds_manager *q, struct ds_task *t);
+struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t);
+int64_t overcommitted_resource_total(struct ds_manager *q, int64_t total);
 
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "ds-%d-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
