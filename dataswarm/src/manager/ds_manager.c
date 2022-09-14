@@ -25,7 +25,6 @@ See the file COPYING for details.
 #include "debug.h"
 #include "stringtools.h"
 #include "catalog_query.h"
-#include "datagram.h"
 #include "domain_name_cache.h"
 #include "hash_table.h"
 #include "interfaces_address.h"
@@ -49,7 +48,6 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_parse.h"
 #include "shell.h"
-#include "pattern.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -65,6 +63,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stddef.h>
 
 // Seconds between updates to the catalog
 #define DS_UPDATE_INTERVAL 60
