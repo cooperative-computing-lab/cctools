@@ -4,7 +4,7 @@ include ../../../rules.mk
 LOCAL_LINKAGE+=${CCTOOLS_HOME}/dataswarm/src/manager/libdataswarm.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
 LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/dataswarm/src/manager
 
-PROGRAMS = ds_status ds_server
+PROGRAMS = ds_status
 TEST_PROGRAMS = ds_example ds_test ds_test_watch ds_priority_test ds_example_json
 TARGETS = $(PROGRAMS) $(TEST_PROGRAMS)
 
