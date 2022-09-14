@@ -48,7 +48,6 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "shell.h"
 #include "pattern.h"
-#include "host_disk_info.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -80,9 +79,6 @@ See the file COPYING for details.
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
 #define MAX_NEW_WORKERS 10
-
-// Threshold for available disk space (MB) beyond which files are not received from worker.
-static uint64_t disk_avail_threshold = 100;
 
 int ds_option_scheduler = DS_SCHEDULE_TIME;
 
@@ -125,8 +121,6 @@ static int task_request_count( struct ds_manager *q, const char *category, categ
 static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *w, const char *line);
 static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_worker_info *w);
 
-static int update_task_result(struct ds_task *t, ds_result_t new_result);
-
 static void process_data_index( struct ds_manager *q, struct ds_worker_info *w, time_t stoptime );
 static ds_msg_code_t process_http_request( struct ds_manager *q, struct ds_worker_info *w, const char *path, time_t stoptime );
 static ds_msg_code_t process_dataswarm(struct ds_manager *q, struct ds_worker_info *w, const char *line);
@@ -150,7 +144,7 @@ static void write_transaction(struct ds_manager *q, const char *str);
 static void write_transaction_task(struct ds_manager *q, struct ds_task *t);
 static void write_transaction_category(struct ds_manager *q, struct category *c);
 static void write_transaction_worker(struct ds_manager *q, struct ds_worker_info *w, int leaving, ds_worker_disconnect_reason_t reason_leaving);
-static void write_transaction_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type);
+void write_transaction_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type);
 static void write_transaction_worker_resources(struct ds_manager *q, struct ds_worker_info *w);
 
 /** Write manager's resources to resource summary file and close the file **/
@@ -626,7 +620,7 @@ Two exceptions are made:
 - The transfer time cannot be below a configurable minimum time.
 */
 
-static int get_transfer_wait_time(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, int64_t length)
+int ds_manager_transfer_wait_time(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, int64_t length)
 {
 	double avg_transfer_rate; // bytes per second
 	char *data_source;
@@ -1021,348 +1015,6 @@ static void add_worker(struct ds_manager *q)
 	hash_table_insert(q->worker_table, w->hashkey, w);
 }
 
-
-/*
-Receive the contents of a single file from a worker.
-The "file" header has already been received, just
-bring back the streaming data within various constraints.
-*/
-
-static ds_result_code_t get_file_contents( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *local_name, int64_t length, int mode )
-{
-	// If a bandwidth limit is in effect, choose the effective stoptime.
-	timestamp_t effective_stoptime = 0;
-	if(q->bandwidth_limit) {
-		effective_stoptime = (length/q->bandwidth_limit)*1000000 + timestamp_get();
-	}
-
-	// Choose the actual stoptime.
-	time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
-
-	// If necessary, create parent directories of the file.
-	char dirname[DS_LINE_MAX];
-	path_dirname(local_name,dirname);
-	if(strchr(local_name,'/')) {
-		if(!create_dir(dirname, 0777)) {
-			debug(D_DS, "Could not create directory - %s (%s)", dirname, strerror(errno));
-			link_soak(w->link, length, stoptime);
-			return DS_MGR_FAILURE;
-		}
-	}
-
-	// Create the local file.
-	debug(D_DS, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
-
-	// Check if there is space for incoming file at manager
-	if(!check_disk_space_for_filesize(dirname, length, disk_avail_threshold)) {
-		debug(D_DS, "Could not receive file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
-		return DS_MGR_FAILURE;
-	}
-
-	int fd = open(local_name, O_WRONLY | O_TRUNC | O_CREAT, 0777);
-	if(fd < 0) {
-		debug(D_NOTICE, "Cannot open file %s for writing: %s", local_name, strerror(errno));
-		link_soak(w->link, length, stoptime);
-		return DS_MGR_FAILURE;
-	}
-
-	// Write the data on the link to file.
-	int64_t actual = link_stream_to_fd(w->link, fd, length, stoptime);
-
-	fchmod(fd,mode);
-
-	if(close(fd) < 0) {
-		warn(D_DS, "Could not write file %s: %s\n", local_name, strerror(errno));
-		unlink(local_name);
-		return DS_MGR_FAILURE;
-	}
-
-	if(actual != length) {
-		debug(D_DS, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
-		unlink(local_name);
-		return DS_WORKER_FAILURE;
-	}
-
-	// If the transfer was too fast, slow things down.
-	timestamp_t current_time = timestamp_get();
-	if(effective_stoptime && effective_stoptime > current_time) {
-		usleep(effective_stoptime - current_time);
-	}
-
-	return DS_SUCCESS;
-}
-
-/*
-Get the contents of a symlink back from the worker,
-after the "symlink" header has already been received.
-*/
-
-
-static ds_result_code_t get_symlink_contents( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *filename, int length )
-{
-        char *target = malloc(length);
-
-        int actual = link_read(w->link,target,length,time(0)+q->short_timeout);
-        if(actual!=length) {
-                free(target);
-                return DS_WORKER_FAILURE;
-        }
-
-        int result = symlink(target,filename);
-        if(result<0) {
-                debug(D_DS,"could not create symlink %s: %s",filename,strerror(errno));
-                free(target);
-                return DS_MGR_FAILURE;
-        }
-
-        free(target);
-
-        return DS_SUCCESS;
-}
-
-
-static ds_result_code_t get_dir_contents( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *dirname, int64_t *totalsize );
-
-/*
-Get a single item (file, dir, symlink, etc) back
-from the worker by observing the header and then
-pulling the appropriate data on the stream.
-Note that if forced_name is non-null, then the item
-is stored under that filename.  Otherwise, it is placed
-in the directory dirname with the filename given by the
-worker.  This allows this function to handle both the
-top-level case of renamed files as well as interior files
-within a directory.
-*/
-
-static ds_result_code_t get_any( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *dirname, const char *forced_name, int64_t *totalsize )
-{
-	char line[DS_LINE_MAX];
-	char name_encoded[DS_LINE_MAX];
-	char name[DS_LINE_MAX];
-	int64_t size;
-	int mode;
-	int errornum;
-
-	ds_result_code_t r = DS_WORKER_FAILURE;
-
-	ds_msg_code_t mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
-	if(mcode!=DS_MSG_NOT_PROCESSED) return DS_WORKER_FAILURE;
-
-	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
-
-		url_decode(name_encoded,name,sizeof(name));
-
-		char *subname;
-		if(forced_name) {
-			subname = strdup(forced_name);
-		} else {
-			subname = string_format("%s/%s",dirname,name);
-		}
-		r = get_file_contents(q,w,t,subname,size,mode);
-		free(subname);
-
-		if(r==DS_SUCCESS) *totalsize += size;
-
-	} else if(sscanf(line,"symlink %s %" SCNd64,name_encoded,&size)==2) {
-
-		url_decode(name_encoded,name,sizeof(name));
-
-		char *subname;
-		if(forced_name) {
-			subname = strdup(forced_name);
-		} else {
-			subname = string_format("%s/%s",dirname,name);
-		}
-		r = get_symlink_contents(q,w,t,subname,size);
-		free(subname);
-
-		if(r==DS_SUCCESS) *totalsize += size;
-
-	} else if(sscanf(line,"dir %s",name_encoded)==1) {
-
-		url_decode(name_encoded,name,sizeof(name));
-
-		char *subname;
-		if(forced_name) {
-			subname = strdup(forced_name);
-		} else {
-			subname = string_format("%s/%s",dirname,name);
-		}
-		r = get_dir_contents(q,w,t,subname,totalsize);
-		free(subname);
-
-	} else if(sscanf(line,"missing %s %d",name_encoded,&errornum)==2) {
-
-		// If the output file is missing, we make a note of that in the task result,
-		// but we continue and consider the transfer a 'success' so that other
-		// outputs are transferred and the task is given back to the caller.
-		url_decode(name_encoded,name,sizeof(name));
-		debug(D_DS, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,name,strerror(errornum));
-		update_task_result(t, DS_RESULT_OUTPUT_MISSING);
-
-		r = DS_SUCCESS;
-
-	} else if(!strcmp(line,"end")) {
-		r = DS_END_OF_LIST;
-
-	} else {
-		debug(D_DS, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
-		r = DS_WORKER_FAILURE;
-	}
-
-	return r;
-}
-
-/*
-Retrieve the contents of a directory by creating the local
-dir, then receiving each item in the directory until an "end"
-header is received.
-*/
-
-static ds_result_code_t get_dir_contents( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *dirname, int64_t *totalsize )
-{
-	int result = mkdir(dirname,0777);
-	if(result<0) {
-		debug(D_DS,"unable to create %s: %s",dirname,strerror(errno));
-		return DS_APP_FAILURE;
-	}
-
-	while(1) {
-		int r = get_any(q,w,t,dirname,0,totalsize);
-		if(r==DS_SUCCESS) {
-			// Successfully received one item. 	
-			continue;
-		} else if(r==DS_END_OF_LIST) {
-			// Sucessfully got end of sequence. 
-			return DS_SUCCESS;
-		} else {
-			// Failed to receive item.
-			return r;
-		}
-	}
-}
-
-/*
-Get a single output file, located at the worker under 'cached_name'.
-*/
-static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f )
-{
-	int64_t total_bytes = 0;
-	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below.
-
-	timestamp_t open_time = timestamp_get();
-
-	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, f->cached_name, f->source);
-	send_worker_msg(q,w, "get %s\n",f->cached_name);
-
-	result = get_any(q, w, t, 0, f->source, &total_bytes);
-
-	timestamp_t close_time = timestamp_get();
-	timestamp_t sum_time = close_time - open_time;
-
-	if(total_bytes>0) {
-		q->stats->bytes_received += total_bytes;
-
-		t->bytes_received    += total_bytes;
-		t->bytes_transferred += total_bytes;
-
-		w->total_bytes_transferred += total_bytes;
-		w->total_transfer_time += sum_time;
-
-		debug(D_DS, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
-
-        write_transaction_transfer(q, w, t, f, total_bytes, sum_time, DS_OUTPUT);
-	}
-
-	// If we failed to *transfer* the output file, then that is a hard
-	// failure which causes this function to return failure and the task
-	// to be returned to the queue to be attempted elsewhere.
-	// But if we failed to *store* the file, that is a manager failure.
-
-	if(result!=DS_SUCCESS) {
-		debug(D_DS, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, f->cached_name, f->source );
-
-		if(result == DS_APP_FAILURE) {
-			update_task_result(t, DS_RESULT_OUTPUT_MISSING);
-		} else if(result == DS_MGR_FAILURE) {
-			update_task_result(t, DS_RESULT_OUTPUT_TRANSFER_ERROR);
-		}
-	}
-
-	// If the transfer was successful, make a record of it in the cache.
-	if(result == DS_SUCCESS && f->flags & DS_CACHE) {
-		struct stat local_info;
-		if (stat(f->source,&local_info) == 0) {
-			struct ds_remote_file_info *remote_info = ds_remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
-			hash_table_insert(w->current_files, f->cached_name, remote_info);
-		} else {
-			debug(D_NOTICE, "Cannot stat file %s: %s", f->source, strerror(errno));
-		}
-	}
-
-	return result;
-}
-
-static ds_result_code_t get_output_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t )
-{
-	struct ds_file *f;
-	ds_result_code_t result = DS_SUCCESS;
-
-	if(t->output_files) {
-		list_first_item(t->output_files);
-		while((f = list_next_item(t->output_files))) {
-			// non-file objects are handled by the worker.
-			if(f->type!=DS_FILE) continue;
-		     
-			int task_succeeded = (t->result==DS_RESULT_SUCCESS && t->exit_code==0);
-
-			// skip failure-only files on success 
-			if(f->flags&DS_FAILURE_ONLY && task_succeeded) continue;
-
- 			// skip success-only files on failure
-			if(f->flags&DS_SUCCESS_ONLY && !task_succeeded) continue;
-
-			// otherwise, get the file.
-			result = get_output_file(q,w,t,f);
-
-			//if success or app-level failure, continue to get other files.
-			//if worker failure, return.
-			if(result == DS_WORKER_FAILURE) {
-				break;
-			}
-		}
-	}
-
-	// tell the worker you no longer need that task's output directory.
-	send_worker_msg(q,w, "kill %d\n",t->taskid);
-
-	return result;
-}
-
-static ds_result_code_t get_monitor_output_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t )
-{
-	struct ds_file *f;
-	ds_result_code_t result = DS_SUCCESS;
-
-	const char *summary_name = RESOURCE_MONITOR_REMOTE_NAME ".summary";
-
-	if(t->output_files) {
-		list_first_item(t->output_files);
-		while((f = list_next_item(t->output_files))) {
-			if(!strcmp(summary_name, f->remote_name)) {
-				result = get_output_file(q,w,t,f);
-				break;
-			}
-		}
-	}
-
-	// tell the worker you no longer need that task's output directory.
-	send_worker_msg(q,w, "kill %d\n",t->taskid);
-
-	return result;
-}
-
 static void delete_worker_file( struct ds_manager *q, struct ds_worker_info *w, const char *filename, int flags, int except_flags ) {
 	if(!(flags & except_flags)) {
 		send_worker_msg(q,w, "unlink %s\n", filename);
@@ -1431,7 +1083,7 @@ void read_measured_resources(struct ds_manager *q, struct ds_task *t) {
 		/* if no resources were measured, then we don't overwrite the return
 		 * status, and mark the task as with error from monitoring. */
 		t->resources_measured = rmsummary_create(-1);
-		update_task_result(t, DS_RESULT_RMONITOR_ERROR);
+		ds_task_update_result(t, DS_RESULT_RMONITOR_ERROR);
 	}
 
 	free(summary);
@@ -1520,9 +1172,9 @@ static void fetch_output_from_worker(struct ds_manager *q, struct ds_worker_info
 	t->time_when_retrieval = timestamp_get();
 
 	if(t->result == DS_RESULT_RESOURCE_EXHAUSTION) {
-		result = get_monitor_output_file(q,w,t);
+		result = ds_manager_get_monitor_output_file(q,w,t);
 	} else {
-		result = get_output_files(q,w,t);
+		result = ds_manager_get_output_files(q,w,t);
 	}
 
 	if(result != DS_SUCCESS) {
@@ -1653,11 +1305,11 @@ static int expire_waiting_tasks(struct ds_manager *q)
 
 		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time)
 		{
-			update_task_result(t, DS_RESULT_TASK_TIMEOUT);
+			ds_task_update_result(t, DS_RESULT_TASK_TIMEOUT);
 			change_task_state(q, t, DS_TASK_RETRIEVED);
 			expired++;
 		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
-			update_task_result(t, DS_RESULT_MAX_RETRIES);
+			ds_task_update_result(t, DS_RESULT_MAX_RETRIES);
 			change_task_state(q, t, DS_TASK_RETRIEVED);
 			expired++;
 		} else {
@@ -1776,12 +1428,12 @@ static ds_result_code_t get_update( struct ds_manager *q, struct ds_worker_info 
 	struct ds_task *t = itable_lookup(w->current_tasks,taskid);
 	if(!t) {
 		debug(D_DS,"worker %s (%s) sent output for unassigned task %"PRId64, w->hostname, w->addrport, taskid);
-		link_soak(w->link,length,time(0)+get_transfer_wait_time(q,w,0,length));
+		link_soak(w->link,length,time(0)+ds_manager_transfer_wait_time(q,w,0,length));
 		return DS_SUCCESS;
 	}
 
 
-	time_t stoptime = time(0) + get_transfer_wait_time(q,w,t,length);
+	time_t stoptime = time(0) + ds_manager_transfer_wait_time(q,w,t,length);
 
 	struct ds_file *f;
 	const char *local_name = 0;
@@ -1853,7 +1505,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
 		debug(D_DS, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
-		stoptime = time(0) + get_transfer_wait_time(q, w, 0, output_length);
+		stoptime = time(0) + ds_manager_transfer_wait_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
 		return DS_SUCCESS;
 	}
@@ -1883,24 +1535,24 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 	} else {
 		retrieved_output_length = MAX_TASK_STDOUT_STORAGE;
 		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retrieved.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
-		update_task_result(t, DS_RESULT_STDOUT_MISSING);
+		ds_task_update_result(t, DS_RESULT_STDOUT_MISSING);
 	}
 
 	t->output = malloc(retrieved_output_length+1);
 	if(t->output == NULL) {
 		fprintf(stderr, "error: allocating memory of size %"PRId64" bytes failed for storing stdout of task %"PRId64".\n", retrieved_output_length, taskid);
 		//drop the entire length of stdout on the link
-		stoptime = time(0) + get_transfer_wait_time(q, w, t, output_length);
+		stoptime = time(0) + ds_manager_transfer_wait_time(q, w, t, output_length);
 		link_soak(w->link, output_length, stoptime);
 		retrieved_output_length = 0;
-		update_task_result(t, DS_RESULT_STDOUT_MISSING);
+		ds_task_update_result(t, DS_RESULT_STDOUT_MISSING);
 	}
 
 	if(retrieved_output_length > 0) {
 		debug(D_DS, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, retrieved_output_length, w->addrport, w->hostname);
 
 		//First read the bytes we keep.
-		stoptime = time(0) + get_transfer_wait_time(q, w, t, retrieved_output_length);
+		stoptime = time(0) + ds_manager_transfer_wait_time(q, w, t, retrieved_output_length);
 		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
 		if(actual != retrieved_output_length) {
 			debug(D_DS, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
@@ -1912,7 +1564,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 		//Then read the bytes we need to throw away.
 		if(output_length > retrieved_output_length) {
 			debug(D_DS, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_STORAGE), taskid, MAX_TASK_STDOUT_STORAGE);
-			stoptime = time(0) + get_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
+			stoptime = time(0) + ds_manager_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
 			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
 
 			//overwrite the last few bytes of buffer to signal truncated stdout.
@@ -1943,9 +1595,9 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 	// Convert resource_monitor status into work queue status if needed.
 	if(q->monitor_mode) {
 		if(t->exit_code == RM_OVERFLOW) {
-			update_task_result(t, DS_RESULT_RESOURCE_EXHAUSTION);
+			ds_task_update_result(t, DS_RESULT_RESOURCE_EXHAUSTION);
 		} else if(t->exit_code == RM_TIME_EXPIRE) {
-			update_task_result(t, DS_RESULT_TASK_TIMEOUT);
+			ds_task_update_result(t, DS_RESULT_TASK_TIMEOUT);
 		}
 	}
 
@@ -1996,31 +1648,6 @@ static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_wo
 	}
 
 	return result;
-}
-
-static int update_task_result(struct ds_task *t, ds_result_t new_result) {
-
-	if(new_result & ~(0x7)) {
-		/* Upper bits are set, so this is not related to old-style result for
-		 * inputs, outputs, or stdout, so we simply make an update. */
-		t->result = new_result;
-	} else if(t->result != DS_RESULT_UNKNOWN && t->result & ~(0x7)) {
-		/* Ignore new result, since we only update for input, output, or
-		 * stdout missing when no other result exists. This is because
-		 * missing inputs/outputs are anyway expected with other kind of
-		 * errors. */
-	} else if(new_result == DS_RESULT_INPUT_MISSING) {
-		/* input missing always appears by itself, so yet again we simply make an update. */
-		t->result = new_result;
-	} else if(new_result == DS_RESULT_OUTPUT_MISSING) {
-		/* output missing clobbers stdout missing. */
-		t->result = new_result;
-	} else {
-		/* we only get here for stdout missing. */
-		t->result = new_result;
-	}
-
-	return t->result;
 }
 
 static struct rmsummary  *total_resources_needed(struct ds_manager *q) {
@@ -2942,7 +2569,7 @@ static int send_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_
 	char remotename_encoded[DS_LINE_MAX];
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
 
-	stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
+	stoptime = time(0) + ds_manager_transfer_wait_time(q, w, t, length);
 	send_worker_msg(q,w, "file %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
@@ -3201,7 +2828,7 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker_i
 
 	case DS_BUFFER:
 		debug(D_DS, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
-		time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, f->length);
+		time_t stoptime = time(0) + ds_manager_transfer_wait_time(q, w, t, f->length);
 		send_worker_msg(q,w, "file %s %d %o\n",f->cached_name, f->length, 0777 );
 		actual = link_putlstring(w->link, f->source, f->length, stoptime);
 		if(actual!=f->length) {
@@ -3274,7 +2901,7 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker_i
 			total_bytes);
 
 		if(result == DS_APP_FAILURE) {
-			update_task_result(t, DS_RESULT_INPUT_MISSING);
+			ds_task_update_result(t, DS_RESULT_INPUT_MISSING);
 		}
 	}
 
@@ -3294,13 +2921,13 @@ static ds_result_code_t send_input_files( struct ds_manager *q, struct ds_worker
 			if(f->type == DS_FILE || f->type == DS_FILE_PIECE) {
 				char * expanded_source = expand_envnames(w, f->source);
 				if(!expanded_source) {
-					update_task_result(t, DS_RESULT_INPUT_MISSING);
+					ds_task_update_result(t, DS_RESULT_INPUT_MISSING);
 					return DS_APP_FAILURE;
 				}
 				if(stat(expanded_source, &s) != 0) {
 					debug(D_DS,"Could not stat %s: %s\n", expanded_source, strerror(errno));
 					free(expanded_source);
-					update_task_result(t, DS_RESULT_INPUT_MISSING);
+					ds_task_update_result(t, DS_RESULT_INPUT_MISSING);
 					return DS_APP_FAILURE;
 				}
 				free(expanded_source);
@@ -4519,6 +4146,7 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 	q->minimum_transfer_timeout = 60;
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1*MEGABYTE;
+	q->disk_avail_threshold = 100;
 
 	q->manager_preferred_connection = xxstrdup("by_ip");
 
@@ -4983,7 +4611,7 @@ static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *
 
 	switch(new_state) {
 		case DS_TASK_READY:
-			update_task_result(t, DS_RESULT_UNKNOWN);
+			ds_task_update_result(t, DS_RESULT_UNKNOWN);
 			push_task_to_ready_list(q, t);
 			break;
 		case DS_TASK_DONE:
@@ -6295,7 +5923,7 @@ static void write_transaction_worker_resources(struct ds_manager *q, struct ds_w
 }
 
 
-static void write_transaction_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type) {
+void write_transaction_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type) {
 	struct buffer B;
 	buffer_init(&B);
 	buffer_printf(&B, "TRANSFER ");

@@ -48,6 +48,10 @@ typedef enum {
 	GPUS_BIT = (1 << 3),
 } ds_resource_bitmask_t;
 
+struct ds_worker_info;
+struct ds_task;
+struct ds_file;
+
 struct ds_manager {
 
 	/* Connection and communication settings */
@@ -146,8 +150,22 @@ struct ds_manager {
 	int force_proportional_resources;  /* If true, tasks divide worker resources proportionally. */
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
+	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB */
 };
 
+/* Internal interfaces to ds_manager.c */
+
+void ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char *fmt, ... );
+ds_msg_code_t ds_manager_recv_retry( struct ds_manager *q, struct ds_worker_info *w, char *line, int length );
+int  ds_manager_transfer_wait_time( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, int64_t length );
 void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t);
+void write_transaction_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type);
+
+
+/* Internal interfaces to ds_manager_get.c */
+
+ds_result_code_t ds_manager_get_output_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f );
+ds_result_code_t ds_manager_get_output_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
+ds_result_code_t ds_manager_get_monitor_output_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
 
 #endif

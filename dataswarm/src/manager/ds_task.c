@@ -701,6 +701,31 @@ void ds_task_specify_monitor_output(struct ds_task *t, const char *monitor_outpu
 	t->monitor_output_directory = xxstrdup(monitor_output_directory);
 }
 
+int ds_task_update_result(struct ds_task *t, ds_result_t new_result)
+{
+	if(new_result & ~(0x7)) {
+		/* Upper bits are set, so this is not related to old-style result for
+		 * inputs, outputs, or stdout, so we simply make an update. */
+		t->result = new_result;
+	} else if(t->result != DS_RESULT_UNKNOWN && t->result & ~(0x7)) {
+		/* Ignore new result, since we only update for input, output, or
+		 * stdout missing when no other result exists. This is because
+		 * missing inputs/outputs are anyway expected with other kind of
+		 * errors. */
+	} else if(new_result == DS_RESULT_INPUT_MISSING) {
+		/* input missing always appears by itself, so yet again we simply make an update. */
+		t->result = new_result;
+	} else if(new_result == DS_RESULT_OUTPUT_MISSING) {
+		/* output missing clobbers stdout missing. */
+		t->result = new_result;
+	} else {
+		/* we only get here for stdout missing. */
+		t->result = new_result;
+	}
+
+	return t->result;
+}
+
 void ds_task_delete(struct ds_task *t)
 {
 	struct ds_file *tf;
