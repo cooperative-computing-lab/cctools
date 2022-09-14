@@ -65,27 +65,31 @@ See the file COPYING for details.
 #include <time.h>
 #include <stddef.h>
 
-// Seconds between updates to the catalog
+/* Seconds between updates to the catalog. */
 #define DS_UPDATE_INTERVAL 60
 
-// Seconds between measurement of manager local resources
+/* Seconds between measurement of manager local resources. */
 #define DS_RESOURCE_MEASUREMENT_INTERVAL 30
 
-/**< Default value for Data Swarm keepalive interval in seconds. */
+/* Default value for keepalive interval in seconds. */
 #define DS_DEFAULT_KEEPALIVE_INTERVAL 120
 
-/**< Default value for Data Swarm keepalive timeout in seconds. */
+/* Default value for keepalive timeout in seconds. */
 #define DS_DEFAULT_KEEPALIVE_TIMEOUT  30
 
+/* How frequently to check for tasks that do not fit any worker. */
 #define DS_LARGE_TASK_CHECK_INTERVAL 180000000 // 3 minutes in usecs
 
+/* Maximum size of standard output from task.  (If larger, send to a separate file.) */
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
+/* Maximum number of workers to add in a single cycle before dealing with other matters. */
 #define MAX_NEW_WORKERS 10
 
+/* Default scheduling option, can be set prior to creating a manager. */
 int ds_option_scheduler = DS_SCHEDULE_TIME;
 
-/* default timeout for slow workers to come back to the pool */
+/* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
 double ds_option_blocklist_slow_workers_timeout = 900;
 
 static void handle_failure(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, ds_result_code_t fail_type);
@@ -148,8 +152,6 @@ static void aggregate_workers_resources( struct ds_manager *q, struct ds_resourc
 static struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag);
 
 static void release_all_workers( struct ds_manager *q );
-
-
 
 /******************************************************/
 /********** ds_manager internal functions *************/
