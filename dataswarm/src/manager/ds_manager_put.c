@@ -5,6 +5,7 @@
 #include "ds_protocol.h"
 #include "ds_remote_file_info.h"
 #include "ds_internal.h"
+#include "ds_transaction.h"
 
 #include "debug.h"
 #include "timestamp.h"
@@ -404,7 +405,7 @@ static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct d
 		q->stats->bytes_sent += total_bytes;
 
 		// Write to the transaction log.
-		write_transaction_transfer(q, w, t, f, total_bytes, elapsed_time, DS_INPUT);
+		ds_transaction_write_transfer(q, w, t, f, total_bytes, elapsed_time, DS_INPUT);
 
 		// Avoid division by zero below.
 		if(elapsed_time==0) elapsed_time = 1;

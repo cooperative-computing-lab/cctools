@@ -6,6 +6,7 @@
 #include "ds_protocol.h"
 #include "ds_remote_file_info.h"
 #include "ds_internal.h"
+#include "ds_transaction.h"
 
 #include "debug.h"
 #include "timestamp.h"
@@ -271,7 +272,7 @@ ds_result_code_t ds_manager_get_output_file( struct ds_manager *q, struct ds_wor
 
 		debug(D_DS, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 
-        write_transaction_transfer(q, w, t, f, total_bytes, sum_time, DS_OUTPUT);
+		ds_transaction_write_transfer(q, w, t, f, total_bytes, sum_time, DS_OUTPUT);
 	}
 
 	// If we failed to *transfer* the output file, then that is a hard

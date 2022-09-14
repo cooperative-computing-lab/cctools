@@ -155,13 +155,17 @@ struct ds_manager {
 
 /* Internal interfaces to ds_manager.c */
 
+#ifndef SWIG
 __attribute__ (( format(printf,3,4) ))
+#endif
 int ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char *fmt, ... );
 ds_msg_code_t ds_manager_recv_retry( struct ds_manager *q, struct ds_worker_info *w, char *line, int length );
 
 int  ds_manager_transfer_wait_time( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, int64_t length );
+
 void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t);
-void write_transaction_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type);
+const char *task_state_str(ds_task_state_t task_state);
+const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t);
 
 
 /* Internal interfaces to ds_manager_get.c */
