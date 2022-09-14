@@ -168,4 +168,8 @@ ds_result_code_t ds_manager_get_output_file( struct ds_manager *q, struct ds_wor
 ds_result_code_t ds_manager_get_output_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
 ds_result_code_t ds_manager_get_monitor_output_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
 
+/* Internal interfaces to ds_manager_put.c */
+
+ds_result_code_t ds_manager_put_input_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
+
 #endif
