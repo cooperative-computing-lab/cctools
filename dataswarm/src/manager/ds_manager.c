@@ -332,7 +332,7 @@ static void link_to_hash_key(struct link *link, char *key)
  * successfully sent. This timestamp is used to determine when to send keepalive checks.
  */
 __attribute__ (( format(printf,3,4) ))
-static int send_worker_msg( struct ds_manager *q, struct ds_worker_info *w, const char *fmt, ... )
+int ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char *fmt, ... )
 {
 	va_list va;
 	time_t stoptime;
@@ -365,7 +365,7 @@ void ds_broadcast_message(struct ds_manager *q, const char *msg) {
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-		send_worker_msg(q, w, "%s", msg);
+		ds_manager_send(q, w, "%s", msg);
 	}
 }
 
@@ -374,7 +374,7 @@ ds_msg_code_t process_name(struct ds_manager *q, struct ds_worker_info *w, char 
 	debug(D_DS, "Sending project name to worker (%s)", w->addrport);
 
 	//send project name (q->name) if there is one. otherwise send blank line
-	send_worker_msg(q, w, "%s\n", q->name ? q->name : "");
+	ds_manager_send(q, w, "%s\n", q->name ? q->name : "");
 
 	return DS_MSG_PROCESSED;
 }
@@ -510,7 +510,7 @@ int process_transfer_address( struct ds_manager *q, struct ds_worker_info *w, co
  * This function receives a message from worker and records the time a message is successfully
  * received. This timestamp is used in keepalive timeout computations.
  */
-static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker_info *w, char *line, size_t length )
+static ds_msg_code_t ds_manager_recv(struct ds_manager *q, struct ds_worker_info *w, char *line, size_t length )
 {
 	time_t stoptime;
 	stoptime = time(0) + q->short_timeout;
@@ -569,16 +569,16 @@ static ds_msg_code_t recv_worker_msg(struct ds_manager *q, struct ds_worker_info
 
 
 /*
-Call recv_worker_msg and silently retry if the result indicates
+Call ds_manager_recv and silently retry if the result indicates
 an asynchronous update message like 'keepalive' or 'resource'.
 */
 
-ds_msg_code_t recv_worker_msg_retry( struct ds_manager *q, struct ds_worker_info *w, char *line, int length )
+ds_msg_code_t ds_manager_recv_retry( struct ds_manager *q, struct ds_worker_info *w, char *line, int length )
 {
 	ds_msg_code_t result = DS_MSG_PROCESSED;
 
 	do {
-		result = recv_worker_msg(q, w,line,length);
+		result = ds_manager_recv(q, w,line,length);
 	} while(result == DS_MSG_PROCESSED);
 
 	return result;
@@ -952,7 +952,7 @@ static int release_worker(struct ds_manager *q, struct ds_worker_info *w)
 	if(!w) return 0;
 
 
-	send_worker_msg(q,w,"release\n");
+	ds_manager_send(q,w,"release\n");
 
 	remove_worker(q, w, DS_WORKER_DISCONNECT_EXPLICIT);
 
@@ -1017,7 +1017,7 @@ static void add_worker(struct ds_manager *q)
 
 static void delete_worker_file( struct ds_manager *q, struct ds_worker_info *w, const char *filename, int flags, int except_flags ) {
 	if(!(flags & except_flags)) {
-		send_worker_msg(q,w, "unlink %s\n", filename);
+		ds_manager_send(q,w, "unlink %s\n", filename);
 		hash_table_remove(w->current_files, filename);
 	}
 }
@@ -1610,7 +1610,7 @@ static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_wo
 {
 
 	//max_count == -1, tells the worker to send all available results.
-	send_worker_msg(q, w, "send_results %d\n", -1);
+	ds_manager_send(q, w, "send_results %d\n", -1);
 	debug(D_DS, "Reading result(s) from %s (%s)", w->hostname, w->addrport);
 
 	char line[DS_LINE_MAX];
@@ -1620,7 +1620,7 @@ static ds_result_code_t get_available_results(struct ds_manager *q, struct ds_wo
 
 	while(1) {
 		ds_msg_code_t mcode;
-		mcode = recv_worker_msg_retry(q, w, line, sizeof(line));
+		mcode = ds_manager_recv_retry(q, w, line, sizeof(line));
 		if(mcode!=DS_MSG_NOT_PROCESSED) {
 			result = DS_WORKER_FAILURE;
 			break;
@@ -2214,7 +2214,7 @@ static void process_data_index( struct ds_manager *q, struct ds_worker_info *w, 
 	buffer_printf(&buf,"<li> <a href=\"/resources_status\">Resources Status</a>\n");
         buffer_printf(&buf,"</ul>\n");
 
-	send_worker_msg(q,w,buffer_tostring(&buf),buffer_pos(&buf),stoptime);
+	ds_manager_send(q,w,buffer_tostring(&buf),buffer_pos(&buf),stoptime);
 
 	buffer_free(&buf);
 
@@ -2235,15 +2235,15 @@ static ds_msg_code_t process_http_request( struct ds_manager *q, struct ds_worke
 		if(line[0]==0) break;
 	}
 
-	send_worker_msg(q,w,"HTTP/1.1 200 OK\nConnection: close\n");
+	ds_manager_send(q,w,"HTTP/1.1 200 OK\nConnection: close\n");
 	if(!strcmp(path,"/")) {
 	        // Requests to root get a simple human readable index.
-		send_worker_msg(q,w,"Content-type: text/html\n\n");
+		ds_manager_send(q,w,"Content-type: text/html\n\n");
 		process_data_index(q, w, stoptime );
 	} else {
 	        // Other requests get raw JSON data.
-		send_worker_msg(q,w,"Access-Control-Allow-Origin: *\n");
-		send_worker_msg(q,w,"Content-type: text/plain\n\n");
+		ds_manager_send(q,w,"Access-Control-Allow-Origin: *\n");
+		ds_manager_send(q,w,"Content-type: text/plain\n\n");
 		process_queue_status(q, w, &path[1], stoptime );
 	}
 
@@ -2421,7 +2421,7 @@ static ds_result_code_t handle_worker(struct ds_manager *q, struct link *l)
 	w = hash_table_lookup(q->worker_table, key);
 
 	ds_msg_code_t mcode;
-	mcode = recv_worker_msg(q, w, line, sizeof(line));
+	mcode = ds_manager_recv(q, w, line, sizeof(line));
 
 	// We only expect asynchronous status queries and updates here.
 
@@ -2628,10 +2628,10 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_in
 		return result;
 	}
 
-	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid);
+	ds_manager_send(q,w, "task %lld\n",  (long long) t->taskid);
 
 	long long cmd_len = strlen(command_line);
-	send_worker_msg(q,w, "cmd %lld\n", (long long) cmd_len);
+	ds_manager_send(q,w, "cmd %lld\n", (long long) cmd_len);
 	link_putlstring(w->link, command_line, cmd_len, time(0) + q->short_timeout);
 	debug(D_DS, "%s\n", command_line);
 	free(command_line);
@@ -2639,24 +2639,24 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_in
 
 	if(t->coprocess) {
 		cmd_len = strlen(t->coprocess);
-		send_worker_msg(q,w, "coprocess %lld\n", (long long) cmd_len);
+		ds_manager_send(q,w, "coprocess %lld\n", (long long) cmd_len);
 		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + q->short_timeout);
 	}
 
-	send_worker_msg(q,w, "category %s\n", t->category);
+	ds_manager_send(q,w, "category %s\n", t->category);
 
-	send_worker_msg(q,w, "cores %s\n",  rmsummary_resource_to_str("cores", limits->cores, 0));
-	send_worker_msg(q,w, "gpus %s\n",   rmsummary_resource_to_str("gpus", limits->gpus, 0));
-	send_worker_msg(q,w, "memory %s\n", rmsummary_resource_to_str("memory", limits->memory, 0));
-	send_worker_msg(q,w, "disk %s\n",   rmsummary_resource_to_str("disk", limits->disk, 0));
+	ds_manager_send(q,w, "cores %s\n",  rmsummary_resource_to_str("cores", limits->cores, 0));
+	ds_manager_send(q,w, "gpus %s\n",   rmsummary_resource_to_str("gpus", limits->gpus, 0));
+	ds_manager_send(q,w, "memory %s\n", rmsummary_resource_to_str("memory", limits->memory, 0));
+	ds_manager_send(q,w, "disk %s\n",   rmsummary_resource_to_str("disk", limits->disk, 0));
 
 	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
 	if(q->monitor_mode == DS_MON_DISABLED) {
 		if(limits->end > 0) {
-			send_worker_msg(q,w, "end_time %s\n",  rmsummary_resource_to_str("end", limits->end, 0));
+			ds_manager_send(q,w, "end_time %s\n",  rmsummary_resource_to_str("end", limits->end, 0));
 		}
 		if(limits->wall_time > 0) {
-			send_worker_msg(q,w, "wall_time %s\n", rmsummary_resource_to_str("wall_time", limits->wall_time, 0));
+			ds_manager_send(q,w, "wall_time %s\n", rmsummary_resource_to_str("wall_time", limits->wall_time, 0));
 		}
 	}
 
@@ -2669,7 +2669,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_in
 	char *var;
 	list_first_item(t->env_list);
 	while((var=list_next_item(t->env_list))) {
-		send_worker_msg(q, w,"env %zu\n%s\n", strlen(var), var);
+		ds_manager_send(q, w,"env %zu\n%s\n", strlen(var), var);
 	}
 
 	if(t->input_files) {
@@ -2677,11 +2677,11 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_in
 		list_first_item(t->input_files);
 		while((tf = list_next_item(t->input_files))) {
 			if(tf->type == DS_DIRECTORY) {
-				send_worker_msg(q,w, "dir %s\n", tf->remote_name);
+				ds_manager_send(q,w, "dir %s\n", tf->remote_name);
 			} else {
 				char remote_name_encoded[PATH_MAX];
 				url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
-				send_worker_msg(q,w, "infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
+				ds_manager_send(q,w, "infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
 			}
 		}
 	}
@@ -2692,14 +2692,14 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_in
 		while((tf = list_next_item(t->output_files))) {
 			char remote_name_encoded[PATH_MAX];
 			url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
-			send_worker_msg(q,w, "outfile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
+			ds_manager_send(q,w, "outfile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
 		}
 	}
 
-	// send_worker_msg returns the number of bytes sent, or a number less than
+	// ds_manager_send returns the number of bytes sent, or a number less than
 	// zero to indicate errors. We are lazy here, we only check the last
 	// message we sent to the worker (other messages may have failed above).
-	int result_msg = send_worker_msg(q,w,"end\n");
+	int result_msg = ds_manager_send(q,w,"end\n");
 
 	if(result_msg > -1)
 	{
@@ -3322,7 +3322,7 @@ static void ask_for_workers_updates(struct ds_manager *q) {
 			if(w->last_msg_recv_time > w->last_update_msg_time) {
 				int64_t last_update_elapsed_time = (int64_t)(current_time - w->last_update_msg_time)/1000000;
 				if(last_update_elapsed_time >= q->keepalive_interval) {
-					if(send_worker_msg(q,w, "check\n")<0) {
+					if(ds_manager_send(q,w, "check\n")<0) {
 						debug(D_DS, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
 						handle_worker_failure(q, w);
 					} else {
@@ -3449,7 +3449,7 @@ static int shut_down_worker(struct ds_manager *q, struct ds_worker_info *w)
 {
 	if(!w) return 0;
 
-	send_worker_msg(q,w,"exit\n");
+	ds_manager_send(q,w,"exit\n");
 	remove_worker(q, w, DS_WORKER_DISCONNECT_EXPLICIT);
 	q->stats->workers_released++;
 
@@ -3498,7 +3498,7 @@ static int cancel_task_on_worker(struct ds_manager *q, struct ds_task *t, ds_tas
 
 	if (w) {
 		//send message to worker asking to kill its task.
-		send_worker_msg(q,w, "kill %d\n",t->taskid);
+		ds_manager_send(q,w, "kill %d\n",t->taskid);
 		debug(D_DS, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 
 		//Delete any input files that are not to be cached.
@@ -4924,7 +4924,7 @@ struct list * ds_cancel_all_tasks(struct ds_manager *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
 
-		send_worker_msg(q,w,"kill -1\n");
+		ds_manager_send(q,w,"kill -1\n");
 
 		itable_firstkey(w->current_tasks);
 		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
