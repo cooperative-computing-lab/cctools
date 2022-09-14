@@ -161,7 +161,8 @@ __attribute__ (( format(printf,3,4) ))
 int ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char *fmt, ... );
 ds_msg_code_t ds_manager_recv_retry( struct ds_manager *q, struct ds_worker_info *w, char *line, int length );
 
-int  ds_manager_transfer_wait_time( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, int64_t length );
+int ds_manager_transfer_wait_time( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, int64_t length );
+int ds_manager_available_workers(struct ds_manager *q);
 
 const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t);
 

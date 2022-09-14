@@ -12,6 +12,7 @@ SOURCES = \
 	ds_task.c \
 	ds_file.c \
 	ds_transaction.c \
+	ds_perf_log.c \
 	ds_remote_file_info.c \
 	ds_factory_info.c \
 	ds_task_info.c \

@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "ds_task_info.h"
 #include "ds_blocklist.h"
 #include "ds_transaction.h"
+#include "ds_perf_log.h"
 
 #include "cctools.h"
 #include "int_sizes.h"
@@ -185,7 +186,7 @@ static int count_workers(struct ds_manager *q, int type) {
 }
 
 //Returns count of workers that are available to run tasks.
-static int available_workers(struct ds_manager *q) {
+int ds_manager_available_workers(struct ds_manager *q) {
 	struct ds_worker_info *w;
 	char* id;
 	int available_workers = 0;
@@ -218,111 +219,6 @@ static int workers_with_tasks(struct ds_manager *q) {
 	}
 
 	return workers_with_tasks;
-}
-
-static void log_queue_stats(struct ds_manager *q, int force)
-{
-	struct ds_stats s;
-
-	timestamp_t now = timestamp_get();
-	if(!force && (now - q->time_last_log_stats < ONE_SECOND)) {
-		return;
-	}
-
-	ds_get_stats(q, &s);
-	debug(D_DS, "workers connections -- known: %d, connecting: %d, available: %d.",
-			s.workers_connected,
-			s.workers_init,
-			available_workers(q));
-
-	q->time_last_log_stats = now;
-	if(!q->logfile) {
-		return;
-	}
-
-	buffer_t B;
-	buffer_init(&B);
-
-	buffer_printf(&B, "%" PRIu64, timestamp_get());
-
-	/* Stats for the current state of workers: */
-	buffer_printf(&B, " %d", s.workers_connected);
-	buffer_printf(&B, " %d", s.workers_init);
-	buffer_printf(&B, " %d", s.workers_idle);
-	buffer_printf(&B, " %d", s.workers_busy);
-	buffer_printf(&B, " %d", s.workers_able);
-
-	/* Cumulative stats for workers: */
-	buffer_printf(&B, " %d", s.workers_joined);
-	buffer_printf(&B, " %d", s.workers_removed);
-	buffer_printf(&B, " %d", s.workers_released);
-	buffer_printf(&B, " %d", s.workers_idled_out);
-	buffer_printf(&B, " %d", s.workers_blocked);
-	buffer_printf(&B, " %d", s.workers_fast_aborted);
-	buffer_printf(&B, " %d", s.workers_lost);
-
-	/* Stats for the current state of tasks: */
-	buffer_printf(&B, " %d", s.tasks_waiting);
-	buffer_printf(&B, " %d", s.tasks_on_workers);
-	buffer_printf(&B, " %d", s.tasks_running);
-	buffer_printf(&B, " %d", s.tasks_with_results);
-
-	/* Cumulative stats for tasks: */
-	buffer_printf(&B, " %d", s.tasks_submitted);
-	buffer_printf(&B, " %d", s.tasks_dispatched);
-	buffer_printf(&B, " %d", s.tasks_done);
-	buffer_printf(&B, " %d", s.tasks_failed);
-	buffer_printf(&B, " %d", s.tasks_cancelled);
-	buffer_printf(&B, " %d", s.tasks_exhausted_attempts);
-
-	/* Master time statistics: */
-	buffer_printf(&B, " %" PRId64, s.time_send);
-	buffer_printf(&B, " %" PRId64, s.time_receive);
-	buffer_printf(&B, " %" PRId64, s.time_send_good);
-	buffer_printf(&B, " %" PRId64, s.time_receive_good);
-	buffer_printf(&B, " %" PRId64, s.time_status_msgs);
-	buffer_printf(&B, " %" PRId64, s.time_internal);
-	buffer_printf(&B, " %" PRId64, s.time_polling);
-	buffer_printf(&B, " %" PRId64, s.time_application);
-
-	/* Workers time statistics: */
-	buffer_printf(&B, " %" PRId64, s.time_workers_execute);
-	buffer_printf(&B, " %" PRId64, s.time_workers_execute_good);
-	buffer_printf(&B, " %" PRId64, s.time_workers_execute_exhaustion);
-
-	/* BW statistics */
-	buffer_printf(&B, " %" PRId64, s.bytes_sent);
-	buffer_printf(&B, " %" PRId64, s.bytes_received);
-	buffer_printf(&B, " %f", s.bandwidth);
-
-	/* resources statistics */
-	buffer_printf(&B, " %d", s.capacity_tasks);
-	buffer_printf(&B, " %d", s.capacity_cores);
-	buffer_printf(&B, " %d", s.capacity_memory);
-	buffer_printf(&B, " %d", s.capacity_disk);
-	buffer_printf(&B, " %d", s.capacity_instantaneous);
-	buffer_printf(&B, " %d", s.capacity_weighted);
-	buffer_printf(&B, " %f", s.manager_load);
-
-	buffer_printf(&B, " %" PRId64, s.total_cores);
-	buffer_printf(&B, " %" PRId64, s.total_memory);
-	buffer_printf(&B, " %" PRId64, s.total_disk);
-
-	buffer_printf(&B, " %" PRId64, s.committed_cores);
-	buffer_printf(&B, " %" PRId64, s.committed_memory);
-	buffer_printf(&B, " %" PRId64, s.committed_disk);
-
-	buffer_printf(&B, " %" PRId64, s.max_cores);
-	buffer_printf(&B, " %" PRId64, s.max_memory);
-	buffer_printf(&B, " %" PRId64, s.max_disk);
-
-	buffer_printf(&B, " %" PRId64, s.min_cores);
-	buffer_printf(&B, " %" PRId64, s.min_memory);
-	buffer_printf(&B, " %" PRId64, s.min_disk);
-
-	fprintf(q->logfile, "%s\n", buffer_tostring(&B));
-
-	buffer_free(&B);
 }
 
 static void link_to_hash_key(struct link *link, char *key)
@@ -3689,7 +3585,7 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 		}
 	}
 
-	log_queue_stats(q, 1);
+	ds_perf_log_write_update(q, 1);
 
 	q->time_last_wait = timestamp_get();
 
@@ -3878,7 +3774,7 @@ void ds_delete(struct ds_manager *q)
 	if(q) {
 		release_all_workers(q);
 
-		log_queue_stats(q, 1);
+		ds_perf_log_write_update(q, 1);
 
 		if(q->name) {
 			update_catalog(q,1);
@@ -4149,7 +4045,7 @@ static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *
 			break;
 	}
 
-	log_queue_stats(q, 0);
+	ds_perf_log_write_update(q, 0);
 	ds_transaction_write_task(q, t);
 
 	return old_state;
@@ -4678,7 +4574,7 @@ static struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const
 	}
 
 	if(events > 0) {
-		log_queue_stats(q, 1);
+		ds_perf_log_write_update(q, 1);
 	}
 
 	q->time_last_wait = timestamp_get();
@@ -5194,36 +5090,8 @@ int ds_specify_log(struct ds_manager *q, const char *logfile)
 {
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
-		setvbuf(q->logfile, NULL, _IOLBF, 2048); // line buffered, we don't want incomplete lines
-		fprintf(q->logfile,
-				// start with a comment
-				"#"
-			// time:
-			" timestamp"
-			// workers current:
-			" workers_connected workers_init workers_idle workers_busy workers_able"
-			// workers cumulative:
-			" workers_joined workers_removed workers_released workers_idled_out workers_blocked workers_fast_aborted workers_lost"
-			// tasks current:
-			" tasks_waiting tasks_on_workers tasks_running tasks_with_results"
-			// tasks cumulative
-			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts"
-			// manager time statistics:
-			" time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_polling time_application"
-			// workers time statistics:
-			" time_execute time_execute_good time_execute_exhaustion"
-			// bandwidth:
-			" bytes_sent bytes_received bandwidth"
-			// resources:
-			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted manager_load"
-			" total_cores total_memory total_disk"
-			" committed_cores committed_memory committed_disk"
-			" max_cores max_memory max_disk"
-			" min_cores min_memory min_disk"
-			// end with a newline
-			"\n"
-			);
-		log_queue_stats(q, 1);
+		ds_perf_log_write_header(q);
+		ds_perf_log_write_update(q,1);
 		debug(D_DS, "log enabled and is being written to %s\n", logfile);
 		return 1;
 	} else {
