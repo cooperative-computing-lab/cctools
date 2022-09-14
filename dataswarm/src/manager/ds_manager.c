@@ -350,19 +350,6 @@ int ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char 
 	return result;
 }
 
-void ds_broadcast_message(struct ds_manager *q, const char *msg) {
-	if(!q)
-		return;
-
-	struct ds_worker_info *w;
-	char* id;
-
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-		ds_manager_send(q, w, "%s", msg);
-	}
-}
-
 ds_msg_code_t process_name(struct ds_manager *q, struct ds_worker_info *w, char *line)
 {
 	debug(D_DS, "Sending project name to worker (%s)", w->addrport);

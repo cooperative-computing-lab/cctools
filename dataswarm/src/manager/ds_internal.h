@@ -40,9 +40,6 @@ void release_all_workers(struct ds_manager *q);
 
 void update_catalog(struct ds_manager *q, int force_update );
 
-/** Send msg to all the workers in the queue. **/
-void ds_broadcast_message(struct ds_manager *q, const char *msg);
-
 /* shortcut to set cores, memory, disk, etc. from a single function. */
 void ds_task_specify_resources(struct ds_task *t, const struct rmsummary *rm);
 
