@@ -147,6 +147,10 @@ static void aggregate_workers_resources( struct ds_manager *q, struct ds_resourc
 
 static struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const char *tag);
 
+static void release_all_workers( struct ds_manager *q );
+
+
+
 /******************************************************/
 /********** ds_manager internal functions *************/
 /******************************************************/
@@ -353,7 +357,7 @@ int ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char 
 	return result;
 }
 
-ds_msg_code_t process_name(struct ds_manager *q, struct ds_worker_info *w, char *line)
+static ds_msg_code_t process_name(struct ds_manager *q, struct ds_worker_info *w, char *line)
 {
 	debug(D_DS, "Sending project name to worker (%s)", w->addrport);
 
@@ -363,7 +367,7 @@ ds_msg_code_t process_name(struct ds_manager *q, struct ds_worker_info *w, char 
 	return DS_MSG_PROCESSED;
 }
 
-ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker_info *w, char *line)
+static ds_msg_code_t process_info(struct ds_manager *q, struct ds_worker_info *w, char *line)
 {
 	char field[DS_LINE_MAX];
 	char value[DS_LINE_MAX];
@@ -423,7 +427,7 @@ remote transfer or command was successful, and know we know the size
 of the file for the purposes of cache storage management.
 */
 
-int process_cache_update( struct ds_manager *q, struct ds_worker_info *w, const char *line )
+static int process_cache_update( struct ds_manager *q, struct ds_worker_info *w, const char *line )
 {
 	char cachename[DS_LINE_MAX];
 	long long size;
@@ -450,7 +454,7 @@ We should expect to soon receive some failed tasks that were unable
 set up their own input sandboxes.
 */
 
-int process_cache_invalid( struct ds_manager *q, struct ds_worker_info *w, const char *line )
+static int process_cache_invalid( struct ds_manager *q, struct ds_worker_info *w, const char *line )
 {
 	char cachename[DS_LINE_MAX];
 	int length;
@@ -480,7 +484,7 @@ A transfer-address message indicates that the worker is listening
 on its own port to receive get requests from other workers.
 */
 
-int process_transfer_address( struct ds_manager *q, struct ds_worker_info *w, const char *line )
+static int process_transfer_address( struct ds_manager *q, struct ds_worker_info *w, const char *line )
 {
 	if(sscanf(line,"transfer-address %s %d",w->transfer_addr,&w->transfer_port)) {
 		w->transfer_port_active = 1;
@@ -690,7 +694,7 @@ static void update_factory(struct ds_manager *q, struct jx *j)
 	}
 }
 
-void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
+static void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 	struct catalog_query *cq;
 	struct jx *jexpr = NULL;
 	struct jx *j;
@@ -741,7 +745,7 @@ void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 	list_delete(outdated_factories);
 }
 
-void update_write_catalog(struct ds_manager *q )
+static void update_write_catalog(struct ds_manager *q )
 {
 	// Only write if we have a name.
 	if (!q->name) return; 
@@ -767,7 +771,7 @@ void update_write_catalog(struct ds_manager *q )
 	jx_delete(j);
 }
 
-void update_read_catalog(struct ds_manager *q)
+static void update_read_catalog(struct ds_manager *q)
 {
 	time_t stoptime = time(0) + 5; // Short timeout for query
 
@@ -776,7 +780,7 @@ void update_read_catalog(struct ds_manager *q)
 	}
 }
 
-void update_catalog(struct ds_manager *q, int force_update )
+static void update_catalog(struct ds_manager *q, int force_update )
 {
 	// Only update every last_update_time seconds.
 	if(!force_update && (time(0) - q->catalog_last_update_time) < DS_UPDATE_INTERVAL)
@@ -1029,7 +1033,7 @@ static void delete_uncacheable_files( struct ds_manager *q, struct ds_worker_inf
 	delete_worker_files(q, w, t->output_files, DS_CACHE );
 }
 
-char *monitor_file_name(struct ds_manager *q, struct ds_task *t, const char *ext) {
+static char *monitor_file_name(struct ds_manager *q, struct ds_task *t, const char *ext) {
 	char *dir;
 	
 	if(t->monitor_output_directory) {
@@ -1044,7 +1048,7 @@ char *monitor_file_name(struct ds_manager *q, struct ds_task *t, const char *ext
 			dir, getpid(), t->taskid, ext ? ext : "");
 }
 
-void read_measured_resources(struct ds_manager *q, struct ds_task *t) {
+static void read_measured_resources(struct ds_manager *q, struct ds_task *t) {
 
 	char *summary = monitor_file_name(q, t, ".summary");
 
@@ -1122,7 +1126,7 @@ void resource_monitor_append_report(struct ds_manager *q, struct ds_task *t)
 	free(summary);
 }
 
-void resource_monitor_compress_logs(struct ds_manager *q, struct ds_task *t) {
+static void resource_monitor_compress_logs(struct ds_manager *q, struct ds_task *t) {
 	char *series    = monitor_file_name(q, t, ".series");
 	char *debug_log = monitor_file_name(q, t, ".debug");
 
@@ -1720,7 +1724,7 @@ static int count_workers_for_waiting_tasks(struct ds_manager *q, const struct rm
 sent to the catalog.
 */
 
-void category_jx_insert_max(struct jx *j, struct category *c, const char *field, const struct rmsummary *largest) {
+static void category_jx_insert_max(struct jx *j, struct category *c, const char *field, const struct rmsummary *largest) {
 
 	double l = rmsummary_get(largest, field);
 	double m = -1;
@@ -2072,9 +2076,7 @@ static struct jx * queue_lean_to_jx( struct ds_manager *q )
 	return j;
 }
 
-
-
-void current_tasks_to_jx( struct jx *j, struct ds_worker_info *w )
+static void current_tasks_to_jx( struct jx *j, struct ds_worker_info *w )
 {
 	struct ds_task *t;
 	uint64_t taskid;
@@ -2093,7 +2095,7 @@ void current_tasks_to_jx( struct jx *j, struct ds_worker_info *w )
 	}
 }
 
-struct jx * worker_to_jx( struct ds_manager *q, struct ds_worker_info *w )
+static struct jx * worker_to_jx( struct ds_manager *q, struct ds_worker_info *w )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
@@ -2141,7 +2143,7 @@ static void priority_add_to_jx(struct jx *j, double priority)
 }
 
 
-struct jx * task_to_jx( struct ds_manager *q, struct ds_task *t, const char *state, const char *host )
+static struct jx * task_to_jx( struct ds_manager *q, struct ds_task *t, const char *state, const char *host )
 {
 	struct jx *j = jx_object(0);
 
@@ -2696,7 +2698,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_in
 	}
 }
 
-void compute_manager_load(struct ds_manager *q, int task_activity) {
+static void compute_manager_load(struct ds_manager *q, int task_activity) {
 
 	double alpha = 0.05;
 
@@ -3873,15 +3875,7 @@ int ds_specify_password_file( struct ds_manager *q, const char *file )
 void ds_delete(struct ds_manager *q)
 {
 	if(q) {
-		struct ds_worker_info *w;
-		char *key;
-
-		hash_table_firstkey(q->worker_table);
-		while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-			release_worker(q, w);
-			hash_table_firstkey(q->worker_table);
-		}
-
+		release_all_workers(q);
 
 		log_queue_stats(q, 1);
 
@@ -3904,6 +3898,7 @@ void ds_delete(struct ds_manager *q)
 
 		itable_delete(q->worker_task_map);
 
+		char *key;
 		struct category *c;
 		hash_table_firstkey(q->categories);
 		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
@@ -3961,7 +3956,7 @@ void ds_delete(struct ds_manager *q)
 	}
 }
 
-void update_resource_report(struct ds_manager *q) {
+static void update_resource_report(struct ds_manager *q) {
 	// Only measure every few seconds.
 	if((time(0) - q->resources_last_update_time) < DS_RESOURCE_MEASUREMENT_INTERVAL)
 		return;
@@ -4095,7 +4090,7 @@ static double ds_task_priority(void *item) {
 
 /* Put a given task on the ready list, taking into account the task priority and the queue schedule. */
 
-void push_task_to_ready_list( struct ds_manager *q, struct ds_task *t )
+static void push_task_to_ready_list( struct ds_manager *q, struct ds_task *t )
 {
 	int by_priority = 1;
 
@@ -4331,7 +4326,7 @@ static int task_request_count( struct ds_manager *q, const char *category, categ
 	return count;
 }
 
-int ds_submit_internal(struct ds_manager *q, struct ds_task *t)
+static int ds_submit_internal(struct ds_manager *q, struct ds_task *t)
 {
 	itable_insert(q->tasks, t->taskid, t);
 
@@ -4927,7 +4922,7 @@ struct list * ds_cancel_all_tasks(struct ds_manager *q) {
 	return l;
 }
 
-void release_all_workers(struct ds_manager *q) {
+static void release_all_workers(struct ds_manager *q) {
 	struct ds_worker_info *w;
 	char *key;
 
@@ -5465,7 +5460,8 @@ int ds_specify_min_taskid(struct ds_manager *q, int minid) {
 
 //the functions below are used by qsort in order to sort the workers summary data
 size_t sort_ds_worker_summary_offset = 0;
-int sort_ds_worker_cmp(const void *a, const void *b)
+
+static int sort_ds_worker_cmp(const void *a, const void *b)
 {
 	const struct rmsummary *x = *((const struct rmsummary **) a);
 	const struct rmsummary *y = *((const struct rmsummary **) b);
