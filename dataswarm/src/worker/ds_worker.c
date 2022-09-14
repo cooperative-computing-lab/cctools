@@ -6,7 +6,6 @@ See the file COPYING for details.
 
 #include "ds_manager.h"
 #include "ds_protocol.h"
-#include "ds_internal.h"
 #include "ds_resources.h"
 #include "ds_process.h"
 #include "ds_catalog.h"
