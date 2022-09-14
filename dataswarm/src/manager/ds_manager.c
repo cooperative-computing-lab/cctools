@@ -85,6 +85,9 @@ See the file COPYING for details.
 /* Maximum number of workers to add in a single cycle before dealing with other matters. */
 #define MAX_NEW_WORKERS 10
 
+/* How frequently to check for tasks that do not fit any worker. */
+#define DS_LARGE_TASK_CHECK_INTERVAL 180000000 // 3 minutes in usecs
+
 /* Default scheduling option, can be set prior to creating a manager. */
 int ds_option_scheduler = DS_SCHEDULE_TIME;
 
@@ -4127,7 +4130,11 @@ static struct ds_task *ds_wait_internal(struct ds_manager *q, int timeout, const
 			}
 		}
 
-		ds_schedule_check_for_large_tasks(q);
+		timestamp_t current_time = timestamp_get();
+		if(current_time - q->time_last_large_tasks_check >= DS_LARGE_TASK_CHECK_INTERVAL) {
+			q->time_last_large_tasks_check = current_time;
+			ds_schedule_check_for_large_tasks(q);
+		}
 
 		// if we got here, no events were triggered.
 		// we set the busy_waiting flag so that link_poll waits for some time
