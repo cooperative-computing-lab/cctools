@@ -111,7 +111,7 @@ static void push_task_to_ready_list( struct ds_manager *q, struct ds_task *t );
 /* returns old state */
 static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state);
 
-const char *task_state_str(ds_task_state_t state);
+const char *ds_task_state_string(ds_task_state_t state);
 
 /* 1, 0 whether t is in state */
 static int task_state_is( struct ds_manager *q, uint64_t taskid, ds_task_state_t state);
@@ -2262,7 +2262,7 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 			w = itable_lookup(q->worker_task_map, taskid);
 			ds_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, taskid);
 			if(w) {
-				j = task_to_jx(q,t,task_state_str(state),w->hostname);
+				j = task_to_jx(q,t,ds_task_state_string(state),w->hostname);
 				if(j) {
 					// Include detailed information on where the task is running:
 					// address and port, workspace
@@ -2277,7 +2277,7 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 					jx_array_insert(a, j);
 				}
 			} else {
-				j = task_to_jx(q,t,task_state_str(state),0);
+				j = task_to_jx(q,t,ds_task_state_string(state),0);
 				if(j) {
 					jx_array_insert(a, j);
 				}
@@ -4132,7 +4132,7 @@ static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *
 	}
 
 	// insert to corresponding table
-	debug(D_DS, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
+	debug(D_DS, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, ds_task_state_string(old_state), old_state, ds_task_state_string(new_state), new_state);
 
 	switch(new_state) {
 		case DS_TASK_READY:
@@ -4153,38 +4153,6 @@ static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *
 	ds_transaction_write_task(q, t);
 
 	return old_state;
-}
-
-const char *task_state_str(ds_task_state_t task_state)
-{
-	const char *str;
-
-	switch(task_state) {
-		case DS_TASK_READY:
-			str = "WAITING";
-			break;
-		case DS_TASK_RUNNING:
-			str = "RUNNING";
-			break;
-		case DS_TASK_WAITING_RETRIEVAL:
-			str = "WAITING_RETRIEVAL";
-			break;
-		case DS_TASK_RETRIEVED:
-			str = "RETRIEVED";
-			break;
-		case DS_TASK_DONE:
-			str = "DONE";
-			break;
-		case DS_TASK_CANCELED:
-			str = "CANCELED";
-			break;
-		case DS_TASK_UNKNOWN:
-		default:
-			str = "UNKNOWN";
-			break;
-	}
-
-	return str;
 }
 
 static int task_in_terminal_state(struct ds_manager *q, struct ds_task *t) {

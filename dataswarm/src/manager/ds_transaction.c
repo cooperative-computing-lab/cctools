@@ -55,7 +55,7 @@ void ds_transaction_write_task(struct ds_manager *q, struct ds_task *t)
 
 	ds_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 
-	buffer_printf(&B, "TASK %d %s", t->taskid, task_state_str(state));
+	buffer_printf(&B, "TASK %d %s", t->taskid, ds_task_state_string(state));
 
 	if(state == DS_TASK_UNKNOWN) {
 			/* do not add any info */

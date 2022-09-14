@@ -826,3 +826,35 @@ int64_t ds_task_get_metric( struct ds_task *t, const char *name )
 	METRIC(bytes_transferred);
 	return 0;
 }
+
+const char *ds_task_state_string( ds_task_state_t task_state )
+{
+	const char *str;
+
+	switch(task_state) {
+		case DS_TASK_READY:
+			str = "WAITING";
+			break;
+		case DS_TASK_RUNNING:
+			str = "RUNNING";
+			break;
+		case DS_TASK_WAITING_RETRIEVAL:
+			str = "WAITING_RETRIEVAL";
+			break;
+		case DS_TASK_RETRIEVED:
+			str = "RETRIEVED";
+			break;
+		case DS_TASK_DONE:
+			str = "DONE";
+			break;
+		case DS_TASK_CANCELED:
+			str = "CANCELED";
+			break;
+		case DS_TASK_UNKNOWN:
+		default:
+			str = "UNKNOWN";
+			break;
+	}
+
+	return str;
+}
