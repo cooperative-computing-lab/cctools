@@ -1842,17 +1842,13 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 	time_t stoptime;
 
 	//Format: task completion status, exit status (exit code or signal), output length, execution time, taskid
-	char items[5][DS_PROTOCOL_FIELD_MAX];
-	int n = sscanf(line, "result %s %s %s %s %" SCNd64"", items[0], items[1], items[2], items[3], &taskid);
+
+	int n = sscanf(line, "result %d %d %"SCNd64 "%"SCNd64" %" SCNd64"", &task_status, &exit_status, &output_length, &execution_time, &taskid);
 
 	if(n < 5) {
 		debug(D_DS, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return DS_WORKER_FAILURE;
 	}
-
-	task_status = atoi(items[0]);
-	exit_status   = atoi(items[1]);
-	output_length = atoll(items[2]);
 
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
@@ -1874,7 +1870,6 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 
 	observed_execution_time = timestamp_get() - t->time_when_commit_end;
 
-	execution_time = atoll(items[3]);
 	t->time_workers_execute_last = observed_execution_time > execution_time ? execution_time : observed_execution_time;
 
 	t->time_workers_execute_all += t->time_workers_execute_last;
