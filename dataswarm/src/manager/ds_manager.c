@@ -1253,10 +1253,10 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker_
 
 	timestamp_t open_time = timestamp_get();
 
-	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, f->cached_name, f->payload);
+	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, f->cached_name, f->source);
 	send_worker_msg(q,w, "get %s\n",f->cached_name);
 
-	result = get_any(q, w, t, 0, f->payload, &total_bytes);
+	result = get_any(q, w, t, 0, f->source, &total_bytes);
 
 	timestamp_t close_time = timestamp_get();
 	timestamp_t sum_time = close_time - open_time;
@@ -1281,7 +1281,7 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker_
 	// But if we failed to *store* the file, that is a manager failure.
 
 	if(result!=DS_SUCCESS) {
-		debug(D_DS, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, f->cached_name, f->payload );
+		debug(D_DS, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, f->cached_name, f->source );
 
 		if(result == DS_APP_FAILURE) {
 			update_task_result(t, DS_RESULT_OUTPUT_MISSING);
@@ -1293,11 +1293,11 @@ static ds_result_code_t get_output_file( struct ds_manager *q, struct ds_worker_
 	// If the transfer was successful, make a record of it in the cache.
 	if(result == DS_SUCCESS && f->flags & DS_CACHE) {
 		struct stat local_info;
-		if (stat(f->payload,&local_info) == 0) {
+		if (stat(f->source,&local_info) == 0) {
 			struct ds_remote_file_info *remote_info = ds_remote_file_info_create(f->type,local_info.st_size,local_info.st_mtime);
 			hash_table_insert(w->current_files, f->cached_name, remote_info);
 		} else {
-			debug(D_NOTICE, "Cannot stat file %s: %s", f->payload, strerror(errno));
+			debug(D_NOTICE, "Cannot stat file %s: %s", f->source, strerror(errno));
 		}
 	}
 
@@ -1789,7 +1789,7 @@ static ds_result_code_t get_update( struct ds_manager *q, struct ds_worker_info 
 	list_first_item(t->output_files);
 	while((f=list_next_item(t->output_files))) {
 		if(!strcmp(path,f->remote_name)) {
-			local_name = f->payload;
+			local_name = f->source;
 			break;
 		}
 	}
@@ -3099,7 +3099,7 @@ static ds_result_code_t send_item_if_not_cached( struct ds_manager *q, struct ds
  *	for any of the environment variables, it will return the input string
  *	as is.
  * 	*/
-static char *expand_envnames(struct ds_worker_info *w, const char *payload)
+static char *expand_envnames(struct ds_worker_info *w, const char *source)
 {
 	char *expanded_name;
 	char *str, *curr_pos;
@@ -3107,13 +3107,13 @@ static char *expand_envnames(struct ds_worker_info *w, const char *payload)
 	char *token;
 
 	// Shortcut: If no dollars anywhere, duplicate the whole string.
-	if(!strchr(payload,'$')) return strdup(payload);
+	if(!strchr(source,'$')) return strdup(source);
 
-	str = xxstrdup(payload);
+	str = xxstrdup(source);
 
-	expanded_name = (char *) malloc(strlen(payload) + (50 * sizeof(char)));
+	expanded_name = (char *) malloc(strlen(source) + (50 * sizeof(char)));
 	if(expanded_name == NULL) {
-		debug(D_NOTICE, "Cannot allocate memory for filename %s.\n", payload);
+		debug(D_NOTICE, "Cannot allocate memory for filename %s.\n", source);
 		return NULL;
 	} else {
 		//Initialize to null byte so it works correctly with strcat.
@@ -3156,7 +3156,7 @@ static char *expand_envnames(struct ds_worker_info *w, const char *payload)
 
 	free(str);
 
-	debug(D_DS, "File name %s expanded to %s for %s (%s).", payload, expanded_name, w->hostname, w->addrport);
+	debug(D_DS, "File name %s expanded to %s for %s (%s).", source, expanded_name, w->hostname, w->addrport);
 
 	return expanded_name;
 }
@@ -3175,7 +3175,7 @@ static ds_result_code_t send_special_if_not_cached( struct ds_manager *q, struct
 	char source_encoded[DS_LINE_MAX];
 	char cached_name_encoded[DS_LINE_MAX];
 
-	url_encode(tf->payload,source_encoded,sizeof(source_encoded));
+	url_encode(tf->source,source_encoded,sizeof(source_encoded));
 	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
 
 	send_worker_msg(q,w,"%s %s %s %d %o\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777);
@@ -3203,7 +3203,7 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker_i
 		debug(D_DS, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, f->length);
 		send_worker_msg(q,w, "file %s %d %o\n",f->cached_name, f->length, 0777 );
-		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
+		actual = link_putlstring(w->link, f->source, f->length, stoptime);
 		if(actual!=f->length) {
 			result = DS_WORKER_FAILURE;
 		}
@@ -3211,12 +3211,12 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker_i
 		break;
 
 	case DS_REMOTECMD:
-		debug(D_DS, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->payload);
+		debug(D_DS, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->source);
 		result = send_special_if_not_cached(q,w,t,f,"putcmd");
 		break;
 
 	case DS_URL:
-		debug(D_DS, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->payload);
+		debug(D_DS, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->source);
 		result = send_special_if_not_cached(q,w,t,f,"puturl");
 		break;
 
@@ -3227,10 +3227,10 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker_i
 
 	case DS_FILE:
 	case DS_FILE_PIECE: {
-		char *expanded_payload = expand_envnames(w, f->payload);
-		if(expanded_payload) {
-			result = send_item_if_not_cached(q,w,t,f,expanded_payload,&total_bytes);
-			free(expanded_payload);
+		char *expanded_source = expand_envnames(w, f->source);
+		if(expanded_source) {
+			result = send_item_if_not_cached(q,w,t,f,expanded_source,&total_bytes);
+			free(expanded_source);
 		} else {
 			result = DS_APP_FAILURE; //signal app-level failure.
 		}
@@ -3270,7 +3270,7 @@ static ds_result_code_t send_input_file(struct ds_manager *q, struct ds_worker_i
 		debug(D_DS, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
 			w->hostname,
 			w->addrport,
-			f->type == DS_BUFFER ? "literal data" : f->payload,
+			f->type == DS_BUFFER ? "literal data" : f->source,
 			total_bytes);
 
 		if(result == DS_APP_FAILURE) {
@@ -3292,18 +3292,18 @@ static ds_result_code_t send_input_files( struct ds_manager *q, struct ds_worker
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
 			if(f->type == DS_FILE || f->type == DS_FILE_PIECE) {
-				char * expanded_payload = expand_envnames(w, f->payload);
-				if(!expanded_payload) {
+				char * expanded_source = expand_envnames(w, f->source);
+				if(!expanded_source) {
 					update_task_result(t, DS_RESULT_INPUT_MISSING);
 					return DS_APP_FAILURE;
 				}
-				if(stat(expanded_payload, &s) != 0) {
-					debug(D_DS,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
-					free(expanded_payload);
+				if(stat(expanded_source, &s) != 0) {
+					debug(D_DS,"Could not stat %s: %s\n", expanded_source, strerror(errno));
+					free(expanded_source);
 					update_task_result(t, DS_RESULT_INPUT_MISSING);
 					return DS_APP_FAILURE;
 				}
-				free(expanded_payload);
+				free(expanded_source);
 			}
 		}
 	}

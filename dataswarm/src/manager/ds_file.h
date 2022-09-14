@@ -12,14 +12,14 @@ See the file COPYING for details.
 #include <sys/types.h>
 
 struct ds_file {
-	ds_file_t type;
-	ds_file_flags_t flags;	// DS_CACHE or others in the future.
-	int length;		// length of payload, only used for non-file objects like buffers and urls
-	off_t offset;		// file offset for DS_FILE_PIECE
-	off_t piece_length;	// file piece length for DS_FILE_PIECE
-	char *payload;		// name on master machine or buffer of data.
-	char *remote_name;	// name on remote machine.
-	char *cached_name;	// name on remote machine in cached directory.
+	ds_file_t type;         // Type of data source: DS_FILE, DS_BUFFER, DS_URL, etc.
+	ds_file_flags_t flags;	// Special handling: DS_CACHE for caching, DS_WATCH for watching, etc.
+	int length;		// Length of source data, if known.
+	off_t offset;		// File offset for DS_FILE_PIECE
+	off_t piece_length;	// File piece length for DS_FILE_PIECE
+	char *source;		// Name of source file, url, or literal data if a DS_BUFFER.
+	char *remote_name;	// Name of file as it appears to the task.
+	char *cached_name;	// Name of file in the worker's cache directory.
 };
 
 struct ds_file * ds_file_create( const char *source, const char *remote_name, ds_file_t type, ds_file_flags_t flags );
