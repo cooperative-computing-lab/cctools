@@ -761,54 +761,55 @@ int ds_task_update_result(struct ds_task *t, ds_result_t new_result)
 
 void ds_task_delete(struct ds_task *t)
 {
-	struct ds_file *tf;
-	if(t) {
+	struct ds_file *f;
 
-		free(t->command_line);
-		free(t->coprocess);
-		free(t->tag);
-		free(t->category);
-		free(t->output);
+	if(!t) return;
 
-		if(t->input_files) {
-			while((tf = list_pop_tail(t->input_files))) {
-				ds_file_delete(tf);
-			}
-			list_delete(t->input_files);
+	free(t->command_line);
+	free(t->coprocess);
+	free(t->tag);
+	free(t->category);
+
+	if(t->input_files) {
+		while((f = list_pop_tail(t->input_files))) {
+			ds_file_delete(f);
 		}
-		if(t->output_files) {
-			while((tf = list_pop_tail(t->output_files))) {
-				ds_file_delete(tf);
-			}
-			list_delete(t->output_files);
-		}
-		if(t->env_list) {
-			char *var;
-			while((var=list_pop_tail(t->env_list))) {
-				free(var);
-			}
-			list_delete(t->env_list);
-		}
-
-		if(t->feature_list) {
-			char *feature;
-			while((feature=list_pop_tail(t->feature_list))) {
-				free(feature);
-			}
-			list_delete(t->feature_list);
-		}
-
-		free(t->hostname);
-		free(t->addrport);
-
-		rmsummary_delete(t->resources_requested);
-		rmsummary_delete(t->resources_measured);
-		rmsummary_delete(t->resources_allocated);
-
-		free(t->monitor_output_directory);
-		free(t->monitor_snapshot_file);
-		free(t);
+		list_delete(t->input_files);
 	}
+	if(t->output_files) {
+		while((f = list_pop_tail(t->output_files))) {
+			ds_file_delete(f);
+		}
+		list_delete(t->output_files);
+	}
+	if(t->env_list) {
+		char *var;
+		while((var=list_pop_tail(t->env_list))) {
+			free(var);
+		}
+		list_delete(t->env_list);
+	}
+
+	if(t->feature_list) {
+		char *feature;
+		while((feature=list_pop_tail(t->feature_list))) {
+			free(feature);
+		}
+		list_delete(t->feature_list);
+	}
+
+	free(t->output);
+	free(t->addrport);
+	free(t->hostname);
+
+	rmsummary_delete(t->resources_requested);
+	rmsummary_delete(t->resources_measured);
+	rmsummary_delete(t->resources_allocated);
+
+	free(t->monitor_output_directory);
+	free(t->monitor_snapshot_file);
+
+	free(t);
 }
 
 const char * ds_task_get_command( struct ds_task *t )
