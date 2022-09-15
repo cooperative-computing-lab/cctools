@@ -646,18 +646,19 @@ class Task(object):
     # >>> print(t.host)
     # @endcode
     @property
-    def hostport(self):
-        return ds_task_get_hostport(self._task)
+    def addrport(self):
+        return ds_task_get_addrport(self._task)
 
     ##
-    # Get the name of the host on which the task ran.
+    # Get the address and port of the host on which the task ran.
     # Must be called only after the task completes execution.
+    #
     # @code
-    # >>> print(t.hostname)
+    # >>> print(t.host)
     # @endcode
     @property
     def hostname(self):
-        return hostport(self).split(":")[0]
+        return ds_task_get_hostname(self._task)
 
     ##
     # Get the resources measured for the task execution if resource monitoring is enabled.

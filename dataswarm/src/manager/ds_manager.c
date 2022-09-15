@@ -2769,7 +2769,7 @@ assignment and the new task state.
 static void commit_task_to_worker(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t)
 {
 	t->hostname = xxstrdup(w->hostname);
-	t->host = xxstrdup(w->addrport);
+	t->addrport = xxstrdup(w->addrport);
 
 	t->time_when_commit_start = timestamp_get();
 	ds_result_code_t result = start_one_task(q, w, t);

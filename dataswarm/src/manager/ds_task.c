@@ -76,8 +76,8 @@ void ds_task_clean( struct ds_task *t, int full_clean )
 	free(t->hostname);
 	t->hostname = NULL;
 
-	free(t->host);
-	t->host = NULL;
+	free(t->addrport);
+	t->addrport = NULL;
 
 	if(full_clean) {
 		t->resource_request = CATEGORY_ALLOCATION_FIRST;
@@ -807,7 +807,7 @@ void ds_task_delete(struct ds_task *t)
 		}
 
 		free(t->hostname);
-		free(t->host);
+		free(t->addrport);
 
 		rmsummary_delete(t->resources_requested);
 		rmsummary_delete(t->resources_measured);
@@ -847,6 +847,16 @@ int ds_task_get_exit_code( struct ds_task *t )
 ds_result_t ds_task_get_result( struct ds_task *t )
 {
 	return t->result;
+}
+
+const char * ds_task_get_addrport( struct ds_task *t )
+{
+	return t->addrport;
+}
+
+const char * ds_task_get_hostname( struct ds_task *t )
+{
+	return t->hostname;
 }
 
 #define METRIC(x) if(!strcmp(name,#x)) return t->x;

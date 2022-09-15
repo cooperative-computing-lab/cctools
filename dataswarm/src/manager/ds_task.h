@@ -56,7 +56,7 @@ struct ds_task {
 	ds_result_t result;          /**< The result of the task (see @ref ds_result_t */
 	int exit_code;               /**< The exit code of the command line. */
 	char *output;                /**< The standard output of the task. */
-	char *host;                  /**< The address and port of the host on which it ran. */
+	char *addrport;              /**< The address and port of the host on which it ran. */
 	char *hostname;              /**< The name of the host on which it ran. */
 
 	/***** Metrics available to the user at completion through ds_task_get_metric.  *****/
