@@ -47,6 +47,8 @@ void ds_worker_delete( struct ds_worker_info *w )
 
 	ds_resources_delete(w->resources);
 	free(w->workerid);
+	if(w->addrport) free(w->addrport);
+	if(w->hashkey) free(w->hashkey);
 
 	if(w->features)
 		hash_table_delete(w->features);

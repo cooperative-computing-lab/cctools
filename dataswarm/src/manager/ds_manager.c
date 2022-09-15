@@ -204,9 +204,9 @@ static int workers_with_tasks(struct ds_manager *q) {
 
 /* Convert a link pointer into a string that can be used as a key into a hash table. */
 
-static void link_to_hash_key(struct link *link, char *key)
+static char * link_to_hash_key(struct link *link )
 {
-	sprintf(key, "0x%p", link);
+	return string_format("0x%p",link);
 }
 
 /*
@@ -874,8 +874,8 @@ static void add_worker(struct ds_manager *q)
 		return;
 	}
 
-	link_to_hash_key(link, w->hashkey);
-	sprintf(w->addrport, "%s:%d", addr, port);
+	w->hashkey = link_to_hash_key(link);
+	w->addrport = string_format("%s:%d",addr,port);
 
 	hash_table_insert(q->worker_table, w->hashkey, w);
 }
@@ -2358,11 +2358,11 @@ messages available.
 static ds_result_code_t handle_worker(struct ds_manager *q, struct link *l)
 {
 	char line[DS_LINE_MAX];
-	char key[DS_LINE_MAX];
 	struct ds_worker_info *w;
 
-	link_to_hash_key(l, key);
+	char *key = link_to_hash_key(l);
 	w = hash_table_lookup(q->worker_table, key);
+	free(key);
 
 	ds_msg_code_t mcode;
 	mcode = ds_manager_recv(q, w, line, sizeof(line));
