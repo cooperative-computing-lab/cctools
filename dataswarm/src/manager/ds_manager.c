@@ -1478,7 +1478,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
 
 			//overwrite the last few bytes of buffer to signal truncated stdout.
-			char *truncate_msg = string_format("\n>>>>>> WORK QUEUE HAS TRUNCATED THE STDOUT AFTER THIS POINT.\n>>>>>> MAXIMUM OF %d BYTES REACHED, %" PRId64 " BYTES TRUNCATED.", MAX_TASK_STDOUT_STORAGE, output_length - retrieved_output_length);
+			char *truncate_msg = string_format("\n>>>>>> STDOUT TRUNCATED AFTER THIS POINT.\n>>>>>> MAXIMUM OF %d BYTES REACHED, %" PRId64 " BYTES TRUNCATED.", MAX_TASK_STDOUT_STORAGE, output_length - retrieved_output_length);
 			memcpy(t->output + MAX_TASK_STDOUT_STORAGE - strlen(truncate_msg) - 1, truncate_msg, strlen(truncate_msg));
 			*(t->output + MAX_TASK_STDOUT_STORAGE - 1) = '\0';
 			free(truncate_msg);
@@ -1502,7 +1502,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 
 	w->finished_tasks++;
 
-	// Convert resource_monitor status into work queue status if needed.
+	// Convert resource_monitor status into dataswarm status if needed.
 	if(q->monitor_mode) {
 		if(t->exit_code == RM_OVERFLOW) {
 			ds_task_update_result(t, DS_RESULT_RESOURCE_EXHAUSTION);
@@ -3193,7 +3193,7 @@ void ds_invalidate_cached_file(struct ds_manager *q, const char *local_name, ds_
 }
 
 /******************************************************/
-/********** work_queue public functions **********/
+/************* dataswarm public functions *************/
 /******************************************************/
 
 struct ds_manager *ds_create(int port) {
@@ -3993,7 +3993,7 @@ static void print_password_warning( struct ds_manager *q )
 	}
 
 	if(!q->password && q->name) {
-		fprintf(stderr,"warning: this work queue manager is visible to the public.\n");
+		fprintf(stderr,"warning: this dataswarm manager is visible to the public.\n");
 		fprintf(stderr,"warning: you should set a password with the --password option.\n");
 	}
 
