@@ -85,6 +85,8 @@ char *make_cached_name( const struct ds_file *f )
 	}
 }
 
+/* Create a new file object with the given properties. */
+
 struct ds_file *ds_file_create(const char *source, const char *remote_name, ds_file_t type, ds_file_flags_t flags)
 {
 	struct ds_file *f;
@@ -116,10 +118,14 @@ struct ds_file *ds_file_create(const char *source, const char *remote_name, ds_f
 	return f;
 }
 
+/* Make a deep copy of a file object to be used independently. */
+
 struct ds_file *ds_file_clone(const struct ds_file *file)
 {
 	return ds_file_create(file->source,file->remote_name,file->type,file->flags);
 }
+
+/* Delete a file object */
 
 void ds_file_delete(struct ds_file *tf)
 {

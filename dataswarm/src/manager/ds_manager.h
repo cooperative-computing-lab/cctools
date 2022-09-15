@@ -8,10 +8,8 @@ See the file COPYING for details.
 #define DS_MANAGER_H
 
 /*
-This module defines the structures and types of the manager process.
-Note that these details are internal to the dataswarm library,
-and are not for public consumption.  End users are limited to the
-API described in dataswarm.h
+This module defines the structures and types of the manager process as a whole.
+This module is private to the manager and should not be invoked by the end user.
 */
 
 #include "dataswarm.h"

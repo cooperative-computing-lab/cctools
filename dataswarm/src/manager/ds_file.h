@@ -7,6 +7,19 @@ See the file COPYING for details.
 #ifndef DS_FILE_H
 #define DS_FILE_H
 
+/*
+This module defines the internal structure and details of a single file.
+Here, a "file" can come from many different sources: a local file,
+a remote url, a command to run on the worker, etc, and is then eventually
+mapped into a tasks' working directory.  As a result, it has several kinds of names:
+
+- f->source indicates the name of the source file, url, or command that provides the data.
+- f->cached_name indicates the name of the file as it is stored in the worker's cache.
+- f->remote_name indicates the name of the file as the task expects to see it.
+
+This module is private to the manager and should not be invoked by the end user.
+*/
+
 #include "dataswarm.h"
 
 #include <sys/types.h>

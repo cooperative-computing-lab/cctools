@@ -7,6 +7,13 @@ See the file COPYING for details.
 #ifndef DS_TASK_H
 #define DS_TASK_H
 
+/*
+This module defines the internal structure and details of a single task.
+Note that these details are internal to the manager library,
+and are not for public consumption.
+End user may only use the API described in dataswarm.h
+*/
+
 #include "dataswarm.h"
 
 #include "list.h"
