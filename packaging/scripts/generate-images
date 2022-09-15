@@ -1,6 +1,6 @@
 #! /usr/bin/env perl
 
-# generate base singularity and docker images for cctools
+# generate base apptainer and docker images for cctools
 
 use strict;
 use warnings;
@@ -378,7 +378,7 @@ sub main {
 		"all",    => \$all,
 		"output_dir=s", => \$output_dir,
 		"docker"      => sub { push @types, 'docker'; },
-		"singularity" => sub { push @types, 'singularity'; } 
+		"apptainer" => sub { push @types, 'apptainer'; } 
 	) or die "@{[ show_help() ]}\n";
 
 	if($help) {
@@ -402,7 +402,7 @@ sub main {
 	}
 
 	unless(@types) {
-		@types = ('singularity', 'docker');
+		@types = ('apptainer', 'docker');
 	}
 
 	make_path($output_dir, { mode => 0755 });
@@ -423,8 +423,8 @@ sub main {
 sub show_help {
 	say "Use:";
 	say "$0 [options] [distribution version outputprefix]";
-	say "\n Example:\n$0 --arch x86_64 centos 7 Singularity.ccl.x86_64-centos7";
-	say "\nproduces Singularity.ccl.x86_64-centos7.{sin,img}";
+	say "\n Example:\n$0 --arch x86_64 centos 7 apptainer.ccl.x86_64-centos7";
+	say "\nproduces apptainer.ccl.x86_64-centos7.{sin,img}";
 	say "\noptions:";
 	say "\t--help            Show this message.";
 	say "\t--all             Build all known platforms.";
@@ -434,7 +434,7 @@ sub show_help {
 	say "\t--list            List known platforms.";
 	say "\t--recp            Generate recipes only, not images.";
 	say "\t--docker          Generate docker images.";
-	say "\t--singularity     Generate singularity images.";
+	say "\t--apptainer       Generate apptainer images.";
 
 	return '';
 }
@@ -490,7 +490,7 @@ sub generate_image {
 		warn "No output prefix given, using $output_name\n";
 	}
 
-	if($type eq 'singularity') {
+	if($type eq 'apptainer') {
 		return generate_singularity_image($arch, $dist, $version, $output_dir, $output_name, $recp);
 	} elsif($type eq 'docker') {
 		return generate_docker_image($arch, $dist, $version, $output_dir, $output_name, $recp);
@@ -502,12 +502,12 @@ sub generate_image {
 sub generate_singularity_image {
 	my ($arch, $dist, $version, $output_dir, $output_name, $recp) = @_;
 
-	make_path(catfile($output_dir, 'singularity'), { mode => 0755 });
+	make_path(catfile($output_dir, 'apptainer'), { mode => 0755 });
 
-	my $sin_name = catfile($output_dir, 'singularity', "$output_name.sin");
-	my $img_name = catfile($output_dir, 'singularity', "$output_name.img");
+	my $sin_name = catfile($output_dir, 'apptainer', "$output_name.sin");
+	my $img_name = catfile($output_dir, 'apptainer', "$output_name.img");
 
-	say "Creating Singularity file: $sin_name";
+	say "Creating apptainer file: $sin_name";
 	open my $sin_fh, '>', $sin_name || croak "Problem with '$sin_name': $@";
 	print { $sin_fh } singularity_file_for($arch, $dist, $version, $img_name, $sin_name);
 	close $sin_fh;
@@ -520,14 +520,14 @@ sub generate_singularity_image {
 		-e "$img_name"     && system(qq(sudo rm -rf "$img_name"));
 		-d "$img_name.sbx" && system(qq(sudo rm -rf "$img_name.sbx"));
 
-		my $output = qx(sudo singularity build --sandbox "$img_name.sbx" "$sin_name");
+		my $output = qx(sudo apptainer build --sandbox "$img_name.sbx" "$sin_name");
 		$exit_status = $?;
 
 		unless($exit_status == 0) {
 			die "Could not build image with $sin_name. Output:\n$output\n";
 		}
 
-		$exit_status = system(qq(sudo singularity build "$img_name" "$img_name.sbx"));
+		$exit_status = system(qq(sudo apptainer build "$img_name" "$img_name.sbx"));
 		unless($exit_status == 0) {
 			die "Could not build from $img_name.sbx\n";
 		}
@@ -581,9 +581,9 @@ sub singularity_file_for {
 	my @steps = spec_preamble_file_for($dist, $version);
 
 	my $sinfile = <<EOF;
-# Singularity image VC3 for $dist$version
-# Build as: singularity build $img_name $sin_name
-# Run as:   singularity shell $img_name
+# apptainer image VC3 for $dist$version
+# Build as: apptainer build $img_name $sin_name
+# Run as:   apptainer shell $img_name
 #
 
 Bootstrap: docker
