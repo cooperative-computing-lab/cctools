@@ -243,15 +243,16 @@ static ds_result_code_t ds_manager_put_item_if_not_cached( struct ds_manager *q,
 	}
 }
 
-/**
- *	This function expands Data Swarm environment variables such as
- * 	$OS, $ARCH, that are specified in the definition of Data Swarm
- * 	input files. It expands these variables based on the info reported
- *	by each connected worker.
- *	Will always return a non-empty string. That is if no match is found
- *	for any of the environment variables, it will return the input string
- *	as is.
- * 	*/
+/*
+This function expands environment variables such as
+$OS, $ARCH, that are specified in the definition of Data Swarm
+input files. It expands these variables based on the info reported
+by each connected worker.
+Will always return a non-empty string. That is if no match is found
+for any of the environment variables, it will return the input string
+as is.
+*/
+
 static char *expand_envnames(struct ds_worker_info *w, const char *source)
 {
 	char *expanded_name;
@@ -340,6 +341,10 @@ static ds_result_code_t ds_manager_put_special_if_not_cached( struct ds_manager 
 
 	return DS_SUCCESS;
 }
+
+/*
+Send a single input file of any type to the given worker, and record the performance.
+*/
 
 static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f)
 {
@@ -433,6 +438,8 @@ static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct d
 
 	return result;
 }
+
+/* Send all input files needed by a task to the given worker. */
 
 ds_result_code_t ds_manager_put_input_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t )
 {

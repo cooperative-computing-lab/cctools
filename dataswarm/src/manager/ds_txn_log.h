@@ -7,6 +7,13 @@ See the file COPYING for details.
 #ifndef DS_TXN_LOG_H
 #define DS_TXN_LOG_H
 
+/*
+Implementation of the manager's transaction log,
+which records details of every major event in the system:
+task execution, file transfer, etc. for later analysis.
+This module is private to the manager and should not be invoked by the end user.
+*/
+
 #include "ds_manager.h"
 
 void ds_txn_log_write_header( struct ds_manager *q );
