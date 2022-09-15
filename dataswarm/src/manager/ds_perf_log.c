@@ -41,7 +41,7 @@ void ds_perf_log_write_header( struct ds_manager *q )
 		);
 }
 
-void ds_perf_log_update( struct ds_manager *q, int force )
+void ds_perf_log_write_update( struct ds_manager *q, int force )
 {
 	struct ds_stats s;
 
