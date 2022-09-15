@@ -110,7 +110,6 @@ static void update_max_worker(struct ds_manager *q, struct ds_worker_info *w);
 
 static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state);
 
-static int task_state_is( struct ds_manager *q, uint64_t taskid, ds_task_state_t state);
 static int task_state_count( struct ds_manager *q, const char *category, ds_task_state_t state);
 static int task_request_count( struct ds_manager *q, const char *category, category_allocation_t request);
 
@@ -2202,8 +2201,8 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 
 		itable_firstkey(q->tasks);
 		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
+			ds_task_state_t state = t->state;
 			w = itable_lookup(q->worker_task_map, taskid);
-			ds_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, taskid);
 			if(w) {
 				j = task_to_jx(q,t,ds_task_state_string(state),w->hostname);
 				if(j) {
@@ -2873,7 +2872,7 @@ static int receive_one_task( struct ds_manager *q )
 
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
-		if( task_state_is(q, taskid, DS_TASK_WAITING_RETRIEVAL) ) {
+		if( t->state==DS_TASK_WAITING_RETRIEVAL ) {
 			w = itable_lookup(q->worker_task_map, taskid);
 			fetch_output_from_worker(q, w, taskid);
 			// Shutdown worker if appropriate.
@@ -3249,8 +3248,6 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 
 	q->tasks          = itable_create(0);
 
-	q->task_state_map = itable_create(0);
-
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
@@ -3541,8 +3538,6 @@ void ds_delete(struct ds_manager *q)
 	list_delete(q->ready_list);
 	itable_delete(q->tasks);
 
-	itable_delete(q->task_state_map);
-
 	hash_table_delete(q->workers_with_available_results);
 
 	struct ds_task_info *tr;
@@ -3742,18 +3737,23 @@ static void push_task_to_ready_list( struct ds_manager *q, struct ds_task *t )
 	ds_task_clean(t,0);
 }
 
-
-ds_task_state_t ds_task_state(struct ds_manager *q, int taskid) {
-	return (int)(uintptr_t)itable_lookup(q->task_state_map, taskid);
+ds_task_state_t ds_task_state( struct ds_manager *q, int taskid )
+{
+	struct ds_task *t = itable_lookup(q->tasks,taskid);
+	if(t) {
+		return t->state;
+	} else {
+		return DS_TASK_UNKNOWN;
+	}
 }
 
 /* Changes task state. Returns old state */
 /* State of the task. One of DS_TASK(UNKNOWN|READY|RUNNING|WAITING_RETRIEVAL|RETRIEVED|DONE) */
 static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state ) {
 
-	ds_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
-	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
-	// remove from current tables:
+	ds_task_state_t old_state = t->state;
+
+	t->state = new_state;
 
 	if( old_state == DS_TASK_READY ) {
 		// Treat DS_TASK_READY specially, as it has the order of the tasks
@@ -3784,11 +3784,9 @@ static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *
 	return old_state;
 }
 
-static int task_in_terminal_state(struct ds_manager *q, struct ds_task *t) {
-
-	ds_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
-
-	switch(state) {
+static int task_in_terminal_state(struct ds_manager *q, struct ds_task *t)
+{
+	switch(t->state) {
 		case DS_TASK_READY:
 		case DS_TASK_RUNNING:
 		case DS_TASK_WAITING_RETRIEVAL:
@@ -3856,19 +3854,13 @@ const char *ds_result_str(ds_result_t result) {
 	return str;
 }
 
-static int task_state_is( struct ds_manager *q, uint64_t taskid, ds_task_state_t state) {
-	return itable_lookup(q->task_state_map, taskid) == (void *) state;
-}
-
 static struct ds_task *task_state_any(struct ds_manager *q, ds_task_state_t state) {
 	struct ds_task *t;
 	uint64_t taskid;
 
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
-		if( task_state_is(q, taskid, state) ) {
-			return t;
-		}
+		if( t->state==state ) return t;
 	}
 
 	return NULL;
@@ -3880,7 +3872,7 @@ static struct ds_task *task_state_any_with_tag(struct ds_manager *q, ds_task_sta
 
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
-		if( task_state_is(q, taskid, state) && tasktag_comparator((void *) t, (void *) tag)) {
+		if( t->state==state && tasktag_comparator((void *) t, (void *) tag)) {
 			return t;
 		}
 	}
@@ -3896,7 +3888,7 @@ static int task_state_count(struct ds_manager *q, const char *category, ds_task_
 
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
-		if( task_state_is(q, taskid, state) ) {
+		if( t->state==state ) {
 			if(!category || strcmp(category, t->category) == 0) {
 				count++;
 			}

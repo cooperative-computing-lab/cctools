@@ -43,6 +43,13 @@ struct ds_task {
 	int max_retries;             /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
 	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see ds_worker --wall-time)*/
 
+	/***** Internal state of task as it works towards completion. *****/
+
+	ds_task_state_t state;       /**< Current state of task: READY, RUNNING, etc */
+	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref DS_RESULT_MAX_RETRIES. */
+	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
+	int fast_abort_count;        /**< Number of times this task has been terminated for running too long. */
+
 	/***** Results of task once it has reached completion. *****/
   
 	ds_result_t result;          /**< The result of the task (see @ref ds_result_t */
@@ -50,11 +57,6 @@ struct ds_task {
 	char *output;                /**< The standard output of the task. */
 	char *host;                  /**< The address and port of the host on which it ran. */
 	char *hostname;              /**< The name of the host on which it ran. */
-
-	/***** Internal counters for fault tolerance. *****/
-	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref DS_RESULT_MAX_RETRIES. */
-	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
-	int fast_abort_count;        /**< Number of times this task has been terminated for running too long. */
 
 	/***** Metrics available to the user at completion through ds_task_get_metric.  *****/
 	/* All times in microseconds */

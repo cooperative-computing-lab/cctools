@@ -90,7 +90,6 @@ struct ds_manager {
 	/* Primary data structures for tracking task state. */
 
 	struct itable *tasks;           /* Maps taskid -> ds_task of all tasks in any state. */
-	struct itable *task_state_map;  /* Maps taskid -> ds_task_state_t */
 	struct list   *ready_list;      /* List of ds_task that are waiting to execute. */
 	struct list   *task_reports;    /* List of last N ds_task_reports for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */

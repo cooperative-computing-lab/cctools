@@ -44,6 +44,7 @@ struct ds_task *ds_task_create(const char *command_line)
 	t->env_list = list_create();
 	t->exit_code = -1;
 
+	t->state = DS_TASK_READY;
 	t->result = DS_RESULT_UNKNOWN;
 
 	t->resource_request   = CATEGORY_ALLOCATION_FIRST;
@@ -96,6 +97,7 @@ void ds_task_clean( struct ds_task *t, int full_clean )
 
 	/* If result is never updated, then it is mark as a failure. */
 	t->result = DS_RESULT_UNKNOWN;
+	t->state = DS_TASK_READY;
 }
 
 static struct list *ds_task_file_list_clone(struct list *list)
