@@ -46,6 +46,7 @@ struct ds_task {
 	/***** Internal state of task as it works towards completion. *****/
 
 	ds_task_state_t state;       /**< Current state of task: READY, RUNNING, etc */
+	struct ds_worker_info *worker;    /**< Worker to which this task has been dispatched. */
 	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref DS_RESULT_MAX_RETRIES. */
 	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
 	int fast_abort_count;        /**< Number of times this task has been terminated for running too long. */

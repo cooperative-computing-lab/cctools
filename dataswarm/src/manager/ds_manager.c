@@ -2195,16 +2195,13 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 		}
 	} else if(!strcmp(request, "task_status") || !strcmp(request, "tasks")) {
 		struct ds_task *t;
-		struct ds_worker_info *w;
-		struct jx *j;
 		uint64_t taskid;
 
 		itable_firstkey(q->tasks);
 		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
-			ds_task_state_t state = t->state;
-			w = itable_lookup(q->worker_task_map, taskid);
+			struct ds_worker_info *w = t->worker;
 			if(w) {
-				j = task_to_jx(q,t,ds_task_state_string(state),w->hostname);
+				struct jx *j = task_to_jx(q,t,ds_task_state_string(t->state),w->hostname);
 				if(j) {
 					// Include detailed information on where the task is running:
 					// address and port, workspace
@@ -2219,7 +2216,7 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 					jx_array_insert(a, j);
 				}
 			} else {
-				j = task_to_jx(q,t,ds_task_state_string(state),0);
+				struct jx *j = task_to_jx(q,t,ds_task_state_string(t->state),0);
 				if(j) {
 					jx_array_insert(a, j);
 				}
@@ -2779,7 +2776,8 @@ static void commit_task_to_worker(struct ds_manager *q, struct ds_worker_info *w
 	t->time_when_commit_end = timestamp_get();
 
 	itable_insert(w->current_tasks, t->taskid, t);
-	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
+
+	t->worker = w;
 
 	change_task_state(q, t, DS_TASK_RUNNING);
 
@@ -2802,23 +2800,24 @@ and change the task state.
 
 static void reap_task_from_worker(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, ds_task_state_t new_state)
 {
-	struct ds_worker_info *wr = itable_lookup(q->worker_task_map, t->taskid);
-
+	struct ds_worker_info *wr = t->worker;
 	if(wr != w)
 	{
+		/* XXX this seems like a bug, should we return quickly here? */
 		debug(D_DS, "Cannot reap task %d from worker. It is not being run by %s (%s)\n", t->taskid, w->hostname, w->addrport);
 	} else {
 		w->total_task_time += t->time_workers_execute_last;
 	}
 
-	//update tables.
 	struct rmsummary *task_box = itable_lookup(w->current_tasks_boxes, t->taskid);
 	if(task_box)
 		rmsummary_delete(task_box);
 
 	itable_remove(w->current_tasks_boxes, t->taskid);
 	itable_remove(w->current_tasks, t->taskid);
-	itable_remove(q->worker_task_map, t->taskid);
+
+	t->worker = 0;
+
 	change_task_state(q, t, new_state);
 
 	count_worker_resources(q, w);
@@ -2866,14 +2865,12 @@ and mark it as done.
 static int receive_one_task( struct ds_manager *q )
 {
 	struct ds_task *t;
-
-	struct ds_worker_info *w;
 	uint64_t taskid;
 
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
 		if( t->state==DS_TASK_WAITING_RETRIEVAL ) {
-			w = itable_lookup(q->worker_task_map, taskid);
+			struct ds_worker_info *w = t->worker;
 			fetch_output_from_worker(q, w, taskid);
 			// Shutdown worker if appropriate.
 			if ( w->factory_name ) {
@@ -3017,7 +3014,7 @@ static int abort_slow_workers(struct ds_manager *q)
 		}
 
 		if(runtime >= (average_task_time * (multiplier + t->fast_abort_count))) {
-			w = itable_lookup(q->worker_task_map, t->taskid);
+			w = t->worker;
 			if(w && (w->type == DS_WORKER_TYPE_WORKER))
 			{
 				debug(D_DS, "Task %d is taking too long. Removing from worker.", t->taskid);
@@ -3105,8 +3102,7 @@ by sending the appropriate kill message and removing any undesired state.
 
 static int cancel_task_on_worker(struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state) {
 
-	struct ds_worker_info *w = itable_lookup(q->worker_task_map, t->taskid);
-
+	struct ds_worker_info *w = t->worker;
 	if (w) {
 		//send message to worker asking to kill its task.
 		ds_manager_send(q,w, "kill %d\n",t->taskid);
@@ -3250,7 +3246,6 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
-	q->worker_task_map = itable_create(0);
 
 	q->factory_table = hash_table_create(0, 0);
 	q->fetch_factory = 0;
@@ -3524,8 +3519,6 @@ void ds_delete(struct ds_manager *q)
 
 	hash_table_clear(q->worker_blocklist,(void*)ds_blocklist_info_delete);
 	hash_table_delete(q->worker_blocklist);
-
-	itable_delete(q->worker_task_map);
 
 	char *key;
 	struct category *c;

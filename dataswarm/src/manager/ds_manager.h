@@ -98,7 +98,6 @@ struct ds_manager {
 
 	struct hash_table *worker_table;     /* Maps link -> ds_worker_info */
 	struct hash_table *worker_blocklist; /* Maps hostname -> ds_blocklist_info */
-	struct itable     *worker_task_map;  /* Maps taskid -> ds_worker_info */     
 	struct hash_table *factory_table;    /* Maps factory_name -> ds_factory_info */
 	struct hash_table *workers_with_available_results;  /* Maps link -> ds_worker_info */
 
