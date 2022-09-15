@@ -42,7 +42,7 @@ OPTION_ARG(E, worker-options, str)Extra options passed to work_queue_worker
 OPTION_ARG_LONG(cores, cores)Set the number of cores each worker should use (0=auto). (default=1)
 OPTION_ARG_LONG(memory, size)Manually set the amonut of memory (in MB) reported by this worker.
 OPTION_ARG_LONG(disk, size)Manually set the amount of disk (in MB) reported by this worker.
-
+OPTION_ARG_LONG(scratch-dir,path)Set the scratch directory location created on te local machine. (default=/tmp/USER-workers)
 OPTION_ARG(r,requirements,reqs)Condor requirements expression.
 OPTION_ARG_LONG(class-ad,ad)Extra condor class ad. May be specified multiple times.
 OPTION_FLAG_LONG(autosize)Condor will automatically size the worker to the slot.

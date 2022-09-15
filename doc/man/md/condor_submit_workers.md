@@ -64,7 +64,7 @@ the catalog server by specifying the name of the work queue using the --manager-
 - **--cores=_&lt;cores&gt;_**<br />Set the number of cores each worker should use (0=auto). (default=1)
 - **--memory=_&lt;size&gt;_**<br />Manually set the amonut of memory (in MB) reported by this worker.
 - **--disk=_&lt;size&gt;_**<br />Manually set the amount of disk (in MB) reported by this worker.
-
+- **--scratch-dir=_&lt;path&gt;_**<br />Set the scratch directory location created on te local machine. (default=/tmp/USER-workers)
 - **-r**,**--requirements=_&lt;reqs&gt;_**<br />Condor requirements expression.
 - **--class-ad=_&lt;ad&gt;_**<br />Extra condor class ad. May be specified multiple times.
 - **--autosize**<br />Condor will automatically size the worker to the slot.

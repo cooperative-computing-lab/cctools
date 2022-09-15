@@ -33,6 +33,7 @@ OPTION_ARG_SHORT(A, arch)Set architecture string for the worker to report to man
 OPTION_ARG_SHORT(O, os)Set operating system string for the worker to report to manager instead of the value in uname.
 OPTION_ARG_SHORT(s, path)Set the location for creating the working directory of the worker.
 OPTION_ARG_SHORT(p, parameters)SLURM qsub parameters.
+OPTION_ARG_LONG(scratch-dir,path)Set the scratch directory location created on the local machine. (default=/tmp/USER-workers)
 OPTION_FLAG_SHORT(h)Show help message.
 OPTIONS_END
 
