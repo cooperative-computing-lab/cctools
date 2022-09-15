@@ -22,20 +22,18 @@ End user may only use the API described in dataswarm.h
 #include <stdint.h>
 
 struct ds_task {
-
         /***** Fixed properties of task at submit time. ******/
 
         int taskid;                  /**< A unique task id number. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
+	char *tag;                   /**< An optional user-defined logical name for the task. */
+	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref ds_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
 	struct list *input_files;    /**< The files to transfer to the worker and place in the executing directory. */
 	struct list *output_files;   /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
 	struct list *env_list;       /**< Environment variables applied to the task. */
-	struct list *features;       /**< User-defined features this task requires. (See ds_worker's --feature option.) */
-
-	char *tag;                   /**< An optional user-defined logical name for the task. */
-	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref ds_task_specify_category. If no explicit category is given, the label "default" is used. **/
+	struct list *feature_list;   /**< User-defined features this task requires. (See ds_worker's --feature option.) */
 
 	category_allocation_t resource_request; /**< See @ref category_allocation_t */
 	ds_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */

@@ -36,25 +36,28 @@ struct ds_task *ds_task_create(const char *command_line)
 	 * corresponding copy in ds_task_clone. Otherwise we get
 	 * double-free segfaults. */
 
-	if(command_line) t->command_line = xxstrdup(command_line);
+	/* For clarity, put initialization in same order as structure. */
 
-	t->worker_selection_algorithm = DS_SCHEDULE_UNSET;
+	if(command_line) t->command_line = xxstrdup(command_line);
+	t->category = xxstrdup("default");
+
 	t->input_files = list_create();
 	t->output_files = list_create();
 	t->env_list = list_create();
-	t->exit_code = -1;
-
-	t->state = DS_TASK_READY;
-	t->result = DS_RESULT_UNKNOWN;
+	t->feature_list = list_create();
 
 	t->resource_request   = CATEGORY_ALLOCATION_FIRST;
+	t->worker_selection_algorithm = DS_SCHEDULE_UNSET;
+
+	t->state = DS_TASK_READY;
+
+	t->result = DS_RESULT_UNKNOWN;
+	t->exit_code = -1;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->resources_requested = rmsummary_create(-1);
 	t->resources_measured  = rmsummary_create(-1);
 	t->resources_allocated = rmsummary_create(-1);
-
-	t->category = xxstrdup("default");
 
 	return t;
 }
@@ -113,12 +116,12 @@ static struct list *ds_task_file_list_clone(struct list *list)
 	return new;
 }
 
-static struct list *ds_task_env_list_clone(struct list *env_list)
+static struct list *ds_task_string_list_clone(struct list *string_list)
 {
 	struct list *new = list_create();
 	char *var;
-	list_first_item(env_list);
-	while((var=list_next_item(env_list))) {
+	list_first_item(string_list);
+	while((var=list_next_item(string_list))) {
 		list_push_tail(new, xxstrdup(var));
 	}
 
@@ -130,19 +133,34 @@ struct ds_task *ds_task_clone(const struct ds_task *task)
 {
 	struct ds_task *new = ds_task_create(task->command_line);
 
-	if(task->tag) {
-		ds_task_specify_tag(new, task->tag);
-	}
+	/* Static features of task are copied. */
+	if(task->coprocess) ds_task_specify_coprocess(new,task->tag);
+	if(task->tag) ds_task_specify_tag(new, task->tag);
+	if(task->category) ds_task_specify_category(new, task->category);
 
-	if(task->category) {
-		ds_task_specify_category(new, task->category);
-	}
+	new->input_files  = ds_task_file_list_clone(task->input_files);
+	new->output_files = ds_task_file_list_clone(task->output_files);
+	new->env_list     = ds_task_string_list_clone(task->env_list);
+	new->feature_list = ds_task_string_list_clone(task->feature_list);
 
+	/* Scheduling features of task are copied. */
+	new->resource_request = task->resource_request;
 	ds_task_specify_algorithm(new, task->worker_selection_algorithm);
 	ds_task_specify_priority(new, task->priority);
 	ds_task_specify_max_retries(new, task->max_retries);
 	ds_task_specify_running_time_min(new, task->min_running_time);
 
+	/* Internal state of task is cleared from ds_task_create */
+
+	/* Results of task are cleared from ds_task_create. */
+
+	/* Metrics of task are cleared from ds_task_create. */
+
+	/* Resource and monitor requests are copied. */
+
+	if(task->resources_requested) {
+		new->resources_requested = rmsummary_copy(task->resources_requested, 0);
+	}
 
 	if(task->monitor_output_directory) {
 		ds_task_specify_monitor_output(new, task->monitor_output_directory);
@@ -151,24 +169,6 @@ struct ds_task *ds_task_clone(const struct ds_task *task)
 	if(task->monitor_snapshot_file) {
 		ds_task_specify_snapshot_file(new, task->monitor_snapshot_file);
 	}
-
-	new->input_files  = ds_task_file_list_clone(task->input_files);
-	new->output_files = ds_task_file_list_clone(task->output_files);
-	new->env_list     = ds_task_env_list_clone(task->env_list);
-
-	if(task->features) {
-		new->features = list_create();
-		char *req;
-		list_first_item(task->features);
-		while((req = list_next_item(task->features))) {
-			list_push_tail(new->features, xxstrdup(req));
-		}
-	}
-
-	if(task->resources_requested) {
-		new->resources_requested = rmsummary_copy(task->resources_requested, 0);
-	}
-
 
 	return new;
 }
@@ -182,11 +182,7 @@ void ds_task_specify_command( struct ds_task *t, const char *cmd )
 
 static void delete_feature(struct ds_task *t, const char *name)
 {
-	if(!t->features) {
-		return;
-	}
-
-	struct list_cursor *c = list_cursor_create(t->features);
+	struct list_cursor *c = list_cursor_create(t->feature_list);
 
 	char *feature;
 	for(list_seek(c, 0); list_get(c, (void **) &feature); list_next(c)) {
@@ -367,11 +363,7 @@ void ds_task_specify_feature(struct ds_task *t, const char *name)
 		return;
 	}
 
-	if(!t->features) {
-		t->features = list_create();
-	}
-
-	list_push_tail(t->features, xxstrdup(name));
+	list_push_tail(t->feature_list, xxstrdup(name));
 }
 
 int ds_task_specify_url(struct ds_task *t, const char *file_url, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
@@ -798,12 +790,12 @@ void ds_task_delete(struct ds_task *t)
 			list_delete(t->env_list);
 		}
 
-		if(t->features) {
+		if(t->feature_list) {
 			char *feature;
-			while((feature=list_pop_tail(t->features))) {
+			while((feature=list_pop_tail(t->feature_list))) {
 				free(feature);
 			}
-			list_delete(t->features);
+			list_delete(t->feature_list);
 		}
 
 		free(t->hostname);

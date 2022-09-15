@@ -87,13 +87,13 @@ static int check_worker_against_task(struct ds_manager *q, struct ds_worker_info
 
 	rmsummary_delete(l);
 
-	if(t->features) {
+	if(t->feature_list) {
 		if(!w->features)
 			return 0;
 
 		char *feature;
-		list_first_item(t->features);
-		while((feature = list_next_item(t->features))) {
+		list_first_item(t->feature_list);
+		while((feature = list_next_item(t->feature_list))) {
 			if(!hash_table_lookup(w->features, feature))
 				return 0;
 		}
