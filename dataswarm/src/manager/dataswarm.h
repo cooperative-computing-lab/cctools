@@ -16,14 +16,22 @@ struct ds_manager;
 struct ds_task;
 struct ds_file;
 
-/** @file ds_manager.h A manager-worker library.
- This provides an implementation of the manager-worker computing model
- using TCP sockets, Unix applications, and files as intermediate buffers.  A
- manager process uses @ref ds_create to create a queue, then @ref
- ds_submit to submit tasks.  Once tasks are running, call @ref
- ds_wait to wait for completion. A generic worker program, named
- <tt>ds_worker</tt>, can be run on any machine, and simply needs to be
- told the host and port of the manager.
+/** @file ds_manager.h The public API for the dataswarm distributed application framework.
+A dataswarm application consists of a manager process and a larger number of worker
+processes, typically running in a high performance computing cluster, or a cloud facility.
+Both the manager and worker processes run with ordinary user privileges and require
+no special capabilities.
+
+From the application perspective, the programmer creates a manager with @ref ds_create,
+defines a number of tasks with @ref ds_task_create, submits the tasks to the manager
+with @ref ds_submit, and then monitors completion with @ref ds_wait.
+Tasks are further described by attaching data objects via @ref ds_task_specify_file,
+@ref ds_task_specify_url and related functions.
+
+The dataswarm framework provides a large number of fault tolerance, resource management,
+and performance monitoring features that enable the construction of applications that
+run reliably on tens of thousands of nodes in the presence of failures and other
+expected events.
 */
 
 #define DS_DEFAULT_PORT 9123               /**< Default Data Swarm port number. */
