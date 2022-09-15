@@ -42,18 +42,18 @@ char *make_cached_name( const struct ds_file *f )
 	static unsigned int file_count = 0;
 	file_count++;
 
-	/* Default of payload is remote name (needed only for directories) */
-	char *payload = f->payload ? f->payload : f->remote_name;
+	/* Default of source is remote name (needed only for directories) */
+	char *source = f->source ? f->source : f->remote_name;
 
 	unsigned char digest[MD5_DIGEST_LENGTH];
-	char payload_enc[PATH_MAX];
+	char source_enc[PATH_MAX];
 
 	if(f->type == DS_BUFFER) {
 		//dummy digest for buffers
 		md5_buffer("buffer", 6, digest);
 	} else {
-		md5_buffer(payload,strlen(payload),digest);
-		url_encode(path_basename(payload), payload_enc, PATH_MAX);
+		md5_buffer(source,strlen(source),digest);
+		url_encode(path_basename(source), source_enc, PATH_MAX);
 	}
 
 	/* 0 for cache files, file_count for non-cache files. With this, non-cache
@@ -67,10 +67,10 @@ char *make_cached_name( const struct ds_file *f )
 	switch(f->type) {
 		case DS_FILE:
 		case DS_DIRECTORY:
-			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), payload_enc);
+			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), source_enc);
 			break;
 		case DS_FILE_PIECE:
-			return string_format("piece-%d-%s-%s-%lld-%lld",cache_file_id, md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
+			return string_format("piece-%d-%s-%s-%lld-%lld",cache_file_id, md5_string(digest),source_enc,(long long)f->offset,(long long)f->piece_length);
 			break;
 		case DS_REMOTECMD:
 			return string_format("cmd-%d-%s", cache_file_id, md5_string(digest));
@@ -85,7 +85,9 @@ char *make_cached_name( const struct ds_file *f )
 	}
 }
 
-struct ds_file *ds_file_create(const char *payload, const char *remote_name, ds_file_t type, ds_file_flags_t flags)
+/* Create a new file object with the given properties. */
+
+struct ds_file *ds_file_create(const char *source, const char *remote_name, ds_file_t type, ds_file_flags_t flags)
 {
 	struct ds_file *f;
 
@@ -102,13 +104,13 @@ struct ds_file *ds_file_create(const char *payload, const char *remote_name, ds_
 	f->flags = flags;
 
 	/* DS_BUFFER needs to set these after the current function returns */
-	if(payload) {
-		f->payload = xxstrdup(payload);
-		f->length  = strlen(payload);
+	if(source) {
+		f->source = xxstrdup(source);
+		f->length  = strlen(source);
 	}
 
 	if(ds_hack_do_not_compute_cached_name) {
-  		f->cached_name = xxstrdup(f->payload);
+  		f->cached_name = xxstrdup(f->source);
 	} else {
 		f->cached_name = make_cached_name(f);
 	}
@@ -116,15 +118,19 @@ struct ds_file *ds_file_create(const char *payload, const char *remote_name, ds_
 	return f;
 }
 
+/* Make a deep copy of a file object to be used independently. */
+
 struct ds_file *ds_file_clone(const struct ds_file *file)
 {
-	return ds_file_create(file->payload,file->remote_name,file->type,file->flags);
+	return ds_file_create(file->source,file->remote_name,file->type,file->flags);
 }
+
+/* Delete a file object */
 
 void ds_file_delete(struct ds_file *tf)
 {
-	if(tf->payload)
-		free(tf->payload);
+	if(tf->source)
+		free(tf->source);
 	if(tf->remote_name)
 		free(tf->remote_name);
 	if(tf->cached_name)

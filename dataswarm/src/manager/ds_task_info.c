@@ -52,8 +52,6 @@ void ds_task_info_add(struct ds_manager *q, struct ds_task *t)
 		ti = list_pop_head(q->task_reports);
 		ds_task_info_delete(ti);
 	}
-
-	resource_monitor_append_report(q, t);
 }
 
 /*

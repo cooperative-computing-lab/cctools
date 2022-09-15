@@ -6,9 +6,9 @@ See the file COPYING for details.
 
 #include "ds_worker_info.h"
 
-struct ds_worker * ds_worker_create( struct link * lnk )
+struct ds_worker_info * ds_worker_create( struct link * lnk )
 {
-	struct ds_worker *w =  malloc(sizeof(*w));
+	struct ds_worker_info *w =  malloc(sizeof(*w));
 	if(!w) return 0;
 
 	memset(w, 0, sizeof(*w));
@@ -37,7 +37,7 @@ struct ds_worker * ds_worker_create( struct link * lnk )
 	return w;
 }
 
-void ds_worker_delete( struct ds_worker *w )
+void ds_worker_delete( struct ds_worker_info *w )
 {
 	if(w->link) link_close(w->link);
 

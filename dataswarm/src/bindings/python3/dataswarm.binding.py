@@ -614,27 +614,34 @@ class Task(object):
         return ds_result_str(ds_task_get_result(self._task))
 
     ##
-    # Get the number of times the task has been resubmitted internally.
+    # Return various integer performance metrics about a completed task.
     # Must be called only after the task completes execution.
+    #
+    # Valid metric names:
+    # - time_when_submitted
+    # - time_when_done
+    # - time_when_commit_start
+    # - time_when_commit_end
+    # - time_when_retrieval
+    # - time_workers_execute_last
+    # - time_workers_execute_all
+    # - time_workers_execute_exhaustion
+    # - time_workers_execute_failure
+    # - bytes_received
+    # - bytes_sent
+    # - bytes_transferred
+    #
     # @code
-    # >>> print(t.total_submissions)
+    # >>> print(t.get_metric("total_submissions")
     # @endcode
     @property
-    def total_submissions(self):
-        return ds_task_get_metric(self._task,"total_submissions")
-
-    ##
-    # Get the number of times the task has been failed given resource exhaustion.
-    # @code
-    # >>> print(t.exhausted_attempts)
-    # @endcode
-    @property
-    def exhausted_attempts(self):
-        return ds_task_get_metric(self._task,"exhausted_attempts")
+    def get_metric(self,name):
+        return ds_task_get_metric(self._task,name)
 
     ##
     # Get the address and port of the host on which the task ran.
     # Must be called only after the task completes execution.
+    #
     # @code
     # >>> print(t.host)
     # @endcode
@@ -650,169 +657,7 @@ class Task(object):
     # @endcode
     @property
     def hostname(self):
-        return self._task.hostname
-
-    ##
-    # Get the time at which this task was submitted.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.submit_time)
-    # @endcode
-    @property
-    def submit_time(self):
-        return self._task.time_task_submit
-
-    ##
-    # Get the time at which this task was finished.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.finish_time)
-    # @endcode
-    @property
-    def finish_time(self):
-        return ds_task_get_metric(self._task,"time_task_finish")
-
-    ##
-    # Get the total time the task executed and failed given resource exhaustion.
-    # @code
-    # >>> print(t.total_cmd_exhausted_execute_time)
-    # @endcode
-    @property
-    def total_cmd_exhausted_execute_time(self):
-        return ds_task_get_metric(self._task,"total_cmd_exhausted_execute_time")
-
-    ##
-    # Get the time spent in upper-level application (outside of ds_wait).
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.app_delay)
-    # @endcode
-    @property
-    def app_delay(self):
-        return self._task.time_app_delay
-
-    ##
-    # Get the time at which the task started to transfer input files.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.send_input_start)
-    # @endcode
-    @property
-    def send_input_start(self):
-        return self._task.time_send_input_start
-
-    ##
-    # Get the time at which the task finished transferring input files.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.send_input_finish)
-    # @endcode
-    @property
-    def send_input_finish(self):
-        return self._task.time_send_input_finish
-
-    ##
-    # The time at which the task began.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.execute_cmd_start)
-    # @endcode
-    @property
-    def execute_cmd_start(self):
-        return self._task.time_execute_cmd_start
-
-    ##
-    # Get the time at which the task finished (discovered by the manager).
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.execute_cmd_finish)
-    # @endcode
-    @property
-    def execute_cmd_finish(self):
-        return self._task.time_execute_cmd_finish
-
-    ##
-    # Get the time at which the task started to transfer output files.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.receive_output_start)
-    # @endcode
-    @property
-    def receive_output_start(self):
-        return self._task.time_receive_output_start
-
-    ##
-    # Get the time at which the task finished transferring output files.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.receive_output_finish)
-    # @endcode
-    @property
-    def receive_output_finish(self):
-        return self._task.time_receive_output_finish
-
-    ##
-    # Get the number of bytes received since task started receiving input data.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.total_bytes_received)
-    # @endcode
-    @property
-    def total_bytes_received(self):
-        return self._task.total_bytes_received
-
-    ##
-    # Get the number of bytes sent since task started sending input data.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.total_bytes_sent)
-    # @endcode
-    @property
-    def total_bytes_sent(self):
-        return self._task.total_bytes_sent
-
-    ##
-    # Get the number of bytes transferred since task started transferring input data.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.total_bytes_transferred)
-    # @endcode
-    @property
-    def total_bytes_transferred(self):
-        return self._task.total_bytes_transferred
-
-    ##
-    # Get the time comsumed in microseconds for transferring total_bytes_transferred.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.total_transfer_time)
-    # @endcode
-    @property
-    def total_transfer_time(self):
-        return self._task.total_transfer_time
-
-    ##
-    # Time spent in microseconds for executing the command until completion on a single worker.
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.cmd_execution_time)
-    # @endcode
-    @property
-    def cmd_execution_time(self):
-        return self._task.cmd_execution_time
-
-    ##
-    # Accumulated time spent in microseconds for executing the command on any
-    # worker, regardless of whether the task finished (i.e., this includes time
-    # running on workers that disconnected).
-    #
-    # Must be called only after the task completes execution.
-    # @code
-    # >>> print(t.total_cmd_execution_time)
-    # @endcode
-    @property
-    def total_cmd_execution_time(self):
-        return self._task.total_cmd_execution_time
+        return hostport(self).split(":")[0]
 
     ##
     # Get the resources measured for the task execution if resource monitoring is enabled.

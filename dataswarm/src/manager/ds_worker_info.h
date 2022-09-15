@@ -23,7 +23,7 @@ typedef enum {
 #define DS_WORKER_ADDRPORT_MAX 64
 #define DS_WORKER_HASHKEY_MAX 32
 
-struct ds_worker {
+struct ds_worker_info {
 	/* Type of connection: unknown, worker, status client. */
 	ds_worker_type_t type;
 
@@ -77,7 +77,7 @@ struct ds_worker {
 	timestamp_t last_update_msg_time;
 };
 
-struct ds_worker * ds_worker_create( struct link * lnk );
-void ds_worker_delete( struct ds_worker *w );
+struct ds_worker_info * ds_worker_create( struct link * lnk );
+void ds_worker_delete( struct ds_worker_info *w );
 
 #endif

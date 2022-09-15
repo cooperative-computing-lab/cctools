@@ -7,6 +7,13 @@ See the file COPYING for details.
 #ifndef DS_TASK_H
 #define DS_TASK_H
 
+/*
+This module defines the internal structure and details of a single task.
+Note that these details are internal to the manager library,
+and are not for public consumption.
+End user may only use the API described in dataswarm.h
+*/
+
 #include "dataswarm.h"
 
 #include "list.h"
@@ -77,5 +84,12 @@ struct ds_task {
 	char *monitor_output_directory;			      /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref ds_enable_monitoring */
 	char *monitor_snapshot_file;                          /**< Filename the monitor checks to produce snapshots. */
 };
+
+int  ds_task_update_result(struct ds_task *t, ds_result_t new_result );
+void ds_task_specify_resources(struct ds_task *t, const struct rmsummary *rm);
+void ds_task_clean( struct ds_task *t, int full_clean );
+
+const char *ds_task_state_string( ds_task_state_t task_state );
+
 
 #endif

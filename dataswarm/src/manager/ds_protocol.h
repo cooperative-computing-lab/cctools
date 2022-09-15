@@ -18,6 +18,4 @@ This file should not be installed and should only be included by .c files.
 
 #define DS_LINE_MAX 4096       /**< Maximum length of a ds message line. */
 
-#define DS_PROTOCOL_FIELD_MAX 256
-
 #endif

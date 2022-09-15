@@ -4,9 +4,9 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "ds_manager.h"
 #include "ds_task.h"
 #include "ds_file.h"
-#include "ds_internal.h"
 
 #include "list.h"
 #include "rmsummary.h"
@@ -58,6 +58,45 @@ struct ds_task *ds_task_create(const char *command_line)
 	return t;
 }
 
+void ds_task_clean( struct ds_task *t, int full_clean )
+{
+	t->time_when_commit_start = 0;
+	t->time_when_commit_end   = 0;
+	t->time_when_retrieval    = 0;
+	t->time_workers_execute_last = 0;
+
+	t->bytes_sent = 0;
+	t->bytes_received = 0;
+	t->bytes_transferred = 0;
+
+	free(t->output);
+	t->output = NULL;
+
+	free(t->hostname);
+	t->hostname = NULL;
+
+	free(t->host);
+	t->host = NULL;
+
+	if(full_clean) {
+		t->resource_request = CATEGORY_ALLOCATION_FIRST;
+		t->try_count = 0;
+		t->exhausted_attempts = 0;
+		t->fast_abort_count = 0;
+
+		t->time_workers_execute_all = 0;
+		t->time_workers_execute_exhaustion = 0;
+		t->time_workers_execute_failure = 0;
+
+		rmsummary_delete(t->resources_measured);
+		rmsummary_delete(t->resources_allocated);
+		t->resources_measured  = rmsummary_create(-1);
+		t->resources_allocated = rmsummary_create(-1);
+	}
+
+	/* If result is never updated, then it is mark as a failure. */
+	t->result = DS_RESULT_UNKNOWN;
+}
 
 static struct list *ds_task_file_list_clone(struct list *list)
 {
@@ -352,7 +391,7 @@ int ds_task_specify_url(struct ds_task *t, const char *file_url, const char *rem
 		//check if two different urls map to the same remote name for inputs.
 		list_first_item(t->input_files);
 		while((tf = (struct ds_file*)list_next_item(files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(file_url, tf->payload)) {
+			if(!strcmp(remote_name, tf->remote_name) && strcmp(file_url, tf->source)) {
 				fprintf(stderr, "Error: input url %s conflicts with another input pointing to same remote name (%s).\n", file_url, remote_name);
 				return 0;
 			}
@@ -407,7 +446,7 @@ int ds_task_specify_file(struct ds_task *t, const char *local_name, const char *
 		//check if two different local names map to the same remote name for inputs.
 		list_first_item(t->input_files);
 		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
+			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->source)){
 				fprintf(stderr, "Error: input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
 			}
@@ -427,7 +466,7 @@ int ds_task_specify_file(struct ds_task *t, const char *local_name, const char *
 		//check if two different different remote names map to the same local name for outputs.
 		list_first_item(files);
 		while((tf = (struct ds_file*)list_next_item(files))) {
-			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
+			if(!strcmp(local_name, tf->source) && strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
 			}
@@ -481,11 +520,11 @@ int ds_task_specify_directory(struct ds_task *t, const char *local_name, const c
 	}
 
 	//KNOWN HACK: Every file passes through make_cached_name() which expects the
-	//payload field to be set. So we simply set the payload to remote name if
+	//source field to be set. So we simply set the source to remote name if
 	//local name is null. This doesn't affect the behavior of the file transfers.
-	const char *payload = local_name ? local_name : remote_name;
+	const char *source = local_name ? local_name : remote_name;
 
-	tf = ds_file_create(payload, remote_name, DS_DIRECTORY, flags);
+	tf = ds_file_create(source, remote_name, DS_DIRECTORY, flags);
 	if(!tf) return 0;
 
 	list_push_tail(files, tf);
@@ -519,7 +558,7 @@ int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const 
 		//check if two different local names map to the same remote name for inputs.
 		list_first_item(t->input_files);
 		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->payload)){
+			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->source)){
 				fprintf(stderr, "Error: piece of input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
 			}
@@ -539,7 +578,7 @@ int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const 
 		//check if two different different remote names map to the same local name for outputs.
 		list_first_item(files);
 		while((tf = (struct ds_file*)list_next_item(files))) {
-			if(!strcmp(local_name, tf->payload) && strcmp(remote_name, tf->remote_name)) {
+			if(!strcmp(local_name, tf->source) && strcmp(remote_name, tf->remote_name)) {
 				fprintf(stderr, "Error: piece of output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
 				return 0;
 			}
@@ -598,15 +637,15 @@ int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, cons
 	tf = ds_file_create(NULL, remote_name, DS_BUFFER, flags);
 	if(!tf) return 0;
 
-	tf->payload = malloc(length);
-	if(!tf->payload) {
+	tf->source = malloc(length);
+	if(!tf->source) {
 		fprintf(stderr, "Error: failed to allocate memory for buffer with remote name %s and length %d bytes.\n", remote_name, length);
 		return 0;
 	}
 
 	tf->length  = length;
 
-	memcpy(tf->payload, data, length);
+	memcpy(tf->source, data, length);
 	list_push_tail(t->input_files, tf);
 
 	return 1;
@@ -633,7 +672,7 @@ int ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char 
 		//check if two different local names map to the same remote name for inputs.
 		list_first_item(t->input_files);
 		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(cmd, tf->payload)){
+			if(!strcmp(remote_name, tf->remote_name) && strcmp(cmd, tf->source)){
 				fprintf(stderr, "Error: input file command %s conflicts with another input pointing to same remote name (%s).\n", cmd, remote_name);
 				return 0;
 			}
@@ -699,6 +738,31 @@ void ds_task_specify_monitor_output(struct ds_task *t, const char *monitor_outpu
 	}
 
 	t->monitor_output_directory = xxstrdup(monitor_output_directory);
+}
+
+int ds_task_update_result(struct ds_task *t, ds_result_t new_result)
+{
+	if(new_result & ~(0x7)) {
+		/* Upper bits are set, so this is not related to old-style result for
+		 * inputs, outputs, or stdout, so we simply make an update. */
+		t->result = new_result;
+	} else if(t->result != DS_RESULT_UNKNOWN && t->result & ~(0x7)) {
+		/* Ignore new result, since we only update for input, output, or
+		 * stdout missing when no other result exists. This is because
+		 * missing inputs/outputs are anyway expected with other kind of
+		 * errors. */
+	} else if(new_result == DS_RESULT_INPUT_MISSING) {
+		/* input missing always appears by itself, so yet again we simply make an update. */
+		t->result = new_result;
+	} else if(new_result == DS_RESULT_OUTPUT_MISSING) {
+		/* output missing clobbers stdout missing. */
+		t->result = new_result;
+	} else {
+		/* we only get here for stdout missing. */
+		t->result = new_result;
+	}
+
+	return t->result;
 }
 
 void ds_task_delete(struct ds_task *t)
@@ -800,4 +864,36 @@ int64_t ds_task_get_metric( struct ds_task *t, const char *name )
 	METRIC(bytes_sent);
 	METRIC(bytes_transferred);
 	return 0;
+}
+
+const char *ds_task_state_string( ds_task_state_t task_state )
+{
+	const char *str;
+
+	switch(task_state) {
+		case DS_TASK_READY:
+			str = "WAITING";
+			break;
+		case DS_TASK_RUNNING:
+			str = "RUNNING";
+			break;
+		case DS_TASK_WAITING_RETRIEVAL:
+			str = "WAITING_RETRIEVAL";
+			break;
+		case DS_TASK_RETRIEVED:
+			str = "RETRIEVED";
+			break;
+		case DS_TASK_DONE:
+			str = "DONE";
+			break;
+		case DS_TASK_CANCELED:
+			str = "CANCELED";
+			break;
+		case DS_TASK_UNKNOWN:
+		default:
+			str = "UNKNOWN";
+			break;
+	}
+
+	return str;
 }
