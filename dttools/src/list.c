@@ -365,17 +365,21 @@ void list_delete(struct list *l) {
 	assert(ok);
 }
 
-void list_free(struct list *l) {
+void list_free(struct list *l)
+{
+	list_clear(l,free);
+}
+
+void list_clear(struct list *l, void (*delete_func)(void *item) )
+{
+	if(!l) return;
+
 	void *item;
 
-	if (!l)
-		return;
-
-	struct list_cursor *cur = list_cursor_create(l);
-	for (list_seek(cur, 0); list_get(cur, &item); list_next(cur)) {
-		free(item);
+	while((item=list_pop_head(l))) {
+		delete_func(item);
 	}
-	list_cursor_destroy(cur);
+
 }
 
 int list_push_head(struct list *l, void *item) {
