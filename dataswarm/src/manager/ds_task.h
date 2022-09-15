@@ -22,20 +22,18 @@ End user may only use the API described in dataswarm.h
 #include <stdint.h>
 
 struct ds_task {
-
         /***** Fixed properties of task at submit time. ******/
 
         int taskid;                  /**< A unique task id number. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
+	char *tag;                   /**< An optional user-defined logical name for the task. */
+	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref ds_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
 	struct list *input_files;    /**< The files to transfer to the worker and place in the executing directory. */
 	struct list *output_files;   /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
 	struct list *env_list;       /**< Environment variables applied to the task. */
-	struct list *features;       /**< User-defined features this task requires. (See ds_worker's --feature option.) */
-
-	char *tag;                   /**< An optional user-defined logical name for the task. */
-	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref ds_task_specify_category. If no explicit category is given, the label "default" is used. **/
+	struct list *feature_list;   /**< User-defined features this task requires. (See ds_worker's --feature option.) */
 
 	category_allocation_t resource_request; /**< See @ref category_allocation_t */
 	ds_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
@@ -43,18 +41,21 @@ struct ds_task {
 	int max_retries;             /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
 	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see ds_worker --wall-time)*/
 
+	/***** Internal state of task as it works towards completion. *****/
+
+	ds_task_state_t state;       /**< Current state of task: READY, RUNNING, etc */
+	struct ds_worker_info *worker;    /**< Worker to which this task has been dispatched. */
+	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref DS_RESULT_MAX_RETRIES. */
+	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
+	int fast_abort_count;        /**< Number of times this task has been terminated for running too long. */
+
 	/***** Results of task once it has reached completion. *****/
   
 	ds_result_t result;          /**< The result of the task (see @ref ds_result_t */
 	int exit_code;               /**< The exit code of the command line. */
 	char *output;                /**< The standard output of the task. */
-	char *host;                  /**< The address and port of the host on which it ran. */
+	char *addrport;              /**< The address and port of the host on which it ran. */
 	char *hostname;              /**< The name of the host on which it ran. */
-
-	/***** Internal counters for fault tolerance. *****/
-	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref DS_RESULT_MAX_RETRIES. */
-	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
-	int fast_abort_count;        /**< Number of times this task has been terminated for running too long. */
 
 	/***** Metrics available to the user at completion through ds_task_get_metric.  *****/
 	/* All times in microseconds */

@@ -532,6 +532,24 @@ then this function returns null.
 
 const char * ds_task_get_output( struct ds_task *t );
 
+/** Get the address and port of the worker on which the task ran.
+@param t A task object.
+@return A null-terminated string containing the address
+and port of the relevant worker. If the task did not run
+on a worker,  then this function returns null.
+*/
+
+const char * ds_task_get_addrport( struct ds_task *t );
+
+/** Get the hostname of the worker on which the task ran.
+@param t A task object.
+@return A null-terminated string containing the hostname
+of the relevant worker. If the task did not run
+on a worker,  then this function returns null.
+*/
+
+const char * ds_task_get_addrport( struct ds_task *t );
+
 /** Get a performance metric of a completed task.
 @param t A task object.
 @param name The name of a performance metric:
@@ -539,6 +557,7 @@ const char * ds_task_get_output( struct ds_task *t );
 */
 
 int64_t ds_task_get_metric( struct ds_task *t, const char *name );
+
 
 
 /** Delete a task.

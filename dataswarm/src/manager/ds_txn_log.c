@@ -58,7 +58,7 @@ void ds_txn_log_write_task(struct ds_manager *q, struct ds_task *t)
 	struct buffer B;
 	buffer_init(&B);
 
-	ds_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
+	ds_task_state_t state = t->state;
 
 	buffer_printf(&B, "TASK %d %s", t->taskid, ds_task_state_string(state));
 
@@ -96,7 +96,7 @@ void ds_txn_log_write_task(struct ds_manager *q, struct ds_task *t)
 			buffer_printf(&B, " {} {}");
 		}
 	} else {
-		struct ds_worker_info *w = itable_lookup(q->worker_task_map, t->taskid);
+		struct ds_worker_info *w = t->worker;
 		const char *worker_str = "worker-info-not-available";
 
 		if(w) {

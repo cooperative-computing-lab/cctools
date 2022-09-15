@@ -20,9 +20,6 @@ typedef enum {
 	DS_WORKER_TYPE_STATUS  = 4,    // connection is known to be a status client
 } ds_worker_type_t;
 
-#define DS_WORKER_ADDRPORT_MAX 64
-#define DS_WORKER_HASHKEY_MAX 32
-
 struct ds_worker_info {
 	/* Type of connection: unknown, worker, status client. */
 	ds_worker_type_t type;
@@ -39,10 +36,10 @@ struct ds_worker_info {
 	char *workerid;
 
 	/* Remote address of worker. */
-	char addrport[DS_WORKER_ADDRPORT_MAX];
+	char *addrport;
 
 	/* Hash key used to locally identify this worker. */
-	char hashkey[DS_WORKER_HASHKEY_MAX];
+	char *hashkey;
 
 	/* Address and port where this worker will accept transfers from peers. */
 	char transfer_addr[LINK_ADDRESS_MAX];

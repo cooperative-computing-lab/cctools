@@ -110,7 +110,6 @@ static void update_max_worker(struct ds_manager *q, struct ds_worker_info *w);
 
 static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state);
 
-static int task_state_is( struct ds_manager *q, uint64_t taskid, ds_task_state_t state);
 static int task_state_count( struct ds_manager *q, const char *category, ds_task_state_t state);
 static int task_request_count( struct ds_manager *q, const char *category, category_allocation_t request);
 
@@ -205,9 +204,9 @@ static int workers_with_tasks(struct ds_manager *q) {
 
 /* Convert a link pointer into a string that can be used as a key into a hash table. */
 
-static void link_to_hash_key(struct link *link, char *key)
+static char * link_to_hash_key(struct link *link )
 {
-	sprintf(key, "0x%p", link);
+	return string_format("0x%p",link);
 }
 
 /*
@@ -644,10 +643,7 @@ static void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 			list_push_tail(outdated_factories, f);
 		}
 	}
-	while ( list_size(outdated_factories) ) {
-		f = list_pop_head(outdated_factories);
-		ds_factory_info_remove(q,f->name);
-	}
+	list_clear(outdated_factories,(void*)ds_factory_info_delete);
 	list_delete(outdated_factories);
 }
 
@@ -878,8 +874,8 @@ static void add_worker(struct ds_manager *q)
 		return;
 	}
 
-	link_to_hash_key(link, w->hashkey);
-	sprintf(w->addrport, "%s:%d", addr, port);
+	w->hashkey = link_to_hash_key(link);
+	w->addrport = string_format("%s:%d",addr,port);
 
 	hash_table_insert(q->worker_table, w->hashkey, w);
 }
@@ -2196,16 +2192,13 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 		}
 	} else if(!strcmp(request, "task_status") || !strcmp(request, "tasks")) {
 		struct ds_task *t;
-		struct ds_worker_info *w;
-		struct jx *j;
 		uint64_t taskid;
 
 		itable_firstkey(q->tasks);
 		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
-			w = itable_lookup(q->worker_task_map, taskid);
-			ds_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, taskid);
+			struct ds_worker_info *w = t->worker;
 			if(w) {
-				j = task_to_jx(q,t,ds_task_state_string(state),w->hostname);
+				struct jx *j = task_to_jx(q,t,ds_task_state_string(t->state),w->hostname);
 				if(j) {
 					// Include detailed information on where the task is running:
 					// address and port, workspace
@@ -2220,7 +2213,7 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 					jx_array_insert(a, j);
 				}
 			} else {
-				j = task_to_jx(q,t,ds_task_state_string(state),0);
+				struct jx *j = task_to_jx(q,t,ds_task_state_string(t->state),0);
 				if(j) {
 					jx_array_insert(a, j);
 				}
@@ -2365,11 +2358,11 @@ messages available.
 static ds_result_code_t handle_worker(struct ds_manager *q, struct link *l)
 {
 	char line[DS_LINE_MAX];
-	char key[DS_LINE_MAX];
 	struct ds_worker_info *w;
 
-	link_to_hash_key(l, key);
+	char *key = link_to_hash_key(l);
 	w = hash_table_lookup(q->worker_table, key);
+	free(key);
 
 	ds_msg_code_t mcode;
 	mcode = ds_manager_recv(q, w, line, sizeof(line));
@@ -2773,14 +2766,15 @@ assignment and the new task state.
 static void commit_task_to_worker(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t)
 {
 	t->hostname = xxstrdup(w->hostname);
-	t->host = xxstrdup(w->addrport);
+	t->addrport = xxstrdup(w->addrport);
 
 	t->time_when_commit_start = timestamp_get();
 	ds_result_code_t result = start_one_task(q, w, t);
 	t->time_when_commit_end = timestamp_get();
 
 	itable_insert(w->current_tasks, t->taskid, t);
-	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
+
+	t->worker = w;
 
 	change_task_state(q, t, DS_TASK_RUNNING);
 
@@ -2803,23 +2797,24 @@ and change the task state.
 
 static void reap_task_from_worker(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, ds_task_state_t new_state)
 {
-	struct ds_worker_info *wr = itable_lookup(q->worker_task_map, t->taskid);
-
+	struct ds_worker_info *wr = t->worker;
 	if(wr != w)
 	{
+		/* XXX this seems like a bug, should we return quickly here? */
 		debug(D_DS, "Cannot reap task %d from worker. It is not being run by %s (%s)\n", t->taskid, w->hostname, w->addrport);
 	} else {
 		w->total_task_time += t->time_workers_execute_last;
 	}
 
-	//update tables.
 	struct rmsummary *task_box = itable_lookup(w->current_tasks_boxes, t->taskid);
 	if(task_box)
 		rmsummary_delete(task_box);
 
 	itable_remove(w->current_tasks_boxes, t->taskid);
 	itable_remove(w->current_tasks, t->taskid);
-	itable_remove(q->worker_task_map, t->taskid);
+
+	t->worker = 0;
+
 	change_task_state(q, t, new_state);
 
 	count_worker_resources(q, w);
@@ -2867,14 +2862,12 @@ and mark it as done.
 static int receive_one_task( struct ds_manager *q )
 {
 	struct ds_task *t;
-
-	struct ds_worker_info *w;
 	uint64_t taskid;
 
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
-		if( task_state_is(q, taskid, DS_TASK_WAITING_RETRIEVAL) ) {
-			w = itable_lookup(q->worker_task_map, taskid);
+		if( t->state==DS_TASK_WAITING_RETRIEVAL ) {
+			struct ds_worker_info *w = t->worker;
 			fetch_output_from_worker(q, w, taskid);
 			// Shutdown worker if appropriate.
 			if ( w->factory_name ) {
@@ -3018,7 +3011,7 @@ static int abort_slow_workers(struct ds_manager *q)
 		}
 
 		if(runtime >= (average_task_time * (multiplier + t->fast_abort_count))) {
-			w = itable_lookup(q->worker_task_map, t->taskid);
+			w = t->worker;
 			if(w && (w->type == DS_WORKER_TYPE_WORKER))
 			{
 				debug(D_DS, "Task %d is taking too long. Removing from worker.", t->taskid);
@@ -3106,8 +3099,7 @@ by sending the appropriate kill message and removing any undesired state.
 
 static int cancel_task_on_worker(struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state) {
 
-	struct ds_worker_info *w = itable_lookup(q->worker_task_map, t->taskid);
-
+	struct ds_worker_info *w = t->worker;
 	if (w) {
 		//send message to worker asking to kill its task.
 		ds_manager_send(q,w, "kill %d\n",t->taskid);
@@ -3249,11 +3241,8 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 
 	q->tasks          = itable_create(0);
 
-	q->task_state_map = itable_create(0);
-
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
-	q->worker_task_map = itable_create(0);
 
 	q->factory_table = hash_table_create(0, 0);
 	q->fetch_factory = 0;
@@ -3280,7 +3269,7 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 
 	q->stats->time_when_started = timestamp_get();
 	q->time_last_large_tasks_check = timestamp_get();
-	q->task_reports = list_create();
+	q->task_info_list = list_create();
 
 	q->time_last_wait = 0;
 	q->time_last_log_stats = 0;
@@ -3520,6 +3509,7 @@ void ds_delete(struct ds_manager *q)
 
 	if(q->catalog_hosts) free(q->catalog_hosts);
 
+	/* XXX this may be a leak, should workers be deleted as well? */
 	hash_table_delete(q->worker_table);
 
 	hash_table_clear(q->factory_table,(void*)ds_factory_info_delete);
@@ -3527,8 +3517,6 @@ void ds_delete(struct ds_manager *q)
 
 	hash_table_clear(q->worker_blocklist,(void*)ds_blocklist_info_delete);
 	hash_table_delete(q->worker_blocklist);
-
-	itable_delete(q->worker_task_map);
 
 	char *key;
 	struct category *c;
@@ -3541,16 +3529,10 @@ void ds_delete(struct ds_manager *q)
 	list_delete(q->ready_list);
 	itable_delete(q->tasks);
 
-	itable_delete(q->task_state_map);
-
 	hash_table_delete(q->workers_with_available_results);
 
-	struct ds_task_info *tr;
-	list_first_item(q->task_reports);
-	while((tr = list_next_item(q->task_reports))) {
-		ds_task_info_delete(tr);
-	}
-	list_delete(q->task_reports);
+	list_clear(q->task_info_list,(void*)ds_task_info_delete);
+	list_delete(q->task_info_list);
 
 	free(q->stats);
 	free(q->stats_disconnected_workers);
@@ -3742,18 +3724,23 @@ static void push_task_to_ready_list( struct ds_manager *q, struct ds_task *t )
 	ds_task_clean(t,0);
 }
 
-
-ds_task_state_t ds_task_state(struct ds_manager *q, int taskid) {
-	return (int)(uintptr_t)itable_lookup(q->task_state_map, taskid);
+ds_task_state_t ds_task_state( struct ds_manager *q, int taskid )
+{
+	struct ds_task *t = itable_lookup(q->tasks,taskid);
+	if(t) {
+		return t->state;
+	} else {
+		return DS_TASK_UNKNOWN;
+	}
 }
 
 /* Changes task state. Returns old state */
 /* State of the task. One of DS_TASK(UNKNOWN|READY|RUNNING|WAITING_RETRIEVAL|RETRIEVED|DONE) */
 static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *t, ds_task_state_t new_state ) {
 
-	ds_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
-	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
-	// remove from current tables:
+	ds_task_state_t old_state = t->state;
+
+	t->state = new_state;
 
 	if( old_state == DS_TASK_READY ) {
 		// Treat DS_TASK_READY specially, as it has the order of the tasks
@@ -3784,11 +3771,9 @@ static ds_task_state_t change_task_state( struct ds_manager *q, struct ds_task *
 	return old_state;
 }
 
-static int task_in_terminal_state(struct ds_manager *q, struct ds_task *t) {
-
-	ds_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
-
-	switch(state) {
+static int task_in_terminal_state(struct ds_manager *q, struct ds_task *t)
+{
+	switch(t->state) {
 		case DS_TASK_READY:
 		case DS_TASK_RUNNING:
 		case DS_TASK_WAITING_RETRIEVAL:
@@ -3856,19 +3841,13 @@ const char *ds_result_str(ds_result_t result) {
 	return str;
 }
 
-static int task_state_is( struct ds_manager *q, uint64_t taskid, ds_task_state_t state) {
-	return itable_lookup(q->task_state_map, taskid) == (void *) state;
-}
-
 static struct ds_task *task_state_any(struct ds_manager *q, ds_task_state_t state) {
 	struct ds_task *t;
 	uint64_t taskid;
 
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
-		if( task_state_is(q, taskid, state) ) {
-			return t;
-		}
+		if( t->state==state ) return t;
 	}
 
 	return NULL;
@@ -3880,7 +3859,7 @@ static struct ds_task *task_state_any_with_tag(struct ds_manager *q, ds_task_sta
 
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
-		if( task_state_is(q, taskid, state) && tasktag_comparator((void *) t, (void *) tag)) {
+		if( t->state==state && tasktag_comparator((void *) t, (void *) tag)) {
 			return t;
 		}
 	}
@@ -3896,7 +3875,7 @@ static int task_state_count(struct ds_manager *q, const char *category, ds_task_
 
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
-		if( task_state_is(q, taskid, state) ) {
+		if( t->state==state ) {
 			if(!category || strcmp(category, t->category) == 0) {
 				count++;
 			}

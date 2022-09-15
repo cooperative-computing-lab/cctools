@@ -1,11 +1,17 @@
 /*
-Store a report summarizing the performance of a completed task.
-Keep a list of reports equal to the number of workers connected.
-Used for computing queue capacity below.
+Copyright (C) 2022- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
 */
 
 #ifndef DS_TASK_INFO_H
 #define DS_TASK_INFO_H
+
+/*
+Store a report summarizing the performance of a completed task.
+Keep a list of reports equal to the number of workers connected.
+Used for computing queue capacity below.
+*/
 
 #include "ds_task.h"
 #include "ds_manager.h"

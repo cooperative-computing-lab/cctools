@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2022- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #include "ds_manager.h"
 #include "ds_task_info.h"
@@ -42,14 +47,14 @@ void ds_task_info_add(struct ds_manager *q, struct ds_task *t)
 
 	struct ds_task_info *ti = ds_task_info_create(t);
 
-	list_push_tail(q->task_reports, ti);
+	list_push_tail(q->task_info_list, ti);
 
 	// Trim the list, but never below its previous size.
 	static int count = DS_TASK_INFO_MIN_SIZE;
 	count = MAX(count, 2*q->stats->tasks_on_workers);
 
-	while(list_size(q->task_reports) >= count) {
-		ti = list_pop_head(q->task_reports);
+	while(list_size(q->task_info_list) >= count) {
+		ti = list_pop_head(q->task_info_list);
 		ds_task_info_delete(ti);
 	}
 }
@@ -66,7 +71,7 @@ void ds_task_info_compute_capacity(const struct ds_manager *q, struct ds_stats *
 
 	struct ds_task_info *ti;
 	double alpha = 0.05;
-	int count = list_size(q->task_reports);
+	int count = list_size(q->task_info_list);
 	int capacity_instantaneous = 0;
 
 	// Compute the average task properties.
@@ -85,8 +90,8 @@ void ds_task_info_compute_capacity(const struct ds_manager *q, struct ds_stats *
 		count = 1;
 	} else {
 		// Sum up the task reports available.
-		list_first_item(q->task_reports);
-		while((ti = list_next_item(q->task_reports))) {
+		list_first_item(q->task_info_list);
+		while((ti = list_next_item(q->task_info_list))) {
 			capacity->transfer_time += ti->transfer_time;
 			capacity->exec_time     += ti->exec_time;
 			capacity->manager_time   += ti->manager_time;
@@ -99,7 +104,7 @@ void ds_task_info_compute_capacity(const struct ds_manager *q, struct ds_stats *
 			}
 		}
 
-		ti = list_peek_tail(q->task_reports);
+		ti = list_peek_tail(q->task_info_list);
 		if(ti->transfer_time > 0) {
 			capacity_instantaneous = DIV_INT_ROUND_UP(ti->exec_time, (ti->transfer_time + ti->manager_time));
 			q->stats->capacity_weighted = (int) ceil((alpha * (float) capacity_instantaneous) + ((1.0 - alpha) * q->stats->capacity_weighted));
