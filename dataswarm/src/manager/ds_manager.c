@@ -3272,7 +3272,7 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 
 	q->stats->time_when_started = timestamp_get();
 	q->time_last_large_tasks_check = timestamp_get();
-	q->task_reports = list_create();
+	q->task_info_list = list_create();
 
 	q->time_last_wait = 0;
 	q->time_last_log_stats = 0;
@@ -3534,11 +3534,11 @@ void ds_delete(struct ds_manager *q)
 	hash_table_delete(q->workers_with_available_results);
 
 	struct ds_task_info *tr;
-	list_first_item(q->task_reports);
-	while((tr = list_next_item(q->task_reports))) {
+	list_first_item(q->task_info_list);
+	while((tr = list_next_item(q->task_info_list))) {
 		ds_task_info_delete(tr);
 	}
-	list_delete(q->task_reports);
+	list_delete(q->task_info_list);
 
 	free(q->stats);
 	free(q->stats_disconnected_workers);
