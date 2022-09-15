@@ -761,8 +761,6 @@ int ds_task_update_result(struct ds_task *t, ds_result_t new_result)
 
 void ds_task_delete(struct ds_task *t)
 {
-	struct ds_file *f;
-
 	if(!t) return;
 
 	free(t->command_line);
@@ -770,33 +768,17 @@ void ds_task_delete(struct ds_task *t)
 	free(t->tag);
 	free(t->category);
 
-	if(t->input_files) {
-		while((f = list_pop_tail(t->input_files))) {
-			ds_file_delete(f);
-		}
-		list_delete(t->input_files);
-	}
-	if(t->output_files) {
-		while((f = list_pop_tail(t->output_files))) {
-			ds_file_delete(f);
-		}
-		list_delete(t->output_files);
-	}
-	if(t->env_list) {
-		char *var;
-		while((var=list_pop_tail(t->env_list))) {
-			free(var);
-		}
-		list_delete(t->env_list);
-	}
+	list_clear(t->input_files,(void*)ds_file_delete);
+	list_delete(t->input_files);
 
-	if(t->feature_list) {
-		char *feature;
-		while((feature=list_pop_tail(t->feature_list))) {
-			free(feature);
-		}
-		list_delete(t->feature_list);
-	}
+	list_clear(t->output_files,(void*)ds_file_delete);
+	list_delete(t->output_files);
+
+	list_clear(t->env_list,(void*)free);
+	list_delete(t->env_list);
+
+	list_clear(t->feature_list,(void*)free);
+	list_delete(t->feature_list);
 
 	free(t->output);
 	free(t->addrport);

@@ -85,10 +85,7 @@ struct list *ds_catalog_query_cached( const char *catalog_host, int catalog_port
 	prev_regex = xxstrdup(project_regex);
 
 	if(managers_list) {
-		struct jx *j;
-		while((j=list_pop_head(managers_list))) {
-			jx_delete(j);
-		}
+		list_clear(managers_list,(void*)jx_delete);
 		list_delete(managers_list);
 	}
 

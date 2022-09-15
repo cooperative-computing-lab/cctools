@@ -643,10 +643,7 @@ static void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 			list_push_tail(outdated_factories, f);
 		}
 	}
-	while ( list_size(outdated_factories) ) {
-		f = list_pop_head(outdated_factories);
-		ds_factory_info_remove(q,f->name);
-	}
+	list_clear(outdated_factories,(void*)ds_factory_info_delete);
 	list_delete(outdated_factories);
 }
 
@@ -3512,6 +3509,7 @@ void ds_delete(struct ds_manager *q)
 
 	if(q->catalog_hosts) free(q->catalog_hosts);
 
+	/* XXX this may be a leak, should workers be deleted as well? */
 	hash_table_delete(q->worker_table);
 
 	hash_table_clear(q->factory_table,(void*)ds_factory_info_delete);
@@ -3533,11 +3531,7 @@ void ds_delete(struct ds_manager *q)
 
 	hash_table_delete(q->workers_with_available_results);
 
-	struct ds_task_info *tr;
-	list_first_item(q->task_info_list);
-	while((tr = list_next_item(q->task_info_list))) {
-		ds_task_info_delete(tr);
-	}
+	list_clear(q->task_info_list,(void*)ds_task_info_delete);
 	list_delete(q->task_info_list);
 
 	free(q->stats);
