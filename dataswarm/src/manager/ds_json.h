@@ -7,19 +7,23 @@ See the file COPYING for details.
 #ifndef DS_JSON_H
 #define DS_JSON_H
 
-/** @file ds_json.h A manager-worker library.
- The work queue provides an implementation of the manager-worker computing model
- using TCP sockets, Unix applications, and files as intermediate buffers.  A
- manager process uses @ref ds_json_create to create a queue, then @ref
- ds_json_submit to submit tasks. Once tasks are running, call @ref
- ds_json_wait to wait for completion.
+/** @file ds_json.h Provides a higher-level JSON-oriented abstraction
+on top of the standard C interface in @ref dataswarm.h.
+
+An application uses  @ref ds_json_create to create a manager,
+then @ref ds_json_submit to submit tasks, and @ref ds_json_wait to
+wait for completion.  Details of tasks and the manager are carried
+in JSON details (which must be parsed) rather than in C structures.
+
+This module is used as the basis for building interfaces to
+dynamic languages outside of C.
 */
 
 #include "ds_manager.h"
 
 /** Create a new work_queue object.
 @param str A json document with properties to configure a new queue. Allowed properties are port, name, and priority.
-@return A new work queue, or null if it could not be created.
+@return A new manager, or null if it could not be created.
  */
 struct ds_manager *ds_json_create(const char *str);
 
@@ -28,7 +32,7 @@ Once a task is submitted to a queue, it is not longer under the user's
 control and should not be inspected until returned via @ref ds_wait.
 Once returned, it is safe to re-submit the same take object via
 @ref ds_submit.
-@param q A work queue object.
+@param q A manager object.
 @param str A JSON description of a task.
 
 task document: (only "command_line" is required.)
@@ -63,7 +67,7 @@ environment document:
 int ds_json_submit(struct ds_manager *q, const char *str);
 
 /** Wait for a task to complete.
-@param q A work queue object.
+@param q A manager object.
 @param timeout The number of seconds to wait for a completed task before
 returning. Use an integer time to set the timeout or the constant
 @ref DS_WAITFORTASK to block until a task has completed.
@@ -80,15 +84,15 @@ char *ds_json_wait(struct ds_manager *q, int timeout);
 
 
 /** Remove a task from the queue.
-@param q A work queue object.
+@param q A manager object.
 @param id The id of the task to be removed from the queue.
 @return A JSON description of the removed task.
 */
 char *ds_json_remove(struct ds_manager *q, int id);
 
-/** Get the status for a given work queue.
-@param q A work queue object.
-@return A JSON description of the stats of the given work queue object.
+/** Get the status for a given manager.
+@param q A manager object.
+@return A JSON description of the stats of the given manager object.
 */
 char *ds_json_get_status(struct ds_manager *q);
 
