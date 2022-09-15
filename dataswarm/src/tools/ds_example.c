@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 
 	/*
 	   Usually, we can execute the gzip utility by simply typing its name at a
-	   terminal. However, this is not enough for work queue; we have to specify
+	   terminal. However, this is not enough for dataswarm; we have to specify
 	   precisely which files need to be transmitted to the workers. We record
 	   the location of gzip in 'gzip_path', which is usually found in /bin/gzip
 	   or /usr/bin/gzip. We use the 'access' function (from unistd.h standard C
