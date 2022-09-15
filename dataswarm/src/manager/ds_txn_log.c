@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2022- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #include "ds_txn_log.h"
 #include "ds_worker_info.h"
