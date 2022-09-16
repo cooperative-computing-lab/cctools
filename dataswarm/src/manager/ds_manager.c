@@ -4492,6 +4492,12 @@ void ds_enable_process_module(struct ds_manager *q)
 	q->process_pending_check = 1;
 }
 
+/*
+Almost but not quite implemented:
+need to call ds_manager_summarize_workers
+and convert to a reasonable text form.
+*/
+
 char * ds_get_worker_summary( struct ds_manager *q )
 {
 	return strdup("n/a");
@@ -4887,127 +4893,6 @@ int ds_specify_min_taskid(struct ds_manager *q, int minid) {
 	}
 
 	return q->next_taskid;
-}
-
-//the functions below are used by qsort in order to sort the workers summary data
-size_t sort_ds_worker_summary_offset = 0;
-
-static int sort_ds_worker_cmp(const void *a, const void *b)
-{
-	const struct rmsummary *x = *((const struct rmsummary **) a);
-	const struct rmsummary *y = *((const struct rmsummary **) b);
-
-	double count_x = x->workers;
-	double count_y = y->workers;
-
-	double res_x = rmsummary_get_by_offset(x, sort_ds_worker_summary_offset);
-	double res_y = rmsummary_get_by_offset(y, sort_ds_worker_summary_offset);
-
-
-	if(res_x == res_y) {
-		return count_y - count_x;
-	}
-	else {
-		return res_y - res_x;
-	}
-}
-
-
-// function used by other functions
-static void sort_ds_worker_summary(struct rmsummary **worker_data, int count, const char *sortby)
-{
-	if(!strcmp(sortby, "cores")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, cores);
-	} else if(!strcmp(sortby, "memory")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, memory);
-	} else if(!strcmp(sortby, "disk")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, disk);
-	} else if(!strcmp(sortby, "gpus")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, gpus);
-	} else if(!strcmp(sortby, "workers")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, workers);
-	} else {
-		debug(D_NOTICE, "Invalid field to sort worker summaries. Valid fields are: cores, memory, disk, gpus, and workers.");
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, memory);
-	}
-
-	qsort(&worker_data[0], count, sizeof(struct rmsummary *), sort_ds_worker_cmp);
-}
-
-
-// round to powers of two log scale with 1/n divisions
-static double round_to_nice_power_of_2(double value, int n) {
-	double exp_org = log2(value);
-	double below = pow(2, floor(exp_org));
-
-	double rest = value - below;
-	double fact = below/n;
-
-	double rounded = below + floor(rest/fact) * fact;
-
-	return rounded;
-}
-
-
-struct rmsummary **ds_workers_summary(struct ds_manager *q) {
-	struct ds_worker_info *w;
-	struct rmsummary *s;
-	char *id;
-	char *resources_key;
-
-
-	struct hash_table *workers_count = hash_table_create(0, 0);
-
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**) &w)) {
-		if (w->resources->tag < 0) {
-			// worker has not yet declared resources
-			continue;
-		}
-
-		int cores = w->resources->cores.total;
-		int memory = round_to_nice_power_of_2(w->resources->memory.total, 8);
-		int disk = round_to_nice_power_of_2(w->resources->disk.total, 8);
-		int gpus = w->resources->gpus.total;
-
-		char *resources_key = string_format("%d_%d_%d_%d", cores, memory, disk, gpus);
-
-		struct rmsummary *s = hash_table_lookup(workers_count, resources_key);
-		if(!s) {
-			s = rmsummary_create(-1);
-			s->cores = cores;
-			s->memory = memory;
-			s->disk = disk;
-			s->gpus = gpus;
-			s->workers = 0;
-
-			hash_table_insert(workers_count, resources_key, (void *) s);
-		}
-		free(resources_key);
-
-		s->workers++;
-	}
-
-	int count = 0;
-	struct rmsummary **worker_data = (struct rmsummary **) malloc((hash_table_size(workers_count) + 1) * sizeof(struct rmsummary *));
-
-	hash_table_firstkey(workers_count);
-	while(hash_table_nextkey(workers_count, &resources_key, (void**) &s)) {
-		worker_data[count] = s;
-		count++;
-	}
-
-	worker_data[count] = NULL;
-
-	hash_table_delete(workers_count);
-
-	sort_ds_worker_summary(worker_data, count, "disk");
-	sort_ds_worker_summary(worker_data, count, "memory");
-	sort_ds_worker_summary(worker_data, count, "gpus");
-	sort_ds_worker_summary(worker_data, count, "cores");
-	sort_ds_worker_summary(worker_data, count, "workers");
-
-	return worker_data;
 }
 
 /* vim: set noexpandtab tabstop=4: */

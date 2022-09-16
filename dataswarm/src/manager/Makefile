@@ -6,6 +6,7 @@ SOURCES = \
 	ds_manager.c \
 	ds_manager_get.c \
 	ds_manager_put.c \
+	ds_manager_summarize.c \
 	ds_schedule.c \
 	ds_worker_info.c \
 	ds_catalog.c \
