@@ -425,8 +425,8 @@ void ds_schedule_check_for_large_tasks( struct ds_manager *q )
 		// check each task against the queue of connected workers
 		ds_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q,t);
 		if(bit_set) {
-			rmsummary_merge_max(largest_unfit_task, task_max_resources(q, t));
-			rmsummary_merge_max(largest_unfit_task, task_min_resources(q, t));
+			rmsummary_merge_max(largest_unfit_task, ds_manager_task_max_resources(q, t));
+			rmsummary_merge_max(largest_unfit_task, ds_manager_task_min_resources(q, t));
 		}
 		if (bit_set & CORES_BIT) {
 			unfit_core++;

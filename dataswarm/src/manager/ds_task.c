@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "ds_manager.h"
 #include "ds_task.h"
+#include "ds_worker_info.h"
 #include "ds_file.h"
 
 #include "list.h"
@@ -22,6 +23,7 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <assert.h>
 #include <string.h>
+#include <math.h>
 
 struct ds_task *ds_task_create(const char *command_line)
 {
@@ -883,4 +885,67 @@ const char *ds_task_state_string( ds_task_state_t task_state )
 	}
 
 	return str;
+}
+
+static void priority_add_to_jx(struct jx *j, double priority)
+{
+	int decimals = 2;
+	int factor   = pow(10, decimals);
+
+	int dpart = ((int) (priority * factor)) - ((int) priority) * factor;
+
+	char *str;
+
+	if(dpart == 0)
+		str = string_format("%d", (int) priority);
+	else
+		str = string_format("%.2g", priority);
+
+	jx_insert_string(j, "priority", str);
+
+	free(str);
+}
+
+struct jx * ds_task_to_jx( struct ds_manager *q, struct ds_task *t )
+{
+	struct jx *j = jx_object(0);
+
+	jx_insert_integer(j,"taskid",t->taskid);
+	jx_insert_string(j,"state",ds_task_state_string(t->state));
+	if(t->tag) jx_insert_string(j,"tag",t->tag);
+	if(t->category) jx_insert_string(j,"category",t->category);
+	jx_insert_string(j,"command",t->command_line);
+	if(t->coprocess) jx_insert_string(j,"coprocess",t->coprocess);
+	if(t->worker) {
+		jx_insert_string(j, "addrport", t->worker->addrport);
+		jx_insert_string(j,"host",t->worker->hostname);
+
+		jx_insert_integer(j,"cores",t->resources_allocated->cores);
+		jx_insert_integer(j,"gpus",t->resources_allocated->gpus);
+		jx_insert_integer(j,"memory",t->resources_allocated->memory);
+		jx_insert_integer(j,"disk",t->resources_allocated->disk);
+	} else {
+		const struct rmsummary *min = ds_manager_task_min_resources(q, t);
+		const struct rmsummary *max = ds_manager_task_max_resources(q, t);
+
+		struct rmsummary *limits = rmsummary_create(-1);
+		rmsummary_merge_override(limits, max);
+		rmsummary_merge_max(limits, min);
+
+		jx_insert_integer(j,"cores",limits->cores);
+		jx_insert_integer(j,"gpus",limits->gpus);
+		jx_insert_integer(j,"memory",limits->memory);
+		jx_insert_integer(j,"disk",limits->disk);
+
+		rmsummary_delete(limits);
+	}
+
+	jx_insert_integer(j, "time_when_submitted", t->time_when_submitted);
+	jx_insert_integer(j, "time_when_commit_start", t->time_when_commit_start);
+	jx_insert_integer(j, "time_when_commit_end", t->time_when_commit_end);
+	jx_insert_integer(j, "current_time", timestamp_get());
+
+	priority_add_to_jx(j, t->priority);
+
+	return j;
 }
