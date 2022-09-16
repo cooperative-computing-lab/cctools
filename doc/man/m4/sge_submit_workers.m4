@@ -41,7 +41,7 @@ OPTION_ARG(P,--password, file)Password file to authenticate workers to manager.
 OPTION_ARG_LONG(cores, cores)Set the number of cores each worker should use (0=auto). (default=1)
 OPTION_ARG_LONG(memory, size)Manually set the amonut of memory (in MB) reported by this worker.
 OPTION_ARG_LONG(disk, size)Manually set the amount of disk (in MB) reported by this worker.
-OPTION_ARG_LONG(scratch-dir, path)Set the scratch directory location created on the local machine. (default=/tmp/USER-workers) 
+OPTION_ARG_LONG(scratch-dir, path)Set the scratch directory location created on the local machine. (default=${USER}-workers) 
 OPTION_FLAG_SHORT(j)Use job array to submit workers.
 OPTION_ARG_SHORT(-p, parameters)SGE qsub parameters.
 OPTION_FLAG(h,help)Show help message.
