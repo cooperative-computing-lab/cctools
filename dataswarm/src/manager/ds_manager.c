@@ -1706,7 +1706,7 @@ static struct rmsummary *category_alloc_info(struct ds_manager *q, struct catego
 	w->resources->disk.largest = q->current_max_worker->disk;
 	w->resources->gpus.largest = q->current_max_worker->gpus;
 
-	struct rmsummary *allocation = task_worker_box_size(q, w, t);
+	struct rmsummary *allocation = ds_manager_choose_resources_for_task(q, w, t);
 
 	ds_task_delete(t);
 	ds_resources_delete(w->resources);
@@ -2321,7 +2321,11 @@ static int build_poll_table(struct ds_manager *q )
 	return n;
 }
 
-struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t) {
+/*
+Determine the resources to allocate for a given task when assigned to a specific worker.
+*/
+
+struct rmsummary *ds_manager_choose_resources_for_task( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t ) {
 
 	const struct rmsummary *min = ds_manager_task_min_resources(q, t);
 	const struct rmsummary *max = ds_manager_task_max_resources(q, t);
@@ -2445,7 +2449,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_in
 {
 	/* wrap command at the last minute, so that we have the updated information
 	 * about resources. */
-	struct rmsummary *limits = task_worker_box_size(q, w, t);
+	struct rmsummary *limits = ds_manager_choose_resources_for_task(q, w, t);
 
 	char *command_line;
 	if(q->monitor_mode && !t->coprocess) {

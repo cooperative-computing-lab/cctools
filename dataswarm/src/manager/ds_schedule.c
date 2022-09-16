@@ -48,7 +48,7 @@ static int check_worker_against_task(struct ds_manager *q, struct ds_worker_info
 		return 0;
 	}
 
-	struct rmsummary *l = task_worker_box_size(q, w, t);
+	struct rmsummary *l = ds_manager_choose_resources_for_task(q, w, t);
 	struct ds_resources *r = w->resources;
 
 	int ok = 1;
@@ -350,7 +350,7 @@ static ds_resource_bitmask_t is_task_larger_than_worker(struct ds_manager *q, st
 	}
 
 	ds_resource_bitmask_t set = 0;
-	struct rmsummary *l = task_worker_box_size(q,w,t);
+	struct rmsummary *l = ds_manager_choose_resources_for_task(q,w,t);
 
 	// baseline resurce comparison of worker total resources and a task requested resorces
 

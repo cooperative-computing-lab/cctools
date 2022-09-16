@@ -188,7 +188,8 @@ int ds_manager_available_workers(struct ds_manager *q);
 const struct rmsummary *ds_manager_task_min_resources(struct ds_manager *q, struct ds_task *t);
 const struct rmsummary *ds_manager_task_max_resources(struct ds_manager *q, struct ds_task *t);
 
-struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t);
+struct rmsummary *ds_manager_choose_resources_for_task( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
+
 int64_t overcommitted_resource_total(struct ds_manager *q, int64_t total);
 
 /* The expected format of files created by the resource monitor.*/
