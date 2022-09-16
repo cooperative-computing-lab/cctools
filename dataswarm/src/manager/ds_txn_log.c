@@ -67,7 +67,7 @@ void ds_txn_log_write_task(struct ds_manager *q, struct ds_task *t)
 	} else if(state == DS_TASK_READY) {
 		const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
 		buffer_printf(&B, " %s %s ", t->category, allocation);
-		rmsummary_print_buffer(&B, task_min_resources(q, t), 1);
+		rmsummary_print_buffer(&B, ds_manager_task_min_resources(q, t), 1);
 	} else if(state == DS_TASK_CANCELED) {
 			/* do not add any info */
 	} else if(state == DS_TASK_RETRIEVED || state == DS_TASK_DONE) {

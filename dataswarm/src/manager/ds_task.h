@@ -92,5 +92,7 @@ void ds_task_clean( struct ds_task *t, int full_clean );
 
 const char *ds_task_state_string( ds_task_state_t task_state );
 
+struct jx * ds_task_to_jx( struct ds_manager *q, struct ds_task *t );
+
 
 #endif

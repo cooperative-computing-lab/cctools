@@ -1577,7 +1577,7 @@ static struct rmsummary  *total_resources_needed(struct ds_manager *q) {
 	/* for waiting tasks, we use what they would request if dispatched right now. */
 	list_first_item(q->ready_list);
 	while((t = list_next_item(q->ready_list))) {
-		const struct rmsummary *s = task_min_resources(q, t);
+		const struct rmsummary *s = ds_manager_task_min_resources(q, t);
 		rmsummary_add(total, s);
 	}
 
@@ -1706,7 +1706,7 @@ static struct rmsummary *category_alloc_info(struct ds_manager *q, struct catego
 	w->resources->disk.largest = q->current_max_worker->disk;
 	w->resources->gpus.largest = q->current_max_worker->gpus;
 
-	struct rmsummary *allocation = task_worker_box_size(q, w, t);
+	struct rmsummary *allocation = ds_manager_choose_resources_for_task(q, w, t);
 
 	ds_task_delete(t);
 	ds_resources_delete(w->resources);
@@ -2016,112 +2016,6 @@ static struct jx * queue_lean_to_jx( struct ds_manager *q )
 	return j;
 }
 
-static void current_tasks_to_jx( struct jx *j, struct ds_worker_info *w )
-{
-	struct ds_task *t;
-	uint64_t taskid;
-	int n = 0;
-
-	itable_firstkey(w->current_tasks);
-	while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
-		char task_string[DS_LINE_MAX];
-
-		sprintf(task_string, "current_task_%03d_id", n);
-		jx_insert_integer(j,task_string,t->taskid);
-
-		sprintf(task_string, "current_task_%03d_command", n);
-		jx_insert_string(j,task_string,t->command_line);
-		n++;
-	}
-}
-
-static struct jx * worker_to_jx( struct ds_manager *q, struct ds_worker_info *w )
-{
-	struct jx *j = jx_object(0);
-	if(!j) return 0;
-
-	if(strcmp(w->hostname, "QUEUE_STATUS") == 0){
-		return 0;
-	}
-	jx_insert_string(j,"hostname",w->hostname);
-	jx_insert_string(j,"os",w->os);
-	jx_insert_string(j,"arch",w->arch);
-	jx_insert_string(j,"address_port",w->addrport);
-	jx_insert_integer(j,"ncpus",w->resources->cores.total);
-	jx_insert_integer(j,"total_tasks_complete",w->total_tasks_complete);
-	jx_insert_integer(j,"total_tasks_running",itable_size(w->current_tasks));
-	jx_insert_integer(j,"total_bytes_transferred",w->total_bytes_transferred);
-	jx_insert_integer(j,"total_transfer_time",w->total_transfer_time);
-	jx_insert_integer(j,"start_time",w->start_time);
-	jx_insert_integer(j,"current_time",timestamp_get());
-
-
-	ds_resources_add_to_jx(w->resources,j);
-
-	current_tasks_to_jx(j, w);
-
-	return j;
-}
-
-static void priority_add_to_jx(struct jx *j, double priority)
-{
-	int decimals = 2;
-	int factor   = pow(10, decimals);
-
-	int dpart = ((int) (priority * factor)) - ((int) priority) * factor;
-
-	char *str;
-
-	if(dpart == 0)
-		str = string_format("%d", (int) priority);
-	else
-		str = string_format("%.2g", priority);
-
-	jx_insert_string(j, "priority", str);
-
-	free(str);
-}
-
-
-static struct jx * task_to_jx( struct ds_manager *q, struct ds_task *t, const char *state, const char *host )
-{
-	struct jx *j = jx_object(0);
-
-	jx_insert_integer(j,"taskid",t->taskid);
-	jx_insert_string(j,"state",state);
-	if(t->tag) jx_insert_string(j,"tag",t->tag);
-	if(t->category) jx_insert_string(j,"category",t->category);
-	jx_insert_string(j,"command",t->command_line);
-	if(t->coprocess) jx_insert_string(j,"coprocess",t->coprocess);
-	if(host) jx_insert_string(j,"host",host);
-
-	if(host) {
-		jx_insert_integer(j,"cores",t->resources_allocated->cores);
-		jx_insert_integer(j,"gpus",t->resources_allocated->gpus);
-		jx_insert_integer(j,"memory",t->resources_allocated->memory);
-		jx_insert_integer(j,"disk",t->resources_allocated->disk);
-	} else {
-		const struct rmsummary *min = task_min_resources(q, t);
-		const struct rmsummary *max = task_max_resources(q, t);
-		struct rmsummary *limits = rmsummary_create(-1);
-
-		rmsummary_merge_override(limits, max);
-		rmsummary_merge_max(limits, min);
-
-		jx_insert_integer(j,"cores",limits->cores);
-		jx_insert_integer(j,"gpus",limits->gpus);
-		jx_insert_integer(j,"memory",limits->memory);
-		jx_insert_integer(j,"disk",limits->disk);
-
-		rmsummary_delete(limits);
-	}
-
-	priority_add_to_jx(j, t->priority);
-
-
-	return j;
-}
-
 /*
 Send a brief human-readable index listing the data
 types that can be queried via this API.
@@ -2196,28 +2090,8 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 
 		itable_firstkey(q->tasks);
 		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
-			struct ds_worker_info *w = t->worker;
-			if(w) {
-				struct jx *j = task_to_jx(q,t,ds_task_state_string(t->state),w->hostname);
-				if(j) {
-					// Include detailed information on where the task is running:
-					// address and port, workspace
-					jx_insert_string(j, "address_port", w->addrport);
-
-					// Timestamps on running task related events
-					jx_insert_integer(j, "time_when_submitted", t->time_when_submitted);
-					jx_insert_integer(j, "time_when_commit_start", t->time_when_commit_start);
-					jx_insert_integer(j, "time_when_commit_end", t->time_when_commit_end);
-					jx_insert_integer(j, "current_time", timestamp_get());
-
-					jx_array_insert(a, j);
-				}
-			} else {
-				struct jx *j = task_to_jx(q,t,ds_task_state_string(t->state),0);
-				if(j) {
-					jx_array_insert(a, j);
-				}
-			}
+			struct jx *j = ds_task_to_jx(q,t);
+			if(j) jx_array_insert(a, j);
 		}
 	} else if(!strcmp(request, "worker_status") || !strcmp(request, "workers")) {
 		struct ds_worker_info *w;
@@ -2228,7 +2102,7 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 		while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 			// If the worker has not been initialized, ignore it.
 			if(!strcmp(w->hostname, "unknown")) continue;
-			j = worker_to_jx(q, w);
+			j = ds_worker_to_jx(w);
 			if(j) {
 				jx_array_insert(a, j);
 			}
@@ -2447,10 +2321,14 @@ static int build_poll_table(struct ds_manager *q )
 	return n;
 }
 
-struct rmsummary *task_worker_box_size(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t) {
+/*
+Determine the resources to allocate for a given task when assigned to a specific worker.
+*/
 
-	const struct rmsummary *min = task_min_resources(q, t);
-	const struct rmsummary *max = task_max_resources(q, t);
+struct rmsummary *ds_manager_choose_resources_for_task( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t ) {
+
+	const struct rmsummary *min = ds_manager_task_min_resources(q, t);
+	const struct rmsummary *max = ds_manager_task_max_resources(q, t);
 
 	struct rmsummary *limits = rmsummary_create(-1);
 
@@ -2571,7 +2449,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_in
 {
 	/* wrap command at the last minute, so that we have the updated information
 	 * about resources. */
-	struct rmsummary *limits = task_worker_box_size(q, w, t);
+	struct rmsummary *limits = ds_manager_choose_resources_for_task(q, w, t);
 
 	char *command_line;
 	if(q->monitor_mode && !t->coprocess) {
@@ -4614,6 +4492,12 @@ void ds_enable_process_module(struct ds_manager *q)
 	q->process_pending_check = 1;
 }
 
+/*
+Almost but not quite implemented:
+need to call ds_manager_summarize_workers
+and convert to a reasonable text form.
+*/
+
 char * ds_get_worker_summary( struct ds_manager *q )
 {
 	return strdup("n/a");
@@ -4955,14 +4839,14 @@ int ds_enable_category_resource(struct ds_manager *q, const char *category, cons
 	return category_enable_auto_resource(c, resource, autolabel);
 }
 
-const struct rmsummary *task_max_resources(struct ds_manager *q, struct ds_task *t) {
+const struct rmsummary *ds_manager_task_max_resources(struct ds_manager *q, struct ds_task *t) {
 
 	struct category *c = ds_category_lookup_or_create(q, t->category);
 
 	return category_dynamic_task_max_resources(c, t->resources_requested, t->resource_request);
 }
 
-const struct rmsummary *task_min_resources(struct ds_manager *q, struct ds_task *t) {
+const struct rmsummary *ds_manager_task_min_resources(struct ds_manager *q, struct ds_task *t) {
 	struct category *c = ds_category_lookup_or_create(q, t->category);
 
 	const struct rmsummary *s = category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);
@@ -5009,127 +4893,6 @@ int ds_specify_min_taskid(struct ds_manager *q, int minid) {
 	}
 
 	return q->next_taskid;
-}
-
-//the functions below are used by qsort in order to sort the workers summary data
-size_t sort_ds_worker_summary_offset = 0;
-
-static int sort_ds_worker_cmp(const void *a, const void *b)
-{
-	const struct rmsummary *x = *((const struct rmsummary **) a);
-	const struct rmsummary *y = *((const struct rmsummary **) b);
-
-	double count_x = x->workers;
-	double count_y = y->workers;
-
-	double res_x = rmsummary_get_by_offset(x, sort_ds_worker_summary_offset);
-	double res_y = rmsummary_get_by_offset(y, sort_ds_worker_summary_offset);
-
-
-	if(res_x == res_y) {
-		return count_y - count_x;
-	}
-	else {
-		return res_y - res_x;
-	}
-}
-
-
-// function used by other functions
-static void sort_ds_worker_summary(struct rmsummary **worker_data, int count, const char *sortby)
-{
-	if(!strcmp(sortby, "cores")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, cores);
-	} else if(!strcmp(sortby, "memory")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, memory);
-	} else if(!strcmp(sortby, "disk")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, disk);
-	} else if(!strcmp(sortby, "gpus")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, gpus);
-	} else if(!strcmp(sortby, "workers")) {
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, workers);
-	} else {
-		debug(D_NOTICE, "Invalid field to sort worker summaries. Valid fields are: cores, memory, disk, gpus, and workers.");
-		sort_ds_worker_summary_offset = offsetof(struct rmsummary, memory);
-	}
-
-	qsort(&worker_data[0], count, sizeof(struct rmsummary *), sort_ds_worker_cmp);
-}
-
-
-// round to powers of two log scale with 1/n divisions
-static double round_to_nice_power_of_2(double value, int n) {
-	double exp_org = log2(value);
-	double below = pow(2, floor(exp_org));
-
-	double rest = value - below;
-	double fact = below/n;
-
-	double rounded = below + floor(rest/fact) * fact;
-
-	return rounded;
-}
-
-
-struct rmsummary **ds_workers_summary(struct ds_manager *q) {
-	struct ds_worker_info *w;
-	struct rmsummary *s;
-	char *id;
-	char *resources_key;
-
-
-	struct hash_table *workers_count = hash_table_create(0, 0);
-
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**) &w)) {
-		if (w->resources->tag < 0) {
-			// worker has not yet declared resources
-			continue;
-		}
-
-		int cores = w->resources->cores.total;
-		int memory = round_to_nice_power_of_2(w->resources->memory.total, 8);
-		int disk = round_to_nice_power_of_2(w->resources->disk.total, 8);
-		int gpus = w->resources->gpus.total;
-
-		char *resources_key = string_format("%d_%d_%d_%d", cores, memory, disk, gpus);
-
-		struct rmsummary *s = hash_table_lookup(workers_count, resources_key);
-		if(!s) {
-			s = rmsummary_create(-1);
-			s->cores = cores;
-			s->memory = memory;
-			s->disk = disk;
-			s->gpus = gpus;
-			s->workers = 0;
-
-			hash_table_insert(workers_count, resources_key, (void *) s);
-		}
-		free(resources_key);
-
-		s->workers++;
-	}
-
-	int count = 0;
-	struct rmsummary **worker_data = (struct rmsummary **) malloc((hash_table_size(workers_count) + 1) * sizeof(struct rmsummary *));
-
-	hash_table_firstkey(workers_count);
-	while(hash_table_nextkey(workers_count, &resources_key, (void**) &s)) {
-		worker_data[count] = s;
-		count++;
-	}
-
-	worker_data[count] = NULL;
-
-	hash_table_delete(workers_count);
-
-	sort_ds_worker_summary(worker_data, count, "disk");
-	sort_ds_worker_summary(worker_data, count, "memory");
-	sort_ds_worker_summary(worker_data, count, "gpus");
-	sort_ds_worker_summary(worker_data, count, "cores");
-	sort_ds_worker_summary(worker_data, count, "workers");
-
-	return worker_data;
 }
 
 /* vim: set noexpandtab tabstop=4: */

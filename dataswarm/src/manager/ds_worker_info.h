@@ -77,4 +77,5 @@ struct ds_worker_info {
 struct ds_worker_info * ds_worker_create( struct link * lnk );
 void ds_worker_delete( struct ds_worker_info *w );
 
+struct jx * ds_worker_to_jx( struct ds_worker_info *w );
 #endif
