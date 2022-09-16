@@ -20,7 +20,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "cctools.h"
 
-#include "ds_json.h"
+#include "dataswarm_json.h"
 
 int timeout = 25;
 

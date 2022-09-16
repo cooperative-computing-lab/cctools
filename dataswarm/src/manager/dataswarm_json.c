@@ -4,9 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_json.h"
-#include "ds_file.h"
-#include "ds_task.h"
+#include "dataswarm_json.h"
+#include "dataswarm.h"
 
 #include "jx.h"
 #include "jx_parse.h"
@@ -353,13 +352,15 @@ char *ds_json_wait(struct ds_manager *q, int timeout)
 		return NULL;
 	}
 
-	command_line = jx_pair(jx_string("command_line"), jx_string(t->command_line), NULL);
-	taskid = jx_pair(jx_string("taskid"), jx_integer(t->taskid), command_line);
-	exit_code = jx_pair(jx_string("exit_code"), jx_integer(t->exit_code), taskid);
-	result = jx_pair(jx_string("result"), jx_integer(t->result), exit_code);
+	command_line = jx_pair(jx_string("command_line"), jx_string(ds_task_get_command(t)), NULL);
+	taskid = jx_pair(jx_string("taskid"), jx_integer(ds_task_get_taskid(t)), command_line);
+	exit_code = jx_pair(jx_string("exit_code"), jx_integer(ds_task_get_exit_code(t)), taskid);
+	result = jx_pair(jx_string("result"), jx_integer(ds_task_get_result(t)), exit_code);
 
-	if(t->output) {
-		output = jx_pair(jx_string("output"), jx_string(t->output), result);
+	const char *toutput = ds_task_get_output(t);
+
+	if(toutput) {
+		output = jx_pair(jx_string("output"), jx_string(toutput), result);
 	} else {
 		output = jx_pair(jx_string("output"), jx_string(""), result);
 	}
@@ -384,8 +385,8 @@ char *ds_json_remove(struct ds_manager *q, int id)
 		return NULL;
 	}
 
-	command_line = jx_pair(jx_string("command_line"), jx_string(t->command_line), NULL);
-	taskid = jx_pair(jx_string("taskid"), jx_integer(t->taskid), command_line);
+	command_line = jx_pair(jx_string("command_line"), jx_string(ds_task_get_command(t)), NULL);
+	taskid = jx_pair(jx_string("taskid"), jx_integer(ds_task_get_taskid(t)), command_line);
 
 	j = jx_object(taskid);
 
@@ -424,3 +425,19 @@ char *ds_json_get_status(struct ds_manager *q)
 	return status;
 
 }
+
+int ds_json_empty( struct ds_manager *q )
+{
+	return ds_empty(q);
+}
+
+int ds_json_hungry( struct ds_manager *q )
+{
+	return ds_hungry(q);
+}
+
+void ds_json_delete( struct ds_manager *q )
+{
+	ds_delete(q);
+}
+

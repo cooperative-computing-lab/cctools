@@ -19,7 +19,7 @@ This module is used as the basis for building interfaces to
 dynamic languages outside of C.
 */
 
-#include "ds_manager.h"
+struct ds_manager;
 
 /** Create a new work_queue object.
 @param str A json document with properties to configure a new queue. Allowed properties are port, name, and priority.
@@ -82,6 +82,28 @@ child process). Return string should be freed using free().
 */
 char *ds_json_wait(struct ds_manager *q, int timeout);
 
+/** Determine whether the manager is 'hungry' for more tasks.
+While the Data Swarm can handle a very large number of tasks,
+it runs most efficiently when the number of tasks is slightly
+larger than the number of active workers.  This function gives
+the user of a flexible application a hint about whether it would
+be better to submit more tasks via @ref ds_submit or wait for some to complete
+via @ref ds_wait.
+@param q A ds_manager object
+@returns The number of additional tasks that can be efficiently submitted,
+or zero if the manager has enough to work with right now.
+*/
+int ds_json_empty( struct ds_manager *q );
+
+/** Determine whether the manager is empty.
+When all of the desired tasks have been submitted to the manager,
+the user should continue to call @ref ds_wait until
+this function returns true.
+@param q A ds_manager object
+@returns True if the manager is completely empty, false otherwise.
+*/
+int ds_json_hungry( struct ds_manager *q );
+
 
 /** Remove a task from the queue.
 @param q A manager object.
@@ -95,5 +117,7 @@ char *ds_json_remove(struct ds_manager *q, int id);
 @return A JSON description of the stats of the given manager object.
 */
 char *ds_json_get_status(struct ds_manager *q);
+
+void ds_json_delete( struct ds_manager *q );
 
 #endif
