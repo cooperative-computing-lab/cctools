@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "ds_manager.h"
 #include "ds_manager_get.h"
 #include "ds_manager_put.h"
+#include "ds_manager_summarize.h"
 #include "ds_schedule.h"
 #include "ds_protocol.h"
 #include "ds_task.h"
@@ -4492,15 +4493,9 @@ void ds_enable_process_module(struct ds_manager *q)
 	q->process_pending_check = 1;
 }
 
-/*
-Almost but not quite implemented:
-need to call ds_manager_summarize_workers
-and convert to a reasonable text form.
-*/
-
-char * ds_get_worker_summary( struct ds_manager *q )
+struct rmsummary ** ds_summarize_workers( struct ds_manager *q )
 {
-	return strdup("n/a");
+	return ds_manager_summarize_workers(q);
 }
 
 void ds_set_bandwidth_limit(struct ds_manager *q, const char *bandwidth)

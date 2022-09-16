@@ -826,7 +826,7 @@ void ds_get_stats_category(struct ds_manager *m, const char *c, struct ds_stats 
 @param q A ds_manager object
 @return A null terminated array of struct rmsummary. Each summary s indicates the number of s->workers with a certain number of s->cores, s->memory, and s->disk. The array and summaries need to be freed after use to avoid memory leaks.
 */
-struct rmsummary **ds_workers_summary(struct ds_manager *m);
+struct rmsummary **ds_summarize_workers(struct ds_manager *m);
 
 /** Get the current state of the task.
 @param q A ds_manager object
@@ -846,14 +846,6 @@ void ds_set_bandwidth_limit(struct ds_manager *m, const char *bandwidth);
 @return The average bandwidth in MB/s measured by the manager.
 */
 double ds_get_effective_bandwidth(struct ds_manager *m);
-
-/** Summarize workers.
-This function summarizes the workers currently connected to the manager,
-indicating how many from each worker pool are attached.
-@param q A ds_manager object
-@return A newly allocated string describing the distribution of workers by pool.  The caller must release this string via free().
-*/
-char * ds_get_worker_summary( struct ds_manager *m );
 
 /** Turn on or off fast abort functionality for a given manager for tasks without
 an explicit category. Given the multiplier, abort a task which running time is

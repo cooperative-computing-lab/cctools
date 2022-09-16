@@ -1101,12 +1101,12 @@ class DataSwarm(object):
     # connected with a certain number of .cores, .memory, and disk.
     # For example:
     # @code
-    # workers = q.worker_summary()
+    # workers = q.summarize_workers()
     # >>> for w in workers:
     # >>>    print("{} workers with: {} cores, {} MB memory, {} MB disk".format(w.workers, w.cores, w.memory, w.disk)
     # @endcode
-    def workers_summary(self):
-        from_c = ds_workers_summary(self._dataswarm)
+    def summarize_workers(self):
+        from_c = ds_summarize_workers(self._dataswarm)
 
         count = 0
         workers = []
