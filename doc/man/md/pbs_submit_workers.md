@@ -56,7 +56,7 @@ auto mode option is specified for work_queue_worker.
 - **-s** _&lt;path&gt;_<br />Set the location for creating the working directory of the worker.
 - **-j** _&lt;&gt;_<br />Use job array to submit workers.
 - **-p** _&lt;parameters&gt;_<br />PBS qsub parameters.
-- **--scratch-dir=_&lt;path&gt;_**<br />Set the scatch directory location created on the local machine. (default=/tmp/USER-workers)
+- **--scratch-dir=_&lt;path&gt;_**<br />Set the scatch directory location created on the local machine. (default=/${USER}-workers)
 - **-h**<br />Show help message.
 
 

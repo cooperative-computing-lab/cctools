@@ -55,7 +55,7 @@ auto mode option is specified for work_queue_worker.
 - **-O** _&lt;os&gt;_<br />Set operating system string for the worker to report to manager instead of the value in uname.
 - **-s** _&lt;path&gt;_<br />Set the location for creating the working directory of the worker.
 - **-p** _&lt;parameters&gt;_<br />SLURM qsub parameters.
-- **--scratch-dir=_&lt;path&gt;_**<br />Set the scratch directory location created on the local machine. (default=/tmp/USER-workers)
+- **--scratch-dir=_&lt;path&gt;_**<br />Set the scratch directory location created on the local machine. (default=${USER}-workers)
 - **-h**<br />Show help message.
 
 

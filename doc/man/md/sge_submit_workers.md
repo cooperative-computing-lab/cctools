@@ -63,7 +63,7 @@ auto mode option is specified for work_queue_worker.
 - **--cores=_&lt;cores&gt;_**<br />Set the number of cores each worker should use (0=auto). (default=1)
 - **--memory=_&lt;size&gt;_**<br />Manually set the amonut of memory (in MB) reported by this worker.
 - **--disk=_&lt;size&gt;_**<br />Manually set the amount of disk (in MB) reported by this worker.
-- **--scratch-dir=_&lt;path&gt;_**<br />Set the scratch directory location created on the local machine. (default=/tmp/USER-workers) 
+- **--scratch-dir=_&lt;path&gt;_**<br />Set the scratch directory location created on the local machine. (default=${USER}-workers) 
 - **-j**<br />Use job array to submit workers.
 - **--p** _&lt;parameters&gt;_<br />SGE qsub parameters.
 - **-h**,**--help**<br />Show help message.
