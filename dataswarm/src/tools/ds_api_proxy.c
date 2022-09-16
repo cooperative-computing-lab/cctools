@@ -4,6 +4,18 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+/*
+This is a work in progress, and is not yet complete.
+
+To facilitate binding to languages and situations that are not
+well supported by SWIG, the ds_api_proxy provides a translation between
+JSON messages and operations on the manager API.  A simple library
+written in any language sends JSON messages over a pipe to the
+ds_api_proxy, which then invokes the appropriate functions
+and returns a JSON result.
+
+See clients/python3/ds_proxy.py for an example in Python.
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,10 +33,11 @@ See the file COPYING for details.
 #include "cctools.h"
 
 #include "dataswarm_json.h"
+#include "dataswarm.h"
 
 int timeout = 25;
 
-void reply(struct link *client, char *method, char *message, int id)
+void reply(struct link *output_link, char *method, char *message, int id)
 {
 	struct jx_pair *result;
 
@@ -49,12 +62,12 @@ void reply(struct link *client, char *method, char *message, int id)
 
 	int len = strlen(buffer);
 
-	link_printf(client, time(NULL) + timeout, "%d\n", len);
+	link_printf(output_link, time(NULL) + timeout, "%d\n", len);
 
 	int total_written = 0;
 	ssize_t written = 0;
 	while(total_written < len) {
-		written = link_write(client, buffer, strlen(buffer), time(NULL) + timeout);
+		written = link_write(output_link, buffer, strlen(buffer), time(NULL) + timeout);
 		total_written += written;
 	}
 
@@ -62,7 +75,7 @@ void reply(struct link *client, char *method, char *message, int id)
 
 }
 
-void mainloop(struct ds_manager *queue, struct link *client)
+void mainloop(struct ds_manager *queue, struct link *input_link, struct link *output_link )
 {
 	char message[BUFSIZ];
 	char msg[BUFSIZ];
@@ -77,27 +90,16 @@ void mainloop(struct ds_manager *queue, struct link *client)
 		memset(message, 0, BUFSIZ);
 		memset(msg, 0, BUFSIZ);
 
-		ssize_t read = link_readline(client, message, sizeof(message), time(NULL) + timeout);
-
+		ssize_t read = link_readline(input_link, message, sizeof(message), time(NULL) + timeout);
 		int length = atoi(message);
 
-		read = link_read(client, msg, length, time(NULL) + timeout);
-
-		//if server cannot read message from client, break connection
-		if(!read) {
-			error = "Error reading from client";
-			reply(client, "error", error, id);
-			link_close(client);
-			break;
-		}
+		read = link_read(input_link, msg, length, time(NULL) + timeout);
+		if(!read) break;
 
 		struct jx *jsonrpc = jx_parse_string(msg);
-
-		//if server cannot parse JSON string, break connection
 		if(!jsonrpc) {
 			error = "Could not parse JSON string";
-			reply(client, "error", error, id);
-			link_close(client);
+			reply(output_link, "error", error, id);
 			break;
 		}
 		//iterate over the object: get method and task description
@@ -118,8 +120,7 @@ void mainloop(struct ds_manager *queue, struct link *client)
 				id = value->u.integer_value;
 			} else if(strcmp(key, "jsonrpc")) {
 				error = "unrecognized parameter";
-				reply(client, "error", error, id);
-				link_close(client);
+				reply(output_link, "error", error, id);
 				break;
 			}
 
@@ -134,44 +135,44 @@ void mainloop(struct ds_manager *queue, struct link *client)
 			int taskid = ds_json_submit(queue, task);
 			if(taskid < 0) {
 				error = "Could not submit task";
-				reply(client, "error", error, id);
+				reply(output_link, "error", error, id);
 			} else {
-				reply(client, method, "Task submitted successfully.", id);
+				reply(output_link, method, "Task submitted successfully.", id);
 			}
 		} else if(!strcmp(method, "wait")) {
 			int time_out = val->u.integer_value;
 			char *task = ds_json_wait(queue, time_out);
 			if(!task) {
 				error = "timeout reached with no task returned";
-				reply(client, "error", error, id);
+				reply(output_link, "error", error, id);
 			} else {
-				reply(client, method, task, id);
+				reply(output_link, method, task, id);
 			}
 		} else if(!strcmp(method, "remove")) {
 			int taskid = val->u.integer_value;
 			char *task = ds_json_remove(queue, taskid);
 			if(!task) {
 				error = "task not able to be removed from queue";
-				reply(client, "error", error, id);
+				reply(output_link, "error", error, id);
 			} else {
-				reply(client, method, "Task removed successfully.", id);
+				reply(output_link, method, "Task removed successfully.", id);
 			}
 		} else if(!strcmp(method, "disconnect")) {
-			reply(client, method, "Successfully disconnected.", id);
+			reply(output_link, method, "Successfully disconnected.", id);
 			break;
 		} else if(!strcmp(method, "empty")) {
 			int empty = ds_empty(queue);
 			if(empty) {
-				reply(client, method, "Empty", id);
+				reply(output_link, method, "Empty", id);
 			} else {
-				reply(client, method, "Not Empty", id);
+				reply(output_link, method, "Not Empty", id);
 			}
 		} else if(!strcmp(method, "status")) {
             char *status = ds_json_get_status(queue);
-            reply(client, method, status, id);
+            reply(output_link, method, status, id);
         } else {
 			error = "Method not recognized";
-			reply(client, "error", error, id);
+			reply(output_link, "error", error, id);
 		}
 
 		//clean up
@@ -201,7 +202,6 @@ static void show_help(const char *cmd)
 	printf("use: %s [options]\n", cmd);
 	printf("where options are:\n");
 	printf("-p,--port=<port>          Port number to listen on.\n");
-	printf("-s,--server-port=<port>   Port number for server.\n");
 	printf("-N,--project-name=<name>  Set project name.\n");
 	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
 	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
@@ -212,7 +212,6 @@ static void show_help(const char *cmd)
 int main(int argc, char *argv[])
 {
 	int port = 0;
-	int server_port = 0;
 	char *project_name = "ds_server";
 
 	int c;
@@ -227,9 +226,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'p':
 			port = atoi(optarg);
-			break;
-		case 's':
-			server_port = atoi(optarg);
 			break;
 		case 'N':
 			project_name = strdup(optarg);
@@ -254,37 +250,21 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "could not listen on port %d: %s\n", port, strerror(errno));
 		return 1;
 	}
-	// what is the port chosen for the queue?
+
 	port = ds_port(queue);
 
-	struct link *server_link = link_serve(server_port);
-	if(!server_link) {
-		fprintf(stderr, "could not serve on port %d: %s\n", server_port, strerror(errno));
-		return 1;
-	}
-	// what is the port chosen for the server?
-	char *addr;
-	addr = (char *) malloc(LINK_ADDRESS_MAX);
-	int local = link_address_local(server_link, addr, &server_port);
-	if(!local) {
-		fprintf(stderr, "could not get local address: %s\n", strerror(errno));
-		return 1;
-	}
-
-	printf("server port: %d\n", server_port);
+	printf("ds_api_proxy ready port %d\n",port);
 	fflush(stdout);
 
-	struct link *client = link_accept(server_link, time(NULL) + timeout);
-	if(!client) {
-		fprintf(stderr, "could not accept connection: %s\n", strerror(errno));
-		return 1;
-	}
+	struct link *input_link = link_attach_to_fd(0);
+	struct link *output_link = link_attach_to_fd(1);
 
-	fprintf(stderr, "Connected to client. Waiting for messages..\n");
+	mainloop(queue,input_link,output_link);
 
-	mainloop(queue, client);
+	link_close(input_link);
+	link_close(output_link);
 
-	link_close(client);
+	ds_json_delete(queue);
 
 	return 0;
 }
