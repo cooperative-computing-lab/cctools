@@ -10,7 +10,7 @@
  * Each file is compressed with gzip and returned to the user.
  * */
 
-#include "ds_manager.h"
+#include "dataswarm.h"
 
 #include <stdio.h>
 #include <stdlib.h>

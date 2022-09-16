@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_json.h"
+#include "dataswarm_json.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 
 	printf("waiting for tasks to complete...\n");
 
-	while(!ds_empty(q)) {
+	while(!ds_json_empty(q)) {
 
 		t = ds_json_wait(q, 5);
         if(t) {
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 
 	printf("all tasks complete!\n");
 
-	ds_delete(q);
+	ds_json_delete(q);
 
 	return 0;
 

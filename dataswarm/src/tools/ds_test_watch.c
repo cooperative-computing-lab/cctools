@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_manager.h"
+#include "dataswarm.h"
 
 #include "cctools.h"
 #include "debug.h"

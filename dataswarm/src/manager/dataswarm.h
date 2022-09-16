@@ -34,7 +34,7 @@ run reliably on tens of thousands of nodes in the presence of failures and other
 expected events.
 */
 
-#define DS_DEFAULT_PORT 9123               /**< Default Data Swarm port number. */
+#define DS_DEFAULT_PORT 9123               /**< Default dataswarm port number. */
 #define DS_RANDOM_PORT  0                  /**< Indicates that any port may be chosen. */
 #define DS_WAITFORTASK  -1                 /**< Timeout value to wait for a task to complete before returning. */
 
@@ -773,7 +773,7 @@ Similar to @ref ds_wait, but guarantees that the returned task has the specified
 struct ds_task *ds_wait_for_tag(struct ds_manager *m, const char *tag, int timeout);
 
 /** Determine whether the manager is 'hungry' for more tasks.
-While the Data Swarm can handle a very large number of tasks,
+While the manager can handle a very large number of tasks,
 it runs most efficiently when the number of tasks is slightly
 larger than the number of active workers.  This function gives
 the user of a flexible application a hint about whether it would
