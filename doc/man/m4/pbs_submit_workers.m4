@@ -34,6 +34,7 @@ OPTION_ARG_SHORT(O, os)Set operating system string for the worker to report to m
 OPTION_ARG_SHORT(s, path)Set the location for creating the working directory of the worker.
 OPTION_ARG_SHORT(j)Use job array to submit workers.
 OPTION_ARG_SHORT(p, parameters)PBS qsub parameters.
+OPTION_ARG_LONG(scratch-dir,path)Set the scatch directory location created on the local machine. (default=${USER}-workers)
 OPTION_FLAG_SHORT(h)Show help message.
 OPTIONS_END
 

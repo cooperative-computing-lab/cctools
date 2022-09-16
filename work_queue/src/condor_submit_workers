@@ -25,7 +25,7 @@ show_help()
 requirements=""
 class_ads=""
 transfer_input_files="work_queue_worker, cctools_gpu_autodetect"
-
+submit_dir=/tmp/${USER}-workers
 parse_arguments()
 {
 	# set default values:
@@ -69,7 +69,6 @@ parse_arguments()
 		shift
 	done
 
-	submit_dir=/tmp/${USER}-workers
 
     current_count=$#
     consumed=$((original_count - current_count))
