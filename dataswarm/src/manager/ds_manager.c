@@ -2132,7 +2132,7 @@ static void handle_data_index( struct ds_manager *q, struct ds_worker_info *w, t
 	buffer_t buf;
 	buffer_init(&buf);
 
-	buffer_printf(&buf,"<h1>Data Swarm Data API</h1>");
+	buffer_printf(&buf,"<h1>Dataswarm Data API</h1>");
         buffer_printf(&buf,"<ul>\n");
 	buffer_printf(&buf,"<li> <a href=\"/queue_status\">Queue Status</a>\n");
 	buffer_printf(&buf,"<li> <a href=\"/task_status\">Task Status</a>\n");
@@ -3316,10 +3316,10 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 
 	char hostname[DOMAIN_NAME_MAX];
 	if(domain_name_cache_guess(hostname)) {
-		debug(D_DS, "Master advertising as %s:%d", hostname, q->port);
+		debug(D_DS, "Manager advertising as %s:%d", hostname, q->port);
 	}
 	else {
-		debug(D_DS, "Data Swarm is listening on port %d.", q->port);
+		debug(D_DS, "Manager is listening on port %d.", q->port);
 	}
 	return q;
 }
@@ -3986,7 +3986,7 @@ static void print_password_warning( struct ds_manager *q )
 
 #define BEGIN_ACCUM_TIME(q, stat) {\
 	if(q->stats_measure->stat != 0) {\
-		fatal("Double-counting stat %s. This should not happen, and it is Data Swarm bug.");\
+		fatal("Double-counting stat %s. This should not happen, and it is a dataswarm bug.");\
 	} else {\
 		q->stats_measure->stat = timestamp_get();\
 	}\

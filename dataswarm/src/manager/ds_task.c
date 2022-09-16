@@ -425,7 +425,7 @@ int ds_task_specify_file(struct ds_task *t, const char *local_name, const char *
 	}
 
 	// @param remote_name is the path of the file as on the worker machine. In
-	// the Data Swarm framework, workers are prohibited from writing to paths
+	// the dataswarm framework, workers are prohibited from writing to paths
 	// outside of their workspaces. When a task is specified, the workspace of
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
