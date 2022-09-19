@@ -5,7 +5,7 @@ LOCAL_LINKAGE+=${CCTOOLS_HOME}/dataswarm/src/manager/libdataswarm.a ${CCTOOLS_HO
 LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/dataswarm/src/manager
 
 PROGRAMS = ds_status
-TEST_PROGRAMS = ds_example ds_test ds_test_watch ds_api_proxy
+TEST_PROGRAMS = ds_example ds_example_gutenberg ds_example_blast ds_test ds_test_watch ds_api_proxy
 TARGETS = $(PROGRAMS) $(TEST_PROGRAMS)
 
 all: $(TARGETS)
