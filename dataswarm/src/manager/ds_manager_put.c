@@ -332,7 +332,7 @@ static ds_result_code_t ds_manager_put_special_if_not_cached( struct ds_manager 
 	url_encode(tf->source,source_encoded,sizeof(source_encoded));
 	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
 
-	ds_manager_send(q,w,"%s %s %s %d %o\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777);
+	ds_manager_send(q,w,"%s %s %s %d %o %d\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777,tf->flags);
 
 	if(tf->flags & DS_CACHE) {
 		struct ds_remote_file_info *remote_info = ds_remote_file_info_create(tf->type,tf->length,time(0));

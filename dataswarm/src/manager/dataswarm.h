@@ -46,7 +46,7 @@ typedef enum {
 typedef enum {
 	DS_NOCACHE  = 0, /**< Do not cache file at execution site. */
 	DS_CACHE    = 1, /**< Cache file at execution site for later use. */
-	DS_SYMLINK  = 2, /**< Create a symlink to the file rather than copying it, if possible. */
+	DS_UNPACK   = 2, /**< Unpack this archive (.tar .tgz .zip) into a directory on arrival. */
 	DS_WATCH    = 16, /**< Watch the output file and send back changes as the task runs. */
 	DS_FAILURE_ONLY = 32,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	DS_SUCCESS_ONLY = 64, /**< Only return this output file if the task succeeded. */

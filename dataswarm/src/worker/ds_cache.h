@@ -18,8 +18,8 @@ via ds_cache_ensure and downloaded if needed.  This allow
 for file transfers to occur asynchronously of the manager.
 */
 
-
 #include <stdint.h>
+#include "ds_file.h"
 
 struct link;
 
@@ -35,7 +35,7 @@ void ds_cache_delete( struct ds_cache *c );
 char *ds_cache_full_path( struct ds_cache *c, const char *cachename );
 
 int ds_cache_addfile( struct ds_cache *c, int64_t size, const char *cachename );
-int ds_cache_queue( struct ds_cache *c, ds_cache_type_t, const char *source, const char *cachename, int64_t size, int mode );
+int ds_cache_queue( struct ds_cache *c, ds_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, ds_file_flags_t flags );
 int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *manager );
 int ds_cache_remove( struct ds_cache *c, const char *cachename );
 

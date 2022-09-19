@@ -33,10 +33,11 @@ struct cache_file {
 	int64_t expected_size;
 	int64_t actual_size;
 	int mode;
+	ds_file_flags_t flags;
 	int present;
 };
 
-struct cache_file * cache_file_create( ds_cache_type_t type, const char *source, int64_t expected_size, int64_t actual_size, int mode, int present )
+struct cache_file * cache_file_create( ds_cache_type_t type, const char *source, int64_t expected_size, int64_t actual_size, int mode, ds_file_flags_t flags, int present )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
@@ -44,6 +45,7 @@ struct cache_file * cache_file_create( ds_cache_type_t type, const char *source,
 	f->expected_size = expected_size;
 	f->actual_size = actual_size;
 	f->mode = mode;
+	f->flags = flags;
 	f->present = present;
 	return f;
 }
@@ -95,7 +97,7 @@ Add a file to the cache manager (already created in the proper place) and note i
 
 int ds_cache_addfile( struct ds_cache *c, int64_t size, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(DS_CACHE_FILE,"manager",size,size,0777,1);
+	struct cache_file *f = cache_file_create(DS_CACHE_FILE,"manager",size,size,0777,0,1);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -105,9 +107,9 @@ Queue a remote file transfer or command execution to produce a file.
 This entry will be materialized later in ds_cache_ensure.
 */
 
-int ds_cache_queue( struct ds_cache *c, ds_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode )
+int ds_cache_queue( struct ds_cache *c, ds_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, ds_file_flags_t flags )
 {
-	struct cache_file *f = cache_file_create(type,source,size,0,mode,0);
+	struct cache_file *f = cache_file_create(type,source,size,0,mode,flags,0);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -197,6 +199,49 @@ static int do_command( struct ds_cache *c, const char *command, const char *cach
 }
 
 /*
+For a given file that has been transferred into transfer_name,
+either unpack it into cache_name, or just rename it into place,
+depending on the flags of the file.
+Returns true on success, false otherwise.
+*/
+
+int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, const char *cache_path )
+{
+	int unix_result;
+	char *command;
+
+	if(f->flags & DS_UNPACK) {
+		if(string_suffix_is(f->source,".tgz")) {
+			mkdir(cache_path,0700);
+			command = string_format("tar xf %s -C %s",transfer_path,cache_path);
+		} else if(string_suffix_is(f->source,".tar.gz")) {
+			mkdir(cache_path,0700);
+			command = string_format("tar xzf %s -C %s",transfer_path,cache_path);
+		} else if(string_suffix_is(f->source,".gz")) {
+			command = string_format("gunzip <%s >%s",transfer_path,cache_path);
+		} else if(string_suffix_is(f->source,".zip")) {
+			mkdir(cache_path,0700);
+			command = string_format("unzip %s -d %s",transfer_path,cache_path);
+		} else {
+			command = strdup("false");
+		}
+		debug(D_DS,"unpacking %s to %s via command %s",transfer_path,cache_path,command);
+		unix_result = system(command);
+		free(command);
+	} else {
+		debug(D_DS,"renaming %s to %s",transfer_path,cache_path);
+		unix_result = rename(transfer_path,cache_path);
+	}
+
+	if(unix_result==0) {
+		return 1;
+	} else {
+		debug(D_DS,"command failed: %s",strerror(errno));
+		return 0;
+	}
+}
+
+/*
 Ensure that a given cached entry is fully materialized in the cache,
 downloading files or executing commands as needed.  If present, return
 true, otherwise return false.
@@ -221,8 +266,9 @@ int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *man
 		return 1;
 	}
 	
-	char *cache_path = ds_cache_full_path(c,cachename);
 	char *error_message = 0;
+	char *cache_path = ds_cache_full_path(c,cachename);
+	char *transfer_path = string_format("%s.transfer",cache_path);
 
 	int result = 0;
 
@@ -236,13 +282,17 @@ int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *man
 		  
 		case DS_CACHE_TRANSFER:
 			debug(D_DS,"cache: transferring %s to %s",f->source,cachename);
-			result = do_transfer(c,f->source,cache_path,&error_message);
+			result = do_transfer(c,f->source,transfer_path,&error_message);
 			break;
 
 		case DS_CACHE_COMMAND:
 			debug(D_DS,"cache: creating %s via shell command",cachename);
-			result = do_command(c,f->source,cache_path,&error_message);
+			result = do_command(c,f->source,transfer_path,&error_message);
 			break;
+	}
+
+	if(result) {
+		result = unpack_or_rename_target(f,transfer_path,cache_path);
 	}
 
 	// Set the permissions as originally indicated.	
@@ -283,11 +333,13 @@ int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *man
 	
 	if(!result) {
 		trash_file(cache_path);
+		trash_file(transfer_path);
 		send_cache_invalid(manager,cachename,error_message);
 	}
 	
 	if(error_message) free(error_message);
 	free(cache_path);
+	free(transfer_path);
 	return result;
 }
 

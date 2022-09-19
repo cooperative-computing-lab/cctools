@@ -78,7 +78,7 @@ See the file COPYING for details.
 #define DS_DEFAULT_KEEPALIVE_INTERVAL 120
 
 /* Default value for keepalive timeout in seconds. */
-#define DS_DEFAULT_KEEPALIVE_TIMEOUT  30
+#define DS_DEFAULT_KEEPALIVE_TIMEOUT  900
 
 /* Maximum size of standard output from task.  (If larger, send to a separate file.) */
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
