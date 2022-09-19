@@ -50,8 +50,8 @@ int main(int argc, char *argv[])
 		struct ds_task *t = ds_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 	  
 		ds_task_specify_buffer(t,query_string,strlen(query_string),"query.file", DS_NOCACHE);
-		ds_task_specify_file_command(t, "mkdir %%; curl https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz | tar xvzf - -C %%", "blastdir", DS_INPUT, DS_CACHE );
-		ds_task_specify_file_command(t, "mkdir %%; curl https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz | tar xvzf - -C %%", "landmark", DS_INPUT, DS_CACHE );
+		ds_task_specify_url(t, "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz", "blastdir", DS_INPUT, DS_CACHE|DS_UNPACK );
+		ds_task_specify_url(t, "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz", "landmark", DS_INPUT, DS_CACHE|DS_UNPACK );
 		ds_task_specify_environment_variable(t,"BLASTDB","landmark");
 
 		int taskid = ds_submit(m, t);
