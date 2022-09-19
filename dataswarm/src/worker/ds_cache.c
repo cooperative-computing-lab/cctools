@@ -33,10 +33,11 @@ struct cache_file {
 	int64_t expected_size;
 	int64_t actual_size;
 	int mode;
+	ds_file_flags_t flags;
 	int present;
 };
 
-struct cache_file * cache_file_create( ds_cache_type_t type, const char *source, int64_t expected_size, int64_t actual_size, int mode, int present )
+struct cache_file * cache_file_create( ds_cache_type_t type, const char *source, int64_t expected_size, int64_t actual_size, int mode, ds_file_flags_t flags, int present )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
@@ -44,6 +45,7 @@ struct cache_file * cache_file_create( ds_cache_type_t type, const char *source,
 	f->expected_size = expected_size;
 	f->actual_size = actual_size;
 	f->mode = mode;
+	f->flags = 0;
 	f->present = present;
 	return f;
 }
@@ -95,7 +97,7 @@ Add a file to the cache manager (already created in the proper place) and note i
 
 int ds_cache_addfile( struct ds_cache *c, int64_t size, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(DS_CACHE_FILE,"manager",size,size,0777,1);
+	struct cache_file *f = cache_file_create(DS_CACHE_FILE,"manager",size,size,0777,0,1);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -105,9 +107,9 @@ Queue a remote file transfer or command execution to produce a file.
 This entry will be materialized later in ds_cache_ensure.
 */
 
-int ds_cache_queue( struct ds_cache *c, ds_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode )
+int ds_cache_queue( struct ds_cache *c, ds_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, ds_file_flags_t flags )
 {
-	struct cache_file *f = cache_file_create(type,source,size,0,mode,0);
+	struct cache_file *f = cache_file_create(type,source,size,0,mode,flags,0);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }

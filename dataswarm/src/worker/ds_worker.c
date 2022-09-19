@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "ds_catalog.h"
 #include "ds_watcher.h"
 #include "ds_gpus.h"
+#include "ds_file.h"
 #include "ds_coprocess.h"
 #include "ds_sandbox.h"
 #include "ds_transfer.h"
@@ -729,18 +730,18 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 Accept a url specification and queue it for later transfer.
 */
 
-static int do_put_url( const char *cache_name, int64_t size, int mode, const char *source )
+static int do_put_url( const char *cache_name, int64_t size, int mode, const char *source, ds_file_flags_t flags )
 {
-	return ds_cache_queue(global_cache,DS_CACHE_TRANSFER,source,cache_name,size,mode);
+	return ds_cache_queue(global_cache,DS_CACHE_TRANSFER,source,cache_name,size,mode,flags);
 }
 
 /*
 Accept a url specification and queue it for later transfer.
 */
 
-static int do_put_cmd( const char *cache_name, int64_t size, int mode, const char *source )
+static int do_put_cmd( const char *cache_name, int64_t size, int mode, const char *source, ds_file_flags_t flags )
 {
-	return ds_cache_queue(global_cache,DS_CACHE_COMMAND,source,cache_name,size,mode);
+	return ds_cache_queue(global_cache,DS_CACHE_COMMAND,source,cache_name,size,mode,flags);
 }
 
 /*
@@ -961,6 +962,7 @@ static int handle_manager(struct link *manager)
 	char source[DS_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
+	int flags;
 	int mode, r, n;
 
 	if(recv_message(manager, line, sizeof(line), idle_stoptime )) {
@@ -974,15 +976,15 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = ds_transfer_get_dir(manager,global_cache,filename,time(0)+active_timeout);
 			reset_idle_timer();
-		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
+		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o %d", source_encoded, filename_encoded, &length, &mode, &flags)==5) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			url_decode(source_encoded,source,sizeof(source));
-			r = do_put_url(filename,length,mode,source);
+			r = do_put_url(filename,length,mode,source,flags);
 			reset_idle_timer();
-		} else if(sscanf(line, "putcmd %s %s %" SCNd64 " %o", source_encoded, filename_encoded, &length, &mode)==4) {
+		} else if(sscanf(line, "putcmd %s %s %" SCNd64 " %o %d", source_encoded, filename_encoded, &length, &mode, &flags)==5) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			url_decode(source_encoded,source,sizeof(source));
-			r = do_put_cmd(filename,length,mode,source);
+			r = do_put_cmd(filename,length,mode,source,flags);
 			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
