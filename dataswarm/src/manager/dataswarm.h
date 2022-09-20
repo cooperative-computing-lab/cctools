@@ -16,7 +16,7 @@ struct ds_manager;
 struct ds_task;
 struct ds_file;
 
-/** @file ds_manager.h The public API for the dataswarm distributed application framework.
+/** @file dataswarm.h The public API for the dataswarm distributed application framework.
 A dataswarm application consists of a manager process and a larger number of worker
 processes, typically running in a high performance computing cluster, or a cloud facility.
 Both the manager and worker processes run with ordinary user privileges and require
