@@ -104,27 +104,35 @@ This is needed to generate uniform names in the API and bindings:
 */
 
 typedef enum {
-    DS_ALLOCATION_MODE_FIXED          = CATEGORY_ALLOCATION_MODE_FIXED, /**< When monitoring is disabled, all tasks run as
-                                                                                  DS_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
-                                                                                  exhaustion occurs for specified resources values, then the task permanently fails. */
-    DS_ALLOCATION_MODE_MAX            = CATEGORY_ALLOCATION_MODE_MAX, /**< When monitoring is enabled, tasks are tried with maximum specified values
-                                                                                of cores, memory, disk or gpus until enough statistics are collected. Then,
-                                                                                further tasks are first tried using the maximum values observed, and in case of
-                                                                                resource exhaustion, they are retried using the maximum specified values. The
-                                                                                task permanently fails when there is an exhaustion using the maximum values. If
-                                                                                no maximum values are specified, the task will wait until a larger worker
-                                                                                connects. */
-    DS_ALLOCATION_MODE_MIN_WASTE      = CATEGORY_ALLOCATION_MODE_MIN_WASTE, /**< As above, but tasks are first tried with an automatically
-                                                                                      computed allocation to minimize resource waste. */
-    DS_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT /**< As above, but maximizing throughput. */
+	/** When monitoring is disabled, all tasks run as DS_ALLOCATION_MODE_FIXED.
+	If monitoring is enabled and resource exhaustion occurs for specified
+	resources values, then the task permanently fails. */
+	DS_ALLOCATION_MODE_FIXED = CATEGORY_ALLOCATION_MODE_FIXED,
+
+	/** When monitoring is enabled, tasks are tried with maximum specified
+	values of cores, memory, disk or gpus until enough statistics are collected.
+	Then, further tasks are first tried using the maximum values observed,
+	and in case of resource exhaustion, they are retried using the maximum
+	specified values. The task permanently fails when there is an exhaustion
+	using the maximum values. If no maximum values are specified,
+	the task will wait until a larger worker connects. */
+	DS_ALLOCATION_MODE_MAX = CATEGORY_ALLOCATION_MODE_MAX,
+
+	/** As above, but tasks are first tried with an automatically computed
+	    allocation to minimize resource waste. */
+	DS_ALLOCATION_MODE_MIN_WASTE = CATEGORY_ALLOCATION_MODE_MIN_WASTE,
+
+	/**< As above, but maximizing throughput. */
+	DS_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
 } ds_category_mode_t;
 
 
-extern int ds_option_scheduler;	               /**< Initial setting for algorithm to assign tasks to
-												 workers upon creating manager . Change prior to
-												 calling ds_create, after queue is created
-												 this variable is not considered and changes must be
-												 made through the API calls.   */
+/** Initial setting for algorithm to assign tasks to workers upon creating manager.
+Change prior to calling ds_create, after queue is created this variable is not
+considered and changes must be made through the API calls.
+*/
+
+extern int ds_option_scheduler;
 
 /** Statistics describing a manager. */
 
