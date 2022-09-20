@@ -44,12 +44,12 @@ typedef enum {
 } ds_file_type_t;
 
 typedef enum {
-	DS_NOCACHE  = 0, /**< Do not cache file at execution site. */
+	DS_NOCACHE  = 0, /**< Do not cache file at execution site. (default) */
 	DS_CACHE    = 1, /**< Cache file at execution site for later use. */
 	DS_UNPACK   = 2, /**< Unpack this archive (.tar .tgz .zip) into a directory on arrival. */
-	DS_WATCH    = 16, /**< Watch the output file and send back changes as the task runs. */
-	DS_FAILURE_ONLY = 32,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
-	DS_SUCCESS_ONLY = 64, /**< Only return this output file if the task succeeded. */
+	DS_WATCH    = 4, /**< Watch the output file and send back changes as the task runs. */
+	DS_FAILURE_ONLY = 8,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
+	DS_SUCCESS_ONLY = 16, /**< Only return this output file if the task succeeded. */
 } ds_file_flags_t;
 
 typedef enum {
@@ -90,13 +90,12 @@ typedef enum {
 
 typedef enum {
 	DS_FILE = 1,              /**< File-spec is a regular file **/
+	DS_URL,                   /**< File-spec refers to an URL **/
 	DS_BUFFER,                /**< Data comes from buffer memory **/
 	DS_REMOTECMD,             /**< File-spec is a regular file **/
 	DS_FILE_PIECE,            /**< File-spec refers to only a part of a file **/
 	DS_DIRECTORY,             /**< File-spec is a directory **/
-	DS_URL                    /**< File-spec refers to an URL **/
 } ds_file_t;
-
 
 /*
 Here we repeat the category_mode_t declaration but with dataswarm names.
