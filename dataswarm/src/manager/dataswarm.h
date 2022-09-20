@@ -251,6 +251,12 @@ can be re-submitted via @ref ds_submit.
 */
 struct ds_task *ds_task_clone(const struct ds_task *task);
 
+/** Delete a task.
+This may be called on tasks after they are returned from @ref ds_wait.
+@param t The task to delete.
+*/
+void ds_task_delete(struct ds_task *t);
+
 /** Indicate the command to be executed.
 @param t A task object.
 @param cmd The command to be executed.  This string will be duplicated by this call, so the argument may be freed or re-used afterward.
@@ -551,14 +557,6 @@ const char * ds_task_get_addrport( struct ds_task *t );
 int64_t ds_task_get_metric( struct ds_task *t, const char *name );
 
 
-
-/** Delete a task.
-This may be called on tasks after they are returned from @ref ds_wait.
-@param t The task to delete.
-*/
-void ds_task_delete(struct ds_task *t);
-
-
 /** When monitoring, indicates a json-encoded file that instructs the
 monitor to take a snapshot of the task resources. Snapshots appear in the JSON
 summary file of the task, under the key "snapshots". Snapshots are taken on
@@ -646,31 +644,11 @@ struct ds_manager *ds_create(int port);
 */
 struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert);
 
-/** Enables resource monitoring on the give manager.
-It generates a resource summary per task, which is written to the given
-directory. It also creates all_summaries-PID.log, that consolidates all
-summaries into a single. If monitor_output_dirname is NULL, ds_task is
-updated with the resources measured, and no summary file is kept unless
-explicitely given by ds_task's monitor_output_file.
-@param q A ds_manager object
-@param monitor_output_directory The name of the output directory. If NULL,
-summaries are kept only when monitor_output_directory is specify per task, but
-resources_measured from ds_task is updated.  @return 1 on success, 0 if
-@param watchdog if not 0, kill tasks that exhaust declared resources.
-@return 1 on success, o if monitoring was not enabled.
+/** Delete a manager.
+This function should only be called after @ref ds_empty returns true.
+@param q A manager to delete.
 */
-int ds_enable_monitoring(struct ds_manager *m, char *monitor_output_directory, int watchdog);
-
-/** Enables resource monitoring on the give manager.
-As @ref ds_enable_monitoring, but it generates a time series and a
-monitor debug file (WARNING: for long running tasks these files may reach
-gigabyte sizes. This function is mostly used for debugging.)
-@param q A ds_manager object.
-@param monitor_output_directory The name of the output directory.
-@param watchdog if not 0, kill tasks that exhaust declared resources.
-@return 1 on success, 0 if monitoring was not enabled.
-*/
-int ds_enable_monitoring_full(struct ds_manager *m, char *monitor_output_directory, int watchdog);
+void ds_delete(struct ds_manager *m);
 
 /** Submit a task to a manager.
 Once a task is submitted to a manager, it is not longer under the user's
@@ -681,62 +659,6 @@ Once returned, it is safe to re-submit the same take object via @ref ds_submit.
 @return An integer taskid assigned to the submitted task.
 */
 int ds_submit(struct ds_manager *m, struct ds_task *t);
-
-
-/** Set the minimum taskid of future submitted tasks.
-Further submitted tasks are guaranteed to have a taskid larger or equal to
-minid.  This function is useful to make taskids consistent in a workflow that
-consists of sequential managers. (Note: This function is rarely used).  If the
-minimum id provided is smaller than the last taskid computed, the minimum id
-provided is ignored.
-@param q A ds_manager object
-@param minid Minimum desired taskid
-@return Returns the actual minimum taskid for future tasks.
-*/
-int ds_specify_min_taskid(struct ds_manager *m, int minid);
-
-/** Block workers in hostname from working for manager q.
-@param q A ds_manager object
-@param hostname A string for hostname.
-*/
-void ds_block_host(struct ds_manager *m, const char *hostname);
-
-/** Block workers in hostname from a manager, but remove block after timeout seconds.
-  If timeout is less than 1, then the hostname is blocked indefinitely, as
-  if @ref ds_block_host was called instead.
-  @param q A ds_manager object
-  @param hostname A string for hostname.
-  @param seconds Number of seconds to the hostname will be blocked.
-  */
-void ds_block_host_with_timeout(struct ds_manager *m, const char *hostname, time_t seconds);
-
-
-/** Unblock host from a manager.
-@param q A ds_manager object
-@param hostname A string for hostname.
-*/
-void ds_unblock_host(struct ds_manager *m, const char *hostname);
-
-/** Unblock all host.
-@param q A ds_manager object
-*/
-void ds_unblock_all(struct ds_manager *m);
-
-/** Invalidate cached file.
-The file or directory with the given local name specification is deleted from
-the workers' cache, so that a newer version may be used. Any running task using
-the file is canceled and resubmitted. Completed tasks waiting for retrieval are
-not affected.
-(Currently anonymous buffers and file pieces cannot be deleted once cached in a worker.)
-@param q A ds_manager object
-@param local_name The name of the file on local disk or shared filesystem, or uri.
-@param type One of:
-- @ref DS_FILE
-- @ref DS_DIRECTORY
-- @ref DS_URL
-*/
-void ds_invalidate_cached_file(struct ds_manager *m, const char *local_name, ds_file_t type);
-
 
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
@@ -793,6 +715,98 @@ Rather than assuming a specific port, the user should simply call this function 
 @return The port the manager is listening on.
 */
 int ds_port(struct ds_manager *m);
+
+/** Change the project name for a given manager.
+@param q A ds_manager object
+@param name The new project name.
+*/
+void ds_specify_name(struct ds_manager *m, const char *name);
+
+/** Get the project name of the manager.
+@param q A ds_manager object
+@return The project name of the manager.
+*/
+const char *ds_name(struct ds_manager *m);
+
+/** Enables resource monitoring on the give manager.
+It generates a resource summary per task, which is written to the given
+directory. It also creates all_summaries-PID.log, that consolidates all
+summaries into a single. If monitor_output_dirname is NULL, ds_task is
+updated with the resources measured, and no summary file is kept unless
+explicitely given by ds_task's monitor_output_file.
+@param q A ds_manager object
+@param monitor_output_directory The name of the output directory. If NULL,
+summaries are kept only when monitor_output_directory is specify per task, but
+resources_measured from ds_task is updated.  @return 1 on success, 0 if
+@param watchdog if not 0, kill tasks that exhaust declared resources.
+@return 1 on success, o if monitoring was not enabled.
+*/
+int ds_enable_monitoring(struct ds_manager *m, char *monitor_output_directory, int watchdog);
+
+/** Enables resource monitoring on the give manager.
+As @ref ds_enable_monitoring, but it generates a time series and a
+monitor debug file (WARNING: for long running tasks these files may reach
+gigabyte sizes. This function is mostly used for debugging.)
+@param q A ds_manager object.
+@param monitor_output_directory The name of the output directory.
+@param watchdog if not 0, kill tasks that exhaust declared resources.
+@return 1 on success, 0 if monitoring was not enabled.
+*/
+int ds_enable_monitoring_full(struct ds_manager *m, char *monitor_output_directory, int watchdog);
+
+/** Set the minimum taskid of future submitted tasks.
+Further submitted tasks are guaranteed to have a taskid larger or equal to
+minid.  This function is useful to make taskids consistent in a workflow that
+consists of sequential managers. (Note: This function is rarely used).  If the
+minimum id provided is smaller than the last taskid computed, the minimum id
+provided is ignored.
+@param q A ds_manager object
+@param minid Minimum desired taskid
+@return Returns the actual minimum taskid for future tasks.
+*/
+int ds_specify_min_taskid(struct ds_manager *m, int minid);
+
+/** Block workers in hostname from working for manager q.
+@param q A ds_manager object
+@param hostname A string for hostname.
+*/
+void ds_block_host(struct ds_manager *m, const char *hostname);
+
+/** Block workers in hostname from a manager, but remove block after timeout seconds.
+  If timeout is less than 1, then the hostname is blocked indefinitely, as
+  if @ref ds_block_host was called instead.
+  @param q A ds_manager object
+  @param hostname A string for hostname.
+  @param seconds Number of seconds to the hostname will be blocked.
+  */
+void ds_block_host_with_timeout(struct ds_manager *m, const char *hostname, time_t seconds);
+
+
+/** Unblock host from a manager.
+@param q A ds_manager object
+@param hostname A string for hostname.
+*/
+void ds_unblock_host(struct ds_manager *m, const char *hostname);
+
+/** Unblock all host.
+@param q A ds_manager object
+*/
+void ds_unblock_all(struct ds_manager *m);
+
+/** Invalidate cached file.
+The file or directory with the given local name specification is deleted from
+the workers' cache, so that a newer version may be used. Any running task using
+the file is canceled and resubmitted. Completed tasks waiting for retrieval are
+not affected.
+(Currently anonymous buffers and file pieces cannot be deleted once cached in a worker.)
+@param q A ds_manager object
+@param local_name The name of the file on local disk or shared filesystem, or uri.
+@param type One of:
+- @ref DS_FILE
+- @ref DS_DIRECTORY
+- @ref DS_URL
+*/
+void ds_invalidate_cached_file(struct ds_manager *m, const char *local_name, ds_file_t type);
 
 /** Get manager statistics (only from manager).
 @param q A ds_manager object
@@ -897,18 +911,6 @@ This function controls which <b>worker</b> will be selected for a given task.
 */
 void ds_specify_algorithm(struct ds_manager *m, ds_schedule_t algorithm);
 
-/** Get the project name of the manager.
-@param q A ds_manager object
-@return The project name of the manager.
-*/
-const char *ds_name(struct ds_manager *m);
-
-/** Change the project name for a given manager.
-@param q A ds_manager object
-@param name The new project name.
-*/
-void ds_specify_name(struct ds_manager *m, const char *name);
-
 /** Change the priority for a given manager.
 @param q A ds_manager object
 @param priority The new priority of the manager.  Higher priority managers will attract workers first.
@@ -963,12 +965,6 @@ struct list * ds_cancel_all_tasks(struct ds_manager *m);
 @param n The number to shut down. All workers if given "0".
 */
 int ds_shut_down_workers(struct ds_manager *m, int n);
-
-/** Delete a manager.
-This function should only be called after @ref ds_empty returns true.
-@param q A manager to delete.
-*/
-void ds_delete(struct ds_manager *m);
 
 /** Add a log file that records cummulative statistics of the connected workers and submitted tasks.
 @param q A ds_manager object
