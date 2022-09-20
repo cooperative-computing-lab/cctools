@@ -514,8 +514,8 @@ class Task(object):
     ##
     # Set this environment variable before running the task.
     # If value is None, then variable is unset.
-    def specify_environment_variable(self, name, value=None):
-        return ds_task_specify_environment_variable(self._task, name, value)
+    def specify_env(self, name, value=None):
+        return ds_task_specify_env(self._task, name, value)
 
     ##
     # Set a name for the resource summary output directory from the monitor.

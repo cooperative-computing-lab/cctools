@@ -210,7 +210,7 @@ void ds_task_specify_coprocess( struct ds_task *t, const char *coprocess )
 	}
 }
 
-void ds_task_specify_environment_variable( struct ds_task *t, const char *name, const char *value )
+void ds_task_specify_env( struct ds_task *t, const char *name, const char *value )
 {
 	if(value) {
 		list_push_tail(t->env_list,string_format("%s=%s",name,value));

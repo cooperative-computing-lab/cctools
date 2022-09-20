@@ -701,7 +701,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			if(value) {
 				*value = 0;
 				value++;
-				ds_task_specify_environment_variable(task,env,value);
+				ds_task_specify_env(task,env,value);
 			}
 			free(env);
 		} else {

@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 		ds_task_specify_buffer(t,query_string,strlen(query_string),"query.file", DS_NOCACHE);
 		ds_task_specify_url(t,BLAST_URL,"blastdir", DS_INPUT, DS_CACHE|DS_UNPACK );
 		ds_task_specify_url(t,LANDMARK_URL,"landmark", DS_INPUT, DS_CACHE|DS_UNPACK );
-		ds_task_specify_environment_variable(t,"BLASTDB","landmark");
+		ds_task_specify_env(t,"BLASTDB","landmark");
 
 		int taskid = ds_submit(m, t);
 

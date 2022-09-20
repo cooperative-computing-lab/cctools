@@ -454,7 +454,7 @@ Specify an environment variable to be added to the task.
 @param name Name of the variable.
 @param value Value of the variable.
 */
-void ds_task_specify_environment_variable( struct ds_task *t, const char *name, const char *value );
+void ds_task_specify_env( struct ds_task *t, const char *name, const char *value );
 
 /** Select the scheduling algorithm for a single task.
 To change the scheduling algorithm for all tasks, use @ref ds_specify_algorithm instead.
