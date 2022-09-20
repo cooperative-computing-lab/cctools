@@ -89,9 +89,6 @@ See the file COPYING for details.
 /* How frequently to check for tasks that do not fit any worker. */
 #define DS_LARGE_TASK_CHECK_INTERVAL 180000000 // 3 minutes in usecs
 
-/* Default scheduling option, can be set prior to creating a manager. */
-int ds_option_scheduler = DS_SCHEDULE_TIME;
-
 /* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
 double ds_option_blocklist_slow_workers_timeout = 900;
 
@@ -3140,7 +3137,7 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
 
-	q->worker_selection_algorithm = ds_option_scheduler;
+	q->worker_selection_algorithm = DS_SCHEDULE_FCFS;
 	q->process_pending_check = 0;
 
 	q->short_timeout = 5;

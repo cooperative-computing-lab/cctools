@@ -125,14 +125,6 @@ typedef enum {
 	DS_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
 } ds_category_mode_t;
 
-
-/** Initial setting for algorithm to assign tasks to workers upon creating manager.
-Change prior to calling ds_create, after queue is created this variable is not
-considered and changes must be made through the API calls.
-*/
-
-extern int ds_option_scheduler;
-
 /** Statistics describing a manager. */
 
 struct ds_stats {
