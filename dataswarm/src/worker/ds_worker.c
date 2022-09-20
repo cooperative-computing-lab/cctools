@@ -680,7 +680,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			ds_hack_do_not_compute_cached_name = 1;
 			ds_task_specify_file(task, localname, taskname, DS_OUTPUT, flags );
 		} else if(sscanf(line, "dir %s", filename)) {
-			ds_task_specify_directory(task, filename, filename, DS_INPUT, 0700, 0);
+			ds_task_specify_empty_dir(task, filename );
 		} else if(sscanf(line,"cores %" PRId64,&n)) {
 			ds_task_specify_cores(task, n);
 		} else if(sscanf(line,"memory %" PRId64,&n)) {
