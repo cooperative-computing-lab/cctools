@@ -307,10 +307,14 @@ int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const 
 */
 int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags);
 
-/** Add a directory to a task.
+/** Add an empty directory to a task.
+This is very occasionally needed for applications that expect
+certain directories to exist in the working directory, prior to producing output.
+This function does not transfer any data to the task, but just creates
+a directory in its working sandbox.  If you want to transfer an
+entire directory worth of data to a task, use @ref ds_task_specify_file and simply give a directory name.
 @param t A task object.
-@param local_name The name of the directory on local disk or shared filesystem.  Optional if the directory is empty.
-@param remote_name The name of the directory at the remote execution site.
+@param remote_name The name of the empty directory at the remote execution site.
 @param type Must be one of the following values:
 - @ref DS_INPUT to indicate an input file to be consumed by the task
 - @ref DS_OUTPUT to indicate an output file to be produced by the task
@@ -320,7 +324,7 @@ int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, cons
 @param recursive indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
 @return 1 if the task directory is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
 */
-int ds_task_specify_directory(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags, int recursive);
+int ds_task_specify_empty_dir( struct ds_task *t, const char *remote_name );
 
 /** Add a url as an input for a task.
 @param t A task object.
