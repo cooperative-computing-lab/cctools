@@ -38,10 +38,14 @@ expected events.
 #define DS_RANDOM_PORT  0                  /**< Indicates that any port may be chosen. */
 #define DS_WAITFORTASK  -1                 /**< Timeout value to wait for a task to complete before returning. */
 
+/** Select whether an attached file is used as an input or output file. */
+
 typedef enum {
 	DS_INPUT  = 0,                         /**< Specify an input object. */
 	DS_OUTPUT = 1                          /**< Specify an output object. */
 } ds_file_type_t;
+
+/** Select optional handling for input and output files: caching, unpacking, watching, etc. **/
 
 typedef enum {
 	DS_NOCACHE  = 0, /**< Do not cache file at execution site. (default) */
@@ -52,6 +56,8 @@ typedef enum {
 	DS_SUCCESS_ONLY = 16, /**< Only return this output file if the task succeeded. */
 } ds_file_flags_t;
 
+/** Select overall scheduling algorithm for matching tasks to workers. */
+
 typedef enum {
 	DS_SCHEDULE_UNSET = 0,
 	DS_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
@@ -61,8 +67,10 @@ typedef enum {
 	DS_SCHEDULE_WORST      /**< Select the worst fit worker (the worker with more unused resources). */
 } ds_schedule_t;
 
+/** Possible outcomes for a task, returned by @ref ds_task_get_result. */
+
 typedef enum {
-	DS_RESULT_SUCCESS             = 0,      /**< The task ran successfully **/
+	DS_RESULT_SUCCESS             = 0,      /**< The task ran successfully, and its Unix exit code is given by @ref ds_task_get_exit_code */
 	DS_RESULT_INPUT_MISSING       = 1,      /**< The task cannot be run due to a missing input file **/
 	DS_RESULT_OUTPUT_MISSING      = 2,      /**< The task ran but failed to generate a specified output file **/
 	DS_RESULT_STDOUT_MISSING      = 4,      /**< The task ran but its stdout has been truncated **/
@@ -78,6 +86,8 @@ typedef enum {
 	DS_RESULT_OUTPUT_TRANSFER_ERROR = 10 << 3  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
 } ds_result_t;
 
+/** Possible states of a task, given by @ref ds_task_get_state */
+
 typedef enum {
 	DS_TASK_UNKNOWN = 0,       /**< There is no such task **/
 	DS_TASK_READY,             /**< Task is ready to be run, waiting in queue **/
@@ -88,6 +98,8 @@ typedef enum {
 	DS_TASK_CANCELED,           /**< Task was canceled before completion **/
 } ds_task_state_t;
 
+/** Select the type of an input or output file to attach to a task. */
+
 typedef enum {
 	DS_FILE = 1,              /**< File-spec is a regular file **/
 	DS_URL,                   /**< File-spec refers to an URL **/
@@ -97,10 +109,7 @@ typedef enum {
 	DS_EMPTY_DIR              /**< File-spec is a directory **/
 } ds_file_t;
 
-/*
-Here we repeat the category_mode_t declaration but with dataswarm names.
-This is needed to generate uniform names in the API and bindings:
-*/
+/** Select how to allocate resources for similar tasks with @ref ds_specify_category_mode */
 
 typedef enum {
 	/** When monitoring is disabled, all tasks run as DS_ALLOCATION_MODE_FIXED.
@@ -121,7 +130,7 @@ typedef enum {
 	    allocation to minimize resource waste. */
 	DS_ALLOCATION_MODE_MIN_WASTE = CATEGORY_ALLOCATION_MODE_MIN_WASTE,
 
-	/**< As above, but maximizing throughput. */
+	/** As above, but maximizing throughput. */
 	DS_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
 } ds_category_mode_t;
 
