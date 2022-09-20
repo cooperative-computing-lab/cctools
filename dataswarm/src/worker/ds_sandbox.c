@@ -40,7 +40,7 @@ static int ensure_input_file( struct ds_process *p, struct ds_file *f, struct ds
 	
 	int result = 0;
 
-	if(f->type==DS_DIRECTORY) {
+	if(f->type==DS_EMPTY_DIR) {
 		/* Special case: empty directories are not cached objects, just create in sandbox */
 		result = create_dir(sandbox_path, 0700);
 		if(!result) debug(D_DS,"couldn't create directory %s: %s", sandbox_path, strerror(errno));

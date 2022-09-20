@@ -2514,7 +2514,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_in
 		struct ds_file *tf;
 		list_first_item(t->input_files);
 		while((tf = list_next_item(t->input_files))) {
-			if(tf->type == DS_DIRECTORY) {
+			if(tf->type == DS_EMPTY_DIR) {
 				ds_manager_send(q,w, "dir %s\n", tf->remote_name);
 			} else {
 				char remote_name_encoded[PATH_MAX];

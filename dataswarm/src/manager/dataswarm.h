@@ -92,9 +92,9 @@ typedef enum {
 	DS_FILE = 1,              /**< File-spec is a regular file **/
 	DS_URL,                   /**< File-spec refers to an URL **/
 	DS_BUFFER,                /**< Data comes from buffer memory **/
-	DS_REMOTECMD,             /**< File-spec is a regular file **/
+	DS_COMMAND,               /**< File-spec is a regular file **/
 	DS_FILE_PIECE,            /**< File-spec refers to only a part of a file **/
-	DS_DIRECTORY,             /**< File-spec is a directory **/
+	DS_EMPTY_DIR              /**< File-spec is a directory **/
 } ds_file_t;
 
 /*

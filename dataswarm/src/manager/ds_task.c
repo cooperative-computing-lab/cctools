@@ -520,7 +520,7 @@ int ds_task_specify_directory(struct ds_task *t, const char *local_name, const c
 	//local name is null. This doesn't affect the behavior of the file transfers.
 	const char *source = local_name ? local_name : remote_name;
 
-	tf = ds_file_create(source, remote_name, DS_DIRECTORY, flags);
+	tf = ds_file_create(source, remote_name, DS_EMPTY_DIR, flags);
 	if(!tf) return 0;
 
 	list_push_tail(files, tf);
@@ -691,7 +691,7 @@ int ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char 
 		fatal("command to transfer file does not contain %%%% specifier: %s", cmd);
 	}
 
-	tf = ds_file_create(cmd, remote_name, DS_REMOTECMD, flags);
+	tf = ds_file_create(cmd, remote_name, DS_COMMAND, flags);
 	if(!tf) return 0;
 
 	// length of source data is not known yet.
