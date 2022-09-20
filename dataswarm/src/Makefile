@@ -1,7 +1,7 @@
 include ../../config.mk
 include ../../rules.mk
 
-TARGETS=manager worker tools scripts bindings examples
+TARGETS=manager worker tools bindings examples
 
 all:
 	for d in $(TARGETS); do $(MAKE) -C $$d; done

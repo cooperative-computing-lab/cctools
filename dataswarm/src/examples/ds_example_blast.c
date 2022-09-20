@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 
 	m = ds_create(DS_DEFAULT_PORT);
 	if(!m) {
-		printf("couldn't create queue: %s\n", strerror(errno));
+		printf("couldn't create manager: %s\n", strerror(errno));
 		return 1;
 	}
 	printf("listening on port %d...\n", ds_port(m));

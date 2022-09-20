@@ -6,7 +6,7 @@ LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/dataswarm/src/manager
 
 PROGRAMS = ds_status ds_api_proxy
 SCRIPTS = ds_graph_log ds_graph_workers
-TEST_PROGRAMS = ds_test ds_test_watch
+TEST_PROGRAMS = ds_test
 TARGETS = $(PROGRAMS) $(TEST_PROGRAMS)
 
 all: $(TARGETS)

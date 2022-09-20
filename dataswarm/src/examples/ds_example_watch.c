@@ -5,19 +5,20 @@ See the file COPYING for details.
 */
 
 /*
-This example program produces a mosaic of images, each one transformed
-with a different amount of swirl.
+This example program shows the behavior of the DS_WATCH flag.
 
-It demonstrates several features of dataswarm:
+If a task produces output to a file incrementally as it runs,
+it can be helpful to see that output piece by piece as it
+is produced. By simply adding the DS_WATCH flag to the output
+of the program, dataswarm will periodically check for output
+and return it to the manager while each task runs.  When the
+task completes, any remaining output is fetched.
 
-- Each task consumes remote data accessed via url, cached and shared
-among all tasks on that machine.
-
-- Each task uses the "convert" program, which may or may not be installed
-on remote machines.  To make the tasks portable, the program "/usr/bin/convert"
-is packaged up into a self-contained archive "convert.sfx" which contains
-the executable and all of its dynamic dependencies.  This allows the
-use of arbitrary workers without regard to their software environment.
+This example runs several instances of the task named
+ds_example_watch_trickle.sh, which gradually produces output
+every few seconds.  While running the manager program, open
+up another terminal, and observe that files output.0, output.1,
+etc are gradually produced throughout the run.
 */
 
 #include "dataswarm.h"
@@ -55,23 +56,13 @@ int main(int argc, char *argv[])
 	printf("Listening on port %d...\n", ds_port(m));
 
 	int i;
-	for(i = 0; i < 360; i+=10) {
-		char outfile[256];
-		char command[1024];
-
-		sprintf(outfile, "%d.cat.jpg",i);
-		sprintf(command, "./convert.sfx -swirl %d cat.jpg %d.cat.jpg", i, i);
-
-		t = ds_task_create(command);
-		ds_task_specify_file(t, "convert.sfx", "convert.sfx", DS_INPUT, DS_CACHE);
-		ds_task_specify_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", DS_INPUT, DS_CACHE );
-		ds_task_specify_file(t,outfile,outfile,DS_OUTPUT,DS_NOCACHE);
-
-		ds_task_specify_cores(t,1);
-
-		int taskid = ds_submit(m, t);
-
-		printf("Submitted task (id# %d): %s\n", taskid, ds_task_get_command(t) );
+	for(i=0;i<10;i++) {
+		char output[256];
+		sprintf(output,"output.%d",i);
+		t = ds_task_create("./ds_example_watch_trickle.sh");
+		ds_task_specify_file(t, "ds_example_watch_trickle.sh", "ds_example_watch_trickle.sh", DS_INPUT, DS_CACHE );
+		ds_task_specify_file(t, output, "output", DS_OUTPUT, DS_WATCH );
+		ds_submit(m, t);
 	}
 
 	printf("Waiting for tasks to complete...\n");
@@ -95,16 +86,6 @@ int main(int argc, char *argv[])
 	printf("All tasks complete!\n");
 
 	ds_delete(m);
-
-	printf("Combining images into mosaic.jpg...\n");
-	system("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg");
-
-	printf("Deleting intermediate images...\n");
-	for(i=0;i<360;i+=10) {
-		char filename[256];
-		sprintf(filename,"%d.cat.jpg",i);
-		unlink(filename);
-	}
 
 	return 0;
 }
