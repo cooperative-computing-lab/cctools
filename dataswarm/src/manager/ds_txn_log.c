@@ -71,7 +71,7 @@ void ds_txn_log_write_task(struct ds_manager *q, struct ds_task *t)
 	} else if(state == DS_TASK_CANCELED) {
 			/* do not add any info */
 	} else if(state == DS_TASK_RETRIEVED || state == DS_TASK_DONE) {
-		buffer_printf(&B, " %s ", ds_result_str(t->result));
+		buffer_printf(&B, " %s ", ds_result_string(t->result));
 		buffer_printf(&B, " %d ", t->exit_code);
 
 		if(t->resources_measured) {

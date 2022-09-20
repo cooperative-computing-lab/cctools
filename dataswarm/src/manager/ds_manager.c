@@ -3666,7 +3666,7 @@ static int task_in_terminal_state(struct ds_manager *q, struct ds_task *t)
 	return 0;
 }
 
-const char *ds_result_str(ds_result_t result) {
+const char *ds_result_string(ds_result_t result) {
 	const char *str = NULL;
 
 	switch(result) {

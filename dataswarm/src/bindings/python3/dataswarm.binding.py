@@ -606,12 +606,12 @@ class Task(object):
     # Return a string that explains the result of a task.
     # Must be called only after the task completes execution.
     # @code
-    # >>> print(t.result_str)
+    # >>> print(t.result_string)
     # 'SUCCESS'
     # @endcode
     @property
-    def result_str(self):
-        return ds_result_str(ds_task_get_result(self._task))
+    def result_string(self):
+        return ds_result_string(ds_task_get_result(self._task))
 
     ##
     # Return various integer performance metrics about a completed task.

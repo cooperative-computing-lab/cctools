@@ -59,7 +59,7 @@ typedef enum {
 /** Select overall scheduling algorithm for matching tasks to workers. */
 
 typedef enum {
-	DS_SCHEDULE_UNSET = 0,
+	DS_SCHEDULE_UNSET = 0, /**< Internal use only. */
 	DS_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
 	DS_SCHEDULE_FILES,     /**< Select worker that has the most data required by the task. */
 	DS_SCHEDULE_TIME,      /**< Select worker that has the fastest execution time on previous tasks. */
@@ -67,7 +67,9 @@ typedef enum {
 	DS_SCHEDULE_WORST      /**< Select the worst fit worker (the worker with more unused resources). */
 } ds_schedule_t;
 
-/** Possible outcomes for a task, returned by @ref ds_task_get_result. */
+/** Possible outcomes for a task, returned by @ref ds_task_get_result.
+These results can be converted to a string with @ref ds_result_string.
+*/
 
 typedef enum {
 	DS_RESULT_SUCCESS             = 0,      /**< The task ran successfully, and its Unix exit code is given by @ref ds_task_get_exit_code */
@@ -262,37 +264,52 @@ will only be sent to workers running the coprocess.
 */
 void ds_task_specify_coprocess( struct ds_task *t, const char *coprocess_name );
 
-/** Add a file to a task.
+/** Attach a file or directory to a task.
 @param t A task object.
-@param local_name The name of the file on local disk or shared filesystem.
-@param remote_name The name of the file at the remote execution site.
-@param type Must be one of the following values:
-- @ref DS_INPUT to indicate an input file to be consumed by the task
-- @ref DS_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of @ref ds_file_flags_t or'd together. The most common are:
-- @ref DS_CACHE indicates that the file should be cached for later tasks. (recommended)
-- @ref DS_NOCACHE indicates that the file should not be cached for later tasks.
-- @ref DS_WATCH indicates that the worker will watch the output file as it is created
-and incrementally return the file to the manager as the task runs.  (The frequency of these updates
-is entirely dependent upon the system load.  If the manager is busy interacting with many workers,
-output updates will be infrequent.)
-@return 1 if the task file is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
+@param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.
+@param remote_name The name that the file/directory will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
+@param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
+@param flags	May be zero or more of the following @ref ds_file_flags_t logical-ored together:
+- @ref DS_CACHE indicates that the file/directory should be cached for later tasks. (recommended)
+- @ref DS_NOCACHE indicates that the file should not be cached.
+- @ref DS_UNPACK indicates that @a local_name is an archive (.tar, .tgz, .zip) that will be automatically unpacked into directory @a remote_name .
+- @ref DS_WATCH indicates that the worker will watch the output file as it is created, and incrementally return the file to the manager as the task runs (The frequency of these updates is entirely dependent upon the system load.  If the manager is busy interacting with many workers, output updates will be less frequent.)
+- @ref DS_FAILURE_ONLY indicates the file should only be returned if the task fails.
+- @ref DS_SUCCESS_ONLY indicates the file should only be returned if the task succeeds.
+@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
 int ds_task_specify_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
 
-/** Add a file piece to a task.
+/** Add a url as an input for a task.
 @param t A task object.
-@param local_name The name of the file on local disk or shared filesystem.
-@param remote_name The name of the file at the remote execution site.
+@param url The source URL to be accessed to provide the file.
+@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
+@param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
+@param flags May be zero or more @ref ds_file_flags_t logical-ored together. See @ref ds_task_specify_file.
+@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
+*/
+int ds_task_specify_url(struct ds_task *t, const char *url, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
+
+/** Add a shell command to produce an input file for a task.
+@param t A task object.
+@param cmd The shell command to produce the file.   The command must contain a special symbol "%%" which indicates the destination of the file.
+For example, the command "grep frog /usr/dict/words > %%" would produce a file by searching for "frog" in the Unix dictionary.
+@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
+@param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
+@param flags May be zero or more @ref ds_file_flags_t logical-ored together. See @ref ds_task_specify_file.
+@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
+*/
+int ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
+
+/** Add a piece of a file to a task.
+@param t A task object.
+@param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.
+@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 @param start_byte The starting byte offset of the file piece to be transferred.
 @param end_byte The ending byte offset of the file piece to be transferred.
-@param type Must be one of the following values:
-- @ref DS_INPUT to indicate an input file to be consumed by the task
-- @ref DS_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of @ref ds_file_flags_t or'd together. The most common are:
-- @ref DS_CACHE indicates that the file should be cached for later tasks. (recommended)
-- @ref DS_NOCACHE indicates that the file should not be cached for later tasks.
-@return 1 if the task file piece is successfully specified, 0 if either of @a t, @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
+@param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
+@param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
+@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
 int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, ds_file_type_t type, ds_file_flags_t flags);
 
@@ -300,11 +317,9 @@ int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const 
 @param t A task object.
 @param data The data to be passed as an input file.
 @param length The length of the buffer, in bytes
-@param remote_name The name of the remote file to create.
-@param flags	May be zero to indicate no special handling or any of @ref ds_file_flags_t or'd together. The most common are:
-- @ref DS_CACHE indicates that the file should be cached for later tasks. (recommended)
-- @ref DS_NOCACHE indicates that the file should not be cached for later tasks.
-@return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
+@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
+@param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
+@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
 int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags);
 
@@ -315,45 +330,10 @@ This function does not transfer any data to the task, but just creates
 a directory in its working sandbox.  If you want to transfer an
 entire directory worth of data to a task, use @ref ds_task_specify_file and simply give a directory name.
 @param t A task object.
-@param remote_name The name of the empty directory at the remote execution site.
-@param type Must be one of the following values:
-- @ref DS_INPUT to indicate an input file to be consumed by the task
-- @ref DS_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of @ref ds_file_flags_t or'd together. The most common are:
-- @ref DS_CACHE indicates that the file should be cached for later tasks. (recommended)
-- @ref DS_NOCACHE indicates that the file should not be cached for later tasks.
-@param recursive indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
-@return 1 if the task directory is successfully specified, 0 if either of @a t,  @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
+@param remote_name The name of the empty directory in the task sandbox.  Must be a relative path name: it may not begin with a slash.
+@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
 int ds_task_specify_empty_dir( struct ds_task *t, const char *remote_name );
-
-/** Add a url as an input for a task.
-@param t A task object.
-@param url The source URL to be accessed to provide the file.
-@param remote_name The name of the file as seen by the task.
-@param type Must be one of the following values:
-- @ref DS_INPUT to indicate an input file to be consumed by the task
-- @ref DS_OUTPUT is not currently supported.
-@param flags	May be zero to indicate no special handling or any of @ref ds_file_flags_t or'd together. The most common are:
-- @ref DS_CACHE indicates that the file should be cached for later tasks. (recommended)
-- @ref DS_NOCACHE indicates that the file should not be cached for later tasks.
-@return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
-*/
-int ds_task_specify_url(struct ds_task *t, const char *url, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
-
-/** Gets/puts file at remote_name using cmd at worker.
-@param t A task object.
-@param cmd The shell command to transfer the file. For input files, it should read the contents from remote_name via stdin. For output files, it should write the contents to stdout.
-@param remote_name The name of the file as seen by the task.
-@param type Must be one of the following values:
-- @ref DS_INPUT to indicate an input file to be consumed by the task
-- @ref DS_OUTPUT to indicate an output file to be produced by the task
-@param flags	May be zero to indicate no special handling or any of @ref ds_file_flags_t or'd together. The most common are:
-- @ref DS_CACHE indicates that the file should be cached for later tasks. (recommended)
-- @ref DS_NOCACHE indicates that the file should not be cached for later tasks.
-@return 1 if the task file is successfully specified, 0 if either of @a t or @a remote_name is null or @a remote_name is an absolute path.
-*/
-int ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
 
 /** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result DS_RESULT_MAX_RETRIES.
 @param t A task object.
@@ -510,7 +490,7 @@ If the result is @ref DS_RESULT_SUCCESS, then the
 task ran to completion and the exit code of the process
 can be obtained from @ref ds_task_get_exit_code.
 For any other result, the task could not be run to
-completion.  Use @ref ds_result_str to convert the
+completion.  Use @ref ds_result_strin to convert the
 result code into a readable string.
 @param t A task object.
 @return The result of the task as a ds_result_t.
@@ -522,7 +502,7 @@ ds_result_t ds_task_get_result( struct ds_task *t );
 @param result Result from a task returned by @ref ds_wait.
 @return String representation of task result code.
 */
-const char *ds_result_str(ds_result_t result);
+const char *ds_result_string(ds_result_t result);
 
 
 /** Get the Unix exit code of the task.

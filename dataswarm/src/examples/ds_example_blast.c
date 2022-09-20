@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
 			if(r==DS_RESULT_SUCCESS) {
 				printf("task %d output: %s\n",id,ds_task_get_output(t));
 			} else {
-				printf("task %d failed: %s\n",id,ds_result_str(r));
+				printf("task %d failed: %s\n",id,ds_result_string(r));
 			}
 			ds_task_delete(t);
 		}
