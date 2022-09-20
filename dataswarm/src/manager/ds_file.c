@@ -66,13 +66,13 @@ char *make_cached_name( const struct ds_file *f )
 
 	switch(f->type) {
 		case DS_FILE:
-		case DS_DIRECTORY:
+		case DS_EMPTY_DIR:
 			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), source_enc);
 			break;
 		case DS_FILE_PIECE:
 			return string_format("piece-%d-%s-%s-%lld-%lld",cache_file_id, md5_string(digest),source_enc,(long long)f->offset,(long long)f->piece_length);
 			break;
-		case DS_REMOTECMD:
+		case DS_COMMAND:
 			return string_format("cmd-%d-%s", cache_file_id, md5_string(digest));
 			break;
 		case DS_URL:

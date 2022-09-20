@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 			if(result==DS_RESULT_SUCCESS) {
 				printf("Task %d complete: %s\n",id,ds_task_get_command(t));
                         } else {
-                                printf("Task %d failed: %s\n",id,ds_result_str(r));
+                                printf("Task %d failed: %s\n",id,ds_result_string(r));
                         }
 
                         ds_task_delete(t);

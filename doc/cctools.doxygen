@@ -1,11 +1,17 @@
 /** @mainpage CCTools API Documentation
 
-This is the API reference manual for the CCTools code,
-which includes Makeflow, Work Queue, Parrot, Chirp and other software.
+This is the API reference manual for the CCTools package,
+which includes Dataswarm, Work Queue, Makeflow, Parrot, Chirp and other software.
 
-If you are writing a Work Queue manager program, start here:
+If you are writing a Work Queue application, start here:
 
-- @ref work_queue.h
+- @ref work_queue.h (C Language Interface)
+- @ref WorkQueuePython (Python Language Interface)
+
+If you are writing a Dataswarm application, start here:
+
+- @ref dataswarm.h (C Language Interface)
+- @ref DataSwarmPython (Python Language Interface)
 
 If you are writing a program to submit jobs to arbitrary batch systems,
 including Work Queue, HTCondor, Amazon EC2, etc. start here:
@@ -18,7 +24,7 @@ If you are writing a programs to access the Chirp filesystem, start here:
 - @ref chirp_recursive.h
 - @ref chirp_stream.h
 
-There are a number of other support modules that implement debugging, communication, and data structures.  The most commonly used are:
+Throughout the CCTools packages, there are a number of other support modules that implement debugging, communication, and data structures.  The most commonly used are:
 
 - Data Structures:
    - @ref list.h
@@ -45,4 +51,5 @@ For more information about using and installing CCTools:
 
 - <a href="http://ccl.cse.nd.edu/software">CCTools Software</a>
 - <a href="http://ccl.cse.nd.edu/software/manuals">CCTools User Manuals</a>
+
 */

@@ -368,7 +368,7 @@ static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct d
 		total_bytes = actual;
 		break;
 
-	case DS_REMOTECMD:
+	case DS_COMMAND:
 		debug(D_DS, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->source);
 		result = ds_manager_put_special_if_not_cached(q,w,t,f,"putcmd");
 		break;
@@ -378,7 +378,7 @@ static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct d
 		result = ds_manager_put_special_if_not_cached(q,w,t,f,"puturl");
 		break;
 
-	case DS_DIRECTORY:
+	case DS_EMPTY_DIR:
 		debug(D_DS, "%s (%s) will create directory %s", w->hostname, w->addrport, f->remote_name);
   		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as DS_FILEs
 		break;

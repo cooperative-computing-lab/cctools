@@ -89,9 +89,6 @@ See the file COPYING for details.
 /* How frequently to check for tasks that do not fit any worker. */
 #define DS_LARGE_TASK_CHECK_INTERVAL 180000000 // 3 minutes in usecs
 
-/* Default scheduling option, can be set prior to creating a manager. */
-int ds_option_scheduler = DS_SCHEDULE_TIME;
-
 /* Default timeout for slow workers to come back to the pool, can be set prior to creating a manager. */
 double ds_option_blocklist_slow_workers_timeout = 900;
 
@@ -2514,7 +2511,7 @@ static ds_result_code_t start_one_task(struct ds_manager *q, struct ds_worker_in
 		struct ds_file *tf;
 		list_first_item(t->input_files);
 		while((tf = list_next_item(t->input_files))) {
-			if(tf->type == DS_DIRECTORY) {
+			if(tf->type == DS_EMPTY_DIR) {
 				ds_manager_send(q,w, "dir %s\n", tf->remote_name);
 			} else {
 				char remote_name_encoded[PATH_MAX];
@@ -3140,7 +3137,7 @@ struct ds_manager *ds_ssl_create(int port, const char *key, const char *cert)
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
 
-	q->worker_selection_algorithm = ds_option_scheduler;
+	q->worker_selection_algorithm = DS_SCHEDULE_FCFS;
 	q->process_pending_check = 0;
 
 	q->short_timeout = 5;
@@ -3669,7 +3666,7 @@ static int task_in_terminal_state(struct ds_manager *q, struct ds_task *t)
 	return 0;
 }
 
-const char *ds_result_str(ds_result_t result) {
+const char *ds_result_string(ds_result_t result) {
 	const char *str = NULL;
 
 	switch(result) {

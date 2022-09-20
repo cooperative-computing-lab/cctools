@@ -210,7 +210,7 @@ void ds_task_specify_coprocess( struct ds_task *t, const char *coprocess )
 	}
 }
 
-void ds_task_specify_environment_variable( struct ds_task *t, const char *name, const char *value )
+void ds_task_specify_env( struct ds_task *t, const char *name, const char *value )
 {
 	if(value) {
 		list_push_tail(t->env_list,string_format("%s=%s",name,value));
@@ -485,7 +485,7 @@ int ds_task_specify_file(struct ds_task *t, const char *local_name, const char *
 	return 1;
 }
 
-int ds_task_specify_directory(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags, int recursive) {
+int ds_task_specify_empty_dir( struct ds_task *t, const char *remote_name ) {
 	struct list *files;
 	struct ds_file *tf;
 
@@ -503,10 +503,6 @@ int ds_task_specify_directory(struct ds_task *t, const char *local_name, const c
 		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 	}
 
-	if(type == DS_OUTPUT || recursive) {
-		return ds_task_specify_file(t, local_name, remote_name, type, flags);
-	}
-
 	files = t->input_files;
 
 	list_first_item(files);
@@ -515,12 +511,7 @@ int ds_task_specify_directory(struct ds_task *t, const char *local_name, const c
 		{	return 0;	}
 	}
 
-	//KNOWN HACK: Every file passes through make_cached_name() which expects the
-	//source field to be set. So we simply set the source to remote name if
-	//local name is null. This doesn't affect the behavior of the file transfers.
-	const char *source = local_name ? local_name : remote_name;
-
-	tf = ds_file_create(source, remote_name, DS_DIRECTORY, flags);
+	tf = ds_file_create("unused", remote_name, DS_EMPTY_DIR, 0);
 	if(!tf) return 0;
 
 	list_push_tail(files, tf);
@@ -691,7 +682,7 @@ int ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char 
 		fatal("command to transfer file does not contain %%%% specifier: %s", cmd);
 	}
 
-	tf = ds_file_create(cmd, remote_name, DS_REMOTECMD, flags);
+	tf = ds_file_create(cmd, remote_name, DS_COMMAND, flags);
 	if(!tf) return 0;
 
 	// length of source data is not known yet.

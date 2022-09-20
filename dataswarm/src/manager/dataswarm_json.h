@@ -4,35 +4,36 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_JSON_H
-#define DS_JSON_H
+#ifndef DATASWARM_JSON_H
+#define DATASWARM_JSON_H
 
-/** @file ds_json.h Provides a higher-level JSON-oriented abstraction
+/** @file dataswarm_json.h Provides a higher-level JSON-oriented abstraction
 on top of the standard C interface in @ref dataswarm.h.
 
 An application uses  @ref ds_json_create to create a manager,
 then @ref ds_json_submit to submit tasks, and @ref ds_json_wait to
 wait for completion.  Details of tasks and the manager are carried
 in JSON details (which must be parsed) rather than in C structures.
+This provides a starting point for building interfaces to languages
+outside of C, without relying on SWIG.
 
-This module is used as the basis for building interfaces to
-dynamic languages outside of C.
+This module is a work in progress and is not yet ready for production.
 */
 
 struct ds_manager;
 
-/** Create a new work_queue object.
-@param str A json document with properties to configure a new queue. Allowed properties are port, name, and priority.
+/** Create a new manager object.
+@param str A json document with properties to configure a new manager. Allowed properties are port, name, and priority.
 @return A new manager, or null if it could not be created.
  */
 struct ds_manager *ds_json_create(const char *str);
 
-/** Submit a task to a queue.
-Once a task is submitted to a queue, it is not longer under the user's
+/** Submit a task to a manager.
+Once a task is submitted to a manager, it is not longer under the user's
 control and should not be inspected until returned via @ref ds_wait.
 Once returned, it is safe to re-submit the same take object via
 @ref ds_submit.
-@param q A manager object.
+@param m A manager object.
 @param str A JSON description of a task.
 
 task document: (only "command_line" is required.)
@@ -64,10 +65,10 @@ environment document:
 
 @return An integer taskid assigned to the submitted task.
 */
-int ds_json_submit(struct ds_manager *q, const char *str);
+int ds_json_submit(struct ds_manager *m, const char *str);
 
 /** Wait for a task to complete.
-@param q A manager object.
+@param m A manager object.
 @param timeout The number of seconds to wait for a completed task before
 returning. Use an integer time to set the timeout or the constant
 @ref DS_WAITFORTASK to block until a task has completed.
@@ -80,7 +81,7 @@ child process). Return string should be freed using free().
 <i>integer</i> , "return_status" : <i>integer</i> , "result" : <i>integer</i> }
 
 */
-char *ds_json_wait(struct ds_manager *q, int timeout);
+char *ds_json_wait(struct ds_manager *m, int timeout);
 
 /** Determine whether the manager is 'hungry' for more tasks.
 While the Data Swarm can handle a very large number of tasks,
@@ -89,35 +90,39 @@ larger than the number of active workers.  This function gives
 the user of a flexible application a hint about whether it would
 be better to submit more tasks via @ref ds_submit or wait for some to complete
 via @ref ds_wait.
-@param q A ds_manager object
+@param m A ds_manager object
 @returns The number of additional tasks that can be efficiently submitted,
 or zero if the manager has enough to work with right now.
 */
-int ds_json_empty( struct ds_manager *q );
+int ds_json_empty( struct ds_manager *m );
 
 /** Determine whether the manager is empty.
 When all of the desired tasks have been submitted to the manager,
 the user should continue to call @ref ds_wait until
 this function returns true.
-@param q A ds_manager object
+@param m A ds_manager object
 @returns True if the manager is completely empty, false otherwise.
 */
-int ds_json_hungry( struct ds_manager *q );
+int ds_json_hungry( struct ds_manager *m );
 
 
-/** Remove a task from the queue.
-@param q A manager object.
-@param id The id of the task to be removed from the queue.
+/** Remove a task from the manager.
+@param m A manager object.
+@param id The id of the task to be removed from the manager.
 @return A JSON description of the removed task.
 */
-char *ds_json_remove(struct ds_manager *q, int id);
+char *ds_json_remove(struct ds_manager *m, int id );
 
 /** Get the status for a given manager.
-@param q A manager object.
+@param m A manager object.
 @return A JSON description of the stats of the given manager object.
 */
-char *ds_json_get_status(struct ds_manager *q);
+char *ds_json_get_status(struct ds_manager *m );
 
-void ds_json_delete( struct ds_manager *q );
+/** Delete a ds_manager object.
+@param m A manager object.
+*/
+
+void ds_json_delete( struct ds_manager *m );
 
 #endif
