@@ -101,12 +101,12 @@ typedef enum {
 /** Select the type of an input or output file to attach to a task. */
 
 typedef enum {
-	DS_FILE = 1,              /**< File-spec is a regular file **/
-	DS_URL,                   /**< File-spec refers to an URL **/
-	DS_BUFFER,                /**< Data comes from buffer memory **/
-	DS_COMMAND,               /**< File-spec is a regular file **/
-	DS_FILE_PIECE,            /**< File-spec refers to only a part of a file **/
-	DS_EMPTY_DIR              /**< File-spec is a directory **/
+	DS_FILE = 1,              /**< A file or directory present at the manager. **/
+	DS_URL,                   /**< A file obtained by downloading from a URL. */
+	DS_BUFFER,                /**< A file obtained from data in the manager's memory space. */
+	DS_COMMAND,               /**< A file obtained by executing a Unix command line. */
+	DS_FILE_PIECE,            /**< A portion of a file present at the manager. */
+	DS_EMPTY_DIR              /**< An empty directory to create in the task sandbox. */
 } ds_file_t;
 
 /** Select how to allocate resources for similar tasks with @ref ds_specify_category_mode */
