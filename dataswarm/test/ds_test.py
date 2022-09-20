@@ -30,7 +30,7 @@ def report_task(task, expected_result, expected_exit_code, expected_outpus=None)
         error = True
         print("It was not completed by a worker.")
     else:
-        print("result: {as_str} {as_int}".format(as_str=t.result_str, as_int=t.result))
+        print("result: {as_str} {as_int}".format(as_str=t.result_string, as_int=t.result))
         print("exit code: {status}".format(status=t.result))
         if t.output:
             print("stderr:\n+++\n{stderr}---".format(stderr=t.output.encode('ascii','replace')))
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     # same simple task, but now we send the directory as an input
     output = output_file()
     t = ds.Task("cd my_dir && ./{exe} {input} 2>&1 > {output}".format(exe=exec_file, input=input_file, output=output))
-    t.specify_directory(test_dir, 'my_dir', recursive=True)
+    t.specify_file(test_dir, 'my_dir')
     t.specify_output_file(path.join(test_dir, output), path.join('my_dir', output))
 
     q.submit(t)
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     t = ds.Task("mkdir outs && ./{exe} {input} 2>&1 > outs/{output}".format(exe=exec_file, input=input_file, output=output))
     t.specify_input_file(path.join(test_dir, exec_file), exec_file)
     t.specify_input_file(path.join(test_dir, input_file), input_file)
-    t.specify_directory(path.join(test_dir, 'outs'), 'outs', type = ds.DS_OUTPUT)
+    t.specify_file(path.join(test_dir, 'outs'), 'outs', type = ds.DS_OUTPUT)
 
     q.submit(t)
     t = q.wait(wait_time)
