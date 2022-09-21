@@ -140,6 +140,14 @@ struct ds_task *ds_task_clone(const struct ds_task *task)
 	if(task->tag) ds_task_specify_tag(new, task->tag);
 	if(task->category) ds_task_specify_category(new, task->category);
 
+	if(task->monitor_output_directory) {
+		ds_task_specify_monitor_output(new, task->monitor_output_directory);
+	}
+
+	if(task->monitor_snapshot_file) {
+		ds_task_specify_snapshot_file(new, task->monitor_snapshot_file);
+	}
+
 	new->input_files  = ds_task_file_list_clone(task->input_files);
 	new->output_files = ds_task_file_list_clone(task->output_files);
 	new->env_list     = ds_task_string_list_clone(task->env_list);
@@ -158,18 +166,10 @@ struct ds_task *ds_task_clone(const struct ds_task *task)
 
 	/* Metrics of task are cleared from ds_task_create. */
 
-	/* Resource and monitor requests are copied. */
+	/* Resource requests are copied. */
 
 	if(task->resources_requested) {
 		new->resources_requested = rmsummary_copy(task->resources_requested, 0);
-	}
-
-	if(task->monitor_output_directory) {
-		ds_task_specify_monitor_output(new, task->monitor_output_directory);
-	}
-
-	if(task->monitor_snapshot_file) {
-		ds_task_specify_snapshot_file(new, task->monitor_snapshot_file);
 	}
 
 	return new;
@@ -761,6 +761,9 @@ void ds_task_delete(struct ds_task *t)
 	free(t->tag);
 	free(t->category);
 
+	free(t->monitor_output_directory);
+	free(t->monitor_snapshot_file);
+
 	list_clear(t->input_files,(void*)ds_file_delete);
 	list_delete(t->input_files);
 
@@ -780,9 +783,6 @@ void ds_task_delete(struct ds_task *t)
 	rmsummary_delete(t->resources_requested);
 	rmsummary_delete(t->resources_measured);
 	rmsummary_delete(t->resources_allocated);
-
-	free(t->monitor_output_directory);
-	free(t->monitor_snapshot_file);
 
 	free(t);
 }

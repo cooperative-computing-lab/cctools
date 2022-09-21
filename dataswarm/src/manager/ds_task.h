@@ -30,6 +30,9 @@ struct ds_task {
 	char *tag;                   /**< An optional user-defined logical name for the task. */
 	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref ds_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
+	char *monitor_output_directory;	/**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref ds_enable_monitoring */
+	char *monitor_snapshot_file;    /**< Filename the monitor checks to produce snapshots. */
+
 	struct list *input_files;    /**< The files to transfer to the worker and place in the executing directory. */
 	struct list *output_files;   /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
 	struct list *env_list;       /**< Environment variables applied to the task. */
@@ -81,9 +84,6 @@ struct ds_task {
 	struct rmsummary *resources_allocated;                 /**< Resources allocated to the task its latest attempt. */
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task in its latest attempt. */
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
-
-	char *monitor_output_directory;			      /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref ds_enable_monitoring */
-	char *monitor_snapshot_file;                          /**< Filename the monitor checks to produce snapshots. */
 };
 
 int  ds_task_update_result(struct ds_task *t, ds_result_t new_result );
