@@ -31,7 +31,7 @@ quit
 EOF
 
 	echo "starting manager"
-	(${VALGRIND} --log-file=manager.valgrind -- ds_test -d all -o manager.log -Z manager.port < manager.script; echo $? > manager.exitcode ) &
+	(${VALGRIND} --log-file=manager.valgrind -- ds_benchmark -d all -o manager.log -Z manager.port < manager.script; echo $? > manager.exitcode ) &
 
 	echo "waiting for manager to get ready"
 	wait_for_file_creation manager.port 15

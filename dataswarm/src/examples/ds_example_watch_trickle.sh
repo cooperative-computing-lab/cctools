@@ -1,17 +1,16 @@
 #!/bin/sh
 
-# This sub-program is used by the main program ds_test_watch.
+# This sub-program is used by the main program ds_example_watch.
 
 # This is a simple example of a program that gradually
 # produces output over time.  It just logs the current
-# time every 5 seconds for 50 seconds.
-
+# time every second for 30 seconds.
 
 hostname > output
 
-for n in 1 .. 10
+for n in 1 .. 30 
 do
-	sleep 5
+	sleep 1 
 	date >> output
 done
 
