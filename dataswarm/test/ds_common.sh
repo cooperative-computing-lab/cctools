@@ -18,7 +18,7 @@ quit
 EOF
 
 	echo "starting master"
-	ds_test -d all -o master.log -Z master.port < master.script &
+	ds_benchmark -d all -o master.log -Z master.port < master.script &
 
 	echo "waiting for master to get ready"
 	wait_for_file_creation master.port 5

@@ -4,14 +4,12 @@ include ../../../rules.mk
 LOCAL_LINKAGE+=${CCTOOLS_HOME}/dataswarm/src/manager/libdataswarm.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
 LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/dataswarm/src/manager
 
-PROGRAMS = ds_status ds_api_proxy
+PROGRAMS = ds_status ds_api_proxy ds_benchmark
 SCRIPTS = ds_graph_log ds_graph_workers
 TEST_PROGRAMS = ds_test
 TARGETS = $(PROGRAMS) $(TEST_PROGRAMS)
 
 all: $(TARGETS)
-
-ds_test ds_test_watch: ds_test_main.o
 
 $(PROGRAMS) $(TEST_PROGRAMS): $(EXTERNALS)
 
