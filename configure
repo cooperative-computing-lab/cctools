@@ -440,6 +440,11 @@ then
 		fi
 		
 		ldflags="${ldflags} -Xlinker -Bdynamic ${link_as_needed}"
+
+		# Building in Conda generates a whole lot of spurious warnings while finding the right library.
+		# Suppress those warnings.
+		ldflags="${ldflags} -Wl,--no-warn-search-mismatch"
+
 elif [ $BUILD_SYS != DARWIN ]
 then
 		if [ "${config_static_libgcc}" = yes ]
