@@ -34,20 +34,6 @@ int main(int argc, char *argv[])
 	struct ds_manager *m;
 	struct ds_task *t;
 
-	printf("Checking that /usr/bin/convert is installed...\n");
-	int r = access("/usr/bin/convert",X_OK);
-	if(r!=0) {
-		printf("%s: /usr/bin/convert is not installed: this won't work at all.\n",argv[0]);
-		return 1;
-	}
-
-	printf("Converting /usr/bin/convert into convert.sfx...\n");
-	r = system("starch -x /usr/bin/convert -c convert convert.sfx");
-	if(r!=0) {
-		printf("%s: failed to run starch, is it in your PATH?\n",argv[0]);
-		return 1;
-	}
-	
 	m = ds_create(DS_DEFAULT_PORT);
 	if(!m) {
 		printf("Couldn't create manager: %s\n", strerror(errno));
@@ -59,9 +45,10 @@ int main(int argc, char *argv[])
 	for(i=0;i<10;i++) {
 		char output[256];
 		sprintf(output,"output.%d",i);
-		t = ds_task_create("./ds_example_watch_trickle.sh");
+		t = ds_task_create("./ds_example_watch_trickle.sh > output");
 		ds_task_specify_file(t, "ds_example_watch_trickle.sh", "ds_example_watch_trickle.sh", DS_INPUT, DS_CACHE );
 		ds_task_specify_file(t, output, "output", DS_OUTPUT, DS_WATCH );
+		ds_task_specify_cores(t,1);
 		ds_submit(m, t);
 	}
 
@@ -70,10 +57,10 @@ int main(int argc, char *argv[])
 	while(!ds_empty(m)) {
 		t = ds_wait(m, 5);
 		if(t) {
-			ds_result_t result = ds_task_get_result(t);
+			ds_result_t r = ds_task_get_result(t);
                         int id = ds_task_get_taskid(t);
 
-			if(result==DS_RESULT_SUCCESS) {
+			if(r==DS_RESULT_SUCCESS) {
 				printf("Task %d complete: %s\n",id,ds_task_get_command(t));
                         } else {
                                 printf("Task %d failed: %s\n",id,ds_result_string(r));

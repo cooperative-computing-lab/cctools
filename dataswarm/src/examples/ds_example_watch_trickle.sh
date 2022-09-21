@@ -6,12 +6,12 @@
 # produces output over time.  It just logs the current
 # time every second for 30 seconds.
 
-hostname > output
+hostname 
 
-for n in 1 .. 30 
+for n in $(seq 1 30)
 do
 	sleep 1 
-	date >> output
+	date
 done
 
-echo "done!" >> output
+echo "done!"
