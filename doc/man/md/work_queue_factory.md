@@ -75,7 +75,8 @@ General options:
 - **-F**,**--foremen-name=_&lt;project&gt;_**<br /> Foremen to serve, can be a regular expression.
 - **--catalog=_&lt;host:port&gt;_**<br /> Catalog server to query for managers.
 - **-P**,**--password=_&lt;pwdfile&gt;_**<br /> Password file for workers to authenticate.
-- **-S**,**--scratch-dir=_&lt;dir&gt;_**<br /> Use this scratch dir for factory. Default is /tmp/wq-factory-$UID.
+- **-S**,**--scratch-dir=_&lt;dir&gt;_**<br /> Use this scratch dir for factory. Default is /tmp/wq-factory-$UID. 
+Also configurable through environment variables **CCTOOLS_TEMP** or **TMPDIR**
 - **--run-factory-as-manager**<br /> Force factory to run itself as a manager.
 - **--parent-death**<br /> Exit if parent process dies.
 - **-d**,**--debug=_&lt;subsystem&gt;_**<br /> Enable debugging for this subsystem.
@@ -131,17 +132,6 @@ Options  specific to batch systems:
 - **--amazon-config=_&lt;cfg&gt;_**<br /> Specify Amazon config file.
 - **--condor-requirements=_&lt;reqs&gt;_**<br /> Set requirements for the workers as Condor jobs.
 
-
-## ENVIRONMENT VARIABLES
-In order to create the workers, **work_queue_factory** will create a temporary scatch
-directory on the host, by default in the /tmp directory. 
-**work_queue_factory** and other **CCTools** programs will check for environment variables
-**CCTOOLS_TEMP** or **TMPDIR** to create the scratch directory. If access to /tmp is restricted
-on your system, you may set an alternate directory with:
-
-LONCODE_BEGIN
-export CCTOOLS_TEMP=~/alternate/scratch/directory
-```
 
 ## EXIT STATUS
 On success, returns zero. On failure, returns non-zero.

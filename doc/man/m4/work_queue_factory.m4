@@ -53,7 +53,8 @@ OPTION_ARG(M,manager-name,project) Project name of managers to server, can be re
 OPTION_ARG(F,foremen-name,project) Foremen to serve, can be a regular expression.
 OPTION_ARG_LONG(catalog,host:port) Catalog server to query for managers.
 OPTION_ARG(P,password,pwdfile) Password file for workers to authenticate.
-OPTION_ARG(S,scratch-dir,dir) Use this scratch dir for factory. Default is /tmp/wq-factory-$UID.
+OPTION_ARG(S,scratch-dir,dir) Use this scratch dir for factory. Default is /tmp/wq-factory-$UID. 
+Also configurable through environment variables BOLD(CCTOOLS_TEMP) or BOLD(TMPDIR)
 OPTION_FLAG_LONG(run-factory-as-manager) Force factory to run itself as a manager.
 OPTION_FLAG_LONG(parent-death) Exit if parent process dies.
 OPTION_ARG(d,debug,subsystem) Enable debugging for this subsystem.
@@ -109,17 +110,6 @@ OPTION_ARG(B,batch-options,options) Generic batch system options.
 OPTION_ARG_LONG(amazon-config,cfg) Specify Amazon config file.
 OPTION_ARG_LONG(condor-requirements,reqs) Set requirements for the workers as Condor jobs.
 OPTIONS_END
-
-SECTION(ENVIRONMENT VARIABLES)
-In order to create the workers, BOLD(work_queue_factory) will create a temporary scatch
-directory on the host, by default in the /tmp directory. 
-BOLD(work_queue_factory) and other BOLD(CCTools) programs will check for environment variables
-BOLD(CCTOOLS_TEMP) or BOLD(TMPDIR) to create the scratch directory. If access to /tmp is restricted
-on your system, you may set an alternate directory with:
-
-LONCODE_BEGIN
-export CCTOOLS_TEMP=~/alternate/scratch/directory
-LONGCODE_END
 
 SECTION(EXIT STATUS)
 On success, returns zero. On failure, returns non-zero.
