@@ -61,11 +61,11 @@ prepare()
 
 run()
 {
-    ${PONCHO_PACKAGE_SERVERIZE} --src wq_remote_task.py --function add --function multiply --dest test_network_function.py
+    # ${PONCHO_PACKAGE_SERVERIZE} --src wq_remote_task.py --function add --function multiply --dest test_network_function.py
 
-    wait_for_file_creation test_network_function.py 5
+    # wait_for_file_creation test_network_function.py 5
 
-    chmod +x test_network_function.py
+    chmod +x network_function.py
 
 	# send makeflow to the background, saving its exit status.
 	(${CCTOOLS_PYTHON_TEST_EXEC} wq_remote_task.py $PORT_FILE; echo $? > $STATUS_FILE) &
@@ -73,7 +73,7 @@ run()
 	# wait at most 5 seconds for wq to find a port.
 	wait_for_file_creation $PORT_FILE 5
 
-	run_wq_worker_coprocess $PORT_FILE worker.log test_network_function.py
+	run_wq_worker_coprocess $PORT_FILE worker.log network_function.py
 
 	# wait for wq to exit.
 	wait_for_file_creation $STATUS_FILE 5
