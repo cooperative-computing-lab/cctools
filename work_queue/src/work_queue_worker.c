@@ -1855,6 +1855,8 @@ static int workspace_create()
 		workdir = user_specified_workdir;
 	} else if((workdir_tmp = getenv("_CONDOR_SCRATCH_DIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
 		workdir = workdir_tmp;
+	} else if((workdir_tmp = getenv("CCTOOLS_TEMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
+		workdir = workdir_tmp;
 	} else if((workdir_tmp = getenv("TMPDIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
 		workdir = workdir_tmp;
 	} else if((workdir_tmp = getenv("TEMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {

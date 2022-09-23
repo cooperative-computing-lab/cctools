@@ -45,9 +45,13 @@ def specify_port_range(low_port, high_port):
     os.environ['TCP_HIGH_PORT'] = str(high_port)
 
 cctools_debug_config('work_queue_python')
+cctools_tmpdir = os.getenv('CCTOOLS_TEMP', 'n')
 
+if cctools_tmpdir != 'n':
+    staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-', dir=cctools_tmpdir)
+else:
+    staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-')
 
-staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-')
 def cleanup_staging_directory():
     try:
         shutil.rmtree(staging_directory)
