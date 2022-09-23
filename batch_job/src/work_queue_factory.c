@@ -1534,10 +1534,17 @@ int main(int argc, char *argv[])
 	that jobs are submitting from a single shared filesystem.
 	Changing to /tmp only works in the case of Condor.
 	*/
-
+	
+	const char *scratch_env;
 	if(!scratch_dir) {
 		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-			scratch_dir = string_format("/tmp/wq-factory-%d",getuid());
+			if((scratch_env = getenv("CCTOOLS_TEMP")) && access(scratch_env, R_OK|W_OK|X_OK) == 0) {
+				scratch_dir = string_format("%s/wq-factory-%d", scratch_env, getuid());
+			} else if((scratch_env = getenv("TMPDIR")) && access(scratch_env, R_OK|W_OK|X_OK) == 0) {
+				scratch_dir = string_format("%s/wq-factory-%d", scratch_env, getuid());
+			} else{
+				scratch_dir = string_format("/tmp/wq-factory-%d",getuid());
+			}
 		} else {
 			scratch_dir = string_format("wq-factory-%d",getuid());
 		}
