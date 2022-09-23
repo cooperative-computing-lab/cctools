@@ -110,6 +110,17 @@ OPTION_ARG_LONG(amazon-config,cfg) Specify Amazon config file.
 OPTION_ARG_LONG(condor-requirements,reqs) Set requirements for the workers as Condor jobs.
 OPTIONS_END
 
+SECTION(ENVIRONMENT VARIABLES)
+In order to create the workers, BOLD(work_queue_factory) will create a temporary scatch
+directory on the host, by default in the /tmp directory. 
+BOLD(work_queue_factory) and other BOLD(CCTools) programs will check for environment variables
+BOLD(CCTOOLS_TEMP) or BOLD(TMPDIR) to create the scratch directory. If access to /tmp is restricted
+on your system, you may set an alternate directory with:
+
+LONCODE_BEGIN
+export CCTOOLS_TEMP=~/alternate/scratch/directory
+LONGCODE_END
+
 SECTION(EXIT STATUS)
 On success, returns zero. On failure, returns non-zero.
 

@@ -132,6 +132,17 @@ Options  specific to batch systems:
 - **--condor-requirements=_&lt;reqs&gt;_**<br /> Set requirements for the workers as Condor jobs.
 
 
+## ENVIRONMENT VARIABLES
+In order to create the workers, **work_queue_factory** will create a temporary scatch
+directory on the host, by default in the /tmp directory. 
+**work_queue_factory** and other **CCTools** programs will check for environment variables
+**CCTOOLS_TEMP** or **TMPDIR** to create the scratch directory. If access to /tmp is restricted
+on your system, you may set an alternate directory with:
+
+LONCODE_BEGIN
+export CCTOOLS_TEMP=~/alternate/scratch/directory
+```
+
 ## EXIT STATUS
 On success, returns zero. On failure, returns non-zero.
 
