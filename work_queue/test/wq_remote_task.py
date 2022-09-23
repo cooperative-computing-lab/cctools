@@ -29,8 +29,8 @@ for value in range(1,10):
     task = wq.RemoteTask("add", "my_coprocess")
     task.specify_cores(1)
     task.specify_disk(1000)
-    task.specify_fn_args({"x":value, "y":value})
-    task.specify_exec_method("direct")
+    task.specify_fn_args([value, value])
+    task.specify_exec_method("thread")
     queue.submit(task)
 
 # add task outputs
@@ -39,9 +39,7 @@ while not queue.empty():
     task = queue.wait(5)
     if task:
         print("task {} completed with result {}".format(task.id,task.output))
-        add_sum += json.loads(task.output)["Result"]
-    else:
-        break
+        add_sum += int(json.loads(task.output)["Result"])
 
 
 # Submit several tasks for execution:
@@ -50,8 +48,8 @@ for value in range(1,10):
     task = wq.RemoteTask("multiply", "my_coprocess")
     task.specify_cores(1)
     task.specify_disk(1000)
-    task.specify_fn_args({"x":value, "y":value})
-    task.specify_exec_method("direct")
+    task.specify_fn_args([value], {"y":value})
+    task.specify_exec_method("thread")
     queue.submit(task)
 
 # add task outputs
@@ -60,10 +58,7 @@ while not queue.empty():
     task = queue.wait(5)
     if task:
         print("task {} completed with result {}".format(task.id,task.output))
-        multiply_sum += json.loads(task.output)["Result"]
-    else:
-        break
+        multiply_sum += int(json.loads(task.output)["Result"])
 
-print(add_sum, multiply_sum)
-assert(add_sum == 0)
-assert(multiply_sum == 0)
+assert(add_sum == 90)
+assert(multiply_sum == 285)
