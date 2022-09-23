@@ -6,7 +6,7 @@ include $(CCTOOLS_HOME)/rules.mk
 LOCAL_CCFLAGS = -w -UHAS_USLEEP -UHAS_ISNAN -UHAS_UTIME -fPIC -Wno-unused-value -Wno-unused-variable $(CCTOOLS_PERL_CCFLAGS) -I $(CCTOOLS_HOME)/dataswarm/src/manager
 LOCAL_LINKAGE = $(CCTOOLS_PERL_LDFLAGS) -lz
 
-EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/dataswarm/src/libdataswarm.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
+EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/dataswarm/src/manager/libdataswarm.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 DSPERLSO = dataswarm.$(CCTOOLS_DYNAMIC_SUFFIX)
 LIBRARIES = dataswarm.pm $(DSPERLSO)
 OBJECTS = ds_wrap.o
