@@ -327,7 +327,17 @@ int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const 
 @param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
 @return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
+
 int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags);
+
+/** Add an output buffer to a task.
+@param t A task object.
+@param data The logical name of the buffer, to be used with @ref ds_task_get_output_buffer.
+@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
+@param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
+@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
+*/
+int ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, const char *remote_name, ds_file_flags_t flags);
 
 /** Add an empty directory to a task.
 This is very occasionally needed for applications that expect
@@ -528,6 +538,17 @@ then this function returns null.
 */
 
 const char * ds_task_get_output( struct ds_task *t );
+
+/** Get an output buffer of the task.
+@param t A task object.
+@param buffer_name The name of the output buffer, given by @ref ds_task_specify_output_buffer
+@param data A pointer to a pointer to be filled in with the file data.  Do not free this buffer;
+it will be removed automatically by @ref ds_task_delete.
+@param length A pointer to an integer to be filled with the file length. 
+@return True if the output buffer is available, false otherwise.
+*/
+
+int ds_task_get_output_buffer( struct ds_task *t, const char *buffer_name, char **data, int *length );
 
 /** Get the address and port of the worker on which the task ran.
 @param t A task object.

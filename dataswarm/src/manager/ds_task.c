@@ -638,6 +638,29 @@ int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, cons
 	return 1;
 }
 
+int ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, const char *remote_name, ds_file_flags_t flags)
+{
+	struct ds_file *tf;
+
+	if(!t || !buffer_name || !remote_name) {
+		fprintf(stderr, "Error: Null arguments for task and remote name not allowed in specify_buffer.\n");
+		return 0;
+	}
+
+	// @param remote_name should not be an absolute path. @see
+	// ds_task_specify_file
+	if(remote_name[0] == '/') {
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
+	}
+
+	tf = ds_file_create(buffer_name, remote_name, DS_BUFFER, flags);
+	if(!tf) return 0;
+
+	list_push_tail(t->output_files, tf);
+
+	return 1;
+}
+
 int ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
 {
 	struct list *files;
@@ -785,6 +808,24 @@ void ds_task_delete(struct ds_task *t)
 	rmsummary_delete(t->resources_allocated);
 
 	free(t);
+}
+
+int ds_task_get_output_buffer( struct ds_task *t, const char *name, char **data, int *length )
+{
+	struct ds_file *f;
+
+	list_first_item(t->output_files);
+	while((f = (struct ds_file*)list_next_item(t->output_files))) {
+		if(f->type==DS_BUFFER && !strcmp(f->source,name)) {
+			*data = f->data;
+			*length = f->length;
+			return 1;
+		}
+	}
+
+	*data = 0;
+	*length = 0;
+	return 0;
 }
 
 const char * ds_task_get_command( struct ds_task *t )
