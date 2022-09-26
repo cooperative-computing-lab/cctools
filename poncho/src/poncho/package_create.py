@@ -200,7 +200,7 @@ def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
 
         conda_spec['channels'] = poncho_spec['conda'].get('channels', ['conda-forge', 'defaults'])
 
-        if 'depdnedencies' in poncho_spec['conda']:
+        if 'dependencies' in poncho_spec['conda']:
 
             conda_spec['dependencies'] = poncho_spec['conda'].get('dependencies', [])
 
