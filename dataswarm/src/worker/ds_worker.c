@@ -989,9 +989,12 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_unlink(filename);
+		} else if(sscanf(line, "getfile %s", filename_encoded) == 1) {
+			url_decode(filename_encoded,filename,sizeof(filename));
+			r = ds_transfer_put_any(manager,global_cache,filename,DS_TRANSFER_MODE_FILE_ONLY,time(0)+active_timeout);
 		} else if(sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = ds_transfer_put_any(manager,global_cache,filename,time(0)+active_timeout);
+			r = ds_transfer_put_any(manager,global_cache,filename,DS_TRANSFER_MODE_ANY,time(0)+active_timeout);
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);

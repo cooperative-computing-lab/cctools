@@ -21,6 +21,15 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+static ds_result_code_t ds_manager_get_symlink_contents( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *filename, int length );
+static ds_result_code_t ds_manager_get_dir_contents( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *dirname, int64_t *totalsize );
+
+/*
+Get an output file from the task and return it as a buffer in memory.
+The buffer is attached to the f->data element and can then be retrieved
+by the application using ds_task_get_output_buffer.
+*/
+
 static ds_result_code_t ds_manager_get_buffer( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, int64_t *total_size )
 {
 	char line[DS_LINE_MAX];
@@ -50,6 +59,7 @@ static ds_result_code_t ds_manager_get_buffer( struct ds_manager *q, struct ds_w
 				*total_size += f->length;
 				r = DS_SUCCESS;
 			} else {
+				/* If insufficient data was read, the connection must be broken. */
 				free(f->data);
 				f->data = 0;
 				r = DS_WORKER_FAILURE;
@@ -57,14 +67,10 @@ static ds_result_code_t ds_manager_get_buffer( struct ds_manager *q, struct ds_w
 		} else {
 			r = DS_APP_FAILURE;
 		}
-	} else if(sscanf(line,"symlink %s %" SCNd64,name_encoded,&size)==2) {
-		ds_task_update_result(t, DS_RESULT_OUTPUT_MISSING);
-		r = DS_SUCCESS;
-	} else if(sscanf(line,"dir %s",name_encoded)==1) {
-		ds_task_update_result(t, DS_RESULT_OUTPUT_MISSING);
-		r = DS_SUCCESS;
 	} else if(sscanf(line,"missing %s %d",name_encoded,&errornum)==2) {
 		debug(D_DS, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,f->remote_name,strerror(errornum));
+
+		/* Mark the task as missing an output, but return success to keep going. */
 		ds_task_update_result(t, DS_RESULT_OUTPUT_MISSING);
 		r = DS_SUCCESS;
 	} else {
@@ -172,8 +178,6 @@ static ds_result_code_t ds_manager_get_symlink_contents( struct ds_manager *q, s
         return DS_SUCCESS;
 }
 
-
-static ds_result_code_t ds_manager_get_dir_contents( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *dirname, int64_t *totalsize );
 
 /*
 Get a single item (file, dir, symlink, etc) back
@@ -307,11 +311,12 @@ ds_result_code_t ds_manager_get_output_file( struct ds_manager *q, struct ds_wor
 	timestamp_t open_time = timestamp_get();
 
 	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, f->cached_name, f->source);
-	ds_manager_send(q,w, "get %s\n",f->cached_name);
 
 	if(f->type==DS_FILE) {
+		ds_manager_send(q,w, "get %s\n",f->cached_name);
 		result = ds_manager_get_any(q, w, t, 0, f->source, &total_bytes);
 	} else if(f->type==DS_BUFFER) {
+		ds_manager_send(q,w, "getfile %s\n",f->cached_name);
 		result = ds_manager_get_buffer(q, w, t, f, &total_bytes );
 	} else {
 		result = DS_APP_FAILURE;

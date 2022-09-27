@@ -64,7 +64,7 @@ end
 
 */
 
-static int ds_transfer_put_internal( struct link *lnk, const char *full_name, const char *relative_name, time_t stoptime )
+static int ds_transfer_put_internal( struct link *lnk, const char *full_name, const char *relative_name, ds_transfer_mode_t xfer_mode, time_t stoptime )
 {
 	struct stat info;
 	int64_t actual, length;
@@ -76,28 +76,7 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 
 	mode = info.st_mode & 0777;
 
-	if(S_ISDIR(info.st_mode)) {
-		DIR *dir = opendir(full_name);
-		if(!dir) goto access_failure;
-
-		send_message(lnk, "dir %s 0\n",relative_name);
-
-		struct dirent *dent;
-		while((dent = readdir(dir))) {
-			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
-				continue;
-			char *sub_full_name = string_format("%s/%s", full_name, dent->d_name);
-			int sub_result = ds_transfer_put_internal(lnk, sub_full_name, dent->d_name, stoptime);
-			free(sub_full_name);
-
-			// Bail out of transfer if we cannot send any more
-			if(!sub_result) break;
-
-		}
-		closedir(dir);
-		send_message(lnk, "end\n");
-
-	} else if(S_ISREG(info.st_mode)) {
+	if(S_ISREG(info.st_mode)) {
 		int fd = open(full_name, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = info.st_size;
@@ -108,6 +87,38 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 		} else {
 			goto access_failure;
 		}
+	} else if(xfer_mode==DS_TRANSFER_MODE_FILE_ONLY) {
+		/*
+		The caller only wants a file, but full_name is something else.
+		Choose a suitable error number to return in the missing message.
+		*/
+		if(S_ISDIR(info.st_mode)) {
+			errno = EISDIR;
+		} else {
+			errno = EINVAL;
+		}
+		goto access_failure;
+	} else if(S_ISDIR(info.st_mode)) {
+		DIR *dir = opendir(full_name);
+		if(!dir) goto access_failure;
+
+		send_message(lnk, "dir %s 0\n",relative_name);
+
+		struct dirent *dent;
+		while((dent = readdir(dir))) {
+			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
+				continue;
+			char *sub_full_name = string_format("%s/%s", full_name, dent->d_name);
+			int sub_result = ds_transfer_put_internal(lnk, sub_full_name, dent->d_name, xfer_mode, stoptime);
+			free(sub_full_name);
+
+			// Bail out of transfer if we cannot send any more
+			if(!sub_result) break;
+
+		}
+		closedir(dir);
+		send_message(lnk, "end\n");
+
 	} else if(S_ISLNK(info.st_mode)) {
 		char link_target[DS_LINE_MAX];
 		int result = readlink(full_name,link_target,sizeof(link_target));
@@ -137,10 +148,10 @@ send_failure:
 Send a cached object of any type down the wire.
 */
 
-int ds_transfer_put_any( struct link *lnk, struct ds_cache *cache, const char *filename, time_t stoptime)
+int ds_transfer_put_any( struct link *lnk, struct ds_cache *cache, const char *filename, ds_transfer_mode_t xfer_mode, time_t stoptime)
 {
 	char * cached_path = ds_cache_full_path(cache,filename);
-	int r = ds_transfer_put_internal(lnk,cached_path,path_basename(filename),stoptime);
+	int r = ds_transfer_put_internal(lnk,cached_path,path_basename(filename),xfer_mode,stoptime);
 	free(cached_path);
 	return r;
 }
