@@ -1406,6 +1406,7 @@ static void workspace_cleanup()
 	trash_empty();
 
 	ds_cache_delete(global_cache);
+	global_cache = 0;
 }
 
 /*
