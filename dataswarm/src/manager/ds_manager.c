@@ -1793,12 +1793,6 @@ static struct jx *categories_to_jx(struct ds_manager *q) {
 		}
 	}
 
-	//overall queue
-	struct jx *j = category_to_jx(q, NULL);
-	if(j) {
-		jx_array_insert(a, j);
-	}
-
 	return a;
 }
 
