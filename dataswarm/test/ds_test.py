@@ -23,7 +23,7 @@ def cleanup():
     shutil.rmtree(test_dir)
 atexit.register(cleanup)
 
-def report_task(task, expected_result, expected_exit_code, expected_outpus=None):
+def report_task(task, expected_result, expected_exit_code, expected_outputs=None):
     error = False
     print("\nTask '{command}' report:".format(command=t.command))
     if not task:
@@ -40,8 +40,8 @@ def report_task(task, expected_result, expected_exit_code, expected_outpus=None)
         elif task.exit_code != expected_exit_code:
             error = True
             print("Should have finished with exit_code {status}, but got {real}.".format(status=str(expected_exit_code), real=str(task.result)))
-        elif expected_outpus:
-            for out in expected_outpus:
+        elif expected_outputs:
+            for out in expected_outputs:
                 if not path.isfile(out):
                     error = True
                     print("Should have created file {output} but did not.".format(output=out))
@@ -122,6 +122,25 @@ if __name__ == '__main__':
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, ds.DS_RESULT_SUCCESS, 0, [path.join(test_dir, 'outs', output)])
+
+    # Execute a task that only communicates through buffers:
+
+    original = "This is only a test!";
+    t = ds.Task("cp input.txt output1.txt && cp input.txt output2.txt")
+    t.specify_input_buffer(original,"input.txt")
+    t.specify_output_buffer("out1","output1.txt")
+    t.specify_output_buffer("out2","output2.txt")
+    q.submit(t)
+    t = q.wait(wait_time)
+    report_task(t, ds.DS_RESULT_SUCCESS, 0)
+
+    if t.get_output_buffer("out1") != original or t.get_output_buffer("out2") != original:
+        print("incorrect output:\nout1: %s\nout2: %s\n".format(t.get_output_buffer("out1"),t.get_output_buffer("out2")))
+        sys.exit(1)
+    else:
+        print("buffer outputs match the inputs.")
+
+
 
     # should fail because the 'executable' cannot be executed:
     t = ds.Task("./{input}".format(input=input_file))

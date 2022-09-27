@@ -236,7 +236,7 @@ struct ds_stats {
 
 /** Create a new task object.
 Once created and elaborated with functions such as @ref ds_task_specify_file
-and @ref ds_task_specify_buffer, the task should be passed to @ref ds_submit.
+and @ref ds_task_specify_input_buffer, the task should be passed to @ref ds_submit.
 @param full_command The shell command line or coprocess functions to be
 executed by the task.  If null, the command will be given later by @ref
 ds_task_specify_command
@@ -327,7 +327,17 @@ int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const 
 @param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
 @return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
-int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags);
+
+int ds_task_specify_input_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags);
+
+/** Add an output buffer to a task.
+@param t A task object.
+@param data The logical name of the buffer, to be used with @ref ds_task_get_output_buffer.
+@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
+@param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
+@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
+*/
+int ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, const char *remote_name, ds_file_flags_t flags);
 
 /** Add an empty directory to a task.
 This is very occasionally needed for applications that expect
@@ -528,6 +538,26 @@ then this function returns null.
 */
 
 const char * ds_task_get_output( struct ds_task *t );
+
+/** Get an output buffer of the task.
+@param t A task object.
+@param buffer_name The name of the output buffer, given by @ref ds_task_specify_output_buffer
+@return A pointer to the contents of the buffer.  The buffer is null-terminated, and so can
+be used directly as a string, if it is expected to contain text.  If the buffer is expected
+to contain binary data, use @ref ds_task_get_output_buffer_length to determine the length.
+Do not attempt to free this pointer, it will be freed when the task is deleted.
+Returns null if the task is not complete or the buffer is not available for some reason.
+*/
+
+const char * ds_task_get_output_buffer( struct ds_task *t, const char *buffer_name );
+
+/** Get the length of an output buffer.
+@param t A task object.
+@param buffer_name The name of the output buffer, given by @ref ds_task_specify_output_buffer
+@return The length of the buffer in bytes, or zero if the buffer is not available.
+*/
+
+int ds_task_get_output_buffer_length( struct ds_task *t, const char *buffer_name );
 
 /** Get the address and port of the worker on which the task ran.
 @param t A task object.

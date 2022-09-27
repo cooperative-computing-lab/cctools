@@ -42,7 +42,7 @@ static void ds_transfer_handler( struct link *lnk, struct ds_cache *cache )
 	if(link_readline(lnk,line,sizeof(line),time(0)+command_timeout)) {
 		if(sscanf(line,"get %s",filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			ds_transfer_put_any(lnk,cache,filename,time(0)+transfer_timeout);
+			ds_transfer_put_any(lnk,cache,filename,DS_TRANSFER_MODE_ANY,time(0)+transfer_timeout);
 		} else {
 			debug(D_DS,"invalid peer transfer message: %s\n",line);
 		}

@@ -369,19 +369,61 @@ class Task(object):
         return ds_task_specify_directory(self._task, local_name, remote_name, type, flags, recursive)
 
     ##
-    # Add an input bufer to the task.
+    # Add an input buffer to the task.
     #
     # @param self           Reference to the current task object.
     # @param buffer         The contents of the buffer to pass as input.
     # @param remote_name    The name of the remote file to create.
     # @param flags          May take the same values as @ref specify_file.
     # @param cache          Whether the file should be cached at workers (True/False)
-    def specify_buffer(self, buffer, remote_name, flags=None, cache=None):
+    def specify_input_buffer(self, buffer, remote_name, flags=None, cache=None):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, None)
-        return ds_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
+        return ds_task_specify_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
+    ##
+    # Add an output buffer to the task.
+    #
+    # @param self           Reference to the current task object.
+    # @param buffer_name    The logical name of the output buffer.
+    # @param remote_name    The name of the remote file to fetch.
+    # @param flags          May take the same values as @ref specify_file.
+    # @param cache          Whether the file should be cached at workers (True/False)
+    def specify_output_buffer(self, buffer_name, remote_name, flags=None, cache=None):
+        if buffer_name:
+            buffer_name = str(buffer_name)
+        if remote_name:
+            remote_name = str(remote_name)
+        flags = Task._determine_file_flags(flags, cache, None)
+        return ds_task_specify_output_buffer(self._task, buffer_name, remote_name, flags)
+
+
+    ##
+    # Get an output buffer of the task.
+    #
+    # @param self           Reference to the current task object.
+    # @param buffer_name    The logical name of the output buffer.
+    # @return               The bytes of the returned file.
+
+    def get_output_buffer(self, buffer_name ):
+        if buffer_name:
+            buffer_name = str(buffer_name)
+
+        return ds_task_get_output_buffer(self._task, buffer_name )
+
+    ##
+    # Get the length of an output buffer.
+    #
+    # @param self           Reference to the current task object.
+    # @param buffer_name    The logical name of the output buffer.
+    # @return               The length of the output buffer.
+
+    def get_output_buffer_length(self, buffer_name ):
+        if buffer_name:
+            buffer_name = str(buffer_name)
+
+        return ds_task_get_output_buffer_length(self._task, buffer_name )
 
     ##
     # When monitoring, indicates a json-encoded file that instructs the monitor

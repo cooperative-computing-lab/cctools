@@ -591,7 +591,7 @@ int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const 
 	return 1;
 }
 
-int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags)
+int ds_task_specify_input_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags)
 {
 	struct ds_file *tf;
 	if(!t || !remote_name) {
@@ -634,6 +634,29 @@ int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, cons
 
 	memcpy(tf->source, data, length);
 	list_push_tail(t->input_files, tf);
+
+	return 1;
+}
+
+int ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, const char *remote_name, ds_file_flags_t flags)
+{
+	struct ds_file *tf;
+
+	if(!t || !buffer_name || !remote_name) {
+		fprintf(stderr, "Error: Null arguments for task and remote name not allowed in specify_buffer.\n");
+		return 0;
+	}
+
+	// @param remote_name should not be an absolute path. @see
+	// ds_task_specify_file
+	if(remote_name[0] == '/') {
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
+	}
+
+	tf = ds_file_create(buffer_name, remote_name, DS_BUFFER, flags);
+	if(!tf) return 0;
+
+	list_push_tail(t->output_files, tf);
 
 	return 1;
 }
@@ -785,6 +808,40 @@ void ds_task_delete(struct ds_task *t)
 	rmsummary_delete(t->resources_allocated);
 
 	free(t);
+}
+
+static struct ds_file * find_output_buffer( struct ds_task *t, const char *name )
+{
+	struct ds_file *f;
+
+	list_first_item(t->output_files);
+	while((f = (struct ds_file*)list_next_item(t->output_files))) {
+		if(f->type==DS_BUFFER && !strcmp(f->source,name)) {
+			return f;
+		}
+	}
+
+	return 0;
+}
+
+const char * ds_task_get_output_buffer( struct ds_task *t, const char *buffer_name )
+{
+	struct ds_file *f = find_output_buffer(t,buffer_name);
+	if(f) {
+		return f->data;
+	} else {
+		return 0;
+	}
+}
+
+int ds_task_get_output_buffer_length( struct ds_task *t, const char *buffer_name )
+{
+	struct ds_file *f = find_output_buffer(t,buffer_name);
+	if(f) {
+		return f->length;
+	} else {
+		return 0;
+	}
 }
 
 const char * ds_task_get_command( struct ds_task *t )
