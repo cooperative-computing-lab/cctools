@@ -41,6 +41,8 @@ int main(int argc, char *argv[])
 	}
 	printf("Listening on port %d...\n", ds_port(m));
 
+	ds_specify_debug_log(m,"manager.log");
+
 	int i;
 	for(i=0;i<10;i++) {
 		char output[256];

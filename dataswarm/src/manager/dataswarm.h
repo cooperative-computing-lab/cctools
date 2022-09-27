@@ -994,12 +994,19 @@ struct list * ds_cancel_all_tasks(struct ds_manager *m);
 */
 int ds_shut_down_workers(struct ds_manager *m, int n);
 
-/** Add a log file that records cummulative statistics of the connected workers and submitted tasks.
+/** Turn on the debugging log output and send to the named file.
 @param m A manager object
 @param logfile The filename.
 @return 1 if logfile was opened, 0 otherwise.
 */
-int ds_specify_log(struct ds_manager *m, const char *logfile);
+int ds_specify_debug_log( struct ds_manager *m, const char *logfile );
+
+/** Add a performance log file that records cummulative statistics of the connected workers and submitted tasks.
+@param m A manager object
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int ds_specify_perf_log(struct ds_manager *m, const char *logfile);
 
 /** Add a log file that records the states of the connected workers and tasks.
 @param m A manager object
