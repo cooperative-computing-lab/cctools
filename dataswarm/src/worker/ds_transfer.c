@@ -90,7 +90,7 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 	} else if(xfer_mode==DS_TRANSFER_MODE_FILE_ONLY) {
 		/*
 		The caller only wants a file, but full_name is something else.
-		Choose a suitable error number to return in the missing message.
+		Choose a suitable error number to return in the error message.
 		*/
 		if(S_ISDIR(info.st_mode)) {
 			errno = EISDIR;
@@ -135,8 +135,8 @@ static int ds_transfer_put_internal( struct link *lnk, const char *full_name, co
 	return 1;
 
 access_failure:
-	// A missing message is not a failure from our perspective, keep going.
-	send_message(lnk, "missing %s %d\n", relative_name, errno);
+	// An error here is not a failure from our perspective, keep going.
+	send_message(lnk, "error %s %d\n", relative_name, errno);
 	return 1;
 
 send_failure:
@@ -269,7 +269,7 @@ static int ds_transfer_get_any_internal( struct link *lnk, const char *dirname, 
 		r = ds_transfer_get_dir_internal(lnk,subname,totalsize,stoptime);
 		free(subname);
 
-	} else if(sscanf(line,"missing %s %d",name_encoded,&errornum)==2) {
+	} else if(sscanf(line,"error %s %d",name_encoded,&errornum)==2) {
 
 		debug(D_DS,"unable to transfer %s: %s",name_encoded,strerror(errornum));
 		r = 0;

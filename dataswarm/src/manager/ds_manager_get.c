@@ -67,7 +67,7 @@ static ds_result_code_t ds_manager_get_buffer( struct ds_manager *q, struct ds_w
 		} else {
 			r = DS_APP_FAILURE;
 		}
-	} else if(sscanf(line,"missing %s %d",name_encoded,&errornum)==2) {
+	} else if(sscanf(line,"error %s %d",name_encoded,&errornum)==2) {
 		debug(D_DS, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,f->remote_name,strerror(errornum));
 
 		/* Mark the task as missing an output, but return success to keep going. */
@@ -248,7 +248,7 @@ static ds_result_code_t ds_manager_get_any( struct ds_manager *q, struct ds_work
 		r = ds_manager_get_dir_contents(q,w,t,subname,totalsize);
 		free(subname);
 
-	} else if(sscanf(line,"missing %s %d",name_encoded,&errornum)==2) {
+	} else if(sscanf(line,"error %s %d",name_encoded,&errornum)==2) {
 
 		// If the output file is missing, we make a note of that in the task result,
 		// but we continue and consider the transfer a 'success' so that other
