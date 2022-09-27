@@ -3,14 +3,18 @@ include ../../rules.mk
 
 LIBRARIES = libbatch_job.a
 
-PROGRAMS = work_queue_factory work_queue_pool
+PROGRAMS = work_queue_factory work_queue_pool ds_factory
 
 ifeq ($(CCTOOLS_CHIRP),chirp)
-CHIRP_LIB=../../chirp/src/libchirp.a
+CHIRP_LIB=${CCTOOLS_HOME}/chirp/src/libchirp.a
 CHIRP_BATCH=batch_job_chirp.c
 endif
 
-EXTERNAL_LIBRARIES = ../../work_queue/src/libwork_queue.a $(CHIRP_LIB) ../../dttools/src/libdttools.a
+DT_LIB=${CCTOOLS_HOME}/dttools/src/libdttools.a
+WQ_LIB=${CCTOOLS_HOME}/work_queue/src/libwork_queue.a
+DS_LIB=${CCTOOLS_HOME}/dataswarm/src/manager/libdataswarm.a
+
+EXTERNAL_LIBRARIES=$(CHIRP_LIB) $(DT_LIB)
 
 SOURCES = \
 	batch_file.c \
@@ -41,7 +45,8 @@ all: $(LIBRARIES) $(PROGRAMS)
 
 libbatch_job.a: $(OBJECTS)
 
-work_queue_factory: work_queue_factory.o libbatch_job.a $(EXTERNAL_LIBRARIES)
+work_queue_factory: work_queue_factory.o libbatch_job.a $(WQ_LIB) $(EXTERNAL_LIBRARIES)
+ds_factory: ds_factory.o libbatch_job.a $(DS_LIB) $(WQ_LIB) $(EXTERNAL_LIBRARIES)
 
 # Note that work_queue_pool is the same as work_queue_factory, for backwards compatibility.
 work_queue_pool: work_queue_factory
