@@ -376,11 +376,11 @@ class Task(object):
     # @param remote_name    The name of the remote file to create.
     # @param flags          May take the same values as @ref specify_file.
     # @param cache          Whether the file should be cached at workers (True/False)
-    def specify_buffer(self, buffer, remote_name, flags=None, cache=None):
+    def specify_input_buffer(self, buffer, remote_name, flags=None, cache=None):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, None)
-        return ds_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
+        return ds_task_specify_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
     # Add an output buffer to the task.

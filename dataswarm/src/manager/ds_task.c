@@ -591,7 +591,7 @@ int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const 
 	return 1;
 }
 
-int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags)
+int ds_task_specify_input_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags)
 {
 	struct ds_file *tf;
 	if(!t || !remote_name) {

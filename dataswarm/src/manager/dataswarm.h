@@ -236,7 +236,7 @@ struct ds_stats {
 
 /** Create a new task object.
 Once created and elaborated with functions such as @ref ds_task_specify_file
-and @ref ds_task_specify_buffer, the task should be passed to @ref ds_submit.
+and @ref ds_task_specify_input_buffer, the task should be passed to @ref ds_submit.
 @param full_command The shell command line or coprocess functions to be
 executed by the task.  If null, the command will be given later by @ref
 ds_task_specify_command
@@ -328,7 +328,7 @@ int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const 
 @return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
 
-int ds_task_specify_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags);
+int ds_task_specify_input_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags);
 
 /** Add an output buffer to a task.
 @param t A task object.
