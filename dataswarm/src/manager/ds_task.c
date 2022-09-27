@@ -810,22 +810,38 @@ void ds_task_delete(struct ds_task *t)
 	free(t);
 }
 
-int ds_task_get_output_buffer( struct ds_task *t, const char *name, char **data, int *length )
+static struct ds_file * find_output_buffer( struct ds_task *t, const char *name )
 {
 	struct ds_file *f;
 
 	list_first_item(t->output_files);
 	while((f = (struct ds_file*)list_next_item(t->output_files))) {
 		if(f->type==DS_BUFFER && !strcmp(f->source,name)) {
-			*data = f->data;
-			*length = f->length;
-			return 1;
+			return f;
 		}
 	}
 
-	*data = 0;
-	*length = 0;
 	return 0;
+}
+
+const char * ds_task_get_output_buffer( struct ds_task *t, const char *buffer_name )
+{
+	struct ds_file *f = find_output_buffer(t,buffer_name);
+	if(f) {
+		return f->data;
+	} else {
+		return 0;
+	}
+}
+
+int ds_task_get_output_buffer_length( struct ds_task *t, const char *buffer_name )
+{
+	struct ds_file *f = find_output_buffer(t,buffer_name);
+	if(f) {
+		return f->length;
+	} else {
+		return 0;
+	}
 }
 
 const char * ds_task_get_command( struct ds_task *t )

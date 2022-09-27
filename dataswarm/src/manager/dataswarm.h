@@ -542,13 +542,22 @@ const char * ds_task_get_output( struct ds_task *t );
 /** Get an output buffer of the task.
 @param t A task object.
 @param buffer_name The name of the output buffer, given by @ref ds_task_specify_output_buffer
-@param data A pointer to a pointer to be filled in with the file data.  Do not free this buffer;
-it will be removed automatically by @ref ds_task_delete.
-@param length A pointer to an integer to be filled with the file length. 
-@return True if the output buffer is available, false otherwise.
+@return A pointer to the contents of the buffer.  The buffer is null-terminated, and so can
+be used directly as a string, if it is expected to contain text.  If the buffer is expected
+to contain binary data, use @ref ds_task_get_output_buffer_length to determine the length.
+Do not attempt to free this pointer, it will be freed when the task is deleted.
+Returns null if the task is not complete or the buffer is not available for some reason.
 */
 
-int ds_task_get_output_buffer( struct ds_task *t, const char *buffer_name, char **data, int *length );
+const char * ds_task_get_output_buffer( struct ds_task *t, const char *buffer_name );
+
+/** Get the length of an output buffer.
+@param t A task object.
+@param buffer_name The name of the output buffer, given by @ref ds_task_specify_output_buffer
+@return The length of the buffer in bytes, or zero if the buffer is not available.
+*/
+
+int ds_task_get_output_buffer_length( struct ds_task *t, const char *buffer_name );
 
 /** Get the address and port of the worker on which the task ran.
 @param t A task object.
