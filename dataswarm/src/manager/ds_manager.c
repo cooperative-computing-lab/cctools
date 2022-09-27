@@ -4678,7 +4678,17 @@ static void aggregate_workers_resources( struct ds_manager *q, struct ds_resourc
 	}
 }
 
-int ds_specify_log(struct ds_manager *q, const char *filename)
+/* This simple wrapper function allows us to hide the debug.h interface from the end user. */
+
+int ds_specify_debug_log( struct ds_manager *m, const char *logfile )
+{
+	debug_config("ds_manager");
+	debug_config_file(logfile);
+	debug_flags_set("all");
+	return 1;
+}
+
+int ds_specify_perf_log(struct ds_manager *q, const char *filename)
 {
 	q->perf_logfile = fopen(filename, "a");
 	if(q->perf_logfile) {

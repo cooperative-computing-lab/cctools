@@ -29,24 +29,12 @@ import atexit
 import time
 import math
 
-def set_debug_flag(*flags):
-    for flag in flags:
-        cctools_debug_flags_set(flag)
-
-def specify_debug_log(logfile):
-    set_debug_flag('all')
-    cctools_debug_config_file_size(0)
-    cctools_debug_config_file(logfile)
-
 def specify_port_range(low_port, high_port):
     if low_port > high_port:
         raise TypeError('low_port {} should be smaller than high_port {}'.format(low_port, high_port))
 
     os.environ['TCP_LOW_PORT'] = str(low_port)
     os.environ['TCP_HIGH_PORT'] = str(high_port)
-
-cctools_debug_config('ds_python')
-
 
 staging_directory = tempfile.mkdtemp(prefix='ds-py-staging-')
 def cleanup_staging_directory():
@@ -952,7 +940,7 @@ class DataSwarm(object):
 
         try:
             if debug_log:
-                specify_debug_log(debug_log)
+                self.specify_debug_log(debug_log)
             self._stats = ds_stats()
             self._stats_hierarchy = ds_stats()
 
@@ -962,7 +950,7 @@ class DataSwarm(object):
                 raise Exception('Could not create queue on port {}'.format(port))
 
             if stats_log:
-                self.specify_log(stats_log)
+                self.specify_perf_log(stats_log)
 
             if transactions_log:
                 self.specify_transactions_log(transactions_log)
@@ -1346,12 +1334,20 @@ class DataSwarm(object):
         return ds_specify_catalog_server(self._dataswarm, hostname, port)
 
     ##
-    # Specify a log file that records the cummulative stats of connected workers and submitted tasks.
+    # Specify a debug log file that records the manager actions in detail.
     #
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
-    def specify_log(self, logfile):
-        return ds_specify_log(self._dataswarm, logfile)
+    def specify_debug_log(self, logfile):
+        return ds_specify_debug_log(self._dataswarm, logfile)
+
+    ##
+    # Specify a performance log file that records the cummulative stats of connected workers and submitted tasks.
+    #
+    # @param self     Reference to the current manager object.
+    # @param logfile  Filename.
+    def specify_perf_log(self, logfile):
+        return ds_specify_perf_log(self._dataswarm, logfile)
 
     ##
     # Specify a log file that records the states of tasks.

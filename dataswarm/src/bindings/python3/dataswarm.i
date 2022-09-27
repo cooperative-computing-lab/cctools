@@ -12,7 +12,6 @@
 %}
 
 %{
-	#include "debug.h"
 	#include "int_sizes.h"
 	#include "timestamp.h"
 	#include "dataswarm.h"
@@ -37,7 +36,6 @@ long long int is guaranteed to be at least 64bit. */
 %ignore output_files;
 
 %include "stdint.i"
-%include "debug.h"
 %include "int_sizes.h"
 %include "timestamp.h"
 %include "dataswarm.h"

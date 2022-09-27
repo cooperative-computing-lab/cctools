@@ -48,6 +48,7 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", ds_port(m));
 
+	ds_specify_debug_log(m,"manager.log");
 	ds_specify_algorithm(m,DS_SCHEDULE_FILES);
 
 	for(i=0;i<10;i++) {
