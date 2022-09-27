@@ -47,9 +47,6 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
-#define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/runos.py"
-#define CCTOOLS_VC3_BUILDER_PATH "/afs/crc.nd.edu/group/ccl/software/vc3-builder-src/vc3-builder"
-
 typedef enum {
 	FORMAT_TABLE,
 	FORMAT_LONG
@@ -107,8 +104,6 @@ struct list *wrapper_inputs = 0;
 
 static char *worker_command = 0;
 
-static char *runos_os = 0;
-
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
 
@@ -125,8 +120,6 @@ int manual_ssl_option = 0;
 //Environment variables to pass along in batch_job_submit
 struct jx *batch_env = NULL;
 
-//0 means the container image does not container work_queue_worker binary
-int k8s_worker_image = 0;
 /*
 In a signal handler, only a limited number of functions are safe to
 invoke, so we construct a string and emit it with a low-level write.
@@ -398,12 +391,7 @@ static int submit_worker( struct batch_queue *queue )
 	char *cmd;
 	char *worker;
 
-	if(runos_os || k8s_worker_image) {
-		worker = xxstrdup("work_queue_worker");
-	} else {
-		worker = string_format("./%s", worker_command);
-	}
-
+	worker = string_format("./%s", worker_command);
 	if(using_catalog) {
 		cmd = string_format(
 		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s %s",
@@ -442,13 +430,7 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	char *files = NULL;
-	if(!runos_os && !k8s_worker_image) {
-		files = xxstrdup(worker_command);
-	} else {
-		// if runos, then worker comes from vc3_cmd. if k8s, then from the
-		// container image.
-		files = xxstrdup("");
-	}
+	files = xxstrdup(worker_command);
 
 	if(password_file) {
 		char *newfiles = string_format("%s,pwfile",files);
@@ -464,19 +446,7 @@ static int submit_worker( struct batch_queue *queue )
 		files = newfiles;
 	}
 
-	if(runos_os){
-		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
-		char* temp = string_format("python %s %s %s",CCTOOLS_RUNOS_PATH,runos_os,vc3_cmd);
-		free(vc3_cmd);
-		free(cmd);
-		cmd = temp;
-		temp = string_format("%s,%s",files,"vc3-builder");
-		free(files);
-		files = temp;
-	}
-
 	debug(D_WQ,"submitting worker: %s",cmd);
-
 
 	int status = batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
 
@@ -1119,7 +1089,6 @@ static void show_help(const char *cmd)
 	printf(" %-30s Password file for workers to authenticate.\n","-P,--password");
 	printf(" %-30s Use this scratch dir for factory.\n","-S,--scratch-dir");
 	printf(" %-30s (default: /tmp/wq-factory-$uid).\n","");
-	printf(" %-30s Force factory to run itself as a manager.\n","--run-factory-as-manager");
 	printf(" %-30s Exit if parent process dies.\n", "--parent-death");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
@@ -1151,18 +1120,12 @@ static void show_help(const char *cmd)
 	printf(" %-30s Alternate binary instead of work_queue_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
-	printf(" %-30s Use runos tool to create environment (ND only).\n","--runos=<img>");
 	printf(" %-30s Run each worker inside this python environment.\n","--python-env=<file.tar.gz>");
 
 	printf("\nOptions specific to batch systems:\n");
 	printf(" %-30s Generic batch system options.\n", "-B,--batch-options=<options>");
 	printf(" %-30s Specify Amazon config file.\n", "--amazon-config");
 	printf(" %-30s Set requirements for the workers as Condor jobs.\n", "--condor-requirements");
-	printf(" %-30s Host name of mesos manager node..\n", "--mesos-master");
-	printf(" %-30s Path to mesos python library..\n", "--mesos-path");
-	printf(" %-30s Libraries for running mesos.\n", "--mesos-preload");
-	printf(" %-30s Container image for Kubernetes.\n", "--k8s-image");
-	printf(" %-30s Container image with worker for Kubernetes.\n", "--k8s-worker-image");
 
 }
 
@@ -1221,16 +1184,11 @@ static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"max-workers", required_argument, 0, 'W'},
 	{"memory", required_argument,  0,  LONG_OPT_MEMORY},
-	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MANAGER},
-	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
-	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 	{"min-workers", required_argument, 0, 'w'},
 	{"parent-death", no_argument, 0, LONG_OPT_PARENT_DEATH},
 	{"password", required_argument, 0, 'P'},
 	{"python-env", required_argument, 0, LONG_OPT_PYTHON_PACKAGE},
 	{"python-package", required_argument, 0, LONG_OPT_PYTHON_PACKAGE}, //same as python-env, kept for compatibility
-	{"run-factory-as-manager", no_argument, 0, LONG_OPT_RUN_AS_MANAGER},
-	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{"scratch-dir", required_argument, 0, 'S' },
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
 	{"timeout", required_argument, 0, 't'},
@@ -1247,15 +1205,7 @@ static const struct option long_options[] = {
 
 int main(int argc, char *argv[])
 {
-	char *mesos_manager = NULL;
-	char *mesos_path = NULL;
-	char *mesos_preload = NULL;
-	char *k8s_image = NULL;
-
 	wrapper_inputs = list_create();
-
-	// --run-factory-as-manager and -Twq should be used together.
-	int run_as_manager = 0;
 
 	//Environment variable handling
 	char *ev = NULL;
@@ -1415,30 +1365,8 @@ int main(int argc, char *argv[])
 			case 'h':
 				show_help(argv[0]);
 				exit(EXIT_SUCCESS);
-			case LONG_OPT_MESOS_MANAGER:
-				mesos_manager = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MESOS_PATH:
-				mesos_path = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MESOS_PRELOAD:
-				mesos_preload = xxstrdup(optarg);
-				break;
-			case LONG_OPT_K8S_IMAGE:
-				k8s_image = xxstrdup(optarg);
-				break;
-			case LONG_OPT_K8S_WORKER_IMAGE:
-				k8s_image = xxstrdup(optarg);
-				k8s_worker_image = 1;
-				break;
 			case LONG_OPT_CATALOG:
 				catalog_host = xxstrdup(optarg);
-				break;
-			case LONG_OPT_RUN_AS_MANAGER:
-				run_as_manager = 1;
-				break;
-			case LONG_OPT_RUN_OS:
-				runos_os = xxstrdup(optarg);
 				break;
 			case LONG_OPT_PARENT_DEATH:
 				initial_ppid = getppid();
@@ -1455,13 +1383,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE && !run_as_manager) {
-		fprintf(stderr, "work_queue_factory: batch system 'wq' specified, but you most likely want 'local'.\n");
-		fprintf(stderr, "work_queue_factory: use --run-factory-as-manager if you know what you are doing.\n");
-		exit(EXIT_FAILURE);
-	} else if(batch_queue_type != BATCH_QUEUE_TYPE_WORK_QUEUE && run_as_manager) {
-		fprintf(stderr, "work_queue_factory: --run-factory-as-manager can only be used with -Twq.\n");
-		fprintf(stderr, "work_queue_factory: you most likely want -Tlocal instead.\n");
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+		fprintf(stderr, "ds_factory: batch system 'wq' specified, but you most likely want 'local'.\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -1574,21 +1497,18 @@ int main(int argc, char *argv[])
 		worker_command = tmp;
 	}else{
 		worker_command = xxstrdup("work_queue_worker");
-		cmd = string_format("cp \"$(which %s)\" '%s'",worker_command,scratch_dir);
+		char *tmp = path_which(worker_command);
+		if(!tmp) {
+			fprintf(stderr, "work_queue_factory: please add ds_worker to your PATH, or use --worker-binary\n");
+			exit(EXIT_FAILURE);
+		}
+
+		cmd = string_format("cp '%s' '%s'",tmp,scratch_dir);
 		if (system(cmd)) {
-			fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
+			fprintf(stderr, "ds_factory: could not copy ds_worker to scratch directory.\n");
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
-	}
-
-	if(runos_os) {
-		cmd = string_format("cp '%s' '%s'",  CCTOOLS_VC3_BUILDER_PATH, scratch_dir);
-		int k = system(cmd);
-		if (k) {
-			fprintf(stderr, "can't copy vc3-builder! Please make sure it's at `%s`. Error code: %i\n",  CCTOOLS_VC3_BUILDER_PATH, k);
-			exit(EXIT_FAILURE);
-		}
 	}
 
 	if(password_file) {
@@ -1625,17 +1545,6 @@ int main(int argc, char *argv[])
 		debug(D_NOTICE, "condor_requirements will be ignored as workers will not be running in condor.");
 	} else {
 		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
-	}
-
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		batch_queue_set_option(queue, "mesos-path", mesos_path);
-		batch_queue_set_option(queue, "mesos-master", mesos_manager);
-		batch_queue_set_option(queue, "mesos-preload", mesos_preload);
-		batch_queue_set_logfile(queue, "work_queue_factory.mesoslog");
-	}
-	
-	if(batch_queue_type == BATCH_QUEUE_TYPE_K8S) {
-		batch_queue_set_option(queue, "k8s-image", k8s_image);
 	}
 
 	mainloop( queue );
