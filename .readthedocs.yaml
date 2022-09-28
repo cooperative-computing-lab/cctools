@@ -14,7 +14,7 @@ build:
       python: "3.9"
     jobs:
       pre_build:
-        - cd docs && doxygen cctools.doxygen.config
+        - cd doc && doxygen cctools.doxygen.config
 
 # Additional pip modules needed from doc/requirements.txt
 python:
