@@ -135,7 +135,7 @@ if __name__ == '__main__':
     report_task(t, ds.DS_RESULT_SUCCESS, 0)
 
     if t.get_output_buffer("out1") != original or t.get_output_buffer("out2") != original:
-        print("incorrect output:\nout1: %s\nout2: %s\n".format(t.get_output_buffer("out1"),t.get_output_buffer("out2")))
+        print("incorrect output:\nout1: {}\nout2: {}\n".format(t.get_output_buffer("out1"),t.get_output_buffer("out2")))
         sys.exit(1)
     else:
         print("buffer outputs match the inputs.")
