@@ -3810,6 +3810,9 @@ int ds_submit(struct ds_manager *q, struct ds_task *t)
 	//Increment taskid. So we get a unique taskid for every submit.
 	q->next_taskid++;
 
+	/* Issue warnings if the files are set up strangely. */
+	ds_task_check_consistency(t);
+
 	return ds_submit_internal(q, t);
 }
 

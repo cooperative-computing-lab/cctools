@@ -368,6 +368,45 @@ void ds_task_specify_feature(struct ds_task *t, const char *name)
 	list_push_tail(t->feature_list, xxstrdup(name));
 }
 
+/*
+Make sure that the various files added to the task do not conflict.
+Emit warnings if inconsistencies are detected, but keep going otherwise.
+*/
+
+void ds_task_check_consistency( struct ds_task *t )
+{
+	struct hash_table *table = hash_table_create(0,0);
+	struct ds_file *f;
+
+
+	/* Cannot have multiple input files mapped to the same remote name. */
+
+	list_first_item(t->input_files);
+	while((f=list_next_item(t->input_files))) {
+		if(hash_table_lookup(table,f->remote_name)) {
+			fprintf(stderr,"warning: task %d has more than one input file named %s\n",t->taskid,f->remote_name);
+		} else {
+			hash_table_insert(table,f->remote_name,f->remote_name);
+		}
+	}
+
+	hash_table_clear(table,0);
+
+	/* Cannot have multiple output files bring back the same file. */
+
+	list_first_item(t->input_files);
+	while((f=list_next_item(t->input_files))) {
+		if(f->type==DS_FILE && hash_table_lookup(table,f->source)) {
+			fprintf(stderr,"warning: task %d has more than one output file named %s\n",t->taskid,f->source);
+		} else {
+			hash_table_insert(table,f->remote_name,f->source);
+		}
+	}
+
+	hash_table_clear(table,0);
+	hash_table_delete(table);
+}
+
 void ds_task_specify_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
 {
 	if(!t || !local_name || !remote_name) {
