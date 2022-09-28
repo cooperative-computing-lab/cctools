@@ -407,39 +407,47 @@ void ds_task_check_consistency( struct ds_task *t )
 	hash_table_delete(table);
 }
 
-void ds_task_specify_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
+static void ds_task_add_input( struct ds_task *t, struct ds_file *f )
 {
-	if(!t || !local_name || !remote_name) {
+	if(!t || !f || !f->source || !f->remote_name) {
 		fatal("%s: invalid null argument.",__func__);
 	}
 
-	if(remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
+	if(f->remote_name[0] == '/') {
+		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,f->remote_name);
 	}
 
-	struct ds_file *f = ds_file_create(local_name, remote_name, 0, 0, DS_FILE, flags);
+	list_push_tail(t->input_files, f);
+}
 
+static void ds_task_add_output( struct ds_task *t, struct ds_file *f )
+{
+	if(!t || !f || !f->source || !f->remote_name) {
+		fatal("%s: invalid null argument.",__func__);
+	}
+
+	if(f->remote_name[0] == '/') {
+		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,f->remote_name);
+	}
+
+	list_push_tail(t->output_files, f);
+}
+
+void ds_task_specify_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
+{
+	struct ds_file *f = ds_file_create(local_name, remote_name, 0, 0, DS_FILE, flags);
 	if(type==DS_INPUT) {
-		list_push_tail(t->input_files, f);
+		ds_task_add_input(t,f);
 	} else {
-		list_push_tail(t->output_files, f);
+		ds_task_add_output(t,f);
 	}
 }
 
 void ds_task_specify_url(struct ds_task *t, const char *file_url, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
 {
-	if(!t || !file_url || !remote_name) {
-		fatal("%s: invalid null argument.",__func__);
-	}
-
-	if(remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
-	}
-
 	struct ds_file *f = ds_file_create(file_url, remote_name, 0, 0, DS_URL, flags);
-
 	if(type==DS_INPUT) {
-		list_push_tail(t->input_files, f);
+		ds_task_add_input(t,f);
 	} else {
 		fatal("%s: urls are not (yet) permitted as output files.",__func__);
 	}
@@ -447,29 +455,12 @@ void ds_task_specify_url(struct ds_task *t, const char *file_url, const char *re
 
 void ds_task_specify_empty_dir( struct ds_task *t, const char *remote_name )
 {
-	if(!t || !remote_name) {
-		fatal("%s: invalid null argument.",__func__);
-	}
-
-	if(remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
-	}
-
 	struct ds_file *f = ds_file_create("unused", remote_name, 0, 0, DS_EMPTY_DIR, 0);
-
-	list_push_tail(t->output_files, f);
+	ds_task_add_input(t,f);
 }
 
 void ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, ds_file_type_t type, ds_file_flags_t flags)
 {
-	if(!t || !local_name || !remote_name) {
-		fatal("%s: invalid null argument.",__func__);
-	}
-
-	if(remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
-	}
-
 	if(end_byte < start_byte) {
 		fatal("%s: end byte lower than start byte for %s.\n",__func__,remote_name);
 	}
@@ -480,63 +471,32 @@ void ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const
 	f->piece_length = end_byte - start_byte + 1;
 
 	if(type==DS_INPUT) {
-		list_push_tail(t->input_files, f);
+		ds_task_add_input(t,f);
 	} else {
-		fatal("%s: files pieces are not (yet) permitted as output files.",__func__);
+		fatal("%s: file pieces are not (yet) permitted as output files.",__func__);
 	}
 }
 
 void ds_task_specify_input_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags)
 {
-	if(!t || !remote_name) {
-		fatal("%s: invalid null argument.",__func__);
-	}
-
-	if(remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
-	}
-
 	struct ds_file *f = ds_file_create("unnamed", remote_name, data, length, DS_BUFFER, flags);
-
-	list_push_tail(t->input_files, f);
+	ds_task_add_input(t,f);
 }
 
 void ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, const char *remote_name, ds_file_flags_t flags)
 {
-	if(!t || !buffer_name || !remote_name) {
-		fatal("%s: invalid null argument.",__func__);
-	}
-
-	if(remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
-	}
-
 	struct ds_file *f = ds_file_create(buffer_name, remote_name, 0, 0, DS_BUFFER, flags);
-
-	list_push_tail(t->output_files, f);
+	ds_task_add_output(t,f);
 }
 
-void ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
+void ds_task_specify_input_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
 {
-	if(!t || !remote_name || !cmd) {
-		fatal("%s: invalid null argument.",__func__);
-	}
-
-	if(remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
-	}
-
 	if(strstr(cmd, "%%") == NULL) {
 		fatal("%s: command to transfer file does not contain %%%% specifier: %s", __func__, cmd);
 	}
 
 	struct ds_file *f = ds_file_create(cmd, remote_name, 0, 0, DS_COMMAND, flags);
-
-	if(type==DS_INPUT) {
-		list_push_tail(t->input_files, f);
-	} else {
-		fatal("%s: shell commands are not (yet) permitted as output files.",__func__);
-	}
+	ds_task_add_input(t,f);
 }
 
 void ds_task_specify_snapshot_file(struct ds_task *t, const char *monitor_snapshot_file) {
