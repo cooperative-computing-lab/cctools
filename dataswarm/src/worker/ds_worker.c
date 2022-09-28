@@ -1355,6 +1355,16 @@ static int workspace_check()
 workspace_prepare is called every time we connect to a new manager.
 The peer transfer server is associated with a particular cache
 directory, and so gets created (and deleted) with the corresponding cache.
+
+The workspace consists of the following directories:
+
+- cache - contains only files/directories that are sent by the manager, or downloaded at the manager's direction.  These are meant for use by tasks as input/output files, and are immutable once created.  The name of each file in the cache is chosen by the manager for the purpose of avoiding accidental sharing, and may differ from the name of the file in the task sandbox.
+
+- temp - a temporary directory of last resort if a tool needs some space to work on items that neither belong in the cache or in a task sandbox.  Really anything using this directory is a hack and its behavior should be reconsidered.
+
+- trash - deleted files are moved here, and then unlinked.  This is done because (a) it may not be possible to unlink a file outright if it is still in use as an executable, and (b) the move of an entire directory can be done quickly and atomically.  An attempt is made to deleted everything in this directory on startup, shutdown, and whenever an individual file is trashed.  (See trash_file.[ch])
+
+- task.%d - each executing task gets its own sandbox directory as it runs
 */
 
 static int workspace_prepare()
@@ -1366,7 +1376,7 @@ static int workspace_prepare()
 	global_cache = ds_cache_create(cachedir);
 	free(cachedir);
 
-	char *tmp_name = string_format("%s/cache/tmp", workspace);
+	char *tmp_name = string_format("%s/temp", workspace);
 	result |= create_dir(tmp_name,0777);
 	setenv("WORKER_TMPDIR", tmp_name, 1);	
 	free(tmp_name);
