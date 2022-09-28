@@ -18,6 +18,5 @@ build:
 
 # Additional pip modules needed from doc/requirements.txt
 python:
-    version: 3.9
     install:
     - requirements: doc/requirements.txt
