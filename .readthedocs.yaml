@@ -11,13 +11,13 @@ mkdocs:
 build:
     os: "ubuntu-20.04"
     tools:
-      python: "3.7"
+      python: "3.9"
     jobs:
       pre_build:
         - cd docs && doxygen cctools.doxygen.config
 
 # Additional pip modules needed from doc/requirements.txt
 python:
-    version: 3.7
+    version: 3.9
     install:
     - requirements: doc/requirements.txt
