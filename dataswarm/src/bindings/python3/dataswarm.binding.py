@@ -29,24 +29,12 @@ import atexit
 import time
 import math
 
-def set_debug_flag(*flags):
-    for flag in flags:
-        cctools_debug_flags_set(flag)
-
-def specify_debug_log(logfile):
-    set_debug_flag('all')
-    cctools_debug_config_file_size(0)
-    cctools_debug_config_file(logfile)
-
 def specify_port_range(low_port, high_port):
     if low_port > high_port:
         raise TypeError('low_port {} should be smaller than high_port {}'.format(low_port, high_port))
 
     os.environ['TCP_LOW_PORT'] = str(low_port)
     os.environ['TCP_HIGH_PORT'] = str(high_port)
-
-cctools_debug_config('ds_python')
-
 
 staging_directory = tempfile.mkdtemp(prefix='ds-py-staging-')
 def cleanup_staging_directory():
@@ -369,19 +357,61 @@ class Task(object):
         return ds_task_specify_directory(self._task, local_name, remote_name, type, flags, recursive)
 
     ##
-    # Add an input bufer to the task.
+    # Add an input buffer to the task.
     #
     # @param self           Reference to the current task object.
     # @param buffer         The contents of the buffer to pass as input.
     # @param remote_name    The name of the remote file to create.
     # @param flags          May take the same values as @ref specify_file.
     # @param cache          Whether the file should be cached at workers (True/False)
-    def specify_buffer(self, buffer, remote_name, flags=None, cache=None):
+    def specify_input_buffer(self, buffer, remote_name, flags=None, cache=None):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, None)
-        return ds_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
+        return ds_task_specify_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
+    ##
+    # Add an output buffer to the task.
+    #
+    # @param self           Reference to the current task object.
+    # @param buffer_name    The logical name of the output buffer.
+    # @param remote_name    The name of the remote file to fetch.
+    # @param flags          May take the same values as @ref specify_file.
+    # @param cache          Whether the file should be cached at workers (True/False)
+    def specify_output_buffer(self, buffer_name, remote_name, flags=None, cache=None):
+        if buffer_name:
+            buffer_name = str(buffer_name)
+        if remote_name:
+            remote_name = str(remote_name)
+        flags = Task._determine_file_flags(flags, cache, None)
+        return ds_task_specify_output_buffer(self._task, buffer_name, remote_name, flags)
+
+
+    ##
+    # Get an output buffer of the task.
+    #
+    # @param self           Reference to the current task object.
+    # @param buffer_name    The logical name of the output buffer.
+    # @return               The bytes of the returned file.
+
+    def get_output_buffer(self, buffer_name ):
+        if buffer_name:
+            buffer_name = str(buffer_name)
+
+        return ds_task_get_output_buffer(self._task, buffer_name )
+
+    ##
+    # Get the length of an output buffer.
+    #
+    # @param self           Reference to the current task object.
+    # @param buffer_name    The logical name of the output buffer.
+    # @return               The length of the output buffer.
+
+    def get_output_buffer_length(self, buffer_name ):
+        if buffer_name:
+            buffer_name = str(buffer_name)
+
+        return ds_task_get_output_buffer_length(self._task, buffer_name )
 
     ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
@@ -952,7 +982,7 @@ class DataSwarm(object):
 
         try:
             if debug_log:
-                specify_debug_log(debug_log)
+                self.specify_debug_log(debug_log)
             self._stats = ds_stats()
             self._stats_hierarchy = ds_stats()
 
@@ -962,7 +992,7 @@ class DataSwarm(object):
                 raise Exception('Could not create queue on port {}'.format(port))
 
             if stats_log:
-                self.specify_log(stats_log)
+                self.specify_perf_log(stats_log)
 
             if transactions_log:
                 self.specify_transactions_log(transactions_log)
@@ -1346,12 +1376,20 @@ class DataSwarm(object):
         return ds_specify_catalog_server(self._dataswarm, hostname, port)
 
     ##
-    # Specify a log file that records the cummulative stats of connected workers and submitted tasks.
+    # Specify a debug log file that records the manager actions in detail.
     #
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
-    def specify_log(self, logfile):
-        return ds_specify_log(self._dataswarm, logfile)
+    def specify_debug_log(self, logfile):
+        return ds_specify_debug_log(self._dataswarm, logfile)
+
+    ##
+    # Specify a performance log file that records the cummulative stats of connected workers and submitted tasks.
+    #
+    # @param self     Reference to the current manager object.
+    # @param logfile  Filename.
+    def specify_perf_log(self, logfile):
+        return ds_specify_perf_log(self._dataswarm, logfile)
 
     ##
     # Specify a log file that records the states of tasks.

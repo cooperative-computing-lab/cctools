@@ -12,7 +12,6 @@
 %}
 
 %{
-	#include "debug.h"
 	#include "int_sizes.h"
 	#include "timestamp.h"
 	#include "dataswarm.h"
@@ -36,12 +35,18 @@ long long int is guaranteed to be at least 64bit. */
 %ignore input_files;
 %ignore output_files;
 
+/* When we enounter buffer_length in the prototype of ds_task_get_output_buffer,
+treat it as an output parameter to be filled in. */
+
+%apply int *OUTPUT { int *buffer_length };
+
 %include "stdint.i"
-%include "debug.h"
 %include "int_sizes.h"
 %include "timestamp.h"
 %include "dataswarm.h"
 %include "rmsummary.h"
 %include "category.h"
+
+
 
 

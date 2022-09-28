@@ -48,12 +48,13 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", ds_port(m));
 
+	ds_specify_debug_log(m,"manager.log");
 	ds_specify_algorithm(m,DS_SCHEDULE_FILES);
 
 	for(i=0;i<10;i++) {
 		struct ds_task *t = ds_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 	  
-		ds_task_specify_buffer(t,query_string,strlen(query_string),"query.file", DS_NOCACHE);
+		ds_task_specify_input_buffer(t,query_string,strlen(query_string),"query.file", DS_NOCACHE);
 		ds_task_specify_url(t,BLAST_URL,"blastdir", DS_INPUT, DS_CACHE|DS_UNPACK );
 		ds_task_specify_url(t,LANDMARK_URL,"landmark", DS_INPUT, DS_CACHE|DS_UNPACK );
 		ds_task_specify_env(t,"BLASTDB","landmark");

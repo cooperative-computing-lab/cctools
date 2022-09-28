@@ -114,26 +114,34 @@ struct ds_file *ds_file_create(const char *source, const char *remote_name, ds_f
 	} else {
 		f->cached_name = make_cached_name(f);
 	}
+
+	f->data = 0;
 	
 	return f;
 }
 
 /* Make a deep copy of a file object to be used independently. */
 
-struct ds_file *ds_file_clone(const struct ds_file *file)
+struct ds_file *ds_file_clone(const struct ds_file *f )
 {
-	return ds_file_create(file->source,file->remote_name,file->type,file->flags);
+	struct ds_file *nf = ds_file_create(f->source,f->remote_name,f->type,f->flags);
+
+	if(f->data) {
+		nf->data = malloc(f->length);
+		nf->length = f->length;
+		memcpy(nf->data,f->data,f->length);
+	}
+
+	return nf;
 }
 
 /* Delete a file object */
 
-void ds_file_delete(struct ds_file *tf)
+void ds_file_delete(struct ds_file *f)
 {
-	if(tf->source)
-		free(tf->source);
-	if(tf->remote_name)
-		free(tf->remote_name);
-	if(tf->cached_name)
-		free(tf->cached_name);
-	free(tf);
+	free(f->source);
+	free(f->remote_name);
+	free(f->cached_name);
+	free(f->data);
+	free(f);
 }

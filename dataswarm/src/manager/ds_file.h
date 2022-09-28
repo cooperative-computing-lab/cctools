@@ -30,9 +30,10 @@ struct ds_file {
 	int length;		// Length of source data, if known.
 	off_t offset;		// File offset for DS_FILE_PIECE
 	off_t piece_length;	// File piece length for DS_FILE_PIECE
-	char *source;		// Name of source file, url, or literal data if a DS_BUFFER.
+	char *source;		// Name of source file, url, buffer, or literal data if an input buffer.
 	char *remote_name;	// Name of file as it appears to the task.
 	char *cached_name;	// Name of file in the worker's cache directory.
+	char *data;		// Raw data if an output buffer.
 };
 
 struct ds_file * ds_file_create( const char *source, const char *remote_name, ds_file_t type, ds_file_flags_t flags );

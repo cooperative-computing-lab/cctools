@@ -1469,6 +1469,11 @@ do
 	fi
 done
 
+if [ dataswarm = "${include_package_dataswarm}" ]
+then
+	internal_ccflags="${internal_ccflags} -I $(pwd)/dataswarm/src/manager"
+fi
+
 ccflags_append_define \
 	"BUILD_DATE='\"$BUILD_DATE\"'" \
 	"BUILD_HOST='\"$BUILD_HOST\"'" \

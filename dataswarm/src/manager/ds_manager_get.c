@@ -21,6 +21,65 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+static ds_result_code_t ds_manager_get_symlink_contents( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *filename, int length );
+static ds_result_code_t ds_manager_get_dir_contents( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *dirname, int64_t *totalsize );
+
+/*
+Get an output file from the task and return it as a buffer in memory.
+The buffer is attached to the f->data element and can then be retrieved
+by the application using ds_task_get_output_buffer.
+*/
+
+static ds_result_code_t ds_manager_get_buffer( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, int64_t *total_size )
+{
+	char line[DS_LINE_MAX];
+	char name_encoded[DS_LINE_MAX];
+	int64_t size;
+	int mode;
+	int errornum;
+
+	ds_result_code_t r = DS_WORKER_FAILURE;
+
+	ds_msg_code_t mcode = ds_manager_recv_retry(q, w, line, sizeof(line));
+	if(mcode!=DS_MSG_NOT_PROCESSED) return DS_WORKER_FAILURE;
+
+	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
+
+		f->length = size;
+		debug(D_DS, "Receiving buffer %s (size: %"PRId64" bytes) from %s (%s) ...", f->source, (int64_t)f->length, w->addrport, w->hostname);
+
+		f->data = malloc(size+1);
+		if(f->data) {
+			time_t stoptime = time(0) + ds_manager_transfer_wait_time(q, w, t, f->length);
+
+			ssize_t actual = link_read(w->link,f->data,f->length,stoptime);
+			if(actual==f->length) {
+				/* While not strictly necessary, add a null terminator to facilitate printing text data. */
+				f->data[f->length] = 0;
+				*total_size += f->length;
+				r = DS_SUCCESS;
+			} else {
+				/* If insufficient data was read, the connection must be broken. */
+				free(f->data);
+				f->data = 0;
+				r = DS_WORKER_FAILURE;
+			}
+		} else {
+			r = DS_APP_FAILURE;
+		}
+	} else if(sscanf(line,"error %s %d",name_encoded,&errornum)==2) {
+		debug(D_DS, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,f->remote_name,strerror(errornum));
+
+		/* Mark the task as missing an output, but return success to keep going. */
+		ds_task_update_result(t, DS_RESULT_OUTPUT_MISSING);
+		r = DS_SUCCESS;
+	} else {
+		r = DS_WORKER_FAILURE;
+	}
+
+	return r;
+}
+
 /*
 Receive the contents of a single file from a worker.
 The "file" header has already been received, just
@@ -120,8 +179,6 @@ static ds_result_code_t ds_manager_get_symlink_contents( struct ds_manager *q, s
 }
 
 
-static ds_result_code_t ds_manager_get_dir_contents( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *dirname, int64_t *totalsize );
-
 /*
 Get a single item (file, dir, symlink, etc) back
 from the worker by observing the header and then
@@ -191,7 +248,7 @@ static ds_result_code_t ds_manager_get_any( struct ds_manager *q, struct ds_work
 		r = ds_manager_get_dir_contents(q,w,t,subname,totalsize);
 		free(subname);
 
-	} else if(sscanf(line,"missing %s %d",name_encoded,&errornum)==2) {
+	} else if(sscanf(line,"error %s %d",name_encoded,&errornum)==2) {
 
 		// If the output file is missing, we make a note of that in the task result,
 		// but we continue and consider the transfer a 'success' so that other
@@ -245,6 +302,7 @@ static ds_result_code_t ds_manager_get_dir_contents( struct ds_manager *q, struc
 /*
 Get a single output file, located at the worker under 'cached_name'.
 */
+
 ds_result_code_t ds_manager_get_output_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f )
 {
 	int64_t total_bytes = 0;
@@ -253,9 +311,16 @@ ds_result_code_t ds_manager_get_output_file( struct ds_manager *q, struct ds_wor
 	timestamp_t open_time = timestamp_get();
 
 	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, f->cached_name, f->source);
-	ds_manager_send(q,w, "get %s\n",f->cached_name);
 
-	result = ds_manager_get_any(q, w, t, 0, f->source, &total_bytes);
+	if(f->type==DS_FILE) {
+		ds_manager_send(q,w, "get %s\n",f->cached_name);
+		result = ds_manager_get_any(q, w, t, 0, f->source, &total_bytes);
+	} else if(f->type==DS_BUFFER) {
+		ds_manager_send(q,w, "getfile %s\n",f->cached_name);
+		result = ds_manager_get_buffer(q, w, t, f, &total_bytes );
+	} else {
+		result = DS_APP_FAILURE;
+	}
 
 	timestamp_t close_time = timestamp_get();
 	timestamp_t sum_time = close_time - open_time;
@@ -314,7 +379,7 @@ ds_result_code_t ds_manager_get_output_files( struct ds_manager *q, struct ds_wo
 		list_first_item(t->output_files);
 		while((f = list_next_item(t->output_files))) {
 			// non-file objects are handled by the worker.
-			if(f->type!=DS_FILE) continue;
+			if(f->type!=DS_FILE && f->type!=DS_BUFFER) continue;
 		     
 			int task_succeeded = (t->result==DS_RESULT_SUCCESS && t->exit_code==0);
 
