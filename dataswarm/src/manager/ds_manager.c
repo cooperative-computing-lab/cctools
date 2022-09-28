@@ -3049,7 +3049,7 @@ static void ds_invalidate_cached_file_internal(struct ds_manager *q, const char 
 }
 
 void ds_invalidate_cached_file(struct ds_manager *q, const char *local_name, ds_file_t type) {
-	struct ds_file *f = ds_file_create(local_name, local_name, type, DS_CACHE);
+	struct ds_file *f = ds_file_create(local_name, local_name, 0, 0, type, DS_CACHE);
 	ds_invalidate_cached_file_internal(q, f->cached_name);
 	ds_file_delete(f);
 }

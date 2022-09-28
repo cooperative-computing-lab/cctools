@@ -36,7 +36,7 @@ struct ds_file {
 	char *data;		// Raw data if an output buffer.
 };
 
-struct ds_file * ds_file_create( const char *source, const char *remote_name, ds_file_t type, ds_file_flags_t flags );
+struct ds_file * ds_file_create( const char *source, const char *remote_name, const char *data, int length, ds_file_t type, ds_file_flags_t flags );
 struct ds_file *ds_file_clone( const struct ds_file *file );
 void ds_file_delete( struct ds_file *f );
 
