@@ -28,7 +28,7 @@ nav:
         - Network Configuration: 'network/index.md'
         - JX Expression Language: 'jx/index.md'
         - Chirp Reference: 'chirp/chirp_protocol.md'
-        - API Reference: 'http://ccl.cse.nd.edu/software/manuals/api/html/index.html'
+        - API Reference: 'api/html/index.html'
 
 extra_css:
     - css/tabs.css
