@@ -489,7 +489,7 @@ void ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, c
 	ds_task_add_output(t,f);
 }
 
-void ds_task_specify_input_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
+void ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
 {
 	if(strstr(cmd, "%%") == NULL) {
 		fatal("%s: command to transfer file does not contain %%%% specifier: %s", __func__, cmd);
