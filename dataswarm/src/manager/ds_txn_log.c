@@ -228,12 +228,12 @@ void ds_txn_log_write_worker_resources(struct ds_manager *q, struct ds_worker_in
 }
 
 
-void ds_txn_log_write_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, ds_file_type_t type)
+void ds_txn_log_write_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, int is_input )
 {
 	struct buffer B;
 	buffer_init(&B);
 	buffer_printf(&B, "TRANSFER ");
-	buffer_printf(&B, type == DS_INPUT ? "INPUT":"OUTPUT");
+	buffer_printf(&B, is_input ? "INPUT":"OUTPUT");
 	buffer_printf(&B, " %d", t->taskid);
 	buffer_printf(&B, " %d", f->flags & DS_CACHE);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));

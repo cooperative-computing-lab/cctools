@@ -55,8 +55,8 @@ int submit_tasks(struct ds_manager *q, int input_size, int run_time, int output_
 		ntasks++;
 
 		struct ds_task *t = ds_task_create(command);
-		ds_task_specify_file(t, input_file, "infile", DS_INPUT, DS_CACHE);
-		ds_task_specify_file(t, output_file, "outfile", DS_OUTPUT, DS_NOCACHE);
+		ds_task_specify_input_file(t, input_file, "infile", DS_CACHE);
+		ds_task_specify_output_file(t, output_file, "outfile", DS_NOCACHE);
 		ds_task_specify_cores(t,1);
 
 		if(category && strlen(category) > 0)

@@ -3490,18 +3490,18 @@ void ds_disable_monitoring(struct ds_manager *q) {
 }
 
 void ds_monitor_add_files(struct ds_manager *q, struct ds_task *t) {
-	ds_task_specify_file(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, DS_INPUT, DS_CACHE);
+	ds_task_specify_input_file(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, DS_CACHE);
 
 	char *summary  = monitor_file_name(q, t, ".summary");
-	ds_task_specify_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", DS_OUTPUT, DS_NOCACHE);
+	ds_task_specify_output_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", DS_NOCACHE);
 	free(summary);
 
 	if(q->monitor_mode & DS_MON_FULL && (q->monitor_output_directory || t->monitor_output_directory)) {
 		char *debug  = monitor_file_name(q, t, ".debug");
 		char *series = monitor_file_name(q, t, ".series");
 
-		ds_task_specify_file(t, debug, RESOURCE_MONITOR_REMOTE_NAME ".debug",   DS_OUTPUT, DS_NOCACHE);
-		ds_task_specify_file(t, series, RESOURCE_MONITOR_REMOTE_NAME ".series", DS_OUTPUT, DS_NOCACHE);
+		ds_task_specify_output_file(t, debug, RESOURCE_MONITOR_REMOTE_NAME ".debug", DS_NOCACHE);
+		ds_task_specify_output_file(t, series, RESOURCE_MONITOR_REMOTE_NAME ".series", DS_NOCACHE);
 
 		free(debug);
 		free(series);

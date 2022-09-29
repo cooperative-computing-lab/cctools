@@ -409,7 +409,7 @@ static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct d
 		q->stats->bytes_sent += total_bytes;
 
 		// Write to the transaction log.
-		ds_txn_log_write_transfer(q, w, t, f, total_bytes, elapsed_time, DS_INPUT);
+		ds_txn_log_write_transfer(q, w, t, f, total_bytes, elapsed_time, 1);
 
 		// Avoid division by zero below.
 		if(elapsed_time==0) elapsed_time = 1;

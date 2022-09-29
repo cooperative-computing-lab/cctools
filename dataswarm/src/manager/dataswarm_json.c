@@ -144,9 +144,9 @@ static int specify_files(int input, struct jx *files, struct ds_task *task)
 		}
 
 		if(input) {
-			ds_task_specify_file(task, local, remote, DS_INPUT, flags);
+			ds_task_specify_input_file(task, local, remote, flags);
 		} else {
-			ds_task_specify_file(task, local, remote, DS_OUTPUT, flags);
+			ds_task_specify_output_file(task, local, remote, flags);
 		}
 
 		arr = jx_iterate_array(files, &i);

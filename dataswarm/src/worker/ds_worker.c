@@ -678,11 +678,11 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, DS_LINE_MAX);
 			ds_hack_do_not_compute_cached_name = 1;
-			ds_task_specify_file(task, localname, taskname, DS_INPUT, flags );
+			ds_task_specify_input_file(task, localname, taskname, flags );
 		} else if(sscanf(line,"outfile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, DS_LINE_MAX);
 			ds_hack_do_not_compute_cached_name = 1;
-			ds_task_specify_file(task, localname, taskname, DS_OUTPUT, flags );
+			ds_task_specify_output_file(task, localname, taskname, flags );
 		} else if(sscanf(line, "dir %s", filename)) {
 			ds_task_specify_empty_dir(task, filename );
 		} else if(sscanf(line,"cores %" PRId64,&n)) {
