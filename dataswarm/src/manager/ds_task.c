@@ -110,8 +110,7 @@ static struct list *ds_task_file_list_clone(struct list *list)
 	struct list *new = list_create();
 	struct ds_file *old_file, *new_file;
 
-	list_first_item(list);
-	while ((old_file = list_next_item(list))) {
+	LIST_ITERATE(list,old_file) {
 		new_file = ds_file_clone(old_file);
 		list_push_tail(new, new_file);
 	}
@@ -122,8 +121,8 @@ static struct list *ds_task_string_list_clone(struct list *string_list)
 {
 	struct list *new = list_create();
 	char *var;
-	list_first_item(string_list);
-	while((var=list_next_item(string_list))) {
+
+	LIST_ITERATE(string_list,var) {
 		list_push_tail(new, xxstrdup(var));
 	}
 
@@ -378,11 +377,9 @@ void ds_task_check_consistency( struct ds_task *t )
 	struct hash_table *table = hash_table_create(0,0);
 	struct ds_file *f;
 
-
 	/* Cannot have multiple input files mapped to the same remote name. */
 
-	list_first_item(t->input_files);
-	while((f=list_next_item(t->input_files))) {
+	LIST_ITERATE(t->input_files,f) {
 		if(hash_table_lookup(table,f->remote_name)) {
 			fprintf(stderr,"warning: task %d has more than one input file named %s\n",t->taskid,f->remote_name);
 		} else {
@@ -394,8 +391,7 @@ void ds_task_check_consistency( struct ds_task *t )
 
 	/* Cannot have multiple output files bring back the same file. */
 
-	list_first_item(t->input_files);
-	while((f=list_next_item(t->input_files))) {
+	LIST_ITERATE(t->output_files,f) {
 		if(f->type==DS_FILE && hash_table_lookup(table,f->source)) {
 			fprintf(stderr,"warning: task %d has more than one output file named %s\n",t->taskid,f->source);
 		} else {
@@ -596,8 +592,7 @@ static struct ds_file * find_output_buffer( struct ds_task *t, const char *name 
 {
 	struct ds_file *f;
 
-	list_first_item(t->output_files);
-	while((f = (struct ds_file*)list_next_item(t->output_files))) {
+	LIST_ITERATE(t->output_files,f) {
 		if(f->type==DS_BUFFER && !strcmp(f->source,name)) {
 			return f;
 		}
