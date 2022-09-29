@@ -131,13 +131,13 @@ Use as follows:
 char *key;
 void *value;
 
-HASH_TABLE_ITERATE(table,key,value) {
+HASH_TABLE_FOREACH(table,key,value) {
 	printf("table contains: %s\n",key);
 }
 
 </pre>
+*/
 
-
-#define HASH_TABLE_ITERATE( table, key, value ) hash_table_firstkey(table); while(hash_table_nextkey(table,&key,(void**)&value))
+#define HASH_TABLE_FOREACH( table, key, value ) hash_table_firstkey(table); while(hash_table_nextkey(table,&key,(void**)&value))
 
 #endif
