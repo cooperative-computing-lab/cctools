@@ -3585,7 +3585,12 @@ static void push_task_to_ready_list( struct ds_manager *q, struct ds_task *t )
 	}
 
 	if(by_priority) {
-		list_push_priority(q->ready_list, ds_task_priority, t);
+		/*If a task has a priority of 0 it gets added to the end of the ready list.*/
+		if(ds_task_priority(t)!=0){
+			list_push_priority(q->ready_list, ds_task_priority, t);
+		} else {
+			list_push_tail(q->ready_list,t);
+		}
 	} else {
 		list_push_head(q->ready_list,t);
 	}
