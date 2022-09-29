@@ -89,6 +89,7 @@ struct ds_task {
 int  ds_task_update_result(struct ds_task *t, ds_result_t new_result );
 void ds_task_specify_resources(struct ds_task *t, const struct rmsummary *rm);
 void ds_task_clean( struct ds_task *t, int full_clean );
+void ds_task_check_consistency( struct ds_task *t );
 
 const char *ds_task_state_string( ds_task_state_t task_state );
 

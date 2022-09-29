@@ -31,12 +31,21 @@ UINT64_T  key;
 void *value;
 
 itable_firstkey(h);
-
 while(itable_nextkey(h,&key,&value)) {
 	printf("table contains: %d\n",key);
 }
 </pre>
 
+Alternatively:
+
+<pre>
+UINT64_T  key;
+void *value;
+
+ITABLE_ITERATE(h,key,value) {
+	printf("table contains: %d\n",key);
+}
+</pre>
 */
 
 /** Create a new integer table.
@@ -120,5 +129,21 @@ This function returns the next key and value in the iteration.
 */
 
 int itable_nextkey(struct itable *h, UINT64_T * key, void **value);
+
+/** Utility macro to simplify common case of iterating over an itable.
+Use as follows:
+
+<pre>
+UINT64_T key;
+void *value;
+
+ITABLE_ITERATE(table,key,value) {
+	printf("table contains: %lld\n",key);
+}
+
+</pre>
+*/
+
+#define ITABLE_ITERATE(table,key,value) itable_firstkey(table); while(itable_nextkey(table,&key,(void**)&value))
 
 #endif

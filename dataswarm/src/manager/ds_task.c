@@ -110,8 +110,7 @@ static struct list *ds_task_file_list_clone(struct list *list)
 	struct list *new = list_create();
 	struct ds_file *old_file, *new_file;
 
-	list_first_item(list);
-	while ((old_file = list_next_item(list))) {
+	LIST_ITERATE(list,old_file) {
 		new_file = ds_file_clone(old_file);
 		list_push_tail(new, new_file);
 	}
@@ -122,8 +121,8 @@ static struct list *ds_task_string_list_clone(struct list *string_list)
 {
 	struct list *new = list_create();
 	char *var;
-	list_first_item(string_list);
-	while((var=list_next_item(string_list))) {
+
+	LIST_ITERATE(string_list,var) {
 		list_push_tail(new, xxstrdup(var));
 	}
 
@@ -368,363 +367,142 @@ void ds_task_specify_feature(struct ds_task *t, const char *name)
 	list_push_tail(t->feature_list, xxstrdup(name));
 }
 
-int ds_task_specify_url(struct ds_task *t, const char *file_url, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
+/*
+Make sure that the various files added to the task do not conflict.
+Emit warnings if inconsistencies are detected, but keep going otherwise.
+*/
+
+void ds_task_check_consistency( struct ds_task *t )
 {
-	struct list *files;
-	struct ds_file *tf;
+	struct hash_table *table = hash_table_create(0,0);
+	struct ds_file *f;
 
-	if(!t || !file_url || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task, url, and remote name not allowed in specify_url.\n");
-		return 0;
-	}
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
+	/* Cannot have multiple input files mapped to the same remote name. */
 
-	if(type == DS_INPUT) {
-		files = t->input_files;
-
-		//check if two different urls map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(file_url, tf->source)) {
-				fprintf(stderr, "Error: input url %s conflicts with another input pointing to same remote name (%s).\n", file_url, remote_name);
-				return 0;
-			}
+	LIST_ITERATE(t->input_files,f) {
+		if(hash_table_lookup(table,f->remote_name)) {
+			fprintf(stderr,"warning: task %d has more than one input file named %s\n",t->taskid,f->remote_name);
+		} else {
+			hash_table_insert(table,f->remote_name,f->remote_name);
 		}
-		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: input url %s conflicts with an output pointing to same remote name (%s).\n", file_url, remote_name);
-				return 0;
-			}
+	}
+
+	hash_table_clear(table,0);
+
+	/* Cannot have multiple output files bring back the same file. */
+
+	LIST_ITERATE(t->output_files,f) {
+		if(f->type==DS_FILE && hash_table_lookup(table,f->source)) {
+			fprintf(stderr,"warning: task %d has more than one output file named %s\n",t->taskid,f->source);
+		} else {
+			hash_table_insert(table,f->remote_name,f->source);
 		}
+	}
+
+	hash_table_clear(table,0);
+	hash_table_delete(table);
+}
+
+static void ds_task_add_input( struct ds_task *t, struct ds_file *f )
+{
+	if(!t || !f || !f->source || !f->remote_name) {
+		fatal("%s: invalid null argument.",__func__);
+	}
+
+	if(f->remote_name[0] == '/') {
+		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,f->remote_name);
+	}
+
+	list_push_tail(t->input_files, f);
+}
+
+static void ds_task_add_output( struct ds_task *t, struct ds_file *f )
+{
+	if(!t || !f || !f->source || !f->remote_name) {
+		fatal("%s: invalid null argument.",__func__);
+	}
+
+	if(f->remote_name[0] == '/') {
+		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,f->remote_name);
+	}
+
+	list_push_tail(t->output_files, f);
+}
+
+void ds_task_specify_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
+{
+	struct ds_file *f = ds_file_create(local_name, remote_name, 0, 0, DS_FILE, flags);
+	if(type==DS_INPUT) {
+		ds_task_add_input(t,f);
 	} else {
-		fprintf(stderr, "Error: ds_specify_url does not yet support output files.\n");
-	  	return 0;
+		ds_task_add_output(t,f);
 	}
-
-	tf = ds_file_create(file_url, remote_name, DS_URL, flags);
-	if(!tf) return 0;
-
-	// length of source data is not known yet.
-	tf->length = 0;
-
-	list_push_tail(files, tf);
-
-	return 1;
 }
 
-int ds_task_specify_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
+void ds_task_specify_url(struct ds_task *t, const char *file_url, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
 {
-	struct list *files;
-	struct ds_file *tf;
-
-	if(!t || !local_name || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task, local name, and remote name not allowed in specify_file.\n");
-		return 0;
-	}
-
-	// @param remote_name is the path of the file as on the worker machine. In
-	// the dataswarm framework, workers are prohibited from writing to paths
-	// outside of their workspaces. When a task is specified, the workspace of
-	// the worker(the worker on which the task will be executed) is unlikely to
-	// be known. Thus @param remote_name should not be an absolute path.
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-
-	if(type == DS_INPUT) {
-		files = t->input_files;
-
-		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->source)){
-				fprintf(stderr, "Error: input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
+	struct ds_file *f = ds_file_create(file_url, remote_name, 0, 0, DS_URL, flags);
+	if(type==DS_INPUT) {
+		ds_task_add_input(t,f);
 	} else {
-		files = t->output_files;
-
-		//check if two different different remote names map to the same local name for outputs.
-		list_first_item(files);
-		while((tf = (struct ds_file*)list_next_item(files))) {
-			if(!strcmp(local_name, tf->source) && strcmp(remote_name, tf->remote_name)) {
-				fprintf(stderr, "Error: output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
+		fatal("%s: urls are not (yet) permitted as output files.",__func__);
 	}
-
-	tf = ds_file_create(local_name, remote_name, DS_FILE, flags);
-	if(!tf) return 0;
-
-	list_push_tail(files, tf);
-	return 1;
 }
 
-int ds_task_specify_empty_dir( struct ds_task *t, const char *remote_name ) {
-	struct list *files;
-	struct ds_file *tf;
-
-	if(!t || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task and remote name not allowed in specify_directory.\n");
-		return 0;
-	}
-
-	// @param remote_name is the path of the file as on the worker machine. In
-	// the Data Swarm framework, workers are prohibited from writing to paths
-	// outside of their workspaces. When a task is specified, the workspace of
-	// the worker(the worker on which the task will be executed) is unlikely to
-	// be known. Thus @param remote_name should not be an absolute path.
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-	files = t->input_files;
-
-	list_first_item(files);
-	while((tf = (struct ds_file*)list_next_item(files))) {
-		if(!strcmp(remote_name, tf->remote_name))
-		{	return 0;	}
-	}
-
-	tf = ds_file_create("unused", remote_name, DS_EMPTY_DIR, 0);
-	if(!tf) return 0;
-
-	list_push_tail(files, tf);
-	return 1;
-
-}
-
-int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, ds_file_type_t type, ds_file_flags_t flags)
+void ds_task_specify_empty_dir( struct ds_task *t, const char *remote_name )
 {
-	struct list *files;
-	struct ds_file *tf;
-	if(!t || !local_name || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task, local name, and remote name not allowed in specify_file_piece.\n");
-		return 0;
-	}
+	struct ds_file *f = ds_file_create("unused", remote_name, 0, 0, DS_EMPTY_DIR, 0);
+	ds_task_add_input(t,f);
+}
 
-	// @param remote_name should not be an absolute path. @see
-	// ds_task_specify_file
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
+void ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, ds_file_type_t type, ds_file_flags_t flags)
+{
 	if(end_byte < start_byte) {
-		fprintf(stderr, "Error: End byte lower than start byte for %s.\n", remote_name);
-		return 0;
+		fatal("%s: end byte lower than start byte for %s.\n",__func__,remote_name);
 	}
 
-	if(type == DS_INPUT) {
-		files = t->input_files;
+	struct ds_file *f = ds_file_create(local_name, remote_name, 0, 0, DS_FILE_PIECE, flags);
 
-		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(local_name, tf->source)){
-				fprintf(stderr, "Error: piece of input file %s conflicts with another input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
+	f->offset = start_byte;
+	f->piece_length = end_byte - start_byte + 1;
 
-		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: piece of input file %s conflicts with an output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
+	if(type==DS_INPUT) {
+		ds_task_add_input(t,f);
 	} else {
-		files = t->output_files;
-
-		//check if two different different remote names map to the same local name for outputs.
-		list_first_item(files);
-		while((tf = (struct ds_file*)list_next_item(files))) {
-			if(!strcmp(local_name, tf->source) && strcmp(remote_name, tf->remote_name)) {
-				fprintf(stderr, "Error: piece of output file %s conflicts with another output pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an input file with the same remote name.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)){
-				fprintf(stderr, "Error: piece of output file %s conflicts with an input pointing to same remote name (%s).\n", local_name, remote_name);
-				return 0;
-			}
-		}
+		fatal("%s: file pieces are not (yet) permitted as output files.",__func__);
 	}
-
-	tf = ds_file_create(local_name, remote_name, DS_FILE_PIECE, flags);
-	if(!tf) return 0;
-
-	tf->offset = start_byte;
-	tf->piece_length = end_byte - start_byte + 1;
-
-	list_push_tail(files, tf);
-	return 1;
 }
 
-int ds_task_specify_input_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags)
+void ds_task_specify_input_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags)
 {
-	struct ds_file *tf;
-	if(!t || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task and remote name not allowed in specify_buffer.\n");
-		return 0;
-	}
-
-	// @param remote_name should not be an absolute path. @see
-	// ds_task_specify_file
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-	list_first_item(t->input_files);
-	while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-		if(!strcmp(remote_name, tf->remote_name)) {
-			fprintf(stderr, "Error: buffer conflicts with another input pointing to same remote name (%s).\n", remote_name);
-			return 0;
-		}
-	}
-
-	list_first_item(t->output_files);
-	while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-		if(!strcmp(remote_name, tf->remote_name)) {
-			fprintf(stderr, "Error: buffer conflicts with an output pointing to same remote name (%s).\n", remote_name);
-			return 0;
-		}
-	}
-
-	tf = ds_file_create(NULL, remote_name, DS_BUFFER, flags);
-	if(!tf) return 0;
-
-	tf->source = malloc(length);
-	if(!tf->source) {
-		fprintf(stderr, "Error: failed to allocate memory for buffer with remote name %s and length %d bytes.\n", remote_name, length);
-		return 0;
-	}
-
-	tf->length  = length;
-
-	memcpy(tf->source, data, length);
-	list_push_tail(t->input_files, tf);
-
-	return 1;
+	struct ds_file *f = ds_file_create("unnamed", remote_name, data, length, DS_BUFFER, flags);
+	ds_task_add_input(t,f);
 }
 
-int ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, const char *remote_name, ds_file_flags_t flags)
+void ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, const char *remote_name, ds_file_flags_t flags)
 {
-	struct ds_file *tf;
-
-	if(!t || !buffer_name || !remote_name) {
-		fprintf(stderr, "Error: Null arguments for task and remote name not allowed in specify_buffer.\n");
-		return 0;
-	}
-
-	// @param remote_name should not be an absolute path. @see
-	// ds_task_specify_file
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-	tf = ds_file_create(buffer_name, remote_name, DS_BUFFER, flags);
-	if(!tf) return 0;
-
-	list_push_tail(t->output_files, tf);
-
-	return 1;
+	struct ds_file *f = ds_file_create(buffer_name, remote_name, 0, 0, DS_BUFFER, flags);
+	ds_task_add_output(t,f);
 }
 
-int ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
+void ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags)
 {
-	struct list *files;
-	struct ds_file *tf;
-	if(!t || !remote_name || !cmd) {
-		fprintf(stderr, "Error: Null arguments for task, remote name, and command not allowed in specify_file_command.\n");
-		return 0;
-	}
-
-	// @param remote_name should not be an absolute path. @see
-	// ds_task_specify_file
-	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-	}
-
-	if(type == DS_INPUT) {
-		files = t->input_files;
-
-		//check if two different local names map to the same remote name for inputs.
-		list_first_item(t->input_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name) && strcmp(cmd, tf->source)){
-				fprintf(stderr, "Error: input file command %s conflicts with another input pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;
-			}
-		}
-
-		//check if there is an output file with the same remote name.
-		list_first_item(t->output_files);
-		while((tf = (struct ds_file*)list_next_item(t->input_files))) {
-			if(!strcmp(remote_name, tf->remote_name)) {
-				fprintf(stderr, "Error: input file command %s conflicts with an output pointing to same remote name (%s).\n", cmd, remote_name);
-				return 0;
-			}
-		}
-	} else {
-		fprintf(stderr, "Error: ds_specify_file_command does not yet support output files.\n");
-	  	return 0;
-	}
-
 	if(strstr(cmd, "%%") == NULL) {
-		fatal("command to transfer file does not contain %%%% specifier: %s", cmd);
+		fatal("%s: command to transfer file does not contain %%%% specifier: %s", __func__, cmd);
 	}
 
-	tf = ds_file_create(cmd, remote_name, DS_COMMAND, flags);
-	if(!tf) return 0;
-
-	// length of source data is not known yet.
-	tf->length = 0;
-
-	list_push_tail(files, tf);
-
-	return 1;
+	struct ds_file *f = ds_file_create(cmd, remote_name, 0, 0, DS_COMMAND, flags);
+	ds_task_add_input(t,f);
 }
 
-int ds_task_specify_snapshot_file(struct ds_task *t, const char *monitor_snapshot_file) {
+void ds_task_specify_snapshot_file(struct ds_task *t, const char *monitor_snapshot_file) {
 
 	assert(monitor_snapshot_file);
 
 	free(t->monitor_snapshot_file);
 	t->monitor_snapshot_file = xxstrdup(monitor_snapshot_file);
 
-	return ds_task_specify_file(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, DS_INPUT, DS_CACHE);
-
+	ds_task_specify_file(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, DS_INPUT, DS_CACHE);
 }
 
 void ds_task_specify_algorithm(struct ds_task *t, ds_schedule_t algorithm)
@@ -814,8 +592,7 @@ static struct ds_file * find_output_buffer( struct ds_task *t, const char *name 
 {
 	struct ds_file *f;
 
-	list_first_item(t->output_files);
-	while((f = (struct ds_file*)list_next_item(t->output_files))) {
+	LIST_ITERATE(t->output_files,f) {
 		if(f->type==DS_BUFFER && !strcmp(f->source,name)) {
 			return f;
 		}

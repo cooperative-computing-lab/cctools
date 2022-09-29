@@ -361,7 +361,7 @@ static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct d
 		debug(D_DS, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + ds_manager_transfer_wait_time(q, w, t, f->length);
 		ds_manager_send(q,w, "file %s %d %o\n",f->cached_name, f->length, 0777 );
-		actual = link_putlstring(w->link, f->source, f->length, stoptime);
+		actual = link_putlstring(w->link, f->data, f->length, stoptime);
 		if(actual!=f->length) {
 			result = DS_WORKER_FAILURE;
 		}

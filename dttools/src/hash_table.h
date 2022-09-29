@@ -18,6 +18,7 @@ h = hash_table_create(0,0);
 FILE * file = fopen(pathname,"r");
 
 hash_table_insert(h,pathname,file);
+file = hash_table_lookup(h,pathname);
 file = hash_table_remove(h,pathname);
 
 </pre>
@@ -28,13 +29,11 @@ To list all of the items in a hash table, use @ref hash_table_firstkey and @ref 
 char *key;
 void *value;
 
-hash_table_firstkey(h);
-
-while(hash_table_nextkey(h,&key,&value)) {
+hash_table_firstkey(table);
+while(hash_table_nextkey(&key,&value)) {
 	printf("table contains: %s\n",key);
 }
 </pre>
-
 */
 
 /** The type signature for a hash function given to @ref hash_table_create */
@@ -124,5 +123,21 @@ int hash_table_nextkey(struct hash_table *h, char **key, void **value);
 */
 
 unsigned hash_string(const char *s);
+
+/** Utility macro to simplify common case of iterating over a hash table.
+Use as follows:
+
+<pre>
+char *key;
+void *value;
+
+HASH_TABLE_ITERATE(table,key,value) {
+	printf("table contains: %s\n",key);
+}
+
+</pre>
+*/
+
+#define HASH_TABLE_ITERATE( table, key, value ) hash_table_firstkey(table); while(hash_table_nextkey(table,&key,(void**)&value))
 
 #endif

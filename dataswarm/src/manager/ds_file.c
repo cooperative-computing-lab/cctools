@@ -42,18 +42,18 @@ char *make_cached_name( const struct ds_file *f )
 	static unsigned int file_count = 0;
 	file_count++;
 
-	/* Default of source is remote name (needed only for directories) */
-	char *source = f->source ? f->source : f->remote_name;
-
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	char source_enc[PATH_MAX];
 
 	if(f->type == DS_BUFFER) {
-		//dummy digest for buffers
-		md5_buffer("buffer", 6, digest);
+		if(f->data) {
+			md5_buffer(f->data, f->length, digest);
+		} else {
+			md5_buffer("buffer", 6, digest );
+		}
 	} else {
-		md5_buffer(source,strlen(source),digest);
-		url_encode(path_basename(source), source_enc, PATH_MAX);
+		md5_buffer(f->source,strlen(f->source),digest);
+		url_encode(path_basename(f->source), source_enc, PATH_MAX);
 	}
 
 	/* 0 for cache files, file_count for non-cache files. With this, non-cache
@@ -87,26 +87,25 @@ char *make_cached_name( const struct ds_file *f )
 
 /* Create a new file object with the given properties. */
 
-struct ds_file *ds_file_create(const char *source, const char *remote_name, ds_file_t type, ds_file_flags_t flags)
+struct ds_file *ds_file_create(const char *source, const char *remote_name, const char *data, int length, ds_file_t type, ds_file_flags_t flags)
 {
 	struct ds_file *f;
 
-	f = malloc(sizeof(*f));
-	if(!f) {
-		debug(D_NOTICE, "Cannot allocate memory for file %s.\n", remote_name);
-		return NULL;
-	}
+	f = xxmalloc(sizeof(*f));
 
 	memset(f, 0, sizeof(*f));
 
+	f->source = xxstrdup(source);
 	f->remote_name = xxstrdup(remote_name);
 	f->type = type;
 	f->flags = flags;
+	f->length = length;
 
-	/* DS_BUFFER needs to set these after the current function returns */
-	if(source) {
-		f->source = xxstrdup(source);
-		f->length  = strlen(source);
+	if(data) {
+		f->data = malloc(length);
+		memcpy(f->data,data,length);
+	} else {
+		f->data = 0;
 	}
 
 	if(ds_hack_do_not_compute_cached_name) {
@@ -115,8 +114,6 @@ struct ds_file *ds_file_create(const char *source, const char *remote_name, ds_f
 		f->cached_name = make_cached_name(f);
 	}
 
-	f->data = 0;
-	
 	return f;
 }
 
@@ -124,15 +121,7 @@ struct ds_file *ds_file_create(const char *source, const char *remote_name, ds_f
 
 struct ds_file *ds_file_clone(const struct ds_file *f )
 {
-	struct ds_file *nf = ds_file_create(f->source,f->remote_name,f->type,f->flags);
-
-	if(f->data) {
-		nf->data = malloc(f->length);
-		nf->length = f->length;
-		memcpy(nf->data,f->data,f->length);
-	}
-
-	return nf;
+	return ds_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags);
 }
 
 /* Delete a file object */

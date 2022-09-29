@@ -282,9 +282,8 @@ void ds_task_specify_coprocess( struct ds_task *t, const char *name );
 - @ref DS_WATCH indicates that the worker will watch the output file as it is created, and incrementally return the file to the manager as the task runs (The frequency of these updates is entirely dependent upon the system load.  If the manager is busy interacting with many workers, output updates will be less frequent.)
 - @ref DS_FAILURE_ONLY indicates the file should only be returned if the task fails.
 - @ref DS_SUCCESS_ONLY indicates the file should only be returned if the task succeeds.
-@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
-int ds_task_specify_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
+void ds_task_specify_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
 
 /** Add a url as an input for a task.
 @param t A task object.
@@ -292,9 +291,8 @@ int ds_task_specify_file(struct ds_task *t, const char *local_name, const char *
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 @param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
 @param flags May be zero or more @ref ds_file_flags_t logical-ored together. See @ref ds_task_specify_file.
-@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
-int ds_task_specify_url(struct ds_task *t, const char *url, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
+void ds_task_specify_url(struct ds_task *t, const char *url, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
 
 /** Add a shell command to produce an input file for a task.
 @param t A task object.
@@ -303,9 +301,8 @@ For example, the command "grep frog /usr/dict/words > %%" would produce a file b
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 @param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
 @param flags May be zero or more @ref ds_file_flags_t logical-ored together. See @ref ds_task_specify_file.
-@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
-int ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
+void ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
 
 /** Add a piece of a file to a task.
 @param t A task object.
@@ -315,9 +312,8 @@ int ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char 
 @param end_byte The ending byte offset of the file piece to be transferred.
 @param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
 @param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
-@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
-int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, ds_file_type_t type, ds_file_flags_t flags);
+void ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, ds_file_type_t type, ds_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
@@ -325,19 +321,17 @@ int ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const 
 @param length The length of the buffer, in bytes
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 @param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
-@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
 
-int ds_task_specify_input_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags);
+void ds_task_specify_input_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags);
 
 /** Add an output buffer to a task.
 @param t A task object.
 @param data The logical name of the buffer, to be used with @ref ds_task_get_output_buffer.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 @param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
-@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
-int ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, const char *remote_name, ds_file_flags_t flags);
+void ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, const char *remote_name, ds_file_flags_t flags);
 
 /** Add an empty directory to a task.
 This is very occasionally needed for applications that expect
@@ -347,9 +341,8 @@ a directory in its working sandbox.  If you want to transfer an
 entire directory worth of data to a task, use @ref ds_task_specify_file and simply give a directory name.
 @param t A task object.
 @param remote_name The name of the empty directory in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@return 1 if the arguments were valid and the file was added to the task; 0 if any of the arguments were invalid.
 */
-int ds_task_specify_empty_dir( struct ds_task *t, const char *remote_name );
+void ds_task_specify_empty_dir( struct ds_task *t, const char *remote_name );
 
 /** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result DS_RESULT_MAX_RETRIES.
 @param t A task object.
@@ -633,10 +626,9 @@ For more information, consult the manual of the resource_monitor.
 
 @param t A ds_task object.
 @param monitor_snapshot_file A filename.
-@return 1 if the task file is successfully specified, 0 if either of @a t, or @a monitor_snapshot_file is null.
 */
 
-int ds_task_specify_snapshot_file(struct ds_task *t, const char *monitor_snapshot_file);
+void ds_task_specify_snapshot_file(struct ds_task *t, const char *monitor_snapshot_file);
 
 //@}
 

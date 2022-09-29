@@ -397,4 +397,18 @@ int list_iterate_reverse(struct list *list, list_op_t op, const void *arg);
 */
 struct list *list_sort(struct list *list, int (*comparator) (const void *, const void *));
 
+/** Macro to iterate over a list in the most common case.
+Note that a statement or code block must follow the macro, like this:
+
+<pre>
+char *s;
+
+LIST_ITERATE( list, s ) {
+	printf("%s\n",s);
+}
+</pre>
+*/
+
+#define LIST_ITERATE( list, item ) list_first_item(list); while((item=list_next_item(list)))
+
 #endif

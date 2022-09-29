@@ -33,10 +33,10 @@ struct ds_file {
 	char *source;		// Name of source file, url, buffer, or literal data if an input buffer.
 	char *remote_name;	// Name of file as it appears to the task.
 	char *cached_name;	// Name of file in the worker's cache directory.
-	char *data;		// Raw data if an output buffer.
+	char *data;		// Raw data for an input or output buffer.
 };
 
-struct ds_file * ds_file_create( const char *source, const char *remote_name, ds_file_t type, ds_file_flags_t flags );
+struct ds_file * ds_file_create( const char *source, const char *remote_name, const char *data, int length, ds_file_t type, ds_file_flags_t flags );
 struct ds_file *ds_file_clone( const struct ds_file *file );
 void ds_file_delete( struct ds_file *f );
 

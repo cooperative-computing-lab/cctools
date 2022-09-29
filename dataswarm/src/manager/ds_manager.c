@@ -139,8 +139,7 @@ static int count_workers( struct ds_manager *q, ds_worker_type_t type )
 
 	int count = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table,id,w) {
 		if(w->type & type) {
 			count++;
 		}
@@ -169,8 +168,7 @@ int ds_manager_available_workers(struct ds_manager *q) {
 	char* id;
 	int available_workers = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table,id,w) {
 		if(strcmp(w->hostname, "unknown") != 0) {
 			if(overcommitted_resource_total(q, w->resources->cores.total) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total) > w->resources->memory.inuse){
 				available_workers++;
@@ -188,8 +186,7 @@ static int workers_with_tasks(struct ds_manager *q) {
 	char* id;
 	int workers_with_tasks = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table,id,w) {
 		if(strcmp(w->hostname, "unknown")){
 			if(itable_size(w->current_tasks)){
 				workers_with_tasks++;
@@ -542,9 +539,8 @@ static int factory_trim_workers(struct ds_manager *q, struct ds_factory_info *f)
 	int trimmed_workers = 0;
 
 	struct hash_table *idle_workers = hash_table_create(0, 0);
-	hash_table_firstkey(q->worker_table);
-	while ( f->connected_workers - trimmed_workers > f->max_workers &&
-			hash_table_nextkey(q->worker_table, &key, (void **) &w) ) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
+		if( f->connected_workers - trimmed_workers <= f->max_workers ) break;
 		if ( w->factory_name &&
 				!strcmp(f->name, w->factory_name) &&
 				itable_size(w->current_tasks) < 1 ) {
@@ -553,8 +549,7 @@ static int factory_trim_workers(struct ds_manager *q, struct ds_factory_info *f)
 		}
 	}
 
-	hash_table_firstkey(idle_workers);
-	while (hash_table_nextkey(idle_workers, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(idle_workers,key,w) {
 		hash_table_remove(idle_workers, key);
 		hash_table_firstkey(idle_workers);
 		shut_down_worker(q, w);
@@ -610,8 +605,7 @@ static void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 	struct ds_factory_info *f = NULL;
 	buffer_putfstring(&filter, "type == \"ds_factory\" && (");
 
-	hash_table_firstkey(q->factory_table);
-	while ( hash_table_nextkey(q->factory_table, &factory_name, (void **)&f) ) {
+	HASH_TABLE_ITERATE(q->factory_table,factory_name,f) {
 		buffer_putfstring(&filter, "%sfactory_name == \"%s\"", first_name ? "" : " || ", factory_name);
 		first_name = 0;
 		f->seen_at_catalog = 0;
@@ -635,8 +629,7 @@ static void update_read_catalog_factory(struct ds_manager *q, time_t stoptime) {
 
 	// Remove outdated factories
 	struct list *outdated_factories = list_create();
-	hash_table_firstkey(q->factory_table);
-	while ( hash_table_nextkey(q->factory_table, &factory_name, (void **) &f) ) {
+	HASH_TABLE_ITERATE(q->factory_table,factory_name,f) {
 		if ( !f->seen_at_catalog && f->connected_workers < 1 ) {
 			list_push_tail(outdated_factories, f);
 		}
@@ -708,22 +701,15 @@ static void update_catalog(struct ds_manager *q, int force_update )
 
 static void cleanup_worker(struct ds_manager *q, struct ds_worker_info *w)
 {
-	char *key, *value;
 	struct ds_task *t;
 	struct rmsummary *r;
 	uint64_t taskid;
 
 	if(!q || !w) return;
 
-	hash_table_firstkey(w->current_files);
-	while(hash_table_nextkey(w->current_files, &key, (void **) &value)) {
-		hash_table_remove(w->current_files, key);
-		free(value);
-		hash_table_firstkey(w->current_files);
-	}
+	hash_table_clear(w->current_files,(void*)ds_remote_file_info_delete);
 
-	itable_firstkey(w->current_tasks);
-	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
+	ITABLE_ITERATE(w->current_tasks,taskid,t) {
 		if (t->time_when_commit_end >= t->time_when_commit_start) {
 			timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
 			t->time_workers_execute_failure += delta_time;
@@ -736,13 +722,13 @@ static void cleanup_worker(struct ds_manager *q, struct ds_worker_info *w)
 		itable_firstkey(w->current_tasks);
 	}
 
-	itable_firstkey(w->current_tasks_boxes);
-	while(itable_nextkey(w->current_tasks_boxes, &taskid, (void **) &r)) {
+	ITABLE_ITERATE(w->current_tasks_boxes,taskid,r) {
 		rmsummary_delete(r);
 	}
 
 	itable_clear(w->current_tasks);
 	itable_clear(w->current_tasks_boxes);
+
 	w->finished_tasks = 0;
 }
 
@@ -1573,8 +1559,7 @@ static struct rmsummary  *total_resources_needed(struct ds_manager *q) {
 	struct rmsummary *total = rmsummary_create(0);
 
 	/* for waiting tasks, we use what they would request if dispatched right now. */
-	list_first_item(q->ready_list);
-	while((t = list_next_item(q->ready_list))) {
+	LIST_ITERATE(q->ready_list,t) {
 		const struct rmsummary *s = ds_manager_task_min_resources(q, t);
 		rmsummary_add(total, s);
 	}
@@ -1582,9 +1567,8 @@ static struct rmsummary  *total_resources_needed(struct ds_manager *q) {
 	/* for running tasks, we use what they have been allocated already. */
 	char *key;
 	struct ds_worker_info *w;
-	hash_table_firstkey(q->worker_table);
 
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		if(w->resources->tag < 0) {
 			continue;
 		}
@@ -1610,8 +1594,7 @@ static const struct rmsummary *largest_seen_resources(struct ds_manager *q, cons
 		c = ds_category_lookup_or_create(q, category);
 		return c->max_allocation;
 	} else {
-		hash_table_firstkey(q->categories);
-		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
+		HASH_TABLE_ITERATE(q->categories,key,c) {
 			rmsummary_merge_max(q->max_task_resources_requested, c->max_allocation);
 		}
 		return q->max_task_resources_requested;
@@ -1646,8 +1629,8 @@ static int count_workers_for_waiting_tasks(struct ds_manager *q, const struct rm
 
 	char *key;
 	struct ds_worker_info *w;
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		count += check_worker_fit(w, s);
 	}
 
@@ -1780,13 +1763,14 @@ static struct jx * category_to_jx(struct ds_manager *q, const char *category) {
 
 /* Convert all resource categories into a JX record. */
 
-static struct jx *categories_to_jx(struct ds_manager *q) {
+static struct jx *categories_to_jx(struct ds_manager *q)
+{
 	struct jx *a = jx_array(0);
 
 	struct category *c;
 	char *category_name;
-	hash_table_firstkey(q->categories);
-	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
+
+	HASH_TABLE_ITERATE(q->categories,category_name,c) {
 		struct jx *j = category_to_jx(q, category_name);
 		if(j) {
 			jx_array_insert(a, j);
@@ -2080,8 +2064,7 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 		struct ds_task *t;
 		uint64_t taskid;
 
-		itable_firstkey(q->tasks);
-		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
+		ITABLE_ITERATE(q->tasks,taskid,t) {
 			struct jx *j = ds_task_to_jx(q,t);
 			if(j) jx_array_insert(a, j);
 		}
@@ -2090,8 +2073,7 @@ static struct jx *construct_status_message( struct ds_manager *q, const char *re
 		struct jx *j;
 		char *key;
 
-		hash_table_firstkey(q->worker_table);
-		while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+		HASH_TABLE_ITERATE(q->worker_table,key,w) {
 			// If the worker has not been initialized, ignore it.
 			if(!strcmp(w->hostname, "unknown")) continue;
 			j = ds_worker_to_jx(w);
@@ -2292,8 +2274,7 @@ static int build_poll_table(struct ds_manager *q )
 	n = 1;
 
 	// For every worker in the hash table, add an item to the poll table
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		// If poll table is not large enough, reallocate it
 		if(n >= q->poll_table_size) {
 			q->poll_table_size *= 2;
@@ -2573,8 +2554,7 @@ static void count_worker_resources(struct ds_manager *q, struct ds_worker_info *
 		return;
 	}
 
-	itable_firstkey(w->current_tasks_boxes);
-	while(itable_nextkey(w->current_tasks_boxes, &taskid, (void **)& box)) {
+	ITABLE_ITERATE(w->current_tasks_boxes,taskid,box) {
 		w->resources->cores.inuse     += box->cores;
 		w->resources->memory.inuse    += box->memory;
 		w->resources->disk.inuse      += box->disk;
@@ -2617,8 +2597,8 @@ static void find_max_worker(struct ds_manager *q) {
 
 	char *key;
 	struct ds_worker_info *w;
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		if(w->resources->workers.total > 0)
 		{
 			update_max_worker(q, w);
@@ -2734,8 +2714,7 @@ static int receive_one_task( struct ds_manager *q )
 	struct ds_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks,taskid,t) {
 		if( t->state==DS_TASK_WAITING_RETRIEVAL ) {
 			struct ds_worker_info *w = t->worker;
 			fetch_output_from_worker(q, w, taskid);
@@ -2765,8 +2744,8 @@ static void ask_for_workers_updates(struct ds_manager *q) {
 	char *key;
 	timestamp_t current_time = timestamp_get();
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
+
 		if(q->keepalive_interval > 0) {
 
 			/* we have not received dataswarm message from worker yet, so we
@@ -2827,8 +2806,8 @@ static int abort_slow_workers(struct ds_manager *q)
 	/* optimization. If no category has a fast abort multiplier, simply return. */
 	int fast_abort_flag = 0;
 
-	hash_table_firstkey(q->categories);
-	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
+	HASH_TABLE_ITERATE(q->categories,category_name,c) {
+
 		struct ds_stats *stats = c->ds_stats;
 		if(!stats) {
 			/* no stats have been computed yet */
@@ -2853,8 +2832,8 @@ static int abort_slow_workers(struct ds_manager *q)
 
 	timestamp_t current = timestamp_get();
 
-	itable_firstkey(q->tasks);
-	while(itable_nextkey(q->tasks, &taskid, (void **) &t)) {
+	ITABLE_ITERATE(q->tasks,taskid,t) {
+
 		c = ds_category_lookup_or_create(q, t->category);
 		/* Fast abort deactivated for this category */
 		if(c->fast_abort == 0)
@@ -2933,8 +2912,7 @@ static int abort_drained_workers(struct ds_manager *q) {
 
 	int removed = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &worker_hashkey, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table,worker_hashkey,w) {
 		if(w->draining && itable_size(w->current_tasks) == 0) {
 			removed++;
 			shut_down_worker(q, w);
@@ -2997,8 +2975,7 @@ static struct ds_task *find_task_by_tag(struct ds_manager *q, const char *taskta
 	struct ds_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while(itable_nextkey(q->tasks, &taskid, (void**)&t)) {
+	ITABLE_ITERATE(q->tasks,taskid,t) {
 		if( tasktag_comparator(t, tasktag) ) {
 			return t;
 		}
@@ -3013,31 +2990,29 @@ Search for workers with that file, cancel any tasks using that
 file, and then remove it.
 */
 
-static void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filename) {
+static void ds_invalidate_cached_file_internal(struct ds_manager *q, const char *filename)
+{
 	char *key;
 	struct ds_worker_info *w;
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
+
 		if(!hash_table_lookup(w->current_files, filename))
 			continue;
 
 		struct ds_task *t;
 		uint64_t taskid;
+		ITABLE_ITERATE(w->current_tasks,taskid,t) {
 
-		itable_firstkey(w->current_tasks);
-		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
-			struct ds_file *tf;
-			list_first_item(t->input_files);
-
-			while((tf = list_next_item(t->input_files))) {
-				if(strcmp(filename, tf->cached_name) == 0) {
+			struct ds_file *f;
+			LIST_ITERATE(t->input_files,f) {
+				if(strcmp(filename, f->cached_name) == 0) {
 					cancel_task_on_worker(q, t, DS_TASK_READY);
 					continue;
 				}
 			}
 
-			while((tf = list_next_item(t->output_files))) {
-				if(strcmp(filename, tf->cached_name) == 0) {
+			LIST_ITERATE(t->output_files,f) {
+				if(strcmp(filename, f->cached_name) == 0) {
 					cancel_task_on_worker(q, t, DS_TASK_READY);
 					continue;
 				}
@@ -3049,7 +3024,7 @@ static void ds_invalidate_cached_file_internal(struct ds_manager *q, const char 
 }
 
 void ds_invalidate_cached_file(struct ds_manager *q, const char *local_name, ds_file_t type) {
-	struct ds_file *f = ds_file_create(local_name, local_name, type, DS_CACHE);
+	struct ds_file *f = ds_file_create(local_name, local_name, 0, 0, type, DS_CACHE);
 	ds_invalidate_cached_file_internal(q, f->cached_name);
 	ds_file_delete(f);
 }
@@ -3390,8 +3365,7 @@ void ds_delete(struct ds_manager *q)
 
 	char *key;
 	struct category *c;
-	hash_table_firstkey(q->categories);
-	while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
+	HASH_TABLE_ITERATE(q->categories,key,c) {
 		category_delete(q->categories, key);
 	}
 	hash_table_delete(q->categories);
@@ -3716,24 +3690,22 @@ const char *ds_result_string(ds_result_t result) {
 	return str;
 }
 
-static struct ds_task *task_state_any(struct ds_manager *q, ds_task_state_t state) {
+static struct ds_task *task_state_any(struct ds_manager *q, ds_task_state_t state)
+{
 	struct ds_task *t;
 	uint64_t taskid;
-
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks,taskid,t) {
 		if( t->state==state ) return t;
 	}
 
 	return NULL;
 }
 
-static struct ds_task *task_state_any_with_tag(struct ds_manager *q, ds_task_state_t state, const char *tag) {
+static struct ds_task *task_state_any_with_tag(struct ds_manager *q, ds_task_state_t state, const char *tag)
+{
 	struct ds_task *t;
 	uint64_t taskid;
-
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks,taskid,t) {
 		if( t->state==state && tasktag_comparator((void *) t, (void *) tag)) {
 			return t;
 		}
@@ -3742,14 +3714,12 @@ static struct ds_task *task_state_any_with_tag(struct ds_manager *q, ds_task_sta
 	return NULL;
 }
 
-static int task_state_count(struct ds_manager *q, const char *category, ds_task_state_t state) {
+static int task_state_count(struct ds_manager *q, const char *category, ds_task_state_t state)
+{
 	struct ds_task *t;
 	uint64_t taskid;
-
 	int count = 0;
-
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks,taskid,t) {
 		if( t->state==state ) {
 			if(!category || strcmp(category, t->category) == 0) {
 				count++;
@@ -3760,14 +3730,14 @@ static int task_state_count(struct ds_manager *q, const char *category, ds_task_
 	return count;
 }
 
-static int task_request_count( struct ds_manager *q, const char *category, category_allocation_t request) {
+static int task_request_count( struct ds_manager *q, const char *category, category_allocation_t request)
+{
 	struct ds_task *t;
 	uint64_t taskid;
 
 	int count = 0;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks,taskid,t) {
 		if(t->resource_request == request) {
 			if(!category || strcmp(category, t->category) == 0) {
 				count++;
@@ -3814,6 +3784,9 @@ int ds_submit(struct ds_manager *q, struct ds_task *t)
 
 	//Increment taskid. So we get a unique taskid for every submit.
 	q->next_taskid++;
+
+	/* Issue warnings if the files are set up strangely. */
+	ds_task_check_consistency(t);
 
 	return ds_submit_internal(q, t);
 }
@@ -3939,8 +3912,7 @@ static int poll_active_workers(struct ds_manager *q, int stoptime )
 	if(hash_table_size(q->workers_with_available_results) > 0) {
 		char *key;
 		struct ds_worker_info *w;
-		hash_table_firstkey(q->workers_with_available_results);
-		while(hash_table_nextkey(q->workers_with_available_results,&key,(void**)&w)) {
+		HASH_TABLE_ITERATE(q->workers_with_available_results,key,w) {
 			get_available_results(q, w);
 			hash_table_remove(q->workers_with_available_results, key);
 			hash_table_firstkey(q->workers_with_available_results);
@@ -4260,8 +4232,8 @@ int ds_shut_down_workers(struct ds_manager *q, int n)
 		return -1;
 
 	// send worker the "exit" msg
-	hash_table_firstkey(q->worker_table);
-	while(i < n && hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
+		if(i>=n) break;
 		if(itable_size(w->current_tasks) == 0) {
 			shut_down_worker(q, w);
 
@@ -4283,8 +4255,7 @@ int ds_specify_draining_by_hostname(struct ds_manager *q, const char *hostname, 
 
 	int workers_updated = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &worker_hashkey, (void *) w)) {
+	HASH_TABLE_ITERATE(q->worker_table,worker_hashkey,w) {
 		if (!strcmp(w->hostname, hostname)) {
 			w->draining = drain_flag;
 			workers_updated++;
@@ -4337,32 +4308,24 @@ struct ds_task *ds_cancel_by_tasktag(struct ds_manager *q, const char* tasktag) 
 	return NULL;
 }
 
-struct list * ds_cancel_all_tasks(struct ds_manager *q) {
+struct list * ds_cancel_all_tasks(struct ds_manager *q)
+{
 	struct list *l = list_create();
 	struct ds_task *t;
 	struct ds_worker_info *w;
 	uint64_t taskid;
 	char *key;
 
-	itable_firstkey(q->tasks);
-	while(itable_nextkey(q->tasks, &taskid, (void**)&t)) {
+	ITABLE_ITERATE(q->tasks,taskid,t) {
 		list_push_tail(l, t);
 		ds_cancel_by_taskid(q, taskid);
 	}
 
-	hash_table_firstkey(q->workers_with_available_results);
-	while(hash_table_nextkey(q->workers_with_available_results, &key, (void **) &w)) {
-		hash_table_remove(q->workers_with_available_results, key);
-		hash_table_firstkey(q->workers_with_available_results);
-	}
+	hash_table_clear(q->workers_with_available_results,0);
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		ds_manager_send(q,w,"kill -1\n");
-
-		itable_firstkey(w->current_tasks);
-		while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+		ITABLE_ITERATE(w->current_tasks,taskid,t) {
 			//Delete any input files that are not to be cached.
 			delete_worker_files(q, w, t->input_files, DS_CACHE );
 
@@ -4384,8 +4347,7 @@ static void release_all_workers(struct ds_manager *q) {
 
 	if(!q) return;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		release_worker(q, w);
 		hash_table_firstkey(q->worker_table);
 	}
@@ -4396,8 +4358,7 @@ int ds_empty(struct ds_manager *q)
 	struct ds_task *t;
 	uint64_t taskid;
 
-	itable_firstkey(q->tasks);
-	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+	ITABLE_ITERATE(q->tasks,taskid,t) {
 		int state = ds_task_state(q, taskid);
 
 		if( state == DS_TASK_READY   )           return 0;
@@ -4529,8 +4490,7 @@ void ds_get_stats(struct ds_manager *q, struct ds_stats *s)
 		char *key;
 		struct ds_worker_info *w;
 		s->tasks_running = 0;
-		hash_table_firstkey(q->worker_table);
-		while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		HASH_TABLE_ITERATE(q->worker_table,key,w) {
 			accumulate_stat(s, w->stats, tasks_running);
 		}
 		/* (see ds_get_stats_hierarchy for an explanation on the
@@ -4578,8 +4538,7 @@ void ds_get_stats_hierarchy(struct ds_manager *q, struct ds_stats *s)
 	s->tasks_running = 0;
 	s->workers_connected = 0;
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		accumulate_stat(s, w->stats, tasks_waiting);
 		accumulate_stat(s, w->stats, tasks_running);
 	}
@@ -4657,8 +4616,7 @@ static void aggregate_workers_resources( struct ds_manager *q, struct ds_resourc
 		hash_table_clear(features,0);
 	}
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		if(w->resources->tag < 0)
 			continue;
 
@@ -4668,8 +4626,7 @@ static void aggregate_workers_resources( struct ds_manager *q, struct ds_resourc
 			if(w->features) {
 				char *key;
 				void *dummy;
-				hash_table_firstkey(w->features);
-				while(hash_table_nextkey(w->features, &key, &dummy)) {
+				HASH_TABLE_ITERATE(w->features,key,dummy) {
 					hash_table_insert(features, key, (void **) 1);
 				}
 			}
