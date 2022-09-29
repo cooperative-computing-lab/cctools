@@ -106,7 +106,7 @@ config_zlib_path=yes
 # auto -> include in configuration if found in standard locations. If not found, exclude from configuration.
 config_ext2fs_path=auto
 config_fuse_path=auto
-config_mysql_path=auto
+config_mysql_path=no
 config_openssl_path=auto
 config_perl_path=auto
 config_python_path=auto    # for python2 or python3, version automatically detected
