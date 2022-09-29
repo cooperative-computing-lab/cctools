@@ -34,7 +34,6 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "load_average.h"
 #include "get_line.h"
-#include "int_sizes.h"
 #include "list.h"
 #include "xxmalloc.h"
 #include "jx.h"

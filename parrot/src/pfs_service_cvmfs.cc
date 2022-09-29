@@ -265,8 +265,8 @@ class cvmfs_dirent {
 
 	char *name;
 	unsigned mode;
-	UINT64_T size;
-	UINT64_T inode;
+	uint64_t size;
+	uint64_t inode;
 	time_t mtime;
 };
 

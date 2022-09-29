@@ -4,7 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "int_sizes.h"
 #include "stringtools.h"
 #include "parrot_client.h"
 
@@ -16,7 +15,7 @@ See the file COPYING for details.
 
 int main( int argc, char *argv[] )
 {
-	INT64_T size;
+	int64_t size;
 
 	if(argc!=3) {
 		printf("use: parrot_mkalloc <path> <size>\n");

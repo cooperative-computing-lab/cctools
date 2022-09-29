@@ -243,9 +243,9 @@ typedef struct sqlite3 sqlite3;
 ** sqlite3_uint64 and sqlite_uint64 types can store integer values 
 ** between 0 and +18446744073709551615 inclusive.
 */
-#ifdef SQLITE_INT64_TYPE
-  typedef SQLITE_INT64_TYPE sqlite_int64;
-  typedef unsigned SQLITE_INT64_TYPE sqlite_uint64;
+#ifdef SQLITE_int64_tYPE
+  typedef SQLITE_int64_tYPE sqlite_int64;
+  typedef unsigned SQLITE_int64_tYPE sqlite_uint64;
 #elif defined(_MSC_VER) || defined(__BORLANDC__)
   typedef __int64 sqlite_int64;
   typedef unsigned __int64 sqlite_uint64;

@@ -59,22 +59,22 @@ so we can be independent of the system headers.
 */
 
 struct i386_registers {
-	INT32_T ebx, ecx, edx, esi, edi, ebp, eax;
-	INT16_T ds, __ds, es, __es;
-	INT16_T fs, __fs, gs, __gs;
-	INT32_T orig_eax, eip;
-	INT16_T cs, __cs;
-	INT32_T eflags, esp;
-	INT16_T ss, __ss;
+	int32_t ebx, ecx, edx, esi, edi, ebp, eax;
+	int16_t ds, __ds, es, __es;
+	int16_t fs, __fs, gs, __gs;
+	int32_t orig_eax, eip;
+	int16_t cs, __cs;
+	int32_t eflags, esp;
+	int16_t ss, __ss;
 };
 
 struct x86_64_registers {
-	INT64_T r15,r14,r13,r12,rbp,rbx,r11,r10;
-	INT64_T r9,r8,rax,rcx,rdx,rsi,rdi,orig_rax;
-	INT64_T rip,cs,eflags;
-	INT64_T rsp,ss;
-	INT64_T fs_base, gs_base;
-	INT64_T ds,es,fs,gs;
+	int64_t r15,r14,r13,r12,rbp,rbx,r11,r10;
+	int64_t r9,r8,rax,rcx,rdx,rsi,rdi,orig_rax;
+	int64_t rip,cs,eflags;
+	int64_t rsp,ss;
+	int64_t fs_base, gs_base;
+	int64_t ds,es,fs,gs;
 };
 
 struct tracer {
@@ -205,7 +205,7 @@ int tracer_continue( struct tracer *t, int signum )
 	return 0;
 }
 
-int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] )
+int tracer_args_get( struct tracer *t, int64_t *syscall, int64_t args[TRACER_ARGS_MAX] )
 {
 	if(!t->gotregs) {
 		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
@@ -261,7 +261,7 @@ void tracer_has_args5_bug( struct tracer *t )
 	t->has_args5_bug = 1;
 }
 
-int tracer_args_set( struct tracer *t, INT64_T syscall, const INT64_T *args, int nargs )
+int tracer_args_set( struct tracer *t, int64_t syscall, const int64_t *args, int nargs )
 {
 	if(!t->gotregs) {
 		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
@@ -319,7 +319,7 @@ int tracer_args_set( struct tracer *t, INT64_T syscall, const INT64_T *args, int
 	return 1;
 }
 
-int tracer_result_get( struct tracer *t, INT64_T *result )
+int tracer_result_get( struct tracer *t, int64_t *result )
 {
 	if(!t->gotregs) {
 		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)
@@ -336,7 +336,7 @@ int tracer_result_get( struct tracer *t, INT64_T *result )
 	return 1;
 }
 
-int tracer_result_set( struct tracer *t, INT64_T result )
+int tracer_result_set( struct tracer *t, int64_t result )
 {
 	if(!t->gotregs) {
 		if(ptrace(PTRACE_GETREGS,t->pid,0,&t->regs) == -1)

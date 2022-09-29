@@ -7,13 +7,12 @@
 #ifndef DISPLAY_SIZE_H
 #define DISPLAY_SIZE_H
 
-#include "int_sizes.h"
 #include "stdlib.h"
 #include "string.h"
 #include "stdio.h"
 
 /** @file display_size.h Display file sizes in human readable format i.e. with units **/
 
-char * human_readable_size(UINT64_T size);
+char * human_readable_size(uint64_t size);
 
 #endif

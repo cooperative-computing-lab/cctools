@@ -239,7 +239,7 @@ CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_
 		goto replicated; /* already there, just not in DB yet */
 	/* else try to replicate... */
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-		INT64_T result;
+		int64_t result;
 		struct confuga_host host_from;
 		char replica_from[CONFUGA_PATH_MAX];
 		time_t timeout = time(0)+60; /* wait at least 1 minute */

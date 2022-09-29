@@ -1151,10 +1151,10 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 			result = pointers[fd]->flags;
 			break;
 		case F_SETFL:
-			flags = (PTRINT_T)arg;
+			flags = (intptr_t)arg;
 			pointers[fd]->flags = flags;
 			flags |= O_NONBLOCK;
-			pointers[fd]->file->fcntl(cmd,(void*)(PTRINT_T)flags);
+			pointers[fd]->file->fcntl(cmd,(void*)(intptr_t)flags);
 			result = 0;
 			break;
 

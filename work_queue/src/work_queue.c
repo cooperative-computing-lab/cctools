@@ -10,7 +10,6 @@ See the file COPYING for details.
 #include "work_queue_resources.h"
 
 #include "cctools.h"
-#include "int_sizes.h"
 #include "link.h"
 #include "link_auth.h"
 #include "debug.h"

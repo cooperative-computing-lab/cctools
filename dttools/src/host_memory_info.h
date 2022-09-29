@@ -8,7 +8,7 @@ See the file COPYING for details.
 #ifndef MEMORY_INFO_H
 #define MEMORY_INFO_H
 
-#include "int_sizes.h"
+#include <stdint.h>
 
 /** @file host_memory_info.h Get current memory status. */
 
@@ -19,13 +19,13 @@ the physical amount of memory installed, and the amount currently available.
 @param total Will be filled in with the memory physically installed, measured in bytes.
 @return One on success, zero on failure.
 */
-int host_memory_info_get(UINT64_T * avail, UINT64_T * total);
+int host_memory_info_get(uint64_t * avail, uint64_t * total);
 
 /** Get current memory usage by this process.
 @param rss Will be filled in with the current resident memory usage of this process, in bytes.
 @param total Will be filled in with the total virtual memory size of this process, in bytes.
 */
 
-int host_memory_usage_get(UINT64_T * rss, UINT64_T * total);
+int host_memory_usage_get(uint64_t * rss, uint64_t * total);
 
 #endif

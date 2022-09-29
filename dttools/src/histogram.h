@@ -7,7 +7,6 @@ See the file COPYING for details.
 #ifndef HISTOGRAM_H
 #define HISTOGRAM_H
 
-#include "int_sizes.h"
 
 /** @file histogram.h Keep counts of doubles that fall in some given bucket size.
 <pre>

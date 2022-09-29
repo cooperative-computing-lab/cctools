@@ -7,7 +7,6 @@ See the file COPYING for details.
 #ifndef STRING_SET_H
 #define STRING_SET_H
 
-#include "int_sizes.h"
 #include "hash_table.h"
 
 /** @file string_set.h A string_set data structure.

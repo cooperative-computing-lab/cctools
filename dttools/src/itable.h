@@ -8,8 +8,6 @@ See the file COPYING for details.
 #ifndef ITABLE_H
 #define ITABLE_H
 
-#include "int_sizes.h"
-
 /** @file itable.h An integer-indexed hash table.
 This hash table module maps integers to arbitrary objects (void pointers).
 For example, to store a filename using the file descriptor as a key:
@@ -27,7 +25,7 @@ pathname = itable_remove(h,id);
 To list all of the items in an itable, use @ref itable_firstkey and @ref itable_nextkey like this:
 
 <pre>
-UINT64_T  key;
+uint64_t  key;
 void *value;
 
 itable_firstkey(h);
@@ -38,6 +36,8 @@ while(itable_nextkey(h,&key,&value)) {
 </pre>
 
 */
+
+#include <stdint.h>
 
 /** Create a new integer table.
 @param buckets The number of buckets in the table.  If zero, a default value will be used.
@@ -77,7 +77,7 @@ Also note that you cannot insert a null value into the table.
 @return One if the insert succeeded, failure otherwise
 */
 
-int itable_insert(struct itable *h, UINT64_T key, const void *value);
+int itable_insert(struct itable *h, uint64_t key, const void *value);
 
 /** Look up a value by key.
 @param h A pointer to an integer table.
@@ -85,7 +85,7 @@ int itable_insert(struct itable *h, UINT64_T key, const void *value);
 @return If found, the pointer associated with the key, otherwise null.
 */
 
-void *itable_lookup(struct itable *h, UINT64_T key);
+void *itable_lookup(struct itable *h, uint64_t key);
 
 /** Remove a value by key.
 @param h A pointer to an integer table.
@@ -93,7 +93,7 @@ void *itable_lookup(struct itable *h, UINT64_T key);
 @return If found, the pointer associated with the key, otherwise null.
 */
 
-void *itable_remove(struct itable *h, UINT64_T key);
+void *itable_remove(struct itable *h, uint64_t key);
 
 /** Remove any one value.
 @param h A pointer to an integer table.
@@ -119,6 +119,6 @@ This function returns the next key and value in the iteration.
 @return Zero if there are no more elements to visit, one otherwise.
 */
 
-int itable_nextkey(struct itable *h, UINT64_T * key, void **value);
+int itable_nextkey(struct itable *h, uint64_t * key, void **value);
 
 #endif

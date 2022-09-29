@@ -192,7 +192,7 @@ public:
 		stats_inc("parrot.local.fcntl", 1);
 		int result;
 		debug(D_LOCAL,"fcntl %d %d %p",fd,cmd,arg);
-		if(cmd==F_SETFL) arg = (void*)(((PTRINT_T)arg)|O_NONBLOCK);
+		if(cmd==F_SETFL) arg = (void*)(((intptr_t)arg)|O_NONBLOCK);
 #if defined(CCTOOLS_OPSYS_LINUX) && defined(CCTOOLS_CPU_X86_64)
 		if (cmd == PFS_GETLK64) cmd = F_GETLK;
 		if (cmd == PFS_SETLK64) cmd = F_SETLK;
@@ -281,7 +281,7 @@ public:
 		stats_inc("parrot.local.mmap", 1);
 		void *result;
 		result = ::mmap((caddr_t)start,length,prot,flags,fd,offset);
-		debug(D_LOCAL,"= %p %s",result,(((PTRINT_T)result>=0) ? "" : strerror(errno)) );
+		debug(D_LOCAL,"= %p %s",result,(((intptr_t)result>=0) ? "" : strerror(errno)) );
 		return result;
 	}
 

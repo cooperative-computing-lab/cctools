@@ -291,7 +291,7 @@ const char *node_executable_redirect(const struct dag_node *n)
 }
 
 /* Writes the DAX representation of a node */
-void dag_to_dax_individual_node(const struct dag_node *n, UINT64_T node_id, FILE *output)
+void dag_to_dax_individual_node(const struct dag_node *n, uint64_t node_id, FILE *output)
 {
 	fprintf(output, "\t<job id=\"ID%07" PRIu64 "\" name=\"%s\">\n", node_id, node_executable(n));
 	fprintf(output, "\t\t<argument>%s</argument>\n", node_executable_arguments(n));
@@ -308,7 +308,7 @@ void dag_to_dax_individual_node(const struct dag_node *n, UINT64_T node_id, FILE
 void dag_to_dax_nodes(const struct dag *d, FILE *output)
 {
 	struct dag_node *n;
-	UINT64_T node_id;
+	uint64_t node_id;
 
 	itable_firstkey(d->node_table);
 	while(itable_nextkey(d->node_table, &node_id, (void *) &n))
@@ -333,7 +333,7 @@ void dag_to_dax_parents(const struct dag_node *n, FILE *output)
 void dag_to_dax_relationships(const struct dag *d, FILE *output)
 {
 	struct dag_node *n;
-	UINT64_T node_id;
+	uint64_t node_id;
 
 	itable_firstkey(d->node_table);
 	while(itable_nextkey(d->node_table, &node_id, (void *) &n))
@@ -1027,7 +1027,7 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 {
 
 	int count, count_row, max_ancestor = 0, max_size = 0;
-	UINT64_T key;
+	uint64_t key;
 	struct dag_node *n;
 
 	char *name;

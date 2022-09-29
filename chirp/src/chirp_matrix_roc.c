@@ -38,7 +38,7 @@ static int timeout = 3600;
 static int buffer_size = 1048576;
 
 int isSubjectIdEqual(const char *setAfilename, const char *setBfilename);
-INT64_T get_local_path(char *, char *, time_t);
+int64_t get_local_path(char *, char *, time_t);
 
 static void show_help(const char *cmd)
 {
@@ -422,7 +422,7 @@ int isSubjectIdEqual(const char *setAfilename, const char *setBfilename)
 		return 0;	// Not equal
 }
 
-INT64_T get_local_path(char *local_path, char *path, time_t stoptime)
+int64_t get_local_path(char *local_path, char *path, time_t stoptime)
 {
 	char *hostname, *chirp_path;
 	char *p;
@@ -459,7 +459,7 @@ INT64_T get_local_path(char *local_path, char *path, time_t stoptime)
 	}
 
 
-	INT64_T retval;
+	int64_t retval;
 
 	// get chirp path
 	count = 0;

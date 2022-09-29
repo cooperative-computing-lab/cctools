@@ -32,7 +32,6 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 </pre>
 */
 
-#include "int_sizes.h"
 
 #include <unistd.h>
 

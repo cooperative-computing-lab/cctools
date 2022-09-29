@@ -229,7 +229,7 @@ int file_cache_contains(struct file_cache *c, const char *path, char *lpath)
 	}
 }
 
-int file_cache_open(struct file_cache *c, const char *path, int flags, char *lpath, INT64_T size, time_t mtime)
+int file_cache_open(struct file_cache *c, const char *path, int flags, char *lpath, int64_t size, time_t mtime)
 {
 	int fd;
 	cached_name(c, path, lpath);

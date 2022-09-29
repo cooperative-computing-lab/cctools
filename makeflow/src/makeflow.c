@@ -13,7 +13,6 @@ See the file COPYING for details.
 #include "debug.h"
 #include "getopt_aux.h"
 #include "hash_table.h"
-#include "int_sizes.h"
 #include "itable.h"
 #include "link.h"
 #include "list.h"

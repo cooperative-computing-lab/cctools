@@ -68,7 +68,7 @@ static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, const char
 static batch_job_id_t batch_job_dryrun_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	struct batch_job_info *info;
-	UINT64_T jobid;
+	uint64_t jobid;
 
 	itable_firstkey(q->job_table);
 	if (itable_nextkey(q->job_table, &jobid, NULL)) {

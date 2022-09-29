@@ -55,7 +55,7 @@ out:
 	return RCUNIX(rc);
 }
 
-void debug_file_write (INT64_T flags, const char *str)
+void debug_file_write (int64_t flags, const char *str)
 {
 	int rc;
 

@@ -156,10 +156,10 @@ void nvpair_insert_string(struct nvpair *n, const char *name, const char *value)
 	hash_table_insert(n->table, name, xxstrdup(value));
 }
 
-void nvpair_insert_integer(struct nvpair *n, const char *name, INT64_T ivalue)
+void nvpair_insert_integer(struct nvpair *n, const char *name, int64_t ivalue)
 {
 	char value[256];
-	sprintf(value, INT64_FORMAT, ivalue);
+	sprintf(value, "%"PRId64, ivalue);
 	nvpair_insert_string(n, name, (char *) value);
 }
 
@@ -175,7 +175,7 @@ const char *nvpair_lookup_string(struct nvpair *n, const char *name)
 	return hash_table_lookup(n->table, name);
 }
 
-INT64_T nvpair_lookup_integer(struct nvpair * n, const char *name)
+int64_t nvpair_lookup_integer(struct nvpair * n, const char *name)
 {
 	const char *value;
 	value = hash_table_lookup(n->table, name);

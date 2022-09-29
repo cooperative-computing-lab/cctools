@@ -7,7 +7,6 @@ See the file COPYING for details.
 #ifndef SET_H
 #define SET_H
 
-#include "int_sizes.h"
 #include "list.h"
 
 /** @file set.h A set data structure.

@@ -60,7 +60,7 @@ struct irods_file {
 	char *path;
 	int fd;
 	int flags;
-	INT64_T offset;
+	int64_t offset;
 	int serial;
 };
 
@@ -558,7 +558,7 @@ int irods_reli_rename   ( const char *host, const char *path, const char *newpat
 	return result;
 }
 
-int irods_reli_truncate ( const char *host, const char *path, INT64_T length )
+int irods_reli_truncate ( const char *host, const char *path, int64_t length )
 {
 	dataObjInp_t request;
 	int result;
@@ -794,7 +794,7 @@ static int connect_to_file( struct irods_server *server, struct irods_file *file
 	}
 }
 
-static int irods_reli_lseek_if_needed( struct irods_file *file, INT64_T offset )
+static int irods_reli_lseek_if_needed( struct irods_file *file, int64_t offset )
 {
 	openedDataObjInp_t request;
 	fileLseekOut_t *response=0;
@@ -817,7 +817,7 @@ static int irods_reli_lseek_if_needed( struct irods_file *file, INT64_T offset )
 	return 0;
 }
 
-int irods_reli_pread ( struct irods_file *file, char *data, int length, INT64_T offset )
+int irods_reli_pread ( struct irods_file *file, char *data, int length, int64_t offset )
 {
 	int result;
 	openedDataObjInp_t request;
@@ -859,7 +859,7 @@ int irods_reli_pread ( struct irods_file *file, char *data, int length, INT64_T 
 	return result;
 }
 
-int irods_reli_pwrite    ( struct irods_file *file, const char *data, int length, INT64_T offset )
+int irods_reli_pwrite    ( struct irods_file *file, const char *data, int length, int64_t offset )
 {
 	int result;
 	openedDataObjInp_t request;

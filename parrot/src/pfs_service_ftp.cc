@@ -199,7 +199,7 @@ public:
 	*/
 
 	virtual int stat( pfs_name *name, struct pfs_stat *buf ) {
-		INT64_T result=-1;
+		int64_t result=-1;
 		struct ftp_lite_server *server = (struct ftp_lite_server *)pfs_service_connect_cache(name);
 		if(server) {
 			pfs_service_emulate_stat(name,buf);

@@ -10,17 +10,16 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-
-#include "int_sizes.h"
+#include <stdint.h>
 
 #ifndef HDFS_EINTERNAL
 #define HDFS_EINTERNAL 255
 #endif
 
-typedef INT32_T tSize;
+typedef int32_t tSize;
 typedef time_t tTime;
-typedef INT64_T tOffset;
-typedef UINT16_T tPort;
+typedef int64_t tOffset;
+typedef uint16_t tPort;
 
 typedef enum tObjectKind {
 	kObjectKindFile = 'F',
@@ -71,7 +70,7 @@ struct hdfs_library {
 	int (*utime) (hdfsFS, const char *, tTime, tTime);
 	int (*chdir) (hdfsFS, const char *);
 	tOffset (*tell) (hdfsFS, hdfsFile);
-	int (*setrep) (hdfsFS fs, const char *path, UINT16_T nreps );
+	int (*setrep) (hdfsFS fs, const char *path, uint16_t nreps );
 	int (*copy) (hdfsFS srcFS, const char* src, hdfsFS dstFS, const char* dst);
 };
 

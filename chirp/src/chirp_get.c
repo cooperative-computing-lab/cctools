@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 	const char *hostname, *source_file, *target_file;
 	time_t stoptime;
 	FILE *file;
-	INT64_T result;
+	int64_t result;
 	signed char c;
 	char *tickets = NULL;
 

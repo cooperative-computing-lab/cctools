@@ -15,7 +15,6 @@ All of the structure and type definitions used by the Chirp API.
 #include "chirp_protocol.h"
 
 #include "buffer.h"
-#include "int_sizes.h"
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -32,19 +31,19 @@ for more information about enforcing access controls.
 */
 
 struct chirp_stat {
-	INT64_T cst_dev;	/**< The device number on which the file is stored. */
-	INT64_T cst_ino;	/**< The inode number of the file. */
-	INT64_T cst_mode;	/**< The Unix mode bits of the file. */
-	INT64_T cst_nlink;	/**< The number of hard links to this file. */
-	INT64_T cst_uid;	/**< The Unix UID of the file's owner. */
-	INT64_T cst_gid;	/**< The Unix GID of the file's group varship. */
-	INT64_T cst_rdev;	/**< The device number, if this represents a device. */
-	INT64_T cst_size;	/**< The size of the file, in bytes. */
-	INT64_T cst_blksize;	/**< The recommended transfer block size for accessing this file.  */
-	INT64_T cst_blocks;	/**< The number of blocks consumed by this file in the file system.  Note that this value has nothing to do with @ref cst_blksize.  The size of the actual storage blocks is given by <tt>f_bsize</tt> in @ref chirp_statfs. */
-	INT64_T cst_atime;	/**< The last time the file was accessed, in <tt>time_t</tt> format. */
-	INT64_T cst_mtime;	/**< The last time the file data was modified,  <tt>time_t</tt> format. */
-	INT64_T cst_ctime;	/**< The last time the inode was changed, in <tt>time_t</tt> format. */
+	int64_t cst_dev;	/**< The device number on which the file is stored. */
+	int64_t cst_ino;	/**< The inode number of the file. */
+	int64_t cst_mode;	/**< The Unix mode bits of the file. */
+	int64_t cst_nlink;	/**< The number of hard links to this file. */
+	int64_t cst_uid;	/**< The Unix UID of the file's owner. */
+	int64_t cst_gid;	/**< The Unix GID of the file's group varship. */
+	int64_t cst_rdev;	/**< The device number, if this represents a device. */
+	int64_t cst_size;	/**< The size of the file, in bytes. */
+	int64_t cst_blksize;	/**< The recommended transfer block size for accessing this file.  */
+	int64_t cst_blocks;	/**< The number of blocks consumed by this file in the file system.  Note that this value has nothing to do with @ref cst_blksize.  The size of the actual storage blocks is given by <tt>f_bsize</tt> in @ref chirp_statfs. */
+	int64_t cst_atime;	/**< The last time the file was accessed, in <tt>time_t</tt> format. */
+	int64_t cst_mtime;	/**< The last time the file data was modified,  <tt>time_t</tt> format. */
+	int64_t cst_ctime;	/**< The last time the inode was changed, in <tt>time_t</tt> format. */
 };
 
 #define chirp_stat_encode(B, info) \
@@ -70,13 +69,13 @@ struct chirp_stat {
 */
 
 struct chirp_statfs {
-	INT64_T f_type;		/**< The integer type of the filesystem */
-	INT64_T f_blocks;	/**< The total number of blocks in the filesystem. */
-	INT64_T f_bavail;	/**< The number of blocks available to an ordinary user. */
-	INT64_T f_bsize;	/**< The size in bytes of a block. */
-	INT64_T f_bfree;	/**< The number of blocks free. */
-	INT64_T f_files;	/**< The maximum number of files (inodes) on the filesystem. */
-	INT64_T f_ffree;	/**< The number of files (inodes) currently in use. */
+	int64_t f_type;		/**< The integer type of the filesystem */
+	int64_t f_blocks;	/**< The total number of blocks in the filesystem. */
+	int64_t f_bavail;	/**< The number of blocks available to an ordinary user. */
+	int64_t f_bsize;	/**< The size in bytes of a block. */
+	int64_t f_bfree;	/**< The number of blocks free. */
+	int64_t f_files;	/**< The maximum number of files (inodes) on the filesystem. */
+	int64_t f_ffree;	/**< The number of files (inodes) currently in use. */
 };
 
 #define chirp_statfs_encode(B, info) \
@@ -160,12 +159,12 @@ struct chirp_bulkio {
 	struct chirp_file *file;   /**< The file to access for all operations. */
 	struct chirp_stat *info;   /**< Pointer to a data buffer for FSTAT */
 	void *buffer;		   /**< Pointer to data buffer for PREAD, PWRITE, SREAD, and SWRITE */
-	INT64_T length;		   /**< Length of the data, in bytes, for PREAD, WRITE, SREAD, and SWRITE. */
-	INT64_T stride_length;	   /**< Length of each stride for SREAD and SWRITE. */
-	INT64_T stride_skip;	   /**< Distance between start of each stride for SREAD and SWRITE. */
-	INT64_T offset;		   /**< Starting offset in file for PREAD, PWRITE, SREAD, and SWRITE. */
-	INT64_T result;		   /**< On completion, contains result of operation. */
-	INT64_T errnum;		   /**< On failure, contains the errno for the call. */
+	int64_t length;		   /**< Length of the data, in bytes, for PREAD, WRITE, SREAD, and SWRITE. */
+	int64_t stride_length;	   /**< Length of each stride for SREAD and SWRITE. */
+	int64_t stride_skip;	   /**< Distance between start of each stride for SREAD and SWRITE. */
+	int64_t offset;		   /**< Starting offset in file for PREAD, PWRITE, SREAD, and SWRITE. */
+	int64_t result;		   /**< On completion, contains result of operation. */
+	int64_t errnum;		   /**< On failure, contains the errno for the call. */
 };
 
 /** Descibes the space consumed by a single user on a Chirp server.
@@ -174,9 +173,9 @@ struct chirp_bulkio {
 
 struct chirp_audit {
 	char name[CHIRP_PATH_MAX];	/**< The identity of the user. */
-	INT64_T nfiles;			/**< The number of files owned by that user. */
-	INT64_T ndirs;			/**< The number of directories owned by that user. */
-	INT64_T nbytes;			/**< The total bytes consumed by that user. */
+	int64_t nfiles;			/**< The number of files owned by that user. */
+	int64_t ndirs;			/**< The number of directories owned by that user. */
+	int64_t nbytes;			/**< The total bytes consumed by that user. */
 };
 
 /** A callback function typedef used to display a directory or access control list.

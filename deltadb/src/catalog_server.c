@@ -113,7 +113,7 @@ static int child_procs_count = 0;
 static int child_procs_timeout = 60;
 
 /* The maximum size of a server that will actually be believed. */
-static INT64_T max_server_size = 0;
+static int64_t max_server_size = 0;
 
 /* Logfile for new updates. */
 static FILE *logfile = 0;
@@ -297,8 +297,8 @@ static void handle_update( const char *addr, int port, const char *raw_data, int
 		/* If the server reports unbelievable numbers, simply reset them */
 
 		if(max_server_size > 0) {
-			INT64_T total = jx_lookup_integer(j, "total");
-			INT64_T avail = jx_lookup_integer(j, "avail");
+			int64_t total = jx_lookup_integer(j, "total");
+			int64_t avail = jx_lookup_integer(j, "avail");
 
 			if(total > max_server_size || avail > max_server_size) {
 				jx_insert_integer(j, "total", max_server_size);
@@ -623,9 +623,9 @@ static void handle_query( struct link *ql, time_t st )
 	} else if(!strcmp(path,"/") || !strcmp(path,"/query.html") ) {
 		char avail_line[LINE_MAX];
 		char total_line[LINE_MAX];
-		INT64_T sum_total = 0;
-		INT64_T sum_avail = 0;
-		INT64_T sum_devices = 0;
+		int64_t sum_total = 0;
+		int64_t sum_avail = 0;
+		int64_t sum_devices = 0;
 
 		send_http_response(ql,200,"OK","text/html",st);
 		link_printf(ql,st, "<title>%s catalog server</title>\n", preferred_hostname);

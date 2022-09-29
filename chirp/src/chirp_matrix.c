@@ -46,10 +46,10 @@ struct chirp_matrix *chirp_matrix_create(const char *host, const char *path, int
 
 	int nfiles = nhosts;
 	while(1) {
-		INT64_T n_row_per_file = height / nfiles;
+		int64_t n_row_per_file = height / nfiles;
 		if(height % nfiles)
 			n_row_per_file++;
-		INT64_T file_size = n_row_per_file * width * element_size;
+		int64_t file_size = n_row_per_file * width * element_size;
 		if(file_size > GIGABYTE) {
 			nfiles *= 2;
 			continue;
@@ -242,28 +242,28 @@ int chirp_matrix_nfiles(struct chirp_matrix *a)
 int chirp_matrix_get(struct chirp_matrix *a, int i, int j, void *data, time_t stoptime)
 {
 	int index = i / a->n_row_per_file;
-	INT64_T offset = ((i % a->n_row_per_file) * a->width + j) * a->element_size;
+	int64_t offset = ((i % a->n_row_per_file) * a->width + j) * a->element_size;
 	return chirp_reli_pread_unbuffered(a->rfiles[index], data, a->element_size, offset, stoptime);
 }
 
 int chirp_matrix_get_row(struct chirp_matrix *a, int j, void *data, time_t stoptime)
 {
 	int index = j / a->n_row_per_file;
-	INT64_T offset = (j % a->n_row_per_file) * a->width * a->element_size;
+	int64_t offset = (j % a->n_row_per_file) * a->width * a->element_size;
 	return chirp_reli_pread_unbuffered(a->rfiles[index], data, a->element_size * a->width, offset, stoptime);
 }
 
 int chirp_matrix_set(struct chirp_matrix *a, int i, int j, const void *data, time_t stoptime)
 {
 	int index = i / a->n_row_per_file;
-	INT64_T offset = ((i % a->n_row_per_file) * a->width + j) * a->element_size;
+	int64_t offset = ((i % a->n_row_per_file) * a->width + j) * a->element_size;
 	return chirp_reli_pwrite_unbuffered(a->rfiles[index], data, sizeof(data), offset, stoptime);
 }
 
 int chirp_matrix_set_row(struct chirp_matrix *a, int j, const void *data, time_t stoptime)
 {
 	int index = j / a->n_row_per_file;
-	INT64_T offset = (j % a->n_row_per_file) * a->width * a->element_size;
+	int64_t offset = (j % a->n_row_per_file) * a->width * a->element_size;
 	return chirp_reli_pwrite_unbuffered(a->rfiles[index], data, a->element_size * a->width, offset, stoptime);
 }
 
@@ -279,10 +279,10 @@ int chirp_matrix_set_range(struct chirp_matrix *a, int x, int y, int width, int 
 
 	for(j = 0; j < height; j++) {
 		int index = (y + j) / a->n_row_per_file;
-		INT64_T file_offset = (x + ((y + j) % a->n_row_per_file) * a->width) * a->element_size;
-		INT64_T buffer_offset = (j * width) * a->element_size;
-		INT64_T length = width * a->element_size;
-		INT64_T result = chirp_reli_pwrite_unbuffered(a->rfiles[index], &cdata[buffer_offset], length, file_offset, stoptime);
+		int64_t file_offset = (x + ((y + j) % a->n_row_per_file) * a->width) * a->element_size;
+		int64_t buffer_offset = (j * width) * a->element_size;
+		int64_t length = width * a->element_size;
+		int64_t result = chirp_reli_pwrite_unbuffered(a->rfiles[index], &cdata[buffer_offset], length, file_offset, stoptime);
 		if(result != length)
 			return -1;
 	}
@@ -302,10 +302,10 @@ int chirp_matrix_get_range(struct chirp_matrix *a, int x, int y, int width, int 
 
 	for(j = 0; j < height; j++) {
 		int index = (y + j) / a->n_row_per_file;
-		INT64_T file_offset = (x + ((y + j) % a->n_row_per_file) * a->width) * a->element_size;
-		INT64_T buffer_offset = (j * width) * a->element_size;
-		INT64_T length = width * a->element_size;
-		INT64_T result = chirp_reli_pread_unbuffered(a->rfiles[index], &cdata[buffer_offset], length, file_offset, stoptime);
+		int64_t file_offset = (x + ((y + j) % a->n_row_per_file) * a->width) * a->element_size;
+		int64_t buffer_offset = (j * width) * a->element_size;
+		int64_t length = width * a->element_size;
+		int64_t result = chirp_reli_pread_unbuffered(a->rfiles[index], &cdata[buffer_offset], length, file_offset, stoptime);
 		if(result != length)
 			return -1;
 	}
@@ -315,7 +315,7 @@ int chirp_matrix_get_range(struct chirp_matrix *a, int x, int y, int width, int 
 
 int chirp_matrix_get_col(struct chirp_matrix *a, int i, void *data, time_t stoptime)
 {
-	INT64_T offset = i * a->element_size;
+	int64_t offset = i * a->element_size;
 	int length = a->element_size * a->n_row_per_file;
 	int j;
 
@@ -336,7 +336,7 @@ int chirp_matrix_get_col(struct chirp_matrix *a, int i, void *data, time_t stopt
 
 int chirp_matrix_set_col(struct chirp_matrix *a, int i, const void *data, time_t stoptime)
 {
-	INT64_T offset = i * a->element_size;
+	int64_t offset = i * a->element_size;
 	int length = a->element_size * a->n_row_per_file;
 	int j;
 

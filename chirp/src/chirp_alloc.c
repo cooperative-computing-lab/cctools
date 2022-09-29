@@ -10,7 +10,6 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "hash_table.h"
-#include "int_sizes.h"
 #include "itable.h"
 #include "macros.h"
 #include "path.h"
@@ -53,10 +52,10 @@ static struct hash_table *root_table = 0;
 
 struct alloc_state {
 	int fd;
-	INT64_T size;
-	INT64_T inuse;
-	INT64_T avail;
-	INT64_T dirty;
+	int64_t size;
+	int64_t inuse;
+	int64_t avail;
+	int64_t dirty;
 };
 
 /*
@@ -67,16 +66,16 @@ the next blocksize.  A more exact function might take into
 account indirect blocks allocated within the filesystem.
 */
 
-static INT64_T space_consumed(INT64_T filesize)
+static int64_t space_consumed(int64_t filesize)
 {
-	INT64_T block_size = 4096;
-	INT64_T blocks = filesize / block_size;
+	int64_t block_size = 4096;
+	int64_t blocks = filesize / block_size;
 	if(filesize % block_size)
 		blocks++;
 	return blocks * block_size;
 }
 
-static void alloc_state_update(struct alloc_state *a, INT64_T change)
+static void alloc_state_update(struct alloc_state *a, int64_t change)
 {
 	if(change != 0) {
 		a->inuse += change;
@@ -117,8 +116,8 @@ static struct alloc_state *alloc_state_load(const char *path)
 	}
 
 	memset(buffer, 0, sizeof(buffer));
-	INT64_T result = cfs->pread(s->fd, buffer, sizeof(buffer), 0);
-	assert(0 < result && result < (INT64_T)sizeof(buffer));
+	int64_t result = cfs->pread(s->fd, buffer, sizeof(buffer), 0);
+	assert(0 < result && result < (int64_t)sizeof(buffer));
 	result = sscanf(buffer, "%" SCNd64 " %" SCNd64, &s->size, &s->inuse);
 	assert(result == 2);
 
@@ -153,7 +152,7 @@ static void alloc_state_save(const char *path, struct alloc_state *s)
 	free(s);
 }
 
-static int alloc_state_create(const char *path, INT64_T size)
+static int alloc_state_create(const char *path, int64_t size)
 {
 	char statepath[CHIRP_PATH_MAX];
 	int fd;
@@ -290,11 +289,11 @@ static void recover(const char *path)
 	debug(D_ALLOC, "%s (%sB)", path, string_metric(a->inuse, -1, 0));
 }
 
-int chirp_alloc_init(INT64_T size)
+int chirp_alloc_init(int64_t size)
 {
 	struct alloc_state *a;
 	time_t start, stop;
-	INT64_T inuse, avail;
+	int64_t inuse, avail;
 
 	alloc_enabled = 0;
 	if(size == 0) {
@@ -381,11 +380,11 @@ time_t chirp_alloc_last_flush_time()
 	return last_flush_time;
 }
 
-INT64_T chirp_alloc_realloc (const char *path, INT64_T change, INT64_T *current)
+int64_t chirp_alloc_realloc (const char *path, int64_t change, int64_t *current)
 {
 	struct alloc_state *a;
 	int result;
-	INT64_T dummy;
+	int64_t dummy;
 
 	if (current == NULL)
 		current = &dummy;
@@ -407,7 +406,7 @@ INT64_T chirp_alloc_realloc (const char *path, INT64_T change, INT64_T *current)
 				/* NOP */
 				result = 0;
 			} else {
-				INT64_T alloc_change = space_consumed(change) - space_consumed(*current);
+				int64_t alloc_change = space_consumed(change) - space_consumed(*current);
 				debug(D_ALLOC, "path `%s' actual change = %" PRId64 " from current = %" PRId64, path, alloc_change, *current);
 				if(a->avail >= alloc_change) {
 					alloc_state_update(a, alloc_change);
@@ -426,14 +425,14 @@ INT64_T chirp_alloc_realloc (const char *path, INT64_T change, INT64_T *current)
 	return result;
 }
 
-INT64_T chirp_alloc_frealloc (int fd, INT64_T change, INT64_T *current)
+int64_t chirp_alloc_frealloc (int fd, int64_t change, int64_t *current)
 {
 	char path[CHIRP_PATH_MAX];
 	if (cfs->fname(fd, path) == -1) return -1;
 	return chirp_alloc_realloc(path, change, current);
 }
 
-INT64_T chirp_alloc_statfs(const char *path, struct chirp_statfs * info)
+int64_t chirp_alloc_statfs(const char *path, struct chirp_statfs * info)
 {
 	struct alloc_state *a;
 	int result;
@@ -460,14 +459,14 @@ INT64_T chirp_alloc_statfs(const char *path, struct chirp_statfs * info)
 	return result;
 }
 
-INT64_T chirp_alloc_fstatfs(int fd, struct chirp_statfs *buf)
+int64_t chirp_alloc_fstatfs(int fd, struct chirp_statfs *buf)
 {
 	char path[CHIRP_PATH_MAX];
 	if (cfs->fname(fd, path) == -1) return -1;
 	return chirp_alloc_statfs(path, buf);
 }
 
-INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse)
+int64_t chirp_alloc_lsalloc(const char *path, char *alloc_path, int64_t * total, int64_t * inuse)
 {
 	int result = -1;
 
@@ -493,7 +492,7 @@ INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total,
 	return result;
 }
 
-INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode)
+int64_t chirp_alloc_mkalloc(const char *path, int64_t size, int64_t mode)
 {
 	struct alloc_state *a;
 	int result = -1;

@@ -12,7 +12,6 @@
 %}
 
 %{
-	#include "int_sizes.h"
 	#include "timestamp.h"
 	#include "dataswarm.h"
 	#include "rmsummary.h"
@@ -41,7 +40,6 @@ treat it as an output parameter to be filled in. */
 %apply int *OUTPUT { int *buffer_length };
 
 %include "stdint.i"
-%include "int_sizes.h"
 %include "timestamp.h"
 %include "dataswarm.h"
 %include "rmsummary.h"

@@ -92,8 +92,8 @@ static int         advertise_timeout = 300; /* five minutes */
 static int         config_pipe[2] = {-1, -1};
 static char        hostname[DOMAIN_NAME_MAX];
 static int         idle_timeout = 60; /* one minute */
-static UINT64_T    minimum_space_free = 0;
-static UINT64_T    root_quota = 0;
+static uint64_t    minimum_space_free = 0;
+static uint64_t    root_quota = 0;
 static gid_t       safe_gid = 0;
 static uid_t       safe_uid = 0;
 static const char *safe_username = 0;
@@ -107,9 +107,9 @@ static time_t      starttime;
  * fixed amount of headroom on the disk.  Note that get_disk_info() is quite
  * expensive, so we do not call it more than once per second.
  */
-static int space_available(INT64_T amount)
+static int space_available(int64_t amount)
 {
-	static UINT64_T avail;
+	static uint64_t avail;
 	static time_t last_check = 0;
 	int check_interval = 1;
 	time_t current;
@@ -189,7 +189,7 @@ static int update_all_catalogs(const char *url)
 	struct utsname name;
 	int cpus;
 	double avg[3];
-	UINT64_T memory_total, memory_avail;
+	uint64_t memory_total, memory_avail;
 
 	uname(&name);
 	string_tolower(name.sysname);
@@ -292,7 +292,7 @@ static void config_pipe_handler(int fd)
 	char flag[PIPE_BUF];
 	char subject[PIPE_BUF];
 	char address[PIPE_BUF];
-	UINT64_T ops, bytes_read, bytes_written;
+	uint64_t ops, bytes_read, bytes_written;
 
 	while(1) {
 		fcntl(fd, F_SETFL, O_NONBLOCK);
@@ -384,9 +384,9 @@ static int errno_to_chirp(int e)
 	}
 }
 
-static INT64_T getstream(const char *path, struct link * l, time_t stoptime)
+static int64_t getstream(const char *path, struct link * l, time_t stoptime)
 {
-	INT64_T fd, total = 0;
+	int64_t fd, total = 0;
 	char buffer[65536];
 
 	fd = cfs->open(path, O_RDONLY, S_IRWXU);
@@ -396,8 +396,8 @@ static INT64_T getstream(const char *path, struct link * l, time_t stoptime)
 	link_putliteral(l, "0\n", stoptime);
 
 	while(1) {
-		INT64_T result;
-		INT64_T actual;
+		int64_t result;
+		int64_t actual;
 
 		result = cfs->pread(fd, buffer, sizeof(buffer), total);
 		if(result <= 0)
@@ -415,9 +415,9 @@ static INT64_T getstream(const char *path, struct link * l, time_t stoptime)
 	return total;
 }
 
-static INT64_T putstream(const char *path, struct link * l, time_t stoptime)
+static int64_t putstream(const char *path, struct link * l, time_t stoptime)
 {
-	INT64_T fd, total = 0;
+	int64_t fd, total = 0;
 
 	fd = cfs->open(path, O_CREAT | O_TRUNC | O_WRONLY, S_IRWXU);
 	if(fd < 0) {
@@ -428,7 +428,7 @@ static INT64_T putstream(const char *path, struct link * l, time_t stoptime)
 
 	while(1) {
 		char buffer[65536];
-		INT64_T streamed;
+		int64_t streamed;
 
 		streamed = link_read(l, buffer, sizeof(buffer), stoptime);
 		if(streamed <= 0)
@@ -436,9 +436,9 @@ static INT64_T putstream(const char *path, struct link * l, time_t stoptime)
 		if(!space_available(streamed))
 			goto failure;
 
-		INT64_T current;
+		int64_t current;
 		if (chirp_alloc_frealloc(fd, total+streamed, &current) == 0) {
-			INT64_T actual = cfs->pwrite(fd, buffer, streamed, total);
+			int64_t actual = cfs->pwrite(fd, buffer, streamed, total);
 			if (actual == -1) {
 				chirp_alloc_frealloc(fd, current, NULL);
 				goto failure;
@@ -461,9 +461,9 @@ done:
 	return total;
 }
 
-static INT64_T rmall(const char *path)
+static int64_t rmall(const char *path)
 {
-	INT64_T result;
+	int64_t result;
 	struct chirp_stat info;
 
 	if(root_quota == 0)
@@ -497,7 +497,7 @@ static INT64_T rmall(const char *path)
 				result = -1;
 			}
 		} else {
-			INT64_T current;
+			int64_t current;
 			if ((result = chirp_alloc_realloc(path, 0, &current)) == 0) {
 				result = cfs->unlink(path);
 				if (result == -1) {
@@ -510,7 +510,7 @@ static INT64_T rmall(const char *path)
 	return result;
 }
 
-static INT64_T getvarstring (struct link *l, time_t stalltime, void *buffer, INT64_T count, int soak_overflow)
+static int64_t getvarstring (struct link *l, time_t stalltime, void *buffer, int64_t count, int soak_overflow)
 {
 	if (count < 0) {
 		return errno = EINVAL, -1;
@@ -535,7 +535,7 @@ static INT64_T getvarstring (struct link *l, time_t stalltime, void *buffer, INT
  * Various operating systems employ integers of different sizes for fields such
  * as file size, user identity, and so forth. Regardless of the operating
  * system support, the Chirp protocol must support integers up to 64 bits. So,
- * in the server handling loop, we treat all integers as INT64_T. What the
+ * in the server handling loop, we treat all integers as int64_t. What the
  * operating system does from there is out of our hands.
  */
 static void chirp_handler(struct link *l, const char *addr, const char *subject)
@@ -557,9 +557,9 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		time_t idletime = time(0) + idle_timeout;
 		time_t stalltime = time(0) + stall_timeout;
 
-		INT64_T result = -1;
+		int64_t result = -1;
 
-		INT64_T fd, length, flags, offset, uid, gid, mode, actime, modtime, stride_length, stride_skip;
+		int64_t fd, length, flags, offset, uid, gid, mode, actime, modtime, stride_length, stride_skip;
 		chirp_jobid_t id;
 		char path[CHIRP_PATH_MAX] = "";
 		char newpath[CHIRP_PATH_MAX] = "";
@@ -624,19 +624,19 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if ((length = getvarstring(l, stalltime, buffer, length, 1)) == -1)
 				goto failure;
 
-			INT64_T oldsize = cfs_fd_size(fd);
+			int64_t oldsize = cfs_fd_size(fd);
 			if(oldsize == -1)
 				goto failure;
 			if(offset < 0) {
 				errno = EINVAL;
 				goto failure;
 			}
-			INT64_T newsize = MAX(length+offset, oldsize);
+			int64_t newsize = MAX(length+offset, oldsize);
 
 			if(!space_available(newsize-oldsize))
 				goto failure;
 
-			INT64_T current;
+			int64_t current;
 			if ((result = chirp_alloc_frealloc(fd, newsize, &current)) == 0) {
 				result = cfs->pwrite(fd, buffer, length, offset);
 				if (result == -1) {
@@ -651,7 +651,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if ((length = getvarstring(l, stalltime, buffer, length, 1)) == -1)
 				goto failure;
 
-			INT64_T oldsize = cfs_fd_size(fd);
+			int64_t oldsize = cfs_fd_size(fd);
 			if(oldsize == -1)
 				goto failure;
 			if(offset < 0 || oldsize < offset) {
@@ -766,7 +766,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(!chirp_acl_check(path, subject, CHIRP_ACL_READ))
 				goto failure;
 
-			INT64_T fd = cfs->open(path, O_RDONLY, 0);
+			int64_t fd = cfs->open(path, O_RDONLY, 0);
 			if (fd == -1)
 				goto failure;
 
@@ -791,12 +791,12 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 			link_printf(l, transmission_stalltime, "%" PRId64 "\n", length);
 
-			INT64_T total = 0;
+			int64_t total = 0;
 			while (total < length) {
 				char b[65536];
 				size_t chunk = MIN(sizeof(b), (size_t)(length-total));
 
-				INT64_T ractual = cfs->pread(fd, b, chunk, total);
+				int64_t ractual = cfs->pread(fd, b, chunk, total);
 				if(ractual <= 0)
 					break;
 
@@ -851,7 +851,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			}
 
-			INT64_T current;
+			int64_t current;
 			if (chirp_alloc_realloc(path, length, &current) == -1) {
 				int saved = errno;
 				cfs->close(fd);
@@ -872,14 +872,14 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 
 			link_putliteral(l, "0\n", transmission_stalltime);
 
-			INT64_T total = 0;
+			int64_t total = 0;
 			while (total < length) {
 				char b[65536];
 				size_t chunk = MIN(sizeof(b), (size_t)(length-total));
 
-				INT64_T ractual = link_read(l, b, chunk, transmission_stalltime);
+				int64_t ractual = link_read(l, b, chunk, transmission_stalltime);
 
-				INT64_T wactual = -1;
+				int64_t wactual = -1;
 				if (ractual > 0)
 					wactual = cfs->pwrite(fd, b, ractual, total);
 
@@ -1027,7 +1027,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			}
 
 			if (flags & O_TRUNC) {
-				INT64_T current;
+				int64_t current;
 				if ((result = chirp_alloc_realloc(path, 0, &current)) == 0) {
 					result = cfs->open(path, flags, (int) mode);
 					if (result == -1) {
@@ -1060,7 +1060,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			if(!space_available(length))
 				goto failure;
 
-			INT64_T current;
+			int64_t current;
 			if ((result = chirp_alloc_frealloc(fd, length, &current)) == 0) {
 				result = cfs->ftruncate(fd, length);
 				if (result == -1) {
@@ -1091,7 +1091,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 		} else if(sscanf(line, "unlink %s", path) == 1) {
 			path_fix(path);
 			if(chirp_acl_check_link(path, subject, CHIRP_ACL_DELETE) || chirp_acl_check_dir(path, subject, CHIRP_ACL_DELETE)) {
-				INT64_T current;
+				int64_t current;
 				if ((result = chirp_alloc_realloc(path, 0, &current)) == 0) {
 					result = cfs->unlink(path);
 					if (result == -1) {
@@ -1142,7 +1142,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			if(!space_available(length))
 				goto failure;
-			INT64_T current;
+			int64_t current;
 			if ((result = chirp_alloc_realloc(path, length, &current)) == 0) {
 				result = cfs->truncate(path, length);
 				if (result == -1) {
@@ -1159,8 +1159,8 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				goto failure;
 			if(!chirp_acl_check(newpath, subject, CHIRP_ACL_WRITE))
 				goto failure;
-			INT64_T newcurrent;
-			INT64_T oldcurrent;
+			int64_t newcurrent;
+			int64_t oldcurrent;
 			if ((result = chirp_alloc_realloc(path, 0, &oldcurrent)) == 0) {
 				if ((result = chirp_alloc_realloc(newpath, cfs_file_size(path), &newcurrent)) == 0) {
 					result = cfs->rename(path, newpath);
@@ -1415,7 +1415,7 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 				buffer_putliteral(B, "\n");
 			}
 		} else if(sscanf(line, "lsalloc %s", path) == 1) {
-			INT64_T size, inuse;
+			int64_t size, inuse;
 			path_fix(path);
 			if(!chirp_acl_check_link(path, subject, CHIRP_ACL_LIST))
 				goto failure;

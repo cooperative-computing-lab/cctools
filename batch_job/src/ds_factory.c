@@ -4,7 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_catalog.h"
+#include "../../dataswarm/src/manager/ds_catalog.h"
+
 #include "cctools.h"
 #include "batch_job.h"
 #include "hash_table.h"

@@ -18,7 +18,6 @@ See the file COPYING for details.
 #include "load_average.h"
 #include <unistd.h>
 #include "host_memory_info.h"
-#include "int_sizes.h"
 #include <string.h>
 #include "xxmalloc.h"
 #include <signal.h>
@@ -226,8 +225,8 @@ int main(int argc, char** argv) {
 
         int cores = rank_0_cores;
         int cores_total = load_average_get_cpus();
-        UINT64_T memtotal;
-        UINT64_T memavail;
+        uint64_t memtotal;
+        uint64_t memavail;
         host_memory_info_get(&memavail, &memtotal);
         int mem = ((memtotal / (1024 * 1024)) / cores_total) * cores; //MB
 
@@ -270,8 +269,8 @@ int main(int argc, char** argv) {
 
         //get a fair amount of memory, for now
         int cores_total = load_average_get_cpus();
-        UINT64_T memtotal;
-        UINT64_T memavail;
+        uint64_t memtotal;
+        uint64_t memavail;
         host_memory_info_get(&memavail, &memtotal);
         int mem = ((memtotal / (1024 * 1024)) / cores_total) * cores; //gigabytes
 

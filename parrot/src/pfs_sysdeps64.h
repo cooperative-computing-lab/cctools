@@ -48,55 +48,55 @@ level that does not concern us.
 */
 
 struct pfs_kernel_timespec {
-	UINT64_T tv_sec;
-	UINT64_T tv_nsec;
+	uint64_t tv_sec;
+	uint64_t tv_nsec;
 };
 
 struct pfs_kernel_stat {
-	UINT64_T st_dev;
-	UINT64_T st_ino;
-	UINT64_T st_nlink;
-	UINT32_T st_mode;
-	UINT32_T st_uid;
-	UINT32_T st_gid;
-	UINT32_T unused0;
-	UINT64_T st_rdev;
-	INT64_T  st_size;
-	INT64_T  st_blksize;
-	INT64_T  st_blocks;
+	uint64_t st_dev;
+	uint64_t st_ino;
+	uint64_t st_nlink;
+	uint32_t st_mode;
+	uint32_t st_uid;
+	uint32_t st_gid;
+	uint32_t unused0;
+	uint64_t st_rdev;
+	int64_t  st_size;
+	int64_t  st_blksize;
+	int64_t  st_blocks;
 #if !defined(st_atime)
-		INT32_T st_atime;
-		INT32_T st_atime_nsec;
-		INT32_T st_mtime;
-		INT32_T st_mtime_nsec;
-		INT32_T st_ctime;
-		INT32_T st_ctime_nsec;
+		int32_t st_atime;
+		int32_t st_atime_nsec;
+		int32_t st_mtime;
+		int32_t st_mtime_nsec;
+		int32_t st_ctime;
+		int32_t st_ctime_nsec;
 #else
 		struct pfs_kernel_timespec st_atim;
 		struct pfs_kernel_timespec st_mtim;
 		struct pfs_kernel_timespec st_ctim;
 #endif
-	INT64_T unused1;
-	INT64_T unused2;
-	INT64_T unused3;
+	int64_t unused1;
+	int64_t unused2;
+	int64_t unused3;
 };
 
 struct pfs_kernel_statfs {
-		INT64_T f_type;
-		INT64_T f_bsize;
-		INT64_T f_blocks;
-		INT64_T f_bfree;
-		INT64_T f_bavail;
-		INT64_T f_files;
-		INT64_T f_ffree;
-	INT64_T f_fsid;
-		INT64_T f_namelen;
-		INT64_T f_spare[6];
+		int64_t f_type;
+		int64_t f_bsize;
+		int64_t f_blocks;
+		int64_t f_bfree;
+		int64_t f_bavail;
+		int64_t f_files;
+		int64_t f_ffree;
+	int64_t f_fsid;
+		int64_t f_namelen;
+		int64_t f_spare[6];
 };
 
 struct pfs_kernel_iovec {
 	void     *iov_base;
-	UINT64_T  iov_len;
+	uint64_t  iov_len;
 };
 
 /*
@@ -107,10 +107,10 @@ defined sigaction puts sa_mask last as follows:
 */
 
 struct pfs_kernel_sigaction {
-	UINT64_T pfs_sa_handler;
-	INT64_T  pfs_sa_flags;
-	UINT64_T pfs_sa_restorer;
-	UINT8_T  pfs_sa_mask[128];
+	uint64_t pfs_sa_handler;
+	int64_t  pfs_sa_flags;
+	uint64_t pfs_sa_restorer;
+	uint8_t  pfs_sa_mask[128];
 };
 
 #ifndef CLONE_PTRACE

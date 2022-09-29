@@ -12,7 +12,7 @@ See the file COPYING for details.
 
 #include <stdarg.h>
 
-void debug_syslog_write (INT64_T flags, const char *str)
+void debug_syslog_write (int64_t flags, const char *str)
 {
 	int priority = LOG_USER;
 	if (flags & D_FATAL) {

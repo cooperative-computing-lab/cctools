@@ -9,7 +9,7 @@ See the file COPYING for details.
 #define TRACER_H
 
 #include <sys/types.h>
-#include "int_sizes.h"
+#include <stdint.h>
 
 #define TRACER_ARGS_MAX 8
 
@@ -22,13 +22,13 @@ int tracer_continue( struct tracer *t, int signum );
 int tracer_listen( struct tracer *t );
 int tracer_getevent( struct tracer *t, unsigned long *message );
 
-int tracer_args_get( struct tracer *t, INT64_T *syscall, INT64_T args[TRACER_ARGS_MAX] );
-int tracer_args_set( struct tracer *t, INT64_T syscall, const INT64_T args[], int nargs );
+int tracer_args_get( struct tracer *t, int64_t *syscall, int64_t args[TRACER_ARGS_MAX] );
+int tracer_args_set( struct tracer *t, int64_t syscall, const int64_t args[], int nargs );
 
 void tracer_has_args5_bug( struct tracer *t );
 
-int tracer_result_get( struct tracer *t, INT64_T *result );
-int tracer_result_set( struct tracer *t, INT64_T result );
+int tracer_result_get( struct tracer *t, int64_t *result );
+int tracer_result_set( struct tracer *t, int64_t result );
 
 int tracer_stack_get( struct tracer *t, uintptr_t *ptr );
 

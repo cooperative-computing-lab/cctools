@@ -221,7 +221,7 @@ struct grow_filesystem * grow_filesystem_create( const char *hostport, const cha
 
 			int fd = file_cache_begin(pfs_file_cache, url, txn);
 			if (fd >= 0) {
-				INT64_T size;
+				int64_t size;
 				struct link *link = http_query_size(url, "GET", &size, stoptime, 1);
 				if (link) {
 					if (link_stream_to_fd(link, fd, size, stoptime) >= 0) {

@@ -19,7 +19,6 @@
 
 #include "path_disk_size_info.h"
 
-#include "int_sizes.h"
 
 #ifndef RMONITOR_TYPES_H
 #define RMONITOR_TYPES_H

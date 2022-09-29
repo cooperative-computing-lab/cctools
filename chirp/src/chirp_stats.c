@@ -20,18 +20,18 @@ See the file COPYING for details.
 
 static struct hash_table *stats_table = 0;
 
-static UINT64_T total_ops = 0;
-static UINT64_T total_bytes_read = 0;
-static UINT64_T total_bytes_written = 0;
+static uint64_t total_ops = 0;
+static uint64_t total_bytes_read = 0;
+static uint64_t total_bytes_written = 0;
 
 struct chirp_stats {
 	char addr[LINK_ADDRESS_MAX];
-	UINT64_T ops;
-	UINT64_T bytes_read;
-	UINT64_T bytes_written;
+	uint64_t ops;
+	uint64_t bytes_read;
+	uint64_t bytes_written;
 };
 
-void chirp_stats_collect(const char *addr, const char *subject, UINT64_T ops, UINT64_T bytes_read, UINT64_T bytes_written)
+void chirp_stats_collect(const char *addr, const char *subject, uint64_t ops, uint64_t bytes_read, uint64_t bytes_written)
 {
 	struct chirp_stats *s;
 
@@ -98,12 +98,12 @@ void chirp_stats_cleanup()
 	}
 }
 
-static UINT64_T child_ops = 0;
-static UINT64_T child_bytes_read = 0;
-static UINT64_T child_bytes_written = 0;
+static uint64_t child_ops = 0;
+static uint64_t child_bytes_read = 0;
+static uint64_t child_bytes_written = 0;
 static time_t child_report_time = 0;
 
-void chirp_stats_update(UINT64_T ops, UINT64_T bytes_read, UINT64_T bytes_written)
+void chirp_stats_update(uint64_t ops, uint64_t bytes_read, uint64_t bytes_written)
 {
 	child_ops += ops;
 	child_bytes_read += bytes_read;

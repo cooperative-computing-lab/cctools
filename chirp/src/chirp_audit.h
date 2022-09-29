@@ -16,7 +16,6 @@ send the hash table back to chirp_audit_delete.
 #ifndef CHIRP_AUDIT_H
 #define CHIRP_AUDIT_H
 
-#include "int_sizes.h"
 #include "hash_table.h"
 #include "chirp_client.h"
 

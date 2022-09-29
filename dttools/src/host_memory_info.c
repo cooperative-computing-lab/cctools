@@ -10,10 +10,10 @@ See the file COPYING for details.
 
 #include <unistd.h>
 
-int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
+int host_memory_info_get(uint64_t * avail, uint64_t * total)
 {
-	*total = getpagesize() * (UINT64_T) sysconf(_SC_PHYS_PAGES);
-	*avail = getpagesize() * (UINT64_T) sysconf(_SC_AVPHYS_PAGES);
+	*total = getpagesize() * (uint64_t) sysconf(_SC_PHYS_PAGES);
+	*avail = getpagesize() * (uint64_t) sysconf(_SC_AVPHYS_PAGES);
 	return 1;
 }
 
@@ -22,7 +22,7 @@ int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
-int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
+int host_memory_info_get(uint64_t * avail, uint64_t * total)
 {
 	unsigned x = 0;
 	size_t s = sizeof(x);
@@ -33,7 +33,7 @@ int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
 
 #else
 
-int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
+int host_memory_info_get(uint64_t * avail, uint64_t * total)
 {
 	*total = 0;
 	*avail = 0;
@@ -46,7 +46,7 @@ int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
 #include <stdio.h>
 #include <unistd.h>
 
-int host_memory_usage_get(UINT64_T * rssp, UINT64_T * totalp)
+int host_memory_usage_get(uint64_t * rssp, uint64_t * totalp)
 {
 #ifdef CCTOOLS_OPSYS_LINUX
 	/*
@@ -64,16 +64,16 @@ int host_memory_usage_get(UINT64_T * rssp, UINT64_T * totalp)
 
 	fclose(file);
 
-	*rssp = (UINT64_T) rss *getpagesize();
-	*totalp = (UINT64_T) total *getpagesize();
+	*rssp = (uint64_t) rss *getpagesize();
+	*totalp = (uint64_t) total *getpagesize();
 
 	return 1;
 #else
 	struct rusage ru;
 	int result = getrusage(RUSAGE_SELF, &ru);
 	if(result >= 0) {
-		*rssp = (UINT64_T) ru.ru_ixrss * getpagesize();
-		*totalp = (UINT64_T) ru.ru_ixrss * getpagesize();
+		*rssp = (uint64_t) ru.ru_ixrss * getpagesize();
+		*totalp = (uint64_t) ru.ru_ixrss * getpagesize();
 		return 1;
 	} else {
 		return 0;

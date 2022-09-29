@@ -8,7 +8,8 @@ See the file COPYING for details.
 #ifndef PFS_TYPES_H
 #define PFS_TYPES_H
 
-#include "int_sizes.h"
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -21,27 +22,27 @@ See the file COPYING for details.
 #define PFS_LINE_MAX 1024
 #define PFS_ARG_MAX  1024
 
-typedef INT64_T pfs_ssize_t;
-typedef INT64_T pfs_size_t;
-typedef INT64_T pfs_off_t;
+typedef int64_t pfs_ssize_t;
+typedef int64_t pfs_size_t;
+typedef int64_t pfs_off_t;
 
 #define PFS_SIZE_FORMAT "lld"
 
 struct pfs_stat {
-	INT64_T	st_dev;
-	INT64_T	st_ino;
-	INT64_T	st_mode;
-	INT64_T	st_nlink;
-	INT64_T	st_uid;
-	INT64_T	st_gid;
-	INT64_T	st_rdev;
-	INT64_T	st_size;
-	INT64_T	st_blksize;
-	INT64_T	st_blocks;
+	int64_t	st_dev;
+	int64_t	st_ino;
+	int64_t	st_mode;
+	int64_t	st_nlink;
+	int64_t	st_uid;
+	int64_t	st_gid;
+	int64_t	st_rdev;
+	int64_t	st_size;
+	int64_t	st_blksize;
+	int64_t	st_blocks;
 #if !defined(st_atime)
-	INT64_T st_atime;
-	INT64_T st_mtime;
-	INT64_T st_ctime;
+	int64_t st_atime;
+	int64_t st_mtime;
+	int64_t st_ctime;
 #else
 	struct timespec st_atim;
 	struct timespec st_mtim;
@@ -50,13 +51,13 @@ struct pfs_stat {
 };
 
 struct pfs_statfs {
-	INT64_T	f_type;
-	INT64_T f_blocks;
-	INT64_T f_bavail;
-	INT64_T f_bsize;
-	INT64_T f_bfree;
-	INT64_T f_files;
-	INT64_T f_ffree;
+	int64_t	f_type;
+	int64_t f_blocks;
+	int64_t f_bavail;
+	int64_t f_bsize;
+	int64_t f_bfree;
+	int64_t f_files;
+	int64_t f_ffree;
 };
 
 extern uid_t pfs_uid;

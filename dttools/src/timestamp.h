@@ -12,14 +12,14 @@ See the file COPYING for details.
 Portable routines for high resolution timing.
 */
 
-#include "int_sizes.h"
 #include <time.h>
+#include <inttypes.h>
 
 /** A type to hold the current time, in microseconds since January 1st, 1970. */
 
-typedef UINT64_T timestamp_t;
+typedef uint64_t timestamp_t;
 
-#define TIMESTAMP_FORMAT UINT64_FORMAT
+#define TIMESTAMP_FORMAT PRIu64
 
 /** Get the current time.
 @return The current time, in microseconds since January 1st, 1970.

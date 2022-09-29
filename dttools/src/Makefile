@@ -145,7 +145,6 @@ HEADERS_PUBLIC = \
 	histogram.h \
 	host_memory_info.h \
 	http_query.h \
-	int_sizes.h \
 	itable.h \
 	jx.h \
 	jx_match.h \

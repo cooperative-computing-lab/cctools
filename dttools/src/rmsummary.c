@@ -23,7 +23,6 @@
 
 #include "buffer.h"
 #include "debug.h"
-#include "int_sizes.h"
 #include "jx.h"
 #include "jx_parse.h"
 #include "jx_pretty_print.h"

@@ -18,10 +18,10 @@ See the file COPYING for details.
 #include <errno.h>
 #include <sys/stat.h>
 
-static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, const char *hostname, const char *rpath, const char *hostsubject, time_t stoptime)
+static int64_t chirp_thirdput_recursive(const char *subject, const char *lpath, const char *hostname, const char *rpath, const char *hostsubject, time_t stoptime)
 {
 	struct chirp_stat info;
-	INT64_T size = 0, result;
+	int64_t size = 0, result;
 	char newlpath[CHIRP_PATH_MAX];
 	char newrpath[CHIRP_PATH_MAX];
 	int save_errno;
@@ -122,12 +122,12 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 			struct chirp_file *F = chirp_reli_open(hostname, rpath, O_WRONLY|O_CREAT|O_TRUNC, info.cst_mode, stoptime);
 			if(F) {
 				char buffer[65536];
-				INT64_T offset = 0;
-				INT64_T nread;
+				int64_t offset = 0;
+				int64_t nread;
 				while ((nread = cfs->pread(fd, buffer, sizeof(buffer), offset)) > 0) {
-					INT64_T nwritten = 0;
+					int64_t nwritten = 0;
 					while (nwritten < nread) {
-						INT64_T nwrite = chirp_reli_pwrite(F, buffer+nwritten, nread-nwritten, offset, stoptime);
+						int64_t nwrite = chirp_reli_pwrite(F, buffer+nwritten, nread-nwritten, offset, stoptime);
 						if (nwrite == -1) {
 							save_errno = errno;
 							cfs->close(fd);
@@ -161,9 +161,9 @@ static INT64_T chirp_thirdput_recursive(const char *subject, const char *lpath, 
 	return -1;
 }
 
-INT64_T chirp_thirdput(const char *subject, const char *lpath, const char *hostname, const char *rpath, time_t stoptime)
+int64_t chirp_thirdput(const char *subject, const char *lpath, const char *hostname, const char *rpath, time_t stoptime)
 {
-	INT64_T result;
+	int64_t result;
 	time_t start, stop;
 	char hostsubject[CHIRP_PATH_MAX];
 

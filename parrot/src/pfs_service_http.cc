@@ -32,7 +32,7 @@ extern "C" {
 
 extern int pfs_main_timeout;
 
-static struct link * http_fetch( pfs_name *name, const char *action, INT64_T *size )
+static struct link * http_fetch( pfs_name *name, const char *action, int64_t *size )
 {
 	char url[HTTP_LINE_MAX];
 
@@ -49,10 +49,10 @@ class pfs_file_http : public pfs_file
 {
 private:
 	struct link *link;
-	INT64_T size;
+	int64_t size;
 
 public:
-	pfs_file_http( pfs_name *n, struct link *l, INT64_T s ) : pfs_file(n) {
+	pfs_file_http( pfs_name *n, struct link *l, int64_t s ) : pfs_file(n) {
 		link = l;
 		size = s;
 	}
@@ -87,7 +87,7 @@ public:
 
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
 		struct link *link;
-		INT64_T size;
+		int64_t size;
 
 		if((flags&O_ACCMODE)!=O_RDONLY) {
 			errno = EROFS;
@@ -104,7 +104,7 @@ public:
 
 	virtual int stat( pfs_name *name, struct pfs_stat *buf ) {
 		struct link *link;
-		INT64_T size;
+		int64_t size;
 
 		link = http_fetch(name,"HEAD",&size);
 		if(link) {

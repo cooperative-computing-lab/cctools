@@ -38,6 +38,7 @@ the right include files.  So, we just define our own.
 
 #include <sched.h>
 #include <linux/net.h>
+#include <inttypes.h>
 
 /*
 On Linux, fork() does not cause the child process to
@@ -58,173 +59,173 @@ level that does not concern us.
 */
 
 struct pfs_kernel_timespec {
-	UINT32_T tv_sec;
-	UINT32_T tv_nsec;
+	uint32_t tv_sec;
+	uint32_t tv_nsec;
 } __attribute__((packed));
 
 struct pfs_kernel_timeval {
-	UINT32_T tv_sec;
-	UINT32_T tv_usec;
+	uint32_t tv_sec;
+	uint32_t tv_usec;
 } __attribute__((packed));
 
 struct pfs_kernel_utimbuf {
-	UINT32_T actime;
-	UINT32_T modtime;
+	uint32_t actime;
+	uint32_t modtime;
 } __attribute__((packed));
 
 struct pfs_kernel_rusage {
 	struct pfs_kernel_timeval ru_utime;
 	struct pfs_kernel_timeval ru_stime;
-	INT32_T ru_maxrss;
-	INT32_T ru_ixrss;
-	INT32_T ru_idrss;
-	INT32_T ru_isrss;
-	INT32_T ru_minflt;
-	INT32_T ru_majflt;
-	INT32_T ru_nswap;
-	INT32_T ru_inblock;
-	INT32_T ru_oublock;
-	INT32_T ru_msgsnd;
-	INT32_T ru_msgrcv;
-	INT32_T ru_nsignals;
-	INT32_T ru_nvcsw;
-	INT32_T ru_nivcsw;
+	int32_t ru_maxrss;
+	int32_t ru_ixrss;
+	int32_t ru_idrss;
+	int32_t ru_isrss;
+	int32_t ru_minflt;
+	int32_t ru_majflt;
+	int32_t ru_nswap;
+	int32_t ru_inblock;
+	int32_t ru_oublock;
+	int32_t ru_msgsnd;
+	int32_t ru_msgrcv;
+	int32_t ru_nsignals;
+	int32_t ru_nvcsw;
+	int32_t ru_nivcsw;
 } __attribute__((packed));
 
 struct pfs_kernel_stat {
-	UINT32_T st_dev;
-	UINT32_T st_ino;
-	UINT16_T st_mode;
-	UINT16_T st_nlink;
-	UINT16_T st_uid;
-	UINT16_T st_gid;
-	UINT32_T st_rdev;
-	UINT32_T st_size;
-	UINT32_T st_blksize;
-	UINT32_T st_blocks;
+	uint32_t st_dev;
+	uint32_t st_ino;
+	uint16_t st_mode;
+	uint16_t st_nlink;
+	uint16_t st_uid;
+	uint16_t st_gid;
+	uint32_t st_rdev;
+	uint32_t st_size;
+	uint32_t st_blksize;
+	uint32_t st_blocks;
 #if !defined(st_atime)
-		INT32_T st_atime;
-		INT32_T st_atime_nsec;
-		INT32_T st_mtime;
-		INT32_T st_mtime_nsec;
-		INT32_T st_ctime;
-		INT32_T st_ctime_nsec;
+		int32_t st_atime;
+		int32_t st_atime_nsec;
+		int32_t st_mtime;
+		int32_t st_mtime_nsec;
+		int32_t st_ctime;
+		int32_t st_ctime_nsec;
 #else
 	struct pfs_kernel_timespec st_atim;
 	struct pfs_kernel_timespec st_mtim;
 	struct pfs_kernel_timespec st_ctim;
 #endif
-	UINT32_T st_p4;
-	UINT32_T st_p5;
+	uint32_t st_p4;
+	uint32_t st_p5;
 } __attribute__((packed));
 
 struct pfs_kernel_stat64 {
-	UINT64_T st_dev;
-	UINT32_T st_pad1;
-	UINT32_T st_ino;
-	UINT32_T st_mode;
-	UINT32_T st_nlink;
-	UINT32_T st_uid;
-	UINT32_T st_gid;
-	UINT64_T st_rdev;
-	UINT32_T st_pad2;
-	INT64_T st_size;
-	UINT32_T st_blksize;
-	UINT64_T st_blocks;
+	uint64_t st_dev;
+	uint32_t st_pad1;
+	uint32_t st_ino;
+	uint32_t st_mode;
+	uint32_t st_nlink;
+	uint32_t st_uid;
+	uint32_t st_gid;
+	uint64_t st_rdev;
+	uint32_t st_pad2;
+	int64_t st_size;
+	uint32_t st_blksize;
+	uint64_t st_blocks;
 #if !defined(st_atime)
-		UINT32_T st_atime;
-		UINT32_T st_atime_nsec;
-		UINT32_T st_mtime;
-		UINT32_T st_mtime_nsec;
-		UINT32_T st_ctime;
-		UINT32_T st_ctime_nsec;
+		uint32_t st_atime;
+		uint32_t st_atime_nsec;
+		uint32_t st_mtime;
+		uint32_t st_mtime_nsec;
+		uint32_t st_ctime;
+		uint32_t st_ctime_nsec;
 #else
 		struct pfs_kernel_timespec st_atim;
 		struct pfs_kernel_timespec st_mtim;
 		struct pfs_kernel_timespec st_ctim;
 #endif
-	UINT64_T st_ino_extra;
+	uint64_t st_ino_extra;
 } __attribute__((packed));
 
 struct pfs_kernel_statfs {
-		UINT32_T f_type;
-		UINT32_T f_bsize;
-		UINT32_T f_blocks;
-		UINT32_T f_bfree;
-		UINT32_T f_bavail;
-		UINT32_T f_files;
-		UINT32_T f_ffree;
-	UINT64_T f_fsid;
-		UINT32_T f_namelen;
-		UINT32_T f_spare[6];
+		uint32_t f_type;
+		uint32_t f_bsize;
+		uint32_t f_blocks;
+		uint32_t f_bfree;
+		uint32_t f_bavail;
+		uint32_t f_files;
+		uint32_t f_ffree;
+	uint64_t f_fsid;
+		uint32_t f_namelen;
+		uint32_t f_spare[6];
 } __attribute__((packed));
 
 struct pfs_kernel_statfs64 {
-		UINT32_T f_type;
-		UINT32_T f_bsize;
-		UINT64_T f_blocks;
-		UINT64_T f_bfree;
-		UINT64_T f_bavail;
-		UINT64_T f_files;
-		UINT64_T f_ffree;
-		UINT64_T f_fsid;
-		UINT32_T f_namelen;
-		UINT32_T f_frsize;
-		UINT32_T f_spare[5];
+		uint32_t f_type;
+		uint32_t f_bsize;
+		uint64_t f_blocks;
+		uint64_t f_bfree;
+		uint64_t f_bavail;
+		uint64_t f_files;
+		uint64_t f_ffree;
+		uint64_t f_fsid;
+		uint32_t f_namelen;
+		uint32_t f_frsize;
+		uint32_t f_spare[5];
 } __attribute__((packed));
 
 struct pfs_kernel_iovec {
-	UINT32_T iov_base;
-	UINT32_T iov_len;
+	uint32_t iov_base;
+	uint32_t iov_len;
 } __attribute__((packed));
 
 struct pfs_kernel_msghdr {
-	UINT32_T msg_name;
-	UINT32_T msg_namelen;
-	UINT32_T msg_iov;
-	UINT32_T msg_iovlen;
-	UINT32_T msg_control;
-	UINT32_T msg_controllen;
-	UINT32_T msg_flags;
+	uint32_t msg_name;
+	uint32_t msg_namelen;
+	uint32_t msg_iov;
+	uint32_t msg_iovlen;
+	uint32_t msg_control;
+	uint32_t msg_controllen;
+	uint32_t msg_flags;
 } __attribute__((packed));
 
 struct pfs_kernel_cmsghdr {
-	UINT32_T cmsg_len;
-	INT32_T cmsg_level;
-	INT32_T cmsg_type;
+	uint32_t cmsg_len;
+	int32_t cmsg_level;
+	int32_t cmsg_type;
 } __attribute__((packed));
 
 struct pfs_kernel_sockaddr_un {
-	UINT16_T sun_family;
+	uint16_t sun_family;
 	char sun_path[108];
 } __attribute__((packed));
 
 struct pfs_kernel_sigaction {
-	UINT32_T pfs_sa_handler;
-	UINT32_T pfs_sa_flags;
-	UINT32_T pfs_sa_restorer;
-	UINT8_T  pfs_sa_mask[128];
+	uint32_t pfs_sa_handler;
+	uint32_t pfs_sa_flags;
+	uint32_t pfs_sa_restorer;
+	uint8_t  pfs_sa_mask[128];
 } __attribute__((packed));
 
 struct pfs_kernel_ifconf {
-	UINT32_T ifc_len;
-	UINT32_T ifc_buffer;
+	uint32_t ifc_len;
+	uint32_t ifc_buffer;
 } __attribute__ ((packed));
 
 struct pfs_kernel_flock {
-	UINT16_T l_type;
-	UINT16_T l_whence;
-	UINT32_T l_start;
-	UINT32_T l_len;
-	UINT32_T l_pid;
+	uint16_t l_type;
+	uint16_t l_whence;
+	uint32_t l_start;
+	uint32_t l_len;
+	uint32_t l_pid;
 }__attribute__ ((packed));
 
 struct pfs_kernel_flock64 {
-	UINT16_T l_type;
-	UINT16_T l_whence;
-	UINT64_T l_start;
-	UINT64_T l_len;
-	UINT32_T l_pid;
+	uint16_t l_type;
+	uint16_t l_whence;
+	uint64_t l_start;
+	uint64_t l_len;
+	uint32_t l_pid;
 }__attribute__ ((packed));
 
 #ifndef CLONE_PTRACE

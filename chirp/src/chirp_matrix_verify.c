@@ -40,7 +40,7 @@ int function_flag;
 
 int (*compare_two_files) (char *filename1, char *filename2) = NULL;
 
-INT64_T get_local_path(char *, char *, time_t);
+int64_t get_local_path(char *, char *, time_t);
 
 // Using mmap() in file I/O
 int compare_bitwise(char *filename1, char *filename2)
@@ -618,7 +618,7 @@ int main(int argc, char *argv[])
 }
 
 
-INT64_T get_local_path(char *local_path, char *path, time_t stoptime)
+int64_t get_local_path(char *local_path, char *path, time_t stoptime)
 {
 	char *hostname, *chirp_path;
 	char *p;
@@ -655,7 +655,7 @@ INT64_T get_local_path(char *local_path, char *path, time_t stoptime)
 	}
 
 
-	INT64_T retval;
+	int64_t retval;
 
 	// get chirp path
 	count = 0;

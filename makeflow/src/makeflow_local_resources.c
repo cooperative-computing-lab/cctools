@@ -23,7 +23,7 @@ void makeflow_local_resources_debug( struct rmsummary *r )
 
 void makeflow_local_resources_measure( struct rmsummary *r )
 {
-	UINT64_T avail, total;
+	uint64_t avail, total;
 
 	r->cores = load_average_get_cpus();
 

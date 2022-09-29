@@ -21,7 +21,7 @@ struct list * makeflow_hook_self = NULL;
 
 #define MAKEFLOW_HOOK_CALL(hook_name, ...) do { \
 	int rc = MAKEFLOW_HOOK_SUCCESS; \
-	INT64_T debug_flags = D_MAKEFLOW_HOOK; \
+	int64_t debug_flags = D_MAKEFLOW_HOOK; \
 	if (!makeflow_hooks) \
 		return rc; \
 	struct list_cursor *cur = list_cursor_create(makeflow_hooks); \

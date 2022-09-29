@@ -11,12 +11,26 @@ See the file COPYING for details.
 #include "macros.h"
 
 #include <time.h>
+#include <inttypes.h>
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/mount.h>
 
-int host_disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
+#ifdef HAS_SYS_STATFS_H
+#include <sys/statfs.h>
+#endif
+
+#ifdef HAS_SYS_STATVFS_H
+#include <sys/statvfs.h>
+#endif
+
+#ifdef HAS_SYS_VFS_H
+#include <sys/vfs.h>
+#endif
+
+
+int host_disk_info_get(const char *path, uint64_t * avail, uint64_t * total)
 {
 	int result;
 	struct statfs s;
@@ -25,8 +39,8 @@ int host_disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
 	if(result < 0)
 		return result;
 
-	*total = ((UINT64_T) s.f_bsize) * s.f_blocks;
-	*avail = ((UINT64_T) s.f_bsize) * s.f_bavail;
+	*total = ((uint64_t) s.f_bsize) * s.f_blocks;
+	*avail = ((uint64_t) s.f_bsize) * s.f_bavail;
 
 	return 0;
 }

@@ -328,7 +328,7 @@ static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct bat
 	int t, c;
 
 	while(1) {
-		UINT64_T ujobid;
+		uint64_t ujobid;
 		itable_firstkey(q->job_table);
 		while(itable_nextkey(q->job_table, &ujobid, (void **) &info)) {
 			jobid = ujobid;

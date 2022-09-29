@@ -200,7 +200,7 @@ static void copystat(struct chirp_stat *cs, hdfsFileInfo * hs, const char *path)
 	cs->cst_atime = cs->cst_mtime = cs->cst_ctime = hs->mLastMod;
 }
 
-static INT64_T do_stat(const char *path, struct chirp_stat *buf)
+static int64_t do_stat(const char *path, struct chirp_stat *buf)
 {
 	debug(D_HDFS, "stat %s", path);
 	hdfsFileInfo *file_info = hdfs_services->stat(fs, path);
@@ -211,13 +211,13 @@ static INT64_T do_stat(const char *path, struct chirp_stat *buf)
 	return 0;
 }
 
-static INT64_T chirp_fs_hdfs_stat(const char *path, struct chirp_stat *buf)
+static int64_t chirp_fs_hdfs_stat(const char *path, struct chirp_stat *buf)
 {
 	RESOLVE(path)
 	return do_stat(path, buf);
 }
 
-static INT64_T chirp_fs_hdfs_fstat(int fd, struct chirp_stat *buf)
+static int64_t chirp_fs_hdfs_fstat(int fd, struct chirp_stat *buf)
 {
 	SETUP_FILE
 	return do_stat(open_files[fd].path, buf);
@@ -282,7 +282,7 @@ HDFS is known to return bogus errnos from unlink,
 so check for directories beforehand, and set the errno
 properly afterwards if needed.
 */
-static INT64_T do_unlink(const char *path, int recursive )
+static int64_t do_unlink(const char *path, int recursive )
 {
 	struct chirp_stat info;
 
@@ -303,9 +303,9 @@ static INT64_T do_unlink(const char *path, int recursive )
 	return 0;
 }
 
-static INT64_T getfd(void)
+static int64_t getfd(void)
 {
-	INT64_T fd;
+	int64_t fd;
 	/* find an unused file descriptor */
 	for(fd = 0; fd < CHIRP_FILESYSTEM_MAXFD; fd++)
 		if(!open_files[fd].file)
@@ -315,11 +315,11 @@ static INT64_T getfd(void)
 	return -1;
 }
 
-static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
+static int64_t chirp_fs_hdfs_open(const char *path, int64_t flags, int64_t mode)
 {
 	struct chirp_stat info;
 	RESOLVE(path)
-	INT64_T fd = getfd();
+	int64_t fd = getfd();
 	if(fd == -1) return -1;
 
 	int result = do_stat(path, &info);
@@ -391,7 +391,7 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 	}
 }
 
-static INT64_T chirp_fs_hdfs_close(int fd)
+static int64_t chirp_fs_hdfs_close(int fd)
 {
 	SETUP_FILE
 	debug(D_HDFS, "close %s", open_files[fd].path);
@@ -400,14 +400,14 @@ static INT64_T chirp_fs_hdfs_close(int fd)
 	return hdfs_services->close(fs, file);
 }
 
-static INT64_T chirp_fs_hdfs_pread(int fd, void *buffer, INT64_T length, INT64_T offset)
+static int64_t chirp_fs_hdfs_pread(int fd, void *buffer, int64_t length, int64_t offset)
 {
 	SETUP_FILE
 	debug(D_HDFS, "pread %d %"PRId64" %"PRId64"", fd, length, offset);
 	return hdfs_services->pread(fs, file, offset, buffer, length);
 }
 
-static void chirp_fs_hdfs_write_zeroes(hdfsFile file, INT64_T length)
+static void chirp_fs_hdfs_write_zeroes(hdfsFile file, int64_t length)
 {
 	/* ANSI C standard requires this be initialized with 0.
 	 *
@@ -424,10 +424,10 @@ static void chirp_fs_hdfs_write_zeroes(hdfsFile file, INT64_T length)
 	}
 }
 
-static INT64_T chirp_fs_hdfs_pwrite(int fd, const void *buffer, INT64_T length, INT64_T offset)
+static int64_t chirp_fs_hdfs_pwrite(int fd, const void *buffer, int64_t length, int64_t offset)
 {
 	SETUP_FILE
-	INT64_T current = hdfs_services->tell(fs, file);
+	int64_t current = hdfs_services->tell(fs, file);
 
 	/* We cannot seek backwards while writing */
 	if(offset < current) {
@@ -452,7 +452,7 @@ static INT64_T chirp_fs_hdfs_pwrite(int fd, const void *buffer, INT64_T length, 
 	return hdfs_services->write(fs, file, buffer, length);
 }
 
-static INT64_T chirp_fs_hdfs_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
+static int64_t chirp_fs_hdfs_swrite(int fd, const void *vbuffer, int64_t length, int64_t stride_length, int64_t stride_skip, int64_t offset)
 {
 	SETUP_FILE
 	/* Strided write won't work on HDFS because it is a variation on random write. */
@@ -460,7 +460,7 @@ static INT64_T chirp_fs_hdfs_swrite(int fd, const void *vbuffer, INT64_T length,
 	return -1;
 }
 
-static INT64_T chirp_fs_hdfs_fchmod(int fd, INT64_T mode)
+static int64_t chirp_fs_hdfs_fchmod(int fd, int64_t mode)
 {
 	struct chirp_stat info;
 	SETUP_FILE
@@ -476,7 +476,7 @@ static INT64_T chirp_fs_hdfs_fchmod(int fd, INT64_T mode)
 	return hdfs_services->chmod(fs, open_files[fd].path, mode);
 }
 
-static INT64_T chirp_fs_hdfs_ftruncate(int fd, INT64_T length)
+static int64_t chirp_fs_hdfs_ftruncate(int fd, int64_t length)
 {
 	SETUP_FILE
 	debug(D_HDFS, "ftruncate %d %"PRId64, fd, length);
@@ -495,28 +495,28 @@ static INT64_T chirp_fs_hdfs_ftruncate(int fd, INT64_T length)
 	}
 }
 
-static INT64_T chirp_fs_hdfs_fsync(int fd)
+static int64_t chirp_fs_hdfs_fsync(int fd)
 {
 	SETUP_FILE
 	debug(D_HDFS, "fsync %s", open_files[fd].path);
 	return hdfs_services->flush(fs, file);
 }
 
-static INT64_T chirp_fs_hdfs_unlink(const char *path)
+static int64_t chirp_fs_hdfs_unlink(const char *path)
 {
 	RESOLVE(path)
 	debug(D_HDFS,"unlink %s",path);
 	return do_unlink(path,0);
 }
 
-static INT64_T chirp_fs_hdfs_rmall(const char *path)
+static int64_t chirp_fs_hdfs_rmall(const char *path)
 {
 	RESOLVE(path)
 	debug(D_HDFS,"rmall %s",path);
 	return do_unlink(path,1);
 }
 
-static INT64_T chirp_fs_hdfs_rename(const char *path, const char *newpath)
+static int64_t chirp_fs_hdfs_rename(const char *path, const char *newpath)
 {
 	RESOLVE(path)
 	RESOLVE(newpath)
@@ -525,7 +525,7 @@ static INT64_T chirp_fs_hdfs_rename(const char *path, const char *newpath)
 	return hdfs_services->rename(fs, path, newpath);
 }
 
-static INT64_T chirp_fs_hdfs_link(const char *path, const char *newpath)
+static int64_t chirp_fs_hdfs_link(const char *path, const char *newpath)
 {
 	RESOLVE(path)
 	RESOLVE(newpath)
@@ -533,7 +533,7 @@ static INT64_T chirp_fs_hdfs_link(const char *path, const char *newpath)
 	return (errno = ENOTSUP, -1);
 }
 
-static INT64_T chirp_fs_hdfs_symlink(const char *path, const char *newpath)
+static int64_t chirp_fs_hdfs_symlink(const char *path, const char *newpath)
 {
 	RESOLVE(path)
 	RESOLVE(newpath)
@@ -541,14 +541,14 @@ static INT64_T chirp_fs_hdfs_symlink(const char *path, const char *newpath)
 	return (errno = ENOTSUP, -1);
 }
 
-static INT64_T chirp_fs_hdfs_readlink(const char *path, char *buf, INT64_T length)
+static int64_t chirp_fs_hdfs_readlink(const char *path, char *buf, int64_t length)
 {
 	RESOLVE(path)
 	debug(D_HDFS, "readlink %s %"PRId64"", path, length);
 	return (errno = EINVAL, -1);
 }
 
-static INT64_T chirp_fs_hdfs_mkdir(const char *path, INT64_T mode)
+static int64_t chirp_fs_hdfs_mkdir(const char *path, int64_t mode)
 {
 	struct chirp_stat info;
 	RESOLVE(path)
@@ -563,7 +563,7 @@ static INT64_T chirp_fs_hdfs_mkdir(const char *path, INT64_T mode)
 	return hdfs_services->mkdir(fs, path);
 }
 
-static INT64_T chirp_fs_hdfs_rmdir(const char *path)
+static int64_t chirp_fs_hdfs_rmdir(const char *path)
 {
 	RESOLVE(path)
 	debug(D_HDFS, "rmdir %s", path);
@@ -586,20 +586,20 @@ static INT64_T chirp_fs_hdfs_rmdir(const char *path)
 	return 0;
 }
 
-static INT64_T chirp_fs_hdfs_lstat(const char *path, struct chirp_stat *buf)
+static int64_t chirp_fs_hdfs_lstat(const char *path, struct chirp_stat *buf)
 {
 	RESOLVE(path)
 	debug(D_HDFS, "lstat %s", path);
 	return do_stat(path, buf);
 }
 
-static INT64_T do_statfs(const char *path, struct chirp_statfs *buf)
+static int64_t do_statfs(const char *path, struct chirp_statfs *buf)
 {
 	debug(D_HDFS, "statfs %s", path);
 
-	INT64_T capacity = hdfs_services->get_capacity(fs);
-	INT64_T used = hdfs_services->get_used(fs);
-	INT64_T blocksize = hdfs_services->get_default_block_size(fs);
+	int64_t capacity = hdfs_services->get_capacity(fs);
+	int64_t used = hdfs_services->get_used(fs);
+	int64_t blocksize = hdfs_services->get_default_block_size(fs);
 
 	if(capacity < 0 || used < 0 || blocksize < 0)
 		return (errno = EIO, -1);
@@ -613,19 +613,19 @@ static INT64_T do_statfs(const char *path, struct chirp_statfs *buf)
 	return 0;
 }
 
-static INT64_T chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs *buf)
+static int64_t chirp_fs_hdfs_statfs(const char *path, struct chirp_statfs *buf)
 {
 	RESOLVE(path)
 	return do_statfs(path, buf);
 }
 
-static INT64_T chirp_fs_hdfs_fstatfs(int fd, struct chirp_statfs *buf)
+static int64_t chirp_fs_hdfs_fstatfs(int fd, struct chirp_statfs *buf)
 {
 	SETUP_FILE
 	return do_statfs(open_files[fd].path, buf);
 }
 
-static INT64_T chirp_fs_hdfs_access(const char *path, INT64_T mode)
+static int64_t chirp_fs_hdfs_access(const char *path, int64_t mode)
 {
 	/* W_OK is ok to delete, not to write, but we can't distinguish intent */
 	/* Chirp ACL will check that we can access the file the way we want, so
@@ -635,7 +635,7 @@ static INT64_T chirp_fs_hdfs_access(const char *path, INT64_T mode)
 	return hdfs_services->exists(fs, path);
 }
 
-static INT64_T chirp_fs_hdfs_chmod(const char *path, INT64_T mode)
+static int64_t chirp_fs_hdfs_chmod(const char *path, int64_t mode)
 {
 	struct chirp_stat info;
 	RESOLVE(path)
@@ -651,7 +651,7 @@ static INT64_T chirp_fs_hdfs_chmod(const char *path, INT64_T mode)
 	return hdfs_services->chmod(fs, path, mode);
 }
 
-static INT64_T chirp_fs_hdfs_truncate(const char *path, INT64_T length)
+static int64_t chirp_fs_hdfs_truncate(const char *path, int64_t length)
 {
 	struct chirp_stat info;
 	RESOLVE(path)
@@ -673,14 +673,14 @@ static INT64_T chirp_fs_hdfs_truncate(const char *path, INT64_T length)
 	}
 }
 
-static INT64_T chirp_fs_hdfs_utime(const char *path, time_t actime, time_t modtime)
+static int64_t chirp_fs_hdfs_utime(const char *path, time_t actime, time_t modtime)
 {
 	RESOLVE(path)
 	debug(D_HDFS, "utime %s %ld %ld", path, (long) actime, (long) modtime);
 	return hdfs_services->utime(fs, path, modtime, actime);
 }
 
-static INT64_T chirp_fs_hdfs_setrep(const char *path, int nreps)
+static int64_t chirp_fs_hdfs_setrep(const char *path, int nreps)
 {
 	RESOLVE(path)
 	debug(D_HDFS, "setrep %s %d", path, nreps);

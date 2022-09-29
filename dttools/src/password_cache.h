@@ -10,7 +10,6 @@ See the password COPYING for details.
 
 #include <sys/types.h>
 
-#include "int_sizes.h"
 
 struct password_cache {
 	char *username;

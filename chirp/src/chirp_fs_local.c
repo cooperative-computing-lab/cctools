@@ -13,7 +13,6 @@ See the file COPYING for details.
 #include "debug.h"
 #include "unlink_recursive.h"
 #include "full_io.h"
-#include "int_sizes.h"
 #include "mkdir_recursive.h"
 #include "path.h"
 #include "uuid.h"
@@ -102,14 +101,14 @@ See the file COPYING for details.
 static int rootfd = -1;
 
 static struct {
-	INT64_T fd;
+	int64_t fd;
 	char path[CHIRP_PATH_MAX];
 } open_files[CHIRP_FILESYSTEM_MAXFD];
 
 static const char nulpath[1] = "";
 
 #define PREAMBLE(fmt, ...) \
-	INT64_T rc = 0;\
+	int64_t rc = 0;\
 	int dirfd = -1;\
 	char basename[CHIRP_PATH_MAX];\
 	debug(D_LOCAL, fmt, __VA_ARGS__);\
@@ -365,9 +364,9 @@ out:
 	return RCUNIX(rc);
 }
 
-static INT64_T getfd(void)
+static int64_t getfd(void)
 {
-	INT64_T fd;
+	int64_t fd;
 	/* find an unused file descriptor */
 	for(fd = 0; fd < CHIRP_FILESYSTEM_MAXFD; fd++)
 		if(open_files[fd].fd == -1)
@@ -377,12 +376,12 @@ static INT64_T getfd(void)
 	return -1;
 }
 
-static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode)
+static int64_t chirp_fs_local_open(const char *path, int64_t flags, int64_t mode)
 {
 	PREAMBLE("open(`%s', 0x%" PRIx64 ", 0o%" PRIo64 ")", path, flags, mode);
 	const char *unresolved = path;
 	RESOLVE(path, 1)
-	INT64_T fd = getfd();
+	int64_t fd = getfd();
 	if (fd >= 0) {
 		mode &= S_IXUSR|S_IRWXG|S_IRWXO;
 		mode |= S_IRUSR|S_IWUSR;
@@ -398,7 +397,7 @@ static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_close(int fd)
+static int64_t chirp_fs_local_close(int fd)
 {
 	PREAMBLE("close(%d)", fd);
 	SETUP_FILE
@@ -410,7 +409,7 @@ static INT64_T chirp_fs_local_close(int fd)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_pread(int fd, void *buffer, INT64_T length, INT64_T offset)
+static int64_t chirp_fs_local_pread(int fd, void *buffer, int64_t length, int64_t offset)
 {
 	PREAMBLE("pread(%d, %p, %zu, %" PRId64 ")", fd, buffer, (size_t)length, offset);
 	SETUP_FILE
@@ -422,7 +421,7 @@ static INT64_T chirp_fs_local_pread(int fd, void *buffer, INT64_T length, INT64_
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_pwrite(int fd, const void *buffer, INT64_T length, INT64_T offset)
+static int64_t chirp_fs_local_pwrite(int fd, const void *buffer, int64_t length, int64_t offset)
 {
 	PREAMBLE("pwrite(%d, %p, %zu, %" PRId64 ")", fd, buffer, (size_t)length, offset);
 	SETUP_FILE
@@ -434,7 +433,7 @@ static INT64_T chirp_fs_local_pwrite(int fd, const void *buffer, INT64_T length,
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_lockf (int fd, int cmd, INT64_T len)
+static int64_t chirp_fs_local_lockf (int fd, int cmd, int64_t len)
 {
 	PREAMBLE("lockf(%d, 0o%o, %" PRId64 ")", fd, cmd, len);
 	SETUP_FILE
@@ -442,7 +441,7 @@ static INT64_T chirp_fs_local_lockf (int fd, int cmd, INT64_T len)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat *info)
+static int64_t chirp_fs_local_fstat(int fd, struct chirp_stat *info)
 {
 	PREAMBLE("fstat(%d, %p)", fd, info);
 	SETUP_FILE
@@ -453,7 +452,7 @@ static INT64_T chirp_fs_local_fstat(int fd, struct chirp_stat *info)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs *info)
+static int64_t chirp_fs_local_fstatfs(int fd, struct chirp_statfs *info)
 {
 	PREAMBLE("fstatfs(%d, %p)", fd, info);
 	SETUP_FILE
@@ -464,7 +463,7 @@ static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs *info)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_fchmod(int fd, INT64_T mode)
+static int64_t chirp_fs_local_fchmod(int fd, int64_t mode)
 {
 	PREAMBLE("fchmod(%d, 0o%" PRIo64 ")", fd, mode);
 	SETUP_FILE
@@ -481,7 +480,7 @@ static INT64_T chirp_fs_local_fchmod(int fd, INT64_T mode)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_ftruncate(int fd, INT64_T length)
+static int64_t chirp_fs_local_ftruncate(int fd, int64_t length)
 {
 	PREAMBLE("ftruncate(%d, %" PRId64 ")", fd, length);
 	SETUP_FILE
@@ -489,7 +488,7 @@ static INT64_T chirp_fs_local_ftruncate(int fd, INT64_T length)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_fsync(int fd)
+static int64_t chirp_fs_local_fsync(int fd)
 {
 	PREAMBLE("fsync(%d)", fd);
 	SETUP_FILE
@@ -497,7 +496,7 @@ static INT64_T chirp_fs_local_fsync(int fd)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_unlink(const char *path)
+static int64_t chirp_fs_local_unlink(const char *path)
 {
 	PREAMBLE("unlink(`%s')", path);
 	RESOLVE(path, 0)
@@ -525,7 +524,7 @@ static INT64_T chirp_fs_local_unlink(const char *path)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_rmall(const char *path)
+static int64_t chirp_fs_local_rmall(const char *path)
 {
 	PREAMBLE("rmall(`%s')", path);
 	RESOLVE(path, 0)
@@ -533,7 +532,7 @@ static INT64_T chirp_fs_local_rmall(const char *path)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_rename(const char *old, const char *new)
+static int64_t chirp_fs_local_rename(const char *old, const char *new)
 {
 	PREAMBLE("rename(`%s', `%s')", old, new);
 	RESOLVE(old, 0)
@@ -545,7 +544,7 @@ static INT64_T chirp_fs_local_rename(const char *old, const char *new)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_link(const char *target, const char *path)
+static int64_t chirp_fs_local_link(const char *target, const char *path)
 {
 	PREAMBLE("link(`%s', `%s')", target, path);
 	RESOLVE(target, 0)
@@ -557,7 +556,7 @@ static INT64_T chirp_fs_local_link(const char *target, const char *path)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_symlink(const char *target, const char *path)
+static int64_t chirp_fs_local_symlink(const char *target, const char *path)
 {
 	PREAMBLE("symlink(`%s', `%s')", target, path);
 	RESOLVE(path, 0)
@@ -565,7 +564,7 @@ static INT64_T chirp_fs_local_symlink(const char *target, const char *path)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_readlink(const char *path, char *buf, INT64_T length)
+static int64_t chirp_fs_local_readlink(const char *path, char *buf, int64_t length)
 {
 	PREAMBLE("readlink(`%s', %p, %zu)", path, buf, (size_t)length);
 	RESOLVE(path, 0)
@@ -573,7 +572,7 @@ static INT64_T chirp_fs_local_readlink(const char *path, char *buf, INT64_T leng
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_mkdir(const char *path, INT64_T mode)
+static int64_t chirp_fs_local_mkdir(const char *path, int64_t mode)
 {
 	PREAMBLE("mkdir(`%s', 0o%" PRIo64 ")", path, mode);
 	RESOLVE(path, 0)
@@ -590,7 +589,7 @@ files such as an ACL and an allocation state.
 Only delete the directory if it contains only those files.
 */
 
-static INT64_T chirp_fs_local_rmdir(const char *path)
+static int64_t chirp_fs_local_rmdir(const char *path)
 {
 	PREAMBLE("rmdir(`%s')", path);
 	RESOLVE(path, 0)
@@ -641,7 +640,7 @@ static INT64_T chirp_fs_local_rmdir(const char *path)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *info)
+static int64_t chirp_fs_local_stat(const char *path, struct chirp_stat *info)
 {
 	PREAMBLE("stat(`%s', %p)", path, info);
 	RESOLVE(path, 1)
@@ -652,7 +651,7 @@ static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *info)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *info)
+static int64_t chirp_fs_local_lstat(const char *path, struct chirp_stat *info)
 {
 	PREAMBLE("lstat(`%s', %p)", path, info);
 	RESOLVE(path, 0)
@@ -663,7 +662,7 @@ static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *info)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *info)
+static int64_t chirp_fs_local_statfs(const char *path, struct chirp_statfs *info)
 {
 	PREAMBLE("statfs(`%s', %p)", path, info);
 	RESOLVE(path, 1)
@@ -683,7 +682,7 @@ static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *info
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_access(const char *path, INT64_T amode)
+static int64_t chirp_fs_local_access(const char *path, int64_t amode)
 {
 	PREAMBLE("access(`%s', 0x%" PRIx64 ")", path, amode);
 	RESOLVE(path, 1)
@@ -747,7 +746,7 @@ static void chirp_fs_local_closedir(struct chirp_dir *dir)
 	free(dir);
 }
 
-static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
+static int64_t chirp_fs_local_chmod(const char *path, int64_t mode)
 {
 	PREAMBLE("chmod(`%s', 0o%" PRIo64 ")", path, mode);
 	RESOLVE(path, 1)
@@ -774,7 +773,7 @@ static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_truncate(const char *path, INT64_T length)
+static int64_t chirp_fs_local_truncate(const char *path, int64_t length)
 {
 	PREAMBLE("truncate(`%s', 0d%" PRId64 ")", path, length);
 	RESOLVE(path, 1)
@@ -791,7 +790,7 @@ static INT64_T chirp_fs_local_truncate(const char *path, INT64_T length)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_utime(const char *path, time_t actime, time_t modtime)
+static int64_t chirp_fs_local_utime(const char *path, time_t actime, time_t modtime)
 {
 	PREAMBLE("utime(`%s', actime = %" PRId64 " modtime = %" PRId64 ")", path, (int64_t)actime, (int64_t)modtime);
 	RESOLVE(path, 1)
@@ -800,14 +799,14 @@ static INT64_T chirp_fs_local_utime(const char *path, time_t actime, time_t modt
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_setrep(const char *path, int nreps)
+static int64_t chirp_fs_local_setrep(const char *path, int nreps)
 {
 	errno = EINVAL;
 	return -1;
 }
 
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
-static INT64_T chirp_fs_local_getxattr(const char *path, const char *name, void *data, size_t size)
+static int64_t chirp_fs_local_getxattr(const char *path, const char *name, void *data, size_t size)
 {
 	PREAMBLE("getxattr(`%s', `%s', %p, %zu)", path, name, data, size);
 	RESOLVE(path, 1)
@@ -828,7 +827,7 @@ static INT64_T chirp_fs_local_getxattr(const char *path, const char *name, void 
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_fgetxattr(int fd, const char *name, void *data, size_t size)
+static int64_t chirp_fs_local_fgetxattr(int fd, const char *name, void *data, size_t size)
 {
 	PREAMBLE("fgetxattr(%d, `%s', %p, %zu)", fd, name, data, size);
 	SETUP_FILE
@@ -840,7 +839,7 @@ static INT64_T chirp_fs_local_fgetxattr(int fd, const char *name, void *data, si
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_lgetxattr(const char *path, const char *name, void *data, size_t size)
+static int64_t chirp_fs_local_lgetxattr(const char *path, const char *name, void *data, size_t size)
 {
 	PREAMBLE("lgetxattr(`%s', `%s', %p, %zu)", path, name, data, size);
 	RESOLVE(path, 0)
@@ -863,7 +862,7 @@ static INT64_T chirp_fs_local_lgetxattr(const char *path, const char *name, void
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_listxattr(const char *path, char *list, size_t size)
+static int64_t chirp_fs_local_listxattr(const char *path, char *list, size_t size)
 {
 	PREAMBLE("listxattr(`%s', %p, %zu)", path, list, size);
 	RESOLVE(path, 1)
@@ -884,7 +883,7 @@ static INT64_T chirp_fs_local_listxattr(const char *path, char *list, size_t siz
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_flistxattr(int fd, char *list, size_t size)
+static int64_t chirp_fs_local_flistxattr(int fd, char *list, size_t size)
 {
 	PREAMBLE("flistxattr(%d, %p, %zu)", fd, list, size);
 	SETUP_FILE
@@ -896,7 +895,7 @@ static INT64_T chirp_fs_local_flistxattr(int fd, char *list, size_t size)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_llistxattr(const char *path, char *list, size_t size)
+static int64_t chirp_fs_local_llistxattr(const char *path, char *list, size_t size)
 {
 	PREAMBLE("llistxattr(`%s', %p, %zu)", path, list, size);
 	RESOLVE(path, 0)
@@ -919,7 +918,7 @@ static INT64_T chirp_fs_local_llistxattr(const char *path, char *list, size_t si
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
+static int64_t chirp_fs_local_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	PREAMBLE("setxattr(`%s', `%s', %p, %zu, %d)", path, name, data, size, flags);
 	RESOLVE(path, 1)
@@ -940,7 +939,7 @@ static INT64_T chirp_fs_local_setxattr(const char *path, const char *name, const
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_fsetxattr(int fd, const char *name, const void *data, size_t size, int flags)
+static int64_t chirp_fs_local_fsetxattr(int fd, const char *name, const void *data, size_t size, int flags)
 {
 	PREAMBLE("fsetxattr(%d, `%s', %p, %zu, %d)", fd, name, data, size, flags);
 	SETUP_FILE
@@ -952,7 +951,7 @@ static INT64_T chirp_fs_local_fsetxattr(int fd, const char *name, const void *da
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
+static int64_t chirp_fs_local_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	PREAMBLE("lsetxattr(`%s', `%s', %p, %zu, %d)", path, name, data, size, flags);
 	RESOLVE(path, 0)
@@ -975,7 +974,7 @@ static INT64_T chirp_fs_local_lsetxattr(const char *path, const char *name, cons
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_removexattr(const char *path, const char *name)
+static int64_t chirp_fs_local_removexattr(const char *path, const char *name)
 {
 	PREAMBLE("removexattr(`%s', `%s')", path, name);
 	RESOLVE(path, 1)
@@ -996,7 +995,7 @@ static INT64_T chirp_fs_local_removexattr(const char *path, const char *name)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_fremovexattr(int fd, const char *name)
+static int64_t chirp_fs_local_fremovexattr(int fd, const char *name)
 {
 	PREAMBLE("fremovexattr(%d, `%s')", fd, name);
 	SETUP_FILE
@@ -1008,7 +1007,7 @@ static INT64_T chirp_fs_local_fremovexattr(int fd, const char *name)
 	PROLOGUE
 }
 
-static INT64_T chirp_fs_local_lremovexattr(const char *path, const char *name)
+static int64_t chirp_fs_local_lremovexattr(const char *path, const char *name)
 {
 	PREAMBLE("lremovexattr(`%s', `%s')", path, name);
 	RESOLVE(path, 0)

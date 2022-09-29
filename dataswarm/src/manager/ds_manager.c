@@ -22,7 +22,6 @@ See the file COPYING for details.
 #include "ds_perf_log.h"
 
 #include "cctools.h"
-#include "int_sizes.h"
 #include "link.h"
 #include "link_auth.h"
 #include "debug.h"

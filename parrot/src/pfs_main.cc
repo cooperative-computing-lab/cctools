@@ -38,7 +38,6 @@ extern "C" {
 #include "file_cache.h"
 #include "ftp_lite.h"
 #include "getopt.h"
-#include "int_sizes.h"
 #include "itable.h"
 #include "macros.h"
 #include "md5.h"
@@ -74,6 +73,7 @@ extern "C" {
 #include <time.h>
 
 #include <vector>
+#include <cinttypes>
 
 #define SIG_ISSTOP(s) (s == SIGTTIN || s == SIGTTOU || s == SIGSTOP || s == SIGTSTP)
 
@@ -123,9 +123,9 @@ const char * pfs_username = 0;
 int pfs_fake_setuid = 0;
 int pfs_fake_setgid = 0;
 
-INT64_T pfs_syscall_count = 0;
-INT64_T pfs_read_count = 0;
-INT64_T pfs_write_count = 0;
+int64_t pfs_syscall_count = 0;
+int64_t pfs_read_count = 0;
+int64_t pfs_write_count = 0;
 
 const char * pfs_cvmfs_repo_arg = 0;
 const char * pfs_cvmfs_config_arg = 0;
@@ -401,7 +401,7 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
 		pid_t cpid;
 		struct pfs_process *child;
-		INT64_T clone_files;
+		int64_t clone_files;
 
 		if (tracer_getevent(p->tracer, &message) == -1)
 			return;

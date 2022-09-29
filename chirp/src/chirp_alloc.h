@@ -12,19 +12,19 @@ See the file COPYING for details.
 
 #include <sys/types.h>
 
-int    chirp_alloc_init(INT64_T size);
+int    chirp_alloc_init(int64_t size);
 void   chirp_alloc_flush(void);
 int    chirp_alloc_flush_needed(void);
 time_t chirp_alloc_last_flush_time(void);
 
-INT64_T chirp_alloc_lsalloc(const char *path, char *alloc_path, INT64_T * total, INT64_T * inuse);
-INT64_T chirp_alloc_mkalloc(const char *path, INT64_T size, INT64_T mode);
+int64_t chirp_alloc_lsalloc(const char *path, char *alloc_path, int64_t * total, int64_t * inuse);
+int64_t chirp_alloc_mkalloc(const char *path, int64_t size, int64_t mode);
 
-INT64_T chirp_alloc_realloc(const char *path, INT64_T change, INT64_T *inuse);
-INT64_T chirp_alloc_frealloc (int fd, INT64_T change, INT64_T *current);
+int64_t chirp_alloc_realloc(const char *path, int64_t change, int64_t *inuse);
+int64_t chirp_alloc_frealloc (int fd, int64_t change, int64_t *current);
 
-INT64_T chirp_alloc_statfs(const char *path, struct chirp_statfs *buf);
-INT64_T chirp_alloc_fstatfs(int fd, struct chirp_statfs *buf);
+int64_t chirp_alloc_statfs(const char *path, struct chirp_statfs *buf);
+int64_t chirp_alloc_fstatfs(int fd, struct chirp_statfs *buf);
 
 #endif
 

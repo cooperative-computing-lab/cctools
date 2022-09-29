@@ -2,11 +2,11 @@
 
 static const char *unit_names[] = {"GB", "MB", "KB", "B"};
 static const int num_units = sizeof(unit_names)/sizeof(*(unit_names));
-static const UINT64_T gigabytes = 1000 * 1000 * 1000;
+static const uint64_t gigabytes = 1000 * 1000 * 1000;
 
-char * human_readable_size(UINT64_T size){
+char * human_readable_size(uint64_t size){
 	char *result = (char *) malloc(sizeof(char) * 21);
-	UINT64_T mult = gigabytes;
+	uint64_t mult = gigabytes;
 
 	int j;
 	for (j= 0; j < num_units; j++, mult /= 1000){

@@ -14,7 +14,6 @@
 #include <errno.h>
 
 #include "getopt.h"
-#include "int_sizes.h"
 #include "jx.h"
 #include "jx_parse.h"
 #include "jx_print.h"

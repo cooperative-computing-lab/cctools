@@ -13,7 +13,6 @@
 
 %{
 	#include "debug.h"
-	#include "int_sizes.h"
 	#include "timestamp.h"
 	#include "work_queue.h"
 	#include "rmsummary.h"
@@ -38,7 +37,6 @@ long long int is guaranteed to be at least 64bit. */
 
 %include "stdint.i"
 %include "debug.h"
-%include "int_sizes.h"
 %include "timestamp.h"
 %include "work_queue.h"
 %include "rmsummary.h"

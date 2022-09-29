@@ -48,7 +48,7 @@ XXX this value should be configurable.
 
 static int directory_low_disk( const char *path, uint64_t size )
 {
-	UINT64_T avail, total;
+	uint64_t avail, total;
 
 	if(host_disk_info_get(path, &avail, &total) >= 0)
 		return avail <= size;

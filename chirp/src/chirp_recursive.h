@@ -7,7 +7,6 @@ See the file COPYING for details.
 #ifndef CHIRP_RECURSIVE_H
 #define CHIRP_RECURSIVE_H
 
-#include "int_sizes.h"
 #include <time.h>
 
 /** @file chirp_recursive.h
@@ -24,7 +23,7 @@ to handle a number of failure cases.
 @return On success, returns the sum of file bytes transferred.  On failure, returns less than zero and sets errno appropriately.
 */
 
-INT64_T chirp_recursive_put(const char *hostport, const char *sourcepath, const char *targetpath, time_t stoptime);
+int64_t chirp_recursive_put(const char *hostport, const char *sourcepath, const char *targetpath, time_t stoptime);
 
 /** Recursively get a file or directory from a Chirp server.
 Relies on @ref chirp_reli_getfile and similar calls
@@ -36,7 +35,7 @@ to handle a number of failure cases.
 @return On success, returns the sum of file bytes transferred.  On failure, returns less than zero and sets errno appropriately.
 */
 
-INT64_T chirp_recursive_get(const char *hostport, const char *sourcepath, const char *targetpath, time_t stoptime);
+int64_t chirp_recursive_get(const char *hostport, const char *sourcepath, const char *targetpath, time_t stoptime);
 
 #endif
 

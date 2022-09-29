@@ -23,6 +23,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 int string_compare(const void *p1, const void *p2) {
 	/* The actual arguments to this function are "pointers to

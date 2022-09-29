@@ -125,7 +125,7 @@ static int get_ancestor_depth(struct dag_node *n)
 
 void dag_find_ancestor_depth(struct dag *d)
 {
-	UINT64_T key;
+	uint64_t key;
 	struct dag_node *n;
 
 	itable_firstkey(d->node_table);

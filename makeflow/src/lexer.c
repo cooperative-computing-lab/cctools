@@ -10,7 +10,6 @@
 #include <ctype.h>
 #include <string.h>
 
-#include "int_sizes.h"
 #include "stringtools.h"
 #include "get_line.h"
 #include "list.h"

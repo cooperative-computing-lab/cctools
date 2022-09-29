@@ -13,7 +13,6 @@ See the file COPYING for details.
 #include "pfs_sysdeps.h"
 
 extern "C" {
-#include "int_sizes.h"
 #include "pfs_resolve.h"
 #include "tracer.h"
 }
@@ -68,13 +67,13 @@ struct pfs_process {
 	char new_logical_name[PFS_PATH_MAX]; /* saved during execve */
 	int exefd; /* during execve */
 
-	INT64_T syscall;
-	INT64_T syscall_original;
-	INT64_T syscall_dummy;
-	INT64_T syscall_parrotfd;
-	INT64_T syscall_result;
-	INT64_T syscall_args[TRACER_ARGS_MAX];
-	INT64_T syscall_args_changed;
+	int64_t syscall;
+	int64_t syscall_original;
+	int64_t syscall_dummy;
+	int64_t syscall_parrotfd;
+	int64_t syscall_result;
+	int64_t syscall_args[TRACER_ARGS_MAX];
+	int64_t syscall_args_changed;
 
 	char tmp[4096];
 };

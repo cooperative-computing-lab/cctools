@@ -133,7 +133,7 @@ public:
 	int get_uid_from_name( const char *name ) {
 		int key;
 
-		key = (PTRINT_T)hash_table_lookup(uid_table, name);
+		key = (intptr_t)hash_table_lookup(uid_table, name);
 		if (key) {
 			return key;
 		} else {
@@ -141,7 +141,7 @@ public:
 
 			owner = getpwnam(name);
 			if (owner) {
-				hash_table_insert(uid_table, name, (void*)(PTRINT_T)owner->pw_uid);
+				hash_table_insert(uid_table, name, (void*)(intptr_t)owner->pw_uid);
 				return owner->pw_uid;
 			} else {
 				return -1;
@@ -152,7 +152,7 @@ public:
 	int get_gid_from_name( const char *name ) {
 		int key;
 
-		key = (PTRINT_T)hash_table_lookup(gid_table, name);
+		key = (intptr_t)hash_table_lookup(gid_table, name);
 		if (key) {
 			return key;
 		} else {
@@ -160,7 +160,7 @@ public:
 
 			group = getgrnam(name);
 			if (group) {
-				hash_table_insert(gid_table, name, (void*)(PTRINT_T)group->gr_gid);
+				hash_table_insert(gid_table, name, (void*)(intptr_t)group->gr_gid);
 				return group->gr_gid;
 			} else {
 				return -1;

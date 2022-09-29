@@ -72,7 +72,7 @@ struct command {
 	int must_be_open;
 	int minargs, maxargs;
 	char *help;
-	INT64_T(*handler) (int argc, char **argv);
+	int64_t(*handler) (int argc, char **argv);
 };
 
 /* Standard C does not let:
@@ -98,14 +98,14 @@ static void acl_simple(char **acl)
 		*acl = ".";
 }
 
-static INT64_T do_close(int argc, char **argv)
+static int64_t do_close(int argc, char **argv)
 {
 	current_host[0] = 0;
 	current_remote_dir[0] = 0;
 	return 0;
 }
 
-static INT64_T do_open(int argc, char **argv)
+static int64_t do_open(int argc, char **argv)
 {
 	do_close(0, 0);
 
@@ -142,9 +142,9 @@ static void complete_remote_path(const char *file, char *full_path)
 	path_collapse(temp, full_path, 1);
 }
 
-static INT64_T do_cat(int argc, char **argv)
+static int64_t do_cat(int argc, char **argv)
 {
-	INT64_T actual;
+	int64_t actual;
 	int i;
 
 	for(i = 1; i < argc; i++) {
@@ -159,7 +159,7 @@ static INT64_T do_cat(int argc, char **argv)
 	return 0;
 }
 
-static INT64_T do_cd(int argc, char **argv)
+static int64_t do_cd(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	struct chirp_stat info;
@@ -177,7 +177,7 @@ static INT64_T do_cd(int argc, char **argv)
 	}
 }
 
-static INT64_T do_lcd(int argc, char **argv)
+static int64_t do_lcd(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_local_path(argv[1], full_path);
@@ -189,25 +189,25 @@ static INT64_T do_lcd(int argc, char **argv)
 	}
 }
 
-static INT64_T do_pwd(int argc, char **argv)
+static int64_t do_pwd(int argc, char **argv)
 {
 	printf("%s\n", current_remote_dir);
 	return 0;
 }
 
-static INT64_T do_lpwd(int argc, char **argv)
+static int64_t do_lpwd(int argc, char **argv)
 {
 	printf("%s\n", current_local_dir);
 	return 0;
 }
 
-static INT64_T do_get(int argc, char **argv)
+static int64_t do_get(int argc, char **argv)
 {
 	char target_full_path[CHIRP_PATH_MAX];
 	char source_full_path[CHIRP_PATH_MAX];
 	timestamp_t start, stop;
 	double elapsed;
-	INT64_T result;
+	int64_t result;
 
 	if(!argv[2])
 		argv[2] = (char *) path_basename(argv[1]);
@@ -229,13 +229,13 @@ static INT64_T do_get(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_put(int argc, char **argv)
+static int64_t do_put(int argc, char **argv)
 {
 	char target_full_path[CHIRP_PATH_MAX];
 	char source_full_path[CHIRP_PATH_MAX];
 	timestamp_t start, stop;
 	double elapsed;
-	INT64_T result;
+	int64_t result;
 
 	if(!argv[2])
 		argv[2] = (char *) path_basename(argv[1]);
@@ -257,7 +257,7 @@ static INT64_T do_put(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_ticket_create(int argc, char **argv)
+static int64_t do_ticket_create(int argc, char **argv)
 {
 	char name[CHIRP_PATH_MAX] = "";
 	const char *subject = NULL;
@@ -301,7 +301,7 @@ static INT64_T do_ticket_create(int argc, char **argv)
 			break;
 	}
 
-	INT64_T result = chirp_reli_ticket_create(current_host, name, bits, stoptime);
+	int64_t result = chirp_reli_ticket_create(current_host, name, bits, stoptime);
 	if(result < 0) {
 		fprintf(stderr, "could not create ticket\n");
 		return result;
@@ -334,7 +334,7 @@ static INT64_T do_ticket_create(int argc, char **argv)
 	return 0;
 }
 
-static INT64_T do_ticket_register(int argc, char **argv)
+static int64_t do_ticket_register(int argc, char **argv)
 {
 	assert(argc == 3 || argc == 4);
 	if(argc == 3) {
@@ -344,16 +344,16 @@ static INT64_T do_ticket_register(int argc, char **argv)
 	}
 }
 
-static INT64_T do_ticket_delete(int argc, char **argv)
+static int64_t do_ticket_delete(int argc, char **argv)
 {
 	return chirp_reli_ticket_delete(current_host, argv[1], stoptime);
 }
 
-static INT64_T do_ticket_list(int argc, char **argv)
+static int64_t do_ticket_list(int argc, char **argv)
 {
 	char **list;
 
-	INT64_T result;
+	int64_t result;
 	if(argc == 1)
 		result = chirp_reli_ticket_list(current_host, "self", &list, stoptime);
 	else
@@ -370,13 +370,13 @@ static INT64_T do_ticket_list(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_ticket_get(int argc, char **argv)
+static int64_t do_ticket_get(int argc, char **argv)
 {
 	char *subject;
 	char *ticket;
 	time_t duration;
 	char **rights;
-	INT64_T result = chirp_reli_ticket_get(current_host, argv[1], &subject, &ticket, &duration, &rights, stoptime);
+	int64_t result = chirp_reli_ticket_get(current_host, argv[1], &subject, &ticket, &duration, &rights, stoptime);
 	if(result >= 0) {
 		printf("%s\n", subject);
 		free(subject);
@@ -400,7 +400,7 @@ static INT64_T do_ticket_get(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_ticket_modify(int argc, char **argv)
+static int64_t do_ticket_modify(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[2], full_path);
@@ -410,7 +410,7 @@ static INT64_T do_ticket_modify(int argc, char **argv)
 	return chirp_reli_ticket_modify(current_host, argv[1], full_path, argv[3], stoptime);
 }
 
-static INT64_T do_setacl(int argc, char **argv)
+static int64_t do_setacl(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], full_path);
@@ -420,7 +420,7 @@ static INT64_T do_setacl(int argc, char **argv)
 	return chirp_reli_setacl(current_host, full_path, argv[2], argv[3], stoptime);
 }
 
-static INT64_T do_resetacl(int argc, char **argv)
+static int64_t do_resetacl(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], full_path);
@@ -435,7 +435,7 @@ static void print_one_acl(const char *line, void *stream)
 	fprintf(stream, "%s\n", line);
 }
 
-static INT64_T do_getacl(int argc, char **argv)
+static int64_t do_getacl(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 
@@ -446,9 +446,9 @@ static INT64_T do_getacl(int argc, char **argv)
 	return chirp_reli_getacl(current_host, full_path, print_one_acl, stdout, stoptime);
 }
 
-static INT64_T do_link(int argc, char **argv)
+static int64_t do_link(int argc, char **argv)
 {
-	INT64_T result;
+	int64_t result;
 	char path[CHIRP_PATH_MAX]; /* the new link */
 	int sym = (argc == 4 && strcmp(argv[1], "-s") == 0);
 
@@ -496,7 +496,7 @@ static void ls_callback(const char *name, void *arg)
 	printf("%s\n", name);
 }
 
-static INT64_T do_ls(int argc, char **argv)
+static int64_t do_ls(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	int long_mode = 0;
@@ -556,24 +556,24 @@ static INT64_T do_ls(int argc, char **argv)
 	}
 }
 
-static INT64_T do_rm(int argc, char **argv)
+static int64_t do_rm(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], full_path);
 	return chirp_reli_rmall(current_host, full_path, stoptime);
 }
 
-static INT64_T do_rmdir(int argc, char **argv)
+static int64_t do_rmdir(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], full_path);
 	return chirp_reli_rmdir(current_host, full_path, stoptime);
 }
 
-static INT64_T do_mkdir(int argc, char **argv)
+static int64_t do_mkdir(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
-	INT64_T result;
+	int64_t result;
 	int create_parents = (argc == 3 && strcmp(argv[1], "-p") == 0);
 
 	if(create_parents) {
@@ -590,7 +590,7 @@ static INT64_T do_mkdir(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_stat(int argc, char **argv)
+static int64_t do_stat(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	struct chirp_stat info;
@@ -621,7 +621,7 @@ static INT64_T do_stat(int argc, char **argv)
 	}
 }
 
-static INT64_T do_statfs(int argc, char **argv)
+static int64_t do_statfs(int argc, char **argv)
 {
 	struct chirp_statfs info;
 	int metric_power = -1;
@@ -651,7 +651,7 @@ static INT64_T do_statfs(int argc, char **argv)
 	}
 }
 
-static INT64_T do_mv(int argc, char **argv)
+static int64_t do_mv(int argc, char **argv)
 {
 	char old_full_path[CHIRP_PATH_MAX];
 	char new_full_path[CHIRP_PATH_MAX];
@@ -660,7 +660,7 @@ static INT64_T do_mv(int argc, char **argv)
 	return chirp_reli_rename(current_host, old_full_path, new_full_path, stoptime);
 }
 
-static INT64_T do_chmod(int argc, char **argv)
+static int64_t do_chmod(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	unsigned mode;
@@ -669,7 +669,7 @@ static INT64_T do_chmod(int argc, char **argv)
 	return chirp_reli_chmod(current_host, full_path, mode, stoptime);
 }
 
-static INT64_T do_debug(int argc, char **argv)
+static int64_t do_debug(int argc, char **argv)
 {
 	if(argv[1]) {
 		if(debug_flags_set(argv[1])) {
@@ -688,15 +688,15 @@ static INT64_T do_debug(int argc, char **argv)
 
 }
 
-static INT64_T do_remote_debug(int argc, char **argv)
+static int64_t do_remote_debug(int argc, char **argv)
 {
 	return chirp_reli_remote_debug(current_host, argv[1], stoptime);
 }
 
-static INT64_T do_whoami(int argc, char **argv)
+static int64_t do_whoami(int argc, char **argv)
 {
 	char name[CHIRP_LINE_MAX];
-	INT64_T result;
+	int64_t result;
 
 	result = chirp_reli_whoami(current_host, name, sizeof(name), stoptime);
 	if(result >= 0) {
@@ -706,10 +706,10 @@ static INT64_T do_whoami(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_whoareyou(int argc, char **argv)
+static int64_t do_whoareyou(int argc, char **argv)
 {
 	char name[CHIRP_LINE_MAX];
-	INT64_T result;
+	int64_t result;
 
 	result = chirp_reli_whoareyou(current_host, argv[1], name, sizeof(name), stoptime);
 	if(result >= 0) {
@@ -719,9 +719,9 @@ static INT64_T do_whoareyou(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_hash(int argc, char **argv)
+static int64_t do_hash(int argc, char **argv)
 {
-	INT64_T result;
+	int64_t result;
 	char full_path[CHIRP_LINE_MAX];
 	unsigned char digest[CHIRP_DIGEST_MAX];
 
@@ -738,7 +738,7 @@ static INT64_T do_hash(int argc, char **argv)
 
 }
 
-static INT64_T do_md5(int argc, char **argv)
+static int64_t do_md5(int argc, char **argv)
 {
 	char *nargv[] = {
 		"hash",
@@ -749,7 +749,7 @@ static INT64_T do_md5(int argc, char **argv)
 	return do_hash(3, nargv);
 }
 
-static INT64_T do_setrep(int argc, char **argv)
+static int64_t do_setrep(int argc, char **argv)
 {
 	char full_path[CHIRP_LINE_MAX];
 
@@ -759,11 +759,11 @@ static INT64_T do_setrep(int argc, char **argv)
 	return chirp_reli_setrep(current_host, full_path, nreps, stoptime);
 }
 
-static INT64_T do_localpath(int argc, char **argv)
+static int64_t do_localpath(int argc, char **argv)
 {
 	char localpath[CHIRP_LINE_MAX];
 	char full_path[CHIRP_LINE_MAX];
-	INT64_T result;
+	int64_t result;
 
 	if(argc == 2) {
 		complete_remote_path(argv[1], full_path);
@@ -779,10 +779,10 @@ static INT64_T do_localpath(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_audit(int argc, char **argv)
+static int64_t do_audit(int argc, char **argv)
 {
 	struct chirp_audit *list;
-	INT64_T result;
+	int64_t result;
 	int raw_mode = 0;
 
 	if(argc > 1) {
@@ -812,20 +812,20 @@ static INT64_T do_audit(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_timeout(int argc, char **argv)
+static int64_t do_timeout(int argc, char **argv)
 {
 	timeout = atoi(argv[1]);
 	fprintf(stderr, "Timeout is %d seconds.\n", timeout);
 	return 0;
 }
 
-static INT64_T do_quit(int argc, char **argv)
+static int64_t do_quit(int argc, char **argv)
 {
 	exit(0);
 	return -1;
 }
 
-static INT64_T do_help(int argc, char **argv)
+static int64_t do_help(int argc, char **argv)
 {
 	int i;
 	printf("Commands:\n");
@@ -838,9 +838,9 @@ static INT64_T do_help(int argc, char **argv)
 	return 0;
 }
 
-static INT64_T do_thirdput(int argc, char **argv)
+static int64_t do_thirdput(int argc, char **argv)
 {
-	INT64_T result;
+	int64_t result;
 	char full_path[CHIRP_PATH_MAX];
 	char remote_path[CHIRP_PATH_MAX];
 	time_t stop, start;
@@ -862,19 +862,19 @@ static INT64_T do_thirdput(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_mkalloc(int argc, char **argv)
+static int64_t do_mkalloc(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], full_path);
 	return chirp_reli_mkalloc(current_host, full_path, string_metric_parse(argv[2]), S_IRWXU, stoptime);
 }
 
-static INT64_T do_lsalloc(int argc, char **argv)
+static int64_t do_lsalloc(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	char alloc_path[CHIRP_PATH_MAX];
-	INT64_T total, inuse;
-	INT64_T result;
+	int64_t total, inuse;
+	int64_t result;
 
 	if(argc != 2)
 		argv[1] = ".";
@@ -892,7 +892,7 @@ static INT64_T do_lsalloc(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_matrix_create(int argc, char **argv)
+static int64_t do_matrix_create(int argc, char **argv)
 {
 	char path[CHIRP_PATH_MAX];
 	struct chirp_matrix *m;
@@ -908,7 +908,7 @@ static INT64_T do_matrix_create(int argc, char **argv)
 	}
 }
 
-static INT64_T do_matrix_list(int argc, char **argv)
+static int64_t do_matrix_list(int argc, char **argv)
 {
 	char path[CHIRP_PATH_MAX];
 	struct chirp_matrix *m;
@@ -931,7 +931,7 @@ static INT64_T do_matrix_list(int argc, char **argv)
 	}
 }
 
-static INT64_T do_matrix_delete(int argc, char **argv)
+static int64_t do_matrix_delete(int argc, char **argv)
 {
 	char path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], path);
@@ -954,7 +954,7 @@ static char *strerrsource(int errsource)
 	}
 }
 
-static INT64_T do_search(int argc, char **argv)
+static int64_t do_search(int argc, char **argv)
 {
 	CHIRP_SEARCH *S;
 	int flags = 0;
@@ -982,7 +982,7 @@ static INT64_T do_search(int argc, char **argv)
 		printf("%-30s", res->path);
 
 		if(flags & CHIRP_SEARCH_METADATA)
-			printf("\t" INT64_FORMAT "\t" INT64_FORMAT "\n", res->info.cst_size, res->info.cst_ino);
+			printf("\t%" PRId64 "\t%" PRId64 "\n", res->info.cst_size, res->info.cst_ino);
 		else
 			printf("\n");
 	}
@@ -991,12 +991,12 @@ static INT64_T do_search(int argc, char **argv)
 	return 0;
 }
 
-static INT64_T do_xattr_get(int argc, char **argv)
+static int64_t do_xattr_get(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], full_path);
 	char data[65536];
-	INT64_T size;
+	int64_t size;
 
 	if((size = chirp_reli_getxattr(current_host, full_path, argv[2], data, sizeof(data), stoptime)) > 0) {
 		write(STDOUT_FILENO, data, (size_t) size);
@@ -1007,12 +1007,12 @@ static INT64_T do_xattr_get(int argc, char **argv)
 	}
 }
 
-static INT64_T do_xattr_list(int argc, char **argv)
+static int64_t do_xattr_list(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], full_path);
 	char data[65536];
-	INT64_T size;
+	int64_t size;
 
 	if((size = chirp_reli_listxattr(current_host, full_path, data, sizeof(data), stoptime)) > 0) {
 		char *current;
@@ -1026,11 +1026,11 @@ static INT64_T do_xattr_list(int argc, char **argv)
 	}
 }
 
-static INT64_T do_xattr_set(int argc, char **argv)
+static int64_t do_xattr_set(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_remote_path(argv[1], full_path);
-	INT64_T size;
+	int64_t size;
 
 	if(argc == 3) {
 		if((size = chirp_reli_removexattr(current_host, full_path, argv[2], stoptime)) >= 0) {
@@ -1047,10 +1047,10 @@ static INT64_T do_xattr_set(int argc, char **argv)
 	}
 }
 
-static INT64_T do_job_create(int argc, char **argv)
+static int64_t do_job_create(int argc, char **argv)
 {
 	chirp_jobid_t id;
-	INT64_T result = chirp_reli_job_create(current_host, argv[1], &id, stoptime);
+	int64_t result = chirp_reli_job_create(current_host, argv[1], &id, stoptime);
 	if (result == 0) {
 		fprintf(stdout, "%" PRICHIRP_JOBID_T "\n", id);
 		fflush(stdout);
@@ -1058,20 +1058,20 @@ static INT64_T do_job_create(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_job_commit(int argc, char **argv)
+static int64_t do_job_commit(int argc, char **argv)
 {
 	return chirp_reli_job_commit(current_host, argv[1], stoptime);
 }
 
-static INT64_T do_job_kill(int argc, char **argv)
+static int64_t do_job_kill(int argc, char **argv)
 {
 	return chirp_reli_job_kill(current_host, argv[1], stoptime);
 }
 
-static INT64_T do_job_status(int argc, char **argv)
+static int64_t do_job_status(int argc, char **argv)
 {
 	char *status;
-	INT64_T result = chirp_reli_job_status(current_host, argv[1], &status, stoptime);
+	int64_t result = chirp_reli_job_status(current_host, argv[1], &status, stoptime);
 	if (result > 0) {
 		fprintf(stdout, "%s\n", status);
 		free(status);
@@ -1079,15 +1079,15 @@ static INT64_T do_job_status(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_job_wait(int argc, char **argv)
+static int64_t do_job_wait(int argc, char **argv)
 {
 	chirp_jobid_t id;
-	INT64_T timeout = -1;
+	int64_t timeout = -1;
 	char *status;
 	sscanf(argv[1], "%" SCNCHIRP_JOBID_T, &id);
 	if (argc >= 3)
 		sscanf(argv[2], "%" SCNd64, &timeout);
-	INT64_T result = chirp_reli_job_wait(current_host, id, timeout, &status, stoptime);
+	int64_t result = chirp_reli_job_wait(current_host, id, timeout, &status, stoptime);
 	if (result > 0) {
 		fprintf(stdout, "%s\n", status);
 		free(status);
@@ -1095,7 +1095,7 @@ static INT64_T do_job_wait(int argc, char **argv)
 	return result;
 }
 
-static INT64_T do_job_reap(int argc, char **argv)
+static int64_t do_job_reap(int argc, char **argv)
 {
 	return chirp_reli_job_reap(current_host, argv[1], stoptime);
 }
@@ -1216,7 +1216,7 @@ int main(int argc, char *argv[])
 	char **user_argv = 0;
 	int user_argc;
 	int c;
-	INT64_T result = 0;
+	int64_t result = 0;
 
 	debug_config(argv[0]);
 

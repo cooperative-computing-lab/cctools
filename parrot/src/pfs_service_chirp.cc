@@ -401,7 +401,7 @@ public:
 	}
 
 	virtual int rename( pfs_name *name, pfs_name *newname ) {
-		INT64_T result;
+		int64_t result;
 		time_t stoptime = time(0) + pfs_main_timeout;
 
 		chirp_dircache_invalidate();

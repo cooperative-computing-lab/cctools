@@ -9,7 +9,6 @@ See the file COPYING for details.
 
 #include "catalog_query.h"
 #include "debug.h"
-#include "int_sizes.h"
 #include "load_average.h"
 #include "host_memory_info.h"
 #include "stringtools.h"
@@ -91,7 +90,7 @@ int main(int argc, char *argv[]) {
 	int cpus;
 	int uptime;
 	double load[3];
-	UINT64_T memory_total, memory_avail;
+	uint64_t memory_total, memory_avail;
 	char owner[USERNAME_MAX];
 
 	uname(&name);

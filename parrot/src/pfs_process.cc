@@ -85,7 +85,7 @@ void pfs_process_kill_everyone( int sig )
  */
 extern "C" void pfs_process_sigio(int sig)
 {
-	UINT64_T pid;
+	uint64_t pid;
 	struct pfs_process *p;
 
 	assert(sig == SIGIO);
@@ -412,7 +412,7 @@ int pfs_process_cankill( pid_t pid )
 
 void pfs_process_killall()
 {
-	UINT64_T pid;
+	uint64_t pid;
 	struct pfs_process *p;
 
 	if (pfs_process_table) {

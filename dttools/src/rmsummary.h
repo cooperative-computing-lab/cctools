@@ -11,7 +11,6 @@ COPYING for details.
 #include <stdlib.h>
 
 #include "jx.h"
-#include "int_sizes.h"
 #include "buffer.h"
 
 /* Environment variables names */

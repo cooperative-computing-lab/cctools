@@ -34,11 +34,11 @@ struct chirp_file {
 	char host[CHIRP_LINE_MAX];
 	char path[CHIRP_LINE_MAX];
 	struct chirp_stat info;
-	INT64_T fd;
-	INT64_T flags;
-	INT64_T mode;
-	INT64_T serial;
-	INT64_T stale;
+	int64_t fd;
+	int64_t flags;
+	int64_t mode;
+	int64_t serial;
+	int64_t stale;
 };
 
 struct chirp_volume *current_volume = 0;
@@ -268,7 +268,7 @@ static int chirp_multi_update(const char *volume, const char *path, struct file_
 	return chirp_reli_putfile_buffer(current_volume->host, info->lpath, buffer, 0700, strlen(buffer), stoptime);
 }
 
-static struct chirp_file *chirp_multi_create(const char *volume, const char *path, INT64_T flags, INT64_T mode, time_t stoptime)
+static struct chirp_file *chirp_multi_create(const char *volume, const char *path, int64_t flags, int64_t mode, time_t stoptime)
 {
 	struct chirp_server *server;
 	struct file_info info;
@@ -318,7 +318,7 @@ static struct chirp_file *chirp_multi_create(const char *volume, const char *pat
 
 }
 
-struct chirp_file *chirp_multi_open(const char *volume, const char *path, INT64_T flags, INT64_T mode, time_t stoptime)
+struct chirp_file *chirp_multi_open(const char *volume, const char *path, int64_t flags, int64_t mode, time_t stoptime)
 {
 	struct file_info info;
 
@@ -333,52 +333,52 @@ struct chirp_file *chirp_multi_open(const char *volume, const char *path, INT64_
 	return chirp_reli_open(info.rhost, info.rpath, flags, mode, stoptime);
 }
 
-INT64_T chirp_multi_close(struct chirp_file * file, time_t stoptime)
+int64_t chirp_multi_close(struct chirp_file * file, time_t stoptime)
 {
 	return chirp_reli_close(file, stoptime);
 }
 
-INT64_T chirp_multi_pread(struct chirp_file * file, void *buffer, INT64_T length, INT64_T offset, time_t stoptime)
+int64_t chirp_multi_pread(struct chirp_file * file, void *buffer, int64_t length, int64_t offset, time_t stoptime)
 {
 	return chirp_reli_pread(file, buffer, length, offset, stoptime);
 }
 
-INT64_T chirp_multi_pwrite(struct chirp_file * file, const void *buffer, INT64_T length, INT64_T offset, time_t stoptime)
+int64_t chirp_multi_pwrite(struct chirp_file * file, const void *buffer, int64_t length, int64_t offset, time_t stoptime)
 {
 	return chirp_reli_pwrite(file, buffer, length, offset, stoptime);
 }
 
-INT64_T chirp_multi_fstat(struct chirp_file * file, struct chirp_stat * buf, time_t stoptime)
+int64_t chirp_multi_fstat(struct chirp_file * file, struct chirp_stat * buf, time_t stoptime)
 {
 	return chirp_reli_fstat(file, buf, stoptime);
 }
 
-INT64_T chirp_multi_fstatfs(struct chirp_file * file, struct chirp_statfs * buf, time_t stoptime)
+int64_t chirp_multi_fstatfs(struct chirp_file * file, struct chirp_statfs * buf, time_t stoptime)
 {
 	return chirp_reli_fstatfs(file, buf, stoptime);
 }
 
-INT64_T chirp_multi_fchown(struct chirp_file * file, INT64_T uid, INT64_T gid, time_t stoptime)
+int64_t chirp_multi_fchown(struct chirp_file * file, int64_t uid, int64_t gid, time_t stoptime)
 {
 	return chirp_reli_fchown(file, uid, gid, stoptime);
 }
 
-INT64_T chirp_multi_fchmod(struct chirp_file * file, INT64_T mode, time_t stoptime)
+int64_t chirp_multi_fchmod(struct chirp_file * file, int64_t mode, time_t stoptime)
 {
 	return chirp_reli_fchmod(file, mode, stoptime);
 }
 
-INT64_T chirp_multi_ftruncate(struct chirp_file * file, INT64_T length, time_t stoptime)
+int64_t chirp_multi_ftruncate(struct chirp_file * file, int64_t length, time_t stoptime)
 {
 	return chirp_reli_ftruncate(file, length, stoptime);
 }
 
-INT64_T chirp_multi_flush(struct chirp_file * file, time_t stoptime)
+int64_t chirp_multi_flush(struct chirp_file * file, time_t stoptime)
 {
 	return chirp_reli_flush(file, stoptime);
 }
 
-INT64_T chirp_multi_getfile(const char *volume, const char *path, FILE * stream, time_t stoptime)
+int64_t chirp_multi_getfile(const char *volume, const char *path, FILE * stream, time_t stoptime)
 {
 	struct file_info info;
 	if(!chirp_multi_lookup(volume, path, &info, stoptime))
@@ -386,7 +386,7 @@ INT64_T chirp_multi_getfile(const char *volume, const char *path, FILE * stream,
 	return chirp_reli_getfile(info.rhost, info.rpath, stream, stoptime);
 }
 
-INT64_T chirp_multi_getfile_buffer(const char *volume, const char *path, char **buffer, time_t stoptime)
+int64_t chirp_multi_getfile_buffer(const char *volume, const char *path, char **buffer, time_t stoptime)
 {
 	struct file_info info;
 	if(!chirp_multi_lookup(volume, path, &info, stoptime))
@@ -394,7 +394,7 @@ INT64_T chirp_multi_getfile_buffer(const char *volume, const char *path, char **
 	return chirp_reli_getfile_buffer(info.rhost, info.rpath, buffer, stoptime);
 }
 
-INT64_T chirp_multi_putfile(const char *volume, const char *path, FILE * stream, INT64_T mode, INT64_T length, time_t stoptime)
+int64_t chirp_multi_putfile(const char *volume, const char *path, FILE * stream, int64_t mode, int64_t length, time_t stoptime)
 {
 	struct file_info info;
 	struct chirp_file *file;
@@ -410,7 +410,7 @@ INT64_T chirp_multi_putfile(const char *volume, const char *path, FILE * stream,
 	return chirp_reli_putfile(info.rhost, info.rpath, stream, mode, length, stoptime);
 }
 
-INT64_T chirp_multi_putfile_buffer(const char *volume, const char *path, const char *buffer, INT64_T mode, INT64_T length, time_t stoptime)
+int64_t chirp_multi_putfile_buffer(const char *volume, const char *path, const char *buffer, int64_t mode, int64_t length, time_t stoptime)
 {
 	struct file_info info;
 	struct chirp_file *file;
@@ -426,7 +426,7 @@ INT64_T chirp_multi_putfile_buffer(const char *volume, const char *path, const c
 	return chirp_reli_putfile_buffer(info.rhost, info.rpath, buffer, mode, length, stoptime);
 }
 
-INT64_T chirp_multi_getdir(const char *volume, const char *path, chirp_dir_t callback, void *arg, time_t stoptime)
+int64_t chirp_multi_getdir(const char *volume, const char *path, chirp_dir_t callback, void *arg, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
 	if(!volume[0]) {
@@ -440,7 +440,7 @@ INT64_T chirp_multi_getdir(const char *volume, const char *path, chirp_dir_t cal
 	}
 }
 
-INT64_T chirp_multi_getlongdir(const char *volume, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime)
+int64_t chirp_multi_getlongdir(const char *volume, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
 	if(!volume[0]) {
@@ -453,7 +453,7 @@ INT64_T chirp_multi_getlongdir(const char *volume, const char *path, chirp_longd
 	}
 }
 
-INT64_T chirp_multi_getacl(const char *volume, const char *path, chirp_dir_t callback, void *arg, time_t stoptime)
+int64_t chirp_multi_getacl(const char *volume, const char *path, chirp_dir_t callback, void *arg, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
 	if(!chirp_multi_lpath(volume, path, lpath, stoptime))
@@ -461,7 +461,7 @@ INT64_T chirp_multi_getacl(const char *volume, const char *path, chirp_dir_t cal
 	return chirp_reli_getacl(current_volume->host, lpath, callback, arg, stoptime);
 }
 
-INT64_T chirp_multi_setacl(const char *volume, const char *path, const char *subject, const char *rights, time_t stoptime)
+int64_t chirp_multi_setacl(const char *volume, const char *path, const char *subject, const char *rights, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
 	if(!chirp_multi_lpath(volume, path, lpath, stoptime))
@@ -469,7 +469,7 @@ INT64_T chirp_multi_setacl(const char *volume, const char *path, const char *sub
 	return chirp_reli_setacl(current_volume->host, lpath, subject, rights, stoptime);
 }
 
-INT64_T chirp_multi_locate(const char *volume, const char *path, chirp_loc_t callback, void *arg, time_t stoptime)
+int64_t chirp_multi_locate(const char *volume, const char *path, chirp_loc_t callback, void *arg, time_t stoptime)
 {
 	struct file_info info;
 	if(!chirp_multi_lookup(volume, path, &info, stoptime))
@@ -477,7 +477,7 @@ INT64_T chirp_multi_locate(const char *volume, const char *path, chirp_loc_t cal
 	return chirp_reli_locate(info.rhost, info.rpath, callback, arg, stoptime);
 }
 
-INT64_T chirp_multi_whoami(const char *volume, char *buf, INT64_T length, time_t stoptime)
+int64_t chirp_multi_whoami(const char *volume, char *buf, int64_t length, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
 	if(!chirp_multi_lpath(volume, "/", lpath, stoptime))
@@ -485,7 +485,7 @@ INT64_T chirp_multi_whoami(const char *volume, char *buf, INT64_T length, time_t
 	return chirp_reli_whoami(current_volume->host, buf, length, stoptime);
 }
 
-INT64_T chirp_multi_unlink(const char *volume, const char *path, time_t stoptime)
+int64_t chirp_multi_unlink(const char *volume, const char *path, time_t stoptime)
 {
 	struct file_info info;
 	int result;
@@ -508,7 +508,7 @@ INT64_T chirp_multi_unlink(const char *volume, const char *path, time_t stoptime
 	return result;
 }
 
-INT64_T chirp_multi_rename(const char *volume, const char *path, const char *newpath, time_t stoptime)
+int64_t chirp_multi_rename(const char *volume, const char *path, const char *newpath, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
 	char newlpath[CHIRP_PATH_MAX];
@@ -531,13 +531,13 @@ INT64_T chirp_multi_rename(const char *volume, const char *path, const char *new
 	return chirp_reli_rename(current_volume->host, lpath, newlpath, stoptime);
 }
 
-INT64_T chirp_multi_link(const char *volume, const char *path, const char *newpath, time_t stoptime)
+int64_t chirp_multi_link(const char *volume, const char *path, const char *newpath, time_t stoptime)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T chirp_multi_symlink(const char *volume, const char *path, const char *newpath, time_t stoptime)
+int64_t chirp_multi_symlink(const char *volume, const char *path, const char *newpath, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
 	char newlpath[CHIRP_PATH_MAX];
@@ -548,7 +548,7 @@ INT64_T chirp_multi_symlink(const char *volume, const char *path, const char *ne
 	return chirp_reli_symlink(current_volume->host, lpath, newlpath, stoptime);
 }
 
-INT64_T chirp_multi_readlink(const char *volume, const char *path, char *buf, INT64_T length, time_t stoptime)
+int64_t chirp_multi_readlink(const char *volume, const char *path, char *buf, int64_t length, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
 	if(chirp_multi_lpath(volume, path, lpath, stoptime)) {
@@ -558,7 +558,7 @@ INT64_T chirp_multi_readlink(const char *volume, const char *path, char *buf, IN
 	}
 }
 
-INT64_T chirp_multi_mkdir(const char *volume, char const *path, INT64_T mode, time_t stoptime)
+int64_t chirp_multi_mkdir(const char *volume, char const *path, int64_t mode, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
 	if(chirp_multi_lpath(volume, path, lpath, stoptime)) {
@@ -568,7 +568,7 @@ INT64_T chirp_multi_mkdir(const char *volume, char const *path, INT64_T mode, ti
 	}
 }
 
-INT64_T chirp_multi_rmdir(const char *volume, char const *path, time_t stoptime)
+int64_t chirp_multi_rmdir(const char *volume, char const *path, time_t stoptime)
 {
 	char lpath[CHIRP_PATH_MAX];
 	if(chirp_multi_lpath(volume, path, lpath, stoptime)) {
@@ -586,7 +586,7 @@ static int emulate_dir_stat(struct chirp_stat *buf)
 	return 0;
 }
 
-INT64_T chirp_multi_stat(const char *volume, const char *path, struct chirp_stat * buf, time_t stoptime)
+int64_t chirp_multi_stat(const char *volume, const char *path, struct chirp_stat * buf, time_t stoptime)
 {
 	struct file_info info;
 
@@ -601,7 +601,7 @@ INT64_T chirp_multi_stat(const char *volume, const char *path, struct chirp_stat
 	}
 }
 
-INT64_T chirp_multi_lstat(const char *volume, const char *path, struct chirp_stat * buf, time_t stoptime)
+int64_t chirp_multi_lstat(const char *volume, const char *path, struct chirp_stat * buf, time_t stoptime)
 {
 	struct file_info info;
 
@@ -616,15 +616,15 @@ INT64_T chirp_multi_lstat(const char *volume, const char *path, struct chirp_sta
 	}
 }
 
-INT64_T chirp_multi_statfs(const char *volume, const char *path, struct chirp_statfs * buf, time_t stoptime)
+int64_t chirp_multi_statfs(const char *volume, const char *path, struct chirp_statfs * buf, time_t stoptime)
 {
 	struct chirp_server *s;
-	INT64_T files_total = 0;
-	INT64_T bytes_avail = 0;
-	INT64_T bytes_free = 0;
-	INT64_T bytes_total = 0;
-	INT64_T files_free = 0;
-	INT64_T block_size = 4096;
+	int64_t files_total = 0;
+	int64_t bytes_avail = 0;
+	int64_t bytes_free = 0;
+	int64_t bytes_total = 0;
+	int64_t files_free = 0;
+	int64_t block_size = 4096;
 	int i;
 
 	if(!chirp_multi_init(volume, stoptime))
@@ -639,9 +639,9 @@ INT64_T chirp_multi_statfs(const char *volume, const char *path, struct chirp_st
 		if(result < 0)
 			return result;
 
-		bytes_total += tmp.f_blocks * (INT64_T) tmp.f_bsize;
-		bytes_avail += tmp.f_bavail * (INT64_T) tmp.f_bsize;
-		bytes_free += tmp.f_bfree * (INT64_T) tmp.f_bsize;
+		bytes_total += tmp.f_blocks * (int64_t) tmp.f_bsize;
+		bytes_avail += tmp.f_bavail * (int64_t) tmp.f_bsize;
+		bytes_free += tmp.f_bfree * (int64_t) tmp.f_bsize;
 		files_total += tmp.f_files;
 		files_free += tmp.f_ffree;
 	}
@@ -658,7 +658,7 @@ INT64_T chirp_multi_statfs(const char *volume, const char *path, struct chirp_st
 	return 0;
 }
 
-INT64_T chirp_multi_access(const char *volume, const char *path, INT64_T mode, time_t stoptime)
+int64_t chirp_multi_access(const char *volume, const char *path, int64_t mode, time_t stoptime)
 {
 	struct file_info info;
 	if(chirp_multi_lookup(volume, path, &info, stoptime)) {
@@ -670,7 +670,7 @@ INT64_T chirp_multi_access(const char *volume, const char *path, INT64_T mode, t
 	}
 }
 
-INT64_T chirp_multi_chmod(const char *volume, const char *path, INT64_T mode, time_t stoptime)
+int64_t chirp_multi_chmod(const char *volume, const char *path, int64_t mode, time_t stoptime)
 {
 	struct file_info info;
 	if(chirp_multi_lookup(volume, path, &info, stoptime)) {
@@ -682,7 +682,7 @@ INT64_T chirp_multi_chmod(const char *volume, const char *path, INT64_T mode, ti
 	}
 }
 
-INT64_T chirp_multi_chown(const char *volume, const char *path, INT64_T uid, INT64_T gid, time_t stoptime)
+int64_t chirp_multi_chown(const char *volume, const char *path, int64_t uid, int64_t gid, time_t stoptime)
 {
 	struct file_info info;
 	if(chirp_multi_lookup(volume, path, &info, stoptime)) {
@@ -694,7 +694,7 @@ INT64_T chirp_multi_chown(const char *volume, const char *path, INT64_T uid, INT
 	}
 }
 
-INT64_T chirp_multi_lchown(const char *volume, const char *path, INT64_T uid, INT64_T gid, time_t stoptime)
+int64_t chirp_multi_lchown(const char *volume, const char *path, int64_t uid, int64_t gid, time_t stoptime)
 {
 	struct file_info info;
 	if(chirp_multi_lookup(volume, path, &info, stoptime)) {
@@ -706,7 +706,7 @@ INT64_T chirp_multi_lchown(const char *volume, const char *path, INT64_T uid, IN
 	}
 }
 
-INT64_T chirp_multi_truncate(const char *volume, const char *path, INT64_T length, time_t stoptime)
+int64_t chirp_multi_truncate(const char *volume, const char *path, int64_t length, time_t stoptime)
 {
 	struct file_info info;
 	if(chirp_multi_lookup(volume, path, &info, stoptime)) {
@@ -716,7 +716,7 @@ INT64_T chirp_multi_truncate(const char *volume, const char *path, INT64_T lengt
 	}
 }
 
-INT64_T chirp_multi_utime(const char *volume, const char *path, time_t actime, time_t modtime, time_t stoptime)
+int64_t chirp_multi_utime(const char *volume, const char *path, time_t actime, time_t modtime, time_t stoptime)
 {
 	struct file_info info;
 	if(chirp_multi_lookup(volume, path, &info, stoptime)) {
@@ -728,7 +728,7 @@ INT64_T chirp_multi_utime(const char *volume, const char *path, time_t actime, t
 	}
 }
 
-INT64_T chirp_multi_md5(const char *volume, const char *path, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime)
+int64_t chirp_multi_md5(const char *volume, const char *path, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime)
 {
 	struct file_info info;
 	if(chirp_multi_lookup(volume, path, &info, stoptime)) {

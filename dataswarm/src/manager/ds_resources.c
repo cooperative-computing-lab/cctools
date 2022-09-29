@@ -36,7 +36,7 @@ void ds_resources_measure_locally( struct ds_resources *r, const char *disk_path
 {
 	static int gpu_check = 0;
 
-	UINT64_T avail,total;
+	uint64_t avail,total;
 
 	r->cores.total = load_average_get_cpus();
 	r->cores.largest = r->cores.smallest = r->cores.total;
@@ -46,11 +46,11 @@ void ds_resources_measure_locally( struct ds_resources *r, const char *disk_path
 	 * other processes/workers. */
 
 	host_disk_info_get(disk_path,&avail,&total);
-	r->disk.total = (avail / (UINT64_T) MEGA) + r->disk.inuse; // Free + whatever we are using.
+	r->disk.total = (avail / (uint64_t) MEGA) + r->disk.inuse; // Free + whatever we are using.
 	r->disk.largest = r->disk.smallest = r->disk.total;
 
 	host_memory_info_get(&avail,&total);
-	r->memory.total = (total / (UINT64_T) MEGA);
+	r->memory.total = (total / (uint64_t) MEGA);
 	r->memory.largest = r->memory.smallest = r->memory.total;
 
 	if(!gpu_check)

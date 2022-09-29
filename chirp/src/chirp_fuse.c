@@ -88,7 +88,7 @@ static void chirp_stat_to_fuse_stat(struct chirp_stat *c, struct stat *f)
 
 static int chirp_fuse_getattr(const char *path, struct stat *info)
 {
-	INT64_T result;
+	int64_t result;
 	struct chirp_stat cinfo;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
@@ -107,7 +107,7 @@ static int chirp_fuse_getattr(const char *path, struct stat *info)
 
 static int chirp_fuse_readlink(const char *path, char *buf, size_t size)
 {
-	INT64_T result;
+	int64_t result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path, newpath, host);
@@ -159,7 +159,7 @@ static int chirp_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t fille
 
 static int chirp_fuse_mkdir(const char *path, mode_t mode)
 {
-	INT64_T result;
+	int64_t result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path, newpath, host);
@@ -175,7 +175,7 @@ static int chirp_fuse_mkdir(const char *path, mode_t mode)
 
 static int chirp_fuse_unlink(const char *path)
 {
-	INT64_T result;
+	int64_t result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path, newpath, host);
@@ -195,7 +195,7 @@ static int chirp_fuse_unlink(const char *path)
 
 static int chirp_fuse_rmdir(const char *path)
 {
-	INT64_T result;
+	int64_t result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path, newpath, host);
@@ -218,7 +218,7 @@ static int chirp_fuse_symlink(const char *source, const char *target)
 		target: full pathname
 */
 {
-	INT64_T result;
+	int64_t result;
 	char dest_path[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 
@@ -235,7 +235,7 @@ static int chirp_fuse_symlink(const char *source, const char *target)
 
 static int chirp_fuse_rename(const char *from, const char *to)
 {
-	INT64_T result;
+	int64_t result;
 	char frompath[CHIRP_PATH_MAX], topath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(from, frompath, host);
@@ -252,7 +252,7 @@ static int chirp_fuse_rename(const char *from, const char *to)
 
 static int chirp_fuse_link(const char *from, const char *to)
 {
-	INT64_T result;
+	int64_t result;
 	char frompath[CHIRP_PATH_MAX], topath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(from, frompath, host);
@@ -269,7 +269,7 @@ static int chirp_fuse_link(const char *from, const char *to)
 
 static int chirp_fuse_chmod(const char *path, mode_t mode)
 {
-	INT64_T result;
+	int64_t result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path, newpath, host);
@@ -286,7 +286,7 @@ static int chirp_fuse_chmod(const char *path, mode_t mode)
 
 static int chirp_fuse_chown(const char *path, uid_t uid, gid_t gid)
 {
-	INT64_T result;
+	int64_t result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path, newpath, host);
@@ -303,7 +303,7 @@ static int chirp_fuse_chown(const char *path, uid_t uid, gid_t gid)
 
 static int chirp_fuse_truncate(const char *path, off_t size)
 {
-	INT64_T result;
+	int64_t result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path, newpath, host);
@@ -319,7 +319,7 @@ static int chirp_fuse_truncate(const char *path, off_t size)
 
 static int chirp_fuse_access(const char *path, int flags)
 {
-	INT64_T result;
+	int64_t result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path, newpath, host);
@@ -351,7 +351,7 @@ static int chirp_fuse_access(const char *path, int flags)
 
 static int chirp_fuse_utime(const char *path, struct utimbuf *buf)
 {
-	INT64_T result;
+	int64_t result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path, newpath, host);
@@ -420,7 +420,7 @@ static int chirp_fuse_release(const char *path, struct fuse_file_info *fi)
 static int chirp_fuse_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
 	struct chirp_file *file;
-	INT64_T result;
+	int64_t result;
 
 	pthread_mutex_lock(&mutex);
 
@@ -443,7 +443,7 @@ static int chirp_fuse_read(const char *path, char *buf, size_t size, off_t offse
 static int chirp_fuse_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
 	struct chirp_file *file;
-	INT64_T result;
+	int64_t result;
 
 	pthread_mutex_lock(&mutex);
 
@@ -506,7 +506,7 @@ static int chirp_fuse_statfs(const char *path, struct statfs *info)
 static int chirp_fuse_statfs(const char *path, struct statvfs *info)
 #endif
 {
-	INT64_T result;
+	int64_t result;
 	char newpath[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	parsepath(path, newpath, host);

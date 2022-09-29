@@ -4,7 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "int_sizes.h"
 #include "stringtools.h"
 #include "parrot_client.h"
 
@@ -18,7 +17,7 @@ int main( int argc, char *argv[] )
 {
 	const char *path;
 	char alloc_path[4096];
-	INT64_T total,inuse;
+	int64_t total,inuse;
 
 	if(argc<2) {
 		path = ".";

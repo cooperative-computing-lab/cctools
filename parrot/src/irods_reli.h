@@ -15,8 +15,8 @@ extern "C" {
 struct irods_file;
 
 struct irods_file * irods_reli_open ( const char *server, const char *path, int flags, int mode );
-int irods_reli_pread    ( struct irods_file *file, char *data, int length, INT64_T offset );
-int irods_reli_pwrite   ( struct irods_file *file, const char *data, int length, INT64_T offset );
+int irods_reli_pread    ( struct irods_file *file, char *data, int length, int64_t offset );
+int irods_reli_pwrite   ( struct irods_file *file, const char *data, int length, int64_t offset );
 int irods_reli_fsync    ( struct irods_file *file );
 int irods_reli_close    ( struct irods_file *file );
 
@@ -27,7 +27,7 @@ int irods_reli_unlink   ( const char *server, const char *path );
 int irods_reli_mkdir    ( const char *server, const char *path );
 int irods_reli_rmdir    ( const char *server, const char *path );
 int irods_reli_rename   ( const char *server, const char *path, const char *newpath );
-int irods_reli_truncate ( const char *server, const char *path, INT64_T size );
+int irods_reli_truncate ( const char *server, const char *path, int64_t size );
 int irods_reli_md5      ( const char *server, const char *path, char *digest );
 
 int irods_reli_putfile ( const char *host, const char *path, const char *local_path );

@@ -18,7 +18,6 @@
 %{
 	#include <time.h>
 	#include "debug.h"
-	#include "int_sizes.h"
 	#include "timestamp.h"
 	#include "auth_all.h"
 	#include "auth_ticket.h"
@@ -57,7 +56,6 @@
 
 %include "stdint.i"
 %include "debug.h"
-%include "int_sizes.h"
 %include "timestamp.h"
 %include "auth_all.h"
 %include "auth_ticket.h"

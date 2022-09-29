@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
 		whole_file_mode = 0;
 
 	if(whole_file_mode) {
-		INT64_T result = chirp_recursive_put(hostname, source_file, target_file, stoptime);
+		int64_t result = chirp_recursive_put(hostname, source_file, target_file, stoptime);
 		if(result < 0) {
 			fprintf(stderr, "chirp_put: couldn't put %s to host %s: %s\n", source_file, hostname, strerror(errno));
 			return 1;
@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
 	} else {
 		struct chirp_stream *stream;
 		char *buffer = xxmalloc(buffer_size);
-		INT64_T ractual, wactual;
+		int64_t ractual, wactual;
 
 		stream = chirp_stream_open(hostname, target_file, CHIRP_STREAM_WRITE, stoptime);
 		if(!stream) {

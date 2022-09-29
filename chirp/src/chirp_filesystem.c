@@ -46,11 +46,11 @@ struct CHIRP_FILE {
 	} type;
 	union {
 		struct {
-			INT64_T fd;
-			INT64_T offset;
+			int64_t fd;
+			int64_t offset;
 			buffer_t B;
 			char read[CHIRP_FILESYSTEM_BUFFER];
-			INT64_T read_n;
+			int64_t read_n;
 			int error;
 		} cfile;
 		FILE *lfile;
@@ -103,8 +103,8 @@ void cfs_normalize(char url[CHIRP_PATH_MAX])
 CHIRP_FILE *cfs_fopen(const char *path, const char *mode)
 {
 	CHIRP_FILE *file;
-	INT64_T fd;
-	INT64_T flags = 0;
+	int64_t fd;
+	int64_t flags = 0;
 
 	if(strchr(mode, '+')) {
 		errno = ENOTSUP;
@@ -163,7 +163,7 @@ int cfs_fflush(CHIRP_FILE * file)
 
 	content = buffer_tolstring(&file->f.cfile.B, &size);
 
-	while((INT64_T) size > file->f.cfile.offset) {	/* finish all writes */
+	while((int64_t) size > file->f.cfile.offset) {	/* finish all writes */
 		int w = cfs->pwrite(file->f.cfile.fd, content, size, file->f.cfile.offset);
 		if(w == -1) {
 			file->f.cfile.error = EIO;
@@ -224,7 +224,7 @@ size_t cfs_fread(void *ptr, size_t size, size_t nitems, CHIRP_FILE * file)
 		size_t bavail = btotal;
 
 		while(bavail > size) {
-			INT64_T t = cfs->pread(file->f.cfile.fd, ptr, bavail, file->f.cfile.offset);
+			int64_t t = cfs->pread(file->f.cfile.fd, ptr, bavail, file->f.cfile.offset);
 			if(t == -1) {
 				if(errno == EINTR) {
 					continue;
@@ -235,7 +235,7 @@ size_t cfs_fread(void *ptr, size_t size, size_t nitems, CHIRP_FILE * file)
 			} else if(t == 0) {
 				break;
 			}
-			assert(0 < t && t < (INT64_T) bavail);
+			assert(0 < t && t < (int64_t) bavail);
 			file->f.cfile.offset += t;
 			bavail -= t;
 			ptr = (char *) ptr + size;
@@ -247,7 +247,7 @@ size_t cfs_fread(void *ptr, size_t size, size_t nitems, CHIRP_FILE * file)
 char *cfs_fgets(char *s, int n, CHIRP_FILE * file)
 {
 	char *current = s;
-	INT64_T i, empty = file->f.cfile.read_n == 0;
+	int64_t i, empty = file->f.cfile.read_n == 0;
 
 	if(file->type == LOCAL)
 		return fgets(s, n, file->f.lfile);
@@ -404,7 +404,7 @@ int cfs_isnotdir(const char *filename)
 	}
 }
 
-INT64_T cfs_file_size(const char *path)
+int64_t cfs_file_size(const char *path)
 {
 	struct chirp_stat info;
 
@@ -415,7 +415,7 @@ INT64_T cfs_file_size(const char *path)
 	}
 }
 
-INT64_T cfs_fd_size(int fd)
+int64_t cfs_fd_size(int fd)
 {
 	struct chirp_stat info;
 
@@ -436,31 +436,31 @@ int cfs_exists(const char *path)
 	}
 }
 
-INT64_T cfs_basic_chown(const char *path, INT64_T uid, INT64_T gid)
+int64_t cfs_basic_chown(const char *path, int64_t uid, int64_t gid)
 {
 	// Changing file ownership is silently ignored,
 	// because permissions are handled through the ACL model.
 	return 0;
 }
 
-INT64_T cfs_basic_lchown(const char *path, INT64_T uid, INT64_T gid)
+int64_t cfs_basic_lchown(const char *path, int64_t uid, int64_t gid)
 {
 	// Changing file ownership is silently ignored,
 	// because permissions are handled through the ACL model.
 	return 0;
 }
 
-INT64_T cfs_basic_fchown(int fd, INT64_T uid, INT64_T gid)
+int64_t cfs_basic_fchown(int fd, int64_t uid, int64_t gid)
 {
 	// Changing file ownership is silently ignored,
 	// because permissions are handled through the ACL model.
 	return 0;
 }
 
-INT64_T cfs_basic_hash(const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX])
+int64_t cfs_basic_hash(const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX])
 {
 	int fd;
-	INT64_T result;
+	int64_t result;
 	struct chirp_stat info;
 
 	union {
@@ -490,14 +490,14 @@ INT64_T cfs_basic_hash(const char *path, const char *algorithm, unsigned char di
 
 	fd = cfs->open(path, O_RDONLY, 0);
 	if(fd >= 0) {
-		INT64_T total = 0;
-		INT64_T length = info.cst_size;
+		int64_t total = 0;
+		int64_t length = info.cst_size;
 
 		while(length > 0) {
 			char buffer[65536];
-			INT64_T chunk = MIN((int) sizeof(buffer), length);
+			int64_t chunk = MIN((int) sizeof(buffer), length);
 
-			INT64_T ractual = cfs->pread(fd, buffer, chunk, total);
+			int64_t ractual = cfs->pread(fd, buffer, chunk, total);
 			if(ractual <= 0)
 				break;
 
@@ -523,9 +523,9 @@ INT64_T cfs_basic_hash(const char *path, const char *algorithm, unsigned char di
 	return -1;
 }
 
-INT64_T cfs_basic_rmall(const char *path)
+int64_t cfs_basic_rmall(const char *path)
 {
-	INT64_T rc = cfs->unlink(path);
+	int64_t rc = cfs->unlink(path);
 	if(rc == -1 && (errno == EISDIR || errno == EPERM)) {
 		struct chirp_dir *dir = cfs->opendir(path);
 		if(dir) {
@@ -549,10 +549,10 @@ INT64_T cfs_basic_rmall(const char *path)
 	return rc;
 }
 
-INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
+int64_t cfs_basic_sread(int fd, void *vbuffer, int64_t length, int64_t stride_length, int64_t stride_skip, int64_t offset)
 {
-	INT64_T total = 0;
-	INT64_T actual = 0;
+	int64_t total = 0;
+	int64_t actual = 0;
 	char *buffer = vbuffer;
 
 	if(stride_length < 0 || stride_skip < 0 || offset < 0) {
@@ -587,10 +587,10 @@ INT64_T cfs_basic_sread(int fd, void *vbuffer, INT64_T length, INT64_T stride_le
 	}
 }
 
-INT64_T cfs_basic_swrite(int fd, const void *vbuffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset)
+int64_t cfs_basic_swrite(int fd, const void *vbuffer, int64_t length, int64_t stride_length, int64_t stride_skip, int64_t offset)
 {
-	INT64_T total = 0;
-	INT64_T actual = 0;
+	int64_t total = 0;
+	int64_t actual = 0;
 	const char *buffer = vbuffer;
 
 	if(stride_length < 0 || stride_skip < 0 || offset < 0) {
@@ -812,7 +812,7 @@ static int search_directory(const char *subject, const char *const base, char fu
 }
 
 /* Note we need the subject because we must check the ACL for any nested directories. */
-INT64_T cfs_basic_search(const char *subject, const char *dir, const char *pattern, int flags, struct link * l, time_t stoptime)
+int64_t cfs_basic_search(const char *subject, const char *dir, const char *pattern, int flags, struct link * l, time_t stoptime)
 {
 	char fullpath[CHIRP_PATH_MAX];
 	strcpy(fullpath, dir);
@@ -829,79 +829,79 @@ void cfs_stub_destroy(void)
 	return;
 }
 
-INT64_T cfs_stub_lockf(int fd, int cmd, INT64_T len)
+int64_t cfs_stub_lockf(int fd, int cmd, int64_t len)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_getxattr(const char *path, const char *name, void *data, size_t size)
+int64_t cfs_stub_getxattr(const char *path, const char *name, void *data, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_fgetxattr(int fd, const char *name, void *data, size_t size)
+int64_t cfs_stub_fgetxattr(int fd, const char *name, void *data, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_lgetxattr(const char *path, const char *name, void *data, size_t size)
+int64_t cfs_stub_lgetxattr(const char *path, const char *name, void *data, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_listxattr(const char *path, char *list, size_t size)
+int64_t cfs_stub_listxattr(const char *path, char *list, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_flistxattr(int fd, char *list, size_t size)
+int64_t cfs_stub_flistxattr(int fd, char *list, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_llistxattr(const char *path, char *list, size_t size)
+int64_t cfs_stub_llistxattr(const char *path, char *list, size_t size)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
+int64_t cfs_stub_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_fsetxattr(int fd, const char *name, const void *data, size_t size, int flags)
+int64_t cfs_stub_fsetxattr(int fd, const char *name, const void *data, size_t size, int flags)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
+int64_t cfs_stub_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_removexattr(const char *path, const char *name)
+int64_t cfs_stub_removexattr(const char *path, const char *name)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_fremovexattr(int fd, const char *name)
+int64_t cfs_stub_fremovexattr(int fd, const char *name)
 {
 	errno = ENOSYS;
 	return -1;
 }
 
-INT64_T cfs_stub_lremovexattr(const char *path, const char *name)
+int64_t cfs_stub_lremovexattr(const char *path, const char *name)
 {
 	errno = ENOSYS;
 	return -1;

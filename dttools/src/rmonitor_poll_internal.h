@@ -30,7 +30,6 @@ See the file COPYING for details.
 #include <sys/statvfs.h>
 #endif
 
-#include "int_sizes.h"
 #include "rmonitor_types.h"
 #include "rmsummary.h"
 

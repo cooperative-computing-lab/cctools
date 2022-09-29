@@ -33,14 +33,14 @@ static void add_to_list(const char *name, void *list)
 	list_push_tail(list, strdup(name));
 }
 
-static INT64_T do_get_one_dir(const char *hostport, const char *source_file, const char *target_file, int mode, time_t stoptime)
+static int64_t do_get_one_dir(const char *hostport, const char *source_file, const char *target_file, int mode, time_t stoptime)
 {
 	char new_source_file[CHIRP_PATH_MAX];
 	char new_target_file[CHIRP_PATH_MAX];
 	struct list *work_list;
 	const char *name;
-	INT64_T result;
-	INT64_T total = 0;
+	int64_t result;
+	int64_t total = 0;
 
 	work_list = list_create();
 
@@ -80,10 +80,10 @@ static INT64_T do_get_one_dir(const char *hostport, const char *source_file, con
 	}
 }
 
-static INT64_T do_get_one_link(const char *hostport, const char *source_file, const char *target_file, time_t stoptime)
+static int64_t do_get_one_link(const char *hostport, const char *source_file, const char *target_file, time_t stoptime)
 {
 	char linkdata[CHIRP_PATH_MAX];
-	INT64_T result;
+	int64_t result;
 
 	result = chirp_reli_readlink(hostport, source_file, linkdata, sizeof(linkdata), stoptime);
 	if(result >= 0) {
@@ -97,11 +97,11 @@ static INT64_T do_get_one_link(const char *hostport, const char *source_file, co
 	return result;
 }
 
-static INT64_T do_get_one_file(const char *hostport, const char *source_file, const char *target_file, int mode, INT64_T length, time_t stoptime)
+static int64_t do_get_one_file(const char *hostport, const char *source_file, const char *target_file, int mode, int64_t length, time_t stoptime)
 {
 	FILE *file;
 	int save_errno;
-	INT64_T actual;
+	int64_t actual;
 
 	file = fopen64(target_file, "w");
 	if(!file)
@@ -128,9 +128,9 @@ static INT64_T do_get_one_file(const char *hostport, const char *source_file, co
 	}
 }
 
-INT64_T chirp_recursive_get(const char *hostport, const char *source_file, const char *target_file, time_t stoptime)
+int64_t chirp_recursive_get(const char *hostport, const char *source_file, const char *target_file, time_t stoptime)
 {
-	INT64_T result;
+	int64_t result;
 	struct chirp_stat info;
 
 	result = chirp_reli_lstat(hostport, source_file, &info, stoptime);
@@ -149,14 +149,14 @@ INT64_T chirp_recursive_get(const char *hostport, const char *source_file, const
 	return result;
 }
 
-static INT64_T do_put_one_dir(const char *hostport, const char *source_file, const char *target_file, int mode, time_t stoptime)
+static int64_t do_put_one_dir(const char *hostport, const char *source_file, const char *target_file, int mode, time_t stoptime)
 {
 	char new_source_file[CHIRP_PATH_MAX];
 	char new_target_file[CHIRP_PATH_MAX];
 	struct list *work_list;
 	const char *name;
-	INT64_T result;
-	INT64_T total = 0;
+	int64_t result;
+	int64_t total = 0;
 
 	struct dirent *d;
 	DIR *dir;
@@ -204,10 +204,10 @@ static INT64_T do_put_one_dir(const char *hostport, const char *source_file, con
 	}
 }
 
-static INT64_T do_put_one_link(const char *hostport, const char *source_file, const char *target_file, time_t stoptime)
+static int64_t do_put_one_link(const char *hostport, const char *source_file, const char *target_file, time_t stoptime)
 {
 	char linkdata[CHIRP_PATH_MAX];
-	INT64_T result;
+	int64_t result;
 
 	result = readlink(source_file, linkdata, sizeof(linkdata));
 	if(result > 0) {
@@ -221,7 +221,7 @@ static INT64_T do_put_one_link(const char *hostport, const char *source_file, co
 	return result;
 }
 
-static INT64_T do_put_one_file(const char *hostport, const char *source_file, const char *target_file, int mode, INT64_T length, time_t stoptime)
+static int64_t do_put_one_file(const char *hostport, const char *source_file, const char *target_file, int mode, int64_t length, time_t stoptime)
 {
 	FILE *file;
 	int save_errno;
@@ -243,13 +243,13 @@ static INT64_T do_put_one_file(const char *hostport, const char *source_file, co
 	}
 }
 
-static INT64_T do_put_one_fifo(const char *hostport, const char *source_file, const char *target_file, int mode, time_t stoptime)
+static int64_t do_put_one_fifo(const char *hostport, const char *source_file, const char *target_file, int mode, time_t stoptime)
 {
 	FILE *file;
 	int save_errno;
 	struct chirp_file *cf = 0;
-	INT64_T result;
-	INT64_T offset = 0;
+	int64_t result;
+	int64_t offset = 0;
 
 	file = fopen64(source_file, "r");
 	if(!file)
@@ -280,9 +280,9 @@ out:
 	return result;
 }
 
-INT64_T chirp_recursive_put(const char *hostport, const char *source_file, const char *target_file, time_t stoptime)
+int64_t chirp_recursive_put(const char *hostport, const char *source_file, const char *target_file, time_t stoptime)
 {
-	INT64_T result;
+	int64_t result;
 	struct stat64 info;
 	struct stat64 linfo;
 

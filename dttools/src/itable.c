@@ -14,7 +14,7 @@ See the file COPYING for details.
 #define DEFAULT_LOAD 0.75
 
 struct entry {
-	UINT64_T key;
+	uint64_t key;
 	void *value;
 	struct entry *next;
 };
@@ -81,10 +81,10 @@ int itable_size(struct itable *h)
 	return h->size;
 }
 
-void *itable_lookup(struct itable *h, UINT64_T key)
+void *itable_lookup(struct itable *h, uint64_t key)
 {
 	struct entry *e;
-	UINT64_T index;
+	uint64_t index;
 
 	index = key % h->bucket_count;
 	e = h->buckets[index];
@@ -141,10 +141,10 @@ static int itable_double_buckets(struct itable *h)
 	return 1;
 }
 
-int itable_insert(struct itable *h, UINT64_T key, const void *value)
+int itable_insert(struct itable *h, uint64_t key, const void *value)
 {
 	struct entry *e;
-	UINT64_T index;
+	uint64_t index;
 
 	if( ((float) h->size / h->bucket_count) > DEFAULT_LOAD )
 		itable_double_buckets(h);
@@ -173,11 +173,11 @@ int itable_insert(struct itable *h, UINT64_T key, const void *value)
 	return 1;
 }
 
-void *itable_remove(struct itable *h, UINT64_T key)
+void *itable_remove(struct itable *h, uint64_t key)
 {
 	struct entry *e, *f;
 	void *value;
-	UINT64_T index;
+	uint64_t index;
 
 	index = key % h->bucket_count;
 	e = h->buckets[index];
@@ -204,7 +204,7 @@ void *itable_remove(struct itable *h, UINT64_T key)
 
 void * itable_pop( struct itable *t )
 {
-	UINT64_T key;
+	uint64_t key;
 	void *value;
 
 	itable_firstkey(t);
@@ -225,7 +225,7 @@ void itable_firstkey(struct itable *h)
 	}
 }
 
-int itable_nextkey(struct itable *h, UINT64_T * key, void **value)
+int itable_nextkey(struct itable *h, uint64_t * key, void **value)
 {
 	if(h->ientry) {
 		*key = h->ientry->key;

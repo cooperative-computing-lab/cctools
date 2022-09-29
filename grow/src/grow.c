@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include <string.h>
 #include <errno.h>
+#include <inttypes.h>
 
 #include "grow.h"
 #include "debug.h"
@@ -40,7 +41,7 @@ static struct grow_dirent *grow_dirent_create_from_file( FILE *file, struct grow
 	char name[GROW_LINE_MAX];
 	char linkname[GROW_LINE_MAX];
 	char type;
-	static INT64_T inode=2;
+	static int64_t inode=2;
 
 	while(fgets(line,sizeof(line),file)) {
 		sha1_update(&grow_filesystem_checksum,(unsigned char*)line,strlen(line));

@@ -14,7 +14,6 @@
 
 %{
 	#include "debug.h"
-	#include "int_sizes.h"
 	#include "timestamp.h"
 	#include "category_internal.h"
 	#include "category.h"
@@ -90,7 +89,6 @@
 
 %include "stdint.i"
 %include "debug.h"
-%include "int_sizes.h"
 %include "timestamp.h"
 %include "category_internal.h"
 %include "category.h"

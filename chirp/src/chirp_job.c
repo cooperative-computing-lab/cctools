@@ -739,7 +739,7 @@ out:
 	return rc;
 }
 
-int chirp_job_wait (chirp_jobid_t id, const char *subject, INT64_T timeout, buffer_t *B)
+int chirp_job_wait (chirp_jobid_t id, const char *subject, int64_t timeout, buffer_t *B)
 {
 	static const char Wait[] =
 		"BEGIN TRANSACTION;"

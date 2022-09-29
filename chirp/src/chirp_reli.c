@@ -30,27 +30,27 @@ struct chirp_file {
 	char host[CHIRP_LINE_MAX];
 	char path[CHIRP_LINE_MAX];
 	struct chirp_stat info;
-	INT64_T fd;
-	INT64_T flags;
-	INT64_T mode;
-	INT64_T serial;
-	INT64_T stale;
+	int64_t fd;
+	int64_t flags;
+	int64_t mode;
+	int64_t serial;
+	int64_t stale;
 	char *buffer;
-	INT64_T buffer_valid;
-	INT64_T buffer_offset;
-	INT64_T buffer_dirty;
+	int64_t buffer_valid;
+	int64_t buffer_offset;
+	int64_t buffer_dirty;
 };
 
 struct hash_table *table = 0;
 static int chirp_reli_blocksize = 65536;
 static int chirp_reli_default_nreps = 0;
 
-INT64_T chirp_reli_blocksize_get()
+int64_t chirp_reli_blocksize_get()
 {
 	return chirp_reli_blocksize;
 }
 
-void    chirp_reli_blocksize_set( INT64_T bs )
+void    chirp_reli_blocksize_set( int64_t bs )
 {
 	chirp_reli_blocksize = bs;
 }
@@ -88,7 +88,7 @@ static struct chirp_client * connect_to_host( const char *host, time_t stoptime 
 	}
 }
 
-static INT64_T connect_to_file( struct chirp_client *client, struct chirp_file *file, time_t stoptime )
+static int64_t connect_to_file( struct chirp_client *client, struct chirp_file *file, time_t stoptime )
 {
 	struct chirp_stat buf;
 
@@ -142,12 +142,12 @@ void chirp_reli_disconnect( const char *host )
 	if(c) chirp_client_disconnect(c);
 }
 
-struct chirp_file * chirp_reli_open( const char *host, const char *path, INT64_T flags, INT64_T mode, time_t stoptime )
+struct chirp_file * chirp_reli_open( const char *host, const char *path, int64_t flags, int64_t mode, time_t stoptime )
 {
 	struct chirp_file *file;
 	int     delay=0;
 	time_t  nexttry;
-	INT64_T result;
+	int64_t result;
 	struct chirp_stat buf;
 	time_t current;
 
@@ -195,7 +195,7 @@ struct chirp_file * chirp_reli_open( const char *host, const char *path, INT64_T
 	}
 }
 
-INT64_T chirp_reli_close( struct chirp_file *file, time_t stoptime )
+int64_t chirp_reli_close( struct chirp_file *file, time_t stoptime )
 {
 	struct chirp_client *client;
 	if(chirp_reli_flush(file,stoptime) < 0)
@@ -214,7 +214,7 @@ INT64_T chirp_reli_close( struct chirp_file *file, time_t stoptime )
 #define RETRY_FILE( ZZZ ) \
 	int delay=0; \
 	time_t nexttry; \
-	INT64_T result; \
+	int64_t result; \
 	time_t current; \
 	while(1) { \
 		struct chirp_client *client = connect_to_host(file->host,stoptime); \
@@ -248,16 +248,16 @@ INT64_T chirp_reli_close( struct chirp_file *file, time_t stoptime )
 	}
 
 
-INT64_T chirp_reli_pread_unbuffered( struct chirp_file *file, void *data, INT64_T length, INT64_T offset, time_t stoptime )
+int64_t chirp_reli_pread_unbuffered( struct chirp_file *file, void *data, int64_t length, int64_t offset, time_t stoptime )
 {
 	RETRY_FILE( result = chirp_client_pread(client,file->fd,data,length,offset,stoptime); )
 }
 
-static INT64_T chirp_reli_pread_buffered( struct chirp_file *file, void *data, INT64_T length, INT64_T offset, time_t stoptime )
+static int64_t chirp_reli_pread_buffered( struct chirp_file *file, void *data, int64_t length, int64_t offset, time_t stoptime )
 {
 	if(file->buffer_valid) {
 		if(offset >= file->buffer_offset && offset < (file->buffer_offset+file->buffer_valid) ) {
-			INT64_T blength;
+			int64_t blength;
 			blength = MIN(length,file->buffer_offset+file->buffer_valid-offset);
 			memcpy(data,&file->buffer[offset-file->buffer_offset],blength);
 			return blength;
@@ -267,7 +267,7 @@ static INT64_T chirp_reli_pread_buffered( struct chirp_file *file, void *data, I
 	chirp_reli_flush(file,stoptime);
 
 	if(length<=chirp_reli_blocksize) {
-		INT64_T result = chirp_reli_pread_unbuffered(file,file->buffer,chirp_reli_blocksize,offset,stoptime);
+		int64_t result = chirp_reli_pread_unbuffered(file,file->buffer,chirp_reli_blocksize,offset,stoptime);
 		if(result<0) {
 			file->buffer_offset = 0;
 			file->buffer_valid = 0;
@@ -286,11 +286,11 @@ static INT64_T chirp_reli_pread_buffered( struct chirp_file *file, void *data, I
 	}
 }
 
-INT64_T chirp_reli_pread( struct chirp_file *file, void *data, INT64_T length, INT64_T offset, time_t stoptime )
+int64_t chirp_reli_pread( struct chirp_file *file, void *data, int64_t length, int64_t offset, time_t stoptime )
 {
 	char *cdata = data;
-	INT64_T result = 0;
-	INT64_T actual = 0;
+	int64_t result = 0;
+	int64_t actual = 0;
 
 	while(length>0) {
 		actual = chirp_reli_pread_buffered(file,cdata,length,offset,stoptime);
@@ -309,12 +309,12 @@ INT64_T chirp_reli_pread( struct chirp_file *file, void *data, INT64_T length, I
 	}
 }
 
-INT64_T chirp_reli_pwrite_unbuffered( struct chirp_file *file, const void *data, INT64_T length, INT64_T offset, time_t stoptime )
+int64_t chirp_reli_pwrite_unbuffered( struct chirp_file *file, const void *data, int64_t length, int64_t offset, time_t stoptime )
 {
 	RETRY_FILE( result = chirp_client_pwrite(client,file->fd,data,length,offset,stoptime); )
 }
 
-static INT64_T chirp_reli_pwrite_buffered( struct chirp_file *file, const void *data, INT64_T length, INT64_T offset, time_t stoptime )
+static int64_t chirp_reli_pwrite_buffered( struct chirp_file *file, const void *data, int64_t length, int64_t offset, time_t stoptime )
 {
 	if(length>=chirp_reli_blocksize) {
 		if(chirp_reli_flush(file,stoptime)<0) {
@@ -326,7 +326,7 @@ static INT64_T chirp_reli_pwrite_buffered( struct chirp_file *file, const void *
 
 	if(file->buffer_valid>0) {
 		if( (file->buffer_offset + file->buffer_valid) == offset ) {
-			INT64_T blength = MIN(chirp_reli_blocksize-file->buffer_valid,length);
+			int64_t blength = MIN(chirp_reli_blocksize-file->buffer_valid,length);
 			memcpy(&file->buffer[file->buffer_valid],data,blength);
 			file->buffer_valid += blength;
 			file->buffer_dirty = 1;
@@ -354,11 +354,11 @@ static INT64_T chirp_reli_pwrite_buffered( struct chirp_file *file, const void *
 	return length;
 }
 
-INT64_T chirp_reli_pwrite( struct chirp_file *file, const void *data, INT64_T length, INT64_T offset, time_t stoptime )
+int64_t chirp_reli_pwrite( struct chirp_file *file, const void *data, int64_t length, int64_t offset, time_t stoptime )
 {
 	const char *cdata = data;
-	INT64_T result = 0;
-	INT64_T actual = 0;
+	int64_t result = 0;
+	int64_t actual = 0;
 
 	while(length>0) {
 		actual = chirp_reli_pwrite_buffered(file,cdata,length,offset,stoptime);
@@ -377,51 +377,51 @@ INT64_T chirp_reli_pwrite( struct chirp_file *file, const void *data, INT64_T le
 	}
 }
 
-INT64_T chirp_reli_sread( struct chirp_file *file, void *data, INT64_T length, INT64_T stride_length, INT64_T stride_offset, INT64_T offset, time_t stoptime )
+int64_t chirp_reli_sread( struct chirp_file *file, void *data, int64_t length, int64_t stride_length, int64_t stride_offset, int64_t offset, time_t stoptime )
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_sread(client,file->fd,data,length,stride_length,stride_offset,offset,stoptime); )
 }
 
-INT64_T chirp_reli_swrite( struct chirp_file *file, const void *data, INT64_T length, INT64_T stride_length, INT64_T stride_offset, INT64_T offset, time_t stoptime )
+int64_t chirp_reli_swrite( struct chirp_file *file, const void *data, int64_t length, int64_t stride_length, int64_t stride_offset, int64_t offset, time_t stoptime )
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_swrite(client,file->fd,data,length,stride_length,stride_offset,offset,stoptime); )
 }
 
-INT64_T chirp_reli_fstat( struct chirp_file *file, struct chirp_stat *buf, time_t stoptime )
+int64_t chirp_reli_fstat( struct chirp_file *file, struct chirp_stat *buf, time_t stoptime )
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fstat(client,file->fd,buf,stoptime); )
 }
 
-INT64_T chirp_reli_fstatfs( struct chirp_file *file, struct chirp_statfs *buf, time_t stoptime )
+int64_t chirp_reli_fstatfs( struct chirp_file *file, struct chirp_statfs *buf, time_t stoptime )
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fstatfs(client,file->fd,buf,stoptime); )
 }
 
-INT64_T chirp_reli_fchown( struct chirp_file *file, INT64_T uid, INT64_T gid, time_t stoptime )
+int64_t chirp_reli_fchown( struct chirp_file *file, int64_t uid, int64_t gid, time_t stoptime )
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fchown(client,file->fd,uid,gid,stoptime); )
 }
 
-INT64_T chirp_reli_fchmod( struct chirp_file *file, INT64_T mode, time_t stoptime )
+int64_t chirp_reli_fchmod( struct chirp_file *file, int64_t mode, time_t stoptime )
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fchmod(client,file->fd,mode,stoptime); )
 }
 
-INT64_T chirp_reli_ftruncate( struct chirp_file *file, INT64_T length, time_t stoptime )
+int64_t chirp_reli_ftruncate( struct chirp_file *file, int64_t length, time_t stoptime )
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_ftruncate(client,file->fd,length,stoptime); )
 }
 
-INT64_T chirp_reli_flush( struct chirp_file *file, time_t stoptime )
+int64_t chirp_reli_flush( struct chirp_file *file, time_t stoptime )
 {
-	INT64_T result;
+	int64_t result;
 
 	if(file->buffer_valid && file->buffer_dirty) {
 		result = chirp_reli_pwrite_unbuffered(file,file->buffer,file->buffer_valid,file->buffer_offset,stoptime);
@@ -436,7 +436,7 @@ INT64_T chirp_reli_flush( struct chirp_file *file, time_t stoptime )
 	return result;
 }
 
-INT64_T chirp_reli_fsync( struct chirp_file *file, time_t stoptime )
+int64_t chirp_reli_fsync( struct chirp_file *file, time_t stoptime )
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fsync(client,file->fd,stoptime); );
@@ -445,7 +445,7 @@ INT64_T chirp_reli_fsync( struct chirp_file *file, time_t stoptime )
 #define _RETRY_ATOMIC( _ZZZ, _NOEAGAIN ) \
 	int delay=0; \
 	time_t nexttry; \
-	INT64_T result; \
+	int64_t result; \
 	time_t current; \
 	while(1) { \
 		struct chirp_client *client = connect_to_host(host,stoptime); \
@@ -487,19 +487,19 @@ INT64_T chirp_reli_fsync( struct chirp_file *file, time_t stoptime )
 #define RETRY_ATOMIC(_ZZZ) _RETRY_ATOMIC(_ZZZ, 0)
 #define RETRY_ATOMIC_NOEAGAIN(_ZZZ) _RETRY_ATOMIC(_ZZZ, 1)
 
-INT64_T chirp_reli_whoami( const char *host, char *buf, INT64_T length, time_t stoptime )
+int64_t chirp_reli_whoami( const char *host, char *buf, int64_t length, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_whoami(client,buf,length,stoptime); );
 }
 
-INT64_T chirp_reli_whoareyou( const char *host, const char *rhost, char *buffer, INT64_T length, time_t stoptime  )
+int64_t chirp_reli_whoareyou( const char *host, const char *rhost, char *buffer, int64_t length, time_t stoptime  )
 {
 	RETRY_ATOMIC( result = chirp_client_whoareyou(client,rhost,buffer,length,stoptime); );
 }
 
-INT64_T chirp_reli_getfile( const char *host, const char *path, FILE *stream, time_t stoptime )
+int64_t chirp_reli_getfile( const char *host, const char *path, FILE *stream, time_t stoptime )
 {
-	INT64_T pos = ftell(stream);
+	int64_t pos = ftell(stream);
 	if (pos < 0) pos = 0;
 
 	RETRY_ATOMIC(\
@@ -509,12 +509,12 @@ INT64_T chirp_reli_getfile( const char *host, const char *path, FILE *stream, ti
 	)
 }
 
-INT64_T chirp_reli_getfile_buffer( const char *host, const char *path, char **buffer, time_t stoptime )
+int64_t chirp_reli_getfile_buffer( const char *host, const char *path, char **buffer, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_getfile_buffer(client,path,buffer,stoptime); )
 }
 
-INT64_T chirp_reli_putfile( const char *host, const char *path, FILE *stream, INT64_T mode, INT64_T length, time_t stoptime )
+int64_t chirp_reli_putfile( const char *host, const char *path, FILE *stream, int64_t mode, int64_t length, time_t stoptime )
 {
 	RETRY_ATOMIC(
 		fseek(stream,0,SEEK_SET);\
@@ -523,102 +523,102 @@ INT64_T chirp_reli_putfile( const char *host, const char *path, FILE *stream, IN
 	)
 }
 
-INT64_T chirp_reli_putfile_buffer( const char *host, const char *path, const void *buffer, INT64_T mode, size_t length, time_t stoptime )
+int64_t chirp_reli_putfile_buffer( const char *host, const char *path, const void *buffer, int64_t mode, size_t length, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_putfile_buffer(client,path,buffer,mode,length,stoptime); )
 }
 
-INT64_T chirp_reli_getlongdir( const char *host, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime )
+int64_t chirp_reli_getlongdir( const char *host, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_getlongdir(client,path,callback,arg,stoptime); )
 }
 
-INT64_T chirp_reli_getdir( const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime )
+int64_t chirp_reli_getdir( const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_getdir(client,path,callback,arg,stoptime); )
 }
 
-INT64_T chirp_reli_getacl( const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime )
+int64_t chirp_reli_getacl( const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_getacl(client,path,callback,arg,stoptime); )
 }
 
-INT64_T chirp_reli_ticket_create( const char *host, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime )
+int64_t chirp_reli_ticket_create( const char *host, char name[CHIRP_PATH_MAX], unsigned bits, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_ticket_create(client,name,bits,stoptime); )
 }
 
-INT64_T chirp_reli_ticket_register( const char *host, const char *name, const char *subject, time_t duration, time_t stoptime )
+int64_t chirp_reli_ticket_register( const char *host, const char *name, const char *subject, time_t duration, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_ticket_register(client,name,subject,duration,stoptime); )
 }
 
-INT64_T chirp_reli_ticket_delete( const char *host, const char *name, time_t stoptime )
+int64_t chirp_reli_ticket_delete( const char *host, const char *name, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_ticket_delete(client,name,stoptime); )
 }
 
-INT64_T chirp_reli_ticket_list( const char *host, const char *subject, char ***list, time_t stoptime )
+int64_t chirp_reli_ticket_list( const char *host, const char *subject, char ***list, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_ticket_list(client,subject,list,stoptime); )
 }
 
-INT64_T chirp_reli_ticket_get( const char *host, const char *name, char **subject, char **ticket, time_t *duration, char ***rights, time_t stoptime )
+int64_t chirp_reli_ticket_get( const char *host, const char *name, char **subject, char **ticket, time_t *duration, char ***rights, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_ticket_get(client,name,subject,ticket,duration,rights,stoptime); )
 }
 
-INT64_T chirp_reli_ticket_modify( const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime )
+int64_t chirp_reli_ticket_modify( const char *host, const char *name, const char *path, const char *aclmask, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_ticket_modify(client,name,path,aclmask,stoptime); )
 }
 
-INT64_T chirp_reli_setacl( const char *host, const char *path, const char *subject, const char *rights, time_t stoptime )
+int64_t chirp_reli_setacl( const char *host, const char *path, const char *subject, const char *rights, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_setacl(client,path,subject,rights,stoptime); )
 }
 
-INT64_T chirp_reli_resetacl( const char *host, const char *path, const char *rights, time_t stoptime )
+int64_t chirp_reli_resetacl( const char *host, const char *path, const char *rights, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_resetacl(client,path,rights,stoptime); )
 }
 
-INT64_T chirp_reli_locate( const char *host, const char *path, chirp_loc_t callback, void *arg, time_t stoptime )
+int64_t chirp_reli_locate( const char *host, const char *path, chirp_loc_t callback, void *arg, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_locate(client,path,callback,arg,stoptime); )
 }
 
-INT64_T chirp_reli_unlink( const char *host, const char *path, time_t stoptime )
+int64_t chirp_reli_unlink( const char *host, const char *path, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_unlink(client,path,stoptime); )
 }
 
-INT64_T chirp_reli_rename( const char *host, const char *path, const char *newpath, time_t stoptime )
+int64_t chirp_reli_rename( const char *host, const char *path, const char *newpath, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_rename(client,path,newpath,stoptime); )
 }
 
-INT64_T chirp_reli_link( const char *host, const char *path, const char *newpath, time_t stoptime )
+int64_t chirp_reli_link( const char *host, const char *path, const char *newpath, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_link(client,path,newpath,stoptime); )
 }
 
-INT64_T chirp_reli_symlink( const char *host, const char *path, const char *newpath, time_t stoptime )
+int64_t chirp_reli_symlink( const char *host, const char *path, const char *newpath, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_symlink(client,path,newpath,stoptime); )
 }
 
-INT64_T chirp_reli_readlink( const char *host, const char *path, char *buf, INT64_T length, time_t stoptime )
+int64_t chirp_reli_readlink( const char *host, const char *path, char *buf, int64_t length, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_readlink(client,path,buf,length,stoptime); )
 }
 
-INT64_T chirp_reli_mkdir( const char *host, const char *path, INT64_T mode, time_t stoptime )
+int64_t chirp_reli_mkdir( const char *host, const char *path, int64_t mode, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_mkdir(client,path,mode,stoptime); )
 }
 
-INT64_T chirp_reli_mkdir_recursive( const char *host, const char *path, INT64_T mode, time_t stoptime )
+int64_t chirp_reli_mkdir_recursive( const char *host, const char *path, int64_t mode, time_t stoptime )
 {
 	char mypath[CHIRP_PATH_MAX];
 	strcpy(mypath,path);
@@ -636,72 +636,72 @@ INT64_T chirp_reli_mkdir_recursive( const char *host, const char *path, INT64_T 
 	return chirp_reli_mkdir(host,path,mode,stoptime);
 }
 
-INT64_T chirp_reli_rmdir( const char *host, const char *path, time_t stoptime )
+int64_t chirp_reli_rmdir( const char *host, const char *path, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_rmdir(client,path,stoptime); )
 }
 
-INT64_T chirp_reli_rmall( const char *host, const char *path, time_t stoptime )
+int64_t chirp_reli_rmall( const char *host, const char *path, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_rmall(client,path,stoptime); )
 }
 
-INT64_T chirp_reli_stat( const char *host, const char *path, struct chirp_stat *buf, time_t stoptime )
+int64_t chirp_reli_stat( const char *host, const char *path, struct chirp_stat *buf, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_stat(client,path,buf,stoptime); )
 }
 
-INT64_T chirp_reli_lstat( const char *host, const char *path, struct chirp_stat *buf, time_t stoptime )
+int64_t chirp_reli_lstat( const char *host, const char *path, struct chirp_stat *buf, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_lstat(client,path,buf,stoptime); )
 }
 
-INT64_T chirp_reli_statfs( const char *host, const char *path, struct chirp_statfs *buf, time_t stoptime )
+int64_t chirp_reli_statfs( const char *host, const char *path, struct chirp_statfs *buf, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_statfs(client,path,buf,stoptime); )
 }
 
-INT64_T chirp_reli_access( const char *host, const char *path, INT64_T mode, time_t stoptime )
+int64_t chirp_reli_access( const char *host, const char *path, int64_t mode, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_access(client,path,mode,stoptime); )
 }
 
-INT64_T chirp_reli_chmod( const char *host, const char *path, INT64_T mode, time_t stoptime )
+int64_t chirp_reli_chmod( const char *host, const char *path, int64_t mode, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_chmod(client,path,mode,stoptime); )
 }
 
-INT64_T chirp_reli_chown( const char *host, const char *path, INT64_T uid, INT64_T gid, time_t stoptime )
+int64_t chirp_reli_chown( const char *host, const char *path, int64_t uid, int64_t gid, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_chown(client,path,uid,gid,stoptime); )
 }
 
-INT64_T chirp_reli_lchown( const char *host, const char *path, INT64_T uid, INT64_T gid, time_t stoptime )
+int64_t chirp_reli_lchown( const char *host, const char *path, int64_t uid, int64_t gid, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_lchown(client,path,uid,gid,stoptime); )
 }
 
-INT64_T chirp_reli_truncate( const char *host, const char *path, INT64_T length, time_t stoptime )
+int64_t chirp_reli_truncate( const char *host, const char *path, int64_t length, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_truncate(client,path,length,stoptime); )
 }
 
-INT64_T chirp_reli_utime( const char *host, const char *path, time_t actime, time_t modtime, time_t stoptime )
+int64_t chirp_reli_utime( const char *host, const char *path, time_t actime, time_t modtime, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_utime(client,path,actime,modtime,stoptime); )
 }
 
-INT64_T chirp_reli_hash( const char *host, const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime )
+int64_t chirp_reli_hash( const char *host, const char *path, const char *algorithm, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_hash(client,path,algorithm,digest,stoptime); )
 }
 
-INT64_T chirp_reli_md5( const char *host, const char *path, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime )
+int64_t chirp_reli_md5( const char *host, const char *path, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_md5(client,path,digest,stoptime); )
 }
 
-INT64_T chirp_reli_setrep(const char *host, const char *path, int nreps, time_t stoptime )
+int64_t chirp_reli_setrep(const char *host, const char *path, int nreps, time_t stoptime )
 {
 	/*
 	If setting a default replication factor for the session,
@@ -712,126 +712,126 @@ INT64_T chirp_reli_setrep(const char *host, const char *path, int nreps, time_t 
 	RETRY_ATOMIC( result = chirp_client_setrep(client,path,nreps,stoptime); )
 }
 
-INT64_T chirp_reli_getxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime)
+int64_t chirp_reli_getxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime)
 {
 	RETRY_ATOMIC( result = chirp_client_getxattr(client,path,name,data,size,stoptime); )
 }
 
-INT64_T chirp_reli_fgetxattr(struct chirp_file *file, const char *name, void *data, size_t size, time_t stoptime)
+int64_t chirp_reli_fgetxattr(struct chirp_file *file, const char *name, void *data, size_t size, time_t stoptime)
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fgetxattr(client,file->fd,name,data,size,stoptime); )
 }
 
-INT64_T chirp_reli_lgetxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime)
+int64_t chirp_reli_lgetxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime)
 {
 	RETRY_ATOMIC( result = chirp_client_lgetxattr(client,path,name,data,size,stoptime); )
 }
 
-INT64_T chirp_reli_listxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime)
+int64_t chirp_reli_listxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime)
 {
 	RETRY_ATOMIC( result = chirp_client_listxattr(client,path,list,size,stoptime); )
 }
 
-INT64_T chirp_reli_flistxattr(struct chirp_file *file, char *list, size_t size, time_t stoptime)
+int64_t chirp_reli_flistxattr(struct chirp_file *file, char *list, size_t size, time_t stoptime)
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_flistxattr(client,file->fd,list,size,stoptime); )
 }
 
-INT64_T chirp_reli_llistxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime)
+int64_t chirp_reli_llistxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime)
 {
 	RETRY_ATOMIC( result = chirp_client_llistxattr(client,path,list,size,stoptime); )
 }
 
-INT64_T chirp_reli_setxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+int64_t chirp_reli_setxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	RETRY_ATOMIC( result = chirp_client_setxattr(client,path,name,data,size,flags,stoptime); )
 }
 
-INT64_T chirp_reli_fsetxattr(struct chirp_file *file, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+int64_t chirp_reli_fsetxattr(struct chirp_file *file, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fsetxattr(client,file->fd,name,data,size,flags,stoptime); )
 }
 
-INT64_T chirp_reli_lsetxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+int64_t chirp_reli_lsetxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	RETRY_ATOMIC( result = chirp_client_lsetxattr(client,path,name,data,size,flags,stoptime); )
 }
 
-INT64_T chirp_reli_removexattr(const char *host, const char *path, const char *name, time_t stoptime)
+int64_t chirp_reli_removexattr(const char *host, const char *path, const char *name, time_t stoptime)
 {
 	RETRY_ATOMIC( result = chirp_client_removexattr(client,path,name,stoptime); )
 }
 
-INT64_T chirp_reli_fremovexattr(struct chirp_file *file, const char *name, time_t stoptime)
+int64_t chirp_reli_fremovexattr(struct chirp_file *file, const char *name, time_t stoptime)
 {
 	chirp_reli_flush(file,stoptime);
 	RETRY_FILE( result = chirp_client_fremovexattr(client,file->fd,name,stoptime); )
 }
 
-INT64_T chirp_reli_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime)
+int64_t chirp_reli_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime)
 {
 	RETRY_ATOMIC( result = chirp_client_lremovexattr(client,path,name,stoptime); )
 }
 
-INT64_T chirp_reli_job_create (const char *host, const char *json, chirp_jobid_t *id, time_t stoptime)
+int64_t chirp_reli_job_create (const char *host, const char *json, chirp_jobid_t *id, time_t stoptime)
 {
 	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_create(client,json,id,stoptime); )
 }
 
-INT64_T chirp_reli_job_commit (const char *host, const char *json, time_t stoptime)
+int64_t chirp_reli_job_commit (const char *host, const char *json, time_t stoptime)
 {
 	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_commit(client,json,stoptime); )
 }
 
-INT64_T chirp_reli_job_kill (const char *host, const char *json, time_t stoptime)
+int64_t chirp_reli_job_kill (const char *host, const char *json, time_t stoptime)
 {
 	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_kill(client,json,stoptime); )
 }
 
-INT64_T chirp_reli_job_status (const char *host, const char *json, char **status, time_t stoptime)
+int64_t chirp_reli_job_status (const char *host, const char *json, char **status, time_t stoptime)
 {
 	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_status(client,json,status,stoptime); )
 }
 
-INT64_T chirp_reli_job_wait (const char *host, chirp_jobid_t id, INT64_T timeout, char **status, time_t stoptime)
+int64_t chirp_reli_job_wait (const char *host, chirp_jobid_t id, int64_t timeout, char **status, time_t stoptime)
 {
 	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_wait(client,id,timeout,status,stoptime); )
 }
 
-INT64_T chirp_reli_job_reap (const char *host, const char *json, time_t stoptime)
+int64_t chirp_reli_job_reap (const char *host, const char *json, time_t stoptime)
 {
 	RETRY_ATOMIC_NOEAGAIN( result = chirp_client_job_reap(client,json,stoptime); )
 }
 
-INT64_T chirp_reli_remote_debug( const char *host, const char *flag, time_t stoptime )
+int64_t chirp_reli_remote_debug( const char *host, const char *flag, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_remote_debug(client,flag,stoptime); )
 }
 
-INT64_T chirp_reli_localpath( const char *host, const char *path, char *localpath, int length, time_t stoptime )
+int64_t chirp_reli_localpath( const char *host, const char *path, char *localpath, int length, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_localpath(client,path,localpath,length,stoptime); )
 }
 
-INT64_T chirp_reli_audit( const char *host, const char *path, struct chirp_audit **list, time_t stoptime )
+int64_t chirp_reli_audit( const char *host, const char *path, struct chirp_audit **list, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_audit(client,path,list,stoptime); )
 }
 
-INT64_T chirp_reli_thirdput( const char *host, const char *path, const char *thirdhost, const char *thirdpath, time_t stoptime )
+int64_t chirp_reli_thirdput( const char *host, const char *path, const char *thirdhost, const char *thirdpath, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_thirdput( client, path, thirdhost, thirdpath, stoptime ); )
 }
 
-INT64_T chirp_reli_mkalloc( const char *host, const char *path, INT64_T size, INT64_T mode, time_t stoptime )
+int64_t chirp_reli_mkalloc( const char *host, const char *path, int64_t size, int64_t mode, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_mkalloc(client,path,size,mode,stoptime); )
 }
 
-INT64_T chirp_reli_lsalloc( const char *host, const char *path, char *allocpath, INT64_T *total, INT64_T *inuse, time_t stoptime )
+int64_t chirp_reli_lsalloc( const char *host, const char *path, char *allocpath, int64_t *total, int64_t *inuse, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_lsalloc(client,path,allocpath,total,inuse,stoptime); )
 }
@@ -872,7 +872,7 @@ static void opendir_callback( const char *path, struct chirp_stat *info, void *v
 struct chirp_dir * chirp_reli_opendir( const char *host, const char *path, time_t stoptime )
 {
 	struct chirp_dir *dir = malloc(sizeof(*dir));
-	INT64_T result;
+	int64_t result;
 
 	dir->head = dir->current = 0;
 
@@ -914,10 +914,10 @@ void chirp_reli_closedir( struct chirp_dir *dir )
 	free(dir);
 }
 
-static INT64_T chirp_reli_bulkio_once( struct chirp_bulkio *v, int count, time_t stoptime )
+static int64_t chirp_reli_bulkio_once( struct chirp_bulkio *v, int count, time_t stoptime )
 {
 	int i;
-	INT64_T result;
+	int64_t result;
 
 	for(i=0;i<count;i++) {
 		struct chirp_bulkio *b = &v[i];
@@ -989,11 +989,11 @@ static INT64_T chirp_reli_bulkio_once( struct chirp_bulkio *v, int count, time_t
 	return -1;
 }
 
-INT64_T chirp_reli_bulkio( struct chirp_bulkio *v, int count, time_t stoptime )
+int64_t chirp_reli_bulkio( struct chirp_bulkio *v, int count, time_t stoptime )
 {
 	int delay=0;
 	time_t nexttry;
-	INT64_T result;
+	int64_t result;
 	time_t current;
 
 	while(1) {

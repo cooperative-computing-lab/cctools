@@ -459,7 +459,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 	char* env_var = amazon_ids.env_prefix;
 	itable_firstkey(amazon_job_ids);
 	char* jaid;
-	UINT64_T jobid;
+	uint64_t jobid;
  	while(itable_nextkey(amazon_job_ids,&jobid,(void**)&jaid)){
 		done = describe_aws_job(jaid,env_var);
 		char* jobname = string_format("%s_%u",queue_name,(unsigned int)jobid);

@@ -9,9 +9,9 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "copy_stream.h"
-#include "int_sizes.h"
 
 uint64_t write_h_file(char *path_h, char *path_lib)
 {

@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 #define HTTP_LINE_MAX 4096
 #define HTTP_PORT 80
@@ -52,17 +53,17 @@ static int http_response_to_errno(int response)
 
 struct link *http_query_no_cache(const char *url, const char *action, time_t stoptime)
 {
-	INT64_T size;
+	int64_t size;
 	return http_query_size(url, action, &size, stoptime, 1);
 }
 
 struct link *http_query(const char *url, const char *action, time_t stoptime)
 {
-	INT64_T size;
+	int64_t size;
 	return http_query_size(url, action, &size, stoptime, 0);
 }
 
-struct link *http_query_size(const char *url, const char *action, INT64_T * size, time_t stoptime, int cache_reload)
+struct link *http_query_size(const char *url, const char *action, int64_t * size, time_t stoptime, int cache_reload)
 {
 	if(!getenv("HTTP_PROXY")) {
 		return http_query_size_via_proxy(0, url, action, size, stoptime, cache_reload);
@@ -84,7 +85,7 @@ struct link *http_query_size(const char *url, const char *action, INT64_T * size
 	}
 }
 
-struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, const char *action, INT64_T * size, time_t stoptime, int cache_reload)
+struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, const char *action, int64_t * size, time_t stoptime, int cache_reload)
 {
 	char url[HTTP_LINE_MAX];
 	char newurl[HTTP_LINE_MAX];
@@ -225,11 +226,11 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 	return 0;
 }
 
-INT64_T http_fetch_to_file(const char *url, const char *filename, time_t stoptime)
+int64_t http_fetch_to_file(const char *url, const char *filename, time_t stoptime)
 {
 	FILE *file;
-	INT64_T size;
-	INT64_T actual;
+	int64_t size;
+	int64_t actual;
 	struct link *link;
 
 	file = fopen(filename, "w");

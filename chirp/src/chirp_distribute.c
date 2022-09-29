@@ -189,7 +189,7 @@ static void show_help()
 
 int main(int argc, char *argv[])
 {
-	INT64_T result;
+	int64_t result;
 	signed char c;
 	char *sourcehost, *sourcepath;
 	struct target_info *targets;
@@ -333,7 +333,7 @@ int main(int argc, char *argv[])
 	failure_matrix_init(ntargets);
 
 	if(destroy_mode) {
-		INT64_T result;
+		int64_t result;
 		int status;
 
 		for(i = 0; i < (ntargets - 1); i++) {

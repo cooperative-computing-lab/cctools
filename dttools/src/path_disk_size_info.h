@@ -7,8 +7,8 @@ See the file COPYING for details.
 #ifndef CWD_INFO_H
 #define CWD_INFO_H
 
-#include "int_sizes.h"
 #include "list.h"
+#include <stdint.h>
 
 struct path_disk_size_info {
 	int     complete_measurement;

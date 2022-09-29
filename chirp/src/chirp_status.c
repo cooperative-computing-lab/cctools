@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 	int c;
 	int count = 0;
 	int mode = MODE_TABLE;
-	INT64_T sum_total = 0, sum_avail = 0;
+	int64_t sum_total = 0, sum_avail = 0;
 	const char *filter_name = 0;
 	const char *filter_value = 0;
 	int show_all_types = 0;

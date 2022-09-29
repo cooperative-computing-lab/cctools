@@ -173,7 +173,7 @@ void chirp_global_inhibit_catalog(int onoff)
 	inhibit_catalog_queries = onoff;
 }
 
-struct chirp_file *chirp_global_open(const char *host, const char *path, INT64_T flags, INT64_T mode, time_t stoptime)
+struct chirp_file *chirp_global_open(const char *host, const char *path, int64_t flags, int64_t mode, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -200,62 +200,62 @@ struct chirp_file *chirp_global_open(const char *host, const char *path, INT64_T
 	}
 }
 
-INT64_T chirp_global_close(struct chirp_file * file, time_t stoptime)
+int64_t chirp_global_close(struct chirp_file * file, time_t stoptime)
 {
 	return chirp_reli_close(file, stoptime);
 }
 
-INT64_T chirp_global_pread(struct chirp_file * file, void *buffer, INT64_T length, INT64_T offset, time_t stoptime)
+int64_t chirp_global_pread(struct chirp_file * file, void *buffer, int64_t length, int64_t offset, time_t stoptime)
 {
 	return chirp_reli_pread(file, buffer, length, offset, stoptime);
 }
 
-INT64_T chirp_global_pwrite(struct chirp_file * file, const void *buffer, INT64_T length, INT64_T offset, time_t stoptime)
+int64_t chirp_global_pwrite(struct chirp_file * file, const void *buffer, int64_t length, int64_t offset, time_t stoptime)
 {
 	return chirp_reli_pwrite(file, buffer, length, offset, stoptime);
 }
 
-INT64_T chirp_global_sread(struct chirp_file * file, void *buffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset, time_t stoptime)
+int64_t chirp_global_sread(struct chirp_file * file, void *buffer, int64_t length, int64_t stride_length, int64_t stride_skip, int64_t offset, time_t stoptime)
 {
 	return chirp_reli_sread(file, buffer, length, stride_length, stride_skip, offset, stoptime);
 }
 
-INT64_T chirp_global_swrite(struct chirp_file * file, const void *buffer, INT64_T length, INT64_T stride_length, INT64_T stride_skip, INT64_T offset, time_t stoptime)
+int64_t chirp_global_swrite(struct chirp_file * file, const void *buffer, int64_t length, int64_t stride_length, int64_t stride_skip, int64_t offset, time_t stoptime)
 {
 	return chirp_reli_swrite(file, buffer, length, stride_length, stride_skip, offset, stoptime);
 }
 
-INT64_T chirp_global_fstat(struct chirp_file * file, struct chirp_stat * buf, time_t stoptime)
+int64_t chirp_global_fstat(struct chirp_file * file, struct chirp_stat * buf, time_t stoptime)
 {
 	return chirp_reli_fstat(file, buf, stoptime);
 }
 
-INT64_T chirp_global_fstatfs(struct chirp_file * file, struct chirp_statfs * buf, time_t stoptime)
+int64_t chirp_global_fstatfs(struct chirp_file * file, struct chirp_statfs * buf, time_t stoptime)
 {
 	return chirp_reli_fstatfs(file, buf, stoptime);
 }
 
-INT64_T chirp_global_fchown(struct chirp_file * file, INT64_T uid, INT64_T gid, time_t stoptime)
+int64_t chirp_global_fchown(struct chirp_file * file, int64_t uid, int64_t gid, time_t stoptime)
 {
 	return chirp_reli_fchown(file, uid, gid, stoptime);
 }
 
-INT64_T chirp_global_fchmod(struct chirp_file * file, INT64_T mode, time_t stoptime)
+int64_t chirp_global_fchmod(struct chirp_file * file, int64_t mode, time_t stoptime)
 {
 	return chirp_reli_fchmod(file, mode, stoptime);
 }
 
-INT64_T chirp_global_ftruncate(struct chirp_file * file, INT64_T length, time_t stoptime)
+int64_t chirp_global_ftruncate(struct chirp_file * file, int64_t length, time_t stoptime)
 {
 	return chirp_reli_ftruncate(file, length, stoptime);
 }
 
-INT64_T chirp_global_flush(struct chirp_file * file, time_t stoptime)
+int64_t chirp_global_flush(struct chirp_file * file, time_t stoptime)
 {
 	return chirp_reli_flush(file, stoptime);
 }
 
-INT64_T chirp_global_getfile(const char *host, const char *path, FILE * stream, time_t stoptime)
+int64_t chirp_global_getfile(const char *host, const char *path, FILE * stream, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -278,7 +278,7 @@ INT64_T chirp_global_getfile(const char *host, const char *path, FILE * stream, 
 	}
 }
 
-INT64_T chirp_global_getfile_buffer(const char *host, const char *path, char **buffer, time_t stoptime)
+int64_t chirp_global_getfile_buffer(const char *host, const char *path, char **buffer, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -301,7 +301,7 @@ INT64_T chirp_global_getfile_buffer(const char *host, const char *path, char **b
 	}
 }
 
-INT64_T chirp_global_putfile(const char *host, const char *path, FILE * stream, INT64_T mode, INT64_T length, time_t stoptime)
+int64_t chirp_global_putfile(const char *host, const char *path, FILE * stream, int64_t mode, int64_t length, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -324,7 +324,7 @@ INT64_T chirp_global_putfile(const char *host, const char *path, FILE * stream, 
 	}
 }
 
-INT64_T chirp_global_putfile_buffer(const char *host, const char *path, const char *buffer, INT64_T mode, INT64_T length, time_t stoptime)
+int64_t chirp_global_putfile_buffer(const char *host, const char *path, const char *buffer, int64_t mode, int64_t length, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -347,7 +347,7 @@ INT64_T chirp_global_putfile_buffer(const char *host, const char *path, const ch
 	}
 }
 
-INT64_T chirp_global_getlongdir(const char *host, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime)
+int64_t chirp_global_getlongdir(const char *host, const char *path, chirp_longdir_t callback, void *arg, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -379,7 +379,7 @@ INT64_T chirp_global_getlongdir(const char *host, const char *path, chirp_longdi
 	}
 }
 
-INT64_T chirp_global_getdir(const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime)
+int64_t chirp_global_getdir(const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -407,7 +407,7 @@ INT64_T chirp_global_getdir(const char *host, const char *path, chirp_dir_t call
 	}
 }
 
-INT64_T chirp_global_getacl(const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime)
+int64_t chirp_global_getacl(const char *host, const char *path, chirp_dir_t callback, void *arg, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -424,7 +424,7 @@ INT64_T chirp_global_getacl(const char *host, const char *path, chirp_dir_t call
 	}
 }
 
-INT64_T chirp_global_setacl(const char *host, const char *path, const char *subject, const char *rights, time_t stoptime)
+int64_t chirp_global_setacl(const char *host, const char *path, const char *subject, const char *rights, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -441,7 +441,7 @@ INT64_T chirp_global_setacl(const char *host, const char *path, const char *subj
 	}
 }
 
-INT64_T chirp_global_whoami(const char *host, const char *path, char *buf, INT64_T length, time_t stoptime)
+int64_t chirp_global_whoami(const char *host, const char *path, char *buf, int64_t length, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -456,7 +456,7 @@ INT64_T chirp_global_whoami(const char *host, const char *path, char *buf, INT64
 	}
 }
 
-INT64_T chirp_global_locate(const char *host, const char *path, chirp_loc_t callback, void *arg, time_t stoptime)
+int64_t chirp_global_locate(const char *host, const char *path, chirp_loc_t callback, void *arg, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EINVAL;
@@ -474,7 +474,7 @@ INT64_T chirp_global_locate(const char *host, const char *path, chirp_loc_t call
 	}
 }
 
-INT64_T chirp_global_unlink(const char *host, const char *path, time_t stoptime)
+int64_t chirp_global_unlink(const char *host, const char *path, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -497,7 +497,7 @@ INT64_T chirp_global_unlink(const char *host, const char *path, time_t stoptime)
 	}
 }
 
-INT64_T chirp_global_rename(const char *host, const char *path, const char *newpath, time_t stoptime)
+int64_t chirp_global_rename(const char *host, const char *path, const char *newpath, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -523,7 +523,7 @@ INT64_T chirp_global_rename(const char *host, const char *path, const char *newp
 	}
 }
 
-INT64_T chirp_global_link(const char *host, const char *path, const char *newpath, time_t stoptime)
+int64_t chirp_global_link(const char *host, const char *path, const char *newpath, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -538,7 +538,7 @@ INT64_T chirp_global_link(const char *host, const char *path, const char *newpat
 	}
 }
 
-INT64_T chirp_global_symlink(const char *host, const char *path, const char *newpath, time_t stoptime)
+int64_t chirp_global_symlink(const char *host, const char *path, const char *newpath, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -553,7 +553,7 @@ INT64_T chirp_global_symlink(const char *host, const char *path, const char *new
 	}
 }
 
-INT64_T chirp_global_readlink(const char *host, const char *path, char *buf, INT64_T length, time_t stoptime)
+int64_t chirp_global_readlink(const char *host, const char *path, char *buf, int64_t length, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -576,7 +576,7 @@ INT64_T chirp_global_readlink(const char *host, const char *path, char *buf, INT
 	}
 }
 
-INT64_T chirp_global_mkdir(const char *host, const char *path, INT64_T mode, time_t stoptime)
+int64_t chirp_global_mkdir(const char *host, const char *path, int64_t mode, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -591,7 +591,7 @@ INT64_T chirp_global_mkdir(const char *host, const char *path, INT64_T mode, tim
 	}
 }
 
-INT64_T chirp_global_rmdir(const char *host, const char *path, time_t stoptime)
+int64_t chirp_global_rmdir(const char *host, const char *path, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -614,7 +614,7 @@ INT64_T chirp_global_rmdir(const char *host, const char *path, time_t stoptime)
 	}
 }
 
-INT64_T chirp_global_rmall(const char *host, const char *path, time_t stoptime)
+int64_t chirp_global_rmall(const char *host, const char *path, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = ENOSYS;
@@ -635,7 +635,7 @@ INT64_T chirp_global_rmall(const char *host, const char *path, time_t stoptime)
 	}
 }
 
-INT64_T chirp_global_stat(const char *host, const char *path, struct chirp_stat * buf, time_t stoptime)
+int64_t chirp_global_stat(const char *host, const char *path, struct chirp_stat * buf, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -658,7 +658,7 @@ INT64_T chirp_global_stat(const char *host, const char *path, struct chirp_stat 
 	}
 }
 
-INT64_T chirp_global_lstat(const char *host, const char *path, struct chirp_stat * buf, time_t stoptime)
+int64_t chirp_global_lstat(const char *host, const char *path, struct chirp_stat * buf, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -681,7 +681,7 @@ INT64_T chirp_global_lstat(const char *host, const char *path, struct chirp_stat
 	}
 }
 
-INT64_T chirp_global_statfs(const char *host, const char *path, struct chirp_statfs * buf, time_t stoptime)
+int64_t chirp_global_statfs(const char *host, const char *path, struct chirp_statfs * buf, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -699,7 +699,7 @@ INT64_T chirp_global_statfs(const char *host, const char *path, struct chirp_sta
 
 }
 
-INT64_T chirp_global_access(const char *host, const char *path, INT64_T mode, time_t stoptime)
+int64_t chirp_global_access(const char *host, const char *path, int64_t mode, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -719,7 +719,7 @@ INT64_T chirp_global_access(const char *host, const char *path, INT64_T mode, ti
 	}
 }
 
-INT64_T chirp_global_chmod(const char *host, const char *path, INT64_T mode, time_t stoptime)
+int64_t chirp_global_chmod(const char *host, const char *path, int64_t mode, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -743,7 +743,7 @@ INT64_T chirp_global_chmod(const char *host, const char *path, INT64_T mode, tim
 }
 
 
-INT64_T chirp_global_chown(const char *host, const char *path, INT64_T uid, INT64_T gid, time_t stoptime)
+int64_t chirp_global_chown(const char *host, const char *path, int64_t uid, int64_t gid, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -766,7 +766,7 @@ INT64_T chirp_global_chown(const char *host, const char *path, INT64_T uid, INT6
 	}
 }
 
-INT64_T chirp_global_lchown(const char *host, const char *path, INT64_T uid, INT64_T gid, time_t stoptime)
+int64_t chirp_global_lchown(const char *host, const char *path, int64_t uid, int64_t gid, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -789,7 +789,7 @@ INT64_T chirp_global_lchown(const char *host, const char *path, INT64_T uid, INT
 	}
 }
 
-INT64_T chirp_global_truncate(const char *host, const char *path, INT64_T length, time_t stoptime)
+int64_t chirp_global_truncate(const char *host, const char *path, int64_t length, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -812,7 +812,7 @@ INT64_T chirp_global_truncate(const char *host, const char *path, INT64_T length
 	}
 }
 
-INT64_T chirp_global_utime(const char *host, const char *path, time_t actime, time_t modtime, time_t stoptime)
+int64_t chirp_global_utime(const char *host, const char *path, time_t actime, time_t modtime, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -835,7 +835,7 @@ INT64_T chirp_global_utime(const char *host, const char *path, time_t actime, ti
 	}
 }
 
-INT64_T chirp_global_thirdput(const char *host, const char *path, const char *thirdhost, const char *thirdpath, time_t stoptime)
+int64_t chirp_global_thirdput(const char *host, const char *path, const char *thirdhost, const char *thirdpath, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
@@ -848,7 +848,7 @@ INT64_T chirp_global_thirdput(const char *host, const char *path, const char *th
 	}
 }
 
-INT64_T chirp_global_md5(const char *host, const char *path, unsigned char *digest, time_t stoptime)
+int64_t chirp_global_md5(const char *host, const char *path, unsigned char *digest, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		char mhost[CHIRP_PATH_MAX];
@@ -863,7 +863,7 @@ INT64_T chirp_global_md5(const char *host, const char *path, unsigned char *dige
 	}
 }
 
-INT64_T chirp_global_lsalloc(const char *host, const char *path, char *alloc_path, INT64_T * size, INT64_T * inuse, time_t stoptime)
+int64_t chirp_global_lsalloc(const char *host, const char *path, char *alloc_path, int64_t * size, int64_t * inuse, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
@@ -876,7 +876,7 @@ INT64_T chirp_global_lsalloc(const char *host, const char *path, char *alloc_pat
 	}
 }
 
-INT64_T chirp_global_mkalloc(const char *host, const char *path, INT64_T size, INT64_T mode, time_t stoptime)
+int64_t chirp_global_mkalloc(const char *host, const char *path, int64_t size, int64_t mode, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
@@ -889,7 +889,7 @@ INT64_T chirp_global_mkalloc(const char *host, const char *path, INT64_T size, I
 	}
 }
 
-INT64_T chirp_global_getxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime)
+int64_t chirp_global_getxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
@@ -910,12 +910,12 @@ INT64_T chirp_global_getxattr(const char *host, const char *path, const char *na
 	}
 }
 
-INT64_T chirp_global_fgetxattr(struct chirp_file * file, const char *name, void *data, size_t size, time_t stoptime)
+int64_t chirp_global_fgetxattr(struct chirp_file * file, const char *name, void *data, size_t size, time_t stoptime)
 {
 	return chirp_reli_fgetxattr(file, name, data, size, stoptime);
 }
 
-INT64_T chirp_global_lgetxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime)
+int64_t chirp_global_lgetxattr(const char *host, const char *path, const char *name, void *data, size_t size, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
@@ -936,7 +936,7 @@ INT64_T chirp_global_lgetxattr(const char *host, const char *path, const char *n
 	}
 }
 
-INT64_T chirp_global_listxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime)
+int64_t chirp_global_listxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
@@ -957,12 +957,12 @@ INT64_T chirp_global_listxattr(const char *host, const char *path, char *list, s
 	}
 }
 
-INT64_T chirp_global_flistxattr(struct chirp_file * file, char *list, size_t size, time_t stoptime)
+int64_t chirp_global_flistxattr(struct chirp_file * file, char *list, size_t size, time_t stoptime)
 {
 	return chirp_reli_flistxattr(file, list, size, stoptime);
 }
 
-INT64_T chirp_global_llistxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime)
+int64_t chirp_global_llistxattr(const char *host, const char *path, char *list, size_t size, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
@@ -983,7 +983,7 @@ INT64_T chirp_global_llistxattr(const char *host, const char *path, char *list, 
 	}
 }
 
-INT64_T chirp_global_setxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+int64_t chirp_global_setxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
@@ -1004,12 +1004,12 @@ INT64_T chirp_global_setxattr(const char *host, const char *path, const char *na
 	}
 }
 
-INT64_T chirp_global_fsetxattr(struct chirp_file * file, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+int64_t chirp_global_fsetxattr(struct chirp_file * file, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	return chirp_reli_fsetxattr(file, name, data, size, flags, stoptime);
 }
 
-INT64_T chirp_global_lsetxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
+int64_t chirp_global_lsetxattr(const char *host, const char *path, const char *name, const void *data, size_t size, int flags, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
@@ -1030,7 +1030,7 @@ INT64_T chirp_global_lsetxattr(const char *host, const char *path, const char *n
 	}
 }
 
-INT64_T chirp_global_removexattr(const char *host, const char *path, const char *name, time_t stoptime)
+int64_t chirp_global_removexattr(const char *host, const char *path, const char *name, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
@@ -1051,12 +1051,12 @@ INT64_T chirp_global_removexattr(const char *host, const char *path, const char 
 	}
 }
 
-INT64_T chirp_global_fremovexattr(struct chirp_file * file, const char *name, time_t stoptime)
+int64_t chirp_global_fremovexattr(struct chirp_file * file, const char *name, time_t stoptime)
 {
 	return chirp_reli_fremovexattr(file, name, stoptime);
 }
 
-INT64_T chirp_global_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime)
+int64_t chirp_global_lremovexattr(const char *host, const char *path, const char *name, time_t stoptime)
 {
 	if(is_multi_path(host)) {
 		errno = EACCES;
