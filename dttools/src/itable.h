@@ -42,7 +42,7 @@ Alternatively:
 UINT64_T  key;
 void *value;
 
-ITABLE_FOREACH(h,key,value) {
+ITABLE_ITERATE(h,key,value) {
 	printf("table contains: %d\n",key);
 }
 </pre>
@@ -137,13 +137,13 @@ Use as follows:
 UINT64_T key;
 void *value;
 
-ITABLE_FOREACH(table,key,value) {
+ITABLE_ITERATE(table,key,value) {
 	printf("table contains: %lld\n",key);
 }
 
 </pre>
 */
 
-#define ITABLE_FOREACH(table,key,value) itable_firstkey(table); while(itable_nextkey(table,&key,(void**)&value))
+#define ITABLE_ITERATE(table,key,value) itable_firstkey(table); while(itable_nextkey(table,&key,(void**)&value))
 
 #endif

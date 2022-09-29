@@ -118,10 +118,10 @@ static struct ds_worker_info *find_worker_by_files(struct ds_manager *q, struct 
 	struct ds_remote_file_info *remote_info;
 	struct ds_file *tf;
 
-	HASH_TABLE_FOREACH(q->worker_table,key,w) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		if( check_worker_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
-			LIST_FOREACH(t->input_files,tf) {
+			LIST_ITERATE(t->input_files,tf) {
 				if((tf->type == DS_FILE || tf->type == DS_FILE_PIECE) && (tf->flags & DS_CACHE)) {
 					remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 					if(remote_info)
@@ -149,7 +149,7 @@ static struct ds_worker_info *find_worker_by_fcfs(struct ds_manager *q, struct d
 {
 	char *key;
 	struct ds_worker_info *w;
-	HASH_TABLE_FOREACH(q->worker_table,key,w) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		if( check_worker_against_task(q, w, t) ) {
 			return w;
 		}
@@ -170,7 +170,7 @@ static struct ds_worker_info *find_worker_by_random(struct ds_manager *q, struct
 	int random_worker;
 	struct list *valid_workers = list_create();
 
-	HASH_TABLE_FOREACH(q->worker_table,key,w) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		if(check_worker_against_task(q, w, t)) {
 			list_push_tail(valid_workers, w);
 		}
@@ -243,7 +243,7 @@ static struct ds_worker_info *find_worker_by_worst_fit(struct ds_manager *q, str
 	memset(&bres, 0, sizeof(struct ds_resources));
 	memset(&wres, 0, sizeof(struct ds_resources));
 
-	HASH_TABLE_FOREACH(q->worker_table,key,w) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 
 		if( check_worker_against_task(q, w, t) ) {
 
@@ -277,7 +277,7 @@ static struct ds_worker_info *find_worker_by_time(struct ds_manager *q, struct d
 	struct ds_worker_info *best_worker = 0;
 	double best_time = HUGE_VAL;
 
-	HASH_TABLE_FOREACH(q->worker_table,key,w) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		if(check_worker_against_task(q, w, t)) {
 			if(w->total_tasks_complete > 0) {
 				double t = (w->total_task_time + w->total_transfer_time) / w->total_tasks_complete;
@@ -381,7 +381,7 @@ static ds_resource_bitmask_t is_task_larger_than_any_worker( struct ds_manager *
 	struct ds_worker_info *w;
 
 	int bit_set = 0;
-	HASH_TABLE_FOREACH(q->worker_table,key,w) {
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		ds_resource_bitmask_t new_set = is_task_larger_than_worker(q, t, w);
 		if (new_set == 0){
 			// Task could run on a currently connected worker, immediately

@@ -403,12 +403,12 @@ Note that a statement or code block must follow the macro, like this:
 <pre>
 char *s;
 
-LIST_FOREACH( list, s ) {
+LIST_ITERATE( list, s ) {
 	printf("%s\n",s);
 }
 </pre>
 */
 
-#define LIST_FOREACH( list, item ) list_first_item(list); while((item=list_next_item(list)))
+#define LIST_ITERATE( list, item ) list_first_item(list); while((item=list_next_item(list)))
 
 #endif
