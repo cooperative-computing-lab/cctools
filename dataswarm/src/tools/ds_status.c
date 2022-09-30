@@ -317,17 +317,12 @@ int get_managers( time_t stoptime )
 		JX_OP_AND,
 		jexpr,
 		jx_operator(
-			JX_OP_OR,
-				jx_operator(
-					JX_OP_EQ,
-					jx_symbol("type"),
-					jx_string("ds_manager")
-				),
-				jx_operator(
-					JX_OP_EQ,
-					jx_symbol("type"),
-					jx_string("ds_master")
-				)));
+			JX_OP_EQ,
+			jx_symbol("type"),
+			jx_string("ds_manager")
+		)
+	);
+
 
 	cq = catalog_query_create(catalog_host, jexpr, stoptime );
 	if(!cq)

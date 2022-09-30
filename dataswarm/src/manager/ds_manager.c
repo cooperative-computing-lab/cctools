@@ -1800,7 +1800,7 @@ static struct jx * queue_to_jx( struct ds_manager *q )
 	char owner[USERNAME_MAX];
 	username_get(owner);
 
-	jx_insert_string(j,"type","ds_master");
+	jx_insert_string(j,"type","ds_manager");
 	if(q->name) jx_insert_string(j,"project",q->name);
 	jx_insert_integer(j,"starttime",(q->stats->time_when_started/1000000)); // catalog expects time_t not timestamp_t
 	jx_insert_string(j,"working_dir",q->workingdir);
@@ -1927,7 +1927,7 @@ static struct jx * queue_lean_to_jx( struct ds_manager *q )
 
 	//information regarding how to contact the manager
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
-	jx_insert_string(j,"type","ds_master");
+	jx_insert_string(j,"type","ds_manager");
 	jx_insert_integer(j,"port",ds_port(q));
 
 	int use_ssl = 0;
