@@ -240,7 +240,7 @@ class Task(object):
             url = str(url)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_url(self._task, url, remote_name, flags)
+        return ds_task_specify_input_url(self._task, url, remote_name, flags)
 
 
     ##
@@ -267,7 +267,7 @@ class Task(object):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_file_command(self._task, cmd, remote_name, flags)
+        return ds_task_specify_input_command(self._task, cmd, remote_name, flags)
 
     ##
     # Add a file piece to the task.
