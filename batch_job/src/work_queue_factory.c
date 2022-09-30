@@ -1545,7 +1545,7 @@ int main(int argc, char *argv[])
 				scratch_dir = string_format("%s/wq-factory-%d", scratch_env, getuid());
 			} 
 			else{
-				scratch_env = "/tmp/";
+				scratch_env = "/tmp";
 				scratch_dir = string_format("/tmp/wq-factory-%d", getuid());
 			}
 		} else {
@@ -1554,9 +1554,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(access(scratch_env, R_OK|W_OK|X_OK) != 0)
+	if((scratch_env) && access(scratch_env, R_OK|W_OK|X_OK) != 0)
 	{
-		fatal("Could not access scratch directory. Specify scratch directory with --scratch-dir or with environment variable CCTOOLS_TEMP");
+		fprintf(stderr,"work_queue_factory: couldn't access scratch directory %s: %s", scratch_env, strerror(errno));
+		return 1;
 	}
 
 	if(!create_dir(scratch_dir,0777)) {
