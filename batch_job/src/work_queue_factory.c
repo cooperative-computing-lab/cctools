@@ -1545,11 +1545,18 @@ int main(int argc, char *argv[])
 				scratch_dir = string_format("%s/wq-factory-%d", scratch_env, getuid());
 			} 
 			else{
+				scratch_env = "/tmp/";
 				scratch_dir = string_format("/tmp/wq-factory-%d", getuid());
 			}
 		} else {
+			scratch_env = "./";
 			scratch_dir = string_format("wq-factory-%d",getuid());
 		}
+	}
+
+	if(access(scratch_env, R_OK|W_OK|X_OK) != 0)
+	{
+		fatal("Could not access scratch directory. Specify scratch directory with --scratch-dir or with environment variable CCTOOLS_TEMP");
 	}
 
 	if(!create_dir(scratch_dir,0777)) {
@@ -1557,10 +1564,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if(access(scratch_dir, R_OK|W_OK|X_OK) != 0)
-	{
-		fatal("Could not access scratch directory. Specify scratch directory with --scratch-dir or with environment variable CCTOOLS_TEMP");
-	}
 
 	const char *item = NULL;
 	list_first_item(wrapper_inputs);
