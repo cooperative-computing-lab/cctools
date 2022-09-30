@@ -1264,6 +1264,8 @@ char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid);
  */
 void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value );
 
+
+const char *cctools_temp_dir();
 //@}
 
 // Renames for backwards compatibility

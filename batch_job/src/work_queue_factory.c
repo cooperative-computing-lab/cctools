@@ -1535,15 +1535,17 @@ int main(int argc, char *argv[])
 	Changing to /tmp only works in the case of Condor.
 	*/
 	
-	const char *scratch_env;
+	const char *scratch_env = NULL;
 	if(!scratch_dir) {
 		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-			if((scratch_env = getenv("CCTOOLS_TEMP")) && access(scratch_env, R_OK|W_OK|X_OK) == 0) {
+			if((scratch_env = getenv("CCTOOLS_TEMP"))){
 				scratch_dir = string_format("%s/wq-factory-%d", scratch_env, getuid());
-			} else if((scratch_env = getenv("TMPDIR")) && access(scratch_env, R_OK|W_OK|X_OK) == 0) {
+			} 
+			else if((scratch_env = getenv("TMPDIR"))){
 				scratch_dir = string_format("%s/wq-factory-%d", scratch_env, getuid());
-			} else{
-				scratch_dir = string_format("/tmp/wq-factory-%d",getuid());
+			} 
+			else{
+				scratch_dir = string_format("/tmp/wq-factory-%d", getuid());
 			}
 		} else {
 			scratch_dir = string_format("wq-factory-%d",getuid());
@@ -1553,6 +1555,11 @@ int main(int argc, char *argv[])
 	if(!create_dir(scratch_dir,0777)) {
 		fprintf(stderr,"work_queue_factory: couldn't create %s: %s",scratch_dir,strerror(errno));
 		return 1;
+	}
+
+	if(access(scratch_dir, R_OK|W_OK|X_OK) != 0)
+	{
+		fatal("Could not access scratch directory. Specify scratch directory with --scratch-dir or with environment variable CCTOOLS_TEMP");
 	}
 
 	const char *item = NULL;
