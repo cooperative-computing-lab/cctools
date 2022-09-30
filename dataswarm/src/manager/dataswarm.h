@@ -25,8 +25,8 @@ no special capabilities.
 From the application perspective, the programmer creates a manager with @ref ds_create,
 defines a number of tasks with @ref ds_task_create, submits the tasks to the manager
 with @ref ds_submit, and then monitors completion with @ref ds_wait.
-Tasks are further described by attaching data objects via @ref ds_task_specify_file,
-@ref ds_task_specify_url and related functions.
+Tasks are further described by attaching data objects via @ref ds_task_specify_input_file,
+@ref ds_task_specify_input_url and related functions.
 
 The dataswarm framework provides a large number of fault tolerance, resource management,
 and performance monitoring features that enable the construction of applications that
@@ -37,13 +37,6 @@ expected events.
 #define DS_DEFAULT_PORT 9123               /**< Default dataswarm port number. */
 #define DS_RANDOM_PORT  0                  /**< Indicates that any port may be chosen. */
 #define DS_WAITFORTASK  -1                 /**< Timeout value to wait for a task to complete before returning. */
-
-/** Select whether an attached file is used as an input or output file. */
-
-typedef enum {
-	DS_INPUT  = 0,                         /**< Specify an input object. */
-	DS_OUTPUT = 1                          /**< Specify an output object. */
-} ds_file_type_t;
 
 /** Select optional handling for input and output files: caching, unpacking, watching, etc. **/
 
@@ -235,7 +228,7 @@ struct ds_stats {
 //@{
 
 /** Create a new task object.
-Once created and elaborated with functions such as @ref ds_task_specify_file
+Once created and elaborated with functions such as @ref ds_task_specify_input_file
 and @ref ds_task_specify_input_buffer, the task should be passed to @ref ds_submit.
 @param full_command The shell command line or coprocess functions to be
 executed by the task.  If null, the command will be given later by @ref
@@ -270,39 +263,46 @@ will only be sent to workers running the coprocess.
 */
 void ds_task_specify_coprocess( struct ds_task *t, const char *name );
 
-/** Attach a file or directory to a task.
+/** Attach an input file or directory to a task.
 @param t A task object.
 @param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.
 @param remote_name The name that the file/directory will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
 @param flags	May be zero or more of the following @ref ds_file_flags_t logical-ored together:
 - @ref DS_CACHE indicates that the file/directory should be cached for later tasks. (recommended)
 - @ref DS_NOCACHE indicates that the file should not be cached.
 - @ref DS_UNPACK indicates that @a local_name is an archive (.tar, .tgz, .zip) that will be automatically unpacked into directory @a remote_name .
+*/
+void ds_task_specify_input_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_flags_t flags);
+
+/** Attach an output file or directory to a task.
+@param t A task object.
+@param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.
+@param remote_name The name that the file/directory will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
+@param flags    May be zero or more of the following @ref ds_file_flags_t logical-ored together:
+- @ref DS_CACHE indicates that the file/directory should be cached for later tasks. (recommended)
+- @ref DS_NOCACHE indicates that the file should not be cached.
 - @ref DS_WATCH indicates that the worker will watch the output file as it is created, and incrementally return the file to the manager as the task runs (The frequency of these updates is entirely dependent upon the system load.  If the manager is busy interacting with many workers, output updates will be less frequent.)
 - @ref DS_FAILURE_ONLY indicates the file should only be returned if the task fails.
 - @ref DS_SUCCESS_ONLY indicates the file should only be returned if the task succeeds.
 */
-void ds_task_specify_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
+void ds_task_specify_output_file(struct ds_task *t, const char *local_name, const char *remote_name, ds_file_flags_t flags);
 
 /** Add a url as an input for a task.
 @param t A task object.
 @param url The source URL to be accessed to provide the file.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
-@param flags May be zero or more @ref ds_file_flags_t logical-ored together. See @ref ds_task_specify_file.
+@param flags May be zero or more @ref ds_file_flags_t logical-ored together. See @ref ds_task_specify_input_file.
 */
-void ds_task_specify_url(struct ds_task *t, const char *url, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
+void ds_task_specify_input_url(struct ds_task *t, const char *url, const char *remote_name, ds_file_flags_t flags);
 
 /** Add a shell command to produce an input file for a task.
 @param t A task object.
 @param cmd The shell command to produce the file.   The command must contain a special symbol "%%" which indicates the destination of the file.
 For example, the command "grep frog /usr/dict/words > %%" would produce a file by searching for "frog" in the Unix dictionary.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
-@param flags May be zero or more @ref ds_file_flags_t logical-ored together. See @ref ds_task_specify_file.
+@param flags May be zero or more @ref ds_file_flags_t logical-ored together. See @ref ds_task_specify_input_file.
 */
-void ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_type_t type, ds_file_flags_t flags);
+void ds_task_specify_input_command(struct ds_task *t, const char *cmd, const char *remote_name, ds_file_flags_t flags);
 
 /** Add a piece of a file to a task.
 @param t A task object.
@@ -310,17 +310,16 @@ void ds_task_specify_file_command(struct ds_task *t, const char *cmd, const char
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 @param start_byte The starting byte offset of the file piece to be transferred.
 @param end_byte The ending byte offset of the file piece to be transferred.
-@param type Must be @ref DS_INPUT for an input file, or @ref DS_OUTPUT for an output file.
-@param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
+@param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_input_file.
 */
-void ds_task_specify_file_piece(struct ds_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, ds_file_type_t type, ds_file_flags_t flags);
+void ds_task_specify_input_piece(struct ds_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, ds_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
 @param data The data to be passed as an input file.
 @param length The length of the buffer, in bytes
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
+@param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_input_file.
 */
 
 void ds_task_specify_input_buffer(struct ds_task *t, const char *data, int length, const char *remote_name, ds_file_flags_t flags);
@@ -329,7 +328,7 @@ void ds_task_specify_input_buffer(struct ds_task *t, const char *data, int lengt
 @param t A task object.
 @param data The logical name of the buffer, to be used with @ref ds_task_get_output_buffer.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_file.
+@param flags May be zero or more @ref ds_file_flags_t or'd together. See @ref ds_task_specify_output_file.
 */
 void ds_task_specify_output_buffer(struct ds_task *t, const char *buffer_name, const char *remote_name, ds_file_flags_t flags);
 
@@ -338,7 +337,7 @@ This is very occasionally needed for applications that expect
 certain directories to exist in the working directory, prior to producing output.
 This function does not transfer any data to the task, but just creates
 a directory in its working sandbox.  If you want to transfer an
-entire directory worth of data to a task, use @ref ds_task_specify_file and simply give a directory name.
+entire directory worth of data to a task, use @ref ds_task_specify_input_file and simply give a directory name.
 @param t A task object.
 @param remote_name The name of the empty directory in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 */

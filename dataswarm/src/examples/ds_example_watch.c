@@ -48,8 +48,8 @@ int main(int argc, char *argv[])
 		char output[256];
 		sprintf(output,"output.%d",i);
 		t = ds_task_create("./ds_example_watch_trickle.sh > output");
-		ds_task_specify_file(t, "ds_example_watch_trickle.sh", "ds_example_watch_trickle.sh", DS_INPUT, DS_CACHE );
-		ds_task_specify_file(t, output, "output", DS_OUTPUT, DS_WATCH );
+		ds_task_specify_input_file(t, "ds_example_watch_trickle.sh", "ds_example_watch_trickle.sh", DS_CACHE );
+		ds_task_specify_output_file(t, output, "output", DS_WATCH );
 		ds_task_specify_cores(t,1);
 		ds_submit(m, t);
 	}

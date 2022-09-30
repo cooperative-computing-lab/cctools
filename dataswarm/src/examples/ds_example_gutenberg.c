@@ -73,9 +73,9 @@ int main(int argc, char *argv[])
 		for(j=0;j<url_count;j++) {
 			struct ds_task *t = ds_task_create("./ds_example_gutenberg_script.sh filea.txt fileb.txt");
 
-			ds_task_specify_file(t, "ds_example_gutenberg_script.sh", "ds_example_gutenberg_script.sh", DS_INPUT, DS_CACHE);
-			ds_task_specify_url(t, urls[i], "filea.txt", DS_INPUT, DS_CACHE);
-			ds_task_specify_url(t, urls[j], "fileb.txt", DS_INPUT, DS_CACHE);
+			ds_task_specify_input_file(t, "ds_example_gutenberg_script.sh", "ds_example_gutenberg_script.sh", DS_CACHE);
+			ds_task_specify_input_url(t, urls[i], "filea.txt", DS_CACHE);
+			ds_task_specify_input_url(t, urls[j], "fileb.txt", DS_CACHE);
 
 			ds_task_specify_cores(t,1);
 

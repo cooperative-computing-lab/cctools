@@ -1800,7 +1800,7 @@ static struct jx * queue_to_jx( struct ds_manager *q )
 	char owner[USERNAME_MAX];
 	username_get(owner);
 
-	jx_insert_string(j,"type","ds_master");
+	jx_insert_string(j,"type","ds_manager");
 	if(q->name) jx_insert_string(j,"project",q->name);
 	jx_insert_integer(j,"starttime",(q->stats->time_when_started/1000000)); // catalog expects time_t not timestamp_t
 	jx_insert_string(j,"working_dir",q->workingdir);
@@ -1927,7 +1927,7 @@ static struct jx * queue_lean_to_jx( struct ds_manager *q )
 
 	//information regarding how to contact the manager
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
-	jx_insert_string(j,"type","ds_master");
+	jx_insert_string(j,"type","ds_manager");
 	jx_insert_integer(j,"port",ds_port(q));
 
 	int use_ssl = 0;
@@ -3490,18 +3490,18 @@ void ds_disable_monitoring(struct ds_manager *q) {
 }
 
 void ds_monitor_add_files(struct ds_manager *q, struct ds_task *t) {
-	ds_task_specify_file(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, DS_INPUT, DS_CACHE);
+	ds_task_specify_input_file(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, DS_CACHE);
 
 	char *summary  = monitor_file_name(q, t, ".summary");
-	ds_task_specify_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", DS_OUTPUT, DS_NOCACHE);
+	ds_task_specify_output_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", DS_NOCACHE);
 	free(summary);
 
 	if(q->monitor_mode & DS_MON_FULL && (q->monitor_output_directory || t->monitor_output_directory)) {
 		char *debug  = monitor_file_name(q, t, ".debug");
 		char *series = monitor_file_name(q, t, ".series");
 
-		ds_task_specify_file(t, debug, RESOURCE_MONITOR_REMOTE_NAME ".debug",   DS_OUTPUT, DS_NOCACHE);
-		ds_task_specify_file(t, series, RESOURCE_MONITOR_REMOTE_NAME ".series", DS_OUTPUT, DS_NOCACHE);
+		ds_task_specify_output_file(t, debug, RESOURCE_MONITOR_REMOTE_NAME ".debug", DS_NOCACHE);
+		ds_task_specify_output_file(t, series, RESOURCE_MONITOR_REMOTE_NAME ".series", DS_NOCACHE);
 
 		free(debug);
 		free(series);

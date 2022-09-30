@@ -170,28 +170,25 @@ class Task(object):
         return ds_task_specify_preferred_host(self._task, hostname)
 
     ##
-    # Add a file to the task.
+    # Add an input file to the task.
     #
     # @param self           Reference to the current task object.
     # @param local_name     The name of the file on local disk or shared filesystem.
     # @param remote_name    The name of the file at the execution site.
-    # @param type           Must be one of the following values: @ref DS_INPUT or @ref DS_OUTPUT
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref ds_file_flags_t or'd together The most common are:
     #                       - @ref DS_NOCACHE (default)
     #                       - @ref DS_CACHE
-    #                       - @ref DS_WATCH
-    #                       - @ref DS_FAILURE_ONLY
     # @param cache         Whether the file should be cached at workers (True/False)
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     #
     # For example:
     # @code
     # # The following are equivalent
-    # >>> task.specify_file("/etc/hosts", type=DS_INPUT, cache = True)
-    # >>> task.specify_file("/etc/hosts", "hosts", type=DS_INPUT, cache = True)
+    # >>> task.specify_input_file("/etc/hosts", cache = True)
+    # >>> task.specify_input_file("/etc/hosts", "hosts", cache = True)
     # @endcode
-    def specify_file(self, local_name, remote_name=None, type=None, flags=None, cache=None, failure_only=None):
+    def specify_input_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
 
         # swig expects strings:
         if local_name:
@@ -202,19 +199,26 @@ class Task(object):
         else:
             remote_name = os.path.basename(local_name)
 
-        if type is None:
-            type = DS_INPUT
+        flags = Task._determine_file_flags(flags, cache, failure_only)
+        return ds_task_specify_input_file(self._task, local_name, remote_name, flags)
+
+    def specify_output_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
+        if local_name:
+            local_name = str(local_name)
+
+        if remote_name:
+            remote_name = str(remote_name)
+        else:
+            remote_name = os.path.basename(local_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_file(self._task, local_name, remote_name, type, flags)
+        return ds_task_specify_output_file(self._task, local_name, remote_name, flags)
 
-    ##
-    # Add a url to the task which will be provided as an input file.
+    ## Add an input url to a task.
     #
     # @param self           Reference to the current task object.
     # @param url            The url of the file to provide.
     # @param remote_name    The name of the file as seen by the task.
-    # @param type           Must be @ref DS_INPUT.  (Output is not currently supported.)
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref ds_file_flags_t or'd together The most common are:
     #                       - @ref DS_NOCACHE (default)
@@ -223,17 +227,11 @@ class Task(object):
     #
     # For example:
     # @code
-    # >>> task.specify_url("http://www.google.com/","google.txt",type=DS_INPUT,flags=DS_CACHE);
+    # >>> task.specify_input_url("http://www.google.com/","google.txt",flags=DS_CACHE);
     # @endcode
 
-    def specify_url(self, url, remote_name, type=None, flags=None, cache=None, failure_only=None):
+    def specify_input_url(self, url, remote_name, flags=None, cache=None, failure_only=None):
 
-        if type is None:
-            type = DS_INPUT
-
-        if type==DS_OUTPUT:
-            raise ValueError("specify_url does not currently support output files.")
-        
         # swig expects strings
         if remote_name:
             remote_name = str(remote_name)
@@ -242,7 +240,7 @@ class Task(object):
             url = str(url)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_url(self._task, url, remote_name, type, flags)
+        return ds_task_specify_input_url(self._task, url, remote_name, flags)
 
 
     ##
@@ -254,7 +252,6 @@ class Task(object):
     # @param command        The shell command which will produce the file.
     #                       The command must contain the string %% which will be replaced with the cached location of the file.
     # @param remote_name    The name of the file as seen by the task.
-    # @param type           Must be @ref DS_INPUT.  (Output is not currently supported.)
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref ds_file_flags_t or'd together The most common are:
     #                       - @ref DS_NOCACHE (default)
@@ -263,22 +260,14 @@ class Task(object):
     #
     # For example:
     # @code
-    # >>> task.specify_file_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",type=DS_INPUT,flags=DS_CACHE);
+    # >>> task.specify_input_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",flags=DS_CACHE);
     # @endcode
 
-    def specify_file_command(self, cmd, remote_name, type=None, flags=None, cache=None, failure_only=None):
-        if type is None:
-            type = DS_INPUT
-
-        if type==DS_OUTPUT:
-            raise ValueError("specify_file_command does not currently support output files.")
-
-        # swig expects strings
+    def specify_input_command(self, cmd, remote_name, flags=None, cache=None, failure_only=None):
         if remote_name:
             remote_name = str(remote_name)
-
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_file_command(self._task, cmd, remote_name, type, flags)
+        return ds_task_specify_input_command(self._task, cmd, remote_name, flags)
 
     ##
     # Add a file piece to the task.
@@ -288,7 +277,6 @@ class Task(object):
     # @param remote_name    The name of the file at the execution site.
     # @param start_byte     The starting byte offset of the file piece to be transferred.
     # @param end_byte       The ending byte offset of the file piece to be transferred.
-    # @param type           Must be one of the following values: @ref DS_INPUT or @ref DS_OUTPUT
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref ds_file_flags_t or'd together The most common are:
     #                       - @ref DS_NOCACHE (default)
@@ -296,7 +284,7 @@ class Task(object):
     #                       - @ref DS_FAILURE_ONLY
     # @param cache         Whether the file should be cached at workers (True/False)
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
-    def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, type=None, flags=None, cache=None, failure_only=None):
+    def specify_input_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, flags=None, cache=None, failure_only=None):
 
         if local_name:
             local_name = str(local_name)
@@ -306,55 +294,18 @@ class Task(object):
         else:
             remote_name = os.path.basename(local_name)
 
-        if type is None:
-            type = DS_INPUT
-
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_file_piece(self._task, local_name, remote_name, start_byte, end_byte, type, flags)
+        return ds_task_specify_input_piece(self._task, local_name, remote_name, start_byte, end_byte, flags)
 
     ##
-    # Add a input file to the task.
-    #
-    # This is just a wrapper for @ref specify_file with type set to @ref DS_INPUT.
-    def specify_input_file(self, local_name, remote_name=None, flags=None, cache=None):
-        return self.specify_file(local_name, remote_name, DS_INPUT, flags, cache, failure_only=None)
-
-    ##
-    # Add a output file to the task.
-    #
-    # This is just a wrapper for @ref specify_file with type set to @ref DS_OUTPUT.
-    def specify_output_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
-        return self.specify_file(local_name, remote_name, DS_OUTPUT, flags, cache, failure_only)
-
-    ##
-    # Add a directory to the task.
+    # Add an empty directory to the task.
     # @param self           Reference to the current task object.
-    # @param local_name     The name of the directory on local disk or shared filesystem. Optional if the directory is empty.
     # @param remote_name    The name of the directory at the remote execution site.
-    # @param type           Must be one of the following values: @ref DS_INPUT or @ref DS_OUTPUT
-    # @param flags          May be zero to indicate no special handling, or any
-    #                       of the @ref ds_file_flags_t or'd together The most common are:
-    #                       - @ref DS_NOCACHE
-    #                       - @ref DS_CACHE
-    # @param recursive      Indicates whether just the directory (False) or the directory and all of its contents (True) should be included.
-    #                       - @ref DS_FAILURE_ONLY
-    # @param cache         Whether the file should be cached at workers (True/False)
-    # @param failure_only  For output directories, whether the file should be retrieved only when the task fails (e.g., debug logs).
-    # @return 1 if the task directory is successfully specified, 0 if either of @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
-    def specify_directory(self, local_name, remote_name=None, type=None, flags=None, recursive=False, cache=None, failure_only=None):
-        if local_name:
-            local_name = str(local_name)
-
+    def specify_empty_dir(self, remote_name=None ):
         if remote_name:
             remote_name = str(remote_name)
-        else:
-            remote_name = os.path.basename(local_name)
 
-        if type is None:
-            type = DS_INPUT
-
-        flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_directory(self._task, local_name, remote_name, type, flags, recursive)
+        return ds_task_specify_empty_dir(task,remote_name);
 
     ##
     # Add an input buffer to the task.

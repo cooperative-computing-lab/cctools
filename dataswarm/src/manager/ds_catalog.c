@@ -51,7 +51,7 @@ struct list * ds_catalog_query( const char *catalog_host, int catalog_port, cons
 	while((j = catalog_query_read(q, stoptime))) {
 		// if it is a WQ manager...
 		const char *type = jx_lookup_string(j,"type");
-		if(type && (!strcmp(type,"ds_master") || !strcmp(type, "ds_manager"))) {
+		if(type && (!strcmp(type, "ds_manager"))) {
 			// and the project name matches...
 			const char *project = jx_lookup_string(j,"project");
 			if(project && whole_string_match_regex(project,project_regex)) {

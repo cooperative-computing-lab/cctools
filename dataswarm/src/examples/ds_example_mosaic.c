@@ -65,9 +65,9 @@ int main(int argc, char *argv[])
 		sprintf(command, "./convert.sfx -swirl %d cat.jpg %d.cat.jpg", i, i);
 
 		t = ds_task_create(command);
-		ds_task_specify_file(t, "convert.sfx", "convert.sfx", DS_INPUT, DS_CACHE);
-		ds_task_specify_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", DS_INPUT, DS_CACHE );
-		ds_task_specify_file(t,outfile,outfile,DS_OUTPUT,DS_NOCACHE);
+		ds_task_specify_input_file(t, "convert.sfx", "convert.sfx", DS_CACHE);
+		ds_task_specify_input_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", DS_CACHE );
+		ds_task_specify_output_file(t,outfile,outfile,DS_NOCACHE);
 
 		ds_task_specify_cores(t,1);
 
