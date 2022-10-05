@@ -193,7 +193,7 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);
 
 /* The expected format of files created by the resource monitor.*/
-#define RESOURCE_MONITOR_TASK_LOCAL_NAME "ds-%d-task-%d"
+#define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-%d-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
 #define RESOURCE_MONITOR_REMOTE_NAME_EVENTS RESOURCE_MONITOR_REMOTE_NAME "events.json"
 

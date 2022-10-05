@@ -9,8 +9,8 @@ import_config_val CCTOOLS_OPENSSL_AVAILABLE
 
 export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
-STATUS_FILE=ds.status
-PORT_FILE=ds.port
+STATUS_FILE=vine.status
+PORT_FILE=vine.port
 
 KEY_FILE=key.pem
 CERT_FILE=cert.pem

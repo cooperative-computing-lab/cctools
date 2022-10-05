@@ -1088,7 +1088,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Catalog server to query for managers.\n", "--catalog=<host:port>");
 	printf(" %-30s Password file for workers to authenticate.\n","-P,--password");
 	printf(" %-30s Use this scratch dir for factory.\n","-S,--scratch-dir");
-	printf(" %-30s (default: /tmp/ds-factory-$uid).\n","");
+	printf(" %-30s (default: /tmp/vine-factory-$uid).\n","");
 	printf(" %-30s Exit if parent process dies.\n", "--parent-death");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
@@ -1460,9 +1460,9 @@ int main(int argc, char *argv[])
 
 	if(!scratch_dir) {
 		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-			scratch_dir = string_format("/tmp/ds-factory-%d",getuid());
+			scratch_dir = string_format("/tmp/vine-factory-%d",getuid());
 		} else {
-			scratch_dir = string_format("ds-factory-%d",getuid());
+			scratch_dir = string_format("vine-factory-%d",getuid());
 		}
 	}
 

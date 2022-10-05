@@ -3195,7 +3195,7 @@ int vine_enable_monitoring(struct vine_manager *q, char *monitor_output_director
 			fatal("Could not create monitor output directory - %s (%s)", q->monitor_output_directory, strerror(errno));
 		}
 
-		q->monitor_summary_filename = string_format("%s/ds-%d.summaries", q->monitor_output_directory, getpid());
+		q->monitor_summary_filename = string_format("%s/vine-%d.summaries", q->monitor_output_directory, getpid());
 		q->monitor_file             = fopen(q->monitor_summary_filename, "a");
 
 		if(!q->monitor_file)

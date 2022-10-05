@@ -1,12 +1,12 @@
 ## @package vine_futures
-# Python Data Swarm bindings.
+# Python TaskVine bindings.
 #
 # This is a library on top of taskvine which replaces q.wait with the concept
 # of futures.
 #
 # This is experimental.
 #
-# - @ref vine_futures::DataSwarm
+# - @ref vine_futures::TaskVine
 # - @ref taskvine::Task
 
 import taskvine

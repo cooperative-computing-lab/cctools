@@ -4,7 +4,7 @@
 # tests for missing/recursive inputs/outputs.
 
 import sys
-import taskvine as ds
+import taskvine as vine
 
 port_file = None
 try:
@@ -17,14 +17,14 @@ desired_tag_order = "7 5 9 6 3 8 2 1".split()
 alpha_order = sorted(desired_tag_order)
 done_order = []
 
-q = ds.DataSwarm(port=0, debug_log='debug.log')
+q = vine.DataSwarm(port=0, debug_log='debug.log')
 with open(port_file, 'w') as f:
     print('Writing port {port} to file {file}'.format(port=q.port, file=port_file))
     f.write(str(q.port))
-print(ds.__file__)
+print(vine.__file__)
 
 for tag in alpha_order:
-    t = ds.Task("/bin/echo hello tag {}".format(tag))
+    t = vine.Task("/bin/echo hello tag {}".format(tag))
     t.specify_tag(tag)
     q.submit(t)
 

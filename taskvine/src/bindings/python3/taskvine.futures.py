@@ -1,13 +1,13 @@
 ## @package vine_futures
-# Python Data Swarm bindings.
+# Python TaskVine bindings.
 #
 # This is a library on top of work_queue which replaces q.wait with the concept
 # of futures.
 #
 # This is experimental.
 #
-# - @ref vine_futures::DataSwarm
-# - @ref work_queue::Task
+# - @ref vine_futures::TaskVine
+# - @ref vine_futures::Task
 
 import work_queue
 import multiprocessing
@@ -362,7 +362,7 @@ class FutureTask(work_queue.Task):
         elif type == 'singularity':
             sin_env = 'sin_env.img'
             self.specify_input_file(filename, sin_env, cache = True)
-            command = 'singularity exec -B $(pwd):/ds-sandbox --pwd /ds-sandbox {} -- {}'.format(sin_env, self.command)
+            command = 'singularity exec -B $(pwd):/vine-sandbox --pwd /vine-sandbox {} -- {}'.format(sin_env, self.command)
             _work_queue.vine_task_command_line_set(self._task, command)
 
 
