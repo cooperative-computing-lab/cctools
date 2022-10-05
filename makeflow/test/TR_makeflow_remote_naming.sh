@@ -51,7 +51,7 @@ run()
 clean()
 {
 	../src/makeflow -c $MAKE_FILE
-	rm -f $MAKE_FILE $STATUS_FILE $PORT_FILE $WORKER_LOG out.1 out.2 out.actual out.expected input.txt
+	rm -f $MAKE_FILE $STATUS_FILE $PORT_FILE $WORKER_LOG out.1 out.2 out.actual out.expected input.txt worker.log
 }
 
 dispatch "$@"
