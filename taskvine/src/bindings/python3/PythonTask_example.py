@@ -35,16 +35,16 @@
 # conda run -p my-minimal-env conda-pack
 
 
-import work_queue as ds
+import taskvine as vine
 
 def divide(dividend, divisor):
     import math
     return dividend/math.sqrt(divisor)
 
 def main():
-    q = ds.DataSwarm(9123)
+    q = vine.DataSwarm(9123)
     for i in range(1, 16):
-        p_task = ds.PythonTask(divide, 1, i**2)
+        p_task = vine.PythonTask(divide, 1, i**2)
 
         # if python environment is missing at worker...
         #p_task.specify_environment("env.tar.gz")
@@ -56,7 +56,7 @@ def main():
         t = q.wait(5)
         if t:
             x = t.output
-            if isinstance(x, ds.PythonTaskNoResult):
+            if isinstance(x, vine.PythonTaskNoResult):
                 print("Task {} failed and did not generate a result.".format(t.id))
             else:
                 sum += x
