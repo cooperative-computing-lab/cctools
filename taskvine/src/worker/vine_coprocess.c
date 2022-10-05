@@ -36,20 +36,20 @@ int vine_coprocess_write(char *buffer, int len, int timeout)
 	{
 		if (errno == EINTR)
 		{
-			debug(D_DS, "Polling coprocess interrupted, trying again");
+			debug(D_VINE, "Polling coprocess interrupted, trying again");
 			return -1;
 		}
-		debug(D_DS, "Polling coprocess pipe failed: %s\n", strerror(errno));
+		debug(D_VINE, "Polling coprocess pipe failed: %s\n", strerror(errno));
 		return -2;
 	}
 	if (poll_result == 0) // check for timeout
 	{
-		debug(D_DS, "writing to coprocess timed out\n");
+		debug(D_VINE, "writing to coprocess timed out\n");
 		return -3;
 	}
 	if ( !(read_poll.revents & POLLOUT)) // check we have data
 	{
-		debug(D_DS, "Data able to be written to pipe: %s\n", strerror(errno));
+		debug(D_VINE, "Data able to be written to pipe: %s\n", strerror(errno));
 		return -2;
 	}
 	int bytes_written = write(coprocess_in[1], buffer, len);
@@ -57,10 +57,10 @@ int vine_coprocess_write(char *buffer, int len, int timeout)
 	{
 		if (errno == EINTR)
 		{
-			debug(D_DS, "Write to coprocess interrupted\n");
+			debug(D_VINE, "Write to coprocess interrupted\n");
 			return 0;
 		}
-		debug(D_DS, "Write to coprocess failed: %s\n", strerror(errno));
+		debug(D_VINE, "Write to coprocess failed: %s\n", strerror(errno));
 		return -2;
 	}
 	return bytes_written;
@@ -73,20 +73,20 @@ int vine_coprocess_read(char *buffer, int len, int timeout){
 	{
 		if (errno == EINTR)
 		{
-			debug(D_DS, "Polling coprocess interrupted, trying again");
+			debug(D_VINE, "Polling coprocess interrupted, trying again");
 			return -1;
 		}
-		debug(D_DS, "Polling coprocess pipe failed: %s\n", strerror(errno));
+		debug(D_VINE, "Polling coprocess pipe failed: %s\n", strerror(errno));
 		return -2;
 	}
 	if (poll_result == 0) // check for timeout
 	{
-		debug(D_DS, "reading from coprocess timed out\n");
+		debug(D_VINE, "reading from coprocess timed out\n");
 		return -3;
 	}
 	if ( !(read_poll.revents & POLLIN)) // check we have data
 	{
-		debug(D_DS, "Data not returned from pipe: %s\n", strerror(errno));
+		debug(D_VINE, "Data not returned from pipe: %s\n", strerror(errno));
 		return -2;
 	}
 
@@ -95,10 +95,10 @@ int vine_coprocess_read(char *buffer, int len, int timeout){
 	{
 		if (errno == EINTR)
 		{
-			debug(D_DS, "Read from coprocess interrupted\n");
+			debug(D_VINE, "Read from coprocess interrupted\n");
 			return 0;
 		}
-		debug(D_DS, "Read from coprocess failed: %s\n", strerror(errno));
+		debug(D_VINE, "Read from coprocess failed: %s\n", strerror(errno));
 		return -2;
 	}
 	buffer[bytes_read] = '\0';
@@ -179,7 +179,7 @@ char *vine_coprocess_setup(int *coprocess_port)
 			free(temp_port);
 		}
 		else {
-			debug(D_DS, "Unable to recognize key %s\n", key);
+			debug(D_VINE, "Unable to recognize key %s\n", key);
 		}
 	}
 
@@ -203,7 +203,7 @@ char *vine_coprocess_start(char *command, int *coprocess_port) {
 		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
 			fatal("coprocess error parent: %s\n", strerror(errno));
 		}
-		debug(D_DS, "coprocess running command %s\n", command);
+		debug(D_VINE, "coprocess running command %s\n", command);
 
         return name;
 	}

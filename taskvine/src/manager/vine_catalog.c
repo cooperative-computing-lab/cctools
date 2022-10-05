@@ -90,10 +90,10 @@ struct list *vine_catalog_query_cached( const char *catalog_host, int catalog_po
 	}
 
 	while(1) {
-		debug(D_DS,"querying catalog for managers with project=%s",project_regex);
+		debug(D_VINE,"querying catalog for managers with project=%s",project_regex);
 		managers_list = vine_catalog_query(catalog_host,catalog_port,project_regex);
 		if(managers_list) break;
-		debug(D_DS,"unable to contact catalog, still trying...");
+		debug(D_VINE,"unable to contact catalog, still trying...");
 		sleep(5);
 	}
 

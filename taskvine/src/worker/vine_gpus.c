@@ -39,7 +39,7 @@ void vine_gpus_debug()
 		buffer_putfstring(&b,"%d ",gpu_to_task[i]);
 	}
 	buffer_putfstring(&b," ]");
-	debug(D_DS,"%s",buffer_tostring(&b));
+	debug(D_VINE,"%s",buffer_tostring(&b));
 	buffer_free(&b);
 }
 

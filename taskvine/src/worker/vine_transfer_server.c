@@ -44,7 +44,7 @@ static void vine_transfer_handler( struct link *lnk, struct vine_cache *cache )
 			url_decode(filename_encoded,filename,sizeof(filename));
 			vine_transfer_put_any(lnk,cache,filename,VINE_TRANSFER_MODE_ANY,time(0)+transfer_timeout);
 		} else {
-			debug(D_DS,"invalid peer transfer message: %s\n",line);
+			debug(D_VINE,"invalid peer transfer message: %s\n",line);
 		}
 	}
 }
@@ -73,7 +73,7 @@ void vine_transfer_server_start( struct vine_cache *cache )
 		char addr[LINK_ADDRESS_MAX];
 		int port;
 		vine_transfer_server_address(addr,&port);
-		debug(D_DS,"started transfer server pid %d listening on %s:%d",transfer_server_pid,addr,port);
+		debug(D_VINE,"started transfer server pid %d listening on %s:%d",transfer_server_pid,addr,port);
 		// in parent, keep going
 	} else {
 		fatal("unable to fork transfer server: %s",strerror(errno));
@@ -84,7 +84,7 @@ void vine_transfer_server_stop()
 {
 	int status;
 
-	debug(D_DS,"stopping transfer server pid %d",transfer_server_pid);
+	debug(D_VINE,"stopping transfer server pid %d",transfer_server_pid);
 
 	link_close(transfer_link);
 	kill(transfer_server_pid,SIGKILL);

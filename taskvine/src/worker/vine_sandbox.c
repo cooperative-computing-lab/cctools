@@ -43,14 +43,14 @@ static int ensure_input_file( struct vine_process *p, struct vine_file *f, struc
 	if(f->type==VINE_EMPTY_DIR) {
 		/* Special case: empty directories are not cached objects, just create in sandbox */
 		result = create_dir(sandbox_path, 0700);
-		if(!result) debug(D_DS,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
+		if(!result) debug(D_VINE,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
 	} else if(vine_cache_ensure(cache,f->cached_name,manager)) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
-		debug(D_DS,"input: link %s -> %s",cache_path,sandbox_path);
+		debug(D_VINE,"input: link %s -> %s",cache_path,sandbox_path);
 		result = file_link_recursive(cache_path,sandbox_path,symlinks_enabled);
-		if(!result) debug(D_DS,"couldn't link %s into sandbox as %s: %s",cache_path,sandbox_path,strerror(errno));
+		if(!result) debug(D_VINE,"couldn't link %s into sandbox as %s: %s",cache_path,sandbox_path,strerror(errno));
 	}
 	
 	free(cache_path);
@@ -96,11 +96,11 @@ static int transfer_output_file( struct vine_process *p, struct vine_file *f, st
 
 	int result = 0;
 	
-	debug(D_DS,"output: moving %s to %s",sandbox_path,cache_path);
+	debug(D_VINE,"output: moving %s to %s",sandbox_path,cache_path);
 	if(rename(sandbox_path,cache_path)<0) {
-		debug(D_DS, "output: move failed, attempting copy of %s to %s: %s",sandbox_path,cache_path,strerror(errno));
+		debug(D_VINE, "output: move failed, attempting copy of %s to %s: %s",sandbox_path,cache_path,strerror(errno));
 		if(copy_file_to_file(sandbox_path, cache_path)  == -1) {
-			debug(D_DS, "could not move or copy output file %s to %s: %s",sandbox_path,cache_path,strerror(errno));
+			debug(D_VINE, "could not move or copy output file %s to %s: %s",sandbox_path,cache_path,strerror(errno));
 			result = 0;
 		} else {
 			result = 1;
@@ -115,7 +115,7 @@ static int transfer_output_file( struct vine_process *p, struct vine_file *f, st
 			vine_cache_addfile(cache,info.st_size,f->cached_name);
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
-			debug(D_DS,"output: failed to stat %s: %s",cache_path,strerror(errno));
+			debug(D_VINE,"output: failed to stat %s: %s",cache_path,strerror(errno));
 			result = 0;
 		}
 	}

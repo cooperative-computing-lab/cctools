@@ -39,7 +39,7 @@ void vine_factory_info_remove( struct vine_manager *q, const char *name )
 	if (f) {
 		vine_factory_info_delete(f);
 	} else {
-		debug(D_DS, "Failed to remove unrecorded factory %s", name);
+		debug(D_VINE, "Failed to remove unrecorded factory %s", name);
 	}
 }
 

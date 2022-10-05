@@ -212,7 +212,7 @@ pid_t vine_process_execute(struct vine_process *p )
 	p->output_file_name = strdup(task_output_template);
 	p->output_fd = mkstemp(p->output_file_name);
 	if(p->output_fd == -1) {
-		debug(D_DS, "Could not open worker stdout: %s", strerror(errno));
+		debug(D_VINE, "Could not open worker stdout: %s", strerror(errno));
 		return 0;
 	}
 
@@ -226,12 +226,12 @@ pid_t vine_process_execute(struct vine_process *p )
 		// This is currently used by kill_task().
 		setpgid(p->pid, 0);
 
-		debug(D_DS, "started process %d: %s", p->pid, p->task->command_line);
+		debug(D_VINE, "started process %d: %s", p->pid, p->task->command_line);
 		return p->pid;
 
 	} else if(p->pid < 0) {
 
-		debug(D_DS, "couldn't create new process: %s\n", strerror(errno));
+		debug(D_VINE, "couldn't create new process: %s\n", strerror(errno));
 		unlink(p->output_file_name);
 		close(p->output_fd);
 		return p->pid;
@@ -296,7 +296,7 @@ void vine_process_kill(struct vine_process *p)
 	if(elapsed_time_execution_start / 1000000 < 3)
 		sleep(3 - (elapsed_time_execution_start / 1000000));
 
-	debug(D_DS, "terminating task %d pid %d", p->task->taskid, p->pid);
+	debug(D_VINE, "terminating task %d pid %d", p->task->taskid, p->pid);
 
 	// Send signal to process group of child which is denoted by -ve value of child pid.
 	// This is done to ensure delivery of signal to processes forked by the child.

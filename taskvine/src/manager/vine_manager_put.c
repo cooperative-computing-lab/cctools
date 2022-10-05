@@ -218,14 +218,14 @@ static vine_result_code_t vine_manager_put_item_if_not_cached( struct vine_manag
 	struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
 	if(remote_info && (remote_info->mtime != local_info.st_mtime || remote_info->size != local_info.st_size)) {
-		debug(D_NOTICE|D_DS, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
+		debug(D_NOTICE|D_VINE, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
 		return VINE_SUCCESS;
 	} else if(!remote_info) {
 
 		if(tf->offset==0 && tf->length==0) {
-			debug(D_DS, "%s (%s) needs file %s as '%s'", w->hostname, w->addrport, expanded_local_name, tf->cached_name);
+			debug(D_VINE, "%s (%s) needs file %s as '%s'", w->hostname, w->addrport, expanded_local_name, tf->cached_name);
 		} else {
-			debug(D_DS, "%s (%s) needs file %s (offset %lld length %lld) as '%s'", w->hostname, w->addrport, expanded_local_name, (long long) tf->offset, (long long) tf->length, tf->cached_name );
+			debug(D_VINE, "%s (%s) needs file %s (offset %lld length %lld) as '%s'", w->hostname, w->addrport, expanded_local_name, (long long) tf->offset, (long long) tf->length, tf->cached_name );
 		}
 
 		vine_result_code_t result;
@@ -310,7 +310,7 @@ static char *expand_envnames(struct vine_worker_info *w, const char *source)
 
 	free(str);
 
-	debug(D_DS, "File name %s expanded to %s for %s (%s).", source, expanded_name, w->hostname, w->addrport);
+	debug(D_VINE, "File name %s expanded to %s for %s (%s).", source, expanded_name, w->hostname, w->addrport);
 
 	return expanded_name;
 }
@@ -358,7 +358,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	switch (f->type) {
 
 	case VINE_BUFFER:
-		debug(D_DS, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
+		debug(D_VINE, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, f->length);
 		vine_manager_send(q,w, "file %s %d %o\n",f->cached_name, f->length, 0777 );
 		actual = link_putlstring(w->link, f->data, f->length, stoptime);
@@ -369,17 +369,17 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 		break;
 
 	case VINE_COMMAND:
-		debug(D_DS, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->source);
+		debug(D_VINE, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->source);
 		result = vine_manager_put_special_if_not_cached(q,w,t,f,"putcmd");
 		break;
 
 	case VINE_URL:
-		debug(D_DS, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->source);
+		debug(D_VINE, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->source);
 		result = vine_manager_put_special_if_not_cached(q,w,t,f,"puturl");
 		break;
 
 	case VINE_EMPTY_DIR:
-		debug(D_DS, "%s (%s) will create directory %s", w->hostname, w->addrport, f->remote_name);
+		debug(D_VINE, "%s (%s) will create directory %s", w->hostname, w->addrport, f->remote_name);
   		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as VINE_FILEs
 		break;
 
@@ -415,7 +415,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 		if(elapsed_time==0) elapsed_time = 1;
 
 		if(total_bytes > 0) {
-			debug(D_DS, "%s (%s) received %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s",
+			debug(D_VINE, "%s (%s) received %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s",
 				w->hostname,
 				w->addrport,
 				total_bytes / 1000000.0,
@@ -425,7 +425,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 			);
 		}
 	} else {
-		debug(D_DS, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
+		debug(D_VINE, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
 			w->hostname,
 			w->addrport,
 			f->type == VINE_BUFFER ? "literal data" : f->source,
@@ -458,7 +458,7 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 					return VINE_APP_FAILURE;
 				}
 				if(stat(expanded_source, &s) != 0) {
-					debug(D_DS,"Could not stat %s: %s\n", expanded_source, strerror(errno));
+					debug(D_VINE,"Could not stat %s: %s\n", expanded_source, strerror(errno));
 					free(expanded_source);
 					vine_task_update_result(t, VINE_RESULT_INPUT_MISSING);
 					return VINE_APP_FAILURE;

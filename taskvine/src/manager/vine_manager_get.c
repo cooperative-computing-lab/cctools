@@ -46,7 +46,7 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
 
 		f->length = size;
-		debug(D_DS, "Receiving buffer %s (size: %"PRId64" bytes) from %s (%s) ...", f->source, (int64_t)f->length, w->addrport, w->hostname);
+		debug(D_VINE, "Receiving buffer %s (size: %"PRId64" bytes) from %s (%s) ...", f->source, (int64_t)f->length, w->addrport, w->hostname);
 
 		f->data = malloc(size+1);
 		if(f->data) {
@@ -68,7 +68,7 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 			r = VINE_APP_FAILURE;
 		}
 	} else if(sscanf(line,"error %s %d",name_encoded,&errornum)==2) {
-		debug(D_DS, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,f->remote_name,strerror(errornum));
+		debug(D_VINE, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,f->remote_name,strerror(errornum));
 
 		/* Mark the task as missing an output, but return success to keep going. */
 		vine_task_update_result(t, VINE_RESULT_OUTPUT_MISSING);
@@ -102,18 +102,18 @@ static vine_result_code_t vine_manager_get_file_contents( struct vine_manager *q
 	path_dirname(local_name,dirname);
 	if(strchr(local_name,'/')) {
 		if(!create_dir(dirname, 0777)) {
-			debug(D_DS, "Could not create directory - %s (%s)", dirname, strerror(errno));
+			debug(D_VINE, "Could not create directory - %s (%s)", dirname, strerror(errno));
 			link_soak(w->link, length, stoptime);
 			return VINE_MGR_FAILURE;
 		}
 	}
 
 	// Create the local file.
-	debug(D_DS, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
+	debug(D_VINE, "Receiving file %s (size: %"PRId64" bytes) from %s (%s) ...", local_name, length, w->addrport, w->hostname);
 
 	// Check if there is space for incoming file at manager
 	if(!check_disk_space_for_filesize(dirname, length, q->disk_avail_threshold)) {
-		debug(D_DS, "Could not receive file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
+		debug(D_VINE, "Could not receive file %s, not enough disk space (%"PRId64" bytes needed)\n", local_name, length);
 		return VINE_MGR_FAILURE;
 	}
 
@@ -130,13 +130,13 @@ static vine_result_code_t vine_manager_get_file_contents( struct vine_manager *q
 	fchmod(fd,mode);
 
 	if(close(fd) < 0) {
-		warn(D_DS, "Could not write file %s: %s\n", local_name, strerror(errno));
+		warn(D_VINE, "Could not write file %s: %s\n", local_name, strerror(errno));
 		unlink(local_name);
 		return VINE_MGR_FAILURE;
 	}
 
 	if(actual != length) {
-		debug(D_DS, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
+		debug(D_VINE, "Received item size (%"PRId64") does not match the expected size - %"PRId64" bytes.", actual, length);
 		unlink(local_name);
 		return VINE_WORKER_FAILURE;
 	}
@@ -168,7 +168,7 @@ static vine_result_code_t vine_manager_get_symlink_contents( struct vine_manager
 
         int result = symlink(target,filename);
         if(result<0) {
-                debug(D_DS,"could not create symlink %s: %s",filename,strerror(errno));
+                debug(D_VINE,"could not create symlink %s: %s",filename,strerror(errno));
                 free(target);
                 return VINE_MGR_FAILURE;
         }
@@ -254,7 +254,7 @@ static vine_result_code_t vine_manager_get_any( struct vine_manager *q, struct v
 		// but we continue and consider the transfer a 'success' so that other
 		// outputs are transferred and the task is given back to the caller.
 		url_decode(name_encoded,name,sizeof(name));
-		debug(D_DS, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,name,strerror(errornum));
+		debug(D_VINE, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,name,strerror(errornum));
 		vine_task_update_result(t, VINE_RESULT_OUTPUT_MISSING);
 
 		r = VINE_SUCCESS;
@@ -263,7 +263,7 @@ static vine_result_code_t vine_manager_get_any( struct vine_manager *q, struct v
 		r = VINE_END_OF_LIST;
 
 	} else {
-		debug(D_DS, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
+		debug(D_VINE, "%s (%s): sent invalid response to get: %s",w->hostname,w->addrport,line);
 		r = VINE_WORKER_FAILURE;
 	}
 
@@ -280,7 +280,7 @@ static vine_result_code_t vine_manager_get_dir_contents( struct vine_manager *q,
 {
 	int result = mkdir(dirname,0777);
 	if(result<0) {
-		debug(D_DS,"unable to create %s: %s",dirname,strerror(errno));
+		debug(D_VINE,"unable to create %s: %s",dirname,strerror(errno));
 		return VINE_APP_FAILURE;
 	}
 
@@ -310,7 +310,7 @@ vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct 
 
 	timestamp_t open_time = timestamp_get();
 
-	debug(D_DS, "%s (%s) sending back %s to %s", w->hostname, w->addrport, f->cached_name, f->source);
+	debug(D_VINE, "%s (%s) sending back %s to %s", w->hostname, w->addrport, f->cached_name, f->source);
 
 	if(f->type==VINE_FILE) {
 		vine_manager_send(q,w, "get %s\n",f->cached_name);
@@ -334,7 +334,7 @@ vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct 
 		w->total_bytes_transferred += total_bytes;
 		w->total_transfer_time += sum_time;
 
-		debug(D_DS, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
+		debug(D_VINE, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 
 		vine_txn_log_write_transfer(q, w, t, f, total_bytes, sum_time, 0);
 	}
@@ -345,7 +345,7 @@ vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct 
 	// But if we failed to *store* the file, that is a manager failure.
 
 	if(result!=VINE_SUCCESS) {
-		debug(D_DS, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, f->cached_name, f->source );
+		debug(D_VINE, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, f->cached_name, f->source );
 
 		if(result == VINE_APP_FAILURE) {
 			vine_task_update_result(t, VINE_RESULT_OUTPUT_MISSING);

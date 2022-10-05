@@ -66,7 +66,7 @@ void vine_resources_measure_locally( struct vine_resources *r, const char *disk_
 
 static void vine_resource_debug( struct vine_resource *r, const char *name )
 {
-	debug(D_DS,"%8s %6"PRId64" inuse %6"PRId64" total %6"PRId64" smallest %6"PRId64" largest",name, r->inuse, r->total, r->smallest, r->largest);
+	debug(D_VINE,"%8s %6"PRId64" inuse %6"PRId64" total %6"PRId64" smallest %6"PRId64" largest",name, r->inuse, r->total, r->smallest, r->largest);
 }
 
 
@@ -78,7 +78,7 @@ static void vine_resource_send( struct link *manager, struct vine_resource *r, c
 
 void vine_resources_send( struct link *manager, struct vine_resources *r, time_t stoptime )
 {
-	debug(D_DS, "Sending resource description to manager:");
+	debug(D_VINE, "Sending resource description to manager:");
 	vine_resource_send(manager, &r->workers, "workers",stoptime);
 	vine_resource_send(manager, &r->disk,    "disk",   stoptime);
 	vine_resource_send(manager, &r->memory,  "memory", stoptime);

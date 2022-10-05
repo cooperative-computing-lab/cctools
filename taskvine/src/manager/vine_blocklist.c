@@ -71,7 +71,7 @@ void vine_blocklist_unblock_all_by_time(struct vine_manager *q, time_t deadline)
 		if(deadline > 0 && info->release_at > deadline)
 			continue;
 
-		debug(D_DS, "Clearing hostname %s from blocklist.\n", hostname);
+		debug(D_VINE, "Clearing hostname %s from blocklist.\n", hostname);
 		vine_blocklist_unblock(q, hostname);
 	}
 }
@@ -93,10 +93,10 @@ void vine_blocklist_block( struct vine_manager *q, const char *hostname, time_t 
 	info->blocked = 1;
 
 	if(timeout > 0) {
-		debug(D_DS, "Blocking host %s by %" PRIu64 " seconds (blocked %d times).\n", hostname, (uint64_t) timeout, info->times_blocked);
+		debug(D_VINE, "Blocking host %s by %" PRIu64 " seconds (blocked %d times).\n", hostname, (uint64_t) timeout, info->times_blocked);
 		info->release_at = time(0) + timeout;
 	} else {
-		debug(D_DS, "Blocking host %s indefinitely.\n", hostname);
+		debug(D_VINE, "Blocking host %s indefinitely.\n", hostname);
 		info->release_at = -1;
 	}
 }

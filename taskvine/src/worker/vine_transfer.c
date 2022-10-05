@@ -140,7 +140,7 @@ access_failure:
 	return 1;
 
 send_failure:
-	debug(D_DS, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", full_name, length, actual);
+	debug(D_VINE, "Sending back output file - %s failed: bytes to send = %"PRId64" and bytes actually sent = %"PRId64".", full_name, length, actual);
 	return 0;
 }
 
@@ -177,7 +177,7 @@ static int vine_transfer_get_symlink_internal( struct link *lnk, char *filename,
 
 	int result = symlink(target,filename);
 	if(result<0) {
-		debug(D_DS,"could not create symlink %s: %s",filename,strerror(errno));
+		debug(D_VINE,"could not create symlink %s: %s",filename,strerror(errno));
 		free(target);
 		return 0;
 	}
@@ -197,20 +197,20 @@ name for validity.
 static int vine_transfer_get_file_internal( struct link *lnk, const char *filename, int64_t length, int mode, time_t stoptime )
 {
 	if(!check_disk_space_for_filesize(".", length, 0)) {
-		debug(D_DS, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
+		debug(D_VINE, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
 
 	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
 	if(fd<0) {
-		debug(D_DS, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
+		debug(D_VINE, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
 		return 0;
 	}
 
 	int64_t actual = link_stream_to_fd(lnk, fd, length, stoptime);
 	close(fd);
 	if(actual!=length) {
-		debug(D_DS, "Failed to put file - %s (%s)\n", filename, strerror(errno));
+		debug(D_VINE, "Failed to put file - %s (%s)\n", filename, strerror(errno));
 		return 0;
 	}
 
@@ -271,7 +271,7 @@ static int vine_transfer_get_any_internal( struct link *lnk, const char *dirname
 
 	} else if(sscanf(line,"error %s %d",name_encoded,&errornum)==2) {
 
-		debug(D_DS,"unable to transfer %s: %s",name_encoded,strerror(errornum));
+		debug(D_VINE,"unable to transfer %s: %s",name_encoded,strerror(errornum));
 		r = 0;
 
 	} else if(!strcmp(line,"end")) {
@@ -293,7 +293,7 @@ static int vine_transfer_get_dir_internal( struct link *lnk, const char *dirname
 {
 	int result = mkdir(dirname,0777);
 	if(result<0) {
-		debug(D_DS,"unable to create %s: %s",dirname,strerror(errno));
+		debug(D_VINE,"unable to create %s: %s",dirname,strerror(errno));
 		return 0;
 	}
 

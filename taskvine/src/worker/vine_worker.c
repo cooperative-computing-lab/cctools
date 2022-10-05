@@ -228,7 +228,7 @@ void send_message( struct link *l, const char *fmt, ... )
 	string_nformat(debug_msg, sizeof(debug_msg), "tx: %s", fmt);
 	va_copy(debug_va, va);
 
-	vdebug(D_DS, debug_msg, debug_va);
+	vdebug(D_VINE, debug_msg, debug_va);
 	link_vprintf(l, time(0)+active_timeout, fmt, va);
 
 	va_end(va);
@@ -237,7 +237,7 @@ void send_message( struct link *l, const char *fmt, ... )
 int recv_message( struct link *l, char *line, int length, time_t stoptime )
 {
 	int result = link_readline(l,line,length,stoptime);
-	if(result) debug(D_DS,"rx: %s",line);
+	if(result) debug(D_VINE,"rx: %s",line);
 	return result;
 }
 
@@ -590,14 +590,14 @@ static int handle_completed_tasks(struct link *manager)
 		if(result==0) {
 			// pid is still going
 		} else if(result<0) {
-			debug(D_DS, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
+			debug(D_VINE, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
 		} else if(result>0) {
 			if (!WIFEXITED(status)){
 				p->exit_code = WTERMSIG(status);
-				debug(D_DS, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_code);
+				debug(D_VINE, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_code);
 			} else {
 				p->exit_code = WEXITSTATUS(status);
-				debug(D_DS, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_code);
+				debug(D_VINE, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_code);
 			}
 
 			/* collect the resources associated with the process */
@@ -666,14 +666,14 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
 			vine_task_specify_command(task,cmd);
-			debug(D_DS,"rx: %s",cmd);
+			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"coprocess %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
 			vine_task_specify_coprocess(task,cmd);
-			debug(D_DS,"rx: %s",cmd);
+			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
@@ -709,7 +709,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			}
 			free(env);
 		} else {
-			debug(D_DS|D_NOTICE,"invalid command from manager: %s",line);
+			debug(D_VINE|D_NOTICE,"invalid command from manager: %s",line);
 			return 0;
 		}
 	}
@@ -764,7 +764,7 @@ static int do_unlink(const char *path)
 		vine_cache_remove(global_cache,path);
 		result = 1;
 	} else {
-		debug(D_DS, "%s is not within workspace %s",cached_path,workspace);
+		debug(D_VINE, "%s is not within workspace %s",cached_path,workspace);
 		result = 0;
 	}
 
@@ -786,7 +786,7 @@ static int do_kill(int taskid)
 
 	p = itable_remove(procs_table, taskid);
 	if(!p) {
-		debug(D_DS,"manager requested kill of task %d which does not exist!",taskid);
+		debug(D_VINE,"manager requested kill of task %d which does not exist!",taskid);
 		return 1;
 	}
 
@@ -836,7 +836,7 @@ static void kill_all_tasks()
 	assert(disk_allocated==0);
 	assert(gpus_allocated==0);
 
-	debug(D_DS,"all data structures are clean");
+	debug(D_VINE,"all data structures are clean");
 }
 
 static void finish_running_task(struct vine_process *p, vine_result_t result)
@@ -864,7 +864,7 @@ static int enforce_process_limits(struct vine_process *p)
 
 	vine_process_measure_disk(p, max_time_on_measurement);
 	if(p->sandbox_size > p->task->resources_requested->disk) {
-		debug(D_DS,"Task %d went over its disk size limit: %s > %s\n",
+		debug(D_VINE,"Task %d went over its disk size limit: %s > %s\n",
 				p->task->taskid,
 				rmsummary_resource_to_str(p->sandbox_size, /* with units */ 1),
 				rmsummary_resource_to_str(p->task->resources_requested->disk, 1));
@@ -920,7 +920,7 @@ static void enforce_processes_max_running_time()
 			continue;
 
 		if(now > p->execution_start + (1e6 * p->task->resources_requested->wall_time)) {
-			debug(D_DS,"Task %d went over its running time limit: %s > %s\n",
+			debug(D_VINE,"Task %d went over its running time limit: %s > %s\n",
 					p->task->taskid,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
@@ -935,17 +935,17 @@ static void enforce_processes_max_running_time()
 
 static int do_release()
 {
-	debug(D_DS, "released by manager %s:%d.\n", current_manager_address->addr, current_manager_address->port);
+	debug(D_VINE, "released by manager %s:%d.\n", current_manager_address->addr, current_manager_address->port);
 	released_by_manager = 1;
 	return 0;
 }
 
 static void disconnect_manager(struct link *manager)
 {
-	debug(D_DS, "disconnecting from manager %s:%d", current_manager_address->addr, current_manager_address->port);
+	debug(D_VINE, "disconnecting from manager %s:%d", current_manager_address->addr, current_manager_address->port);
 	link_close(manager);
 
-	debug(D_DS, "killing all outstanding tasks");
+	debug(D_VINE, "killing all outstanding tasks");
 	kill_all_tasks();
 
 	if(released_by_manager) {
@@ -1020,11 +1020,11 @@ static int handle_manager(struct link *manager)
 			report_tasks_complete(manager);
 			r = 1;
 		} else {
-			debug(D_DS, "Unrecognized manager message: %s.\n", line);
+			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
 			r = 0;
 		}
 	} else {
-		debug(D_DS, "Failed to read from manager.\n");
+		debug(D_VINE, "Failed to read from manager.\n");
 		r = 0;
 	}
 
@@ -1070,7 +1070,7 @@ void forsake_waiting_process(struct link *manager, struct vine_process *p)
 	p->result = VINE_RESULT_FORSAKEN;
 	itable_insert(procs_complete, p->task->taskid, p);
 
-	debug(D_DS, "Waiting task %d has been forsaken.", p->task->taskid);
+	debug(D_VINE, "Waiting task %d has been forsaken.", p->task->taskid);
 
 	/* we also send updated resources to the manager. */
 	send_keepalive(manager, 1);
@@ -1136,7 +1136,7 @@ static void work_for_manager( struct link *manager )
 {
 	sigset_t mask;
 
-	debug(D_DS, "working for manager at %s:%d.\n", current_manager_address->addr, current_manager_address->port);
+	debug(D_VINE, "working for manager at %s:%d.\n", current_manager_address->addr, current_manager_address->port);
 
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
@@ -1369,7 +1369,7 @@ The workspace consists of the following directories:
 
 static int workspace_prepare()
 {
-	debug(D_DS,"preparing workspace %s",workspace);
+	debug(D_VINE,"preparing workspace %s",workspace);
 
 	char *cachedir = string_format("%s/cache",workspace);
 	int result = create_dir(cachedir,0777);
@@ -1398,7 +1398,7 @@ directories (except trash) and move them to the trash directory.
 
 static void workspace_cleanup()
 {
-	debug(D_DS,"cleaning workspace %s",workspace);
+	debug(D_VINE,"cleaning workspace %s",workspace);
 
 	vine_transfer_server_stop();
 
@@ -1495,10 +1495,10 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	link_address_local(manager, local_addr, &local_port);
 
 	printf("connected to manager %s:%d via local address %s:%d\n", host, port, local_addr, local_port);
-	debug(D_DS, "connected to manager %s:%d via local address %s:%d", host, port, local_addr, local_port);
+	debug(D_VINE, "connected to manager %s:%d via local address %s:%d", host, port, local_addr, local_port);
 
 	if(password) {
-		debug(D_DS,"authenticating to manager");
+		debug(D_VINE,"authenticating to manager");
 		if(!link_auth_password(manager,password,idle_stoptime)) {
 			fprintf(stderr,"vine_worker: wrong password for manager %s:%d\n",host,port);
 			link_close(manager);
@@ -1508,10 +1508,10 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 
 	if(verify_project) {
 		char line[VINE_LINE_MAX];
-		debug(D_DS, "verifying manager's project name");
+		debug(D_VINE, "verifying manager's project name");
 		send_message(manager, "name\n");
 		if(!recv_message(manager,line,sizeof(line),idle_stoptime)) {
-			debug(D_DS,"no response from manager while verifying name");
+			debug(D_VINE,"no response from manager while verifying name");
 			link_close(manager);
 			return 0;
 		}
@@ -1607,7 +1607,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 {
 	struct list *managers_list = vine_catalog_query_cached(catalog_hosts,-1,project_regex);
 
-	debug(D_DS,"project name %s matches %d managers",project_regex,list_size(managers_list));
+	debug(D_VINE,"project name %s matches %d managers",project_regex,list_size(managers_list));
 
 	if(list_size(managers_list)==0) return 0;
 
@@ -1645,7 +1645,7 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 
 					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
 					connect_stoptime = idle_stoptime;
-					debug(D_DS,"Previous idle disconnection from only manager available project=%s name=%s addr=%s port=%d",project,name,addr,port);
+					debug(D_VINE,"Previous idle disconnection from only manager available project=%s name=%s addr=%s port=%d",project,name,addr,port);
 
 					return 0;
 				} else {
@@ -1658,13 +1658,13 @@ static int serve_manager_by_name( const char *catalog_hosts, const char *project
 		int result;
 
 		if(pref && strcmp(pref, "by_hostname") == 0) {
-			debug(D_DS,"selected manager with project=%s hostname=%s addr=%s port=%d",project,name,addr,port);
+			debug(D_VINE,"selected manager with project=%s hostname=%s addr=%s port=%d",project,name,addr,port);
 			manager_addresses = interfaces_to_list(name, port, NULL);
 		} else if(pref && strcmp(pref, "by_apparent_ip") == 0) {
-			debug(D_DS,"selected manager with project=%s apparent_addr=%s port=%d",project,addr,port);
+			debug(D_VINE,"selected manager with project=%s apparent_addr=%s port=%d",project,addr,port);
 			manager_addresses = interfaces_to_list(addr, port, NULL);
 		} else {
-			debug(D_DS,"selected manager with project=%s addr=%s port=%d",project,addr,port);
+			debug(D_VINE,"selected manager with project=%s addr=%s port=%d",project,addr,port);
 			manager_addresses = interfaces_to_list(addr, port, ifas);
 		}
 
@@ -2098,7 +2098,7 @@ int main(int argc, char *argv[])
 	}
 
 	// set $VINE_SANDBOX to workspace.
-	debug(D_DS, "VINE_SANDBOX set to %s.\n", workspace);
+	debug(D_VINE, "VINE_SANDBOX set to %s.\n", workspace);
 	setenv("VINE_SANDBOX", workspace, 0);
 
 	// change to workspace

@@ -145,7 +145,7 @@ static int do_internal_command( struct vine_cache *c, const char *command, char 
 	int result = 0;
 	*error_message = 0;
 	
-	debug(D_DS,"executing: %s",command);
+	debug(D_VINE,"executing: %s",command);
 		
 	FILE *stream = popen(command,"r");
 	if(stream) {
@@ -158,7 +158,7 @@ static int do_internal_command( struct vine_cache *c, const char *command, char 
 			}
 			result = 1;
 		} else {
-			debug(D_DS,"command failed with output: %s",*error_message);
+			debug(D_VINE,"command failed with output: %s",*error_message);
 			result = 0;
 		}
 	} else {
@@ -225,18 +225,18 @@ int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, co
 		} else {
 			command = strdup("false");
 		}
-		debug(D_DS,"unpacking %s to %s via command %s",transfer_path,cache_path,command);
+		debug(D_VINE,"unpacking %s to %s via command %s",transfer_path,cache_path,command);
 		unix_result = system(command);
 		free(command);
 	} else {
-		debug(D_DS,"renaming %s to %s",transfer_path,cache_path);
+		debug(D_VINE,"renaming %s to %s",transfer_path,cache_path);
 		unix_result = rename(transfer_path,cache_path);
 	}
 
 	if(unix_result==0) {
 		return 1;
 	} else {
-		debug(D_DS,"command failed: %s",strerror(errno));
+		debug(D_VINE,"command failed: %s",strerror(errno));
 		return 0;
 	}
 }
@@ -257,12 +257,12 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 {
 	struct cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
-		debug(D_DS,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
+		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
 		return 0;
 	}
 
 	if(f->present) {
-		debug(D_DS,"cache: %s is already present.",cachename);
+		debug(D_VINE,"cache: %s is already present.",cachename);
 		return 1;
 	}
 	
@@ -276,17 +276,17 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	
 	switch(f->type) {
 		case VINE_CACHE_FILE:
-			debug(D_DS,"error: file %s should already be present!",cachename);
+			debug(D_VINE,"error: file %s should already be present!",cachename);
 			result = 0;
 			break;
 		  
 		case VINE_CACHE_TRANSFER:
-			debug(D_DS,"cache: transferring %s to %s",f->source,cachename);
+			debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
 			result = do_transfer(c,f->source,transfer_path,&error_message);
 			break;
 
 		case VINE_CACHE_COMMAND:
-			debug(D_DS,"cache: creating %s via shell command",cachename);
+			debug(D_VINE,"cache: creating %s via shell command",cachename);
 			result = do_command(c,f->source,transfer_path,&error_message);
 			break;
 	}
@@ -312,15 +312,15 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 			f->actual_size = info.st_size;
 			f->expected_size = f->actual_size;
 			f->present = 1;
-			debug(D_DS,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
+			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
 			send_cache_update(manager,cachename,f->actual_size,transfer_time);
 			result = 1;
 		} else {
-			debug(D_DS,"cache: command succeeded but did not create %s",cachename);
+			debug(D_VINE,"cache: command succeeded but did not create %s",cachename);
 			result = 0;
 		}
 	} else {
-		debug(D_DS,"cache: unable to create %s",cachename);
+		debug(D_VINE,"cache: unable to create %s",cachename);
 		result = 0;
 	}
 

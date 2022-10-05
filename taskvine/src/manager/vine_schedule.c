@@ -436,23 +436,23 @@ void vine_schedule_check_for_large_tasks( struct vine_manager *q )
 	}
 
 	if(unfit_core || unfit_mem || unfit_disk || unfit_gpu){
-		notice(D_DS,"There are tasks that cannot fit any currently connected worker:\n");
+		notice(D_VINE,"There are tasks that cannot fit any currently connected worker:\n");
 	}
 
 	if(unfit_core) {
-		notice(D_DS,"    %d waiting task(s) need more than %s", unfit_core, rmsummary_resource_to_str("cores", largest_unfit_task->cores, 1));
+		notice(D_VINE,"    %d waiting task(s) need more than %s", unfit_core, rmsummary_resource_to_str("cores", largest_unfit_task->cores, 1));
 	}
 
 	if(unfit_mem) {
-		notice(D_DS,"    %d waiting task(s) need more than %s of memory", unfit_mem, rmsummary_resource_to_str("memory", largest_unfit_task->memory, 1));
+		notice(D_VINE,"    %d waiting task(s) need more than %s of memory", unfit_mem, rmsummary_resource_to_str("memory", largest_unfit_task->memory, 1));
 	}
 
 	if(unfit_disk) {
-		notice(D_DS,"    %d waiting task(s) need more than %s of disk", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task->disk, 1));
+		notice(D_VINE,"    %d waiting task(s) need more than %s of disk", unfit_disk, rmsummary_resource_to_str("disk", largest_unfit_task->disk, 1));
 	}
 
 	if(unfit_gpu) {
-		notice(D_DS,"    %d waiting task(s) need more than %s", unfit_gpu, rmsummary_resource_to_str("gpus", largest_unfit_task->gpus, 1));
+		notice(D_VINE,"    %d waiting task(s) need more than %s", unfit_gpu, rmsummary_resource_to_str("gpus", largest_unfit_task->gpus, 1));
 	}
 
 	rmsummary_delete(largest_unfit_task);

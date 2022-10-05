@@ -376,7 +376,7 @@ int find_child_relations(int spaces, const char *host, int port, struct jx_table
 
 	if(!domain_name_cache_lookup(host, full_address))
 	{
-		debug(D_DS,"Could not resolve %s into an ip address\n",host);
+		debug(D_VINE,"Could not resolve %s into an ip address\n",host);
 		return 0;
 	}
 
