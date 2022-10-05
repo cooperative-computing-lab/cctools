@@ -7,7 +7,7 @@ htmlpages manpages mdpages:
 
 apiperl: manuals/api/html/work_queue_perl.html manuals/api/html/work_queue_task_perl.html manuals/api/html/chirp_client_perl.html manuals/api/html/chirp_stat_perl.html
 
-apipages: manuals/api/html/index.html apiperl
+apipages: manuals/api/html/index.html
 
 manuals/api/html/index.html:
 	mkdir -p manuals/api/html
