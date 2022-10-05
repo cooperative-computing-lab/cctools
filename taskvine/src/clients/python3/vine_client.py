@@ -20,7 +20,7 @@ import json
 from time import sleep
 from subprocess import Popen, PIPE
 
-class DataSwarmClient:
+class TaskVineClient:
 
     def __init__(self):
         self.id = 1
@@ -78,7 +78,7 @@ class DataSwarmClient:
 
 
 print("Creating API proxy...")
-client = DataSwarmClient()
+client = TaskVineClient()
 print("Checking manager status...")
 client.connect(0,"testproject")
 print("Manager status:")

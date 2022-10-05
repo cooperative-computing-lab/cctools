@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-# work queue python binding tests
+# taskvine python binding tests
 # tests for missing/recursive inputs/outputs.
 
 import argparse
@@ -61,7 +61,7 @@ def make_task(exe, input, output):
     return t
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser("Test for Data Swarm python bindings.")
+    parser = argparse.ArgumentParser("Test for TaskVine python bindings.")
     parser.add_argument('port_file', help='File to write the port the queue is using.')
     parser.add_argument('--ssl_key', default=None, help='SSL key in pem format.')
     parser.add_argument('--ssl_cert', default=None, help='SSL certificate in pem format.')
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     os.chmod(path.join(test_dir, exec_file), stat.S_IRWXU)
 
 
-    q = vine.DataSwarm(port=0, ssl=(args.ssl_key, args.ssl_cert), debug_log="manager.log")
+    q = vine.TaskVine(port=0, ssl=(args.ssl_key, args.ssl_cert), debug_log="manager.log")
 
     with open(args.port_file, 'w') as f:
         print('Writing port {port} to file {file}'.format(port=q.port, file=args.port_file))
