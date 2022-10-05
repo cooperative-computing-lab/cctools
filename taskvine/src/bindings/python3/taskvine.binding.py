@@ -1,6 +1,6 @@
-## @package DataSwarmPython
+## @package TaskVinePython
 #
-# Python Dataswarm bindings.
+# Python TaskVine bindings.
 #
 # The objects and methods provided by this package correspond to the native
 # C API in @ref vine_manager.h.
@@ -8,7 +8,7 @@
 # The SWIG-based Python bindings provide a higher-level interface that
 # revolves around the following objects:
 #
-# - @ref taskvine::DataSwarm
+# - @ref taskvine::TaskVine
 # - @ref taskvine::Task
 # - @ref taskvine::Factory
 
@@ -100,7 +100,7 @@ class Task(object):
     # Return a copy of this task
     #
     def clone(self):
-        """Return a (deep)copy this task that can also be submitted to the DataSwarm."""
+        """Return a (deep)copy this task that can also be submitted to the TaskVine."""
         new = copy.copy(self)
         new._task = vine_task_clone(self._task)
         return new
@@ -893,11 +893,11 @@ class PythonTaskNoResult(Exception):
     pass
 
 ##
-# Python Data Swarm object
+# Python TaskVine object
 #
 # This class uses a dictionary to map between the task pointer objects and the
 # @ref taskvine::Task.
-class DataSwarm(object):
+class TaskVine(object):
     ##
     # Create a new manager.
     #
@@ -951,7 +951,7 @@ class DataSwarm(object):
             if name:
                 vine_specify_name(self._taskvine, name)
         except Exception as e:
-            raise Exception('Unable to create internal Data Swarm structure: {}'.format(e))
+            raise Exception('Unable to create internal TaskVine structure: {}'.format(e))
 
 
     def _free_queue(self):
@@ -2016,7 +2016,7 @@ class RemoteTask(Task):
 
 ##
 # \class Factory
-# Launch a Data Swarm factory.
+# Launch a TaskVine factory.
 #
 # The command line arguments for `vine_factory` can be set for a
 # factory object (with dashes replaced with underscores). Creating a factory

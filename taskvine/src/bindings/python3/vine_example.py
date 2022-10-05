@@ -4,7 +4,7 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-# This program is a very simple example of how to use Data Swarm.
+# This program is a very simple example of how to use TaskVine.
 # It accepts a list of files on the command line.
 # Each file is compressed with gzip and returned to the user.
 
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     sys.exit(1)
 
   # Usually, we can execute the gzip utility by simply typing its name at a
-  # terminal. However, this is not enough for work queue; we have to
+  # terminal. However, this is not enough for taskvine; we have to
   # specify precisely which files need to be transmitted to the workers. We
   # record the location of gzip in 'gzip_path', which is usually found in
   # /bin/gzip or /usr/bin/gzip.
@@ -37,9 +37,9 @@ if __name__ == '__main__':
   # been used by another program, you can try setting port = 0 to use an
   # available port.
   try:
-      q = DataSwarm(port = VINE_DEFAULT_PORT)
+      q = TaskVine(port = VINE_DEFAULT_PORT)
   except:
-      print("Instantiation of Data Swarm failed!")
+      print("Instantiation of TaskVine failed!")
       sys.exit(1)
 
   print("listening on port %d..." % q.port)
@@ -83,5 +83,5 @@ if __name__ == '__main__':
 
   print("all tasks complete!")
 
-  #work queue object will be garbage collected by Python automatically when it goes out of scope
+  #taskvine object will be garbage collected by Python automatically when it goes out of scope
   sys.exit(0)

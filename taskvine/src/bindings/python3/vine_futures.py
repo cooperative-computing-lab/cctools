@@ -31,11 +31,11 @@ except ImportError:
 
 
 ##
-# Python Data Swarm object
+# Python TaskVineFutures object
 #
-# Implements an asynchronous DataSwarmFutures object.
-# @ref vine_futures::DataSwarmFutures.
-class DataSwarmFutures(object):
+# Implements an asynchronous TaskVineFutures object.
+# @ref vine_futures::TaskVineFutures.
+class TaskVineFutures(object):
     def __init__(self, *args, **kwargs):
 
         local_worker_args = kwargs.get('local_worker', None)
@@ -47,7 +47,7 @@ class DataSwarmFutures(object):
                 # 1000MB of disk)
                 local_worker_args = {}
 
-        # calls to synchronous DataSwarmFutures are coordinated with _queue_lock
+        # calls to synchronous TaskVineFutures are coordinated with _queue_lock
         self._queue_lock       = threading.Lock()
         self._stop_queue_event = threading.Event()
 
@@ -65,7 +65,7 @@ class DataSwarmFutures(object):
 
         self._local_worker = None
 
-        self._queue = taskvine.DataSwarm(*args, **kwargs)
+        self._queue = taskvine.TaskVineFutures(*args, **kwargs)
 
         if local_worker_args:
             self._local_worker = Worker(self.port, **local_worker_args)
@@ -76,7 +76,7 @@ class DataSwarmFutures(object):
         atexit.register(self._terminate)
 
 
-    # methods not explicitly defined we route to synchronous DataSwarm, using a lock.
+    # methods not explicitly defined we route to synchronous TaskVineFutures, using a lock.
     def __getattr__(self, name):
         attr = getattr(self._queue, name)
 
@@ -94,13 +94,13 @@ class DataSwarmFutures(object):
     ##
     # Submit a task to the queue.
     #
-    # @param self   Reference to the current work queue object.
+    # @param self   Reference to the current taskvine object.
     # @param task   A task description created from @ref taskvine::Task.
     def submit(self, future_task):
         if isinstance(future_task, FutureTask):
             self._tasks_to_submit.put(future_task, False)
         else:
-            raise TypeError("{} is not a DataSwarm.Task")
+            raise TypeError("{} is not a TaskVineFutures.Task")
 
     ##
     # Disable wait when using the futures interface
@@ -112,7 +112,7 @@ class DataSwarmFutures(object):
     #
     # Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
     #
-    # @param self       Reference to the current work queue object.
+    # @param self       Reference to the current taskvine object.
     def empty(self):
         if self._tasks_to_submit.empty():
             return self._queue.empty()

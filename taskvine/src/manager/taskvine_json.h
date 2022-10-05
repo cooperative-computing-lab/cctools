@@ -84,7 +84,7 @@ child process). Return string should be freed using free().
 char *vine_json_wait(struct vine_manager *m, int timeout);
 
 /** Determine whether the manager is 'hungry' for more tasks.
-While the Data Swarm can handle a very large number of tasks,
+While the TaskVine can handle a very large number of tasks,
 it runs most efficiently when the number of tasks is slightly
 larger than the number of active workers.  This function gives
 the user of a flexible application a hint about whether it would

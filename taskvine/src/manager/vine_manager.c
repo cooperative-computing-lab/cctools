@@ -2002,7 +2002,7 @@ static void handle_data_index( struct vine_manager *q, struct vine_worker_info *
 	buffer_t buf;
 	buffer_init(&buf);
 
-	buffer_printf(&buf,"<h1>Dataswarm Data API</h1>");
+	buffer_printf(&buf,"<h1>TaskVine Data API</h1>");
         buffer_printf(&buf,"<ul>\n");
 	buffer_printf(&buf,"<li> <a href=\"/queue_status\">Queue Status</a>\n");
 	buffer_printf(&buf,"<li> <a href=\"/task_status\">Task Status</a>\n");
