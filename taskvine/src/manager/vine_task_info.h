@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_TASK_INFO_H
-#define DS_TASK_INFO_H
+#ifndef VINE_TASK_INFO_H
+#define VINE_TASK_INFO_H
 
 /*
 Store a report summarizing the performance of a completed task.
@@ -13,23 +13,23 @@ Keep a list of reports equal to the number of workers connected.
 Used for computing queue capacity below.
 */
 
-#include "ds_task.h"
-#include "ds_manager.h"
+#include "vine_task.h"
+#include "vine_manager.h"
 #include "timestamp.h"
 #include "rmsummary.h"
 
-struct ds_task_info {
+struct vine_task_info {
 	timestamp_t transfer_time;
 	timestamp_t exec_time;
 	timestamp_t manager_time;
 	struct rmsummary *resources;
 };
 
-struct ds_task_info * ds_task_info_create( struct ds_task *t );
-void ds_task_info_delete(struct ds_task_info *tr);
+struct vine_task_info * vine_task_info_create( struct vine_task *t );
+void vine_task_info_delete(struct vine_task_info *tr);
 
-void ds_task_info_add( struct ds_manager *q, struct ds_task *t );
-void ds_task_info_compute_capacity(const struct ds_manager *q, struct ds_stats *s);
+void vine_task_info_add( struct vine_manager *q, struct vine_task *t );
+void vine_task_info_compute_capacity(const struct vine_manager *q, struct vine_stats *s);
 
 #endif
 

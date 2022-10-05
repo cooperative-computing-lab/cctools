@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_resources.h"
+#include "vine_resources.h"
 
 #include "link.h"
 #include "load_average.h"
@@ -18,21 +18,21 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-struct ds_resources * ds_resources_create()
+struct vine_resources * vine_resources_create()
 {
-	struct ds_resources *r = malloc(sizeof(*r));
-	memset(r, 0, sizeof(struct ds_resources));
+	struct vine_resources *r = malloc(sizeof(*r));
+	memset(r, 0, sizeof(struct vine_resources));
 
 	r->tag = -1;
 	return r;
 }
 
-void ds_resources_delete( struct ds_resources *r )
+void vine_resources_delete( struct vine_resources *r )
 {
 	free(r);
 }
 
-void ds_resources_measure_locally( struct ds_resources *r, const char *disk_path )
+void vine_resources_measure_locally( struct vine_resources *r, const char *disk_path )
 {
 	static int gpu_check = 0;
 
@@ -64,46 +64,46 @@ void ds_resources_measure_locally( struct ds_resources *r, const char *disk_path
 	r->workers.largest = r->workers.smallest = r->workers.total;
 }
 
-static void ds_resource_debug( struct ds_resource *r, const char *name )
+static void vine_resource_debug( struct vine_resource *r, const char *name )
 {
 	debug(D_DS,"%8s %6"PRId64" inuse %6"PRId64" total %6"PRId64" smallest %6"PRId64" largest",name, r->inuse, r->total, r->smallest, r->largest);
 }
 
 
-static void ds_resource_send( struct link *manager, struct ds_resource *r, const char *name, time_t stoptime )
+static void vine_resource_send( struct link *manager, struct vine_resource *r, const char *name, time_t stoptime )
 {
-	ds_resource_debug(r, name);
+	vine_resource_debug(r, name);
 	link_printf(manager, stoptime, "resource %s %"PRId64" %"PRId64" %"PRId64"\n", name, r->total, r->smallest, r->largest );
 }
 
-void ds_resources_send( struct link *manager, struct ds_resources *r, time_t stoptime )
+void vine_resources_send( struct link *manager, struct vine_resources *r, time_t stoptime )
 {
 	debug(D_DS, "Sending resource description to manager:");
-	ds_resource_send(manager, &r->workers, "workers",stoptime);
-	ds_resource_send(manager, &r->disk,    "disk",   stoptime);
-	ds_resource_send(manager, &r->memory,  "memory", stoptime);
-	ds_resource_send(manager, &r->gpus,    "gpus",   stoptime);
-	ds_resource_send(manager, &r->cores,   "cores",  stoptime);
+	vine_resource_send(manager, &r->workers, "workers",stoptime);
+	vine_resource_send(manager, &r->disk,    "disk",   stoptime);
+	vine_resource_send(manager, &r->memory,  "memory", stoptime);
+	vine_resource_send(manager, &r->gpus,    "gpus",   stoptime);
+	vine_resource_send(manager, &r->cores,   "cores",  stoptime);
 
 	/* send the tag last, the manager knows when the resource update is complete */
 	link_printf(manager, stoptime, "resource tag %"PRId64"\n", r->tag);
 }
 
-void ds_resources_debug( struct ds_resources *r )
+void vine_resources_debug( struct vine_resources *r )
 {
-	ds_resource_debug(&r->workers, "workers");
-	ds_resource_debug(&r->disk,    "disk");
-	ds_resource_debug(&r->memory,  "memory");
-	ds_resource_debug(&r->gpus,    "gpus");
-	ds_resource_debug(&r->cores,   "cores");
+	vine_resource_debug(&r->workers, "workers");
+	vine_resource_debug(&r->disk,    "disk");
+	vine_resource_debug(&r->memory,  "memory");
+	vine_resource_debug(&r->gpus,    "gpus");
+	vine_resource_debug(&r->cores,   "cores");
 }
 
-void ds_resources_clear( struct ds_resources *r )
+void vine_resources_clear( struct vine_resources *r )
 {
 	memset(r,0,sizeof(*r));
 }
 
-static void ds_resource_add( struct ds_resource *total, struct ds_resource *r )
+static void vine_resource_add( struct vine_resource *total, struct vine_resource *r )
 {
 	total->inuse += r->inuse;
 	total->total += r->total;
@@ -111,16 +111,16 @@ static void ds_resource_add( struct ds_resource *total, struct ds_resource *r )
 	total->largest = MAX(total->largest,r->largest);
 }
 
-void ds_resources_add( struct ds_resources *total, struct ds_resources *r )
+void vine_resources_add( struct vine_resources *total, struct vine_resources *r )
 {
-	ds_resource_add(&total->workers, &r->workers);
-	ds_resource_add(&total->memory,  &r->memory);
-	ds_resource_add(&total->disk,    &r->disk);
-	ds_resource_add(&total->gpus,    &r->gpus);
-	ds_resource_add(&total->cores,   &r->cores);
+	vine_resource_add(&total->workers, &r->workers);
+	vine_resource_add(&total->memory,  &r->memory);
+	vine_resource_add(&total->disk,    &r->disk);
+	vine_resource_add(&total->gpus,    &r->gpus);
+	vine_resource_add(&total->cores,   &r->cores);
 }
 
-void ds_resources_add_to_jx( struct ds_resources *r, struct jx *nv )
+void vine_resources_add_to_jx( struct vine_resources *r, struct jx *nv )
 {
 	jx_insert_integer(nv, "workers_inuse",   r->workers.inuse);
 	jx_insert_integer(nv, "workers_total",   r->workers.total);

@@ -4,12 +4,12 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_gpus.h"
-#include "ds_resources.h"
+#include "vine_gpus.h"
+#include "vine_resources.h"
 #include "buffer.h"
 #include "debug.h"
 
-extern struct ds_resources *total_resources;
+extern struct vine_resources *total_resources;
 
 /* Array tracks which task is assigned to each GPU. */
 static int *gpu_to_task = 0;
@@ -20,7 +20,7 @@ Note that this may be called many times,
 but should only initialized once.
 */
 
-void ds_gpus_init( int ngpus )
+void vine_gpus_init( int ngpus )
 {
 	if(!gpu_to_task) gpu_to_task = calloc(ngpus,sizeof(int));
 }
@@ -29,7 +29,7 @@ void ds_gpus_init( int ngpus )
 Display the GPUs associated with each task.
 */
 
-void ds_gpus_debug()
+void vine_gpus_debug()
 {
 	buffer_t b;
 	buffer_init(&b);
@@ -47,7 +47,7 @@ void ds_gpus_debug()
 Free all of the GPUs associated with this taskid.
 */
 
-void ds_gpus_free( int taskid )
+void vine_gpus_free( int taskid )
 {
 	int i;
 	for(i=0;i<total_resources->gpus.total;i++) {
@@ -64,7 +64,7 @@ accurately tracked: this function will fatal()
 if not enough are available.
 */
 
-void ds_gpus_allocate( int n, int task )
+void vine_gpus_allocate( int n, int task )
 {
 	int i;
 	for(i=0;i<total_resources->gpus.total && n>0;i++) {
@@ -74,9 +74,9 @@ void ds_gpus_allocate( int n, int task )
 		}
 	}
 
-	if(n>0) fatal("ds_gpus_allocate: accounting error: ran out of gpus to assign!");
+	if(n>0) fatal("vine_gpus_allocate: accounting error: ran out of gpus to assign!");
 
-	ds_gpus_debug();
+	vine_gpus_debug();
 }
 
 /*
@@ -85,7 +85,7 @@ For example, if GPUs 1 and 3 are allocated, return "1,3"
 This string must be freed after use.
 */
 
-char *ds_gpus_to_string( int taskid )
+char *vine_gpus_to_string( int taskid )
 {
 	int i;
 	int first = 1;

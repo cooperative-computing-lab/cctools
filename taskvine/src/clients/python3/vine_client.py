@@ -5,14 +5,14 @@
 # This is a work in progress and not ready for deployment yet.
 
 # This is a demo of accessing the manager without SWIG.
-# This class invokes the tool ds_api_proxy as a sub-process,
+# This class invokes the tool vine_api_proxy as a sub-process,
 # and communicates with the sub-process using JSON RPCs.
 
 # To be complete, this example must be extended to include the
 # full manager API, and include a non-trivial application.
 
 # The same style of communication could be used to build clients
-# in other languages using the ds_api_proxy without SWIG.
+# in other languages using the vine_api_proxy without SWIG.
 
 import os
 import json
@@ -27,7 +27,7 @@ class DataSwarmClient:
         self.proxy = None
 
     def connect(self, manager_port, project_name):
-        args = ['ds_api_proxy', '-p', "%d" % manager_port, '-N', project_name ]
+        args = ['vine_api_proxy', '-p', "%d" % manager_port, '-N', project_name ]
         self.proxy = Popen(args, stdout=PIPE, stdin=PIPE)
         readyline = self.proxy.stdout.readline()
         # read back port value from readyline

@@ -4,11 +4,11 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_PROCESS_H
-#define DS_PROCESS_H
+#ifndef VINE_PROCESS_H
+#define VINE_PROCESS_H
 
-#include "ds_manager.h"
-#include "ds_task.h"
+#include "vine_manager.h"
+#include "vine_task.h"
 
 #include "timestamp.h"
 #include "path_disk_size_info.h"
@@ -20,13 +20,13 @@ See the file COPYING for details.
 #define MAX_BUFFER_SIZE 4096
 
 /*
-ds_process is a running instance of a ds_task.
-This object is private to the ds_worker.
+vine_process is a running instance of a vine_task.
+This object is private to the vine_worker.
 */
 
-struct ds_process {
+struct vine_process {
 	pid_t pid;
-	ds_result_t result;                // Any of DS_RESULT_*
+	vine_result_t result;                // Any of VINE_RESULT_*
 	int exit_code;                 // Exit code, or signal number to task process.
 
 	struct rusage rusage;
@@ -39,7 +39,7 @@ struct ds_process {
 	char *output_file_name;
 	int output_fd;
 
-	struct ds_task *task;
+	struct vine_task *task;
 
 	/* expected disk usage by the process. If no cache is used, it is the same as in task. */
 	int64_t disk;
@@ -56,12 +56,12 @@ struct ds_process {
 	int coprocess_port;
 };
 
-struct ds_process * ds_process_create( struct ds_task *task );
-pid_t ds_process_execute( struct ds_process *p );
-void  ds_process_kill( struct ds_process *p );
-void  ds_process_delete( struct ds_process *p );
-void  ds_process_compute_disk_needed( struct ds_process *p );
+struct vine_process * vine_process_create( struct vine_task *task );
+pid_t vine_process_execute( struct vine_process *p );
+void  vine_process_kill( struct vine_process *p );
+void  vine_process_delete( struct vine_process *p );
+void  vine_process_compute_disk_needed( struct vine_process *p );
 
-int ds_process_measure_disk(struct ds_process *p, int max_time_on_measurement);
+int vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement);
 
 #endif

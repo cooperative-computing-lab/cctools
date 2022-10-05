@@ -4,7 +4,7 @@ include ../../../rules.mk
 LOCAL_LINKAGE+=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
 LOCAL_CCFLAGS+=-I ${CCTOOLS_HOME}/taskvine/src/manager
 
-PROGRAMS = ds_example_gutenberg ds_example_blast ds_example_mosaic ds_example_watch
+PROGRAMS = vine_example_gutenberg vine_example_blast vine_example_mosaic vine_example_watch
 TARGETS = $(PROGRAMS)
 
 all: $(TARGETS)

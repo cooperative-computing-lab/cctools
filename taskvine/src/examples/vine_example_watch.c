@@ -5,17 +5,17 @@ See the file COPYING for details.
 */
 
 /*
-This example program shows the behavior of the DS_WATCH flag.
+This example program shows the behavior of the VINE_WATCH flag.
 
 If a task produces output to a file incrementally as it runs,
 it can be helpful to see that output piece by piece as it
-is produced. By simply adding the DS_WATCH flag to the output
+is produced. By simply adding the VINE_WATCH flag to the output
 of the program, taskvine will periodically check for output
 and return it to the manager while each task runs.  When the
 task completes, any remaining output is fetched.
 
 This example runs several instances of the task named
-ds_example_watch_trickle.sh, which gradually produces output
+vine_example_watch_trickle.sh, which gradually produces output
 every few seconds.  While running the manager program, open
 up another terminal, and observe that files output.0, output.1,
 etc are gradually produced throughout the run.
@@ -31,50 +31,50 @@ etc are gradually produced throughout the run.
 
 int main(int argc, char *argv[])
 {
-	struct ds_manager *m;
-	struct ds_task *t;
+	struct vine_manager *m;
+	struct vine_task *t;
 
-	m = ds_create(DS_DEFAULT_PORT);
+	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("Couldn't create manager: %s\n", strerror(errno));
 		return 1;
 	}
-	printf("Listening on port %d...\n", ds_port(m));
+	printf("Listening on port %d...\n", vine_port(m));
 
-	ds_specify_debug_log(m,"manager.log");
+	vine_specify_debug_log(m,"manager.log");
 
 	int i;
 	for(i=0;i<10;i++) {
 		char output[256];
 		sprintf(output,"output.%d",i);
-		t = ds_task_create("./ds_example_watch_trickle.sh > output");
-		ds_task_specify_input_file(t, "ds_example_watch_trickle.sh", "ds_example_watch_trickle.sh", DS_CACHE );
-		ds_task_specify_output_file(t, output, "output", DS_WATCH );
-		ds_task_specify_cores(t,1);
-		ds_submit(m, t);
+		t = vine_task_create("./vine_example_watch_trickle.sh > output");
+		vine_task_specify_input_file(t, "vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", VINE_CACHE );
+		vine_task_specify_output_file(t, output, "output", VINE_WATCH );
+		vine_task_specify_cores(t,1);
+		vine_submit(m, t);
 	}
 
 	printf("Waiting for tasks to complete...\n");
 
-	while(!ds_empty(m)) {
-		t = ds_wait(m, 5);
+	while(!vine_empty(m)) {
+		t = vine_wait(m, 5);
 		if(t) {
-			ds_result_t r = ds_task_get_result(t);
-                        int id = ds_task_get_taskid(t);
+			vine_result_t r = vine_task_get_result(t);
+                        int id = vine_task_get_taskid(t);
 
-			if(r==DS_RESULT_SUCCESS) {
-				printf("Task %d complete: %s\n",id,ds_task_get_command(t));
+			if(r==VINE_RESULT_SUCCESS) {
+				printf("Task %d complete: %s\n",id,vine_task_get_command(t));
                         } else {
-                                printf("Task %d failed: %s\n",id,ds_result_string(r));
+                                printf("Task %d failed: %s\n",id,vine_result_string(r));
                         }
 
-                        ds_task_delete(t);
+                        vine_task_delete(t);
 		}
 	}
 
 	printf("All tasks complete!\n");
 
-	ds_delete(m);
+	vine_delete(m);
 
 	return 0;
 }

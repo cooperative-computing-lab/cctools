@@ -4,21 +4,21 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_MANAGER_GET_H
-#define DS_MANAGER_GET_H
+#ifndef VINE_MANAGER_GET_H
+#define VINE_MANAGER_GET_H
 
 /*
 Provides the recursive transfer of files and directories
 from the worker back to the manager at task completion.
-This is the counterpart of worker/ds_transfer.c on the worker side.
+This is the counterpart of worker/vine_transfer.c on the worker side.
 This module is private to the manager and should not be invoked by the end user.
 */
 
-#include "ds_manager.h"
+#include "vine_manager.h"
 
-ds_result_code_t ds_manager_get_output_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f );
-ds_result_code_t ds_manager_get_output_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
-ds_result_code_t ds_manager_get_monitor_output_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
+vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f );
+vine_result_code_t vine_manager_get_output_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
+vine_result_code_t vine_manager_get_monitor_output_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 
 #endif
 

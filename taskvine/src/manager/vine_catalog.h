@@ -4,12 +4,12 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_CATALOG_H
-#define DS_CATALOG_H
+#ifndef VINE_CATALOG_H
+#define VINE_CATALOG_H
 
 #include "list.h"
 
-struct list * ds_catalog_query( const char *catalog_host, int catalog_port, const char *project_regex );
-struct list * ds_catalog_query_cached( const char *catalog_host, int catalog_port, const char *project_regex );
+struct list * vine_catalog_query( const char *catalog_host, int catalog_port, const char *project_regex );
+struct list * vine_catalog_query_cached( const char *catalog_host, int catalog_port, const char *project_regex );
 
 #endif

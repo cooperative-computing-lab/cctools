@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_cache.h"
+#include "vine_cache.h"
 
 #include "xxmalloc.h"
 #include "hash_table.h"
@@ -22,22 +22,22 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-struct ds_cache {
+struct vine_cache {
 	struct hash_table *table;
 	char *cache_dir;
 };
 
 struct cache_file {
-	ds_cache_type_t type;
+	vine_cache_type_t type;
 	char *source;
 	int64_t expected_size;
 	int64_t actual_size;
 	int mode;
-	ds_file_flags_t flags;
+	vine_file_flags_t flags;
 	int present;
 };
 
-struct cache_file * cache_file_create( ds_cache_type_t type, const char *source, int64_t expected_size, int64_t actual_size, int mode, ds_file_flags_t flags, int present )
+struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t expected_size, int64_t actual_size, int mode, vine_file_flags_t flags, int present )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
@@ -60,9 +60,9 @@ void cache_file_delete( struct cache_file *f )
 Create the cache manager structure for a given cache directory.
 */
 
-struct ds_cache * ds_cache_create( const char *cache_dir )
+struct vine_cache * vine_cache_create( const char *cache_dir )
 {
-	struct ds_cache *c = malloc(sizeof(*c));
+	struct vine_cache *c = malloc(sizeof(*c));
 	c->cache_dir = strdup(cache_dir);
 	c->table = hash_table_create(0,0);
 	return c;
@@ -72,7 +72,7 @@ struct ds_cache * ds_cache_create( const char *cache_dir )
 Delete the cache manager structure, though not the underlying files.
 */
 
-void ds_cache_delete( struct ds_cache *c )
+void vine_cache_delete( struct vine_cache *c )
 {
 	hash_table_clear(c->table,(void*)cache_file_delete);
 	hash_table_delete(c->table);
@@ -85,7 +85,7 @@ Get the full path to a file name within the cache.
 This result must be freed.
 */
 
-char * ds_cache_full_path( struct ds_cache *c, const char *cachename )
+char * vine_cache_full_path( struct vine_cache *c, const char *cachename )
 {
 	return string_format("%s/%s",c->cache_dir,cachename);
 }
@@ -95,19 +95,19 @@ char * ds_cache_full_path( struct ds_cache *c, const char *cachename )
 Add a file to the cache manager (already created in the proper place) and note its size.
 */
 
-int ds_cache_addfile( struct ds_cache *c, int64_t size, const char *cachename )
+int vine_cache_addfile( struct vine_cache *c, int64_t size, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(DS_CACHE_FILE,"manager",size,size,0777,0,1);
+	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,size,0777,0,1);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
 
 /*
 Queue a remote file transfer or command execution to produce a file.
-This entry will be materialized later in ds_cache_ensure.
+This entry will be materialized later in vine_cache_ensure.
 */
 
-int ds_cache_queue( struct ds_cache *c, ds_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, ds_file_flags_t flags )
+int vine_cache_queue( struct vine_cache *c, vine_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
 {
 	struct cache_file *f = cache_file_create(type,source,size,0,mode,flags,0);
 	hash_table_insert(c->table,cachename,f);
@@ -118,12 +118,12 @@ int ds_cache_queue( struct ds_cache *c, ds_cache_type_t type, const char *source
 Remove a named item from the cache, regardless of its type.
 */
 
-int ds_cache_remove( struct ds_cache *c, const char *cachename )
+int vine_cache_remove( struct vine_cache *c, const char *cachename )
 {
 	struct cache_file *f = hash_table_remove(c->table,cachename);
 	if(!f) return 0;
 	
-	char *cache_path = ds_cache_full_path(c,cachename);
+	char *cache_path = vine_cache_full_path(c,cachename);
 	trash_file(cache_path);
 	free(cache_path);
 
@@ -140,7 +140,7 @@ On failure, return false with the string error_message filled in.
 */
 
 
-static int do_internal_command( struct ds_cache *c, const char *command, char **error_message )
+static int do_internal_command( struct vine_cache *c, const char *command, char **error_message )
 {
 	int result = 0;
 	*error_message = 0;
@@ -177,7 +177,7 @@ Transfer a single input file from a url to a local filename by using /usr/bin/cu
 --stderr Send errors to /dev/stdout so that they are observed by popen.
 */
 
-static int do_transfer( struct ds_cache *c, const char *source_url, const char *cache_path, char **error_message )
+static int do_transfer( struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message )
 {
 	char * command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"",cache_path,source_url);
 	int result = do_internal_command(c,command,error_message);
@@ -190,7 +190,7 @@ Create a file by executing a shell command.
 The command should contain %% which indicates the path of the cache file to be created.
 */
 
-static int do_command( struct ds_cache *c, const char *command, const char *cache_path, char **error_message )
+static int do_command( struct vine_cache *c, const char *command, const char *cache_path, char **error_message )
 {
 	char *full_command = string_replace_percents(command,cache_path);
 	int result = do_internal_command(c,full_command,error_message);
@@ -210,7 +210,7 @@ int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, co
 	int unix_result;
 	char *command;
 
-	if(f->flags & DS_UNPACK) {
+	if(f->flags & VINE_UNPACK) {
 		if(string_suffix_is(f->source,".tgz")) {
 			mkdir(cache_path,0700);
 			command = string_format("tar xf %s -C %s",transfer_path,cache_path);
@@ -253,7 +253,7 @@ but it is needed in order to send back the necessary update/invalid messages.
 int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
 int send_cache_invalid( struct link *manager, const char *cachename, const char *message );
 
-int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *manager )
+int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager )
 {
 	struct cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
@@ -267,7 +267,7 @@ int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *man
 	}
 	
 	char *error_message = 0;
-	char *cache_path = ds_cache_full_path(c,cachename);
+	char *cache_path = vine_cache_full_path(c,cachename);
 	char *transfer_path = string_format("%s.transfer",cache_path);
 
 	int result = 0;
@@ -275,17 +275,17 @@ int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *man
 	timestamp_t transfer_start = timestamp_get();
 	
 	switch(f->type) {
-		case DS_CACHE_FILE:
+		case VINE_CACHE_FILE:
 			debug(D_DS,"error: file %s should already be present!",cachename);
 			result = 0;
 			break;
 		  
-		case DS_CACHE_TRANSFER:
+		case VINE_CACHE_TRANSFER:
 			debug(D_DS,"cache: transferring %s to %s",f->source,cachename);
 			result = do_transfer(c,f->source,transfer_path,&error_message);
 			break;
 
-		case DS_CACHE_COMMAND:
+		case VINE_CACHE_COMMAND:
 			debug(D_DS,"cache: creating %s via shell command",cachename);
 			result = do_command(c,f->source,transfer_path,&error_message);
 			break;

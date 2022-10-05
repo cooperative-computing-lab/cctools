@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_catalog.h"
+#include "vine_catalog.h"
 #include "cctools.h"
 #include "batch_job.h"
 #include "hash_table.h"
@@ -63,7 +63,7 @@ static struct jx_table queue_headers[] = {
 {NULL,NULL,0,0,0}
 };
 
-static int ds_status_timeout = 30;
+static int vine_status_timeout = 30;
 
 static const char *catalog_host = 0;
 
@@ -227,7 +227,7 @@ struct list* do_direct_query( const char *manager_host, int manager_port )
 
 	char manager_addr[LINK_ADDRESS_MAX];
 
-	time_t stoptime = time(0) + ds_status_timeout;
+	time_t stoptime = time(0) + vine_status_timeout;
 
 	if(!domain_name_cache_lookup(manager_host,manager_addr)) {
 		fprintf(stderr,"couldn't find address of %s\n",manager_host);
@@ -242,7 +242,7 @@ struct list* do_direct_query( const char *manager_host, int manager_port )
 
 	if(manual_ssl_option) {
 		if(link_ssl_wrap_connect(l) < 1) {
-			fprintf(stderr,"ds_factory: could not setup ssl connection.\n");
+			fprintf(stderr,"vine_factory: could not setup ssl connection.\n");
 			link_close(l);
 			return 0;
 		}
@@ -251,7 +251,7 @@ struct list* do_direct_query( const char *manager_host, int manager_port )
 	if(password) {
 		debug(D_WQ,"authenticating to manager");
 		if(!link_auth_password(l,password,stoptime)) {
-			fprintf(stderr,"ds_factory: wrong password for manager.\n");
+			fprintf(stderr,"vine_factory: wrong password for manager.\n");
 			link_close(l);
 			return 0;
 		}
@@ -606,7 +606,7 @@ struct jx *manager_to_jx(struct jx *m) {
 struct jx *factory_to_jx(struct list *managers, struct list *foremen, int submitted, int needed, int requested, int connected) {
 
 	struct jx *j= jx_object(NULL);
-	jx_insert_string(j, "type", "ds_factory");
+	jx_insert_string(j, "type", "vine_factory");
 
 	if(using_catalog) {
 		jx_insert_string(j, "project_regex",    project_regex);
@@ -902,7 +902,7 @@ static void mainloop( struct batch_queue *queue )
 		submission_regex = foremen_regex ? foremen_regex : project_regex;
 
 		if(using_catalog) {
-			managers_list = ds_catalog_query(catalog_host,-1,project_regex);
+			managers_list = vine_catalog_query(catalog_host,-1,project_regex);
 		}
 		else {
 			managers_list = do_direct_query(manager_host,manager_port);
@@ -934,7 +934,7 @@ static void mainloop( struct batch_queue *queue )
 			 * or running on the foremen. */
 			workers_needed = count_workers_needed(managers_list, /* do not count running tasks */ 1);
 			debug(D_WQ,"evaluating foremen list...");
-			foremen_list    = ds_catalog_query(catalog_host,-1,foremen_regex);
+			foremen_list    = vine_catalog_query(catalog_host,-1,foremen_regex);
 
 			/* add workers on foremen. Also, subtract foremen from workers
 			 * connected, as they were not deployed by the pool. */
@@ -1076,8 +1076,8 @@ void add_wrapper_input( const char *filename )
 
 static void show_help(const char *cmd)
 {
-	printf("Use: ds_factory [options] <managerhost> <port>\n");
-	printf("Or:  ds_factory [options] -M projectname\n");
+	printf("Use: vine_factory [options] <managerhost> <port>\n");
+	printf("Or:  vine_factory [options] -M projectname\n");
 	printf("\n");
 	/*------------------------------------------------------------*/
 	printf("General options:\n");
@@ -1117,7 +1117,7 @@ static void show_help(const char *cmd)
 	printf("\nWorker environment options:\n");
 	printf(" %-30s Environment variable to add to worker.\n", "--env=<variable=value>");
 	printf(" %-30s Extra options to give to worker.\n", "-E,--extra-options=<options>");
-	printf(" %-30s Alternate binary instead of ds_worker.\n", "--worker-binary=<file>");
+	printf(" %-30s Alternate binary instead of vine_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
 	printf(" %-30s Run each worker inside this python environment.\n","--python-env=<file.tar.gz>");
@@ -1317,7 +1317,7 @@ int main(int argc, char *argv[])
 				// --package X is the equivalent of --wrapper "poncho_package_run X" --wrapper-input X
 				char *fullpath = path_which("poncho_package_run");
 				if(!fullpath) {
-					fprintf(stderr,"ds_factory: could not find poncho_package_run in PATH");
+					fprintf(stderr,"vine_factory: could not find poncho_package_run in PATH");
 					return 1;
 				}
 				add_wrapper_input(fullpath);
@@ -1337,7 +1337,7 @@ int main(int argc, char *argv[])
 			case 'P':
 				password_file = optarg;
 				if(copy_file_to_buffer(optarg, &password, NULL) < 0) {
-					fprintf(stderr,"ds_factory: couldn't load password from %s: %s\n",optarg,strerror(errno));
+					fprintf(stderr,"vine_factory: couldn't load password from %s: %s\n",optarg,strerror(errno));
 					exit(EXIT_FAILURE);
 				}
 				break;
@@ -1384,7 +1384,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-		fprintf(stderr, "ds_factory: batch system 'wq' specified, but you most likely want 'local'.\n");
+		fprintf(stderr, "vine_factory: batch system 'wq' specified, but you most likely want 'local'.\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -1392,7 +1392,7 @@ int main(int argc, char *argv[])
 		char abs_path_name[PATH_MAX];
 
 		if(!realpath(config_file, abs_path_name)) {
-			fprintf(stderr, "ds_factory: could not resolve configuration file path: '%s'.\n", config_file);
+			fprintf(stderr, "vine_factory: could not resolve configuration file path: '%s'.\n", config_file);
 			exit(EXIT_FAILURE);
 		}
 
@@ -1409,13 +1409,13 @@ int main(int argc, char *argv[])
 
 	if(config_file) {
 		if(!read_config_file(config_file)) {
-			fprintf(stderr,"ds_factory: There were errors in the configuration file: %s\n", config_file);
+			fprintf(stderr,"vine_factory: There were errors in the configuration file: %s\n", config_file);
 			return 1;
 		}
 	}
 
 	if(!(manager_host || config_file || project_regex)) {
-		fprintf(stderr,"ds_factory: You must either give a project name with the -M option or manager-name option with a configuration file, or give the manager's host and port.\n");
+		fprintf(stderr,"vine_factory: You must either give a project name with the -M option or manager-name option with a configuration file, or give the manager's host and port.\n");
 		exit(1);
 	}
 
@@ -1428,14 +1428,14 @@ int main(int argc, char *argv[])
 	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
-		fprintf(stderr,"ds_factory: You must specify a batch type with the -T option.\n");
+		fprintf(stderr,"vine_factory: You must specify a batch type with the -T option.\n");
 		fprintf(stderr, "valid options:\n");
 		fprintf(stderr, "%s\n", batch_queue_type_string());
 		return 1;
 	}
 
 	if(workers_min>workers_max) {
-		fprintf(stderr,"ds_factory: min workers (%d) is greater than max workers (%d)\n",workers_min, workers_max);
+		fprintf(stderr,"vine_factory: min workers (%d) is greater than max workers (%d)\n",workers_min, workers_max);
 		return 1;
 	}
 
@@ -1467,7 +1467,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(!create_dir(scratch_dir,0777)) {
-		fprintf(stderr,"ds_factory: couldn't create %s: %s",scratch_dir,strerror(errno));
+		fprintf(stderr,"vine_factory: couldn't create %s: %s",scratch_dir,strerror(errno));
 		return 1;
 	}
 
@@ -1477,7 +1477,7 @@ int main(int argc, char *argv[])
 		char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(item));
 		int result = copy_file_to_file(item, file_at_scratch_dir);
 		if(result < 0) {
-			fprintf(stderr,"ds_factory: Cannot copy wrapper input file %s to factory scratch directory %s:\n", item, file_at_scratch_dir);
+			fprintf(stderr,"vine_factory: Cannot copy wrapper input file %s to factory scratch directory %s:\n", item, file_at_scratch_dir);
 			fprintf(stderr,"%s\n", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
@@ -1488,7 +1488,7 @@ int main(int argc, char *argv[])
 	if(worker_command != NULL){
 		cmd = string_format("cp '%s' '%s'",worker_command,scratch_dir);
 		if(system(cmd)){
-			fprintf(stderr,"ds_factory: Could not Access specified worker binary.\n");
+			fprintf(stderr,"vine_factory: Could not Access specified worker binary.\n");
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
@@ -1496,16 +1496,16 @@ int main(int argc, char *argv[])
 		free(worker_command);
 		worker_command = tmp;
 	}else{
-		worker_command = xxstrdup("ds_worker");
+		worker_command = xxstrdup("vine_worker");
 		char *tmp = path_which(worker_command);
 		if(!tmp) {
-			fprintf(stderr, "ds_factory: please add ds_worker to your PATH, or use --worker-binary\n");
+			fprintf(stderr, "vine_factory: please add vine_worker to your PATH, or use --worker-binary\n");
 			exit(EXIT_FAILURE);
 		}
 
 		cmd = string_format("cp '%s' '%s'",tmp,scratch_dir);
 		if (system(cmd)) {
-			fprintf(stderr, "ds_factory: could not copy ds_worker to scratch directory.\n");
+			fprintf(stderr, "vine_factory: could not copy vine_worker to scratch directory.\n");
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
@@ -1518,7 +1518,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(chdir(scratch_dir)!=0) {
-		fprintf(stderr,"ds_factory: couldn't chdir to %s: %s",scratch_dir,strerror(errno));
+		fprintf(stderr,"vine_factory: couldn't chdir to %s: %s",scratch_dir,strerror(errno));
 		return 1;
 	}
 
@@ -1529,7 +1529,7 @@ int main(int argc, char *argv[])
 
 	queue = batch_queue_create(batch_queue_type);
 	if(!queue) {
-		fprintf(stderr,"ds_factory: couldn't establish queue type %s",batch_queue_type_to_string(batch_queue_type));
+		fprintf(stderr,"vine_factory: couldn't establish queue type %s",batch_queue_type_to_string(batch_queue_type));
 		return 1;
 	}
 

@@ -29,7 +29,7 @@ See the file COPYING for details.
 #include <limits.h>
 
 
-int submit_tasks(struct ds_manager *q, int input_size, int run_time, int output_size, int count, char *category )
+int submit_tasks(struct vine_manager *q, int input_size, int run_time, int output_size, int count, char *category )
 {
 	static int ntasks=0;
 	char output_file[128];
@@ -54,30 +54,30 @@ int submit_tasks(struct ds_manager *q, int input_size, int run_time, int output_
 
 		ntasks++;
 
-		struct ds_task *t = ds_task_create(command);
-		ds_task_specify_input_file(t, input_file, "infile", DS_CACHE);
-		ds_task_specify_output_file(t, output_file, "outfile", DS_NOCACHE);
-		ds_task_specify_cores(t,1);
+		struct vine_task *t = vine_task_create(command);
+		vine_task_specify_input_file(t, input_file, "infile", VINE_CACHE);
+		vine_task_specify_output_file(t, output_file, "outfile", VINE_NOCACHE);
+		vine_task_specify_cores(t,1);
 
 		if(category && strlen(category) > 0)
-			ds_task_specify_category(t, category);
+			vine_task_specify_category(t, category);
 
-		ds_submit(q, t);
+		vine_submit(q, t);
 	}
 
 	return 1;
 }
 
-void wait_for_all_tasks( struct ds_manager *q )
+void wait_for_all_tasks( struct vine_manager *q )
 {
-	struct ds_task *t;
-	while(!ds_empty(q)) {
-		t = ds_wait(q,5);
-		if(t) ds_task_delete(t);
+	struct vine_task *t;
+	while(!vine_empty(q)) {
+		t = vine_wait(q,5);
+		if(t) vine_task_delete(t);
 	}
 }
 
-void mainloop( struct ds_manager *q )
+void mainloop( struct vine_manager *q )
 {
 	char line[1024];
 	char category[1024];
@@ -85,7 +85,7 @@ void mainloop( struct ds_manager *q )
 	int sleep_time, run_time, input_size, output_size, count;
 
 	while(1) {
-		printf("ds_test > ");
+		printf("vine_test > ");
 		fflush(stdout);
 
 		if(!fgets(line,sizeof(line),stdin)) break;
@@ -140,7 +140,7 @@ void show_help( const char *cmd )
 
 int main(int argc, char *argv[])
 {
-	int port = DS_DEFAULT_PORT;
+	int port = VINE_DEFAULT_PORT;
 	const char *port_file=0;
 	const char *project_name=0;
 	int monitor_flag = 0;
@@ -180,33 +180,33 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	struct ds_manager *q = ds_create(port);
+	struct vine_manager *q = vine_create(port);
 	if(!q) fatal("couldn't listen on any port!");
 
-	printf("listening on port %d...\n", ds_port(q));
+	printf("listening on port %d...\n", vine_port(q));
 
 	if(port_file) {
 		FILE *file = fopen(port_file,"w");
 		if(!file) fatal("couldn't open %s: %s",port_file,strerror(errno));
-		fprintf(file,"%d\n",ds_port(q));
+		fprintf(file,"%d\n",vine_port(q));
 		fclose(file);
 	}
 
 	if(project_name) {
-		ds_specify_name(q,project_name);
+		vine_specify_name(q,project_name);
 	}
 
 	if(monitor_flag) {
-		unlink_recursive("ds_benchmark_monitor");
-		ds_enable_monitoring(q, "ds_benchmark_monitorr", 1);
-		ds_specify_category_mode(q, NULL, DS_ALLOCATION_MODE_MAX_THROUGHPUT);
-		ds_specify_transactions_log(q, "ds_benchmark_monitor/transactions.log");
+		unlink_recursive("vine_benchmark_monitor");
+		vine_enable_monitoring(q, "vine_benchmark_monitorr", 1);
+		vine_specify_category_mode(q, NULL, VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
+		vine_specify_transactions_log(q, "vine_benchmark_monitor/transactions.log");
 	}
 
 
 	mainloop(q);
 
-	ds_delete(q);
+	vine_delete(q);
 
 	return 0;
 }

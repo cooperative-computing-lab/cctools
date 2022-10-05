@@ -5,13 +5,13 @@ See the file COPYING for details.
 */
 
 
-#include "ds_process.h"
-#include "ds_manager.h"
-#include "ds_gpus.h"
-#include "ds_protocol.h"
-#include "ds_coprocess.h"
+#include "vine_process.h"
+#include "vine_manager.h"
+#include "vine_gpus.h"
+#include "vine_protocol.h"
+#include "vine_coprocess.h"
 
-#include "ds_file.h"
+#include "vine_file.h"
 
 #include "debug.h"
 #include "errno.h"
@@ -49,7 +49,7 @@ Create temporary directories inside as well.
 
 extern char * workspace;
 
-static int create_sandbox_dir( struct ds_process *p )
+static int create_sandbox_dir( struct vine_process *p )
 {
 	p->cache_dir = string_format("%s/cache",workspace);
   	p->sandbox = string_format("%s/t.%d", workspace,p->task->taskid);
@@ -71,27 +71,27 @@ static int create_sandbox_dir( struct ds_process *p )
 }
 
 /*
-Create a ds_process and all of the information necessary for invocation.
+Create a vine_process and all of the information necessary for invocation.
 However, do not allocate substantial resources at this point.
 */
 
-struct ds_process *ds_process_create(struct ds_task *ds_task )
+struct vine_process *vine_process_create(struct vine_task *vine_task )
 {
-	struct ds_process *p = malloc(sizeof(*p));
+	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
-	p->task = ds_task;
+	p->task = vine_task;
 	if(!create_sandbox_dir(p)) {
-		ds_process_delete(p);
+		vine_process_delete(p);
 		return 0;
 	}
 	return p;
 }
 
 
-void ds_process_delete(struct ds_process *p)
+void vine_process_delete(struct vine_process *p)
 {
 	if(p->task)
-		ds_task_delete(p->task);
+		vine_task_delete(p->task);
 
 	if(p->output_fd) {
 		close(p->output_fd);
@@ -126,7 +126,7 @@ static void clear_environment() {
 
 }
 
-static void export_environment( struct ds_process *p )
+static void export_environment( struct vine_process *p )
 {
 	struct list *env_list = p->task->env_list;
 	char *name;
@@ -153,13 +153,13 @@ static void export_environment( struct ds_process *p )
 	}
 }
 
-static void specify_integer_env_var( struct ds_process *p, const char *name, int64_t value) {
+static void specify_integer_env_var( struct vine_process *p, const char *name, int64_t value) {
 	char *value_str = string_format("%" PRId64, value);
-	ds_task_specify_env(p->task, name, value_str);
+	vine_task_specify_env(p->task, name, value_str);
 	free(value_str);
 }
 
-static void specify_resources_vars(struct ds_process *p) {
+static void specify_resources_vars(struct vine_process *p) {
 	if(p->task->resources_requested->cores > 0) {
 		specify_integer_env_var(p, "CORES", p->task->resources_requested->cores);
 		specify_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
@@ -175,15 +175,15 @@ static void specify_resources_vars(struct ds_process *p) {
 
 	if(p->task->resources_requested->gpus > 0) {
 		specify_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
-		char *str = ds_gpus_to_string(p->task->taskid);
-		ds_task_specify_env(p->task,"CUDA_VISIBLE_DEVICES",str);
+		char *str = vine_gpus_to_string(p->task->taskid);
+		vine_task_specify_env(p->task,"CUDA_VISIBLE_DEVICES",str);
 		free(str);
 	}
 }
 
 static const char task_output_template[] = "./worker.stdout.XXXXXX";
 
-static char * load_input_file(struct ds_task *t) {
+static char * load_input_file(struct vine_task *t) {
 	FILE *fp = fopen("infile", "r");
 	if(!fp) {
 		fatal("coprocess could not open file 'infile' for reading: %s", strerror(errno));
@@ -203,7 +203,7 @@ static char * load_input_file(struct ds_task *t) {
 	return buf;
 }
 
-pid_t ds_process_execute(struct ds_process *p )
+pid_t vine_process_execute(struct vine_process *p )
 {
 	// make warning
 
@@ -263,7 +263,7 @@ pid_t ds_process_execute(struct ds_process *p )
 			char *input = load_input_file(p->task);
 
 			// call invoke_coprocess_function
-		 	char *output = ds_coprocess_run(p->task->command_line, input, p->coprocess_port);
+		 	char *output = vine_coprocess_run(p->task->command_line, input, p->coprocess_port);
 
 			// write data to output file
 			full_write(p->output_fd, output, strlen(output));
@@ -287,7 +287,7 @@ pid_t ds_process_execute(struct ds_process *p )
 	return 0;
 }
 
-void ds_process_kill(struct ds_process *p)
+void vine_process_kill(struct vine_process *p)
 {
 	//make sure a few seconds have passed since child process was created to avoid sending a signal
 	//before it has been fully initialized. Else, the signal sent to that process gets lost.
@@ -312,9 +312,9 @@ void ds_process_kill(struct ds_process *p)
  * files). In this way, we can only measure the size of the sandbox when
  * enforcing limits on the process, as a task should never write directly to
  * the cache. */
-void  ds_process_compute_disk_needed( struct ds_process *p ) {
-	struct ds_task *t = p->task;
-	struct ds_file *f;
+void  vine_process_compute_disk_needed( struct vine_process *p ) {
+	struct vine_task *t = p->task;
+	struct vine_file *f;
 	struct stat s;
 
 	p->disk = t->resources_requested->disk;
@@ -326,7 +326,7 @@ void  ds_process_compute_disk_needed( struct ds_process *p ) {
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
-			if(f->type != DS_FILE && f->type != DS_FILE_PIECE)
+			if(f->type != VINE_FILE && f->type != VINE_FILE_PIECE)
 					continue;
 
 			if(stat(f->cached_name, &s) < 0)
@@ -343,7 +343,7 @@ void  ds_process_compute_disk_needed( struct ds_process *p ) {
 
 }
 
-int ds_process_measure_disk(struct ds_process *p, int max_time_on_measurement) {
+int vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement) {
 	/* we can't have pointers to struct members, thus we create temp variables here */
 
 	struct path_disk_size_info *state = p->disk_measurement_state;

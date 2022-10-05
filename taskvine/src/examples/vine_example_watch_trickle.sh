@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# This sub-program is used by the main program ds_example_watch.
+# This sub-program is used by the main program vine_example_watch.
 
 # This is a simple example of a program that gradually
 # produces output over time.  It just logs the current

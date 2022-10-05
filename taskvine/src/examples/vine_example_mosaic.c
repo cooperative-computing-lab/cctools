@@ -30,8 +30,8 @@ use of arbitrary workers without regard to their software environment.
 
 int main(int argc, char *argv[])
 {
-	struct ds_manager *m;
-	struct ds_task *t;
+	struct vine_manager *m;
+	struct vine_task *t;
 
 	printf("Checking that /usr/bin/convert is installed...\n");
 	int r = access("/usr/bin/convert",X_OK);
@@ -47,14 +47,14 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	
-	m = ds_create(DS_DEFAULT_PORT);
+	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("Couldn't create manager: %s\n", strerror(errno));
 		return 1;
 	}
-	printf("Listening on port %d...\n", ds_port(m));
+	printf("Listening on port %d...\n", vine_port(m));
 
-	ds_specify_debug_log(m,"manager.log");
+	vine_specify_debug_log(m,"manager.log");
 
 	int i;
 	for(i = 0; i < 360; i+=10) {
@@ -64,39 +64,39 @@ int main(int argc, char *argv[])
 		sprintf(outfile, "%d.cat.jpg",i);
 		sprintf(command, "./convert.sfx -swirl %d cat.jpg %d.cat.jpg", i, i);
 
-		t = ds_task_create(command);
-		ds_task_specify_input_file(t, "convert.sfx", "convert.sfx", DS_CACHE);
-		ds_task_specify_input_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", DS_CACHE );
-		ds_task_specify_output_file(t,outfile,outfile,DS_NOCACHE);
+		t = vine_task_create(command);
+		vine_task_specify_input_file(t, "convert.sfx", "convert.sfx", VINE_CACHE);
+		vine_task_specify_input_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", VINE_CACHE );
+		vine_task_specify_output_file(t,outfile,outfile,VINE_NOCACHE);
 
-		ds_task_specify_cores(t,1);
+		vine_task_specify_cores(t,1);
 
-		int taskid = ds_submit(m, t);
+		int taskid = vine_submit(m, t);
 
-		printf("Submitted task (id# %d): %s\n", taskid, ds_task_get_command(t) );
+		printf("Submitted task (id# %d): %s\n", taskid, vine_task_get_command(t) );
 	}
 
 	printf("Waiting for tasks to complete...\n");
 
-	while(!ds_empty(m)) {
-		t = ds_wait(m, 5);
+	while(!vine_empty(m)) {
+		t = vine_wait(m, 5);
 		if(t) {
-			ds_result_t result = ds_task_get_result(t);
-                        int id = ds_task_get_taskid(t);
+			vine_result_t result = vine_task_get_result(t);
+                        int id = vine_task_get_taskid(t);
 
-			if(result==DS_RESULT_SUCCESS) {
-				printf("Task %d complete: %s\n",id,ds_task_get_command(t));
+			if(result==VINE_RESULT_SUCCESS) {
+				printf("Task %d complete: %s\n",id,vine_task_get_command(t));
                         } else {
-                                printf("Task %d failed: %s\n",id,ds_result_string(r));
+                                printf("Task %d failed: %s\n",id,vine_result_string(r));
                         }
 
-                        ds_task_delete(t);
+                        vine_task_delete(t);
 		}
 	}
 
 	printf("All tasks complete!\n");
 
-	ds_delete(m);
+	vine_delete(m);
 
 	printf("Combining images into mosaic.jpg...\n");
 	system("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg");

@@ -5,22 +5,22 @@ LOCAL_LINKAGE+=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a ${CCTOOLS_HOME
 LOCAL_CCFLAGS=-I ${CCTOOLS_HOME}/taskvine/src/manager
 
 SOURCES = \
-	ds_sandbox.c \
-	ds_cache.c \
-	ds_transfer.c \
-	ds_transfer_server.c \
-	ds_process.c \
-	ds_coprocess.c \
-	ds_watcher.c \
-	ds_gpus.c
+	vine_sandbox.c \
+	vine_cache.c \
+	vine_transfer.c \
+	vine_transfer_server.c \
+	vine_process.c \
+	vine_coprocess.c \
+	vine_watcher.c \
+	vine_gpus.c
 
 OBJECTS = $(SOURCES:%.c=%.o)
-PROGRAMS = ds_worker
+PROGRAMS = vine_worker
 TARGETS = $(PROGRAMS)
 
 all: $(TARGETS)
 
-ds_worker: $(OBJECTS) $(EXTERNALS)
+vine_worker: $(OBJECTS) $(EXTERNALS)
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin

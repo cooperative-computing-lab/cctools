@@ -5,12 +5,12 @@ See the file COPYING for details.
 */
 
 
-#ifndef DS_BLOCKLIST_H
-#define DS_BLOCKLIST_H
+#ifndef VINE_BLOCKLIST_H
+#define VINE_BLOCKLIST_H
 
-#include "ds_manager.h"
+#include "vine_manager.h"
 
-struct ds_blocklist_info {
+struct vine_blocklist_info {
 	int    blocked;
 	int    times_blocked;
 	time_t release_at;
@@ -18,15 +18,15 @@ struct ds_blocklist_info {
 
 /* Operations on individual blocklist entries. */
 
-struct ds_blocklist_info * ds_blocklist_info_create();
-void ds_blocklist_info_delete( struct ds_blocklist_info *b );
+struct vine_blocklist_info * vine_blocklist_info_create();
+void vine_blocklist_info_delete( struct vine_blocklist_info *b );
 
 /* Operations on the blocklist as a whole. */
 
-void       ds_blocklist_block( struct ds_manager *q, const char *hostname, time_t timeout );
-void       ds_blocklist_unblock_all_by_time(struct ds_manager *q, time_t deadline);
-void       ds_blocklist_unblock( struct ds_manager *q, const char *host );
-int        ds_blocklist_is_blocked( struct ds_manager *q, const char *host );
-struct jx *ds_blocklist_to_jx( struct ds_manager *q );
+void       vine_blocklist_block( struct vine_manager *q, const char *hostname, time_t timeout );
+void       vine_blocklist_unblock_all_by_time(struct vine_manager *q, time_t deadline);
+void       vine_blocklist_unblock( struct vine_manager *q, const char *host );
+int        vine_blocklist_is_blocked( struct vine_manager *q, const char *host );
+struct jx *vine_blocklist_to_jx( struct vine_manager *q );
 
 #endif

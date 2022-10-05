@@ -5,8 +5,8 @@ See the file COPYING for details.
 */
 
 /* return the name of the coprocess */
-char *ds_coprocess_start(char *coprocess_command, int *coprocess_port);
-void ds_coprocess_terminate();
-int ds_coprocess_check();
-char *ds_coprocess_run(const char *function_name, const char *function_input, int coprocess_port);
+char *vine_coprocess_start(char *coprocess_command, int *coprocess_port);
+void vine_coprocess_terminate();
+int vine_coprocess_check();
+char *vine_coprocess_run(const char *function_name, const char *function_input, int coprocess_port);
 

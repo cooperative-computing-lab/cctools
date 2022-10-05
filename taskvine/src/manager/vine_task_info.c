@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_manager.h"
-#include "ds_task_info.h"
+#include "vine_manager.h"
+#include "vine_task_info.h"
 
 #include "macros.h"
 
@@ -13,14 +13,14 @@ See the file COPYING for details.
 
 // The default tasks capacity reported before information is available.
 // Default capacity also implies 1 core, 1024 MB of disk and 512 memory per task.
-#define DS_DEFAULT_CAPACITY_TASKS 10
+#define VINE_DEFAULT_CAPACITY_TASKS 10
 
 // The minimum number of task reports to keep
-#define DS_TASK_INFO_MIN_SIZE 50
+#define VINE_TASK_INFO_MIN_SIZE 50
 
-struct ds_task_info * ds_task_info_create( struct ds_task *t )
+struct vine_task_info * vine_task_info_create( struct vine_task *t )
 {
-	struct ds_task_info *ti = calloc(1, sizeof(*ti));
+	struct vine_task_info *ti = calloc(1, sizeof(*ti));
 
 	ti->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
 	ti->exec_time     = t->time_workers_execute_last;
@@ -30,32 +30,32 @@ struct ds_task_info * ds_task_info_create( struct ds_task *t )
 	return ti;
 }
 
-void ds_task_info_delete(struct ds_task_info *ti)
+void vine_task_info_delete(struct vine_task_info *ti)
 {
 	rmsummary_delete(ti->resources);
 	free(ti);
 }
 
-void ds_task_info_add(struct ds_manager *q, struct ds_task *t)
+void vine_task_info_add(struct vine_manager *q, struct vine_task *t)
 {
 	if(!t->resources_allocated) {
 		return;
 	}
 
-	struct ds_stats s;
-	ds_get_stats(q, &s);
+	struct vine_stats s;
+	vine_get_stats(q, &s);
 
-	struct ds_task_info *ti = ds_task_info_create(t);
+	struct vine_task_info *ti = vine_task_info_create(t);
 
 	list_push_tail(q->task_info_list, ti);
 
 	// Trim the list, but never below its previous size.
-	static int count = DS_TASK_INFO_MIN_SIZE;
+	static int count = VINE_TASK_INFO_MIN_SIZE;
 	count = MAX(count, 2*q->stats->tasks_on_workers);
 
 	while(list_size(q->task_info_list) >= count) {
 		ti = list_pop_head(q->task_info_list);
-		ds_task_info_delete(ti);
+		vine_task_info_delete(ti);
 	}
 }
 
@@ -64,12 +64,12 @@ Compute queue capacity based on stored task reports
 and the summary of manager activity.
 */
 
-void ds_task_info_compute_capacity(const struct ds_manager *q, struct ds_stats *s)
+void vine_task_info_compute_capacity(const struct vine_manager *q, struct vine_stats *s)
 {
-	struct ds_task_info *capacity = calloc(1, sizeof(*capacity));
+	struct vine_task_info *capacity = calloc(1, sizeof(*capacity));
 	capacity->resources = rmsummary_create(0);
 
-	struct ds_task_info *ti;
+	struct vine_task_info *ti;
 	double alpha = 0.05;
 	int count = list_size(q->task_info_list);
 	int capacity_instantaneous = 0;
@@ -81,11 +81,11 @@ void ds_task_info_compute_capacity(const struct ds_manager *q, struct ds_stats *
 		capacity->resources->disk   = 1024;
 		capacity->resources->gpus   = 0;
 
-		capacity->exec_time     = DS_DEFAULT_CAPACITY_TASKS;
+		capacity->exec_time     = VINE_DEFAULT_CAPACITY_TASKS;
 		capacity->transfer_time = 1;
 
-		q->stats->capacity_weighted = DS_DEFAULT_CAPACITY_TASKS;
-		capacity_instantaneous = DS_DEFAULT_CAPACITY_TASKS;
+		q->stats->capacity_weighted = VINE_DEFAULT_CAPACITY_TASKS;
+		capacity_instantaneous = VINE_DEFAULT_CAPACITY_TASKS;
 
 		count = 1;
 	} else {
@@ -118,7 +118,7 @@ void ds_task_info_compute_capacity(const struct ds_manager *q, struct ds_stats *
 	capacity->manager_time   = MAX(1, capacity->manager_time);
 
 	// Never go below the default capacity
-	int64_t ratio = MAX(DS_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->manager_time)));
+	int64_t ratio = MAX(VINE_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->manager_time)));
 
 	q->stats->capacity_tasks  = ratio;
 	q->stats->capacity_cores  = DIV_INT_ROUND_UP(capacity->resources->cores  * ratio, count);
@@ -127,6 +127,6 @@ void ds_task_info_compute_capacity(const struct ds_manager *q, struct ds_stats *
 	q->stats->capacity_gpus   = DIV_INT_ROUND_UP(capacity->resources->gpus   * ratio, count);
 	q->stats->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
 
-	ds_task_info_delete(capacity);
+	vine_task_info_delete(capacity);
 }
 

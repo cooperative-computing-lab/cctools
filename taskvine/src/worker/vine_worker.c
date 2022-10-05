@@ -4,18 +4,18 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_manager.h"
-#include "ds_protocol.h"
-#include "ds_resources.h"
-#include "ds_process.h"
-#include "ds_catalog.h"
-#include "ds_watcher.h"
-#include "ds_gpus.h"
-#include "ds_file.h"
-#include "ds_coprocess.h"
-#include "ds_sandbox.h"
-#include "ds_transfer.h"
-#include "ds_transfer_server.h"
+#include "vine_manager.h"
+#include "vine_protocol.h"
+#include "vine_resources.h"
+#include "vine_process.h"
+#include "vine_catalog.h"
+#include "vine_watcher.h"
+#include "vine_gpus.h"
+#include "vine_file.h"
+#include "vine_coprocess.h"
+#include "vine_sandbox.h"
+#include "vine_transfer.h"
+#include "vine_transfer_server.h"
 
 #include "cctools.h"
 #include "macros.h"
@@ -150,11 +150,11 @@ static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
 static timestamp_t worker_start_time = 0;
 
-static struct ds_watcher * watcher = 0;
+static struct vine_watcher * watcher = 0;
 
-static struct ds_resources * local_resources = 0;
-struct ds_resources * total_resources = 0;
-struct ds_resources * total_resources_last = 0;
+static struct vine_resources * local_resources = 0;
+struct vine_resources * total_resources = 0;
+struct vine_resources * total_resources_last = 0;
 
 static int64_t last_task_received  = 0;
 
@@ -212,14 +212,14 @@ static int coprocess_port = -1;
 
 static char *factory_name = NULL;
 
-struct ds_cache *global_cache = 0;
+struct vine_cache *global_cache = 0;
 
-extern int ds_hack_do_not_compute_cached_name;
+extern int vine_hack_do_not_compute_cached_name;
 
 __attribute__ (( format(printf,2,3) ))
 void send_message( struct link *l, const char *fmt, ... )
 {
-	char debug_msg[2*DS_LINE_MAX];
+	char debug_msg[2*VINE_LINE_MAX];
 	va_list va;
 	va_list debug_va;
 
@@ -261,7 +261,7 @@ static int64_t measure_worker_disk()
 
 	if(!global_cache) return 0;
 
-	char *cache_dir = ds_cache_full_path(global_cache,".");
+	char *cache_dir = vine_cache_full_path(global_cache,".");
 	path_disk_size_info_get_r(cache_dir, max_time_on_measurement, &state);
 	free(cache_dir);
 
@@ -276,7 +276,7 @@ static int64_t measure_worker_disk()
 		/* if a complete measurement has been done, then update
 		 * for the found value, and add the known values of the processes. */
 
-		struct ds_process *p;
+		struct vine_process *p;
 		uint64_t taskid;
 
 		itable_firstkey(procs_table);
@@ -303,9 +303,9 @@ static void measure_worker_resources()
 		return;
 	}
 
-	struct ds_resources *r = local_resources;
+	struct vine_resources *r = local_resources;
 
-	ds_resources_measure_locally(r,workspace);
+	vine_resources_measure_locally(r,workspace);
 
 	if(manual_cores_option > 0)
 		r->cores.total = manual_cores_option;
@@ -326,9 +326,9 @@ static void measure_worker_resources()
 	r->disk.inuse = measure_worker_disk();
 	r->tag = last_task_received;
 
-	memcpy(total_resources, r, sizeof(struct ds_resources));
+	memcpy(total_resources, r, sizeof(struct vine_resources));
 
-	ds_gpus_init(r->gpus.total);
+	vine_gpus_init(r->gpus.total);
 
 	last_resources_measurement = time(0);
 }
@@ -343,9 +343,9 @@ static void send_features(struct link *manager)
 	void *dummy;
 	hash_table_firstkey(features);
 
-	char fenc[DS_LINE_MAX];
+	char fenc[VINE_LINE_MAX];
 	while(hash_table_nextkey(features, &f, &dummy)) {
-		url_encode(f, fenc, DS_LINE_MAX);
+		url_encode(f, fenc, VINE_LINE_MAX);
 		send_message(manager, "feature %s\n", fenc);
 	}
 }
@@ -372,7 +372,7 @@ static void send_resource_update(struct link *manager)
 		end_time = worker_start_time + (manual_wall_time_option * 1e6);
 	}
 
-	ds_resources_send(manager,total_resources,stoptime);
+	vine_resources_send(manager,total_resources,stoptime);
 	send_message(manager, "info end_of_resource_update %d\n", 0);
 }
 
@@ -422,7 +422,7 @@ void send_transfer_address( struct link *manager )
 {
 	char addr[LINK_ADDRESS_MAX];
 	int port;
-	ds_transfer_server_address(addr,&port);
+	vine_transfer_server_address(addr,&port);
 	send_message(manager, "transfer-address %s %d\n",addr,port);
 }
 
@@ -435,7 +435,7 @@ static void report_worker_ready( struct link *manager )
 {
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
-	send_message(manager,"taskvine %d %s %s %s %d.%d.%d\n",DS_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
+	send_message(manager,"taskvine %d %s %s %s %d.%d.%d\n",VINE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_message(manager, "info worker-id %s\n", worker_id);
 	send_features(manager);
 	send_keepalive(manager, 1);
@@ -451,15 +451,15 @@ accounting for the resources as necessary.
 Should maintain parallel structure to reap_process() above.
 */
 
-static int start_process( struct ds_process *p, struct link *manager )
+static int start_process( struct vine_process *p, struct link *manager )
 {
 	pid_t pid;
 
-	struct ds_task *t = p->task;
+	struct vine_task *t = p->task;
 
-	if(!ds_sandbox_stagein(p,global_cache,manager)) {
+	if(!vine_sandbox_stagein(p,global_cache,manager)) {
 		p->execution_start = p->execution_end = timestamp_get();
-		p->result = DS_RESULT_INPUT_MISSING;
+		p->result = VINE_RESULT_INPUT_MISSING;
 		p->exit_code = 1;
 		itable_insert(procs_complete,p->task->taskid,p);
 		return 0;
@@ -471,10 +471,10 @@ static int start_process( struct ds_process *p, struct link *manager )
 	gpus_allocated += t->resources_requested->gpus;
 
 	if(t->resources_requested->gpus>0) {
-		ds_gpus_allocate(t->resources_requested->gpus,t->taskid);
+		vine_gpus_allocate(t->resources_requested->gpus,t->taskid);
 	}
 
-	pid = ds_process_execute(p);
+	pid = vine_process_execute(p);
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
 	itable_insert(procs_running,p->pid,p);
@@ -488,7 +488,7 @@ account for the resources as necessary.
 Should maintain parallel structure to start_process() above.
 */
 
-static void reap_process( struct ds_process *p )
+static void reap_process( struct vine_process *p )
 {
 	p->execution_end = timestamp_get();
 
@@ -497,10 +497,10 @@ static void reap_process( struct ds_process *p )
 	disk_allocated   -= p->task->resources_requested->disk;
 	gpus_allocated   -= p->task->resources_requested->gpus;
 
-	ds_gpus_free(p->task->taskid);
+	vine_gpus_free(p->task->taskid);
 
-	if(!ds_sandbox_stageout(p,global_cache)) {
-		p->result = DS_RESULT_OUTPUT_MISSING;
+	if(!vine_sandbox_stageout(p,global_cache)) {
+		p->result = VINE_RESULT_OUTPUT_MISSING;
 		p->exit_code = 1;
 	}
 
@@ -513,7 +513,7 @@ Transmit the results of the given process to the manager.
 If a local worker, stream the output from disk.
 */
 
-static void report_task_complete( struct link *manager, struct ds_process *p )
+static void report_task_complete( struct link *manager, struct vine_process *p )
 {
 	int64_t output_length;
 	struct stat st;
@@ -537,13 +537,13 @@ send the results to the manager.
 
 static void report_tasks_complete( struct link *manager )
 {
-	struct ds_process *p;
+	struct vine_process *p;
 
 	while((p=itable_pop(procs_complete))) {
 		report_task_complete(manager,p);
 	}
 
-	ds_watcher_send_changes(watcher,manager,time(0)+active_timeout);
+	vine_watcher_send_changes(watcher,manager,time(0)+active_timeout);
 
 	send_message(manager, "end\n");
 
@@ -557,7 +557,7 @@ and send a kill signal.  The actual exit of the process will be detected at a la
 
 static void expire_procs_running()
 {
-	struct ds_process *p;
+	struct vine_process *p;
 	uint64_t pid;
 
 	double current_time = timestamp_get() / USECOND;
@@ -566,7 +566,7 @@ static void expire_procs_running()
 	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
-			p->result = DS_RESULT_TASK_TIMEOUT;
+			p->result = VINE_RESULT_TASK_TIMEOUT;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -580,7 +580,7 @@ for later processing.
 
 static int handle_completed_tasks(struct link *manager)
 {
-	struct ds_process *p;
+	struct vine_process *p;
 	pid_t pid;
 	int status;
 
@@ -617,9 +617,9 @@ then assume that the task occupies all worker resources.
 Otherwise, just make sure all values are non-zero.
 */
 
-static void normalize_resources( struct ds_process *p )
+static void normalize_resources( struct vine_process *p )
 {
-	struct ds_task *t = p->task;
+	struct vine_task *t = p->task;
 
 	if(t->resources_requested->cores < 0 && t->resources_requested->memory < 0 && t->resources_requested->disk < 0 && t->resources_requested->gpus < 0) {
 		t->resources_requested->cores = local_resources->cores.total;
@@ -636,67 +636,67 @@ static void normalize_resources( struct ds_process *p )
 
 /*
 Handle an incoming task message from the manager.
-Generate a ds_process wrapped around a ds_task,
+Generate a vine_process wrapped around a vine_task,
 and deposit it into the waiting list.
 */
 
 static int do_task( struct link *manager, int taskid, time_t stoptime )
 {
-	char line[DS_LINE_MAX];
-	char filename[DS_LINE_MAX];
-	char localname[DS_LINE_MAX];
-	char taskname[DS_LINE_MAX];
-	char taskname_encoded[DS_LINE_MAX];
-	char category[DS_LINE_MAX];
+	char line[VINE_LINE_MAX];
+	char filename[VINE_LINE_MAX];
+	char localname[VINE_LINE_MAX];
+	char taskname[VINE_LINE_MAX];
+	char taskname_encoded[VINE_LINE_MAX];
+	char category[VINE_LINE_MAX];
 	int flags, length;
 	int64_t n;
 
 	timestamp_t nt;
 
-	struct ds_task *task = ds_task_create(0);
+	struct vine_task *task = vine_task_create(0);
 	task->taskid = taskid;
 
 	while(recv_message(manager,line,sizeof(line),stoptime)) {
 		if(!strcmp(line,"end")) {
 			break;
 		} else if(sscanf(line, "category %s",category)) {
-			ds_task_specify_category(task, category);
+			vine_task_specify_category(task, category);
 		} else if(sscanf(line,"cmd %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
-			ds_task_specify_command(task,cmd);
+			vine_task_specify_command(task,cmd);
 			debug(D_DS,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"coprocess %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
-			ds_task_specify_coprocess(task,cmd);
+			vine_task_specify_coprocess(task,cmd);
 			debug(D_DS,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
-			url_decode(taskname_encoded, taskname, DS_LINE_MAX);
-			ds_hack_do_not_compute_cached_name = 1;
-			ds_task_specify_input_file(task, localname, taskname, flags );
+			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
+			vine_hack_do_not_compute_cached_name = 1;
+			vine_task_specify_input_file(task, localname, taskname, flags );
 		} else if(sscanf(line,"outfile %s %s %d", localname, taskname_encoded, &flags)) {
-			url_decode(taskname_encoded, taskname, DS_LINE_MAX);
-			ds_hack_do_not_compute_cached_name = 1;
-			ds_task_specify_output_file(task, localname, taskname, flags );
+			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
+			vine_hack_do_not_compute_cached_name = 1;
+			vine_task_specify_output_file(task, localname, taskname, flags );
 		} else if(sscanf(line, "dir %s", filename)) {
-			ds_task_specify_empty_dir(task, filename );
+			vine_task_specify_empty_dir(task, filename );
 		} else if(sscanf(line,"cores %" PRId64,&n)) {
-			ds_task_specify_cores(task, n);
+			vine_task_specify_cores(task, n);
 		} else if(sscanf(line,"memory %" PRId64,&n)) {
-			ds_task_specify_memory(task, n);
+			vine_task_specify_memory(task, n);
 		} else if(sscanf(line,"disk %" PRId64,&n)) {
-			ds_task_specify_disk(task, n);
+			vine_task_specify_disk(task, n);
 		} else if(sscanf(line,"gpus %" PRId64,&n)) {
-			ds_task_specify_gpus(task, n);
+			vine_task_specify_gpus(task, n);
 		} else if(sscanf(line,"wall_time %" PRIu64,&nt)) {
-			ds_task_specify_running_time_max(task, nt);
+			vine_task_specify_running_time_max(task, nt);
 		} else if(sscanf(line,"end_time %" PRIu64,&nt)) {
-			ds_task_specify_end_time(task, nt * USECOND); //end_time needs it usecs
+			vine_task_specify_end_time(task, nt * USECOND); //end_time needs it usecs
 		} else if(sscanf(line,"env %d",&length)==1) {
 			char *env = malloc(length+2); /* +2 for \n and \0 */
 			link_read(manager, env, length+1, stoptime);
@@ -705,7 +705,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			if(value) {
 				*value = 0;
 				value++;
-				ds_task_specify_env(task,env,value);
+				vine_task_specify_env(task,env,value);
 			}
 			free(env);
 		} else {
@@ -716,7 +716,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 
 	last_task_received = task->taskid;
 
-	struct ds_process *p = ds_process_create(task);
+	struct vine_process *p = vine_process_create(task);
 	if(!p) return 0;
 
 	// Every received task goes into procs_table.
@@ -725,7 +725,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 	normalize_resources(p);
 	list_push_tail(procs_waiting,p);
 
-	ds_watcher_add_process(watcher,p);
+	vine_watcher_add_process(watcher,p);
 
 	return 1;
 }
@@ -734,18 +734,18 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 Accept a url specification and queue it for later transfer.
 */
 
-static int do_put_url( const char *cache_name, int64_t size, int mode, const char *source, ds_file_flags_t flags )
+static int do_put_url( const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
 {
-	return ds_cache_queue(global_cache,DS_CACHE_TRANSFER,source,cache_name,size,mode,flags);
+	return vine_cache_queue(global_cache,VINE_CACHE_TRANSFER,source,cache_name,size,mode,flags);
 }
 
 /*
 Accept a url specification and queue it for later transfer.
 */
 
-static int do_put_cmd( const char *cache_name, int64_t size, int mode, const char *source, ds_file_flags_t flags )
+static int do_put_cmd( const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
 {
-	return ds_cache_queue(global_cache,DS_CACHE_COMMAND,source,cache_name,size,mode,flags);
+	return vine_cache_queue(global_cache,VINE_CACHE_COMMAND,source,cache_name,size,mode,flags);
 }
 
 /*
@@ -756,12 +756,12 @@ trash and deal with it there.
 
 static int do_unlink(const char *path)
 {
-	char *cached_path = ds_cache_full_path(global_cache,path);
+	char *cached_path = vine_cache_full_path(global_cache,path);
   
 	int result = 0;
 	
 	if(path_within_dir(cached_path, workspace)) {
-		ds_cache_remove(global_cache,path);
+		vine_cache_remove(global_cache,path);
 		result = 1;
 	} else {
 		debug(D_DS, "%s is not within workspace %s",cached_path,workspace);
@@ -782,7 +782,7 @@ remove all of the associated files and other state.
 
 static int do_kill(int taskid)
 {
-	struct ds_process *p;
+	struct vine_process *p;
 
 	p = itable_remove(procs_table, taskid);
 	if(!p) {
@@ -791,20 +791,20 @@ static int do_kill(int taskid)
 	}
 
 	if(itable_remove(procs_running, p->pid)) {
-		ds_process_kill(p);
+		vine_process_kill(p);
 		cores_allocated -= p->task->resources_requested->cores;
 		memory_allocated -= p->task->resources_requested->memory;
 		disk_allocated -= p->task->resources_requested->disk;
 		gpus_allocated -= p->task->resources_requested->gpus;
-		ds_gpus_free(taskid);
+		vine_gpus_free(taskid);
 	}
 
 	itable_remove(procs_complete, p->task->taskid);
 	list_remove(procs_waiting,p);
 
-	ds_watcher_remove_process(watcher,p);
+	vine_watcher_remove_process(watcher,p);
 
-	ds_process_delete(p);
+	vine_process_delete(p);
 
 	return 1;
 }
@@ -819,7 +819,7 @@ then we need to abort to clean things up.
 
 static void kill_all_tasks()
 {
-	struct ds_process *p;
+	struct vine_process *p;
 	uint64_t taskid;
 
 	itable_firstkey(procs_table);
@@ -839,15 +839,15 @@ static void kill_all_tasks()
 	debug(D_DS,"all data structures are clean");
 }
 
-static void finish_running_task(struct ds_process *p, ds_result_t result)
+static void finish_running_task(struct vine_process *p, vine_result_t result)
 {
 	p->result |= result;
 	kill(p->pid, SIGKILL);
 }
 
-static void finish_running_tasks(ds_result_t result)
+static void finish_running_tasks(vine_result_t result)
 {
-	struct ds_process *p;
+	struct vine_process *p;
 	pid_t pid;
 
 	itable_firstkey(procs_running);
@@ -856,13 +856,13 @@ static void finish_running_tasks(ds_result_t result)
 	}
 }
 
-static int enforce_process_limits(struct ds_process *p)
+static int enforce_process_limits(struct vine_process *p)
 {
 	/* If the task did not specify disk usage, return right away. */
 	if(p->disk < 1)
 		return 1;
 
-	ds_process_measure_disk(p, max_time_on_measurement);
+	vine_process_measure_disk(p, max_time_on_measurement);
 	if(p->sandbox_size > p->task->resources_requested->disk) {
 		debug(D_DS,"Task %d went over its disk size limit: %s > %s\n",
 				p->task->taskid,
@@ -878,7 +878,7 @@ static int enforce_processes_limits()
 {
 	static time_t last_check_time = 0;
 
-	struct ds_process *p;
+	struct vine_process *p;
 	pid_t pid;
 
 	int ok = 1;
@@ -889,7 +889,7 @@ static int enforce_processes_limits()
 	itable_firstkey(procs_table);
 	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
 		if(!enforce_process_limits(p)) {
-			finish_running_task(p, DS_RESULT_RESOURCE_EXHAUSTION);
+			finish_running_task(p, VINE_RESULT_RESOURCE_EXHAUSTION);
 			trash_file(p->sandbox);
 
 			ok = 0;
@@ -908,7 +908,7 @@ as other running tasks should not be affected by a task timeout.
 
 static void enforce_processes_max_running_time()
 {
-	struct ds_process *p;
+	struct vine_process *p;
 	pid_t pid;
 
 	timestamp_t now = timestamp_get();
@@ -924,7 +924,7 @@ static void enforce_processes_max_running_time()
 					p->task->taskid,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
-			p->result = DS_RESULT_TASK_MAX_RUN_TIME;
+			p->result = VINE_RESULT_TASK_MAX_RUN_TIME;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -959,11 +959,11 @@ static void disconnect_manager(struct link *manager)
 
 static int handle_manager(struct link *manager)
 {
-	char line[DS_LINE_MAX];
-	char filename_encoded[DS_LINE_MAX];
-	char filename[DS_LINE_MAX];
-	char source_encoded[DS_LINE_MAX];
-	char source[DS_LINE_MAX];
+	char line[VINE_LINE_MAX];
+	char filename_encoded[VINE_LINE_MAX];
+	char filename[VINE_LINE_MAX];
+	char source_encoded[VINE_LINE_MAX];
+	char source[VINE_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
 	int flags;
@@ -974,11 +974,11 @@ static int handle_manager(struct link *manager)
 			r = do_task(manager, taskid,time(0)+active_timeout);
 		} else if(sscanf(line,"file %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = ds_transfer_get_file(manager, global_cache, filename, length, mode, time(0)+active_timeout);
+			r = vine_transfer_get_file(manager, global_cache, filename, length, mode, time(0)+active_timeout);
 			reset_idle_timer();
 		} else if(sscanf(line, "dir %s", filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = ds_transfer_get_dir(manager,global_cache,filename,time(0)+active_timeout);
+			r = vine_transfer_get_dir(manager,global_cache,filename,time(0)+active_timeout);
 			reset_idle_timer();
 		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o %d", source_encoded, filename_encoded, &length, &mode, &flags)==5) {
 			url_decode(filename_encoded,filename,sizeof(filename));
@@ -995,10 +995,10 @@ static int handle_manager(struct link *manager)
 			r = do_unlink(filename);
 		} else if(sscanf(line, "getfile %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = ds_transfer_put_any(manager,global_cache,filename,DS_TRANSFER_MODE_FILE_ONLY,time(0)+active_timeout);
+			r = vine_transfer_put_any(manager,global_cache,filename,VINE_TRANSFER_MODE_FILE_ONLY,time(0)+active_timeout);
 		} else if(sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = ds_transfer_put_any(manager,global_cache,filename,DS_TRANSFER_MODE_ANY,time(0)+active_timeout);
+			r = vine_transfer_put_any(manager,global_cache,filename,VINE_TRANSFER_MODE_ANY,time(0)+active_timeout);
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
@@ -1014,7 +1014,7 @@ static int handle_manager(struct link *manager)
 		} else if(!strncmp(line, "check", 6)) {
 			r = send_keepalive(manager, 0);
 		} else if(!strncmp(line, "auth", 4)) {
-			fprintf(stderr,"ds_worker: this manager requires a password. (use the -P option)\n");
+			fprintf(stderr,"vine_worker: this manager requires a password. (use the -P option)\n");
 			r = 0;
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
@@ -1035,7 +1035,7 @@ static int handle_manager(struct link *manager)
 Return true if this task can run with the resources currently available.
 */
 
-static int task_resources_fit_now(struct ds_task *t)
+static int task_resources_fit_now(struct vine_task *t)
 {
 	return
 		(cores_allocated  + t->resources_requested->cores  <= local_resources->cores.total) &&
@@ -1051,9 +1051,9 @@ option, and the free available memory of the system is consumed by some other
 process.
 */
 
-static int task_resources_fit_eventually(struct ds_task *t)
+static int task_resources_fit_eventually(struct vine_task *t)
 {
-	struct ds_resources *r;
+	struct vine_resources *r;
 
 	r = local_resources;
 
@@ -1064,10 +1064,10 @@ static int task_resources_fit_eventually(struct ds_task *t)
 		(t->resources_requested->gpus   <= r->gpus.largest);
 }
 
-void forsake_waiting_process(struct link *manager, struct ds_process *p)
+void forsake_waiting_process(struct link *manager, struct vine_process *p)
 {
 	/* the task cannot run in this worker */
-	p->result = DS_RESULT_FORSAKEN;
+	p->result = VINE_RESULT_FORSAKEN;
 	itable_insert(procs_complete, p->task->taskid, p);
 
 	debug(D_DS, "Waiting task %d has been forsaken.", p->task->taskid);
@@ -1083,7 +1083,7 @@ If 0, the worker is using more resources than promised. 1 if resource usage hold
 static int enforce_worker_limits(struct link *manager)
 {
 	if( manual_disk_option > 0 && local_resources->disk.inuse > manual_disk_option ) {
-		fprintf(stderr,"ds_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
+		fprintf(stderr,"vine_worker: %s used more than declared disk space (--disk - < disk used) %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, local_resources->disk.inuse);
 
 		if(manager) {
 			send_message(manager, "info disk_exhausted %lld\n", (long long) local_resources->disk.inuse);
@@ -1093,7 +1093,7 @@ static int enforce_worker_limits(struct link *manager)
 	}
 
 	if(manual_memory_option > 0 && local_resources->memory.inuse > manual_memory_option) {
-		fprintf(stderr,"ds_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.inuse);
+		fprintf(stderr,"vine_worker: used more than declared memory (--memory < memory used) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.inuse);
 
 		if(manager) {
 			send_message(manager, "info memory_exhausted %lld\n", (long long) local_resources->memory.inuse);
@@ -1112,7 +1112,7 @@ If 0, the worker has less resources than promised. 1 otherwise.
 static int enforce_worker_promises(struct link *manager)
 {
 	if(end_time > 0 && timestamp_get() > ((uint64_t) end_time)) {
-		warn(D_NOTICE, "ds_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t) manual_wall_time_option);
+		warn(D_NOTICE, "vine_worker: reached the wall time limit %"PRIu64" s\n", (uint64_t) manual_wall_time_option);
 		if(manager) {
 			send_message(manager, "info wall_time_exhausted %"PRIu64"\n", (uint64_t) manual_wall_time_option);
 		}
@@ -1120,7 +1120,7 @@ static int enforce_worker_promises(struct link *manager)
 	}
 
 	if( manual_disk_option > 0 && local_resources->disk.total < manual_disk_option) {
-		fprintf(stderr,"ds_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
+		fprintf(stderr,"vine_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
 
 		if(manager) {
 			send_message(manager, "info disk_error %lld\n", (long long) local_resources->disk.total);
@@ -1196,7 +1196,7 @@ static void work_for_manager( struct link *manager )
 		measure_worker_resources();
 
 		if(!enforce_worker_promises(manager)) {
-			finish_running_tasks(DS_RESULT_FORSAKEN);
+			finish_running_tasks(VINE_RESULT_FORSAKEN);
 			abort_flag = 1;
 			break;
 		}
@@ -1210,14 +1210,14 @@ static void work_for_manager( struct link *manager )
 		/* end running processes if worker resources are exhasusted, and marked
 		 * them as FORSAKEN, so they can be resubmitted somewhere else. */
 		if(!enforce_worker_limits(manager)) {
-			finish_running_tasks(DS_RESULT_FORSAKEN);
+			finish_running_tasks(VINE_RESULT_FORSAKEN);
 			// finish all tasks, disconnect from manager, but don't kill the worker (no abort_flag = 1)
 			break;
 		}
 
 		int task_event = 0;
 		if(ok) {
-			struct ds_process *p;
+			struct vine_process *p;
 			int visited;
 			int waiting = list_size(procs_waiting);
 
@@ -1249,7 +1249,7 @@ static void work_for_manager( struct link *manager )
 		}
 
 		if(ok && !results_to_be_sent_msg) {
-			if(ds_watcher_check(watcher) || itable_size(procs_complete) > 0) {
+			if(vine_watcher_check(watcher) || itable_size(procs_complete) > 0) {
 				send_message(manager, "available_results\n");
 				results_to_be_sent_msg = 1;
 			}
@@ -1273,7 +1273,7 @@ workspace_create is done once when the worker starts.
 
 static int workspace_create()
 {
-	char absolute[DS_LINE_MAX];
+	char absolute[VINE_LINE_MAX];
 
 	// Setup working space(dir)
 	const char *workdir;
@@ -1296,7 +1296,7 @@ static int workspace_create()
 		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
 
-	printf( "ds_worker: creating workspace %s\n", workspace);
+	printf( "vine_worker: creating workspace %s\n", workspace);
 
 	if(!create_dir(workspace,0777)) {
 		return 0;
@@ -1373,7 +1373,7 @@ static int workspace_prepare()
 
 	char *cachedir = string_format("%s/cache",workspace);
 	int result = create_dir(cachedir,0777);
-	global_cache = ds_cache_create(cachedir);
+	global_cache = vine_cache_create(cachedir);
 	free(cachedir);
 
 	char *tmp_name = string_format("%s/temp", workspace);
@@ -1385,7 +1385,7 @@ static int workspace_prepare()
 	trash_setup(trash_dir);
 	free(trash_dir);
 
-	ds_transfer_server_start(global_cache);
+	vine_transfer_server_start(global_cache);
 
 	return result;
 }
@@ -1400,7 +1400,7 @@ static void workspace_cleanup()
 {
 	debug(D_DS,"cleaning workspace %s",workspace);
 
-	ds_transfer_server_stop();
+	vine_transfer_server_stop();
 
 	DIR *dir = opendir(workspace);
 	if(dir) {
@@ -1415,7 +1415,7 @@ static void workspace_cleanup()
 	}
 	trash_empty();
 
-	ds_cache_delete(global_cache);
+	vine_cache_delete(global_cache);
 	global_cache = 0;
 }
 
@@ -1436,9 +1436,9 @@ static void workspace_delete()
 	if(procs_complete)     itable_delete(procs_complete);
 	if(procs_waiting)      list_delete(procs_waiting);
 
-	if(watcher)            ds_watcher_delete(watcher);
+	if(watcher)            vine_watcher_delete(watcher);
 
-	printf( "ds_worker: deleting workspace %s\n", workspace);
+	printf( "vine_worker: deleting workspace %s\n", workspace);
 
 	/*
 	Note that we cannot use trash_file here because the trash dir
@@ -1477,12 +1477,12 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	}
 
 	if(manual_ssl_option && !use_ssl) {
-		fprintf(stderr,"ds_worker: --ssl was given, but manager %s:%d is not using ssl.\n",host,port);
+		fprintf(stderr,"vine_worker: --ssl was given, but manager %s:%d is not using ssl.\n",host,port);
 		link_close(manager);
 		return 0;
 	} else if(manual_ssl_option || use_ssl) {
 		if(link_ssl_wrap_connect(manager) < 1) {
-			fprintf(stderr,"ds_worker: could not setup ssl connection.\n");
+			fprintf(stderr,"vine_worker: could not setup ssl connection.\n");
 			link_close(manager);
 			return 0;
 		}
@@ -1500,14 +1500,14 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	if(password) {
 		debug(D_DS,"authenticating to manager");
 		if(!link_auth_password(manager,password,idle_stoptime)) {
-			fprintf(stderr,"ds_worker: wrong password for manager %s:%d\n",host,port);
+			fprintf(stderr,"vine_worker: wrong password for manager %s:%d\n",host,port);
 			link_close(manager);
 			return 0;
 		}
 	}
 
 	if(verify_project) {
-		char line[DS_LINE_MAX];
+		char line[VINE_LINE_MAX];
 		debug(D_DS, "verifying manager's project name");
 		send_message(manager, "name\n");
 		if(!recv_message(manager,line,sizeof(line),idle_stoptime)) {
@@ -1517,7 +1517,7 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 		}
 
 		if(strcmp(line,verify_project)) {
-			fprintf(stderr, "ds_worker: manager has project %s instead of %s\n", line, verify_project);
+			fprintf(stderr, "vine_worker: manager has project %s instead of %s\n", line, verify_project);
 			link_close(manager);
 			return 0;
 		}
@@ -1605,7 +1605,7 @@ static struct list *interfaces_to_list(const char *addr, int port, struct jx *if
 
 static int serve_manager_by_name( const char *catalog_hosts, const char *project_regex )
 {
-	struct list *managers_list = ds_catalog_query_cached(catalog_hosts,-1,project_regex);
+	struct list *managers_list = vine_catalog_query_cached(catalog_hosts,-1,project_regex);
 
 	debug(D_DS,"project name %s matches %d managers",project_regex,list_size(managers_list));
 
@@ -1968,15 +1968,15 @@ int main(int argc, char *argv[])
 			break;
 		case 'P':
 			if(copy_file_to_buffer(optarg, &password, NULL) < 0) {
-				fprintf(stderr,"ds_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
+				fprintf(stderr,"vine_worker: couldn't load password from %s: %s\n",optarg,strerror(errno));
 				exit(EXIT_FAILURE);
 			}
 			break;
 		case LONG_OPT_BANDWIDTH:
-			setenv("DS_BANDWIDTH", optarg, 1);
+			setenv("VINE_BANDWIDTH", optarg, 1);
 			break;
 		case LONG_OPT_DEBUG_RELEASE:
-			setenv("DS_RESET_DEBUG_FILE", "yes", 1);
+			setenv("VINE_RESET_DEBUG_FILE", "yes", 1);
 			break;
 		case LONG_OPT_CORES:
 			if(!strncmp(optarg, "all", 3)) {
@@ -2089,7 +2089,7 @@ int main(int argc, char *argv[])
 	random_init();
 
 	if(!workspace_create()) {
-		fprintf(stderr, "ds_worker: failed to setup workspace at %s.\n", workspace);
+		fprintf(stderr, "vine_worker: failed to setup workspace at %s.\n", workspace);
 		exit(1);
 	}
 
@@ -2097,9 +2097,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	// set $DS_SANDBOX to workspace.
-	debug(D_DS, "DS_SANDBOX set to %s.\n", workspace);
-	setenv("DS_SANDBOX", workspace, 0);
+	// set $VINE_SANDBOX to workspace.
+	debug(D_DS, "VINE_SANDBOX set to %s.\n", workspace);
+	setenv("VINE_SANDBOX", workspace, 0);
 
 	// change to workspace
 	chdir(workspace);
@@ -2109,11 +2109,11 @@ int main(int argc, char *argv[])
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
 
-	watcher = ds_watcher_create();
+	watcher = vine_watcher_create();
 
-	local_resources = ds_resources_create();
-	total_resources = ds_resources_create();
-	total_resources_last = ds_resources_create();
+	local_resources = vine_resources_create();
+	total_resources = vine_resources_create();
+	total_resources_last = vine_resources_create();
 
 	if(manual_cores_option < 1) {
 		manual_cores_option = load_average_get_cpus();
@@ -2123,7 +2123,7 @@ int main(int argc, char *argv[])
 	connect_stoptime = time(0) + connect_timeout;
 
 	measure_worker_resources();
-	printf("ds_worker: using %"PRId64 " cores, %"PRId64 " MB memory, %"PRId64 " MB disk, %"PRId64 " gpus\n",
+	printf("vine_worker: using %"PRId64 " cores, %"PRId64 " MB memory, %"PRId64 " MB disk, %"PRId64 " gpus\n",
 		total_resources->cores.total,
 		total_resources->memory.total,
 		total_resources->disk.total,
@@ -2131,7 +2131,7 @@ int main(int argc, char *argv[])
 
 	if(coprocess_command) {
 		/* start coprocess per manager attempt */
-		coprocess_name = ds_coprocess_start(coprocess_command, &coprocess_port);
+		coprocess_name = vine_coprocess_start(coprocess_command, &coprocess_port);
 		hash_table_insert(features, coprocess_name, (void **) 1);
 	}
 
@@ -2191,7 +2191,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (coprocess_command) {
-		ds_coprocess_terminate();
+		vine_coprocess_terminate();
 		free(coprocess_name);
 	}
 

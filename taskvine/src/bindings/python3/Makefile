@@ -9,30 +9,30 @@ LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS) -lz $(CCTOOLS_OPENSSL_LDFLAGS) $(CCTO
 
 DSPYTHONSO = _taskvine.$(CCTOOLS_DYNAMIC_SUFFIX)
 LIBRARIES = $(DSPYTHONSO) taskvine.py
-OBJECTS = ds_wrap.o
+OBJECTS = vine_wrap.o
 TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
 # The odd symlink in the following rule is necessary to overcome a problem
 # in the framework search path emitted by the Python configuration on macOS.
-ds_wrap.c taskvine.py: taskvine.i taskvine.binding.py
+vine_wrap.c taskvine.py: taskvine.i taskvine.binding.py
 	@echo "SWIG taskvine.i (python)"
-	@$(CCTOOLS_SWIG) -o ds_wrap.c -python -py3 -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/manager taskvine.i
+	@$(CCTOOLS_SWIG) -o vine_wrap.c -python -py3 -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/manager taskvine.i
 	@cat -u taskvine.binding.py >> taskvine.py
 	ln -sf /System/Library/Frameworks/Python.framework .
 
-$(DSPYTHONSO): ds_wrap.o $(EXTERNAL_DEPENDENCIES)
+$(DSPYTHONSO): vine_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 test:
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) Python.framework taskvine.py ds_wrap.c *.pyc
+	rm -f $(OBJECTS) $(TARGETS) Python.framework taskvine.py vine_wrap.c *.pyc
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)
-	chmod 755 taskvine.py ds_example.py
-	cp taskvine.py ds_futures.py _taskvine.$(CCTOOLS_DYNAMIC_SUFFIX) $(CCTOOLS_PYTHON3_PATH)/
+	chmod 755 taskvine.py vine_example.py
+	cp taskvine.py vine_futures.py _taskvine.$(CCTOOLS_DYNAMIC_SUFFIX) $(CCTOOLS_PYTHON3_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp ds_example.py ds_futures_example.py $(CCTOOLS_INSTALL_DIR)/doc/
+	cp vine_example.py vine_futures_example.py $(CCTOOLS_INSTALL_DIR)/doc/
 

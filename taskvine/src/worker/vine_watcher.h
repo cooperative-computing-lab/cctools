@@ -4,18 +4,18 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_WATCH_H
-#define DS_WATCH_H
+#ifndef VINE_WATCH_H
+#define VINE_WATCH_H
 
-#include "ds_process.h"
+#include "vine_process.h"
 #include "link.h"
 
-struct ds_watcher * ds_watcher_create();
-void ds_watcher_delete( struct ds_watcher *w );
+struct vine_watcher * vine_watcher_create();
+void vine_watcher_delete( struct vine_watcher *w );
 
-void ds_watcher_add_process( struct ds_watcher *w, struct ds_process *p );
-void ds_watcher_remove_process( struct ds_watcher *w, struct ds_process *p );
-int ds_watcher_check( struct ds_watcher *w );
-int ds_watcher_send_changes( struct ds_watcher *w, struct link *manager, time_t stoptime );
+void vine_watcher_add_process( struct vine_watcher *w, struct vine_process *p );
+void vine_watcher_remove_process( struct vine_watcher *w, struct vine_process *p );
+int vine_watcher_check( struct vine_watcher *w );
+int vine_watcher_send_changes( struct vine_watcher *w, struct link *manager, time_t stoptime );
 
 #endif

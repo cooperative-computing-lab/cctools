@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_CACHE_H
-#define DS_CACHE_H
+#ifndef VINE_CACHE_H
+#define VINE_CACHE_H
 
 /*
 The cache module keeps track of the intention and state of objects
@@ -14,29 +14,29 @@ sent directly by the manager, as well as requests to create files
 by transferring urls or executing Unix commands.  Requests for
 transfers or commands are queued and not executed immediately.
 When a task is about to be executed, each input file is checked
-via ds_cache_ensure and downloaded if needed.  This allow
+via vine_cache_ensure and downloaded if needed.  This allow
 for file transfers to occur asynchronously of the manager.
 */
 
 #include <stdint.h>
-#include "ds_file.h"
+#include "vine_file.h"
 
 struct link;
 
 typedef enum {
-	DS_CACHE_FILE,
-	DS_CACHE_TRANSFER,
-	DS_CACHE_COMMAND,
-} ds_cache_type_t;
+	VINE_CACHE_FILE,
+	VINE_CACHE_TRANSFER,
+	VINE_CACHE_COMMAND,
+} vine_cache_type_t;
 
-struct ds_cache * ds_cache_create( const char *cachedir );
-void ds_cache_delete( struct ds_cache *c );
+struct vine_cache * vine_cache_create( const char *cachedir );
+void vine_cache_delete( struct vine_cache *c );
 
-char *ds_cache_full_path( struct ds_cache *c, const char *cachename );
+char *vine_cache_full_path( struct vine_cache *c, const char *cachename );
 
-int ds_cache_addfile( struct ds_cache *c, int64_t size, const char *cachename );
-int ds_cache_queue( struct ds_cache *c, ds_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, ds_file_flags_t flags );
-int ds_cache_ensure( struct ds_cache *c, const char *cachename, struct link *manager );
-int ds_cache_remove( struct ds_cache *c, const char *cachename );
+int vine_cache_addfile( struct vine_cache *c, int64_t size, const char *cachename );
+int vine_cache_queue( struct vine_cache *c, vine_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags );
+int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager );
+int vine_cache_remove( struct vine_cache *c, const char *cachename );
 
 #endif

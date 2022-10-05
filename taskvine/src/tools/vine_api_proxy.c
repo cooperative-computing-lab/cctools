@@ -8,13 +8,13 @@ See the file COPYING for details.
 This is a work in progress, and is not yet complete.
 
 To facilitate binding to languages and situations that are not
-well supported by SWIG, the ds_api_proxy provides a translation between
+well supported by SWIG, the vine_api_proxy provides a translation between
 JSON messages and operations on the manager API.  A simple library
 written in any language sends JSON messages over a pipe to the
-ds_api_proxy, which then invokes the appropriate functions
+vine_api_proxy, which then invokes the appropriate functions
 and returns a JSON result.
 
-See clients/python3/ds_proxy.py for an example in Python.
+See clients/python3/vine_proxy.py for an example in Python.
 */
 
 #include <stdio.h>
@@ -75,7 +75,7 @@ void reply(struct link *output_link, char *method, char *message, int id)
 
 }
 
-void mainloop(struct ds_manager *queue, struct link *input_link, struct link *output_link )
+void mainloop(struct vine_manager *queue, struct link *input_link, struct link *output_link )
 {
 	char message[BUFSIZ];
 	char msg[BUFSIZ];
@@ -132,7 +132,7 @@ void mainloop(struct ds_manager *queue, struct link *input_link, struct link *ou
 		//submit or wait
 		if(!strcmp(method, "submit")) {
 			char *task = val->u.string_value;
-			int taskid = ds_json_submit(queue, task);
+			int taskid = vine_json_submit(queue, task);
 			if(taskid < 0) {
 				error = "Could not submit task";
 				reply(output_link, "error", error, id);
@@ -141,7 +141,7 @@ void mainloop(struct ds_manager *queue, struct link *input_link, struct link *ou
 			}
 		} else if(!strcmp(method, "wait")) {
 			int time_out = val->u.integer_value;
-			char *task = ds_json_wait(queue, time_out);
+			char *task = vine_json_wait(queue, time_out);
 			if(!task) {
 				error = "timeout reached with no task returned";
 				reply(output_link, "error", error, id);
@@ -150,7 +150,7 @@ void mainloop(struct ds_manager *queue, struct link *input_link, struct link *ou
 			}
 		} else if(!strcmp(method, "remove")) {
 			int taskid = val->u.integer_value;
-			char *task = ds_json_remove(queue, taskid);
+			char *task = vine_json_remove(queue, taskid);
 			if(!task) {
 				error = "task not able to be removed from queue";
 				reply(output_link, "error", error, id);
@@ -161,14 +161,14 @@ void mainloop(struct ds_manager *queue, struct link *input_link, struct link *ou
 			reply(output_link, method, "Successfully disconnected.", id);
 			break;
 		} else if(!strcmp(method, "empty")) {
-			int empty = ds_empty(queue);
+			int empty = vine_empty(queue);
 			if(empty) {
 				reply(output_link, method, "Empty", id);
 			} else {
 				reply(output_link, method, "Not Empty", id);
 			}
 		} else if(!strcmp(method, "status")) {
-            char *status = ds_json_get_status(queue);
+            char *status = vine_json_get_status(queue);
             reply(output_link, method, status, id);
         } else {
 			error = "Method not recognized";
@@ -212,7 +212,7 @@ static void show_help(const char *cmd)
 int main(int argc, char *argv[])
 {
 	int port = 0;
-	char *project_name = "ds_server";
+	char *project_name = "vine_server";
 
 	int c;
 	while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0)) != -1) {
@@ -245,15 +245,15 @@ int main(int argc, char *argv[])
 
 	char *config = string_format("{ \"name\":\"%s\", \"port\":%d }", project_name, port);
 
-	struct ds_manager *queue = ds_json_create(config);
+	struct vine_manager *queue = vine_json_create(config);
 	if(!queue) {
 		fprintf(stderr, "could not listen on port %d: %s\n", port, strerror(errno));
 		return 1;
 	}
 
-	port = ds_port(queue);
+	port = vine_port(queue);
 
-	printf("ds_api_proxy ready port %d\n",port);
+	printf("vine_api_proxy ready port %d\n",port);
 	fflush(stdout);
 
 	struct link *input_link = link_attach_to_fd(0);
@@ -264,7 +264,7 @@ int main(int argc, char *argv[])
 	link_close(input_link);
 	link_close(output_link);
 
-	ds_json_delete(queue);
+	vine_json_delete(queue);
 
 	return 0;
 }

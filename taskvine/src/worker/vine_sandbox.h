@@ -4,14 +4,14 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_SANDBOX_H
-#define DS_SANDBOX_H
+#ifndef VINE_SANDBOX_H
+#define VINE_SANDBOX_H
 
-#include "ds_process.h"
-#include "ds_cache.h"
+#include "vine_process.h"
+#include "vine_cache.h"
 #include "link.h"
 
-int ds_sandbox_stagein( struct ds_process *p, struct ds_cache *c, struct link *manager );
-int ds_sandbox_stageout( struct ds_process *p, struct ds_cache *c );
+int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *c, struct link *manager );
+int vine_sandbox_stageout( struct vine_process *p, struct vine_cache *c );
 
 #endif

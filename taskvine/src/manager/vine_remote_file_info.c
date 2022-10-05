@@ -4,11 +4,11 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_remote_file_info.h"
+#include "vine_remote_file_info.h"
 
-struct ds_remote_file_info * ds_remote_file_info_create( ds_file_t type, int64_t size, time_t mtime )
+struct vine_remote_file_info * vine_remote_file_info_create( vine_file_t type, int64_t size, time_t mtime )
 {
-	struct ds_remote_file_info *rinfo = malloc(sizeof(*rinfo));
+	struct vine_remote_file_info *rinfo = malloc(sizeof(*rinfo));
 	rinfo->type = type;
 	rinfo->size = size;
 	rinfo->mtime = mtime;
@@ -16,7 +16,7 @@ struct ds_remote_file_info * ds_remote_file_info_create( ds_file_t type, int64_t
 	return rinfo;
 }
 
-void ds_remote_file_info_delete( struct ds_remote_file_info *rinfo )
+void vine_remote_file_info_delete( struct vine_remote_file_info *rinfo )
 {
 	free(rinfo);
 }

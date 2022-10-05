@@ -62,53 +62,53 @@ worker.debug_file="factory.log"
 
 with worker:
     r = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 4}
-    check_task('all_specified', ds.DS_ALLOCATION_MODE_FIXED, max = r, min = {}, expected = r)
+    check_task('all_specified', ds.VINE_ALLOCATION_MODE_FIXED, max = r, min = {}, expected = r)
 
     check_task('all_specified_no_gpu',
-            ds.DS_ALLOCATION_MODE_FIXED,
+            ds.VINE_ALLOCATION_MODE_FIXED,
             max = {'cores': 1, 'memory': 2, 'disk': 3},
             min = {},
             expected = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 0})
 
     check_task('all_specified_no_cores',
-            ds.DS_ALLOCATION_MODE_FIXED,
+            ds.VINE_ALLOCATION_MODE_FIXED,
             max = {'gpus': 4, 'memory': 2, 'disk': 3},
             min = {},
             expected = {'cores': 0, 'memory': 2, 'disk': 3, 'gpus': 4})
 
     check_task('all_zero',
-            ds.DS_ALLOCATION_MODE_FIXED,
+            ds.VINE_ALLOCATION_MODE_FIXED,
             max = {'cores': 0, 'memory': 0, 'disk': 0, 'gpus': 0},
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
     check_task('only_memory',
-            ds.DS_ALLOCATION_MODE_FIXED,
+            ds.VINE_ALLOCATION_MODE_FIXED,
             max = {'memory': worker_memory/2},
             min = {},
             expected = {'cores': worker_cores/2, 'memory': worker_memory/2, 'disk': worker_disk/2, 'gpus': 0})
 
     check_task('only_cores',
-            ds.DS_ALLOCATION_MODE_FIXED,
+            ds.VINE_ALLOCATION_MODE_FIXED,
             max = {'cores': worker_cores},
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
     check_task('only_memory_w_minimum',
-            ds.DS_ALLOCATION_MODE_FIXED,
+            ds.VINE_ALLOCATION_MODE_FIXED,
             max = {'memory': worker_memory/2},
             min = {'cores': 3, 'gpus': 2},
             expected = {'cores': 3, 'memory': worker_memory/2, 'disk': worker_disk/2, 'gpus': 2})
 
     check_task('auto_whole_worker',
-            ds.DS_ALLOCATION_MODE_MIN_WASTE,
+            ds.VINE_ALLOCATION_MODE_MIN_WASTE,
             max = {},
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
     q.specify_category_first_allocation_guess('auto_with_guess', {'cores': 1, 'memory': 2, 'disk': 3})
     check_task('auto_with_guess',
-            ds.DS_ALLOCATION_MODE_MIN_WASTE,
+            ds.VINE_ALLOCATION_MODE_MIN_WASTE,
             max = {},
             min = {},
             expected = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 0})

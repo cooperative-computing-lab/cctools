@@ -3,7 +3,7 @@
 # Python Dataswarm bindings.
 #
 # The objects and methods provided by this package correspond to the native
-# C API in @ref ds_manager.h.
+# C API in @ref vine_manager.h.
 #
 # The SWIG-based Python bindings provide a higher-level interface that
 # revolves around the following objects:
@@ -62,14 +62,14 @@ class Task(object):
     def __init__(self, command):
         self._task = None
 
-        self._task = ds_task_create(command)
+        self._task = vine_task_create(command)
         if not self._task:
             raise Exception('Unable to create internal Task structure')
 
     def __del__(self):
         try:
             if self._task:
-                ds_task_delete(self._task)
+                vine_task_delete(self._task)
         except:
             #ignore exceptions, in case task has been already collected
             pass
@@ -80,19 +80,19 @@ class Task(object):
         # asked explicitely.
 
         if flags is None:
-            flags = DS_NOCACHE
+            flags = VINE_NOCACHE
 
         if cache is not None:
             if cache:
-                flags = flags | DS_CACHE
+                flags = flags | VINE_CACHE
             else:
-                flags = flags & ~(DS_CACHE)
+                flags = flags & ~(VINE_CACHE)
 
         if failure_only is not None:
             if failure_only:
-                flags = flags | DS_FAILURE_ONLY
+                flags = flags | VINE_FAILURE_ONLY
             else:
-                flags = flags & ~(DS_FAILURE_ONLY)
+                flags = flags & ~(VINE_FAILURE_ONLY)
 
         return flags
 
@@ -102,7 +102,7 @@ class Task(object):
     def clone(self):
         """Return a (deep)copy this task that can also be submitted to the DataSwarm."""
         new = copy.copy(self)
-        new._task = ds_task_clone(self._task)
+        new._task = vine_task_clone(self._task)
         return new
 
 
@@ -112,7 +112,7 @@ class Task(object):
     # @param self       Reference to the current task object.
     # @param command    The command to be executed.
     def specify_command(self, command):
-        return ds_task_specify_command(self._task, command)
+        return vine_task_specify_command(self._task, command)
 
 
     ##
@@ -122,17 +122,17 @@ class Task(object):
     # @param self       Reference to the current task object.
     # @param coprocess  The name of the coprocess.
     def specify_coprocess(self, coprocess):
-        return ds_task_specify_coprocess(self._task, coprocess)
+        return vine_task_specify_coprocess(self._task, coprocess)
 
     ##
     # Set the worker selection algorithm for task.
     #
     # @param self       Reference to the current task object.
     # @param algorithm  One of the following algorithms to use in assigning a
-    #                   task to a worker. See @ref ds_schedule_t for
+    #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
     def specify_algorithm(self, algorithm):
-        return ds_task_specify_algorithm(self._task, algorithm)
+        return vine_task_specify_algorithm(self._task, algorithm)
 
     ##
     # Attach a user defined logical name to the task.
@@ -140,7 +140,7 @@ class Task(object):
     # @param self       Reference to the current task object.
     # @param tag        The tag to attach to task.
     def specify_tag(self, tag):
-        return ds_task_specify_tag(self._task, tag)
+        return vine_task_specify_tag(self._task, tag)
 
     ##
     # Label the task with the given category. It is expected that tasks with the
@@ -149,7 +149,7 @@ class Task(object):
     # @param self       Reference to the current task object.
     # @param name       The name of the category
     def specify_category(self, name):
-        return ds_task_specify_category(self._task, name)
+        return vine_task_specify_category(self._task, name)
 
     ##
     # Label the task with the given user-defined feature. Tasks with the
@@ -159,7 +159,7 @@ class Task(object):
     # @param self       Reference to the current task object.
     # @param name       The name of the feature.
     def specify_feature(self, name):
-        return ds_task_specify_feature(self._task, name)
+        return vine_task_specify_feature(self._task, name)
 
     ##
     # Indicate that the task would be optimally run on a given host.
@@ -167,7 +167,7 @@ class Task(object):
     # @param self       Reference to the current task object.
     # @param hostname   The hostname to which this task would optimally be sent.
     def specify_preferred_host(self, hostname):
-        return ds_task_specify_preferred_host(self._task, hostname)
+        return vine_task_specify_preferred_host(self._task, hostname)
 
     ##
     # Add an input file to the task.
@@ -176,9 +176,9 @@ class Task(object):
     # @param local_name     The name of the file on local disk or shared filesystem.
     # @param remote_name    The name of the file at the execution site.
     # @param flags          May be zero to indicate no special handling, or any
-    #                       of the @ref ds_file_flags_t or'd together The most common are:
-    #                       - @ref DS_NOCACHE (default)
-    #                       - @ref DS_CACHE
+    #                       of the @ref vine_file_flags_t or'd together The most common are:
+    #                       - @ref VINE_NOCACHE (default)
+    #                       - @ref VINE_CACHE
     # @param cache         Whether the file should be cached at workers (True/False)
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     #
@@ -200,7 +200,7 @@ class Task(object):
             remote_name = os.path.basename(local_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_input_file(self._task, local_name, remote_name, flags)
+        return vine_task_specify_input_file(self._task, local_name, remote_name, flags)
 
     def specify_output_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
         if local_name:
@@ -212,7 +212,7 @@ class Task(object):
             remote_name = os.path.basename(local_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_output_file(self._task, local_name, remote_name, flags)
+        return vine_task_specify_output_file(self._task, local_name, remote_name, flags)
 
     ## Add an input url to a task.
     #
@@ -220,14 +220,14 @@ class Task(object):
     # @param url            The url of the file to provide.
     # @param remote_name    The name of the file as seen by the task.
     # @param flags          May be zero to indicate no special handling, or any
-    #                       of the @ref ds_file_flags_t or'd together The most common are:
-    #                       - @ref DS_NOCACHE (default)
-    #                       - @ref DS_CACHE
+    #                       of the @ref vine_file_flags_t or'd together The most common are:
+    #                       - @ref VINE_NOCACHE (default)
+    #                       - @ref VINE_CACHE
     # @param cache         Whether the file should be cached at workers (True/False)
     #
     # For example:
     # @code
-    # >>> task.specify_input_url("http://www.google.com/","google.txt",flags=DS_CACHE);
+    # >>> task.specify_input_url("http://www.google.com/","google.txt",flags=VINE_CACHE);
     # @endcode
 
     def specify_input_url(self, url, remote_name, flags=None, cache=None, failure_only=None):
@@ -240,7 +240,7 @@ class Task(object):
             url = str(url)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_input_url(self._task, url, remote_name, flags)
+        return vine_task_specify_input_url(self._task, url, remote_name, flags)
 
 
     ##
@@ -253,21 +253,21 @@ class Task(object):
     #                       The command must contain the string %% which will be replaced with the cached location of the file.
     # @param remote_name    The name of the file as seen by the task.
     # @param flags          May be zero to indicate no special handling, or any
-    #                       of the @ref ds_file_flags_t or'd together The most common are:
-    #                       - @ref DS_NOCACHE (default)
-    #                       - @ref DS_CACHE
+    #                       of the @ref vine_file_flags_t or'd together The most common are:
+    #                       - @ref VINE_NOCACHE (default)
+    #                       - @ref VINE_CACHE
     # @param cache         Whether the file should be cached at workers (True/False)
     #
     # For example:
     # @code
-    # >>> task.specify_input_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",flags=DS_CACHE);
+    # >>> task.specify_input_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",flags=VINE_CACHE);
     # @endcode
 
     def specify_input_command(self, cmd, remote_name, flags=None, cache=None, failure_only=None):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_input_command(self._task, cmd, remote_name, flags)
+        return vine_task_specify_input_command(self._task, cmd, remote_name, flags)
 
     ##
     # Add a file piece to the task.
@@ -278,10 +278,10 @@ class Task(object):
     # @param start_byte     The starting byte offset of the file piece to be transferred.
     # @param end_byte       The ending byte offset of the file piece to be transferred.
     # @param flags          May be zero to indicate no special handling, or any
-    #                       of the @ref ds_file_flags_t or'd together The most common are:
-    #                       - @ref DS_NOCACHE (default)
-    #                       - @ref DS_CACHE
-    #                       - @ref DS_FAILURE_ONLY
+    #                       of the @ref vine_file_flags_t or'd together The most common are:
+    #                       - @ref VINE_NOCACHE (default)
+    #                       - @ref VINE_CACHE
+    #                       - @ref VINE_FAILURE_ONLY
     # @param cache         Whether the file should be cached at workers (True/False)
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     def specify_input_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, flags=None, cache=None, failure_only=None):
@@ -295,7 +295,7 @@ class Task(object):
             remote_name = os.path.basename(local_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return ds_task_specify_input_piece(self._task, local_name, remote_name, start_byte, end_byte, flags)
+        return vine_task_specify_input_piece(self._task, local_name, remote_name, start_byte, end_byte, flags)
 
     ##
     # Add an empty directory to the task.
@@ -305,7 +305,7 @@ class Task(object):
         if remote_name:
             remote_name = str(remote_name)
 
-        return ds_task_specify_empty_dir(task,remote_name);
+        return vine_task_specify_empty_dir(task,remote_name);
 
     ##
     # Add an input buffer to the task.
@@ -319,7 +319,7 @@ class Task(object):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, None)
-        return ds_task_specify_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
+        return vine_task_specify_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
     # Add an output buffer to the task.
@@ -335,7 +335,7 @@ class Task(object):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, None)
-        return ds_task_specify_output_buffer(self._task, buffer_name, remote_name, flags)
+        return vine_task_specify_output_buffer(self._task, buffer_name, remote_name, flags)
 
 
     ##
@@ -349,7 +349,7 @@ class Task(object):
         if buffer_name:
             buffer_name = str(buffer_name)
 
-        return ds_task_get_output_buffer(self._task, buffer_name )
+        return vine_task_get_output_buffer(self._task, buffer_name )
 
     ##
     # Get the length of an output buffer.
@@ -362,7 +362,7 @@ class Task(object):
         if buffer_name:
             buffer_name = str(buffer_name)
 
-        return ds_task_get_output_buffer_length(self._task, buffer_name )
+        return vine_task_get_output_buffer_length(self._task, buffer_name )
 
     ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
@@ -424,7 +424,7 @@ class Task(object):
     # @param self           Reference to the current task object.
     # @param filename       The name of the snapshot events specification
     def specify_snapshot_file(self, filename):
-        return ds_specify_snapshot_file(self._task, filename)
+        return vine_specify_snapshot_file(self._task, filename)
 
 
 
@@ -432,45 +432,45 @@ class Task(object):
     # Indicate the number of times the task should be retried. If 0 (the
     # default), the task is tried indefinitely. A task that did not succeed
     # after the given number of retries is returned with result
-    # DS_RESULT_MAX_RETRIES.
+    # VINE_RESULT_MAX_RETRIES.
     def specify_max_retries(self, max_retries):
-        return ds_task_specify_max_retries(self._task, max_retries)
+        return vine_task_specify_max_retries(self._task, max_retries)
 
     ##
     # Indicate the number of cores required by this task.
     def specify_cores(self, cores):
-        return ds_task_specify_cores(self._task, cores)
+        return vine_task_specify_cores(self._task, cores)
 
     ##
     # Indicate the memory (in MB) required by this task.
     def specify_memory(self, memory):
-        return ds_task_specify_memory(self._task, memory)
+        return vine_task_specify_memory(self._task, memory)
 
     ##
     # Indicate the disk space (in MB) required by this task.
     def specify_disk(self, disk):
-        return ds_task_specify_disk(self._task, disk)
+        return vine_task_specify_disk(self._task, disk)
 
     ##
     # Indicate the number of GPUs required by this task.
     def specify_gpus(self, gpus):
-        return ds_task_specify_gpus(self._task, gpus)
+        return vine_task_specify_gpus(self._task, gpus)
 
     ##
     # Indicate the the priority of this task (larger means better priority, default is 0).
     def specify_priority(self, priority):
-        return ds_task_specify_priority(self._task, priority)
+        return vine_task_specify_priority(self._task, priority)
 
     # Indicate the maximum end time (absolute, in microseconds from the Epoch) of this task.
     # This is useful, for example, when the task uses certificates that expire.
     # If less than 1, or not specified, no limit is imposed.
     def specify_end_time(self, useconds):
-        return ds_task_specify_end_time(self._task, int(useconds))
+        return vine_task_specify_end_time(self._task, int(useconds))
 
     # Indicate the minimum start time (absolute, in microseconds from the Epoch) of this task.
     # If less than 1, or not specified, no limit is imposed.
     def specify_start_time_min(self, useconds):
-        return ds_task_specify_start_time_min(self._task, int(useconds))
+        return vine_task_specify_start_time_min(self._task, int(useconds))
 
     # Indicate the maximum running time (in microseconds) for a task in a
     # worker (relative to when the task starts to run).  If less than 1, or not
@@ -478,30 +478,30 @@ class Task(object):
     # Note: It has the same effect that specify_running_time_max, but specified
     # in microseconds. Kept for backwards compatibility.
     def specify_running_time(self, useconds):
-        return ds_task_specify_running_time(self._task, int(useconds))
+        return vine_task_specify_running_time(self._task, int(useconds))
 
     # Indicate the maximum running time (in seconds) for a task in a worker
     # (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
     def specify_running_time_max(self, seconds):
-        return ds_task_specify_running_time_max(self._task, int(seconds))
+        return vine_task_specify_running_time_max(self._task, int(seconds))
 
     # Indicate the minimum running time (in seconds) for a task in a worker
     # (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
     def specify_running_time_min(self, seconds):
-        return ds_task_specify_running_time_min(self._task, int(seconds))
+        return vine_task_specify_running_time_min(self._task, int(seconds))
 
     ##
     # Set this environment variable before running the task.
     # If value is None, then variable is unset.
     def specify_env(self, name, value=None):
-        return ds_task_specify_env(self._task, name, value)
+        return vine_task_specify_env(self._task, name, value)
 
     ##
     # Set a name for the resource summary output directory from the monitor.
     def specify_monitor_output(self, directory):
-        return ds_task_specify_monitor_output(self._task, directory)
+        return vine_task_specify_monitor_output(self._task, directory)
 
     ##
     # Get the user-defined logical name for the task.
@@ -511,7 +511,7 @@ class Task(object):
     # @endcode
     @property
     def tag(self):
-        return ds_task_get_tag(self._task)
+        return vine_task_get_tag(self._task)
 
     ##
     # Get the category name for the task.
@@ -521,7 +521,7 @@ class Task(object):
     # @endcode
     @property
     def category(self):
-        return ds_task_get_category(self._task)
+        return vine_task_get_category(self._task)
     
     ##
     # Get the shell command executed by the task.
@@ -530,7 +530,7 @@ class Task(object):
     # @endcode
     @property
     def command(self):
-        return ds_task_get_command(self._task)
+        return vine_task_get_command(self._task)
 
     ##
     # Get the standard output of the task. Must be called only after the task
@@ -540,7 +540,7 @@ class Task(object):
     # @endcode
     @property
     def std_output(self):
-        return ds_task_get_output(self._task)
+        return vine_task_get_output(self._task)
     
     ##
     # Get the standard output of the task. (Same as t.std_output for regular
@@ -550,7 +550,7 @@ class Task(object):
     # @endcode
     @property
     def output(self):
-        return ds_task_get_output(self._task)
+        return vine_task_get_output(self._task)
 
     ##
     # Get the task id number. Must be called only after the task was submitted.
@@ -559,7 +559,7 @@ class Task(object):
     # @endcode
     @property
     def id(self):
-        return ds_task_get_taskid(self._task)
+        return vine_task_get_taskid(self._task)
 
     ##
     # Get the exit code of the command executed by the task. Must be called only
@@ -569,11 +569,11 @@ class Task(object):
     # @endcode
     @property
     def exit_code(self):
-        return ds_task_get_exit_code(self._task)
+        return vine_task_get_exit_code(self._task)
     
     ##
     # Get the result of the task as an integer code, such as successful, missing file, etc.
-    # See @ref ds_result_t for possible values.  Must be called only
+    # See @ref vine_result_t for possible values.  Must be called only
     # after the task completes execution.
     # @code
     # >>> print(t.result)
@@ -581,7 +581,7 @@ class Task(object):
     # @endcode
     @property
     def result(self):
-        return ds_task_get_result(self._task)
+        return vine_task_get_result(self._task)
 
     ##
     # Return a string that explains the result of a task.
@@ -592,7 +592,7 @@ class Task(object):
     # @endcode
     @property
     def result_string(self):
-        return ds_result_string(ds_task_get_result(self._task))
+        return vine_result_string(vine_task_get_result(self._task))
 
     ##
     # Return various integer performance metrics about a completed task.
@@ -617,7 +617,7 @@ class Task(object):
     # @endcode
     @property
     def get_metric(self,name):
-        return ds_task_get_metric(self._task,name)
+        return vine_task_get_metric(self._task,name)
 
     ##
     # Get the address and port of the host on which the task ran.
@@ -628,7 +628,7 @@ class Task(object):
     # @endcode
     @property
     def addrport(self):
-        return ds_task_get_addrport(self._task)
+        return vine_task_get_addrport(self._task)
 
     ##
     # Get the address and port of the host on which the task ran.
@@ -639,7 +639,7 @@ class Task(object):
     # @endcode
     @property
     def hostname(self):
-        return ds_task_get_hostname(self._task)
+        return vine_task_get_hostname(self._task)
 
     ##
     # Get the resources measured for the task execution if resource monitoring is enabled.
@@ -783,7 +783,7 @@ class PythonTask(Task):
     @property
     def output(self):
         if not self._output_loaded:
-            if self.result == DS_RESULT_SUCCESS:
+            if self.result == VINE_RESULT_SUCCESS:
                 try:
                     with open(os.path.join(self._tmpdir, 'out_{}.p'.format(self._id)), 'rb') as f:
                         self._output = dill.load(f)
@@ -805,7 +805,7 @@ class PythonTask(Task):
                 raise RuntimeError("Could not find poncho_package_run in PATH.")
 
             self._command = self._python_function_command()
-            ds_task_specify_command(self._task, self._command)
+            vine_task_specify_command(self._task, self._command)
 
             self.specify_input_file(self._env_file, cache=True)
             self.specify_input_file(self._pp_run, cache=True)
@@ -842,7 +842,7 @@ class PythonTask(Task):
                 out=os.path.basename(self._out_file))
 
         if self._env_file:
-            command = './{pprun} -e {tar} --unpack-to "$DS_SANDBOX"/{unpack}-env {cmd}'.format(
+            command = './{pprun} -e {tar} --unpack-to "$VINE_SANDBOX"/{unpack}-env {cmd}'.format(
                 pprun=os.path.basename(self._pp_run),
                 unpack=os.path.basename(self._env_file),
                 tar=os.path.basename(self._env_file),
@@ -911,8 +911,8 @@ class DataSwarm(object):
     # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
     #
-    # @see ds_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=DS_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl=None):
+    # @see vine_create    - For more information about environmental variables that affect the behavior this method.
+    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl=None):
         self._shutdown = shutdown
         self._taskvine = None
         self._stats = None
@@ -934,11 +934,11 @@ class DataSwarm(object):
         try:
             if debug_log:
                 self.specify_debug_log(debug_log)
-            self._stats = ds_stats()
-            self._stats_hierarchy = ds_stats()
+            self._stats = vine_stats()
+            self._stats_hierarchy = vine_stats()
 
             ssl_key, ssl_cert = self._setup_ssl(ssl)
-            self._taskvine = ds_ssl_create(port, ssl_key, ssl_cert)
+            self._taskvine = vine_ssl_create(port, ssl_key, ssl_cert)
             if not self._taskvine:
                 raise Exception('Could not create queue on port {}'.format(port))
 
@@ -949,7 +949,7 @@ class DataSwarm(object):
                 self.specify_transactions_log(transactions_log)
 
             if name:
-                ds_specify_name(self._taskvine, name)
+                vine_specify_name(self._taskvine, name)
         except Exception as e:
             raise Exception('Unable to create internal Data Swarm structure: {}'.format(e))
 
@@ -959,7 +959,7 @@ class DataSwarm(object):
             if self._taskvine:
                 if self._shutdown:
                     self.shutdown_workers(0)
-                ds_delete(self._taskvine)
+                vine_delete(self._taskvine)
                 self._taskvine = None
         except:
             #ignore exceptions, as we are going away...
@@ -1001,7 +1001,7 @@ class DataSwarm(object):
     # @endcode
     @property
     def name(self):
-        return ds_name(self._taskvine)
+        return vine_name(self._taskvine)
 
     ##
     # Get the listening port of the queue.
@@ -1010,7 +1010,7 @@ class DataSwarm(object):
     # @endcode
     @property
     def port(self):
-        return ds_port(self._taskvine)
+        return vine_port(self._taskvine)
 
     ##
     # Get queue statistics.
@@ -1023,7 +1023,7 @@ class DataSwarm(object):
     # @endcode
     @property
     def stats(self):
-        ds_get_stats(self._taskvine, self._stats)
+        vine_get_stats(self._taskvine, self._stats)
         return self._stats
 
     ##
@@ -1037,7 +1037,7 @@ class DataSwarm(object):
     # @endcode
     @property
     def stats_hierarchy(self):
-        ds_get_stats_hierarchy(self._taskvine, self._stats_hierarchy)
+        vine_get_stats_hierarchy(self._taskvine, self._stats_hierarchy)
         return self._stats_hierarchy
 
     ##
@@ -1050,13 +1050,13 @@ class DataSwarm(object):
     # s = q.stats_category("my_category")
     # >>> print(s)
     # @endcode
-    # The fields in @ref ds_stats can also be individually accessed through this call. For example:
+    # The fields in @ref vine_stats can also be individually accessed through this call. For example:
     # @code
     # >>> print(s.tasks_waiting)
     # @endcode
     def stats_category(self, category):
-        stats = ds_stats()
-        ds_get_stats_category(self._taskvine, category, stats)
+        stats = vine_stats()
+        vine_get_stats_category(self._taskvine, category, stats)
         return stats
 
     ##
@@ -1069,7 +1069,7 @@ class DataSwarm(object):
     # tasks_info = q.status("tasks")
     # @endcode
     def status(self, request):
-        info_raw = ds_status(self._work_queue, request)
+        info_raw = vine_status(self._work_queue, request)
         info_json = json.loads(info_raw)
         del info_raw
         return info_json
@@ -1087,7 +1087,7 @@ class DataSwarm(object):
     # >>>    print("{} workers with: {} cores, {} MB memory, {} MB disk".format(w.workers, w.cores, w.memory, w.disk)
     # @endcode
     def summarize_workers(self):
-        from_c = ds_summarize_workers(self._taskvine)
+        from_c = vine_summarize_workers(self._taskvine)
 
         count = 0
         workers = []
@@ -1117,8 +1117,8 @@ class DataSwarm(object):
     # @param category A category name. If None, sets the mode by default for
     # newly created categories.
     # @param mode One of:
-    #                  - DS_ALLOCATION_MODE_FIXED Task fails (default).
-    #                  - DS_ALLOCATION_MODE_MAX If maximum values are
+    #                  - VINE_ALLOCATION_MODE_FIXED Task fails (default).
+    #                  - VINE_ALLOCATION_MODE_MAX If maximum values are
     #                  specified for cores, memory, disk, and gpus (e.g. via @ref
     #                  specify_category_max_resources or @ref Task.specify_memory),
     #                  and one of those resources is exceeded, the task fails.
@@ -1128,12 +1128,12 @@ class DataSwarm(object):
     #                  resources not specified. Use @ref Task.specify_max_retries to
     #                  set a limit on the number of times manager attemps
     #                  to complete the task.
-    #                  - DS_ALLOCATION_MODE_MIN_WASTE As above, but
+    #                  - VINE_ALLOCATION_MODE_MIN_WASTE As above, but
     #                  manager tries allocations to minimize resource waste.
-    #                  - DS_ALLOCATION_MODE_MAX_THROUGHPUT As above, but
+    #                  - VINE_ALLOCATION_MODE_MAX_THROUGHPUT As above, but
     #                  manager tries allocations to maximize throughput.
     def specify_category_mode(self, category, mode):
-        return ds_specify_category_mode(self._taskvine, category, mode)
+        return vine_specify_category_mode(self._taskvine, category, mode)
 
     ##
     # Turn on or off first-allocation labeling for a given category and
@@ -1145,15 +1145,15 @@ class DataSwarm(object):
     # @param autolabel True/False for on/off.
     # @returns 1 if resource is valid, 0 otherwise.
     def specify_category_autolabel_resource(self, category, resource, autolabel):
-        return ds_enable_category_resource(self._taskvine, category, category, resource, autolabel)
+        return vine_enable_category_resource(self._taskvine, category, category, resource, autolabel)
 
     ##
-    # Get current task state. See @ref ds_task_state_t for possible values.
+    # Get current task state. See @ref vine_task_state_t for possible values.
     # @code
     # >>> print(q.task_state(taskid))
     # @endcode
     def task_state(self, taskid):
-        return ds_task_state(self._taskvine, taskid)
+        return vine_task_state(self._taskvine, taskid)
 
     ## Enables resource monitoring of tasks in the queue, and writes a summary
     #  per task to the directory given. Additionally, all summaries are
@@ -1165,7 +1165,7 @@ class DataSwarm(object):
     # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
     def enable_monitoring(self, dirname=None, watchdog=True):
-        return ds_enable_monitoring(self._taskvine, dirname, watchdog)
+        return vine_enable_monitoring(self._taskvine, dirname, watchdog)
 
     ## As @ref enable_monitoring, but it also generates a time series and a debug file.
     #  WARNING: Such files may reach gigabyte sizes for long running tasks.
@@ -1176,7 +1176,7 @@ class DataSwarm(object):
     # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
     def enable_monitoring_full(self, dirname=None, watchdog=True):
-        return ds_enable_monitoring_full(self._taskvine, dirname, watchdog)
+        return vine_enable_monitoring_full(self._taskvine, dirname, watchdog)
 
     ##
     # Turn on or off fast abort functionality for a given queue for tasks in
@@ -1186,7 +1186,7 @@ class DataSwarm(object):
     # @param self       Reference to the current manager object.
     # @param multiplier The multiplier of the average task time at which point to abort; if negative (the default) fast_abort is deactivated.
     def activate_fast_abort(self, multiplier):
-        return ds_activate_fast_abort(self._taskvine, multiplier)
+        return vine_activate_fast_abort(self._taskvine, multiplier)
 
     ##
     # Turn on or off fast abort functionality for a given queue.
@@ -1195,7 +1195,7 @@ class DataSwarm(object):
     # @param name       Name of the category.
     # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref activate_fast_abort)
     def activate_fast_abort_category(self, name, multiplier):
-        return ds_activate_fast_abort_category(self._taskvine, name, multiplier)
+        return vine_activate_fast_abort_category(self._taskvine, name, multiplier)
 
     ##
     # Turn on or off draining mode for workers at hostname.
@@ -1204,7 +1204,7 @@ class DataSwarm(object):
     # @param hostname   The hostname the host running the workers.
     # @param drain_mode If True, no new tasks are dispatched to workers at hostname, and empty workers are shutdown. Else, workers works as usual.
     def specify_draining_by_hostname(self, hostname, drain_mode=True):
-        return ds_specify_draining_by_hostname(self._taskvine, hostname, drain_mode)
+        return vine_specify_draining_by_hostname(self._taskvine, hostname, drain_mode)
 
     ##
     # Determine whether there are any known tasks queued, running, or waiting to be collected.
@@ -1213,7 +1213,7 @@ class DataSwarm(object):
     #
     # @param self       Reference to the current manager object.
     def empty(self):
-        return ds_empty(self._taskvine)
+        return vine_empty(self._taskvine)
 
     ##
     # Determine whether the queue can support more tasks.
@@ -1222,17 +1222,17 @@ class DataSwarm(object):
     #
     # @param self       Reference to the current manager object.
     def hungry(self):
-        return ds_hungry(self._taskvine)
+        return vine_hungry(self._taskvine)
 
     ##
     # Set the worker selection algorithm for queue.
     #
     # @param self       Reference to the current manager object.
     # @param algorithm  One of the following algorithms to use in assigning a
-    #                   task to a worker. See @ref ds_schedule_t for
+    #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
     def specify_algorithm(self, algorithm):
-        return ds_specify_algorithm(self._taskvine, algorithm)
+        return vine_specify_algorithm(self._taskvine, algorithm)
 
     ##
     # Set the order for dispatching submitted tasks in the queue.
@@ -1240,10 +1240,10 @@ class DataSwarm(object):
     # @param self       Reference to the current manager object.
     # @param order      One of the following algorithms to use in dispatching
     #                   submitted tasks to workers:
-    #                   - @ref DS_TASK_ORDER_FIFO
-    #                   - @ref DS_TASK_ORDER_LIFO
+    #                   - @ref VINE_TASK_ORDER_FIFO
+    #                   - @ref VINE_TASK_ORDER_LIFO
     def specify_task_order(self, order):
-        return ds_specify_task_order(self._taskvine, order)
+        return vine_specify_task_order(self._taskvine, order)
 
     ##
     # Change the project name for the given queue.
@@ -1251,7 +1251,7 @@ class DataSwarm(object):
     # @param self   Reference to the current manager object.
     # @param name   The new project name.
     def specify_name(self, name):
-        return ds_specify_name(self._taskvine, name)
+        return vine_specify_name(self._taskvine, name)
 
     ##
     # Set the preference for using hostname over IP address to connect.
@@ -1263,12 +1263,12 @@ class DataSwarm(object):
     # @param self Reference to the current manager object.
     # @param mode An string to indicate using 'by_ip', 'by_hostname' or 'by_apparent_ip'.
     def specify_manager_preferred_connection(self, mode):
-        return ds_manager_preferred_connection(self._taskvine, mode)
+        return vine_manager_preferred_connection(self._taskvine, mode)
 
     ##
     # See specify_manager_preferred_connection
     def specify_master_preferred_connection(self, mode):
-        return ds_manager_preferred_connection(self._taskvine, mode)
+        return vine_manager_preferred_connection(self._taskvine, mode)
 
     ##
     # Set the minimum taskid of future submitted tasks.
@@ -1283,7 +1283,7 @@ class DataSwarm(object):
     # @param minid  Minimum desired taskid
     # @return Returns the actual minimum taskid for future tasks.
     def specify_min_taskid(self, minid):
-        return ds_specify_min_taskid(self._taskvine, minid)
+        return vine_specify_min_taskid(self._taskvine, minid)
 
     ##
     # Change the project priority for the given queue.
@@ -1291,31 +1291,31 @@ class DataSwarm(object):
     # @param self       Reference to the current manager object.
     # @param priority   An integer that presents the priorty of this manager manager. The higher the value, the higher the priority.
     def specify_priority(self, priority):
-        return ds_specify_priority(self._taskvine, priority)
+        return vine_specify_priority(self._taskvine, priority)
 
     ## Specify the number of tasks not yet submitted to the queue.
-    # It is used by ds_factory to determine the number of workers to launch.
+    # It is used by vine_factory to determine the number of workers to launch.
     # If not specified, it defaults to 0.
-    # ds_factory considers the number of tasks as:
+    # vine_factory considers the number of tasks as:
     # num tasks left + num tasks running + num tasks read.
     # @param self   Reference to the current manager object.
     # @param ntasks Number of tasks yet to be submitted.
     def specify_num_tasks_left(self, ntasks):
-        return ds_specify_num_tasks_left(self._taskvine, ntasks)
+        return vine_specify_num_tasks_left(self._taskvine, ntasks)
 
     ##
     # Specify the manager mode for the given queue.
     # (Kept for compatibility. It is no-op.)
     #
     # @param self   Reference to the current manager object.
-    # @param mode   This may be one of the following values: DS_MASTER_MODE_STANDALONE or DS_MASTER_MODE_CATALOG.
+    # @param mode   This may be one of the following values: VINE_MASTER_MODE_STANDALONE or VINE_MASTER_MODE_CATALOG.
     def specify_manager_mode(self, mode):
-        return ds_specify_manager_mode(self._taskvine, mode)
+        return vine_specify_manager_mode(self._taskvine, mode)
 
     ##
     # See specify_manager_mode
     def specify_master_mode(self, mode):
-        return ds_specify_manager_mode(self._taskvine, mode)
+        return vine_specify_manager_mode(self._taskvine, mode)
 
     ##
     # Specify the catalog server the manager should report to.
@@ -1324,7 +1324,7 @@ class DataSwarm(object):
     # @param hostname   The hostname of the catalog server.
     # @param port       The port the catalog server is listening on.
     def specify_catalog_server(self, hostname, port):
-        return ds_specify_catalog_server(self._taskvine, hostname, port)
+        return vine_specify_catalog_server(self._taskvine, hostname, port)
 
     ##
     # Specify a debug log file that records the manager actions in detail.
@@ -1332,7 +1332,7 @@ class DataSwarm(object):
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
     def specify_debug_log(self, logfile):
-        return ds_specify_debug_log(self._taskvine, logfile)
+        return vine_specify_debug_log(self._taskvine, logfile)
 
     ##
     # Specify a performance log file that records the cummulative stats of connected workers and submitted tasks.
@@ -1340,7 +1340,7 @@ class DataSwarm(object):
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
     def specify_perf_log(self, logfile):
-        return ds_specify_perf_log(self._taskvine, logfile)
+        return vine_specify_perf_log(self._taskvine, logfile)
 
     ##
     # Specify a log file that records the states of tasks.
@@ -1348,7 +1348,7 @@ class DataSwarm(object):
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
     def specify_transactions_log(self, logfile):
-        ds_specify_transactions_log(self._taskvine, logfile)
+        vine_specify_transactions_log(self._taskvine, logfile)
 
     ##
     # Add a mandatory password that each worker must present.
@@ -1356,7 +1356,7 @@ class DataSwarm(object):
     # @param self      Reference to the current manager object.
     # @param password  The password.
     def specify_password(self, password):
-        return ds_specify_password(self._taskvine, password)
+        return vine_specify_password(self._taskvine, password)
 
     ##
     # Add a mandatory password file that each worker must present.
@@ -1365,7 +1365,7 @@ class DataSwarm(object):
     # @param file      Name of the file containing the password.
 
     def specify_password_file(self, file):
-        return ds_specify_password_file(self._taskvine, file)
+        return vine_specify_password_file(self._taskvine, file)
 
     ##
     #
@@ -1385,7 +1385,7 @@ class DataSwarm(object):
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return ds_specify_max_resources(self._taskvine, rm)
+        return vine_specify_max_resources(self._taskvine, rm)
 
     ##
     #
@@ -1405,7 +1405,7 @@ class DataSwarm(object):
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return ds_specify_min_resources(self._taskvine, rm)
+        return vine_specify_min_resources(self._taskvine, rm)
 
     ##
     # Specifies the maximum resources allowed for the given category.
@@ -1426,7 +1426,7 @@ class DataSwarm(object):
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return ds_specify_category_max_resources(self._taskvine, category, rm)
+        return vine_specify_category_max_resources(self._taskvine, category, rm)
 
     ##
     # Specifies the minimum resources allowed for the given category.
@@ -1447,7 +1447,7 @@ class DataSwarm(object):
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return ds_specify_category_min_resources(self._taskvine, category, rm)
+        return vine_specify_category_min_resources(self._taskvine, category, rm)
 
     ##
     # Specifies the first-allocation guess for the given category
@@ -1468,7 +1468,7 @@ class DataSwarm(object):
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return ds_specify_category_first_allocation_guess(self._taskvine, category, rm)
+        return vine_specify_category_first_allocation_guess(self._taskvine, category, rm)
 
     ##
     # Initialize first value of categories
@@ -1478,7 +1478,7 @@ class DataSwarm(object):
     # @param filename JSON file with resource summaries.
 
     def initialize_categories(self, filename, rm):
-        return ds_initialize_categories(self._taskvine, rm, filename)
+        return vine_initialize_categories(self._taskvine, rm, filename)
 
     ##
     # Cancel task identified by its taskid and remove from the given queue.
@@ -1487,7 +1487,7 @@ class DataSwarm(object):
     # @param id     The taskid returned from @ref submit.
     def cancel_by_taskid(self, id):
         task = None
-        task_pointer = ds_cancel_by_taskid(self._taskvine, id)
+        task_pointer = vine_cancel_by_taskid(self._taskvine, id)
         if task_pointer:
             task = self._task_table.pop(int(id))
         return task
@@ -1499,7 +1499,7 @@ class DataSwarm(object):
     # @param tag    The tag assigned to task using @ref specify_tag.
     def cancel_by_tasktag(self, tag):
         task = None
-        task_pointer = ds_cancel_by_tasktag(self._taskvine, tag)
+        task_pointer = vine_cancel_by_tasktag(self._taskvine, tag)
         if task_pointer:
             task = self._task_table.pop(int(id))
         return task
@@ -1529,7 +1529,7 @@ class DataSwarm(object):
     # @param self   Reference to the current manager object.
     # @param n      The number to shutdown.  To shut down all workers, specify "0".
     def shutdown_workers(self, n):
-        return ds_shut_down_workers(self._taskvine, n)
+        return vine_shut_down_workers(self._taskvine, n)
 
     ##
     # Block workers running on host from working for the manager.
@@ -1537,7 +1537,7 @@ class DataSwarm(object):
     # @param self   Reference to the current manager object.
     # @param host   The hostname the host running the workers.
     def block_host(self, host):
-        return ds_block_host(self._taskvine, host)
+        return vine_block_host(self._taskvine, host)
 
     ##
     # Replaced by @ref block_host
@@ -1551,7 +1551,7 @@ class DataSwarm(object):
     # @param host    The hostname the host running the workers.
     # @param timeout How long this block entry lasts (in seconds). If less than 1, block indefinitely.
     def block_host_with_timeout(self, host, timeout):
-        return ds_block_host_with_timeout(self._taskvine, host, timeout)
+        return vine_block_host_with_timeout(self._taskvine, host, timeout)
 
     ##
     # See @ref block_host_with_timeout
@@ -1565,8 +1565,8 @@ class DataSwarm(object):
     # @param host   The of the hostname the host.
     def unblock_host(self, host=None):
         if host is None:
-            return ds_unblock_all(self._taskvine)
-        return ds_unblock_host(self._taskvine, host)
+            return vine_unblock_all(self._taskvine)
+        return vine_unblock_host(self._taskvine, host)
 
     ##
     # See @ref unblock_host
@@ -1581,7 +1581,7 @@ class DataSwarm(object):
     def invalidate_cache_file(self, local_name):
         if local_name:
             local_name = str(local_name)
-        return ds_invalidate_cached_file(self._taskvine, local_name, DS_FILE)
+        return vine_invalidate_cached_file(self._taskvine, local_name, VINE_FILE)
 
     ##
     # Change keepalive interval for a given queue.
@@ -1590,7 +1590,7 @@ class DataSwarm(object):
     # @param interval Minimum number of seconds to wait before sending new keepalive
     #                 checks to workers.
     def specify_keepalive_interval(self, interval):
-        return ds_specify_keepalive_interval(self._taskvine, interval)
+        return vine_specify_keepalive_interval(self._taskvine, interval)
 
     ##
     # Change keepalive timeout for a given queue.
@@ -1599,7 +1599,7 @@ class DataSwarm(object):
     # @param timeout  Minimum number of seconds to wait for a keepalive response
     #                 from worker before marking it as dead.
     def specify_keepalive_timeout(self, timeout):
-        return ds_specify_keepalive_timeout(self._taskvine, timeout)
+        return vine_specify_keepalive_timeout(self._taskvine, timeout)
 
     ##
     # Turn on manager capacity measurements.
@@ -1607,7 +1607,7 @@ class DataSwarm(object):
     # @param self     Reference to the current manager object.
     #
     def estimate_capacity(self):
-        return ds_specify_estimate_capacity_on(self._taskvine, 1)
+        return vine_specify_estimate_capacity_on(self._taskvine, 1)
 
     ##
     # Tune advanced parameters.
@@ -1627,12 +1627,12 @@ class DataSwarm(object):
     # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
     # - "hungry-minimum" Mimimum number of tasks to consider queue not hungry. (default=10)
     # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
-    # - "wait_retrieve_many" Parameter to alter how ds_wait works. If set to 0, ds_wait breaks out of the while loop whenever a task changes to DS_TASK_DONE (wait_retrieve_one mode). If set to 1, ds_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
+    # - "wait_retrieve_many" Parameter to alter how vine_wait works. If set to 0, vine_wait breaks out of the while loop whenever a task changes to VINE_TASK_DONE (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
     # @param value The value to set the parameter to.
     # @return 0 on succes, -1 on failure.
     #
     def tune(self, name, value):
-        return ds_tune(self._taskvine, name, value)
+        return vine_tune(self._taskvine, name, value)
 
     ##
     # Submit a task to the queue.
@@ -1644,7 +1644,7 @@ class DataSwarm(object):
     def submit(self, task):
         if isinstance(task, RemoteTask):
             task.specify_buffer(json.dumps(task._event), "infile")
-        taskid = ds_submit(self._taskvine, task._task)
+        taskid = vine_submit(self._taskvine, task._task)
         self._task_table[taskid] = task
         return taskid
 
@@ -1656,8 +1656,8 @@ class DataSwarm(object):
     # @param self       Reference to the current manager object.
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.  Use an integer to set the timeout or the constant @ref
-    #                   DS_WAITFORTASK to block until a task has completed.
-    def wait(self, timeout=DS_WAITFORTASK):
+    #                   VINE_WAITFORTASK to block until a task has completed.
+    def wait(self, timeout=VINE_WAITFORTASK):
         return self.wait_for_tag(None, timeout)
 
     ##
@@ -1670,11 +1670,11 @@ class DataSwarm(object):
     # @param tag        Desired tag. If None, then it is equivalent to self.wait(timeout)
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
-    def wait_for_tag(self, tag, timeout=DS_WAITFORTASK):
-        task_pointer = ds_wait_for_tag(self._taskvine, tag, timeout)
+    def wait_for_tag(self, tag, timeout=VINE_WAITFORTASK):
+        task_pointer = vine_wait_for_tag(self._taskvine, tag, timeout)
         if task_pointer:
-            task = self._task_table[ds_task_get_taskid(task_pointer)]
-            del self._task_table[ds_task_get_taskid(task_pointer)]
+            task = self._task_table[vine_task_get_taskid(task_pointer)]
+            del self._task_table[vine_task_get_taskid(task_pointer)]
             return task
         return None            
 
@@ -1712,7 +1712,7 @@ class DataSwarm(object):
 
                 t = self.wait_for_tag(str(i), 1)                
                 if t:
-                    results[tasks[ds_task_get_taskid(t)]] = list(ds_task_get_output(t))
+                    results[tasks[vine_task_get_taskid(t)]] = list(vine_task_get_output(t))
                     n += 1
                     break
 
@@ -1774,7 +1774,7 @@ class DataSwarm(object):
                 t = self.wait_for_tag(str(i), 10)
 
                 if t:
-                    results[tasks[ds_task_get_taskid(t)]] = ds_task_get_output(t)
+                    results[tasks[vine_task_get_taskid(t)]] = vine_task_get_output(t)
                     n += 1
                     break
  
@@ -1822,7 +1822,7 @@ class DataSwarm(object):
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
-                        results[tasks[ds_task_get_taskid(t)]] = ds_task_get_output(t)
+                        results[tasks[vine_task_get_taskid(t)]] = vine_task_get_output(t)
                         n += 1
                         break
 
@@ -1862,7 +1862,7 @@ class DataSwarm(object):
             while not self.empty() and n < size:
                 t = self.wait_for_tag(str(i), 1)                
                 if t:
-                    results[tasks[ds_task_get_taskid(t)]] = list(json.loads(ds_task_get_output(t))["Result"])
+                    results[tasks[vine_task_get_taskid(t)]] = list(json.loads(vine_task_get_output(t))["Result"])
                     n += 1
                     break
 
@@ -1916,7 +1916,7 @@ class DataSwarm(object):
             while not self.empty() and n < num_task:
                 t = self.wait_for_tag(str(i), 10)
                 if t:
-                    results[tasks[ds_task_get_taskid(t)]] = json.loads(ds_task_get_output(t))["Result"]
+                    results[tasks[vine_task_get_taskid(t)]] = json.loads(vine_task_get_output(t))["Result"]
                     n += 1
                     break
          
@@ -1962,7 +1962,7 @@ class DataSwarm(object):
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
-                        results[tasks[ds_task_get_taskid(t)]] = json.loads(ds_task_get_output(t))["Result"]
+                        results[tasks[vine_task_get_taskid(t)]] = json.loads(vine_task_get_output(t))["Result"]
                         n += 1
                         break
 
@@ -2007,7 +2007,7 @@ class RemoteTask(Task):
     # @param remote_task_exec_method  Can be one of "fork", "direct", or "thread". Fork creates a child process to execute the function, direct has the worker directly call the function, and thread spawns a thread to execute the function
     def specify_exec_method(self, remote_task_exec_method):
         if remote_task_exec_method not in ["fork", "direct", "thread"]:
-            print("Error, ds_exec_method must be one of fork, direct, or thread")
+            print("Error, vine_exec_method must be one of fork, direct, or thread")
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
 
@@ -2018,7 +2018,7 @@ class RemoteTask(Task):
 # \class Factory
 # Launch a Data Swarm factory.
 #
-# The command line arguments for `ds_factory` can be set for a
+# The command line arguments for `vine_factory` can be set for a
 # factory object (with dashes replaced with underscores). Creating a factory
 # object does not immediately launch it, so this is a good time to configure
 # the resources, number of workers, etc. Factory objects function as Python
@@ -2124,10 +2124,10 @@ class Factory(object):
 
         self._set_manager(manager_name, manager_host_port)
         self._opts['batch-type'] = batch_type
-        self._opts['worker-binary'] = self._find_exe(worker_binary, 'ds_worker')
+        self._opts['worker-binary'] = self._find_exe(worker_binary, 'vine_worker')
         self._opts['scratch-dir'] = None
 
-        self._factory_binary = self._find_exe(factory_binary, 'ds_factory')
+        self._factory_binary = self._find_exe(factory_binary, 'vine_factory')
 
     def _set_manager(self, manager_name, manager_host_port):
         if not (manager_name or manager_host_port):
@@ -2279,7 +2279,7 @@ class Factory(object):
         if status:
             with open(self._error_file) as error_f:
                 error_log = error_f.read()
-                raise RuntimeError('Could not execute ds_factory. Exited with status: {}\n{}'.format(str(status), error_log))
+                raise RuntimeError('Could not execute vine_factory. Exited with status: {}\n{}'.format(str(status), error_log))
         return self
 
 

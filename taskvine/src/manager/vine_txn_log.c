@@ -4,10 +4,10 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_txn_log.h"
-#include "ds_worker_info.h"
-#include "ds_task.h"
-#include "ds_file.h"
+#include "vine_txn_log.h"
+#include "vine_worker_info.h"
+#include "vine_task.h"
+#include "vine_file.h"
 
 #include "buffer.h"
 #include "rmsummary.h"
@@ -20,7 +20,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <unistd.h>
 
-void ds_txn_log_write_header( struct ds_manager *q )
+void vine_txn_log_write_header( struct vine_manager *q )
 {
 	setvbuf(q->txn_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
 
@@ -39,7 +39,7 @@ void ds_txn_log_write_header( struct ds_manager *q )
 	fprintf(q->txn_logfile, "\n");
 }
 
-void ds_txn_log_write(struct ds_manager *q, const char *str)
+void vine_txn_log_write(struct vine_manager *q, const char *str)
 {
 	if(!q->txn_logfile)
 		return;
@@ -50,7 +50,7 @@ void ds_txn_log_write(struct ds_manager *q, const char *str)
 	fprintf(q->txn_logfile, "\n");
 }
 
-void ds_txn_log_write_task(struct ds_manager *q, struct ds_task *t)
+void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 {
 	if(!q->txn_logfile)
 		return;
@@ -58,24 +58,24 @@ void ds_txn_log_write_task(struct ds_manager *q, struct ds_task *t)
 	struct buffer B;
 	buffer_init(&B);
 
-	ds_task_state_t state = t->state;
+	vine_task_state_t state = t->state;
 
-	buffer_printf(&B, "TASK %d %s", t->taskid, ds_task_state_string(state));
+	buffer_printf(&B, "TASK %d %s", t->taskid, vine_task_state_string(state));
 
-	if(state == DS_TASK_UNKNOWN) {
+	if(state == VINE_TASK_UNKNOWN) {
 			/* do not add any info */
-	} else if(state == DS_TASK_READY) {
+	} else if(state == VINE_TASK_READY) {
 		const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
 		buffer_printf(&B, " %s %s ", t->category, allocation);
-		rmsummary_print_buffer(&B, ds_manager_task_min_resources(q, t), 1);
-	} else if(state == DS_TASK_CANCELED) {
+		rmsummary_print_buffer(&B, vine_manager_task_min_resources(q, t), 1);
+	} else if(state == VINE_TASK_CANCELED) {
 			/* do not add any info */
-	} else if(state == DS_TASK_RETRIEVED || state == DS_TASK_DONE) {
-		buffer_printf(&B, " %s ", ds_result_string(t->result));
+	} else if(state == VINE_TASK_RETRIEVED || state == VINE_TASK_DONE) {
+		buffer_printf(&B, " %s ", vine_result_string(t->result));
 		buffer_printf(&B, " %d ", t->exit_code);
 
 		if(t->resources_measured) {
-			if(t->result == DS_RESULT_RESOURCE_EXHAUSTION) {
+			if(t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
 				rmsummary_print_buffer(&B, t->resources_measured->limits_exceeded, 1);
 				buffer_printf(&B, " ");
 			}
@@ -85,10 +85,10 @@ void ds_txn_log_write_task(struct ds_manager *q, struct ds_task *t)
 			}
 
 			struct jx *m = rmsummary_to_json(t->resources_measured, /* only resources */ 1);
-			jx_insert(m, jx_string("ds_input_size"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
-			jx_insert(m, jx_string("ds_output_size"), jx_arrayv(jx_double(t->bytes_received/((double) MEGABYTE)), jx_string("MB"), NULL));
-			jx_insert(m, jx_string("ds_input_time"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
-			jx_insert(m, jx_string("ds_output_time"), jx_arrayv(jx_double((t->time_when_done - t->time_when_retrieval)/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_insert(m, jx_string("vine_input_size"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
+			jx_insert(m, jx_string("vine_output_size"), jx_arrayv(jx_double(t->bytes_received/((double) MEGABYTE)), jx_string("MB"), NULL));
+			jx_insert(m, jx_string("vine_input_time"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_insert(m, jx_string("vine_output_time"), jx_arrayv(jx_double((t->time_when_done - t->time_when_retrieval)/((double) ONE_SECOND)), jx_string("s"), NULL));
 			jx_print_buffer(m, &B);
 			jx_delete(m);
 		} else {
@@ -96,29 +96,29 @@ void ds_txn_log_write_task(struct ds_manager *q, struct ds_task *t)
 			buffer_printf(&B, " {} {}");
 		}
 	} else {
-		struct ds_worker_info *w = t->worker;
+		struct vine_worker_info *w = t->worker;
 		const char *worker_str = "worker-info-not-available";
 
 		if(w) {
 			worker_str = w->addrport;
 			buffer_printf(&B, " %s ", worker_str);
 
-			if(state == DS_TASK_RUNNING) {
+			if(state == VINE_TASK_RUNNING) {
 				const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
 				buffer_printf(&B, " %s ", allocation);
 				const struct rmsummary *box = itable_lookup(w->current_tasks_boxes, t->taskid);
 				rmsummary_print_buffer(&B, box, 1);
-			} else if(state == DS_TASK_WAITING_RETRIEVAL) {
+			} else if(state == VINE_TASK_WAITING_RETRIEVAL) {
 				/* do not add any info */
 			}
 		}
 	}
 
-	ds_txn_log_write(q, buffer_tostring(&B));
+	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
 }
 
-void ds_txn_log_write_category(struct ds_manager *q, struct category *c)
+void vine_txn_log_write_category(struct vine_manager *q, struct category *c)
 {
 	if(!q->txn_logfile)
 		return;
@@ -131,12 +131,12 @@ void ds_txn_log_write_category(struct ds_manager *q, struct category *c)
 
 	buffer_printf(&B, "CATEGORY %s MAX ", c->name);
 	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX), 1);
-	ds_txn_log_write(q, buffer_tostring(&B));
+	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
 	buffer_printf(&B, "CATEGORY %s MIN ", c->name);
 	rmsummary_print_buffer(&B, category_dynamic_task_min_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
-	ds_txn_log_write(q, buffer_tostring(&B));
+	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
 	const char *mode;
@@ -159,12 +159,12 @@ void ds_txn_log_write_category(struct ds_manager *q, struct category *c)
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
 	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
-	ds_txn_log_write(q, buffer_tostring(&B));
+	vine_txn_log_write(q, buffer_tostring(&B));
 
 	buffer_free(&B);
 }
 
-void ds_txn_log_write_worker(struct ds_manager *q, struct ds_worker_info *w, int leaving, ds_worker_disconnect_reason_t reason_leaving)
+void vine_txn_log_write_worker(struct vine_manager *q, struct vine_worker_info *w, int leaving, vine_worker_disconnect_reason_t reason_leaving)
 {
 	struct buffer B;
 	buffer_init(&B);
@@ -174,22 +174,22 @@ void ds_txn_log_write_worker(struct ds_manager *q, struct ds_worker_info *w, int
 	if(leaving) {
 		buffer_printf(&B, " DISCONNECTION");
 		switch(reason_leaving) {
-			case DS_WORKER_DISCONNECT_IDLE_OUT:
+			case VINE_WORKER_DISCONNECT_IDLE_OUT:
 				buffer_printf(&B, " IDLE_OUT");
 				break;
-			case DS_WORKER_DISCONNECT_FAST_ABORT:
+			case VINE_WORKER_DISCONNECT_FAST_ABORT:
 				buffer_printf(&B, " FAST_ABORT");
 				break;
-			case DS_WORKER_DISCONNECT_FAILURE:
+			case VINE_WORKER_DISCONNECT_FAILURE:
 				buffer_printf(&B, " FAILURE");
 				break;
-			case DS_WORKER_DISCONNECT_STATUS_WORKER:
+			case VINE_WORKER_DISCONNECT_STATUS_WORKER:
 				buffer_printf(&B, " STATUS_WORKER");
 				break;
-			case DS_WORKER_DISCONNECT_EXPLICIT:
+			case VINE_WORKER_DISCONNECT_EXPLICIT:
 				buffer_printf(&B, " EXPLICIT");
 				break;
-			case DS_WORKER_DISCONNECT_UNKNOWN:
+			case VINE_WORKER_DISCONNECT_UNKNOWN:
 			default:
 				buffer_printf(&B, " UNKNOWN");
 				break;
@@ -198,12 +198,12 @@ void ds_txn_log_write_worker(struct ds_manager *q, struct ds_worker_info *w, int
 		buffer_printf(&B, " CONNECTION");
 	}
 
-	ds_txn_log_write(q, buffer_tostring(&B));
+	vine_txn_log_write(q, buffer_tostring(&B));
 
 	buffer_free(&B);
 }
 
-void ds_txn_log_write_worker_resources(struct ds_manager *q, struct ds_worker_info *w)
+void vine_txn_log_write_worker_resources(struct vine_manager *q, struct vine_worker_info *w)
 {
 
 	struct rmsummary *s = rmsummary_create(-1);
@@ -220,7 +220,7 @@ void ds_txn_log_write_worker_resources(struct ds_manager *q, struct ds_worker_in
 
 	buffer_printf(&B, "WORKER %s RESOURCES %s", w->workerid, rjx);
 
-	ds_txn_log_write(q, buffer_tostring(&B));
+	vine_txn_log_write(q, buffer_tostring(&B));
 
 	rmsummary_delete(s);
 	buffer_free(&B);
@@ -228,19 +228,19 @@ void ds_txn_log_write_worker_resources(struct ds_manager *q, struct ds_worker_in
 }
 
 
-void ds_txn_log_write_transfer(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f, size_t size_in_bytes, int time_in_usecs, int is_input )
+void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f, size_t size_in_bytes, int time_in_usecs, int is_input )
 {
 	struct buffer B;
 	buffer_init(&B);
 	buffer_printf(&B, "TRANSFER ");
 	buffer_printf(&B, is_input ? "INPUT":"OUTPUT");
 	buffer_printf(&B, " %d", t->taskid);
-	buffer_printf(&B, " %d", f->flags & DS_CACHE);
+	buffer_printf(&B, " %d", f->flags & VINE_CACHE);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
 	buffer_printf(&B, " %s", f->remote_name);
 
-	ds_txn_log_write(q, buffer_tostring(&B));
+	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
 }
 

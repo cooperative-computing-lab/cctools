@@ -31,11 +31,11 @@ long long int is guaranteed to be at least 64bit. */
 
 /* These return pointers to lists defined in list.h. We aren't
  * wrapping methods in list.h and so ignore these. */
-%ignore ds_cancel_all_tasks;
+%ignore vine_cancel_all_tasks;
 %ignore input_files;
 %ignore output_files;
 
-/* When we enounter buffer_length in the prototype of ds_task_get_output_buffer,
+/* When we enounter buffer_length in the prototype of vine_task_get_output_buffer,
 treat it as an output parameter to be filled in. */
 
 %apply int *OUTPUT { int *buffer_length };

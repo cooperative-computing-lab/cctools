@@ -3,22 +3,22 @@ include ../../../rules.mk
 
 SOURCES = \
 	taskvine_json.c \
-	ds_manager.c \
-	ds_manager_get.c \
-	ds_manager_put.c \
-	ds_manager_summarize.c \
-	ds_schedule.c \
-	ds_worker_info.c \
-	ds_catalog.c \
-	ds_resources.c \
-	ds_task.c \
-	ds_file.c \
-	ds_txn_log.c \
-	ds_perf_log.c \
-	ds_remote_file_info.c \
-	ds_factory_info.c \
-	ds_task_info.c \
-	ds_blocklist.c
+	vine_manager.c \
+	vine_manager_get.c \
+	vine_manager_put.c \
+	vine_manager_summarize.c \
+	vine_schedule.c \
+	vine_worker_info.c \
+	vine_catalog.c \
+	vine_resources.c \
+	vine_task.c \
+	vine_file.c \
+	vine_txn_log.c \
+	vine_perf_log.c \
+	vine_remote_file_info.c \
+	vine_factory_info.c \
+	vine_task_info.c \
+	vine_blocklist.c
 
 PUBLIC_HEADERS = taskvine.h taskvine_json.h
 

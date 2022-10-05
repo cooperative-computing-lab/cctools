@@ -9,7 +9,7 @@ This example shows some of the remote data handling features of taskvine.
 It performs an all-to-all comparison of twenty (relatively small) documents
 downloaded from the Gutenberg public archive.
 
-A small shell script (ds_example_guteberg_task.sh) is used to perform
+A small shell script (vine_example_guteberg_task.sh) is used to perform
 a simple text comparison of each pair of files.
 */
 
@@ -55,56 +55,56 @@ int url_count=25;
 
 int main(int argc, char *argv[])
 {
-	struct ds_manager *m;
-	struct ds_task *t;
+	struct vine_manager *m;
+	struct vine_task *t;
 	int i,j ;
 
-	m = ds_create(DS_DEFAULT_PORT);
+	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));
 		return 1;
 	}
-	printf("listening on port %d...\n", ds_port(m));
+	printf("listening on port %d...\n", vine_port(m));
 
-	ds_specify_debug_log(m,"manager.log");
-	ds_specify_algorithm(m,DS_SCHEDULE_FILES);
+	vine_specify_debug_log(m,"manager.log");
+	vine_specify_algorithm(m,VINE_SCHEDULE_FILES);
 
 	for(i=0;i<url_count;i++) {
 		for(j=0;j<url_count;j++) {
-			struct ds_task *t = ds_task_create("./ds_example_gutenberg_script.sh filea.txt fileb.txt");
+			struct vine_task *t = vine_task_create("./vine_example_gutenberg_script.sh filea.txt fileb.txt");
 
-			ds_task_specify_input_file(t, "ds_example_gutenberg_script.sh", "ds_example_gutenberg_script.sh", DS_CACHE);
-			ds_task_specify_input_url(t, urls[i], "filea.txt", DS_CACHE);
-			ds_task_specify_input_url(t, urls[j], "fileb.txt", DS_CACHE);
+			vine_task_specify_input_file(t, "vine_example_gutenberg_script.sh", "vine_example_gutenberg_script.sh", VINE_CACHE);
+			vine_task_specify_input_url(t, urls[i], "filea.txt", VINE_CACHE);
+			vine_task_specify_input_url(t, urls[j], "fileb.txt", VINE_CACHE);
 
-			ds_task_specify_cores(t,1);
+			vine_task_specify_cores(t,1);
 
-			int taskid = ds_submit(m, t);
+			int taskid = vine_submit(m, t);
 
-			printf("submitted task (id# %d): %s\n", taskid, ds_task_get_command(t) );
+			printf("submitted task (id# %d): %s\n", taskid, vine_task_get_command(t) );
 		}
 	}
 
 	printf("waiting for tasks to complete...\n");
 
-	while(!ds_empty(m)) {
-		t  = ds_wait(m, 5);
+	while(!vine_empty(m)) {
+		t  = vine_wait(m, 5);
 		if(t) {
-			ds_result_t r = ds_task_get_result(t);
-			int id = ds_task_get_taskid(t);
+			vine_result_t r = vine_task_get_result(t);
+			int id = vine_task_get_taskid(t);
 
-			if(r==DS_RESULT_SUCCESS) {
-				printf("task %d output: %s\n",id,ds_task_get_output(t));
+			if(r==VINE_RESULT_SUCCESS) {
+				printf("task %d output: %s\n",id,vine_task_get_output(t));
 			} else {
-				printf("task %d failed: %s\n",id,ds_result_string(r));
+				printf("task %d failed: %s\n",id,vine_result_string(r));
 			}
-			ds_task_delete(t);
+			vine_task_delete(t);
 		}
 	}
 
 	printf("all tasks complete!\n");
 
-	ds_delete(m);
+	vine_delete(m);
 
 	return 0;
 }

@@ -46,7 +46,7 @@ prepare()
 run()
 {
 	# send command to the background, saving its exit status.
-	( ${CCTOOLS_PYTHON_TEST_EXEC} ds_test.py $PORT_FILE --ssl_key ${KEY_FILE} --ssl_cert ${CERT_FILE}; echo $? > $STATUS_FILE ) &
+	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_test.py $PORT_FILE --ssl_key ${KEY_FILE} --ssl_cert ${CERT_FILE}; echo $? > $STATUS_FILE ) &
 
 	# wait at most 15 seconds for the command to find a port.
 	wait_for_file_creation $PORT_FILE 15

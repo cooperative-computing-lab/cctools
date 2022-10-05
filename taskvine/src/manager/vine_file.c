@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_file.h"
+#include "vine_file.h"
 
 #include "debug.h"
 #include "xxmalloc.h"
@@ -18,7 +18,7 @@ See the file COPYING for details.
 #include <limits.h>
 
 /* Internal use: when the worker uses the client library, do not recompute cached names. */
-int ds_hack_do_not_compute_cached_name = 0;
+int vine_hack_do_not_compute_cached_name = 0;
 
 /*
 For a given task and file, generate the name under which the file
@@ -37,7 +37,7 @@ including a hash and a name where one is known, or another
 unique identifier where no name is available.
 */
 
-char *make_cached_name( const struct ds_file *f )
+char *make_cached_name( const struct vine_file *f )
 {
 	static unsigned int file_count = 0;
 	file_count++;
@@ -45,7 +45,7 @@ char *make_cached_name( const struct ds_file *f )
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	char source_enc[PATH_MAX];
 
-	if(f->type == DS_BUFFER) {
+	if(f->type == VINE_BUFFER) {
 		if(f->data) {
 			md5_buffer(f->data, f->length, digest);
 		} else {
@@ -60,25 +60,25 @@ char *make_cached_name( const struct ds_file *f )
 	 * files cannot be shared among tasks, and can be safely deleted once a
 	 * task finishes. */
 	unsigned int cache_file_id = 0;
-	if(!(f->flags & DS_CACHE)) {
+	if(!(f->flags & VINE_CACHE)) {
 		cache_file_id = file_count;
 	}
 
 	switch(f->type) {
-		case DS_FILE:
-		case DS_EMPTY_DIR:
+		case VINE_FILE:
+		case VINE_EMPTY_DIR:
 			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), source_enc);
 			break;
-		case DS_FILE_PIECE:
+		case VINE_FILE_PIECE:
 			return string_format("piece-%d-%s-%s-%lld-%lld",cache_file_id, md5_string(digest),source_enc,(long long)f->offset,(long long)f->piece_length);
 			break;
-		case DS_COMMAND:
+		case VINE_COMMAND:
 			return string_format("cmd-%d-%s", cache_file_id, md5_string(digest));
 			break;
-		case DS_URL:
+		case VINE_URL:
 			return string_format("url-%d-%s", cache_file_id, md5_string(digest));
 			break;
-		case DS_BUFFER:
+		case VINE_BUFFER:
 		default:
 			return string_format("buffer-%d-%s", cache_file_id, md5_string(digest));
 			break;
@@ -87,9 +87,9 @@ char *make_cached_name( const struct ds_file *f )
 
 /* Create a new file object with the given properties. */
 
-struct ds_file *ds_file_create(const char *source, const char *remote_name, const char *data, int length, ds_file_t type, ds_file_flags_t flags)
+struct vine_file *vine_file_create(const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags)
 {
-	struct ds_file *f;
+	struct vine_file *f;
 
 	f = xxmalloc(sizeof(*f));
 
@@ -108,7 +108,7 @@ struct ds_file *ds_file_create(const char *source, const char *remote_name, cons
 		f->data = 0;
 	}
 
-	if(ds_hack_do_not_compute_cached_name) {
+	if(vine_hack_do_not_compute_cached_name) {
   		f->cached_name = xxstrdup(f->source);
 	} else {
 		f->cached_name = make_cached_name(f);
@@ -119,14 +119,14 @@ struct ds_file *ds_file_create(const char *source, const char *remote_name, cons
 
 /* Make a deep copy of a file object to be used independently. */
 
-struct ds_file *ds_file_clone(const struct ds_file *f )
+struct vine_file *vine_file_clone(const struct vine_file *f )
 {
-	return ds_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags);
+	return vine_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags);
 }
 
 /* Delete a file object */
 
-void ds_file_delete(struct ds_file *f)
+void vine_file_delete(struct vine_file *f)
 {
 	free(f->source);
 	free(f->remote_name);

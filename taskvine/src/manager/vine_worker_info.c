@@ -4,20 +4,20 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_worker_info.h"
-#include "ds_remote_file_info.h"
-#include "ds_protocol.h"
-#include "ds_task.h"
-#include "ds_resources.h"
+#include "vine_worker_info.h"
+#include "vine_remote_file_info.h"
+#include "vine_protocol.h"
+#include "vine_task.h"
+#include "vine_resources.h"
 
-struct ds_worker_info * ds_worker_create( struct link * lnk )
+struct vine_worker_info * vine_worker_create( struct link * lnk )
 {
-	struct ds_worker_info *w =  malloc(sizeof(*w));
+	struct vine_worker_info *w =  malloc(sizeof(*w));
 	if(!w) return 0;
 
 	memset(w, 0, sizeof(*w));
 
-	w->type = DS_WORKER_TYPE_UNKNOWN;
+	w->type = VINE_WORKER_TYPE_UNKNOWN;
 	w->link = lnk;
 
 	w->hostname = strdup("unknown");
@@ -27,9 +27,9 @@ struct ds_worker_info * ds_worker_create( struct link * lnk )
 	w->factory_name = 0;
 	w->workerid = 0;
 
-	w->resources = ds_resources_create();
+	w->resources = vine_resources_create();
 	w->features  = hash_table_create(0,0);
-	w->stats     = calloc(1, sizeof(struct ds_stats));
+	w->stats     = calloc(1, sizeof(struct vine_stats));
 
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
@@ -43,7 +43,7 @@ struct ds_worker_info * ds_worker_create( struct link * lnk )
 	return w;
 }
 
-void ds_worker_delete( struct ds_worker_info *w )
+void vine_worker_delete( struct vine_worker_info *w )
 {
 	if(w->link) link_close(w->link);
 
@@ -56,12 +56,12 @@ void ds_worker_delete( struct ds_worker_info *w )
 	free(w->addrport);
 	free(w->hashkey);
 
-	ds_resources_delete(w->resources);
+	vine_resources_delete(w->resources);
 	hash_table_clear(w->features,(void*)free);
 	hash_table_delete(w->features);
 	free(w->stats);
 
-	hash_table_clear(w->current_files,(void*)ds_remote_file_info_delete);
+	hash_table_clear(w->current_files,(void*)vine_remote_file_info_delete);
 	hash_table_delete(w->current_files);
 	itable_delete(w->current_tasks);
 	itable_delete(w->current_tasks_boxes);
@@ -69,15 +69,15 @@ void ds_worker_delete( struct ds_worker_info *w )
 	free(w);
 }
 
-static void current_tasks_to_jx( struct jx *j, struct ds_worker_info *w )
+static void current_tasks_to_jx( struct jx *j, struct vine_worker_info *w )
 {
-	struct ds_task *t;
+	struct vine_task *t;
 	uint64_t taskid;
 	int n = 0;
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
-		char task_string[DS_LINE_MAX];
+		char task_string[VINE_LINE_MAX];
 
 		sprintf(task_string, "current_task_%03d_id", n);
 		jx_insert_integer(j,task_string,t->taskid);
@@ -88,7 +88,7 @@ static void current_tasks_to_jx( struct jx *j, struct ds_worker_info *w )
 	}
 }
 
-struct jx * ds_worker_to_jx( struct ds_worker_info *w )
+struct jx * vine_worker_to_jx( struct vine_worker_info *w )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
@@ -105,7 +105,7 @@ struct jx * ds_worker_to_jx( struct ds_worker_info *w )
 	if(w->factory_name) jx_insert_string(j,"factory_name",w->factory_name);
 	if(w->factory_name) jx_insert_string(j,"workerid",w->workerid);
 
-	ds_resources_add_to_jx(w->resources,j);
+	vine_resources_add_to_jx(w->resources,j);
 
 	jx_insert_integer(j,"ncpus",w->resources->cores.total);
 	jx_insert_integer(j,"total_tasks_complete",w->total_tasks_complete);

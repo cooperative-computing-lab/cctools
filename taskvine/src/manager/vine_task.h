@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_TASK_H
-#define DS_TASK_H
+#ifndef VINE_TASK_H
+#define VINE_TASK_H
 
 /*
 This module defines the internal structure and details of a single task.
@@ -21,46 +21,46 @@ End user may only use the API described in taskvine.h
 
 #include <stdint.h>
 
-struct ds_task {
+struct vine_task {
         /***** Fixed properties of task at submit time. ******/
 
         int taskid;                  /**< A unique task id number. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
 	char *tag;                   /**< An optional user-defined logical name for the task. */
-	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref ds_task_specify_category. If no explicit category is given, the label "default" is used. **/
+	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref vine_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
-	char *monitor_output_directory;	/**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref ds_enable_monitoring */
+	char *monitor_output_directory;	/**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref vine_enable_monitoring */
 	char *monitor_snapshot_file;    /**< Filename the monitor checks to produce snapshots. */
 
 	struct list *input_files;    /**< The files to transfer to the worker and place in the executing directory. */
 	struct list *output_files;   /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
 	struct list *env_list;       /**< Environment variables applied to the task. */
-	struct list *feature_list;   /**< User-defined features this task requires. (See ds_worker's --feature option.) */
+	struct list *feature_list;   /**< User-defined features this task requires. (See vine_worker's --feature option.) */
 
 	category_allocation_t resource_request; /**< See @ref category_allocation_t */
-	ds_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
+	vine_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
 	double priority;             /**< The priority of this task relative to others in the queue: higher number run earlier. */
 	int max_retries;             /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
-	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see ds_worker --wall-time)*/
+	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see vine_worker --wall-time)*/
 
 	/***** Internal state of task as it works towards completion. *****/
 
-	ds_task_state_t state;       /**< Current state of task: READY, RUNNING, etc */
-	struct ds_worker_info *worker;    /**< Worker to which this task has been dispatched. */
-	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref DS_RESULT_MAX_RETRIES. */
+	vine_task_state_t state;       /**< Current state of task: READY, RUNNING, etc */
+	struct vine_worker_info *worker;    /**< Worker to which this task has been dispatched. */
+	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref VINE_RESULT_MAX_RETRIES. */
 	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
 	int fast_abort_count;        /**< Number of times this task has been terminated for running too long. */
 
 	/***** Results of task once it has reached completion. *****/
   
-	ds_result_t result;          /**< The result of the task (see @ref ds_result_t */
+	vine_result_t result;          /**< The result of the task (see @ref vine_result_t */
 	int exit_code;               /**< The exit code of the command line. */
 	char *output;                /**< The standard output of the task. */
 	char *addrport;              /**< The address and port of the host on which it ran. */
 	char *hostname;              /**< The name of the host on which it ran. */
 
-	/***** Metrics available to the user at completion through ds_task_get_metric.  *****/
+	/***** Metrics available to the user at completion through vine_task_get_metric.  *****/
 	/* All times in microseconds */
 	/* A time_when_* refers to an instant in time, otherwise it refers to a length of time. */
 
@@ -86,13 +86,13 @@ struct ds_task {
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
 };
 
-int  ds_task_update_result(struct ds_task *t, ds_result_t new_result );
-void ds_task_specify_resources(struct ds_task *t, const struct rmsummary *rm);
-void ds_task_clean( struct ds_task *t, int full_clean );
-void ds_task_check_consistency( struct ds_task *t );
+int  vine_task_update_result(struct vine_task *t, vine_result_t new_result );
+void vine_task_specify_resources(struct vine_task *t, const struct rmsummary *rm);
+void vine_task_clean( struct vine_task *t, int full_clean );
+void vine_task_check_consistency( struct vine_task *t );
 
-const char *ds_task_state_string( ds_task_state_t task_state );
+const char *vine_task_state_string( vine_task_state_t task_state );
 
-struct jx * ds_task_to_jx( struct ds_manager *q, struct ds_task *t );
+struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t );
 
 #endif

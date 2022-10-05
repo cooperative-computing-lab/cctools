@@ -15,7 +15,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-static const char *ds_properties[] = { "name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "manager_link",
+static const char *vine_properties[] = { "name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "manager_link",
 	"poll_table", "poll_table_size", "tasks", "task_state_map", "ready_list", "worker_table",
 	"worker_blacklist", "worker_task_map", "categories", "workers_with_available_results",
 	"stats", "stats_measure", "stats_disconnected_workers", "time_last_wait",
@@ -30,7 +30,7 @@ static const char *ds_properties[] = { "name", "port", "priority", "num_tasks_le
 	"current_max_worker", "password", "bandwidth", NULL
 };
 
-static const char *ds_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", "environment",
+static const char *vine_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", "environment",
 	"output_files", "env_list", "taskid", "exit_code", "result", "host", "hostname",
 	"category", "resource_request", "priority", "max_retries", "try_count",
 	"exhausted_attempts", "time_when_submitted", "time_when_done",
@@ -89,7 +89,7 @@ static int validate_json(struct jx *json, const char **array)
 
 }
 
-static int specify_files(int input, struct jx *files, struct ds_task *task)
+static int specify_files(int input, struct jx *files, struct vine_task *task)
 {
 
 	void *i = NULL;
@@ -121,11 +121,11 @@ static int specify_files(int input, struct jx *files, struct ds_task *task)
 					bool flag_value = flag->value->u.boolean_value;
 					if(!strcmp(flag_key, "cache")) {
 						if(flag_value) {
-							flags |= DS_CACHE;
+							flags |= VINE_CACHE;
 						}
 					} else if(!strcmp(flag_key, "watch")) {
 						if(flag_value) {
-							flags |= DS_WATCH;
+							flags |= VINE_WATCH;
 						}
 					} else {
 						printf("KEY ERROR: %s not valid\n", flag_key);
@@ -144,9 +144,9 @@ static int specify_files(int input, struct jx *files, struct ds_task *task)
 		}
 
 		if(input) {
-			ds_task_specify_input_file(task, local, remote, flags);
+			vine_task_specify_input_file(task, local, remote, flags);
 		} else {
-			ds_task_specify_output_file(task, local, remote, flags);
+			vine_task_specify_output_file(task, local, remote, flags);
 		}
 
 		arr = jx_iterate_array(files, &i);
@@ -157,7 +157,7 @@ static int specify_files(int input, struct jx *files, struct ds_task *task)
 
 }
 
-static int specify_environment(struct jx *environment, struct ds_task *task)
+static int specify_environment(struct jx *environment, struct vine_task *task)
 {
 	void *j = NULL;
 	void *i = NULL;
@@ -165,7 +165,7 @@ static int specify_environment(struct jx *environment, struct ds_task *task)
 	struct jx *value = jx_iterate_values(environment, &i);
 
 	while(key != NULL) {
-		ds_task_specify_env(task, key, value->u.string_value);
+		vine_task_specify_env(task, key, value->u.string_value);
 		key = jx_iterate_keys(environment, &j);
 		value = jx_iterate_values(environment, &i);
 	}
@@ -175,7 +175,7 @@ static int specify_environment(struct jx *environment, struct ds_task *task)
 
 
 
-static struct ds_task *create_task(const char *str)
+static struct vine_task *create_task(const char *str)
 {
 
 	char *command_line = NULL;
@@ -189,7 +189,7 @@ static struct ds_task *create_task(const char *str)
 		return NULL;
 	}
 	//validate json
-	if(validate_json(json, ds_task_properties)) {
+	if(validate_json(json, vine_task_properties)) {
 		return NULL;
 	}
 	//get command from json
@@ -223,10 +223,10 @@ static struct ds_task *create_task(const char *str)
 
 	}
 
-	//call ds_task_create
+	//call vine_task_create
 	if(command_line) {
 
-		struct ds_task *task = ds_task_create(command_line);
+		struct vine_task *task = vine_task_create(command_line);
 
 		if(!task) {
 			return NULL;
@@ -245,15 +245,15 @@ static struct ds_task *create_task(const char *str)
 		}
 
 		if(cores) {
-			ds_task_specify_cores(task, cores);
+			vine_task_specify_cores(task, cores);
 		}
 
 		if(memory) {
-			ds_task_specify_memory(task, memory);
+			vine_task_specify_memory(task, memory);
 		}
 
 		if(disk) {
-			ds_task_specify_disk(task, disk);
+			vine_task_specify_disk(task, disk);
 		}
 		return task;
 
@@ -263,7 +263,7 @@ static struct ds_task *create_task(const char *str)
 
 }
 
-struct ds_manager *ds_json_create(const char *str)
+struct vine_manager *vine_json_create(const char *str)
 {
 
 
@@ -275,7 +275,7 @@ struct ds_manager *ds_json_create(const char *str)
 		return NULL;
 	}
 	//validate json
-	if(validate_json(json, ds_properties)) {
+	if(validate_json(json, vine_properties)) {
 		return NULL;
 	}
 
@@ -303,17 +303,17 @@ struct ds_manager *ds_json_create(const char *str)
 
 	if(port >= 0) {
 
-		struct ds_manager *taskvine = ds_create(port);
+		struct vine_manager *taskvine = vine_create(port);
 
 		if(!taskvine) {
 			return NULL;
 		}
 
 		if(name) {
-			ds_specify_name(taskvine, name);
+			vine_specify_name(taskvine, name);
 		}
 		if(priority) {
-			ds_specify_priority(taskvine, priority);
+			vine_specify_priority(taskvine, priority);
 		}
 
 		return taskvine;
@@ -324,40 +324,40 @@ struct ds_manager *ds_json_create(const char *str)
 
 }
 
-int ds_json_submit(struct ds_manager *q, const char *str)
+int vine_json_submit(struct vine_manager *q, const char *str)
 {
 
-	struct ds_task *task;
+	struct vine_task *task;
 
 	task = create_task(str);
 
 	if(task) {
-		return ds_submit(q, task);
+		return vine_submit(q, task);
 	} else {
 		return -1;
 	}
 
 }
 
-char *ds_json_wait(struct ds_manager *q, int timeout)
+char *vine_json_wait(struct vine_manager *q, int timeout)
 {
 
 	char *task;
 	struct jx *j;
 	struct jx_pair *command_line, *taskid, *exit_code, *output, *result;
 
-	struct ds_task *t = ds_wait(q, timeout);
+	struct vine_task *t = vine_wait(q, timeout);
 
 	if(!t) {
 		return NULL;
 	}
 
-	command_line = jx_pair(jx_string("command_line"), jx_string(ds_task_get_command(t)), NULL);
-	taskid = jx_pair(jx_string("taskid"), jx_integer(ds_task_get_taskid(t)), command_line);
-	exit_code = jx_pair(jx_string("exit_code"), jx_integer(ds_task_get_exit_code(t)), taskid);
-	result = jx_pair(jx_string("result"), jx_integer(ds_task_get_result(t)), exit_code);
+	command_line = jx_pair(jx_string("command_line"), jx_string(vine_task_get_command(t)), NULL);
+	taskid = jx_pair(jx_string("taskid"), jx_integer(vine_task_get_taskid(t)), command_line);
+	exit_code = jx_pair(jx_string("exit_code"), jx_integer(vine_task_get_exit_code(t)), taskid);
+	result = jx_pair(jx_string("result"), jx_integer(vine_task_get_result(t)), exit_code);
 
-	const char *toutput = ds_task_get_output(t);
+	const char *toutput = vine_task_get_output(t);
 
 	if(toutput) {
 		output = jx_pair(jx_string("output"), jx_string(toutput), result);
@@ -372,21 +372,21 @@ char *ds_json_wait(struct ds_manager *q, int timeout)
 	return task;
 }
 
-char *ds_json_remove(struct ds_manager *q, int id)
+char *vine_json_remove(struct vine_manager *q, int id)
 {
 
 	char *task;
 	struct jx *j;
 	struct jx_pair *command_line, *taskid;
 
-	struct ds_task *t = ds_cancel_by_taskid(q, id);
+	struct vine_task *t = vine_cancel_by_taskid(q, id);
 
 	if(!t) {
 		return NULL;
 	}
 
-	command_line = jx_pair(jx_string("command_line"), jx_string(ds_task_get_command(t)), NULL);
-	taskid = jx_pair(jx_string("taskid"), jx_integer(ds_task_get_taskid(t)), command_line);
+	command_line = jx_pair(jx_string("command_line"), jx_string(vine_task_get_command(t)), NULL);
+	taskid = jx_pair(jx_string("taskid"), jx_integer(vine_task_get_taskid(t)), command_line);
 
 	j = jx_object(taskid);
 
@@ -396,14 +396,14 @@ char *ds_json_remove(struct ds_manager *q, int id)
 
 }
 
-char *ds_json_get_status(struct ds_manager *q)
+char *vine_json_get_status(struct vine_manager *q)
 {
 	char *status;
-	struct ds_stats s;
+	struct vine_stats s;
 	struct jx *j;
 	struct jx_pair *workers_connected, *workers_idle, *workers_busy, *tasks_waiting, *tasks_on_workers, *tasks_running, *tasks_with_results, *tasks_submitted, *tasks_done, *tasks_failed, *bytes_sent, *bytes_received;
 
-	ds_get_stats(q, &s);
+	vine_get_stats(q, &s);
 
 	workers_connected = jx_pair(jx_string("workers_connected"), jx_integer(s.workers_connected), NULL);
 	workers_idle = jx_pair(jx_string("workers_idle"), jx_integer(s.workers_idle), workers_connected);
@@ -426,18 +426,18 @@ char *ds_json_get_status(struct ds_manager *q)
 
 }
 
-int ds_json_empty( struct ds_manager *q )
+int vine_json_empty( struct vine_manager *q )
 {
-	return ds_empty(q);
+	return vine_empty(q);
 }
 
-int ds_json_hungry( struct ds_manager *q )
+int vine_json_hungry( struct vine_manager *q )
 {
-	return ds_hungry(q);
+	return vine_hungry(q);
 }
 
-void ds_json_delete( struct ds_manager *q )
+void vine_json_delete( struct vine_manager *q )
 {
-	ds_delete(q);
+	vine_delete(q);
 }
 

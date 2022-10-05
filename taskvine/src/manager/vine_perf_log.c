@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_manager.h"
+#include "vine_manager.h"
 
 #include "timestamp.h"
 #include "buffer.h"
@@ -14,7 +14,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <stdio.h>
 
-void ds_perf_log_write_header( struct ds_manager *q )
+void vine_perf_log_write_header( struct vine_manager *q )
 {
 	setvbuf(q->perf_logfile, NULL, _IOLBF, 2048); // line buffered, we don't want incomplete lines
 	fprintf(q->perf_logfile,
@@ -47,20 +47,20 @@ void ds_perf_log_write_header( struct ds_manager *q )
 		);
 }
 
-void ds_perf_log_write_update( struct ds_manager *q, int force )
+void vine_perf_log_write_update( struct vine_manager *q, int force )
 {
-	struct ds_stats s;
+	struct vine_stats s;
 
 	timestamp_t now = timestamp_get();
 	if(!force && (now - q->time_last_log_stats < ONE_SECOND)) {
 		return;
 	}
 
-	ds_get_stats(q, &s);
+	vine_get_stats(q, &s);
 	debug(D_DS, "workers connections -- known: %d, connecting: %d, available: %d.",
 			s.workers_connected,
 			s.workers_init,
-			ds_manager_available_workers(q));
+			vine_manager_available_workers(q));
 
 	q->time_last_log_stats = now;
 

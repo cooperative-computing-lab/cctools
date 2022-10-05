@@ -4,25 +4,25 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_WORKER_INFO_H
-#define DS_WORKER_INFO_H
+#ifndef VINE_WORKER_INFO_H
+#define VINE_WORKER_INFO_H
 
 #include "taskvine.h"
-#include "ds_resources.h"
+#include "vine_resources.h"
 
 #include "hash_table.h"
 #include "link.h"
 #include "itable.h"
 
 typedef enum {
-	DS_WORKER_TYPE_UNKNOWN = 1,    // connection has not yet identified itself
-	DS_WORKER_TYPE_WORKER  = 2,    // connection is known to be a worker
-	DS_WORKER_TYPE_STATUS  = 4,    // connection is known to be a status client
-} ds_worker_type_t;
+	VINE_WORKER_TYPE_UNKNOWN = 1,    // connection has not yet identified itself
+	VINE_WORKER_TYPE_WORKER  = 2,    // connection is known to be a worker
+	VINE_WORKER_TYPE_STATUS  = 4,    // connection is known to be a status client
+} vine_worker_type_t;
 
-struct ds_worker_info {
+struct vine_worker_info {
 	/* Type of connection: unknown, worker, status client. */
-	ds_worker_type_t type;
+	vine_worker_type_t type;
 
 	/* Connection to the worker or other client. */
 	struct link *link;
@@ -54,9 +54,9 @@ struct ds_worker_info {
 	                                        // If -1, means the worker has not reported in. If 0, means no limit.
 
 	/* Resources and features that describe this worker. */
-	struct ds_resources *resources;
+	struct vine_resources *resources;
 	struct hash_table   *features;
-	struct ds_stats     *stats;
+	struct vine_stats     *stats;
 
 	/* Current files and tasks that have been transfered to this worker */
 	struct hash_table   *current_files;
@@ -74,8 +74,8 @@ struct ds_worker_info {
 	timestamp_t last_update_msg_time;
 };
 
-struct ds_worker_info * ds_worker_create( struct link * lnk );
-void ds_worker_delete( struct ds_worker_info *w );
+struct vine_worker_info * vine_worker_create( struct link * lnk );
+void vine_worker_delete( struct vine_worker_info *w );
 
-struct jx * ds_worker_to_jx( struct ds_worker_info *w );
+struct jx * vine_worker_to_jx( struct vine_worker_info *w );
 #endif

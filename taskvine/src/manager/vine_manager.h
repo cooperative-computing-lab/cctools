@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_MANAGER_H
-#define DS_MANAGER_H
+#ifndef VINE_MANAGER_H
+#define VINE_MANAGER_H
 
 /*
 This module defines the structures and types of the manager process as a whole.
@@ -22,50 +22,50 @@ the application, or the manager.
 */
 
 typedef enum {
-	DS_SUCCESS = 0,
-	DS_WORKER_FAILURE,
-	DS_APP_FAILURE,
-	DS_MGR_FAILURE,
-	DS_END_OF_LIST,
-} ds_result_code_t;
+	VINE_SUCCESS = 0,
+	VINE_WORKER_FAILURE,
+	VINE_APP_FAILURE,
+	VINE_MGR_FAILURE,
+	VINE_END_OF_LIST,
+} vine_result_code_t;
 
 /*
-The result of ds_manager_recv{_retry}, indicating whether an
+The result of vine_manager_recv{_retry}, indicating whether an
 incoming message was processed, and the expected next state of the connection.
 */
 
 typedef enum {
-	DS_MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */
-	DS_MSG_PROCESSED_DISCONNECT, /* Message was processed and disconnect now expected. */
-	DS_MSG_NOT_PROCESSED,        /* Message was not processed, waiting to be consumed. */
-	DS_MSG_FAILURE               /* Message not received, connection failure. */
-} ds_msg_code_t;
+	VINE_MSG_PROCESSED = 0,        /* Message was processed and connection is still good. */
+	VINE_MSG_PROCESSED_DISCONNECT, /* Message was processed and disconnect now expected. */
+	VINE_MSG_NOT_PROCESSED,        /* Message was not processed, waiting to be consumed. */
+	VINE_MSG_FAILURE               /* Message not received, connection failure. */
+} vine_msg_code_t;
 
 /* The current resource monitoring configuration of the manager. */
 
 typedef enum {
-	DS_MON_DISABLED = 0,
-	DS_MON_SUMMARY  = 1,   /* generate only summary. */
-	DS_MON_FULL     = 2,   /* generate summary, series and monitoring debug output. */
-	DS_MON_WATCHDOG = 4    /* kill tasks that exhaust resources */
-} ds_monitoring_mode_t;
+	VINE_MON_DISABLED = 0,
+	VINE_MON_SUMMARY  = 1,   /* generate only summary. */
+	VINE_MON_FULL     = 2,   /* generate summary, series and monitoring debug output. */
+	VINE_MON_WATCHDOG = 4    /* kill tasks that exhaust resources */
+} vine_monitoring_mode_t;
 
 /* The various reasons why a worker process may disconnect from the manager. */
 
 typedef enum {
-	DS_WORKER_DISCONNECT_UNKNOWN  = 0,
-	DS_WORKER_DISCONNECT_EXPLICIT,
-	DS_WORKER_DISCONNECT_STATUS_WORKER,
-	DS_WORKER_DISCONNECT_IDLE_OUT,
- 	DS_WORKER_DISCONNECT_FAST_ABORT,
-	DS_WORKER_DISCONNECT_FAILURE
-} ds_worker_disconnect_reason_t;
+	VINE_WORKER_DISCONNECT_UNKNOWN  = 0,
+	VINE_WORKER_DISCONNECT_EXPLICIT,
+	VINE_WORKER_DISCONNECT_STATUS_WORKER,
+	VINE_WORKER_DISCONNECT_IDLE_OUT,
+ 	VINE_WORKER_DISCONNECT_FAST_ABORT,
+	VINE_WORKER_DISCONNECT_FAILURE
+} vine_worker_disconnect_reason_t;
 
-struct ds_worker_info;
-struct ds_task;
-struct ds_file;
+struct vine_worker_info;
+struct vine_task;
+struct vine_file;
 
-struct ds_manager {
+struct vine_manager {
 
 	/* Connection and communication settings */
 
@@ -73,7 +73,7 @@ struct ds_manager {
 	int   port;          /* Port number on which this manager is listening for connections. */
 	int   priority;      /* Priority of this manager relative to other managers with the same name. */
 	char *catalog_hosts; /* List of catalogs to which this manager reports. */
-	char *manager_preferred_connection; /* Recommended method for connecting to this manager.  @ref ds_manager_preferred_connection */
+	char *manager_preferred_connection; /* Recommended method for connecting to this manager.  @ref vine_manager_preferred_connection */
 	char  workingdir[PATH_MAX];         /* Current working dir, for reporting to the catalog server. */
 
 	struct link *manager_link;       /* Listening TCP connection for accepting new workers. */
@@ -89,34 +89,34 @@ struct ds_manager {
 
 	/* Primary data structures for tracking task state. */
 
-	struct itable *tasks;           /* Maps taskid -> ds_task of all tasks in any state. */
-	struct list   *ready_list;      /* List of ds_task that are waiting to execute. */
-	struct list   *task_info_list;  /* List of last N ds_task_infos for computing capacity. */
+	struct itable *tasks;           /* Maps taskid -> vine_task of all tasks in any state. */
+	struct list   *ready_list;      /* List of vine_task that are waiting to execute. */
+	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
 
 	/* Primary data structures for tracking worker state. */
 
-	struct hash_table *worker_table;     /* Maps link -> ds_worker_info */
-	struct hash_table *worker_blocklist; /* Maps hostname -> ds_blocklist_info */
-	struct hash_table *factory_table;    /* Maps factory_name -> ds_factory_info */
-	struct hash_table *workers_with_available_results;  /* Maps link -> ds_worker_info */
+	struct hash_table *worker_table;     /* Maps link -> vine_worker_info */
+	struct hash_table *worker_blocklist; /* Maps hostname -> vine_blocklist_info */
+	struct hash_table *factory_table;    /* Maps factory_name -> vine_factory_info */
+	struct hash_table *workers_with_available_results;  /* Maps link -> vine_worker_info */
 
 	/* Primary scheduling controls. */
 
-	ds_schedule_t worker_selection_algorithm;    /* Mode for selecting best worker for task in main scheduler. */
-	ds_category_mode_t allocation_default_mode;  /* Mode for computing resources allocations for each task. */
+	vine_schedule_t worker_selection_algorithm;    /* Mode for selecting best worker for task in main scheduler. */
+	vine_category_mode_t allocation_default_mode;  /* Mode for computing resources allocations for each task. */
 
 	/* Internal state modified by the manager */
 
  	int next_taskid;       /* Next integer taskid to be assigned to a created task. */
-	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref ds_specify_num_tasks */
+	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_specify_num_tasks */
 	int busy_waiting_flag; /* Set internally in main loop if no messages were processed -> wait longer. */
 
 	/* Accumulation of statistics for reporting to the caller. */
 
-	struct ds_stats *stats;		 
-	struct ds_stats *stats_measure;
-	struct ds_stats *stats_disconnected_workers;
+	struct vine_stats *stats;		 
+	struct vine_stats *stats_measure;
+	struct vine_stats *stats_disconnected_workers;
 
 	/* Time of most recent events for computing various timeouts */
 
@@ -134,7 +134,7 @@ struct ds_manager {
 
 	/* Resource monitoring configuration. */
 
-	ds_monitoring_mode_t monitor_mode;
+	vine_monitoring_mode_t monitor_mode;
 	FILE *monitor_file;
 	char *monitor_output_directory;
 	char *monitor_summary_filename;
@@ -173,24 +173,24 @@ be called on the manager object by other elements of the manager process.
 #ifndef SWIG
 __attribute__ (( format(printf,3,4) ))
 #endif
-int ds_manager_send( struct ds_manager *q, struct ds_worker_info *w, const char *fmt, ... );
+int vine_manager_send( struct vine_manager *q, struct vine_worker_info *w, const char *fmt, ... );
 
 /* Receive a line-oriented message from a remote worker. */
-ds_msg_code_t ds_manager_recv_retry( struct ds_manager *q, struct ds_worker_info *w, char *line, int length );
+vine_msg_code_t vine_manager_recv_retry( struct vine_manager *q, struct vine_worker_info *w, char *line, int length );
 
 /* Compute the expected wait time for a transfer of length bytes. */
-int ds_manager_transfer_wait_time( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, int64_t length );
+int vine_manager_transfer_wait_time( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length );
 
 /* Give the number of workers available to run tasks at the moment. */
-int ds_manager_available_workers(struct ds_manager *q);
+int vine_manager_available_workers(struct vine_manager *q);
 
 /* Various functions to compute expected properties of tasks. */
-const struct rmsummary *ds_manager_task_min_resources(struct ds_manager *q, struct ds_task *t);
-const struct rmsummary *ds_manager_task_max_resources(struct ds_manager *q, struct ds_task *t);
+const struct rmsummary *vine_manager_task_min_resources(struct vine_manager *q, struct vine_task *t);
+const struct rmsummary *vine_manager_task_max_resources(struct vine_manager *q, struct vine_task *t);
 
-struct rmsummary *ds_manager_choose_resources_for_task( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
+struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 
-int64_t overcommitted_resource_total(struct ds_manager *q, int64_t total);
+int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);
 
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "ds-%d-task-%d"

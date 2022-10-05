@@ -1,6 +1,6 @@
 
-#include "ds_manager_summarize.h"
-#include "ds_worker_info.h"
+#include "vine_manager_summarize.h"
+#include "vine_worker_info.h"
 
 #include "rmsummary.h"
 #include "hash_table.h"
@@ -69,9 +69,9 @@ static double round_to_nice_power_of_2(double value, int n) {
 	return rounded;
 }
 
-struct rmsummary ** ds_manager_summarize_workers( struct ds_manager *q )
+struct rmsummary ** vine_manager_summarize_workers( struct vine_manager *q )
 {
-	struct ds_worker_info *w;
+	struct vine_worker_info *w;
 	struct rmsummary *s;
 	char *id;
 	char *resources_key;

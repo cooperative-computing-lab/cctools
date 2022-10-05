@@ -4,10 +4,10 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_sandbox.h"
-#include "ds_cache.h"
-#include "ds_task.h"
-#include "ds_file.h"
+#include "vine_sandbox.h"
+#include "vine_cache.h"
+#include "vine_task.h"
+#include "vine_file.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -22,7 +22,7 @@ See the file COPYING for details.
 
 extern int symlinks_enabled;
 
-char * ds_sandbox_full_path( struct ds_process *p, const char *sandbox_name )
+char * vine_sandbox_full_path( struct vine_process *p, const char *sandbox_name )
 {
 	return string_format("%s/%s",p->sandbox,sandbox_name);
 }
@@ -33,19 +33,19 @@ Ensure that a given input file/dir/object is present in the cache,
 and then link it into the sandbox at the desired location.
 */
 
-static int ensure_input_file( struct ds_process *p, struct ds_file *f, struct ds_cache *cache, struct link *manager )
+static int ensure_input_file( struct vine_process *p, struct vine_file *f, struct vine_cache *cache, struct link *manager )
 {
-	char *cache_path = ds_cache_full_path(cache,f->cached_name);
-	char *sandbox_path = ds_sandbox_full_path(p,f->remote_name);
+	char *cache_path = vine_cache_full_path(cache,f->cached_name);
+	char *sandbox_path = vine_sandbox_full_path(p,f->remote_name);
 	
 	int result = 0;
 
-	if(f->type==DS_EMPTY_DIR) {
+	if(f->type==VINE_EMPTY_DIR) {
 		/* Special case: empty directories are not cached objects, just create in sandbox */
 		result = create_dir(sandbox_path, 0700);
 		if(!result) debug(D_DS,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
-	} else if(ds_cache_ensure(cache,f->cached_name,manager)) {
+	} else if(vine_cache_ensure(cache,f->cached_name,manager)) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_DS,"input: link %s -> %s",cache_path,sandbox_path);
@@ -64,10 +64,10 @@ For each input file specified by the process,
 transfer it into the sandbox directory.
 */
 
-int ds_sandbox_stagein( struct ds_process *p, struct ds_cache *cache, struct link *manager )
+int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *cache, struct link *manager )
 {
-	struct ds_task *t = p->task;
-	struct ds_file *f;
+	struct vine_task *t = p->task;
+	struct vine_file *f;
 	int result=1;
 	
 	if(t->input_files) {
@@ -89,10 +89,10 @@ then attempt a recursive copy.
 Inform the cache of the added file.
 */
 
-static int transfer_output_file( struct ds_process *p, struct ds_file *f, struct ds_cache *cache )
+static int transfer_output_file( struct vine_process *p, struct vine_file *f, struct vine_cache *cache )
 {
-	char *cache_path = ds_cache_full_path(cache,f->cached_name);
-	char *sandbox_path = ds_sandbox_full_path(p,f->remote_name);
+	char *cache_path = vine_cache_full_path(cache,f->cached_name);
+	char *sandbox_path = vine_sandbox_full_path(p,f->remote_name);
 
 	int result = 0;
 	
@@ -112,7 +112,7 @@ static int transfer_output_file( struct ds_process *p, struct ds_file *f, struct
 	if(result) {
 		struct stat info;
 		if(stat(cache_path,&info)==0) {
-			ds_cache_addfile(cache,info.st_size,f->cached_name);
+			vine_cache_addfile(cache,info.st_size,f->cached_name);
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
 			debug(D_DS,"output: failed to stat %s: %s",cache_path,strerror(errno));
@@ -133,9 +133,9 @@ created, we still want the task to be marked as completed and sent back to the
 manager.  The manager will handle the consequences of missing output files.
 */
 
-int ds_sandbox_stageout( struct ds_process *p, struct ds_cache *cache )
+int vine_sandbox_stageout( struct vine_process *p, struct vine_cache *cache )
 {
-	struct ds_file *f;
+	struct vine_file *f;
 	list_first_item(p->task->output_files);
 	while((f = list_next_item(p->task->output_files))) {
 		transfer_output_file(p,f,cache);

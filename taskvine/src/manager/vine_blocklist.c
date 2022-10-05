@@ -4,34 +4,34 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_blocklist.h"
+#include "vine_blocklist.h"
 
 #include "hash_table.h"
 #include "debug.h"
 
 #include <stdlib.h>
 
-struct ds_blocklist_info * ds_blocklist_info_create()
+struct vine_blocklist_info * vine_blocklist_info_create()
 {
-	struct ds_blocklist_info *info;
+	struct vine_blocklist_info *info;
 	info = malloc(sizeof(*info));
 	memset(info,0,sizeof(*info));
 	return info;
 }
 
-void ds_blocklist_info_delete( struct ds_blocklist_info *info )
+void vine_blocklist_info_delete( struct vine_blocklist_info *info )
 {
 	free(info);
 }
 
-void ds_blocklist_unblock( struct ds_manager *q, const char *host )
+void vine_blocklist_unblock( struct vine_manager *q, const char *host )
 {
-	struct ds_blocklist_info *info;
+	struct vine_blocklist_info *info;
 	info = hash_table_remove(q->worker_blocklist,host);
-	if(info) ds_blocklist_info_delete(info);
+	if(info) vine_blocklist_info_delete(info);
 }
 
-struct jx *ds_blocklist_to_jx( struct ds_manager  *q )
+struct jx *vine_blocklist_to_jx( struct vine_manager  *q )
 {
 	if(hash_table_size(q->worker_blocklist) < 1) {
 		return NULL;
@@ -40,7 +40,7 @@ struct jx *ds_blocklist_to_jx( struct ds_manager  *q )
 	struct jx *j = jx_array(0);
 
 	char *hostname;
-	struct ds_blocklist_info *info;
+	struct vine_blocklist_info *info;
 
 	hash_table_firstkey(q->worker_blocklist);
 	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
@@ -53,10 +53,10 @@ struct jx *ds_blocklist_to_jx( struct ds_manager  *q )
 }
 
 /* deadline < 1 means release all, regardless of release_at time. */
-void ds_blocklist_unblock_all_by_time(struct ds_manager *q, time_t deadline)
+void vine_blocklist_unblock_all_by_time(struct vine_manager *q, time_t deadline)
 {
 	char *hostname;
-	struct ds_blocklist_info *info;
+	struct vine_blocklist_info *info;
 
 	hash_table_firstkey(q->worker_blocklist);
 	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
@@ -72,15 +72,15 @@ void ds_blocklist_unblock_all_by_time(struct ds_manager *q, time_t deadline)
 			continue;
 
 		debug(D_DS, "Clearing hostname %s from blocklist.\n", hostname);
-		ds_blocklist_unblock(q, hostname);
+		vine_blocklist_unblock(q, hostname);
 	}
 }
 
-void ds_blocklist_block( struct ds_manager *q, const char *hostname, time_t timeout )
+void vine_blocklist_block( struct vine_manager *q, const char *hostname, time_t timeout )
 {
-	struct ds_blocklist_info *info = hash_table_lookup(q->worker_blocklist,hostname);
+	struct vine_blocklist_info *info = hash_table_lookup(q->worker_blocklist,hostname);
 	if(!info) {
-		info = ds_blocklist_info_create();
+		info = vine_blocklist_info_create();
 		hash_table_insert(q->worker_blocklist,hostname,info);
 	}
 
@@ -101,9 +101,9 @@ void ds_blocklist_block( struct ds_manager *q, const char *hostname, time_t time
 	}
 }
 
-int ds_blocklist_is_blocked( struct ds_manager *q, const char *hostname )
+int vine_blocklist_is_blocked( struct vine_manager *q, const char *hostname )
 {
-	struct ds_blocklist_info *info = hash_table_lookup(q->worker_blocklist,hostname);
+	struct vine_blocklist_info *info = hash_table_lookup(q->worker_blocklist,hostname);
 	return info && info->blocked;
 }
 

@@ -1,10 +1,10 @@
-#include "ds_manager_put.h"
-#include "ds_worker_info.h"
-#include "ds_task.h"
-#include "ds_file.h"
-#include "ds_protocol.h"
-#include "ds_remote_file_info.h"
-#include "ds_txn_log.h"
+#include "vine_manager_put.h"
+#include "vine_worker_info.h"
+#include "vine_task.h"
+#include "vine_file.h"
+#include "vine_protocol.h"
+#include "vine_remote_file_info.h"
+#include "vine_txn_log.h"
 
 #include "debug.h"
 #include "timestamp.h"
@@ -29,23 +29,23 @@ as the "body" of the link, following the
 message header.
 */
 
-static int ds_manager_put_symlink( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *localname, const char *remotename, int64_t *total_bytes )
+static int vine_manager_put_symlink( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, int64_t *total_bytes )
 {
-	char target[DS_LINE_MAX];
+	char target[VINE_LINE_MAX];
 
 	int length = readlink(localname,target,sizeof(target));
-	if(length<0) return DS_APP_FAILURE;
+	if(length<0) return VINE_APP_FAILURE;
 
-	char remotename_encoded[DS_LINE_MAX];
+	char remotename_encoded[VINE_LINE_MAX];
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
 
-	ds_manager_send(q,w,"symlink %s %d\n",remotename_encoded,length);
+	vine_manager_send(q,w,"symlink %s %d\n",remotename_encoded,length);
 
 	link_write(w->link,target,length,time(0)+q->long_timeout);
 
 	*total_bytes += length;
 
-	return DS_SUCCESS;
+	return VINE_SUCCESS;
 }
 
 /*
@@ -54,7 +54,7 @@ The transfer time is controlled by the size of the file.
 If the transfer takes too long, then abort.
 */
 
-static int ds_manager_put_file( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, struct stat info, int64_t *total_bytes )
+static int vine_manager_put_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, struct stat info, int64_t *total_bytes )
 {
 	time_t stoptime;
 	timestamp_t effective_stoptime = 0;
@@ -70,7 +70,7 @@ static int ds_manager_put_file( struct ds_manager *q, struct ds_worker_info *w, 
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s: %s", localname, strerror(errno));
-		return DS_APP_FAILURE;
+		return VINE_APP_FAILURE;
 	}
 
 	/* If we are sending only a piece of the file, seek there first. */
@@ -79,12 +79,12 @@ static int ds_manager_put_file( struct ds_manager *q, struct ds_worker_info *w, 
 		if(lseek(fd, offset, SEEK_SET) == -1) {
 			debug(D_NOTICE, "Cannot seek file %s to offset %lld: %s", localname, (long long) offset, strerror(errno));
 			close(fd);
-			return DS_APP_FAILURE;
+			return VINE_APP_FAILURE;
 		}
 	} else {
 		debug(D_NOTICE, "File specification %s (%lld:%lld) is invalid", localname, (long long) offset, (long long) offset+length);
 		close(fd);
-		return DS_APP_FAILURE;
+		return VINE_APP_FAILURE;
 	}
 
 	if(q->bandwidth_limit) {
@@ -92,29 +92,29 @@ static int ds_manager_put_file( struct ds_manager *q, struct ds_worker_info *w, 
 	}
 
 	/* filenames are url-encoded to avoid problems with spaces, etc */
-	char remotename_encoded[DS_LINE_MAX];
+	char remotename_encoded[VINE_LINE_MAX];
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
 
-	stoptime = time(0) + ds_manager_transfer_wait_time(q, w, t, length);
-	ds_manager_send(q,w, "file %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
+	stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, length);
+	vine_manager_send(q,w, "file %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 
 	*total_bytes += actual;
 
-	if(actual != length) return DS_WORKER_FAILURE;
+	if(actual != length) return VINE_WORKER_FAILURE;
 
 	timestamp_t current_time = timestamp_get();
 	if(effective_stoptime && effective_stoptime > current_time) {
 		usleep(effective_stoptime - current_time);
 	}
 
-	return DS_SUCCESS;
+	return VINE_SUCCESS;
 }
 
 /* Need prototype here to address mutually recursive code. */
 
-static ds_result_code_t ds_manager_put_item( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *name, const char *remotename, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links );
+static vine_result_code_t vine_manager_put_item( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *name, const char *remotename, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links );
 
 /*
 Send a directory and all of its contents using the new streaming protocol.
@@ -122,20 +122,20 @@ Do this by sending a "dir" prefix, then all of the directory contents,
 and then an "end" marker.
 */
 
-static ds_result_code_t ds_manager_put_directory( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *localname, const char *remotename, int64_t * total_bytes )
+static vine_result_code_t vine_manager_put_directory( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, int64_t * total_bytes )
 {
 	DIR *dir = opendir(localname);
 	if(!dir) {
 		debug(D_NOTICE, "Cannot open dir %s: %s", localname, strerror(errno));
-		return DS_APP_FAILURE;
+		return VINE_APP_FAILURE;
 	}
 
-	ds_result_code_t result = DS_SUCCESS;
+	vine_result_code_t result = VINE_SUCCESS;
 
-	char remotename_encoded[DS_LINE_MAX];
+	char remotename_encoded[VINE_LINE_MAX];
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
 
-	ds_manager_send(q,w,"dir %s\n",remotename_encoded);
+	vine_manager_send(q,w,"dir %s\n",remotename_encoded);
 
 	struct dirent *d;
 	while((d = readdir(dir))) {
@@ -143,14 +143,14 @@ static ds_result_code_t ds_manager_put_directory( struct ds_manager *q, struct d
 
 		char *localpath = string_format("%s/%s",localname,d->d_name);
 
-		result = ds_manager_put_item( q, w, t, localpath, d->d_name, 0, 0, total_bytes, 0 );
+		result = vine_manager_put_item( q, w, t, localpath, d->d_name, 0, 0, total_bytes, 0 );
 
 		free(localpath);
 
-		if(result != DS_SUCCESS) break;
+		if(result != VINE_SUCCESS) break;
 	}
 
-	ds_manager_send(q,w,"end\n");
+	vine_manager_send(q,w,"end\n");
 
 	closedir(dir);
 	return result;
@@ -170,10 +170,10 @@ and internal links are not followed, they are sent natively.
 */
 
 
-static ds_result_code_t ds_manager_put_item( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links )
+static vine_result_code_t vine_manager_put_item( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links )
 {
 	struct stat info;
-	int result = DS_SUCCESS;
+	int result = VINE_SUCCESS;
 
 	if(follow_links) {
 		result = stat(localpath,&info);
@@ -183,17 +183,17 @@ static ds_result_code_t ds_manager_put_item( struct ds_manager *q, struct ds_wor
 
 	if(result>=0) {
 		if(S_ISDIR(info.st_mode))  {
-			result = ds_manager_put_directory( q, w, t, localpath, remotepath, total_bytes );
+			result = vine_manager_put_directory( q, w, t, localpath, remotepath, total_bytes );
 		} else if(S_ISLNK(info.st_mode)) {
-			result = ds_manager_put_symlink( q, w, t, localpath, remotepath, total_bytes );
+			result = vine_manager_put_symlink( q, w, t, localpath, remotepath, total_bytes );
 		} else if(S_ISREG(info.st_mode)) {
-			result = ds_manager_put_file( q, w, t, localpath, remotepath, offset, length, info, total_bytes );
+			result = vine_manager_put_file( q, w, t, localpath, remotepath, offset, length, info, total_bytes );
 		} else {
 			debug(D_NOTICE,"skipping unusual file: %s",strerror(errno));
 		}
 	} else {
 		debug(D_NOTICE, "cannot stat file %s: %s", localpath, strerror(errno));
-		result = DS_APP_FAILURE;
+		result = VINE_APP_FAILURE;
 	}
 
 	return result;
@@ -207,19 +207,19 @@ We do not want to rewrite the file while some other task may be using it.
 Otherwise, send it to the worker.
 */
 
-static ds_result_code_t ds_manager_put_item_if_not_cached( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *tf, const char *expanded_local_name, int64_t * total_bytes)
+static vine_result_code_t vine_manager_put_item_if_not_cached( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *tf, const char *expanded_local_name, int64_t * total_bytes)
 {
 	struct stat local_info;
 	if(lstat(expanded_local_name, &local_info) < 0) {
 		debug(D_NOTICE, "Cannot stat file %s: %s", expanded_local_name, strerror(errno));
-		return DS_APP_FAILURE;
+		return VINE_APP_FAILURE;
 	}
 
-	struct ds_remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
+	struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
 	if(remote_info && (remote_info->mtime != local_info.st_mtime || remote_info->size != local_info.st_size)) {
 		debug(D_NOTICE|D_DS, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
-		return DS_SUCCESS;
+		return VINE_SUCCESS;
 	} else if(!remote_info) {
 
 		if(tf->offset==0 && tf->length==0) {
@@ -228,18 +228,18 @@ static ds_result_code_t ds_manager_put_item_if_not_cached( struct ds_manager *q,
 			debug(D_DS, "%s (%s) needs file %s (offset %lld length %lld) as '%s'", w->hostname, w->addrport, expanded_local_name, (long long) tf->offset, (long long) tf->length, tf->cached_name );
 		}
 
-		ds_result_code_t result;
-		result = ds_manager_put_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
+		vine_result_code_t result;
+		result = vine_manager_put_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
 
-		if(result == DS_SUCCESS && tf->flags & DS_CACHE) {
-			remote_info = ds_remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
+		if(result == VINE_SUCCESS && tf->flags & VINE_CACHE) {
+			remote_info = vine_remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
 			hash_table_insert(w->current_files, tf->cached_name, remote_info);
 		}
 
 		return result;
 	} else {
 		/* Up-to-date file on the worker, we do nothing. */
-		return DS_SUCCESS;
+		return VINE_SUCCESS;
 	}
 }
 
@@ -253,7 +253,7 @@ for any of the environment variables, it will return the input string
 as is.
 */
 
-static char *expand_envnames(struct ds_worker_info *w, const char *source)
+static char *expand_envnames(struct vine_worker_info *w, const char *source)
 {
 	char *expanded_name;
 	char *str, *curr_pos;
@@ -322,81 +322,81 @@ may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-static ds_result_code_t ds_manager_put_special_if_not_cached( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *tf, const char *typestring )
+static vine_result_code_t vine_manager_put_special_if_not_cached( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *tf, const char *typestring )
 {
-	if(hash_table_lookup(w->current_files,tf->cached_name)) return DS_SUCCESS;
+	if(hash_table_lookup(w->current_files,tf->cached_name)) return VINE_SUCCESS;
 
-	char source_encoded[DS_LINE_MAX];
-	char cached_name_encoded[DS_LINE_MAX];
+	char source_encoded[VINE_LINE_MAX];
+	char cached_name_encoded[VINE_LINE_MAX];
 
 	url_encode(tf->source,source_encoded,sizeof(source_encoded));
 	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
 
-	ds_manager_send(q,w,"%s %s %s %d %o %d\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777,tf->flags);
+	vine_manager_send(q,w,"%s %s %s %d %o %d\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777,tf->flags);
 
-	if(tf->flags & DS_CACHE) {
-		struct ds_remote_file_info *remote_info = ds_remote_file_info_create(tf->type,tf->length,time(0));
+	if(tf->flags & VINE_CACHE) {
+		struct vine_remote_file_info *remote_info = vine_remote_file_info_create(tf->type,tf->length,time(0));
 		hash_table_insert(w->current_files,tf->cached_name,remote_info);
 	}
 
-	return DS_SUCCESS;
+	return VINE_SUCCESS;
 }
 
 /*
 Send a single input file of any type to the given worker, and record the performance.
 */
 
-static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t, struct ds_file *f)
+static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
 {
 
 	int64_t total_bytes = 0;
 	int64_t actual = 0;
-	ds_result_code_t result = DS_SUCCESS; //return success unless something fails below
+	vine_result_code_t result = VINE_SUCCESS; //return success unless something fails below
 
 	timestamp_t open_time = timestamp_get();
 
 	switch (f->type) {
 
-	case DS_BUFFER:
+	case VINE_BUFFER:
 		debug(D_DS, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
-		time_t stoptime = time(0) + ds_manager_transfer_wait_time(q, w, t, f->length);
-		ds_manager_send(q,w, "file %s %d %o\n",f->cached_name, f->length, 0777 );
+		time_t stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, f->length);
+		vine_manager_send(q,w, "file %s %d %o\n",f->cached_name, f->length, 0777 );
 		actual = link_putlstring(w->link, f->data, f->length, stoptime);
 		if(actual!=f->length) {
-			result = DS_WORKER_FAILURE;
+			result = VINE_WORKER_FAILURE;
 		}
 		total_bytes = actual;
 		break;
 
-	case DS_COMMAND:
+	case VINE_COMMAND:
 		debug(D_DS, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->source);
-		result = ds_manager_put_special_if_not_cached(q,w,t,f,"putcmd");
+		result = vine_manager_put_special_if_not_cached(q,w,t,f,"putcmd");
 		break;
 
-	case DS_URL:
+	case VINE_URL:
 		debug(D_DS, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->source);
-		result = ds_manager_put_special_if_not_cached(q,w,t,f,"puturl");
+		result = vine_manager_put_special_if_not_cached(q,w,t,f,"puturl");
 		break;
 
-	case DS_EMPTY_DIR:
+	case VINE_EMPTY_DIR:
 		debug(D_DS, "%s (%s) will create directory %s", w->hostname, w->addrport, f->remote_name);
-  		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as DS_FILEs
+  		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as VINE_FILEs
 		break;
 
-	case DS_FILE:
-	case DS_FILE_PIECE: {
+	case VINE_FILE:
+	case VINE_FILE_PIECE: {
 		char *expanded_source = expand_envnames(w, f->source);
 		if(expanded_source) {
-			result = ds_manager_put_item_if_not_cached(q,w,t,f,expanded_source,&total_bytes);
+			result = vine_manager_put_item_if_not_cached(q,w,t,f,expanded_source,&total_bytes);
 			free(expanded_source);
 		} else {
-			result = DS_APP_FAILURE; //signal app-level failure.
+			result = VINE_APP_FAILURE; //signal app-level failure.
 		}
 		break;
 		}
 	}
 
-	if(result == DS_SUCCESS) {
+	if(result == VINE_SUCCESS) {
 		timestamp_t close_time = timestamp_get();
 		timestamp_t elapsed_time = close_time-open_time;
 
@@ -409,7 +409,7 @@ static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct d
 		q->stats->bytes_sent += total_bytes;
 
 		// Write to the transaction log.
-		ds_txn_log_write_transfer(q, w, t, f, total_bytes, elapsed_time, 1);
+		vine_txn_log_write_transfer(q, w, t, f, total_bytes, elapsed_time, 1);
 
 		// Avoid division by zero below.
 		if(elapsed_time==0) elapsed_time = 1;
@@ -428,11 +428,11 @@ static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct d
 		debug(D_DS, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
 			w->hostname,
 			w->addrport,
-			f->type == DS_BUFFER ? "literal data" : f->source,
+			f->type == VINE_BUFFER ? "literal data" : f->source,
 			total_bytes);
 
-		if(result == DS_APP_FAILURE) {
-			ds_task_update_result(t, DS_RESULT_INPUT_MISSING);
+		if(result == VINE_APP_FAILURE) {
+			vine_task_update_result(t, VINE_RESULT_INPUT_MISSING);
 		}
 	}
 
@@ -441,9 +441,9 @@ static ds_result_code_t ds_manager_put_input_file(struct ds_manager *q, struct d
 
 /* Send all input files needed by a task to the given worker. */
 
-ds_result_code_t ds_manager_put_input_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t )
+vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t )
 {
-	struct ds_file *f;
+	struct vine_file *f;
 	struct stat s;
 
 	// Check for existence of each input file first.
@@ -451,17 +451,17 @@ ds_result_code_t ds_manager_put_input_files( struct ds_manager *q, struct ds_wor
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
-			if(f->type == DS_FILE || f->type == DS_FILE_PIECE) {
+			if(f->type == VINE_FILE || f->type == VINE_FILE_PIECE) {
 				char * expanded_source = expand_envnames(w, f->source);
 				if(!expanded_source) {
-					ds_task_update_result(t, DS_RESULT_INPUT_MISSING);
-					return DS_APP_FAILURE;
+					vine_task_update_result(t, VINE_RESULT_INPUT_MISSING);
+					return VINE_APP_FAILURE;
 				}
 				if(stat(expanded_source, &s) != 0) {
 					debug(D_DS,"Could not stat %s: %s\n", expanded_source, strerror(errno));
 					free(expanded_source);
-					ds_task_update_result(t, DS_RESULT_INPUT_MISSING);
-					return DS_APP_FAILURE;
+					vine_task_update_result(t, VINE_RESULT_INPUT_MISSING);
+					return VINE_APP_FAILURE;
 				}
 				free(expanded_source);
 			}
@@ -473,13 +473,13 @@ ds_result_code_t ds_manager_put_input_files( struct ds_manager *q, struct ds_wor
 	if(t->input_files) {
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
-			ds_result_code_t result = ds_manager_put_input_file(q,w,t,f);
-			if(result != DS_SUCCESS) {
+			vine_result_code_t result = vine_manager_put_input_file(q,w,t,f);
+			if(result != VINE_SUCCESS) {
 				return result;
 			}
 		}
 	}
 
-	return DS_SUCCESS;
+	return VINE_SUCCESS;
 }
 

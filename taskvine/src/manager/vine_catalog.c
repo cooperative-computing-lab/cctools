@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_catalog.h"
+#include "vine_catalog.h"
 
 #include "catalog_query.h"
 #include "jx.h"
@@ -27,7 +27,7 @@ Query the catalog for all DS managers whose project name matches the given regex
 Return a linked list of jx expressions describing the managers.
 */
 
-struct list * ds_catalog_query( const char *catalog_host, int catalog_port, const char *project_regex )
+struct list * vine_catalog_query( const char *catalog_host, int catalog_port, const char *project_regex )
 {
 	char hostport[DOMAIN_NAME_MAX + 8];
 	time_t stoptime = time(0) + 60;
@@ -51,7 +51,7 @@ struct list * ds_catalog_query( const char *catalog_host, int catalog_port, cons
 	while((j = catalog_query_read(q, stoptime))) {
 		// if it is a WQ manager...
 		const char *type = jx_lookup_string(j,"type");
-		if(type && (!strcmp(type, "ds_manager"))) {
+		if(type && (!strcmp(type, "vine_manager"))) {
 			// and the project name matches...
 			const char *project = jx_lookup_string(j,"project");
 			if(project && whole_string_match_regex(project,project_regex)) {
@@ -68,7 +68,7 @@ struct list * ds_catalog_query( const char *catalog_host, int catalog_port, cons
 	return managers_list;
 }
 
-struct list *ds_catalog_query_cached( const char *catalog_host, int catalog_port, const char *project_regex )
+struct list *vine_catalog_query_cached( const char *catalog_host, int catalog_port, const char *project_regex )
 {
 	static struct list * managers_list = 0;
 	static time_t managers_list_timestamp = 0;
@@ -91,7 +91,7 @@ struct list *ds_catalog_query_cached( const char *catalog_host, int catalog_port
 
 	while(1) {
 		debug(D_DS,"querying catalog for managers with project=%s",project_regex);
-		managers_list = ds_catalog_query(catalog_host,catalog_port,project_regex);
+		managers_list = vine_catalog_query(catalog_host,catalog_port,project_regex);
 		if(managers_list) break;
 		debug(D_DS,"unable to contact catalog, still trying...");
 		sleep(5);

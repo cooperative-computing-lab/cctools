@@ -4,11 +4,11 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "ds_schedule.h"
-#include "ds_factory_info.h"
-#include "ds_blocklist.h"
-#include "ds_file.h"
-#include "ds_remote_file_info.h"
+#include "vine_schedule.h"
+#include "vine_factory_info.h"
+#include "vine_blocklist.h"
+#include "vine_file.h"
+#include "vine_remote_file_info.h"
 
 #include "debug.h"
 #include "rmsummary.h"
@@ -25,7 +25,7 @@ resources availability, features, blocklist, and all other relevant factors.
 Used by all scheduling methods for basic compatibility.
 */
 
-static int check_worker_against_task(struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t)
+static int check_worker_against_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
 	/* worker has not reported any resources yet */
 	if(w->resources->tag < 0)
@@ -40,16 +40,16 @@ static int check_worker_against_task(struct ds_manager *q, struct ds_worker_info
 	}
 
 	if ( w->factory_name ) {
-		struct ds_factory_info *f = ds_factory_info_lookup(q,w->factory_name);
+		struct vine_factory_info *f = vine_factory_info_lookup(q,w->factory_name);
 		if ( f && f->connected_workers > f->max_workers ) return 0;
 	}
 
-	if( ds_blocklist_is_blocked(q,w->hostname) ) {
+	if( vine_blocklist_is_blocked(q,w->hostname) ) {
 		return 0;
 	}
 
-	struct rmsummary *l = ds_manager_choose_resources_for_task(q, w, t);
-	struct ds_resources *r = w->resources;
+	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
+	struct vine_resources *r = w->resources;
 
 	int ok = 1;
 
@@ -108,21 +108,21 @@ by this task, so as to minimize transfer work that must be done
 by the manager.
 */
 
-static struct ds_worker_info *find_worker_by_files(struct ds_manager *q, struct ds_task *t)
+static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, struct vine_task *t)
 {
 	char *key;
-	struct ds_worker_info *w;
-	struct ds_worker_info *best_worker = 0;
+	struct vine_worker_info *w;
+	struct vine_worker_info *best_worker = 0;
 	int64_t most_task_cached_bytes = 0;
 	int64_t task_cached_bytes;
-	struct ds_remote_file_info *remote_info;
-	struct ds_file *tf;
+	struct vine_remote_file_info *remote_info;
+	struct vine_file *tf;
 
 	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		if( check_worker_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
 			LIST_ITERATE(t->input_files,tf) {
-				if((tf->type == DS_FILE || tf->type == DS_FILE_PIECE) && (tf->flags & DS_CACHE)) {
+				if((tf->type == VINE_FILE || tf->type == VINE_FILE_PIECE) && (tf->flags & VINE_CACHE)) {
 					remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 					if(remote_info)
 						task_cached_bytes += remote_info->size;
@@ -145,10 +145,10 @@ Since the order of workers in the hashtable is somewhat arbitrary,
 this amounts to simply "find the first available worker".
 */
 
-static struct ds_worker_info *find_worker_by_fcfs(struct ds_manager *q, struct ds_task *t)
+static struct vine_worker_info *find_worker_by_fcfs(struct vine_manager *q, struct vine_task *t)
 {
 	char *key;
-	struct ds_worker_info *w;
+	struct vine_worker_info *w;
 	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		if( check_worker_against_task(q, w, t) ) {
 			return w;
@@ -163,10 +163,10 @@ This works by finding all compatible workers,
 putting them in a list, and then choosing from the list at random.
 */
 
-static struct ds_worker_info *find_worker_by_random(struct ds_manager *q, struct ds_task *t)
+static struct vine_worker_info *find_worker_by_random(struct vine_manager *q, struct vine_task *t)
 {
 	char *key;
-	struct ds_worker_info *w = NULL;
+	struct vine_worker_info *w = NULL;
 	int random_worker;
 	struct list *valid_workers = list_create();
 
@@ -191,7 +191,7 @@ static struct ds_worker_info *find_worker_by_random(struct ds_manager *q, struct
 }
 
 // 1 if a < b, 0 if a >= b
-static int compare_worst_fit(struct ds_resources *a, struct ds_resources *b)
+static int compare_worst_fit(struct vine_resources *a, struct vine_resources *b)
 {
 	//Total worker order: free cores > free memory > free disk > free gpus
 	if((a->cores.total < b->cores.total))
@@ -231,17 +231,17 @@ meaning the worker that will have the most resources
 unused once this task is placed there.
 */
 
-static struct ds_worker_info *find_worker_by_worst_fit(struct ds_manager *q, struct ds_task *t)
+static struct vine_worker_info *find_worker_by_worst_fit(struct vine_manager *q, struct vine_task *t)
 {
 	char *key;
-	struct ds_worker_info *w;
-	struct ds_worker_info *best_worker = NULL;
+	struct vine_worker_info *w;
+	struct vine_worker_info *best_worker = NULL;
 
-	struct ds_resources bres;
-	struct ds_resources wres;
+	struct vine_resources bres;
+	struct vine_resources wres;
 
-	memset(&bres, 0, sizeof(struct ds_resources));
-	memset(&wres, 0, sizeof(struct ds_resources));
+	memset(&bres, 0, sizeof(struct vine_resources));
+	memset(&wres, 0, sizeof(struct vine_resources));
 
 	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 
@@ -256,7 +256,7 @@ static struct ds_worker_info *find_worker_by_worst_fit(struct ds_manager *q, str
 			if(!best_worker || compare_worst_fit(&bres, &wres))
 			{
 				best_worker = w;
-				memcpy(&bres, &wres, sizeof(struct ds_resources));
+				memcpy(&bres, &wres, sizeof(struct vine_resources));
 			}
 		}
 	}
@@ -270,11 +270,11 @@ If there are no workers avialable that have previously run a task,
 then pick one FCFS.
 */
 
-static struct ds_worker_info *find_worker_by_time(struct ds_manager *q, struct ds_task *t)
+static struct vine_worker_info *find_worker_by_time(struct vine_manager *q, struct vine_task *t)
 {
 	char *key;
-	struct ds_worker_info *w;
-	struct ds_worker_info *best_worker = 0;
+	struct vine_worker_info *w;
+	struct vine_worker_info *best_worker = 0;
 	double best_time = HUGE_VAL;
 
 	HASH_TABLE_ITERATE(q->worker_table,key,w) {
@@ -300,24 +300,24 @@ static struct ds_worker_info *find_worker_by_time(struct ds_manager *q, struct d
 Select the best worker for this task, based on the current scheduling mode.
 */
 
-struct ds_worker_info *ds_schedule_task_to_worker( struct ds_manager *q, struct ds_task *t )
+struct vine_worker_info *vine_schedule_task_to_worker( struct vine_manager *q, struct vine_task *t )
 {
 	int a = t->worker_selection_algorithm;
 
-	if(a == DS_SCHEDULE_UNSET) {
+	if(a == VINE_SCHEDULE_UNSET) {
 		a = q->worker_selection_algorithm;
 	}
 
 	switch (a) {
-	case DS_SCHEDULE_FILES:
+	case VINE_SCHEDULE_FILES:
 		return find_worker_by_files(q, t);
-	case DS_SCHEDULE_TIME:
+	case VINE_SCHEDULE_TIME:
 		return find_worker_by_time(q, t);
-	case DS_SCHEDULE_WORST:
+	case VINE_SCHEDULE_WORST:
 		return find_worker_by_worst_fit(q, t);
-	case DS_SCHEDULE_FCFS:
+	case VINE_SCHEDULE_FCFS:
 		return find_worker_by_fcfs(q, t);
-	case DS_SCHEDULE_RAND:
+	case VINE_SCHEDULE_RAND:
 	default:
 		return find_worker_by_random(q, t);
 	}
@@ -328,7 +328,7 @@ typedef enum {
 	MEMORY_BIT = (1 << 1),
 	DISK_BIT = (1 << 2),
 	GPUS_BIT = (1 << 3),
-} ds_resource_bitmask_t;
+} vine_resource_bitmask_t;
 
 
 /*
@@ -337,15 +337,15 @@ Returns a bitmask that indicates which resource of the task, if any, cannot
 be met by the worker. If the task fits in the worker, it returns 0.
 */
 
-static ds_resource_bitmask_t is_task_larger_than_worker(struct ds_manager *q, struct ds_task *t, struct ds_worker_info *w)
+static vine_resource_bitmask_t is_task_larger_than_worker(struct vine_manager *q, struct vine_task *t, struct vine_worker_info *w)
 {
 	if(w->resources->tag < 0) {
 		/* quickly return if worker has not sent its resources yet */
 		return 0;
 	}
 
-	ds_resource_bitmask_t set = 0;
-	struct rmsummary *l = ds_manager_choose_resources_for_task(q,w,t);
+	vine_resource_bitmask_t set = 0;
+	struct rmsummary *l = vine_manager_choose_resources_for_task(q,w,t);
 
 	// baseline resurce comparison of worker total resources and a task requested resorces
 
@@ -375,14 +375,14 @@ Returns 0 if there is worker than can fit the task. Otherwise it returns a bitma
 that indicates that there was at least one worker that could not fit that task resource.
 */
 
-static ds_resource_bitmask_t is_task_larger_than_any_worker( struct ds_manager *q, struct ds_task *t )
+static vine_resource_bitmask_t is_task_larger_than_any_worker( struct vine_manager *q, struct vine_task *t )
 {
 	char *key;
-	struct ds_worker_info *w;
+	struct vine_worker_info *w;
 
 	int bit_set = 0;
 	HASH_TABLE_ITERATE(q->worker_table,key,w) {
-		ds_resource_bitmask_t new_set = is_task_larger_than_worker(q, t, w);
+		vine_resource_bitmask_t new_set = is_task_larger_than_worker(q, t, w);
 		if (new_set == 0){
 			// Task could run on a currently connected worker, immediately
 			// return
@@ -403,9 +403,9 @@ If so, then display a suitable message to the user.
 This is quite an expensive function and so is invoked only periodically.
 */
 
-void ds_schedule_check_for_large_tasks( struct ds_manager *q )
+void vine_schedule_check_for_large_tasks( struct vine_manager *q )
 {
-	struct ds_task *t;
+	struct vine_task *t;
 	int unfit_core = 0;
 	int unfit_mem  = 0;
 	int unfit_disk = 0;
@@ -416,10 +416,10 @@ void ds_schedule_check_for_large_tasks( struct ds_manager *q )
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))){
 		// check each task against the queue of connected workers
-		ds_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q,t);
+		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q,t);
 		if(bit_set) {
-			rmsummary_merge_max(largest_unfit_task, ds_manager_task_max_resources(q, t));
-			rmsummary_merge_max(largest_unfit_task, ds_manager_task_min_resources(q, t));
+			rmsummary_merge_max(largest_unfit_task, vine_manager_task_max_resources(q, t));
+			rmsummary_merge_max(largest_unfit_task, vine_manager_task_min_resources(q, t));
 		}
 		if (bit_set & CORES_BIT) {
 			unfit_core++;

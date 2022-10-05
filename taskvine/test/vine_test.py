@@ -93,13 +93,13 @@ if __name__ == '__main__':
 
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
 
     # same task as above, but testing resubmission on final state
     for i in range(3):
         q.submit(t)
         t = q.wait(5)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
 
     # same simple task, but now we send the directory as an input
     output = output_file()
@@ -109,7 +109,7 @@ if __name__ == '__main__':
 
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
 
 
     # we bring back the outputs from a directory:
@@ -121,7 +121,7 @@ if __name__ == '__main__':
 
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0, [path.join(test_dir, 'outs', output)])
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0, [path.join(test_dir, 'outs', output)])
 
     # Execute a task that only communicates through buffers:
 
@@ -132,7 +132,7 @@ if __name__ == '__main__':
     t.specify_output_buffer("out2","output2.txt")
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0)
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0)
 
     if t.get_output_buffer("out1") != original or t.get_output_buffer("out2") != original:
         print("incorrect output:\nout1: {}\nout2: {}\n".format(t.get_output_buffer("out1"),t.get_output_buffer("out2")))
@@ -148,14 +148,14 @@ if __name__ == '__main__':
 
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 126)
+    report_task(t, ds.VINE_RESULT_SUCCESS, 126)
 
     # should fail because the 'executable' cannot be found:
     t = ds.Task("./notacommand")
 
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 127)
+    report_task(t, ds.VINE_RESULT_SUCCESS, 127)
 
     # should fail because an input file does not exists:
     t = ds.Task("./notacommand")
@@ -163,7 +163,7 @@ if __name__ == '__main__':
 
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_INPUT_MISSING, -1)
+    report_task(t, ds.VINE_RESULT_INPUT_MISSING, -1)
 
     # should fail because an output file was not created:
     output = output_file()
@@ -174,70 +174,70 @@ if __name__ == '__main__':
 
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_OUTPUT_MISSING, 0)
+    report_task(t, ds.VINE_RESULT_OUTPUT_MISSING, 0)
 
     # should succeed in the alloted time
     t = ds.Task("/bin/sleep 1")
     t.specify_running_time_max(10)
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0)
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0)
 
     # should fail in the alloted time
     t = ds.Task("/bin/sleep 10")
     t.specify_running_time_max(1)
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_TASK_MAX_RUN_TIME, 9)
+    report_task(t, ds.VINE_RESULT_TASK_MAX_RUN_TIME, 9)
 
     # should run in the alloted absolute time
     t = ds.Task("/bin/sleep 1")
     t.specify_end_time((time.time() + 5) * 1e6)
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0)
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0)
 
     # should fail in the alloted absolute time
     t = ds.Task("/bin/sleep 10")
     t.specify_end_time((time.time() + 2) * 1e6)
     q.submit(t)
     t = q.wait(30)
-    report_task(t, ds.DS_RESULT_TASK_TIMEOUT, 9)
+    report_task(t, ds.VINE_RESULT_TASK_TIMEOUT, 9)
 
     # Now generate an input file from a shell command:
     t = ds.Task("/bin/cat infile")
     t.specify_input_command("curl http://www.nd.edu -o %%","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0)
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0)
 
     # second time should have it cached (though we can't tell from here)
     t = ds.Task("/bin/cat infile")
     t.specify_input_command("curl http://www.nd.edu -o %%","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0)
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0)
 
     # Now generate an input file from a shell command:
     t = ds.Task("/bin/cat infile")
     t.specify_input_url("http://www.nd.edu","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0)
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0)
 
     # second time should have it cached (though we can't tell from here)
     t = ds.Task("/bin/cat infile")
     t.specify_input_url("http://www.nd.edu","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_SUCCESS, 0)
+    report_task(t, ds.VINE_RESULT_SUCCESS, 0)
 
     # generate an invalid remote input file, should get an input missing error.
     t = ds.Task("/bin/cat infile")
     t.specify_input_url("http://pretty-sure-this-is-not-a-valid-url.com","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, ds.DS_RESULT_INPUT_MISSING, 1)
+    report_task(t, ds.VINE_RESULT_INPUT_MISSING, 1)
 
 
     

@@ -1,4 +1,4 @@
-from ds_futures import DataSwarmFutures, FutureTask, FutureTaskError
+from vine_futures import DataSwarmFutures, FutureTask, FutureTaskError
 
 q = DataSwarmFutures(port = 9123, local_worker = {'cores':1, 'memory':512, 'disk':10000})
 #q = DataSwarmFutures(port = 9123)

@@ -1,4 +1,4 @@
-## @package ds_futures
+## @package vine_futures
 # Python Data Swarm bindings.
 #
 # This is a library on top of work_queue which replaces q.wait with the concept
@@ -6,7 +6,7 @@
 #
 # This is experimental.
 #
-# - @ref ds_futures::DataSwarm
+# - @ref vine_futures::DataSwarm
 # - @ref work_queue::Task
 
 import work_queue
@@ -34,7 +34,7 @@ except ImportError:
 # Python Data Swarm object
 #
 # Implements an asynchronous DataSwarmFutures object.
-# @ref ds_futures::DataSwarmFutures.
+# @ref vine_futures::DataSwarmFutures.
 class DataSwarmFutures(object):
     def __init__(self, *args, **kwargs):
 
@@ -328,7 +328,7 @@ class FutureTask(work_queue.Task):
 
     def set_result_or_exception(self):
         result = self._task.result
-        if result == work_queue.DS_RESULT_SUCCESS and self.return_status == 0:
+        if result == work_queue.VINE_RESULT_SUCCESS and self.return_status == 0:
             self.set_result(True)
         else:
             self.set_exception(FutureTaskError(self))
@@ -358,18 +358,18 @@ class FutureTask(work_queue.Task):
             conda_env = 'conda_env.tar.gz'
             self.specify_input_file(filename, conda_env, cache = True)
             command = 'mkdir -p conda_env && tar xf {} -C conda_env && source conda_env/bin/activate && {}'.format(conda_env, self.command)
-            _work_queue.ds_task_command_line_set(self._task, command)
+            _work_queue.vine_task_command_line_set(self._task, command)
         elif type == 'singularity':
             sin_env = 'sin_env.img'
             self.specify_input_file(filename, sin_env, cache = True)
             command = 'singularity exec -B $(pwd):/ds-sandbox --pwd /ds-sandbox {} -- {}'.format(sin_env, self.command)
-            _work_queue.ds_task_command_line_set(self._task, command)
+            _work_queue.vine_task_command_line_set(self._task, command)
 
 
 
 
 class Worker(object):
-    def __init__(self, port, executable='ds_worker', cores=1, memory=512, disk=1000):
+    def __init__(self, port, executable='vine_worker', cores=1, memory=512, disk=1000):
         self._proc = None
         self._port = port
 
@@ -430,18 +430,18 @@ class Worker(object):
 
 class FutureTaskError(Exception):
     _state_to_msg = {
-        work_queue.DS_RESULT_SUCCESS:             'Success',
-        work_queue.DS_RESULT_INPUT_MISSING:       'Input file is missing',
-        work_queue.DS_RESULT_OUTPUT_MISSING:      'Output file is missing',
-        work_queue.DS_RESULT_STDOUT_MISSING:      'stdout is missing',
-        work_queue.DS_RESULT_SIGNAL:              'Signal received',
-        work_queue.DS_RESULT_RESOURCE_EXHAUSTION: 'Resources exhausted',
-        work_queue.DS_RESULT_TASK_TIMEOUT:        'Task timed-out before completion',
-        work_queue.DS_RESULT_UNKNOWN:             'Unknown error',
-        work_queue.DS_RESULT_FORSAKEN:            'Internal error',
-        work_queue.DS_RESULT_MAX_RETRIES:         'Maximum number of retries reached',
-        work_queue.DS_RESULT_TASK_MAX_RUN_TIME:   'Task did not finish before deadline',
-        work_queue.DS_RESULT_DISK_ALLOC_FULL:     'Disk allocation for the task is full'
+        work_queue.VINE_RESULT_SUCCESS:             'Success',
+        work_queue.VINE_RESULT_INPUT_MISSING:       'Input file is missing',
+        work_queue.VINE_RESULT_OUTPUT_MISSING:      'Output file is missing',
+        work_queue.VINE_RESULT_STDOUT_MISSING:      'stdout is missing',
+        work_queue.VINE_RESULT_SIGNAL:              'Signal received',
+        work_queue.VINE_RESULT_RESOURCE_EXHAUSTION: 'Resources exhausted',
+        work_queue.VINE_RESULT_TASK_TIMEOUT:        'Task timed-out before completion',
+        work_queue.VINE_RESULT_UNKNOWN:             'Unknown error',
+        work_queue.VINE_RESULT_FORSAKEN:            'Internal error',
+        work_queue.VINE_RESULT_MAX_RETRIES:         'Maximum number of retries reached',
+        work_queue.VINE_RESULT_TASK_MAX_RUN_TIME:   'Task did not finish before deadline',
+        work_queue.VINE_RESULT_DISK_ALLOC_FULL:     'Disk allocation for the task is full'
     }
 
     def __init__(self, task, exception = None):
@@ -465,7 +465,7 @@ class FutureTaskError(Exception):
         if not msg:
             return str(self.state)
 
-        if self.state != work_queue.DS_RESULT_SUCCESS or self.exit_status == 0:
+        if self.state != work_queue.VINE_RESULT_SUCCESS or self.exit_status == 0:
             return msg
         else:
             return 'Execution completed with exit status {}'.format(self.exit_status)

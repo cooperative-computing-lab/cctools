@@ -4,19 +4,19 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DS_MANAGER_PUT_H
-#define DS_MANAGER_PUT_H
+#ifndef VINE_MANAGER_PUT_H
+#define VINE_MANAGER_PUT_H
 
 /*
 Provides the recursive transfer of files and directories
 from the manager to the worker prior to task execution.
-This is the counterpart of worker/ds_transfer.c on the worker side.
+This is the counterpart of worker/vine_transfer.c on the worker side.
 This module is private to the manager and should not be invoked by the end user.
 */
 
-#include "ds_manager.h"
+#include "vine_manager.h"
 
-ds_result_code_t ds_manager_put_input_files( struct ds_manager *q, struct ds_worker_info *w, struct ds_task *t );
+vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 
 #endif
 

@@ -9,8 +9,8 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-#include "ds_coprocess.h"
-#include "ds_protocol.h"
+#include "vine_coprocess.h"
+#include "vine_protocol.h"
 
 #include "debug.h"
 #include "domain_name_cache.h"
@@ -28,7 +28,7 @@ static int coprocess_out[2];
 static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
 
-int ds_coprocess_write(char *buffer, int len, int timeout)
+int vine_coprocess_write(char *buffer, int len, int timeout)
 {
 	struct pollfd read_poll = {coprocess_in[1], POLLOUT, 0};
 	int poll_result = poll(&read_poll, 1, timeout);
@@ -66,7 +66,7 @@ int ds_coprocess_write(char *buffer, int len, int timeout)
 	return bytes_written;
 }
 
-int ds_coprocess_read(char *buffer, int len, int timeout){
+int vine_coprocess_read(char *buffer, int len, int timeout){
 	struct pollfd read_poll = {coprocess_out[0], POLLIN, 0};
 	int poll_result = poll(&read_poll, 1, timeout);
 	if (poll_result < 0)
@@ -105,16 +105,16 @@ int ds_coprocess_read(char *buffer, int len, int timeout){
 	return bytes_read;
 }
 
-char *ds_coprocess_setup(int *coprocess_port)
+char *vine_coprocess_setup(int *coprocess_port)
 {
 	int json_offset, json_length = -1, cumulative_bytes_read = 0, buffer_offset = 0;
-	char buffer[DS_LINE_MAX];
+	char buffer[VINE_LINE_MAX];
 	char *envelope_size = NULL;
     char *name = NULL;
 
 	while (1)
 	{
-		int curr_bytes_read = ds_coprocess_read(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout);
+		int curr_bytes_read = vine_coprocess_read(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout);
 		if (curr_bytes_read < 0) {
 			fatal("Unable to get information from coprocess\n");
 		}
@@ -170,7 +170,7 @@ char *ds_coprocess_setup(int *coprocess_port)
 		}
 		if (!strcmp(key, "name")) {
             if(item->type == JX_STRING) {
-                name = string_format("ds_worker_coprocess:%s", item->u.string_value);
+                name = string_format("vine_worker_coprocess:%s", item->u.string_value);
             }
 		}
 		else if (!strcmp(key, "port")) {
@@ -191,14 +191,14 @@ char *ds_coprocess_setup(int *coprocess_port)
     return name;
 }
 
-char *ds_coprocess_start(char *command, int *coprocess_port) {
+char *vine_coprocess_start(char *command, int *coprocess_port) {
 	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
 		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
 		return NULL;
 	}
 	coprocess_pid = fork();
 	if(coprocess_pid > 0) {
-		char *name = ds_coprocess_setup(coprocess_port);
+		char *name = vine_coprocess_setup(coprocess_port);
 
 		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
 			fatal("coprocess error parent: %s\n", strerror(errno));
@@ -229,11 +229,11 @@ char *ds_coprocess_start(char *command, int *coprocess_port) {
     return NULL;
 }
 
-void ds_coprocess_terminate() {
+void vine_coprocess_terminate() {
     process_kill_waitpid(coprocess_pid, 30);
 }
 
-int ds_coprocess_check()
+int vine_coprocess_check()
 {
 	struct process_info *p = process_waitpid(coprocess_pid, 0);
 	if (!p) {
@@ -244,7 +244,7 @@ int ds_coprocess_check()
     return 1;
 }
 
-char *ds_coprocess_run(const char *function_name, const char *function_input, int coprocess_port) {
+char *vine_coprocess_run(const char *function_name, const char *function_input, int coprocess_port) {
 	char addr[DOMAIN_NAME_MAX];
 	int len;
 	int timeout = 60000000; // one minute, can be changed
@@ -292,7 +292,7 @@ char *ds_coprocess_run(const char *function_name, const char *function_input, in
 	curr_time = timestamp_get();
 	stoptime = curr_time + timeout;
 	// read in the length of the response
-	char line[DS_LINE_MAX];
+	char line[VINE_LINE_MAX];
 	int length;
 	link_readline(link, line, sizeof(line), stoptime);
 	sscanf(line, "output %d", &length);
