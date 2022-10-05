@@ -28,7 +28,7 @@ chirp_wrap.c CChirp.py: chirp.i chirp.binding.py
 $(CHIRPPYTHONSO): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) Python.framework Chirp.py CChirp.py chirp_wrap.c *.pyc
+	rm -rf $(OBJECTS) $(TARGETS) Python.framework Chirp.py CChirp.py chirp_wrap.c *.pyc __pycache__
 
 test:
 

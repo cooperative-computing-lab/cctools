@@ -55,6 +55,7 @@ clean()
 	../src/makeflow -c $MAKE_FILE
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
+	rm -f worker.log
 
 	rm -rf input
 	rm -rf mydir

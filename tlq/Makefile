@@ -1,4 +1,6 @@
-all:
+all: client
+
+client: ../dttools/src/jx_test
 	cp ../dttools/src/jx_test client
 	
 clean:

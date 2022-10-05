@@ -57,8 +57,6 @@ worker.disk=worker_disk
 worker.gpus=worker_gpus
 
 worker.debug="all"
-worker.debug_file="factory.log"
-
 
 with worker:
     r = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 4}

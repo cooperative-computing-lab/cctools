@@ -29,7 +29,7 @@ $(WQPYTHONSO): work_queue_wrap.o $(EXTERNAL_DEPENDENCIES)
 test:
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) Python.framework work_queue.py work_queue_wrap.c *.pyc
+	rm -rf $(OBJECTS) $(TARGETS) Python.framework work_queue.py work_queue_wrap.c *.pyc __pycache__
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)

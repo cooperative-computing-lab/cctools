@@ -23,7 +23,7 @@ rmonitor_wrap.c resource_monitor.py: rmonitor.i resource_monitor.bindings.py
 $(RMPYTHONSO): rmonitor_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(TARGETS) $(OBJECTS) rmonitor_wrap.c *.so *.pyc
+	rm -rf $(TARGETS) $(OBJECTS) rmonitor_wrap.c *.so *.pyc __pycache__
 
 test:
 

@@ -50,6 +50,7 @@ clean()
 {
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
+	rm -f debug.log
 
 	exit 0
 }

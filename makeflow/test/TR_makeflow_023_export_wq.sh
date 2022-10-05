@@ -51,6 +51,7 @@ run()
 clean()
 {
 	rm -rf ${TEST_DIR}
+	rm -f worker.log
 	exit 0
 }
 
