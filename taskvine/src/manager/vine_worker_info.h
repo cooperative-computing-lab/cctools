@@ -7,7 +7,7 @@ See the file COPYING for details.
 #ifndef DS_WORKER_INFO_H
 #define DS_WORKER_INFO_H
 
-#include "dataswarm.h"
+#include "taskvine.h"
 #include "ds_resources.h"
 
 #include "hash_table.h"

@@ -8,7 +8,7 @@ See the file COPYING for details.
 This example program produces a mosaic of images, each one transformed
 with a different amount of swirl.
 
-It demonstrates several features of dataswarm:
+It demonstrates several features of taskvine:
 
 - Each task consumes remote data accessed via url, cached and shared
 among all tasks on that machine.
@@ -20,7 +20,7 @@ the executable and all of its dynamic dependencies.  This allows the
 use of arbitrary workers without regard to their software environment.
 */
 
-#include "dataswarm.h"
+#include "taskvine.h"
 
 #include <stdio.h>
 #include <stdlib.h>

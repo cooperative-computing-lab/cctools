@@ -2,7 +2,7 @@ include ../../../config.mk
 include ../../../rules.mk
 
 SOURCES = \
-	dataswarm_json.c \
+	taskvine_json.c \
 	ds_manager.c \
 	ds_manager_get.c \
 	ds_manager_put.c \
@@ -20,16 +20,16 @@ SOURCES = \
 	ds_task_info.c \
 	ds_blocklist.c
 
-PUBLIC_HEADERS = dataswarm.h dataswarm_json.h
+PUBLIC_HEADERS = taskvine.h taskvine_json.h
 
 OBJECTS = $(SOURCES:%.c=%.o)
-PUBLIC_HEADERS = dataswarm.h dataswarm_json.h
-LIBRARIES = libdataswarm.a
+PUBLIC_HEADERS = taskvine.h taskvine_json.h
+LIBRARIES = libtaskvine.a
 TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
-libdataswarm.a: $(OBJECTS)
+libtaskvine.a: $(OBJECTS)
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib

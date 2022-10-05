@@ -11,10 +11,10 @@ See the file COPYING for details.
 This module defines the internal structure and details of a single task.
 Note that these details are internal to the manager library,
 and are not for public consumption.
-End user may only use the API described in dataswarm.h
+End user may only use the API described in taskvine.h
 */
 
-#include "dataswarm.h"
+#include "taskvine.h"
 
 #include "list.h"
 #include "category.h"

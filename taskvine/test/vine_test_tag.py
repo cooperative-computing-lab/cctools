@@ -4,7 +4,7 @@
 # tests for missing/recursive inputs/outputs.
 
 import sys
-import dataswarm as ds
+import taskvine as ds
 
 port_file = None
 try:

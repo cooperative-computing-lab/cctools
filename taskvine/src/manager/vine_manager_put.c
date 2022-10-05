@@ -245,7 +245,7 @@ static ds_result_code_t ds_manager_put_item_if_not_cached( struct ds_manager *q,
 
 /*
 This function expands environment variables such as
-$OS, $ARCH, that are specified in the definition of dataswarm
+$OS, $ARCH, that are specified in the definition of taskvine
 input files. It expands these variables based on the info reported
 by each connected worker.
 Will always return a non-empty string. That is if no match is found

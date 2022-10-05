@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "dataswarm.h"
+#include "taskvine.h"
 
 #include "ds_protocol.h"
 

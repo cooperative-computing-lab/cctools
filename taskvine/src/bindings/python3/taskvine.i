@@ -1,5 +1,5 @@
-/* dataswarm.i */
-%module dataswarm
+/* taskvine.i */
+%module taskvine
 
 %include carrays.i
 %array_functions(struct rmsummary *, rmsummayArray);
@@ -14,7 +14,7 @@
 %{
 	#include "int_sizes.h"
 	#include "timestamp.h"
-	#include "dataswarm.h"
+	#include "taskvine.h"
 	#include "rmsummary.h"
 %}
 
@@ -43,7 +43,7 @@ treat it as an output parameter to be filled in. */
 %include "stdint.i"
 %include "int_sizes.h"
 %include "timestamp.h"
-%include "dataswarm.h"
+%include "taskvine.h"
 %include "rmsummary.h"
 %include "category.h"
 

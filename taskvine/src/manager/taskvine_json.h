@@ -4,11 +4,11 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DATASWARM_JSON_H
-#define DATASWARM_JSON_H
+#ifndef TASKVINE_JSON_H
+#define TASKVINE_JSON_H
 
-/** @file dataswarm_json.h Provides a higher-level JSON-oriented abstraction
-on top of the standard C interface in @ref dataswarm.h.
+/** @file taskvine_json.h Provides a higher-level JSON-oriented abstraction
+on top of the standard C interface in @ref taskvine.h.
 
 An application uses  @ref ds_json_create to create a manager,
 then @ref ds_json_submit to submit tasks, and @ref ds_json_wait to

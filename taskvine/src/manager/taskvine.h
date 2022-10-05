@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef DATASWARM_H
-#define DATASWARM_H
+#ifndef TASKVINE_H
+#define TASKVINE_H
 
 #include <sys/types.h>
 #include "timestamp.h"
@@ -16,8 +16,8 @@ struct ds_manager;
 struct ds_task;
 struct ds_file;
 
-/** @file dataswarm.h The public API for the dataswarm distributed application framework.
-A dataswarm application consists of a manager process and a larger number of worker
+/** @file taskvine.h The public API for the taskvine distributed application framework.
+A taskvine application consists of a manager process and a larger number of worker
 processes, typically running in a high performance computing cluster, or a cloud facility.
 Both the manager and worker processes run with ordinary user privileges and require
 no special capabilities.
@@ -28,13 +28,13 @@ with @ref ds_submit, and then monitors completion with @ref ds_wait.
 Tasks are further described by attaching data objects via @ref ds_task_specify_input_file,
 @ref ds_task_specify_input_url and related functions.
 
-The dataswarm framework provides a large number of fault tolerance, resource management,
+The taskvine framework provides a large number of fault tolerance, resource management,
 and performance monitoring features that enable the construction of applications that
 run reliably on tens of thousands of nodes in the presence of failures and other
 expected events.
 */
 
-#define DS_DEFAULT_PORT 9123               /**< Default dataswarm port number. */
+#define DS_DEFAULT_PORT 9123               /**< Default taskvine port number. */
 #define DS_RANDOM_PORT  0                  /**< Indicates that any port may be chosen. */
 #define DS_WAITFORTASK  -1                 /**< Timeout value to wait for a task to complete before returning. */
 

@@ -435,7 +435,7 @@ static void report_worker_ready( struct link *manager )
 {
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
-	send_message(manager,"dataswarm %d %s %s %s %d.%d.%d\n",DS_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
+	send_message(manager,"taskvine %d %s %s %s %d.%d.%d\n",DS_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_message(manager, "info worker-id %s\n", worker_id);
 	send_features(manager);
 	send_keepalive(manager, 1);

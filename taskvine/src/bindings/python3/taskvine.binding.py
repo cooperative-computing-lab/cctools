@@ -8,9 +8,9 @@
 # The SWIG-based Python bindings provide a higher-level interface that
 # revolves around the following objects:
 #
-# - @ref dataswarm::DataSwarm
-# - @ref dataswarm::Task
-# - @ref dataswarm::Factory
+# - @ref taskvine::DataSwarm
+# - @ref taskvine::Task
+# - @ref taskvine::Factory
 
 import itertools
 import math
@@ -544,7 +544,7 @@ class Task(object):
     
     ##
     # Get the standard output of the task. (Same as t.std_output for regular
-    # dataswarm tasks) Must be called only after the task completes execution.
+    # taskvine tasks) Must be called only after the task completes execution.
     # @code
     # >>> print(t.output)
     # @endcode
@@ -867,7 +867,7 @@ class PythonTask(Task):
                     import sys
                     import dill
                 except ImportError:
-                    print("Could not execute PythonTask function because a needed module for dataswarm was not available.")
+                    print("Could not execute PythonTask function because a needed module for taskvine was not available.")
                     raise
 
                 (fn, args, out) = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -896,7 +896,7 @@ class PythonTaskNoResult(Exception):
 # Python Data Swarm object
 #
 # This class uses a dictionary to map between the task pointer objects and the
-# @ref dataswarm::Task.
+# @ref taskvine::Task.
 class DataSwarm(object):
     ##
     # Create a new manager.
@@ -914,7 +914,7 @@ class DataSwarm(object):
     # @see ds_create    - For more information about environmental variables that affect the behavior this method.
     def __init__(self, port=DS_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl=None):
         self._shutdown = shutdown
-        self._dataswarm = None
+        self._taskvine = None
         self._stats = None
         self._stats_hierarchy = None
         self._task_table = {}
@@ -938,8 +938,8 @@ class DataSwarm(object):
             self._stats_hierarchy = ds_stats()
 
             ssl_key, ssl_cert = self._setup_ssl(ssl)
-            self._dataswarm = ds_ssl_create(port, ssl_key, ssl_cert)
-            if not self._dataswarm:
+            self._taskvine = ds_ssl_create(port, ssl_key, ssl_cert)
+            if not self._taskvine:
                 raise Exception('Could not create queue on port {}'.format(port))
 
             if stats_log:
@@ -949,18 +949,18 @@ class DataSwarm(object):
                 self.specify_transactions_log(transactions_log)
 
             if name:
-                ds_specify_name(self._dataswarm, name)
+                ds_specify_name(self._taskvine, name)
         except Exception as e:
             raise Exception('Unable to create internal Data Swarm structure: {}'.format(e))
 
 
     def _free_queue(self):
         try:
-            if self._dataswarm:
+            if self._taskvine:
                 if self._shutdown:
                     self.shutdown_workers(0)
-                ds_delete(self._dataswarm)
-                self._dataswarm = None
+                ds_delete(self._taskvine)
+                self._taskvine = None
         except:
             #ignore exceptions, as we are going away...
             pass
@@ -1001,7 +1001,7 @@ class DataSwarm(object):
     # @endcode
     @property
     def name(self):
-        return ds_name(self._dataswarm)
+        return ds_name(self._taskvine)
 
     ##
     # Get the listening port of the queue.
@@ -1010,7 +1010,7 @@ class DataSwarm(object):
     # @endcode
     @property
     def port(self):
-        return ds_port(self._dataswarm)
+        return ds_port(self._taskvine)
 
     ##
     # Get queue statistics.
@@ -1023,7 +1023,7 @@ class DataSwarm(object):
     # @endcode
     @property
     def stats(self):
-        ds_get_stats(self._dataswarm, self._stats)
+        ds_get_stats(self._taskvine, self._stats)
         return self._stats
 
     ##
@@ -1037,7 +1037,7 @@ class DataSwarm(object):
     # @endcode
     @property
     def stats_hierarchy(self):
-        ds_get_stats_hierarchy(self._dataswarm, self._stats_hierarchy)
+        ds_get_stats_hierarchy(self._taskvine, self._stats_hierarchy)
         return self._stats_hierarchy
 
     ##
@@ -1056,7 +1056,7 @@ class DataSwarm(object):
     # @endcode
     def stats_category(self, category):
         stats = ds_stats()
-        ds_get_stats_category(self._dataswarm, category, stats)
+        ds_get_stats_category(self._taskvine, category, stats)
         return stats
 
     ##
@@ -1087,7 +1087,7 @@ class DataSwarm(object):
     # >>>    print("{} workers with: {} cores, {} MB memory, {} MB disk".format(w.workers, w.cores, w.memory, w.disk)
     # @endcode
     def summarize_workers(self):
-        from_c = ds_summarize_workers(self._dataswarm)
+        from_c = ds_summarize_workers(self._taskvine)
 
         count = 0
         workers = []
@@ -1111,7 +1111,7 @@ class DataSwarm(object):
     # default, only cores, memory, and disk are labeled, and gpus are unlabeled.
     # NOTE: autolabeling is only meaningfull when task monitoring is enabled
     # (@ref enable_monitoring). When monitoring is enabled and a task exhausts
-    # resources in a worker, mode dictates how dataswarm handles the
+    # resources in a worker, mode dictates how taskvine handles the
     # exhaustion:
     # @param self Reference to the current manager object.
     # @param category A category name. If None, sets the mode by default for
@@ -1133,7 +1133,7 @@ class DataSwarm(object):
     #                  - DS_ALLOCATION_MODE_MAX_THROUGHPUT As above, but
     #                  manager tries allocations to maximize throughput.
     def specify_category_mode(self, category, mode):
-        return ds_specify_category_mode(self._dataswarm, category, mode)
+        return ds_specify_category_mode(self._taskvine, category, mode)
 
     ##
     # Turn on or off first-allocation labeling for a given category and
@@ -1145,7 +1145,7 @@ class DataSwarm(object):
     # @param autolabel True/False for on/off.
     # @returns 1 if resource is valid, 0 otherwise.
     def specify_category_autolabel_resource(self, category, resource, autolabel):
-        return ds_enable_category_resource(self._dataswarm, category, category, resource, autolabel)
+        return ds_enable_category_resource(self._taskvine, category, category, resource, autolabel)
 
     ##
     # Get current task state. See @ref ds_task_state_t for possible values.
@@ -1153,7 +1153,7 @@ class DataSwarm(object):
     # >>> print(q.task_state(taskid))
     # @endcode
     def task_state(self, taskid):
-        return ds_task_state(self._dataswarm, taskid)
+        return ds_task_state(self._taskvine, taskid)
 
     ## Enables resource monitoring of tasks in the queue, and writes a summary
     #  per task to the directory given. Additionally, all summaries are
@@ -1165,7 +1165,7 @@ class DataSwarm(object):
     # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
     def enable_monitoring(self, dirname=None, watchdog=True):
-        return ds_enable_monitoring(self._dataswarm, dirname, watchdog)
+        return ds_enable_monitoring(self._taskvine, dirname, watchdog)
 
     ## As @ref enable_monitoring, but it also generates a time series and a debug file.
     #  WARNING: Such files may reach gigabyte sizes for long running tasks.
@@ -1176,7 +1176,7 @@ class DataSwarm(object):
     # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
     def enable_monitoring_full(self, dirname=None, watchdog=True):
-        return ds_enable_monitoring_full(self._dataswarm, dirname, watchdog)
+        return ds_enable_monitoring_full(self._taskvine, dirname, watchdog)
 
     ##
     # Turn on or off fast abort functionality for a given queue for tasks in
@@ -1186,7 +1186,7 @@ class DataSwarm(object):
     # @param self       Reference to the current manager object.
     # @param multiplier The multiplier of the average task time at which point to abort; if negative (the default) fast_abort is deactivated.
     def activate_fast_abort(self, multiplier):
-        return ds_activate_fast_abort(self._dataswarm, multiplier)
+        return ds_activate_fast_abort(self._taskvine, multiplier)
 
     ##
     # Turn on or off fast abort functionality for a given queue.
@@ -1195,7 +1195,7 @@ class DataSwarm(object):
     # @param name       Name of the category.
     # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref activate_fast_abort)
     def activate_fast_abort_category(self, name, multiplier):
-        return ds_activate_fast_abort_category(self._dataswarm, name, multiplier)
+        return ds_activate_fast_abort_category(self._taskvine, name, multiplier)
 
     ##
     # Turn on or off draining mode for workers at hostname.
@@ -1204,7 +1204,7 @@ class DataSwarm(object):
     # @param hostname   The hostname the host running the workers.
     # @param drain_mode If True, no new tasks are dispatched to workers at hostname, and empty workers are shutdown. Else, workers works as usual.
     def specify_draining_by_hostname(self, hostname, drain_mode=True):
-        return ds_specify_draining_by_hostname(self._dataswarm, hostname, drain_mode)
+        return ds_specify_draining_by_hostname(self._taskvine, hostname, drain_mode)
 
     ##
     # Determine whether there are any known tasks queued, running, or waiting to be collected.
@@ -1213,7 +1213,7 @@ class DataSwarm(object):
     #
     # @param self       Reference to the current manager object.
     def empty(self):
-        return ds_empty(self._dataswarm)
+        return ds_empty(self._taskvine)
 
     ##
     # Determine whether the queue can support more tasks.
@@ -1222,7 +1222,7 @@ class DataSwarm(object):
     #
     # @param self       Reference to the current manager object.
     def hungry(self):
-        return ds_hungry(self._dataswarm)
+        return ds_hungry(self._taskvine)
 
     ##
     # Set the worker selection algorithm for queue.
@@ -1232,7 +1232,7 @@ class DataSwarm(object):
     #                   task to a worker. See @ref ds_schedule_t for
     #                   possible values.
     def specify_algorithm(self, algorithm):
-        return ds_specify_algorithm(self._dataswarm, algorithm)
+        return ds_specify_algorithm(self._taskvine, algorithm)
 
     ##
     # Set the order for dispatching submitted tasks in the queue.
@@ -1243,7 +1243,7 @@ class DataSwarm(object):
     #                   - @ref DS_TASK_ORDER_FIFO
     #                   - @ref DS_TASK_ORDER_LIFO
     def specify_task_order(self, order):
-        return ds_specify_task_order(self._dataswarm, order)
+        return ds_specify_task_order(self._taskvine, order)
 
     ##
     # Change the project name for the given queue.
@@ -1251,7 +1251,7 @@ class DataSwarm(object):
     # @param self   Reference to the current manager object.
     # @param name   The new project name.
     def specify_name(self, name):
-        return ds_specify_name(self._dataswarm, name)
+        return ds_specify_name(self._taskvine, name)
 
     ##
     # Set the preference for using hostname over IP address to connect.
@@ -1263,12 +1263,12 @@ class DataSwarm(object):
     # @param self Reference to the current manager object.
     # @param mode An string to indicate using 'by_ip', 'by_hostname' or 'by_apparent_ip'.
     def specify_manager_preferred_connection(self, mode):
-        return ds_manager_preferred_connection(self._dataswarm, mode)
+        return ds_manager_preferred_connection(self._taskvine, mode)
 
     ##
     # See specify_manager_preferred_connection
     def specify_master_preferred_connection(self, mode):
-        return ds_manager_preferred_connection(self._dataswarm, mode)
+        return ds_manager_preferred_connection(self._taskvine, mode)
 
     ##
     # Set the minimum taskid of future submitted tasks.
@@ -1283,7 +1283,7 @@ class DataSwarm(object):
     # @param minid  Minimum desired taskid
     # @return Returns the actual minimum taskid for future tasks.
     def specify_min_taskid(self, minid):
-        return ds_specify_min_taskid(self._dataswarm, minid)
+        return ds_specify_min_taskid(self._taskvine, minid)
 
     ##
     # Change the project priority for the given queue.
@@ -1291,7 +1291,7 @@ class DataSwarm(object):
     # @param self       Reference to the current manager object.
     # @param priority   An integer that presents the priorty of this manager manager. The higher the value, the higher the priority.
     def specify_priority(self, priority):
-        return ds_specify_priority(self._dataswarm, priority)
+        return ds_specify_priority(self._taskvine, priority)
 
     ## Specify the number of tasks not yet submitted to the queue.
     # It is used by ds_factory to determine the number of workers to launch.
@@ -1301,7 +1301,7 @@ class DataSwarm(object):
     # @param self   Reference to the current manager object.
     # @param ntasks Number of tasks yet to be submitted.
     def specify_num_tasks_left(self, ntasks):
-        return ds_specify_num_tasks_left(self._dataswarm, ntasks)
+        return ds_specify_num_tasks_left(self._taskvine, ntasks)
 
     ##
     # Specify the manager mode for the given queue.
@@ -1310,12 +1310,12 @@ class DataSwarm(object):
     # @param self   Reference to the current manager object.
     # @param mode   This may be one of the following values: DS_MASTER_MODE_STANDALONE or DS_MASTER_MODE_CATALOG.
     def specify_manager_mode(self, mode):
-        return ds_specify_manager_mode(self._dataswarm, mode)
+        return ds_specify_manager_mode(self._taskvine, mode)
 
     ##
     # See specify_manager_mode
     def specify_master_mode(self, mode):
-        return ds_specify_manager_mode(self._dataswarm, mode)
+        return ds_specify_manager_mode(self._taskvine, mode)
 
     ##
     # Specify the catalog server the manager should report to.
@@ -1324,7 +1324,7 @@ class DataSwarm(object):
     # @param hostname   The hostname of the catalog server.
     # @param port       The port the catalog server is listening on.
     def specify_catalog_server(self, hostname, port):
-        return ds_specify_catalog_server(self._dataswarm, hostname, port)
+        return ds_specify_catalog_server(self._taskvine, hostname, port)
 
     ##
     # Specify a debug log file that records the manager actions in detail.
@@ -1332,7 +1332,7 @@ class DataSwarm(object):
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
     def specify_debug_log(self, logfile):
-        return ds_specify_debug_log(self._dataswarm, logfile)
+        return ds_specify_debug_log(self._taskvine, logfile)
 
     ##
     # Specify a performance log file that records the cummulative stats of connected workers and submitted tasks.
@@ -1340,7 +1340,7 @@ class DataSwarm(object):
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
     def specify_perf_log(self, logfile):
-        return ds_specify_perf_log(self._dataswarm, logfile)
+        return ds_specify_perf_log(self._taskvine, logfile)
 
     ##
     # Specify a log file that records the states of tasks.
@@ -1348,7 +1348,7 @@ class DataSwarm(object):
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
     def specify_transactions_log(self, logfile):
-        ds_specify_transactions_log(self._dataswarm, logfile)
+        ds_specify_transactions_log(self._taskvine, logfile)
 
     ##
     # Add a mandatory password that each worker must present.
@@ -1356,7 +1356,7 @@ class DataSwarm(object):
     # @param self      Reference to the current manager object.
     # @param password  The password.
     def specify_password(self, password):
-        return ds_specify_password(self._dataswarm, password)
+        return ds_specify_password(self._taskvine, password)
 
     ##
     # Add a mandatory password file that each worker must present.
@@ -1365,7 +1365,7 @@ class DataSwarm(object):
     # @param file      Name of the file containing the password.
 
     def specify_password_file(self, file):
-        return ds_specify_password_file(self._dataswarm, file)
+        return ds_specify_password_file(self._taskvine, file)
 
     ##
     #
@@ -1385,7 +1385,7 @@ class DataSwarm(object):
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return ds_specify_max_resources(self._dataswarm, rm)
+        return ds_specify_max_resources(self._taskvine, rm)
 
     ##
     #
@@ -1405,7 +1405,7 @@ class DataSwarm(object):
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return ds_specify_min_resources(self._dataswarm, rm)
+        return ds_specify_min_resources(self._taskvine, rm)
 
     ##
     # Specifies the maximum resources allowed for the given category.
@@ -1426,7 +1426,7 @@ class DataSwarm(object):
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return ds_specify_category_max_resources(self._dataswarm, category, rm)
+        return ds_specify_category_max_resources(self._taskvine, category, rm)
 
     ##
     # Specifies the minimum resources allowed for the given category.
@@ -1447,7 +1447,7 @@ class DataSwarm(object):
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return ds_specify_category_min_resources(self._dataswarm, category, rm)
+        return ds_specify_category_min_resources(self._taskvine, category, rm)
 
     ##
     # Specifies the first-allocation guess for the given category
@@ -1468,7 +1468,7 @@ class DataSwarm(object):
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return ds_specify_category_first_allocation_guess(self._dataswarm, category, rm)
+        return ds_specify_category_first_allocation_guess(self._taskvine, category, rm)
 
     ##
     # Initialize first value of categories
@@ -1478,7 +1478,7 @@ class DataSwarm(object):
     # @param filename JSON file with resource summaries.
 
     def initialize_categories(self, filename, rm):
-        return ds_initialize_categories(self._dataswarm, rm, filename)
+        return ds_initialize_categories(self._taskvine, rm, filename)
 
     ##
     # Cancel task identified by its taskid and remove from the given queue.
@@ -1487,7 +1487,7 @@ class DataSwarm(object):
     # @param id     The taskid returned from @ref submit.
     def cancel_by_taskid(self, id):
         task = None
-        task_pointer = ds_cancel_by_taskid(self._dataswarm, id)
+        task_pointer = ds_cancel_by_taskid(self._taskvine, id)
         if task_pointer:
             task = self._task_table.pop(int(id))
         return task
@@ -1499,7 +1499,7 @@ class DataSwarm(object):
     # @param tag    The tag assigned to task using @ref specify_tag.
     def cancel_by_tasktag(self, tag):
         task = None
-        task_pointer = ds_cancel_by_tasktag(self._dataswarm, tag)
+        task_pointer = ds_cancel_by_tasktag(self._taskvine, tag)
         if task_pointer:
             task = self._task_table.pop(int(id))
         return task
@@ -1529,7 +1529,7 @@ class DataSwarm(object):
     # @param self   Reference to the current manager object.
     # @param n      The number to shutdown.  To shut down all workers, specify "0".
     def shutdown_workers(self, n):
-        return ds_shut_down_workers(self._dataswarm, n)
+        return ds_shut_down_workers(self._taskvine, n)
 
     ##
     # Block workers running on host from working for the manager.
@@ -1537,7 +1537,7 @@ class DataSwarm(object):
     # @param self   Reference to the current manager object.
     # @param host   The hostname the host running the workers.
     def block_host(self, host):
-        return ds_block_host(self._dataswarm, host)
+        return ds_block_host(self._taskvine, host)
 
     ##
     # Replaced by @ref block_host
@@ -1551,7 +1551,7 @@ class DataSwarm(object):
     # @param host    The hostname the host running the workers.
     # @param timeout How long this block entry lasts (in seconds). If less than 1, block indefinitely.
     def block_host_with_timeout(self, host, timeout):
-        return ds_block_host_with_timeout(self._dataswarm, host, timeout)
+        return ds_block_host_with_timeout(self._taskvine, host, timeout)
 
     ##
     # See @ref block_host_with_timeout
@@ -1565,8 +1565,8 @@ class DataSwarm(object):
     # @param host   The of the hostname the host.
     def unblock_host(self, host=None):
         if host is None:
-            return ds_unblock_all(self._dataswarm)
-        return ds_unblock_host(self._dataswarm, host)
+            return ds_unblock_all(self._taskvine)
+        return ds_unblock_host(self._taskvine, host)
 
     ##
     # See @ref unblock_host
@@ -1581,7 +1581,7 @@ class DataSwarm(object):
     def invalidate_cache_file(self, local_name):
         if local_name:
             local_name = str(local_name)
-        return ds_invalidate_cached_file(self._dataswarm, local_name, DS_FILE)
+        return ds_invalidate_cached_file(self._taskvine, local_name, DS_FILE)
 
     ##
     # Change keepalive interval for a given queue.
@@ -1590,7 +1590,7 @@ class DataSwarm(object):
     # @param interval Minimum number of seconds to wait before sending new keepalive
     #                 checks to workers.
     def specify_keepalive_interval(self, interval):
-        return ds_specify_keepalive_interval(self._dataswarm, interval)
+        return ds_specify_keepalive_interval(self._taskvine, interval)
 
     ##
     # Change keepalive timeout for a given queue.
@@ -1599,7 +1599,7 @@ class DataSwarm(object):
     # @param timeout  Minimum number of seconds to wait for a keepalive response
     #                 from worker before marking it as dead.
     def specify_keepalive_timeout(self, timeout):
-        return ds_specify_keepalive_timeout(self._dataswarm, timeout)
+        return ds_specify_keepalive_timeout(self._taskvine, timeout)
 
     ##
     # Turn on manager capacity measurements.
@@ -1607,7 +1607,7 @@ class DataSwarm(object):
     # @param self     Reference to the current manager object.
     #
     def estimate_capacity(self):
-        return ds_specify_estimate_capacity_on(self._dataswarm, 1)
+        return ds_specify_estimate_capacity_on(self._taskvine, 1)
 
     ##
     # Tune advanced parameters.
@@ -1632,7 +1632,7 @@ class DataSwarm(object):
     # @return 0 on succes, -1 on failure.
     #
     def tune(self, name, value):
-        return ds_tune(self._dataswarm, name, value)
+        return ds_tune(self._taskvine, name, value)
 
     ##
     # Submit a task to the queue.
@@ -1640,11 +1640,11 @@ class DataSwarm(object):
     # It is safe to re-submit a task returned by @ref wait.
     #
     # @param self   Reference to the current manager object.
-    # @param task   A task description created from @ref dataswarm::Task.
+    # @param task   A task description created from @ref taskvine::Task.
     def submit(self, task):
         if isinstance(task, RemoteTask):
             task.specify_buffer(json.dumps(task._event), "infile")
-        taskid = ds_submit(self._dataswarm, task._task)
+        taskid = ds_submit(self._taskvine, task._task)
         self._task_table[taskid] = task
         return taskid
 
@@ -1671,7 +1671,7 @@ class DataSwarm(object):
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
     def wait_for_tag(self, tag, timeout=DS_WAITFORTASK):
-        task_pointer = ds_wait_for_tag(self._dataswarm, tag, timeout)
+        task_pointer = ds_wait_for_tag(self._taskvine, tag, timeout)
         if task_pointer:
             task = self._task_table[ds_task_get_taskid(task_pointer)]
             del self._task_table[ds_task_get_taskid(task_pointer)]
@@ -1679,7 +1679,7 @@ class DataSwarm(object):
         return None            
 
     ##
-    # Maps a function to elements in a sequence using dataswarm
+    # Maps a function to elements in a sequence using taskvine
     #
     # Similar to regular map function in python
     #
@@ -1831,7 +1831,7 @@ class DataSwarm(object):
         return seq[0]
 
     ##
-    # Maps a function to elements in a sequence using dataswarm remote task 
+    # Maps a function to elements in a sequence using taskvine remote task 
     #
     # Similar to regular map function in python, but creates a task to execute each function on a worker running a coprocess
     #
@@ -2028,7 +2028,7 @@ class RemoteTask(Task):
 # config changes to the factory while it is running. As an example,
 #
 #     # normal WQ setup stuff
-#     workers = dataswarm.Factory("sge", "myproject")
+#     workers = taskvine.Factory("sge", "myproject")
 #     workers.cores = 4
 #     with workers:
 #         # submit some tasks

@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "dataswarm_json.h"
-#include "dataswarm.h"
+#include "taskvine_json.h"
+#include "taskvine.h"
 
 #include "jx.h"
 #include "jx_parse.h"
@@ -303,20 +303,20 @@ struct ds_manager *ds_json_create(const char *str)
 
 	if(port >= 0) {
 
-		struct ds_manager *dataswarm = ds_create(port);
+		struct ds_manager *taskvine = ds_create(port);
 
-		if(!dataswarm) {
+		if(!taskvine) {
 			return NULL;
 		}
 
 		if(name) {
-			ds_specify_name(dataswarm, name);
+			ds_specify_name(taskvine, name);
 		}
 		if(priority) {
-			ds_specify_priority(dataswarm, priority);
+			ds_specify_priority(taskvine, priority);
 		}
 
-		return dataswarm;
+		return taskvine;
 
 	}
 

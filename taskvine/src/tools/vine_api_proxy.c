@@ -32,8 +32,8 @@ See clients/python3/ds_proxy.py for an example in Python.
 #include "stringtools.h"
 #include "cctools.h"
 
-#include "dataswarm_json.h"
-#include "dataswarm.h"
+#include "taskvine_json.h"
+#include "taskvine.h"
 
 int timeout = 25;
 

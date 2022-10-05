@@ -12,7 +12,7 @@ endif
 
 DT_LIB=${CCTOOLS_HOME}/dttools/src/libdttools.a
 WQ_LIB=${CCTOOLS_HOME}/work_queue/src/libwork_queue.a
-DS_LIB=${CCTOOLS_HOME}/dataswarm/src/manager/libdataswarm.a
+DS_LIB=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a
 
 EXTERNAL_LIBRARIES=$(CHIRP_LIB) $(DT_LIB)
 

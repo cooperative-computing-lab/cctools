@@ -93,7 +93,7 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_JX       (1LL<<45)  /**< Debug JX */
 #define D_MAKEFLOW_HOOK  (1LL<<46)  /**< Debug makeflow's hook system */
 #define D_EXT      (1LL<<47)  /**< Debug the ext module in Parrot */
-#define D_DS  (1LL<<48) /**< Debug the dataswarm service. */
+#define D_DS  (1LL<<48) /**< Debug the taskvine service. */
 #define D_TLQ (1LL<<49) /**< Debug the TLQ service's interactions with CCTools. */
 #define D_SSL (1LL<<50) /**< Debug the TLQ service's interactions with CCTools. */
 

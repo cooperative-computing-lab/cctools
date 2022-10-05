@@ -112,7 +112,7 @@ static int task_state_count( struct ds_manager *q, const char *category, ds_task
 static int task_request_count( struct ds_manager *q, const char *category, category_allocation_t request);
 
 static ds_msg_code_t handle_http_request( struct ds_manager *q, struct ds_worker_info *w, const char *path, time_t stoptime );
-static ds_msg_code_t handle_dataswarm(struct ds_manager *q, struct ds_worker_info *w, const char *line);
+static ds_msg_code_t handle_taskvine(struct ds_manager *q, struct ds_worker_info *w, const char *line);
 static ds_msg_code_t handle_queue_status(struct ds_manager *q, struct ds_worker_info *w, const char *line, time_t stoptime);
 static ds_msg_code_t handle_resource(struct ds_manager *q, struct ds_worker_info *w, const char *line);
 static ds_msg_code_t handle_feature(struct ds_manager *q, struct ds_worker_info *w, const char *line);
@@ -400,8 +400,8 @@ static ds_msg_code_t ds_manager_recv(struct ds_manager *q, struct ds_worker_info
 	// Check for status updates that can be consumed here.
 	if(string_prefix_is(line, "alive")) {
 		result = DS_MSG_PROCESSED;
-	} else if(string_prefix_is(line, "dataswarm")) {
-		result = handle_dataswarm(q, w, line);
+	} else if(string_prefix_is(line, "taskvine")) {
+		result = handle_taskvine(q, w, line);
 	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status") || string_prefix_is(line, "wable_status") || string_prefix_is(line, "resources_status")) {
 		result = handle_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
@@ -1251,12 +1251,12 @@ Once this message is processed, the manager knows it is a valid connection
 and can begin sending tasks and data.
 */
 
-static ds_msg_code_t handle_dataswarm(struct ds_manager *q, struct ds_worker_info *w, const char *line)
+static ds_msg_code_t handle_taskvine(struct ds_manager *q, struct ds_worker_info *w, const char *line)
 {
 	char items[4][DS_LINE_MAX];
 	int worker_protocol;
 
-	int n = sscanf(line,"dataswarm %d %s %s %s %s",&worker_protocol,items[0],items[1],items[2],items[3]);
+	int n = sscanf(line,"taskvine %d %s %s %s %s",&worker_protocol,items[0],items[1],items[2],items[3]);
 	if(n != 5)
 		return DS_MSG_FAILURE;
 
@@ -1482,7 +1482,7 @@ static ds_result_code_t get_result(struct ds_manager *q, struct ds_worker_info *
 
 	w->finished_tasks++;
 
-	// Convert resource_monitor status into dataswarm status if needed.
+	// Convert resource_monitor status into taskvine status if needed.
 	if(q->monitor_mode) {
 		if(t->exit_code == RM_OVERFLOW) {
 			ds_task_update_result(t, DS_RESULT_RESOURCE_EXHAUSTION);
@@ -2748,7 +2748,7 @@ static void ask_for_workers_updates(struct ds_manager *q) {
 
 		if(q->keepalive_interval > 0) {
 
-			/* we have not received dataswarm message from worker yet, so we
+			/* we have not received taskvine message from worker yet, so we
 			 * simply check again its start_time. */
 			if(!strcmp(w->hostname, "unknown")){
 				if ((int)((current_time - w->start_time)/1000000) >= q->keepalive_timeout) {
@@ -3030,7 +3030,7 @@ void ds_invalidate_cached_file(struct ds_manager *q, const char *local_name, ds_
 }
 
 /******************************************************/
-/************* dataswarm public functions *************/
+/************* taskvine public functions *************/
 /******************************************************/
 
 struct ds_manager *ds_create(int port) {
@@ -3820,7 +3820,7 @@ static void print_password_warning( struct ds_manager *q )
 	}
 
 	if(!q->password && q->name) {
-		fprintf(stderr,"warning: this dataswarm manager is visible to the public.\n");
+		fprintf(stderr,"warning: this taskvine manager is visible to the public.\n");
 		fprintf(stderr,"warning: you should set a password with the --password option.\n");
 	}
 
@@ -3834,7 +3834,7 @@ static void print_password_warning( struct ds_manager *q )
 
 #define BEGIN_ACCUM_TIME(q, stat) {\
 	if(q->stats_measure->stat != 0) {\
-		fatal("Double-counting stat %s. This should not happen, and it is a dataswarm bug.");\
+		fatal("Double-counting stat %s. This should not happen, and it is a taskvine bug.");\
 	} else {\
 		q->stats_measure->stat = timestamp_get();\
 	}\

@@ -10,7 +10,7 @@ This example program shows the behavior of the DS_WATCH flag.
 If a task produces output to a file incrementally as it runs,
 it can be helpful to see that output piece by piece as it
 is produced. By simply adding the DS_WATCH flag to the output
-of the program, dataswarm will periodically check for output
+of the program, taskvine will periodically check for output
 and return it to the manager while each task runs.  When the
 task completes, any remaining output is fetched.
 
@@ -21,7 +21,7 @@ up another terminal, and observe that files output.0, output.1,
 etc are gradually produced throughout the run.
 */
 
-#include "dataswarm.h"
+#include "taskvine.h"
 
 #include <stdio.h>
 #include <stdlib.h>

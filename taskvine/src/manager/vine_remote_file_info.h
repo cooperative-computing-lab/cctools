@@ -7,7 +7,7 @@ See the file COPYING for details.
 #ifndef DS_REMOTE_FILE_INFO_H
 #define DS_REMOTE_FILE_INFO_H
 
-#include "dataswarm.h"
+#include "taskvine.h"
 
 struct ds_remote_file_info {
 	ds_file_t type;

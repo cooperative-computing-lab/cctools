@@ -1,8 +1,8 @@
 include ../../../config.mk
 include ../../../rules.mk
 
-LOCAL_LINKAGE+=${CCTOOLS_HOME}/dataswarm/src/manager/libdataswarm.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
-LOCAL_CCFLAGS=-I ${CCTOOLS_HOME}/dataswarm/src/manager
+LOCAL_LINKAGE+=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a ${CCTOOLS_HOME}/dttools/src/libdttools.a
+LOCAL_CCFLAGS=-I ${CCTOOLS_HOME}/taskvine/src/manager
 
 SOURCES = \
 	ds_sandbox.c \

@@ -13,7 +13,7 @@ import shutil
 import stat
 import time
 
-import dataswarm as ds
+import taskvine as ds
 
 test_dir    = tempfile.mkdtemp(prefix='ds.test', dir=".")
 input_file  = 'input.file'

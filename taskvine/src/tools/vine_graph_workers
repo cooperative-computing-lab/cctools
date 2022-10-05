@@ -39,7 +39,7 @@ TOOLTIPS = [
 # Functions
 def usage(status=0, prog=os.path.basename(__file__)):
     print(f"Usage: {prog} [-gtw] [-o outfile] logfile")
-    print("Utilize the bokeh package to analyze the dataswarm transaction log file interactively.")
+    print("Utilize the bokeh package to analyze the taskvine transaction log file interactively.")
     print("""
   -g  Display lifetime of all tasks. (default)
   -t  Display lifetime of tasks per worker.
