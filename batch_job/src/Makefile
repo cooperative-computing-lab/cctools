@@ -3,7 +3,7 @@ include ../../rules.mk
 
 LIBRARIES = libbatch_job.a
 
-PROGRAMS = work_queue_factory work_queue_pool ds_factory
+PROGRAMS = work_queue_factory work_queue_pool vine_factory
 
 ifeq ($(CCTOOLS_CHIRP),chirp)
 CHIRP_LIB=${CCTOOLS_HOME}/chirp/src/libchirp.a
@@ -12,7 +12,7 @@ endif
 
 DT_LIB=${CCTOOLS_HOME}/dttools/src/libdttools.a
 WQ_LIB=${CCTOOLS_HOME}/work_queue/src/libwork_queue.a
-DS_LIB=${CCTOOLS_HOME}/dataswarm/src/manager/libdataswarm.a
+VINE_LIB=${CCTOOLS_HOME}/taskvine/src/manager/libtaskvine.a
 
 EXTERNAL_LIBRARIES=$(CHIRP_LIB) $(DT_LIB)
 
@@ -46,7 +46,7 @@ all: $(LIBRARIES) $(PROGRAMS)
 libbatch_job.a: $(OBJECTS)
 
 work_queue_factory: work_queue_factory.o libbatch_job.a $(WQ_LIB) $(EXTERNAL_LIBRARIES)
-ds_factory: ds_factory.o libbatch_job.a $(DS_LIB) $(WQ_LIB) $(EXTERNAL_LIBRARIES)
+vine_factory: vine_factory.o libbatch_job.a $(VINE_LIB) $(WQ_LIB) $(EXTERNAL_LIBRARIES)
 
 # Note that work_queue_pool is the same as work_queue_factory, for backwards compatibility.
 work_queue_pool: work_queue_factory

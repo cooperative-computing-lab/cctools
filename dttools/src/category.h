@@ -86,8 +86,8 @@ struct category {
 	uint64_t average_task_time;
 	struct work_queue_stats *wq_stats;
 
-	/* stats for dataswarm */
-	struct ds_stats *ds_stats;
+	/* stats for taskvine */
+	struct vine_stats *vine_stats;
 
 	/* variables for makeflow */
 	/* Mappings between variable names defined in the makeflow file and their values. */

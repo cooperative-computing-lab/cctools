@@ -68,7 +68,7 @@ include_package_apps="apps"
 include_package_chirp="chirp"
 include_package_deltadb="deltadb"
 include_package_doc="doc"
-include_package_dataswarm="dataswarm"
+include_package_taskvine="taskvine"
 include_package_ftplite="ftp_lite"
 include_package_grow="grow"
 include_package_makeflow="makeflow"
@@ -108,13 +108,13 @@ config_ext2fs_path=auto
 config_fuse_path=auto
 config_mysql_path=no
 config_openssl_path=auto
-config_perl_path=auto
 config_python_path=auto    # for python2 or python3, version automatically detected
 config_python2_path=auto
 config_python3_path=auto
 config_readline_path=auto
 config_swig_path=auto
 
+config_perl_path=no
 config_golang_path=no
 config_curl_path=no
 config_cvmfs_path=no
@@ -301,8 +301,8 @@ do
 		--without-system-prune)
 			include_package_prune=""
 			;;
-		--without-system-dataswarm)
-			include_package_dataswarm=""
+		--without-system-taskvine)
+			include_package_taskvine=""
 			;;
 		--with-*-path)
 			echo "ignoring unknown package ${arg}"
@@ -358,7 +358,7 @@ Where PACKAGE may be:
 
 And SYSTEM may be:
 	chirp
-	dataswarm
+	taskvine
 	doc
 	ftp-lite
 	makeflow
@@ -1451,7 +1451,7 @@ then
 	fi
 fi
 
-potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_dataswarm} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_tlq} ${include_package_doc} poncho"
+potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_taskvine} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_tlq} ${include_package_doc} poncho"
 
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
@@ -1469,9 +1469,9 @@ do
 	fi
 done
 
-if [ dataswarm = "${include_package_dataswarm}" ]
+if [ taskvine = "${include_package_taskvine}" ]
 then
-	internal_ccflags="${internal_ccflags} -I $(pwd)/dataswarm/src/manager"
+	internal_ccflags="${internal_ccflags} -I $(pwd)/taskvine/src/manager"
 fi
 
 ccflags_append_define \
@@ -1539,7 +1539,7 @@ else
 	CCTOOLS_LD='@echo LINK $@;'"${linker}"
 fi
 
-swig_dataswarm_bindings=""
+swig_taskvine_bindings=""
 swig_workqueue_bindings=""
 swig_chirp_bindings=""
 swig_rmonitor_bindings=""
@@ -1547,9 +1547,9 @@ if [ "$swig_avail" = yes ]
 then
 	for binding in $swig_bindings
 	do
-		if [ -d dataswarm/src/bindings/${binding} ]
+		if [ -d taskvine/src/bindings/${binding} ]
 		then
-			swig_dataswarm_bindings="$binding $swig_dataswarm_bindings"
+			swig_taskvine_bindings="$binding $swig_taskvine_bindings"
 		fi
 
 		if [ -d work_queue/src/bindings/${binding} ]
@@ -1641,7 +1641,7 @@ CCTOOLS_READLINE_LDFLAGS=${readline_ldflags}
 
 CCTOOLS_SWIG_AVAILABLE=${swig_avail}
 CCTOOLS_SWIG=${swig_exe}
-CCTOOLS_SWIG_DATASWARM_BINDINGS=${swig_dataswarm_bindings}
+CCTOOLS_SWIG_TASKVINE_BINDINGS=${swig_taskvine_bindings}
 CCTOOLS_SWIG_WORKQUEUE_BINDINGS=${swig_workqueue_bindings}
 CCTOOLS_SWIG_CHIRP_BINDINGS=${swig_chirp_bindings}
 CCTOOLS_SWIG_RMONITOR_BINDINGS=${swig_rmonitor_bindings}

@@ -17,12 +17,12 @@ config.mk:
 	@echo "You must run 'configure' before '${MAKE}'."
 	@exit 1
 
-batch_job chirp dataswarm deltadb ftp_lite tlq makeflow makeflow_linker parrot resource_monitor work_queue grow: dttools
+batch_job chirp taskvine deltadb ftp_lite tlq makeflow makeflow_linker parrot resource_monitor work_queue grow: dttools
 makeflow: batch_job
 parrot: ftp_lite grow
 batch_job parrot: chirp
 batch_job makeflow: work_queue
-batch_job makeflow: dataswarm
+batch_job makeflow: taskvine
 
 $(CCTOOLS_PACKAGES): config.mk
 	@$(MAKE) -C $@
