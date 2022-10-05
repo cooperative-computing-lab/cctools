@@ -9,13 +9,13 @@ prepare()
 
 run()
 {
-	cd syntax; ../../src/makeflow meta2.makeflow && exit 0
+	cd syntax && ../../src/makeflow meta2.makeflow && exit 0
 	exit 1
 }
 
 clean()
 {
-	cd syntax; ../../src/makeflow -c meta2.makeflow && exit 0
+	cd syntax && ../../src/makeflow -c meta2.makeflow && rm *.makeflowlog && exit 0
 	exit 1
 }
 

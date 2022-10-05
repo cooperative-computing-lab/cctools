@@ -27,7 +27,7 @@ $(DSPYTHONSO): vine_wrap.o $(EXTERNAL_DEPENDENCIES)
 test:
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) Python.framework taskvine.py vine_wrap.c *.pyc
+	rm -rf $(OBJECTS) $(TARGETS) Python.framework taskvine.py vine_wrap.c vine_wrap.o *.pyc __pycache__
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)

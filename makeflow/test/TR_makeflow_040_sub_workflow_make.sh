@@ -60,7 +60,7 @@ clean()
 	../src/makeflow -Z "$PORT_FILE" sublevel.makeflow -c
 	../src/makeflow -Z "$PORT_FILE" toplevel.makeflow -c
 
-	rm -f $MAKE_FILE $PORT_FILE $WORKER_LOG input.txt out.1 out.2 out.actual out.expected toplevel.makeflow sublevel.makeflow
+	rm -f $MAKE_FILE $PORT_FILE $WORKER_LOG input.txt out.1 out.2 out.actual out.expected toplevel.makeflow sublevel.makeflow worker.log
 }
 
 dispatch "$@"

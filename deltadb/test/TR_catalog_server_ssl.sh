@@ -58,6 +58,7 @@ run()
 clean()
 {
 	rm -f cert.pem key.pem catalog.log update.json query.out
+	rm -rf catalog.history
 	return 0
 }
 
