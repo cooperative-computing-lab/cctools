@@ -24,13 +24,16 @@ batch_job parrot: chirp
 batch_job makeflow: work_queue
 batch_job makeflow: taskvine
 
+clean-config:
+	rm -f .configure.tmp.o cctools.test.log cctools.test.fail cctools.test.tmp configure.rerun
+
 $(CCTOOLS_PACKAGES): config.mk
 	@$(MAKE) -C $@
 
 CLEAN_PACKAGES = $(CCTOOLS_PACKAGES:%=clean-%)
 $(CLEAN_PACKAGES):
 	@$(MAKE) -C $(@:clean-%=%) clean
-clean: $(CLEAN_PACKAGES)
+clean: $(CLEAN_PACKAGES) clean-config
 
 INSTALL_PACKAGES = $(CCTOOLS_PACKAGES:%=install-%)
 $(INSTALL_PACKAGES): $(CCTOOLS_PACKAGES)
