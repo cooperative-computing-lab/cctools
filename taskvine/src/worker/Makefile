@@ -27,7 +27,7 @@ install: all
 	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
 
 clean:
-	rm -rf $(OBJECTS) $(PROGRAMS) 
+	rm -rf $(PROGRAMS) *.o
 
 test: all
 
