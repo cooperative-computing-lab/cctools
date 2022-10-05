@@ -36,7 +36,7 @@ def specify_port_range(low_port, high_port):
     os.environ['TCP_LOW_PORT'] = str(low_port)
     os.environ['TCP_HIGH_PORT'] = str(high_port)
 
-staging_directory = tempfile.mkdtemp(prefix='ds-py-staging-')
+staging_directory = tempfile.mkdtemp(prefix='vine-py-staging-')
 def cleanup_staging_directory():
     try:
         shutil.rmtree(staging_directory)
@@ -2117,7 +2117,7 @@ class Factory(object):
 
         (tmp, self._error_file) = tempfile.mkstemp(
                 dir=staging_directory,
-                prefix='ds-factory-err-')
+                prefix='vine-factory-err-')
         os.close(tmp)
 
         self._opts = {}
@@ -2250,13 +2250,13 @@ class Factory(object):
             raise RuntimeError('Factory was already started')
         (tmp, self._config_file) = tempfile.mkstemp(
                 dir=staging_directory,
-                prefix='ds-factory-config-',
+                prefix='vine-factory-config-',
                 suffix='.json')
 
         if not self.scratch_dir:
             self.scratch_dir = tempfile.mkdtemp(
                     dir=staging_directory,
-                    prefix="ds-factory-scratch-")
+                    prefix="vine-factory-scratch-")
 
         os.close(tmp)
         self._write_config()

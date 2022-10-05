@@ -4,14 +4,14 @@
 # tests for missing/recursive inputs/outputs.
 
 import sys
-import taskvine as ds
+import taskvine as vine
 
 def check_task(category, category_mode, max, min, expected):
     q.specify_category_max_resources(category, max)
     q.specify_category_min_resources(category, min)
     q.specify_category_mode(category, category_mode)
 
-    t = ds.Task('/bin/echo hello')
+    t = vine.Task('/bin/echo hello')
     t.specify_category(category)
     q.submit(t)
 
@@ -42,12 +42,12 @@ except IndexError:
     sys.stderr.write("Usage: {} PORTFILE WORKER_CORES WORKER_MEMORY WORKER_DISK\n".format(sys.argv[0]))
     raise
 
-q = ds.DataSwarm(0)
+q = vine.DataSwarm(0)
 with open(port_file, 'w') as f:
     print('Writing port {port} to file {file}'.format(port=q.port, file=port_file))
     f.write(str(q.port))
 
-worker = ds.Factory("local", manager_host_port="localhost:{}".format(q.port))
+worker = vine.Factory("local", manager_host_port="localhost:{}".format(q.port))
 worker.max_workers = 1
 worker.min_workers = 1
 
@@ -62,53 +62,53 @@ worker.debug_file="factory.log"
 
 with worker:
     r = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 4}
-    check_task('all_specified', ds.VINE_ALLOCATION_MODE_FIXED, max = r, min = {}, expected = r)
+    check_task('all_specified', vine.VINE_ALLOCATION_MODE_FIXED, max = r, min = {}, expected = r)
 
     check_task('all_specified_no_gpu',
-            ds.VINE_ALLOCATION_MODE_FIXED,
+            vine.VINE_ALLOCATION_MODE_FIXED,
             max = {'cores': 1, 'memory': 2, 'disk': 3},
             min = {},
             expected = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 0})
 
     check_task('all_specified_no_cores',
-            ds.VINE_ALLOCATION_MODE_FIXED,
+            vine.VINE_ALLOCATION_MODE_FIXED,
             max = {'gpus': 4, 'memory': 2, 'disk': 3},
             min = {},
             expected = {'cores': 0, 'memory': 2, 'disk': 3, 'gpus': 4})
 
     check_task('all_zero',
-            ds.VINE_ALLOCATION_MODE_FIXED,
+            vine.VINE_ALLOCATION_MODE_FIXED,
             max = {'cores': 0, 'memory': 0, 'disk': 0, 'gpus': 0},
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
     check_task('only_memory',
-            ds.VINE_ALLOCATION_MODE_FIXED,
+            vine.VINE_ALLOCATION_MODE_FIXED,
             max = {'memory': worker_memory/2},
             min = {},
             expected = {'cores': worker_cores/2, 'memory': worker_memory/2, 'disk': worker_disk/2, 'gpus': 0})
 
     check_task('only_cores',
-            ds.VINE_ALLOCATION_MODE_FIXED,
+            vine.VINE_ALLOCATION_MODE_FIXED,
             max = {'cores': worker_cores},
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
     check_task('only_memory_w_minimum',
-            ds.VINE_ALLOCATION_MODE_FIXED,
+            vine.VINE_ALLOCATION_MODE_FIXED,
             max = {'memory': worker_memory/2},
             min = {'cores': 3, 'gpus': 2},
             expected = {'cores': 3, 'memory': worker_memory/2, 'disk': worker_disk/2, 'gpus': 2})
 
     check_task('auto_whole_worker',
-            ds.VINE_ALLOCATION_MODE_MIN_WASTE,
+            vine.VINE_ALLOCATION_MODE_MIN_WASTE,
             max = {},
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
     q.specify_category_first_allocation_guess('auto_with_guess', {'cores': 1, 'memory': 2, 'disk': 3})
     check_task('auto_with_guess',
-            ds.VINE_ALLOCATION_MODE_MIN_WASTE,
+            vine.VINE_ALLOCATION_MODE_MIN_WASTE,
             max = {},
             min = {},
             expected = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 0})

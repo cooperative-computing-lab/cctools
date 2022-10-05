@@ -15,7 +15,7 @@ run()
 
 clean()
 {
-	cd syntax; ../../src/makeflow -c meta.makeflow && rm *.makeflowlog && exit 0
+	cd syntax; ../../src/makeflow -c meta.makeflow && rm -f *.makeflowlog && exit 0
 	exit 1
 }
 

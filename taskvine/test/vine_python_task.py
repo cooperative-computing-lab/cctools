@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import sys
-import taskvine as ds
+import taskvine as vine
 
 port_file = None
 try:
@@ -20,7 +20,7 @@ def my_sum(x, y, negate=False):
     return s
 
 # Create a new queue
-queue = ds.DataSwarm(port=[9123,9130])
+queue = vine.DataSwarm(port=[9123,9130])
 print("listening on port {}".format(queue.port))
 with open(port_file, "w") as f:
     f.write(str(queue.port))
@@ -29,7 +29,7 @@ with open(port_file, "w") as f:
 # Submit several tasks for execution:
 print("submitting tasks...")
 for value in range(1,10):
-    task = ds.PythonTask(my_sum, value, value)
+    task = vine.PythonTask(my_sum, value, value)
     task.specify_cores(1)
     queue.submit(task)
 
@@ -44,7 +44,7 @@ while not queue.empty():
 
 # Submit several tasks for execution:
 for value in range(1,10):
-    task = ds.PythonTask(my_sum, value, value, negate=True)
+    task = vine.PythonTask(my_sum, value, value, negate=True)
     task.specify_cores(1)
     queue.submit(task)
 

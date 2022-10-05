@@ -8,8 +8,8 @@ import_config_val CCTOOLS_PYTHON_TEST_DIR
 
 export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
-STATUS_FILE=ds.status
-PORT_FILE=ds.port
+STATUS_FILE=vine.status
+PORT_FILE=vine.port
 
 
 check_needed()
@@ -27,18 +27,18 @@ prepare()
 
 run()
 {
-	# send ds to the background, saving its exit status.
+	# send vine to the background, saving its exit status.
 	(${CCTOOLS_PYTHON_TEST_EXEC} vine_test_tag.py $PORT_FILE; echo $? > $STATUS_FILE) &
 
-	# wait at most 15 seconds for ds to find a port.
+	# wait at most 15 seconds for vine to find a port.
 	wait_for_file_creation $PORT_FILE 15
 
 	run_ds_worker $PORT_FILE worker.log
 
-	# wait for ds to exit.
+	# wait for vine to exit.
 	wait_for_file_creation $STATUS_FILE 15
 
-	# retrieve ds exit status
+	# retrieve vine exit status
 	status=$(cat $STATUS_FILE)
 	if [ $status -ne 0 ]
 	then
