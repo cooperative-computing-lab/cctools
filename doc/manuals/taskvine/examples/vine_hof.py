@@ -5,7 +5,7 @@ import taskvine as vine
 
 def main():
     # Set up queue
-    q = vine.TaskVine(port=9123)
+    q = vine.Manager(port=9123)
 
     # map - similar to Python's own map function, but uses a taskvine worker
     # to complete computation. Returns sequence with the results from the given function
