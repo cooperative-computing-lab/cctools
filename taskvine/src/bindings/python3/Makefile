@@ -31,8 +31,5 @@ clean:
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)
-	chmod 755 taskvine.py vine_example.py
+	chmod 755 taskvine.py
 	cp taskvine.py vine_futures.py _taskvine.$(CCTOOLS_DYNAMIC_SUFFIX) $(CCTOOLS_PYTHON3_PATH)/
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp vine_example.py vine_futures_example.py $(CCTOOLS_INSTALL_DIR)/doc/
-
