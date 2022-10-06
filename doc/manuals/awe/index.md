@@ -322,7 +322,7 @@ For the latest information about AWE, please visit our [web
 site](http://ccl.cse.nd.edu/software/awe) and subscribe to our [mailing
 list](http://ccl.cse.nd.edu/software/help.shtml).
 
-AWE is Copyright (C) 2013- The University of Notre Dame. This software is
+AWE is Copyright (C) 2022 The University of Notre Dame. This software is
 distributed under the GNU General Public License. See the file COPYING for
 details.
 

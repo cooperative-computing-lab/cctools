@@ -2,7 +2,7 @@
 
 **Last edited: January 2011**
 
-SAND is Copyright (C) 2010- The University of Notre Dame.  
+SAND is Copyright (C) 2022 The University of Notre Dame.  
 All rights reserved.  
 This software is distributed under the GNU General Public License.  
 See the file COPYING for details.

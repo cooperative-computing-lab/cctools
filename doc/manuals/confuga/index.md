@@ -345,7 +345,7 @@ file binding. For this reason, it cannot use Chirp servers running with
 Patrick Donnelly, Nicholas Hazekamp, Douglas Thain, [Confuga: Scalable Data Intensive Computing for POSIX Workflows](http://ccl.cse.nd.edu/research/papers/confuga-ccgrid2015.pdf), IEEE/ACM International Symposium on Cluster, Cloud and Grid Computing, May, 2015.
 
 
-Confuga is Copyright (C) 2015 The University of Notre Dame.  
+Confuga is Copyright (C) 2022 The University of Notre Dame.  
 All rights reserved.  
 This software is distributed under the GNU General Public License.  
 See the file COPYING for details.

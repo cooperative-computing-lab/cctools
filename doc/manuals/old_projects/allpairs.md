@@ -2,7 +2,7 @@
 
 **Last Updated October 2010**
 
-Allpairs is Copyright (C) 2009 The University of Notre Dame. This software is
+Allpairs is Copyright (C) 2022 The University of Notre Dame. This software is
 distributed under the GNU General Public License. See the file COPYING for
 details.
 

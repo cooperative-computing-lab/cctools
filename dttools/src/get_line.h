@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2009- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 Originally written by Kevin Partington (27 January 2009)
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
