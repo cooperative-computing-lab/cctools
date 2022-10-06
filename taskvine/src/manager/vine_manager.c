@@ -127,7 +127,7 @@ struct category *vine_category_lookup_or_create(struct vine_manager *q, const ch
 
 void vine_disable_monitoring(struct vine_manager *q);
 static void aggregate_workers_resources( struct vine_manager *q, struct vine_resources *total, struct hash_table *features);
-static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag);
+static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int taskid);
 static void release_all_workers( struct vine_manager *q );
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
@@ -3865,7 +3865,26 @@ struct vine_task *vine_wait_for_tag(struct vine_manager *q, const char *tag, int
 		timeout = 5;
 	}
 
-	return vine_wait_internal(q, timeout, tag);
+	return vine_wait_internal(q, timeout, tag, -1);
+}
+
+struct vine_task *vine_wait_for_taskid(struct vine_manager *q, int taskid, int timeout)
+{
+	if(timeout == 0) {
+		// re-establish old, if unintended behavior, where 0 would wait at
+		// least a second. With 0, we would like the loop to be executed at
+		// least once, but right now we cannot enforce that. Making it 1, we
+		// guarantee that the wait loop is executed once.
+		timeout = 1;
+	}
+
+	if(timeout != VINE_WAITFORTASK && timeout < 0) {
+		debug(D_NOTICE|D_VINE, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
+		timeout = 5;
+	}
+
+	return vine_wait_internal(q, timeout, NULL, taskid);
+
 }
 
 /* return number of workers that failed */
@@ -3943,7 +3962,7 @@ static int connect_new_workers(struct vine_manager *q, int stoptime, int max_new
 }
 
 
-static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag)
+static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int taskid)
 {
 /*
    - compute stoptime
@@ -3985,6 +4004,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		{
 			if(tag) {
 				t = task_state_any_with_tag(q, VINE_TASK_RETRIEVED, tag);
+			} else if(taskid >= 0) {
+				struct vine_task *temp = itable_lookup(q->tasks, taskid);
+				if(temp->state==VINE_TASK_RETRIEVED) {
+					t = temp;
+				}
 			} else {
 				t = task_state_any(q, VINE_TASK_RETRIEVED);
 			}
