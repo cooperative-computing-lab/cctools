@@ -1676,6 +1676,24 @@ class TaskVine(object):
             task = self._task_table[vine_task_get_taskid(task_pointer)]
             del self._task_table[vine_task_get_taskid(task_pointer)]
             return task
+        return None
+
+    ##
+    # Similar to @ref wait, but guarantees that the returned task has the
+    # specified taskid.
+    #
+    # This call will block until the timeout has elapsed.
+    #
+    # @param self       Reference to the current manager object.
+    # @param taskid        Desired taskid. If -1, then it is equivalent to self.wait(timeout)
+    # @param timeout    The number of seconds to wait for a completed task
+    #                   before returning.
+    def wait_for_taskid(self, taskid, timeout=VINE_WAITFORTASK):
+        task_pointer = vine_wait_for_taskid(self._taskvine, taskid, timeout)
+        if task_pointer:
+            task = self._task_table[vine_task_get_taskid(task_pointer)]
+            del self._task_table[vine_task_get_taskid(task_pointer)]
+            return task
         return None            
 
     ##
