@@ -38,4 +38,4 @@ we are eager to work with you.
 
 This work has been sponsored in part by the National Science Foundation via grants OAC-1931348 (CSSI 2019-2022), OAC-1642409 (SI2 2016-2019), OAC-1148330 (SI2 2013-2016), and CNS-0453229 (CAREER 2007-2012)
 
-This software is Copyright (C) 2019- The University of Notre Dame.  The software is distributed unt the GNU General Public License V2.  See the file COPYING for details.
+This software is Copyright (C) 2022 The University of Notre Dame.  The software is distributed unt the GNU General Public License V2.  See the file COPYING for details.
