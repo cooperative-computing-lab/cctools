@@ -20,7 +20,7 @@ import json
 from time import sleep
 from subprocess import Popen, PIPE
 
-class TaskVineClient:
+class Client:
 
     def __init__(self):
         self.id = 1
@@ -78,7 +78,7 @@ class TaskVineClient:
 
 
 print("Creating API proxy...")
-client = TaskVineClient()
+client = Client()
 print("Checking manager status...")
 client.connect(0,"testproject")
 print("Manager status:")

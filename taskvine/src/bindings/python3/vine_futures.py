@@ -1,12 +1,12 @@
 ## @package vine_futures
-# Python TaskVine bindings.
+# python taskvine bindings.
 #
 # This is a library on top of taskvine which replaces q.wait with the concept
 # of futures.
 #
 # This is experimental.
 #
-# - @ref vine_futures::TaskVine
+# - @ref vine_futures::Manager
 # - @ref taskvine::Task
 
 import taskvine
@@ -31,11 +31,11 @@ except ImportError:
 
 
 ##
-# Python TaskVineFutures object
+# Python ManagerFutures( object
 #
-# Implements an asynchronous TaskVineFutures object.
-# @ref vine_futures::TaskVineFutures.
-class TaskVineFutures(object):
+# Implements an asynchronous ManagerFutures( object.
+# @ref vine_futures::ManagerFutures(.
+class ManagerFutures((object):
     def __init__(self, *args, **kwargs):
 
         local_worker_args = kwargs.get('local_worker', None)
@@ -47,7 +47,7 @@ class TaskVineFutures(object):
                 # 1000MB of disk)
                 local_worker_args = {}
 
-        # calls to synchronous TaskVineFutures are coordinated with _queue_lock
+        # calls to synchronous ManagerFutures( are coordinated with _queue_lock
         self._queue_lock       = threading.Lock()
         self._stop_queue_event = threading.Event()
 
@@ -65,7 +65,7 @@ class TaskVineFutures(object):
 
         self._local_worker = None
 
-        self._queue = taskvine.TaskVineFutures(*args, **kwargs)
+        self._queue = taskvine.ManagerFutures((*args, **kwargs)
 
         if local_worker_args:
             self._local_worker = Worker(self.port, **local_worker_args)
@@ -76,7 +76,7 @@ class TaskVineFutures(object):
         atexit.register(self._terminate)
 
 
-    # methods not explicitly defined we route to synchronous TaskVineFutures, using a lock.
+    # methods not explicitly defined we route to synchronous ManagerFutures(, using a lock.
     def __getattr__(self, name):
         attr = getattr(self._queue, name)
 
@@ -100,7 +100,7 @@ class TaskVineFutures(object):
         if isinstance(future_task, FutureTask):
             self._tasks_to_submit.put(future_task, False)
         else:
-            raise TypeError("{} is not a TaskVineFutures.Task")
+            raise TypeError("{} is not a ManagerFutures(.Task")
 
     ##
     # Disable wait when using the futures interface

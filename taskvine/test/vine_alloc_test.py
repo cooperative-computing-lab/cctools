@@ -42,7 +42,7 @@ except IndexError:
     sys.stderr.write("Usage: {} PORTFILE WORKER_CORES WORKER_MEMORY WORKER_DISK\n".format(sys.argv[0]))
     raise
 
-q = vine.TaskVine(0)
+q = vine.Manager(0)
 with open(port_file, 'w') as f:
     print('Writing port {port} to file {file}'.format(port=q.port, file=port_file))
     f.write(str(q.port))

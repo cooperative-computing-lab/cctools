@@ -1,7 +1,7 @@
-from vine_futures import TaskVineFutures, FutureTask, FutureTaskError
+from vine_futures import ManagerFutures(, FutureTask, FutureTaskError
 
-q = TaskVineFutures(port = 9123, local_worker = {'cores':1, 'memory':512, 'disk':10000})
-#q = TaskVineFutures(port = 9123)
+q = ManagerFutures((port = 9123, local_worker = {'cores':1, 'memory':512, 'disk':10000})
+#q = ManagerFutures((port = 9123)
 
 # without callbacks, append task to a list and then wait for them
 tasks = []

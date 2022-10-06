@@ -1,6 +1,6 @@
-## @package TaskVinePython
+## @package taskvine
 #
-# Python TaskVine bindings.
+# python taskvine bindings.
 #
 # The objects and methods provided by this package correspond to the native
 # C API in @ref vine_manager.h.
@@ -8,7 +8,7 @@
 # The SWIG-based Python bindings provide a higher-level interface that
 # revolves around the following objects:
 #
-# - @ref taskvine::TaskVine
+# - @ref taskvine::Manager
 # - @ref taskvine::Task
 # - @ref taskvine::Factory
 
@@ -100,7 +100,7 @@ class Task(object):
     # Return a copy of this task
     #
     def clone(self):
-        """Return a (deep)copy this task that can also be submitted to the TaskVine."""
+        """Return a (deep)copy this task that can also be submitted to the taskvine."""
         new = copy.copy(self)
         new._task = vine_task_clone(self._task)
         return new
@@ -893,11 +893,11 @@ class PythonTaskNoResult(Exception):
     pass
 
 ##
-# Python TaskVine object
+# python taskvine object
 #
 # This class uses a dictionary to map between the task pointer objects and the
 # @ref taskvine::Task.
-class TaskVine(object):
+class Manager(object):
     ##
     # Create a new manager.
     #
@@ -951,7 +951,7 @@ class TaskVine(object):
             if name:
                 vine_specify_name(self._taskvine, name)
         except Exception as e:
-            raise Exception('Unable to create internal TaskVine structure: {}'.format(e))
+            raise Exception('Unable to create internal taskvine structure: {}'.format(e))
 
 
     def _free_queue(self):
@@ -2016,7 +2016,7 @@ class RemoteTask(Task):
 
 ##
 # \class Factory
-# Launch a TaskVine factory.
+# Launch a taskvine factory.
 #
 # The command line arguments for `vine_factory` can be set for a
 # factory object (with dashes replaced with underscores). Creating a factory

@@ -4,7 +4,7 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-# This program is a very simple example of how to use TaskVine.
+# This program is a very simple example of how to use taskvine.
 # It accepts a list of files on the command line.
 # Each file is compressed with gzip and returned to the user.
 
@@ -37,9 +37,9 @@ if __name__ == '__main__':
   # been used by another program, you can try setting port = 0 to use an
   # available port.
   try:
-      q = TaskVine(port = VINE_DEFAULT_PORT)
+      q = Manager(port = VINE_DEFAULT_PORT)
   except:
-      print("Instantiation of TaskVine failed!")
+      print("Instantiation of taskvine Manager failed!")
       sys.exit(1)
 
   print("listening on port %d..." % q.port)
