@@ -15,18 +15,15 @@ TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
-# The odd symlink in the following rule is necessary to overcome a problem
-# in the framework search path emitted by the Python configuration on macOS.
 work_queue_wrap.c work_queue.py: work_queue.i work_queue.binding.py
 	@echo "SWIG work_queue.i (python)"
 	@$(CCTOOLS_SWIG) -o work_queue_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src/ -I$(CCTOOLS_HOME)/work_queue/src work_queue.i
 	@cat work_queue.binding.py >> work_queue.py
-	ln -sf /System/Library/Frameworks/Python.framework .
 
 $(WQPYTHONSO): work_queue_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) Python.framework work_queue.py work_queue_wrap.c *.pyc
+	rm -f $(OBJECTS) $(TARGETS) work_queue.py work_queue_wrap.c *.pyc
 
 test:
 
