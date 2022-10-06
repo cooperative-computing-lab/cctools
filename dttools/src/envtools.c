@@ -100,4 +100,22 @@ int env_replace( const char *infile, const char *outfile ){
 	return 0;
 }
 
+const char *env_temp_dir()
+{
+	char *scratch_env;
+	if((scratch_env = getenv("CCTOOLS_TEMP")) && access(scratch_env, R_OK|W_OK|X_OK) == 0){
+		return scratch_env;
+	}
+	else if((scratch_env = getenv("TMPDIR")) && access(scratch_env, R_OK|W_OK|X_OK) == 0){
+		return scratch_env;
+	}
+	else if((scratch_env = getenv("TEMP")) && access(scratch_env, R_OK|W_OK|X_OK) == 0){
+		return scratch_env;
+	}
+	else if((scratch_env = getenv("TMP")) && access(scratch_env, R_OK|W_OK|X_OK) == 0){
+		return scratch_env;
+	}
+	return "/tmp";
+}
+
 /* vim: set noexpandtab tabstop=4: */

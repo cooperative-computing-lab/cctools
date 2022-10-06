@@ -1461,7 +1461,8 @@ int main(int argc, char *argv[])
 	const char *scratch_env = NULL;
 	if(!scratch_dir) {
 		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-			scratch_dir = string_format("/tmp/vine-factory-%d",getuid());
+			scratch_env = env_temp_dir();
+			scratch_dir = string_format("%s/vine-factory-%d", scratch_env, getuid());
 		} else {
 			scratch_dir = string_format("vine-factory-%d",getuid());
 		}

@@ -22,6 +22,7 @@ See the file COPYING for details.
 #include "vine_perf_log.h"
 
 #include "cctools.h"
+#include "envtools.h"
 #include "int_sizes.h"
 #include "link.h"
 #include "link_auth.h"
@@ -4853,15 +4854,5 @@ int vine_specify_min_taskid(struct vine_manager *q, int minid) {
 	return q->next_taskid;
 }
 
-const char *cctools_temp_dir(){
-	char *scratch_env;
-	if((scratch_env = getenv("CCTOOLS_TEMP")) && access(scratch_env, R_OK|W_OK|X_OK) == 0){
-		return scratch_env;	
-	}
-	else if((scratch_env = getenv("TMPDIR")) && access(scratch_env, R_OK|W_OK|X_OK) == 0){
-		return scratch_env;
-	}
-	return 0;
-}
 
 /* vim: set noexpandtab tabstop=4: */

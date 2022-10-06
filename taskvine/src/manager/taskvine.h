@@ -1102,7 +1102,6 @@ void vine_specify_category_first_allocation_guess(struct vine_manager *m,  const
 */
 void vine_initialize_categories(struct vine_manager *m, struct rmsummary *max, const char *summaries_file);
 
-const char *cctools_temp_dir();
 
 //@}
 

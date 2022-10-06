@@ -1538,16 +1538,8 @@ int main(int argc, char *argv[])
 	const char *scratch_env = NULL;
 	if(!scratch_dir) {
 		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-			if((scratch_env = getenv("CCTOOLS_TEMP"))){
-				scratch_dir = string_format("%s/wq-factory-%d", scratch_env, getuid());
-			} 
-			else if((scratch_env = getenv("TMPDIR"))){
-				scratch_dir = string_format("%s/wq-factory-%d", scratch_env, getuid());
-			} 
-			else{
-				scratch_env = "/tmp";
-				scratch_dir = string_format("/tmp/wq-factory-%d", getuid());
-			}
+			scratch_env = env_temp_dir();
+			scratch_dir = string_format("%s/wq-factory-%d", scratch_env, getuid());
 		} else {
 			scratch_env = "./";
 			scratch_dir = string_format("wq-factory-%d",getuid());

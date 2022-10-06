@@ -19,4 +19,6 @@ int find_executable(const char *exe_name, const char *env_path_var, char *exe_pa
 
 int env_replace( const char *infile, const char *outfile );
 
+
+const char *env_temp_dir();
 #endif

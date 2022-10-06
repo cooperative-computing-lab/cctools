@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include "work_queue_sandbox.h"
 
 #include "cctools.h"
+#include "envtools.h"
 #include "macros.h"
 #include "catalog_query.h"
 #include "domain_name_cache.h"
@@ -1855,14 +1856,8 @@ static int workspace_create()
 		workdir = user_specified_workdir;
 	} else if((workdir_tmp = getenv("_CONDOR_SCRATCH_DIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
 		workdir = workdir_tmp;
-	} else if((workdir_tmp = cctools_temp_dir())) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TEMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
 	} else {
-		workdir = "/tmp";
+		workdir = env_temp_dir();
 	}
 
 	if(!workspace) {
