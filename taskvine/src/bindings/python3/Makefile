@@ -14,20 +14,17 @@ TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
-# The odd symlink in the following rule is necessary to overcome a problem
-# in the framework search path emitted by the Python configuration on macOS.
 vine_wrap.c taskvine.py: taskvine.i taskvine.binding.py
 	@echo "SWIG taskvine.i (python)"
 	@$(CCTOOLS_SWIG) -o vine_wrap.c -python -py3 -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/manager taskvine.i
 	@cat -u taskvine.binding.py >> taskvine.py
-	ln -sf /System/Library/Frameworks/Python.framework .
 
 $(DSPYTHONSO): vine_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 test:
 
 clean:
-	rm -rf $(OBJECTS) $(TARGETS) Python.framework taskvine.py vine_wrap.c vine_wrap.o *.pyc __pycache__
+	rm -rf $(OBJECTS) $(TARGETS) taskvine.py vine_wrap.c vine_wrap.o *.pyc __pycache__
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)

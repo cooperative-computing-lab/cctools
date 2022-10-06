@@ -15,8 +15,6 @@ TARGETS = $(LIBRARIES)
 
 all: $(TARGETS)
 
-# The odd symlink in the following rule is necessary to overcome a problem
-# in the framework search path emitted by the Python configuration on macOS.
 rmonitor_wrap.c resource_monitor.py: rmonitor.i
 	@echo "SWIG rmonitor.i (python)"
 	@$(CCTOOLS_SWIG) -o rmonitor_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src/ rmonitor.i
@@ -25,7 +23,7 @@ rmonitor_wrap.c resource_monitor.py: rmonitor.i
 $(RMPYTHONSO): rmonitor_wrap.o $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) Python.framework rmonitor_wrap.c *.so *.pyc
+	rm -f $(OBJECTS) $(TARGETS) rmonitor_wrap.c *.so *.pyc
 
 test:
 
