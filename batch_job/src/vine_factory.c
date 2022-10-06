@@ -1457,13 +1457,19 @@ int main(int argc, char *argv[])
 	that jobs are submitting from a single shared filesystem.
 	Changing to /tmp only works in the case of Condor.
 	*/
-
+	
+	const char *scratch_env = NULL;
 	if(!scratch_dir) {
 		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
 			scratch_dir = string_format("/tmp/vine-factory-%d",getuid());
 		} else {
 			scratch_dir = string_format("vine-factory-%d",getuid());
 		}
+	}
+
+	if((scratch_env) && access(scratch_env, R_OK|W_OK|X_OK)){
+		fprintf(stderr, "ds_factory: couldn't access scratch directory %s: %s", scratch_env, strerror(errno));
+		return 1;
 	}
 
 	if(!create_dir(scratch_dir,0777)) {

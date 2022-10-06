@@ -8231,7 +8231,7 @@ const char *cctools_temp_dir(){
 	if((scratch_env = getenv("CCTOOLS_TEMP")) && access(scratch_env, R_OK|W_OK|X_OK) == 0){
 		return scratch_env;
 	}
-	if((scratch_env = getenv("TMPDIR")) && access(scratch_env, R_OK|W_OK|X_OK) == 0){
+	else if((scratch_env = getenv("TMPDIR")) && access(scratch_env, R_OK|W_OK|X_OK) == 0){
 		return scratch_env;
 	}
 	return 0;
