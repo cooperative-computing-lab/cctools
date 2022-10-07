@@ -228,6 +228,32 @@ int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, co
 		debug(D_VINE,"unpacking %s to %s via command %s",transfer_path,cache_path,command);
 		unix_result = system(command);
 		free(command);
+	} else if(f-> flags & VINE_PONHO_UNPACK){
+		command = string_format("poncho_package_run -k -r -e %s --unpack-to %s", trasnfer_path, cache_path);
+		debug(D_VINE,"unpacking %s to %s via command %s", transfer_path, cache_path, command);
+		unix_result = system(command);
+		if(unix_result!=0){
+			debug(D_VINE,"command failed: %s",strerror(errno));
+			return 0;
+		}
+		command = string_format("%s/bin/activate", transfer_path);
+		debug(D_VINE,"activating conda environment");
+		unix_result = system(command);
+		if(unix_result!=0){
+			debug(D_VINE,"command failed: %s",strerror(errno));
+			return 0;
+		}
+		command = string_format("%s/poncho/set_env", transfer_path);
+
+		struct stat info; 	
+		if(stat(command,&info)==0) {
+			unix_result = system(command);
+			if(unix_result!=0){
+				debug(D_VINE,"command failed: %s",strerror(errno));
+				return 0;
+			}
+		}
+		
 	} else {
 		debug(D_VINE,"renaming %s to %s",transfer_path,cache_path);
 		unix_result = rename(transfer_path,cache_path);
