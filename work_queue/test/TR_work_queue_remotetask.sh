@@ -36,7 +36,7 @@ run_wq_worker_coprocess()
 		exit 1
 	fi
 	echo "Running worker."
-	if ! "$WORK_QUEUE_WORKER" --single-shot --timeout=10s --coprocess ${coprocess} --coprocess_cores 1  --debug=all --debug-file="$log" $* localhost $(cat "$port_file"); then
+	if ! "$WORK_QUEUE_WORKER" --single-shot --timeout=10s --coprocess ${coprocess} --coprocess_cores 1 --coprocess_disk 1000 --coprocess_memory 1000 --debug=all --debug-file="$log" $* localhost $(cat "$port_file"); then
 		echo "ERROR: could not start worker"
 		exit 1
 	fi
@@ -68,7 +68,7 @@ run()
     chmod +x network_function.py
 
 	# send makeflow to the background, saving its exit status.
-	(${CCTOOLS_PYTHON_TEST_EXEC} wq_remote_task.py $PORT_FILE; echo $? > $STATUS_FILE) &
+	# (${CCTOOLS_PYTHON_TEST_EXEC} wq_remote_task.py $PORT_FILE; echo $? > $STATUS_FILE) &
 
 	# wait at most 5 seconds for wq to find a port.
 	wait_for_file_creation $PORT_FILE 5
