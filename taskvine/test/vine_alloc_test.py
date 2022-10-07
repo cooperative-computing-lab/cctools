@@ -12,7 +12,7 @@ def check_task(category, category_mode, max, min, expected):
     q.specify_category_mode(category, category_mode)
 
     t = vine.Task('/bin/echo hello')
-    t.specify_category(category)
+    t.set_category(category)
     q.submit(t)
 
     t = q.wait(30)

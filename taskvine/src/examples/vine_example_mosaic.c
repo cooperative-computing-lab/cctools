@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 		vine_task_specify_input_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", VINE_CACHE );
 		vine_task_specify_output_file(t,outfile,outfile,VINE_NOCACHE);
 
-		vine_task_specify_cores(t,1);
+		vine_task_set_cores(t,1);
 
 		int taskid = vine_submit(m, t);
 

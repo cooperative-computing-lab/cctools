@@ -111,8 +111,8 @@ class Task(object):
     #
     # @param self       Reference to the current task object.
     # @param command    The command to be executed.
-    def specify_command(self, command):
-        return vine_task_specify_command(self._task, command)
+    def set_command(self, command):
+        return vine_task_set_command(self._task, command)
 
 
     ##
@@ -121,8 +121,8 @@ class Task(object):
     #
     # @param self       Reference to the current task object.
     # @param coprocess  The name of the coprocess.
-    def specify_coprocess(self, coprocess):
-        return vine_task_specify_coprocess(self._task, coprocess)
+    def set_coprocess(self, coprocess):
+        return vine_task_set_coprocess(self._task, coprocess)
 
     ##
     # Set the worker selection algorithm for task.
@@ -131,16 +131,16 @@ class Task(object):
     # @param algorithm  One of the following algorithms to use in assigning a
     #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
-    def specify_algorithm(self, algorithm):
-        return vine_task_specify_algorithm(self._task, algorithm)
+    def set_algorithm(self, algorithm):
+        return vine_task_set_algorithm(self._task, algorithm)
 
     ##
     # Attach a user defined logical name to the task.
     #
     # @param self       Reference to the current task object.
     # @param tag        The tag to attach to task.
-    def specify_tag(self, tag):
-        return vine_task_specify_tag(self._task, tag)
+    def set_tag(self, tag):
+        return vine_task_set_tag(self._task, tag)
 
     ##
     # Label the task with the given category. It is expected that tasks with the
@@ -148,8 +148,8 @@ class Task(object):
     #
     # @param self       Reference to the current task object.
     # @param name       The name of the category
-    def specify_category(self, name):
-        return vine_task_specify_category(self._task, name)
+    def set_category(self, name):
+        return vine_task_set_category(self._task, name)
 
     ##
     # Label the task with the given user-defined feature. Tasks with the
@@ -159,15 +159,15 @@ class Task(object):
     # @param self       Reference to the current task object.
     # @param name       The name of the feature.
     def specify_feature(self, name):
-        return vine_task_specify_feature(self._task, name)
+        return vine_task_set_feature(self._task, name)
 
     ##
     # Indicate that the task would be optimally run on a given host.
     #
     # @param self       Reference to the current task object.
     # @param hostname   The hostname to which this task would optimally be sent.
-    def specify_preferred_host(self, hostname):
-        return vine_task_specify_preferred_host(self._task, hostname)
+    def set_preferred_host(self, hostname):
+        return vine_task_set_preferred_host(self._task, hostname)
 
     ##
     # Add an input file to the task.
@@ -433,75 +433,75 @@ class Task(object):
     # default), the task is tried indefinitely. A task that did not succeed
     # after the given number of retries is returned with result
     # VINE_RESULT_MAX_RETRIES.
-    def specify_max_retries(self, max_retries):
-        return vine_task_specify_max_retries(self._task, max_retries)
+    def set_max_retries(self, max_retries):
+        return vine_task_set_max_retries(self._task, max_retries)
 
     ##
     # Indicate the number of cores required by this task.
-    def specify_cores(self, cores):
-        return vine_task_specify_cores(self._task, cores)
+    def set_cores(self, cores):
+        return vine_task_set_cores(self._task, cores)
 
     ##
     # Indicate the memory (in MB) required by this task.
-    def specify_memory(self, memory):
-        return vine_task_specify_memory(self._task, memory)
+    def set_memory(self, memory):
+        return vine_task_set_memory(self._task, memory)
 
     ##
     # Indicate the disk space (in MB) required by this task.
-    def specify_disk(self, disk):
-        return vine_task_specify_disk(self._task, disk)
+    def set_disk(self, disk):
+        return vine_task_set_disk(self._task, disk)
 
     ##
     # Indicate the number of GPUs required by this task.
-    def specify_gpus(self, gpus):
-        return vine_task_specify_gpus(self._task, gpus)
+    def set_gpus(self, gpus):
+        return vine_task_set_gpus(self._task, gpus)
 
     ##
     # Indicate the the priority of this task (larger means better priority, default is 0).
-    def specify_priority(self, priority):
-        return vine_task_specify_priority(self._task, priority)
+    def set_priority(self, priority):
+        return vine_task_set_priority(self._task, priority)
 
     # Indicate the maximum end time (absolute, in microseconds from the Epoch) of this task.
     # This is useful, for example, when the task uses certificates that expire.
     # If less than 1, or not specified, no limit is imposed.
-    def specify_end_time(self, useconds):
-        return vine_task_specify_end_time(self._task, int(useconds))
+    def set_end_time(self, useconds):
+        return vine_task_set_end_time(self._task, int(useconds))
 
     # Indicate the minimum start time (absolute, in microseconds from the Epoch) of this task.
     # If less than 1, or not specified, no limit is imposed.
-    def specify_start_time_min(self, useconds):
-        return vine_task_specify_start_time_min(self._task, int(useconds))
+    def set_start_time_min(self, useconds):
+        return vine_task_set_start_time_min(self._task, int(useconds))
 
     # Indicate the maximum running time (in microseconds) for a task in a
     # worker (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
-    # Note: It has the same effect that specify_running_time_max, but specified
+    # Note: It has the same effect that set_running_time_max, but specified
     # in microseconds. Kept for backwards compatibility.
-    def specify_running_time(self, useconds):
-        return vine_task_specify_running_time(self._task, int(useconds))
+    def set_running_time(self, useconds):
+        return vine_task_set_running_time(self._task, int(useconds))
 
     # Indicate the maximum running time (in seconds) for a task in a worker
     # (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
-    def specify_running_time_max(self, seconds):
-        return vine_task_specify_running_time_max(self._task, int(seconds))
+    def set_running_time_max(self, seconds):
+        return vine_task_set_running_time_max(self._task, int(seconds))
 
     # Indicate the minimum running time (in seconds) for a task in a worker
     # (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
-    def specify_running_time_min(self, seconds):
-        return vine_task_specify_running_time_min(self._task, int(seconds))
+    def set_running_time_min(self, seconds):
+        return vine_task_set_running_time_min(self._task, int(seconds))
 
     ##
     # Set this environment variable before running the task.
     # If value is None, then variable is unset.
-    def specify_env(self, name, value=None):
-        return vine_task_specify_env(self._task, name, value)
+    def set_env_var(self, name, value=None):
+        return vine_task_set_env_var(self._task, name, value)
 
     ##
     # Set a name for the resource summary output directory from the monitor.
-    def specify_monitor_output(self, directory):
-        return vine_task_specify_monitor_output(self._task, directory)
+    def set_monitor_output(self, directory):
+        return vine_task_set_monitor_output(self._task, directory)
 
     ##
     # Get the user-defined logical name for the task.
@@ -796,7 +796,7 @@ class PythonTask(Task):
         return self._output
 
 
-    def specify_environment(self, env_file):
+    def set_environment(self, env_file):
         if env_file:
             self._env_file = env_file
             self._pp_run = shutil.which('poncho_package_run')
@@ -805,12 +805,10 @@ class PythonTask(Task):
                 raise RuntimeError("Could not find poncho_package_run in PATH.")
 
             self._command = self._python_function_command()
-            vine_task_specify_command(self._task, self._command)
+            vine_task_set_command(self._task, self._command)
 
             self.specify_input_file(self._env_file, cache=True)
             self.specify_input_file(self._pp_run, cache=True)
-
-    specify_package = specify_environment
 
     def __del__(self):
         try:
@@ -1120,12 +1118,12 @@ class Manager(object):
     #                  - VINE_ALLOCATION_MODE_FIXED Task fails (default).
     #                  - VINE_ALLOCATION_MODE_MAX If maximum values are
     #                  specified for cores, memory, disk, and gpus (e.g. via @ref
-    #                  specify_category_max_resources or @ref Task.specify_memory),
+    #                  specify_category_max_resources or @ref Task.set_memory),
     #                  and one of those resources is exceeded, the task fails.
     #                  Otherwise it is retried until a large enough worker
     #                  connects to the manager, using the maximum values
     #                  specified, and the maximum values so far seen for
-    #                  resources not specified. Use @ref Task.specify_max_retries to
+    #                  resources not specified. Use @ref Task.set_max_retries to
     #                  set a limit on the number of times manager attemps
     #                  to complete the task.
     #                  - VINE_ALLOCATION_MODE_MIN_WASTE As above, but
@@ -1749,11 +1747,11 @@ class Manager(object):
         def fpairs(fn, s):
             results = []
 
-            for p in s:    
+            for p in s:
                 results.append(fn(p))
 
             return results
-       
+
         size = math.ceil((len(seq1) * len(seq2))/chunk_size)
         results = [None] * size
         tasks = {}
@@ -1766,11 +1764,11 @@ class Manager(object):
             if num == chunk_size:
                 p_task = PythonTask(fpairs, fn, task)
                 if env:
-                    p_task.specify_environment(env)
-                
-                p_task.specify_tag(str(num_task))
+                    p_task.set_environment(env)
+
+                p_task.set_tag(str(num_task))
                 self.submit(p_task)
-                tasks[p_task.id] = num_task                
+                tasks[p_task.id] = num_task
                 num = 0
                 num_task += 1
                 task.clear()
@@ -1780,7 +1778,7 @@ class Manager(object):
 
         if len(task) > 0:
             p_task = PythonTask(fpairs, fn, task)
-            p_task.specify_tag(str(num_task))
+            p_task.set_tag(str(num_task))
             self.submit(p_task)
             tasks[p_task.id] = num_task
             num_task += 1
@@ -1829,7 +1827,7 @@ class Manager(object):
                 else:
                     p_task = PythonTask(fn, seq[start:end])
 
-                p_task.specify_tag(str(i))
+                p_task.set_tag(str(i))
                 self.submit(p_task)
                 tasks[p_task.id] = i
 
@@ -1871,7 +1869,7 @@ class Manager(object):
             event = json.dumps({name : array[start:end]})
             p_task = RemoteTask(fn, event, coprocess)
             
-            p_task.specify_tag(str(i))
+            p_task.set_tag(str(i))
             self.submit(p_task)
             tasks[p_task.id] = i
                
@@ -1911,7 +1909,7 @@ class Manager(object):
             if num == chunk_size:
                 event = json.dumps({name : task})
                 p_task = RemoteTask(fn, event, coprocess)
-                p_task.specify_tag(str(num_task))
+                p_task.set_tag(str(num_task))
                 self.submit(p_task)
                 tasks[p_task.id] = num_task                
                 num = 0
@@ -1924,7 +1922,7 @@ class Manager(object):
         if len(task) > 0:
             event = json.dumps({name : task})
             p_task = RemoteTask(fn, event, coprocess)
-            p_task.specify_tag(str(num_task))
+            p_task.set_tag(str(num_task))
             self.submit(p_task)
             tasks[p_task.id] = num_task
             num_task += 1
@@ -1969,7 +1967,7 @@ class Manager(object):
                 event = json.dumps({name : seq[start:end]})
                 p_task = RemoteTask(fn, event, coprocess)
 
-                p_task.specify_tag(str(i))
+                p_task.set_tag(str(i))
                 self.submit(p_task)
                 tasks[p_task.id] = i
 
@@ -2010,20 +2008,20 @@ class RemoteTask(Task):
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
-        Task.specify_coprocess(self, coprocess)
+        Task.set_coprocess(self, coprocess)
     ##
     # Specify function arguments. Accepts arrays and dictionarys. This overrides any arguments passed during task creation
     # @param self             Reference to the current remote task object
     # @param args             An array of positional args to be passed to the function
     # @param kwargs           A dictionary of keyword arguments to be passed to the function
-    def specify_fn_args(self, args=[], kwargs={}):
+    def set_fn_args(self, args=[], kwargs={}):
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
     ##
     # Specify how the remote task should execute
     # @param self                     Reference to the current remote task object
     # @param remote_task_exec_method  Can be one of "fork", "direct", or "thread". Fork creates a child process to execute the function, direct has the worker directly call the function, and thread spawns a thread to execute the function
-    def specify_exec_method(self, remote_task_exec_method):
+    def set_exec_method(self, remote_task_exec_method):
         if remote_task_exec_method not in ["fork", "direct", "thread"]:
             print("Error, vine_exec_method must be one of fork, direct, or thread")
         self._event["remote_task_exec_method"] = remote_task_exec_method
@@ -2335,10 +2333,8 @@ class Factory(object):
         with open(self._config_file, 'w') as f:
             json.dump(opts_subset, f, indent=4)
 
-    def specify_environment(self, env):
+    def set_environment(self, env):
         self._env_file = env
-
-    specify_package = specify_environment
 
 def rmsummary_snapshots(self):
     if self.snapshots_count < 1:

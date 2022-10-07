@@ -165,7 +165,7 @@ static int specify_environment(struct jx *environment, struct vine_task *task)
 	struct jx *value = jx_iterate_values(environment, &i);
 
 	while(key != NULL) {
-		vine_task_specify_env(task, key, value->u.string_value);
+		vine_task_set_env_var(task, key, value->u.string_value);
 		key = jx_iterate_keys(environment, &j);
 		value = jx_iterate_values(environment, &i);
 	}
@@ -245,15 +245,15 @@ static struct vine_task *create_task(const char *str)
 		}
 
 		if(cores) {
-			vine_task_specify_cores(task, cores);
+			vine_task_set_cores(task, cores);
 		}
 
 		if(memory) {
-			vine_task_specify_memory(task, memory);
+			vine_task_set_memory(task, memory);
 		}
 
 		if(disk) {
-			vine_task_specify_disk(task, disk);
+			vine_task_set_disk(task, disk);
 		}
 		return task;
 

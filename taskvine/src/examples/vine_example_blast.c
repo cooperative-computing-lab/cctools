@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 		vine_task_specify_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
 		vine_task_specify_input_url(t,BLAST_URL,"blastdir", VINE_CACHE|VINE_UNPACK );
 		vine_task_specify_input_url(t,LANDMARK_URL,"landmark", VINE_CACHE|VINE_UNPACK );
-		vine_task_specify_env(t,"BLASTDB","landmark");
+		vine_task_set_env_var(t,"BLASTDB","landmark");
 
 		int taskid = vine_submit(m, t);
 

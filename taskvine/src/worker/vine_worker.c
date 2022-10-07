@@ -661,19 +661,19 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 		if(!strcmp(line,"end")) {
 			break;
 		} else if(sscanf(line, "category %s",category)) {
-			vine_task_specify_category(task, category);
+			vine_task_set_category(task, category);
 		} else if(sscanf(line,"cmd %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
-			vine_task_specify_command(task,cmd);
+			vine_task_set_command(task,cmd);
 			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"coprocess %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
-			vine_task_specify_coprocess(task,cmd);
+			vine_task_set_coprocess(task,cmd);
 			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
@@ -687,17 +687,17 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 		} else if(sscanf(line, "dir %s", filename)) {
 			vine_task_specify_empty_dir(task, filename );
 		} else if(sscanf(line,"cores %" PRId64,&n)) {
-			vine_task_specify_cores(task, n);
+			vine_task_set_cores(task, n);
 		} else if(sscanf(line,"memory %" PRId64,&n)) {
-			vine_task_specify_memory(task, n);
+			vine_task_set_memory(task, n);
 		} else if(sscanf(line,"disk %" PRId64,&n)) {
-			vine_task_specify_disk(task, n);
+			vine_task_set_disk(task, n);
 		} else if(sscanf(line,"gpus %" PRId64,&n)) {
-			vine_task_specify_gpus(task, n);
+			vine_task_set_gpus(task, n);
 		} else if(sscanf(line,"wall_time %" PRIu64,&nt)) {
-			vine_task_specify_running_time_max(task, nt);
+			vine_task_set_running_time_max(task, nt);
 		} else if(sscanf(line,"end_time %" PRIu64,&nt)) {
-			vine_task_specify_end_time(task, nt * USECOND); //end_time needs it usecs
+			vine_task_set_end_time(task, nt * USECOND); //end_time needs it usecs
 		} else if(sscanf(line,"env %d",&length)==1) {
 			char *env = malloc(length+2); /* +2 for \n and \0 */
 			link_read(manager, env, length+1, stoptime);
@@ -706,7 +706,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			if(value) {
 				*value = 0;
 				value++;
-				vine_task_specify_env(task,env,value);
+				vine_task_set_env_var(task,env,value);
 			}
 			free(env);
 		} else {

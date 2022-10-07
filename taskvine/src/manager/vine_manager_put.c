@@ -432,7 +432,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 			total_bytes);
 
 		if(result == VINE_APP_FAILURE) {
-			vine_task_update_result(t, VINE_RESULT_INPUT_MISSING);
+			vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
 		}
 	}
 
@@ -454,13 +454,13 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 			if(f->type == VINE_FILE || f->type == VINE_FILE_PIECE) {
 				char * expanded_source = expand_envnames(w, f->source);
 				if(!expanded_source) {
-					vine_task_update_result(t, VINE_RESULT_INPUT_MISSING);
+					vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
 					return VINE_APP_FAILURE;
 				}
 				if(stat(expanded_source, &s) != 0) {
 					debug(D_VINE,"Could not stat %s: %s\n", expanded_source, strerror(errno));
 					free(expanded_source);
-					vine_task_update_result(t, VINE_RESULT_INPUT_MISSING);
+					vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
 					return VINE_APP_FAILURE;
 				}
 				free(expanded_source);

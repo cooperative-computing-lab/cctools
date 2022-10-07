@@ -232,7 +232,7 @@ Once created and elaborated with functions such as @ref vine_task_specify_input_
 and @ref vine_task_specify_input_buffer, the task should be passed to @ref vine_submit.
 @param full_command The shell command line or coprocess functions to be
 executed by the task.  If null, the command will be given later by @ref
-vine_task_specify_command
+vine_task_set_command
 @return A new task object, or null if it could not be created.
 */
 struct vine_task *vine_task_create(const char *full_command);
@@ -254,14 +254,14 @@ void vine_task_delete(struct vine_task *t);
 @param t A task object.
 @param cmd The command to be executed.  This string will be duplicated by this call, so the argument may be freed or re-used afterward.
 */
-void vine_task_specify_command( struct vine_task *t, const char *cmd );
+void vine_task_set_command( struct vine_task *t, const char *cmd );
 
 /** Indicate the command to be executed.
 @param t A task object.
 @param name The coprocess name that will execute the command at the worker. The task
 will only be sent to workers running the coprocess.
 */
-void vine_task_specify_coprocess( struct vine_task *t, const char *name );
+void vine_task_set_coprocess( struct vine_task *t, const char *name );
 
 /** Attach an input file or directory to a task.
 @param t A task object.
@@ -348,35 +348,35 @@ void vine_task_specify_empty_dir( struct vine_task *t, const char *remote_name )
 @param max_retries The number of retries.
 */
 
-void vine_task_specify_max_retries( struct vine_task *t, int64_t max_retries );
+void vine_task_set_max_retries( struct vine_task *t, int64_t max_retries );
 
 /** Specify the amount of disk space required by a task.
 @param t A task object.
 @param memory The amount of disk space required by the task, in megabytes.
 */
 
-void vine_task_specify_memory( struct vine_task *t, int64_t memory );
+void vine_task_set_memory( struct vine_task *t, int64_t memory );
 
 /** Specify the amount of disk space required by a task.
 @param t A task object.
 @param disk The amount of disk space required by the task, in megabytes.
 */
 
-void vine_task_specify_disk( struct vine_task *t, int64_t disk );
+void vine_task_set_disk( struct vine_task *t, int64_t disk );
 
 /** Specify the number of cores required by a task.
 @param t A task object.
 @param cores The number of cores required by the task.
 */
 
-void vine_task_specify_cores( struct vine_task *t, int cores );
+void vine_task_set_cores( struct vine_task *t, int cores );
 
 /** Specify the number of gpus required by a task.
 @param t A task object.
 @param gpus The number of gpus required by the task.
 */
 
-void vine_task_specify_gpus( struct vine_task *t, int gpus );
+void vine_task_set_gpus( struct vine_task *t, int gpus );
 
 /** Specify the maximum end time allowed for the task (in microseconds since the
 Epoch). If less than 1, then no end time is specified (this is the default).
@@ -385,7 +385,7 @@ This is useful, for example, when the task uses certificates that expire.
 @param useconds Number of useconds since the Epoch.
 */
 
-void vine_task_specify_end_time( struct vine_task *t, int64_t useconds );
+void vine_task_set_end_time( struct vine_task *t, int64_t useconds );
 
 /** Specify the minimum start time allowed for the task (in microseconds since the
 Epoch). If less than 1, then no minimum start time is specified (this is the default).
@@ -393,7 +393,7 @@ Epoch). If less than 1, then no minimum start time is specified (this is the def
 @param useconds Number of useconds since the Epoch.
 */
 
-void vine_task_specify_start_time_min( struct vine_task *t, int64_t useconds );
+void vine_task_set_start_time_min( struct vine_task *t, int64_t useconds );
 
 /** Specify the maximum time (in microseconds) the task is allowed to run in a
 worker. This time is accounted since the the moment the task starts to run
@@ -402,16 +402,16 @@ in a worker.  If less than 1, then no maximum time is specified (this is the def
 @param useconds Maximum number of seconds the task may run in a worker.
 */
 
-void vine_task_specify_running_time( struct vine_task *t, int64_t useconds );
+void vine_task_set_running_time( struct vine_task *t, int64_t useconds );
 
 /** Specify the maximum time (in seconds) the task is allowed to run in a worker.
 This time is accounted since the moment the task starts to run in a worker.
 If less than 1, then no maximum time is specified (this is the default).
-Note: same effect as vine_task_specify_running_time.
+Note: same effect as vine_task_set_running_time.
 @param t A task object.
 @param seconds Maximum number of seconds the task may run in a worker.
 */
-void vine_task_specify_running_time_max( struct vine_task *t, int64_t seconds );
+void vine_task_set_running_time_max( struct vine_task *t, int64_t seconds );
 
 /** Specify the minimum time (in seconds) the task is expected to run in a worker.
 This time is accounted since the moment the task starts to run in a worker.
@@ -419,7 +419,7 @@ If less than 1, then no minimum time is specified (this is the default).
 @param t A task object.
 @param seconds Minimum number of seconds the task may run in a worker.
 */
-void vine_task_specify_running_time_min( struct vine_task *t, int64_t seconds );
+void vine_task_set_running_time_min( struct vine_task *t, int64_t seconds );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the manager, but is provided for the user's convenience
@@ -427,20 +427,20 @@ in identifying tasks when they complete.
 @param t A task object.
 @param tag The tag to attach to task t.
 */
-void vine_task_specify_tag(struct vine_task *t, const char *tag);
+void vine_task_set_tag(struct vine_task *t, const char *tag);
 
 /** Label the task with the given category. It is expected that tasks with the same category
 have similar resources requirements (e.g. for fast abort).
 @param t A task object.
 @param category The name of the category to use.
 */
-void vine_task_specify_category(struct vine_task *t, const char *category);
+void vine_task_set_category(struct vine_task *t, const char *category);
 
 /** Label the task with a user-defined feature. The task will only run on a worker that provides (--feature option) such feature.
 @param t A task object.
 @param name The name of the feature.
 */
-void vine_task_specify_feature(struct vine_task *t, const char *name);
+void vine_task_set_feature(struct vine_task *t, const char *name);
 
 /** Specify the priority of this task relative to others in the queue.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list, regardless of the priority.
@@ -448,28 +448,28 @@ Tasks with a higher priority value run first. If no priority is given, a task is
 @param priority The priority of the task.
 */
 
-void vine_task_specify_priority(struct vine_task *t, double priority );
+void vine_task_set_priority(struct vine_task *t, double priority );
 
 /** Specify an environment variable to be added to the task.
 @param t A task object
 @param name Name of the variable.
 @param value Value of the variable.
 */
-void vine_task_specify_env( struct vine_task *t, const char *name, const char *value );
+void vine_task_set_env_var( struct vine_task *t, const char *name, const char *value );
 
 /** Select the scheduling algorithm for a single task.
 To change the scheduling algorithm for all tasks, use @ref vine_specify_algorithm instead.
 @param t A task object.
 @param algorithm The algorithm to use in assigning this task to a worker. For possible values, see @ref vine_schedule_t.
 */
-void vine_task_specify_algorithm(struct vine_task *t, vine_schedule_t algorithm);
+void vine_task_set_algorithm(struct vine_task *t, vine_schedule_t algorithm);
 
 /** Specify a custom name for the monitoring summary. If @ref vine_enable_monitoring is also enabled, the summary is also written to that directory.
 @param t A task object.
 @param monitor_output Resource summary file.
 */
 
-void vine_task_specify_monitor_output(struct vine_task *t, const char *monitor_output);
+void vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output);
 
 /** Get the command line of the task.
 @param t A task object.
@@ -480,7 +480,7 @@ const char * vine_task_get_command( struct vine_task *t );
 
 /** Get the tag associated with the task.
 @param t A task object.
-@return The tag string set by @ref vine_task_specify_tag.
+@return The tag string set by @ref vine_task_set_tag.
 */
 
 const char * vine_task_get_tag( struct vine_task *t );
@@ -627,7 +627,7 @@ For more information, consult the manual of the resource_monitor.
 @param monitor_snapshot_file A filename.
 */
 
-void vine_task_specify_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file);
+void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file);
 
 //@}
 
@@ -977,7 +977,7 @@ struct vine_task *vine_cancel_by_taskid(struct vine_manager *m, int id);
 
 /** Cancel a submitted task using its tag and remove it from manager.
 @param m A manager object
-@param tag The tag name assigned to task using @ref vine_task_specify_tag.
+@param tag The tag name assigned to task using @ref vine_task_set_tag.
 @return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
 */
 struct vine_task *vine_cancel_by_tasktag(struct vine_manager *m, const char *tag);

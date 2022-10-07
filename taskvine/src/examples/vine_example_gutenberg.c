@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 			vine_task_specify_input_url(t, urls[i], "filea.txt", VINE_CACHE);
 			vine_task_specify_input_url(t, urls[j], "fileb.txt", VINE_CACHE);
 
-			vine_task_specify_cores(t,1);
+			vine_task_set_cores(t,1);
 
 			int taskid = vine_submit(m, t);
 

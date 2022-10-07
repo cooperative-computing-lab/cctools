@@ -347,7 +347,7 @@ class FutureTask(taskvine.Task):
         self._exception = exception
         self._invoke_callbacks()
 
-    def specify_runtime_env(self, type, filename):
+    def set_runtime_env(self, type, filename):
         import _taskvine
         if type not in FutureTask.valid_runtime_envs:
             raise FutureTaskError("Runtime '{}' type is not one of {}".format(type, FutureTask.valid_runtime_envs))

@@ -155,7 +155,7 @@ static void export_environment( struct vine_process *p )
 
 static void specify_integer_env_var( struct vine_process *p, const char *name, int64_t value) {
 	char *value_str = string_format("%" PRId64, value);
-	vine_task_specify_env(p->task, name, value_str);
+	vine_task_set_env_var(p->task, name, value_str);
 	free(value_str);
 }
 
@@ -176,7 +176,7 @@ static void specify_resources_vars(struct vine_process *p) {
 	if(p->task->resources_requested->gpus > 0) {
 		specify_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
 		char *str = vine_gpus_to_string(p->task->taskid);
-		vine_task_specify_env(p->task,"CUDA_VISIBLE_DEVICES",str);
+		vine_task_set_env_var(p->task,"CUDA_VISIBLE_DEVICES",str);
 		free(str);
 	}
 }

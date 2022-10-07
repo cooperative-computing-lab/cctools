@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 		t = vine_task_create("./vine_example_watch_trickle.sh > output");
 		vine_task_specify_input_file(t, "vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", VINE_CACHE );
 		vine_task_specify_output_file(t, output, "output", VINE_WATCH );
-		vine_task_specify_cores(t,1);
+		vine_task_set_cores(t,1);
 		vine_submit(m, t);
 	}
 

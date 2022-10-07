@@ -71,7 +71,7 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 		debug(D_VINE, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,f->remote_name,strerror(errornum));
 
 		/* Mark the task as missing an output, but return success to keep going. */
-		vine_task_update_result(t, VINE_RESULT_OUTPUT_MISSING);
+		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
 		r = VINE_SUCCESS;
 	} else {
 		r = VINE_WORKER_FAILURE;
@@ -255,7 +255,7 @@ static vine_result_code_t vine_manager_get_any( struct vine_manager *q, struct v
 		// outputs are transferred and the task is given back to the caller.
 		url_decode(name_encoded,name,sizeof(name));
 		debug(D_VINE, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,name,strerror(errornum));
-		vine_task_update_result(t, VINE_RESULT_OUTPUT_MISSING);
+		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
 
 		r = VINE_SUCCESS;
 
@@ -348,9 +348,9 @@ vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct 
 		debug(D_VINE, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, f->cached_name, f->source );
 
 		if(result == VINE_APP_FAILURE) {
-			vine_task_update_result(t, VINE_RESULT_OUTPUT_MISSING);
+			vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
 		} else if(result == VINE_MGR_FAILURE) {
-			vine_task_update_result(t, VINE_RESULT_OUTPUT_TRANSFER_ERROR);
+			vine_task_set_result(t, VINE_RESULT_OUTPUT_TRANSFER_ERROR);
 		}
 	}
 

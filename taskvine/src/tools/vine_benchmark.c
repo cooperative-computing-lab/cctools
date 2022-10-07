@@ -57,10 +57,10 @@ int submit_tasks(struct vine_manager *q, int input_size, int run_time, int outpu
 		struct vine_task *t = vine_task_create(command);
 		vine_task_specify_input_file(t, input_file, "infile", VINE_CACHE);
 		vine_task_specify_output_file(t, output_file, "outfile", VINE_NOCACHE);
-		vine_task_specify_cores(t,1);
+		vine_task_set_cores(t,1);
 
 		if(category && strlen(category) > 0)
-			vine_task_specify_category(t, category);
+			vine_task_set_category(t, category);
 
 		vine_submit(q, t);
 	}

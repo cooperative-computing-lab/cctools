@@ -60,7 +60,7 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 
 	vine_task_state_t state = t->state;
 
-	buffer_printf(&B, "TASK %d %s", t->taskid, vine_task_state_string(state));
+	buffer_printf(&B, "TASK %d %s", t->taskid, vine_task_state_to_string(state));
 
 	if(state == VINE_TASK_UNKNOWN) {
 			/* do not add any info */

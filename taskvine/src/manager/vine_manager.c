@@ -944,7 +944,7 @@ static void read_measured_resources(struct vine_manager *q, struct vine_task *t)
 		/* if no resources were measured, then we don't overwrite the return
 		 * status, and mark the task as with error from monitoring. */
 		t->resources_measured = rmsummary_create(-1);
-		vine_task_update_result(t, VINE_RESULT_RMONITOR_ERROR);
+		vine_task_set_result(t, VINE_RESULT_RMONITOR_ERROR);
 	}
 
 	free(summary);
@@ -1178,11 +1178,11 @@ static int expire_waiting_tasks(struct vine_manager *q)
 
 		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time)
 		{
-			vine_task_update_result(t, VINE_RESULT_TASK_TIMEOUT);
+			vine_task_set_result(t, VINE_RESULT_TASK_TIMEOUT);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
-			vine_task_update_result(t, VINE_RESULT_MAX_RETRIES);
+			vine_task_set_result(t, VINE_RESULT_MAX_RETRIES);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		} else {
@@ -1426,7 +1426,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	} else {
 		retrieved_output_length = MAX_TASK_STDOUT_STORAGE;
 		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retrieved.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
-		vine_task_update_result(t, VINE_RESULT_STDOUT_MISSING);
+		vine_task_set_result(t, VINE_RESULT_STDOUT_MISSING);
 	}
 
 	t->output = malloc(retrieved_output_length+1);
@@ -1436,7 +1436,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		stoptime = time(0) + vine_manager_transfer_time(q, w, t, output_length);
 		link_soak(w->link, output_length, stoptime);
 		retrieved_output_length = 0;
-		vine_task_update_result(t, VINE_RESULT_STDOUT_MISSING);
+		vine_task_set_result(t, VINE_RESULT_STDOUT_MISSING);
 	}
 
 	if(retrieved_output_length > 0) {
@@ -1486,9 +1486,9 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	// Convert resource_monitor status into taskvine status if needed.
 	if(q->monitor_mode) {
 		if(t->exit_code == RM_OVERFLOW) {
-			vine_task_update_result(t, VINE_RESULT_RESOURCE_EXHAUSTION);
+			vine_task_set_result(t, VINE_RESULT_RESOURCE_EXHAUSTION);
 		} else if(t->exit_code == RM_TIME_EXPIRE) {
-			vine_task_update_result(t, VINE_RESULT_TASK_TIMEOUT);
+			vine_task_set_result(t, VINE_RESULT_TASK_TIMEOUT);
 		}
 	}
 
@@ -1676,7 +1676,7 @@ static void category_jx_insert_max(struct jx *j, struct category *c, const char 
 
 static struct rmsummary *category_alloc_info(struct vine_manager *q, struct category *c, category_allocation_t request) {
 	struct vine_task *t = vine_task_create("nop");
-	vine_task_specify_category(t, c->name);
+	vine_task_set_category(t, c->name);
 	t->resource_request = request;
 
 	/* XXX this seems like a hack: a vine_worker is being created by malloc instead of vine_worker_create */
@@ -3598,11 +3598,11 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 	}
 
 	// insert to corresponding table
-	debug(D_VINE, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, vine_task_state_string(old_state), old_state, vine_task_state_string(new_state), new_state);
+	debug(D_VINE, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, vine_task_state_to_string(old_state), old_state, vine_task_state_to_string(new_state), new_state);
 
 	switch(new_state) {
 		case VINE_TASK_READY:
-			vine_task_update_result(t, VINE_RESULT_UNKNOWN);
+			vine_task_set_result(t, VINE_RESULT_UNKNOWN);
 			push_task_to_ready_list(q, t);
 			break;
 		case VINE_TASK_DONE:
