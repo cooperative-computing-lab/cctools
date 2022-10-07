@@ -999,21 +999,21 @@ int vine_shut_down_workers(struct vine_manager *m, int n);
 @param logfile The filename.
 @return 1 if logfile was opened, 0 otherwise.
 */
-int vine_specify_debug_log( struct vine_manager *m, const char *logfile );
+int vine_enable_debug_log( struct vine_manager *m, const char *logfile );
 
 /** Add a performance log file that records cummulative statistics of the connected workers and submitted tasks.
 @param m A manager object
 @param logfile The filename.
 @return 1 if logfile was opened, 0 otherwise.
 */
-int vine_specify_perf_log(struct vine_manager *m, const char *logfile);
+int vine_enable_perf_log(struct vine_manager *m, const char *logfile);
 
 /** Add a log file that records the states of the connected workers and tasks.
 @param m A manager object
 @param logfile The filename.
 @return 1 if logfile was opened, 0 otherwise.
 */
-int vine_specify_transactions_log(struct vine_manager *m, const char *logfile);
+int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
 
 /** Add a mandatory password that each worker must present.
 @param m A manager object

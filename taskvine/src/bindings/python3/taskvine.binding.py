@@ -931,7 +931,7 @@ class Manager(object):
 
         try:
             if debug_log:
-                self.specify_debug_log(debug_log)
+                self.enable_debug_log(debug_log)
             self._stats = vine_stats()
             self._stats_hierarchy = vine_stats()
 
@@ -941,10 +941,10 @@ class Manager(object):
                 raise Exception('Could not create queue on port {}'.format(port))
 
             if stats_log:
-                self.specify_perf_log(stats_log)
+                self.enable_perf_log(stats_log)
 
             if transactions_log:
-                self.specify_transactions_log(transactions_log)
+                self.enable_transactions_log(transactions_log)
 
             if name:
                 vine_specify_name(self._taskvine, name)
@@ -1329,24 +1329,24 @@ class Manager(object):
     #
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
-    def specify_debug_log(self, logfile):
-        return vine_specify_debug_log(self._taskvine, logfile)
+    def enable_debug_log(self, logfile):
+        return vine_enable_debug_log(self._taskvine, logfile)
 
     ##
     # Specify a performance log file that records the cummulative stats of connected workers and submitted tasks.
     #
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
-    def specify_perf_log(self, logfile):
-        return vine_specify_perf_log(self._taskvine, logfile)
+    def enable_perf_log(self, logfile):
+        return vine_enable_perf_log(self._taskvine, logfile)
 
     ##
     # Specify a log file that records the states of tasks.
     #
     # @param self     Reference to the current manager object.
     # @param logfile  Filename.
-    def specify_transactions_log(self, logfile):
-        vine_specify_transactions_log(self._taskvine, logfile)
+    def enable_transactions_log(self, logfile):
+        vine_enable_transactions_log(self._taskvine, logfile)
 
     ##
     # Add a mandatory password that each worker must present.

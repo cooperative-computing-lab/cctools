@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 	}
 	printf("Listening on port %d...\n", vine_port(m));
 
-	vine_specify_debug_log(m,"manager.log");
+	vine_enable_debug_log(m,"manager.log");
 
 	int i;
 	for(i=0;i<10;i++) {
