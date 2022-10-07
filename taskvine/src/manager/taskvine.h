@@ -104,7 +104,7 @@ typedef enum {
 	VINE_EMPTY_DIR              /**< An empty directory to create in the task sandbox. */
 } vine_file_t;
 
-/** Select how to allocate resources for similar tasks with @ref vine_specify_category_mode */
+/** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
 
 typedef enum {
 	/** When monitoring is disabled, all tasks run as VINE_ALLOCATION_MODE_FIXED.
@@ -921,9 +921,9 @@ int vine_specify_draining_by_hostname(struct vine_manager *m, const char *hostna
 @param mode     One of @ref vine_category_mode_t.
 @returns 1 if mode is valid, 0 otherwise.
 */
-int vine_specify_category_mode(struct vine_manager *m, const char *category, vine_category_mode_t mode);
+int vine_set_category_mode(struct vine_manager *m, const char *category, vine_category_mode_t mode);
 
-/** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref vine_specify_category_mode.
+/** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref vine_set_category_mode.
 @param m A manager object
 @param category A category name.
 @param resource A resource name.
@@ -1088,21 +1088,21 @@ void vine_specify_min_resources(struct vine_manager *m,  const struct rmsummary 
 @param category  Name of the category.
 @param rm Structure indicating minimum values. See @ref rmsummary for possible fields.
 */
-void vine_specify_category_max_resources(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
+void vine_set_category_max_resources(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Sets the minimum resources a task in the category may use.
 @param m         Reference to the current manager object.
 @param category  Name of the category.
 @param rm Structure indicating minimum values. See @ref rmsummary for possible fields.
 */
-void vine_specify_category_min_resources(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
+void vine_set_category_min_resources(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Set the initial guess for resource autolabeling for the given category.
 @param m         Reference to the current manager object.
 @param category  Name of the category.
 @param rm Structure indicating maximum values. Autolabeling available for cores, memory, disk, and gpus
 */
-void vine_specify_category_first_allocation_guess(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
+void vine_set_category_first_allocation_guess(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Initialize first value of categories
 @param m     Reference to the current manager object.

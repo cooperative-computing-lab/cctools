@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 	if(monitor_flag) {
 		unlink_recursive("vine_benchmark_monitor");
 		vine_enable_monitoring(q, "vine_benchmark_monitorr", 1);
-		vine_specify_category_mode(q, NULL, VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
+		vine_set_category_mode(q, NULL, VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
 		vine_specify_transactions_log(q, "vine_benchmark_monitor/transactions.log");
 	}
 

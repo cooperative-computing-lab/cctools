@@ -4767,29 +4767,29 @@ void vine_initialize_categories(struct vine_manager *q, struct rmsummary *max, c
 }
 
 void vine_specify_max_resources(struct vine_manager *q,  const struct rmsummary *rm) {
-	vine_specify_category_max_resources(q,  "default", rm);
+	vine_set_category_max_resources(q,  "default", rm);
 }
 
 void vine_specify_min_resources(struct vine_manager *q,  const struct rmsummary *rm) {
-	vine_specify_category_min_resources(q,  "default", rm);
+	vine_set_category_min_resources(q,  "default", rm);
 }
 
-void vine_specify_category_max_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
+void vine_set_category_max_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
 	category_specify_max_allocation(c, rm);
 }
 
-void vine_specify_category_min_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
+void vine_set_category_min_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
 	category_specify_min_allocation(c, rm);
 }
 
-void vine_specify_category_first_allocation_guess(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
+void vine_set_category_first_allocation_guess(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
 	category_specify_first_allocation_guess(c, rm);
 }
 
-int vine_specify_category_mode(struct vine_manager *q, const char *category, vine_category_mode_t mode) {
+int vine_set_category_mode(struct vine_manager *q, const char *category, vine_category_mode_t mode) {
 
 	switch(mode) {
 		case CATEGORY_ALLOCATION_MODE_FIXED:

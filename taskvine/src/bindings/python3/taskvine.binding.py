@@ -1118,7 +1118,7 @@ class Manager(object):
     #                  - VINE_ALLOCATION_MODE_FIXED Task fails (default).
     #                  - VINE_ALLOCATION_MODE_MAX If maximum values are
     #                  specified for cores, memory, disk, and gpus (e.g. via @ref
-    #                  specify_category_max_resources or @ref Task.set_memory),
+    #                  set_category_max_resources or @ref Task.set_memory),
     #                  and one of those resources is exceeded, the task fails.
     #                  Otherwise it is retried until a large enough worker
     #                  connects to the manager, using the maximum values
@@ -1130,19 +1130,19 @@ class Manager(object):
     #                  manager tries allocations to minimize resource waste.
     #                  - VINE_ALLOCATION_MODE_MAX_THROUGHPUT As above, but
     #                  manager tries allocations to maximize throughput.
-    def specify_category_mode(self, category, mode):
-        return vine_specify_category_mode(self._taskvine, category, mode)
+    def set_category_mode(self, category, mode):
+        return vine_set_category_mode(self._taskvine, category, mode)
 
     ##
     # Turn on or off first-allocation labeling for a given category and
     # resource. This function should be use to fine-tune the defaults from @ref
-    # specify_category_mode.
+    # set_category_mode.
     # @param self   Reference to the current manager object.
     # @param category A category name.
     # @param resource A resource name.
     # @param autolabel True/False for on/off.
     # @returns 1 if resource is valid, 0 otherwise.
-    def specify_category_autolabel_resource(self, category, resource, autolabel):
+    def set_category_autolabel_resource(self, category, resource, autolabel):
         return vine_enable_category_resource(self._taskvine, category, category, resource, autolabel)
 
     ##
@@ -1414,17 +1414,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A maximum of 4 cores may be used by a task in the category:
-    # >>> q.specify_category_max_resources("my_category", {'cores': 4})
+    # >>> q.set_category_max_resources("my_category", {'cores': 4})
     # >>> # A maximum of 8 cores, 1GB of memory, and 10GB may be used by a task:
-    # >>> q.specify_category_max_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
+    # >>> q.set_category_max_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
     # @endcode
 
-    def specify_category_max_resources(self, category, rmd):
+    def set_category_max_resources(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_specify_category_max_resources(self._taskvine, category, rm)
+        return vine_set_category_max_resources(self._taskvine, category, rm)
 
     ##
     # Specifies the minimum resources allowed for the given category.
@@ -1435,17 +1435,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
-    # >>> q.specify_category_min_resources("my_category", {'cores': 2})
+    # >>> q.set_category_min_resources("my_category", {'cores': 2})
     # >>> # A minimum of 4 cores, 512MB of memory, and 1GB disk are found on any worker:
-    # >>> q.specify_category_min_resources("my_category", {'cores': 4, 'memory':  512, 'disk': 1024})
+    # >>> q.set_category_min_resources("my_category", {'cores': 4, 'memory':  512, 'disk': 1024})
     # @endcode
 
-    def specify_category_min_resources(self, category, rmd):
+    def set_category_min_resources(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_specify_category_min_resources(self._taskvine, category, rm)
+        return vine_set_category_min_resources(self._taskvine, category, rm)
 
     ##
     # Specifies the first-allocation guess for the given category
@@ -1456,17 +1456,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # Tasks are first tried with 4 cores:
-    # >>> q.specify_category_first_allocation_guess("my_category", {'cores': 4})
+    # >>> q.set_category_first_allocation_guess("my_category", {'cores': 4})
     # >>> # Tasks are first tried with 8 cores, 1GB of memory, and 10GB:
-    # >>> q.specify_category_first_allocation_guess("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
+    # >>> q.set_category_first_allocation_guess("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
     # @endcode
 
-    def specify_category_first_allocation_guess(self, category, rmd):
+    def set_category_first_allocation_guess(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_specify_category_first_allocation_guess(self._taskvine, category, rm)
+        return vine_set_category_first_allocation_guess(self._taskvine, category, rm)
 
     ##
     # Initialize first value of categories
