@@ -26,8 +26,6 @@ usage() {
     echo "                            on <dir>. Default is 300"
     echo " -d, --debug                Print debug messages."
     echo " -k, --keep-alive           Keeps unpacked and activated environment alive after execution"
-    echo " -n, --no-command           Do not execute command"
-    echo " -r, --remove-locking       Omit the use of file locking when unpacking the environment"
     echo " --help-env-creation        Show instructions to create conda environments as tar files."
     echo " -h, --help                 Show this help screen."
     echo "command and args            Command to execute inside the given environment."
