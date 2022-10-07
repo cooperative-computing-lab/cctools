@@ -111,12 +111,6 @@ parse_arguments() {
 	    -k | --keep-alive)
 		export PONCHO_KEEP_ALIVE=yes
 		;;
-	    -n | --no-command)
-		export PONCHO_NO_COMMAND=yes
-		;;
-            -r | --remove-lock)
-		export PONCHO_REMOVE_LOCKING=yes
-		;;
             --)
                 shift
                 break

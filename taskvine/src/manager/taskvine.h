@@ -44,10 +44,10 @@ typedef enum {
 	VINE_NOCACHE  = 0, /**< Do not cache file at execution site. (default) */
 	VINE_CACHE    = 1, /**< Cache file at execution site for later use. */
 	VINE_UNPACK   = 2, /**< Unpack this archive (.tar .tgz .zip) into a directory on arrival. */
-	VINE_PONCHO_UNPACK, /**< Unpacks a Poncho environment into a directory on arrival. */
 	VINE_WATCH    = 4, /**< Watch the output file and send back changes as the task runs. */
 	VINE_FAILURE_ONLY = 8,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	VINE_SUCCESS_ONLY = 16, /**< Only return this output file if the task succeeded. */
+	VINE_PONCHO_UNPACK = 32, /**< Unpacks a Poncho environment into a directory on arrival. */
 } vine_file_flags_t;
 
 /** Select overall scheduling algorithm for matching tasks to workers. */
