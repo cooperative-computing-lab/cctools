@@ -68,7 +68,7 @@ run()
     chmod +x network_function.py
 
 	# send makeflow to the background, saving its exit status.
-	# (${CCTOOLS_PYTHON_TEST_EXEC} wq_remote_task.py $PORT_FILE; echo $? > $STATUS_FILE) &
+	(${CCTOOLS_PYTHON_TEST_EXEC} wq_remote_task.py $PORT_FILE; echo $? > $STATUS_FILE) &
 
 	# wait at most 5 seconds for wq to find a port.
 	wait_for_file_creation $PORT_FILE 5

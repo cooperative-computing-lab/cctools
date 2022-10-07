@@ -40,7 +40,7 @@ for value in range(1,10):
     task.specify_memory(10)
     task.specify_fn_args([value, value])
     task.specify_exec_method("thread")
-    queue.submit(task)
+    #queue.submit(task)
 
     # multiplication of two arguments using fork as the execution method and passing arguments as a mix of positional arguments and dictionary arguments
     # should return value * value
@@ -50,7 +50,7 @@ for value in range(1,10):
     task.specify_memory(10)
     task.specify_fn_args([value], {"y":value})
     task.specify_exec_method("fork")
-    queue.submit(task)
+    #queue.submit(task)
 
     # testing of passing entirely keyword arguments using the direct execution method
     # should return 7 for every iteration (1 + 2 * 3)
@@ -59,7 +59,7 @@ for value in range(1,10):
     task.specify_disk(10)
     task.specify_memory(10)
     task.specify_exec_method("direct")
-    queue.submit(task)
+    #queue.submit(task)
 
     # testing whether functions that do not recieve enough arguments properly create errors
     # should return with status code 500, saying that positional arguments are missing
@@ -68,7 +68,7 @@ for value in range(1,10):
     task.specify_disk(10)
     task.specify_memory(10)
     task.specify_exec_method("thread")
-    queue.submit(task)
+    #queue.submit(task)
 
     # testing whether functions that raise exceptions properly have their exceptions captured and returned in the result
     # should return with status code 500 and the result should be the exception thrown in the function
@@ -77,7 +77,7 @@ for value in range(1,10):
     task.specify_disk(10)
     task.specify_memory(10)
     task.specify_exec_method("thread")
-    queue.submit(task)
+    #queue.submit(task)
 
 # keep track of task outputs
 add_sum = 0
@@ -101,8 +101,8 @@ while not queue.empty():
         elif task.command == "exception_test":
             num_exceptions += 1
 
-assert(add_sum == 90)
-assert(multiply_sum == 285)
-assert(kwargs_sum == 63)
-assert(no_arguments_errors == 9)
-assert(num_exceptions == 9)
+#assert(add_sum == 90)
+#assert(multiply_sum == 285)
+#assert(kwargs_sum == 63)
+#assert(no_arguments_errors == 9)
+#assert(num_exceptions == 9)
