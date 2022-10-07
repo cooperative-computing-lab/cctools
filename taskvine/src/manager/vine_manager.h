@@ -179,7 +179,7 @@ int vine_manager_send( struct vine_manager *q, struct vine_worker_info *w, const
 vine_msg_code_t vine_manager_recv( struct vine_manager *q, struct vine_worker_info *w, char *line, int length );
 
 /* Compute the expected wait time for a transfer of length bytes. */
-int vine_manager_transfer_wait_time( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length );
+int vine_manager_transfer_time( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length );
 
 /* Give the number of workers available to run tasks at the moment. */
 int vine_manager_available_workers(struct vine_manager *q);

@@ -95,7 +95,7 @@ static int vine_manager_put_file( struct vine_manager *q, struct vine_worker_inf
 	char remotename_encoded[VINE_LINE_MAX];
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
 
-	stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, length);
+	stoptime = time(0) + vine_manager_transfer_time(q, w, t, length);
 	vine_manager_send(q,w, "file %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
@@ -359,7 +359,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 
 	case VINE_BUFFER:
 		debug(D_VINE, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
-		time_t stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, f->length);
+		time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->length);
 		vine_manager_send(q,w, "file %s %d %o\n",f->cached_name, f->length, 0777 );
 		actual = link_putlstring(w->link, f->data, f->length, stoptime);
 		if(actual!=f->length) {

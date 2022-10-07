@@ -50,7 +50,7 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 
 		f->data = malloc(size+1);
 		if(f->data) {
-			time_t stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, f->length);
+			time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->length);
 
 			ssize_t actual = link_read(w->link,f->data,f->length,stoptime);
 			if(actual==f->length) {
@@ -95,7 +95,7 @@ static vine_result_code_t vine_manager_get_file_contents( struct vine_manager *q
 	}
 
 	// Choose the actual stoptime.
-	time_t stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, length);
+	time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, length);
 
 	// If necessary, create parent directories of the file.
 	char dirname[VINE_LINE_MAX];

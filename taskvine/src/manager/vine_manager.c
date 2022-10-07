@@ -314,7 +314,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 	char cachename[VINE_LINE_MAX];
 	long long size;
 	long long transfer_time;
-	
+
 	if(sscanf(line,"cache-update %s %lld %lld",cachename,&size,&transfer_time)==3) {
 		struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
 		if(remote_info) {
@@ -322,7 +322,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 			remote_info->transfer_time = transfer_time;
 		}
 	}
-	
+
 	return VINE_MSG_PROCESSED;
 }
 
@@ -492,7 +492,7 @@ Two exceptions are made:
 - The transfer time cannot be below a configurable minimum time.
 */
 
-int vine_manager_transfer_wait_time(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length)
+int vine_manager_transfer_time(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length)
 {
 	double avg_transfer_rate; // bytes per second
 	char *data_source;
@@ -1318,12 +1318,12 @@ static vine_result_code_t get_update( struct vine_manager *q, struct vine_worker
 	struct vine_task *t = itable_lookup(w->current_tasks,taskid);
 	if(!t) {
 		debug(D_VINE,"worker %s (%s) sent output for unassigned task %"PRId64, w->hostname, w->addrport, taskid);
-		link_soak(w->link,length,time(0)+vine_manager_transfer_wait_time(q,w,0,length));
+		link_soak(w->link,length,time(0)+vine_manager_transfer_time(q,w,0,length));
 		return VINE_SUCCESS;
 	}
 
 
-	time_t stoptime = time(0) + vine_manager_transfer_wait_time(q,w,t,length);
+	time_t stoptime = time(0) + vine_manager_transfer_time(q,w,t,length);
 
 	struct vine_file *f;
 	const char *local_name = 0;
@@ -1396,7 +1396,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
 		debug(D_VINE, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
-		stoptime = time(0) + vine_manager_transfer_wait_time(q, w, 0, output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
 		return VINE_SUCCESS;
 	}
@@ -1433,7 +1433,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	if(t->output == NULL) {
 		fprintf(stderr, "error: allocating memory of size %"PRId64" bytes failed for storing stdout of task %"PRId64".\n", retrieved_output_length, taskid);
 		//drop the entire length of stdout on the link
-		stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, t, output_length);
 		link_soak(w->link, output_length, stoptime);
 		retrieved_output_length = 0;
 		vine_task_update_result(t, VINE_RESULT_STDOUT_MISSING);
@@ -1443,7 +1443,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		debug(D_VINE, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, retrieved_output_length, w->addrport, w->hostname);
 
 		//First read the bytes we keep.
-		stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, retrieved_output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, t, retrieved_output_length);
 		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
 		if(actual != retrieved_output_length) {
 			debug(D_VINE, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
@@ -1455,7 +1455,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		//Then read the bytes we need to throw away.
 		if(output_length > retrieved_output_length) {
 			debug(D_VINE, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_STORAGE), taskid, MAX_TASK_STDOUT_STORAGE);
-			stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
+			stoptime = time(0) + vine_manager_transfer_time(q, w, t, (output_length-retrieved_output_length));
 			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
 
 			//overwrite the last few bytes of buffer to signal truncated stdout.
