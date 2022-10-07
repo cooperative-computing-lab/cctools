@@ -2461,7 +2461,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	vine_manager_send(q,w, "memory %s\n", rmsummary_resource_to_str("memory", limits->memory, 0));
 	vine_manager_send(q,w, "disk %s\n",   rmsummary_resource_to_str("disk", limits->disk, 0));
 
-	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
+	/* Do not set end, wall_time if running the resource monitor. We let the monitor police these resources. */
 	if(q->monitor_mode == VINE_MON_DISABLED) {
 		if(limits->end > 0) {
 			vine_manager_send(q,w, "end_time %s\n",  rmsummary_resource_to_str("end", limits->end, 0));
@@ -2476,7 +2476,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
-	 * specify_*, if used. */
+	 * set_*, if used. */
 	char *var;
 	list_first_item(t->env_list);
 	while((var=list_next_item(t->env_list))) {
@@ -3271,12 +3271,12 @@ int vine_port(struct vine_manager *q)
 	}
 }
 
-void vine_specify_algorithm(struct vine_manager *q, vine_schedule_t algorithm)
+void vine_set_algorithm(struct vine_manager *q, vine_schedule_t algorithm)
 {
 	q->worker_selection_algorithm = algorithm;
 }
 
-void vine_specify_name(struct vine_manager *q, const char *name)
+void vine_set_name(struct vine_manager *q, const char *name)
 {
 	if(q->name) free(q->name);
 	if(name) {
@@ -3292,12 +3292,12 @@ const char *vine_name(struct vine_manager *q)
 	return q->name;
 }
 
-void vine_specify_priority(struct vine_manager *q, int priority)
+void vine_set_priority(struct vine_manager *q, int priority)
 {
 	q->priority = priority;
 }
 
-void vine_specify_num_tasks_left(struct vine_manager *q, int ntasks)
+void vine_set_num_tasks_left(struct vine_manager *q, int ntasks)
 {
 	if(ntasks < 1) {
 		q->num_tasks_left = 0;
@@ -3307,21 +3307,21 @@ void vine_specify_num_tasks_left(struct vine_manager *q, int ntasks)
 	}
 }
 
-void vine_specify_catalog_server(struct vine_manager *q, const char *hostname, int port)
+void vine_set_catalog_server(struct vine_manager *q, const char *hostname, int port)
 {
 	char hostport[DOMAIN_NAME_MAX + 8];
 	if(hostname && (port > 0)) {
 		sprintf(hostport, "%s:%d", hostname, port);
-		vine_specify_catalog_servers(q, hostport);
+		vine_set_catalog_servers(q, hostport);
 	} else if(hostname) {
-		vine_specify_catalog_servers(q, hostname);
+		vine_set_catalog_servers(q, hostname);
 	} else if (port > 0) {
 		sprintf(hostport, "%d", port);
 		setenv("CATALOG_PORT", hostport, 1);
 	}
 }
 
-void vine_specify_catalog_servers(struct vine_manager *q, const char *hosts)
+void vine_set_catalog_servers(struct vine_manager *q, const char *hosts)
 {
 	if(hosts) {
 		if(q->catalog_hosts) free(q->catalog_hosts);
@@ -3330,12 +3330,12 @@ void vine_specify_catalog_servers(struct vine_manager *q, const char *hosts)
 	}
 }
 
-void vine_specify_password( struct vine_manager *q, const char *password )
+void vine_set_password( struct vine_manager *q, const char *password )
 {
 	q->password = xxstrdup(password);
 }
 
-int vine_specify_password_file( struct vine_manager *q, const char *file )
+int vine_set_password_file( struct vine_manager *q, const char *file )
 {
 	return copy_file_to_buffer(file,&q->password,NULL)>0;
 }
@@ -4271,7 +4271,7 @@ int vine_shut_down_workers(struct vine_manager *q, int n)
 	return i;
 }
 
-int vine_specify_draining_by_hostname(struct vine_manager *q, const char *hostname, int drain_flag)
+int vine_set_draining_by_hostname(struct vine_manager *q, const char *hostname, int drain_flag)
 {
 	char *worker_hashkey = NULL;
 	struct vine_worker_info *w = NULL;
@@ -4395,12 +4395,12 @@ int vine_empty(struct vine_manager *q)
 	return 1;
 }
 
-void vine_specify_keepalive_interval(struct vine_manager *q, int interval)
+void vine_set_keepalive_interval(struct vine_manager *q, int interval)
 {
 	q->keepalive_interval = interval;
 }
 
-void vine_specify_keepalive_timeout(struct vine_manager *q, int timeout)
+void vine_set_keepalive_timeout(struct vine_manager *q, int timeout)
 {
 	q->keepalive_timeout = timeout;
 }
@@ -4766,27 +4766,27 @@ void vine_initialize_categories(struct vine_manager *q, struct rmsummary *max, c
 	categories_initialize(q->categories, max, summaries_file);
 }
 
-void vine_specify_max_resources(struct vine_manager *q,  const struct rmsummary *rm) {
+void vine_set_max_resources(struct vine_manager *q,  const struct rmsummary *rm) {
 	vine_set_category_max_resources(q,  "default", rm);
 }
 
-void vine_specify_min_resources(struct vine_manager *q,  const struct rmsummary *rm) {
+void vine_set_min_resources(struct vine_manager *q,  const struct rmsummary *rm) {
 	vine_set_category_min_resources(q,  "default", rm);
 }
 
 void vine_set_category_max_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
-	category_specify_max_allocation(c, rm);
+	category_set_max_allocation(c, rm);
 }
 
 void vine_set_category_min_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
-	category_specify_min_allocation(c, rm);
+	category_set_min_allocation(c, rm);
 }
 
 void vine_set_category_first_allocation_guess(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
-	category_specify_first_allocation_guess(c, rm);
+	category_set_first_allocation_guess(c, rm);
 }
 
 int vine_set_category_mode(struct vine_manager *q, const char *category, vine_category_mode_t mode) {
@@ -4808,7 +4808,7 @@ int vine_set_category_mode(struct vine_manager *q, const char *category, vine_ca
 	}
 	else {
 		struct category *c = vine_category_lookup_or_create(q, category);
-		category_specify_allocation_mode(c, (category_mode_t) mode);
+		category_set_allocation_mode(c, (category_mode_t) mode);
 		vine_txn_log_write_category(q, c);
 	}
 
@@ -4863,13 +4863,13 @@ struct category *vine_category_lookup_or_create(struct vine_manager *q, const ch
 
 	if(!c->vine_stats) {
 		c->vine_stats = calloc(1, sizeof(struct vine_stats));
-		category_specify_allocation_mode(c, (category_mode_t) q->allocation_default_mode);
+		category_set_allocation_mode(c, (category_mode_t) q->allocation_default_mode);
 	}
 
 	return c;
 }
 
-int vine_specify_min_taskid(struct vine_manager *q, int minid) {
+int vine_set_min_taskid(struct vine_manager *q, int minid) {
 
 	if(minid > q->next_taskid) {
 		q->next_taskid = minid;

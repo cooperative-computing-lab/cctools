@@ -859,7 +859,7 @@ static void finish_running_tasks(vine_result_t result)
 
 static int enforce_process_limits(struct vine_process *p)
 {
-	/* If the task did not specify disk usage, return right away. */
+	/* If the task did not set disk usage, return right away. */
 	if(p->disk < 1)
 		return 1;
 
@@ -916,7 +916,7 @@ static void enforce_processes_max_running_time()
 
 	itable_firstkey(procs_running);
 	while(itable_nextkey(procs_running, (uint64_t*) &pid, (void**) &p)) {
-		/* If the task did not specify wall_time, return right away. */
+		/* If the task did not set wall_time, return right away. */
 		if(p->task->resources_requested->wall_time < 1)
 			continue;
 

@@ -129,7 +129,7 @@ void vine_watcher_remove_process( struct vine_watcher *w, struct vine_process *p
 Check to see if any watched files have changed since the last look.
 If any one file has changed, it is not necessary to look for any more,
 since the files will be rescanned in vine_watcher_send_results.
-Also, note that the debug message does not specify the specific file;
+Also, note that the debug message does not print the specific file;
 we don't want the user to be thrown off by missing messages about
 files not examined.
 */

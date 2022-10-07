@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 	printf("listening on port %d...\n", vine_port(m));
 
 	vine_enable_debug_log(m,"manager.log");
-	vine_specify_algorithm(m,VINE_SCHEDULE_FILES);
+	vine_set_algorithm(m,VINE_SCHEDULE_FILES);
 
 	for(i=0;i<10;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");

@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 	printf("listening on port %d...\n", vine_port(m));
 
 	vine_enable_debug_log(m,"manager.log");
-	vine_specify_algorithm(m,VINE_SCHEDULE_FILES);
+	vine_set_algorithm(m,VINE_SCHEDULE_FILES);
 
 	for(i=0;i<url_count;i++) {
 		for(j=0;j<url_count;j++) {

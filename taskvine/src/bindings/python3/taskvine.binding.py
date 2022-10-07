@@ -29,7 +29,7 @@ import atexit
 import time
 import math
 
-def specify_port_range(low_port, high_port):
+def set_port_range(low_port, high_port):
     if low_port > high_port:
         raise TypeError('low_port {} should be smaller than high_port {}'.format(low_port, high_port))
 
@@ -313,7 +313,7 @@ class Task(object):
     # @param self           Reference to the current task object.
     # @param buffer         The contents of the buffer to pass as input.
     # @param remote_name    The name of the remote file to create.
-    # @param flags          May take the same values as @ref specify_file.
+    # @param flags          May take the same values as @ref add_file.
     # @param cache          Whether the file should be cached at workers (True/False)
     def add_input_buffer(self, buffer, remote_name, flags=None, cache=None):
         if remote_name:
@@ -327,7 +327,7 @@ class Task(object):
     # @param self           Reference to the current task object.
     # @param buffer_name    The logical name of the output buffer.
     # @param remote_name    The name of the remote file to fetch.
-    # @param flags          May take the same values as @ref specify_file.
+    # @param flags          May take the same values as @ref add_file.
     # @param cache          Whether the file should be cached at workers (True/False)
     def add_output_buffer(self, buffer_name, remote_name, flags=None, cache=None):
         if buffer_name:
@@ -423,8 +423,8 @@ class Task(object):
     #
     # @param self           Reference to the current task object.
     # @param filename       The name of the snapshot events specification
-    def specify_snapshot_file(self, filename):
-        return vine_specify_snapshot_file(self._task, filename)
+    def set_snapshot_file(self, filename):
+        return vine_set_snapshot_file(self._task, filename)
 
 
 
@@ -774,7 +774,7 @@ class PythonTask(Task):
         self._output = None
 
         super(PythonTask, self).__init__(self._command)
-        self._specify_IO_files()
+        self._add_IO_files()
 
     ##
     # returns the result of a python task as a python variable
@@ -849,7 +849,7 @@ class PythonTask(Task):
         return command
 
 
-    def _specify_IO_files(self):
+    def _add_IO_files(self):
         self.add_input_file(self._wrapper, cache=True)
         self.add_input_file(self._func_file, cache=False)
         self.add_input_file(self._args_file, cache=False)
@@ -921,7 +921,7 @@ class Manager(object):
         lower, upper = None, None
         try:
             lower, upper = port
-            specify_port_range(lower, upper)
+            set_port_range(lower, upper)
             port = 0
         except TypeError:
             # if not a range, ignore
@@ -947,7 +947,7 @@ class Manager(object):
                 self.enable_transactions_log(transactions_log)
 
             if name:
-                vine_specify_name(self._taskvine, name)
+                vine_set_name(self._taskvine, name)
         except Exception as e:
             raise Exception('Unable to create internal taskvine structure: {}'.format(e))
 
@@ -1201,8 +1201,8 @@ class Manager(object):
     # @param self       Reference to the current manager object.
     # @param hostname   The hostname the host running the workers.
     # @param drain_mode If True, no new tasks are dispatched to workers at hostname, and empty workers are shutdown. Else, workers works as usual.
-    def specify_draining_by_hostname(self, hostname, drain_mode=True):
-        return vine_specify_draining_by_hostname(self._taskvine, hostname, drain_mode)
+    def set_draining_by_hostname(self, hostname, drain_mode=True):
+        return vine_set_draining_by_hostname(self._taskvine, hostname, drain_mode)
 
     ##
     # Determine whether there are any known tasks queued, running, or waiting to be collected.
@@ -1229,8 +1229,8 @@ class Manager(object):
     # @param algorithm  One of the following algorithms to use in assigning a
     #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
-    def specify_algorithm(self, algorithm):
-        return vine_specify_algorithm(self._taskvine, algorithm)
+    def set_algorithm(self, algorithm):
+        return vine_set_algorithm(self._taskvine, algorithm)
 
     ##
     # Set the order for dispatching submitted tasks in the queue.
@@ -1240,16 +1240,16 @@ class Manager(object):
     #                   submitted tasks to workers:
     #                   - @ref VINE_TASK_ORDER_FIFO
     #                   - @ref VINE_TASK_ORDER_LIFO
-    def specify_task_order(self, order):
-        return vine_specify_task_order(self._taskvine, order)
+    def set_task_order(self, order):
+        return vine_set_task_order(self._taskvine, order)
 
     ##
     # Change the project name for the given queue.
     #
     # @param self   Reference to the current manager object.
     # @param name   The new project name.
-    def specify_name(self, name):
-        return vine_specify_name(self._taskvine, name)
+    def set_name(self, name):
+        return vine_set_name(self._taskvine, name)
 
     ##
     # Set the preference for using hostname over IP address to connect.
@@ -1260,12 +1260,12 @@ class Manager(object):
     #
     # @param self Reference to the current manager object.
     # @param mode An string to indicate using 'by_ip', 'by_hostname' or 'by_apparent_ip'.
-    def specify_manager_preferred_connection(self, mode):
+    def set_manager_preferred_connection(self, mode):
         return vine_manager_preferred_connection(self._taskvine, mode)
 
     ##
-    # See specify_manager_preferred_connection
-    def specify_master_preferred_connection(self, mode):
+    # See set_manager_preferred_connection
+    def set_master_preferred_connection(self, mode):
         return vine_manager_preferred_connection(self._taskvine, mode)
 
     ##
@@ -1280,16 +1280,16 @@ class Manager(object):
     # @param self   Reference to the current manager object.
     # @param minid  Minimum desired taskid
     # @return Returns the actual minimum taskid for future tasks.
-    def specify_min_taskid(self, minid):
-        return vine_specify_min_taskid(self._taskvine, minid)
+    def set_min_taskid(self, minid):
+        return vine_set_min_taskid(self._taskvine, minid)
 
     ##
     # Change the project priority for the given queue.
     #
     # @param self       Reference to the current manager object.
     # @param priority   An integer that presents the priorty of this manager manager. The higher the value, the higher the priority.
-    def specify_priority(self, priority):
-        return vine_specify_priority(self._taskvine, priority)
+    def set_priority(self, priority):
+        return vine_set_priority(self._taskvine, priority)
 
     ## Specify the number of tasks not yet submitted to the queue.
     # It is used by vine_factory to determine the number of workers to launch.
@@ -1298,8 +1298,8 @@ class Manager(object):
     # num tasks left + num tasks running + num tasks read.
     # @param self   Reference to the current manager object.
     # @param ntasks Number of tasks yet to be submitted.
-    def specify_num_tasks_left(self, ntasks):
-        return vine_specify_num_tasks_left(self._taskvine, ntasks)
+    def set_num_tasks_left(self, ntasks):
+        return vine_set_num_tasks_left(self._taskvine, ntasks)
 
     ##
     # Specify the manager mode for the given queue.
@@ -1307,13 +1307,13 @@ class Manager(object):
     #
     # @param self   Reference to the current manager object.
     # @param mode   This may be one of the following values: VINE_MASTER_MODE_STANDALONE or VINE_MASTER_MODE_CATALOG.
-    def specify_manager_mode(self, mode):
-        return vine_specify_manager_mode(self._taskvine, mode)
+    def set_manager_mode(self, mode):
+        return vine_set_manager_mode(self._taskvine, mode)
 
     ##
-    # See specify_manager_mode
-    def specify_master_mode(self, mode):
-        return vine_specify_manager_mode(self._taskvine, mode)
+    # See set_manager_mode
+    def set_master_mode(self, mode):
+        return vine_set_manager_mode(self._taskvine, mode)
 
     ##
     # Specify the catalog server the manager should report to.
@@ -1321,8 +1321,8 @@ class Manager(object):
     # @param self       Reference to the current manager object.
     # @param hostname   The hostname of the catalog server.
     # @param port       The port the catalog server is listening on.
-    def specify_catalog_server(self, hostname, port):
-        return vine_specify_catalog_server(self._taskvine, hostname, port)
+    def set_catalog_server(self, hostname, port):
+        return vine_set_catalog_server(self._taskvine, hostname, port)
 
     ##
     # Specify a debug log file that records the manager actions in detail.
@@ -1353,8 +1353,8 @@ class Manager(object):
     #
     # @param self      Reference to the current manager object.
     # @param password  The password.
-    def specify_password(self, password):
-        return vine_specify_password(self._taskvine, password)
+    def set_password(self, password):
+        return vine_set_password(self._taskvine, password)
 
     ##
     # Add a mandatory password file that each worker must present.
@@ -1362,8 +1362,8 @@ class Manager(object):
     # @param self      Reference to the current manager object.
     # @param file      Name of the file containing the password.
 
-    def specify_password_file(self, file):
-        return vine_specify_password_file(self._taskvine, file)
+    def set_password_file(self, file):
+        return vine_set_password_file(self._taskvine, file)
 
     ##
     #
@@ -1373,17 +1373,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A maximum of 4 cores is found on any worker:
-    # >>> q.specify_max_resources({'cores': 4})
+    # >>> q.set_max_resources({'cores': 4})
     # >>> # A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
-    # >>> q.specify_max_resources({'cores': 8, 'memory':  1024, 'disk': 10240})
+    # >>> q.set_max_resources({'cores': 8, 'memory':  1024, 'disk': 10240})
     # @endcode
 
-    def specify_max_resources(self, rmd):
+    def set_max_resources(self, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_specify_max_resources(self._taskvine, rm)
+        return vine_set_max_resources(self._taskvine, rm)
 
     ##
     #
@@ -1393,17 +1393,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
-    # >>> q.specify_min_resources({'cores': 2})
+    # >>> q.set_min_resources({'cores': 2})
     # >>> # A minimum of 4 cores, 512MB of memory, and 1GB disk are found on any worker:
-    # >>> q.specify_min_resources({'cores': 4, 'memory':  512, 'disk': 1024})
+    # >>> q.set_min_resources({'cores': 4, 'memory':  512, 'disk': 1024})
     # @endcode
 
-    def specify_min_resources(self, rmd):
+    def set_min_resources(self, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_specify_min_resources(self._taskvine, rm)
+        return vine_set_min_resources(self._taskvine, rm)
 
     ##
     # Specifies the maximum resources allowed for the given category.
@@ -1494,7 +1494,7 @@ class Manager(object):
     # Cancel task identified by its tag and remove from the given queue.
     #
     # @param self   Reference to the current manager object.
-    # @param tag    The tag assigned to task using @ref specify_tag.
+    # @param tag    The tag assigned to task using @ref set_tag.
     def cancel_by_tasktag(self, tag):
         task = None
         task_pointer = vine_cancel_by_tasktag(self._taskvine, tag)
@@ -1506,7 +1506,7 @@ class Manager(object):
     # Cancel all tasks of the given category and remove them from the queue.
     #
     # @param self   Reference to the current manager object.
-    # @param tag    The tag assigned to task using @ref specify_tag.
+    # @param tag    The tag assigned to task using @ref set_tag.
     def cancel_by_category(self, category):
         canceled_tasks = []
         ids_to_cancel = []
@@ -1525,8 +1525,8 @@ class Manager(object):
     # Gives a best effort and then returns the number of workers given the shutdown order.
     #
     # @param self   Reference to the current manager object.
-    # @param n      The number to shutdown.  To shut down all workers, specify "0".
-    def shutdown_workers(self, n):
+    # @param n      The number to shutdown.  0 shutdowns all workers
+    def shutdown_workers(self, n=0):
         return vine_shut_down_workers(self._taskvine, n)
 
     ##
@@ -1587,8 +1587,8 @@ class Manager(object):
     # @param self     Reference to the current manager object.
     # @param interval Minimum number of seconds to wait before sending new keepalive
     #                 checks to workers.
-    def specify_keepalive_interval(self, interval):
-        return vine_specify_keepalive_interval(self._taskvine, interval)
+    def set_keepalive_interval(self, interval):
+        return vine_set_keepalive_interval(self._taskvine, interval)
 
     ##
     # Change keepalive timeout for a given queue.
@@ -1596,8 +1596,8 @@ class Manager(object):
     # @param self     Reference to the current manager object.
     # @param timeout  Minimum number of seconds to wait for a keepalive response
     #                 from worker before marking it as dead.
-    def specify_keepalive_timeout(self, timeout):
-        return vine_specify_keepalive_timeout(self._taskvine, timeout)
+    def set_keepalive_timeout(self, timeout):
+        return vine_set_keepalive_timeout(self._taskvine, timeout)
 
     ##
     # Turn on manager capacity measurements.
@@ -1605,7 +1605,7 @@ class Manager(object):
     # @param self     Reference to the current manager object.
     #
     def estimate_capacity(self):
-        return vine_specify_estimate_capacity_on(self._taskvine, 1)
+        return vine_set_estimate_capacity_on(self._taskvine, 1)
 
     ##
     # Tune advanced parameters.
@@ -1641,7 +1641,7 @@ class Manager(object):
     # @param task   A task description created from @ref taskvine::Task.
     def submit(self, task):
         if isinstance(task, RemoteTask):
-            task.specify_buffer(json.dumps(task._event), "infile")
+            task.add_buffer(json.dumps(task._event), "infile")
         taskid = vine_submit(self._taskvine, task._task)
         self._task_table[taskid] = task
         return taskid
@@ -1717,16 +1717,16 @@ class Manager(object):
                 p_task = PythonTask(map, fn, array[start:])
             else:
                 p_task = PythonTask(map, fn, array[start:end])
-            
-            p_task.specify_tag(str(i))
+
+            p_task.set_tag(str(i))
             self.submit(p_task)
             tasks[p_task.id] = i
-               
+
         n = 0
         for i in range(size+1):
             while not self.empty() and n < size:
 
-                t = self.wait_for_tag(str(i), 1)                
+                t = self.wait_for_tag(str(i), 1)
                 if t:
                     results[tasks[vine_task_get_taskid(t)]] = list(vine_task_get_output(t))
                     n += 1

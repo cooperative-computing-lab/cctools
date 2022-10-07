@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(project_name) {
-		vine_specify_name(q,project_name);
+		vine_set_name(q,project_name);
 	}
 
 	if(monitor_flag) {

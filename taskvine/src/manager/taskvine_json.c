@@ -89,7 +89,7 @@ static int validate_json(struct jx *json, const char **array)
 
 }
 
-static int specify_files(int input, struct jx *files, struct vine_task *task)
+static int add_files(int input, struct jx *files, struct vine_task *task)
 {
 
 	void *i = NULL;
@@ -157,7 +157,7 @@ static int specify_files(int input, struct jx *files, struct vine_task *task)
 
 }
 
-static int specify_environment(struct jx *environment, struct vine_task *task)
+static int set_environment(struct jx *environment, struct vine_task *task)
 {
 	void *j = NULL;
 	void *i = NULL;
@@ -233,15 +233,15 @@ static struct vine_task *create_task(const char *str)
 		}
 
 		if(input_files) {
-			specify_files(1, input_files, task);
+			add_files(1, input_files, task);
 		}
 
 		if(output_files) {
-			specify_files(0, output_files, task);
+			add_files(0, output_files, task);
 		}
 
 		if(environment) {
-			specify_environment(environment, task);
+			set_environment(environment, task);
 		}
 
 		if(cores) {
@@ -310,10 +310,10 @@ struct vine_manager *vine_json_create(const char *str)
 		}
 
 		if(name) {
-			vine_specify_name(taskvine, name);
+			vine_set_name(taskvine, name);
 		}
 		if(priority) {
-			vine_specify_priority(taskvine, priority);
+			vine_set_priority(taskvine, priority);
 		}
 
 		return taskvine;

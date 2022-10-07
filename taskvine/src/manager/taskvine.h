@@ -458,7 +458,7 @@ void vine_task_set_priority(struct vine_task *t, double priority );
 void vine_task_set_env_var( struct vine_task *t, const char *name, const char *value );
 
 /** Select the scheduling algorithm for a single task.
-To change the scheduling algorithm for all tasks, use @ref vine_specify_algorithm instead.
+To change the scheduling algorithm for all tasks, use @ref vine_set_algorithm instead.
 @param t A task object.
 @param algorithm The algorithm to use in assigning this task to a worker. For possible values, see @ref vine_schedule_t.
 */
@@ -645,7 +645,7 @@ Users may modify the behavior of @ref vine_create by setting the following envir
 - <b>VINE_PRIORITY</b>: This sets the priority of the manager, which is used by workers to sort managers such that higher priority managers will be served first (if unset, the default is 10).
 
 If the manager has a project name, then manager statistics and information will be
-reported to a catalog server.  To specify the catalog server, the user may set
+reported to a catalog server.  To set the catalog server, the user may set
 the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as described in @ref catalog_query_create.
 
 @param port The port number to listen on.  If zero is specified, then the port stored in the <b>VINE_PORT</b> environment variable is used if available. If it isn't, or if -1 is specified, the first unused port between <b>VINE_LOW_PORT</b> and <b>VINE_HIGH_PORT</b> (1024 and 32767 by default) is chosen.
@@ -749,7 +749,7 @@ int vine_port(struct vine_manager *m);
 @param m A manager object
 @param name The new project name.
 */
-void vine_specify_name(struct vine_manager *m, const char *name);
+void vine_set_name(struct vine_manager *m, const char *name);
 
 /** Get the project name of the manager.
 @param m A manager object
@@ -765,7 +765,7 @@ updated with the resources measured, and no summary file is kept unless
 explicitely given by vine_task's monitor_output_file.
 @param m A manager object
 @param monitor_output_directory The name of the output directory. If NULL,
-summaries are kept only when monitor_output_directory is specify per task, but
+summaries are kept only when monitor_output_directory is set per task, but
 resources_measured from vine_task is updated.  @return 1 on success, 0 if
 @param watchdog if not 0, kill tasks that exhaust declared resources.
 @return 1 on success, o if monitoring was not enabled.
@@ -793,7 +793,7 @@ provided is ignored.
 @param minid Minimum desired taskid
 @return Returns the actual minimum taskid for future tasks.
 */
-int vine_specify_min_taskid(struct vine_manager *m, int minid);
+int vine_set_min_taskid(struct vine_manager *m, int minid);
 
 /** Block workers in hostname from working for manager q.
 @param m A manager object
@@ -913,7 +913,7 @@ and if empty they are shutdown.
 @param hostname The hostname running the worker.
 @param drain_flag Draining mode.
 */
-int vine_specify_draining_by_hostname(struct vine_manager *m, const char *hostname, int drain_flag);
+int vine_set_draining_by_hostname(struct vine_manager *m, const char *hostname, int drain_flag);
 
 /** Turn on or off first-allocation labeling for a given category. By default, cores, memory, and disk are labeled, and gpus are unlabeled. Turn on/off other specific resources use @ref vine_enable_category_resource
 @param m A manager object
@@ -937,13 +937,13 @@ This function controls which <b>worker</b> will be selected for a given task.
 @param m A manager object
 @param algorithm The algorithm to use in assigning a task to a worker. See @ref vine_schedule_t for possible values.
 */
-void vine_specify_algorithm(struct vine_manager *m, vine_schedule_t algorithm);
+void vine_set_algorithm(struct vine_manager *m, vine_schedule_t algorithm);
 
 /** Change the priority for a given manager.
 @param m A manager object
 @param priority The new priority of the manager.  Higher priority managers will attract workers first.
 */
-void vine_specify_priority(struct vine_manager *m, int priority);
+void vine_set_priority(struct vine_manager *m, int priority);
 
 /** Specify the number of tasks not yet submitted to the manager.
 It is used by vine_factory to determine the number of workers to launch.
@@ -953,20 +953,20 @@ num tasks left + num tasks running + num tasks read.
 @param m A manager object
 @param ntasks Number of tasks yet to be submitted.
 */
-void vine_specify_num_tasks_left(struct vine_manager *m, int ntasks);
+void vine_set_num_tasks_left(struct vine_manager *m, int ntasks);
 
 /** Specify the catalog server the manager should report to.
 @param m A manager object
 @param hostname The catalog server's hostname.
 @param port The port the catalog server is listening on.
 */
-void vine_specify_catalog_server(struct vine_manager *m, const char *hostname, int port);
+void vine_set_catalog_server(struct vine_manager *m, const char *hostname, int port);
 
 /** Specify the catalog server(s) the manager should report to.
 @param m A manager object
 @param hosts The catalog servers given as a comma delimited list of hostnames or hostname:port
 */
-void vine_specify_catalog_servers(struct vine_manager *m, const char *hosts);
+void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
 
 /** Cancel a submitted task using its task id and remove it from manager.
 @param m A manager object
@@ -1020,7 +1020,7 @@ int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
 @param password The password to require.
 */
 
-void vine_specify_password( struct vine_manager *m, const char *password );
+void vine_set_password( struct vine_manager *m, const char *password );
 
 /** Add a mandatory password file that each worker must present.
 @param m A manager object
@@ -1028,19 +1028,19 @@ void vine_specify_password( struct vine_manager *m, const char *password );
 @return True if the password was loaded, false otherwise.
 */
 
-int vine_specify_password_file( struct vine_manager *m, const char *file );
+int vine_set_password_file( struct vine_manager *m, const char *file );
 
 /** Change the keepalive interval for a given manager.
 @param m A manager object
 @param interval The minimum number of seconds to wait before sending new keepalive checks to workers.
 */
-void vine_specify_keepalive_interval(struct vine_manager *m, int interval);
+void vine_set_keepalive_interval(struct vine_manager *m, int interval);
 
 /** Change the keepalive timeout for identifying dead workers for a given manager.
 @param m A manager object
 @param timeout The minimum number of seconds to wait for a keepalive response from worker before marking it as dead.
 */
-void vine_specify_keepalive_timeout(struct vine_manager *m, int timeout);
+void vine_set_keepalive_timeout(struct vine_manager *m, int timeout);
 
 /** Set the preference for using hostname over IP address to connect.
 'by_ip' uses IP addresses from the network interfaces of the manager (standard behavior), 'by_hostname' to use the hostname at the manager, or 'by_apparent_ip' to use the address of the manager as seen by the catalog server.
@@ -1074,14 +1074,14 @@ rm specifies the maximum resources a task in the default category may use.
 @param m  Reference to the current manager object.
 @param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
-void vine_specify_max_resources(struct vine_manager *m,  const struct rmsummary *rm);
+void vine_set_max_resources(struct vine_manager *m,  const struct rmsummary *rm);
 
 /** Sets the minimum resources a task without an explicit category ("default" category).
 rm specifies the maximum resources a task in the default category may use.
 @param m  Reference to the current manager object.
 @param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
-void vine_specify_min_resources(struct vine_manager *m,  const struct rmsummary *rm);
+void vine_set_min_resources(struct vine_manager *m,  const struct rmsummary *rm);
 
 /** Sets the maximum resources a task in the category may use.
 @param m         Reference to the current manager object.
