@@ -75,7 +75,8 @@ General options:
 - **-F**,**--foremen-name=_&lt;project&gt;_**<br /> Foremen to serve, can be a regular expression.
 - **--catalog=_&lt;host:port&gt;_**<br /> Catalog server to query for managers.
 - **-P**,**--password=_&lt;pwdfile&gt;_**<br /> Password file for workers to authenticate.
-- **-S**,**--scratch-dir=_&lt;dir&gt;_**<br /> Use this scratch dir for factory. Default is /tmp/wq-factory-$UID.
+- **-S**,**--scratch-dir=_&lt;dir&gt;_**<br /> Use this scratch dir for factory. Default is /tmp/wq-factory-$UID. 
+Also configurable through environment variables **CCTOOLS_TEMP** or **TMPDIR**
 - **--run-factory-as-manager**<br /> Force factory to run itself as a manager.
 - **--parent-death**<br /> Exit if parent process dies.
 - **-d**,**--debug=_&lt;subsystem&gt;_**<br /> Enable debugging for this subsystem.

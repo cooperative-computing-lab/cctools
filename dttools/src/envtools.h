@@ -19,4 +19,10 @@ int find_executable(const char *exe_name, const char *env_path_var, char *exe_pa
 
 int env_replace( const char *infile, const char *outfile );
 
+
+/* Return the first temporary directory found in the following order:
+   override_tmp_dir argument value, CCTOOLS_TEMP env var, _CONDOR_SCRATCH_DIR
+   env var, TMPDIR env var, TEMP env var, /tmp
+   */
+const char *system_tmp_dir(const char *override_tmp_dir);
 #endif

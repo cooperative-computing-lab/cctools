@@ -83,7 +83,7 @@ grid or cloud computing environments such as SGE, PBS, SLURM, and HTCondor using
 - **-b**,**--max-backoff=_&lt;time&gt;_**<br />Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
 - **-A**,**--arch=_&lt;arch&gt;_**<br />Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
 - **-O**,**--os=_&lt;os&gt;_**<br />Set the operating system string the worker reports to its supervisor. (default=the value reported by uname)
-- **-s**,**--workdir=_&lt;path&gt;_**<br />Set the location where the worker should create its working directory. (default=/tmp)
+- **-s**,**--workdir=_&lt;path&gt;_**<br />Set the location where the worker should create its working directory. (default=/tmp). Also configurable through environment variables **CCTOOLS_TEMP** or **TMPDIR**.
 - **--bandwidth=_&lt;mbps&gt;_**<br />Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)
 - **--cores=_&lt;n&gt;_**<br />Set the number of cores this worker should use.  Set it to 0 to have the worker use all of the available resources. (default=1)
 - **--gpus=_&lt;n&gt;_**<br />Set the number of GPUs this worker should use. If less than 0 or not given, try to detect gpus available.
