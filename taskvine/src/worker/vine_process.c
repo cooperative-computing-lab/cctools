@@ -153,30 +153,30 @@ static void export_environment( struct vine_process *p )
 	}
 }
 
-static void specify_integer_env_var( struct vine_process *p, const char *name, int64_t value) {
+static void set_integer_env_var( struct vine_process *p, const char *name, int64_t value) {
 	char *value_str = string_format("%" PRId64, value);
-	vine_task_specify_env(p->task, name, value_str);
+	vine_task_set_env_var(p->task, name, value_str);
 	free(value_str);
 }
 
-static void specify_resources_vars(struct vine_process *p) {
+static void set_resources_vars(struct vine_process *p) {
 	if(p->task->resources_requested->cores > 0) {
-		specify_integer_env_var(p, "CORES", p->task->resources_requested->cores);
-		specify_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
+		set_integer_env_var(p, "CORES", p->task->resources_requested->cores);
+		set_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
 	}
 
 	if(p->task->resources_requested->memory > 0) {
-		specify_integer_env_var(p, "MEMORY", p->task->resources_requested->memory);
+		set_integer_env_var(p, "MEMORY", p->task->resources_requested->memory);
 	}
 
 	if(p->task->resources_requested->disk > 0) {
-		specify_integer_env_var(p, "DISK", p->task->resources_requested->disk);
+		set_integer_env_var(p, "DISK", p->task->resources_requested->disk);
 	}
 
 	if(p->task->resources_requested->gpus > 0) {
-		specify_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
+		set_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
 		char *str = vine_gpus_to_string(p->task->taskid);
-		vine_task_specify_env(p->task,"CUDA_VISIBLE_DEVICES",str);
+		vine_task_set_env_var(p->task,"CUDA_VISIBLE_DEVICES",str);
 		free(str);
 	}
 }
@@ -275,8 +275,8 @@ pid_t vine_process_execute(struct vine_process *p )
 
 		clear_environment();
 
-		/* overwrite CORES, MEMORY, or DISK variables, if the task used specify_* */
-		specify_resources_vars(p);
+		/* overwrite CORES, MEMORY, or DISK variables, if the task used set_* */
+		set_resources_vars(p);
 
 		export_environment(p);
 
@@ -319,7 +319,7 @@ void  vine_process_compute_disk_needed( struct vine_process *p ) {
 
 	p->disk = t->resources_requested->disk;
 
-	/* task did not specify its disk usage. */
+	/* task did not set its disk usage. */
 	if(p->disk < 0)
 		return;
 

@@ -87,9 +87,9 @@ if __name__ == '__main__':
     # define a task, sending stderr to console, and stdout to output
     output = output_file()
     t = vine.Task("./{exe} {input} 2>&1 > {output}".format(exe=exec_file, input=input_file, output=output))
-    t.specify_input_file(path.join(test_dir, exec_file), exec_file)
-    t.specify_input_file(path.join(test_dir, input_file), input_file)
-    t.specify_output_file(path.join(test_dir, output), output)
+    t.add_input_file(path.join(test_dir, exec_file), exec_file)
+    t.add_input_file(path.join(test_dir, input_file), input_file)
+    t.add_output_file(path.join(test_dir, output), output)
 
     q.submit(t)
     t = q.wait(wait_time)
@@ -104,8 +104,8 @@ if __name__ == '__main__':
     # same simple task, but now we send the directory as an input
     output = output_file()
     t = vine.Task("cd my_dir && ./{exe} {input} 2>&1 > {output}".format(exe=exec_file, input=input_file, output=output))
-    t.specify_input_file(test_dir, 'my_dir')
-    t.specify_output_file(path.join(test_dir, output), path.join('my_dir', output))
+    t.add_input_file(test_dir, 'my_dir')
+    t.add_output_file(path.join(test_dir, output), path.join('my_dir', output))
 
     q.submit(t)
     t = q.wait(wait_time)
@@ -115,9 +115,9 @@ if __name__ == '__main__':
     # we bring back the outputs from a directory:
     output = output_file()
     t = vine.Task("mkdir outs && ./{exe} {input} 2>&1 > outs/{output}".format(exe=exec_file, input=input_file, output=output))
-    t.specify_input_file(path.join(test_dir, exec_file), exec_file)
-    t.specify_input_file(path.join(test_dir, input_file), input_file)
-    t.specify_output_file(path.join(test_dir, 'outs'), 'outs' )
+    t.add_input_file(path.join(test_dir, exec_file), exec_file)
+    t.add_input_file(path.join(test_dir, input_file), input_file)
+    t.add_output_file(path.join(test_dir, 'outs'), 'outs' )
 
     q.submit(t)
     t = q.wait(wait_time)
@@ -127,9 +127,9 @@ if __name__ == '__main__':
 
     original = "This is only a test!";
     t = vine.Task("cp input.txt output1.txt && cp input.txt output2.txt")
-    t.specify_input_buffer(original,"input.txt")
-    t.specify_output_buffer("out1","output1.txt")
-    t.specify_output_buffer("out2","output2.txt")
+    t.add_input_buffer(original,"input.txt")
+    t.add_output_buffer("out1","output1.txt")
+    t.add_output_buffer("out2","output2.txt")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
@@ -144,7 +144,7 @@ if __name__ == '__main__':
 
     # should fail because the 'executable' cannot be executed:
     t = vine.Task("./{input}".format(input=input_file))
-    t.specify_input_file(path.join(test_dir, input_file), input_file)
+    t.add_input_file(path.join(test_dir, input_file), input_file)
 
     q.submit(t)
     t = q.wait(wait_time)
@@ -159,7 +159,7 @@ if __name__ == '__main__':
 
     # should fail because an input file does not exists:
     t = vine.Task("./notacommand")
-    t.specify_input_file('notacommand')
+    t.add_input_file('notacommand')
 
     q.submit(t)
     t = q.wait(wait_time)
@@ -168,9 +168,9 @@ if __name__ == '__main__':
     # should fail because an output file was not created:
     output = output_file()
     t = vine.Task("./{exe} {input} 2>&1".format(exe=exec_file, input=input_file))
-    t.specify_input_file(path.join(test_dir, exec_file), exec_file)
-    t.specify_input_file(path.join(test_dir, input_file), input_file)
-    t.specify_output_file(path.join(test_dir, output), output)
+    t.add_input_file(path.join(test_dir, exec_file), exec_file)
+    t.add_input_file(path.join(test_dir, input_file), input_file)
+    t.add_output_file(path.join(test_dir, output), output)
 
     q.submit(t)
     t = q.wait(wait_time)
@@ -178,63 +178,63 @@ if __name__ == '__main__':
 
     # should succeed in the alloted time
     t = vine.Task("/bin/sleep 1")
-    t.specify_running_time_max(10)
+    t.set_running_time_max(10)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # should fail in the alloted time
     t = vine.Task("/bin/sleep 10")
-    t.specify_running_time_max(1)
+    t.set_running_time_max(1)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_TASK_MAX_RUN_TIME, 9)
 
     # should run in the alloted absolute time
     t = vine.Task("/bin/sleep 1")
-    t.specify_end_time((time.time() + 5) * 1e6)
+    t.set_end_time((time.time() + 5) * 1e6)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # should fail in the alloted absolute time
     t = vine.Task("/bin/sleep 10")
-    t.specify_end_time((time.time() + 2) * 1e6)
+    t.set_end_time((time.time() + 2) * 1e6)
     q.submit(t)
     t = q.wait(30)
     report_task(t, vine.VINE_RESULT_TASK_TIMEOUT, 9)
 
     # Now generate an input file from a shell command:
     t = vine.Task("/bin/cat infile")
-    t.specify_input_command("curl http://www.nd.edu -o %%","infile",cache=True)
+    t.add_input_command("curl http://www.nd.edu -o %%","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # second time should have it cached (though we can't tell from here)
     t = vine.Task("/bin/cat infile")
-    t.specify_input_command("curl http://www.nd.edu -o %%","infile",cache=True)
+    t.add_input_command("curl http://www.nd.edu -o %%","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # Now generate an input file from a shell command:
     t = vine.Task("/bin/cat infile")
-    t.specify_input_url("http://www.nd.edu","infile",cache=True)
+    t.add_input_url("http://www.nd.edu","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # second time should have it cached (though we can't tell from here)
     t = vine.Task("/bin/cat infile")
-    t.specify_input_url("http://www.nd.edu","infile",cache=True)
+    t.add_input_url("http://www.nd.edu","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # generate an invalid remote input file, should get an input missing error.
     t = vine.Task("/bin/cat infile")
-    t.specify_input_url("http://pretty-sure-this-is-not-a-valid-url.com","infile",cache=True)
+    t.add_input_url("http://pretty-sure-this-is-not-a-valid-url.com","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_INPUT_MISSING, 1)

@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
   # Usually, we can execute the gzip utility by simply typing its name at a
   # terminal. However, this is not enough for taskvine; we have to
-  # specify precisely which files need to be transmitted to the workers. We
+  # indicate precisely which files need to be transmitted to the workers. We
   # record the location of gzip in 'gzip_path', which is usually found in
   # /bin/gzip or /usr/bin/gzip.
 
@@ -56,16 +56,16 @@ if __name__ == '__main__':
       t = Task(command)
 
       # gzip is the same across all tasks, so we can cache it in the workers.
-      # Note that when specifying a file, we have to name its local name
+      # Note that when adding a file, we have to name its local name
       # (e.g. gzip_path), and its remote name (e.g. "gzip"). Unlike the
       # following line, more often than not these are the same.
-      t.specify_file(gzip_path, "gzip", VINE_INPUT, cache=True)
+      t.add_file(gzip_path, "gzip", VINE_INPUT, cache=True)
 
       # files to be compressed are different across all tasks, so we do not
       # cache them. This is, of course, application specific. Sometimes you may
       # want to cache an output file if is the input of a later task.
-      t.specify_file(infile, infile, VINE_INPUT, cache=False)
-      t.specify_file(outfile, outfile, VINE_OUTPUT, cache=False)
+      t.add_file(infile, infile, VINE_INPUT, cache=False)
+      t.add_file(outfile, outfile, VINE_OUTPUT, cache=False)
 
       # Once all files has been specified, we are ready to submit the task to the queue.
       taskid = q.submit(t)

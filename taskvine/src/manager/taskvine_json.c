@@ -89,7 +89,7 @@ static int validate_json(struct jx *json, const char **array)
 
 }
 
-static int specify_files(int input, struct jx *files, struct vine_task *task)
+static int add_files(int input, struct jx *files, struct vine_task *task)
 {
 
 	void *i = NULL;
@@ -144,9 +144,9 @@ static int specify_files(int input, struct jx *files, struct vine_task *task)
 		}
 
 		if(input) {
-			vine_task_specify_input_file(task, local, remote, flags);
+			vine_task_add_input_file(task, local, remote, flags);
 		} else {
-			vine_task_specify_output_file(task, local, remote, flags);
+			vine_task_add_output_file(task, local, remote, flags);
 		}
 
 		arr = jx_iterate_array(files, &i);
@@ -157,7 +157,7 @@ static int specify_files(int input, struct jx *files, struct vine_task *task)
 
 }
 
-static int specify_environment(struct jx *environment, struct vine_task *task)
+static int set_environment(struct jx *environment, struct vine_task *task)
 {
 	void *j = NULL;
 	void *i = NULL;
@@ -165,7 +165,7 @@ static int specify_environment(struct jx *environment, struct vine_task *task)
 	struct jx *value = jx_iterate_values(environment, &i);
 
 	while(key != NULL) {
-		vine_task_specify_env(task, key, value->u.string_value);
+		vine_task_set_env_var(task, key, value->u.string_value);
 		key = jx_iterate_keys(environment, &j);
 		value = jx_iterate_values(environment, &i);
 	}
@@ -233,27 +233,27 @@ static struct vine_task *create_task(const char *str)
 		}
 
 		if(input_files) {
-			specify_files(1, input_files, task);
+			add_files(1, input_files, task);
 		}
 
 		if(output_files) {
-			specify_files(0, output_files, task);
+			add_files(0, output_files, task);
 		}
 
 		if(environment) {
-			specify_environment(environment, task);
+			set_environment(environment, task);
 		}
 
 		if(cores) {
-			vine_task_specify_cores(task, cores);
+			vine_task_set_cores(task, cores);
 		}
 
 		if(memory) {
-			vine_task_specify_memory(task, memory);
+			vine_task_set_memory(task, memory);
 		}
 
 		if(disk) {
-			vine_task_specify_disk(task, disk);
+			vine_task_set_disk(task, disk);
 		}
 		return task;
 
@@ -310,10 +310,10 @@ struct vine_manager *vine_json_create(const char *str)
 		}
 
 		if(name) {
-			vine_specify_name(taskvine, name);
+			vine_set_name(taskvine, name);
 		}
 		if(priority) {
-			vine_specify_priority(taskvine, priority);
+			vine_set_priority(taskvine, priority);
 		}
 
 		return taskvine;

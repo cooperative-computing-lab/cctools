@@ -23,7 +23,7 @@
 #
 # By default, the task will run assuming that the worker is executing inside an
 # appropiate  python environment. If this is not the case, an environment file
-# can be specified with: `t.specify_environment("env.tar.gz")`, in which
+# can be specified with: `t.set_environment("env.tar.gz")`, in which
 # env.tar.gz is created with the conda-pack module, and has at least a python
 # installation, the dill module, and the conda module.
 #
@@ -47,7 +47,7 @@ def main():
         p_task = vine.PythonTask(divide, 1, i**2)
 
         # if python environment is missing at worker...
-        #p_task.specify_environment("env.tar.gz")
+        #p_task.set_environment("env.tar.gz")
 
         q.submit(p_task)
 

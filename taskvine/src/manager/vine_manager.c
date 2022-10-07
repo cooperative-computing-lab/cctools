@@ -314,7 +314,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 	char cachename[VINE_LINE_MAX];
 	long long size;
 	long long transfer_time;
-	
+
 	if(sscanf(line,"cache-update %s %lld %lld",cachename,&size,&transfer_time)==3) {
 		struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
 		if(remote_info) {
@@ -322,7 +322,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 			remote_info->transfer_time = transfer_time;
 		}
 	}
-	
+
 	return VINE_MSG_PROCESSED;
 }
 
@@ -381,7 +381,7 @@ This function receives a message from worker and records the time a message is s
 received. This timestamp is used in keepalive timeout computations.
 */
 
-static vine_msg_code_t vine_manager_recv(struct vine_manager *q, struct vine_worker_info *w, char *line, size_t length )
+static vine_msg_code_t vine_manager_recv_no_retry(struct vine_manager *q, struct vine_worker_info *w, char *line, size_t length )
 {
 	time_t stoptime;
 	stoptime = time(0) + q->short_timeout;
@@ -436,16 +436,16 @@ static vine_msg_code_t vine_manager_recv(struct vine_manager *q, struct vine_wor
 }
 
 /*
-Call vine_manager_recv and silently retry if the result indicates
+Call vine_manager_recv_no_retry and silently retry if the result indicates
 an asynchronous update message like 'keepalive' or 'resource'.
 */
 
-vine_msg_code_t vine_manager_recv_retry( struct vine_manager *q, struct vine_worker_info *w, char *line, int length )
+vine_msg_code_t vine_manager_recv( struct vine_manager *q, struct vine_worker_info *w, char *line, int length )
 {
 	vine_msg_code_t result = VINE_MSG_PROCESSED;
 
 	do {
-		result = vine_manager_recv(q, w,line,length);
+		result = vine_manager_recv_no_retry(q, w,line,length);
 	} while(result == VINE_MSG_PROCESSED);
 
 	return result;
@@ -492,7 +492,7 @@ Two exceptions are made:
 - The transfer time cannot be below a configurable minimum time.
 */
 
-int vine_manager_transfer_wait_time(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length)
+int vine_manager_transfer_time(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length)
 {
 	double avg_transfer_rate; // bytes per second
 	char *data_source;
@@ -944,7 +944,7 @@ static void read_measured_resources(struct vine_manager *q, struct vine_task *t)
 		/* if no resources were measured, then we don't overwrite the return
 		 * status, and mark the task as with error from monitoring. */
 		t->resources_measured = rmsummary_create(-1);
-		vine_task_update_result(t, VINE_RESULT_RMONITOR_ERROR);
+		vine_task_set_result(t, VINE_RESULT_RMONITOR_ERROR);
 	}
 
 	free(summary);
@@ -1178,11 +1178,11 @@ static int expire_waiting_tasks(struct vine_manager *q)
 
 		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time)
 		{
-			vine_task_update_result(t, VINE_RESULT_TASK_TIMEOUT);
+			vine_task_set_result(t, VINE_RESULT_TASK_TIMEOUT);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
-			vine_task_update_result(t, VINE_RESULT_MAX_RETRIES);
+			vine_task_set_result(t, VINE_RESULT_MAX_RETRIES);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		} else {
@@ -1318,12 +1318,12 @@ static vine_result_code_t get_update( struct vine_manager *q, struct vine_worker
 	struct vine_task *t = itable_lookup(w->current_tasks,taskid);
 	if(!t) {
 		debug(D_VINE,"worker %s (%s) sent output for unassigned task %"PRId64, w->hostname, w->addrport, taskid);
-		link_soak(w->link,length,time(0)+vine_manager_transfer_wait_time(q,w,0,length));
+		link_soak(w->link,length,time(0)+vine_manager_transfer_time(q,w,0,length));
 		return VINE_SUCCESS;
 	}
 
 
-	time_t stoptime = time(0) + vine_manager_transfer_wait_time(q,w,t,length);
+	time_t stoptime = time(0) + vine_manager_transfer_time(q,w,t,length);
 
 	struct vine_file *f;
 	const char *local_name = 0;
@@ -1396,7 +1396,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
 		debug(D_VINE, "Unknown task result from worker %s (%s): no task %" PRId64" assigned to worker.  Ignoring result.", w->hostname, w->addrport, taskid);
-		stoptime = time(0) + vine_manager_transfer_wait_time(q, w, 0, output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, 0, output_length);
 		link_soak(w->link, output_length, stoptime);
 		return VINE_SUCCESS;
 	}
@@ -1426,24 +1426,24 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	} else {
 		retrieved_output_length = MAX_TASK_STDOUT_STORAGE;
 		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retrieved.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
-		vine_task_update_result(t, VINE_RESULT_STDOUT_MISSING);
+		vine_task_set_result(t, VINE_RESULT_STDOUT_MISSING);
 	}
 
 	t->output = malloc(retrieved_output_length+1);
 	if(t->output == NULL) {
 		fprintf(stderr, "error: allocating memory of size %"PRId64" bytes failed for storing stdout of task %"PRId64".\n", retrieved_output_length, taskid);
 		//drop the entire length of stdout on the link
-		stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, t, output_length);
 		link_soak(w->link, output_length, stoptime);
 		retrieved_output_length = 0;
-		vine_task_update_result(t, VINE_RESULT_STDOUT_MISSING);
+		vine_task_set_result(t, VINE_RESULT_STDOUT_MISSING);
 	}
 
 	if(retrieved_output_length > 0) {
 		debug(D_VINE, "Receiving stdout of task %"PRId64" (size: %"PRId64" bytes) from %s (%s) ...", taskid, retrieved_output_length, w->addrport, w->hostname);
 
 		//First read the bytes we keep.
-		stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, retrieved_output_length);
+		stoptime = time(0) + vine_manager_transfer_time(q, w, t, retrieved_output_length);
 		actual = link_read(w->link, t->output, retrieved_output_length, stoptime);
 		if(actual != retrieved_output_length) {
 			debug(D_VINE, "Failure: actual received stdout size (%"PRId64" bytes) is different from expected (%"PRId64" bytes).", actual, retrieved_output_length);
@@ -1455,7 +1455,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		//Then read the bytes we need to throw away.
 		if(output_length > retrieved_output_length) {
 			debug(D_VINE, "Dropping the remaining %"PRId64" bytes of the stdout of task %"PRId64" since stdout length is limited to %d bytes.\n", (output_length-MAX_TASK_STDOUT_STORAGE), taskid, MAX_TASK_STDOUT_STORAGE);
-			stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, (output_length-retrieved_output_length));
+			stoptime = time(0) + vine_manager_transfer_time(q, w, t, (output_length-retrieved_output_length));
 			link_soak(w->link, (output_length-retrieved_output_length), stoptime);
 
 			//overwrite the last few bytes of buffer to signal truncated stdout.
@@ -1486,9 +1486,9 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	// Convert resource_monitor status into taskvine status if needed.
 	if(q->monitor_mode) {
 		if(t->exit_code == RM_OVERFLOW) {
-			vine_task_update_result(t, VINE_RESULT_RESOURCE_EXHAUSTION);
+			vine_task_set_result(t, VINE_RESULT_RESOURCE_EXHAUSTION);
 		} else if(t->exit_code == RM_TIME_EXPIRE) {
-			vine_task_update_result(t, VINE_RESULT_TASK_TIMEOUT);
+			vine_task_set_result(t, VINE_RESULT_TASK_TIMEOUT);
 		}
 	}
 
@@ -1517,7 +1517,7 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 
 	while(1) {
 		vine_msg_code_t mcode;
-		mcode = vine_manager_recv_retry(q, w, line, sizeof(line));
+		mcode = vine_manager_recv(q, w, line, sizeof(line));
 		if(mcode!=VINE_MSG_NOT_PROCESSED) {
 			result = VINE_WORKER_FAILURE;
 			break;
@@ -1676,7 +1676,7 @@ static void category_jx_insert_max(struct jx *j, struct category *c, const char 
 
 static struct rmsummary *category_alloc_info(struct vine_manager *q, struct category *c, category_allocation_t request) {
 	struct vine_task *t = vine_task_create("nop");
-	vine_task_specify_category(t, c->name);
+	vine_task_set_category(t, c->name);
 	t->resource_request = request;
 
 	/* XXX this seems like a hack: a vine_worker is being created by malloc instead of vine_worker_create */
@@ -2214,7 +2214,7 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 	free(key);
 
 	vine_msg_code_t mcode;
-	mcode = vine_manager_recv(q, w, line, sizeof(line));
+	mcode = vine_manager_recv_no_retry(q, w, line, sizeof(line));
 
 	// We only expect asynchronous status queries and updates here.
 
@@ -2461,7 +2461,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	vine_manager_send(q,w, "memory %s\n", rmsummary_resource_to_str("memory", limits->memory, 0));
 	vine_manager_send(q,w, "disk %s\n",   rmsummary_resource_to_str("disk", limits->disk, 0));
 
-	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
+	/* Do not set end, wall_time if running the resource monitor. We let the monitor police these resources. */
 	if(q->monitor_mode == VINE_MON_DISABLED) {
 		if(limits->end > 0) {
 			vine_manager_send(q,w, "end_time %s\n",  rmsummary_resource_to_str("end", limits->end, 0));
@@ -2476,7 +2476,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
-	 * specify_*, if used. */
+	 * set_*, if used. */
 	char *var;
 	list_first_item(t->env_list);
 	while((var=list_next_item(t->env_list))) {
@@ -3271,12 +3271,12 @@ int vine_port(struct vine_manager *q)
 	}
 }
 
-void vine_specify_algorithm(struct vine_manager *q, vine_schedule_t algorithm)
+void vine_set_algorithm(struct vine_manager *q, vine_schedule_t algorithm)
 {
 	q->worker_selection_algorithm = algorithm;
 }
 
-void vine_specify_name(struct vine_manager *q, const char *name)
+void vine_set_name(struct vine_manager *q, const char *name)
 {
 	if(q->name) free(q->name);
 	if(name) {
@@ -3292,12 +3292,12 @@ const char *vine_name(struct vine_manager *q)
 	return q->name;
 }
 
-void vine_specify_priority(struct vine_manager *q, int priority)
+void vine_set_priority(struct vine_manager *q, int priority)
 {
 	q->priority = priority;
 }
 
-void vine_specify_num_tasks_left(struct vine_manager *q, int ntasks)
+void vine_set_num_tasks_left(struct vine_manager *q, int ntasks)
 {
 	if(ntasks < 1) {
 		q->num_tasks_left = 0;
@@ -3307,21 +3307,21 @@ void vine_specify_num_tasks_left(struct vine_manager *q, int ntasks)
 	}
 }
 
-void vine_specify_catalog_server(struct vine_manager *q, const char *hostname, int port)
+void vine_set_catalog_server(struct vine_manager *q, const char *hostname, int port)
 {
 	char hostport[DOMAIN_NAME_MAX + 8];
 	if(hostname && (port > 0)) {
 		sprintf(hostport, "%s:%d", hostname, port);
-		vine_specify_catalog_servers(q, hostport);
+		vine_set_catalog_servers(q, hostport);
 	} else if(hostname) {
-		vine_specify_catalog_servers(q, hostname);
+		vine_set_catalog_servers(q, hostname);
 	} else if (port > 0) {
 		sprintf(hostport, "%d", port);
 		setenv("CATALOG_PORT", hostport, 1);
 	}
 }
 
-void vine_specify_catalog_servers(struct vine_manager *q, const char *hosts)
+void vine_set_catalog_servers(struct vine_manager *q, const char *hosts)
 {
 	if(hosts) {
 		if(q->catalog_hosts) free(q->catalog_hosts);
@@ -3330,12 +3330,12 @@ void vine_specify_catalog_servers(struct vine_manager *q, const char *hosts)
 	}
 }
 
-void vine_specify_password( struct vine_manager *q, const char *password )
+void vine_set_password( struct vine_manager *q, const char *password )
 {
 	q->password = xxstrdup(password);
 }
 
-int vine_specify_password_file( struct vine_manager *q, const char *file )
+int vine_set_password_file( struct vine_manager *q, const char *file )
 {
 	return copy_file_to_buffer(file,&q->password,NULL)>0;
 }
@@ -3491,18 +3491,18 @@ void vine_disable_monitoring(struct vine_manager *q) {
 }
 
 void vine_monitor_add_files(struct vine_manager *q, struct vine_task *t) {
-	vine_task_specify_input_file(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, VINE_CACHE);
+	vine_task_add_input_file(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, VINE_CACHE);
 
 	char *summary  = monitor_file_name(q, t, ".summary");
-	vine_task_specify_output_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", VINE_NOCACHE);
+	vine_task_add_output_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", VINE_NOCACHE);
 	free(summary);
 
 	if(q->monitor_mode & VINE_MON_FULL && (q->monitor_output_directory || t->monitor_output_directory)) {
 		char *debug  = monitor_file_name(q, t, ".debug");
 		char *series = monitor_file_name(q, t, ".series");
 
-		vine_task_specify_output_file(t, debug, RESOURCE_MONITOR_REMOTE_NAME ".debug", VINE_NOCACHE);
-		vine_task_specify_output_file(t, series, RESOURCE_MONITOR_REMOTE_NAME ".series", VINE_NOCACHE);
+		vine_task_add_output_file(t, debug, RESOURCE_MONITOR_REMOTE_NAME ".debug", VINE_NOCACHE);
+		vine_task_add_output_file(t, series, RESOURCE_MONITOR_REMOTE_NAME ".series", VINE_NOCACHE);
 
 		free(debug);
 		free(series);
@@ -3598,11 +3598,11 @@ static vine_task_state_t change_task_state( struct vine_manager *q, struct vine_
 	}
 
 	// insert to corresponding table
-	debug(D_VINE, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, vine_task_state_string(old_state), old_state, vine_task_state_string(new_state), new_state);
+	debug(D_VINE, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, vine_task_state_to_string(old_state), old_state, vine_task_state_to_string(new_state), new_state);
 
 	switch(new_state) {
 		case VINE_TASK_READY:
-			vine_task_update_result(t, VINE_RESULT_UNKNOWN);
+			vine_task_set_result(t, VINE_RESULT_UNKNOWN);
 			push_task_to_ready_list(q, t);
 			break;
 		case VINE_TASK_DONE:
@@ -4271,7 +4271,7 @@ int vine_shut_down_workers(struct vine_manager *q, int n)
 	return i;
 }
 
-int vine_specify_draining_by_hostname(struct vine_manager *q, const char *hostname, int drain_flag)
+int vine_set_draining_by_hostname(struct vine_manager *q, const char *hostname, int drain_flag)
 {
 	char *worker_hashkey = NULL;
 	struct vine_worker_info *w = NULL;
@@ -4395,12 +4395,12 @@ int vine_empty(struct vine_manager *q)
 	return 1;
 }
 
-void vine_specify_keepalive_interval(struct vine_manager *q, int interval)
+void vine_set_keepalive_interval(struct vine_manager *q, int interval)
 {
 	q->keepalive_interval = interval;
 }
 
-void vine_specify_keepalive_timeout(struct vine_manager *q, int timeout)
+void vine_set_keepalive_timeout(struct vine_manager *q, int timeout)
 {
 	q->keepalive_timeout = timeout;
 }
@@ -4661,7 +4661,7 @@ static void aggregate_workers_resources( struct vine_manager *q, struct vine_res
 
 /* This simple wrapper function allows us to hide the debug.h interface from the end user. */
 
-int vine_specify_debug_log( struct vine_manager *m, const char *logfile )
+int vine_enable_debug_log( struct vine_manager *m, const char *logfile )
 {
 	debug_config("vine_manager");
 	debug_config_file(logfile);
@@ -4669,7 +4669,7 @@ int vine_specify_debug_log( struct vine_manager *m, const char *logfile )
 	return 1;
 }
 
-int vine_specify_perf_log(struct vine_manager *q, const char *filename)
+int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 {
 	q->perf_logfile = fopen(filename, "a");
 	if(q->perf_logfile) {
@@ -4683,7 +4683,7 @@ int vine_specify_perf_log(struct vine_manager *q, const char *filename)
 	}
 }
 
-int vine_specify_transactions_log(struct vine_manager *q, const char *filename)
+int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 {
 	q->txn_logfile = fopen(filename, "a");
 	if(q->txn_logfile) {
@@ -4766,30 +4766,30 @@ void vine_initialize_categories(struct vine_manager *q, struct rmsummary *max, c
 	categories_initialize(q->categories, max, summaries_file);
 }
 
-void vine_specify_max_resources(struct vine_manager *q,  const struct rmsummary *rm) {
-	vine_specify_category_max_resources(q,  "default", rm);
+void vine_set_max_resources(struct vine_manager *q,  const struct rmsummary *rm) {
+	vine_set_category_max_resources(q,  "default", rm);
 }
 
-void vine_specify_min_resources(struct vine_manager *q,  const struct rmsummary *rm) {
-	vine_specify_category_min_resources(q,  "default", rm);
+void vine_set_min_resources(struct vine_manager *q,  const struct rmsummary *rm) {
+	vine_set_category_min_resources(q,  "default", rm);
 }
 
-void vine_specify_category_max_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
+void vine_set_category_max_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
 	category_specify_max_allocation(c, rm);
 }
 
-void vine_specify_category_min_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
+void vine_set_category_min_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
 	category_specify_min_allocation(c, rm);
 }
 
-void vine_specify_category_first_allocation_guess(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
+void vine_set_category_first_allocation_guess(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
 	category_specify_first_allocation_guess(c, rm);
 }
 
-int vine_specify_category_mode(struct vine_manager *q, const char *category, vine_category_mode_t mode) {
+int vine_set_category_mode(struct vine_manager *q, const char *category, vine_category_mode_t mode) {
 
 	switch(mode) {
 		case CATEGORY_ALLOCATION_MODE_FIXED:
@@ -4869,7 +4869,7 @@ struct category *vine_category_lookup_or_create(struct vine_manager *q, const ch
 	return c;
 }
 
-int vine_specify_min_taskid(struct vine_manager *q, int minid) {
+int vine_set_min_taskid(struct vine_manager *q, int minid) {
 
 	if(minid > q->next_taskid) {
 		q->next_taskid = minid;

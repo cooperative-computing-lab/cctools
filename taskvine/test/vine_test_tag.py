@@ -25,7 +25,7 @@ print(vine.__file__)
 
 for tag in alpha_order:
     t = vine.Task("/bin/echo hello tag {}".format(tag))
-    t.specify_tag(tag)
+    t.set_tag(tag)
     q.submit(t)
 
 for tag in desired_tag_order:

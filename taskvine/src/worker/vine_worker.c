@@ -661,43 +661,43 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 		if(!strcmp(line,"end")) {
 			break;
 		} else if(sscanf(line, "category %s",category)) {
-			vine_task_specify_category(task, category);
+			vine_task_set_category(task, category);
 		} else if(sscanf(line,"cmd %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
-			vine_task_specify_command(task,cmd);
+			vine_task_set_command(task,cmd);
 			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"coprocess %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
-			vine_task_specify_coprocess(task,cmd);
+			vine_task_set_coprocess(task,cmd);
 			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
-			vine_task_specify_input_file(task, localname, taskname, flags );
+			vine_task_add_input_file(task, localname, taskname, flags );
 		} else if(sscanf(line,"outfile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
-			vine_task_specify_output_file(task, localname, taskname, flags );
+			vine_task_add_output_file(task, localname, taskname, flags );
 		} else if(sscanf(line, "dir %s", filename)) {
-			vine_task_specify_empty_dir(task, filename );
+			vine_task_add_empty_dir(task, filename );
 		} else if(sscanf(line,"cores %" PRId64,&n)) {
-			vine_task_specify_cores(task, n);
+			vine_task_set_cores(task, n);
 		} else if(sscanf(line,"memory %" PRId64,&n)) {
-			vine_task_specify_memory(task, n);
+			vine_task_set_memory(task, n);
 		} else if(sscanf(line,"disk %" PRId64,&n)) {
-			vine_task_specify_disk(task, n);
+			vine_task_set_disk(task, n);
 		} else if(sscanf(line,"gpus %" PRId64,&n)) {
-			vine_task_specify_gpus(task, n);
+			vine_task_set_gpus(task, n);
 		} else if(sscanf(line,"wall_time %" PRIu64,&nt)) {
-			vine_task_specify_running_time_max(task, nt);
+			vine_task_set_running_time_max(task, nt);
 		} else if(sscanf(line,"end_time %" PRIu64,&nt)) {
-			vine_task_specify_end_time(task, nt * USECOND); //end_time needs it usecs
+			vine_task_set_end_time(task, nt * USECOND); //end_time needs it usecs
 		} else if(sscanf(line,"env %d",&length)==1) {
 			char *env = malloc(length+2); /* +2 for \n and \0 */
 			link_read(manager, env, length+1, stoptime);
@@ -706,7 +706,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			if(value) {
 				*value = 0;
 				value++;
-				vine_task_specify_env(task,env,value);
+				vine_task_set_env_var(task,env,value);
 			}
 			free(env);
 		} else {
@@ -859,7 +859,7 @@ static void finish_running_tasks(vine_result_t result)
 
 static int enforce_process_limits(struct vine_process *p)
 {
-	/* If the task did not specify disk usage, return right away. */
+	/* If the task did not set disk usage, return right away. */
 	if(p->disk < 1)
 		return 1;
 
@@ -916,7 +916,7 @@ static void enforce_processes_max_running_time()
 
 	itable_firstkey(procs_running);
 	while(itable_nextkey(procs_running, (uint64_t*) &pid, (void**) &p)) {
-		/* If the task did not specify wall_time, return right away. */
+		/* If the task did not set wall_time, return right away. */
 		if(p->task->resources_requested->wall_time < 1)
 			continue;
 

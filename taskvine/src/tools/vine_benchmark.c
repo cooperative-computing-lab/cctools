@@ -55,12 +55,12 @@ int submit_tasks(struct vine_manager *q, int input_size, int run_time, int outpu
 		ntasks++;
 
 		struct vine_task *t = vine_task_create(command);
-		vine_task_specify_input_file(t, input_file, "infile", VINE_CACHE);
-		vine_task_specify_output_file(t, output_file, "outfile", VINE_NOCACHE);
-		vine_task_specify_cores(t,1);
+		vine_task_add_input_file(t, input_file, "infile", VINE_CACHE);
+		vine_task_add_output_file(t, output_file, "outfile", VINE_NOCACHE);
+		vine_task_set_cores(t,1);
 
 		if(category && strlen(category) > 0)
-			vine_task_specify_category(t, category);
+			vine_task_set_category(t, category);
 
 		vine_submit(q, t);
 	}
@@ -193,14 +193,14 @@ int main(int argc, char *argv[])
 	}
 
 	if(project_name) {
-		vine_specify_name(q,project_name);
+		vine_set_name(q,project_name);
 	}
 
 	if(monitor_flag) {
 		unlink_recursive("vine_benchmark_monitor");
 		vine_enable_monitoring(q, "vine_benchmark_monitorr", 1);
-		vine_specify_category_mode(q, NULL, VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
-		vine_specify_transactions_log(q, "vine_benchmark_monitor/transactions.log");
+		vine_set_category_mode(q, NULL, VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
+		vine_enable_transactions_log(q, "vine_benchmark_monitor/transactions.log");
 	}
 
 

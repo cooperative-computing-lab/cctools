@@ -347,7 +347,7 @@ class FutureTask(taskvine.Task):
         self._exception = exception
         self._invoke_callbacks()
 
-    def specify_runtime_env(self, type, filename):
+    def set_runtime_env(self, type, filename):
         import _taskvine
         if type not in FutureTask.valid_runtime_envs:
             raise FutureTaskError("Runtime '{}' type is not one of {}".format(type, FutureTask.valid_runtime_envs))
@@ -356,12 +356,12 @@ class FutureTask(taskvine.Task):
 
         if type == 'conda':
             conda_env = 'conda_env.tar.gz'
-            self.specify_input_file(filename, conda_env, cache = True)
+            self.add_input_file(filename, conda_env, cache = True)
             command = 'mkdir -p conda_env && tar xf {} -C conda_env && source conda_env/bin/activate && {}'.format(conda_env, self.command)
             _taskvine.vine_task_command_line_set(self._task, command)
         elif type == 'singularity':
             sin_env = 'sin_env.img'
-            self.specify_input_file(filename, sin_env, cache = True)
+            self.add_input_file(filename, sin_env, cache = True)
             command = 'singularity exec -B $(pwd):/ds-sandbox --pwd /ds-sandbox {} -- {}'.format(sin_env, self.command)
             _taskvine.vine_task_command_line_set(self._task, command)
 

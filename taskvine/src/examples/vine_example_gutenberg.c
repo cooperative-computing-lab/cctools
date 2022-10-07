@@ -66,18 +66,18 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_specify_debug_log(m,"manager.log");
-	vine_specify_algorithm(m,VINE_SCHEDULE_FILES);
+	vine_enable_debug_log(m,"manager.log");
+	vine_set_algorithm(m,VINE_SCHEDULE_FILES);
 
 	for(i=0;i<url_count;i++) {
 		for(j=0;j<url_count;j++) {
 			struct vine_task *t = vine_task_create("./vine_example_gutenberg_script.sh filea.txt fileb.txt");
 
-			vine_task_specify_input_file(t, "vine_example_gutenberg_script.sh", "vine_example_gutenberg_script.sh", VINE_CACHE);
-			vine_task_specify_input_url(t, urls[i], "filea.txt", VINE_CACHE);
-			vine_task_specify_input_url(t, urls[j], "fileb.txt", VINE_CACHE);
+			vine_task_add_input_file(t, "vine_example_gutenberg_script.sh", "vine_example_gutenberg_script.sh", VINE_CACHE);
+			vine_task_add_input_url(t, urls[i], "filea.txt", VINE_CACHE);
+			vine_task_add_input_url(t, urls[j], "fileb.txt", VINE_CACHE);
 
-			vine_task_specify_cores(t,1);
+			vine_task_set_cores(t,1);
 
 			int taskid = vine_submit(m, t);
 
