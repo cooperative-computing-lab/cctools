@@ -2,7 +2,6 @@
 
 import sys, json
 import work_queue as wq
-exit(0)
 port_file = None
 try:
     port_file = sys.argv[1]
