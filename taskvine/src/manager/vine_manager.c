@@ -22,6 +22,7 @@ See the file COPYING for details.
 #include "vine_perf_log.h"
 
 #include "cctools.h"
+#include "envtools.h"
 #include "int_sizes.h"
 #include "link.h"
 #include "link_auth.h"
@@ -4876,5 +4877,6 @@ int vine_specify_min_taskid(struct vine_manager *q, int minid) {
 
 	return q->next_taskid;
 }
+
 
 /* vim: set noexpandtab tabstop=4: */

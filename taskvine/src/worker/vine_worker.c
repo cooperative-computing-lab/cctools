@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "vine_transfer_server.h"
 
 #include "cctools.h"
+#include "envtools.h"
 #include "macros.h"
 #include "catalog_query.h"
 #include "domain_name_cache.h"
@@ -1276,23 +1277,8 @@ static int workspace_create()
 	char absolute[VINE_LINE_MAX];
 
 	// Setup working space(dir)
-	const char *workdir;
-	const char *workdir_tmp;
-	if (user_specified_workdir) {
-		workdir = user_specified_workdir;
-	} else if((workdir_tmp = getenv("_CONDOR_SCRATCH_DIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TMPDIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TEMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else {
-		workdir = "/tmp";
-	}
-
 	if(!workspace) {
+		const char *workdir = system_tmp_dir(user_specified_workdir);
 		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
 
