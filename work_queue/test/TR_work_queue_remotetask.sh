@@ -36,7 +36,7 @@ run_wq_worker_coprocess()
 		exit 1
 	fi
 	echo "Running worker."
-	if ! "$WORK_QUEUE_WORKER" --single-shot --timeout=10s --coprocess ${coprocess} --coprocess_cores 2 --coprocess_disk 2000 --coprocess_memory 2000 --debug=all --debug-file="$log" $* localhost $(cat "$port_file"); then
+	if ! "$WORK_QUEUE_WORKER" --single-shot --timeout=10s --coprocess ${coprocess} --coprocess_cores 1 --coprocess_disk 1000 --coprocess_memory 1000 --debug=all --debug-file="$log" $* localhost $(cat "$port_file"); then
 		echo "ERROR: could not start worker"
 		exit 1
 	fi

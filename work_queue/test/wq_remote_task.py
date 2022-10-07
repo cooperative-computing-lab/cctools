@@ -34,9 +34,9 @@ for value in range(1,10):
     # simple addition of two arguments using thread execution and passing all arguments positionally 
     # should return value + value
     task = wq.RemoteTask("add", "my_coprocess")
-    task.specify_cores(1)
-    task.specify_disk(10)
-    task.specify_memory(10)
+    #task.specify_cores(1)
+    #task.specify_disk(10)
+    #task.specify_memory(10)
     task.specify_fn_args([value, value])
     task.specify_exec_method("thread")
     queue.submit(task)
@@ -44,9 +44,9 @@ for value in range(1,10):
     # multiplication of two arguments using fork as the execution method and passing arguments as a mix of positional arguments and dictionary arguments
     # should return value * value
     task = wq.RemoteTask("multiply", "my_coprocess")
-    task.specify_cores(1)
-    task.specify_disk(10)
-    task.specify_memory(10)
+    #task.specify_cores(1)
+    #task.specify_disk(10)
+    #task.specify_memory(10)
     task.specify_fn_args([value], {"y":value})
     task.specify_exec_method("fork")
     queue.submit(task)
@@ -54,27 +54,27 @@ for value in range(1,10):
     # testing of passing entirely keyword arguments using the direct execution method
     # should return 7 for every iteration (1 + 2 * 3)
     task = wq.RemoteTask("kwargs_test", "my_coprocess", x=1, y=2, z=3)
-    task.specify_cores(1)
-    task.specify_disk(10)
-    task.specify_memory(10)
+    #task.specify_cores(1)
+    #task.specify_disk(10)
+    #task.specify_memory(10)
     task.specify_exec_method("direct")
     queue.submit(task)
 
     # testing whether functions that do not recieve enough arguments properly create errors
     # should return with status code 500, saying that positional arguments are missing
     task = wq.RemoteTask("no_arguments_test", "my_coprocess")
-    task.specify_cores(1)
-    task.specify_disk(10)
-    task.specify_memory(10)
+    #task.specify_cores(1)
+    #task.specify_disk(10)
+    #task.specify_memory(10)
     task.specify_exec_method("thread")
     queue.submit(task)
 
     # testing whether functions that raise exceptions properly have their exceptions captured and returned in the result
     # should return with status code 500 and the result should be the exception thrown in the function
     task = wq.RemoteTask("exception_test", "my_coprocess")
-    task.specify_cores(1)
-    task.specify_disk(10)
-    task.specify_memory(10)
+    #task.specify_cores(1)
+    #task.specify_disk(10)
+    #task.specify_memory(10)
     task.specify_exec_method("thread")
     queue.submit(task)
 
