@@ -4776,17 +4776,17 @@ void vine_set_min_resources(struct vine_manager *q,  const struct rmsummary *rm)
 
 void vine_set_category_max_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
-	category_set_max_allocation(c, rm);
+	category_specify_max_allocation(c, rm);
 }
 
 void vine_set_category_min_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
-	category_set_min_allocation(c, rm);
+	category_specify_min_allocation(c, rm);
 }
 
 void vine_set_category_first_allocation_guess(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
-	category_set_first_allocation_guess(c, rm);
+	category_specify_first_allocation_guess(c, rm);
 }
 
 int vine_set_category_mode(struct vine_manager *q, const char *category, vine_category_mode_t mode) {
@@ -4808,7 +4808,7 @@ int vine_set_category_mode(struct vine_manager *q, const char *category, vine_ca
 	}
 	else {
 		struct category *c = vine_category_lookup_or_create(q, category);
-		category_set_allocation_mode(c, (category_mode_t) mode);
+		category_specify_allocation_mode(c, (category_mode_t) mode);
 		vine_txn_log_write_category(q, c);
 	}
 
@@ -4863,7 +4863,7 @@ struct category *vine_category_lookup_or_create(struct vine_manager *q, const ch
 
 	if(!c->vine_stats) {
 		c->vine_stats = calloc(1, sizeof(struct vine_stats));
-		category_set_allocation_mode(c, (category_mode_t) q->allocation_default_mode);
+		category_specify_allocation_mode(c, (category_mode_t) q->allocation_default_mode);
 	}
 
 	return c;
