@@ -706,6 +706,15 @@ Similar to @ref vine_wait, but guarantees that the returned task has the specifi
 */
 struct vine_task *vine_wait_for_tag(struct vine_manager *m, const char *tag, int timeout);
 
+/** Wait for a task with a given taskid to complete.
+Similar to @ref vine_wait, but guarantees that the returned task has the specified taskid.
+@param m A manager object
+@param taskid The desired taskid. If -1, then tasks are returned regardless of their taskid.
+@param timeout The number of seconds to wait for a completed task before returning. Use an integer time to set the timeout or the constant @ref VINE_WAITFORTASK to block until a task has completed.
+@returns A completed task description, or null if the manager is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
+*/
+struct vine_task *vine_wait_for_taskid(struct vine_manager *m, int taskid, int timeout);
+
 /** Determine whether the manager is 'hungry' for more tasks.
 While the manager can handle a very large number of tasks,
 it runs most efficiently when the number of tasks is slightly
