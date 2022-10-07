@@ -356,12 +356,12 @@ class FutureTask(taskvine.Task):
 
         if type == 'conda':
             conda_env = 'conda_env.tar.gz'
-            self.specify_input_file(filename, conda_env, cache = True)
+            self.add_input_file(filename, conda_env, cache = True)
             command = 'mkdir -p conda_env && tar xf {} -C conda_env && source conda_env/bin/activate && {}'.format(conda_env, self.command)
             _taskvine.vine_task_command_line_set(self._task, command)
         elif type == 'singularity':
             sin_env = 'sin_env.img'
-            self.specify_input_file(filename, sin_env, cache = True)
+            self.add_input_file(filename, sin_env, cache = True)
             command = 'singularity exec -B $(pwd):/ds-sandbox --pwd /ds-sandbox {} -- {}'.format(sin_env, self.command)
             _taskvine.vine_task_command_line_set(self._task, command)
 

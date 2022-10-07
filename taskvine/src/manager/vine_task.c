@@ -205,7 +205,7 @@ void vine_task_set_coprocess( struct vine_task *t, const char *coprocess )
 
 	if(coprocess) {
 		t->coprocess = string_format("vine_worker_coprocess:%s", coprocess);
-		vine_task_specify_feature(t, t->coprocess);
+		vine_task_add_feature(t, t->coprocess);
 	}
 }
 
@@ -358,7 +358,7 @@ void vine_task_set_category(struct vine_task *t, const char *category)
 	t->category = xxstrdup(category ? category : "default");
 }
 
-void vine_task_specify_feature(struct vine_task *t, const char *name)
+void vine_task_add_feature(struct vine_task *t, const char *name)
 {
 	if(!name) {
 		return;
@@ -429,31 +429,31 @@ static void vine_task_add_output( struct vine_task *t, struct vine_file *f )
 	list_push_tail(t->output_files, f);
 }
 
-void vine_task_specify_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
 {
 	struct vine_file *f = vine_file_create(local_name, remote_name, 0, 0, VINE_FILE, flags);
 	vine_task_add_input(t,f);
 }
 
-void vine_task_specify_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
 {
 	struct vine_file *f = vine_file_create(local_name, remote_name, 0, 0, VINE_FILE, flags);
 	vine_task_add_output(t,f);
 }
 
-void vine_task_specify_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_file_flags_t flags)
 {
 	struct vine_file *f = vine_file_create(file_url, remote_name, 0, 0, VINE_URL, flags);
 	vine_task_add_input(t,f);
 }
 
-void vine_task_specify_empty_dir( struct vine_task *t, const char *remote_name )
+void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
 {
 	struct vine_file *f = vine_file_create("unused", remote_name, 0, 0, VINE_EMPTY_DIR, 0);
 	vine_task_add_input(t,f);
 }
 
-void vine_task_specify_input_piece(struct vine_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, vine_file_flags_t flags)
+void vine_task_add_input_piece(struct vine_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, vine_file_flags_t flags)
 {
 	if(end_byte < start_byte) {
 		fatal("%s: end byte lower than start byte for %s.\n",__func__,remote_name);
@@ -467,19 +467,19 @@ void vine_task_specify_input_piece(struct vine_task *t, const char *local_name, 
 	vine_task_add_input(t,f);
 }
 
-void vine_task_specify_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags)
 {
 	struct vine_file *f = vine_file_create("unnamed", remote_name, data, length, VINE_BUFFER, flags);
 	vine_task_add_input(t,f);
 }
 
-void vine_task_specify_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags)
 {
 	struct vine_file *f = vine_file_create(buffer_name, remote_name, 0, 0, VINE_BUFFER, flags);
 	vine_task_add_output(t,f);
 }
 
-void vine_task_specify_input_command(struct vine_task *t, const char *cmd, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_input_command(struct vine_task *t, const char *cmd, const char *remote_name, vine_file_flags_t flags)
 {
 	if(strstr(cmd, "%%") == NULL) {
 		fatal("%s: command to transfer file does not contain %%%% specifier: %s", __func__, cmd);
@@ -496,7 +496,7 @@ void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapsh
 	free(t->monitor_snapshot_file);
 	t->monitor_snapshot_file = xxstrdup(monitor_snapshot_file);
 
-	vine_task_set_input_file(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, VINE_CACHE);
+	vine_task_add_input_file(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, VINE_CACHE);
 }
 
 void vine_task_set_algorithm(struct vine_task *t, vine_schedule_t algorithm)

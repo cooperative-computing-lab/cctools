@@ -65,9 +65,9 @@ int main(int argc, char *argv[])
 		sprintf(command, "./convert.sfx -swirl %d cat.jpg %d.cat.jpg", i, i);
 
 		t = vine_task_create(command);
-		vine_task_specify_input_file(t, "convert.sfx", "convert.sfx", VINE_CACHE);
-		vine_task_specify_input_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", VINE_CACHE );
-		vine_task_specify_output_file(t,outfile,outfile,VINE_NOCACHE);
+		vine_task_add_input_file(t, "convert.sfx", "convert.sfx", VINE_CACHE);
+		vine_task_add_input_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", VINE_CACHE );
+		vine_task_add_output_file(t,outfile,outfile,VINE_NOCACHE);
 
 		vine_task_set_cores(t,1);
 

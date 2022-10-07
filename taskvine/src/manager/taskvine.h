@@ -25,8 +25,8 @@ no special capabilities.
 From the application perspective, the programmer creates a manager with @ref vine_create,
 defines a number of tasks with @ref vine_task_create, submits the tasks to the manager
 with @ref vine_submit, and then monitors completion with @ref vine_wait.
-Tasks are further described by attaching data objects via @ref vine_task_specify_input_file,
-@ref vine_task_specify_input_url and related functions.
+Tasks are further described by attaching data objects via @ref vine_task_add_input_file,
+@ref vine_task_add_input_url and related functions.
 
 The taskvine framework provides a large number of fault tolerance, resource management,
 and performance monitoring features that enable the construction of applications that
@@ -228,8 +228,8 @@ struct vine_stats {
 //@{
 
 /** Create a new task object.
-Once created and elaborated with functions such as @ref vine_task_specify_input_file
-and @ref vine_task_specify_input_buffer, the task should be passed to @ref vine_submit.
+Once created and elaborated with functions such as @ref vine_task_add_input_file
+and @ref vine_task_add_input_buffer, the task should be passed to @ref vine_submit.
 @param full_command The shell command line or coprocess functions to be
 executed by the task.  If null, the command will be given later by @ref
 vine_task_set_command
@@ -272,7 +272,7 @@ void vine_task_set_coprocess( struct vine_task *t, const char *name );
 - @ref VINE_NOCACHE indicates that the file should not be cached.
 - @ref VINE_UNPACK indicates that @a local_name is an archive (.tar, .tgz, .zip) that will be automatically unpacked into directory @a remote_name .
 */
-void vine_task_specify_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags);
 
 /** Attach an output file or directory to a task.
 @param t A task object.
@@ -285,24 +285,24 @@ void vine_task_specify_input_file(struct vine_task *t, const char *local_name, c
 - @ref VINE_FAILURE_ONLY indicates the file should only be returned if the task fails.
 - @ref VINE_SUCCESS_ONLY indicates the file should only be returned if the task succeeds.
 */
-void vine_task_specify_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags);
 
 /** Add a url as an input for a task.
 @param t A task object.
 @param url The source URL to be accessed to provide the file.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_specify_input_file.
+@param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_add_input_file.
 */
-void vine_task_specify_input_url(struct vine_task *t, const char *url, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_input_url(struct vine_task *t, const char *url, const char *remote_name, vine_file_flags_t flags);
 
 /** Add a shell command to produce an input file for a task.
 @param t A task object.
 @param cmd The shell command to produce the file.   The command must contain a special symbol "%%" which indicates the destination of the file.
 For example, the command "grep frog /usr/dict/words > %%" would produce a file by searching for "frog" in the Unix dictionary.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_specify_input_file.
+@param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_add_input_file.
 */
-void vine_task_specify_input_command(struct vine_task *t, const char *cmd, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_input_command(struct vine_task *t, const char *cmd, const char *remote_name, vine_file_flags_t flags);
 
 /** Add a piece of a file to a task.
 @param t A task object.
@@ -310,38 +310,38 @@ void vine_task_specify_input_command(struct vine_task *t, const char *cmd, const
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 @param start_byte The starting byte offset of the file piece to be transferred.
 @param end_byte The ending byte offset of the file piece to be transferred.
-@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_specify_input_file.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
 */
-void vine_task_specify_input_piece(struct vine_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, vine_file_flags_t flags);
+void vine_task_add_input_piece(struct vine_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, vine_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
 @param data The data to be passed as an input file.
 @param length The length of the buffer, in bytes
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_specify_input_file.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
 */
 
-void vine_task_specify_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags);
 
 /** Add an output buffer to a task.
 @param t A task object.
 @param data The logical name of the buffer, to be used with @ref vine_task_get_output_buffer.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_specify_output_file.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_output_file.
 */
-void vine_task_specify_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags);
 
 /** Add an empty directory to a task.
 This is very occasionally needed for applications that expect
 certain directories to exist in the working directory, prior to producing output.
 This function does not transfer any data to the task, but just creates
 a directory in its working sandbox.  If you want to transfer an
-entire directory worth of data to a task, use @ref vine_task_specify_input_file and simply give a directory name.
+entire directory worth of data to a task, use @ref vine_task_add_input_file and simply give a directory name.
 @param t A task object.
 @param remote_name The name of the empty directory in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 */
-void vine_task_specify_empty_dir( struct vine_task *t, const char *remote_name );
+void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name );
 
 /** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result VINE_RESULT_MAX_RETRIES.
 @param t A task object.
@@ -440,7 +440,7 @@ void vine_task_set_category(struct vine_task *t, const char *category);
 @param t A task object.
 @param name The name of the feature.
 */
-void vine_task_set_feature(struct vine_task *t, const char *name);
+void vine_task_add_feature(struct vine_task *t, const char *name);
 
 /** Specify the priority of this task relative to others in the queue.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list, regardless of the priority.
@@ -533,7 +533,7 @@ const char * vine_task_get_output( struct vine_task *t );
 
 /** Get an output buffer of the task.
 @param t A task object.
-@param buffer_name The name of the output buffer, given by @ref vine_task_specify_output_buffer
+@param buffer_name The name of the output buffer, given by @ref vine_task_add_output_buffer
 @return A pointer to the contents of the buffer.  The buffer is null-terminated, and so can
 be used directly as a string, if it is expected to contain text.  If the buffer is expected
 to contain binary data, use @ref vine_task_get_output_buffer_length to determine the length.
@@ -545,7 +545,7 @@ const char * vine_task_get_output_buffer( struct vine_task *t, const char *buffe
 
 /** Get the length of an output buffer.
 @param t A task object.
-@param buffer_name The name of the output buffer, given by @ref vine_task_specify_output_buffer
+@param buffer_name The name of the output buffer, given by @ref vine_task_add_output_buffer
 @return The length of the buffer in bytes, or zero if the buffer is not available.
 */
 

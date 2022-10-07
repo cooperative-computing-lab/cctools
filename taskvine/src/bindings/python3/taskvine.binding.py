@@ -158,8 +158,8 @@ class Task(object):
     #
     # @param self       Reference to the current task object.
     # @param name       The name of the feature.
-    def specify_feature(self, name):
-        return vine_task_set_feature(self._task, name)
+    def add_feature(self, name):
+        return vine_task_add_feature(self._task, name)
 
     ##
     # Indicate that the task would be optimally run on a given host.
@@ -185,10 +185,10 @@ class Task(object):
     # For example:
     # @code
     # # The following are equivalent
-    # >>> task.specify_input_file("/etc/hosts", cache = True)
-    # >>> task.specify_input_file("/etc/hosts", "hosts", cache = True)
+    # >>> task.add_input_file("/etc/hosts", cache = True)
+    # >>> task.add_input_file("/etc/hosts", "hosts", cache = True)
     # @endcode
-    def specify_input_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
+    def add_input_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
 
         # swig expects strings:
         if local_name:
@@ -200,9 +200,9 @@ class Task(object):
             remote_name = os.path.basename(local_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return vine_task_specify_input_file(self._task, local_name, remote_name, flags)
+        return vine_task_add_input_file(self._task, local_name, remote_name, flags)
 
-    def specify_output_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
+    def add_output_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
         if local_name:
             local_name = str(local_name)
 
@@ -212,7 +212,7 @@ class Task(object):
             remote_name = os.path.basename(local_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return vine_task_specify_output_file(self._task, local_name, remote_name, flags)
+        return vine_task_add_output_file(self._task, local_name, remote_name, flags)
 
     ## Add an input url to a task.
     #
@@ -227,10 +227,10 @@ class Task(object):
     #
     # For example:
     # @code
-    # >>> task.specify_input_url("http://www.google.com/","google.txt",flags=VINE_CACHE);
+    # >>> task.add_input_url("http://www.google.com/","google.txt",flags=VINE_CACHE);
     # @endcode
 
-    def specify_input_url(self, url, remote_name, flags=None, cache=None, failure_only=None):
+    def add_input_url(self, url, remote_name, flags=None, cache=None, failure_only=None):
 
         # swig expects strings
         if remote_name:
@@ -240,7 +240,7 @@ class Task(object):
             url = str(url)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return vine_task_specify_input_url(self._task, url, remote_name, flags)
+        return vine_task_add_input_url(self._task, url, remote_name, flags)
 
 
     ##
@@ -260,14 +260,14 @@ class Task(object):
     #
     # For example:
     # @code
-    # >>> task.specify_input_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",flags=VINE_CACHE);
+    # >>> task.add_input_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",flags=VINE_CACHE);
     # @endcode
 
-    def specify_input_command(self, cmd, remote_name, flags=None, cache=None, failure_only=None):
+    def add_input_command(self, cmd, remote_name, flags=None, cache=None, failure_only=None):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return vine_task_specify_input_command(self._task, cmd, remote_name, flags)
+        return vine_task_add_input_command(self._task, cmd, remote_name, flags)
 
     ##
     # Add a file piece to the task.
@@ -284,7 +284,7 @@ class Task(object):
     #                       - @ref VINE_FAILURE_ONLY
     # @param cache         Whether the file should be cached at workers (True/False)
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
-    def specify_input_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, flags=None, cache=None, failure_only=None):
+    def add_input_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, flags=None, cache=None, failure_only=None):
 
         if local_name:
             local_name = str(local_name)
@@ -295,17 +295,17 @@ class Task(object):
             remote_name = os.path.basename(local_name)
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return vine_task_specify_input_piece(self._task, local_name, remote_name, start_byte, end_byte, flags)
+        return vine_task_add_input_piece(self._task, local_name, remote_name, start_byte, end_byte, flags)
 
     ##
     # Add an empty directory to the task.
     # @param self           Reference to the current task object.
     # @param remote_name    The name of the directory at the remote execution site.
-    def specify_empty_dir(self, remote_name=None ):
+    def add_empty_dir(self, remote_name=None ):
         if remote_name:
             remote_name = str(remote_name)
 
-        return vine_task_specify_empty_dir(task,remote_name);
+        return vine_task_add_empty_dir(task,remote_name);
 
     ##
     # Add an input buffer to the task.
@@ -315,11 +315,11 @@ class Task(object):
     # @param remote_name    The name of the remote file to create.
     # @param flags          May take the same values as @ref specify_file.
     # @param cache          Whether the file should be cached at workers (True/False)
-    def specify_input_buffer(self, buffer, remote_name, flags=None, cache=None):
+    def add_input_buffer(self, buffer, remote_name, flags=None, cache=None):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, None)
-        return vine_task_specify_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
+        return vine_task_add_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
     # Add an output buffer to the task.
@@ -329,13 +329,13 @@ class Task(object):
     # @param remote_name    The name of the remote file to fetch.
     # @param flags          May take the same values as @ref specify_file.
     # @param cache          Whether the file should be cached at workers (True/False)
-    def specify_output_buffer(self, buffer_name, remote_name, flags=None, cache=None):
+    def add_output_buffer(self, buffer_name, remote_name, flags=None, cache=None):
         if buffer_name:
             buffer_name = str(buffer_name)
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, None)
-        return vine_task_specify_output_buffer(self._task, buffer_name, remote_name, flags)
+        return vine_task_add_output_buffer(self._task, buffer_name, remote_name, flags)
 
 
     ##
@@ -807,8 +807,8 @@ class PythonTask(Task):
             self._command = self._python_function_command()
             vine_task_set_command(self._task, self._command)
 
-            self.specify_input_file(self._env_file, cache=True)
-            self.specify_input_file(self._pp_run, cache=True)
+            self.add_input_file(self._env_file, cache=True)
+            self.add_input_file(self._pp_run, cache=True)
 
     def __del__(self):
         try:
@@ -850,10 +850,10 @@ class PythonTask(Task):
 
 
     def _specify_IO_files(self):
-        self.specify_input_file(self._wrapper, cache=True)
-        self.specify_input_file(self._func_file, cache=False)
-        self.specify_input_file(self._args_file, cache=False)
-        self.specify_output_file(self._out_file, cache=False)
+        self.add_input_file(self._wrapper, cache=True)
+        self.add_input_file(self._func_file, cache=False)
+        self.add_input_file(self._args_file, cache=False)
+        self.add_output_file(self._out_file, cache=False)
 
 
     ##

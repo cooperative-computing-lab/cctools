@@ -679,13 +679,13 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
-			vine_task_specify_input_file(task, localname, taskname, flags );
+			vine_task_add_input_file(task, localname, taskname, flags );
 		} else if(sscanf(line,"outfile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
-			vine_task_specify_output_file(task, localname, taskname, flags );
+			vine_task_add_output_file(task, localname, taskname, flags );
 		} else if(sscanf(line, "dir %s", filename)) {
-			vine_task_specify_empty_dir(task, filename );
+			vine_task_add_empty_dir(task, filename );
 		} else if(sscanf(line,"cores %" PRId64,&n)) {
 			vine_task_set_cores(task, n);
 		} else if(sscanf(line,"memory %" PRId64,&n)) {

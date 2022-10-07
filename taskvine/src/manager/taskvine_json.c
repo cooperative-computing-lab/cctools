@@ -144,9 +144,9 @@ static int specify_files(int input, struct jx *files, struct vine_task *task)
 		}
 
 		if(input) {
-			vine_task_specify_input_file(task, local, remote, flags);
+			vine_task_add_input_file(task, local, remote, flags);
 		} else {
-			vine_task_specify_output_file(task, local, remote, flags);
+			vine_task_add_output_file(task, local, remote, flags);
 		}
 
 		arr = jx_iterate_array(files, &i);

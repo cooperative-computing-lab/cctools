@@ -39,13 +39,13 @@ tasks_with_errors.append(t)
 
 # missing input file
 t = FutureTask('/bin/date')
-t.specify_input_file('some-filename-that-does-not-exists')
+t.add_input_file('some-filename-that-does-not-exists')
 q.submit(t)
 tasks_with_errors.append(t)
 
 # missing output file
 t = FutureTask('/bin/date')
-t.specify_output_file('some-filename-that-was-not-generated')
+t.add_output_file('some-filename-that-was-not-generated')
 q.submit(t)
 tasks_with_errors.append(t)
 

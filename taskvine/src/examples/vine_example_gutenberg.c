@@ -73,9 +73,9 @@ int main(int argc, char *argv[])
 		for(j=0;j<url_count;j++) {
 			struct vine_task *t = vine_task_create("./vine_example_gutenberg_script.sh filea.txt fileb.txt");
 
-			vine_task_specify_input_file(t, "vine_example_gutenberg_script.sh", "vine_example_gutenberg_script.sh", VINE_CACHE);
-			vine_task_specify_input_url(t, urls[i], "filea.txt", VINE_CACHE);
-			vine_task_specify_input_url(t, urls[j], "fileb.txt", VINE_CACHE);
+			vine_task_add_input_file(t, "vine_example_gutenberg_script.sh", "vine_example_gutenberg_script.sh", VINE_CACHE);
+			vine_task_add_input_url(t, urls[i], "filea.txt", VINE_CACHE);
+			vine_task_add_input_url(t, urls[j], "fileb.txt", VINE_CACHE);
 
 			vine_task_set_cores(t,1);
 
