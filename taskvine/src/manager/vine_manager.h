@@ -30,7 +30,7 @@ typedef enum {
 } vine_result_code_t;
 
 /*
-The result of vine_manager_recv{_retry}, indicating whether an
+The result of vine_manager_recv{_no_retry}, indicating whether an
 incoming message was processed, and the expected next state of the connection.
 */
 
@@ -114,7 +114,7 @@ struct vine_manager {
 
 	/* Accumulation of statistics for reporting to the caller. */
 
-	struct vine_stats *stats;		 
+	struct vine_stats *stats;
 	struct vine_stats *stats_measure;
 	struct vine_stats *stats_disconnected_workers;
 
@@ -176,7 +176,7 @@ __attribute__ (( format(printf,3,4) ))
 int vine_manager_send( struct vine_manager *q, struct vine_worker_info *w, const char *fmt, ... );
 
 /* Receive a line-oriented message from a remote worker. */
-vine_msg_code_t vine_manager_recv_retry( struct vine_manager *q, struct vine_worker_info *w, char *line, int length );
+vine_msg_code_t vine_manager_recv( struct vine_manager *q, struct vine_worker_info *w, char *line, int length );
 
 /* Compute the expected wait time for a transfer of length bytes. */
 int vine_manager_transfer_wait_time( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length );

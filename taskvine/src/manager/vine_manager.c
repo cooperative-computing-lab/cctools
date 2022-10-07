@@ -381,7 +381,7 @@ This function receives a message from worker and records the time a message is s
 received. This timestamp is used in keepalive timeout computations.
 */
 
-static vine_msg_code_t vine_manager_recv(struct vine_manager *q, struct vine_worker_info *w, char *line, size_t length )
+static vine_msg_code_t vine_manager_recv_no_retry(struct vine_manager *q, struct vine_worker_info *w, char *line, size_t length )
 {
 	time_t stoptime;
 	stoptime = time(0) + q->short_timeout;
@@ -436,16 +436,16 @@ static vine_msg_code_t vine_manager_recv(struct vine_manager *q, struct vine_wor
 }
 
 /*
-Call vine_manager_recv and silently retry if the result indicates
+Call vine_manager_recv_no_retry and silently retry if the result indicates
 an asynchronous update message like 'keepalive' or 'resource'.
 */
 
-vine_msg_code_t vine_manager_recv_retry( struct vine_manager *q, struct vine_worker_info *w, char *line, int length )
+vine_msg_code_t vine_manager_recv( struct vine_manager *q, struct vine_worker_info *w, char *line, int length )
 {
 	vine_msg_code_t result = VINE_MSG_PROCESSED;
 
 	do {
-		result = vine_manager_recv(q, w,line,length);
+		result = vine_manager_recv_no_retry(q, w,line,length);
 	} while(result == VINE_MSG_PROCESSED);
 
 	return result;
@@ -1517,7 +1517,7 @@ static vine_result_code_t get_available_results(struct vine_manager *q, struct v
 
 	while(1) {
 		vine_msg_code_t mcode;
-		mcode = vine_manager_recv_retry(q, w, line, sizeof(line));
+		mcode = vine_manager_recv(q, w, line, sizeof(line));
 		if(mcode!=VINE_MSG_NOT_PROCESSED) {
 			result = VINE_WORKER_FAILURE;
 			break;
@@ -2214,7 +2214,7 @@ static vine_result_code_t handle_worker(struct vine_manager *q, struct link *l)
 	free(key);
 
 	vine_msg_code_t mcode;
-	mcode = vine_manager_recv(q, w, line, sizeof(line));
+	mcode = vine_manager_recv_no_retry(q, w, line, sizeof(line));
 
 	// We only expect asynchronous status queries and updates here.
 

@@ -40,7 +40,7 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 
 	vine_result_code_t r = VINE_WORKER_FAILURE;
 
-	vine_msg_code_t mcode = vine_manager_recv_retry(q, w, line, sizeof(line));
+	vine_msg_code_t mcode = vine_manager_recv(q, w, line, sizeof(line));
 	if(mcode!=VINE_MSG_NOT_PROCESSED) return VINE_WORKER_FAILURE;
 
 	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
@@ -202,7 +202,7 @@ static vine_result_code_t vine_manager_get_any( struct vine_manager *q, struct v
 
 	vine_result_code_t r = VINE_WORKER_FAILURE;
 
-	vine_msg_code_t mcode = vine_manager_recv_retry(q, w, line, sizeof(line));
+	vine_msg_code_t mcode = vine_manager_recv(q, w, line, sizeof(line));
 	if(mcode!=VINE_MSG_NOT_PROCESSED) return VINE_WORKER_FAILURE;
 
 	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
