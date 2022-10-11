@@ -51,7 +51,7 @@ static int vine_manager_put_symlink( struct vine_manager *q, struct vine_worker_
 /*
 Send a single file (or a piece of a file) to the remote worker.
 The transfer time is controlled by the size of the file.
-If the transfer takes too long, then abort.
+If the transfer takes too long, then cancel it.
 */
 
 static int vine_manager_put_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, struct stat info, int64_t *total_bytes )

@@ -141,12 +141,12 @@ struct vine_stats {
 
 	/* Cumulative stats for workers: */
 	int workers_joined;       /**< Total number of worker connections that were established to the manager. */
-	int workers_removed;      /**< Total number of worker connections that were released by the manager, idled-out, fast-aborted, or lost. */
+	int workers_removed;      /**< Total number of worker connections that were terminated. */
 	int workers_released;     /**< Total number of worker connections that were asked by the manager to disconnect. */
 	int workers_idled_out;    /**< Total number of worker that disconnected for being idle. */
-	int workers_fast_aborted; /**< Total number of worker connections terminated for being too slow. (see @ref vine_activate_fast_abort) */
-	int workers_blocked ;     /**< Total number of workers blocked by the manager. (Includes workers_fast_aborted.) */
-	int workers_lost;         /**< Total number of worker connections that were unexpectedly lost. (does not include idled-out or fast-aborted) */
+	int workers_slow;         /**< Total number of workers disconnected for being too slow. (see @ref vine_enable_disconnect_slow_workers) */
+	int workers_blocked ;     /**< Total number of workers blocked by the manager. (Includes workers_slow.) */
+	int workers_lost;         /**< Total number of worker connections that were unexpectedly lost. (does not include workers_idle_out or workers_slow) */
 
 	/* Stats for the current state of tasks: */
 	int tasks_waiting;        /**< Number of tasks waiting to be dispatched. */
@@ -430,7 +430,7 @@ in identifying tasks when they complete.
 void vine_task_set_tag(struct vine_task *t, const char *tag);
 
 /** Label the task with the given category. It is expected that tasks with the same category
-have similar resources requirements (e.g. for fast abort).
+have similar resources requirements (e.g. to disconnect slow workers).
 @param t A task object.
 @param category The name of the category to use.
 */
@@ -881,28 +881,28 @@ void vine_set_bandwidth_limit(struct vine_manager *m, const char *bandwidth);
 */
 double vine_get_effective_bandwidth(struct vine_manager *m);
 
-/** Turn on or off fast abort functionality for a given manager for tasks without
-an explicit category. Given the multiplier, abort a task which running time is
-larger than the average times the multiplier.  Fast-abort is computed per task
+/** Enable disconnect slow workers functionality for a given manager for tasks without
+an explicit category. Given the multiplier, disconnect a worker when it is executing a task
+with a running time is
+larger than the average times the multiplier.  The average is s computed per task
 category. The value specified here applies to all the categories for which @ref
-vine_activate_fast_abort_category was not explicitely called.
+vine_enable_disconnect_slow_workers_category was not explicitely called.
 @param m A manager object
-@param multiplier The multiplier of the average task time at which point to abort; if less than zero, fast_abort is deactivated (the default).
+@param multiplier The multiplier of the average task time at which point to disconnect; Disabled if less than 1.
 @returns 0 if activated, 1 if deactivated.
 */
-int vine_activate_fast_abort(struct vine_manager *m, double multiplier);
+int vine_enable_disconnect_slow_workers(struct vine_manager *m, double multiplier);
 
 
-/** Turn on or off fast abort functionality for a given category. Given the
-multiplier, abort a task which running time is larger than the average times the
-multiplier.  The value specified here applies only to tasks in the given category.
-(Note: vine_activate_fast_abort_category(q, "default", n) is the same as vine_activate_fast_abort(q, n).)
+/** Enable disconnect slow workers functionality for a given category. As @ref vine_enable_disconnect_slow_workers, but for a single
+task category.
+(Note: vine_enable_disconnect_slow_workers_category(q, "default", n) is the same as vine_enable_disconnect_slow_workers(q, n).)
 @param m A manager object
 @param category A category name.
-@param multiplier The multiplier of the average task time at which point to abort; if zero, fast_abort is deactivated. If less than zero (default), use the fast abort of the "default" category.
+@param multiplier The multiplier of the average task time at which point to disconnect; If less than one (default), use the multiplier of the "default" category.
 @returns 0 if activated, 1 if deactivated.
 */
-int vine_activate_fast_abort_category(struct vine_manager *m, const char *category, double multiplier);
+int vine_enable_disconnect_slow_workers_category(struct vine_manager *m, const char *category, double multiplier);
 
 
 /** Set the draining mode per worker hostname.
@@ -1054,9 +1054,9 @@ void vine_manager_preferred_connection(struct vine_manager *m, const char *prefe
 @param name The name of the parameter to tune
  - "resource-submit-multiplier" Treat each worker as having ({cores,memory,gpus} * multiplier) when submitting tasks. This allows for tasks to wait at a worker rather than the manager. (default = 1.0)
  - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
- - "transfer-outlier-factor" Transfer that are this many times slower than the average will be aborted.  (default=10x)
+ - "transfer-outlier-factor" Transfer that are this many times slower than the average will be terminated.  (default=10x)
  - "default-transfer-rate" The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
- - "fast-abort-multiplier" Set the multiplier of the average task time at which point to abort; if negative or zero fast_abort is deactivated. (default=0)
+ - "disconnect-slow-workers-factor" Set the multiplier of the average task time at which point to disconnect; deactivated if less than 1. (default=0)
  - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
  - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
  - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)

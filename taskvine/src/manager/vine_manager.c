@@ -744,7 +744,7 @@ static void record_removed_worker_stats(struct vine_manager *q, struct vine_work
 	accumulate_stat(qs, ws, workers_removed);
 	accumulate_stat(qs, ws, workers_released);
 	accumulate_stat(qs, ws, workers_idled_out);
-	accumulate_stat(qs, ws, workers_fast_aborted);
+	accumulate_stat(qs, ws, workers_slow);
 	accumulate_stat(qs, ws, workers_blocked);
 	accumulate_stat(qs, ws, workers_lost);
 
@@ -1077,10 +1077,10 @@ static void fetch_output_from_worker(struct vine_manager *q, struct vine_worker_
 	w->finished_tasks--;
 	w->total_tasks_complete++;
 
-	// At least one task has finished without triggering fast abort, thus we
+	// At least one task has finished without triggering a slow worker disconnect, thus we
 	// now have evidence that worker is not slow (e.g., it was probably the
 	// previous task that was slow).
-	w->fast_abort_alarm = 0;
+	w->alarm_slow_worker = 0;
 
 	if(t->result == VINE_RESULT_RESOURCE_EXHAUSTION) {
 		if(t->resources_measured && t->resources_measured->limits_exceeded) {
@@ -1836,7 +1836,7 @@ static struct jx * queue_to_jx( struct vine_manager *q )
 	jx_insert_integer(j,"workers_removed",info.workers_removed);
 	jx_insert_integer(j,"workers_released",info.workers_released);
 	jx_insert_integer(j,"workers_idled_out",info.workers_idled_out);
-	jx_insert_integer(j,"workers_fast_aborted",info.workers_fast_aborted);
+	jx_insert_integer(j,"workers_slow",info.workers_slow);
 	jx_insert_integer(j,"workers_lost",info.workers_lost);
 
 	//workers_blocked adds host names, not a count
@@ -2788,12 +2788,12 @@ static void ask_for_workers_updates(struct vine_manager *q) {
 }
 
 /*
-If fast-abort is enabled, then look for workers that
+If disconnect slow workers is enabled, then look for workers that
 have taken too long to execute a task, and disconnect
 them, under the assumption that they are halted or faulty.
 */
 
-static int abort_slow_workers(struct vine_manager *q)
+static int disconnect_slow_workers(struct vine_manager *q)
 {
 	struct category *c;
 	char *category_name;
@@ -2804,8 +2804,8 @@ static int abort_slow_workers(struct vine_manager *q)
 
 	int removed = 0;
 
-	/* optimization. If no category has a fast abort multiplier, simply return. */
-	int fast_abort_flag = 0;
+	/* optimization. If no category has a multiplier, simply return. */
+	int disconnect_slow_flag = 0;
 
 	HASH_TABLE_ITERATE(q->categories,category_name,c) {
 
@@ -2823,10 +2823,10 @@ static int abort_slow_workers(struct vine_manager *q)
 		c->average_task_time = (stats->time_workers_execute_good + stats->time_send_good + stats->time_receive_good) / stats->tasks_done;
 
 		if(c->fast_abort > 0)
-			fast_abort_flag = 1;
+			disconnect_slow_flag = 1;
 	}
 
-	if(!fast_abort_flag)
+	if(!disconnect_slow_flag)
 		return 0;
 
 	struct category *c_def = vine_category_lookup_or_create(q, "default");
@@ -2836,7 +2836,7 @@ static int abort_slow_workers(struct vine_manager *q)
 	ITABLE_ITERATE(q->tasks,taskid,t) {
 
 		c = vine_category_lookup_or_create(q, t->category);
-		/* Fast abort deactivated for this category */
+		/* disconnect slow workers is not enabled for this category */
 		if(c->fast_abort == 0)
 			continue;
 
@@ -2852,41 +2852,41 @@ static int abort_slow_workers(struct vine_manager *q)
 			multiplier = c->fast_abort;
 		}
 		else if(c_def->fast_abort > 0) {
-			/* This category uses the default fast abort. (< 0 use default, 0 deactivate). */
+			/* This category uses the default multiplier. (< 0 use default, 0 deactivate). */
 			multiplier = c_def->fast_abort;
 		}
 		else {
-			/* Fast abort also deactivated for the default category. */
+			/* deactivated for the default category. */
 			continue;
 		}
 
-		if(runtime >= (average_task_time * (multiplier + t->fast_abort_count))) {
+		if(runtime >= (average_task_time * (multiplier + t->workers_slow))) {
 			w = t->worker;
 			if(w && (w->type == VINE_WORKER_TYPE_WORKER))
 			{
 				debug(D_VINE, "Task %d is taking too long. Removing from worker.", t->taskid);
 				cancel_task_on_worker(q, t, VINE_TASK_READY);
-				t->fast_abort_count++;
+				t->workers_slow++;
 
 				/* a task cannot mark two different workers as suspect */
-				if(t->fast_abort_count > 1) {
+				if(t->workers_slow > 1) {
 					continue;
 				}
 
-				if(w->fast_abort_alarm > 0) {
-					/* this is the second task in a row that triggered fast
-					 * abort, therefore we have evidence that this a slow
-					 * worker (rather than a task) */
+				if(w->alarm_slow_worker > 0) {
+					/* this is the second task in a row that triggered a disconnection
+					 * as a slow worker, therefore we have evidence that this
+					 * indeed a slow worker (rather than a task) */
 
 					debug(D_VINE, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
 					vine_block_host_with_timeout(q, w->hostname, vine_option_blocklist_slow_workers_timeout);
 					remove_worker(q, w, VINE_WORKER_DISCONNECT_FAST_ABORT);
 
-					q->stats->workers_fast_aborted++;
+					q->stats->workers_slow++;
 					removed++;
 				}
 
-				w->fast_abort_alarm = 1;
+				w->alarm_slow_worker = 1;
 			}
 		}
 	}
@@ -2907,7 +2907,7 @@ static int shut_down_worker(struct vine_manager *q, struct vine_worker_info *w)
 	return 1;
 }
 
-static int abort_drained_workers(struct vine_manager *q) {
+static int shutdown_drained_workers(struct vine_manager *q) {
 	char *worker_hashkey = NULL;
 	struct vine_worker_info *w = NULL;
 
@@ -2952,12 +2952,12 @@ static int cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, vi
 	if (w) {
 		//send message to worker asking to kill its task.
 		vine_manager_send(q,w, "kill %d\n",t->taskid);
-		debug(D_VINE, "Task with id %d is aborted at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
+		debug(D_VINE, "Task with id %d has been cancelled at worker %s (%s) and removed.", t->taskid, w->hostname, w->addrport);
 
 		//Delete any input files that are not to be cached.
 		delete_worker_files(q, w, t->input_files, VINE_CACHE );
 
-		//Delete all output files since they are not needed as the task was aborted.
+		//Delete all output files since they are not needed as the task was cancelled.
 		delete_worker_files(q, w, t->output_files, 0);
 
 		//update tables.
@@ -3134,9 +3134,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->allocation_default_mode = VINE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
-	// The value -1 indicates that fast abort is inactive by default
-	// fast abort depends on categories, thus set after them.
-	vine_activate_fast_abort(q, -1);
+	// The value -1 indicates that disconnecting slow workers is inactive by
+	// default
+	vine_enable_disconnect_slow_workers(q, -1);
 
 	q->password = 0;
 
@@ -3233,28 +3233,28 @@ int vine_enable_monitoring_full(struct vine_manager *q, char *monitor_output_dir
 	return status;
 }
 
-int vine_activate_fast_abort_category(struct vine_manager *q, const char *category, double multiplier)
+int vine_enable_disconnect_slow_workers_category(struct vine_manager *q, const char *category, double multiplier)
 {
 	struct category *c = vine_category_lookup_or_create(q, category);
 
 	if(multiplier >= 1) {
-		debug(D_VINE, "Enabling fast abort multiplier for '%s': %3.3lf\n", category, multiplier);
+		debug(D_VINE, "Enabling disconnect slow workers for '%s': %3.3lf\n", category, multiplier);
 		c->fast_abort = multiplier;
 		return 0;
 	} else if(multiplier == 0) {
-		debug(D_VINE, "Disabling fast abort multiplier for '%s'.\n", category);
+		debug(D_VINE, "Disabling disconnect slow workers for '%s'.\n", category);
 		c->fast_abort = 0;
 		return 1;
 	} else {
-		debug(D_VINE, "Using default fast abort multiplier for '%s'.\n", category);
+		debug(D_VINE, "Using default disconnect slow workers factor for '%s'.\n", category);
 		c->fast_abort = -1;
 		return 0;
 	}
 }
 
-int vine_activate_fast_abort(struct vine_manager *q, double multiplier)
+int vine_enable_disconnect_slow_workers(struct vine_manager *q, double multiplier)
 {
-	return vine_activate_fast_abort_category(q, "default", multiplier);
+	return vine_enable_disconnect_slow_workers_category(q, "default", multiplier);
 }
 
 int vine_port(struct vine_manager *q)
@@ -3974,7 +3974,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
    - tasks waiting to be retrieved?          Yes: retrieve one task and go to S.
    - tasks waiting to be dispatched?         Yes: dispatch one task and go to S.
    - send keepalives to appropriate workers
-   - fast-abort workers
+   - disconnect slow workers
+   - drain workers from factories
    - if new workers, connect n of them
    - expired tasks?                          Yes: mark expired tasks as retrieved and go to S.
    - queue empty?                            Yes: return null
@@ -4105,8 +4106,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// Kill off slow/drained workers.
 		BEGIN_ACCUM_TIME(q, time_internal);
-		result  = abort_slow_workers(q);
-		result += abort_drained_workers(q);
+		result  = disconnect_slow_workers(q);
+		result += shutdown_drained_workers(q);
 		vine_blocklist_unblock_all_by_time(q, time(0));
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
@@ -4354,7 +4355,7 @@ struct list * vine_cancel_all_tasks(struct vine_manager *q)
 			//Delete any input files that are not to be cached.
 			delete_worker_files(q, w, t->input_files, VINE_CACHE );
 
-			//Delete all output files since they are not needed as the task was aborted.
+			//Delete all output files since they are not needed as the task was canceled.
 			delete_worker_files(q, w, t->output_files, 0);
 			reap_task_from_worker(q, w, t, VINE_TASK_CANCELED);
 
@@ -4432,8 +4433,8 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "transfer-outlier-factor")) {
 		q->transfer_outlier_factor = value;
 
-	} else if(!strcmp(name, "fast-abort-multiplier")) {
-		vine_activate_fast_abort(q, value);
+	} else if(!strcmp(name, "disconnect-slow-worker-factor")) {
+		vine_enable_disconnect_slow_workers(q, value);
 
 	} else if(!strcmp(name, "keepalive-interval")) {
 		q->keepalive_interval = MAX(0, (int)value);
@@ -4577,11 +4578,11 @@ void vine_get_stats_hierarchy(struct vine_manager *q, struct vine_stats *s)
 	/* Account also for workers connected directly to the manager. */
 	s->workers_connected = s->workers_joined - s->workers_removed;
 
-	s->workers_joined       += q->stats_disconnected_workers->workers_joined;
-	s->workers_removed      += q->stats_disconnected_workers->workers_removed;
-	s->workers_idled_out    += q->stats_disconnected_workers->workers_idled_out;
-	s->workers_fast_aborted += q->stats_disconnected_workers->workers_fast_aborted;
-	s->workers_lost         += q->stats_disconnected_workers->workers_lost;
+	s->workers_joined    += q->stats_disconnected_workers->workers_joined;
+	s->workers_removed   += q->stats_disconnected_workers->workers_removed;
+	s->workers_idled_out += q->stats_disconnected_workers->workers_idled_out;
+	s->workers_slow      += q->stats_disconnected_workers->workers_slow;
+	s->workers_lost      += q->stats_disconnected_workers->workers_lost;
 
 	s->time_send         += q->stats_disconnected_workers->time_send;
 	s->time_receive      += q->stats_disconnected_workers->time_receive;

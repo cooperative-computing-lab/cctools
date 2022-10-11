@@ -88,7 +88,7 @@ void vine_task_clean( struct vine_task *t, int full_clean )
 		t->resource_request = CATEGORY_ALLOCATION_FIRST;
 		t->try_count = 0;
 		t->exhausted_attempts = 0;
-		t->fast_abort_count = 0;
+		t->workers_slow = 0;
 
 		t->time_workers_execute_all = 0;
 		t->time_workers_execute_exhaustion = 0;

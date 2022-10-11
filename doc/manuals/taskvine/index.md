@@ -1303,26 +1303,28 @@ only be returned in the event of failure:
 In a similar way, the `WORK_QUEUE_SUCCESS_ONLY` flag indicates that an output file
 should only be returned if the task actually succeeded.
 
-### Fast Abort
+### Disconnect slow workers
 
 A large computation can often be slowed down by stragglers. If you have a
-large number of small tasks that take a short amount of time, then Fast Abort
-can help. The Fast Abort feature keeps statistics on tasks execution times and
-proactively aborts tasks that are statistical outliers:
+large number of small tasks that take a short amount of time, then
+automatically disconnecting slow workers can help. With this feature enabled,
+statistics are kept on tasks execution times and statistical outlier are
+terminated. If two different tasks are canceled in the same worker, then the
+worker is disconnected and blacklisted.
 
 === "Python"
     ```python
     # Disconnect workers that are executing tasks twice as slow as compared to the average.
-    q.activate_fast_abort(2)
+    q.enable_disconnect_slow_workers(2)
     ```
 
 === "C"
     ```C
     // Disconnect workers that are executing tasks twice as slow as compared to the average.
-    vine_activate_fast_abort(q, 2);
+    vine_enable_disconnect_slow_workers(q, 2);
     ```
 
-Tasks that trigger fast abort are automatically retried in some other worker.
+Tasks terminated this way are automatically retried in some other worker.
 Each retry allows the task to run for longer and longer times until a
 completion is reached. You can set an upper bound in the number of retries with
 [Maximum Retries](#maximum-retries).
@@ -1663,12 +1665,12 @@ The statistics available are:
 |||
 |       | **Cumulative stats for workers** |
 | workers_joined        | Total number of worker connections that were established to the manager |
-| workers_removed       | Total number of worker connections that were released by the manager, idled-out, fast-aborted, or lost |
+| workers_removed       | Total number of worker connections that were released by the manager, idled-out, slow, or lost |
 | workers_released      | Total number of worker connections that were asked by the manager to disconnect |
 | workers_idled_out     | Total number of worker that disconnected for being idle |
-| workers_fast_aborted  | Total number of worker connections terminated for being too slow |
-| workers_blacklisted   | Total number of workers blacklisted by the manager (includes fast-aborted) |
-| workers_lost          | Total number of worker connections that were unexpectedly lost (does not include idled-out or fast-aborted) |
+| workers_slow          | Total number of worker connections terminated for being too slow |
+| workers_blacklisted   | Total number of workers blacklisted by the manager (includes workers_slow) |
+| workers_lost          | Total number of worker connections that were unexpectedly lost (does not include idled-out or slow) |
 |||
 |       | **Stats for the current state of tasks** |
 | tasks_waiting         | Number of tasks waiting to be dispatched |

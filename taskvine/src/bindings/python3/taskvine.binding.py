@@ -144,7 +144,7 @@ class Task(object):
 
     ##
     # Label the task with the given category. It is expected that tasks with the
-    # same category have similar resources requirements (e.g. for fast abort).
+    # same category have similar resources requirements (e.g. to disconnect slow workers).
     #
     # @param self       Reference to the current task object.
     # @param name       The name of the category
@@ -1177,23 +1177,23 @@ class Manager(object):
         return vine_enable_monitoring_full(self._taskvine, dirname, watchdog)
 
     ##
-    # Turn on or off fast abort functionality for a given queue for tasks in
+    # Enable disconnect slow workers functionality for a given queue for tasks in
     # the "default" category, and for task which category does not set an
     # explicit multiplier.
     #
     # @param self       Reference to the current manager object.
-    # @param multiplier The multiplier of the average task time at which point to abort; if negative (the default) fast_abort is deactivated.
-    def activate_fast_abort(self, multiplier):
-        return vine_activate_fast_abort(self._taskvine, multiplier)
+    # @param multiplier The multiplier of the average task time at which point to disconnect a worker; if less than 1, it is disabled (default).
+    def enable_disconnect_slow_workers(self, multiplier):
+        return vine_enable_disconnect_slow_workers(self._taskvine, multiplier)
 
     ##
-    # Turn on or off fast abort functionality for a given queue.
+    # Enable disconnect slow workers functionality for a given queue.
     #
     # @param self       Reference to the current manager object.
     # @param name       Name of the category.
-    # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref activate_fast_abort)
-    def activate_fast_abort_category(self, name, multiplier):
-        return vine_activate_fast_abort_category(self._taskvine, name, multiplier)
+    # @param multiplier The multiplier of the average task time at which point to disconnect a worker; disabled if less than one (see @ref enable_disconnect_slow_workers)
+    def enable_disconnect_slow_workers_category(self, name, multiplier):
+        return vine_enable_disconnect_slow_workers_category(self._taskvine, name, multiplier)
 
     ##
     # Turn on or off draining mode for workers at hostname.
@@ -1615,9 +1615,9 @@ class Manager(object):
     # - "resource-submit-multiplier" Treat each worker as having ({cores,memory,gpus} * multiplier) when submitting tasks. This allows for tasks to wait at a worker rather than the manager. (default = 1.0)
     # - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
     # - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
-    # - "transfer-outlier-factor" Transfer that are this many times slower than the average will be aborted.  (default=10x)
+    # - "transfer-outlier-factor" Transfer that are this many times slower than the average will be terminated.  (default=10x)
     # - "default-transfer-rate" The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
-    # - "fast-abort-multiplier" Set the multiplier of the average task time at which point to abort; if negative or zero fast_abort is deactivated. (default=0)
+    # - "disconnect-slow-workers-factor" Set the multiplier of the average task time at which point to disconnect a worker; disabled if less than 1. (default=0)
     # - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
     # - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
     # - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
