@@ -143,7 +143,7 @@ The basic outline of a TaskVine manager is:
 
 To begin, you must import the TaskVine library, and then create a Manager object.
 You may specific a specific port number to listen on like this:
- 
+
 === "Python"
     ```python
     # Import the taskvine library
@@ -441,7 +441,7 @@ If you installed via Conda, then no further setup is needed.
 If you are running a Python application and did *not* install via Conda,
 then you will need to set the `PYTHONPATH` to point to the cctools
 installation, like this:
-    
+
 ```sh
 # Note: This is only needed if not using Conda:
 $ PYVER=$(python -c 'import sys; print("%s.%s" % sys.version_info[:2])')
@@ -455,7 +455,7 @@ If you are writing a taskvine application in C, you should compile it into an ex
 ```sh
 $ gcc taskvine_example.c -o taskvine_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -ltaskvine -ldttools -lm -lz
 ```
-   
+
 ### Running a Manager Program
 
 The example application simply compresses a bunch of files in parallel. The
@@ -468,7 +468,7 @@ application, run it as:
 ```sh
 # Python:
 $ ./taskvine_example.py a b c
- 
+
 # C
 $ ./taskvine_example a b c
 ```
@@ -483,12 +483,12 @@ submitted task: /usr/bin/gzip < b > b.gz
 submitted task: /usr/bin/gzip < c > c.gz
 waiting for tasks to complete...
 ```
-    
+
 The taskvine manager is now waiting for workers to connect and begin
 requesting work. (Without any workers, it will wait forever.) You can start
 one worker on the same machine by opening a new shell and running:
 
-    
+
 ```sh
 # Substitute the IP or name of your machine for MACHINENAME.
 $ vine_worker MACHINENAME 9123
@@ -557,18 +557,18 @@ For example, to have a taskvine manager advertise its project name as
     ```C
     vine_set_name(q, "myproject");
     ```
-        
+
 To start a worker for this manager, specify the project name (`myproject`) to
 connect in the `-M` option:
 
 ```sh
 $ vine_worker -M myproject
 ```
-    
+
 
 You can start ten workers for this manager on Condor using
 `condor_submit_workers` by providing the same option arguments.:
-    
+
 ```sh
 $ condor_submit_workers -M myproject 10
 Submitting job(s)..........
@@ -597,10 +597,10 @@ per minute.).  For example:
 
 ```sh
 % vine_status
-PROJECT               HOST                      PORT WAITING RUNNING COMPLETE WORKERS 
-molsim-c2h2           home.cse.nd.edu           8999     793      64      791      16 
-freds-model-search    mars.indiana.edu          9123     100     700     1372     350 
-yang-analysis-355     login.crc.nd.edu          9100    8932    4873    10007    4873  
+PROJECT               HOST                      PORT WAITING RUNNING COMPLETE WORKERS
+molsim-c2h2           home.cse.nd.edu           8999     793      64      791      16
+freds-model-search    mars.indiana.edu          9123     100     700     1372     350
+yang-analysis-355     login.crc.nd.edu          9100    8932    4873    10007    4873
 ```
 
 The same information is available in a more graphical form online
@@ -879,7 +879,7 @@ returns:
 
 === "C"
     ```C
-    vine_task *t = vine_wait(q,5); 
+    vine_task *t = vine_wait(q,5);
     if(t) {
         printf("Task used %f cores, %f MB memory, %f MB disk",
             t->resources_measured->cores,
@@ -981,7 +981,7 @@ some reasonable defaults in the same way described before in the section
 
 When the resources used by a task are unknown, taskvine can measure and
 compute efficient resource values to maximize throughput or minimize waste, as
-we explain in the following sections. 
+we explain in the following sections.
 
 ### Automatic Resource Management
 
@@ -1167,11 +1167,11 @@ Then, modify your manager program to use the password:
     ```C
     vine_set_password_file(q,"mypwfile");
     ```
-    
+
 
 And give the `--password` option to give the same password file to your
 workers:
-    
+
 ```sh
 $ vine_worker --password mypwfile -M myproject
 ```
@@ -1452,13 +1452,13 @@ to make a progress bar or other user-visible information:
 
 #### Map
 
-The taskvine map abstraction works similar to python map, as it applies a 
-a function to every element in a list. This function works by taking in a chunk_size, 
-which is the size of an iterable to send to a worker. The worker than maps the given 
-function over the iterable and returns it. All the results are then combined from the 
+The taskvine map abstraction works similar to python map, as it applies a
+a function to every element in a list. This function works by taking in a chunk_size,
+which is the size of an iterable to send to a worker. The worker than maps the given
+function over the iterable and returns it. All the results are then combined from the
 workers and returned. The size of the chunk depends on the cost of the function.
 If the function is very cheap, then sending a larger chunk_size is better. If the
-function is expensive, then smaller is better. If an invalid operation happens, 
+function is expensive, then smaller is better. If an invalid operation happens,
 the error will appear in the results.
 
 ```python
@@ -1474,8 +1474,8 @@ The taskvine pair function computes all the pairs of 2 sequences, and then uses
 them as inputs of a given function. The pairs are generated locally using itertools,
 and then based on the given chunk_size, are sent out to a worker as an iterable of pairs.
 The given function must accept an iterable, as the pair will be sent to the function as
-a tuple. The worker will then return the results, and each result from each worker will be 
-combined locally. Again, cheaper functions work better with larger chunk_sizes, 
+a tuple. The worker will then return the results, and each result from each worker will be
+combined locally. Again, cheaper functions work better with larger chunk_sizes,
 more expensive functions work better with smaller ones. Errors will be placed in results.
 
 ```python
@@ -1490,9 +1490,9 @@ q.pair(fn, seq1, seq2, chunk_size)
 The taskvine treeReduce fucntion combines an array using a given function by
 breaking up the array into chunk_sized chunks, computing the results, and returning
 the results to a new array. It then does the same process on the new array until there
-only one element left and then returns it. The given fucntion must accept an iterable, 
+only one element left and then returns it. The given fucntion must accept an iterable,
 and must be an associative fucntion, or else the same result cannot be gaurenteed for
-different chunk sizes. Again, cheaper functions work better with larger chunk_sizes, 
+different chunk sizes. Again, cheaper functions work better with larger chunk_sizes,
 more expensive functions work better with smaller ones. Errors will be placed in results.
 Also, the minimum chunk size is 2, as going 1 element at time would not reduce the array
 
@@ -1500,7 +1500,7 @@ Also, the minimum chunk size is 2, as going 1 element at time would not reduce t
 def fn(seq):
     return max(seq)
 
-q.treeReduce(fn, arry, chunk_size) 
+q.treeReduce(fn, arry, chunk_size)
 ```
 
 Below is an example of all three abstractions, and their expected output:
@@ -1543,7 +1543,7 @@ find failures, bugs, and other errors. To activate debug output:
     cctools_debug_flags_set("all");
     cctools_debug_config_file("my.debug.log");
     ```
-    
+
 The `all` flag causes debug messages from every subsystem called by taskvine
 to be printed. More information about the debug flags are
 [here](api/html/debug_8h.html).
@@ -1551,7 +1551,7 @@ to be printed. More information about the debug flags are
 
 To enable debugging at the worker, set the `-d` option:
 
-    
+
 ```sh
 $ vine_worker -d all -o worker.debug -M myproject
 ```
