@@ -47,6 +47,7 @@ run_wq_worker_coprocess()
 check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
+	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import dill" || return 1
 
 	return 0
 }
