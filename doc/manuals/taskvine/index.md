@@ -1,33 +1,46 @@
 ![](../logos/taskvine-logo.png)
 
-# taskvine User's Manual
+# TaskVine User's Manual
+
+**TaskVine is our next-generation framework for constructing
+data intensive applications.  The software and documentation
+are currently under active development, and so may not be
+fully up to date.**
 
 ## Overview
 
-taskvine is a framework for building large scale manager-worker applications.
-Using the taskvine library, you create a custom manager program that defines
-and submits a large number of small tasks. Each task is distributed to a
-remote worker process which executes it and returns the results. As results
-are created, the manager may generate more tasks to be executed. It is not
-unusual to write programs that distribute millions of tasks to thousands of
-remote workers.
+TaskVine is an framework for building large scale data
+intensive dynamic workflows that run on high performance computing (HPC)
+clusters, cloud service providers, and other distributed computing systems.
 
-Each worker process is a common executable that can be deployed within
-existing cluster and cloud systems, so it's easy to deploy a taskvine
-application to run on machines that you already have access to. Whether you
-use a university batch system or a commercial cloud provider, your taskvine
-application will be able to run there.
+A TaskVine application consists of a manager and a large number of
+worker processes.  The application generates a large number of small
+tasks, which are distributed to workers.
+As tasks access external input data and produce their own outputs,
+more and more data is pulled into local storage on cluster nodes.  This
+data is used to accelerate future tasks and avoid re-computing exisiting
+results.  The application gradually grows "like a vine" through
+the cluster.
 
-taskvine is a production framework that has been used to create highly
-scalable scientific applications in high energy physics, bioinformatics, data
-mining, and other fields. It can also be used as an execution system for the
-[Makeflow](http://ccl.cse.nd.edu/software/makeflow) workflow engine. To see
-some of the taskvine applications running right now, view the [real time
-status page](http://ccl.cse.nd.edu/software/taskvine/status).
+TaskVine manager applications can be written in Python or C
+on Linux or OSX platforms.  Individual tasks can be simple
+Python functions, complex Unix applications, or serverless function
+invocations.  Several different programming models can be used,
+including submit-wait, task futures, and bulk-synchronous-parallel.
+
+TaskVine is easy to deploy on existing HPC and cloud facilities.
+The worker processes are self-contained executables, and TaskVine
+arranges for all necessary task dependencies to be moved to workers,
+making the system self-hosting.  Applications regularly consist of
+millions of tasks running on thousands of workers.
+
+TaskVine is our next-generation workflow system, build on our nearly
+twenty years of experience building scalable applications in high energy physics,
+bioinformatics, molecular dynamics, machine learning, and other fields.
 
 ## Quick Start in Python
 
-There are a variety of ways to install taskvine, depending on your local environment.
+There are a variety of ways to install TaskVine, depending on your local environment.
 In most cases, installing via `conda` is the easiest method.
 Please see our [full installation instructions](../install) for other options.
 
@@ -74,14 +87,14 @@ task 2 exited with output 20
 all done.
 ```
 
-(You can also declare and launch directly from python using the [taskvine factory.](#using-the-factory-with-python))
+(You can also declare and launch directly from python using the [TaskVine factory.](#using-the-factory-with-python))
 
 Congrats! You have now run a simple manager application that runs tasks on one local worker.
 Read on to learn how to build more complex applications and run large numbers of workers at scale.
 
 ## Principle of Operation
 
-A taskvine application is a large parallel application consisting of a **manager** and multiple **workers**.
+A TaskVine application is a large parallel application consisting of a **manager** and multiple **workers**.
 The manager defines a large number of **tasks**, each of which is a discrete unit
 of work that can be executed in parallel.  Each task is submitted to a **queue**, which makes
 it available for a worker to execute.  Each worker connects to the manager, receives tasks
@@ -115,10 +128,10 @@ A manager program can be written in Python, or C.
 In each language, the underlying principles are the same, but there are some syntactic differences shown below.
 The full API documentation for each language is here:
 
-- [taskvine Python API](../api/html/namespacetaskvinePython.html)
-- [taskvine C API](../api/html/taskvine_8h.html)
+- [TaskVine Python API](../api/html/namespacetaskvinePython.html)
+- [TaskVine C API](../api/html/taskvine_8h.html)
 
-The basic outline of a taskvine manager is:
+The basic outline of a TaskVine manager is:
 
 1. Create and configure the tasks' queue.
 2. Create tasks and add them to the queue.
@@ -128,7 +141,7 @@ The basic outline of a taskvine manager is:
 
 ### Creating a Queue
 
-To begin, you must import the taskvine library, and then create a taskvine object.
+To begin, you must import the TaskVine library, and then create a Manager object.
 You may specific a specific port number to listen on like this:
  
 === "Python"
