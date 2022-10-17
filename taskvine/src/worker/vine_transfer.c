@@ -344,5 +344,3 @@ int vine_transfer_get_any( struct link *lnk, struct vine_cache *cache, const cha
 	free(cache_root);
 	return r;
 }
-
-

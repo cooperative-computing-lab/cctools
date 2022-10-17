@@ -45,7 +45,7 @@ static int ensure_input_file( struct vine_process *p, struct vine_file *f, struc
 		result = create_dir(sandbox_path, 0700);
 		if(!result) debug(D_VINE,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
-	} else if(vine_cache_ensure(cache,f->cached_name,manager)) {
+	} else if(vine_cache_ensure(cache,f->cached_name,manager,f->flags)) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_VINE,"input: link %s -> %s",cache_path,sandbox_path);
