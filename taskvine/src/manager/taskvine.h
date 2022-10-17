@@ -450,7 +450,7 @@ void vine_task_set_priority(struct vine_task *t, double priority );
 void vine_task_set_env_var( struct vine_task *t, const char *name, const char *value );
 
 /** Select the scheduling algorithm for a single task.
-To change the scheduling algorithm for all tasks, use @ref vine_set_algorithm instead.
+To change the scheduling algorithm for all tasks, use @ref vine_set_scheduler instead.
 @param t A task object.
 @param algorithm The algorithm to use in assigning this task to a worker. For possible values, see @ref vine_schedule_t.
 */
@@ -923,7 +923,7 @@ This function controls which <b>worker</b> will be selected for a given task.
 @param m A manager object
 @param algorithm The algorithm to use in assigning a task to a worker. See @ref vine_schedule_t for possible values.
 */
-void vine_set_algorithm(struct vine_manager *m, vine_schedule_t algorithm);
+void vine_set_scheduler(struct vine_manager *m, vine_schedule_t algorithm);
 
 /** Change the priority for a given manager.
 @param m A manager object

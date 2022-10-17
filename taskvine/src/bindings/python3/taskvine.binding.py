@@ -125,14 +125,14 @@ class Task(object):
         return vine_task_set_coprocess(self._task, coprocess)
 
     ##
-    # Set the worker selection algorithm for task.
+    # Set the worker selection scheduler for task.
     #
     # @param self       Reference to the current task object.
-    # @param algorithm  One of the following algorithms to use in assigning a
+    # @param scheduler  One of the following schedulers to use in assigning a
     #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
-    def set_algorithm(self, algorithm):
-        return vine_task_set_scheduler(self._task, algorithm)
+    def set_scheduler(self, scheduler):
+        return vine_task_set_scheduler(self._task, scheduler)
 
     ##
     # Attach a user defined logical name to the task.
@@ -1216,20 +1216,20 @@ class Manager(object):
         return vine_hungry(self._taskvine)
 
     ##
-    # Set the worker selection algorithm for queue.
+    # Set the worker selection scheduler for queue.
     #
     # @param self       Reference to the current manager object.
-    # @param algorithm  One of the following algorithms to use in assigning a
+    # @param scheduler  One of the following schedulers to use in assigning a
     #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
-    def set_algorithm(self, algorithm):
-        return vine_set_algorithm(self._taskvine, algorithm)
+    def set_scheduler(self, scheduler):
+        return vine_set_scheduler(self._taskvine, scheduler)
 
     ##
     # Set the order for dispatching submitted tasks in the queue.
     #
     # @param self       Reference to the current manager object.
-    # @param order      One of the following algorithms to use in dispatching
+    # @param order      One of the following schedulers to use in dispatching
     #                   submitted tasks to workers:
     #                   - @ref VINE_TASK_ORDER_FIFO
     #                   - @ref VINE_TASK_ORDER_LIFO

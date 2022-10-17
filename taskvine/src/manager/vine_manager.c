@@ -3253,7 +3253,7 @@ int vine_port(struct vine_manager *q)
 	}
 }
 
-void vine_set_algorithm(struct vine_manager *q, vine_schedule_t algorithm)
+void vine_set_scheduler(struct vine_manager *q, vine_schedule_t algorithm)
 {
 	q->worker_selection_algorithm = algorithm;
 }
