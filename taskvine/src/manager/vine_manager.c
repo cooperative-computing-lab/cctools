@@ -4852,7 +4852,7 @@ struct category *vine_category_lookup_or_create(struct vine_manager *q, const ch
 	return c;
 }
 
-int vine_set_min_task_id(struct vine_manager *q, int minid) {
+int vine_set_task_id_min(struct vine_manager *q, int minid) {
 
 	if(minid > q->next_task_id) {
 		q->next_task_id = minid;

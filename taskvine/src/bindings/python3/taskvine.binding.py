@@ -1274,7 +1274,7 @@ class Manager(object):
     # @param minid  Minimum desired task_id
     # @return Returns the actual minimum task_id for future tasks.
     def set_min_task_id(self, minid):
-        return vine_set_min_task_id(self._taskvine, minid)
+        return vine_set_task_id_min(self._taskvine, minid)
 
     ##
     # Change the project priority for the given queue.

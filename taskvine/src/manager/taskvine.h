@@ -785,7 +785,7 @@ provided is ignored.
 @param minid Minimum desired task_id
 @return Returns the actual minimum task_id for future tasks.
 */
-int vine_set_min_task_id(struct vine_manager *m, int minid);
+int vine_set_task_id_min(struct vine_manager *m, int minid);
 
 /** Block workers in hostname from working for manager q.
 @param m A manager object
