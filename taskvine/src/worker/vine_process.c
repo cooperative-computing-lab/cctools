@@ -4,7 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-
 #include "vine_process.h"
 #include "vine_manager.h"
 #include "vine_gpus.h"

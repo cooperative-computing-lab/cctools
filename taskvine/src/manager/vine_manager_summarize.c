@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2022- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #include "vine_manager_summarize.h"
 #include "vine_worker_info.h"
