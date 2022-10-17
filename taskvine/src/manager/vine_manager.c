@@ -4501,8 +4501,10 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 		HASH_TABLE_ITERATE(q->worker_table,key,w) {
 			accumulate_stat(s, w->stats, tasks_running);
 		}
-		/* (see vine_get_stats_hierarchy for an explanation on the
-		 * following line) */
+		/* we rely on workers messages to update tasks_running. such data are
+		* attached to keepalive messages, thus tasks_running is not always
+		* current. Here we simply enforce that there can be more tasks_running
+		* that tasks_on_workers. */
 		s->tasks_running = MIN(s->tasks_running, s->tasks_on_workers);
 	}
 
@@ -4533,50 +4535,6 @@ void vine_get_stats(struct vine_manager *q, struct vine_stats *s)
 	s->max_gpus = r.gpus.largest;
 
 	s->workers_able = count_workers_for_waiting_tasks(q, largest_seen_resources(q, NULL));
-}
-
-void vine_get_stats_hierarchy(struct vine_manager *q, struct vine_stats *s)
-{
-	vine_get_stats(q, s);
-
-	char *key;
-	struct vine_worker_info *w;
-
-	/* Consider running only if reported by some hand. */
-	s->tasks_running = 0;
-	s->workers_connected = 0;
-
-	HASH_TABLE_ITERATE(q->worker_table,key,w) {
-		accumulate_stat(s, w->stats, tasks_waiting);
-		accumulate_stat(s, w->stats, tasks_running);
-	}
-
-	/* we rely on workers messages to update tasks_running. such data are
-	 * attached to keepalive messages, thus tasks_running is not always
-	 * current. Here we simply enforce that there can be more tasks_running
-	 * that tasks_on_workers. */
-	s->tasks_running = MIN(s->tasks_running, s->tasks_on_workers);
-
-	/* Account also for workers connected directly to the manager. */
-	s->workers_connected = s->workers_joined - s->workers_removed;
-
-	s->workers_joined    += q->stats_disconnected_workers->workers_joined;
-	s->workers_removed   += q->stats_disconnected_workers->workers_removed;
-	s->workers_idled_out += q->stats_disconnected_workers->workers_idled_out;
-	s->workers_slow      += q->stats_disconnected_workers->workers_slow;
-	s->workers_lost      += q->stats_disconnected_workers->workers_lost;
-
-	s->time_send         += q->stats_disconnected_workers->time_send;
-	s->time_receive      += q->stats_disconnected_workers->time_receive;
-	s->time_send_good    += q->stats_disconnected_workers->time_send_good;
-	s->time_receive_good += q->stats_disconnected_workers->time_receive_good;
-
-	s->time_workers_execute            += q->stats_disconnected_workers->time_workers_execute;
-	s->time_workers_execute_good       += q->stats_disconnected_workers->time_workers_execute_good;
-	s->time_workers_execute_exhaustion += q->stats_disconnected_workers->time_workers_execute_exhaustion;
-
-	s->bytes_sent      += q->stats_disconnected_workers->bytes_sent;
-	s->bytes_received  += q->stats_disconnected_workers->bytes_received;
 }
 
 void vine_get_stats_category(struct vine_manager *q, const char *category, struct vine_stats *s)

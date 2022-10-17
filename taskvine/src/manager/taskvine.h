@@ -834,12 +834,6 @@ void vine_invalidate_cached_file(struct vine_manager *m, const char *local_name,
 */
 void vine_get_stats(struct vine_manager *m, struct vine_stats *s);
 
-/** Get statistics of the manager.
-@param m A manager object
-@param s A pointer to a buffer that will be filed with statistics.
-*/
-void vine_get_stats_hierarchy(struct vine_manager *m, struct vine_stats *s);
-
 /** Get the task statistics for the given category.
 @param m A manager object
 @param c A category name.
