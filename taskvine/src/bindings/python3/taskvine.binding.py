@@ -1518,8 +1518,8 @@ class Manager(object):
     #
     # @param self   Reference to the current manager object.
     # @param n      The number to shutdown.  0 shutdowns all workers
-    def shutdown_workers(self, n=0):
-        return vine_shut_down_workers(self._taskvine, n)
+    def workers_shutdown(self, n=0):
+        return vine_workers_shutdown(self._taskvine, n)
 
     ##
     # Block workers running on host from working for the manager.

@@ -971,7 +971,7 @@ struct list * vine_tasks_cancel(struct vine_manager *m);
 @param m A manager object
 @param n The number to shut down. All workers if given "0".
 */
-int vine_shut_down_workers(struct vine_manager *m, int n);
+int vine_workers_shutdown(struct vine_manager *m, int n);
 
 /** Turn on the debugging log output and send to the named file.
 @param m A manager object

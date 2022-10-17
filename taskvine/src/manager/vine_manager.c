@@ -4212,7 +4212,7 @@ int vine_hungry(struct vine_manager *q)
 	return 1;	//all good
 }
 
-int vine_shut_down_workers(struct vine_manager *q, int n)
+int vine_workers_shutdown(struct vine_manager *q, int n)
 {
 	struct vine_worker_info *w;
 	char *key;
