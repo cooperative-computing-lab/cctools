@@ -81,10 +81,10 @@ int main(int argc, char *argv[])
 	while(!vine_empty(m)) {
 		t = vine_wait(m, 5);
 		if(t) {
-			vine_result_t result = vine_task_get_result(t);
+			vine_result_t r = vine_task_get_result(t);
                         int id = vine_task_get_taskid(t);
 
-			if(result==VINE_RESULT_SUCCESS) {
+			if(r==VINE_RESULT_SUCCESS) {
 				printf("Task %d complete: %s\n",id,vine_task_get_command(t));
                         } else {
                                 printf("Task %d failed: %s\n",id,vine_result_string(r));
