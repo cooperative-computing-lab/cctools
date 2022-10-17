@@ -31,11 +31,11 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MAX {resources_max_per_task}\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}\n");
-	fprintf(q->txn_logfile, "# time manager_pid TASK taskid WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}\n");
-	fprintf(q->txn_logfile, "# time manager_pid TASK taskid RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
-	fprintf(q->txn_logfile, "# time manager_pid TASK taskid WAITING_RETRIEVAL worker_address\n");
-	fprintf(q->txn_logfile, "# time manager_pid TASK taskid (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
-	fprintf(q->txn_logfile, "# time manager_pid TRANSFER (INPUT|OUTPUT) taskid cache_flag sizeinmb walltime filename\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK task_id RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING_RETRIEVAL worker_address\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TRANSFER (INPUT|OUTPUT) task_id cache_flag sizeinmb walltime filename\n");
 	fprintf(q->txn_logfile, "\n");
 }
 
@@ -60,7 +60,7 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 
 	vine_task_state_t state = t->state;
 
-	buffer_printf(&B, "TASK %d %s", t->taskid, vine_task_state_to_string(state));
+	buffer_printf(&B, "TASK %d %s", t->task_id, vine_task_state_to_string(state));
 
 	if(state == VINE_TASK_UNKNOWN) {
 			/* do not add any info */
@@ -106,7 +106,7 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 			if(state == VINE_TASK_RUNNING) {
 				const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
 				buffer_printf(&B, " %s ", allocation);
-				const struct rmsummary *box = itable_lookup(w->current_tasks_boxes, t->taskid);
+				const struct rmsummary *box = itable_lookup(w->current_tasks_boxes, t->task_id);
 				rmsummary_print_buffer(&B, box, 1);
 			} else if(state == VINE_TASK_WAITING_RETRIEVAL) {
 				/* do not add any info */
@@ -234,7 +234,7 @@ void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info
 	buffer_init(&B);
 	buffer_printf(&B, "TRANSFER ");
 	buffer_printf(&B, is_input ? "INPUT":"OUTPUT");
-	buffer_printf(&B, " %d", t->taskid);
+	buffer_printf(&B, " %d", t->task_id);
 	buffer_printf(&B, " %d", f->flags & VINE_CACHE);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));

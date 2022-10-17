@@ -375,7 +375,7 @@ void vine_task_check_consistency( struct vine_task *t )
 
 	LIST_ITERATE(t->input_files,f) {
 		if(hash_table_lookup(table,f->remote_name)) {
-			fprintf(stderr,"warning: task %d has more than one input file named %s\n",t->taskid,f->remote_name);
+			fprintf(stderr,"warning: task %d has more than one input file named %s\n",t->task_id,f->remote_name);
 		} else {
 			hash_table_insert(table,f->remote_name,f->remote_name);
 		}
@@ -387,7 +387,7 @@ void vine_task_check_consistency( struct vine_task *t )
 
 	LIST_ITERATE(t->output_files,f) {
 		if(f->type==VINE_FILE && hash_table_lookup(table,f->source)) {
-			fprintf(stderr,"warning: task %d has more than one output file named %s\n",t->taskid,f->source);
+			fprintf(stderr,"warning: task %d has more than one output file named %s\n",t->task_id,f->source);
 		} else {
 			hash_table_insert(table,f->remote_name,f->source);
 		}
@@ -621,7 +621,7 @@ const char * vine_task_get_tag( struct vine_task *t )
 
 int vine_task_get_id( struct vine_task *t )
 {
-	return t->taskid;
+	return t->task_id;
 }
 
 const char * vine_task_get_stdout( struct vine_task *t )
@@ -723,7 +723,7 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 {
 	struct jx *j = jx_object(0);
 
-	jx_insert_integer(j,"taskid",t->taskid);
+	jx_insert_integer(j,"task_id",t->task_id);
 	jx_insert_string(j,"state",vine_task_state_to_string(t->state));
 	if(t->tag) jx_insert_string(j,"tag",t->tag);
 	if(t->category) jx_insert_string(j,"category",t->category);

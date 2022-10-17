@@ -89,7 +89,7 @@ struct vine_manager {
 
 	/* Primary data structures for tracking task state. */
 
-	struct itable *tasks;           /* Maps taskid -> vine_task of all tasks in any state. */
+	struct itable *tasks;           /* Maps task_id -> vine_task of all tasks in any state. */
 	struct list   *ready_list;      /* List of vine_task that are waiting to execute. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
@@ -108,7 +108,7 @@ struct vine_manager {
 
 	/* Internal state modified by the manager */
 
- 	int next_taskid;       /* Next integer taskid to be assigned to a created task. */
+ 	int next_task_id;       /* Next integer task_id to be assigned to a created task. */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
 	int busy_waiting_flag; /* Set internally in main loop if no messages were processed -> wait longer. */
 

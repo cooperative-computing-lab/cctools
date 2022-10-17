@@ -67,8 +67,8 @@ class Client:
     def wait(self, timeout):
         return self.rpc("wait",timeout)
 
-    def remove(self, taskid):
-        return self.rpc("remove",taskid)
+    def remove(self, task_id):
+        return self.rpc("remove",task_id)
 
     def status(self):
         return self.rpc("status",None)

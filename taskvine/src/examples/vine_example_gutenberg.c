@@ -79,9 +79,9 @@ int main(int argc, char *argv[])
 
 			vine_task_set_cores(t,1);
 
-			int taskid = vine_submit(m, t);
+			int task_id = vine_submit(m, t);
 
-			printf("submitted task (id# %d): %s\n", taskid, vine_task_get_command(t) );
+			printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );
 		}
 	}
 

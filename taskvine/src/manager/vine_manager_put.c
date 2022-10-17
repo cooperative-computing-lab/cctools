@@ -224,7 +224,7 @@ static vine_result_code_t vine_manager_put_item_if_not_cached( struct vine_manag
 	struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
 	if(remote_info && (remote_info->mtime != local_info.st_mtime || remote_info->size != local_info.st_size)) {
-		debug(D_NOTICE|D_VINE, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
+		debug(D_NOTICE|D_VINE, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->task_id);
 		return VINE_SUCCESS;
 	} else if(!remote_info) {
 

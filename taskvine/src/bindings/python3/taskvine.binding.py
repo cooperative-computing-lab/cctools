@@ -1141,10 +1141,10 @@ class Manager(object):
     ##
     # Get current task state. See @ref vine_task_state_t for possible values.
     # @code
-    # >>> print(q.task_state(taskid))
+    # >>> print(q.task_state(task_id))
     # @endcode
-    def task_state(self, taskid):
-        return vine_task_state(self._taskvine, taskid)
+    def task_state(self, task_id):
+        return vine_task_state(self._taskvine, task_id)
 
     ## Enables resource monitoring of tasks in the queue, and writes a summary
     #  per task to the directory given. Additionally, all summaries are
@@ -1262,19 +1262,19 @@ class Manager(object):
         return vine_manager_preferred_connection(self._taskvine, mode)
 
     ##
-    # Set the minimum taskid of future submitted tasks.
+    # Set the minimum task_id of future submitted tasks.
     #
-    # Further submitted tasks are guaranteed to have a taskid larger or equal
-    # to minid.  This function is useful to make taskids consistent in a
+    # Further submitted tasks are guaranteed to have a task_id larger or equal
+    # to minid.  This function is useful to make task_ids consistent in a
     # workflow that consists of sequential managers. (Note: This function is
-    # rarely used).  If the minimum id provided is smaller than the last taskid
+    # rarely used).  If the minimum id provided is smaller than the last task_id
     # computed, the minimum id provided is ignored.
     #
     # @param self   Reference to the current manager object.
-    # @param minid  Minimum desired taskid
-    # @return Returns the actual minimum taskid for future tasks.
-    def set_min_taskid(self, minid):
-        return vine_set_min_taskid(self._taskvine, minid)
+    # @param minid  Minimum desired task_id
+    # @return Returns the actual minimum task_id for future tasks.
+    def set_min_task_id(self, minid):
+        return vine_set_min_task_id(self._taskvine, minid)
 
     ##
     # Change the project priority for the given queue.
@@ -1472,13 +1472,13 @@ class Manager(object):
         return vine_initialize_categories(self._taskvine, rm, filename)
 
     ##
-    # Cancel task identified by its taskid and remove from the given queue.
+    # Cancel task identified by its task_id and remove from the given queue.
     #
     # @param self   Reference to the current manager object.
-    # @param id     The taskid returned from @ref submit.
-    def cancel_by_taskid(self, id):
+    # @param id     The task_id returned from @ref submit.
+    def cancel_by_task_id(self, id):
         task = None
-        task_pointer = vine_cancel_by_taskid(self._taskvine, id)
+        task_pointer = vine_cancel_by_task_id(self._taskvine, id)
         if task_pointer:
             task = self._task_table.pop(int(id))
         return task
@@ -1508,7 +1508,7 @@ class Manager(object):
             if task.category == category:
                 ids_to_cancel.append(task.id)
 
-        canceled_tasks =  [self.cancel_by_taskid(id) for id in ids_to_cancel]
+        canceled_tasks =  [self.cancel_by_task_id(id) for id in ids_to_cancel]
         return canceled_tasks
 
 
@@ -1635,9 +1635,9 @@ class Manager(object):
     def submit(self, task):
         if isinstance(task, RemoteTask):
             task.add_buffer(json.dumps(task._event), "infile")
-        taskid = vine_submit(self._taskvine, task._task)
-        self._task_table[taskid] = task
-        return taskid
+        task_id = vine_submit(self._taskvine, task._task)
+        self._task_table[task_id] = task
+        return task_id
 
     ##
     # Wait for tasks to complete.
@@ -1671,21 +1671,21 @@ class Manager(object):
 
     ##
     # Similar to @ref wait, but guarantees that the returned task has the
-    # specified taskid.
+    # specified task_id.
     #
     # This call will block until the timeout has elapsed.
     #
     # @param self       Reference to the current manager object.
-    # @param taskid        Desired taskid. If -1, then it is equivalent to self.wait(timeout)
+    # @param task_id        Desired task_id. If -1, then it is equivalent to self.wait(timeout)
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
-    def wait_for_taskid(self, taskid, timeout=VINE_WAITFORTASK):
-        task_pointer = vine_wait_for_taskid(self._taskvine, taskid, timeout)
+    def wait_for_task_id(self, task_id, timeout=VINE_WAITFORTASK):
+        task_pointer = vine_wait_for_task_id(self._taskvine, task_id, timeout)
         if task_pointer:
             task = self._task_table[vine_task_get_id(task_pointer)]
             del self._task_table[vine_task_get_id(task_pointer)]
             return task
-        return None            
+        return None
 
     ##
     # Maps a function to elements in a sequence using taskvine

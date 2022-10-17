@@ -51,12 +51,12 @@ extern char * workspace;
 static int create_sandbox_dir( struct vine_process *p )
 {
 	p->cache_dir = string_format("%s/cache",workspace);
-  	p->sandbox = string_format("%s/t.%d", workspace,p->task->taskid);
+  	p->sandbox = string_format("%s/t.%d", workspace,p->task->task_id);
 
 	if(!create_dir(p->sandbox, 0777)) return 0;
 
 	char tmpdir_template[1024];
-	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
+	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->task_id);
 	if(mkdtemp(tmpdir_template) == NULL) {
 		return 0;
 	}
@@ -174,7 +174,7 @@ static void set_resources_vars(struct vine_process *p) {
 
 	if(p->task->resources_requested->gpus > 0) {
 		set_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
-		char *str = vine_gpus_to_string(p->task->taskid);
+		char *str = vine_gpus_to_string(p->task->task_id);
 		vine_task_set_env_var(p->task,"CUDA_VISIBLE_DEVICES",str);
 		free(str);
 	}
@@ -295,7 +295,7 @@ void vine_process_kill(struct vine_process *p)
 	if(elapsed_time_execution_start / 1000000 < 3)
 		sleep(3 - (elapsed_time_execution_start / 1000000));
 
-	debug(D_VINE, "terminating task %d pid %d", p->task->taskid, p->pid);
+	debug(D_VINE, "terminating task %d pid %d", p->task->task_id, p->pid);
 
 	// Send signal to process group of child which is denoted by -ve value of child pid.
 	// This is done to ensure delivery of signal to processes forked by the child.

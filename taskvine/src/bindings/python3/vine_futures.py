@@ -137,7 +137,7 @@ class ManagerFt(object):
                     print(err)
 
     def _sync_loop(self):
-        # map from taskids to FutureTask objects
+        # map from task_ids to FutureTask objects
         active_tasks = {}
 
         while True:
@@ -160,7 +160,7 @@ class ManagerFt(object):
                         if not task.cancelled():
                             with self._queue_lock:
                                 submit_timeout = 0
-                                taskid = self._queue.submit(task)
+                                task_id = self._queue.submit(task)
                                 task._set_queue(self)
                                 active_tasks[task.id] = task
                         self._tasks_to_submit.task_done()
@@ -251,7 +251,7 @@ class FutureTask(taskvine.Task):
 
     def cancel(self):
         if self.queue:
-            self.queue.cancel_by_taskid(self.id)
+            self.queue.cancel_by_task_id(self.id)
 
         self._cancelled = True
         self._done_event.set()

@@ -24,7 +24,7 @@ End user may only use the API described in taskvine.h
 struct vine_task {
         /***** Fixed properties of task at submit time. ******/
 
-        int taskid;                  /**< A unique task id number. */
+        int task_id;                  /**< A unique task id number. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
 	char *tag;                   /**< An optional user-defined logical name for the task. */

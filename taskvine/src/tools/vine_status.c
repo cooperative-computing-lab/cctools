@@ -67,7 +67,7 @@ static struct jx_table queue_headers[] = {
 };
 
 static struct jx_table task_headers[] = {
-{"taskid",       "ID",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 4},
+{"task_id",       "ID",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 4},
 {"state",        "STATE",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  8},
 {"priority",     "PRIORITY",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
 {"host",         "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -10},

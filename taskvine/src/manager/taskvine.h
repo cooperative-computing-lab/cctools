@@ -668,7 +668,7 @@ control and should not be inspected until returned via @ref vine_wait.
 Once returned, it is safe to re-submit the same take object via @ref vine_submit.
 @param m A manager object
 @param t A task object returned from @ref vine_task_create.
-@return An integer taskid assigned to the submitted task.
+@return An integer task_id assigned to the submitted task.
 */
 int vine_submit(struct vine_manager *m, struct vine_task *t);
 
@@ -698,14 +698,14 @@ Similar to @ref vine_wait, but guarantees that the returned task has the specifi
 */
 struct vine_task *vine_wait_for_tag(struct vine_manager *m, const char *tag, int timeout);
 
-/** Wait for a task with a given taskid to complete.
-Similar to @ref vine_wait, but guarantees that the returned task has the specified taskid.
+/** Wait for a task with a given task_id to complete.
+Similar to @ref vine_wait, but guarantees that the returned task has the specified task_id.
 @param m A manager object
-@param taskid The desired taskid. If -1, then tasks are returned regardless of their taskid.
+@param task_id The desired task_id. If -1, then tasks are returned regardless of their task_id.
 @param timeout The number of seconds to wait for a completed task before returning. Use an integer time to set the timeout or the constant @ref VINE_WAITFORTASK to block until a task has completed.
 @returns A completed task description, or null if the manager is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
 */
-struct vine_task *vine_wait_for_taskid(struct vine_manager *m, int taskid, int timeout);
+struct vine_task *vine_wait_for_task_id(struct vine_manager *m, int task_id, int timeout);
 
 /** Determine whether the manager is 'hungry' for more tasks.
 While the manager can handle a very large number of tasks,
@@ -775,17 +775,17 @@ gigabyte sizes. This function is mostly used for debugging.)
 */
 int vine_enable_monitoring_full(struct vine_manager *m, char *monitor_output_directory, int watchdog);
 
-/** Set the minimum taskid of future submitted tasks.
-Further submitted tasks are guaranteed to have a taskid larger or equal to
-minid.  This function is useful to make taskids consistent in a workflow that
+/** Set the minimum task_id of future submitted tasks.
+Further submitted tasks are guaranteed to have a task_id larger or equal to
+minid.  This function is useful to make task_ids consistent in a workflow that
 consists of sequential managers. (Note: This function is rarely used).  If the
-minimum id provided is smaller than the last taskid computed, the minimum id
+minimum id provided is smaller than the last task_id computed, the minimum id
 provided is ignored.
 @param m A manager object
-@param minid Minimum desired taskid
-@return Returns the actual minimum taskid for future tasks.
+@param minid Minimum desired task_id
+@return Returns the actual minimum task_id for future tasks.
 */
-int vine_set_min_taskid(struct vine_manager *m, int minid);
+int vine_set_min_task_id(struct vine_manager *m, int minid);
 
 /** Block workers in hostname from working for manager q.
 @param m A manager object
@@ -856,10 +856,10 @@ struct rmsummary **vine_summarize_workers(struct vine_manager *m);
 
 /** Get the current state of the task.
 @param m A manager object
-@param taskid The taskid of the task.
+@param task_id The task_id of the task.
 @return One of: VINE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
 */
-vine_task_state_t vine_task_state(struct vine_manager *m, int taskid);
+vine_task_state_t vine_task_state(struct vine_manager *m, int task_id);
 
 /** Limit the manager bandwidth when transferring files to and from workers.
 @param m A manager object
@@ -962,10 +962,10 @@ void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
 
 /** Cancel a submitted task using its task id and remove it from manager.
 @param m A manager object
-@param id The taskid returned from @ref vine_submit.
+@param id The task_id returned from @ref vine_submit.
 @return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
 */
-struct vine_task *vine_cancel_by_taskid(struct vine_manager *m, int id);
+struct vine_task *vine_cancel_by_task_id(struct vine_manager *m, int id);
 
 /** Cancel a submitted task using its tag and remove it from manager.
 @param m A manager object

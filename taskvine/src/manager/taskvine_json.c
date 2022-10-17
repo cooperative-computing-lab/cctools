@@ -15,7 +15,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-static const char *vine_properties[] = { "name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "manager_link",
+static const char *vine_properties[] = { "name", "port", "priority", "num_tasks_left", "next_task_id", "workingdir", "manager_link",
 	"poll_table", "poll_table_size", "tasks", "task_state_map", "ready_list", "worker_table",
 	"worker_blacklist", "worker_task_map", "categories", "workers_with_available_results",
 	"stats", "stats_measure", "stats_disconnected_workers", "time_last_wait",
@@ -31,7 +31,7 @@ static const char *vine_properties[] = { "name", "port", "priority", "num_tasks_
 };
 
 static const char *vine_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", "environment",
-	"output_files", "env_list", "taskid", "exit_code", "result", "host", "hostname",
+	"output_files", "env_list", "task_id", "exit_code", "result", "host", "hostname",
 	"category", "resource_request", "priority", "max_retries", "try_count",
 	"exhausted_attempts", "time_when_submitted", "time_when_done",
 	"disk_allocation_exhausted", "time_when_commit_start", "time_when_commit_end",
@@ -344,7 +344,7 @@ char *vine_json_wait(struct vine_manager *q, int timeout)
 
 	char *task;
 	struct jx *j;
-	struct jx_pair *command_line, *taskid, *exit_code, *output, *result;
+	struct jx_pair *command_line, *task_id, *exit_code, *output, *result;
 
 	struct vine_task *t = vine_wait(q, timeout);
 
@@ -353,8 +353,8 @@ char *vine_json_wait(struct vine_manager *q, int timeout)
 	}
 
 	command_line = jx_pair(jx_string("command_line"), jx_string(vine_task_get_command(t)), NULL);
-	taskid = jx_pair(jx_string("taskid"), jx_integer(vine_task_get_id(t)), command_line);
-	exit_code = jx_pair(jx_string("exit_code"), jx_integer(vine_task_get_exit_code(t)), taskid);
+	task_id = jx_pair(jx_string("task_id"), jx_integer(vine_task_get_id(t)), command_line);
+	exit_code = jx_pair(jx_string("exit_code"), jx_integer(vine_task_get_exit_code(t)), task_id);
 	result = jx_pair(jx_string("result"), jx_integer(vine_task_get_result(t)), exit_code);
 
 	const char *toutput = vine_task_get_stdout(t);
@@ -377,18 +377,18 @@ char *vine_json_remove(struct vine_manager *q, int id)
 
 	char *task;
 	struct jx *j;
-	struct jx_pair *command_line, *taskid;
+	struct jx_pair *command_line, *task_id;
 
-	struct vine_task *t = vine_cancel_by_taskid(q, id);
+	struct vine_task *t = vine_cancel_by_task_id(q, id);
 
 	if(!t) {
 		return NULL;
 	}
 
 	command_line = jx_pair(jx_string("command_line"), jx_string(vine_task_get_command(t)), NULL);
-	taskid = jx_pair(jx_string("taskid"), jx_integer(vine_task_get_id(t)), command_line);
+	task_id = jx_pair(jx_string("task_id"), jx_integer(vine_task_get_id(t)), command_line);
 
-	j = jx_object(taskid);
+	j = jx_object(task_id);
 
 	task = jx_print_string(j);
 

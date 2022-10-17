@@ -407,7 +407,7 @@ vine_result_code_t vine_manager_get_output_files( struct vine_manager *q, struct
 	}
 
 	// tell the worker you no longer need that task's output directory.
-	vine_manager_send(q,w, "kill %d\n",t->taskid);
+	vine_manager_send(q,w, "kill %d\n",t->task_id);
 
 	return result;
 }
@@ -435,7 +435,7 @@ vine_result_code_t vine_manager_get_monitor_output_file( struct vine_manager *q,
 	}
 
 	// tell the worker you no longer need that task's output directory.
-	vine_manager_send(q,w, "kill %d\n",t->taskid);
+	vine_manager_send(q,w, "kill %d\n",t->task_id);
 
 	return result;
 }
