@@ -160,7 +160,6 @@ function cleanup {
 
 PONCHO_KEEP_ALIVE=no
 PONCHO_NO_COMMAND=no
-PONCHO_REMOVE_LOCKING=no
 
 parse_arguments "$@"
 
@@ -239,29 +238,18 @@ EOF
 
 if [[ "${ENV_NAME_IS_DIR}" = no ]]
 then
-    if [[ "${PONCHO_REMOVE_LOCKING}" = yes ]]
+    logmsg waiting for lock on directory "${UNPACK_TO}"
+    flock -E 222 -w "${LOCK_WAIT}" "${UNPACK_TO}" -c "/bin/bash ${UNTAR_SCRIPT}"
+    status=$?
+    if [[ "$status" != 0 ]]
     then
-	logmsg unpacking directory without file locking
-	/bin/bash ${UNTAR_SCRIPT}
-	if [[ "$?" != 0 ]]
+        if [[ "$status" = 222 ]]
         then
+            errmsg could not acquire lock
+        else
             errmsg could not untar environment: "${ENV_NAME}"
-	    exit 1
-	fi
-    else
-        logmsg waiting for lock on directory "${UNPACK_TO}"
-        flock -E 222 -w "${LOCK_WAIT}" "${UNPACK_TO}" -c "/bin/bash ${UNTAR_SCRIPT}"
-        status=$?
-        if [[ "$status" != 0 ]]
-        then
-            if [[ "$status" = 222 ]]
-            then
-                errmsg could not acquire lock
-            else
-                errmsg could not untar environment: "${ENV_NAME}"
-            fi
-            exit 1
         fi
+        exit 1
     fi
 fi
 

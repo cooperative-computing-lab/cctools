@@ -228,17 +228,11 @@ int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, co
 		debug(D_VINE,"unpacking %s to %s via command %s",transfer_path,cache_path,command);
 		unix_result = system(command);
 		free(command);
-	} else if(f-> flags & VINE_PONHO_UNPACK){
-		command = string_format("poncho_package_run -u %s -e %s && %s/bin/activate", cache_path, trasnfer_path, cache__path);
-		debug(D_VINE,"unpacking %s to %s via command %s and activating environment", transfer_path, cache_path, command);
+	} else if(f->flags & VINE_PONCHO_UNPACK){
+		command = string_format("poncho_package_run -u %s -e %s", cache_path, transfer_path);
+		debug(D_VINE,"unpacking %s to %s via command %s", transfer_path, cache_path, command);
 		unix_result = system(command);
-
-		command = string_format("%s/poncho/set_env" %s, transfer_path, transfer_path);
-		struct stat info; 	
-		if(stat(command,&info)==0) {
-			unix_result = system(command);
-		}
-		free(command)	
+		free(command);
 	} else {
 		debug(D_VINE,"renaming %s to %s",transfer_path,cache_path);
 		unix_result = rename(transfer_path,cache_path);
