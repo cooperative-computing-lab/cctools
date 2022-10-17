@@ -4374,7 +4374,7 @@ void vine_set_keepalive_timeout(struct vine_manager *q, int timeout)
 	q->keepalive_timeout = timeout;
 }
 
-void vine_manager_preferred_connection(struct vine_manager *q, const char *preferred_connection)
+void vine_set_manager_preferred_connection(struct vine_manager *q, const char *preferred_connection)
 {
 	free(q->manager_preferred_connection);
 	assert(preferred_connection);

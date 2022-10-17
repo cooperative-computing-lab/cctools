@@ -1254,12 +1254,7 @@ class Manager(object):
     # @param self Reference to the current manager object.
     # @param mode An string to indicate using 'by_ip', 'by_hostname' or 'by_apparent_ip'.
     def set_manager_preferred_connection(self, mode):
-        return vine_manager_preferred_connection(self._taskvine, mode)
-
-    ##
-    # See set_manager_preferred_connection
-    def set_master_preferred_connection(self, mode):
-        return vine_manager_preferred_connection(self._taskvine, mode)
+        return vine_set_manager_preferred_connection(self._taskvine, mode)
 
     ##
     # Set the minimum task_id of future submitted tasks.

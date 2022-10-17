@@ -1026,7 +1026,7 @@ void vine_set_keepalive_timeout(struct vine_manager *m, int timeout);
 @param m A manager object
 @param preferred_connection An string to indicate using 'by_ip' or a 'by_hostname'.
 */
-void vine_manager_preferred_connection(struct vine_manager *m, const char *preferred_connection);
+void vine_set_manager_preferred_connection(struct vine_manager *m, const char *preferred_connection);
 
 /** Tune advanced parameters for manager.
 @param m A manager object
