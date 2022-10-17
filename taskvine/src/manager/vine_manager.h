@@ -161,7 +161,7 @@ struct vine_manager {
 	int force_proportional_resources;  /* If true, tasks divide worker resources proportionally. */
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
-	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB */
+	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */
 };
 
 /*
