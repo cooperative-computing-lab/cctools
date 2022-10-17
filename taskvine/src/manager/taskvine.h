@@ -454,7 +454,7 @@ To change the scheduling algorithm for all tasks, use @ref vine_set_algorithm in
 @param t A task object.
 @param algorithm The algorithm to use in assigning this task to a worker. For possible values, see @ref vine_schedule_t.
 */
-void vine_task_set_algorithm(struct vine_task *t, vine_schedule_t algorithm);
+void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm);
 
 /** Specify a custom name for the monitoring summary. If @ref vine_enable_monitoring is also enabled, the summary is also written to that directory.
 @param t A task object.

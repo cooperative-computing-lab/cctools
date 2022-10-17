@@ -132,7 +132,7 @@ class Task(object):
     #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
     def set_algorithm(self, algorithm):
-        return vine_task_set_algorithm(self._task, algorithm)
+        return vine_task_set_scheduler(self._task, algorithm)
 
     ##
     # Attach a user defined logical name to the task.

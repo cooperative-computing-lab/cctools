@@ -154,7 +154,7 @@ struct vine_task *vine_task_clone(const struct vine_task *task)
 
 	/* Scheduling features of task are copied. */
 	new->resource_request = task->resource_request;
-	vine_task_set_algorithm(new, task->worker_selection_algorithm);
+	vine_task_set_scheduler(new, task->worker_selection_algorithm);
 	vine_task_set_priority(new, task->priority);
 	vine_task_set_max_retries(new, task->max_retries);
 	vine_task_set_time_min(new, task->min_running_time);
@@ -493,7 +493,7 @@ void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapsh
 	vine_task_add_input_file(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, VINE_CACHE);
 }
 
-void vine_task_set_algorithm(struct vine_task *t, vine_schedule_t algorithm)
+void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm)
 {
 	t->worker_selection_algorithm = algorithm;
 }
