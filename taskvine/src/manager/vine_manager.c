@@ -3279,7 +3279,7 @@ void vine_set_priority(struct vine_manager *q, int priority)
 	q->priority = priority;
 }
 
-void vine_set_num_tasks_left(struct vine_manager *q, int ntasks)
+void vine_set_tasks_left_count(struct vine_manager *q, int ntasks)
 {
 	if(ntasks < 1) {
 		q->num_tasks_left = 0;

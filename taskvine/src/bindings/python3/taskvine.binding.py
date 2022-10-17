@@ -1291,8 +1291,8 @@ class Manager(object):
     # num tasks left + num tasks running + num tasks read.
     # @param self   Reference to the current manager object.
     # @param ntasks Number of tasks yet to be submitted.
-    def set_num_tasks_left(self, ntasks):
-        return vine_set_num_tasks_left(self._taskvine, ntasks)
+    def tasks_left_count(self, ntasks):
+        return vine_set_tasks_left_count(self._taskvine, ntasks)
 
     ##
     # Specify the manager mode for the given queue.

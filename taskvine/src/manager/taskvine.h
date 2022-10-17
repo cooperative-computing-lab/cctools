@@ -939,7 +939,7 @@ num tasks left + num tasks running + num tasks read.
 @param m A manager object
 @param ntasks Number of tasks yet to be submitted.
 */
-void vine_set_num_tasks_left(struct vine_manager *m, int ntasks);
+void vine_set_tasks_left_count(struct vine_manager *m, int ntasks);
 
 /** Specify the catalog server the manager should report to.
 @param m A manager object
