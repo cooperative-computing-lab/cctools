@@ -210,10 +210,10 @@ int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, co
 	char *command;
 
 	if(flags & VINE_UNPACK) {
-		if(string_suffix_is(f->source,".tgz")) {
+		if(string_suffix_is(f->source,".tar")) {
 			mkdir(cache_path,0700);
 			command = string_format("tar xf %s -C %s",transfer_path,cache_path);
-		} else if(string_suffix_is(f->source,".tar.gz")) {
+		} else if(string_suffix_is(f->source,".tar.gz") || string_suffix_is(f->source,".tgz")) {
 			mkdir(cache_path,0700);
 			command = string_format("tar xzf %s -C %s",transfer_path,cache_path);
 		} else if(string_suffix_is(f->source,".gz")) {
