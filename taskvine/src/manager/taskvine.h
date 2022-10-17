@@ -521,7 +521,7 @@ output of the task.  If the task did not run to completion,
 then this function returns null.
 */
 
-const char * vine_task_get_output( struct vine_task *t );
+const char * vine_task_get_stdout( struct vine_task *t );
 
 /** Get an output buffer of the task.
 @param t A task object.

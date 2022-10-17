@@ -624,7 +624,7 @@ int vine_task_get_id( struct vine_task *t )
 	return t->taskid;
 }
 
-const char * vine_task_get_output( struct vine_task *t )
+const char * vine_task_get_stdout( struct vine_task *t )
 {
 	return t->output;
 }

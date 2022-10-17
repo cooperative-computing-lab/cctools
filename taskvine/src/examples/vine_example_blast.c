@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 			int id = vine_task_get_id(t);
 
 			if(r==VINE_RESULT_SUCCESS) {
-				printf("task %d output: %s\n",id,vine_task_get_output(t));
+				printf("task %d output: %s\n",id,vine_task_get_stdout(t));
 			} else {
 				printf("task %d failed: %s\n",id,vine_result_string(r));
 			}

@@ -357,7 +357,7 @@ char *vine_json_wait(struct vine_manager *q, int timeout)
 	exit_code = jx_pair(jx_string("exit_code"), jx_integer(vine_task_get_exit_code(t)), taskid);
 	result = jx_pair(jx_string("result"), jx_integer(vine_task_get_result(t)), exit_code);
 
-	const char *toutput = vine_task_get_output(t);
+	const char *toutput = vine_task_get_stdout(t);
 
 	if(toutput) {
 		output = jx_pair(jx_string("output"), jx_string(toutput), result);
