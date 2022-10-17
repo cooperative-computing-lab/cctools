@@ -67,7 +67,7 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 	} else if(state == VINE_TASK_READY) {
 		const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
 		buffer_printf(&B, " %s %s ", t->category, allocation);
-		rmsummary_print_buffer(&B, vine_manager_task_min_resources(q, t), 1);
+		rmsummary_print_buffer(&B, vine_manager_task_resources_min(q, t), 1);
 	} else if(state == VINE_TASK_CANCELED) {
 			/* do not add any info */
 	} else if(state == VINE_TASK_RETRIEVED || state == VINE_TASK_DONE) {

@@ -182,8 +182,8 @@ vine_msg_code_t vine_manager_recv( struct vine_manager *q, struct vine_worker_in
 int vine_manager_transfer_time( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length );
 
 /* Various functions to compute expected properties of tasks. */
-const struct rmsummary *vine_manager_task_min_resources(struct vine_manager *q, struct vine_task *t);
-const struct rmsummary *vine_manager_task_max_resources(struct vine_manager *q, struct vine_task *t);
+const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t);
+const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, struct vine_task *t);
 
 struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 

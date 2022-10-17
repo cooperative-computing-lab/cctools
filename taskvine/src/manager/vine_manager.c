@@ -1543,7 +1543,7 @@ static struct rmsummary  *total_resources_needed(struct vine_manager *q) {
 
 	/* for waiting tasks, we use what they would request if dispatched right now. */
 	LIST_ITERATE(q->ready_list,t) {
-		const struct rmsummary *s = vine_manager_task_min_resources(q, t);
+		const struct rmsummary *s = vine_manager_task_resources_min(q, t);
 		rmsummary_add(total, s);
 	}
 
@@ -2283,8 +2283,8 @@ Determine the resources to allocate for a given task when assigned to a specific
 
 struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t ) {
 
-	const struct rmsummary *min = vine_manager_task_min_resources(q, t);
-	const struct rmsummary *max = vine_manager_task_max_resources(q, t);
+	const struct rmsummary *min = vine_manager_task_resources_min(q, t);
+	const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
 	struct rmsummary *limits = rmsummary_create(-1);
 
@@ -4693,20 +4693,20 @@ void vine_initialize_categories(struct vine_manager *q, struct rmsummary *max, c
 	categories_initialize(q->categories, max, summaries_file);
 }
 
-void vine_set_max_resources(struct vine_manager *q,  const struct rmsummary *rm) {
-	vine_set_category_max_resources(q,  "default", rm);
+void vine_set_resources_max(struct vine_manager *q,  const struct rmsummary *rm) {
+	vine_set_category_resources_max(q,  "default", rm);
 }
 
-void vine_set_min_resources(struct vine_manager *q,  const struct rmsummary *rm) {
-	vine_set_category_min_resources(q,  "default", rm);
+void vine_set_resources_min(struct vine_manager *q,  const struct rmsummary *rm) {
+	vine_set_category_resources_min(q,  "default", rm);
 }
 
-void vine_set_category_max_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
+void vine_set_category_resources_max(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
 	category_specify_max_allocation(c, rm);
 }
 
-void vine_set_category_min_resources(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
+void vine_set_category_resources_min(struct vine_manager *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = vine_category_lookup_or_create(q, category);
 	category_specify_min_allocation(c, rm);
 }
@@ -4749,14 +4749,14 @@ int vine_enable_category_resource(struct vine_manager *q, const char *category, 
 	return category_enable_auto_resource(c, resource, autolabel);
 }
 
-const struct rmsummary *vine_manager_task_max_resources(struct vine_manager *q, struct vine_task *t) {
+const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, struct vine_task *t) {
 
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
 	return category_dynamic_task_max_resources(c, t->resources_requested, t->resource_request);
 }
 
-const struct rmsummary *vine_manager_task_min_resources(struct vine_manager *q, struct vine_task *t) {
+const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t) {
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
 	const struct rmsummary *s = category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);

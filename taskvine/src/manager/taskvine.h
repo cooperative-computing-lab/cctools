@@ -1053,28 +1053,28 @@ rm specifies the maximum resources a task in the default category may use.
 @param m  Reference to the current manager object.
 @param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
-void vine_set_max_resources(struct vine_manager *m,  const struct rmsummary *rm);
+void vine_set_resources_max(struct vine_manager *m,  const struct rmsummary *rm);
 
 /** Sets the minimum resources a task without an explicit category ("default" category).
 rm specifies the maximum resources a task in the default category may use.
 @param m  Reference to the current manager object.
 @param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
-void vine_set_min_resources(struct vine_manager *m,  const struct rmsummary *rm);
+void vine_set_resources_min(struct vine_manager *m,  const struct rmsummary *rm);
 
 /** Sets the maximum resources a task in the category may use.
 @param m         Reference to the current manager object.
 @param category  Name of the category.
 @param rm Structure indicating minimum values. See @ref rmsummary for possible fields.
 */
-void vine_set_category_max_resources(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
+void vine_set_category_resources_max(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Sets the minimum resources a task in the category may use.
 @param m         Reference to the current manager object.
 @param category  Name of the category.
 @param rm Structure indicating minimum values. See @ref rmsummary for possible fields.
 */
-void vine_set_category_min_resources(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
+void vine_set_category_resources_min(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Set the initial guess for resource autolabeling for the given category.
 @param m         Reference to the current manager object.

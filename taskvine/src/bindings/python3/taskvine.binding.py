@@ -1111,7 +1111,7 @@ class Manager(object):
     #                  - VINE_ALLOCATION_MODE_FIXED Task fails (default).
     #                  - VINE_ALLOCATION_MODE_MAX If maximum values are
     #                  specified for cores, memory, disk, and gpus (e.g. via @ref
-    #                  set_category_max_resources or @ref Task.set_memory),
+    #                  set_category_resources_max or @ref Task.set_memory),
     #                  and one of those resources is exceeded, the task fails.
     #                  Otherwise it is retried until a large enough worker
     #                  connects to the manager, using the maximum values
@@ -1360,17 +1360,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A maximum of 4 cores is found on any worker:
-    # >>> q.set_max_resources({'cores': 4})
+    # >>> q.set_resources_max({'cores': 4})
     # >>> # A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
-    # >>> q.set_max_resources({'cores': 8, 'memory':  1024, 'disk': 10240})
+    # >>> q.set_resources_max({'cores': 8, 'memory':  1024, 'disk': 10240})
     # @endcode
 
-    def set_max_resources(self, rmd):
+    def set_resources_max(self, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_set_max_resources(self._taskvine, rm)
+        return vine_set_resources_max(self._taskvine, rm)
 
     ##
     #
@@ -1380,17 +1380,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
-    # >>> q.set_min_resources({'cores': 2})
+    # >>> q.set_resources_min({'cores': 2})
     # >>> # A minimum of 4 cores, 512MB of memory, and 1GB disk are found on any worker:
-    # >>> q.set_min_resources({'cores': 4, 'memory':  512, 'disk': 1024})
+    # >>> q.set_resources_min({'cores': 4, 'memory':  512, 'disk': 1024})
     # @endcode
 
-    def set_min_resources(self, rmd):
+    def set_resources_min(self, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_set_min_resources(self._taskvine, rm)
+        return vine_set_resources_min(self._taskvine, rm)
 
     ##
     # Specifies the maximum resources allowed for the given category.
@@ -1401,17 +1401,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A maximum of 4 cores may be used by a task in the category:
-    # >>> q.set_category_max_resources("my_category", {'cores': 4})
+    # >>> q.set_category_resources_max("my_category", {'cores': 4})
     # >>> # A maximum of 8 cores, 1GB of memory, and 10GB may be used by a task:
-    # >>> q.set_category_max_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
+    # >>> q.set_category_resources_max("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
     # @endcode
 
-    def set_category_max_resources(self, category, rmd):
+    def set_category_resources_max(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_set_category_max_resources(self._taskvine, category, rm)
+        return vine_set_category_resources_max(self._taskvine, category, rm)
 
     ##
     # Specifies the minimum resources allowed for the given category.
@@ -1422,17 +1422,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
-    # >>> q.set_category_min_resources("my_category", {'cores': 2})
+    # >>> q.set_category_resources_min("my_category", {'cores': 2})
     # >>> # A minimum of 4 cores, 512MB of memory, and 1GB disk are found on any worker:
-    # >>> q.set_category_min_resources("my_category", {'cores': 4, 'memory':  512, 'disk': 1024})
+    # >>> q.set_category_resources_min("my_category", {'cores': 4, 'memory':  512, 'disk': 1024})
     # @endcode
 
-    def set_category_min_resources(self, category, rmd):
+    def set_category_resources_min(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_set_category_min_resources(self._taskvine, category, rm)
+        return vine_set_category_resources_min(self._taskvine, category, rm)
 
     ##
     # Specifies the first-allocation guess for the given category

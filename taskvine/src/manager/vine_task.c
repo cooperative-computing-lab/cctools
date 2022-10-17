@@ -738,8 +738,8 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 		jx_insert_integer(j,"memory",t->resources_allocated->memory);
 		jx_insert_integer(j,"disk",t->resources_allocated->disk);
 	} else {
-		const struct rmsummary *min = vine_manager_task_min_resources(q, t);
-		const struct rmsummary *max = vine_manager_task_max_resources(q, t);
+		const struct rmsummary *min = vine_manager_task_resources_min(q, t);
+		const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
 		struct rmsummary *limits = rmsummary_create(-1);
 		rmsummary_merge_override(limits, max);
