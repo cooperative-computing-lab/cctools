@@ -992,7 +992,7 @@ class Manager(object):
     # @endcode
     @property
     def name(self):
-        return vine_name(self._taskvine)
+        return vine_get_name(self._taskvine)
 
     ##
     # Get the listening port of the queue.

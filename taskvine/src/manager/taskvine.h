@@ -747,7 +747,7 @@ void vine_set_name(struct vine_manager *m, const char *name);
 @param m A manager object
 @return The project name of the manager.
 */
-const char *vine_name(struct vine_manager *m);
+const char *vine_get_name(struct vine_manager *m);
 
 /** Enables resource monitoring on the give manager.
 It generates a resource summary per task, which is written to the given

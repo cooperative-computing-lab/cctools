@@ -3269,7 +3269,7 @@ void vine_set_name(struct vine_manager *q, const char *name)
 	}
 }
 
-const char *vine_name(struct vine_manager *q)
+const char *vine_get_name(struct vine_manager *q)
 {
 	return q->name;
 }
