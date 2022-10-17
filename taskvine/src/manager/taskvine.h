@@ -199,7 +199,7 @@ struct vine_stats {
 	int64_t total_memory;     /**< Total memory in MB aggregated across the connected workers. */
 	int64_t total_disk;	      /**< Total disk space in MB aggregated across the connected workers. */
 	int64_t total_gpus;       /**< Total number of gpus aggregated across the connected workers. */
-  
+
 	int64_t committed_cores;  /**< Committed number of cores aggregated across the connected workers. */
 	int64_t committed_memory; /**< Committed memory in MB aggregated across the connected workers. */
 	int64_t committed_disk;	  /**< Committed disk space in MB aggregated across the connected workers. */
@@ -385,10 +385,11 @@ This is useful, for example, when the task uses certificates that expire.
 @param useconds Number of useconds since the Epoch.
 */
 
-void vine_task_set_end_time( struct vine_task *t, int64_t useconds );
+void vine_task_set_time_end( struct vine_task *t, int64_t useconds );
 
-/** Specify the minimum start time allowed for the task (in microseconds since the
-Epoch). If less than 1, then no minimum start time is specified (this is the default).
+/** Specify the minimum start time allowed for the task (in microseconds since
+ the Epoch). The task will only be submitted to workers after the specified time.
+ If less than 1, then no minimum start time is specified (this is the default).
 @param t A task object.
 @param useconds Number of useconds since the Epoch.
 */

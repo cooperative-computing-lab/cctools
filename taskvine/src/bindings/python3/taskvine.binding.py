@@ -464,8 +464,8 @@ class Task(object):
     # Indicate the maximum end time (absolute, in microseconds from the Epoch) of this task.
     # This is useful, for example, when the task uses certificates that expire.
     # If less than 1, or not specified, no limit is imposed.
-    def set_end_time(self, useconds):
-        return vine_task_set_end_time(self._task, int(useconds))
+    def set_time_end(self, useconds):
+        return vine_task_set_time_end(self._task, int(useconds))
 
     # Indicate the minimum start time (absolute, in microseconds from the Epoch) of this task.
     # If less than 1, or not specified, no limit is imposed.

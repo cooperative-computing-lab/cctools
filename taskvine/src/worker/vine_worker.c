@@ -697,7 +697,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 		} else if(sscanf(line,"wall_time %" PRIu64,&nt)) {
 			vine_task_set_running_time_max(task, nt);
 		} else if(sscanf(line,"end_time %" PRIu64,&nt)) {
-			vine_task_set_end_time(task, nt * USECOND); //end_time needs it usecs
+			vine_task_set_time_end(task, nt * USECOND); //end_time needs it usecs
 		} else if(sscanf(line,"env %d",&length)==1) {
 			char *env = malloc(length+2); /* +2 for \n and \0 */
 			link_read(manager, env, length+1, stoptime);

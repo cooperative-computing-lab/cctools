@@ -276,7 +276,7 @@ void vine_task_set_gpus( struct vine_task *t, int gpus )
 	}
 }
 
-void vine_task_set_end_time( struct vine_task *t, int64_t useconds )
+void vine_task_set_time_end( struct vine_task *t, int64_t useconds )
 {
 	if(useconds < 1)
 	{
@@ -340,7 +340,7 @@ void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm) {
 	vine_task_set_running_time(t, rm->wall_time);
 	vine_task_set_running_time_max(t, rm->wall_time);
 	vine_task_set_running_time_min(t, t->min_running_time);
-	vine_task_set_end_time(t,     rm->end);
+	vine_task_set_time_end(t,     rm->end);
 }
 
 void vine_task_set_tag(struct vine_task *t, const char *tag)
