@@ -57,10 +57,9 @@ void vine_perf_log_write_update( struct vine_manager *q, int force )
 	}
 
 	vine_get_stats(q, &s);
-	debug(D_VINE, "workers connections -- known: %d, connecting: %d, available: %d.",
+	debug(D_VINE, "workers connections -- known: %d, connecting: %d",
 			s.workers_connected,
-			s.workers_init,
-			vine_manager_available_workers(q));
+			s.workers_init);
 
 	q->time_last_log_stats = now;
 

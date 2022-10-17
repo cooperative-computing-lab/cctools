@@ -162,24 +162,6 @@ int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total)
 	return r;
 }
 
-/* Return the number of workers available to run tasks of any size. */
-
-int vine_manager_available_workers(struct vine_manager *q) {
-	struct vine_worker_info *w;
-	char* id;
-	int available_workers = 0;
-
-	HASH_TABLE_ITERATE(q->worker_table,id,w) {
-		if(strcmp(w->hostname, "unknown") != 0) {
-			if(overcommitted_resource_total(q, w->resources->cores.total) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total) > w->resources->memory.inuse){
-				available_workers++;
-			}
-		}
-	}
-
-	return available_workers;
-}
-
 /* Returns count of workers that are running at least 1 task. */
 
 static int workers_with_tasks(struct vine_manager *q) {

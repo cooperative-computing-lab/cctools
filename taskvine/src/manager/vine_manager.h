@@ -181,9 +181,6 @@ vine_msg_code_t vine_manager_recv( struct vine_manager *q, struct vine_worker_in
 /* Compute the expected wait time for a transfer of length bytes. */
 int vine_manager_transfer_time( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length );
 
-/* Give the number of workers available to run tasks at the moment. */
-int vine_manager_available_workers(struct vine_manager *q);
-
 /* Various functions to compute expected properties of tasks. */
 const struct rmsummary *vine_manager_task_min_resources(struct vine_manager *q, struct vine_task *t);
 const struct rmsummary *vine_manager_task_max_resources(struct vine_manager *q, struct vine_task *t);
