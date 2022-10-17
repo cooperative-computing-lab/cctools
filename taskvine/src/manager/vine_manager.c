@@ -4302,7 +4302,7 @@ struct vine_task *vine_cancel_by_task_tag(struct vine_manager *q, const char* ta
 	return NULL;
 }
 
-struct list * vine_cancel_all_tasks(struct vine_manager *q)
+struct list * vine_tasks_cancel(struct vine_manager *q)
 {
 	struct list *l = list_create();
 	struct vine_task *t;

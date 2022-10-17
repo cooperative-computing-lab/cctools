@@ -965,7 +965,7 @@ struct vine_task *vine_cancel_by_task_tag(struct vine_manager *m, const char *ta
 @param m A manager object
 @return A struct list of all of the tasks canceled.  Each task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
 */
-struct list * vine_cancel_all_tasks(struct vine_manager *m);
+struct list * vine_tasks_cancel(struct vine_manager *m);
 
 /** Shut down workers connected to the manager. Gives a best effort and then returns the number of workers given the shut down order.
 @param m A manager object
