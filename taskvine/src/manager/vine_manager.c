@@ -3289,20 +3289,6 @@ void vine_set_tasks_left_count(struct vine_manager *q, int ntasks)
 	}
 }
 
-void vine_set_catalog_server(struct vine_manager *q, const char *hostname, int port)
-{
-	char hostport[DOMAIN_NAME_MAX + 8];
-	if(hostname && (port > 0)) {
-		sprintf(hostport, "%s:%d", hostname, port);
-		vine_set_catalog_servers(q, hostport);
-	} else if(hostname) {
-		vine_set_catalog_servers(q, hostname);
-	} else if (port > 0) {
-		sprintf(hostport, "%d", port);
-		setenv("CATALOG_PORT", hostport, 1);
-	}
-}
-
 void vine_set_catalog_servers(struct vine_manager *q, const char *hosts)
 {
 	if(hosts) {

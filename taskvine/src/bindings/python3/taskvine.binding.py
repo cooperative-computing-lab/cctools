@@ -1309,13 +1309,12 @@ class Manager(object):
         return vine_set_manager_mode(self._taskvine, mode)
 
     ##
-    # Specify the catalog server the manager should report to.
+    # Specify the catalog servers the manager should report to.
     #
     # @param self       Reference to the current manager object.
-    # @param hostname   The hostname of the catalog server.
-    # @param port       The port the catalog server is listening on.
-    def set_catalog_server(self, hostname, port):
-        return vine_set_catalog_server(self._taskvine, hostname, port)
+    # @param catalogs   The catalog servers given as a comma delimited list of hostnames or hostname:port
+    def set_catalog_servers(self, hostname, port):
+        return vine_set_catalog_servers(self._taskvine, catalogs)
 
     ##
     # Specify a debug log file that records the manager actions in detail.

@@ -941,13 +941,6 @@ num tasks left + num tasks running + num tasks read.
 */
 void vine_set_tasks_left_count(struct vine_manager *m, int ntasks);
 
-/** Specify the catalog server the manager should report to.
-@param m A manager object
-@param hostname The catalog server's hostname.
-@param port The port the catalog server is listening on.
-*/
-void vine_set_catalog_server(struct vine_manager *m, const char *hostname, int port);
-
 /** Specify the catalog server(s) the manager should report to.
 @param m A manager object
 @param hosts The catalog servers given as a comma delimited list of hostnames or hostname:port
