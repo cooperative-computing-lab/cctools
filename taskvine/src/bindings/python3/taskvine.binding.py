@@ -552,7 +552,7 @@ class Task(object):
     # @endcode
     @property
     def id(self):
-        return vine_task_get_taskid(self._task)
+        return vine_task_get_id(self._task)
 
     ##
     # Get the exit code of the command executed by the task. Must be called only
@@ -1664,8 +1664,8 @@ class Manager(object):
     def wait_for_tag(self, tag, timeout=VINE_WAITFORTASK):
         task_pointer = vine_wait_for_tag(self._taskvine, tag, timeout)
         if task_pointer:
-            task = self._task_table[vine_task_get_taskid(task_pointer)]
-            del self._task_table[vine_task_get_taskid(task_pointer)]
+            task = self._task_table[vine_task_get_id(task_pointer)]
+            del self._task_table[vine_task_get_id(task_pointer)]
             return task
         return None
 
@@ -1682,8 +1682,8 @@ class Manager(object):
     def wait_for_taskid(self, taskid, timeout=VINE_WAITFORTASK):
         task_pointer = vine_wait_for_taskid(self._taskvine, taskid, timeout)
         if task_pointer:
-            task = self._task_table[vine_task_get_taskid(task_pointer)]
-            del self._task_table[vine_task_get_taskid(task_pointer)]
+            task = self._task_table[vine_task_get_id(task_pointer)]
+            del self._task_table[vine_task_get_id(task_pointer)]
             return task
         return None            
 
@@ -1721,7 +1721,7 @@ class Manager(object):
 
                 t = self.wait_for_tag(str(i), 1)
                 if t:
-                    results[tasks[vine_task_get_taskid(t)]] = list(vine_task_get_output(t))
+                    results[tasks[vine_task_get_id(t)]] = list(vine_task_get_output(t))
                     n += 1
                     break
 
@@ -1783,7 +1783,7 @@ class Manager(object):
                 t = self.wait_for_tag(str(i), 10)
 
                 if t:
-                    results[tasks[vine_task_get_taskid(t)]] = vine_task_get_output(t)
+                    results[tasks[vine_task_get_id(t)]] = vine_task_get_output(t)
                     n += 1
                     break
  
@@ -1831,7 +1831,7 @@ class Manager(object):
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
-                        results[tasks[vine_task_get_taskid(t)]] = vine_task_get_output(t)
+                        results[tasks[vine_task_get_id(t)]] = vine_task_get_output(t)
                         n += 1
                         break
 
@@ -1871,7 +1871,7 @@ class Manager(object):
             while not self.empty() and n < size:
                 t = self.wait_for_tag(str(i), 1)                
                 if t:
-                    results[tasks[vine_task_get_taskid(t)]] = list(json.loads(vine_task_get_output(t))["Result"])
+                    results[tasks[vine_task_get_id(t)]] = list(json.loads(vine_task_get_output(t))["Result"])
                     n += 1
                     break
 
@@ -1925,7 +1925,7 @@ class Manager(object):
             while not self.empty() and n < num_task:
                 t = self.wait_for_tag(str(i), 10)
                 if t:
-                    results[tasks[vine_task_get_taskid(t)]] = json.loads(vine_task_get_output(t))["Result"]
+                    results[tasks[vine_task_get_id(t)]] = json.loads(vine_task_get_output(t))["Result"]
                     n += 1
                     break
          
@@ -1971,7 +1971,7 @@ class Manager(object):
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
-                        results[tasks[vine_task_get_taskid(t)]] = json.loads(vine_task_get_output(t))["Result"]
+                        results[tasks[vine_task_get_id(t)]] = json.loads(vine_task_get_output(t))["Result"]
                         n += 1
                         break
 

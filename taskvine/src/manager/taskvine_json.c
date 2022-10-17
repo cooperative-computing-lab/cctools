@@ -353,7 +353,7 @@ char *vine_json_wait(struct vine_manager *q, int timeout)
 	}
 
 	command_line = jx_pair(jx_string("command_line"), jx_string(vine_task_get_command(t)), NULL);
-	taskid = jx_pair(jx_string("taskid"), jx_integer(vine_task_get_taskid(t)), command_line);
+	taskid = jx_pair(jx_string("taskid"), jx_integer(vine_task_get_id(t)), command_line);
 	exit_code = jx_pair(jx_string("exit_code"), jx_integer(vine_task_get_exit_code(t)), taskid);
 	result = jx_pair(jx_string("result"), jx_integer(vine_task_get_result(t)), exit_code);
 
@@ -386,7 +386,7 @@ char *vine_json_remove(struct vine_manager *q, int id)
 	}
 
 	command_line = jx_pair(jx_string("command_line"), jx_string(vine_task_get_command(t)), NULL);
-	taskid = jx_pair(jx_string("taskid"), jx_integer(vine_task_get_taskid(t)), command_line);
+	taskid = jx_pair(jx_string("taskid"), jx_integer(vine_task_get_id(t)), command_line);
 
 	j = jx_object(taskid);
 

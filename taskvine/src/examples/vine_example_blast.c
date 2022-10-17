@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 		t  = vine_wait(m, 5);
 		if(t) {
 			vine_result_t r = vine_task_get_result(t);
-			int id = vine_task_get_taskid(t);
+			int id = vine_task_get_id(t);
 
 			if(r==VINE_RESULT_SUCCESS) {
 				printf("task %d output: %s\n",id,vine_task_get_output(t));

@@ -482,7 +482,7 @@ const char * vine_task_get_tag( struct vine_task *t );
 @return The integer task ID assigned at creation time.
 */
 
-int vine_task_get_taskid( struct vine_task *t );
+int vine_task_get_id( struct vine_task *t );
 
 /** Get the end result of the task.
 If the result is @ref VINE_RESULT_SUCCESS, then the
