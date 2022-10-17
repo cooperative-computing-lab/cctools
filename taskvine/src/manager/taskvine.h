@@ -972,7 +972,7 @@ struct vine_task *vine_cancel_by_task_id(struct vine_manager *m, int id);
 @param tag The tag name assigned to task using @ref vine_task_set_tag.
 @return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
 */
-struct vine_task *vine_cancel_by_tasktag(struct vine_manager *m, const char *tag);
+struct vine_task *vine_cancel_by_task_tag(struct vine_manager *m, const char *tag);
 
 /** Cancel all submitted tasks and remove them from the manager.
 @param m A manager object

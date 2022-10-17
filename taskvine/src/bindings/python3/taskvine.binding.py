@@ -1488,9 +1488,9 @@ class Manager(object):
     #
     # @param self   Reference to the current manager object.
     # @param tag    The tag assigned to task using @ref set_tag.
-    def cancel_by_tasktag(self, tag):
+    def cancel_by_task_tag(self, tag):
         task = None
-        task_pointer = vine_cancel_by_tasktag(self._taskvine, tag)
+        task_pointer = vine_cancel_by_task_tag(self._taskvine, tag)
         if task_pointer:
             task = self._task_table.pop(int(id))
         return task

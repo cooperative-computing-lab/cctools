@@ -2907,20 +2907,20 @@ static int shutdown_drained_workers(struct vine_manager *q) {
 
 /* Comparator function for checking if a task matches a given tag. */
 
-static int tasktag_comparator(void *t, const void *r) {
+static int task_tag_comparator(void *t, const void *r) {
 
 	struct vine_task *task_in_queue = t;
-	const char *tasktag = r;
+	const char *task_tag = r;
 
-	if(!task_in_queue->tag && !tasktag) {
+	if(!task_in_queue->tag && !task_tag) {
 		return 1;
 	}
 
-	if(!task_in_queue->tag || !tasktag) {
+	if(!task_in_queue->tag || !task_tag) {
 		return 0;
 	}
 
-	return !strcmp(task_in_queue->tag, tasktag);
+	return !strcmp(task_in_queue->tag, task_tag);
 }
 
 /*
@@ -2954,12 +2954,12 @@ static int cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, vi
 
 /* Search for any one task that matches the given tag string. */
 
-static struct vine_task *find_task_by_tag(struct vine_manager *q, const char *tasktag) {
+static struct vine_task *find_task_by_tag(struct vine_manager *q, const char *task_tag) {
 	struct vine_task *t;
 	uint64_t task_id;
 
 	ITABLE_ITERATE(q->tasks,task_id,t) {
-		if( tasktag_comparator(t, tasktag) ) {
+		if( task_tag_comparator(t, task_tag) ) {
 			return t;
 		}
 	}
@@ -3689,7 +3689,7 @@ static struct vine_task *task_state_any_with_tag(struct vine_manager *q, vine_ta
 	struct vine_task *t;
 	uint64_t task_id;
 	ITABLE_ITERATE(q->tasks,task_id,t) {
-		if( t->state==state && tasktag_comparator((void *) t, (void *) tag)) {
+		if( t->state==state && task_tag_comparator((void *) t, (void *) tag)) {
 			return t;
 		}
 	}
@@ -4299,12 +4299,12 @@ struct vine_task *vine_cancel_by_task_id(struct vine_manager *q, int task_id) {
 	return matched_task;
 }
 
-struct vine_task *vine_cancel_by_tasktag(struct vine_manager *q, const char* tasktag) {
+struct vine_task *vine_cancel_by_task_tag(struct vine_manager *q, const char* task_tag) {
 
 	struct vine_task *matched_task = NULL;
 
-	if (tasktag){
-		matched_task = find_task_by_tag(q, tasktag);
+	if (task_tag){
+		matched_task = find_task_by_tag(q, task_tag);
 
 		if(matched_task) {
 			return vine_cancel_by_task_id(q, matched_task->task_id);
@@ -4312,7 +4312,7 @@ struct vine_task *vine_cancel_by_tasktag(struct vine_manager *q, const char* tas
 
 	}
 
-	debug(D_VINE, "Task with tag %s is not found in queue.", tasktag);
+	debug(D_VINE, "Task with tag %s is not found in queue.", task_tag);
 	return NULL;
 }
 
