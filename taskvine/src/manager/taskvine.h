@@ -396,23 +396,14 @@ void vine_task_set_time_end( struct vine_task *t, int64_t useconds );
 
 void vine_task_set_time_start( struct vine_task *t, int64_t useconds );
 
-/** Specify the maximum time (in microseconds) the task is allowed to run in a
+/** Specify the maximum time (in seconds) the task is allowed to run in a
 worker. This time is accounted since the the moment the task starts to run
 in a worker.  If less than 1, then no maximum time is specified (this is the default).
 @param t A task object.
-@param useconds Maximum number of seconds the task may run in a worker.
-*/
-
-void vine_task_set_running_time( struct vine_task *t, int64_t useconds );
-
-/** Specify the maximum time (in seconds) the task is allowed to run in a worker.
-This time is accounted since the moment the task starts to run in a worker.
-If less than 1, then no maximum time is specified (this is the default).
-Note: same effect as vine_task_set_running_time.
-@param t A task object.
 @param seconds Maximum number of seconds the task may run in a worker.
 */
-void vine_task_set_running_time_max( struct vine_task *t, int64_t seconds );
+
+void vine_task_set_time_max( struct vine_task *t, int64_t seconds );
 
 /** Specify the minimum time (in seconds) the task is expected to run in a worker.
 This time is accounted since the moment the task starts to run in a worker.
@@ -420,7 +411,7 @@ If less than 1, then no minimum time is specified (this is the default).
 @param t A task object.
 @param seconds Minimum number of seconds the task may run in a worker.
 */
-void vine_task_set_running_time_min( struct vine_task *t, int64_t seconds );
+void vine_task_set_time_min( struct vine_task *t, int64_t seconds );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the manager, but is provided for the user's convenience

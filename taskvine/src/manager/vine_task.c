@@ -157,7 +157,7 @@ struct vine_task *vine_task_clone(const struct vine_task *task)
 	vine_task_set_algorithm(new, task->worker_selection_algorithm);
 	vine_task_set_priority(new, task->priority);
 	vine_task_set_max_retries(new, task->max_retries);
-	vine_task_set_running_time_min(new, task->min_running_time);
+	vine_task_set_time_min(new, task->min_running_time);
 
 	/* Internal state of task is cleared from vine_task_create */
 
@@ -300,24 +300,19 @@ void vine_task_set_time_start( struct vine_task *t, int64_t useconds )
 	}
 }
 
-void vine_task_set_running_time( struct vine_task *t, int64_t useconds )
+void vine_task_set_time_max( struct vine_task *t, int64_t seconds )
 {
-	if(useconds < 1)
+	if(seconds < 1)
 	{
 		t->resources_requested->wall_time = -1;
 	}
 	else
 	{
-		t->resources_requested->wall_time = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
+		t->resources_requested->wall_time = DIV_INT_ROUND_UP(seconds, ONE_SECOND);
 	}
 }
 
-void vine_task_set_running_time_max( struct vine_task *t, int64_t seconds )
-{
-	vine_task_set_running_time(t, seconds);
-}
-
-void vine_task_set_running_time_min( struct vine_task *t, int64_t seconds )
+void vine_task_set_time_min( struct vine_task *t, int64_t seconds )
 {
 	if(seconds < 1)
 	{
@@ -337,9 +332,8 @@ void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm) {
 	vine_task_set_memory(t,       rm->memory);
 	vine_task_set_disk(t,         rm->disk);
 	vine_task_set_gpus(t,         rm->gpus);
-	vine_task_set_running_time(t, rm->wall_time);
-	vine_task_set_running_time_max(t, rm->wall_time);
-	vine_task_set_running_time_min(t, t->min_running_time);
+	vine_task_set_time_max(t, rm->wall_time);
+	vine_task_set_time_min(t, t->min_running_time);
 	vine_task_set_time_end(t,     rm->end);
 }
 

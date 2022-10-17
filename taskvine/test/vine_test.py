@@ -178,28 +178,28 @@ if __name__ == '__main__':
 
     # should succeed in the alloted time
     t = vine.Task("/bin/sleep 1")
-    t.set_running_time_max(10)
+    t.set_time_max(10)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # should fail in the alloted time
     t = vine.Task("/bin/sleep 10")
-    t.set_running_time_max(1)
+    t.set_time_max(1)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_TASK_MAX_RUN_TIME, 9)
 
     # should run in the alloted absolute time
     t = vine.Task("/bin/sleep 1")
-    t.set_end_time((time.time() + 5) * 1e6)
+    t.set_time_end((time.time() + 5) * 1e6)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # should fail in the alloted absolute time
     t = vine.Task("/bin/sleep 10")
-    t.set_end_time((time.time() + 2) * 1e6)
+    t.set_time_end((time.time() + 2) * 1e6)
     q.submit(t)
     t = q.wait(30)
     report_task(t, vine.VINE_RESULT_TASK_TIMEOUT, 9)

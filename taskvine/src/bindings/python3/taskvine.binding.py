@@ -473,25 +473,17 @@ class Task(object):
     def set_time_start(self, useconds):
         return vine_task_set_time_start(self._task, int(useconds))
 
-    # Indicate the maximum running time (in microseconds) for a task in a
+    # Indicate the maximum running time (in seconds) for a task in a
     # worker (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
-    # Note: It has the same effect that set_running_time_max, but specified
-    # in microseconds. Kept for backwards compatibility.
-    def set_running_time(self, useconds):
-        return vine_task_set_running_time(self._task, int(useconds))
-
-    # Indicate the maximum running time (in seconds) for a task in a worker
-    # (relative to when the task starts to run).  If less than 1, or not
-    # specified, no limit is imposed.
-    def set_running_time_max(self, seconds):
-        return vine_task_set_running_time_max(self._task, int(seconds))
+    def set_time_max(self, useconds):
+        return vine_task_set_time_max(self._task, int(useconds))
 
     # Indicate the minimum running time (in seconds) for a task in a worker
     # (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
-    def set_running_time_min(self, seconds):
-        return vine_task_set_running_time_min(self._task, int(seconds))
+    def set_time_min(self, seconds):
+        return vine_task_set_time_min(self._task, int(seconds))
 
     ##
     # Set this environment variable before running the task.
