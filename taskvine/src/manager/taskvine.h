@@ -394,7 +394,7 @@ void vine_task_set_time_end( struct vine_task *t, int64_t useconds );
 @param useconds Number of useconds since the Epoch.
 */
 
-void vine_task_set_start_time_min( struct vine_task *t, int64_t useconds );
+void vine_task_set_time_start( struct vine_task *t, int64_t useconds );
 
 /** Specify the maximum time (in microseconds) the task is allowed to run in a
 worker. This time is accounted since the the moment the task starts to run

@@ -468,9 +468,10 @@ class Task(object):
         return vine_task_set_time_end(self._task, int(useconds))
 
     # Indicate the minimum start time (absolute, in microseconds from the Epoch) of this task.
+    # Task will only be submitted to workers after the specified time.
     # If less than 1, or not specified, no limit is imposed.
-    def set_start_time_min(self, useconds):
-        return vine_task_set_start_time_min(self._task, int(useconds))
+    def set_time_start(self, useconds):
+        return vine_task_set_time_start(self._task, int(useconds))
 
     # Indicate the maximum running time (in microseconds) for a task in a
     # worker (relative to when the task starts to run).  If less than 1, or not

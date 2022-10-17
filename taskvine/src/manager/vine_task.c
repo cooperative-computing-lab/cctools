@@ -288,7 +288,7 @@ void vine_task_set_time_end( struct vine_task *t, int64_t useconds )
 	}
 }
 
-void vine_task_set_start_time_min( struct vine_task *t, int64_t useconds )
+void vine_task_set_time_start( struct vine_task *t, int64_t useconds )
 {
 	if(useconds < 1)
 	{
