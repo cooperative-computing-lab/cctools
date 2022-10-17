@@ -156,7 +156,7 @@ struct vine_task *vine_task_clone(const struct vine_task *task)
 	new->resource_request = task->resource_request;
 	vine_task_set_scheduler(new, task->worker_selection_algorithm);
 	vine_task_set_priority(new, task->priority);
-	vine_task_set_max_retries(new, task->max_retries);
+	vine_task_set_retries(new, task->max_retries);
 	vine_task_set_time_min(new, task->min_running_time);
 
 	/* Internal state of task is cleared from vine_task_create */
@@ -219,7 +219,7 @@ void vine_task_set_env_var( struct vine_task *t, const char *name, const char *v
 	}
 }
 
-void vine_task_set_max_retries( struct vine_task *t, int64_t max_retries ) {
+void vine_task_set_retries( struct vine_task *t, int64_t max_retries ) {
 	if(max_retries < 1) {
 		t->max_retries = 0;
 	}

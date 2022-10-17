@@ -433,8 +433,8 @@ class Task(object):
     # default), the task is tried indefinitely. A task that did not succeed
     # after the given number of retries is returned with result
     # VINE_RESULT_MAX_RETRIES.
-    def set_max_retries(self, max_retries):
-        return vine_task_set_max_retries(self._task, max_retries)
+    def set_retries(self, max_retries):
+        return vine_task_set_retries(self._task, max_retries)
 
     ##
     # Indicate the number of cores required by this task.
@@ -1116,7 +1116,7 @@ class Manager(object):
     #                  Otherwise it is retried until a large enough worker
     #                  connects to the manager, using the maximum values
     #                  specified, and the maximum values so far seen for
-    #                  resources not specified. Use @ref Task.set_max_retries to
+    #                  resources not specified. Use @ref Task.set_retries to
     #                  set a limit on the number of times manager attemps
     #                  to complete the task.
     #                  - VINE_ALLOCATION_MODE_MIN_WASTE As above, but

@@ -7,8 +7,8 @@ import sys
 import taskvine as vine
 
 def check_task(category, category_mode, max, min, expected):
-    q.set_category_max_resources(category, max)
-    q.set_category_min_resources(category, min)
+    q.set_category_resource_max(category, max)
+    q.set_category_resource_min(category, min)
     q.set_category_mode(category, category_mode)
 
     t = vine.Task('/bin/echo hello')

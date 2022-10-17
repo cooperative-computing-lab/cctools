@@ -348,7 +348,7 @@ void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name );
 @param max_retries The number of retries.
 */
 
-void vine_task_set_max_retries( struct vine_task *t, int64_t max_retries );
+void vine_task_set_retries( struct vine_task *t, int64_t max_retries );
 
 /** Specify the amount of disk space required by a task.
 @param t A task object.
