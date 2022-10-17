@@ -695,8 +695,8 @@ as in the following example:
     t.set_memory(1024)                 # task needs 1024 MB of memory
     t.set_disk(4096)                   # task needs 4096 MB of disk space
     t.set_gpus(0)                      # task does not need a gpu
-    t.set_running_time_max(100)        # task is allowed to run in 100 seconds
-    t.set_running_time_min(10)         # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
+    t.set_time_max(100)        # task is allowed to run in 100 seconds
+    t.set_time_min(10)         # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
     ```
 
 === "C"
@@ -705,8 +705,8 @@ as in the following example:
     vine_task_set_memory(t,1024)             # task needs 1024 MB of memory
     vine_task_set_disk(t,4096)               # task needs 4096 MB of disk space
     vine_task_set_gpus(t,0)                  # task does not need a gpu
-    vine_task_set_running_time_max(t,100)    # task is allowed to run in 100 seconds
-    vine_task_set_running_time_min(t,10)     # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
+    vine_task_set_run_time_max(t,100)    # task is allowed to run in 100 seconds
+    vine_task_set_run_time_min(t,10)     # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
     ```
 
 When all cores, memory, and disk are specified, taskvine will simply fit as
@@ -771,7 +771,7 @@ $ vine_worker --wall-time 3600 ...other options...
 ```
 
 In combination with the worker option `--wall-time`, tasks can request a
-minimum time to execute with `set_running_time_min`, as explained (below)[#setting-task-resources].
+minimum time to execute with `set_time_min`, as explained (below)[#setting-task-resources].
 
 You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options when using
 batch submission scripts such as `condor_submit_workers` or
@@ -933,9 +933,9 @@ We can create some categories with their resource description as follows:
 === "Python"
     ```python
     # memory and disk values in MB.
-    q.set_category_max_resources('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
-    q.set_category_max_resources('my-category-b', {'cores': 1})
-    q.set_category_max_resources('my-category-c', {})
+    q.set_category_resources_max('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
+    q.set_category_resources_max('my-category-b', {'cores': 1})
+    q.set_category_resources_max('my-category-c', {})
     ```
 
 === "C"
@@ -945,15 +945,15 @@ We can create some categories with their resource description as follows:
     ra->cores = 2;
     ra->memory = 1024;
     ra->disk = 2048;
-    vine_set_max_resources("my-category-a", ra);
+    vine_set_resources_max("my-category-a", ra);
     rmsummary_delete(ra);
 
     struct rmsummary *rb = rmsummary_create(-1);
     rb->cores = 1;
-    vine_set_max_resources("my-category-b", rb);
+    vine_set_resources_max("my-category-b", rb);
     rmsummary_delete(rb);
 
-    vine_set_max_resources("my-category-c", NULL);
+    vine_set_resources_max("my-category-c", NULL);
     ```
 
 In the previous examples, we created three categories. Note that it is not
@@ -988,17 +988,17 @@ we explain in the following sections.
 If the resources a category uses are unknown, then taskvine can be directed
 to find efficient resource values to maximize throughput or minimize resources
 wasted. In these modes, if a value for a resource is set with
-`set_max_resources`, then it is used as a theoretical maximum.
+`set_resources_max`, then it is used as a theoretical maximum.
 
 When automatically computing resources, if any of cores, memory or disk are
-left unspecified in `set_max_resources`, then taskvine will run some
+left unspecified in `set_resources_max`, then taskvine will run some
 tasks using whole workers to collect some resource usage statistics. If all
 cores, memory, and disk are set, then taskvine uses these maximum
 values instead of using whole workers. As before, unspecified gpus default to 0.
 
 Once some statistics are available, further tasks may run with smaller
 allocations if such a change would increase throughput. Should a task exhaust
-its resources, it will be retried using the values of `set_max_resources`,
+its resources, it will be retried using the values of `set_resources_max`,
 or a whole worker, as explained before.
 
 Automatic resource management is enabled per category as follows:
@@ -1006,22 +1006,22 @@ Automatic resource management is enabled per category as follows:
 === "Python"
     ```python
     q.enable_monitoring()
-    q.set_category_max_resources('my-category-a', {})
+    q.set_category_resources_max('my-category-a', {})
     q.set_category_mode('my-category-a', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
 
-    q.set_category_max_resources('my-category-b', {'cores': 2})
+    q.set_category_resources_max('my-category-b', {'cores': 2})
     q.set_category_mode('my-category-b', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
     ```
 
 === "C"
     ```C
     vine_enable_monitoring(q,0,0);
-    vine_set_category_max_resources(q, "my-category-a", NULL);
+    vine_set_category_resources_max(q, "my-category-a", NULL);
     vine_set_category_mode(q, "my-category-a", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
 
     struct rmsummary *r = rmsummary_create(-1);
     r->cores = 2;
-    vine_set_category_max_resources(q, "my-category-b", r);
+    vine_set_category_resources_max(q, "my-category-b", r);
     vine_set_category_mode(q, "my-category-b", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
     rmsummary_delete(r);
     ```
@@ -1035,14 +1035,14 @@ automatic resource computation will never go below the values set:
 
 === "Python"
     ```python
-    q.set_category_min_resources('my-category-a', {'memory': 512})
+    q.set_category_resources_min('my-category-a', {'memory': 512})
     ```
 
 === "C"
     ```C
     struct rmsummary *r = rmsummary_create(-1);
     r->memory = 512;
-    $q->set_category_min_resources("my-category-a", r);
+    $q->set_category_resources_min("my-category-a", r);
     rmsummary_delete(r);
     ```
 
@@ -1063,9 +1063,9 @@ column FIT-WORKERS shows the count of workers that can fit at least one task in
 that category using the maximum resources either set or found. Values for max
 cores, memory and disk have modifiers `~` and `>` as follows:
 
-- No modifier: The maximum resource usage set with `set_category_max_resources`, or set for any task in the category via calls such as `set_cores`.
-- ~: The maximum resource usage so far seen when resource is left unspecified in `set_category_max_resources`. All tasks so far have run with no more than this resource value allocated.
-- >: The maximum resource usage that has caused a resource exhaustion. If this value is larger than then one set with `set_category_max_resources`, then tasks that exhaust resources are not retried. Otherwise, if a maximum was not set, the tasks will be retried in larger workers as workers become available.
+- No modifier: The maximum resource usage set with `set_category_resources_max`, or set for any task in the category via calls such as `set_cores`.
+- ~: The maximum resource usage so far seen when resource is left unspecified in `set_category_resources_max`. All tasks so far have run with no more than this resource value allocated.
+- >: The maximum resource usage that has caused a resource exhaustion. If this value is larger than then one set with `set_category_resources_max`, then tasks that exhaust resources are not retried. Otherwise, if a maximum was not set, the tasks will be retried in larger workers as workers become available.
 
 
 !!! warning
@@ -1190,12 +1190,12 @@ limit on the number of retries:
 
 === "Python"
     ```python
-    t.set_max_retries(5)   # Task will be try at most 6 times (5 retries).
+    t.set_retries(5)   # Task will be try at most 6 times (5 retries).
     ```
 
 === "C"
     ```C
-    vine_set_max_retries(t, 5)
+    vine_set_retries(t, 5)
     ```
 
 When a task cannot be completed in the set number of tries,
