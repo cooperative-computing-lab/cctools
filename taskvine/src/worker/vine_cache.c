@@ -31,18 +31,16 @@ struct vine_cache {
 struct cache_file {
 	vine_cache_type_t type;
 	char *source;
-	int64_t expected_size;
 	int64_t actual_size;
 	int mode;
 	int complete;
 };
 
-struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t expected_size, int64_t actual_size, int mode )
+struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
 	f->source = xxstrdup(source);
-	f->expected_size = expected_size;
 	f->actual_size = actual_size;
 	f->mode = mode;
 	f->complete = 0;
@@ -97,7 +95,7 @@ It may still be necessary to perform post-transfer processing of this file.
 
 int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,size,mode);
+	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -109,7 +107,7 @@ This entry will be materialized later in vine_cache_ensure.
 
 int vine_cache_queue( struct vine_cache *c, vine_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
 {
-	struct cache_file *f = cache_file_create(type,source,size,0,mode);
+	struct cache_file *f = cache_file_create(type,source,size,mode);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -321,7 +319,6 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 		int64_t nbytes, nfiles;
 		if(path_disk_size_info_get(cache_path,&nbytes,&nfiles)==0) {
 			f->actual_size = nbytes;
-			f->expected_size = nbytes;
 			f->complete = 1;
 			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
 			send_cache_update(manager,cachename,f->actual_size,transfer_time);
