@@ -112,7 +112,7 @@ static int transfer_output_file( struct vine_process *p, struct vine_file *f, st
 	if(result) {
 		struct stat info;
 		if(stat(cache_path,&info)==0) {
-			vine_cache_addfile(cache,info.st_size,f->cached_name);
+			vine_cache_addfile(cache,info.st_size,info.st_mode,f->cached_name);
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
 			debug(D_VINE,"output: failed to stat %s: %s",cache_path,strerror(errno));

@@ -319,7 +319,7 @@ int vine_transfer_get_dir( struct link *lnk, struct vine_cache *cache, const cha
 	int64_t totalsize = 0;
 	char * cached_path = vine_cache_full_path(cache,dirname);
 	int r = vine_transfer_get_dir_internal(lnk,cached_path,&totalsize,stoptime);
-	if(r) vine_cache_addfile(cache,totalsize,dirname);
+	if(r) vine_cache_addfile(cache,totalsize,0755,dirname);
 	free(cached_path);
 	return r;
 }
@@ -328,7 +328,7 @@ int vine_transfer_get_file( struct link *lnk, struct vine_cache *cache, const ch
 {
 	char * cached_path = vine_cache_full_path(cache,filename);
 	int r = vine_transfer_get_file_internal(lnk,cached_path,length,mode,stoptime);
-	if(r) vine_cache_addfile(cache,length,filename);
+	if(r) vine_cache_addfile(cache,length,mode,filename);
 	free(cached_path);
 	return r;
 }
@@ -340,7 +340,7 @@ int vine_transfer_get_any( struct link *lnk, struct vine_cache *cache, const cha
 	send_message(lnk,"get %s\n",filename);
 	char * cache_root = vine_cache_full_path(cache,"");
 	int r = vine_transfer_get_any_internal(lnk,cache_root,&totalsize,stoptime);
-	if(r) vine_cache_addfile(cache,totalsize,filename);
+	if(r) vine_cache_addfile(cache,totalsize,0755,filename);
 	free(cache_root);
 	return r;
 }

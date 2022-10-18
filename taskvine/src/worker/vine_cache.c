@@ -94,9 +94,9 @@ Add a file to the cache manager (already created in the proper place) and note i
 It may still be necessary to perform post-transfer processing of this file.
 */
 
-int vine_cache_addfile( struct vine_cache *c, int64_t size, const char *cachename )
+int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,size,0777);
+	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,size,mode);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -287,8 +287,7 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 			look like transfer/command files, which arrive into .transfer files,
 			and then have the opportunity to be unpacked below.
 			*/
-			rename(cache_path,transfer_path);
-			result = 1;
+			result = (rename(cache_path,transfer_path)==0);
 			break;
 		  
 		case VINE_CACHE_TRANSFER:
