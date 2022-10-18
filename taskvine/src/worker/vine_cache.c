@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "link.h"
 #include "timestamp.h"
 #include "copy_stream.h"
+#include "path_disk_size_info.h"
 
 #include <sys/types.h>
 #include <sys/fcntl.h>
@@ -317,11 +318,10 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	*/
 	
 	if(result) {
-		struct stat info;
-		if(stat(cache_path,&info)==0) {
-			// XXX This only works for files, we need to measure the directory recursively.
-			f->actual_size = info.st_size;
-			f->expected_size = f->actual_size;
+		int64_t nbytes, nfiles;
+		if(path_disk_size_info_get(cache_path,&nbytes,&nfiles)==0) {
+			f->actual_size = nbytes;
+			f->expected_size = nbytes;
 			f->complete = 1;
 			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
 			send_cache_update(manager,cachename,f->actual_size,transfer_time);
