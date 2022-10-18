@@ -7798,6 +7798,12 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 		default:
 			mode = "FIXED";
 			break;
+		case CATEGORY_ALLOCATION_MODE_FAST_BUCKETING:
+			mode = "FAST_BUCKETING";
+			break;
+		case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
+			mode = "EXHAUSTIVE_BUCKETING";
+			break;
 	}
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
@@ -8015,6 +8021,8 @@ int work_queue_specify_category_mode(struct work_queue *q, const char *category,
 		case CATEGORY_ALLOCATION_MODE_MAX:
 		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
 		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
+		case CATEGORY_ALLOCATION_MODE_FAST_BUCKETING:
+		case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
 			break;
 		default:
 			notice(D_WQ, "Unknown category mode specified.");
