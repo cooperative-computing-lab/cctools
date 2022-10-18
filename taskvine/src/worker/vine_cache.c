@@ -33,11 +33,10 @@ struct cache_file {
 	int64_t expected_size;
 	int64_t actual_size;
 	int mode;
-	vine_file_flags_t flags;
-	int present;
+	int complete;
 };
 
-struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t expected_size, int64_t actual_size, int mode, vine_file_flags_t flags, int present )
+struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t expected_size, int64_t actual_size, int mode )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
@@ -45,8 +44,7 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->expected_size = expected_size;
 	f->actual_size = actual_size;
 	f->mode = mode;
-	f->flags = flags;
-	f->present = present;
+	f->complete = 0;
 	return f;
 }
 
@@ -93,11 +91,12 @@ char * vine_cache_full_path( struct vine_cache *c, const char *cachename )
 
 /*
 Add a file to the cache manager (already created in the proper place) and note its size.
+It may still be necessary to perform post-transfer processing of this file.
 */
 
-int vine_cache_addfile( struct vine_cache *c, int64_t size, const char *cachename )
+int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,size,0777,0,1);
+	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,size,mode);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -109,7 +108,7 @@ This entry will be materialized later in vine_cache_ensure.
 
 int vine_cache_queue( struct vine_cache *c, vine_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
 {
-	struct cache_file *f = cache_file_create(type,source,size,0,mode,flags,0);
+	struct cache_file *f = cache_file_create(type,source,size,0,mode);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -205,16 +204,16 @@ depending on the flags of the file.
 Returns true on success, false otherwise.
 */
 
-int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, const char *cache_path )
+int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, const char *cache_path, vine_file_flags_t flags )
 {
 	int unix_result;
 	char *command;
 
-	if(f->flags & VINE_UNPACK) {
-		if(string_suffix_is(f->source,".tgz")) {
+	if(flags & VINE_UNPACK) {
+		if(string_suffix_is(f->source,".tar")) {
 			mkdir(cache_path,0700);
 			command = string_format("tar xf %s -C %s",transfer_path,cache_path);
-		} else if(string_suffix_is(f->source,".tar.gz")) {
+		} else if(string_suffix_is(f->source,".tar.gz") || string_suffix_is(f->source,".tgz")) {
 			mkdir(cache_path,0700);
 			command = string_format("tar xzf %s -C %s",transfer_path,cache_path);
 		} else if(string_suffix_is(f->source,".gz")) {
@@ -243,17 +242,23 @@ int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, co
 
 /*
 Ensure that a given cached entry is fully materialized in the cache,
-downloading files or executing commands as needed.  If present, return
+downloading files or executing commands as needed.  If complete, return
 true, otherwise return false.
 
 It is a little odd that the manager link is passed as an argument here,
 but it is needed in order to send back the necessary update/invalid messages.
+
+XXX There is a subtle problem here.  File flags like UNPACK are associated
+with the task definition, rather than the file definition.  If two or more
+tasks specify the same input file but with different flags, unexpected things
+will happen.  We need to better separate flags that affect files vs flags that
+affect the binding to files.
 */
 
 int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
 int send_cache_invalid( struct link *manager, const char *cachename, const char *message );
 
-int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager )
+int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager, vine_file_flags_t flags )
 {
 	struct cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
@@ -261,7 +266,7 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 		return 0;
 	}
 
-	if(f->present) {
+	if(f->complete) {
 		debug(D_VINE,"cache: %s is already present.",cachename);
 		return 1;
 	}
@@ -276,8 +281,13 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	
 	switch(f->type) {
 		case VINE_CACHE_FILE:
-			debug(D_VINE,"error: file %s should already be present!",cachename);
-			result = 0;
+			debug(D_VINE,"cache: manager already delivered %s",cachename);
+			/*
+			This odd little rename here is to make manager-delivered files
+			look like transfer/command files, which arrive into .transfer files,
+			and then have the opportunity to be unpacked below.
+			*/
+			result = (rename(cache_path,transfer_path)==0);
 			break;
 		  
 		case VINE_CACHE_TRANSFER:
@@ -292,7 +302,7 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	}
 
 	if(result) {
-		result = unpack_or_rename_target(f,transfer_path,cache_path);
+		result = unpack_or_rename_target(f,transfer_path,cache_path,flags);
 	}
 
 	// Set the permissions as originally indicated.	
@@ -303,15 +313,16 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	
 	/*
 	Although the prior command may have succeeded, check the actual desired
-	file in the cache to make sure that it is present.
+	file in the cache to make sure that it is complete.
 	*/
 	
 	if(result) {
 		struct stat info;
 		if(stat(cache_path,&info)==0) {
+			// XXX This only works for files, we need to measure the directory recursively.
 			f->actual_size = info.st_size;
 			f->expected_size = f->actual_size;
-			f->present = 1;
+			f->complete = 1;
 			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
 			send_cache_update(manager,cachename,f->actual_size,transfer_time);
 			result = 1;
@@ -334,6 +345,7 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	if(!result) {
 		trash_file(cache_path);
 		trash_file(transfer_path);
+		if(!error_message) error_message = strdup("unknown");
 		send_cache_invalid(manager,cachename,error_message);
 	}
 	

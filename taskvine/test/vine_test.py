@@ -31,7 +31,7 @@ def report_task(task, expected_result, expected_exit_code, expected_outputs=None
         print("It was not completed by a worker.")
     else:
         print("result: {as_str} {as_int}".format(as_str=t.result_string, as_int=t.result))
-        print("exit code: {status}".format(status=t.result))
+        print("exit code: {exit_code}".format(exit_code=t.exit_code))
         if t.output:
             print("stderr:\n+++\n{stderr}---".format(stderr=t.output.encode('ascii','replace')))
         if task.result != expected_result:
@@ -39,7 +39,7 @@ def report_task(task, expected_result, expected_exit_code, expected_outputs=None
             print("Should have finished with result '{result}', but got '{real}'.".format(result=expected_result, real=task.result))
         elif task.exit_code != expected_exit_code:
             error = True
-            print("Should have finished with exit_code {status}, but got {real}.".format(status=str(expected_exit_code), real=str(task.result)))
+            print("Should have finished with exit_code {expected_exit_code}, but got {real}.".format(expected_exit_code=str(expected_exit_code), real=str(task.exit_code)))
         elif expected_outputs:
             for out in expected_outputs:
                 if not path.isfile(out):
