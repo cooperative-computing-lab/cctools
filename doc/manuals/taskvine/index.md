@@ -143,7 +143,7 @@ The basic outline of a TaskVine manager is:
 
 To begin, you must import the TaskVine library, and then create a Manager object.
 You may specific a specific port number to listen on like this:
- 
+
 === "Python"
     ```python
     # Import the taskvine library
@@ -441,7 +441,7 @@ If you installed via Conda, then no further setup is needed.
 If you are running a Python application and did *not* install via Conda,
 then you will need to set the `PYTHONPATH` to point to the cctools
 installation, like this:
-    
+
 ```sh
 # Note: This is only needed if not using Conda:
 $ PYVER=$(python -c 'import sys; print("%s.%s" % sys.version_info[:2])')
@@ -455,7 +455,7 @@ If you are writing a taskvine application in C, you should compile it into an ex
 ```sh
 $ gcc taskvine_example.c -o taskvine_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -ltaskvine -ldttools -lm -lz
 ```
-   
+
 ### Running a Manager Program
 
 The example application simply compresses a bunch of files in parallel. The
@@ -468,7 +468,7 @@ application, run it as:
 ```sh
 # Python:
 $ ./taskvine_example.py a b c
- 
+
 # C
 $ ./taskvine_example a b c
 ```
@@ -483,12 +483,12 @@ submitted task: /usr/bin/gzip < b > b.gz
 submitted task: /usr/bin/gzip < c > c.gz
 waiting for tasks to complete...
 ```
-    
+
 The taskvine manager is now waiting for workers to connect and begin
 requesting work. (Without any workers, it will wait forever.) You can start
 one worker on the same machine by opening a new shell and running:
 
-    
+
 ```sh
 # Substitute the IP or name of your machine for MACHINENAME.
 $ vine_worker MACHINENAME 9123
@@ -557,18 +557,18 @@ For example, to have a taskvine manager advertise its project name as
     ```C
     vine_set_name(q, "myproject");
     ```
-        
+
 To start a worker for this manager, specify the project name (`myproject`) to
 connect in the `-M` option:
 
 ```sh
 $ vine_worker -M myproject
 ```
-    
+
 
 You can start ten workers for this manager on Condor using
 `condor_submit_workers` by providing the same option arguments.:
-    
+
 ```sh
 $ condor_submit_workers -M myproject 10
 Submitting job(s)..........
@@ -597,10 +597,10 @@ per minute.).  For example:
 
 ```sh
 % vine_status
-PROJECT               HOST                      PORT WAITING RUNNING COMPLETE WORKERS 
-molsim-c2h2           home.cse.nd.edu           8999     793      64      791      16 
-freds-model-search    mars.indiana.edu          9123     100     700     1372     350 
-yang-analysis-355     login.crc.nd.edu          9100    8932    4873    10007    4873  
+PROJECT               HOST                      PORT WAITING RUNNING COMPLETE WORKERS
+molsim-c2h2           home.cse.nd.edu           8999     793      64      791      16
+freds-model-search    mars.indiana.edu          9123     100     700     1372     350
+yang-analysis-355     login.crc.nd.edu          9100    8932    4873    10007    4873
 ```
 
 The same information is available in a more graphical form online
@@ -695,8 +695,8 @@ as in the following example:
     t.set_memory(1024)                 # task needs 1024 MB of memory
     t.set_disk(4096)                   # task needs 4096 MB of disk space
     t.set_gpus(0)                      # task does not need a gpu
-    t.set_running_time_max(100)        # task is allowed to run in 100 seconds
-    t.set_running_time_min(10)         # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
+    t.set_time_max(100)        # task is allowed to run in 100 seconds
+    t.set_time_min(10)         # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
     ```
 
 === "C"
@@ -705,8 +705,8 @@ as in the following example:
     vine_task_set_memory(t,1024)             # task needs 1024 MB of memory
     vine_task_set_disk(t,4096)               # task needs 4096 MB of disk space
     vine_task_set_gpus(t,0)                  # task does not need a gpu
-    vine_task_set_running_time_max(t,100)    # task is allowed to run in 100 seconds
-    vine_task_set_running_time_min(t,10)     # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
+    vine_task_set_run_time_max(t,100)    # task is allowed to run in 100 seconds
+    vine_task_set_run_time_min(t,10)     # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
     ```
 
 When all cores, memory, and disk are specified, taskvine will simply fit as
@@ -771,7 +771,7 @@ $ vine_worker --wall-time 3600 ...other options...
 ```
 
 In combination with the worker option `--wall-time`, tasks can request a
-minimum time to execute with `set_running_time_min`, as explained (below)[#setting-task-resources].
+minimum time to execute with `set_time_min`, as explained (below)[#setting-task-resources].
 
 You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options when using
 batch submission scripts such as `condor_submit_workers` or
@@ -879,7 +879,7 @@ returns:
 
 === "C"
     ```C
-    vine_task *t = vine_wait(q,5); 
+    vine_task *t = vine_wait(q,5);
     if(t) {
         printf("Task used %f cores, %f MB memory, %f MB disk",
             t->resources_measured->cores,
@@ -933,9 +933,9 @@ We can create some categories with their resource description as follows:
 === "Python"
     ```python
     # memory and disk values in MB.
-    q.set_category_max_resources('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
-    q.set_category_max_resources('my-category-b', {'cores': 1})
-    q.set_category_max_resources('my-category-c', {})
+    q.set_category_resources_max('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
+    q.set_category_resources_max('my-category-b', {'cores': 1})
+    q.set_category_resources_max('my-category-c', {})
     ```
 
 === "C"
@@ -945,15 +945,15 @@ We can create some categories with their resource description as follows:
     ra->cores = 2;
     ra->memory = 1024;
     ra->disk = 2048;
-    vine_set_max_resources("my-category-a", ra);
+    vine_set_resources_max("my-category-a", ra);
     rmsummary_delete(ra);
 
     struct rmsummary *rb = rmsummary_create(-1);
     rb->cores = 1;
-    vine_set_max_resources("my-category-b", rb);
+    vine_set_resources_max("my-category-b", rb);
     rmsummary_delete(rb);
 
-    vine_set_max_resources("my-category-c", NULL);
+    vine_set_resources_max("my-category-c", NULL);
     ```
 
 In the previous examples, we created three categories. Note that it is not
@@ -981,24 +981,24 @@ some reasonable defaults in the same way described before in the section
 
 When the resources used by a task are unknown, taskvine can measure and
 compute efficient resource values to maximize throughput or minimize waste, as
-we explain in the following sections. 
+we explain in the following sections.
 
 ### Automatic Resource Management
 
 If the resources a category uses are unknown, then taskvine can be directed
 to find efficient resource values to maximize throughput or minimize resources
 wasted. In these modes, if a value for a resource is set with
-`set_max_resources`, then it is used as a theoretical maximum.
+`set_resources_max`, then it is used as a theoretical maximum.
 
 When automatically computing resources, if any of cores, memory or disk are
-left unspecified in `set_max_resources`, then taskvine will run some
+left unspecified in `set_resources_max`, then taskvine will run some
 tasks using whole workers to collect some resource usage statistics. If all
 cores, memory, and disk are set, then taskvine uses these maximum
 values instead of using whole workers. As before, unspecified gpus default to 0.
 
 Once some statistics are available, further tasks may run with smaller
 allocations if such a change would increase throughput. Should a task exhaust
-its resources, it will be retried using the values of `set_max_resources`,
+its resources, it will be retried using the values of `set_resources_max`,
 or a whole worker, as explained before.
 
 Automatic resource management is enabled per category as follows:
@@ -1006,22 +1006,22 @@ Automatic resource management is enabled per category as follows:
 === "Python"
     ```python
     q.enable_monitoring()
-    q.set_category_max_resources('my-category-a', {})
+    q.set_category_resources_max('my-category-a', {})
     q.set_category_mode('my-category-a', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
 
-    q.set_category_max_resources('my-category-b', {'cores': 2})
+    q.set_category_resources_max('my-category-b', {'cores': 2})
     q.set_category_mode('my-category-b', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
     ```
 
 === "C"
     ```C
     vine_enable_monitoring(q,0,0);
-    vine_set_category_max_resources(q, "my-category-a", NULL);
+    vine_set_category_resources_max(q, "my-category-a", NULL);
     vine_set_category_mode(q, "my-category-a", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
 
     struct rmsummary *r = rmsummary_create(-1);
     r->cores = 2;
-    vine_set_category_max_resources(q, "my-category-b", r);
+    vine_set_category_resources_max(q, "my-category-b", r);
     vine_set_category_mode(q, "my-category-b", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
     rmsummary_delete(r);
     ```
@@ -1035,14 +1035,14 @@ automatic resource computation will never go below the values set:
 
 === "Python"
     ```python
-    q.set_category_min_resources('my-category-a', {'memory': 512})
+    q.set_category_resources_min('my-category-a', {'memory': 512})
     ```
 
 === "C"
     ```C
     struct rmsummary *r = rmsummary_create(-1);
     r->memory = 512;
-    $q->set_category_min_resources("my-category-a", r);
+    $q->set_category_resources_min("my-category-a", r);
     rmsummary_delete(r);
     ```
 
@@ -1063,9 +1063,9 @@ column FIT-WORKERS shows the count of workers that can fit at least one task in
 that category using the maximum resources either set or found. Values for max
 cores, memory and disk have modifiers `~` and `>` as follows:
 
-- No modifier: The maximum resource usage set with `set_category_max_resources`, or set for any task in the category via calls such as `set_cores`.
-- ~: The maximum resource usage so far seen when resource is left unspecified in `set_category_max_resources`. All tasks so far have run with no more than this resource value allocated.
-- >: The maximum resource usage that has caused a resource exhaustion. If this value is larger than then one set with `set_category_max_resources`, then tasks that exhaust resources are not retried. Otherwise, if a maximum was not set, the tasks will be retried in larger workers as workers become available.
+- No modifier: The maximum resource usage set with `set_category_resources_max`, or set for any task in the category via calls such as `set_cores`.
+- ~: The maximum resource usage so far seen when resource is left unspecified in `set_category_resources_max`. All tasks so far have run with no more than this resource value allocated.
+- >: The maximum resource usage that has caused a resource exhaustion. If this value is larger than then one set with `set_category_resources_max`, then tasks that exhaust resources are not retried. Otherwise, if a maximum was not set, the tasks will be retried in larger workers as workers become available.
 
 
 !!! warning
@@ -1167,11 +1167,11 @@ Then, modify your manager program to use the password:
     ```C
     vine_set_password_file(q,"mypwfile");
     ```
-    
+
 
 And give the `--password` option to give the same password file to your
 workers:
-    
+
 ```sh
 $ vine_worker --password mypwfile -M myproject
 ```
@@ -1190,12 +1190,12 @@ limit on the number of retries:
 
 === "Python"
     ```python
-    t.set_max_retries(5)   # Task will be try at most 6 times (5 retries).
+    t.set_retries(5)   # Task will be try at most 6 times (5 retries).
     ```
 
 === "C"
     ```C
-    vine_set_max_retries(t, 5)
+    vine_set_retries(t, 5)
     ```
 
 When a task cannot be completed in the set number of tries,
@@ -1303,26 +1303,28 @@ only be returned in the event of failure:
 In a similar way, the `WORK_QUEUE_SUCCESS_ONLY` flag indicates that an output file
 should only be returned if the task actually succeeded.
 
-### Fast Abort
+### Disconnect slow workers
 
 A large computation can often be slowed down by stragglers. If you have a
-large number of small tasks that take a short amount of time, then Fast Abort
-can help. The Fast Abort feature keeps statistics on tasks execution times and
-proactively aborts tasks that are statistical outliers:
+large number of small tasks that take a short amount of time, then
+automatically disconnecting slow workers can help. With this feature enabled,
+statistics are kept on tasks execution times and statistical outlier are
+terminated. If two different tasks are canceled in the same worker, then the
+worker is disconnected and blacklisted.
 
 === "Python"
     ```python
     # Disconnect workers that are executing tasks twice as slow as compared to the average.
-    q.activate_fast_abort(2)
+    q.enable_disconnect_slow_workers(2)
     ```
 
 === "C"
     ```C
     // Disconnect workers that are executing tasks twice as slow as compared to the average.
-    vine_activate_fast_abort(q, 2);
+    vine_enable_disconnect_slow_workers(q, 2);
     ```
 
-Tasks that trigger fast abort are automatically retried in some other worker.
+Tasks terminated this way are automatically retried in some other worker.
 Each retry allows the task to run for longer and longer times until a
 completion is reached. You can set an upper bound in the number of retries with
 [Maximum Retries](#maximum-retries).
@@ -1452,13 +1454,13 @@ to make a progress bar or other user-visible information:
 
 #### Map
 
-The taskvine map abstraction works similar to python map, as it applies a 
-a function to every element in a list. This function works by taking in a chunk_size, 
-which is the size of an iterable to send to a worker. The worker than maps the given 
-function over the iterable and returns it. All the results are then combined from the 
+The taskvine map abstraction works similar to python map, as it applies a
+a function to every element in a list. This function works by taking in a chunk_size,
+which is the size of an iterable to send to a worker. The worker than maps the given
+function over the iterable and returns it. All the results are then combined from the
 workers and returned. The size of the chunk depends on the cost of the function.
 If the function is very cheap, then sending a larger chunk_size is better. If the
-function is expensive, then smaller is better. If an invalid operation happens, 
+function is expensive, then smaller is better. If an invalid operation happens,
 the error will appear in the results.
 
 ```python
@@ -1474,8 +1476,8 @@ The taskvine pair function computes all the pairs of 2 sequences, and then uses
 them as inputs of a given function. The pairs are generated locally using itertools,
 and then based on the given chunk_size, are sent out to a worker as an iterable of pairs.
 The given function must accept an iterable, as the pair will be sent to the function as
-a tuple. The worker will then return the results, and each result from each worker will be 
-combined locally. Again, cheaper functions work better with larger chunk_sizes, 
+a tuple. The worker will then return the results, and each result from each worker will be
+combined locally. Again, cheaper functions work better with larger chunk_sizes,
 more expensive functions work better with smaller ones. Errors will be placed in results.
 
 ```python
@@ -1490,9 +1492,9 @@ q.pair(fn, seq1, seq2, chunk_size)
 The taskvine treeReduce fucntion combines an array using a given function by
 breaking up the array into chunk_sized chunks, computing the results, and returning
 the results to a new array. It then does the same process on the new array until there
-only one element left and then returns it. The given fucntion must accept an iterable, 
+only one element left and then returns it. The given fucntion must accept an iterable,
 and must be an associative fucntion, or else the same result cannot be gaurenteed for
-different chunk sizes. Again, cheaper functions work better with larger chunk_sizes, 
+different chunk sizes. Again, cheaper functions work better with larger chunk_sizes,
 more expensive functions work better with smaller ones. Errors will be placed in results.
 Also, the minimum chunk size is 2, as going 1 element at time would not reduce the array
 
@@ -1500,7 +1502,7 @@ Also, the minimum chunk size is 2, as going 1 element at time would not reduce t
 def fn(seq):
     return max(seq)
 
-q.treeReduce(fn, arry, chunk_size) 
+q.treeReduce(fn, arry, chunk_size)
 ```
 
 Below is an example of all three abstractions, and their expected output:
@@ -1543,7 +1545,7 @@ find failures, bugs, and other errors. To activate debug output:
     cctools_debug_flags_set("all");
     cctools_debug_config_file("my.debug.log");
     ```
-    
+
 The `all` flag causes debug messages from every subsystem called by taskvine
 to be printed. More information about the debug flags are
 [here](api/html/debug_8h.html).
@@ -1551,7 +1553,7 @@ to be printed. More information about the debug flags are
 
 To enable debugging at the worker, set the `-d` option:
 
-    
+
 ```sh
 $ vine_worker -d all -o worker.debug -M myproject
 ```
@@ -1663,12 +1665,12 @@ The statistics available are:
 |||
 |       | **Cumulative stats for workers** |
 | workers_joined        | Total number of worker connections that were established to the manager |
-| workers_removed       | Total number of worker connections that were released by the manager, idled-out, fast-aborted, or lost |
+| workers_removed       | Total number of worker connections that were released by the manager, idled-out, slow, or lost |
 | workers_released      | Total number of worker connections that were asked by the manager to disconnect |
 | workers_idled_out     | Total number of worker that disconnected for being idle |
-| workers_fast_aborted  | Total number of worker connections terminated for being too slow |
-| workers_blacklisted   | Total number of workers blacklisted by the manager (includes fast-aborted) |
-| workers_lost          | Total number of worker connections that were unexpectedly lost (does not include idled-out or fast-aborted) |
+| workers_slow          | Total number of worker connections terminated for being too slow |
+| workers_blacklisted   | Total number of workers blacklisted by the manager (includes workers_slow) |
+| workers_lost          | Total number of worker connections that were unexpectedly lost (does not include idled-out or slow) |
 |||
 |       | **Stats for the current state of tasks** |
 | tasks_waiting         | Number of tasks waiting to be dispatched |

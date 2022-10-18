@@ -44,14 +44,14 @@ void vine_gpus_debug()
 }
 
 /*
-Free all of the GPUs associated with this taskid.
+Free all of the GPUs associated with this task_id.
 */
 
-void vine_gpus_free( int taskid )
+void vine_gpus_free( int task_id )
 {
 	int i;
 	for(i=0;i<total_resources->gpus.total;i++) {
-		if(gpu_to_task[i]==taskid) {
+		if(gpu_to_task[i]==task_id) {
 			gpu_to_task[i] = 0;
 		}
 	}
@@ -80,19 +80,19 @@ void vine_gpus_allocate( int n, int task )
 }
 
 /*
-Return a string representing the GPUs allocated to taskid.
+Return a string representing the GPUs allocated to task_id.
 For example, if GPUs 1 and 3 are allocated, return "1,3"
 This string must be freed after use.
 */
 
-char *vine_gpus_to_string( int taskid )
+char *vine_gpus_to_string( int task_id )
 {
 	int i;
 	int first = 1;
 	buffer_t b;
 	buffer_init(&b);
 	for(i=0;i<total_resources->gpus.total;i++) {
-		if(gpu_to_task[i]==taskid) {
+		if(gpu_to_task[i]==task_id) {
 			if(first) {
 				first = 0;
 			} else {

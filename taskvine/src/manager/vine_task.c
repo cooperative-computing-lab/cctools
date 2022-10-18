@@ -88,7 +88,7 @@ void vine_task_clean( struct vine_task *t, int full_clean )
 		t->resource_request = CATEGORY_ALLOCATION_FIRST;
 		t->try_count = 0;
 		t->exhausted_attempts = 0;
-		t->fast_abort_count = 0;
+		t->workers_slow = 0;
 
 		t->time_workers_execute_all = 0;
 		t->time_workers_execute_exhaustion = 0;
@@ -154,10 +154,10 @@ struct vine_task *vine_task_clone(const struct vine_task *task)
 
 	/* Scheduling features of task are copied. */
 	new->resource_request = task->resource_request;
-	vine_task_set_algorithm(new, task->worker_selection_algorithm);
+	vine_task_set_scheduler(new, task->worker_selection_algorithm);
 	vine_task_set_priority(new, task->priority);
-	vine_task_set_max_retries(new, task->max_retries);
-	vine_task_set_running_time_min(new, task->min_running_time);
+	vine_task_set_retries(new, task->max_retries);
+	vine_task_set_time_min(new, task->min_running_time);
 
 	/* Internal state of task is cleared from vine_task_create */
 
@@ -219,7 +219,7 @@ void vine_task_set_env_var( struct vine_task *t, const char *name, const char *v
 	}
 }
 
-void vine_task_set_max_retries( struct vine_task *t, int64_t max_retries ) {
+void vine_task_set_retries( struct vine_task *t, int64_t max_retries ) {
 	if(max_retries < 1) {
 		t->max_retries = 0;
 	}
@@ -276,7 +276,7 @@ void vine_task_set_gpus( struct vine_task *t, int gpus )
 	}
 }
 
-void vine_task_set_end_time( struct vine_task *t, int64_t useconds )
+void vine_task_set_time_end( struct vine_task *t, int64_t useconds )
 {
 	if(useconds < 1)
 	{
@@ -288,7 +288,7 @@ void vine_task_set_end_time( struct vine_task *t, int64_t useconds )
 	}
 }
 
-void vine_task_set_start_time_min( struct vine_task *t, int64_t useconds )
+void vine_task_set_time_start( struct vine_task *t, int64_t useconds )
 {
 	if(useconds < 1)
 	{
@@ -300,24 +300,19 @@ void vine_task_set_start_time_min( struct vine_task *t, int64_t useconds )
 	}
 }
 
-void vine_task_set_running_time( struct vine_task *t, int64_t useconds )
+void vine_task_set_time_max( struct vine_task *t, int64_t seconds )
 {
-	if(useconds < 1)
+	if(seconds < 1)
 	{
 		t->resources_requested->wall_time = -1;
 	}
 	else
 	{
-		t->resources_requested->wall_time = DIV_INT_ROUND_UP(useconds, ONE_SECOND);
+		t->resources_requested->wall_time = DIV_INT_ROUND_UP(seconds, ONE_SECOND);
 	}
 }
 
-void vine_task_set_running_time_max( struct vine_task *t, int64_t seconds )
-{
-	vine_task_set_running_time(t, seconds);
-}
-
-void vine_task_set_running_time_min( struct vine_task *t, int64_t seconds )
+void vine_task_set_time_min( struct vine_task *t, int64_t seconds )
 {
 	if(seconds < 1)
 	{
@@ -337,10 +332,9 @@ void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm) {
 	vine_task_set_memory(t,       rm->memory);
 	vine_task_set_disk(t,         rm->disk);
 	vine_task_set_gpus(t,         rm->gpus);
-	vine_task_set_running_time(t, rm->wall_time);
-	vine_task_set_running_time_max(t, rm->wall_time);
-	vine_task_set_running_time_min(t, t->min_running_time);
-	vine_task_set_end_time(t,     rm->end);
+	vine_task_set_time_max(t, rm->wall_time);
+	vine_task_set_time_min(t, t->min_running_time);
+	vine_task_set_time_end(t,     rm->end);
 }
 
 void vine_task_set_tag(struct vine_task *t, const char *tag)
@@ -381,7 +375,7 @@ void vine_task_check_consistency( struct vine_task *t )
 
 	LIST_ITERATE(t->input_files,f) {
 		if(hash_table_lookup(table,f->remote_name)) {
-			fprintf(stderr,"warning: task %d has more than one input file named %s\n",t->taskid,f->remote_name);
+			fprintf(stderr,"warning: task %d has more than one input file named %s\n",t->task_id,f->remote_name);
 		} else {
 			hash_table_insert(table,f->remote_name,f->remote_name);
 		}
@@ -393,7 +387,7 @@ void vine_task_check_consistency( struct vine_task *t )
 
 	LIST_ITERATE(t->output_files,f) {
 		if(f->type==VINE_FILE && hash_table_lookup(table,f->source)) {
-			fprintf(stderr,"warning: task %d has more than one output file named %s\n",t->taskid,f->source);
+			fprintf(stderr,"warning: task %d has more than one output file named %s\n",t->task_id,f->source);
 		} else {
 			hash_table_insert(table,f->remote_name,f->source);
 		}
@@ -499,7 +493,7 @@ void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapsh
 	vine_task_add_input_file(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, VINE_CACHE);
 }
 
-void vine_task_set_algorithm(struct vine_task *t, vine_schedule_t algorithm)
+void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm)
 {
 	t->worker_selection_algorithm = algorithm;
 }
@@ -625,12 +619,12 @@ const char * vine_task_get_tag( struct vine_task *t )
 	return t->tag;
 }
 
-int vine_task_get_taskid( struct vine_task *t )
+int vine_task_get_id( struct vine_task *t )
 {
-	return t->taskid;
+	return t->task_id;
 }
 
-const char * vine_task_get_output( struct vine_task *t )
+const char * vine_task_get_stdout( struct vine_task *t )
 {
 	return t->output;
 }
@@ -729,7 +723,7 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 {
 	struct jx *j = jx_object(0);
 
-	jx_insert_integer(j,"taskid",t->taskid);
+	jx_insert_integer(j,"task_id",t->task_id);
 	jx_insert_string(j,"state",vine_task_state_to_string(t->state));
 	if(t->tag) jx_insert_string(j,"tag",t->tag);
 	if(t->category) jx_insert_string(j,"category",t->category);
@@ -744,8 +738,8 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 		jx_insert_integer(j,"memory",t->resources_allocated->memory);
 		jx_insert_integer(j,"disk",t->resources_allocated->disk);
 	} else {
-		const struct rmsummary *min = vine_manager_task_min_resources(q, t);
-		const struct rmsummary *max = vine_manager_task_max_resources(q, t);
+		const struct rmsummary *min = vine_manager_task_resources_min(q, t);
+		const struct rmsummary *max = vine_manager_task_resources_max(q, t);
 
 		struct rmsummary *limits = rmsummary_create(-1);
 		rmsummary_merge_override(limits, max);

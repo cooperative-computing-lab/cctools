@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2022- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #include "vine_manager_put.h"
 #include "vine_worker_info.h"
 #include "vine_task.h"
@@ -51,7 +57,7 @@ static int vine_manager_put_symlink( struct vine_manager *q, struct vine_worker_
 /*
 Send a single file (or a piece of a file) to the remote worker.
 The transfer time is controlled by the size of the file.
-If the transfer takes too long, then abort.
+If the transfer takes too long, then cancel it.
 */
 
 static int vine_manager_put_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, struct stat info, int64_t *total_bytes )
@@ -218,7 +224,7 @@ static vine_result_code_t vine_manager_put_item_if_not_cached( struct vine_manag
 	struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
 	if(remote_info && (remote_info->mtime != local_info.st_mtime || remote_info->size != local_info.st_size)) {
-		debug(D_NOTICE|D_VINE, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
+		debug(D_NOTICE|D_VINE, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->task_id);
 		return VINE_SUCCESS;
 	} else if(!remote_info) {
 

@@ -125,14 +125,14 @@ class Task(object):
         return vine_task_set_coprocess(self._task, coprocess)
 
     ##
-    # Set the worker selection algorithm for task.
+    # Set the worker selection scheduler for task.
     #
     # @param self       Reference to the current task object.
-    # @param algorithm  One of the following algorithms to use in assigning a
+    # @param scheduler  One of the following schedulers to use in assigning a
     #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
-    def set_algorithm(self, algorithm):
-        return vine_task_set_algorithm(self._task, algorithm)
+    def set_scheduler(self, scheduler):
+        return vine_task_set_scheduler(self._task, scheduler)
 
     ##
     # Attach a user defined logical name to the task.
@@ -144,7 +144,7 @@ class Task(object):
 
     ##
     # Label the task with the given category. It is expected that tasks with the
-    # same category have similar resources requirements (e.g. for fast abort).
+    # same category have similar resources requirements (e.g. to disconnect slow workers).
     #
     # @param self       Reference to the current task object.
     # @param name       The name of the category
@@ -433,8 +433,8 @@ class Task(object):
     # default), the task is tried indefinitely. A task that did not succeed
     # after the given number of retries is returned with result
     # VINE_RESULT_MAX_RETRIES.
-    def set_max_retries(self, max_retries):
-        return vine_task_set_max_retries(self._task, max_retries)
+    def set_retries(self, max_retries):
+        return vine_task_set_retries(self._task, max_retries)
 
     ##
     # Indicate the number of cores required by this task.
@@ -464,33 +464,26 @@ class Task(object):
     # Indicate the maximum end time (absolute, in microseconds from the Epoch) of this task.
     # This is useful, for example, when the task uses certificates that expire.
     # If less than 1, or not specified, no limit is imposed.
-    def set_end_time(self, useconds):
-        return vine_task_set_end_time(self._task, int(useconds))
+    def set_time_end(self, useconds):
+        return vine_task_set_time_end(self._task, int(useconds))
 
     # Indicate the minimum start time (absolute, in microseconds from the Epoch) of this task.
+    # Task will only be submitted to workers after the specified time.
     # If less than 1, or not specified, no limit is imposed.
-    def set_start_time_min(self, useconds):
-        return vine_task_set_start_time_min(self._task, int(useconds))
+    def set_time_start(self, useconds):
+        return vine_task_set_time_start(self._task, int(useconds))
 
-    # Indicate the maximum running time (in microseconds) for a task in a
+    # Indicate the maximum running time (in seconds) for a task in a
     # worker (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
-    # Note: It has the same effect that set_running_time_max, but specified
-    # in microseconds. Kept for backwards compatibility.
-    def set_running_time(self, useconds):
-        return vine_task_set_running_time(self._task, int(useconds))
-
-    # Indicate the maximum running time (in seconds) for a task in a worker
-    # (relative to when the task starts to run).  If less than 1, or not
-    # specified, no limit is imposed.
-    def set_running_time_max(self, seconds):
-        return vine_task_set_running_time_max(self._task, int(seconds))
+    def set_time_max(self, useconds):
+        return vine_task_set_time_max(self._task, int(useconds))
 
     # Indicate the minimum running time (in seconds) for a task in a worker
     # (relative to when the task starts to run).  If less than 1, or not
     # specified, no limit is imposed.
-    def set_running_time_min(self, seconds):
-        return vine_task_set_running_time_min(self._task, int(seconds))
+    def set_time_min(self, seconds):
+        return vine_task_set_time_min(self._task, int(seconds))
 
     ##
     # Set this environment variable before running the task.
@@ -540,7 +533,7 @@ class Task(object):
     # @endcode
     @property
     def std_output(self):
-        return vine_task_get_output(self._task)
+        return vine_task_get_stdout(self._task)
     
     ##
     # Get the standard output of the task. (Same as t.std_output for regular
@@ -550,7 +543,7 @@ class Task(object):
     # @endcode
     @property
     def output(self):
-        return vine_task_get_output(self._task)
+        return vine_task_get_stdout(self._task)
 
     ##
     # Get the task id number. Must be called only after the task was submitted.
@@ -559,7 +552,7 @@ class Task(object):
     # @endcode
     @property
     def id(self):
-        return vine_task_get_taskid(self._task)
+        return vine_task_get_id(self._task)
 
     ##
     # Get the exit code of the command executed by the task. Must be called only
@@ -999,7 +992,7 @@ class Manager(object):
     # @endcode
     @property
     def name(self):
-        return vine_name(self._taskvine)
+        return vine_get_name(self._taskvine)
 
     ##
     # Get the listening port of the queue.
@@ -1118,12 +1111,12 @@ class Manager(object):
     #                  - VINE_ALLOCATION_MODE_FIXED Task fails (default).
     #                  - VINE_ALLOCATION_MODE_MAX If maximum values are
     #                  specified for cores, memory, disk, and gpus (e.g. via @ref
-    #                  set_category_max_resources or @ref Task.set_memory),
+    #                  set_category_resources_max or @ref Task.set_memory),
     #                  and one of those resources is exceeded, the task fails.
     #                  Otherwise it is retried until a large enough worker
     #                  connects to the manager, using the maximum values
     #                  specified, and the maximum values so far seen for
-    #                  resources not specified. Use @ref Task.set_max_retries to
+    #                  resources not specified. Use @ref Task.set_retries to
     #                  set a limit on the number of times manager attemps
     #                  to complete the task.
     #                  - VINE_ALLOCATION_MODE_MIN_WASTE As above, but
@@ -1148,10 +1141,10 @@ class Manager(object):
     ##
     # Get current task state. See @ref vine_task_state_t for possible values.
     # @code
-    # >>> print(q.task_state(taskid))
+    # >>> print(q.task_state(task_id))
     # @endcode
-    def task_state(self, taskid):
-        return vine_task_state(self._taskvine, taskid)
+    def task_state(self, task_id):
+        return vine_task_state(self._taskvine, task_id)
 
     ## Enables resource monitoring of tasks in the queue, and writes a summary
     #  per task to the directory given. Additionally, all summaries are
@@ -1177,23 +1170,23 @@ class Manager(object):
         return vine_enable_monitoring_full(self._taskvine, dirname, watchdog)
 
     ##
-    # Turn on or off fast abort functionality for a given queue for tasks in
+    # Enable disconnect slow workers functionality for a given queue for tasks in
     # the "default" category, and for task which category does not set an
     # explicit multiplier.
     #
     # @param self       Reference to the current manager object.
-    # @param multiplier The multiplier of the average task time at which point to abort; if negative (the default) fast_abort is deactivated.
-    def activate_fast_abort(self, multiplier):
-        return vine_activate_fast_abort(self._taskvine, multiplier)
+    # @param multiplier The multiplier of the average task time at which point to disconnect a worker; if less than 1, it is disabled (default).
+    def enable_disconnect_slow_workers(self, multiplier):
+        return vine_enable_disconnect_slow_workers(self._taskvine, multiplier)
 
     ##
-    # Turn on or off fast abort functionality for a given queue.
+    # Enable disconnect slow workers functionality for a given queue.
     #
     # @param self       Reference to the current manager object.
     # @param name       Name of the category.
-    # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref activate_fast_abort)
-    def activate_fast_abort_category(self, name, multiplier):
-        return vine_activate_fast_abort_category(self._taskvine, name, multiplier)
+    # @param multiplier The multiplier of the average task time at which point to disconnect a worker; disabled if less than one (see @ref enable_disconnect_slow_workers)
+    def enable_disconnect_slow_workers_category(self, name, multiplier):
+        return vine_enable_disconnect_slow_workers_category(self._taskvine, name, multiplier)
 
     ##
     # Turn on or off draining mode for workers at hostname.
@@ -1223,20 +1216,20 @@ class Manager(object):
         return vine_hungry(self._taskvine)
 
     ##
-    # Set the worker selection algorithm for queue.
+    # Set the worker selection scheduler for queue.
     #
     # @param self       Reference to the current manager object.
-    # @param algorithm  One of the following algorithms to use in assigning a
+    # @param scheduler  One of the following schedulers to use in assigning a
     #                   task to a worker. See @ref vine_schedule_t for
     #                   possible values.
-    def set_algorithm(self, algorithm):
-        return vine_set_algorithm(self._taskvine, algorithm)
+    def set_scheduler(self, scheduler):
+        return vine_set_scheduler(self._taskvine, scheduler)
 
     ##
     # Set the order for dispatching submitted tasks in the queue.
     #
     # @param self       Reference to the current manager object.
-    # @param order      One of the following algorithms to use in dispatching
+    # @param order      One of the following schedulers to use in dispatching
     #                   submitted tasks to workers:
     #                   - @ref VINE_TASK_ORDER_FIFO
     #                   - @ref VINE_TASK_ORDER_LIFO
@@ -1261,27 +1254,22 @@ class Manager(object):
     # @param self Reference to the current manager object.
     # @param mode An string to indicate using 'by_ip', 'by_hostname' or 'by_apparent_ip'.
     def set_manager_preferred_connection(self, mode):
-        return vine_manager_preferred_connection(self._taskvine, mode)
+        return vine_set_manager_preferred_connection(self._taskvine, mode)
 
     ##
-    # See set_manager_preferred_connection
-    def set_master_preferred_connection(self, mode):
-        return vine_manager_preferred_connection(self._taskvine, mode)
-
-    ##
-    # Set the minimum taskid of future submitted tasks.
+    # Set the minimum task_id of future submitted tasks.
     #
-    # Further submitted tasks are guaranteed to have a taskid larger or equal
-    # to minid.  This function is useful to make taskids consistent in a
+    # Further submitted tasks are guaranteed to have a task_id larger or equal
+    # to minid.  This function is useful to make task_ids consistent in a
     # workflow that consists of sequential managers. (Note: This function is
-    # rarely used).  If the minimum id provided is smaller than the last taskid
+    # rarely used).  If the minimum id provided is smaller than the last task_id
     # computed, the minimum id provided is ignored.
     #
     # @param self   Reference to the current manager object.
-    # @param minid  Minimum desired taskid
-    # @return Returns the actual minimum taskid for future tasks.
-    def set_min_taskid(self, minid):
-        return vine_set_min_taskid(self._taskvine, minid)
+    # @param minid  Minimum desired task_id
+    # @return Returns the actual minimum task_id for future tasks.
+    def set_min_task_id(self, minid):
+        return vine_set_task_id_min(self._taskvine, minid)
 
     ##
     # Change the project priority for the given queue.
@@ -1298,8 +1286,8 @@ class Manager(object):
     # num tasks left + num tasks running + num tasks read.
     # @param self   Reference to the current manager object.
     # @param ntasks Number of tasks yet to be submitted.
-    def set_num_tasks_left(self, ntasks):
-        return vine_set_num_tasks_left(self._taskvine, ntasks)
+    def tasks_left_count(self, ntasks):
+        return vine_set_tasks_left_count(self._taskvine, ntasks)
 
     ##
     # Specify the manager mode for the given queue.
@@ -1316,13 +1304,12 @@ class Manager(object):
         return vine_set_manager_mode(self._taskvine, mode)
 
     ##
-    # Specify the catalog server the manager should report to.
+    # Specify the catalog servers the manager should report to.
     #
     # @param self       Reference to the current manager object.
-    # @param hostname   The hostname of the catalog server.
-    # @param port       The port the catalog server is listening on.
-    def set_catalog_server(self, hostname, port):
-        return vine_set_catalog_server(self._taskvine, hostname, port)
+    # @param catalogs   The catalog servers given as a comma delimited list of hostnames or hostname:port
+    def set_catalog_servers(self, hostname, port):
+        return vine_set_catalog_servers(self._taskvine, catalogs)
 
     ##
     # Specify a debug log file that records the manager actions in detail.
@@ -1373,17 +1360,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A maximum of 4 cores is found on any worker:
-    # >>> q.set_max_resources({'cores': 4})
+    # >>> q.set_resources_max({'cores': 4})
     # >>> # A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
-    # >>> q.set_max_resources({'cores': 8, 'memory':  1024, 'disk': 10240})
+    # >>> q.set_resources_max({'cores': 8, 'memory':  1024, 'disk': 10240})
     # @endcode
 
-    def set_max_resources(self, rmd):
+    def set_resources_max(self, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_set_max_resources(self._taskvine, rm)
+        return vine_set_resources_max(self._taskvine, rm)
 
     ##
     #
@@ -1393,17 +1380,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
-    # >>> q.set_min_resources({'cores': 2})
+    # >>> q.set_resources_min({'cores': 2})
     # >>> # A minimum of 4 cores, 512MB of memory, and 1GB disk are found on any worker:
-    # >>> q.set_min_resources({'cores': 4, 'memory':  512, 'disk': 1024})
+    # >>> q.set_resources_min({'cores': 4, 'memory':  512, 'disk': 1024})
     # @endcode
 
-    def set_min_resources(self, rmd):
+    def set_resources_min(self, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_set_min_resources(self._taskvine, rm)
+        return vine_set_resources_min(self._taskvine, rm)
 
     ##
     # Specifies the maximum resources allowed for the given category.
@@ -1414,17 +1401,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A maximum of 4 cores may be used by a task in the category:
-    # >>> q.set_category_max_resources("my_category", {'cores': 4})
+    # >>> q.set_category_resources_max("my_category", {'cores': 4})
     # >>> # A maximum of 8 cores, 1GB of memory, and 10GB may be used by a task:
-    # >>> q.set_category_max_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
+    # >>> q.set_category_resources_max("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
     # @endcode
 
-    def set_category_max_resources(self, category, rmd):
+    def set_category_resources_max(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_set_category_max_resources(self._taskvine, category, rm)
+        return vine_set_category_resources_max(self._taskvine, category, rm)
 
     ##
     # Specifies the minimum resources allowed for the given category.
@@ -1435,17 +1422,17 @@ class Manager(object):
     # For example:
     # @code
     # >>> # A minimum of 2 cores is found on any worker:
-    # >>> q.set_category_min_resources("my_category", {'cores': 2})
+    # >>> q.set_category_resources_min("my_category", {'cores': 2})
     # >>> # A minimum of 4 cores, 512MB of memory, and 1GB disk are found on any worker:
-    # >>> q.set_category_min_resources("my_category", {'cores': 4, 'memory':  512, 'disk': 1024})
+    # >>> q.set_category_resources_min("my_category", {'cores': 4, 'memory':  512, 'disk': 1024})
     # @endcode
 
-    def set_category_min_resources(self, category, rmd):
+    def set_category_resources_min(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return vine_set_category_min_resources(self._taskvine, category, rm)
+        return vine_set_category_resources_min(self._taskvine, category, rm)
 
     ##
     # Specifies the first-allocation guess for the given category
@@ -1479,13 +1466,13 @@ class Manager(object):
         return vine_initialize_categories(self._taskvine, rm, filename)
 
     ##
-    # Cancel task identified by its taskid and remove from the given queue.
+    # Cancel task identified by its task_id and remove from the given queue.
     #
     # @param self   Reference to the current manager object.
-    # @param id     The taskid returned from @ref submit.
-    def cancel_by_taskid(self, id):
+    # @param id     The task_id returned from @ref submit.
+    def cancel_by_task_id(self, id):
         task = None
-        task_pointer = vine_cancel_by_taskid(self._taskvine, id)
+        task_pointer = vine_cancel_by_task_id(self._taskvine, id)
         if task_pointer:
             task = self._task_table.pop(int(id))
         return task
@@ -1495,9 +1482,9 @@ class Manager(object):
     #
     # @param self   Reference to the current manager object.
     # @param tag    The tag assigned to task using @ref set_tag.
-    def cancel_by_tasktag(self, tag):
+    def cancel_by_task_tag(self, tag):
         task = None
-        task_pointer = vine_cancel_by_tasktag(self._taskvine, tag)
+        task_pointer = vine_cancel_by_task_tag(self._taskvine, tag)
         if task_pointer:
             task = self._task_table.pop(int(id))
         return task
@@ -1515,7 +1502,7 @@ class Manager(object):
             if task.category == category:
                 ids_to_cancel.append(task.id)
 
-        canceled_tasks =  [self.cancel_by_taskid(id) for id in ids_to_cancel]
+        canceled_tasks =  [self.cancel_by_task_id(id) for id in ids_to_cancel]
         return canceled_tasks
 
 
@@ -1526,8 +1513,8 @@ class Manager(object):
     #
     # @param self   Reference to the current manager object.
     # @param n      The number to shutdown.  0 shutdowns all workers
-    def shutdown_workers(self, n=0):
-        return vine_shut_down_workers(self._taskvine, n)
+    def workers_shutdown(self, n=0):
+        return vine_workers_shutdown(self._taskvine, n)
 
     ##
     # Block workers running on host from working for the manager.
@@ -1615,9 +1602,9 @@ class Manager(object):
     # - "resource-submit-multiplier" Treat each worker as having ({cores,memory,gpus} * multiplier) when submitting tasks. This allows for tasks to wait at a worker rather than the manager. (default = 1.0)
     # - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
     # - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
-    # - "transfer-outlier-factor" Transfer that are this many times slower than the average will be aborted.  (default=10x)
+    # - "transfer-outlier-factor" Transfer that are this many times slower than the average will be terminated.  (default=10x)
     # - "default-transfer-rate" The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
-    # - "fast-abort-multiplier" Set the multiplier of the average task time at which point to abort; if negative or zero fast_abort is deactivated. (default=0)
+    # - "disconnect-slow-workers-factor" Set the multiplier of the average task time at which point to disconnect a worker; disabled if less than 1. (default=0)
     # - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
     # - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
     # - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
@@ -1642,9 +1629,9 @@ class Manager(object):
     def submit(self, task):
         if isinstance(task, RemoteTask):
             task.add_buffer(json.dumps(task._event), "infile")
-        taskid = vine_submit(self._taskvine, task._task)
-        self._task_table[taskid] = task
-        return taskid
+        task_id = vine_submit(self._taskvine, task._task)
+        self._task_table[task_id] = task
+        return task_id
 
     ##
     # Wait for tasks to complete.
@@ -1671,28 +1658,28 @@ class Manager(object):
     def wait_for_tag(self, tag, timeout=VINE_WAITFORTASK):
         task_pointer = vine_wait_for_tag(self._taskvine, tag, timeout)
         if task_pointer:
-            task = self._task_table[vine_task_get_taskid(task_pointer)]
-            del self._task_table[vine_task_get_taskid(task_pointer)]
+            task = self._task_table[vine_task_get_id(task_pointer)]
+            del self._task_table[vine_task_get_id(task_pointer)]
             return task
         return None
 
     ##
     # Similar to @ref wait, but guarantees that the returned task has the
-    # specified taskid.
+    # specified task_id.
     #
     # This call will block until the timeout has elapsed.
     #
     # @param self       Reference to the current manager object.
-    # @param taskid        Desired taskid. If -1, then it is equivalent to self.wait(timeout)
+    # @param task_id        Desired task_id. If -1, then it is equivalent to self.wait(timeout)
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
-    def wait_for_taskid(self, taskid, timeout=VINE_WAITFORTASK):
-        task_pointer = vine_wait_for_taskid(self._taskvine, taskid, timeout)
+    def wait_for_task_id(self, task_id, timeout=VINE_WAITFORTASK):
+        task_pointer = vine_wait_for_task_id(self._taskvine, task_id, timeout)
         if task_pointer:
-            task = self._task_table[vine_task_get_taskid(task_pointer)]
-            del self._task_table[vine_task_get_taskid(task_pointer)]
+            task = self._task_table[vine_task_get_id(task_pointer)]
+            del self._task_table[vine_task_get_id(task_pointer)]
             return task
-        return None            
+        return None
 
     ##
     # Maps a function to elements in a sequence using taskvine
@@ -1728,7 +1715,7 @@ class Manager(object):
 
                 t = self.wait_for_tag(str(i), 1)
                 if t:
-                    results[tasks[vine_task_get_taskid(t)]] = list(vine_task_get_output(t))
+                    results[tasks[vine_task_get_id(t)]] = list(vine_task_get_stdout(t))
                     n += 1
                     break
 
@@ -1790,7 +1777,7 @@ class Manager(object):
                 t = self.wait_for_tag(str(i), 10)
 
                 if t:
-                    results[tasks[vine_task_get_taskid(t)]] = vine_task_get_output(t)
+                    results[tasks[vine_task_get_id(t)]] = vine_task_get_stdout(t)
                     n += 1
                     break
  
@@ -1838,7 +1825,7 @@ class Manager(object):
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
-                        results[tasks[vine_task_get_taskid(t)]] = vine_task_get_output(t)
+                        results[tasks[vine_task_get_id(t)]] = vine_task_get_stdout(t)
                         n += 1
                         break
 
@@ -1878,7 +1865,7 @@ class Manager(object):
             while not self.empty() and n < size:
                 t = self.wait_for_tag(str(i), 1)                
                 if t:
-                    results[tasks[vine_task_get_taskid(t)]] = list(json.loads(vine_task_get_output(t))["Result"])
+                    results[tasks[vine_task_get_id(t)]] = list(json.loads(vine_task_get_stdout(t))["Result"])
                     n += 1
                     break
 
@@ -1932,7 +1919,7 @@ class Manager(object):
             while not self.empty() and n < num_task:
                 t = self.wait_for_tag(str(i), 10)
                 if t:
-                    results[tasks[vine_task_get_taskid(t)]] = json.loads(vine_task_get_output(t))["Result"]
+                    results[tasks[vine_task_get_id(t)]] = json.loads(vine_task_get_stdout(t))["Result"]
                     n += 1
                     break
          
@@ -1978,7 +1965,7 @@ class Manager(object):
                     t = self.wait_for_tag(str(i), 10)
 
                     if t:
-                        results[tasks[vine_task_get_taskid(t)]] = json.loads(vine_task_get_output(t))["Result"]
+                        results[tasks[vine_task_get_id(t)]] = json.loads(vine_task_get_stdout(t))["Result"]
                         n += 1
                         break
 

@@ -418,8 +418,8 @@ void vine_schedule_check_for_large_tasks( struct vine_manager *q )
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q,t);
 		if(bit_set) {
-			rmsummary_merge_max(largest_unfit_task, vine_manager_task_max_resources(q, t));
-			rmsummary_merge_max(largest_unfit_task, vine_manager_task_min_resources(q, t));
+			rmsummary_merge_max(largest_unfit_task, vine_manager_task_resources_max(q, t));
+			rmsummary_merge_max(largest_unfit_task, vine_manager_task_resources_min(q, t));
 		}
 		if (bit_set & CORES_BIT) {
 			unfit_core++;

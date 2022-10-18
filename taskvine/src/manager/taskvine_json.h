@@ -63,7 +63,7 @@ environment document:
     ...
 }
 
-@return An integer taskid assigned to the submitted task.
+@return An integer task_id assigned to the submitted task.
 */
 int vine_json_submit(struct vine_manager *m, const char *str);
 
@@ -77,7 +77,7 @@ returning. Use an integer time to set the timeout or the constant
 process (call @ref process_wait to retrieve the status of the completed
 child process). Return string should be freed using free().
 
-{ "command_line" : <i>string</i> , "tag" : <i>string</i> , "output" : <i>string</i> , "taskid" :
+{ "command_line" : <i>string</i> , "tag" : <i>string</i> , "output" : <i>string</i> , "task_id" :
 <i>integer</i> , "return_status" : <i>integer</i> , "result" : <i>integer</i> }
 
 */
