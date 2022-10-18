@@ -68,8 +68,8 @@ if __name__ == '__main__':
       t.add_file(outfile, outfile, VINE_OUTPUT, cache=False)
 
       # Once all files has been specified, we are ready to submit the task to the queue.
-      taskid = q.submit(t)
-      print("submitted task (id# %d): %s" % (taskid, t.command))
+      task_id = q.submit(t)
+      print("submitted task (id# %d): %s" % (task_id, t.command))
 
   print("waiting for tasks to complete...")
   while not q.empty():

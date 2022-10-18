@@ -73,7 +73,7 @@ struct vine_manager {
 	int   port;          /* Port number on which this manager is listening for connections. */
 	int   priority;      /* Priority of this manager relative to other managers with the same name. */
 	char *catalog_hosts; /* List of catalogs to which this manager reports. */
-	char *manager_preferred_connection; /* Recommended method for connecting to this manager.  @ref vine_manager_preferred_connection */
+	char *manager_preferred_connection; /* Recommended method for connecting to this manager.  @ref vine_set_manager_preferred_connection */
 	char  workingdir[PATH_MAX];         /* Current working dir, for reporting to the catalog server. */
 
 	struct link *manager_link;       /* Listening TCP connection for accepting new workers. */
@@ -89,7 +89,7 @@ struct vine_manager {
 
 	/* Primary data structures for tracking task state. */
 
-	struct itable *tasks;           /* Maps taskid -> vine_task of all tasks in any state. */
+	struct itable *tasks;           /* Maps task_id -> vine_task of all tasks in any state. */
 	struct list   *ready_list;      /* List of vine_task that are waiting to execute. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
@@ -108,7 +108,7 @@ struct vine_manager {
 
 	/* Internal state modified by the manager */
 
- 	int next_taskid;       /* Next integer taskid to be assigned to a created task. */
+ 	int next_task_id;       /* Next integer task_id to be assigned to a created task. */
 	int num_tasks_left;    /* Optional: Number of tasks remaining, if given by user.  @ref vine_set_num_tasks */
 	int busy_waiting_flag; /* Set internally in main loop if no messages were processed -> wait longer. */
 
@@ -161,7 +161,7 @@ struct vine_manager {
 	int force_proportional_resources;  /* If true, tasks divide worker resources proportionally. */
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
-	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB */
+	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */
 };
 
 /*
@@ -181,12 +181,9 @@ vine_msg_code_t vine_manager_recv( struct vine_manager *q, struct vine_worker_in
 /* Compute the expected wait time for a transfer of length bytes. */
 int vine_manager_transfer_time( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, int64_t length );
 
-/* Give the number of workers available to run tasks at the moment. */
-int vine_manager_available_workers(struct vine_manager *q);
-
 /* Various functions to compute expected properties of tasks. */
-const struct rmsummary *vine_manager_task_min_resources(struct vine_manager *q, struct vine_task *t);
-const struct rmsummary *vine_manager_task_max_resources(struct vine_manager *q, struct vine_task *t);
+const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t);
+const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, struct vine_task *t);
 
 struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 

@@ -338,8 +338,8 @@ if __name__ == '__main__':
 
         plots['workers-accum'] = WQPlot(x_units = x_units, ylabel = 'workers', range = x_range,
                 title = "workers cumulative counts",
-                fields = ['workers_joined', 'workers_removed', 'workers_released', 'workers_fast_aborted', 'workers_idled_out', 'workers_lost'],
-                labels = ['joined', 'removed', 'released', 'fast aborted', 'idled out,', 'lost'])
+                fields = ['workers_joined', 'workers_removed', 'workers_released', 'workers_slow', 'workers_idled_out', 'workers_lost'],
+                labels = ['joined', 'removed', 'released', 'slow', 'idled out,', 'lost'])
 
         plots['tasks'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
                 title = "tasks instantaneous counts",

@@ -45,11 +45,11 @@ struct vine_worker_info {
 	char transfer_addr[LINK_ADDRESS_MAX];
 	int  transfer_port;
 	int  transfer_port_active;
-  
+
 	/* Worker condition that may affect task start or cancellation. */
-	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
-	int  fast_abort_alarm;                    // if 1, no task has finished since a task triggered fast abort.
-	                                          // 0 otherwise. A 2nd task triggering fast abort will cause the worker to disconnect
+	int  draining;                          // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
+	int  alarm_slow_worker;                 // if 1, no task has finished since a slow running task triggered a disconnection.
+	                                        // 0 otherwise. A 2nd task triggering disconnection will cause the worker to disconnect
 	int64_t     end_time;                   // epoch time (in seconds) at which the worker terminates
 	                                        // If -1, means the worker has not reported in. If 0, means no limit.
 

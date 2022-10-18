@@ -106,8 +106,8 @@ void mainloop(struct vine_manager *queue, struct link *input_link, struct link *
 
 		if(!strcmp(method, "submit")) {
 			const char *task = jx_lookup_string(jsonrpc,"params");
-			int taskid = vine_json_submit(queue, task);
-			if(taskid < 0) {
+			int task_id = vine_json_submit(queue, task);
+			if(task_id < 0) {
 				reply(output_link, "error", "Could not submit task", id);
 			} else {
 				reply(output_link, method, "Task submitted successfully.", id);
@@ -121,8 +121,8 @@ void mainloop(struct vine_manager *queue, struct link *input_link, struct link *
 				reply(output_link, method, task, id);
 			}
 		} else if(!strcmp(method, "remove")) {
-			int taskid = jx_lookup_integer(jsonrpc,"params");
-			char *task = vine_json_remove(queue, taskid);
+			int task_id = jx_lookup_integer(jsonrpc,"params");
+			char *task = vine_json_remove(queue, task_id);
 			if(!task) {
 				reply(output_link, "error", "unable to remove task", id);
 			} else {

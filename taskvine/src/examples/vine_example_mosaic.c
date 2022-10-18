@@ -71,9 +71,9 @@ int main(int argc, char *argv[])
 
 		vine_task_set_cores(t,1);
 
-		int taskid = vine_submit(m, t);
+		int task_id = vine_submit(m, t);
 
-		printf("Submitted task (id# %d): %s\n", taskid, vine_task_get_command(t) );
+		printf("Submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );
 	}
 
 	printf("Waiting for tasks to complete...\n");
@@ -81,16 +81,15 @@ int main(int argc, char *argv[])
 	while(!vine_empty(m)) {
 		t = vine_wait(m, 5);
 		if(t) {
-			vine_result_t r = vine_task_get_result(t);
-                        int id = vine_task_get_taskid(t);
+      vine_result_t r = vine_task_get_result(t);
+      int id = vine_task_get_id(t);
 
 			if(r==VINE_RESULT_SUCCESS) {
-				printf("Task %d complete: %s\n",id,vine_task_get_command(t));
-                        } else {
-                                printf("Task %d failed: %s\n",id,vine_result_string(r));
-                        }
-
-                        vine_task_delete(t);
+		    printf("Task %d complete: %s\n",id,vine_task_get_command(t));
+      } else {
+        printf("Task %d failed: %s\n",id,vine_result_string(r));
+      }
+      vine_task_delete(t);
 		}
 	}
 

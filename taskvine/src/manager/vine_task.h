@@ -24,7 +24,7 @@ End user may only use the API described in taskvine.h
 struct vine_task {
         /***** Fixed properties of task at submit time. ******/
 
-        int taskid;                  /**< A unique task id number. */
+        int task_id;                  /**< A unique task id number. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
 	char *tag;                   /**< An optional user-defined logical name for the task. */
@@ -50,7 +50,7 @@ struct vine_task {
 	struct vine_worker_info *worker;    /**< Worker to which this task has been dispatched. */
 	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref VINE_RESULT_MAX_RETRIES. */
 	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
-	int fast_abort_count;        /**< Number of times this task has been terminated for running too long. */
+	int workers_slow;            /**< Number of times this task has been terminated for running too long. */
 
 	/***** Results of task once it has reached completion. *****/
 
