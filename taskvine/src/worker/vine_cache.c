@@ -272,6 +272,7 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 	// rename file to our expected cache name (probably not the best way to do this)
 	char * command = string_format("mv %s/%s %s", c->cache_dir, path, cache_path);
 	do_internal_command(c,command,error_message);
+	free(command);
 
 	return 1;
 }
