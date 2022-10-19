@@ -42,8 +42,7 @@ struct jx *vine_blocklist_to_jx( struct vine_manager  *q )
 	char *hostname;
 	struct vine_blocklist_info *info;
 
-	hash_table_firstkey(q->worker_blocklist);
-	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
+	HASH_TABLE_ITERATE(q->worker_blocklist,hostname,info) {
 		if(info->blocked) {
 			jx_array_insert(j, jx_string(hostname));
 		}
@@ -58,8 +57,7 @@ void vine_blocklist_unblock_all_by_time(struct vine_manager *q, time_t deadline)
 	char *hostname;
 	struct vine_blocklist_info *info;
 
-	hash_table_firstkey(q->worker_blocklist);
-	while(hash_table_nextkey(q->worker_blocklist, &hostname, (void *) &info)) {
+	HASH_TABLE_ITERATE(q->worker_blocklist,hostname,info) {
 		if(!info->blocked)
 			continue;
 
