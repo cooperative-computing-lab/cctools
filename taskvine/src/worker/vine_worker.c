@@ -280,8 +280,7 @@ static int64_t measure_worker_disk()
 		struct vine_process *p;
 		uint64_t task_id;
 
-		itable_firstkey(procs_table);
-		while(itable_nextkey(procs_table,&task_id,(void**)&p)) {
+		ITABLE_ITERATE(procs_table,task_id,p) {
 			if(p->sandbox_size > 0) {
 				disk_measured += p->sandbox_size;
 				files_counted += p->sandbox_file_count;
@@ -342,12 +341,11 @@ static void send_features(struct link *manager)
 {
 	char *f;
 	void *dummy;
-	hash_table_firstkey(features);
 
-	char fenc[VINE_LINE_MAX];
-	while(hash_table_nextkey(features, &f, &dummy)) {
-		url_encode(f, fenc, VINE_LINE_MAX);
-		send_message(manager, "feature %s\n", fenc);
+	HASH_TABLE_ITERATE(features,f,dummy) {
+		char feature_encoded[VINE_LINE_MAX];
+		url_encode(f, feature_encoded, VINE_LINE_MAX);
+		send_message(manager, "feature %s\n", feature_encoded);
 	}
 }
 
@@ -563,8 +561,7 @@ static void expire_procs_running()
 
 	double current_time = timestamp_get() / USECOND;
 
-	itable_firstkey(procs_running);
-	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
+	ITABLE_ITERATE(procs_running,pid,p) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
 			p->result = VINE_RESULT_TASK_TIMEOUT;
@@ -582,16 +579,15 @@ for later processing.
 static int handle_completed_tasks(struct link *manager)
 {
 	struct vine_process *p;
-	pid_t pid;
+	uint64_t pid;
 	int status;
 
-	itable_firstkey(procs_running);
-	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
+	ITABLE_ITERATE(procs_running,pid,p) {
 		int result = wait4(pid, &status, WNOHANG, &p->rusage);
 		if(result==0) {
 			// pid is still going
 		} else if(result<0) {
-			debug(D_VINE, "wait4 on pid %d returned an error: %s",pid,strerror(errno));
+		  debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)pid,strerror(errno));
 		} else if(result>0) {
 			if (!WIFEXITED(status)){
 				p->exit_code = WTERMSIG(status);
@@ -823,8 +819,7 @@ static void kill_all_tasks()
 	struct vine_process *p;
 	uint64_t task_id;
 
-	itable_firstkey(procs_table);
-	while(itable_nextkey(procs_table,&task_id,(void**)&p)) {
+	ITABLE_ITERATE(procs_table,task_id,p) {
 		do_kill(task_id);
 	}
 
@@ -849,10 +844,9 @@ static void finish_running_task(struct vine_process *p, vine_result_t result)
 static void finish_running_tasks(vine_result_t result)
 {
 	struct vine_process *p;
-	pid_t pid;
+	uint64_t pid;
 
-	itable_firstkey(procs_running);
-	while(itable_nextkey(procs_running, (uint64_t*) &pid, (void**)&p)) {
+	ITABLE_ITERATE(procs_running,pid,p) {
 		finish_running_task(p, result);
 	}
 }
@@ -880,15 +874,14 @@ static int enforce_processes_limits()
 	static time_t last_check_time = 0;
 
 	struct vine_process *p;
-	pid_t pid;
+	uint64_t pid;
 
 	int ok = 1;
 
 	/* Do not check too often, as it is expensive (particularly disk) */
 	if((time(0) - last_check_time) < check_resources_interval ) return 1;
 
-	itable_firstkey(procs_table);
-	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
+	ITABLE_ITERATE(procs_running,pid,p) {
 		if(!enforce_process_limits(p)) {
 			finish_running_task(p, VINE_RESULT_RESOURCE_EXHAUSTION);
 			trash_file(p->sandbox);
@@ -910,12 +903,12 @@ as other running tasks should not be affected by a task timeout.
 static void enforce_processes_max_running_time()
 {
 	struct vine_process *p;
-	pid_t pid;
+	uint64_t pid;
 
 	timestamp_t now = timestamp_get();
 
-	itable_firstkey(procs_running);
-	while(itable_nextkey(procs_running, (uint64_t*) &pid, (void**) &p)) {
+	ITABLE_ITERATE(procs_running,pid,p) {
+
 		/* If the task did not set wall_time, return right away. */
 		if(p->task->resources_requested->wall_time < 1)
 			continue;
@@ -1537,10 +1530,8 @@ int serve_manager_by_hostport_list(struct list *manager_addresses, int use_ssl)
 
 	/* keep trying managers in the list, until all manager addresses
 	 * are tried, or a succesful connection was done */
-	list_first_item(manager_addresses);
-	while((current_manager_address = list_next_item(manager_addresses))) {
+	LIST_ITERATE(manager_addresses,current_manager_address) {
 		result = serve_manager_by_hostport(current_manager_address->host,current_manager_address->port,/*verify name*/ 0, use_ssl);
-
 		if(result) {
 			break;
 		}
