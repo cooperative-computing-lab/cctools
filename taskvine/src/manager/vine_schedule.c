@@ -92,8 +92,7 @@ static int check_worker_against_task(struct vine_manager *q, struct vine_worker_
 			return 0;
 
 		char *feature;
-		list_first_item(t->feature_list);
-		while((feature = list_next_item(t->feature_list))) {
+		LIST_ITERATE(t->feature_list,feature) {
 			if(!hash_table_lookup(w->features, feature))
 				return 0;
 		}
@@ -413,8 +412,8 @@ void vine_schedule_check_for_large_tasks( struct vine_manager *q )
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	list_first_item(q->ready_list);
-	while( (t = list_next_item(q->ready_list))){
+	LIST_ITERATE(q->ready_list,t) {
+
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q,t);
 		if(bit_set) {
