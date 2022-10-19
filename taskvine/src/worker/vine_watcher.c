@@ -88,8 +88,8 @@ void vine_watcher_add_process( struct vine_watcher *w, struct vine_process *p )
 {
 	struct vine_file *f;
 
-	list_first_item(p->task->output_files);
-	while((f=list_next_item(p->task->output_files))) {
+	LIST_ITERATE(p->task->output_files,f) {
+
 		if(f->flags & VINE_WATCH) {
 
 			struct entry *e;
@@ -138,8 +138,7 @@ int vine_watcher_check( struct vine_watcher *w )
 {
 	struct entry *e;
 
-	list_first_item(w->watchlist);
-	while((e=list_next_item(w->watchlist))) {
+	LIST_ITERATE(w->watchlist,e) {
 		struct stat info;
 		if(e->do_not_watch) continue;
 		if(stat(e->physical_path,&info)==0) {
@@ -169,8 +168,7 @@ int vine_watcher_send_changes( struct vine_watcher *w, struct link *manager, tim
 {
 	struct entry *e;
 
-	list_first_item(w->watchlist);
-	while((e=list_next_item(w->watchlist))) {
+	LIST_ITERATE(w->watchlist,e) {
 		struct stat info;
 		if(e->do_not_watch) continue;
 		if(stat(e->physical_path,&info)==0) {

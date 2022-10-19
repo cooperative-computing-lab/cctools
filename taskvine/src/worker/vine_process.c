@@ -129,8 +129,8 @@ static void export_environment( struct vine_process *p )
 {
 	struct list *env_list = p->task->env_list;
 	char *name;
-	list_first_item(env_list);
-	while((name=list_next_item(env_list))) {
+
+	LIST_ITERATE(env_list,name) {
 		char *value = strchr(name,'=');
 		if(value) {
 			*value = 0;
@@ -323,8 +323,8 @@ void  vine_process_compute_disk_needed( struct vine_process *p ) {
 		return;
 
 	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((f = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,f) {
+
 			if(f->type != VINE_FILE && f->type != VINE_FILE_PIECE)
 					continue;
 
