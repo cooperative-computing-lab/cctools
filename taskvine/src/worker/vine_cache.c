@@ -238,26 +238,15 @@ Transfer a single input file from a worker url to a local file name.
 static int do_worker_transfer( struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message)
 {	
 	int port_num;
-	char *addr, *port, *path;
-	char source_mutable[4096];
-	
-	strcpy(source_mutable, source_url);
-	
+	char addr[99], path[4096];
+	int stoptime;	
+	struct link *worker_link;
+
 	// expect the form: worker://addr:port/path/to/file
-	strtok(source_mutable, "/:");
-	addr = strtok(NULL, "/:");
-	port = strtok(NULL, "/:");
-	path = strtok(NULL, "");
+	sscanf(source_url, "worker://%99[^:]:%d/%s", addr, &port_num, path);
 
-	if(path == NULL)
-	{ 
-		debug(D_VINE, "Improperly formed worker URL: %s", source_url);
-		return 0;
-	}
-
-	port_num = atoi(port);
-	int stoptime = time(0) + 15;
-	struct link *worker_link = link_connect(addr, port_num, stoptime);
+	stoptime = time(0) + 15;
+	worker_link = link_connect(addr, port_num, stoptime);
 
 	if(worker_link == NULL)
 	{
