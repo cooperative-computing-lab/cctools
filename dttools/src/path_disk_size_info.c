@@ -25,14 +25,24 @@ struct DIR_with_name {
 
 
 int path_disk_size_info_get(const char *path, int64_t *measured_size, int64_t *number_of_files) {
-	struct path_disk_size_info *state = NULL;
-	int result = path_disk_size_info_get_r(path, -1, &state);
 
-	*measured_size   = state->last_byte_size_complete;
-	*number_of_files = state->last_file_count_complete;
+	struct stat info;
+	int result = stat(path,&info);
+	if(result==0) {
+		if(S_ISDIR(info.st_mode)) {
+			struct path_disk_size_info *state = NULL;
+			result = path_disk_size_info_get_r(path, -1, &state);
 
-	path_disk_size_info_delete_state(state);
+			*measured_size   = state->last_byte_size_complete;
+			*number_of_files = state->last_file_count_complete;
 
+			path_disk_size_info_delete_state(state);
+		} else {
+			*measured_size   = info.st_size;
+			*number_of_files = 1;
+		}
+	}
+	
 	return result;
 }
 
