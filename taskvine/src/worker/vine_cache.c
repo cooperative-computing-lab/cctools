@@ -266,7 +266,6 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 
 	if(!vine_transfer_get_any(worker_link, c, path, time(0) + 120))
 	{
-
 		return 0;
 	}
 
