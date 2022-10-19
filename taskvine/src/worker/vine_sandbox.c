@@ -71,8 +71,7 @@ int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *cache, stru
 	int result=1;
 	
 	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((f = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,f) {
 			result = ensure_input_file(p,f,cache,manager);
 			if(!result) break;
 		}
@@ -136,8 +135,7 @@ manager.  The manager will handle the consequences of missing output files.
 int vine_sandbox_stageout( struct vine_process *p, struct vine_cache *cache )
 {
 	struct vine_file *f;
-	list_first_item(p->task->output_files);
-	while((f = list_next_item(p->task->output_files))) {
+	LIST_ITERATE(p->task->output_files,f) {
 		transfer_output_file(p,f,cache);
 	}
 

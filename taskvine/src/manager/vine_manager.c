@@ -863,8 +863,7 @@ static void delete_worker_files( struct vine_manager *q, struct vine_worker_info
 
 	if(!files) return;
 
-	list_first_item(files);
-	while((tf = list_next_item(files))) {
+	LIST_ITERATE(files,tf) {
 		delete_worker_file(q, w, tf->cached_name, tf->flags, except_flags);
 	}
 }
@@ -1310,8 +1309,7 @@ static vine_result_code_t get_update( struct vine_manager *q, struct vine_worker
 	struct vine_file *f;
 	const char *local_name = 0;
 
-	list_first_item(t->output_files);
-	while((f=list_next_item(t->output_files))) {
+	LIST_ITERATE(t->output_files,f) {
 		if(!strcmp(path,f->remote_name)) {
 			local_name = f->source;
 			break;
@@ -2460,15 +2458,13 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
 	 * set_*, if used. */
 	char *var;
-	list_first_item(t->env_list);
-	while((var=list_next_item(t->env_list))) {
+	LIST_ITERATE(t->env_list,var) {
 		vine_manager_send(q, w,"env %zu\n%s\n", strlen(var), var);
 	}
 
 	if(t->input_files) {
 		struct vine_file *tf;
-		list_first_item(t->input_files);
-		while((tf = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,tf) {
 			if(tf->type == VINE_EMPTY_DIR) {
 				vine_manager_send(q,w, "dir %s\n", tf->remote_name);
 			} else {
@@ -2481,8 +2477,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 
 	if(t->output_files) {
 		struct vine_file *tf;
-		list_first_item(t->output_files);
-		while((tf = list_next_item(t->output_files))) {
+		LIST_ITERATE(t->output_files,tf) {
 			char remote_name_encoded[PATH_MAX];
 			url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
 			vine_manager_send(q,w, "outfile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
@@ -2667,8 +2662,8 @@ static int send_one_task( struct vine_manager *q )
 	timestamp_t now = timestamp_get();
 
 	// Consider each task in the order of priority:
-	list_first_item(q->ready_list);
-	while( (t = list_next_item(q->ready_list))) {
+	LIST_ITERATE(q->ready_list,t) {
+
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 

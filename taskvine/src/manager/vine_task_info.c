@@ -90,8 +90,8 @@ void vine_task_info_compute_capacity(const struct vine_manager *q, struct vine_s
 		count = 1;
 	} else {
 		// Sum up the task reports available.
-		list_first_item(q->task_info_list);
-		while((ti = list_next_item(q->task_info_list))) {
+
+		LIST_ITERATE(q->task_info_list,ti) {
 			capacity->transfer_time += ti->transfer_time;
 			capacity->exec_time     += ti->exec_time;
 			capacity->manager_time   += ti->manager_time;
