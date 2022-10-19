@@ -455,8 +455,7 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 	// Check for existence of each input file first.
 	// If any one fails to exist, set the failure condition and return failure.
 	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((f = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,f) {
 			if(f->type == VINE_FILE || f->type == VINE_FILE_PIECE) {
 				char * expanded_source = expand_envnames(w, f->source);
 				if(!expanded_source) {
@@ -477,8 +476,7 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 	// Send each of the input files.
 	// If any one fails to be sent, return failure.
 	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((f = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,f) {
 			vine_result_code_t result = vine_manager_put_input_file(q,w,t,f);
 			if(result != VINE_SUCCESS) {
 				return result;

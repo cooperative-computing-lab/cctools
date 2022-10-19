@@ -382,8 +382,7 @@ vine_result_code_t vine_manager_get_output_files( struct vine_manager *q, struct
 	vine_result_code_t result = VINE_SUCCESS;
 
 	if(t->output_files) {
-		list_first_item(t->output_files);
-		while((f = list_next_item(t->output_files))) {
+		LIST_ITERATE(t->output_files,f) {
 			// non-file objects are handled by the worker.
 			if(f->type!=VINE_FILE && f->type!=VINE_BUFFER) continue;
 		     
@@ -425,8 +424,7 @@ vine_result_code_t vine_manager_get_monitor_output_file( struct vine_manager *q,
 	const char *summary_name = RESOURCE_MONITOR_REMOTE_NAME ".summary";
 
 	if(t->output_files) {
-		list_first_item(t->output_files);
-		while((f = list_next_item(t->output_files))) {
+		LIST_ITERATE(t->output_files,f) {
 			if(!strcmp(summary_name, f->remote_name)) {
 				result = vine_manager_get_output_file(q,w,t,f);
 				break;

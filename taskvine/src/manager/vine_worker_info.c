@@ -75,8 +75,8 @@ static void current_tasks_to_jx( struct jx *j, struct vine_worker_info *w )
 	uint64_t task_id;
 	int n = 0;
 
-	itable_firstkey(w->current_tasks);
-	while(itable_nextkey(w->current_tasks, &task_id, (void**)&t)) {
+	ITABLE_ITERATE(w->current_tasks,task_id,t) {
+
 		char task_string[VINE_LINE_MAX];
 
 		sprintf(task_string, "current_task_%03d_id", n);
