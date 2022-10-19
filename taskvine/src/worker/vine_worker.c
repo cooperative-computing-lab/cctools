@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "vine_transfer_server.h"
 
 #include "cctools.h"
+#include "envtools.h"
 #include "macros.h"
 #include "catalog_query.h"
 #include "domain_name_cache.h"
@@ -177,7 +178,7 @@ static int64_t files_counted = 0;
 static int check_resources_interval = 5;
 static int max_time_on_measurement  = 3;
 
-// Table of all processes in any state, indexed by taskid.
+// Table of all processes in any state, indexed by task_id.
 // Processes should be created/deleted when added/removed from this table.
 static struct itable *procs_table = NULL;
 
@@ -189,7 +190,7 @@ static struct itable *procs_running = NULL;
 // These are additional pointers into procs_table.
 static struct list   *procs_waiting = NULL;
 
-// Table of all processes with results to be sent back, indexed by taskid.
+// Table of all processes with results to be sent back, indexed by task_id.
 // These are additional pointers into procs_table.
 static struct itable *procs_complete = NULL;
 
@@ -277,10 +278,10 @@ static int64_t measure_worker_disk()
 		 * for the found value, and add the known values of the processes. */
 
 		struct vine_process *p;
-		uint64_t taskid;
+		uint64_t task_id;
 
 		itable_firstkey(procs_table);
-		while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
+		while(itable_nextkey(procs_table,&task_id,(void**)&p)) {
 			if(p->sandbox_size > 0) {
 				disk_measured += p->sandbox_size;
 				files_counted += p->sandbox_file_count;
@@ -461,7 +462,7 @@ static int start_process( struct vine_process *p, struct link *manager )
 		p->execution_start = p->execution_end = timestamp_get();
 		p->result = VINE_RESULT_INPUT_MISSING;
 		p->exit_code = 1;
-		itable_insert(procs_complete,p->task->taskid,p);
+		itable_insert(procs_complete,p->task->task_id,p);
 		return 0;
 	}
 	
@@ -471,11 +472,11 @@ static int start_process( struct vine_process *p, struct link *manager )
 	gpus_allocated += t->resources_requested->gpus;
 
 	if(t->resources_requested->gpus>0) {
-		vine_gpus_allocate(t->resources_requested->gpus,t->taskid);
+		vine_gpus_allocate(t->resources_requested->gpus,t->task_id);
 	}
 
 	pid = vine_process_execute(p);
-	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
+	if(pid<0) fatal("unable to fork process for task_id %d!",p->task->task_id);
 
 	itable_insert(procs_running,p->pid,p);
 	
@@ -497,7 +498,7 @@ static void reap_process( struct vine_process *p )
 	disk_allocated   -= p->task->resources_requested->disk;
 	gpus_allocated   -= p->task->resources_requested->gpus;
 
-	vine_gpus_free(p->task->taskid);
+	vine_gpus_free(p->task->task_id);
 
 	if(!vine_sandbox_stageout(p,global_cache)) {
 		p->result = VINE_RESULT_OUTPUT_MISSING;
@@ -505,7 +506,7 @@ static void reap_process( struct vine_process *p )
 	}
 
 	itable_remove(procs_running, p->pid);
-	itable_insert(procs_complete, p->task->taskid, p);
+	itable_insert(procs_complete, p->task->task_id, p);
 }
 
 /*
@@ -521,7 +522,7 @@ static void report_task_complete( struct link *manager, struct vine_process *p )
 	fstat(p->output_fd, &st);
 	output_length = st.st_size;
 	lseek(p->output_fd, 0, SEEK_SET);
-	send_message(manager, "result %d %d %lld %llu %d\n", p->result, p->exit_code, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
+	send_message(manager, "result %d %d %lld %llu %d\n", p->result, p->exit_code, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->task_id);
 	link_stream_from_fd(manager, p->output_fd, output_length, time(0)+active_timeout);
 
 	total_task_execution_time += (p->execution_end - p->execution_start);
@@ -594,10 +595,10 @@ static int handle_completed_tasks(struct link *manager)
 		} else if(result>0) {
 			if (!WIFEXITED(status)){
 				p->exit_code = WTERMSIG(status);
-				debug(D_VINE, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_code);
+				debug(D_VINE, "task %d (pid %d) exited abnormally with signal %d",p->task->task_id,p->pid,p->exit_code);
 			} else {
 				p->exit_code = WEXITSTATUS(status);
-				debug(D_VINE, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_code);
+				debug(D_VINE, "task %d (pid %d) exited normally with exit code %d",p->task->task_id,p->pid,p->exit_code);
 			}
 
 			/* collect the resources associated with the process */
@@ -640,7 +641,7 @@ Generate a vine_process wrapped around a vine_task,
 and deposit it into the waiting list.
 */
 
-static int do_task( struct link *manager, int taskid, time_t stoptime )
+static int do_task( struct link *manager, int task_id, time_t stoptime )
 {
 	char line[VINE_LINE_MAX];
 	char filename[VINE_LINE_MAX];
@@ -654,49 +655,49 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 	timestamp_t nt;
 
 	struct vine_task *task = vine_task_create(0);
-	task->taskid = taskid;
+	task->task_id = task_id;
 
 	while(recv_message(manager,line,sizeof(line),stoptime)) {
 		if(!strcmp(line,"end")) {
 			break;
 		} else if(sscanf(line, "category %s",category)) {
-			vine_task_specify_category(task, category);
+			vine_task_set_category(task, category);
 		} else if(sscanf(line,"cmd %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
-			vine_task_specify_command(task,cmd);
+			vine_task_set_command(task,cmd);
 			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"coprocess %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
-			vine_task_specify_coprocess(task,cmd);
+			vine_task_set_coprocess(task,cmd);
 			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
-			vine_task_specify_input_file(task, localname, taskname, flags );
+			vine_task_add_input_file(task, localname, taskname, flags );
 		} else if(sscanf(line,"outfile %s %s %d", localname, taskname_encoded, &flags)) {
 			url_decode(taskname_encoded, taskname, VINE_LINE_MAX);
 			vine_hack_do_not_compute_cached_name = 1;
-			vine_task_specify_output_file(task, localname, taskname, flags );
+			vine_task_add_output_file(task, localname, taskname, flags );
 		} else if(sscanf(line, "dir %s", filename)) {
-			vine_task_specify_empty_dir(task, filename );
+			vine_task_add_empty_dir(task, filename );
 		} else if(sscanf(line,"cores %" PRId64,&n)) {
-			vine_task_specify_cores(task, n);
+			vine_task_set_cores(task, n);
 		} else if(sscanf(line,"memory %" PRId64,&n)) {
-			vine_task_specify_memory(task, n);
+			vine_task_set_memory(task, n);
 		} else if(sscanf(line,"disk %" PRId64,&n)) {
-			vine_task_specify_disk(task, n);
+			vine_task_set_disk(task, n);
 		} else if(sscanf(line,"gpus %" PRId64,&n)) {
-			vine_task_specify_gpus(task, n);
+			vine_task_set_gpus(task, n);
 		} else if(sscanf(line,"wall_time %" PRIu64,&nt)) {
-			vine_task_specify_running_time_max(task, nt);
+			vine_task_set_time_max(task, nt);
 		} else if(sscanf(line,"end_time %" PRIu64,&nt)) {
-			vine_task_specify_end_time(task, nt * USECOND); //end_time needs it usecs
+			vine_task_set_time_end(task, nt * USECOND); //end_time needs it usecs
 		} else if(sscanf(line,"env %d",&length)==1) {
 			char *env = malloc(length+2); /* +2 for \n and \0 */
 			link_read(manager, env, length+1, stoptime);
@@ -705,7 +706,7 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 			if(value) {
 				*value = 0;
 				value++;
-				vine_task_specify_env(task,env,value);
+				vine_task_set_env_var(task,env,value);
 			}
 			free(env);
 		} else {
@@ -714,13 +715,13 @@ static int do_task( struct link *manager, int taskid, time_t stoptime )
 		}
 	}
 
-	last_task_received = task->taskid;
+	last_task_received = task->task_id;
 
 	struct vine_process *p = vine_process_create(task);
 	if(!p) return 0;
 
 	// Every received task goes into procs_table.
-	itable_insert(procs_table,taskid,p);
+	itable_insert(procs_table,task_id,p);
 
 	normalize_resources(p);
 	list_push_tail(procs_waiting,p);
@@ -780,13 +781,13 @@ of finished.  Regardless of the state, we kill the process and
 remove all of the associated files and other state.
 */
 
-static int do_kill(int taskid)
+static int do_kill(int task_id)
 {
 	struct vine_process *p;
 
-	p = itable_remove(procs_table, taskid);
+	p = itable_remove(procs_table, task_id);
 	if(!p) {
-		debug(D_VINE,"manager requested kill of task %d which does not exist!",taskid);
+		debug(D_VINE,"manager requested kill of task %d which does not exist!",task_id);
 		return 1;
 	}
 
@@ -796,10 +797,10 @@ static int do_kill(int taskid)
 		memory_allocated -= p->task->resources_requested->memory;
 		disk_allocated -= p->task->resources_requested->disk;
 		gpus_allocated -= p->task->resources_requested->gpus;
-		vine_gpus_free(taskid);
+		vine_gpus_free(task_id);
 	}
 
-	itable_remove(procs_complete, p->task->taskid);
+	itable_remove(procs_complete, p->task->task_id);
 	list_remove(procs_waiting,p);
 
 	vine_watcher_remove_process(watcher,p);
@@ -820,11 +821,11 @@ then we need to abort to clean things up.
 static void kill_all_tasks()
 {
 	struct vine_process *p;
-	uint64_t taskid;
+	uint64_t task_id;
 
 	itable_firstkey(procs_table);
-	while(itable_nextkey(procs_table,&taskid,(void**)&p)) {
-		do_kill(taskid);
+	while(itable_nextkey(procs_table,&task_id,(void**)&p)) {
+		do_kill(task_id);
 	}
 
 	assert(itable_size(procs_table)==0);
@@ -858,14 +859,14 @@ static void finish_running_tasks(vine_result_t result)
 
 static int enforce_process_limits(struct vine_process *p)
 {
-	/* If the task did not specify disk usage, return right away. */
+	/* If the task did not set disk usage, return right away. */
 	if(p->disk < 1)
 		return 1;
 
 	vine_process_measure_disk(p, max_time_on_measurement);
 	if(p->sandbox_size > p->task->resources_requested->disk) {
 		debug(D_VINE,"Task %d went over its disk size limit: %s > %s\n",
-				p->task->taskid,
+				p->task->task_id,
 				rmsummary_resource_to_str(p->sandbox_size, /* with units */ 1),
 				rmsummary_resource_to_str(p->task->resources_requested->disk, 1));
 		return 0;
@@ -915,13 +916,13 @@ static void enforce_processes_max_running_time()
 
 	itable_firstkey(procs_running);
 	while(itable_nextkey(procs_running, (uint64_t*) &pid, (void**) &p)) {
-		/* If the task did not specify wall_time, return right away. */
+		/* If the task did not set wall_time, return right away. */
 		if(p->task->resources_requested->wall_time < 1)
 			continue;
 
 		if(now > p->execution_start + (1e6 * p->task->resources_requested->wall_time)) {
 			debug(D_VINE,"Task %d went over its running time limit: %s > %s\n",
-					p->task->taskid,
+					p->task->task_id,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
 			p->result = VINE_RESULT_TASK_MAX_RUN_TIME;
@@ -965,13 +966,13 @@ static int handle_manager(struct link *manager)
 	char source_encoded[VINE_LINE_MAX];
 	char source[VINE_LINE_MAX];
 	int64_t length;
-	int64_t taskid = 0;
+	int64_t task_id = 0;
 	int flags;
 	int mode, r, n;
 
 	if(recv_message(manager, line, sizeof(line), idle_stoptime )) {
-		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
-			r = do_task(manager, taskid,time(0)+active_timeout);
+		if(sscanf(line,"task %" SCNd64, &task_id)==1) {
+			r = do_task(manager, task_id,time(0)+active_timeout);
 		} else if(sscanf(line,"file %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = vine_transfer_get_file(manager, global_cache, filename, length, mode, time(0)+active_timeout);
@@ -999,9 +1000,9 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "get %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = vine_transfer_put_any(manager,global_cache,filename,VINE_TRANSFER_MODE_ANY,time(0)+active_timeout);
-		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
-			if(taskid >= 0) {
-				r = do_kill(taskid);
+		} else if(sscanf(line, "kill %" SCNd64, &task_id) == 1) {
+			if(task_id >= 0) {
+				r = do_kill(task_id);
 			} else {
 				kill_all_tasks();
 				r = 1;
@@ -1068,9 +1069,9 @@ void forsake_waiting_process(struct link *manager, struct vine_process *p)
 {
 	/* the task cannot run in this worker */
 	p->result = VINE_RESULT_FORSAKEN;
-	itable_insert(procs_complete, p->task->taskid, p);
+	itable_insert(procs_complete, p->task->task_id, p);
 
-	debug(D_VINE, "Waiting task %d has been forsaken.", p->task->taskid);
+	debug(D_VINE, "Waiting task %d has been forsaken.", p->task->task_id);
 
 	/* we also send updated resources to the manager. */
 	send_keepalive(manager, 1);
@@ -1276,23 +1277,8 @@ static int workspace_create()
 	char absolute[VINE_LINE_MAX];
 
 	// Setup working space(dir)
-	const char *workdir;
-	const char *workdir_tmp;
-	if (user_specified_workdir) {
-		workdir = user_specified_workdir;
-	} else if((workdir_tmp = getenv("_CONDOR_SCRATCH_DIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TMPDIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TEMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else {
-		workdir = "/tmp";
-	}
-
 	if(!workspace) {
+		const char *workdir = system_tmp_dir(user_specified_workdir);
 		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
 

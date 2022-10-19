@@ -7,12 +7,12 @@ import sys
 import taskvine as vine
 
 def check_task(category, category_mode, max, min, expected):
-    q.specify_category_max_resources(category, max)
-    q.specify_category_min_resources(category, min)
-    q.specify_category_mode(category, category_mode)
+    q.set_category_resource_max(category, max)
+    q.set_category_resource_min(category, min)
+    q.set_category_mode(category, category_mode)
 
     t = vine.Task('/bin/echo hello')
-    t.specify_category(category)
+    t.set_category(category)
     q.submit(t)
 
     t = q.wait(30)
@@ -42,7 +42,7 @@ except IndexError:
     sys.stderr.write("Usage: {} PORTFILE WORKER_CORES WORKER_MEMORY WORKER_DISK\n".format(sys.argv[0]))
     raise
 
-q = vine.TaskVine(0)
+q = vine.Manager(0)
 with open(port_file, 'w') as f:
     print('Writing port {port} to file {file}'.format(port=q.port, file=port_file))
     f.write(str(q.port))
@@ -106,7 +106,7 @@ with worker:
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
-    q.specify_category_first_allocation_guess('auto_with_guess', {'cores': 1, 'memory': 2, 'disk': 3})
+    q.set_category_first_allocation_guess('auto_with_guess', {'cores': 1, 'memory': 2, 'disk': 3})
     check_task('auto_with_guess',
             vine.VINE_ALLOCATION_MODE_MIN_WASTE,
             max = {},

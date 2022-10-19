@@ -15,7 +15,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-static const char *vine_properties[] = { "name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "manager_link",
+static const char *vine_properties[] = { "name", "port", "priority", "num_tasks_left", "next_task_id", "workingdir", "manager_link",
 	"poll_table", "poll_table_size", "tasks", "task_state_map", "ready_list", "worker_table",
 	"worker_blacklist", "worker_task_map", "categories", "workers_with_available_results",
 	"stats", "stats_measure", "stats_disconnected_workers", "time_last_wait",
@@ -31,7 +31,7 @@ static const char *vine_properties[] = { "name", "port", "priority", "num_tasks_
 };
 
 static const char *vine_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", "environment",
-	"output_files", "env_list", "taskid", "exit_code", "result", "host", "hostname",
+	"output_files", "env_list", "task_id", "exit_code", "result", "host", "hostname",
 	"category", "resource_request", "priority", "max_retries", "try_count",
 	"exhausted_attempts", "time_when_submitted", "time_when_done",
 	"disk_allocation_exhausted", "time_when_commit_start", "time_when_commit_end",
@@ -89,7 +89,7 @@ static int validate_json(struct jx *json, const char **array)
 
 }
 
-static int specify_files(int input, struct jx *files, struct vine_task *task)
+static int add_files(int input, struct jx *files, struct vine_task *task)
 {
 
 	void *i = NULL;
@@ -144,9 +144,9 @@ static int specify_files(int input, struct jx *files, struct vine_task *task)
 		}
 
 		if(input) {
-			vine_task_specify_input_file(task, local, remote, flags);
+			vine_task_add_input_file(task, local, remote, flags);
 		} else {
-			vine_task_specify_output_file(task, local, remote, flags);
+			vine_task_add_output_file(task, local, remote, flags);
 		}
 
 		arr = jx_iterate_array(files, &i);
@@ -157,7 +157,7 @@ static int specify_files(int input, struct jx *files, struct vine_task *task)
 
 }
 
-static int specify_environment(struct jx *environment, struct vine_task *task)
+static int set_environment(struct jx *environment, struct vine_task *task)
 {
 	void *j = NULL;
 	void *i = NULL;
@@ -165,7 +165,7 @@ static int specify_environment(struct jx *environment, struct vine_task *task)
 	struct jx *value = jx_iterate_values(environment, &i);
 
 	while(key != NULL) {
-		vine_task_specify_env(task, key, value->u.string_value);
+		vine_task_set_env_var(task, key, value->u.string_value);
 		key = jx_iterate_keys(environment, &j);
 		value = jx_iterate_values(environment, &i);
 	}
@@ -233,27 +233,27 @@ static struct vine_task *create_task(const char *str)
 		}
 
 		if(input_files) {
-			specify_files(1, input_files, task);
+			add_files(1, input_files, task);
 		}
 
 		if(output_files) {
-			specify_files(0, output_files, task);
+			add_files(0, output_files, task);
 		}
 
 		if(environment) {
-			specify_environment(environment, task);
+			set_environment(environment, task);
 		}
 
 		if(cores) {
-			vine_task_specify_cores(task, cores);
+			vine_task_set_cores(task, cores);
 		}
 
 		if(memory) {
-			vine_task_specify_memory(task, memory);
+			vine_task_set_memory(task, memory);
 		}
 
 		if(disk) {
-			vine_task_specify_disk(task, disk);
+			vine_task_set_disk(task, disk);
 		}
 		return task;
 
@@ -310,10 +310,10 @@ struct vine_manager *vine_json_create(const char *str)
 		}
 
 		if(name) {
-			vine_specify_name(taskvine, name);
+			vine_set_name(taskvine, name);
 		}
 		if(priority) {
-			vine_specify_priority(taskvine, priority);
+			vine_set_priority(taskvine, priority);
 		}
 
 		return taskvine;
@@ -344,7 +344,7 @@ char *vine_json_wait(struct vine_manager *q, int timeout)
 
 	char *task;
 	struct jx *j;
-	struct jx_pair *command_line, *taskid, *exit_code, *output, *result;
+	struct jx_pair *command_line, *task_id, *exit_code, *output, *result;
 
 	struct vine_task *t = vine_wait(q, timeout);
 
@@ -353,11 +353,11 @@ char *vine_json_wait(struct vine_manager *q, int timeout)
 	}
 
 	command_line = jx_pair(jx_string("command_line"), jx_string(vine_task_get_command(t)), NULL);
-	taskid = jx_pair(jx_string("taskid"), jx_integer(vine_task_get_taskid(t)), command_line);
-	exit_code = jx_pair(jx_string("exit_code"), jx_integer(vine_task_get_exit_code(t)), taskid);
+	task_id = jx_pair(jx_string("task_id"), jx_integer(vine_task_get_id(t)), command_line);
+	exit_code = jx_pair(jx_string("exit_code"), jx_integer(vine_task_get_exit_code(t)), task_id);
 	result = jx_pair(jx_string("result"), jx_integer(vine_task_get_result(t)), exit_code);
 
-	const char *toutput = vine_task_get_output(t);
+	const char *toutput = vine_task_get_stdout(t);
 
 	if(toutput) {
 		output = jx_pair(jx_string("output"), jx_string(toutput), result);
@@ -377,18 +377,18 @@ char *vine_json_remove(struct vine_manager *q, int id)
 
 	char *task;
 	struct jx *j;
-	struct jx_pair *command_line, *taskid;
+	struct jx_pair *command_line, *task_id;
 
-	struct vine_task *t = vine_cancel_by_taskid(q, id);
+	struct vine_task *t = vine_cancel_by_task_id(q, id);
 
 	if(!t) {
 		return NULL;
 	}
 
 	command_line = jx_pair(jx_string("command_line"), jx_string(vine_task_get_command(t)), NULL);
-	taskid = jx_pair(jx_string("taskid"), jx_integer(vine_task_get_taskid(t)), command_line);
+	task_id = jx_pair(jx_string("task_id"), jx_integer(vine_task_get_id(t)), command_line);
 
-	j = jx_object(taskid);
+	j = jx_object(task_id);
 
 	task = jx_print_string(j);
 

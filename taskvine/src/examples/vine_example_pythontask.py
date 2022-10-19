@@ -4,8 +4,8 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-# Example on how to execute python code with a TaskVine task.
-# The class PythonTask allows users to execute python functions as TaskVine
+# Example on how to execute python code with a taskvine task.
+# The class PythonTask allows users to execute python functions as taskvine
 # commands. Functions and their arguments are pickled to a file and executed
 # utilizing a wrapper script to execut the function. the output of the executed
 # function is then written to a file as an output file and read when neccesary
@@ -23,7 +23,7 @@
 #
 # By default, the task will run assuming that the worker is executing inside an
 # appropiate  python environment. If this is not the case, an environment file
-# can be specified with: `t.specify_environment("env.tar.gz")`, in which
+# can be specified with: `t.set_environment("env.tar.gz")`, in which
 # env.tar.gz is created with the conda-pack module, and has at least a python
 # installation, the dill module, and the conda module.
 #
@@ -42,12 +42,12 @@ def divide(dividend, divisor):
     return dividend/math.sqrt(divisor)
 
 def main():
-    q = vine.TaskVine(9123)
+    q = vine.Manager(9123)
     for i in range(1, 16):
         p_task = vine.PythonTask(divide, 1, i**2)
 
         # if python environment is missing at worker...
-        #p_task.specify_environment("env.tar.gz")
+        #p_task.set_environment("env.tar.gz")
 
         q.submit(p_task)
 

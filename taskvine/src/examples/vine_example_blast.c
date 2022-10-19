@@ -48,20 +48,20 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_specify_debug_log(m,"manager.log");
-	vine_specify_algorithm(m,VINE_SCHEDULE_FILES);
+	vine_enable_debug_log(m,"manager.log");
+	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
 
 	for(i=0;i<10;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 	  
-		vine_task_specify_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
-		vine_task_specify_input_url(t,BLAST_URL,"blastdir", VINE_CACHE|VINE_UNPACK );
-		vine_task_specify_input_url(t,LANDMARK_URL,"landmark", VINE_CACHE|VINE_UNPACK );
-		vine_task_specify_env(t,"BLASTDB","landmark");
+		vine_task_add_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
+		vine_task_add_input_url(t,BLAST_URL,"blastdir", VINE_CACHE|VINE_UNPACK );
+		vine_task_add_input_url(t,LANDMARK_URL,"landmark", VINE_CACHE|VINE_UNPACK );
+		vine_task_set_env_var(t,"BLASTDB","landmark");
 
-		int taskid = vine_submit(m, t);
+		int task_id = vine_submit(m, t);
 
-		printf("submitted task (id# %d): %s\n", taskid, vine_task_get_command(t) );
+		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );
 	}
 
 	printf("waiting for tasks to complete...\n");
@@ -70,10 +70,10 @@ int main(int argc, char *argv[])
 		t  = vine_wait(m, 5);
 		if(t) {
 			vine_result_t r = vine_task_get_result(t);
-			int id = vine_task_get_taskid(t);
+			int id = vine_task_get_id(t);
 
 			if(r==VINE_RESULT_SUCCESS) {
-				printf("task %d output: %s\n",id,vine_task_get_output(t));
+				printf("task %d output: %s\n",id,vine_task_get_stdout(t));
 			} else {
 				printf("task %d failed: %s\n",id,vine_result_string(r));
 			}

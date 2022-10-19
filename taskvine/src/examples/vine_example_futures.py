@@ -1,7 +1,7 @@
-from vine_futures import TaskVineFutures, FutureTask, FutureTaskError
+from vine_futures import ManagerFt, FutureTask, FutureTaskError
 
-q = TaskVineFutures(port = 9123, local_worker = {'cores':1, 'memory':512, 'disk':10000})
-#q = TaskVineFutures(port = 9123)
+q = ManagerFt(port = 9123, local_worker = {'cores':1, 'memory':512, 'disk':10000})
+#q = ManagerFt(port = 9123)
 
 # without callbacks, append task to a list and then wait for them
 tasks = []
@@ -39,13 +39,13 @@ tasks_with_errors.append(t)
 
 # missing input file
 t = FutureTask('/bin/date')
-t.specify_input_file('some-filename-that-does-not-exists')
+t.add_input_file('some-filename-that-does-not-exists')
 q.submit(t)
 tasks_with_errors.append(t)
 
 # missing output file
 t = FutureTask('/bin/date')
-t.specify_output_file('some-filename-that-was-not-generated')
+t.add_output_file('some-filename-that-was-not-generated')
 q.submit(t)
 tasks_with_errors.append(t)
 

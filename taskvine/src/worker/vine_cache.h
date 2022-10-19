@@ -34,9 +34,9 @@ void vine_cache_delete( struct vine_cache *c );
 
 char *vine_cache_full_path( struct vine_cache *c, const char *cachename );
 
-int vine_cache_addfile( struct vine_cache *c, int64_t size, const char *cachename );
+int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename );
 int vine_cache_queue( struct vine_cache *c, vine_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags );
-int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager );
+int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager, vine_file_flags_t flags );
 int vine_cache_remove( struct vine_cache *c, const char *cachename );
 
 #endif

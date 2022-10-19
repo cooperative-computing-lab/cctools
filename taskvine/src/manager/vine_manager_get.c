@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2022- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 
 #include "vine_manager_get.h"
 #include "vine_worker_info.h"
@@ -40,7 +46,7 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 
 	vine_result_code_t r = VINE_WORKER_FAILURE;
 
-	vine_msg_code_t mcode = vine_manager_recv_retry(q, w, line, sizeof(line));
+	vine_msg_code_t mcode = vine_manager_recv(q, w, line, sizeof(line));
 	if(mcode!=VINE_MSG_NOT_PROCESSED) return VINE_WORKER_FAILURE;
 
 	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
@@ -50,7 +56,7 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 
 		f->data = malloc(size+1);
 		if(f->data) {
-			time_t stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, f->length);
+			time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->length);
 
 			ssize_t actual = link_read(w->link,f->data,f->length,stoptime);
 			if(actual==f->length) {
@@ -71,7 +77,7 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 		debug(D_VINE, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,f->remote_name,strerror(errornum));
 
 		/* Mark the task as missing an output, but return success to keep going. */
-		vine_task_update_result(t, VINE_RESULT_OUTPUT_MISSING);
+		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
 		r = VINE_SUCCESS;
 	} else {
 		r = VINE_WORKER_FAILURE;
@@ -95,7 +101,7 @@ static vine_result_code_t vine_manager_get_file_contents( struct vine_manager *q
 	}
 
 	// Choose the actual stoptime.
-	time_t stoptime = time(0) + vine_manager_transfer_wait_time(q, w, t, length);
+	time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, length);
 
 	// If necessary, create parent directories of the file.
 	char dirname[VINE_LINE_MAX];
@@ -202,7 +208,7 @@ static vine_result_code_t vine_manager_get_any( struct vine_manager *q, struct v
 
 	vine_result_code_t r = VINE_WORKER_FAILURE;
 
-	vine_msg_code_t mcode = vine_manager_recv_retry(q, w, line, sizeof(line));
+	vine_msg_code_t mcode = vine_manager_recv(q, w, line, sizeof(line));
 	if(mcode!=VINE_MSG_NOT_PROCESSED) return VINE_WORKER_FAILURE;
 
 	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
@@ -255,7 +261,7 @@ static vine_result_code_t vine_manager_get_any( struct vine_manager *q, struct v
 		// outputs are transferred and the task is given back to the caller.
 		url_decode(name_encoded,name,sizeof(name));
 		debug(D_VINE, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,name,strerror(errornum));
-		vine_task_update_result(t, VINE_RESULT_OUTPUT_MISSING);
+		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
 
 		r = VINE_SUCCESS;
 
@@ -348,9 +354,9 @@ vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct 
 		debug(D_VINE, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, f->cached_name, f->source );
 
 		if(result == VINE_APP_FAILURE) {
-			vine_task_update_result(t, VINE_RESULT_OUTPUT_MISSING);
+			vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
 		} else if(result == VINE_MGR_FAILURE) {
-			vine_task_update_result(t, VINE_RESULT_OUTPUT_TRANSFER_ERROR);
+			vine_task_set_result(t, VINE_RESULT_OUTPUT_TRANSFER_ERROR);
 		}
 	}
 
@@ -401,7 +407,7 @@ vine_result_code_t vine_manager_get_output_files( struct vine_manager *q, struct
 	}
 
 	// tell the worker you no longer need that task's output directory.
-	vine_manager_send(q,w, "kill %d\n",t->taskid);
+	vine_manager_send(q,w, "kill %d\n",t->task_id);
 
 	return result;
 }
@@ -429,7 +435,7 @@ vine_result_code_t vine_manager_get_monitor_output_file( struct vine_manager *q,
 	}
 
 	// tell the worker you no longer need that task's output directory.
-	vine_manager_send(q,w, "kill %d\n",t->taskid);
+	vine_manager_send(q,w, "kill %d\n",t->task_id);
 
 	return result;
 }

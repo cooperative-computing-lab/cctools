@@ -2,28 +2,41 @@
 
 # TaskVine User's Manual
 
+**TaskVine is our next-generation framework for constructing
+data intensive applications.  The software and documentation
+are currently under active development, and so may not be
+fully up to date.**
+
 ## Overview
 
-TaskVine is a framework for building large scale manager-worker applications.
-Using the TaskVine library, you create a custom manager program that defines
-and submits a large number of small tasks. Each task is distributed to a
-remote worker process which executes it and returns the results. As results
-are created, the manager may generate more tasks to be executed. It is not
-unusual to write programs that distribute millions of tasks to thousands of
-remote workers.
+TaskVine is an framework for building large scale data
+intensive dynamic workflows that run on high performance computing (HPC)
+clusters, cloud service providers, and other distributed computing systems.
 
-Each worker process is a common executable that can be deployed within
-existing cluster and cloud systems, so it's easy to deploy a TaskVine
-application to run on machines that you already have access to. Whether you
-use a university batch system or a commercial cloud provider, your TaskVine
-application will be able to run there.
+A TaskVine application consists of a manager and a large number of
+worker processes.  The application generates a large number of small
+tasks, which are distributed to workers.
+As tasks access external input data and produce their own outputs,
+more and more data is pulled into local storage on cluster nodes.  This
+data is used to accelerate future tasks and avoid re-computing exisiting
+results.  The application gradually grows "like a vine" through
+the cluster.
 
-TaskVine is a production framework that has been used to create highly
-scalable scientific applications in high energy physics, bioinformatics, data
-mining, and other fields. It can also be used as an execution system for the
-[Makeflow](http://ccl.cse.nd.edu/software/makeflow) workflow engine. To see
-some of the TaskVine applications running right now, view the [real time
-status page](http://ccl.cse.nd.edu/software/taskvine/status).
+TaskVine manager applications can be written in Python or C
+on Linux or OSX platforms.  Individual tasks can be simple
+Python functions, complex Unix applications, or serverless function
+invocations.  Several different programming models can be used,
+including submit-wait, task futures, and bulk-synchronous-parallel.
+
+TaskVine is easy to deploy on existing HPC and cloud facilities.
+The worker processes are self-contained executables, and TaskVine
+arranges for all necessary task dependencies to be moved to workers,
+making the system self-hosting.  Applications regularly consist of
+millions of tasks running on thousands of workers.
+
+TaskVine is our next-generation workflow system, build on our nearly
+twenty years of experience building scalable applications in high energy physics,
+bioinformatics, molecular dynamics, machine learning, and other fields.
 
 ## Quick Start in Python
 
@@ -63,7 +76,7 @@ requesting work. (Without any workers, it will wait forever.) You can start
 one worker on the same machine by opening a new shell and running:
 
 ```
-taskvine_worker localhost 9123
+vine_worker localhost 9123
 ```
 
 The manager will send tasks to the worker for execution.  As they complete, you will see output like this:
@@ -74,7 +87,7 @@ task 2 exited with output 20
 all done.
 ```
 
-(You can also declare and launch directly from python using the [taskvine factory.](#using-the-factory-with-python))
+(You can also declare and launch directly from python using the [TaskVine factory.](#using-the-factory-with-python))
 
 Congrats! You have now run a simple manager application that runs tasks on one local worker.
 Read on to learn how to build more complex applications and run large numbers of workers at scale.
@@ -105,7 +118,7 @@ If you are using a university cluster or HPC system, then you will likely be sub
 the workers to a batch system such as HTCondor, SLURM, or SGE.  If you are using a commercial
 cloud, then you can run your workers inside of virtual machines.  We provide a number of
 scripts to facilitate starting workers this way, or you can arrange things yourself to
-simply run the `taskvine_worker` executable.
+simply run the `vine_worker` executable.
 
 
 
@@ -115,7 +128,7 @@ A manager program can be written in Python, or C.
 In each language, the underlying principles are the same, but there are some syntactic differences shown below.
 The full API documentation for each language is here:
 
-- [TaskVine Python API](../api/html/namespaceTaskVinePython.html)
+- [TaskVine Python API](../api/html/namespacetaskvinePython.html)
 - [TaskVine C API](../api/html/taskvine_8h.html)
 
 The basic outline of a TaskVine manager is:
@@ -128,25 +141,25 @@ The basic outline of a TaskVine manager is:
 
 ### Creating a Queue
 
-To begin, you must import the TaskVine library, and then create a TaskVine object.
+To begin, you must import the TaskVine library, and then create a Manager object.
 You may specific a specific port number to listen on like this:
- 
+
 === "Python"
     ```python
-    # Import the TaskVine library
+    # Import the taskvine library
     import taskvine as vine
 
     # Create a new queue listening on port 9123
-    q = vine.TaskVine(9123)
+    q = vine.Manager(9123)
     ```
 
 === "C"
     ```
-    /* Import the TaskVine library */
+    /* Import the taskvine library */
     #include "taskvine.h"
 
     /* Create a new queue listening on port 9123 */
-    struct taskvine *q = taskvine_create(9123);
+    struct taskvine *q = vine_create(9123);
     ```
 
 Of course, that specific port might already be in use, and so you may
@@ -156,15 +169,15 @@ discover which port was obtained:
 === "Python"
     ```python
     # Create a new queue listening on any port
-    q = vine.TaskVine(0)
+    q = vine.Manager(0)
     print("listening on port {}".format(q.port))
     ```
 
 === "C"
     ```
     /* Create a new queue listening on any port */
-    struct taskvine *q = taskvine_create(0);
-    printf("listening on port %d\n",taskvine_port(q));
+    struct taskvine *q = vine_create(0);
+    printf("listening on port %d\n",vine_port(q));
 
     ```
 
@@ -186,7 +199,7 @@ which will read the file `my-file` and produce `my-file.gz` as an output:
 
 === "C"
     ```C
-    struct taskvine_task *t = taskvine_task_create("./gzip < my-file > my-file.gz");
+    struct vine_task *t = vine_task_create("./gzip < my-file > my-file.gz");
     ```
 
 It is not enough to simply state the command line.  In addition, the
@@ -209,24 +222,24 @@ Here is how to describe the files needed by this task:
 
 === "Python"
     ```python
-    # t.specify_input_file("name at manager", "name when copied at execution site", ...)
+    # t.add_input_file("name at manager", "name when copied at execution site", ...)
 
-    t.specify_input_file("/usr/bin/gzip", "gzip",       cache = True)
-    t.specify_input_file("my-file",       "my-file",    cache = False)
-    t.specify_output_file("my-file.gz",   "my-file.gz", cache = False)
+    t.add_input_file("/usr/bin/gzip", "gzip",       cache = True)
+    t.add_input_file("my-file",       "my-file",    cache = False)
+    t.add_output_file("my-file.gz",   "my-file.gz", cache = False)
 
     # when the name at manager is the same as the exection site, we can write instead:
-    t.specify_input_file("my-file",     cache = False)
-    t.specify_output_file("my-file.gz", cache = False)
+    t.add_input_file("my-file",     cache = False)
+    t.add_output_file("my-file.gz", cache = False)
     ```
 
 === "C"
     ```C
-    # taskvine_task_specify_file(t, "name at manager", "name when copied at execution site", ...)
+    # vine_task_add_file(t, "name at manager", "name when copied at execution site", ...)
 
-    taskvine_task_specify_file(t, "/usr/bin/gzip", "gzip",       WORK_QUEUE_INPUT,  WORK_QUEUE_CACHE);
-    taskvine_task_specify_file(t, "my-file",       "my-file",    WORK_QUEUE_INPUT,  WORK_QUEUE_NOCACHE);
-    taskvine_task_specify_file(t, "my-file.gz",    "my-file.gz", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+    vine_task_add_file(t, "/usr/bin/gzip", "gzip",       WORK_QUEUE_INPUT,  WORK_QUEUE_CACHE);
+    vine_task_add_file(t, "my-file",       "my-file",    WORK_QUEUE_INPUT,  WORK_QUEUE_NOCACHE);
+    vine_task_add_file(t, "my-file.gz",    "my-file.gz", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
     ```
 
 When the task actually executes, the worker will create a **sandbox** directory,
@@ -242,7 +255,7 @@ sandbox directory.
 ### Describing Tasks
 
 In addition to describing the input and output files, you may optionally
-specify additional details about the task that will assist TaskVine in
+specify additional details about the task that will assist taskvine in
 making good scheduling decisions.
 
 If you are able, describe the resources needed by each task (cores, gpus,
@@ -255,16 +268,16 @@ when the task is complete.
 
 === "Python"
     ```python
-    t.specify_cores(2)
-    t.specify_memory(4096)
-    t.specify_tag("config-4.5.0")
+    t.set_cores(2)
+    t.set_memory(4096)
+    t.set_tag("config-4.5.0")
     ```
 
 === "C"
     ```C
-    taskvine_task_specify_cores(t,2);
-    taskvine_task_specify_memory(t,4096);
-    taskvine_task_specify_tag(t,"config-4.5.0");
+    vine_task_set_cores(t,2);
+    vine_task_set_memory(t,4096);
+    vine_task_set_tag(t,"config-4.5.0");
     ```
 
 ### Managing Tasks
@@ -280,7 +293,7 @@ to a task:
 
 === "C"
     ```C
-    int taskid = taskvine_submit(q,t);
+    int taskid = vine_submit(q,t);
     ```
 
 Once all tasks are submitted, use `wait` to wait until a task completes,
@@ -304,8 +317,8 @@ If no task completes within the timeout, it returns null.
 
 === "C"
     ```C
-    while(!taskvine_empty(q)) {
-        struct taskvine_task *t = taskvine_wait(q,5);
+    while(!vine_empty(q)) {
+        struct vine_task *t = vine_wait(q,5);
         if(t) {
             printf("Task %d has returned!\n", t->taskid);
             if(t->return_status == 0) {
@@ -332,19 +345,19 @@ When you are done with the task, delete it (only needed for C):
 
 === "C"
     ```C
-    taskvine_task_delete(t);
+    vine_task_delete(t);
     ```
 
 Continue submitting and waiting for tasks until all work is complete. You may
-check to make sure that the queue is empty with `taskvine_empty`. When all
+check to make sure that the queue is empty with `vine_empty`. When all
 is done, delete the queue (only needed for C):
 
 === "C"
     ```C
-    taskvine_delete(q);
+    vine_delete(q);
     ```
 
-Full details of all of the TaskVine functions can be found in the [TaskVine API](api/html/taskvine_8h.html).
+Full details of all of the taskvine functions can be found in the [taskvine API](api/html/taskvine_8h.html).
 
 ### Managing Python Tasks
 
@@ -386,12 +399,12 @@ all apply to `PythonTask` as well.
 
 When running a Python function remotely, it is assumed that the Python interpreter
 and libraries available at the worker correspond to the appropiate python environment for the task.
-If this is not the case, an environment file can be provided with t.specify_environment:
+If this is not the case, an environment file can be provided with t.set_environment:
 
 === "Python"
     ```python
     t = vine.PythonTask(my_sum, 1, 2)
-    t.specify_environment("my-env.tar.gz")
+    t.set_environment("my-env.tar.gz")
     ```
 
 The file `my-env.tar.gz` is a
@@ -413,8 +426,8 @@ Queue manager application to demonstrate various features.
 
 Donload the example file for the language of your choice:
 
-  * Python: [taskvine_example.py](examples/vine_python_function.py)
-  * C: [taskvine_example.c](examples/vine_example_mosaic.c.c)
+  * Python: [vine_python_function.py](examples/vine_python_function.py)
+  * C: [vine_example_mosaic.c](examples/vine_example_mosaic.c.c)
 
 ### Language Specific Setup
 
@@ -428,7 +441,7 @@ If you installed via Conda, then no further setup is needed.
 If you are running a Python application and did *not* install via Conda,
 then you will need to set the `PYTHONPATH` to point to the cctools
 installation, like this:
-    
+
 ```sh
 # Note: This is only needed if not using Conda:
 $ PYVER=$(python -c 'import sys; print("%s.%s" % sys.version_info[:2])')
@@ -437,12 +450,12 @@ $ export PYTHONPATH=${HOME}/cctools/lib/python${PYVER}/site-packages:${PYTHONPAT
 
 #### C Language Setup
 
-If you are writing a TaskVine application in C, you should compile it into an executable like this:
+If you are writing a taskvine application in C, you should compile it into an executable like this:
 
 ```sh
 $ gcc taskvine_example.c -o taskvine_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -ltaskvine -ldttools -lm -lz
 ```
-   
+
 ### Running a Manager Program
 
 The example application simply compresses a bunch of files in parallel. The
@@ -455,7 +468,7 @@ application, run it as:
 ```sh
 # Python:
 $ ./taskvine_example.py a b c
- 
+
 # C
 $ ./taskvine_example a b c
 ```
@@ -470,15 +483,15 @@ submitted task: /usr/bin/gzip < b > b.gz
 submitted task: /usr/bin/gzip < c > c.gz
 waiting for tasks to complete...
 ```
-    
-The TaskVine manager is now waiting for workers to connect and begin
+
+The taskvine manager is now waiting for workers to connect and begin
 requesting work. (Without any workers, it will wait forever.) You can start
 one worker on the same machine by opening a new shell and running:
 
-    
+
 ```sh
 # Substitute the IP or name of your machine for MACHINENAME.
-$ taskvine_worker MACHINENAME 9123
+$ vine_worker MACHINENAME 9123
 ```
 
 If you have access to other machines, you can simply `ssh` there and run workers as well. In general, the more you start, the faster the work gets done. If a
@@ -521,41 +534,41 @@ option to `worker`.)
 ### Project Names and the Catalog Server
 
 Keeping track of the manager's hostname and port can get cumbersome, especially
-if there are multiple managers. To help with this, a **project name** can be used to identify a TaskVine manager with a human-readable name.
-TaskVine workers can then be started for their managers by providing
+if there are multiple managers. To help with this, a **project name** can be used to identify a taskvine manager with a human-readable name.
+taskvine workers can then be started for their managers by providing
 the project name instead of a host an port number.
 
 The project name feature uses the [Catalog Server](../catalog) to maintain and track the
 project names of managers and their respective locations. It works as follows:
 the manager advertises its project name along with its hostname and port to the
-catalog server. TaskVine workers that are provided with the manager's project
+catalog server. taskvine workers that are provided with the manager's project
 name query the catalog server to find the hostname and port of the manager with
 the given project name.
 
-For example, to have a TaskVine manager advertise its project name as
+For example, to have a taskvine manager advertise its project name as
 `myproject`, add the following code snippet after creating the queue:
 
 === "Python"
     ```python
-    q = vine.TaskVine(name = "myproject")
+    q = vine.Manager(name = "myproject")
     ```
 
 === "C"
     ```C
-    taskvine_specify_name(q, "myproject");
+    vine_set_name(q, "myproject");
     ```
-        
+
 To start a worker for this manager, specify the project name (`myproject`) to
 connect in the `-M` option:
 
 ```sh
-$ taskvine_worker -M myproject
+$ vine_worker -M myproject
 ```
-    
+
 
 You can start ten workers for this manager on Condor using
 `condor_submit_workers` by providing the same option arguments.:
-    
+
 ```sh
 $ condor_submit_workers -M myproject 10
 Submitting job(s)..........
@@ -573,7 +586,7 @@ Your job 153099 ("worker.sh") has been submitted
 ...
 ```
 
-### TaskVine Status Display
+### taskvine Status Display
 
 An additional benefit of using a project name is that you can
 now use the [taskvine_status](../man_pages/taskvine_status) command
@@ -583,30 +596,30 @@ catalog server.  (Note that this information is updated about once
 per minute.).  For example:
 
 ```sh
-% taskvine_status
-PROJECT               HOST                      PORT WAITING RUNNING COMPLETE WORKERS 
-molsim-c2h2           home.cse.nd.edu           8999     793      64      791      16 
-freds-model-search    mars.indiana.edu          9123     100     700     1372     350 
-yang-analysis-355     login.crc.nd.edu          9100    8932    4873    10007    4873  
+% vine_status
+PROJECT               HOST                      PORT WAITING RUNNING COMPLETE WORKERS
+molsim-c2h2           home.cse.nd.edu           8999     793      64      791      16
+freds-model-search    mars.indiana.edu          9123     100     700     1372     350
+yang-analysis-355     login.crc.nd.edu          9100    8932    4873    10007    4873
 ```
 
 The same information is available in a more graphical form online
-at the [TaskVine Status Display](http://ccl.cse.nd.edu/software/taskvine/status),
+at the [taskvine Status Display](http://ccl.cse.nd.edu/software/taskvine/status),
 which looks like this:
 
 <img src=examples/work-queue-status-example.png>
 
-### Managing Workers with the TaskVine Factory
+### Managing Workers with the taskvine Factory
 
 Instead of launching each worker manually from the command line, the utility
-**taskvine_factory** may be used to launch workers are needed. The factory
+**vine_factory** may be used to launch workers are needed. The factory
 will submit and maintain a number of workers according to the tasks available
 in one or more managers.
 For example, we can supply a minimum of 2 workers and a maximum of 10 to
 a manager with the project name `myproject` via the condor batch system as follows:
 
 ```sh
-taskvine_factory -Tcondor --min-workers=2 --max-workers=10 --manager-name myproject
+vine_factory -Tcondor --min-workers=2 --max-workers=10 --manager-name myproject
 ```
 
 This arguments can be specified in a file. The factory will periodically
@@ -621,10 +634,10 @@ Configuarion file `factory.json`:
 }
 ```
 ```sh
-taskvine_factory -Tcondor -Cfactory.json
+vine_factory -Tcondor -Cfactory.json
 ```
 
-For further options, please refer to the taskvine factory [manual](../man_pages/taskvine_factory.md).
+For further options, please refer to the taskvine factory [manual](../man_pages/vine_factory.md).
 
 By default, the factory submits as many tasks that are waiting and running up
 to a specified maximum. To run more than one task in a worker, please refer
@@ -658,7 +671,7 @@ with workers:
 
 ## Managing Resources
 
-Unless otherwise specified, TaskVine assumes that a single task runs on a
+Unless otherwise specified, taskvine assumes that a single task runs on a
 single worker at a time, and a single worker occupies an entire machine.
 
 However, if the resources at a machine are larger than what you know a task
@@ -678,33 +691,33 @@ as in the following example:
 
 === "Python"
     ```python
-    t.specify_cores(1)                     # task needs one core
-    t.specify_memory(1024)                 # task needs 1024 MB of memory
-    t.specify_disk(4096)                   # task needs 4096 MB of disk space
-    t.specify_gpus(0)                      # task does not need a gpu
-    t.specify_running_time_max(100)        # task is allowed to run in 100 seconds
-    t.specify_running_time_min(10)         # task needs at least 10 seconds to run (see taskvine_worker --wall-time option above)
+    t.set_cores(1)                     # task needs one core
+    t.set_memory(1024)                 # task needs 1024 MB of memory
+    t.set_disk(4096)                   # task needs 4096 MB of disk space
+    t.set_gpus(0)                      # task does not need a gpu
+    t.set_time_max(100)        # task is allowed to run in 100 seconds
+    t.set_time_min(10)         # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
     ```
 
 === "C"
     ```C
-    taskvine_task_specify_cores(t,1)                 # task needs one core
-    taskvine_task_specify_memory(t,1024)             # task needs 1024 MB of memory
-    taskvine_task_specify_disk(t,4096)               # task needs 4096 MB of disk space
-    taskvine_task_specify_gpus(t,0)                  # task does not need a gpu
-    taskvine_task_specify_running_time_max(t,100)    # task is allowed to run in 100 seconds
-    taskvine_task_specify_running_time_min(t,10)     # task needs at least 10 seconds to run (see taskvine_worker --wall-time option above)
+    vine_task_set_cores(t,1)                 # task needs one core
+    vine_task_set_memory(t,1024)             # task needs 1024 MB of memory
+    vine_task_set_disk(t,4096)               # task needs 4096 MB of disk space
+    vine_task_set_gpus(t,0)                  # task does not need a gpu
+    vine_task_set_run_time_max(t,100)    # task is allowed to run in 100 seconds
+    vine_task_set_run_time_min(t,10)     # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
     ```
 
-When all cores, memory, and disk are specified, TaskVine will simply fit as
+When all cores, memory, and disk are specified, taskvine will simply fit as
 many tasks as possible without going above the resources available at a
-particular worker. When the maximum running time is specified, TaskVine will
+particular worker. When the maximum running time is specified, taskvine will
 kill any task that exceeds its maximum running time. The minimum running time,
-if specified, helps TaskVine decide which worker best fits which task.
+if specified, helps taskvine decide which worker best fits which task.
 Specifying tasks' running time is especially helpful in clusters where workers
 may have a hard threshold of their running time.
 
-When some of the resources are left unspecified, then TaskVine tries to find
+When some of the resources are left unspecified, then taskvine tries to find
 some reasonable defaults as follows:
 
 - If no resources are specified, or all resources are specified to be 0, then a
@@ -718,12 +731,12 @@ some reasonable defaults as follows:
   in 8-core workers. When more than one resource is specified, the default uses
   the largest proportion.
 
-The current TaskVine implementation only accepts whole integers for its
+The current taskvine implementation only accepts whole integers for its
 resources, which means that no worker can concurrently execute more tasks than
 its number of cores. (This will likely change in the future.)
 
 When you would like to run several tasks in a worker, but you are not sure
-about the resources each task needs, TaskVine can automatically find values
+about the resources each task needs, taskvine can automatically find values
 of resources that maximize throughput, or minimize waste. This is discussed in
 the section [below](#grouping-tasks-with-similar-resources-needs).
 
@@ -734,15 +747,15 @@ running.  The resources detected are displayed when the worker starts up,
 for example:
 
 ```
-taskvine_worker: creating workspace /tmp/worker-102744-8066
-taskvine_worker: using 16 cores, 15843 MB memory, 61291 MB disk, 0 gpus
+vine_worker: creating workspace /tmp/worker-102744-8066
+vine_worker: using 16 cores, 15843 MB memory, 61291 MB disk, 0 gpus
 ```
 
 You can manually adjust the resources managed by a worker like this:
 
 
 ```sh
-$ taskvine_worker --cores 8  --memory 1000 --disk 8000 --gpus 1 ...other options...
+$ vine_worker --cores 8  --memory 1000 --disk 8000 --gpus 1 ...other options...
 ```
 
 Unlike other resources, the default value for gpus is 0. You can use the
@@ -754,11 +767,11 @@ lease, this information can be communicated to the worker as follows. For
 example, if the worker will be terminated in one hour:
 
 ```sh
-$ taskvine_worker --wall-time 3600 ...other options...
+$ vine_worker --wall-time 3600 ...other options...
 ```
 
 In combination with the worker option `--wall-time`, tasks can request a
-minimum time to execute with `specify_running_time_min`, as explained (below)[#specifying-task-resources].
+minimum time to execute with `set_time_min`, as explained (below)[#setting-task-resources].
 
 You may also use the same `--cores`, `--memory`, `--disk`, and `--gpus` options when using
 batch submission scripts such as `condor_submit_workers` or
@@ -767,11 +780,11 @@ a node of the desired size.
 
 The only caveat is when using `sge_submit_workers`, as there are many
 differences across systems that the script cannot manage. For `
-sge_submit_workers ` you have to specify **both** the resources used by the
+sge_submit_workers ` you have to set **both** the resources used by the
 worker (i.e., with `--cores`, etc.) and the appropiate computing node with the `
 -p ` option.
 
-For example, say that your local SGE installation requires you to specify the
+For example, say that your local SGE installation requires you to set the
 number of cores with the switch ` -pe smp ` , and you want workers with 4
 cores:
 
@@ -799,9 +812,9 @@ options passed to `--cores`, `--memory`, `--disk. `
 
 ### Factory Resources
 
-The `taskvine_factory` accepts the arguments `--cores`, `--memory`,
-`--disk`, and `--gpus` to specify the size of the desired workers. Resources may also be
-specified in the configuration file as follows:
+The `vine_factory` accepts the arguments `--cores`, `--memory`,
+`--disk`, and `--gpus` to set the size of the desired workers. Resources may also be
+set in the configuration file as follows:
 
 ```json
 {
@@ -815,12 +828,12 @@ specified in the configuration file as follows:
 }
 ```
 
-Both memory and disk are specified in `MB`.
+Both memory and disk are set in `MB`.
 
 ### Monitoring and Enforcement
 
-So far we have used resources values simply as hints to TaskVine to schedule
-concurrent tasks at workers. By default, TaskVine does not monitor or enforce
+So far we have used resources values simply as hints to taskvine to schedule
+concurrent tasks at workers. By default, taskvine does not monitor or enforce
 these limits. You can enable monitoring and enforcement as follows:
 
 === "Python"
@@ -838,11 +851,11 @@ these limits. You can enable monitoring and enforcement as follows:
     ```C
     # Measure the resources used by tasks, and terminate tasks that go above their
     # resources:
-    taskvine_enable_monitoring(q,0,0)
+    vine_enable_monitoring(q,0,0)
 
     # Measure the resources used by tasks, but do not terminate tasks that go above
     # declared resources:
-    taskvine_enable_monitoring(q,0,1)
+    vine_enable_monitoring(q,0,1)
     ```
 
 When monitoring is enabled, you can explore the resources measured when a task
@@ -866,7 +879,7 @@ returns:
 
 === "C"
     ```C
-    taskvine_task *t = taskvine_wait(q,5); 
+    vine_task *t = vine_wait(q,5);
     if(t) {
         printf("Task used %f cores, %f MB memory, %f MB disk",
             t->resources_measured->cores,
@@ -890,20 +903,20 @@ report format is JSON, as its filename has the form
 === "Python"
     ```python
     t = vine.Task(...)
-    t.specify_monitor_output("my-resources-output")
+    t.set_monitor_output("my-resources-output")
     ...
     taskid = q.submit(t)
     ```
 
 === "C"
     ```C
-    struct taskvine_task *t = taskvine_task_create(...);
-    taskvine_specify_monitor_output("my-resources-output");
+    struct vine_task *t = vine_task_create(...);
+    vine_set_monitor_output("my-resources-output");
     ...
-    int taskid = taskvine_submti(q, t);
+    int taskid = vine_submti(q, t);
     ```
 
-TaskVine also measures other resources, such as peak `bandwidth`,
+taskvine also measures other resources, such as peak `bandwidth`,
 `bytes_read`, `bytes_written`, `bytes_sent`, `bytes_received`,
 `total_files`, `cpu_time`, and `wall_time`.
 
@@ -911,7 +924,7 @@ TaskVine also measures other resources, such as peak `bandwidth`,
 ### Grouping Tasks with Similar Resource Needs
 
 Several tasks usually share the same resource description, and to this end,
-TaskVine allows you to tasks into groups called **categories**. You can
+taskvine allows you to tasks into groups called **categories**. You can
 attach resource descriptions to each category, and then label a task to set it
 as part of a category.
 
@@ -920,9 +933,9 @@ We can create some categories with their resource description as follows:
 === "Python"
     ```python
     # memory and disk values in MB.
-    q.specify_category_max_resources('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
-    q.specify_category_max_resources('my-category-b', {'cores': 1})
-    q.specify_category_max_resources('my-category-c', {})
+    q.set_category_resources_max('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
+    q.set_category_resources_max('my-category-b', {'cores': 1})
+    q.set_category_resources_max('my-category-c', {})
     ```
 
 === "C"
@@ -932,60 +945,60 @@ We can create some categories with their resource description as follows:
     ra->cores = 2;
     ra->memory = 1024;
     ra->disk = 2048;
-    taskvine_specify_max_resources("my-category-a", ra);
+    vine_set_resources_max("my-category-a", ra);
     rmsummary_delete(ra);
 
     struct rmsummary *rb = rmsummary_create(-1);
     rb->cores = 1;
-    taskvine_specify_max_resources("my-category-b", rb);
+    vine_set_resources_max("my-category-b", rb);
     rmsummary_delete(rb);
 
-    taskvine_specify_max_resources("my-category-c", NULL);
+    vine_set_resources_max("my-category-c", NULL);
     ```
 
 In the previous examples, we created three categories. Note that it is not
-necessary to specify all the resources, as TaskVine can be directed to
+necessary to set all the resources, as taskvine can be directed to
 compute some efficient defaults. To assign a task to a category:
 
 === "Python"
     ```python
-    t.specify_category('my-category-a')
+    t.set_category('my-category-a')
     ```
 
 === "C"
     ```C
-    taskvine_task_specify_category(t,"my-category-a")
+    vine_task_set_category(t,"my-category-a")
     ```
-When a category leaves some resource unspecified, then TaskVine tries to find
+When a category leaves some resource unspecified, then taskvine tries to find
 some reasonable defaults in the same way described before in the section
-(Specifying Task Resources)[#specifying-task-resources].
+(Specifying Task Resources)[#setting-task-resources].
 
 !!! warning
     When a task is declared as part of a category, and also has resources
-    specified directly with calls such as `t.specify_cores`, the resources
-    directly specified take precedence over the category declaration for that
+    set directly with calls such as `t.set_cores`, the resources
+    directly set take precedence over the category declaration for that
     task
 
-When the resources used by a task are unknown, TaskVine can measure and
+When the resources used by a task are unknown, taskvine can measure and
 compute efficient resource values to maximize throughput or minimize waste, as
-we explain in the following sections. 
+we explain in the following sections.
 
 ### Automatic Resource Management
 
-If the resources a category uses are unknown, then TaskVine can be directed
+If the resources a category uses are unknown, then taskvine can be directed
 to find efficient resource values to maximize throughput or minimize resources
-wasted. In these modes, if a value for a resource is specified with
-`specify_max_resources`, then it is used as a theoretical maximum.
+wasted. In these modes, if a value for a resource is set with
+`set_resources_max`, then it is used as a theoretical maximum.
 
 When automatically computing resources, if any of cores, memory or disk are
-left unspecified in `specify_max_resources`, then TaskVine will run some
+left unspecified in `set_resources_max`, then taskvine will run some
 tasks using whole workers to collect some resource usage statistics. If all
-cores, memory, and disk are specified, then TaskVine uses these maximum
+cores, memory, and disk are set, then taskvine uses these maximum
 values instead of using whole workers. As before, unspecified gpus default to 0.
 
 Once some statistics are available, further tasks may run with smaller
 allocations if such a change would increase throughput. Should a task exhaust
-its resources, it will be retried using the values of `specify_max_resources`,
+its resources, it will be retried using the values of `set_resources_max`,
 or a whole worker, as explained before.
 
 Automatic resource management is enabled per category as follows:
@@ -993,23 +1006,23 @@ Automatic resource management is enabled per category as follows:
 === "Python"
     ```python
     q.enable_monitoring()
-    q.specify_category_max_resources('my-category-a', {})
-    q.specify_category_mode('my-category-a', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    q.set_category_resources_max('my-category-a', {})
+    q.set_category_mode('my-category-a', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
 
-    q.specify_category_max_resources('my-category-b', {'cores': 2})
-    q.specify_category_mode('my-category-b', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    q.set_category_resources_max('my-category-b', {'cores': 2})
+    q.set_category_mode('my-category-b', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
     ```
 
 === "C"
     ```C
-    taskvine_enable_monitoring(q,0,0);
-    taskvine_specify_category_max_resources(q, "my-category-a", NULL);
-    taskvine_specify_category_mode(q, "my-category-a", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
+    vine_enable_monitoring(q,0,0);
+    vine_set_category_resources_max(q, "my-category-a", NULL);
+    vine_set_category_mode(q, "my-category-a", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
 
     struct rmsummary *r = rmsummary_create(-1);
     r->cores = 2;
-    taskvine_specify_category_max_resources(q, "my-category-b", r);
-    taskvine_specify_category_mode(q, "my-category-b", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
+    vine_set_category_resources_max(q, "my-category-b", r);
+    vine_set_category_mode(q, "my-category-b", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
     rmsummary_delete(r);
     ```
 
@@ -1018,27 +1031,27 @@ cores, while tasks in 'my-category-a' are free to use as many cores as the
 largest worker available if needed.
 
 You can set a limit on the minimum resource value a category can use. The
-automatic resource computation will never go below the values specified:
+automatic resource computation will never go below the values set:
 
 === "Python"
     ```python
-    q.specify_category_min_resources('my-category-a', {'memory': 512})
+    q.set_category_resources_min('my-category-a', {'memory': 512})
     ```
 
 === "C"
     ```C
     struct rmsummary *r = rmsummary_create(-1);
     r->memory = 512;
-    $q->specify_category_min_resources("my-category-a", r);
+    $q->set_category_resources_min("my-category-a", r);
     rmsummary_delete(r);
     ```
 
 You can enquire about the resources computed per category with
-`taskvine_status`:
+`vine_status`:
 
 
 ```
-$ taskvine_status -A  IP-OF-MACHINE-HOSTING-WQ PORT-OF-WQ
+$ vine_status -A  IP-OF-MACHINE-HOSTING-WQ PORT-OF-WQ
 CATEGORY        RUNNING    WAITING  FIT-WORKERS  MAX-CORES MAX-MEMORY   MAX-DISK
 analysis            216        784           54          4      ~1011      ~3502
 merge                20         92           30         ~1      ~4021      21318
@@ -1050,39 +1063,39 @@ column FIT-WORKERS shows the count of workers that can fit at least one task in
 that category using the maximum resources either set or found. Values for max
 cores, memory and disk have modifiers `~` and `>` as follows:
 
-- No modifier: The maximum resource usage set with `specify_category_max_resources`, or set for any task in the category via calls such as `specify_cores`.
-- ~: The maximum resource usage so far seen when resource is left unspecified in `specify_category_max_resources`. All tasks so far have run with no more than this resource value allocated.
-- >: The maximum resource usage that has caused a resource exhaustion. If this value is larger than then one specified with `specify_category_max_resources`, then tasks that exhaust resources are not retried. Otherwise, if a maximum was not set, the tasks will be retried in larger workers as workers become available.
+- No modifier: The maximum resource usage set with `set_category_resources_max`, or set for any task in the category via calls such as `set_cores`.
+- ~: The maximum resource usage so far seen when resource is left unspecified in `set_category_resources_max`. All tasks so far have run with no more than this resource value allocated.
+- >: The maximum resource usage that has caused a resource exhaustion. If this value is larger than then one set with `set_category_resources_max`, then tasks that exhaust resources are not retried. Otherwise, if a maximum was not set, the tasks will be retried in larger workers as workers become available.
 
 
 !!! warning
-    When resources are specified directly to the task with calls such as
-    `t.specify_cores`, such resources are fixed for the task and are not
+    When resources are set directly to the task with calls such as
+    `t.set_cores`, such resources are fixed for the task and are not
     modified when more efficient values are found.
 
 ## Advanced Techniques
 
 A variety of advanced features are available for programs with unusual needs
 or very large scales. Each feature is described briefly here, and more details
-may be found in the [TaskVine
+may be found in the [taskvine
 API](api/html/taskvine_8h.html).
 
 ### Security
 
-By default, TaskVine does **not** perform any encryption or authentication,
+By default, taskvine does **not** perform any encryption or authentication,
 so any workers will be able to connect to your manager, and vice versa. This
 may be fine for a short running anonymous application, but is not safe for a
 long running application with a public name.
 
-Currently, TaskVine uses SSL to provide communication encryption, and a
+Currently, taskvine uses SSL to provide communication encryption, and a
 password file to provide worker-manager authentication. These features can be
 enabled independet of each other.
 
 
 #### SSL support
 
-TaskVine can encrypt the communication between manager and workers using SSL.
-For this, you need to specify the key and certificate (in PEM format) of your
+taskvine can encrypt the communication between manager and workers using SSL.
+For this, you need to set the key and certificate (in PEM format) of your
 server when creating the queue.
 
 If you do not have a key and certificate at hand, but you want the
@@ -1100,22 +1113,22 @@ creating the queue:
 
 === "Python"
     ```python
-    # Import the TaskVine library
+    # Import the taskvine library
     import taskvine as vine
-    q = vine.TaskVine(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
+    q = vine.Manager(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
 
     # Alternatively, you can set ssl=True and let the python API generate
     # temporary ssl credentials for the queue:
-    q = vine.TaskVine(port=9123, ssl=True)
+    q = vine.Manager(port=9123, ssl=True)
     ```
 
 === "C"
     ```
-    /* Import the TaskVine library */
+    /* Import the taskvine library */
     #include "taskvine.h"
 
     /* Create a new queue listening on port 9123 */
-    struct taskvine *q = taskvine_ssl_create(9123, 'MY_KEY.pem', 'MY_CERT.pem');
+    struct taskvine *q = vine_ssl_create(9123, 'MY_KEY.pem', 'MY_CERT.pem');
     ```
 
 
@@ -1126,9 +1139,9 @@ address of the manager when launching the workers, then you need to add the
 `--ssl` flag to the command line, as:
 
 ```sh
-taskvine_worker (... other args ...) --ssl HOST PORT
-taskvine_factory (... other args ...) --ssl HOST PORT
-taskvine_status --ssl HOST PORT
+vine_worker (... other args ...) --ssl HOST PORT
+vine_factory (... other args ...) --ssl HOST PORT
+vine_status --ssl HOST PORT
 condor_submit_workers -E'--ssl' HOST PORT
 ```
 
@@ -1147,20 +1160,20 @@ Then, modify your manager program to use the password:
 
 === "Python"
     ```python
-    q.specify_password_file("mypwfile")
+    q.set_password_file("mypwfile")
     ```
 
 === "C"
     ```C
-    taskvine_specify_password_file(q,"mypwfile");
+    vine_set_password_file(q,"mypwfile");
     ```
-    
+
 
 And give the `--password` option to give the same password file to your
 workers:
-    
+
 ```sh
-$ taskvine_worker --password mypwfile -M myproject
+$ vine_worker --password mypwfile -M myproject
 ```
 
 With this option enabled, both the manager and the workers will verify that the
@@ -1177,15 +1190,15 @@ limit on the number of retries:
 
 === "Python"
     ```python
-    t.specify_max_retries(5)   # Task will be try at most 6 times (5 retries).
+    t.set_retries(5)   # Task will be try at most 6 times (5 retries).
     ```
 
 === "C"
     ```C
-    taskvine_specify_max_retries(t, 5)
+    vine_set_retries(t, 5)
     ```
 
-When a task cannot be completed in the specified number of tries,
+When a task cannot be completed in the set number of tries,
 then the task result is set to  `WORK_QUEUE_RESULT_MAX_RETRIES`.
 
 ### Pipelined Submission
@@ -1204,7 +1217,7 @@ warranted:
 
 === "C"
     ```C
-    if(taskvine_hungry(q)) {
+    if(vine_hungry(q)) {
         // submit more tasks...
     }
     ```
@@ -1213,22 +1226,22 @@ warranted:
 
 Tasks can fetch remote data named by a URL into the worker's cache.
 For example, if you have a large dataset provided by a web server,
-use `specify_url` to attach the URL to a local file.  The data
+use `add_url` to attach the URL to a local file.  The data
 will be downloaded once per worker and then shared among all
 tasks that require it:
 
 
 === "Python"
     ```python
-    t.specify_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=WORK_QUEUE_INPUT, cache=True)
+    t.add_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=WORK_QUEUE_INPUT, cache=True)
     ```
 
 === "C"
     ```c
-    taskvine_task_specify_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
+    vine_task_add_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
     ```
 
-(Note that `specify_url` does not currently support output data.)
+(Note that `add_url` does not currently support output data.)
 
 ### Fetching Input Data via Command
 
@@ -1241,32 +1254,32 @@ a URL and then unpack into the directory `data`:
 
 === "Python"
     ```python
-    t.specify_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , type=WORK_QUEUE_INPUT, cache=True)
+    t.add_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , type=WORK_QUEUE_INPUT, cache=True)
     ```
 
 === "C"
     ```c
-    taskvine_task_specify_file_command(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
+    vine_task_add_file_command(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
     ```
 
-(Note that `specify_file_command` does not currently support output data.)
+(Note that `add_file_command` does not currently support output data.)
 
 ### Watching Output Files
 
 If you would like to see the output of a task as it is produced, add
-`WORK_QUEUE_WATCH` to the flags argument of `specify_file`. This will
+`WORK_QUEUE_WATCH` to the flags argument of `add_file`. This will
 cause the worker to periodically send output appended to that file back to the
 manager. This is useful for a program that produces a log or progress bar as
 part of its output.
 
 === "Python"
     ```python
-    t.specify_output_file("my-file", flags = vine.WORK_QUEUE_WATCH)
+    t.add_output_file("my-file", flags = vine.WORK_QUEUE_WATCH)
     ```
 
 === "C"
     ```C
-    taskvine_task_specify_file(t, "my-file", "my-file", WORK_QUEUE_OUTPUT, WORK_QUEUE_WATCH);
+    vine_task_add_file(t, "my-file", "my-file", WORK_QUEUE_OUTPUT, WORK_QUEUE_WATCH);
     ```
 
 ### Optional Output Files
@@ -1279,37 +1292,39 @@ only be returned in the event of failure:
 
 === "Python"
     ```python
-    t.specify_output_file("debug.out", flags = vine.WORK_QUEUE_FAILURE_ONLY)
+    t.add_output_file("debug.out", flags = vine.WORK_QUEUE_FAILURE_ONLY)
     ```
 
 === "C"
     ```C
-    taskvine_task_specify_file(t, "debug.out", "debug.out", WORK_QUEUE_OUTPUT, WORK_QUEUE_FAILURE_ONLY);
+    vine_task_add_file(t, "debug.out", "debug.out", WORK_QUEUE_OUTPUT, WORK_QUEUE_FAILURE_ONLY);
     ```
 
 In a similar way, the `WORK_QUEUE_SUCCESS_ONLY` flag indicates that an output file
 should only be returned if the task actually succeeded.
 
-### Fast Abort
+### Disconnect slow workers
 
 A large computation can often be slowed down by stragglers. If you have a
-large number of small tasks that take a short amount of time, then Fast Abort
-can help. The Fast Abort feature keeps statistics on tasks execution times and
-proactively aborts tasks that are statistical outliers:
+large number of small tasks that take a short amount of time, then
+automatically disconnecting slow workers can help. With this feature enabled,
+statistics are kept on tasks execution times and statistical outlier are
+terminated. If two different tasks are canceled in the same worker, then the
+worker is disconnected and blacklisted.
 
 === "Python"
     ```python
     # Disconnect workers that are executing tasks twice as slow as compared to the average.
-    q.activate_fast_abort(2)
+    q.enable_disconnect_slow_workers(2)
     ```
 
 === "C"
     ```C
     // Disconnect workers that are executing tasks twice as slow as compared to the average.
-    taskvine_activate_fast_abort(q, 2);
+    vine_enable_disconnect_slow_workers(q, 2);
     ```
 
-Tasks that trigger fast abort are automatically retried in some other worker.
+Tasks terminated this way are automatically retried in some other worker.
 Each retry allows the task to run for longer and longer times until a
 completion is reached. You can set an upper bound in the number of retries with
 [Maximum Retries](#maximum-retries).
@@ -1320,18 +1335,18 @@ If you have workers distributed across multiple operating systems (such as
 Linux, Cygwin, Solaris) and/or architectures (such as i686, x86_64) and have
 files specific to each of these systems, this feature will help. The strings
 $OS and $ARCH are available for use in the specification of input file names.
-TaskVine will automatically resolve these strings to the operating system
+taskvine will automatically resolve these strings to the operating system
 and architecture of each connected worker and transfer the input file
 corresponding to the resolved file name. For example:
 
 === "Python"
     ```C
-    t.specify_input_file("my-executable.$OS.$ARCH", "my-exe")
+    t.add_input_file("my-executable.$OS.$ARCH", "my-exe")
     ```
 
 === "C"
     ```C
-    taskvine_task_specify_file(t,"my-executable.$OS.$ARCH","./my-exe",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+    vine_task_add_file(t,"my-executable.$OS.$ARCH","./my-exe",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
     ```
 
 This will transfer `my-executable.Linux.x86_64` to workers running on a Linux
@@ -1349,15 +1364,15 @@ environment.
 
 This feature is useful in workflows where there are redundant tasks or tasks
 that become obsolete as other tasks finish. Tasks that have been submitted can
-be cancelled and immediately retrieved without waiting for TaskVine to
-return them in `taskvine_wait`. The tasks to cancel can be identified by
+be cancelled and immediately retrieved without waiting for taskvine to
+return them in `vine_wait`. The tasks to cancel can be identified by
 either their `taskid` or `tag`. For example:
 
 === "Python"
     ```python
     # create task as usual and tag it with an arbitrary string.
     t = vine.Task(...)
-    t.specify_tag("my-tag")
+    t.set_tag("my-tag")
 
     taskid = q.submit(t)
 
@@ -1371,16 +1386,16 @@ either their `taskid` or `tag`. For example:
 === "C"
     ```C
     // create task as usual and tag it with an arbitrary string.
-    struct taskvine_task *t = taskvine_task_create("...");
-    taskvine_specify_task(t, "my-tag");
+    struct vine_task *t = vine_task_create("...");
+    vine_set_task(t, "my-tag");
 
-    int taskid = taskvine_submit(q, t);
+    int taskid = vine_submit(q, t);
 
     // cancel task by id. Return the canceled task.
-    t = taskvine_cancel_by_taskid(q, taskid);
+    t = vine_cancel_by_taskid(q, taskid);
 
     # or cancel task by tag. Return the canceled task.
-    t = taskvine_cancel_by_tasktag(q, "my-tag");
+    t = vine_cancel_by_tasktag(q, "my-tag");
     ```
 
 
@@ -1410,10 +1425,10 @@ feature. For example:
 
 === "C"
     ```C
-    struct taskvine_task *t = taskvine_wait(q, t);
+    struct vine_task *t = vine_wait(q, t);
 
     //if t fails given a worker misconfiguration:
-    taskvine_blacklist_add(q, t->{hostname});
+    vine_blacklist_add(q, t->{hostname});
     ```
 
 ### Performance Statistics
@@ -1430,8 +1445,8 @@ to make a progress bar or other user-visible information:
 
 === "C"
     ```C
-    struct taskvine_stats stats;
-    taskvine_get_stats(q, &stats);
+    struct vine_stats stats;
+    vine_get_stats(q, &stats);
     printf("%d\n", stats->workers_connected);
     ```
 
@@ -1439,13 +1454,13 @@ to make a progress bar or other user-visible information:
 
 #### Map
 
-The taskvine map abstraction works similar to python map, as it applies a 
-a function to every element in a list. This function works by taking in a chunk_size, 
-which is the size of an iterable to send to a worker. The worker than maps the given 
-function over the iterable and returns it. All the results are then combined from the 
+The taskvine map abstraction works similar to python map, as it applies a
+a function to every element in a list. This function works by taking in a chunk_size,
+which is the size of an iterable to send to a worker. The worker than maps the given
+function over the iterable and returns it. All the results are then combined from the
 workers and returned. The size of the chunk depends on the cost of the function.
 If the function is very cheap, then sending a larger chunk_size is better. If the
-function is expensive, then smaller is better. If an invalid operation happens, 
+function is expensive, then smaller is better. If an invalid operation happens,
 the error will appear in the results.
 
 ```python
@@ -1461,8 +1476,8 @@ The taskvine pair function computes all the pairs of 2 sequences, and then uses
 them as inputs of a given function. The pairs are generated locally using itertools,
 and then based on the given chunk_size, are sent out to a worker as an iterable of pairs.
 The given function must accept an iterable, as the pair will be sent to the function as
-a tuple. The worker will then return the results, and each result from each worker will be 
-combined locally. Again, cheaper functions work better with larger chunk_sizes, 
+a tuple. The worker will then return the results, and each result from each worker will be
+combined locally. Again, cheaper functions work better with larger chunk_sizes,
 more expensive functions work better with smaller ones. Errors will be placed in results.
 
 ```python
@@ -1477,9 +1492,9 @@ q.pair(fn, seq1, seq2, chunk_size)
 The taskvine treeReduce fucntion combines an array using a given function by
 breaking up the array into chunk_sized chunks, computing the results, and returning
 the results to a new array. It then does the same process on the new array until there
-only one element left and then returns it. The given fucntion must accept an iterable, 
+only one element left and then returns it. The given fucntion must accept an iterable,
 and must be an associative fucntion, or else the same result cannot be gaurenteed for
-different chunk sizes. Again, cheaper functions work better with larger chunk_sizes, 
+different chunk sizes. Again, cheaper functions work better with larger chunk_sizes,
 more expensive functions work better with smaller ones. Errors will be placed in results.
 Also, the minimum chunk size is 2, as going 1 element at time would not reduce the array
 
@@ -1487,7 +1502,7 @@ Also, the minimum chunk size is 2, as going 1 element at time would not reduce t
 def fn(seq):
     return max(seq)
 
-q.treeReduce(fn, arry, chunk_size) 
+q.treeReduce(fn, arry, chunk_size)
 ```
 
 Below is an example of all three abstractions, and their expected output:
@@ -1521,7 +1536,7 @@ find failures, bugs, and other errors. To activate debug output:
 
 === "Python"
     ```python
-    q = vine.TaskVine(debug_log = "my.debug.log")
+    q = vine.Manager(debug_log = "my.debug.log")
     ```
 
 === "C"
@@ -1530,17 +1545,17 @@ find failures, bugs, and other errors. To activate debug output:
     cctools_debug_flags_set("all");
     cctools_debug_config_file("my.debug.log");
     ```
-    
-The `all` flag causes debug messages from every subsystem called by TaskVine
+
+The `all` flag causes debug messages from every subsystem called by taskvine
 to be printed. More information about the debug flags are
 [here](api/html/debug_8h.html).
 
 
 To enable debugging at the worker, set the `-d` option:
 
-    
+
 ```sh
-$ taskvine_worker -d all -o worker.debug -M myproject
+$ vine_worker -d all -o worker.debug -M myproject
 ```
 
 ### Statistics Log
@@ -1551,12 +1566,12 @@ total number of cores available, etc. The log is activated as follows:
 
 === "Python"
     ```python
-    q = vine.TaskVine(stats_log = "my.statslog")
+    q = vine.Manager(stats_log = "my.statslog")
     ```
 
 === "C"
     ```C
-    taskvine_specify_log(q, "my.stats.log");
+    vine_enable_perf_log(q, "my.stats.log");
     ```
 
 The time series are presented in columns, with the leftmost column as a
@@ -1571,12 +1586,12 @@ columns. Here is an example of the first few rows and columns.
 ...
 ```
 
-The script `taskvine_graph_log` is a wrapper for `gnuplot`, and with it you
+The script `vine_graph_log` is a wrapper for `gnuplot`, and with it you
 can plot some of the statistics, such as total time spent transfering tasks,
 number of tasks running, and workers connected:
 
 ```sh
-$ taskvine_graph_log -o myplots my.stats.log
+$ vine_graph_log -o myplots my.stats.log
 $ ls *.png
 $ ... my.stats.log.tasks.png my.stats.log.tasks-log.png my.stats.log.time.png my.stats.log.time-log.png ...
 ```
@@ -1592,12 +1607,12 @@ tasks. It is activated as follows:
 
 === "Python"
     ```python
-    q = vine.TaskVine(transactions_log = "my.tr.log")
+    q = vine.Manager(transactions_log = "my.tr.log")
     ```
 
 === "C"
     ```C
-   taskvine_specify_transactions_log(q, "my.tr.log");
+   vine_enable_transactions_log(q, "my.tr.log");
    ```
 
 The first few lines of the log document the possible log records:
@@ -1650,12 +1665,12 @@ The statistics available are:
 |||
 |       | **Cumulative stats for workers** |
 | workers_joined        | Total number of worker connections that were established to the manager |
-| workers_removed       | Total number of worker connections that were released by the manager, idled-out, fast-aborted, or lost |
+| workers_removed       | Total number of worker connections that were released by the manager, idled-out, slow, or lost |
 | workers_released      | Total number of worker connections that were asked by the manager to disconnect |
 | workers_idled_out     | Total number of worker that disconnected for being idle |
-| workers_fast_aborted  | Total number of worker connections terminated for being too slow |
-| workers_blacklisted   | Total number of workers blacklisted by the manager (includes fast-aborted) |
-| workers_lost          | Total number of worker connections that were unexpectedly lost (does not include idled-out or fast-aborted) |
+| workers_slow          | Total number of worker connections terminated for being too slow |
+| workers_blacklisted   | Total number of workers blacklisted by the manager (includes workers_slow) |
+| workers_lost          | Total number of worker connections that were unexpectedly lost (does not include idled-out or slow) |
 |||
 |       | **Stats for the current state of tasks** |
 | tasks_waiting         | Number of tasks waiting to be dispatched |
@@ -1680,7 +1695,7 @@ The statistics available are:
 | time_status_msgs   | Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. |
 | time_internal      | Total time the queue spents in internal processing |
 | time_polling       | Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message) |
-| time_application   | Total time spent outside taskvine_wait |
+| time_application   | Total time spent outside vine_wait |
 |||
 |       | **Wrokers time statistics (in microseconds)** |
 | time_workers_execute             | Total time workers spent executing done tasks |
@@ -1718,16 +1733,16 @@ The statistics available are:
 |||
 | manager_load       | In the range of [0,1]. If close to 1, then the manager is at full load <br /> and spends most of its time sending and receiving taks, and thus <br /> cannot accept connections from new workers. If close to 0, the <br /> manager is spending most of its time waiting for something to happen. |
 
-The script `taskvine_graph_workers` is an interactive visualization tool for
-TaskVine transaction logs based on Python `bokeh` package. It can be used to
+The script `vine_graph_workers` is an interactive visualization tool for
+taskvine transaction logs based on Python `bokeh` package. It can be used to
 visualize the life time of tasks and workers, as well as diagnosing the effects
 of file transfer time on overall performance. See
-[taskvine_graph_workers(1)](../man_pages/taskvine_graph_workers.md) for
+[vine_graph_workers(1)](../man_pages/vine_graph_workers.md) for
 detailed information.
 
 ## Specialized and Experimental Settings
 
-The behaviour of TaskVine can be tuned by the following parameters. We advise
+The behaviour of taskvine can be tuned by the following parameters. We advise
 caution when using these parameters, as the standard behaviour may drastically
 change.
 
@@ -1747,7 +1762,7 @@ change.
 
 === "C"
     ```
-    taskvine_tune(q, "hungry-minumum", 20)
+    vine_tune(q, "hungry-minumum", 20)
     ```
 
 

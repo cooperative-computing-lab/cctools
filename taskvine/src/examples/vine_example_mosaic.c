@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 	}
 	printf("Listening on port %d...\n", vine_port(m));
 
-	vine_specify_debug_log(m,"manager.log");
+	vine_enable_debug_log(m,"manager.log");
 
 	int i;
 	for(i = 0; i < 360; i+=10) {
@@ -65,15 +65,15 @@ int main(int argc, char *argv[])
 		sprintf(command, "./convert.sfx -swirl %d cat.jpg %d.cat.jpg", i, i);
 
 		t = vine_task_create(command);
-		vine_task_specify_input_file(t, "convert.sfx", "convert.sfx", VINE_CACHE);
-		vine_task_specify_input_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", VINE_CACHE );
-		vine_task_specify_output_file(t,outfile,outfile,VINE_NOCACHE);
+		vine_task_add_input_file(t, "convert.sfx", "convert.sfx", VINE_CACHE);
+		vine_task_add_input_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", VINE_CACHE );
+		vine_task_add_output_file(t,outfile,outfile,VINE_NOCACHE);
 
-		vine_task_specify_cores(t,1);
+		vine_task_set_cores(t,1);
 
-		int taskid = vine_submit(m, t);
+		int task_id = vine_submit(m, t);
 
-		printf("Submitted task (id# %d): %s\n", taskid, vine_task_get_command(t) );
+		printf("Submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );
 	}
 
 	printf("Waiting for tasks to complete...\n");
@@ -81,16 +81,15 @@ int main(int argc, char *argv[])
 	while(!vine_empty(m)) {
 		t = vine_wait(m, 5);
 		if(t) {
-			vine_result_t result = vine_task_get_result(t);
-                        int id = vine_task_get_taskid(t);
+      vine_result_t r = vine_task_get_result(t);
+      int id = vine_task_get_id(t);
 
-			if(result==VINE_RESULT_SUCCESS) {
-				printf("Task %d complete: %s\n",id,vine_task_get_command(t));
-                        } else {
-                                printf("Task %d failed: %s\n",id,vine_result_string(r));
-                        }
-
-                        vine_task_delete(t);
+			if(r==VINE_RESULT_SUCCESS) {
+		    printf("Task %d complete: %s\n",id,vine_task_get_command(t));
+      } else {
+        printf("Task %d failed: %s\n",id,vine_result_string(r));
+      }
+      vine_task_delete(t);
 		}
 	}
 

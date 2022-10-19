@@ -45,7 +45,7 @@ static int ensure_input_file( struct vine_process *p, struct vine_file *f, struc
 		result = create_dir(sandbox_path, 0700);
 		if(!result) debug(D_VINE,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
-	} else if(vine_cache_ensure(cache,f->cached_name,manager)) {
+	} else if(vine_cache_ensure(cache,f->cached_name,manager,f->flags)) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_VINE,"input: link %s -> %s",cache_path,sandbox_path);
@@ -112,7 +112,7 @@ static int transfer_output_file( struct vine_process *p, struct vine_file *f, st
 	if(result) {
 		struct stat info;
 		if(stat(cache_path,&info)==0) {
-			vine_cache_addfile(cache,info.st_size,f->cached_name);
+			vine_cache_addfile(cache,info.st_size,info.st_mode,f->cached_name);
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
 			debug(D_VINE,"output: failed to stat %s: %s",cache_path,strerror(errno));

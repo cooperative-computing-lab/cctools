@@ -269,7 +269,7 @@ char *vine_coprocess_run(const char *function_name, const char *function_input, 
 			sleep(1);
 		}
 	}
-	// if we can't connect at all, abort
+	// if we can't connect at all, cancel
 	if(!link) {
 		fatal("connection error: %s", strerror(errno));
 	}

@@ -8,8 +8,7 @@ include ../../rules.mk
 SOURCES_LIBRARY = \
 	work_queue.c \
 	work_queue_catalog.c \
-	work_queue_resources.c \
-	work_queue_json.c
+	work_queue_resources.c
 
 SOURCES_WORKER = \
 	work_queue_sandbox.o \
@@ -28,10 +27,10 @@ LIBRARIES = libwork_queue.a
 OBJECTS = $(OBJECTS_LIBRARY) $(OBJECTS_WORKER) work_queue_test_main.o
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)
 OBJECTS_WORKER = $(SOURCES_WORKER:%.c=%.o)
-PROGRAMS = work_queue_worker work_queue_status work_queue_example work_queue_server
-PUBLIC_HEADERS = work_queue.h work_queue_catalog.h work_queue_json.h
+PROGRAMS = work_queue_worker work_queue_status work_queue_example
+PUBLIC_HEADERS = work_queue.h work_queue_catalog.h
 SCRIPTS = work_queue_submit_common condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers slurm_submit_workers work_queue_graph_log
-TEST_PROGRAMS = work_queue_example work_queue_test work_queue_test_watch work_queue_priority_test work_queue_example_json
+TEST_PROGRAMS = work_queue_example work_queue_test work_queue_test_watch work_queue_priority_test
 TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) sge_submit_workers bindings
 
 all: $(TARGETS)

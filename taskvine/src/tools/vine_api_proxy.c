@@ -37,7 +37,7 @@ See clients/python3/vine_proxy.py for an example in Python.
 
 int timeout = 25;
 
-void reply(struct link *output_link, char *method, char *message, int id)
+void reply(struct link *output_link, const char *method, const char *message, int id)
 {
 	struct jx_pair *result;
 
@@ -77,83 +77,54 @@ void reply(struct link *output_link, char *method, char *message, int id)
 
 void mainloop(struct vine_manager *queue, struct link *input_link, struct link *output_link )
 {
-	char message[BUFSIZ];
-	char msg[BUFSIZ];
+	char line[BUFSIZ];
+	char *msg = 0;
 
 	while(true) {
+		ssize_t nread = link_readline(input_link, line, sizeof(line), time(NULL) + timeout);
+		int length = atoi(line);
 
-		//reset
-		char *error = NULL;
-		int id = -1;
+		msg = malloc(length+1);
 
-		//receive message
-		memset(message, 0, BUFSIZ);
-		memset(msg, 0, BUFSIZ);
+		nread = link_read(input_link, msg, length, time(NULL) + timeout);
+		if(nread!=length) {
+			free(msg);
+			break;
+		}
 
-		ssize_t read = link_readline(input_link, message, sizeof(message), time(NULL) + timeout);
-		int length = atoi(message);
-
-		read = link_read(input_link, msg, length, time(NULL) + timeout);
-		if(!read) break;
+		msg[length] = 0;
 
 		struct jx *jsonrpc = jx_parse_string(msg);
 		if(!jsonrpc) {
-			error = "Could not parse JSON string";
-			reply(output_link, "error", error, id);
+			free(msg);
+			reply(output_link, "error", "Could not parse JSON string",0);
 			break;
 		}
-		//iterate over the object: get method and task description
-		void *k = NULL, *v = NULL;
-		const char *key = jx_iterate_keys(jsonrpc, &k);
-		struct jx *value = jx_iterate_values(jsonrpc, &v);
 
-		char *method = NULL;
-		struct jx *val = NULL;
+		const char *method = jx_lookup_string(jsonrpc,"method");
+		int id = jx_lookup_integer(jsonrpc,"id");
 
-		while(key) {
-
-			if(!strcmp(key, "method")) {
-				method = value->u.string_value;
-			} else if(!strcmp(key, "params")) {
-				val = value;
-			} else if(!strcmp(key, "id")) {
-				id = value->u.integer_value;
-			} else if(strcmp(key, "jsonrpc")) {
-				error = "unrecognized parameter";
-				reply(output_link, "error", error, id);
-				break;
-			}
-
-			key = jx_iterate_keys(jsonrpc, &k);
-			value = jx_iterate_values(jsonrpc, &v);
-
-		}
-
-		//submit or wait
 		if(!strcmp(method, "submit")) {
-			char *task = val->u.string_value;
-			int taskid = vine_json_submit(queue, task);
-			if(taskid < 0) {
-				error = "Could not submit task";
-				reply(output_link, "error", error, id);
+			const char *task = jx_lookup_string(jsonrpc,"params");
+			int task_id = vine_json_submit(queue, task);
+			if(task_id < 0) {
+				reply(output_link, "error", "Could not submit task", id);
 			} else {
 				reply(output_link, method, "Task submitted successfully.", id);
 			}
 		} else if(!strcmp(method, "wait")) {
-			int time_out = val->u.integer_value;
+			int time_out = jx_lookup_integer(jsonrpc,"params");
 			char *task = vine_json_wait(queue, time_out);
 			if(!task) {
-				error = "timeout reached with no task returned";
-				reply(output_link, "error", error, id);
+				reply(output_link, "error", "timeout reached with no task returned", id);
 			} else {
 				reply(output_link, method, task, id);
 			}
 		} else if(!strcmp(method, "remove")) {
-			int taskid = val->u.integer_value;
-			char *task = vine_json_remove(queue, taskid);
+			int task_id = jx_lookup_integer(jsonrpc,"params");
+			char *task = vine_json_remove(queue, task_id);
 			if(!task) {
-				error = "task not able to be removed from queue";
-				reply(output_link, "error", error, id);
+				reply(output_link, "error", "unable to remove task", id);
 			} else {
 				reply(output_link, method, "Task removed successfully.", id);
 			}
@@ -168,22 +139,21 @@ void mainloop(struct vine_manager *queue, struct link *input_link, struct link *
 				reply(output_link, method, "Not Empty", id);
 			}
 		} else if(!strcmp(method, "status")) {
-            char *status = vine_json_get_status(queue);
-            reply(output_link, method, status, id);
-        } else {
-			error = "Method not recognized";
-			reply(output_link, "error", error, id);
-		}
-
-		//clean up
-		if(value) {
-			jx_delete(value);
+			char *status = vine_json_get_status(queue);
+			reply(output_link, method, status, id);
+		} else {
+			reply(output_link, "error", "method not recognized", id);
 		}
 
 		if(jsonrpc) {
 			jx_delete(jsonrpc);
+			jsonrpc = 0;
 		}
 
+		if(msg) {
+			free(msg);
+			msg = 0;
+		}
 	}
 }
 

@@ -8,14 +8,14 @@ def my_sum(x, y):
     return x+y
 
 # Create a new queue, listening on port 9123:
-queue = vine.TaskVine(9123)
+queue = vine.Manager(9123)
 print("listening on port {}".format(queue.port))
 
 # Submit several tasks for execution:
 print("submitting tasks...")
 for value in range(1,100):
     task = vine.PythonTask(my_sum, value, value)
-    task.specify_cores(1)
+    task.set_cores(1)
     queue.submit(task)
 
 # As they complete, display the results:
