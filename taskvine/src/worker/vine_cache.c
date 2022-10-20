@@ -251,18 +251,21 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 	if(worker_link == NULL)
 	{
 		debug(D_VINE, "Could not connect with worker at: %s", source_url);
+		error_message = string_format("Could not establish connection with worker at: %s", source_url);
+		return 0;
 	}
 
 	if(!vine_transfer_get_any(worker_link, c, path, time(0) + 120))
 	{
+		error_message = string_format("Could not transfer file %s from worker %s", path, source_url);
 		return 0;
 	}
 
 	// rename file to our expected cache name (probably not the best way to do this)
-	char * command = string_format("mv %s/%s %s", c->cache_dir, path, cache_path);
-	do_internal_command(c,command,error_message);
-	free(command);
-
+	char *received_filename = string_format("%s/%s", c->cache_dir, path);
+	rename(received_filename, cache_path);
+	free(received_filename);
+	
 	return 1;
 }
 
