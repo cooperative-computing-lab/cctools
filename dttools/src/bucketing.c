@@ -64,6 +64,43 @@ int bucketing_state_delete(bucketing_state* s)
     free(s);
 }
 
+int bucketing_cursor_w_pos_create(struct list_cursor* lc, int pos, bucketing_cursor_w_pos* cursor_pos)
+{
+    cursor_pos = malloc(sizeof(*cursor_pos));
+    cursor_pos->lc = lc;
+    cursor_pos->pos = pos;
+    return 0;
+}
+
+int bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos* cursor_pos)
+{
+    list_cursor_destroy(cursor_pos->lc);
+    free(cursor_pos);
+}
+
+int bucketing_bucket_range_create(int lo, int hi, struct list* l, bucketing_bucket_range* range)
+{
+    range = malloc(sizeof(*range));
+    struct list_cursor* lc_lo = list_cursor_create(l);
+    list_seek(lc_lo, lo);
+    struct list_cursor* lc_hi = list_cursor_create(l);
+    list_seek(lc_hi, hi);
+    bucketing_cursor_w_pos* cursor_pos_lo;
+    bucketing_cursor_w_pos_create(lc_lo, lo, cursor_pos_lo);
+    bucketing_cursor_w_pos* cursor_pos_hi; 
+    bucketing_cursor_w_pos_create(lc_hi, hi, cursor_pos_hi);
+    range->lo = cursor_pos_lo;
+    range->hi = cursor_pos_hi;
+    return range;
+}
+
+int bucketing_bucket_range_delete(bucketing_bucket_range* range)
+{
+    bucketing_cursor_w_pos_delete(range->lo);
+    bucketing_cursor_w_pos_delete(range->hi);
+    free(range);
+}
+
 int bucketing_add(double val, double sig, bucketing_state* s)
 {
     bucketing_point *p = bucketing_point_create(val, sig);

@@ -319,7 +319,7 @@ void *list_peek_tail(struct list *list);
 
 /** Peek at the current element in the iteration.
 @param list The list to peek.
-@return The item at the list head, or null if list is empty.
+@return The item at the current internal iterator, or null if list is empty.
 */
 void *list_peek_current(struct list *list);
 
