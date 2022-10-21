@@ -368,7 +368,7 @@ void list_first_item(struct list *list);
 This function returns the current list item,
 and advances the internal iterator to the next item.
 @param list The list to traverse.
-@return The current item in the list.
+@return The current item in the list, NULL if end of list.
 */
 
 void *list_next_item(struct list *list);

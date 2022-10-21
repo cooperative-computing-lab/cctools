@@ -96,7 +96,7 @@ typedef struct
  * @param p pointer to a bucketing point
  * @return 0 if success
  * @return 1 if failure */
-int bucketing_point_create(double val, double sig, bucketing_point* p);
+bucketing_point* bucketing_point_create(double val, double sig);
 
 /* Delete a bucketing point
  * @param p the bucketing point to be deleted
@@ -110,7 +110,7 @@ int bucketing_point_delete(bucketing_point* p);
  * @param b pointer to a bucketing bucket
  * @return 0 if success
  * @return 1 if failure */
-int bucketing_bucket_create(double val, double prob, bucketing_bucket* b);
+bucketing_bucket* bucketing_bucket_create(double val, double prob);
 
 /* Delete a bucketing bucket
  * @param b the bucket to be deleted
@@ -125,8 +125,8 @@ int bucketing_bucket_delete(bucketing_bucket* b);
  * @param s pointer to bucketing state
  * @return 0 if success
  * @return 1 if failure */
-int bucketing_state_create(double default_value, int num_sampling_points,
-    double increase_rate, bucketing_state* s);
+bucketing_state* bucketing_state_create(double default_value, int num_sampling_points,
+    double increase_rate);
 
 /* Delete a bucketing state
  * @param s pointer to bucketing state to be deleted
@@ -140,8 +140,7 @@ int bucketing_state_delete(bucketing_state* s);
  * @param cursor_pos empty pointer
  * @return 0 if success
  * @return 1 if failure */
-int bucketing_cursor_w_pos_create(struct list_cursor* lc, int pos,
-        bucketing_cursor_w_pos* cursor_pos);
+bucketing_cursor_w_pos* bucketing_cursor_w_pos_create(struct list_cursor* lc, int pos);
 
 /* Delete a bucketing_cursor_w_pos structure
  * @param cursor_pos the structure to be deleted
@@ -156,7 +155,7 @@ int bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos* cursor_pos);
  * @param range Empty pointer
  * @return 0 if success
  * @return 1 if failure */
-int bucketing_bucket_range_create(int lo, int hi, struct list* l, bucketing_bucket_range* range);
+bucketing_bucket_range* bucketing_bucket_range_create(int lo, int hi, struct list* l);
 
 /* Delete a bucketing_bucket_range
  * @param range the structure to be deleted
@@ -175,13 +174,6 @@ int bucketing_add(double val, double sig, bucketing_state* s);
 /** End: APIs **/
 
 /** Begin: internals **/
-
-/* Insert a bucketing point into a sorted list of points in O(log(n))
- * @param l pointer to sorted list of points
- * @param p pointer to point
- * @return 0 if success
- * @return 1 if failure */
-static int bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point *p);
 
 /** End: internals **/
 

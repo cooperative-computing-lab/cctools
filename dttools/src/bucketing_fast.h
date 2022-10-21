@@ -26,7 +26,7 @@ int bucketing_fast_update_buckets(bucketing_state* s);
  * @param break_point_list empty pointer to be filled w list
  * @return 0 if success
  * @return 1 if failure */
-int bucketing_find_break_points(bucketing_state* s, struct list* break_point_list);
+struct list* bucketing_find_break_points(bucketing_state* s);
 
 /* Compare position of two break points
  * @param p1 first break point
@@ -39,13 +39,13 @@ int compare_break_points(bucketing_cursor_w_pos* p1, bucketing_cursor_w_pos* p2)
  * @param break_point empty pointer
  * @return 0 if success
  * @return 1 if failure */
-int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_w_pos* break_point);
+int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_w_pos** break_point);
 
 /* Apply policy to see if calculate cost of using this break point at break index
  * @param range range of two break points denoting current bucket
  * @param break_index the index of break point
  * @param break_point empty pointer to be filled
  * @return cost of current break point */
-double bucketing_fast_policy(bucketing_bucket_range* range, int break_index, bucketing_cursor_w_pos* break_point);
+double bucketing_fast_policy(bucketing_bucket_range* range, int break_index, bucketing_cursor_w_pos** break_point);
 
 #endif

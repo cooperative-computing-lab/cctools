@@ -13,6 +13,7 @@ SOURCES = \
 	auth_unix.c \
 	b64.c \
 	bitmap.c \
+	bucketing_fast.c \
 	buffer.c \
 	catalog_query.c \
 	category.c \
