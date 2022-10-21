@@ -368,8 +368,21 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 
 	timestamp_t open_time = timestamp_get();
 
-	switch (f->type) {
+	// search for workers with our file
+	char *id, *new_source;
+	struct vine_worker_info *peer;
+	HASH_TABLE_ITERATE(q->worker_table, id, peer){
+		if(hash_table_lookup(peer->current_files, f->cached_name))
+		{
+			debug(D_VINE, "Signaling this file to be requested from worker: %s:%d", peer->transfer_addr, peer->transfer_port);
+			debug(D_VINE, "Original source: %s", f->source);
+			new_source = string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+			f->source = new_source;
+			break;
+		}
+	}
 
+	switch (f->type) {
 	case VINE_BUFFER:
 		debug(D_VINE, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->length);
