@@ -16,7 +16,7 @@ doing the logging, so that various subsystems may be easily turned on and off.
 For example, the Chirp subsystem has many statements like this:
 
 <pre>
-debug(D_CHIRP,"reading file %s from host %s:d",filename,hostname,port);
+debug(D_CHIRP,"reading file %s from host %s:%d",filename,hostname,port);
 </pre>
 
 The <tt>main</tt> routine of a program is responsible for
