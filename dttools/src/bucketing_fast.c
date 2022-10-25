@@ -53,7 +53,6 @@ int bucketing_fast_update_buckets(bucketing_state* s)
     list_delete(s->sorted_buckets);
 
     struct list* break_point_list = bucketing_find_break_points(s);
-    printf("Done finding break points\n");
     bucketing_cursor_w_pos* tmp_break_point;
     bucketing_bucket* tmp_bucket;
 
@@ -70,12 +69,9 @@ int bucketing_fast_update_buckets(bucketing_state* s)
         list_push_tail(s->sorted_buckets, tmp_bucket);
     }
     
-    printf("Done pushing new buckets\n");
-    printf("Break point list length %u\n", list_length(break_point_list));
     list_clear(break_point_list, (void*) bucketing_cursor_w_pos_delete);
-    printf("Done dropping all points in break point list\n");
-    list_delete(break_point_list);
     free(tmp_point_ptr);
+    list_delete(break_point_list);
     return 0;
 }
 
@@ -101,7 +97,6 @@ struct list* bucketing_find_break_points(bucketing_state* s)
     do
     {
         list_get(lc, (void**) bbr_ptr);
-        printf("Checking bucket w range %d, %d\n", (*bbr_ptr)->lo->pos, (*bbr_ptr)->hi->pos);
         if (bucketing_fast_break_bucket(*bbr_ptr, break_point) == 0)
         {
             list_push_tail(break_point_list, *break_point);
@@ -129,13 +124,10 @@ struct list* bucketing_find_break_points(bucketing_state* s)
     free(bbr_ptr);
     free(break_point);
     
-    printf("Returning list of break points\n");
-    lc = list_cursor_create(break_point_list);
     bucketing_cursor_w_pos* tmp_cur_pos;
     list_first_item(break_point_list);
     while ((tmp_cur_pos = list_next_item(break_point_list)))
     {
-        printf("%d\n", tmp_cur_pos->pos);
     }
     return break_point_list;
 }
@@ -150,13 +142,9 @@ int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_
     double min_cost = -1;
     double cost;
     bucketing_cursor_w_pos** tmp_break_point = malloc(sizeof(*tmp_break_point));
-    printf("Enter loop to caculate all costs\n");
     for (int i = range->lo->pos; i <= range->hi->pos; ++i)
     {
-        printf("Computing cost\n");
-        printf("Address is %p\n", tmp_break_point);
         cost = bucketing_fast_policy(range, i, tmp_break_point);
-        printf("Cost is %lf\n", cost);
         if (min_cost == -1)
         {
             min_cost = cost;
@@ -175,7 +163,6 @@ int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_
     }
     
     free(tmp_break_point);
-    printf("break point position %d, hi range position %d\n", (*break_point)->pos, range->hi->pos);
     if ((*break_point)->pos == range->hi->pos)
         return 1;
     return 0;
@@ -183,7 +170,6 @@ int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_
 
 double bucketing_fast_policy(bucketing_bucket_range* range, int break_index, bucketing_cursor_w_pos** break_point)
 {
-    printf("Entering bucketing_fast_policy\n");
     int total_sig = 0;
     double p1 = 0;
     double p2 = 0;
@@ -193,11 +179,9 @@ double bucketing_fast_policy(bucketing_bucket_range* range, int break_index, buc
     double exp_cons_lq_break = 0;
     double exp_cons_g_break = 0;
     int break_val, max_val;
-    printf("Entering loop for policy cost\n");
     for (int i = range->lo->pos; i <= range->hi->pos; ++i, list_next(iter))
     {
         list_get(iter, (void**) tmp_point_ptr);
-        printf("just got the element from iter\n");
         total_sig += (*tmp_point_ptr)->sig;
         
         if (i == break_index)
@@ -232,9 +216,6 @@ double bucketing_fast_policy(bucketing_bucket_range* range, int break_index, buc
     double cost_upper_hit = p2*(p2*(max_val - exp_cons_g_break));
 
     double cost = cost_lower_hit + cost_lower_miss + cost_upper_miss + cost_upper_hit;
-    printf("break_point pos is %d\n", (*break_point)->pos);
-    printf("cost of policy before destroy is %lf\n", cost);
     list_cursor_destroy(iter);
-    printf("cost of policy after destroy is %lf\n", cost);
     return cost;
 }
