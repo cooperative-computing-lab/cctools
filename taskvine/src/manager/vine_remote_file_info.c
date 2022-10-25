@@ -13,6 +13,7 @@ struct vine_remote_file_info * vine_remote_file_info_create( vine_file_t type, i
 	rinfo->size = size;
 	rinfo->mtime = mtime;
 	rinfo->transfer_time = 0;
+	rinfo->in_cache = 0;
 	return rinfo;
 }
 

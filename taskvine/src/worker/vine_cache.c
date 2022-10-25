@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "vine_process.h"
 
 #include "vine_transfer.h"
+#include "vine_protocol.h"
 #include "xxmalloc.h"
 #include "hash_table.h"
 #include "debug.h"
@@ -238,7 +239,7 @@ Transfer a single input file from a worker url to a local file name.
 static int do_worker_transfer( struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message)
 {	
 	int port_num;
-	char addr[99], path[4096];
+	char addr[VINE_LINE_MAX], path[VINE_LINE_MAX];
 	int stoptime;	
 	struct link *worker_link;
 
