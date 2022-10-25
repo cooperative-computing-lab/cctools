@@ -7,7 +7,8 @@
 typedef enum
 {
     add = 0,
-    predict
+    predict,
+    null
 } bucketing_operation;
 
 /* Each point (e.g., a task) in a bucket is a pair of value 

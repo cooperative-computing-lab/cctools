@@ -7,9 +7,11 @@ void print_sorted_points(struct list* l)
     bucketing_point* tmp;
     list_first_item(l);
     printf("Printing sorted points\n");
+    int i = 0;
     while((tmp = list_next_item(l)))
     {
-        printf("%lf\n", tmp->val);
+        printf("pos: %d, value: %lf, sig: %lf\n", i, tmp->val, tmp->sig);
+        ++i;
     }
 }
 
@@ -31,18 +33,18 @@ int main()
     for (int i = 0; i < iters; ++i)
     {
         num = num * multiple % prime;
-        printf("iteration %d data value %d\n", i, num);
+        //printf("iteration %d data value %d\n", i, num);
         bucketing_add(num, i + 1, s);
-        printf("value added\n");
+        //printf("value added\n");
         print_sorted_points(s->sorted_points);
         if (i >= num_sampling_points - 1)
         {
-            printf("Finding buckets\n");
+            //printf("Finding buckets\n");
             bucketing_fast_update_buckets(s);
         }
-        printf("Predicting value %lf\n", bucketing_fast_predict(-1, s));
-        printf("Sorted list length %d\n", list_length(s->sorted_points));
-        printf("----------------------------------\n");
+        //printf("Predicting value %lf\n", bucketing_fast_predict(-1, s));
+        //printf("Sorted list length %d\n", list_length(s->sorted_points));
+        //printf("----------------------------------\n");
     }
     return 0;
 }

@@ -92,7 +92,7 @@ bucketing_state* bucketing_state_create(double default_value, int num_sampling_p
     s->sorted_buckets = list_create();
     s->num_points = 0;
     s->in_sampling_phase = 1;
-    s->prev_op = -1;
+    s->prev_op = null;
     s->default_value = default_value;
     s->num_sampling_points = num_sampling_points;
     s->increase_rate = increase_rate;
@@ -162,15 +162,19 @@ int bucketing_bucket_range_delete(bucketing_bucket_range* range)
 
 int bucketing_add(double val, double sig, bucketing_state* s)
 {
+    /* insert to sorted list and append to sequence list */
     bucketing_point *p = bucketing_point_create(val, sig);
     bucketing_insert_point_to_sorted_list(s->sorted_points, p);
     list_push_tail(s->sequence_points, p);
     
+    /* Change to predicting phase if appropriate */
     s->num_points++;
     if (s->num_points >= s->num_sampling_points)
     {
         s->in_sampling_phase = 0;
     }
+
+    /* set previous operation */
     s->prev_op = add;
     
     return 0;
