@@ -5,8 +5,9 @@
 #include "list.h"
 
 /** Begin: APIs **/
+
 /* Predict a value
- * @param prev_val previous value to consider, -1 if no previous value
+ * @param prev_val previous value to consider, -1 if no previous value, 
  * > 0 means a larger value is expected from prediction
  * @param s the relevant bucketing_state
  * @return the predicted value, -1 if failure */
@@ -21,11 +22,11 @@ int bucketing_fast_update_buckets(bucketing_state* s);
 /** End: APIs **/
 
 /** Begin: Internals **/
+
 /* Find all break points from a bucketing state
  * @param s bucketing state
- * @param break_point_list empty pointer to be filled w list
- * @return 0 if success
- * @return 1 if failure */
+ * @return pointer to a break point list if success
+ * @return null if failure */
 struct list* bucketing_find_break_points(bucketing_state* s);
 
 /* Compare position of two break points

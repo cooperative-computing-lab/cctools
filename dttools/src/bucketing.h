@@ -8,7 +8,7 @@ typedef enum
 {
     add = 0,
     predict,
-    null
+    null    //only used when initializing
 } bucketing_operation;
 
 /* Each point (e.g., a task) in a bucket is a pair of value 
@@ -78,12 +78,14 @@ typedef struct
     /** End: externally provided fields **/ 
 } bucketing_state;
 
+/* List cursor with its position in a list */
 typedef struct
 {
     struct list_cursor* lc;
     int pos;
 } bucketing_cursor_w_pos;
 
+/* Range defined by a low cursor and a high cursor pointing to a list */
 typedef struct
 {
     bucketing_cursor_w_pos* lo;
@@ -91,6 +93,7 @@ typedef struct
 } bucketing_bucket_range;
 
 /** Begin: APIs **/
+
 /* Create a bucketing point
  * @param val value of point
  * @param sig significance of point
@@ -138,9 +141,8 @@ int bucketing_state_delete(bucketing_state* s);
 /* Cursor but with position in list
  * @param lc pointer to list cursor
  * @param pos position of list cursor in a list
- * @param cursor_pos empty pointer
- * @return 0 if success
- * @return 1 if failure */
+ * @return pointer to bucketing_cursor_w_pos structure if success
+ * @return null if failure */
 bucketing_cursor_w_pos* bucketing_cursor_w_pos_create(struct list_cursor* lc, int pos);
 
 /* Delete a bucketing_cursor_w_pos structure
@@ -153,9 +155,8 @@ int bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos* cursor_pos);
  * @param lo low index
  * @param hi high index
  * @param l list that indices point to
- * @param range Empty pointer
- * @return 0 if success
- * @return 1 if failure */
+ * @return pointer to a bucketing range if success
+ * @return null if failure */
 bucketing_bucket_range* bucketing_bucket_range_create(int lo, int hi, struct list* l);
 
 /* Delete a bucketing_bucket_range
@@ -175,6 +176,19 @@ int bucketing_add(double val, double sig, bucketing_state* s);
 /** End: APIs **/
 
 /** Begin: internals **/
+
+/* Insert a bucketing point into a sorted list of points in O(log(n))
+ * @param l pointer to sorted list of points
+ * @param p pointer to point
+ * @return 0 if success
+ * @return 1 if failure */
+int bucketing_insert_point_to_sorted_list(struct list* li, bucketing_point *p);
+
+int bucketing_cursor_pos_list_clear(struct list* l, int (*f) (bucketing_cursor_w_pos*));
+
+int bucketing_bucket_range_list_clear(struct list* l, int(*f) (bucketing_bucket_range*));
+
+struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (bucketing_cursor_w_pos*, bucketing_cursor_w_pos*));
 
 /** End: internals **/
 

@@ -5,10 +5,12 @@
 #include "random.h"
 #include "list.h"
 
+//TODO: fix predict to check for prev_val
 double bucketing_fast_predict(double prev_val, bucketing_state* s)
 {
     /* if in sampling phase, just return default value */
     /* TODO: fix action when in sampling phase */
+    s->prev_op = predict;
     if (s->in_sampling_phase)
     {
         return s->default_value;
@@ -75,7 +77,7 @@ int bucketing_fast_update_buckets(bucketing_state* s)
     }
    
     /* Delete break point list */
-    list_clear(break_point_list, (void*) bucketing_cursor_w_pos_delete);
+    bucketing_cursor_pos_list_clear(break_point_list, bucketing_cursor_w_pos_delete);
     list_delete(break_point_list);
     return 0;
 }
@@ -105,10 +107,9 @@ struct list* bucketing_find_break_points(bucketing_state* s)
     do
     {
         list_get(lc, (void**) &bbr_ptr);
-        printf("Range (%d, %d)\n", bbr_ptr->lo->pos, bbr_ptr->hi->pos);
+        
         if (bucketing_fast_break_bucket(bbr_ptr, &break_point) == 0)
         {
-            printf("Break point chosen: %d\n", break_point->pos);
             list_push_tail(break_point_list, break_point);
             if (bbr_ptr->lo->pos != break_point->pos)
             {
@@ -121,7 +122,6 @@ struct list* bucketing_find_break_points(bucketing_state* s)
                 list_push_tail(bucket_range_list, hi_bucket_range);
             }
         }
-        printf("------------------\n");
     } while (list_next(lc));
 
     /* Push the highest point into the break point list */
@@ -129,10 +129,10 @@ struct list* bucketing_find_break_points(bucketing_state* s)
     list_push_tail(break_point_list, last_break_point);
 
     /* Sort in increasing order */
-    list_sort(break_point_list, (void*) compare_break_points);
+    break_point_list = bucketing_cursor_pos_list_sort(break_point_list, compare_break_points);
 
     /* Destroy bucket range list */
-    list_clear(bucket_range_list, (void*) bucketing_bucket_range_delete); 
+    bucketing_bucket_range_list_clear(bucket_range_list, bucketing_bucket_range_delete); 
     list_cursor_destroy(lc);
     list_free(bucket_range_list);
     
@@ -236,7 +236,7 @@ double bucketing_fast_policy(bucketing_bucket_range* range, int break_index, buc
 
     /* Compute final cost */
     double cost = cost_lower_hit + cost_lower_miss + cost_upper_miss + cost_upper_hit;
-    printf("break point %d with cost %lf\n", break_index, cost);    
+    
     list_cursor_destroy(iter);
 
     return cost;
