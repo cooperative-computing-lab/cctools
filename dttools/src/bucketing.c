@@ -178,20 +178,24 @@ int bucketing_insert_point_to_sorted_list(struct list* li, bucketing_point *p)
 int bucketing_cursor_pos_list_clear(struct list* l, int (*f) (bucketing_cursor_w_pos*))
 {
     bucketing_cursor_w_pos* tmp;
+    
     while ((tmp = list_pop_head(l)))
         f(tmp);
+    
     return 0;
 }
 
 int bucketing_bucket_range_list_clear(struct list* l, int(*f) (bucketing_bucket_range*))
 {
     bucketing_bucket_range* tmp;
+    
     while ((tmp = list_pop_head(l)))
         f(tmp);
+    
     return 0;
 }
 
-struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (bucketing_cursor_w_pos*, bucketing_cursor_w_pos*))
+struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (const void*, const void*))
 {
     unsigned int size = list_length(l);
     unsigned int i = 0;
@@ -199,23 +203,34 @@ struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (bucketing_
     struct list_cursor* lc = list_cursor_create(l);
     list_seek(lc, 0);
 
+    /* Save all elements to array */
     while (list_get(lc, (void**) &arr[i]))
     {
         ++i;
         list_next(lc);
     }
 
-    bucketing_cursor_pos_list_clear(l, bucketing_cursor_w_pos_delete);
-    list_cursor_destroy(lc);
+    /* Destroy the list but not its elements */
+    list_cursor_destroy(lc); 
     list_delete(l);
-
-    qsort(arr, size, sizeof(*arr), (void*) f);
+    
+    /* Qsort the array */
+    qsort(arr, size, sizeof(*arr), f);
 
     struct list* ret = list_create();
+    lc = list_cursor_create(ret);
+
+    /* Put back elements to a new list */
     for (i = 0; i < size; ++i)
         list_insert(lc, arr[i]);
-
+    
+    list_cursor_destroy(lc);
     free(arr);
 
     return ret;
+}
+
+int compare_break_points(const void* p1, const void* p2)
+{
+    return (*((bucketing_cursor_w_pos**) p1))->pos - (*((bucketing_cursor_w_pos**) p2))->pos;
 }

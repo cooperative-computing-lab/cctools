@@ -184,11 +184,33 @@ int bucketing_add(double val, double sig, bucketing_state* s);
  * @return 1 if failure */
 int bucketing_insert_point_to_sorted_list(struct list* li, bucketing_point *p);
 
+/* Free the list with the function used to free a bucketing_cursor_pos
+ * This does not destroy the list, only the elements inside
+ * @param l pointer to list to destroy
+ * @param f function to free bucketing_cursor_pos
+ * @return 0 if success
+ * @return 1 if failure */
 int bucketing_cursor_pos_list_clear(struct list* l, int (*f) (bucketing_cursor_w_pos*));
 
+/* Free the list with the function used to free a bucketing_bucket_range
+ * This does not destroy the list, only the elements inside
+ * @param l pointer to list to destroy
+ * @param f function to free bucketing_bucket_range
+ * @return 0 if success
+ * @return 1 if failure */
 int bucketing_bucket_range_list_clear(struct list* l, int(*f) (bucketing_bucket_range*));
 
-struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (bucketing_cursor_w_pos*, bucketing_cursor_w_pos*));
+/* Sort a list of bucketing_cursor_pos
+ * @param l the list to be sorted
+ * @param f the compare function
+ * @return pointer to a sorted list of bucketing_cursor_pos */
+struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (const void*, const void*));
+
+/* Compare position of two break points
+ * @param p1 first break point
+ * @param p2 second break point
+ * @return negative if p1 < p2, 0 if p1 == p2, positive if p1 > p2 */
+int compare_break_points(const void* p1, const void* p2);
 
 /** End: internals **/
 

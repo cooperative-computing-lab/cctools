@@ -17,10 +17,10 @@ double bucketing_fast_predict(double prev_val, bucketing_state* s)
     }
 
     struct list_cursor* lc = list_cursor_create(s->sorted_buckets); //cursor to iterate
-    list_seek(lc, 0);   //reset to 0
+    list_seek(lc, 0);               //reset to 0
     bucketing_bucket* bb_ptr = 0;   //pointer to hold item from list
-    double sum = 0; //sum of probability
-    double ret_val; //predicted value to be returned
+    double sum = 0;                 //sum of probability
+    double ret_val;                 //predicted value to be returned
     double rand = random_double();  //random double to choose a bucket
 
     /* Loop through list of buckets to choose 1 */
@@ -62,11 +62,11 @@ int bucketing_fast_update_buckets(bucketing_state* s)
     struct list* break_point_list = bucketing_find_break_points(s);
     
     bucketing_cursor_w_pos* tmp_break_point;    //pointer pointing to item in break point list
-    bucketing_bucket* tmp_bucket;   //pointer to a created bucket
-    bucketing_point* tmp_point_ptr = 0; //pointer to what tmp_break_point->lc points
-    int prev_pos = 0;   //previous position to find probability of buckets
-    list_first_item(break_point_list);  //reset to beginning of break point list
-
+    bucketing_bucket* tmp_bucket;               //pointer to a created bucket
+    bucketing_point* tmp_point_ptr = 0;         //pointer to what tmp_break_point->lc points
+    int prev_pos = 0;                           //previous position to find probability of buckets
+    list_first_item(break_point_list);          //reset to beginning of break point list
+    
     /* Loop through list of break points */
     while ((tmp_break_point = list_next_item(break_point_list)) != NULL)
     {
@@ -75,10 +75,11 @@ int bucketing_fast_update_buckets(bucketing_state* s)
         prev_pos = tmp_break_point->pos;
         list_push_tail(s->sorted_buckets, tmp_bucket);
     }
-   
+    
     /* Delete break point list */
     bucketing_cursor_pos_list_clear(break_point_list, bucketing_cursor_w_pos_delete);
     list_delete(break_point_list);
+    
     return 0;
 }
 
@@ -130,18 +131,13 @@ struct list* bucketing_find_break_points(bucketing_state* s)
 
     /* Sort in increasing order */
     break_point_list = bucketing_cursor_pos_list_sort(break_point_list, compare_break_points);
-
+    
     /* Destroy bucket range list */
-    bucketing_bucket_range_list_clear(bucket_range_list, bucketing_bucket_range_delete); 
     list_cursor_destroy(lc);
-    list_free(bucket_range_list);
+    bucketing_bucket_range_list_clear(bucket_range_list, bucketing_bucket_range_delete); 
+    list_delete(bucket_range_list);
     
     return break_point_list;
-}
-
-int compare_break_points(bucketing_cursor_w_pos* p1, bucketing_cursor_w_pos* p2)
-{
-    return p1->pos - p2->pos;
 }
 
 int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_w_pos** break_point)

@@ -29,12 +29,6 @@ int bucketing_fast_update_buckets(bucketing_state* s);
  * @return null if failure */
 struct list* bucketing_find_break_points(bucketing_state* s);
 
-/* Compare position of two break points
- * @param p1 first break point
- * @param p2 second break point
- * @return negative if p1 < p2, 0 if p1 == p2, positive if p1 > p2 */
-int compare_break_points(bucketing_cursor_w_pos* p1, bucketing_cursor_w_pos* p2);
-
 /* Break a bucket into 2 buckets if possible
  * @param range range of to-be-broken bucket
  * @param break_point empty pointer
