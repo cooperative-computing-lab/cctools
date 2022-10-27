@@ -60,7 +60,8 @@ int bucketing_state_delete(bucketing_state* s)
 {
     list_free(s->sorted_points);
     list_delete(s->sorted_points);
-    list_free(s->sequence_points);
+    /* pointers already free'd as sorted_points and sequence_points
+     * share the same set of pointers */
     list_delete(s->sequence_points);
     list_free(s->sorted_buckets);
     list_delete(s->sorted_buckets);
@@ -136,12 +137,12 @@ int bucketing_add(double val, double sig, bucketing_state* s)
     return 0;
 }
 
-int bucketing_insert_point_to_sorted_list(struct list* li, bucketing_point *p)
+int bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point *p)
 {
-    struct list_cursor* lc = list_cursor_create(li);
+    struct list_cursor* lc = list_cursor_create(l);
     
     /* If list is empty, append new point to list */
-    if (list_length(li) == 0)
+    if (list_length(l) == 0)
     {
         list_insert(lc, p);
         list_cursor_destroy(lc);
@@ -150,12 +151,12 @@ int bucketing_insert_point_to_sorted_list(struct list* li, bucketing_point *p)
 
     /* Linear insert a data point */
     list_seek(lc, 0);
-    bucketing_point** bpp = malloc(sizeof(*bpp));
+    bucketing_point* bpp = 0;
     int inserted = 0;
     do
     {
-        list_get(lc, (void**) bpp);
-        if ((*bpp)->val >= p->val)
+        list_get(lc, (void**) &bpp);
+        if (bpp->val >= p->val)
         {
             list_insert(lc, p);
             inserted = 1;
@@ -171,7 +172,6 @@ int bucketing_insert_point_to_sorted_list(struct list* li, bucketing_point *p)
     }
 
     list_cursor_destroy(lc);
-    free(bpp);
     return 0;
 }
 

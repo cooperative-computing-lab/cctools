@@ -72,8 +72,8 @@ int bucketing_fast_update_buckets(bucketing_state* s)
     {
         list_get(tmp_break_point->lc, (void**) &tmp_point_ptr);
         tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, (tmp_break_point->pos - prev_pos + 1)/list_length(s->sorted_points));
-        prev_pos = tmp_break_point->pos;
         list_push_tail(s->sorted_buckets, tmp_bucket);
+        prev_pos = tmp_break_point->pos;
     }
     
     /* Delete break point list */
@@ -98,7 +98,7 @@ struct list* bucketing_find_break_points(bucketing_state* s)
 
     bucketing_bucket_range* lo_bucket_range;    //create low bucket, if possible
     bucketing_bucket_range* hi_bucket_range;    //create high bucket, if possible
-    bucketing_cursor_w_pos* break_point = 0;    //store break point of high and low buckets
+    bucketing_cursor_w_pos* break_point = 0;    //store break point betweem high and low buckets
     bucketing_bucket_range* bbr_ptr = 0;        //pointer to a bucket in bucket_range_list
     
     struct list_cursor* lc = list_cursor_create(bucket_range_list);
@@ -167,9 +167,12 @@ int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_
         }
     }
     
-    /* If chosen break point is the highest point, don't do anything as it is included already */
+    /* If chosen break point is the highest point, delete the break point as it is included already */
     if ((*break_point)->pos == range->hi->pos)
+    {
+        bucketing_cursor_w_pos_delete(*break_point); 
         return 1;
+    }
     return 0;
 }
 

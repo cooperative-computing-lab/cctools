@@ -15,6 +15,19 @@ void print_sorted_points(struct list* l)
     }
 }
 
+void print_sorted_buckets(struct list* l)
+{
+    bucketing_bucket *tmp;
+    list_first_item(l);
+    printf("Printing sorted buckets\n");
+    int i = 0;
+    while((tmp = list_next_item(l)))
+    {
+        printf("bucket pos: %d, value: %lf, prob: %lf\n", i, tmp->val, tmp->prob);
+        ++i;
+    }
+}
+
 int main()
 {
     double default_value = 1000;
@@ -41,6 +54,7 @@ int main()
         {
             printf("Finding buckets\n");
             bucketing_fast_update_buckets(s);
+            print_sorted_buckets(s->sorted_buckets);
         }
         printf("Predicting value %lf\n", bucketing_fast_predict(-1, s));
         printf("Sorted list length %d\n", list_length(s->sorted_points));

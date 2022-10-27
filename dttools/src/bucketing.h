@@ -40,15 +40,17 @@ typedef struct
 typedef struct
 {
     /** Begin: internally maintained fields **/
-    /* a doubly linked list of points of type 'bucketing_point'
-     * sorted by 'point->val' in increasing order */
+    /* a doubly linked list of pointers to points of type 'bucketing_point'
+     * sorted by 'point->val' in increasing order
+     * sorted_points and sequence_points share the same set of pointers */
     struct list *sorted_points;
 
-    /* a doubly linked list of points of type 'bucketing_point'
-     * sorted by 'point->sig' in increasing order */
+    /* a doubly linked list of pointers to points of type 'bucketing_point'
+     * sorted by 'point->sig' in increasing order
+     * sequence_points and sorted_points share the same set of pointers */
     struct list *sequence_points;
     
-    /* a doubly linked list of buckets of type 'bucketing_bucket'
+    /* a doubly linked list of pointers to buckets of type 'bucketing_bucket'
      * sorted by 'bucket->val' in increasing order */
     struct list *sorted_buckets;
     
