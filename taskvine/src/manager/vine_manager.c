@@ -302,6 +302,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 		if(remote_info) {
 			remote_info->size = size;
 			remote_info->transfer_time = transfer_time;
+			remote_info->in_cache = true;
 		}
 	}
 

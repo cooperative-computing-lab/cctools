@@ -368,20 +368,6 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 
 	timestamp_t open_time = timestamp_get();
 
-	// search for workers with our file
-	char *id, *new_source;
-	struct vine_worker_info *peer;
-	HASH_TABLE_ITERATE(q->worker_table, id, peer){
-		if(hash_table_lookup(peer->current_files, f->cached_name))
-		{
-			debug(D_VINE, "Signaling this file to be requested from worker: %s:%d", peer->transfer_addr, peer->transfer_port);
-			debug(D_VINE, "Original source: %s", f->source);
-			new_source = string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
-			f->source = new_source;
-			break;
-		}
-	}
-
 	switch (f->type) {
 	case VINE_BUFFER:
 		debug(D_VINE, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
@@ -464,6 +450,25 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	return result;
 }
 
+static char *vine_manager_can_worker_transfer( struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
+{
+		char *id;
+		struct vine_worker_info *peer;
+		struct vine_remote_file_info *remote_info;
+
+		HASH_TABLE_ITERATE(q->worker_table, id, peer){
+			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)))
+			{
+				if(remote_info->in_cache)
+				{
+					debug(D_VINE, "This file is to be requested from worker: %s:%d", peer->transfer_addr, peer->transfer_port);
+					return string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+				}
+			}
+		}
+		return NULL;
+}
+
 /* Send all input files needed by a task to the given worker. */
 
 vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t )
@@ -496,7 +501,17 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 	// If any one fails to be sent, return failure.
 	if(t->input_files) {
 		LIST_ITERATE(t->input_files,f) {
-			vine_result_code_t result = vine_manager_put_input_file(q,w,t,f);
+			vine_result_code_t result;
+			char *peer_source;
+			if((peer_source = vine_manager_can_worker_transfer(q, w, f))) { 
+				struct vine_file worker_file = *f;
+				worker_file.source = peer_source;
+				result = vine_manager_put_input_file(q, w, t, &worker_file);
+				free(peer_source);
+			} else {
+				result = vine_manager_put_input_file(q,w,t,f);
+			}
+			
 			if(result != VINE_SUCCESS) {
 				return result;
 			}
