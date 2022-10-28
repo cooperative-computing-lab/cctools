@@ -89,11 +89,11 @@ to execute, and returns results back to the manager. The manager receives result
 they complete, and may submit further tasks as needed. Commonly used files are cached
 at each worker to speed up execution.
 
-Tasks come in two types:
+Tasks come in three types:
 
 - A **standard task** is a single Unix command line to execute, along with its needed input files.  Upon completion, it will produce one or more output files to be returned to the manager.
 - A **PythonTask** is a single Python function to execute, along with its needed arguments.  Upon completion, it will produce a Python value (or an exception) as a result to return to the master.
-- A **RemoteTask** is used to invoke serverless functions running on a worker. It consists of the name of the function to execute as well as the required arguments. Upon completion, it will produce a Python value (or an exception) as a result to return to the master.
+- A **RemoteTask** is used to invoke serverless functions by name. Upon completion, it will produce a json response which will be returned to the manager.
 
 All types of tasks share a common set of options.  Each task can be labelled with the **resources**
 (CPU cores, GPU devices, memory, disk space) that it needs to execute.  This allows each worker to pack the appropriate
@@ -1669,19 +1669,24 @@ to make a progress bar or other user-visible information:
     ```
 
 ### Managing Remote Tasks
-A `RemoteTask` is a specialized form of task only running on workers with serverless coprocesses.
+A `RemoteTask` is a specialized form of task ran on workers with serverless coprocesses.
 To start a worker with a serverless coprocess, refer to the next section about running workers.
 
-Defining a `RemoteTask` involves specifying the name of the function to execute, 
-as well as the name of the coprocess the function exists on.
+Defining a `RemoteTask` involves specifying the name of the python function to execute, 
+as well as the name of the coprocess that contains that function.
 
+coprocess.py
 === "Python"
     ```python
     # this function is running on a worker's serverless coprocess
     # the coprocess has the name "sum_coprocess"
     def my_sum(x, y):
         return x+y
+    ```
 
+manager.py
+=== "Python"
+    ```python
     # task to execute x = my_sum(1, 2)
     t = wq.RemoteTask("my_sum", "sum_coprocess", 1, 2)
     ```
@@ -1717,11 +1722,10 @@ Fork execution will have the coprocess fork a child process to execute the funct
     t.specify_exec_method("thread")
     # fork a child process to execute the function
     t.specify_exec_method("fork")
-   
     ```
 
-A RemoteTask is executed on the worker as other tasks are,
-except that its output `t.output` is a json encoded string. 
+Once a RemoteTask is executed on the worker's coprocess,
+the output it returns (`t.output`) is a json encoded string. 
 `json.loads(t.output)` contains two keys: `Result` and `StatusCode`.
 `Result` will contain the result of the function, or the text of an exception if one occurs.
 `StatusCode` will have the value 200 if the function executes successfully, and 500 otherwise.
@@ -1747,6 +1751,7 @@ all apply to `RemoteTask` as well.
 
 The only difference is that `RemoteTask` tasks will only consume
 worker resources allocated for its serverless coprocess, and not regular resources.
+They also can not run on workers without the prerequisite coprocess.
 
 ### Creating workers with serverless coprocesses
 
