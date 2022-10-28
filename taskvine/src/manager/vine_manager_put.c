@@ -504,10 +504,11 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 			vine_result_code_t result;
 			char *peer_source;
 			if((peer_source = vine_manager_can_worker_transfer(q, w, f))) { 
-				struct vine_file worker_file = *f;
-				worker_file.source = peer_source;
-				result = vine_manager_put_input_file(q, w, t, &worker_file);
+				struct vine_file *worker_file = vine_file_clone(f);
+				worker_file->source = peer_source;
+				result = vine_manager_put_input_file(q, w, t, worker_file);
 				free(peer_source);
+				vine_file_delete(worker_file);
 			} else {
 				result = vine_manager_put_input_file(q,w,t,f);
 			}

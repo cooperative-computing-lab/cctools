@@ -258,8 +258,11 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 	if(!vine_transfer_get_any(worker_link, c, path, time(0) + 120))
 	{
 		*error_message = string_format("Could not transfer file %s from worker %s:%d", path, addr, port_num);
+		link_close(worker_link);
 		return 0;
 	}
+
+	link_close(worker_link);
 
 	// rename file to our expected cache name
 	char *received_filename = string_format("%s/%s", c->cache_dir, path);
