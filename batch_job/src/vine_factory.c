@@ -77,6 +77,7 @@ static int tasks_per_worker = -1;
 static int autosize = 0;
 static int worker_timeout = 300;
 static int consider_capacity = 0;
+static int debug_workers = 0;
 
 static char *project_regex = 0;
 static char *submission_regex = 0;
@@ -103,6 +104,9 @@ static char *wrapper_command = 0;
 struct list *wrapper_inputs = 0;
 
 static char *worker_command = 0;
+
+/* Unique number assigned to each worker instance for troubleshooting. */
+static int worker_instance = 0;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -389,31 +393,40 @@ static void set_worker_resources_options( struct batch_queue *queue )
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
-	char *worker;
 
-	worker = string_format("./%s", worker_command);
+	char *worker_log_file = 0;
+	char *debug_worker_options = 0;
+	
+	if(debug_workers) {
+		worker_instance++;
+		worker_log_file = string_format("worker.%d.log",worker_instance);
+		debug_worker_options = string_format("-d all -o %s",worker_log_file);
+	}
+	
+	char *worker = string_format("./%s", worker_command);
 	if(using_catalog) {
 		cmd = string_format(
-		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s %s",
+		"%s -M %s -t %d -C '%s' %s %s %s %s %s %s",
 		worker,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
+		debug_workers ? debug_worker_options : "",
 		factory_name ? string_format("--from-factory \"%s\"", factory_name) : "",
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
 		extra_worker_args ? extra_worker_args : ""
 		);
-	}
-	else {
+	} else {
 		cmd = string_format(
-		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s %s",
+		"%s %s %d -t %d -C '%s' %s %s %s %s %s",
 		worker,
 		manager_host,
 		manager_port,
 		worker_timeout,
 		catalog_host,
+		debug_workers ? debug_worker_options : "",
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
@@ -448,8 +461,10 @@ static int submit_worker( struct batch_queue *queue )
 
 	debug(D_WQ,"submitting worker: %s",cmd);
 
-	int status = batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
+	int status = batch_job_submit(queue,cmd,files,worker_log_file,batch_env,resources);
 
+	free(worker_log_file);
+	free(debug_worker_options);
 	free(cmd);
 	free(files);
 	free(worker);
@@ -1090,6 +1105,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Use this scratch dir for factory.\n","-S,--scratch-dir");
 	printf(" %-30s (default: /tmp/vine-factory-$uid).\n","");
 	printf(" %-30s Exit if parent process dies.\n", "--parent-death");
+	printf(" %-30s Enable debug log for each remote worker in scratch dir.\n","--debug-workers");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
 	printf(" %-30s Specify the size of the debug file.\n", "-O,--debug-file-size=<mb>");
@@ -1155,8 +1171,9 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_PARENT_DEATH,
 		LONG_OPT_PYTHON_PACKAGE,
 		LONG_OPT_USE_SSL,
-		LONG_OPT_FACTORY_NAME
-	};
+		LONG_OPT_FACTORY_NAME,
+		LONG_OPT_DEBUG_WORKERS,
+};
 
 static const struct option long_options[] = {
 	{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
@@ -1171,6 +1188,7 @@ static const struct option long_options[] = {
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
 	{"debug-file-size", required_argument, 0, 'O'},
+	{"debug-workers", no_argument, 0, LONG_OPT_DEBUG_WORKERS },
 	{"disk",   required_argument,  0,  LONG_OPT_DISK},
 	{"env", required_argument, 0, LONG_OPT_ENVIRONMENT_VARIABLE},
 	{"extra-options", required_argument, 0, 'E'},
@@ -1359,6 +1377,9 @@ int main(int argc, char *argv[])
 			case 'O':
 				debug_config_file_size(string_metric_parse(optarg));
 				break;
+			case LONG_OPT_DEBUG_WORKERS:
+				debug_workers = 1;
+				break;
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				exit(EXIT_SUCCESS);
@@ -1462,7 +1483,7 @@ int main(int argc, char *argv[])
 		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
 			scratch_parent_dir = system_tmp_dir(NULL);
 		}
-		scratch_dir = string_format("%s/wq-factory-%d", scratch_parent_dir, getuid());
+		scratch_dir = string_format("%s/vine-factory-%d", scratch_parent_dir, getuid());
 	}
 
 	if(!create_dir(scratch_dir,0777)) {
