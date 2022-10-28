@@ -1790,10 +1790,10 @@ to start a worker with a serverless coprocess function, add the argument
 ``` 
 
 This will cause the worker to spawn an instance of the serverless coprocess at startup.
-The worker will then be able to recieve and execute serverless functions
+The worker will then be able to receive and execute serverless functions
 if the name of its coprocess matches what was specified on the task.
 
-Several options exists when starting workers with coprocesses.
+Several options exist when starting workers with coprocesses.
 One is that workers can start an arbitrary number of coprocesses.
 For example, running the following command will have a worker start 4 instances of a coprocess.
 
@@ -1801,7 +1801,7 @@ For example, running the following command will have a worker start 4 instances 
 --coprocess coprocess.py --num_coprocesses 4
 ``` 
 
-Each coprocess can independantly recieve and execute a `RemoteTask`, provided the worker has resources to do so.
+Each coprocess can independently receive and execute a `RemoteTask`, provided the worker has resources to do so.
 
 The resources allocated to coprocesses on the worker can be specified as such.
 
@@ -1810,7 +1810,7 @@ The resources allocated to coprocesses on the worker can be specified as such.
 ``` 
 
 Each coprocess will be given an equal share of the total number of coprocess resources allocated.
-For example, with 4 coprocesses and 4 coprocess cores, each coprocess will recieve 1 core.
+For example, with 4 coprocesses and 4 coprocess cores, each coprocess will receive 1 core.
 These allocations are automatically monitored and offending coprocesses are terminated.
 
 
