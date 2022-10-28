@@ -261,7 +261,7 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 		return 0;
 	}
 
-	// rename file to our expected cache name (probably not the best way to do this)
+	// rename file to our expected cache name
 	char *received_filename = string_format("%s/%s", c->cache_dir, path);
 	rename(received_filename, cache_path);
 	free(received_filename);
