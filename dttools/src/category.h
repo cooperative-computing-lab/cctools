@@ -22,7 +22,9 @@ typedef enum {
 	CATEGORY_ALLOCATION_FIRST = 0,       /**< No automatic allocation, or using first step value of the two-step policy. */
 	CATEGORY_ALLOCATION_AUTO  = 0,       /**< Same as FIRST, FIRST is deprecated */
 	CATEGORY_ALLOCATION_MAX,             /**< Using max of category. (2nd step of two-step policy) */
-	CATEGORY_ALLOCATION_ERROR            /**< No valid resources could be found. (E.g., after 2nd step fails) */
+	CATEGORY_ALLOCATION_ERROR,            /**< No valid resources could be found. (E.g., after 2nd step fails) */
+    CATEGORY_ALLOCATION_MODE_FAST_BUCKETING,
+    CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING
 } category_allocation_t;
 
 
