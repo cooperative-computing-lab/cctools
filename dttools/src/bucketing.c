@@ -1,23 +1,29 @@
 #include <stdlib.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include "bucketing.h"
 #include "list.h"
+#include "random.h"
+
+//TODO: integrate debug in all bucketing files
 
 bucketing_point* bucketing_point_create(double val, double sig)
 {
     bucketing_point* p = malloc(sizeof(*p));
     
-    if (p == NULL)
+    if (p == NULL) 
         return p;
+    
 
     p->val = val;
     p->sig = sig;
     return p;
 }
 
-int bucketing_point_delete(bucketing_point *p)
+void bucketing_point_delete(bucketing_point *p)
 {
     free(p);
-    return 0;
 }
 
 bucketing_bucket* bucketing_bucket_create(double val, double prob)
@@ -32,16 +38,18 @@ bucketing_bucket* bucketing_bucket_create(double val, double prob)
     return b;
 }
 
-int bucketing_bucket_delete(bucketing_bucket* b)
+void bucketing_bucket_delete(bucketing_bucket* b)
 {
     free(b);
-    return 0;
 }
 
 bucketing_state* bucketing_state_create(double default_value, int num_sampling_points,
-    double increase_rate)
+    double increase_rate, int max_num_buckets)
 {
     bucketing_state* s = malloc(sizeof(*s));
+
+    if (s == NULL)
+        return s;
 
     s->sorted_points = list_create();
     s->sequence_points = list_create();
@@ -52,11 +60,12 @@ bucketing_state* bucketing_state_create(double default_value, int num_sampling_p
     s->default_value = default_value;
     s->num_sampling_points = num_sampling_points;
     s->increase_rate = increase_rate;
+    s->max_num_buckets = max_num_buckets;
 
     return s;
 }
 
-int bucketing_state_delete(bucketing_state* s)
+void bucketing_state_delete(bucketing_state* s)
 {
     list_free(s->sorted_points);
     list_delete(s->sorted_points);
@@ -66,8 +75,6 @@ int bucketing_state_delete(bucketing_state* s)
     list_free(s->sorted_buckets);
     list_delete(s->sorted_buckets);
     free(s);
-
-    return 0;
 }
 
 bucketing_cursor_w_pos* bucketing_cursor_w_pos_create(struct list_cursor* lc, int pos)
@@ -83,11 +90,10 @@ bucketing_cursor_w_pos* bucketing_cursor_w_pos_create(struct list_cursor* lc, in
     return cursor_pos;
 }
 
-int bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos* cursor_pos)
+void bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos* cursor_pos)
 {
     list_cursor_destroy(cursor_pos->lc);
     free(cursor_pos);
-    return 0;
 }
 
 bucketing_bucket_range* bucketing_bucket_range_create(int lo, int hi, struct list* l)
@@ -98,23 +104,24 @@ bucketing_bucket_range* bucketing_bucket_range_create(int lo, int hi, struct lis
         return range;
     
     struct list_cursor* cursor_lo = list_cursor_create(l);
-    list_seek(cursor_lo, lo);
+    if (!list_seek(cursor_lo, lo))
+        return NULL;
     bucketing_cursor_w_pos* cursor_pos_lo = bucketing_cursor_w_pos_create(cursor_lo, lo);
     range->lo = cursor_pos_lo;
     
     struct list_cursor* cursor_hi = list_cursor_create(l);
-    list_seek(cursor_hi, hi);
+    if (!list_seek(cursor_hi, hi))
+        return NULL;
     bucketing_cursor_w_pos* cursor_pos_hi = bucketing_cursor_w_pos_create(cursor_hi, hi);
     range->hi = cursor_pos_hi;
     return range;
 }
 
-int bucketing_bucket_range_delete(bucketing_bucket_range* range)
+void bucketing_bucket_range_delete(bucketing_bucket_range* range)
 {
     bucketing_cursor_w_pos_delete(range->lo);
     bucketing_cursor_w_pos_delete(range->hi);
     free(range);
-    return 0;
 }
 
 int bucketing_add(double val, double sig, bucketing_state* s)
@@ -135,6 +142,63 @@ int bucketing_add(double val, double sig, bucketing_state* s)
     s->prev_op = add;
     
     return 0;
+}
+
+double bucketing_predict(double prev_val, bucketing_state* s)
+{
+    /* in sampling phase */
+    s->prev_op = predict;
+    if (s->in_sampling_phase)
+    {
+        /* if new, return default value */
+        if (prev_val == -1)
+            return s->default_value;
+        /* otherwise increase to exponent level */
+        else
+        {
+            int exp = floor(log(prev_val/s->default_value)/log(s->increase_rate)) + 1;
+            return s->default_value * pow(s->increase_rate, exp);
+        } 
+    }
+
+    struct list_cursor* lc = list_cursor_create(s->sorted_buckets); //cursor to iterate
+    list_seek(lc, 0);               //reset to 0
+    bucketing_bucket* bb_ptr = 0;   //pointer to hold item from list
+    double sum = 0;                 //sum of probability
+    double ret_val;                 //predicted value to be returned
+    int exp;                        //exponent to raise if prev_val > max_val
+    double rand = random_double();  //random double to choose a bucket
+
+    /* Loop through list of buckets to choose 1 */
+    for (unsigned int i = 0; i < list_length(s->sorted_buckets); ++i, list_next(lc))
+    {
+        list_get(lc, (void**) &bb_ptr);
+
+        /* return if at last bucket */
+        if (i == list_length(s->sorted_buckets) - 1)
+        {
+            ret_val = bb_ptr->val;
+            if (ret_val <= prev_val)
+            {
+                exp = floor(log(prev_val/s->default_value)/log(s->increase_rate)) + 1;
+                list_cursor_destroy(lc);
+                return s->default_value * pow(s->increase_rate, exp);   
+            }
+            list_cursor_destroy(lc);
+            return ret_val;
+        }
+
+        sum += bb_ptr->prob;
+
+        if (sum > rand)
+        {
+            ret_val = bb_ptr->val;
+            list_cursor_destroy(lc);
+            return ret_val;
+        }
+    }
+
+    return -1;  //control should never reach here
 }
 
 int bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point *p)
@@ -175,7 +239,7 @@ int bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point *p)
     return 0;
 }
 
-int bucketing_cursor_pos_list_clear(struct list* l, int (*f) (bucketing_cursor_w_pos*))
+int bucketing_cursor_pos_list_clear(struct list* l, void (*f) (bucketing_cursor_w_pos*))
 {
     bucketing_cursor_w_pos* tmp;
     
@@ -185,7 +249,7 @@ int bucketing_cursor_pos_list_clear(struct list* l, int (*f) (bucketing_cursor_w
     return 0;
 }
 
-int bucketing_bucket_range_list_clear(struct list* l, int(*f) (bucketing_bucket_range*))
+int bucketing_bucket_range_list_clear(struct list* l, void (*f) (bucketing_bucket_range*))
 {
     bucketing_bucket_range* tmp;
     

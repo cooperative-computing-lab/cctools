@@ -6,13 +6,6 @@
 
 /** Begin: APIs **/
 
-/* Predict a value
- * @param prev_val previous value to consider, -1 if no previous value, 
- * > 0 means a larger value is expected from prediction
- * @param s the relevant bucketing_state
- * @return the predicted value, -1 if failure */
-double bucketing_fast_predict(double prev_val, bucketing_state* s);
-
 /* Calculate the buckets from a bucketing state
  * @param the relevant bucketing state
  * @return 0 if success
@@ -42,5 +35,7 @@ int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_
  * @param break_point empty pointer to be filled
  * @return cost of current break point */
 double bucketing_fast_policy(bucketing_bucket_range* range, int break_index, bucketing_cursor_w_pos** break_point);
+
+/** End: Internals **/
 
 #endif

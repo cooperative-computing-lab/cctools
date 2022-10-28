@@ -1,53 +1,7 @@
-#include <stdbool.h>
-#include <stdio.h>
+#include <stdlib.h>
 #include "bucketing_fast.h"
 #include "bucketing.h"
-#include "random.h"
 #include "list.h"
-
-//TODO: fix predict to check for prev_val
-double bucketing_fast_predict(double prev_val, bucketing_state* s)
-{
-    /* if in sampling phase, just return default value */
-    /* TODO: fix action when in sampling phase */
-    s->prev_op = predict;
-    if (s->in_sampling_phase)
-    {
-        return s->default_value;
-    }
-
-    struct list_cursor* lc = list_cursor_create(s->sorted_buckets); //cursor to iterate
-    list_seek(lc, 0);               //reset to 0
-    bucketing_bucket* bb_ptr = 0;   //pointer to hold item from list
-    double sum = 0;                 //sum of probability
-    double ret_val;                 //predicted value to be returned
-    double rand = random_double();  //random double to choose a bucket
-
-    /* Loop through list of buckets to choose 1 */
-    for (unsigned int i = 0; i < list_length(s->sorted_buckets); ++i, list_next(lc))
-    {    
-        list_get(lc, (void**) &bb_ptr);
-       
-        /* return if at last bucket */
-        if (i == list_length(s->sorted_buckets) - 1)
-        {
-            ret_val = bb_ptr->val;
-            list_cursor_destroy(lc);
-            return ret_val;
-        }
-        
-        sum += bb_ptr->prob;
-        
-        if (sum > rand)
-        {
-            ret_val = bb_ptr->val;
-            list_cursor_destroy(lc);
-            return ret_val;
-        }
-    }
-
-    return -1;  //control should never reach here
-}
 
 int bucketing_fast_update_buckets(bucketing_state* s)
 {
@@ -71,7 +25,7 @@ int bucketing_fast_update_buckets(bucketing_state* s)
     while ((tmp_break_point = list_next_item(break_point_list)) != NULL)
     {
         list_get(tmp_break_point->lc, (void**) &tmp_point_ptr);
-        tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, (tmp_break_point->pos - prev_pos + 1)/list_length(s->sorted_points));
+        tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, 1.0*(tmp_break_point->pos - prev_pos + 1)/list_length(s->sorted_points));
         list_push_tail(s->sorted_buckets, tmp_bucket);
         prev_pos = tmp_break_point->pos;
     }
@@ -109,19 +63,34 @@ struct list* bucketing_find_break_points(bucketing_state* s)
     {
         list_get(lc, (void**) &bbr_ptr);
         
+        /* If bucket is breakable */
         if (bucketing_fast_break_bucket(bbr_ptr, &break_point) == 0)
         {
             list_push_tail(break_point_list, break_point);
-            if (bbr_ptr->lo->pos != break_point->pos)
+
+            /* cannot spawn low bucket */
+            if (break_point->pos == bbr_ptr->lo->pos)
             {
+                /* cannot spawn high bucket */ 
+                if (break_point->pos + 1 == bbr_ptr->hi->pos)
+                    continue;
+                else
+                {
+                    hi_bucket_range = bucketing_bucket_range_create(break_point->pos + 1, bbr_ptr->hi->pos, s->sorted_points);
+                    list_push_tail(bucket_range_list, hi_bucket_range);   
+                }
+            }
+            else
+            {
+                /* cannot spawn high bucket */
+                if (break_point->pos + 1 != bbr_ptr->hi->pos)
+                {
+                    hi_bucket_range = bucketing_bucket_range_create(break_point->pos + 1, bbr_ptr->hi->pos, s->sorted_points);
+                    list_push_tail(bucket_range_list, hi_bucket_range);
+                }
                 lo_bucket_range = bucketing_bucket_range_create(bbr_ptr->lo->pos, break_point->pos, s->sorted_points);
                 list_push_tail(bucket_range_list, lo_bucket_range);
-            }
-            if (break_point->pos + 1 != bbr_ptr->hi->pos)
-            {
-                hi_bucket_range = bucketing_bucket_range_create(break_point->pos + 1, bbr_ptr->hi->pos, s->sorted_points);
-                list_push_tail(bucket_range_list, hi_bucket_range);
-            }
+            } 
         }
     } while (list_next(lc));
 
