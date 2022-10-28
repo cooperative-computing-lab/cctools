@@ -93,8 +93,9 @@ Tasks come in two types:
 
 - A **standard task** is a single Unix command line to execute, along with its needed input files.  Upon completion, it will produce one or more output files to be returned to the manager.
 - A **PythonTask** is a single Python function to execute, along with its needed arguments.  Upon completion, it will produce a Python value (or an exception) as a result to return to the master.
+- A **RemoteTask** is used to invoke serverless functions running on a worker. It consists of the name of the function to execute as well as the required arguments. Upon completion, it will produce a Python value (or an exception) as a result to return to the master.
 
-Both types of tasks share a common set of options.  Each task can be labelled with the **resources**
+All types of tasks share a common set of options.  Each task can be labelled with the **resources**
 (CPU cores, GPU devices, memory, disk space) that it needs to execute.  This allows each worker to pack the appropriate
 number of tasks.  For example, a worker running on a 64-core machine could run 32 dual-core tasks, 16 four-core tasks,
 or any other combination that adds up to 64 cores.  If you don't know the resources needed, you can enable
@@ -1666,6 +1667,152 @@ to make a progress bar or other user-visible information:
     work_queue_get_stats(q, &stats);
     printf("%d\n", stats->workers_connected);
     ```
+
+### Managing Remote Tasks
+A `RemoteTask` is a specialized form of task only running on workers with serverless coprocesses.
+To start a worker with a serverless coprocess, refer to the next section about running workers.
+
+Defining a `RemoteTask` involves specifying the name of the function to execute, 
+as well as the name of the coprocess the function exists on.
+
+=== "Python"
+    ```python
+    # this function is running on a worker's serverless coprocess
+    # the coprocess has the name "sum_coprocess"
+    def my_sum(x, y):
+        return x+y
+
+    # task to execute x = my_sum(1, 2)
+    t = wq.RemoteTask("my_sum", "sum_coprocess", 1, 2)
+    ```
+
+There are many ways to specify function arguments for a RemoteTask
+=== "Python"
+    ```python
+    # task to execute x = my_sum(1, 2)
+
+    # one way is by using purely positional arguments
+    t = wq.RemoteTask("my_sum", "sum_coprocess", 1, 2)
+
+    # keyword arguments are also accepted
+    t = wq.RemoteTask("my_sum", "sum_coprocess", x=1, y=2)
+
+    # arguments can be passed in as a dictionary
+    t = wq.RemoteTask("my_sum", "sum_coprocess", {x:1, y:2})
+
+    # or a mix and match of argument types can be used
+    t = wq.RemoteTask("my_sum", "sum_coprocess", 1, y=2)
+    ```
+
+Additionally, there are three unique execution methods: direct, thread, and fork.
+Direct execution will have the worker's coprocess directly execute the function.
+Thread execution will have the coprocess spawn a thread to execute the function.
+Fork execution will have the coprocess fork a child process to execute the function.
+
+=== "Python"
+    ```python
+    # directly have the coprocess execute the function
+    t.specify_exec_method("direct")
+    # use a thread to execute the function
+    t.specify_exec_method("thread")
+    # fork a child process to execute the function
+    t.specify_exec_method("fork")
+   
+    ```
+
+A RemoteTask is executed on the worker as other tasks are,
+except that its output `t.output` is a json encoded string. 
+`json.loads(t.output)` contains two keys: `Result` and `StatusCode`.
+`Result` will contain the result of the function, or the text of an exception if one occurs.
+`StatusCode` will have the value 200 if the function executes successfully, and 500 otherwise.
+
+You can examine the result of a RemoteTask like this:
+
+=== "Python"
+    ```
+    while not q.empty():
+        t = q.wait(5)
+        if t:
+            x = t.output
+            response = json.loads(t.output)
+            if response["StatusCode"] == 500:
+                print("Exception: {}".format(response["Result]))
+            else:
+                print("Result: {}".format(response["Result]))
+    ```
+
+A `RemoteTask` inherits from `Task` and so all other methods for
+controlling scheduling, managing resources, and setting performance options
+all apply to `RemoteTask` as well.
+
+The only difference is that `RemoteTask` tasks will only consume
+worker resources allocated for its serverless coprocess, and not regular resources.
+
+### Creating workers with serverless coprocesses
+
+Running a `RemoteTask` requires a worker initialized with a serverless coprocess.
+A serverless coprocess has a name and contains one or many Python functions.
+These functions will exist for the lifetime of the worker and can be executed repeatedly.
+
+For example, with the file functions.py below 
+=== "Python"
+    ```python
+    def my_sum(x, y):
+        return x+y
+
+    def my_mult(x, y):
+        return x*y
+    ```
+
+To turn the functions "my_sum" and "my_mult" below into serverless functions:
+Run the command
+
+``` 
+poncho_package_serverize --src functions.py --function my_sum --function my_mult --dest coprocess.py
+```
+
+This causes the functions my_sum and my_mult from the file functions.py 
+to be turned into a serverless coprocess in the file coprocess.py.
+The name will be set to a default unless a function defined `name` exists 
+which returns the name of the coprocess.
+
+=== "Python"
+    ```python
+    def name():
+        return "arithmetic_coprocess"
+    ```
+
+Once the functions have been turned into their serverless form,
+to start a worker with a serverless coprocess function, add the argument
+
+```
+--coprocess coprocess.py
+``` 
+
+This will cause the worker to spawn an instance of the serverless coprocess at startup.
+The worker will then be able to recieve and execute serverless functions
+if the name of its coprocess matches what was specified on the task.
+
+Several options exists when starting workers with coprocesses.
+One is that workers can start an arbitrary number of coprocesses.
+For example, running the following command will have a worker start 4 instances of a coprocess.
+
+```
+--coprocess coprocess.py --num_coprocesses 4
+``` 
+
+Each coprocess can independantly recieve and execute a `RemoteTask`, provided the worker has resources to do so.
+
+The resources allocated to coprocesses on the worker can be specified as such.
+
+```
+--coprocess coprocess.py --coprocess_cores 4 --coprocess_disk 4 --coprocess_memory 1000 --coprocess_gpus 0
+``` 
+
+Each coprocess will be given an equal share of the total number of coprocess resources allocated.
+For example, with 4 coprocesses and 4 coprocess cores, each coprocess will recieve 1 core.
+These allocations are automatically monitored and offending coprocesses are terminated.
+
 
 ### Python Abstractions
 
