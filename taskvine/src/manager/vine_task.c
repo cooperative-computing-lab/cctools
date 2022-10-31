@@ -447,20 +447,6 @@ void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
 	vine_task_add_input(t,f);
 }
 
-void vine_task_add_input_piece(struct vine_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, vine_file_flags_t flags)
-{
-	if(end_byte < start_byte) {
-		fatal("%s: end byte lower than start byte for %s.\n",__func__,remote_name);
-	}
-
-	struct vine_file *f = vine_file_create(local_name, remote_name, 0, 0, VINE_FILE_PIECE, flags);
-
-	f->offset = start_byte;
-	f->piece_length = end_byte - start_byte + 1;
-
-	vine_task_add_input(t,f);
-}
-
 void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags)
 {
 	struct vine_file *f = vine_file_create("unnamed", remote_name, data, length, VINE_BUFFER, flags);

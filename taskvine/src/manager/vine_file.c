@@ -69,9 +69,6 @@ char *make_cached_name( const struct vine_file *f )
 		case VINE_EMPTY_DIR:
 			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), source_enc);
 			break;
-		case VINE_FILE_PIECE:
-			return string_format("piece-%d-%s-%s-%lld-%lld",cache_file_id, md5_string(digest),source_enc,(long long)f->offset,(long long)f->piece_length);
-			break;
 		case VINE_COMMAND:
 			return string_format("cmd-%d-%s", cache_file_id, md5_string(digest));
 			break;

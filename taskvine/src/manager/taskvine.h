@@ -101,7 +101,6 @@ typedef enum {
 	VINE_URL,                   /**< A file obtained by downloading from a URL. */
 	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
 	VINE_COMMAND,               /**< A file obtained by executing a Unix command line. */
-	VINE_FILE_PIECE,            /**< A portion of a file present at the manager. */
 	VINE_EMPTY_DIR              /**< An empty directory to create in the task sandbox. */
 } vine_file_t;
 
@@ -305,16 +304,6 @@ For example, the command "grep frog /usr/dict/words > %%" would produce a file b
 @param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_add_input_file.
 */
 void vine_task_add_input_command(struct vine_task *t, const char *cmd, const char *remote_name, vine_file_flags_t flags);
-
-/** Add a piece of a file to a task.
-@param t A task object.
-@param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.
-@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param start_byte The starting byte offset of the file piece to be transferred.
-@param end_byte The ending byte offset of the file piece to be transferred.
-@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
-*/
-void vine_task_add_input_piece(struct vine_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, vine_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
@@ -821,7 +810,7 @@ The file or directory with the given local name specification is deleted from
 the workers' cache, so that a newer version may be used. Any running task using
 the file is canceled and resubmitted. Completed tasks waiting for retrieval are
 not affected.
-(Currently anonymous buffers and file pieces cannot be deleted once cached in a worker.)
+(Currently anonymous buffers cannot be deleted once cached in a worker.)
 @param m A manager object
 @param local_name The name of the file on local disk or shared filesystem, or uri.
 @param type One of:

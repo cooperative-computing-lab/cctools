@@ -28,8 +28,6 @@ struct vine_file {
 	vine_file_t type;         // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
 	vine_file_flags_t flags;	// Special handling: VINE_CACHE for caching, VINE_WATCH for watching, etc.
 	int length;		// Length of source data, if known.
-	off_t offset;		// File offset for VINE_FILE_PIECE
-	off_t piece_length;	// File piece length for VINE_FILE_PIECE
 	char *source;		// Name of source file, url, buffer, or literal data if an input buffer.
 	char *remote_name;	// Name of file as it appears to the task.
 	char *cached_name;	// Name of file in the worker's cache directory.

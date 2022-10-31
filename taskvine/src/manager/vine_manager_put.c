@@ -55,12 +55,12 @@ static int vine_manager_put_symlink( struct vine_manager *q, struct vine_worker_
 }
 
 /*
-Send a single file (or a piece of a file) to the remote worker.
+Send a single file to the remote worker.
 The transfer time is controlled by the size of the file.
 If the transfer takes too long, then cancel it.
 */
 
-static int vine_manager_put_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, struct stat info, int64_t *total_bytes )
+static int vine_manager_put_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localname, const char *remotename, struct stat info, int64_t *total_bytes )
 {
 	time_t stoptime;
 	timestamp_t effective_stoptime = 0;
@@ -69,27 +69,11 @@ static int vine_manager_put_file( struct vine_manager *q, struct vine_worker_inf
 	/* normalize the mode so as not to set up invalid permissions */
 	int mode = ( info.st_mode | 0x600 ) & 0777;
 
-	if(!length) {
-		length = info.st_size;
-	}
+	int64_t length = info.st_size;
 
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s: %s", localname, strerror(errno));
-		return VINE_APP_FAILURE;
-	}
-
-	/* If we are sending only a piece of the file, seek there first. */
-
-	if (offset >= 0 && (offset+length) <= info.st_size) {
-		if(lseek(fd, offset, SEEK_SET) == -1) {
-			debug(D_NOTICE, "Cannot seek file %s to offset %lld: %s", localname, (long long) offset, strerror(errno));
-			close(fd);
-			return VINE_APP_FAILURE;
-		}
-	} else {
-		debug(D_NOTICE, "File specification %s (%lld:%lld) is invalid", localname, (long long) offset, (long long) offset+length);
-		close(fd);
 		return VINE_APP_FAILURE;
 	}
 
@@ -120,7 +104,7 @@ static int vine_manager_put_file( struct vine_manager *q, struct vine_worker_inf
 
 /* Need prototype here to address mutually recursive code. */
 
-static vine_result_code_t vine_manager_put_item( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *name, const char *remotename, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links );
+static vine_result_code_t vine_manager_put_item( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *name, const char *remotename, int64_t * total_bytes, int follow_links );
 
 /*
 Send a directory and all of its contents using the new streaming protocol.
@@ -149,7 +133,7 @@ static vine_result_code_t vine_manager_put_directory( struct vine_manager *q, st
 
 		char *localpath = string_format("%s/%s",localname,d->d_name);
 
-		result = vine_manager_put_item( q, w, t, localpath, d->d_name, 0, 0, total_bytes, 0 );
+		result = vine_manager_put_item( q, w, t, localpath, d->d_name, total_bytes, 0 );
 
 		free(localpath);
 
@@ -176,7 +160,7 @@ and internal links are not followed, they are sent natively.
 */
 
 
-static vine_result_code_t vine_manager_put_item( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links )
+static vine_result_code_t vine_manager_put_item( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *localpath, const char *remotepath, int64_t * total_bytes, int follow_links )
 {
 	struct stat info;
 	int result = VINE_SUCCESS;
@@ -193,7 +177,7 @@ static vine_result_code_t vine_manager_put_item( struct vine_manager *q, struct 
 		} else if(S_ISLNK(info.st_mode)) {
 			result = vine_manager_put_symlink( q, w, t, localpath, remotepath, total_bytes );
 		} else if(S_ISREG(info.st_mode)) {
-			result = vine_manager_put_file( q, w, t, localpath, remotepath, offset, length, info, total_bytes );
+			result = vine_manager_put_file( q, w, t, localpath, remotepath, info, total_bytes );
 		} else {
 			debug(D_NOTICE,"skipping unusual file: %s",strerror(errno));
 		}
@@ -228,14 +212,10 @@ static vine_result_code_t vine_manager_put_item_if_not_cached( struct vine_manag
 		return VINE_SUCCESS;
 	} else if(!remote_info) {
 
-		if(tf->offset==0 && tf->length==0) {
-			debug(D_VINE, "%s (%s) needs file %s as '%s'", w->hostname, w->addrport, expanded_local_name, tf->cached_name);
-		} else {
-			debug(D_VINE, "%s (%s) needs file %s (offset %lld length %lld) as '%s'", w->hostname, w->addrport, expanded_local_name, (long long) tf->offset, (long long) tf->length, tf->cached_name );
-		}
+		debug(D_VINE, "%s (%s) needs file %s as '%s'", w->hostname, w->addrport, expanded_local_name, tf->cached_name);
 
 		vine_result_code_t result;
-		result = vine_manager_put_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
+		result = vine_manager_put_item(q, w, t, expanded_local_name, tf->cached_name, total_bytes, 1 );
 
 		if(result == VINE_SUCCESS && tf->flags & VINE_CACHE) {
 			remote_info = vine_remote_file_info_create(tf->type,local_info.st_size,local_info.st_mtime);
@@ -397,8 +377,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
   		// Do nothing.  Empty directories are handled by the task specification, while recursive directories are implemented as VINE_FILEs
 		break;
 
-	case VINE_FILE:
-	case VINE_FILE_PIECE: {
+	case VINE_FILE: {
 		char *expanded_source = expand_envnames(w, f->source);
 		if(expanded_source) {
 			result = vine_manager_put_item_if_not_cached(q,w,t,f,expanded_source,&total_bytes);
@@ -464,7 +443,7 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 	// If any one fails to exist, set the failure condition and return failure.
 	if(t->input_files) {
 		LIST_ITERATE(t->input_files,f) {
-			if(f->type == VINE_FILE || f->type == VINE_FILE_PIECE) {
+			if(f->type == VINE_FILE) {
 				char * expanded_source = expand_envnames(w, f->source);
 				if(!expanded_source) {
 					vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);

@@ -326,8 +326,8 @@ void  vine_process_compute_disk_needed( struct vine_process *p ) {
 	if(t->input_files) {
 		LIST_ITERATE(t->input_files,f) {
 
-			if(f->type != VINE_FILE && f->type != VINE_FILE_PIECE)
-					continue;
+			if(f->type!=VINE_FILE)
+				continue;
 
 			if(stat(f->cached_name, &s) < 0)
 				continue;
