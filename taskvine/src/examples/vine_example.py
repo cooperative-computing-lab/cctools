@@ -59,13 +59,13 @@ if __name__ == '__main__':
       # Note that when adding a file, we have to name its local name
       # (e.g. gzip_path), and its remote name (e.g. "gzip"). Unlike the
       # following line, more often than not these are the same.
-      t.add_file(gzip_path, "gzip", VINE_INPUT, cache=True)
+      t.add_input_file(gzip_path, "gzip", flags=VINE_UNPACK, cache=True)
 
       # files to be compressed are different across all tasks, so we do not
       # cache them. This is, of course, application specific. Sometimes you may
       # want to cache an output file if is the input of a later task.
-      t.add_file(infile, infile, VINE_INPUT, cache=False)
-      t.add_file(outfile, outfile, VINE_OUTPUT, cache=False)
+      t.add_input_file(infile, infile, flags=VINE_UNPACK, cache=False)
+      t.add_output_file(outfile, outfile, flags=VINE_UNPACK, cache=False)
 
       # Once all files has been specified, we are ready to submit the task to the queue.
       task_id = q.submit(t)
@@ -75,8 +75,8 @@ if __name__ == '__main__':
   while not q.empty():
       t = q.wait(5)
       if t:
-          print("task (id# %d) complete: %s (return code %d)" % (t.id, t.command, t.return_status))
-          if t.return_status != 0:
+          print("task (id# %d) complete: %s (return code %d)" % (t.id, t.command, t.exit_code))
+          if t.exit_code != 0:
             # The task failed. Error handling (e.g., resubmit with new parameters, examine logs, etc.) here
             None
       #task object will be garbage collected by Python automatically when it goes out of scope
