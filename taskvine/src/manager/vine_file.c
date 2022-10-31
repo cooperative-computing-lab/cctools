@@ -131,3 +131,30 @@ void vine_file_delete(struct vine_file *f)
 	free(f->data);
 	free(f);
 }
+
+struct vine_file * vine_file_local( const char *source, const char *remote_name, vine_file_flags_t flags )
+{
+	return vine_file_create(source,remote_name,0,0,VINE_FILE,flags);
+}
+
+struct vine_file * vine_file_url( const char *source, const char *remote_name, vine_file_flags_t flags )
+{
+	return vine_file_create(source,remote_name,0,0,VINE_URL,flags);
+}
+
+struct vine_file * vine_file_buffer( const char *buffer_name,const char *data, int length, const char *remote_name, vine_file_flags_t flags )
+{
+	return vine_file_create(buffer_name,remote_name,data,length,VINE_BUFFER,flags);
+}
+
+struct vine_file * vine_file_command( const char *cmd, const char *remote_name, vine_file_flags_t flags, struct vine_file *requires )
+{
+	return vine_file_create(cmd,remote_name,0,0,VINE_COMMAND,flags);
+}
+
+struct vine_file * vine_file_empty_dir( const char *remote_name )
+{
+	return vine_file_create("unnamed",remote_name,0,0,VINE_EMPTY_DIR,VINE_NOCACHE);
+}
+
+

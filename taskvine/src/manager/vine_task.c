@@ -425,37 +425,37 @@ static void vine_task_add_output( struct vine_task *t, struct vine_file *f )
 
 void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_create(local_name, remote_name, 0, 0, VINE_FILE, flags);
+	struct vine_file *f = vine_file_local(local_name, remote_name, flags);
 	vine_task_add_input(t,f);
 }
 
 void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_create(local_name, remote_name, 0, 0, VINE_FILE, flags);
+	struct vine_file *f = vine_file_local(local_name, remote_name, flags);
 	vine_task_add_output(t,f);
 }
 
 void vine_task_add_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_create(file_url, remote_name, 0, 0, VINE_URL, flags);
+	struct vine_file *f = vine_file_url(file_url, remote_name, flags);
 	vine_task_add_input(t,f);
 }
 
 void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
 {
-	struct vine_file *f = vine_file_create("unused", remote_name, 0, 0, VINE_EMPTY_DIR, 0);
+	struct vine_file *f = vine_file_empty_dir(remote_name);
 	vine_task_add_input(t,f);
 }
 
 void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_create("unnamed", remote_name, data, length, VINE_BUFFER, flags);
+	struct vine_file *f = vine_file_buffer("unnamed",data,length,remote_name,flags);
 	vine_task_add_input(t,f);
 }
 
 void vine_task_add_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_create(buffer_name, remote_name, 0, 0, VINE_BUFFER, flags);
+	struct vine_file *f = vine_file_buffer(buffer_name,0,0,remote_name,flags);
 	vine_task_add_output(t,f);
 }
 
@@ -465,7 +465,7 @@ void vine_task_add_input_command(struct vine_task *t, const char *cmd, const cha
 		fatal("%s: command to transfer file does not contain %%%% specifier: %s", __func__, cmd);
 	}
 
-	struct vine_file *f = vine_file_create(cmd, remote_name, 0, 0, VINE_COMMAND, flags);
+	struct vine_file *f = vine_file_command(cmd,remote_name,flags,0);
 	vine_task_add_input(t,f);
 }
 

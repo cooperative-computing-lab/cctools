@@ -25,17 +25,24 @@ This module is private to the manager and should not be invoked by the end user.
 #include <sys/types.h>
 
 struct vine_file {
-	vine_file_t type;         // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
-	vine_file_flags_t flags;	// Special handling: VINE_CACHE for caching, VINE_WATCH for watching, etc.
+	vine_file_t type;       // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
+	vine_file_flags_t flags;// Special handling: VINE_CACHE for caching, VINE_WATCH for watching, etc.
 	int length;		// Length of source data, if known.
-	char *source;		// Name of source file, url, buffer, or literal data if an input buffer.
+	char *source;		// Name of source file, url, buffer.
 	char *remote_name;	// Name of file as it appears to the task.
 	char *cached_name;	// Name of file in the worker's cache directory.
 	char *data;		// Raw data for an input or output buffer.
+	struct vine_file *requires; // Depends upon this existence of this file first.
 };
 
 struct vine_file * vine_file_create( const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags );
 struct vine_file *vine_file_clone( const struct vine_file *file );
 void vine_file_delete( struct vine_file *f );
+
+struct vine_file * vine_file_local( const char *source, const char *remote_name, vine_file_flags_t flags );
+struct vine_file * vine_file_url( const char *source, const char *remote_name, vine_file_flags_t flags );
+struct vine_file * vine_file_buffer( const char *buffer_name, const char *data, int length, const char *remote_name, vine_file_flags_t flags );
+struct vine_file * vine_file_command( const char *cmd, const char *remote_name, vine_file_flags_t flags, struct vine_file *requires );
+struct vine_file * vine_file_empty_dir( const char *remote_name );
 
 #endif
