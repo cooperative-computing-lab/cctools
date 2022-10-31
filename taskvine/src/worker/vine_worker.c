@@ -750,16 +750,16 @@ Accept a url specification and queue it for later transfer.
 
 static int do_put_url( const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
 {
-	return vine_cache_queue(global_cache,VINE_CACHE_TRANSFER,source,cache_name,size,mode,flags);
+	return vine_cache_queue(global_cache,VINE_CACHE_TRANSFER,source,cache_name,size,mode,flags,"0");
 }
 
 /*
 Accept a url specification and queue it for later transfer.
 */
 
-static int do_put_cmd( const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
+static int do_put_cmd( const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags, const char *requires )
 {
-	return vine_cache_queue(global_cache,VINE_CACHE_COMMAND,source,cache_name,size,mode,flags);
+	return vine_cache_queue(global_cache,VINE_CACHE_COMMAND,source,cache_name,size,mode,flags,requires);
 }
 
 /*
@@ -973,6 +973,8 @@ static int handle_manager(struct link *manager)
 	char line[VINE_LINE_MAX];
 	char filename_encoded[VINE_LINE_MAX];
 	char filename[VINE_LINE_MAX];
+	char requires_encoded[VINE_LINE_MAX];
+	char requires[VINE_LINE_MAX];
 	char source_encoded[VINE_LINE_MAX];
 	char source[VINE_LINE_MAX];
 	int64_t length;
@@ -996,10 +998,11 @@ static int handle_manager(struct link *manager)
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_url(filename,length,mode,source,flags);
 			reset_idle_timer();
-		} else if(sscanf(line, "putcmd %s %s %" SCNd64 " %o %d", source_encoded, filename_encoded, &length, &mode, &flags)==5) {
+		} else if(sscanf(line, "putcmd %s %s %" SCNd64 " %o %d %s", source_encoded, filename_encoded, &length, &mode, &flags, requires_encoded)==6) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			url_decode(source_encoded,source,sizeof(source));
-			r = do_put_cmd(filename,length,mode,source,flags);
+			url_decode(requires_encoded,requires,sizeof(requires));
+			r = do_put_cmd(filename,length,mode,source,flags,requires);
 			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));

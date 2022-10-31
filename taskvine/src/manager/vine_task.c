@@ -397,7 +397,7 @@ void vine_task_check_consistency( struct vine_task *t )
 	hash_table_delete(table);
 }
 
-static void vine_task_add_input( struct vine_task *t, struct vine_file *f )
+void vine_task_add_input( struct vine_task *t, struct vine_file *f )
 {
 	if(!t || !f || !f->source || !f->remote_name) {
 		fatal("%s: invalid null argument.",__func__);
@@ -410,7 +410,7 @@ static void vine_task_add_input( struct vine_task *t, struct vine_file *f )
 	list_push_tail(t->input_files, f);
 }
 
-static void vine_task_add_output( struct vine_task *t, struct vine_file *f )
+void vine_task_add_output( struct vine_task *t, struct vine_file *f )
 {
 	if(!t || !f || !f->source || !f->remote_name) {
 		fatal("%s: invalid null argument.",__func__);

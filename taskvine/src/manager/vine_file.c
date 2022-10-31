@@ -84,7 +84,7 @@ char *make_cached_name( const struct vine_file *f )
 
 /* Create a new file object with the given properties. */
 
-struct vine_file *vine_file_create(const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags)
+struct vine_file *vine_file_create(const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags, struct vine_file *requires )
 {
 	struct vine_file *f;
 
@@ -97,7 +97,8 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 	f->type = type;
 	f->flags = flags;
 	f->length = length;
-
+	f->requires = requires;
+	
 	if(data) {
 		f->data = malloc(length);
 		memcpy(f->data,data,length);
@@ -118,7 +119,7 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 
 struct vine_file *vine_file_clone(const struct vine_file *f )
 {
-	return vine_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags);
+	return vine_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags,f->requires);
 }
 
 /* Delete a file object */
@@ -134,27 +135,27 @@ void vine_file_delete(struct vine_file *f)
 
 struct vine_file * vine_file_local( const char *source, const char *remote_name, vine_file_flags_t flags )
 {
-	return vine_file_create(source,remote_name,0,0,VINE_FILE,flags);
+	return vine_file_create(source,remote_name,0,0,VINE_FILE,flags,0);
 }
 
 struct vine_file * vine_file_url( const char *source, const char *remote_name, vine_file_flags_t flags )
 {
-	return vine_file_create(source,remote_name,0,0,VINE_URL,flags);
+	return vine_file_create(source,remote_name,0,0,VINE_URL,flags,0);
 }
 
 struct vine_file * vine_file_buffer( const char *buffer_name,const char *data, int length, const char *remote_name, vine_file_flags_t flags )
 {
-	return vine_file_create(buffer_name,remote_name,data,length,VINE_BUFFER,flags);
+	return vine_file_create(buffer_name,remote_name,data,length,VINE_BUFFER,flags,0);
 }
 
 struct vine_file * vine_file_command( const char *cmd, const char *remote_name, vine_file_flags_t flags, struct vine_file *requires )
 {
-	return vine_file_create(cmd,remote_name,0,0,VINE_COMMAND,flags);
+	return vine_file_create(cmd,remote_name,0,0,VINE_COMMAND,flags,requires);
 }
 
 struct vine_file * vine_file_empty_dir( const char *remote_name )
 {
-	return vine_file_create("unnamed",remote_name,0,0,VINE_EMPTY_DIR,VINE_NOCACHE);
+	return vine_file_create("unnamed",remote_name,0,0,VINE_EMPTY_DIR,VINE_NOCACHE,0);
 }
 
 

@@ -34,9 +34,10 @@ struct cache_file {
 	int64_t actual_size;
 	int mode;
 	int complete;
+	char *requires;
 };
 
-struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode )
+struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, const char *requires )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
@@ -44,11 +45,13 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->actual_size = actual_size;
 	f->mode = mode;
 	f->complete = 0;
+	f->requires = xxstrdup(requires);
 	return f;
 }
 
 void cache_file_delete( struct cache_file *f )
 {
+	free(f->requires);
 	free(f->source);
 	free(f);
 }
@@ -95,7 +98,7 @@ It may still be necessary to perform post-transfer processing of this file.
 
 int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode);
+	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode,"0");
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -105,9 +108,9 @@ Queue a remote file transfer or command execution to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue( struct vine_cache *c, vine_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
+int vine_cache_queue( struct vine_cache *c, vine_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags, const char *requires )
 {
-	struct cache_file *f = cache_file_create(type,source,size,mode);
+	struct cache_file *f = cache_file_create(type,source,size,mode,requires);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -190,9 +193,11 @@ The command should contain %% which indicates the path of the cache file to be c
 
 static int do_command( struct vine_cache *c, const char *command, const char *cache_path, char **error_message )
 {
+	chdir("cache");
 	char *full_command = string_replace_percents(command,cache_path);
 	int result = do_internal_command(c,full_command,error_message);
 	free(full_command);
+	chdir("..");
 	return result;
 }
 
@@ -274,7 +279,13 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 		debug(D_VINE,"cache: %s is already present.",cachename);
 		return 1;
 	}
+
+	/* Ensure the dependent file is there. */
+	/* XXX this doesn't check for success! */
+	/* XXX not sure what the right flags are here */
 	
+	vine_cache_ensure(c,f->requires,manager,VINE_CACHE);
+
 	char *error_message = 0;
 	char *cache_path = vine_cache_full_path(c,cachename);
 	char *transfer_path = string_format("%s.transfer",cache_path);

@@ -35,7 +35,7 @@ struct vine_file {
 	struct vine_file *requires; // Depends upon this existence of this file first.
 };
 
-struct vine_file * vine_file_create( const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags );
+struct vine_file * vine_file_create( const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags, struct vine_file *requires );
 struct vine_file *vine_file_clone( const struct vine_file *file );
 void vine_file_delete( struct vine_file *f );
 
