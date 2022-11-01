@@ -1,4 +1,4 @@
-## @package ChirpPython
+## @package Chirp
 #
 # Python Chirp bindings.
 #
