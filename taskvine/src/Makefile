@@ -5,6 +5,9 @@ TARGETS=manager worker tools bindings examples
 
 all: $(TARGETS)
 
+worker: manager
+bindings: manager
+tools: manager
 examples: manager worker tools bindings
 
 $(TARGETS): %:
