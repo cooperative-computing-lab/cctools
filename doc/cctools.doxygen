@@ -6,12 +6,12 @@ which includes TaskVine, Work Queue, Makeflow, Parrot, Chirp and other software.
 If you are writing a TaskVine application, start here:
 
 - @ref taskvine.h (C Language Interface)
-- @ref TaskVinePython (Python Language Interface)
+- @ref taskvine (Python Language Interface)
 
 If you are writing a Work Queue application, start here:
 
 - @ref work_queue.h (C Language Interface)
-- @ref WorkQueuePython (Python Language Interface)
+- @ref work_queue (Python Language Interface)
 
 
 If you are writing a program to submit jobs to arbitrary batch systems,
