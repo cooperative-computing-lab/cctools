@@ -1,4 +1,4 @@
-## @package WorkQueuePython
+## @package work_queue
 #
 # Python Work Queue bindings.
 #
