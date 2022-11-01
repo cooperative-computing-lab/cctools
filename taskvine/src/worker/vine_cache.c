@@ -251,13 +251,13 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 
 	if(worker_link == NULL)
 	{
-		//*error_message = string_format("Could not establish connection with worker at: %s:%d", addr, port_num);
+		*error_message = string_format("Could not establish connection with worker at: %s:%d", addr, port_num);
 		return 0;
 	}
 
 	if(!vine_transfer_get_any(worker_link, c, path, time(0) + 120))
 	{
-		//*error_message = string_format("Could not transfer file %s from worker %s:%d", path, addr, port_num);
+		*error_message = string_format("Could not transfer file %s from worker %s:%d", path, addr, port_num);
 		link_close(worker_link);
 		return 0;
 	}
