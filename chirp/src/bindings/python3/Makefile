@@ -11,7 +11,7 @@ EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/chirp/src/libchirp.a $(CCTOOLS_HOME)/dtt
 CHIRPPYTHONSO = _chirp.$(CCTOOLS_DYNAMIC_SUFFIX)
 LIBRARIES = $(CHIRPPYTHONSO)
 OBJECTS = chirp_wrap.o $(CCTOOLS_HOME)/chirp/src/chirp_swig_wrap.o
-TARGETS = $(LIBRARIES) chirp.py
+TARGETS = chirp.py $(LIBRARIES)
 
 all: $(TARGETS)
 
@@ -25,7 +25,7 @@ chirp_wrap.c chirp.py: chirp.i chirp.binding.py
 $(CHIRPPYTHONSO): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -rf $(OBJECTS) $(TARGETS) Python.framework chirp.py chirp_wrap.c *.pyc __pycache__
+	rm -rf $(OBJECTS) $(TARGETS) chirp.py chirp_wrap.c *.pyc __pycache__
 
 test:
 
