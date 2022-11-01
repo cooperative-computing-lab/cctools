@@ -1,5 +1,5 @@
 /* chirp.i */
-%module CChirp
+%module chirp
 
 /* next is a perl keyword. rename it to next_entry */
 %rename(next_entry) chirp_dirent::next;

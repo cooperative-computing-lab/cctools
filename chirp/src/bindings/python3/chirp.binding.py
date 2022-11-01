@@ -1,4 +1,4 @@
-## @package Chirp
+## @package chirp
 #
 # Python Chirp bindings.
 #
@@ -8,14 +8,14 @@
 # The SWIG-based Python bindings provide a higher-level interface that
 # revolves around:
 #
-# - @ref Chirp.Client
-# - @ref Chirp.Stat
+# - @ref chirp.Client
+# - @ref chirp.Stat
 import os
 import time
 import json
 
 ##
-# \class Chirp.Client
+# \class chirp.Client
 # Python Client object
 #
 # This class is used to create a chirp client
@@ -184,7 +184,7 @@ class Client(object):
 
 
     ##
-    # Returns a Chirp.Stat object with information on path.
+    # Returns a chirp.Stat object with information on path.
     # Throws an IOError on error (e.g., no such path or insufficient permissions).
     #
     # @param self                Reference to the current task object.
@@ -225,7 +225,7 @@ class Client(object):
     ##
     # Copies local file/directory source to the chirp server as file/directory destination.
     # If destination is not given, source name is used.
-    # Raises Chirp.TransferFailure on error.
+    # Raises chirp.TransferFailure on error.
     #
     # @param self                Reference to the current task object.
     # @param source              A local file or directory.
@@ -250,7 +250,7 @@ class Client(object):
     ##
     # Copies server file/directory source to the local file/directory destination.
     # If destination is not given, source name is used.
-    # Raises Chirp.TransferFailure on error.
+    # Raises chirp.TransferFailure on error.
     #
     # @param self                Reference to the current task object.
     # @param source              A server file or directory.
