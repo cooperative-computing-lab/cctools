@@ -3,7 +3,7 @@
 import sys
 import os
 
-import Chirp
+import chirp
 
 def write_some_file(filename='bar.txt'):
     message  = '''
@@ -34,12 +34,12 @@ if __name__ == '__main__':
     write_some_file()
 
     try:
-        client = Chirp.Client(hostport,
+        client = chirp.Client(hostport,
                               authentication = ['ticket'],
                               tickets = [ticket],
                               timeout = 15,
                               debug = True)
-    except Chirp.AuthenticationFailure as e:
+    except chirp.AuthenticationFailure as e:
         print("Could not authenticate using: %s" % ', '.join(e.value))
         sys.exit(1)
 
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     try:
         client.put('bar.txt', '/bar.txt')
         client.get('/bar.txt', 'foo.txt')
-    except Chirp.TransferFailure as e:
+    except chirp.TransferFailure as e:
         print("Could not transfer file: %s" % e)
         sys.exit(1)
 
