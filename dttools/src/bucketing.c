@@ -298,3 +298,62 @@ int compare_break_points(const void* p1, const void* p2)
 {
     return (*((bucketing_cursor_w_pos**) p1))->pos - (*((bucketing_cursor_w_pos**) p2))->pos;
 }
+
+bucketing_bucket** bucketing_bucket_list_to_array(struct list* bucket_list)
+{
+    list_first_item(bucket_list);
+    bucketing_bucket* tmp_buck;
+    bucketing_bucket** bucket_array = malloc(list_size(bucket_list) * sizeof(*bucket_array));
+    int i = 0;
+    while ((tmp_buck = list_next_item(bucket_list)))
+    {
+        bucket_array[i] = tmp_buck;
+        ++i;
+    }
+
+    return bucket_array;
+}
+
+double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, int lo, int hi)
+{
+    double* bucket_probs = malloc((hi - lo + 1) * sizeof(*bucket_probs));
+
+    double total_prob = 0;
+    for (int i = lo; i <= hi; ++i)
+    {
+        total_prob += bucket_array[i]->prob;
+    }
+
+    for (int i = lo; i <= hi; ++i)
+    {
+        bucket_probs[i - lo] = bucket_array[i]->prob / total_prob;
+    }
+
+    return bucket_probs;
+}
+
+void print_sorted_buckets(struct list* l)
+{
+    bucketing_bucket *tmp;
+    list_first_item(l);
+    printf("Printing sorted buckets\n");
+    int i = 0;
+    while((tmp = list_next_item(l)))
+    {
+        printf("bucket pos: %d, value: %lf, prob: %lf\n", i, tmp->val, tmp->prob);
+        ++i;
+    }
+}
+
+void print_sorted_points(struct list* l)
+{
+    bucketing_point* tmp;
+    list_first_item(l);
+    printf("Printing sorted points\n");
+    int i = 0;
+    while((tmp = list_next_item(l)))
+    {
+        printf("pos: %d, value: %lf, sig: %lf\n", i, tmp->val, tmp->sig);
+        ++i;
+    }
+}

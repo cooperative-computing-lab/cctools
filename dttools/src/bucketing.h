@@ -213,6 +213,30 @@ struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (const void
  * @return negative if p1 < p2, 0 if p1 == p2, positive if p1 > p2 */
 int compare_break_points(const void* p1, const void* p2);
 
+/* Convert a list of bucketing_bucket to an array of those
+ * @param bucket_list list of bucketing_bucket
+ * @return pointer to array of bucketing_bucket* */
+bucketing_bucket** bucketing_bucket_list_to_array(struct list* bucket_list);
+
+/* Reweight the probabilities of a range of buckets to 1
+ * @param bucket_array the array of bucketing_bucket*
+ * @param lo index of low bucket
+ * @param hi index of high bucket
+ * @return array of reweighted probabilities */
+double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, int lo, int hi);
+
 /** End: internals **/
+
+/** Begin: debug functions **/
+
+/* Print a sorted list of bucketing_bucket
+ * @param l the list of buckets */
+void print_sorted_buckets(struct list* l);
+
+/* Print a sorted list of bucketing_point
+ * @param l the list of points */
+void print_sorted_points(struct list* l);
+
+/** End: debug functions **/
 
 #endif

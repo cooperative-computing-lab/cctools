@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "bucketing_fast.h"
+#include "bucketing_exhaust.h"
 #include "bucketing.h"
 
 int main()
@@ -8,15 +8,15 @@ int main()
     int num_sampling_points = 10;
     double increase_rate = 2;
 
-    //printf("Creating bucketing state\n");
-    bucketing_state* s = bucketing_state_create(default_value, num_sampling_points, increase_rate, 0);
+    printf("Creating bucketing state\n");
+    bucketing_state* s = bucketing_state_create(default_value, num_sampling_points, increase_rate, 10);
 
     int prime = 7;
     int num = 2;
     int multiple = 2;
     int iters = 50;
 
-    //printf("Adding values\n");
+    printf("Adding values\n");
     for (int i = 0; i < iters; ++i)
     {
         num = num * multiple % prime;
@@ -27,7 +27,7 @@ int main()
         if (i >= num_sampling_points - 1)
         {
             //printf("Finding buckets\n");
-            bucketing_fast_update_buckets(s);
+            bucketing_exhaust_update_buckets(s);
             print_sorted_buckets(s->sorted_buckets);
         }
         printf("Predicting value %lf\n", bucketing_predict(-1, s));

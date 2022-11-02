@@ -27,7 +27,7 @@ int bucketing_fast_update_buckets(bucketing_state* s)
         list_get(tmp_break_point->lc, (void**) &tmp_point_ptr);
         tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, 1.0*(tmp_break_point->pos - prev_pos + 1)/list_length(s->sorted_points));
         list_push_tail(s->sorted_buckets, tmp_bucket);
-        prev_pos = tmp_break_point->pos;
+        prev_pos = tmp_break_point->pos + 1;
     }
     
     /* Delete break point list */
