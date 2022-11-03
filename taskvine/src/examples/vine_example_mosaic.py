@@ -29,18 +29,18 @@ import errno
 if __name__ == '__main__':
     print("Checking that /usr/bin/convert is installed...")
     r = os.access("/usr/bin/convert",os.X_OK)
-    if r!=0:
+    if r != 0:
         print(sys.argv[0],": /usr/bin/convert is not installed: this won't work at all.")
         sys.exit(1)
         
     print("Converting /usr/bin/convert into convert.sfx...")
     r = os.system("starch -x /usr/bin/convert -c convert convert.sfx")
-    if r!=0:
+    if r != 0:
         print(sys.argv[0],": failed to run starch, is it in your PATH?")
         sys.exit(1)
         
     try:
-        m = vine.Manager(port = vine.VINE_DEFAULT_PORT)
+        m = vine.Manager()
     except IOError as e:
         print("couldn't create manager:",e.errno)
         sys.exit(1)
@@ -71,7 +71,7 @@ if __name__ == '__main__':
             r = t.result
             id = t.id
             
-            if r==vine.VINE_RESULT_SUCCESS:
+            if r == vine.VINE_RESULT_SUCCESS:
                 print("Task "+str(id)+" complete: "+command)
         else:
             print("Task "+str(id)+" falied: "+command)

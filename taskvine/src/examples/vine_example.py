@@ -37,7 +37,7 @@ if __name__ == '__main__':
   # been used by another program, you can try setting port = 0 to use an
   # available port.
   try:
-      q = vine.Manager(port = vine.VINE_DEFAULT_PORT)
+      q = vine.Manager()
   except:
       print("Instantiation of taskvine Manager failed!")
       sys.exit(1)
@@ -78,7 +78,7 @@ if __name__ == '__main__':
           print("task (id# %d) complete: %s (return code %d)" % (t.id, t.command, t.exit_code))
           if t.exit_code != 0:
             # The task failed. Error handling (e.g., resubmit with new parameters, examine logs, etc.) here
-            None
+            pass
       #task object will be garbage collected by Python automatically when it goes out of scope
 
   print("all tasks complete!")

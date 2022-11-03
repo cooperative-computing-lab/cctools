@@ -22,10 +22,10 @@ import sys
 import errno
 
 query_string = """>P01013 GENE X PROTEIN (OVALBUMIN-RELATED)
-		QIKDLLVSSSTDLDTTLVLVNAIYFKGMWKTAFNAEDTREMPFHVTKQESKPVQMMCMNNSFNVATLPAE
-		KMKILELPFASGDLSMLVLLPDEVSDLERIEKTINFEKLTEWTNPNTMEKRRVKVYLPQMKIEEKYNLTS
-		VLMALGMTDLFIPSANLTGISSAESLKISQAVHGAFMELSEDGIEMAGSTGVIEDIKHSPESEQFRADHP
-		FLFLIKHNPTNTIVYFGRYWSP"""
+QIKDLLVSSSTDLDTTLVLVNAIYFKGMWKTAFNAEDTREMPFHVTKQESKPVQMMCMNNSFNVATLPAE
+KMKILELPFASGDLSMLVLLPDEVSDLERIEKTINFEKLTEWTNPNTMEKRRVKVYLPQMKIEEKYNLTS
+VLMALGMTDLFIPSANLTGISSAESLKISQAVHGAFMELSEDGIEMAGSTGVIEDIKHSPESEQFRADHP
+FLFLIKHNPTNTIVYFGRYWSP"""
 
 blast_url = "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz"
 
@@ -33,7 +33,7 @@ landmark_url = "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz"
 
 if __name__ == '__main__':
     try:
-        m = vine.Manager(port = vine.VINE_DEFAULT_PORT)
+        m = vine.Manager()
     except IOError as e:
         print("couldn't create manager:",e.errno)
         sys.exit(1)
@@ -62,7 +62,7 @@ if __name__ == '__main__':
             r = t.result
             id = t.id
 
-            if r==vine.VINE_RESULT_SUCCESS:
+            if r == vine.VINE_RESULT_SUCCESS:
                 print("task",id,"output:",t.std_output)
             else:
                 print("task",id,"failed:",t.result_string)

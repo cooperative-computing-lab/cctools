@@ -50,7 +50,7 @@ url_count=25
 
 if __name__ == '__main__':
     try:
-        m = vine.Manager(port = vine.VINE_DEFAULT_PORT)
+        m = vine.Manager()
     except IOError as e:
         print("couldn't create manager:",e.errno)
         sys.exit(1)
@@ -76,12 +76,12 @@ if __name__ == '__main__':
     print("waiting for tasks to complete...")
 
     while not m.empty():
-        t=m.wait(5)
+        t = m.wait(5)
         if t:
             r = t.result
             id = t.id
             
-            if r==vine.VINE_RESULT_SUCCESS:
+            if r == vine.VINE_RESULT_SUCCESS:
                 print("task",id,"output:",t.std_output)
             else:
                 print("task",id,"failed:",t.result_string)
