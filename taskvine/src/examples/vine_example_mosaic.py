@@ -20,7 +20,7 @@
 
 # Originally written in C (vine_example_mosaic.c)
 
-from taskvine import *
+import taskvine as vine
 
 import os
 import sys
@@ -40,7 +40,7 @@ if __name__ == '__main__':
         sys.exit(1)
         
     try:
-        m = Manager(port = VINE_DEFAULT_PORT)
+        m = vine.Manager(port = vine.VINE_DEFAULT_PORT)
     except IOError as e:
         print("couldn't create manager:",e.errno)
         sys.exit(1)
@@ -52,10 +52,10 @@ if __name__ == '__main__':
         outfile = str(i)+".cat.jpg"
         command = "./convert.sfx -swirl "+str(i)+" cat.jpg "+str(i)+".cat.jpg"
         
-        t = Task(command)
-        t.add_input_file("convert.sfx", "convert.sfx", flags=VINE_CACHE)
-        t.add_input_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", flags=VINE_CACHE)
-        t.add_output_file(outfile,outfile,flags=VINE_NOCACHE)
+        t = vine.Task(command)
+        t.add_input_file("convert.sfx", "convert.sfx", cache=True)
+        t.add_input_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", cache=True)
+        t.add_output_file(outfile,outfile,cache=False)
         
         t.set_cores(1)
         
@@ -71,15 +71,12 @@ if __name__ == '__main__':
             r = t.result
             id = t.id
             
-            if r==VINE_RESULT_SUCCESS:
+            if r==vine.VINE_RESULT_SUCCESS:
                 print("Task "+str(id)+" complete: "+command)
         else:
             print("Task "+str(id)+" falied: "+command)
-        del t
         
     print("All tasks complete!")
-    
-    del m
     
     print("Combining images into mosaic.jpg...")
     os.system("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg")
@@ -88,5 +85,3 @@ if __name__ == '__main__':
     for i in range(0,360,10):
         filename = str(i)+".cat.jpg"
         os.unlink(filename)
-        
-    sys.exit(0)

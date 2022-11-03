@@ -8,7 +8,7 @@
 # It accepts a list of files on the command line.
 # Each file is compressed with gzip and returned to the user.
 
-from taskvine import *
+import taskvine as vine
 
 import os
 import sys
@@ -31,13 +31,13 @@ if __name__ == '__main__':
     gzip_path = "/usr/bin/gzip"
     if not os.path.exists(gzip_path):
       print("gzip was not found. Please modify the gzip_path variable accordingly. To determine the location of gzip, from the terminal type: which gzip (usual locations are /bin/gzip and /usr/bin/gzip)")
-      sys.exit(1);
+      sys.exit(1)
 
   # We create the tasks queue using the default port. If this port is already
   # been used by another program, you can try setting port = 0 to use an
   # available port.
   try:
-      q = Manager(port = VINE_DEFAULT_PORT)
+      q = vine.Manager(port = vine.VINE_DEFAULT_PORT)
   except:
       print("Instantiation of taskvine Manager failed!")
       sys.exit(1)
@@ -53,19 +53,19 @@ if __name__ == '__main__':
       # are using is the one being sent to the workers.
       command = "./gzip < %s > %s" % (infile, outfile)
 
-      t = Task(command)
+      t = vine.Task(command)
 
       # gzip is the same across all tasks, so we can cache it in the workers.
       # Note that when adding a file, we have to name its local name
       # (e.g. gzip_path), and its remote name (e.g. "gzip"). Unlike the
       # following line, more often than not these are the same.
-      t.add_input_file(gzip_path, "gzip", flags=VINE_UNPACK, cache=True)
+      t.add_input_file(gzip_path, "gzip", cache=True)
 
       # files to be compressed are different across all tasks, so we do not
       # cache them. This is, of course, application specific. Sometimes you may
       # want to cache an output file if is the input of a later task.
-      t.add_input_file(infile, infile, flags=VINE_UNPACK, cache=False)
-      t.add_output_file(outfile, outfile, flags=VINE_UNPACK, cache=False)
+      t.add_input_file(infile, infile, cache=False)
+      t.add_output_file(outfile, outfile, cache=False)
 
       # Once all files has been specified, we are ready to submit the task to the queue.
       task_id = q.submit(t)

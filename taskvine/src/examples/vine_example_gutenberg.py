@@ -13,7 +13,7 @@
 
 # Originally written in C (vine_example_gutenberg.c)
 
-from taskvine import *
+import taskvine as vine
 
 import os
 import sys
@@ -50,28 +50,28 @@ url_count=25
 
 if __name__ == '__main__':
     try:
-        m = Manager(port = VINE_DEFAULT_PORT)
+        m = vine.Manager(port = vine.VINE_DEFAULT_PORT)
     except IOError as e:
         print("couldn't create manager:",e.errno)
         sys.exit(1)
     print("listening on port",m.port)
 
     m.enable_debug_log("manager.log")
-    m.set_scheduler(VINE_SCHEDULE_FILES)
+    m.set_scheduler(vine.VINE_SCHEDULE_FILES)
 
     for i in range (url_count):
         for j in range(url_count):
-            t = Task("./vine_example_gutenberg_script.sh filea.txt fileb.txt")
+            t = vine.Task("./vine_example_gutenberg_script.sh filea.txt fileb.txt")
 
-            t.add_input_file("vine_example_gutenberg_script.sh", "vine_example_gutenberg_script.sh", flags=VINE_CACHE)
-            t.add_input_url(urls[i], "filea.txt", flags=VINE_CACHE)
-            t.add_input_url(urls[j], "fileb.txt", flags=VINE_CACHE)
+            t.add_input_file("vine_example_gutenberg_script.sh", "vine_example_gutenberg_script.sh", cache=True)
+            t.add_input_url(urls[i], "filea.txt", cache=True)
+            t.add_input_url(urls[j], "fileb.txt", cache=True)
             
             t.set_cores(1)
             
             task_id = m.submit(t)
             
-            print("submitted task (id#",task_id,"):",t.command)
+            print("submitted task (id# "+str(task_id)+"):",t.command)
 
     print("waiting for tasks to complete...")
 
@@ -81,14 +81,9 @@ if __name__ == '__main__':
             r = t.result
             id = t.id
             
-            if r==VINE_RESULT_SUCCESS:
+            if r==vine.VINE_RESULT_SUCCESS:
                 print("task",id,"output:",t.std_output)
             else:
-                print("task",id,"failed:",r.result_string)
-            del t
+                print("task",id,"failed:",t.result_string)
 
     print("all tasks complete!")
-    
-    del m
-    
-    sys.exit(0)

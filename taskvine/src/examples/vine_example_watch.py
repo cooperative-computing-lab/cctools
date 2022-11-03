@@ -21,7 +21,7 @@
 
 # Originally written in C (vine_example_watch.c)
 
-from taskvine import *
+import taskvine as vine
 
 import os
 import sys
@@ -29,7 +29,7 @@ import errno
 
 if __name__ == '__main__':
     try:
-        m = Manager(port = VINE_DEFAULT_PORT)
+        m = vine.Manager(port = vine.VINE_DEFAULT_PORT)
     except IOError as e:
         print("couldn't create manager:",e.errno)
         sys.exit(1)
@@ -39,9 +39,9 @@ if __name__ == '__main__':
     
     for i in range(10):
         output = "output."+str(i)
-        t = Task("./vine_example_watch_trickle.sh > output")
-        t.add_input_file("vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", flags=VINE_CACHE)
-        t.add_output_file(output, "output", flags=VINE_WATCH)
+        t = vine.Task("./vine_example_watch_trickle.sh > output")
+        t.add_input_file("vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", cache=True)
+        t.add_output_file(output, "output", flags=vine.VINE_WATCH)
         t.set_cores(1)
         m.submit(t)
         
@@ -53,14 +53,9 @@ if __name__ == '__main__':
             r = t.result
             id = t.id
             
-            if r==VINE_RESULT_SUCCESS:
+            if r==vine.VINE_RESULT_SUCCESS:
                 print("task",id,"output:",t.std_output)
             else:
-                print("task",id,"failed:",r.result_string)
-            del t
+                print("task",id,"failed:",t.result_string)
             
     print("All tasks complete!")
-    
-    del m
-    
-    sys.exit(0)
