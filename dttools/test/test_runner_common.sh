@@ -108,6 +108,7 @@ run_wq_worker()
 		exit 1
 	fi
 	echo "Running worker."
+	echo "$WORK_QUEUE_WORKER --single-shot --timeout=10s --cores ${cores:-1} --memory ${memory:-250} --disk ${disk:-250} --gpus ${gpus:-0} ${coprocess:-""} --coprocess_cores ${coprocess_cores:-1} --coprocess_disk ${coprocess_disk:-250} --coprocess_memory ${coprocess_memory:-250} --coprocess_gpus ${coprocess_gpus:-0} --debug=all --debug-file=$log $* localhost $(cat $port_file)"
 	if ! "$WORK_QUEUE_WORKER" --single-shot --timeout=10s --cores ${cores:-1} --memory ${memory:-250} --disk ${disk:-250} --gpus ${gpus:-0} ${coprocess:-""} --coprocess_cores ${coprocess_cores:-1} --coprocess_disk ${coprocess_disk:-250} --coprocess_memory ${coprocess_memory:-250} --coprocess_gpus ${coprocess_gpus:-0} --debug=all --debug-file="$log" $* localhost $(cat "$port_file"); then
 		echo "ERROR: could not start worker"
 		exit 1
