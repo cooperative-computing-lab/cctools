@@ -43,10 +43,10 @@ run()
 	wait_for_file_creation $PORT_FILE 5
 
 	coprocess="--coprocess serverless_function.py --num_coprocesses 1"
-	coprocess_cores="--coprocess_cores 2"
-	coprocess_memory="--coprocess_memory 1000"
-	coprocess_disk="--coprocess_disk 1000"
-	coprocess_gpus="--coprocess_gpus 0"
+	coprocess_cores=2
+	coprocess_memory=1000
+	coprocess_disk=1000
+	coprocess_gpus=0
 	run_wq_worker $PORT_FILE worker.log 
 
 	# wait for wq to exit.
