@@ -8017,12 +8017,12 @@ void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  c
 int work_queue_specify_category_mode(struct work_queue *q, const char *category, work_queue_category_mode_t mode) {
 
 	switch(mode) {
-		case CATEGORY_ALLOCATION_MODE_FIXED:
-		case CATEGORY_ALLOCATION_MODE_MAX:
-		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
-		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
-		case CATEGORY_ALLOCATION_MODE_FAST_BUCKETING:
-		case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
+		case WORK_QUEUE_ALLOCATION_MODE_FIXED:
+		case WORK_QUEUE_ALLOCATION_MODE_MAX:
+		case WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE:
+		case WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT:
+		case WORK_QUEUE_ALLOCATION_MODE_FAST_BUCKETING:
+		case WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
 			break;
 		default:
 			notice(D_WQ, "Unknown category mode specified.");
