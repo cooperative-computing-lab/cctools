@@ -257,6 +257,7 @@ struct work_queue_coprocess *work_queue_coprocess_find_state(struct work_queue_c
 }
 
 struct work_queue_coprocess *work_queue_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct work_queue_resources *total_resources, char *coprocess_command, int number_of_coprocess_instances) {
+	if (number_of_coprocess_instances <= 0) return NULL;
 	int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : total_resources->cores.total);
 	int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : total_resources->memory.total);
 	int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : total_resources->disk.total);
@@ -279,6 +280,7 @@ struct work_queue_coprocess *work_queue_coprocess_initalize_all_coprocesses(int 
 }
 
 void work_queue_coprocess_shutdown_all_coprocesses(struct work_queue_coprocess *coprocess_info, int number_of_coprocess_instances) {
+	if (number_of_coprocess_instances <= 0) return;
 	work_queue_coprocess_shutdown(coprocess_info, number_of_coprocess_instances);
 	for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
 		struct work_queue_coprocess *curr_coprocess = &coprocess_info[coprocess_num];
@@ -293,6 +295,7 @@ void work_queue_coprocess_shutdown_all_coprocesses(struct work_queue_coprocess *
 }
 
 void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses) {
+	if (number_of_coprocesses <= 0) return;
 	for (int i = 0; i < number_of_coprocesses; i++)
 	{
 		struct work_queue_coprocess *curr_coprocess = &coprocess_info[i];
@@ -302,15 +305,8 @@ void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coproce
 		struct rmsummary *resources = rmonitor_measure_process(curr_coprocess->pid);
 
 		debug(D_WQ, "Measuring resources of coprocess with pid %d\n", curr_coprocess->pid);
-		debug(D_WQ, "cores: %lf, memory: %lf, disk: %lf, gpus: %lf\n",    	resources->cores, 
-																			resources->memory + resources->swap_memory,
-																			resources->disk,
-																			resources->gpus);
-		debug(D_WQ, "Max resources available to coprocess:\ncores: %"PRId64 " memory: %"PRId64 " disk: %"PRId64 " gpus: %"PRId64 "\n",  
-																				curr_coprocess->coprocess_resources->cores.total,
-																				curr_coprocess->coprocess_resources->memory.total,
-																				curr_coprocess->coprocess_resources->disk.total,
-																				curr_coprocess->coprocess_resources->gpus.total);
+		debug(D_WQ, "cores: %lf, memory: %lf, disk: %lf, gpus: %lf\n", resources->cores, resources->memory + resources->swap_memory, resources->disk, resources->gpus);
+		debug(D_WQ, "Max resources available to coprocess:\ncores: %"PRId64 " memory: %"PRId64 " disk: %"PRId64 " gpus: %"PRId64 "\n", curr_coprocess->coprocess_resources->cores.total, curr_coprocess->coprocess_resources->memory.total, curr_coprocess->coprocess_resources->disk.total, curr_coprocess->coprocess_resources->gpus.total);
 		curr_coprocess->coprocess_resources->cores.inuse = resources->cores;
 		curr_coprocess->coprocess_resources->memory.inuse = resources->memory + resources->swap_memory;
 		curr_coprocess->coprocess_resources->disk.inuse = resources->disk;
@@ -328,7 +324,7 @@ int work_queue_coprocess_enforce_limit(struct work_queue_coprocess *coprocess) {
 		coprocess->coprocess_resources->memory.inuse > coprocess->coprocess_resources->memory.total ||
 		coprocess->coprocess_resources->disk.inuse   > coprocess->coprocess_resources->disk.total ||
 		coprocess->coprocess_resources->gpus.inuse   > coprocess->coprocess_resources->gpus.total) {
-		fprintf(stdout, "Coprocess with pid %d has exceeded limits, killing coprocess\n", coprocess->pid);
+		debug(D_WQ, "Coprocess with pid %d has exceeded limits, killing coprocess\n", coprocess->pid);
 		work_queue_coprocess_terminate(coprocess);
 		return 0;
 	}

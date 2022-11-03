@@ -3169,13 +3169,13 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 			w->resources->workers = r;
 			w->resources->workers.inuse = inuse;
 		}
-		else if(!strcmp(resource_name,"coprocess_cores")) {
+		else if(string_prefix_is(resource_name, "coprocess_cores")) {
 			w->coprocess_resources->cores = r;
-		} else if(!strcmp(resource_name,"coprocess_memory")) {
+		} else if(string_prefix_is(resource_name, "coprocess_memory")) {
 			w->coprocess_resources->memory = r;
-		} else if(!strcmp(resource_name,"coprocess_disk")) {
+		} else if(string_prefix_is(resource_name, "coprocess_disk")) {
 			w->coprocess_resources->disk = r;
-		} else if(!strcmp(resource_name,"coprocess_gpus")) {
+		} else if(string_prefix_is(resource_name, "coprocess_gpus")) {
 			w->coprocess_resources->gpus = r;
 		}
 	} else {
@@ -4128,7 +4128,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	}
 
 	struct rmsummary *l = task_worker_box_size(q, w, t);
-	struct work_queue_resources *r;
+	struct work_queue_resources *r = NULL;
 	if (t->coprocess == NULL) {
 		r = w->resources;
 	} else {
