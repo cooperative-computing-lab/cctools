@@ -23,16 +23,16 @@ int main()
         //printf("iteration %d data value %d\n", i, num);
         bucketing_add(num, i + 1, s);
         //printf("value added\n");
-        print_sorted_points(s->sorted_points);
+        //bucketing_sorted_points_print(s->sorted_points);
         if (i >= num_sampling_points - 1)
         {
             //printf("Finding buckets\n");
             bucketing_fast_update_buckets(s);
-            print_sorted_buckets(s->sorted_buckets);
+            //bucketing_sorted_buckets_print(s->sorted_buckets);
         }
-        printf("Predicting value %lf\n", bucketing_predict(-1, s));
+        //printf("Predicting value %lf\n", bucketing_predict(-1, s));
         //printf("Sorted list length %d\n", list_length(s->sorted_points));
-        printf("----------------------------------\n");
+        //printf("----------------------------------\n");
     }
     bucketing_state_delete(s);
     return 0;

@@ -15,19 +15,59 @@ int bucketing_fast_update_buckets(bucketing_state* s)
     /* Find all break points */
     struct list* break_point_list = bucketing_find_break_points(s);
     
+    /* Find probabilities of buckets */
+    double bucket_probs[list_size(break_point_list)];   //store probabilities of buckets
+    list_first_item(s->sorted_points);
+    list_first_item(break_point_list);
+    bucketing_point* tmp_point;                 //pointer to item in s->sorted_points
     bucketing_cursor_w_pos* tmp_break_point;    //pointer pointing to item in break point list
+    int i = 0;
+    bucket_probs[0] = 0;
+    double total_sig = 0;                       //track total significance
+
+    tmp_point = list_next_item(s->sorted_points);
+    tmp_break_point = list_next_item(break_point_list);
+    bucketing_point* tmp_point_of_break_point = 0;
+    list_get(tmp_break_point->lc, (void**) &tmp_point_of_break_point);
+    
+    /* loop to compute buckets' probabilities */
+    while(tmp_point)
+    {
+
+        if (tmp_point->val <= tmp_point_of_break_point->val)
+        {
+            bucket_probs[i] += tmp_point->sig;
+            total_sig += tmp_point->sig;
+            tmp_point = list_next_item(s->sorted_points);
+        }
+        else
+        {
+
+            ++i;
+            bucket_probs[i] = 0;
+            tmp_break_point = list_next_item(break_point_list);
+            list_get(tmp_break_point->lc, (void**) &tmp_point_of_break_point);
+        }
+    }
+
+    /* must divide by total significance to normalize to [0, 1] */
+    for (int i = 0; i < list_size(break_point_list); ++i)
+    {
+        bucket_probs[i] /= total_sig;    
+    }
+
     bucketing_bucket* tmp_bucket;               //pointer to a created bucket
     bucketing_point* tmp_point_ptr = 0;         //pointer to what tmp_break_point->lc points
-    int prev_pos = 0;                           //previous position to find probability of buckets
     list_first_item(break_point_list);          //reset to beginning of break point list
-    
+    i = 0;
+
     /* Loop through list of break points */
     while ((tmp_break_point = list_next_item(break_point_list)) != NULL)
     {
         list_get(tmp_break_point->lc, (void**) &tmp_point_ptr);
-        tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, 1.0*(tmp_break_point->pos - prev_pos + 1)/list_length(s->sorted_points));
+        tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, bucket_probs[i]);
         list_push_tail(s->sorted_buckets, tmp_bucket);
-        prev_pos = tmp_break_point->pos + 1;
+        ++i;
     }
     
     /* Delete break point list */

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 #include "bucketing_exhaust.h"
 #include "bucketing.h"
 
@@ -8,31 +9,34 @@ int main()
     int num_sampling_points = 10;
     double increase_rate = 2;
 
-    printf("Creating bucketing state\n");
+    //printf("Creating bucketing state\n");
     bucketing_state* s = bucketing_state_create(default_value, num_sampling_points, increase_rate, 10);
 
-    int prime = 7;
-    int num = 2;
+    int prime = 7000;
+    int num = 2000;
     int multiple = 2;
     int iters = 50;
 
-    printf("Adding values\n");
-    for (int i = 0; i < iters; ++i)
+    //printf("Adding values\n");
+    for (int i = 0; i < iters+20; ++i)
     {
-        num = num * multiple % prime;
-        //printf("iteration %d data value %d\n", i, num);
+        if (i >= iters)
+            num = 10;
+        else
+            num = num * multiple % prime;
+        //printf("iteration %d data value %d num points %d\n", i, num, list_size(s->sorted_points));
         bucketing_add(num, i + 1, s);
         //printf("value added\n");
-        print_sorted_points(s->sorted_points);
+        //bucketing_sorted_points_print(s->sorted_points);
         if (i >= num_sampling_points - 1)
         {
             //printf("Finding buckets\n");
             bucketing_exhaust_update_buckets(s);
-            print_sorted_buckets(s->sorted_buckets);
+            //bucketing_sorted_buckets_print(s->sorted_buckets);
         }
-        printf("Predicting value %lf\n", bucketing_predict(-1, s));
+        //printf("Predicting value %lf\n", bucketing_predict(-1, s));
         //printf("Sorted list length %d\n", list_length(s->sorted_points));
-        printf("----------------------------------\n");
+        //printf("----------------------------------\n");
     }
     bucketing_state_delete(s);
     return 0;

@@ -231,11 +231,11 @@ double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, int lo,
 
 /* Print a sorted list of bucketing_bucket
  * @param l the list of buckets */
-void print_sorted_buckets(struct list* l);
+void bucketing_sorted_buckets_print(struct list* l);
 
 /* Print a sorted list of bucketing_point
  * @param l the list of points */
-void print_sorted_points(struct list* l);
+void bucketing_sorted_points_print(struct list* l);
 
 /** End: debug functions **/
 

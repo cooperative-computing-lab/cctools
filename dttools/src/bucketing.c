@@ -318,12 +318,14 @@ double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, int lo,
 {
     double* bucket_probs = malloc((hi - lo + 1) * sizeof(*bucket_probs));
 
+    /* get all probabilities of buckets in range */
     double total_prob = 0;
     for (int i = lo; i <= hi; ++i)
     {
         total_prob += bucket_array[i]->prob;
     }
 
+    /* reweight to [0, 1] */
     for (int i = lo; i <= hi; ++i)
     {
         bucket_probs[i - lo] = bucket_array[i]->prob / total_prob;
@@ -332,7 +334,7 @@ double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, int lo,
     return bucket_probs;
 }
 
-void print_sorted_buckets(struct list* l)
+void bucketing_sorted_buckets_print(struct list* l)
 {
     bucketing_bucket *tmp;
     list_first_item(l);
@@ -345,7 +347,7 @@ void print_sorted_buckets(struct list* l)
     }
 }
 
-void print_sorted_points(struct list* l)
+void bucketing_sorted_points_print(struct list* l)
 {
     bucketing_point* tmp;
     list_first_item(l);
