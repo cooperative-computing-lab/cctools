@@ -18,8 +18,6 @@
 # the executable and all of its dynamic dependencies.  This allows the
 # use of arbitrary workers without regard to their software environment.
 
-# Originally written in C (vine_example_mosaic.c)
-
 import taskvine as vine
 
 import os

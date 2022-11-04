@@ -13,8 +13,6 @@
 # Both the downloads are automatically unpacked, cached, and shared
 # with all the same tasks on the worker.
 
-# Originally written in C (vine_example_blast.c)
-
 import taskvine as vine
 
 import os

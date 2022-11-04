@@ -19,8 +19,6 @@
 # up another terminal, and observe that files output.0, output.1,
 # etc are gradually produced throughout the run.
 
-# Originally written in C (vine_example_watch.c)
-
 import taskvine as vine
 
 import os

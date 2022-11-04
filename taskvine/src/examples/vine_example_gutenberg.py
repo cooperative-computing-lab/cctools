@@ -11,8 +11,6 @@
 # A small shell script (vine_example_guteberg_task.sh) is used to perform
 # a simple text comparison of each pair of files.
 
-# Originally written in C (vine_example_gutenberg.c)
-
 import taskvine as vine
 
 import os
