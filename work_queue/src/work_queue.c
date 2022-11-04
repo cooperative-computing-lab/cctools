@@ -261,6 +261,7 @@ struct work_queue_worker {
 
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
+	struct work_queue_resources *coprocess_resources;
 	struct hash_table           *features;
 
 	char *workerid;
@@ -1270,6 +1271,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 	itable_delete(w->current_tasks_boxes);
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
+	work_queue_resources_delete(w->coprocess_resources);
 	free(w->workerid);
 
 	if(w->features)
@@ -1378,6 +1380,7 @@ static void add_worker(struct work_queue *q)
 	w->last_update_msg_time = w->start_time;
 
 	w->resources = work_queue_resources_create();
+	w->coprocess_resources = work_queue_resources_create();
 
 	w->workerid = NULL;
 
@@ -3165,6 +3168,15 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 			w->resources->workers = r;
 			w->resources->workers.inuse = inuse;
 		}
+		else if(string_prefix_is(resource_name, "coprocess_cores")) {
+			w->coprocess_resources->cores = r;
+		} else if(string_prefix_is(resource_name, "coprocess_memory")) {
+			w->coprocess_resources->memory = r;
+		} else if(string_prefix_is(resource_name, "coprocess_disk")) {
+			w->coprocess_resources->disk = r;
+		} else if(string_prefix_is(resource_name, "coprocess_gpus")) {
+			w->coprocess_resources->gpus = r;
+		}
 	} else {
 		return MSG_FAILURE;
 	}
@@ -4115,7 +4127,14 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	}
 
 	struct rmsummary *l = task_worker_box_size(q, w, t);
-	struct work_queue_resources *r = w->resources;
+	struct work_queue_resources *r = NULL;
+	if (t->coprocess == NULL) {
+		r = w->resources;
+	} else {
+		r = w->coprocess_resources;
+	}
+
+	
 
 	int ok = 1;
 
@@ -4134,6 +4153,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	if((l->gpus > r->gpus.total) || (r->gpus.inuse + l->gpus > overcommitted_resource_total(q, r->gpus.total))) {
 		ok = 0;
 	}
+
 
 	//if worker's end time has not been received
 	if(w->end_time < 0){
@@ -4433,6 +4453,11 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 	w->resources->disk.inuse   = 0;
 	w->resources->gpus.inuse   = 0;
 
+	w->coprocess_resources->cores.inuse  = 0;
+	w->coprocess_resources->memory.inuse = 0;
+	w->coprocess_resources->disk.inuse   = 0;
+	w->coprocess_resources->gpus.inuse   = 0;
+
 	update_max_worker(q, w);
 
 	if(w->resources->workers.total < 1)
@@ -4442,10 +4467,19 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 
 	itable_firstkey(w->current_tasks_boxes);
 	while(itable_nextkey(w->current_tasks_boxes, &taskid, (void **)& box)) {
-		w->resources->cores.inuse     += box->cores;
-		w->resources->memory.inuse    += box->memory;
-		w->resources->disk.inuse      += box->disk;
-		w->resources->gpus.inuse      += box->gpus;
+		struct work_queue_task *t = itable_lookup(w->current_tasks, taskid);
+		if (t->coprocess) {
+			w->coprocess_resources->cores.inuse     += box->cores;
+			w->coprocess_resources->memory.inuse    += box->memory;
+			w->coprocess_resources->disk.inuse      += box->disk;
+			w->coprocess_resources->gpus.inuse      += box->gpus;
+		}
+		else {
+			w->resources->cores.inuse     += box->cores;
+			w->resources->memory.inuse    += box->memory;
+			w->resources->disk.inuse      += box->disk;
+			w->resources->gpus.inuse      += box->gpus;
+		}
 	}
 }
 
@@ -5039,7 +5073,6 @@ void work_queue_task_specify_coprocess( struct work_queue_task *t, const char *c
 		free(t->coprocess);
 		t->coprocess = NULL;
 	}
-
 	if(coprocess) {
 		t->coprocess = string_format("wq_worker_coprocess:%s", coprocess);
 		work_queue_task_specify_feature(t, t->coprocess);
