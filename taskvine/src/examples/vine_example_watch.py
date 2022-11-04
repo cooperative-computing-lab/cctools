@@ -34,8 +34,9 @@ if __name__ == '__main__':
     print("listening on port",m.port)
     
     m.enable_debug_log("manager.log")
-    
-    for i in range(10):
+    n = 3
+
+    for i in range(n):
         output = "output."+str(i)
         t = vine.Task("./vine_example_watch_trickle.sh > output")
         t.add_input_file("vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", cache=True)
@@ -55,5 +56,13 @@ if __name__ == '__main__':
                 print("task",id,"output:",t.std_output)
             else:
                 print("task",id,"failed:",t.result_string)
-            
+
+        for i in range(n):
+            try:
+                with open(f"output.{i}") as f:
+                    print(f"output.{i}:\n{f.readlines()}\n")
+            except IOError:
+                pass
+
+
     print("All tasks complete!")
