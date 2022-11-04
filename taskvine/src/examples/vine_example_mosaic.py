@@ -35,7 +35,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print(f"Converting {convert} into convert.sfx...")
-    if os.system(f"starch -x {convert} -c convert convert.sfx") is not 0:
+    if os.system(f"starch -x {convert} -c convert convert.sfx") != 0:
         print(sys.argv[0], ": failed to run starch, is it in your PATH?")
         sys.exit(1)
 
