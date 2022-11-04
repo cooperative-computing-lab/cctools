@@ -21,13 +21,15 @@ int main()
     {
         num = num * multiple % prime;
         //printf("iteration %d data value %d\n", i, num);
-        bucketing_add(num, i + 1, s);
+        if (bucketing_add(num, i + 1, s))
+            return -1;
         //printf("value added\n");
         //bucketing_sorted_points_print(s->sorted_points);
         if (i >= num_sampling_points - 1)
         {
             //printf("Finding buckets\n");
-            bucketing_fast_update_buckets(s);
+            if (bucketing_fast_update_buckets(s))
+                return -1;
             //bucketing_sorted_buckets_print(s->sorted_buckets);
         }
         //printf("Predicting value %lf\n", bucketing_predict(-1, s));

@@ -167,11 +167,13 @@ void bucketing_bucket_range_delete(bucketing_bucket_range* range);
  * @return 1 if failure */
 int bucketing_add(double val, double sig, bucketing_state* s);
 
-/* Predict a value
+/* Predict a value, only predict when we need a new value, don't predict when prev value
+ * (if available) is usable
  * @param prev_val previous value to consider, -1 if no previous value, 
  * > 0 means a larger value is expected from prediction
  * @param s the relevant bucketing_state
- * @return the predicted value, -1 if failure */
+ * @return the predicted value
+ * @return -1 if failure */
 double bucketing_predict(double prev_val, bucketing_state* s);
 
 /** End: APIs **/
@@ -204,7 +206,8 @@ int bucketing_bucket_range_list_clear(struct list* l, void (*f) (bucketing_bucke
 /* Sort a list of bucketing_cursor_pos
  * @param l the list to be sorted
  * @param f the compare function
- * @return pointer to a sorted list of bucketing_cursor_pos */
+ * @return pointer to a sorted list of bucketing_cursor_pos
+ * @return 0 if failure */
 struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (const void*, const void*));
 
 /* Compare position of two break points
@@ -215,14 +218,16 @@ int compare_break_points(const void* p1, const void* p2);
 
 /* Convert a list of bucketing_bucket to an array of those
  * @param bucket_list list of bucketing_bucket
- * @return pointer to array of bucketing_bucket* */
+ * @return pointer to array of bucketing_bucket
+ * @return 0 if failure */
 bucketing_bucket** bucketing_bucket_list_to_array(struct list* bucket_list);
 
 /* Reweight the probabilities of a range of buckets to 1
  * @param bucket_array the array of bucketing_bucket*
  * @param lo index of low bucket
  * @param hi index of high bucket
- * @return array of reweighted probabilities */
+ * @return array of reweighted probabilities
+ * @return 0 if failure */
 double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, int lo, int hi);
 
 /** End: internals **/

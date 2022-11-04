@@ -7,18 +7,26 @@
 
 int bucketing_exhaust_update_buckets(bucketing_state *s)
 {
+    if (!s)
+        return 1;
+
     /* Destroy old list */
     list_free(s->sorted_buckets);
     list_delete(s->sorted_buckets);
 
     /* Update with new list */
     s->sorted_buckets = bucketing_exhaust_get_min_cost_bucket_list(s);
+    if (!(s->sorted_buckets))
+        return 1;
     
     return 0;
 }
 
 struct list* bucketing_exhaust_get_min_cost_bucket_list(bucketing_state* s)
 {
+    if (!s)
+        return 0;
+
     double cost;
     double min_cost = -1;
     struct list* best_bucket_list = 0;
@@ -29,9 +37,13 @@ struct list* bucketing_exhaust_get_min_cost_bucket_list(bucketing_state* s)
     {
         /* get list of buckets */
         bucket_list = bucketing_exhaust_get_buckets(s, i + 1);
+        if (!bucket_list)
+            return 0;
 
         /* compute cost associated with bucket_list */
         cost = bucketing_exhaust_compute_cost(s, bucket_list);
+        if (cost == -1)
+            return 0;
         
         /* get list with lowest cost */
         if (min_cost == -1 || min_cost > cost)
@@ -58,10 +70,13 @@ struct list* bucketing_exhaust_get_min_cost_bucket_list(bucketing_state* s)
 
 struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
 {
+    if (!s)
+        return 0;
     double max_val = ((bucketing_point*) list_peek_tail(s->sorted_points))->val;    //max value in all points
     
     int steps = floor(log(max_val / n) / log(2));   //logarithmic steps to take below max_val/n
 
+    /* No steps if steps is negative */
     if (steps < 0)
         steps = 0;
 
@@ -108,13 +123,19 @@ struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
     total_sig += buck_sig;
 
     struct list* ret = list_create();
-    
+   
+    bucketing_bucket* tmp_bucket;
+
     /* push a bucket in sorted order if bucket is not empty */
     for (i = 0; i < steps + n; ++i)
     {
         if (candidate_probs[i] != 0)
         {
-            list_push_tail(ret, bucketing_bucket_create(candidate_vals[i], candidate_probs[i] / total_sig));
+            tmp_bucket = bucketing_bucket_create(candidate_vals[i], candidate_probs[i] / total_sig);
+            if (!tmp_bucket)
+                return 0;
+
+            list_push_tail(ret, tmp_bucket);
         }
     }
 
@@ -123,13 +144,20 @@ struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
 
 double bucketing_exhaust_compute_cost(bucketing_state* s, struct list* bucket_list)
 {
+    if (!s || !bucket_list)
+        return -1;
+
     int N = list_size(bucket_list);
     double cost_table[N][N];
 
     /* Compute task expectation in each bucket */
     double* task_exps = bucketing_exhaust_compute_task_exps(s, bucket_list);
+    if (!task_exps)
+        return -1;
 
     bucketing_bucket** bucket_array = bucketing_bucket_list_to_array(bucket_list);
+    if (!bucket_array)
+        return -1;
 
     /* i is task in which bucket, j is which bucket is chosen */
     /* fill easy entries */
@@ -149,6 +177,8 @@ double bucketing_exhaust_compute_cost(bucketing_state* s, struct list* bucket_li
         {
             cost_table[i][j] = bucket_array[j]->val;
             upper_bucket_probs = bucketing_reweight_bucket_probs(bucket_array, j + 1, N - 1);
+            if (!upper_bucket_probs)
+                return -1;
             
             for (int k = j + 1; k < N; ++k)
             {
@@ -176,7 +206,13 @@ double bucketing_exhaust_compute_cost(bucketing_state* s, struct list* bucket_li
 
 double* bucketing_exhaust_compute_task_exps(bucketing_state* s, struct list* bucket_list)
 {
+    if (!s || !bucket_list)
+        return 0;
+
     double* task_exps = calloc(list_size(bucket_list), sizeof(*task_exps));
+    if (!task_exps)
+        return 0;
+
     bucketing_point* tmp_pnt;
     bucketing_bucket* tmp_buck;
     int i = 0;

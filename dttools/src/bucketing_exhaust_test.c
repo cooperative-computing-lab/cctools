@@ -25,7 +25,8 @@ int main()
         else
             num = num * multiple % prime;
         //printf("iteration %d data value %d num points %d\n", i, num, list_size(s->sorted_points));
-        bucketing_add(num, i + 1, s);
+        if (bucketing_add(num, i + 1, s))
+            return 1;
         //printf("value added\n");
         //bucketing_sorted_points_print(s->sorted_points);
         if (i >= num_sampling_points - 1)
