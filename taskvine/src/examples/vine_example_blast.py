@@ -42,8 +42,8 @@ if __name__ == '__main__':
 
     for i in range(10):
         t = vine.Task("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file")
-        
-        t.add_input_buffer(query_string,"query.file", flags=vine.VINE_UNPACK, cache=True)
+
+        t.add_input_buffer(query_string,"query.file", cache=True)
         t.add_input_url(blast_url,"blastdir", flags=vine.VINE_UNPACK, cache=True )
         t.add_input_url(landmark_url,"landmark", flags=vine.VINE_UNPACK, cache=True )
         t.set_env_var("BLASTDB",value="landmark")
