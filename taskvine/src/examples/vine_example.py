@@ -42,9 +42,9 @@ if __name__ == "__main__":
     # available port.
     try:
         q = vine.Manager()
-    except:
+    except Exception:
         print("Instantiation of taskvine Manager failed!")
-        sys.exit(1)
+        raise
 
     print("listening on port %d..." % q.port)
 
