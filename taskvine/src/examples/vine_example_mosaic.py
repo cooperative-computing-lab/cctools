@@ -24,7 +24,7 @@ import os
 import sys
 import errno
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     try:
         convert = sys.argv[1]
@@ -38,52 +38,58 @@ if __name__ == '__main__':
 
     print(f"Converting {convert} into convert.sfx...")
     if os.system(f"starch -x {convert} -c convert convert.sfx") is not 0:
-        print(sys.argv[0],": failed to run starch, is it in your PATH?")
+        print(sys.argv[0], ": failed to run starch, is it in your PATH?")
         sys.exit(1)
-        
+
     try:
         m = vine.Manager()
     except IOError as e:
-        print("couldn't create manager:",e.errno)
+        print("couldn't create manager:", e.errno)
         sys.exit(1)
-    print("listening on port",m.port)
-    
+    print("listening on port", m.port)
+
     m.enable_debug_log("manager.log")
-    
-    for i in range(0,360,10):
-        outfile = str(i)+".cat.jpg"
-        command = "./convert.sfx -swirl "+str(i)+" cat.jpg "+str(i)+".cat.jpg"
-        
+
+    for i in range(0, 360, 10):
+        outfile = str(i) + ".cat.jpg"
+        command = "./convert.sfx -swirl " + str(i) + " cat.jpg " + str(i) + ".cat.jpg"
+
         t = vine.Task(command)
         t.add_input_file("convert.sfx", "convert.sfx", cache=True)
-        t.add_input_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", cache=True)
-        t.add_output_file(outfile,outfile,cache=False)
-        
+        t.add_input_url(
+            "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg",
+            "cat.jpg",
+            cache=True,
+        )
+        t.add_output_file(outfile, outfile, cache=False)
+
         t.set_cores(1)
-        
+
         task_id = m.submit(t)
-        
-        print("Submitted task (id# "+str(task_id)+"): "+command)
-        
+
+        print("Submitted task (id# " + str(task_id) + "): " + command)
+
     print("Waiting for tasks to complete...")
-    
+
     while not m.empty():
         t = m.wait(5)
         if t:
             r = t.result
             id = t.id
-            
+
             if r == vine.VINE_RESULT_SUCCESS:
-                print("Task "+str(id)+" complete: "+command)
+                print("Task " + str(id) + " complete: " + command)
         else:
-            print("Task "+str(id)+" falied: "+command)
-        
+            print("Task " + str(id) + " falied: " + command)
+
     print("All tasks complete!")
-    
+
     print("Combining images into mosaic.jpg...")
-    os.system("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg")
-    
+    os.system(
+        "montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg"
+    )
+
     print("Deleting intermediate images...")
-    for i in range(0,360,10):
-        filename = str(i)+".cat.jpg"
+    for i in range(0, 360, 10):
+        filename = str(i) + ".cat.jpg"
         os.unlink(filename)

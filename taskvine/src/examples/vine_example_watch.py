@@ -25,37 +25,39 @@ import os
 import sys
 import errno
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         m = vine.Manager()
     except IOError as e:
-        print("couldn't create manager:",e.errno)
+        print("couldn't create manager:", e.errno)
         sys.exit(1)
-    print("listening on port",m.port)
-    
+    print("listening on port", m.port)
+
     m.enable_debug_log("manager.log")
     n = 3
 
     for i in range(n):
-        output = "output."+str(i)
+        output = "output." + str(i)
         t = vine.Task("./vine_example_watch_trickle.sh > output")
-        t.add_input_file("vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", cache=True)
+        t.add_input_file(
+            "vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", cache=True
+        )
         t.add_output_file(output, "output", flags=vine.VINE_WATCH)
         t.set_cores(1)
         m.submit(t)
-        
+
     print("Waiting for tasks to complete...")
-    
+
     while not m.empty():
         t = m.wait(5)
         if t:
             r = t.result
             id = t.id
-            
+
             if r == vine.VINE_RESULT_SUCCESS:
-                print("task",id,"output:",t.std_output)
+                print("task", id, "output:", t.std_output)
             else:
-                print("task",id,"failed:",t.result_string)
+                print("task", id, "failed:", t.result_string)
 
         for i in range(n):
             try:
@@ -63,6 +65,5 @@ if __name__ == '__main__':
                     print(f"output.{i}:\n{f.readlines()}\n")
             except IOError:
                 pass
-
 
     print("All tasks complete!")

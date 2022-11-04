@@ -29,29 +29,31 @@ blast_url = "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-b
 
 landmark_url = "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz"
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         m = vine.Manager()
     except IOError as e:
-        print("couldn't create manager:",e.errno)
+        print("couldn't create manager:", e.errno)
         sys.exit(1)
-    print("listening on port",m.port)
-    
+    print("listening on port", m.port)
+
     m.enable_debug_log("manager.log")
     m.set_scheduler(vine.VINE_SCHEDULE_FILES)
 
     for i in range(10):
-        t = vine.Task("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file")
+        t = vine.Task(
+            "blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file"
+        )
 
-        t.add_input_buffer(query_string,"query.file", cache=True)
-        t.add_input_url(blast_url,"blastdir", flags=vine.VINE_UNPACK, cache=True )
-        t.add_input_url(landmark_url,"landmark", flags=vine.VINE_UNPACK, cache=True )
-        t.set_env_var("BLASTDB",value="landmark")
-        
+        t.add_input_buffer(query_string, "query.file", cache=True)
+        t.add_input_url(blast_url, "blastdir", flags=vine.VINE_UNPACK, cache=True)
+        t.add_input_url(landmark_url, "landmark", flags=vine.VINE_UNPACK, cache=True)
+        t.set_env_var("BLASTDB", value="landmark")
+
         task_id = m.submit(t)
-        
-        print("submitted task (id# "+str(task_id)+"):",t.command)
-    
+
+        print("submitted task (id# " + str(task_id) + "):", t.command)
+
     print("waiting for tasks to complete...")
 
     while not m.empty():
@@ -61,8 +63,8 @@ if __name__ == '__main__':
             id = t.id
 
             if r == vine.VINE_RESULT_SUCCESS:
-                print("task",id,"output:",t.std_output)
+                print("task", id, "output:", t.std_output)
             else:
-                print("task",id,"failed:",t.result_string)
+                print("task", id, "failed:", t.result_string)
 
     print("all tasks complete!")
