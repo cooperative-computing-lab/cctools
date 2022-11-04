@@ -31,6 +31,7 @@ void work_queue_resources_delete( struct work_queue_resources *r );
 void work_queue_resources_debug( struct work_queue_resources *r );
 void work_queue_resources_measure_locally( struct work_queue_resources *r, const char *workspace );
 void work_queue_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime );
+void work_queue_coprocess_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime );
 void work_queue_resources_clear( struct work_queue_resources *r );
 void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r );
 void work_queue_resources_add_to_jx( struct work_queue_resources *r, struct jx *j );

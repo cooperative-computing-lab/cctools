@@ -46,8 +46,7 @@ struct work_queue_process {
 	struct path_disk_size_info *disk_measurement_state;
 
 	/* variables for coprocess funciton calls */
-	char *coprocess_name;
-	int coprocess_port;
+	void *coprocess;
 };
 
 struct work_queue_process * work_queue_process_create( struct work_queue_task *task, int disk_allocation );

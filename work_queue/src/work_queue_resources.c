@@ -89,6 +89,15 @@ void work_queue_resources_send( struct link *manager, struct work_queue_resource
 	link_printf(manager, stoptime, "resource tag %"PRId64"\n", r->tag);
 }
 
+void work_queue_coprocess_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime ) 
+{
+	debug(D_WQ, "Sending coprocess resource description to manager:");
+	work_queue_resource_send(manager, &r->disk,    "coprocess_disk",   stoptime);
+	work_queue_resource_send(manager, &r->memory,  "coprocess_memory", stoptime);
+	work_queue_resource_send(manager, &r->gpus,    "coprocess_gpus",   stoptime);
+	work_queue_resource_send(manager, &r->cores,   "coprocess_cores",  stoptime);
+}
+
 void work_queue_resources_debug( struct work_queue_resources *r )
 {
 	work_queue_resource_debug(&r->workers, "workers");
