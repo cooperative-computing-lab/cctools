@@ -25,15 +25,19 @@ import sys
 import errno
 
 if __name__ == '__main__':
-    print("Checking that /usr/bin/convert is installed...")
-    r = os.access("/usr/bin/convert",os.X_OK)
-    if r != 0:
-        print(sys.argv[0],": /usr/bin/convert is not installed: this won't work at all.")
+
+    try:
+        convert = sys.argv[1]
+    except IndexError:
+        convert = "/usr/bin/convert"
+
+    print(f"Checking that {convert} is installed...")
+    if not os.access(convert, os.X_OK):
+        print(sys.argv[0], f": {convert} is not installed: this won't work at all.")
         sys.exit(1)
-        
-    print("Converting /usr/bin/convert into convert.sfx...")
-    r = os.system("starch -x /usr/bin/convert -c convert convert.sfx")
-    if r != 0:
+
+    print(f"Converting {convert} into convert.sfx...")
+    if os.system(f"starch -x {convert} -c convert convert.sfx") is not 0:
         print(sys.argv[0],": failed to run starch, is it in your PATH?")
         sys.exit(1)
         
