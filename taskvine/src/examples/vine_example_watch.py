@@ -20,10 +20,7 @@
 # etc are gradually produced throughout the run.
 
 import taskvine as vine
-
-import os
 import sys
-import errno
 
 if __name__ == "__main__":
     try:

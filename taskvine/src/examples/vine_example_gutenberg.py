@@ -12,10 +12,7 @@
 # a simple text comparison of each pair of files.
 
 import taskvine as vine
-
-import os
 import sys
-import errno
 
 urls = [
     "http://www.gutenberg.org/files/1960/1960.txt",

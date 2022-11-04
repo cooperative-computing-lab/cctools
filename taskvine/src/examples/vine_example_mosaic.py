@@ -19,10 +19,8 @@
 # use of arbitrary workers without regard to their software environment.
 
 import taskvine as vine
-
 import os
 import sys
-import errno
 
 if __name__ == "__main__":
 

@@ -14,10 +14,7 @@
 # with all the same tasks on the worker.
 
 import taskvine as vine
-
-import os
 import sys
-import errno
 
 query_string = """>P01013 GENE X PROTEIN (OVALBUMIN-RELATED)
 QIKDLLVSSSTDLDTTLVLVNAIYFKGMWKTAFNAEDTREMPFHVTKQESKPVQMMCMNNSFNVATLPAE
