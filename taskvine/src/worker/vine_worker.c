@@ -194,6 +194,9 @@ static struct list   *procs_waiting = NULL;
 // These are additional pointers into procs_table.
 static struct itable *procs_complete = NULL;
 
+// Table of current transfers and their id
+static struct hash_table *current_transfers = NULL;
+
 //User specified features this worker provides.
 static struct hash_table *features = NULL;
 
@@ -416,7 +419,13 @@ Send an asynchronmous message to the manager indicating that an item was success
 
 void send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
 {
-	send_message(manager,"cache-update %s %lld %lld\n",cachename,(long long)size,(long long)transfer_time);
+	char *transfer_id;
+	transfer_id = hash_table_lookup(current_transfers, cachename);
+	send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
+	if(transfer_id)
+	{
+		hash_table_remove(current_transfers, cachename);
+	}
 }
 
 /*
@@ -986,6 +995,7 @@ static int handle_manager(struct link *manager)
 	char filename[VINE_LINE_MAX];
 	char source_encoded[VINE_LINE_MAX];
 	char source[VINE_LINE_MAX];
+	char transfer_id[VINE_LINE_MAX];
 	int64_t length;
 	int64_t task_id = 0;
 	int flags;
@@ -1002,11 +1012,13 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = vine_transfer_get_dir(manager,global_cache,filename,time(0)+active_timeout);
 			reset_idle_timer();
-		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o %d", source_encoded, filename_encoded, &length, &mode, &flags)==5) {
+		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o %d %s", source_encoded, filename_encoded, &length, &mode, &flags, transfer_id)==6) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_url(filename,length,mode,source,flags);
 			reset_idle_timer();
+			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
+			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
 		} else if(sscanf(line, "mini_task %"SCNd64" %s %"SCNd64" %o %d",&task_id,filename_encoded, &length, &mode, &flags)==5) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_put_mini_task(manager,time(0)+active_timeout,filename,length,mode,source,flags);
@@ -1894,7 +1906,7 @@ int main(int argc, char *argv[])
 	catalog_hosts = CATALOG_HOST;
 
 	features = hash_table_create(4, 0);
-
+	current_transfers = hash_table_create(0, 0);
 	worker_start_time = timestamp_get();
 
 	set_worker_id();

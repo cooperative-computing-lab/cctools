@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "vine_blocklist.h"
 #include "vine_txn_log.h"
 #include "vine_perf_log.h"
+#include "vine_current_transfers.h"
 
 #include "cctools.h"
 #include "envtools.h"
@@ -296,14 +297,17 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 	char cachename[VINE_LINE_MAX];
 	long long size;
 	long long transfer_time;
+	char id[VINE_LINE_MAX];
 
-	if(sscanf(line,"cache-update %s %lld %lld",cachename,&size,&transfer_time)==3) {
+	if(sscanf(line,"cache-update %s %lld %lld %s",cachename,&size,&transfer_time, id)==4) {
 		struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
 		if(remote_info) {
 			remote_info->size = size;
 			remote_info->transfer_time = transfer_time;
 			remote_info->in_cache = 1;
 		}
+		vine_current_transfers_remove(q, id);
+		vine_current_transfers_print_table(q);
 	}
 
 	return VINE_MSG_PROCESSED;
@@ -3014,6 +3018,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->worker_blocklist = hash_table_create(0, 0);
 
 	q->factory_table = hash_table_create(0, 0);
+	q->current_transfer_table = hash_table_create(0, 0);
 	q->fetch_factory = 0;
 
 	q->measured_local_resources = rmsummary_create(-1);

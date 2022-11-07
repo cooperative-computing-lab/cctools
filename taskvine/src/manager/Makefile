@@ -18,7 +18,8 @@ SOURCES = \
 	vine_remote_file_info.c \
 	vine_factory_info.c \
 	vine_task_info.c \
-	vine_blocklist.c
+	vine_blocklist.c \
+	vine_current_transfers.c
 
 PUBLIC_HEADERS = taskvine.h taskvine_json.h
 

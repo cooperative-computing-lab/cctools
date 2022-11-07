@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "vine_protocol.h"
 #include "vine_remote_file_info.h"
 #include "vine_txn_log.h"
+#include "vine_current_transfers.h"
 
 #include "debug.h"
 #include "timestamp.h"
@@ -319,6 +320,8 @@ static vine_result_code_t vine_manager_put_url_if_not_cached( struct vine_manage
 
 	url_encode(tf->source,source_encoded,sizeof(source_encoded));
 	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
+									
+	char *transfer_id = vine_current_transfers_add(q, w, strdup(tf->source));
 
 	vine_manager_send(q,w,"puturl %s %s %d %o %d\n",source_encoded, cached_name_encoded, tf->length, 0777,tf->flags );
 
@@ -459,10 +462,15 @@ static char *vine_manager_can_worker_transfer( struct vine_manager *q, struct vi
 		HASH_TABLE_ITERATE(q->worker_table, id, peer){
 			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)))
 			{
-				if(remote_info->in_cache)
+				if(vine_current_transfers_source_in_use(q, f->source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
 				{
-					debug(D_VINE, "This file is to be requested from worker: %s:%d", peer->transfer_addr, peer->transfer_port);
-					return string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+					if(remote_info->in_cache)
+					{
+						debug(D_VINE, "This file is to be requested from worker: %s:%d", peer->transfer_addr, peer->transfer_port);
+						return string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+					}
+				}else{
+					debug(D_VINE, "Vine transfer source busy: %s:%d", peer->transfer_addr, peer->transfer_port);
 				}
 			}
 		}
@@ -505,6 +513,8 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 			char *peer_source;
 			if((peer_source = vine_manager_can_worker_transfer(q, w, f))) { 
 				struct vine_file *worker_file = vine_file_create(peer_source, f->remote_name, f->data, f->length, VINE_URL, f->flags);
+				free(worker_file->cached_name);
+				worker_file->cached_name = strdup(f->cached_name);
 				result = vine_manager_put_input_file(q, w, t, worker_file);
 				free(peer_source);
 				vine_file_delete(worker_file);
