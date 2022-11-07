@@ -9,7 +9,7 @@ int main()
     double increase_rate = 2;
 
     //printf("Creating bucketing state\n");
-    bucketing_state* s = bucketing_state_create(default_value, num_sampling_points, increase_rate, 0);
+    bucketing_state_t* s = bucketing_state_create(default_value, num_sampling_points, increase_rate, 0);
 
     int prime = 7;
     int num = 2;
@@ -21,20 +21,18 @@ int main()
     {
         num = num * multiple % prime;
         //printf("iteration %d data value %d\n", i, num);
-        if (bucketing_add(num, i + 1, s))
-            return -1;
+        bucketing_add(num, i + 1, s);
         //printf("value added\n");
-        //bucketing_sorted_points_print(s->sorted_points);
+        bucketing_sorted_points_print(s->sorted_points);
         if (i >= num_sampling_points - 1)
         {
             //printf("Finding buckets\n");
-            if (bucketing_greedy_update_buckets(s))
-                return -1;
-            //bucketing_sorted_buckets_print(s->sorted_buckets);
+            bucketing_greedy_update_buckets(s);
+            bucketing_sorted_buckets_print(s->sorted_buckets);
         }
-        //printf("Predicting value %lf\n", bucketing_predict(-1, s));
+        printf("Predicting value %lf\n", bucketing_predict(-1, s));
         //printf("Sorted list length %d\n", list_length(s->sorted_points));
-        //printf("----------------------------------\n");
+        printf("----------------------------------\n");
     }
     bucketing_state_delete(s);
     return 0;

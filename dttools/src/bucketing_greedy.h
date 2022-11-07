@@ -7,10 +7,8 @@
 /** Begin: APIs **/
 
 /* Calculate the buckets from a bucketing state
- * @param the relevant bucketing state
- * @return 0 if success
- * @return 1 if failure */
-int bucketing_greedy_update_buckets(bucketing_state* s);
+ * @param the relevant bucketing state */
+void bucketing_greedy_update_buckets(bucketing_state_t* s);
 
 /** End: APIs **/
 

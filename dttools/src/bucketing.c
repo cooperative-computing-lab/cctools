@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include "bucketing.h"
 #include "random.h"
+#include "xxmalloc.h"
+#include "debug.h"
 
 /** Begin: internals **/
 
@@ -11,13 +13,10 @@
  * @param sig significance of point
  * @return pointer to created point
  * @return NULL if failure */
-static bucketing_point* bucketing_point_create(double val, double sig)
+static bucketing_point_t* bucketing_point_create(double val, double sig)
 {
-    bucketing_point* p = malloc(sizeof(*p));
+    bucketing_point_t* p = xxmalloc(sizeof(*p));
     
-    if (!p) 
-        return p;
-
     p->val = val;
     p->sig = sig;
 
@@ -26,7 +25,7 @@ static bucketing_point* bucketing_point_create(double val, double sig)
 
 /* Delete a bucketing point
  * @param p the bucketing point to be deleted */
-static void bucketing_point_delete(bucketing_point *p)
+static void bucketing_point_delete(bucketing_point_t *p)
 {
     if (p)
         free(p);
@@ -34,10 +33,8 @@ static void bucketing_point_delete(bucketing_point *p)
 
 /* Insert a bucketing point into a sorted list of points in O(log(n))
  * @param l pointer to sorted list of points
- * @param p pointer to point
- * @return 0 if success
- * @return 1 if failure */
-static int bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point *p)
+ * @param p pointer to point */
+static void bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point_t *p)
 {
     struct list_cursor* lc = list_cursor_create(l);
     
@@ -46,17 +43,20 @@ static int bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point
     {
         list_insert(lc, p);
         list_cursor_destroy(lc);
-        return 0;
+        return;
     }
 
     /* Linear insert a data point */
     list_seek(lc, 0);
-    bucketing_point* bpp = 0;
+    bucketing_point_t* bpp = 0;
     int inserted = 0;
     do
     {
         if (!list_get(lc, (void**) &bpp))
-            return 1;
+        {
+            fatal("Cannot get element from list.\n");
+            return;
+        }
 
         if (bpp->val >= p->val)
         {
@@ -74,20 +74,16 @@ static int bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point
     }
 
     list_cursor_destroy(lc);
-    return 0;
 }
 
 /** End: internals **/
 
 /** Begin: APIs **/
 
-bucketing_state* bucketing_state_create(double default_value, int num_sampling_points,
+bucketing_state_t* bucketing_state_create(double default_value, int num_sampling_points,
     double increase_rate, int max_num_buckets)
 {
-    bucketing_state* s = malloc(sizeof(*s));
-
-    if (!s)
-        return s;
+    bucketing_state_t* s = xxmalloc(sizeof(*s));
 
     s->sorted_points = list_create();
     s->sequence_points = list_create();
@@ -103,7 +99,7 @@ bucketing_state* bucketing_state_create(double default_value, int num_sampling_p
     return s;
 }
 
-void bucketing_state_delete(bucketing_state* s)
+void bucketing_state_delete(bucketing_state_t* s)
 {
     if (s)
     {
@@ -119,18 +115,23 @@ void bucketing_state_delete(bucketing_state* s)
     }
 }
 
-int bucketing_add(double val, double sig, bucketing_state* s)
+void bucketing_add(double val, double sig, bucketing_state_t* s)
 {
     /* insert to sorted list and append to sequence list */
-    bucketing_point *p = bucketing_point_create(val, sig);
+    bucketing_point_t *p = bucketing_point_create(val, sig);
     if (!p)
-        return 1;
+    {
+        fatal("Cannot create point\n");
+        return;
+    }
 
-    if (bucketing_insert_point_to_sorted_list(s->sorted_points, p))
-        return 1;
+    bucketing_insert_point_to_sorted_list(s->sorted_points, p);
 
     if (!list_push_tail(s->sequence_points, p))
-        return 1;
+    {
+        fatal("Cannot push point to list tail\n");
+        return;
+    }
     
     /* Change to predicting phase if appropriate */
     s->num_points++;
@@ -141,11 +142,9 @@ int bucketing_add(double val, double sig, bucketing_state* s)
 
     /* set previous operation */
     s->prev_op = BUCKETING_OP_ADD;
-    
-    return 0;
 }
 
-double bucketing_predict(double prev_val, bucketing_state* s)
+double bucketing_predict(double prev_val, bucketing_state_t* s)
 {
     /* set previous operation */
     s->prev_op = BUCKETING_OP_PREDICT;
@@ -169,9 +168,12 @@ double bucketing_predict(double prev_val, bucketing_state* s)
     
     /* reset to 0 */
     if (!list_seek(lc, 0))
+    {
+        fatal("Cannot seek list\n");
         return -1;
+    }
 
-    bucketing_bucket* bb_ptr = 0;   //pointer to hold item from list
+    bucketing_bucket_t* bb_ptr = 0;   //pointer to hold item from list
     double sum = 0;                 //sum of probability
     double ret_val;                 //predicted value to be returned
     int exp;                        //exponent to raise if prev_val > max_val
@@ -181,7 +183,10 @@ double bucketing_predict(double prev_val, bucketing_state* s)
     for (unsigned int i = 0; i < list_length(s->sorted_buckets); ++i, list_next(lc))
     {
         if (!list_get(lc, (void**) &bb_ptr))
+        {
+            fatal("Cannot get item from list\n");
             return -1;
+        }
 
         /* return if at last bucket */
         if (i == list_length(s->sorted_buckets) - 1)
@@ -208,16 +213,14 @@ double bucketing_predict(double prev_val, bucketing_state* s)
             return ret_val;
         }
     }
-
-    return -1;  //control should never reach here
+    
+    fatal("Control should never reach here\n");
+    return -1; 
 }
 
-bucketing_bucket* bucketing_bucket_create(double val, double prob)
+bucketing_bucket_t* bucketing_bucket_create(double val, double prob)
 {
-    bucketing_bucket* b = malloc(sizeof(*b));
-
-    if (!b)
-        return b;
+    bucketing_bucket_t* b = xxmalloc(sizeof(*b));
 
     b->val = val;
     b->prob = prob;
@@ -227,7 +230,7 @@ bucketing_bucket* bucketing_bucket_create(double val, double prob)
 
 /* Delete a bucketing bucket
  * @param b the bucket to be deleted */
-void bucketing_bucket_delete(bucketing_bucket* b)
+void bucketing_bucket_delete(bucketing_bucket_t* b)
 {
     if (b)
         free(b);
@@ -239,7 +242,7 @@ void bucketing_bucket_delete(bucketing_bucket* b)
 
 void bucketing_sorted_buckets_print(struct list* l)
 {
-    bucketing_bucket *tmp;
+    bucketing_bucket_t *tmp;
     list_first_item(l);
     printf("Printing sorted buckets\n");
     int i = 0;
@@ -252,7 +255,7 @@ void bucketing_sorted_buckets_print(struct list* l)
 
 void bucketing_sorted_points_print(struct list* l)
 {
-    bucketing_point* tmp;
+    bucketing_point_t* tmp;
     list_first_item(l);
     printf("Printing sorted points\n");
     int i = 0;

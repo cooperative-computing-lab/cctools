@@ -1,27 +1,28 @@
 #include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
-#include "bucketing.h"
 #include "bucketing_exhaust.h"
 #include "list.h"
+#include "xxmalloc.h"
+#include "debug.h"
 
 /** Begin: internals **/
 
-/* Convert a list of bucketing_bucket to an array of those
- * @param bucket_list list of bucketing_bucket
- * @return pointer to array of bucketing_bucket
+/* Convert a list of bucketing_bucket_t to an array of those
+ * @param bucket_list list of bucketing_bucket_t
+ * @return pointer to array of bucketing_bucket_t
  * @return 0 if failure */
-static bucketing_bucket** bucketing_bucket_list_to_array(struct list* bucket_list)
+static bucketing_bucket_t** bucketing_bucket_list_to_array(struct list* bucket_list)
 {
     if (!bucket_list)
+    {
+        fatal("No bucket list\n");
         return 0;
+    }
 
     list_first_item(bucket_list);
-    bucketing_bucket* tmp_buck;
-    bucketing_bucket** bucket_array = malloc(list_size(bucket_list) * sizeof(*bucket_array));
-    if (!bucket_array)
-        return 0;
-
+    bucketing_bucket_t* tmp_buck;
+    bucketing_bucket_t** bucket_array = xxmalloc(list_size(bucket_list) * sizeof(*bucket_array));
+    
     int i = 0;
     while ((tmp_buck = list_next_item(bucket_list)))
     {
@@ -33,20 +34,20 @@ static bucketing_bucket** bucketing_bucket_list_to_array(struct list* bucket_lis
 }
 
 /* Reweight the probabilities of a range of buckets to 1
- * @param bucket_array the array of bucketing_bucket*
+ * @param bucket_array the array of bucketing_bucket_t*
  * @param lo index of low bucket
  * @param hi index of high bucket
  * @return array of reweighted probabilities
  * @return 0 if failure */
-static double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, int lo, int hi)
+static double* bucketing_reweight_bucket_probs(bucketing_bucket_t** bucket_array, int lo, int hi)
 {
     if (!bucket_array)
+    {
+        fatal("No array of buckets\n");
         return 0;
+    }
 
-    double* bucket_probs = malloc((hi - lo + 1) * sizeof(*bucket_probs));
-
-    if (!bucket_probs)
-        return 0;
+    double* bucket_probs = xxmalloc((hi - lo + 1) * sizeof(*bucket_probs));
 
     /* get all probabilities of buckets in range */
     double total_prob = 0;
@@ -69,17 +70,18 @@ static double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, 
  * @param bucket_list the list of buckets
  * @return pointer to a malloc'ed array of values
  * @return 0 if failure */
-static double* bucketing_exhaust_compute_task_exps(bucketing_state* s, struct list* bucket_list)
+static double* bucketing_exhaust_compute_task_exps(bucketing_state_t* s, struct list* bucket_list)
 {
     if (!s || !bucket_list)
+    {
+        fatal("At least one parameter is empty\n");
         return 0;
+    }
 
-    double* task_exps = calloc(list_size(bucket_list), sizeof(*task_exps));
-    if (!task_exps)
-        return 0;
+    double* task_exps = xxcalloc(list_size(bucket_list), sizeof(*task_exps));
 
-    bucketing_point* tmp_pnt;
-    bucketing_bucket* tmp_buck;
+    bucketing_point_t* tmp_pnt;
+    bucketing_bucket_t* tmp_buck;
     int i = 0;
     double total_sig_buck = 0;
     
@@ -117,10 +119,13 @@ static double* bucketing_exhaust_compute_task_exps(bucketing_state* s, struct li
  * @param bucket_list the list of buckets to be computed
  * @return expected cost of the list of buckets 
  * @return -1 if failure */
-static double bucketing_exhaust_compute_cost(bucketing_state* s, struct list* bucket_list)
+static double bucketing_exhaust_compute_cost(bucketing_state_t* s, struct list* bucket_list)
 {
     if (!s || !bucket_list)
+    {
+        fatal("At least one parameter is empty\n");
         return -1;
+    }
 
     int N = list_size(bucket_list);
     double cost_table[N][N];
@@ -128,11 +133,17 @@ static double bucketing_exhaust_compute_cost(bucketing_state* s, struct list* bu
     /* Compute task expectation in each bucket */
     double* task_exps = bucketing_exhaust_compute_task_exps(s, bucket_list);
     if (!task_exps)
+    {
+        fatal("Cannot compute task expectations\n");
         return -1;
+    }
 
-    bucketing_bucket** bucket_array = bucketing_bucket_list_to_array(bucket_list);
+    bucketing_bucket_t** bucket_array = bucketing_bucket_list_to_array(bucket_list);
     if (!bucket_array)
+    {
+        fatal("Cannot convert list of buckets to array of buckets\n");
         return -1;
+    }
 
     /* i is task in which bucket, j is which bucket is chosen */
     /* fill easy entries */
@@ -153,7 +164,10 @@ static double bucketing_exhaust_compute_cost(bucketing_state* s, struct list* bu
             cost_table[i][j] = bucket_array[j]->val;
             upper_bucket_probs = bucketing_reweight_bucket_probs(bucket_array, j + 1, N - 1);
             if (!upper_bucket_probs)
+            {
+                fatal("Cannot reweight buckets\n");
                 return -1;
+            }
             
             for (int k = j + 1; k < N; ++k)
             {
@@ -182,13 +196,17 @@ static double bucketing_exhaust_compute_cost(bucketing_state* s, struct list* bu
 /* Get the list of buckets from a list of points and the number of buckets
  * @param s the relevant bucketing state
  * @param n the number of buckets to get
- * @return a list of bucketing_bucket
+ * @return a list of bucketing_bucket_t
  * @return 0 if failure */
-static struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
+static struct list* bucketing_exhaust_get_buckets(bucketing_state_t* s, int n)
 {
     if (!s)
+    {
+        fatal("No state of compute buckets\n");
         return 0;
-    double max_val = ((bucketing_point*) list_peek_tail(s->sorted_points))->val;    //max value in all points
+    }
+
+    double max_val = ((bucketing_point_t*) list_peek_tail(s->sorted_points))->val;    //max value in all points
     
     int steps = floor(log(max_val / n) / log(2));   //logarithmic steps to take below max_val/n
 
@@ -204,7 +222,7 @@ static struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
         
     /* fill candidate values with linear increase */
     for (int i = 0; i < n; ++i) 
-    candidate_vals[i + steps] = max_val * (i + 1) / (n * 1.0);
+        candidate_vals[i + steps] = max_val * (i + 1) / (n * 1.0);
         
     double buck_sig = 0;    //track signficance of a bucket
     double total_sig = 0;   //track total significance
@@ -212,7 +230,7 @@ static struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
     double prev_val = 0;    //previous seen value of point
     double candidate_probs[steps + n];  //probabilities of candidate buckets
     list_first_item(s->sorted_points);
-    bucketing_point* tmp = list_next_item(s->sorted_points);
+    bucketing_point_t* tmp = list_next_item(s->sorted_points);
 
     /* loop through points to fill values for buckets */
     while ((tmp) && (i < steps + n))
@@ -240,7 +258,7 @@ static struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
 
     struct list* ret = list_create();
    
-    bucketing_bucket* tmp_bucket;
+    bucketing_bucket_t* tmp_bucket;
 
     /* push a bucket in sorted order if bucket is not empty */
     for (i = 0; i < steps + n; ++i)
@@ -249,7 +267,10 @@ static struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
         {
             tmp_bucket = bucketing_bucket_create(candidate_vals[i], candidate_probs[i] / total_sig);
             if (!tmp_bucket)
+            {
+                fatal("Cannot create bucket\n");
                 return 0;
+            }
 
             list_push_tail(ret, tmp_bucket);
         }
@@ -260,12 +281,15 @@ static struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
 
 /* Return list of buckets that have the lowest expected cost
  * @param s the relevant bucketing state
- * @return a list of bucketing_bucket
+ * @return a list of bucketing_bucket_t
  * @return 0 if failure */
-static struct list* bucketing_exhaust_get_min_cost_bucket_list(bucketing_state* s)
+static struct list* bucketing_exhaust_get_min_cost_bucket_list(bucketing_state_t* s)
 {
     if (!s)
+    {
+        fatal("No bucket state to get min cost bucket list\n");
         return 0;
+    }
 
     double cost;
     double min_cost = -1;
@@ -278,12 +302,18 @@ static struct list* bucketing_exhaust_get_min_cost_bucket_list(bucketing_state* 
         /* get list of buckets */
         bucket_list = bucketing_exhaust_get_buckets(s, i + 1);
         if (!bucket_list)
+        {
+            fatal("Cannot compute buckets\n");
             return 0;
+        }
 
         /* compute cost associated with bucket_list */
         cost = bucketing_exhaust_compute_cost(s, bucket_list);
         if (cost == -1)
+        {
+            fatal("Cannot compute cost of bucket list\n");
             return 0;
+        }
         
         /* get list with lowest cost */
         if (min_cost == -1 || min_cost > cost)
@@ -312,10 +342,13 @@ static struct list* bucketing_exhaust_get_min_cost_bucket_list(bucketing_state* 
 
 /** Begin: APIs **/
 
-int bucketing_exhaust_update_buckets(bucketing_state *s)
+void bucketing_exhaust_update_buckets(bucketing_state_t *s)
 {
     if (!s)
-        return 1;
+    {
+        fatal("No bucket state to update buckets\n");
+        return;
+    }
 
     /* Destroy old list */
     list_free(s->sorted_buckets);
@@ -324,9 +357,10 @@ int bucketing_exhaust_update_buckets(bucketing_state *s)
     /* Update with new list */
     s->sorted_buckets = bucketing_exhaust_get_min_cost_bucket_list(s);
     if (!(s->sorted_buckets))
-        return 1;
-    
-    return 0;
+    {
+        fatal("Problem updating new sorted list of buckets\n");
+        return;
+    }
 }
 
 /** End: APIs **/

@@ -6,10 +6,8 @@
 /** Begin: APIs **/
 
 /* Calculate the buckets from a bucketing state
- * @param s the relevant bucketing state
- * @return 0 if success
- * @return 1 if failure */
-int bucketing_exhaust_update_buckets(bucketing_state *s);
+ * @param s the relevant bucketing state */
+void bucketing_exhaust_update_buckets(bucketing_state_t *s);
 
 /** End: APIs **/
 
