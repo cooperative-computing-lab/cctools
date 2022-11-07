@@ -15,7 +15,7 @@ int main()
     int prime = 7000;
     int num = 2000;
     int multiple = 2;
-    int iters = 10000;
+    int iters = 50;
 
     //printf("Adding values\n");
     for (int i = 0; i < iters+20; ++i)

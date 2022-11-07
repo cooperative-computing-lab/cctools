@@ -23,7 +23,7 @@ typedef enum {
 	CATEGORY_ALLOCATION_AUTO  = 0,       /**< Same as FIRST, FIRST is deprecated */
 	CATEGORY_ALLOCATION_MAX,             /**< Using max of category. (2nd step of two-step policy) */
 	CATEGORY_ALLOCATION_ERROR,            /**< No valid resources could be found. (E.g., after 2nd step fails) */
-    CATEGORY_ALLOCATION_FAST_BUCKETING,    /**< Use the fast bucketing algorithm to label resources */
+    CATEGORY_ALLOCATION_GREEDY_BUCKETING,    /**< Use the greedy bucketing algorithm to label resources */
     CATEGORY_ALLOCATION_EXHAUSTIVE_BUCKETING, /**< Use the exhaustive bucketing algorithm to label resources */
 } category_allocation_t;
 
@@ -57,7 +57,7 @@ typedef enum {
                                          * waste. */
     CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT, /**< As above, but maximizing
                                               throughput. */
-    CATEGORY_ALLOCATION_MODE_FAST_BUCKETING, /**< Use the fast bucketing 
+    CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING, /**< Use the greedy bucketing 
                                                algorithm to label resources */
     
     CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING   /**< Use the exhaustive 

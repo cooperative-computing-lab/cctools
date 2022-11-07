@@ -3,95 +3,325 @@
 #include "bucketing.h"
 #include "list.h"
 
-int bucketing_greedy_update_buckets(bucketing_state* s)
+/* List cursor with its position in a list */
+typedef struct
 {
-    if (!s)
-        return 1;
-    
-    /* Delete old list of buckets */
-    list_free(s->sorted_buckets);
-    list_delete(s->sorted_buckets);
-    
-    /* Create new list of buckets */
-    s->sorted_buckets = list_create();
+    struct list_cursor* lc;
+    int pos;
+} bucketing_cursor_w_pos;
 
-    /* Find all break points */
-    struct list* break_point_list = bucketing_greedy_find_break_points(s);
-    if (!break_point_list)
-        return 1;
-    
-    /* Find probabilities of buckets */
-    double bucket_probs[list_size(break_point_list)];   //store probabilities of buckets
-    list_first_item(s->sorted_points);
-    list_first_item(break_point_list);
-    bucketing_point* tmp_point;                 //pointer to item in s->sorted_points
-    bucketing_cursor_w_pos* tmp_break_point;    //pointer pointing to item in break point list
-    int i = 0;
-    bucket_probs[0] = 0;
-    double total_sig = 0;                       //track total significance
+/* Range defined by a low cursor and a high cursor pointing to a list */
+typedef struct
+{
+    bucketing_cursor_w_pos* lo;
+    bucketing_cursor_w_pos* hi;
+} bucketing_bucket_range;
 
-    tmp_point = list_next_item(s->sorted_points);
-    tmp_break_point = list_next_item(break_point_list);
-    bucketing_point* tmp_point_of_break_point = 0;
-    if (!list_get(tmp_break_point->lc, (void**) &tmp_point_of_break_point))
-        return 1;
-    
-    /* loop to compute buckets' probabilities */
-    while(tmp_point)
+/** Begin: internals **/
+
+/* Cursor but with position in list
+ * @param lc pointer to list cursor
+ * @param pos position of list cursor in a list
+ * @return pointer to bucketing_cursor_w_pos structure if success
+ * @return NULL if failure */
+static bucketing_cursor_w_pos* bucketing_cursor_w_pos_create(struct list_cursor* lc, int pos)
+{
+    bucketing_cursor_w_pos* cursor_pos = malloc(sizeof(*cursor_pos));
+
+    if (!cursor_pos)
+        return cursor_pos;
+
+    cursor_pos->lc = lc;
+    cursor_pos->pos = pos;
+
+    return cursor_pos;
+}
+
+/* Delete a bucketing_cursor_w_pos structure
+ * @param cursor_pos the structure to be deleted */
+static void bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos* cursor_pos)
+{
+    if(cursor_pos)
     {
-
-        if (tmp_point->val <= tmp_point_of_break_point->val)
-        {
-            bucket_probs[i] += tmp_point->sig;
-            total_sig += tmp_point->sig;
-            tmp_point = list_next_item(s->sorted_points);
-        }
-        else
-        {
-
-            ++i;
-            bucket_probs[i] = 0;
-            tmp_break_point = list_next_item(break_point_list);
-            if (!list_get(tmp_break_point->lc, (void**) &tmp_point_of_break_point))
-                return 1;
-        }
+        list_cursor_destroy(cursor_pos->lc);
+        free(cursor_pos);
     }
+}
 
-    /* must divide by total significance to normalize to [0, 1] */
-    for (int i = 0; i < list_size(break_point_list); ++i)
-    {
-        bucket_probs[i] /= total_sig;    
-    }
-
-    bucketing_bucket* tmp_bucket;               //pointer to a created bucket
-    bucketing_point* tmp_point_ptr = 0;         //pointer to what tmp_break_point->lc points
-    list_first_item(break_point_list);          //reset to beginning of break point list
-    i = 0;
-
-    /* Loop through list of break points */
-    while ((tmp_break_point = list_next_item(break_point_list)) != NULL)
-    {
-        if (!list_get(tmp_break_point->lc, (void**) &tmp_point_ptr))
-            return 1;
-
-        tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, bucket_probs[i]);
-        if (!tmp_bucket)
-            return 1;
-
-        list_push_tail(s->sorted_buckets, tmp_bucket);
-        ++i;
-    }
+/* Create a bucketing_bucket_range structure
+ * @param lo low index
+ * @param hi high index
+ * @param l list that indices point to
+ * @return pointer to a bucketing range if success
+ * @return NULL if failure */
+static bucketing_bucket_range* bucketing_bucket_range_create(int lo, int hi, struct list* l)
+{
+    bucketing_bucket_range* range = malloc(sizeof(*range));
     
-    /* Delete break point list */
-    if (bucketing_cursor_pos_list_clear(break_point_list, bucketing_cursor_w_pos_delete))
-        return 1;
-
-    list_delete(break_point_list);
+    if (!range)
+        return range;
     
+    struct list_cursor* cursor_lo = list_cursor_create(l);
+    if (!list_seek(cursor_lo, lo))
+        return NULL;
+ 
+    bucketing_cursor_w_pos* cursor_pos_lo = bucketing_cursor_w_pos_create(cursor_lo, lo);
+    if (!cursor_pos_lo)
+        return NULL;
+    
+    range->lo = cursor_pos_lo;
+    
+    struct list_cursor* cursor_hi = list_cursor_create(l);
+    if (!list_seek(cursor_hi, hi))
+        return NULL;
+    
+    bucketing_cursor_w_pos* cursor_pos_hi = bucketing_cursor_w_pos_create(cursor_hi, hi);
+    if (!cursor_pos_hi)
+        return NULL;
+
+    range->hi = cursor_pos_hi;
+
+    return range;
+}
+
+/* Delete a bucketing_bucket_range
+ * @param range the structure to be deleted */
+static void bucketing_bucket_range_delete(bucketing_bucket_range* range)
+{
+    if (range)
+    {
+        bucketing_cursor_w_pos_delete(range->lo);
+        bucketing_cursor_w_pos_delete(range->hi);
+        free(range);
+    }
+}
+
+/* Free the list with the function used to free a bucketing_cursor_pos
+ * This does not destroy the list, only the elements inside
+ * @param l pointer to list to destroy
+ * @param f function to free bucketing_cursor_pos
+ * @return 0 if success
+ * @return 1 if failure */
+static int bucketing_cursor_pos_list_clear(struct list* l, void (*f) (bucketing_cursor_w_pos*))
+{
+    if (!l)
+        return 0;
+
+    bucketing_cursor_w_pos* tmp;
+
+    while ((tmp = list_pop_head(l)))
+        f(tmp);
+
     return 0;
 }
 
-struct list* bucketing_greedy_find_break_points(bucketing_state* s)
+/* Free the list with the function used to free a bucketing_bucket_range
+ * This does not destroy the list, only the elements inside
+ * @param l pointer to list to destroy
+ * @param f function to free bucketing_bucket_range
+ * @return 0 if success
+ * @return 1 if failure */
+static int bucketing_bucket_range_list_clear(struct list* l, void (*f) (bucketing_bucket_range*))
+{
+    if (!l)
+        return 0;
+
+    bucketing_bucket_range* tmp;
+
+    while ((tmp = list_pop_head(l)))
+        f(tmp);
+
+    return 0;
+}
+
+/* Sort a list of bucketing_cursor_pos
+ * @param l the list to be sorted
+ * @param f the compare function
+ * @return pointer to a sorted list of bucketing_cursor_pos
+ * @return 0 if failure */
+static struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (const void*, const void*))
+{
+    if (!l)
+        return 0;
+    
+    unsigned int size = list_length(l);
+    unsigned int i = 0;
+    bucketing_cursor_w_pos** arr = malloc(size * sizeof(*arr));
+    if (!arr)
+        return 0;
+
+    struct list_cursor* lc = list_cursor_create(l);
+  
+    if (!list_seek(lc, 0))
+        return 0;
+
+    /* Save all elements to array */
+    while (list_get(lc, (void**) &arr[i]))
+    {
+        ++i;
+        list_next(lc);
+    }
+
+    /* Destroy the list but not its elements */
+    list_cursor_destroy(lc); 
+    list_delete(l);
+
+    /* Qsort the array */
+    qsort(arr, size, sizeof(*arr), f);
+
+    struct list* ret = list_create();
+    lc = list_cursor_create(ret);
+
+    /* Put back elements to a new list */
+    for (i = 0; i < size; ++i)
+        list_insert(lc, arr[i]);
+
+    list_cursor_destroy(lc);
+    free(arr);
+
+    return ret;
+}
+
+/* Compare position of two break points
+ * @param p1 first break point
+ * @param p2 second break point
+ * @return negative if p1 < p2, 0 if p1 == p2, positive if p1 > p2 */
+static int bucketing_compare_break_points(const void* p1, const void* p2)
+{
+    return (*((bucketing_cursor_w_pos**) p1))->pos - (*((bucketing_cursor_w_pos**) p2))->pos;
+}
+
+/* Apply policy to see if calculate cost of using this break point at break index
+ * @param range range of two break points denoting current bucket
+ * @param break_index the index of break point
+ * @param break_point empty pointer to be filled
+ * @return cost of current break point
+ * @return -1 if failure */
+static double bucketing_greedy_policy(bucketing_bucket_range* range, int break_index, bucketing_cursor_w_pos** break_point)
+{
+    if (!range)
+        return -1;
+
+    int total_sig = 0;                  //track total significance of points in range
+    int total_lo_sig = 0;               //track total significance in low range
+    int total_hi_sig = 0;               //track total significance in high range
+    double p1 = 0;                      //probability of candidate lower bucket
+    double p2 = 0;                      //probability of candidate higher bucket
+    bucketing_point* tmp_point_ptr = 0; //pointer to get item from sorted points
+    double exp_cons_lq_break = 0;       //expected value if next point is lower than or equal to break point
+    double exp_cons_g_break = 0;        //expected value if next point is higher than break point
+    int break_val, max_val; //values at break point and max point
+    struct list_cursor* iter = list_cursor_clone(range->lo->lc);    //cursor to iterate through list
+
+    /* Loop through the range to collect statistics */
+    for (int i = range->lo->pos; i <= range->hi->pos; ++i, list_next(iter))
+    {
+        if (!list_get(iter, (void**) &tmp_point_ptr))
+            return -1;
+
+        total_sig += tmp_point_ptr->sig;
+        
+        if (i == break_index)
+        {
+            break_val = tmp_point_ptr->val;
+            *break_point = bucketing_cursor_w_pos_create(list_cursor_clone(iter), break_index);
+            if (!(*break_point))
+                return -1;
+        }
+        
+        if (i == range->hi->pos)
+            max_val = tmp_point_ptr->val;
+        
+        if (i <= break_index)
+        {
+            p1 += tmp_point_ptr->sig;
+            exp_cons_lq_break += tmp_point_ptr->val * tmp_point_ptr->sig;
+            total_lo_sig += tmp_point_ptr->sig;
+        }
+        else
+        {
+            p2 += tmp_point_ptr->sig;
+            exp_cons_g_break += tmp_point_ptr->val * tmp_point_ptr->sig;
+            total_hi_sig += tmp_point_ptr->sig;
+        }
+    }
+
+    /* Update general statistics */
+    p1 /= total_sig;
+    p2 /= total_sig; 
+    exp_cons_lq_break /= total_lo_sig;
+    if (total_hi_sig == 0)
+        exp_cons_g_break = 0;
+    else
+        exp_cons_g_break /= total_hi_sig;
+
+    /* Compute individual costs */
+    double cost_lower_hit = p1*(p1*(break_val - exp_cons_lq_break));
+    double cost_lower_miss = p1*(p2*(max_val - exp_cons_lq_break));
+    double cost_upper_miss = p2*(p1*(break_val + max_val - exp_cons_g_break));
+    double cost_upper_hit = p2*(p2*(max_val - exp_cons_g_break));
+
+    /* Compute final cost */
+    double cost = cost_lower_hit + cost_lower_miss + cost_upper_miss + cost_upper_hit;
+    
+    list_cursor_destroy(iter);
+
+    return cost;
+}
+
+/* Break a bucket into 2 buckets if possible
+ * @param range range of to-be-broken bucket
+ * @param break_point empty pointer
+ * @return 0 if can break bucket
+ * @return 1 if cannot break bucket
+ * @return -1 if failure */
+static int bucketing_greedy_break_bucket(bucketing_bucket_range* range, bucketing_cursor_w_pos** break_point)
+{
+    if (!range)
+        return -1;
+
+    double min_cost = -1;   //track min cost of a candidate break point
+    double cost;    //track cost of current point
+    bucketing_cursor_w_pos* tmp_break_point = 0;   //get current point 
+
+    /* Loop through all points in range and choose 1 with the lowest cost */
+    for (int i = range->lo->pos; i <= range->hi->pos; ++i)
+    {
+        cost = bucketing_greedy_policy(range, i, &tmp_break_point);
+        if (cost == -1)
+            return -1;
+
+        if (min_cost == -1)
+        {
+            min_cost = cost;
+            *break_point = tmp_break_point;
+        }
+        else if (cost < min_cost)
+        {
+            min_cost = cost;
+            bucketing_cursor_w_pos_delete(*break_point);
+            *break_point = tmp_break_point;
+        }
+        else 
+        {
+            bucketing_cursor_w_pos_delete(tmp_break_point);
+        }
+    }
+    
+    /* If chosen break point is the highest point, delete the break point as it is included already */
+    if ((*break_point)->pos == range->hi->pos)
+    {
+        bucketing_cursor_w_pos_delete(*break_point); 
+        return 1;
+    }
+    return 0;
+}
+
+/* Find all break points from a bucketing state
+ * @param s bucketing state
+ * @return pointer to a break point list if success
+ * @return null if failure */
+static struct list* bucketing_greedy_find_break_points(bucketing_state* s)
 {
     if (!s)
         return 0;
@@ -186,7 +416,7 @@ struct list* bucketing_greedy_find_break_points(bucketing_state* s)
     list_push_tail(break_point_list, last_break_point);
 
     /* Sort in increasing order */
-    break_point_list = bucketing_cursor_pos_list_sort(break_point_list, compare_break_points);
+    break_point_list = bucketing_cursor_pos_list_sort(break_point_list, bucketing_compare_break_points);
     if (!break_point_list)
         return 0;
     
@@ -200,116 +430,94 @@ struct list* bucketing_greedy_find_break_points(bucketing_state* s)
     return break_point_list;
 }
 
-int bucketing_greedy_break_bucket(bucketing_bucket_range* range, bucketing_cursor_w_pos** break_point)
+/** End: internals **/
+
+int bucketing_greedy_update_buckets(bucketing_state* s)
 {
-    if (!range)
-        return -1;
-
-    double min_cost = -1;   //track min cost of a candidate break point
-    double cost;    //track cost of current point
-    bucketing_cursor_w_pos* tmp_break_point = 0;   //get current point 
-
-    /* Loop through all points in range and choose 1 with the lowest cost */
-    for (int i = range->lo->pos; i <= range->hi->pos; ++i)
-    {
-        cost = bucketing_greedy_policy(range, i, &tmp_break_point);
-        if (cost == -1)
-            return -1;
-
-        if (min_cost == -1)
-        {
-            min_cost = cost;
-            *break_point = tmp_break_point;
-        }
-        else if (cost < min_cost)
-        {
-            min_cost = cost;
-            bucketing_cursor_w_pos_delete(*break_point);
-            *break_point = tmp_break_point;
-        }
-        else 
-        {
-            bucketing_cursor_w_pos_delete(tmp_break_point);
-        }
-    }
-    
-    /* If chosen break point is the highest point, delete the break point as it is included already */
-    if ((*break_point)->pos == range->hi->pos)
-    {
-        bucketing_cursor_w_pos_delete(*break_point); 
+    if (!s)
         return 1;
-    }
-    return 0;
-}
+    
+    /* Delete old list of buckets */
+    list_free(s->sorted_buckets);
+    list_delete(s->sorted_buckets);
+    
+    /* Create new list of buckets */
+    s->sorted_buckets = list_create();
 
-double bucketing_greedy_policy(bucketing_bucket_range* range, int break_index, bucketing_cursor_w_pos** break_point)
-{
-    if (!range)
-        return -1;
+    /* Find all break points */
+    struct list* break_point_list = bucketing_greedy_find_break_points(s);
+    if (!break_point_list)
+        return 1;
+    
+    /* Find probabilities of buckets */
+    double bucket_probs[list_size(break_point_list)];   //store probabilities of buckets
+    list_first_item(s->sorted_points);
+    list_first_item(break_point_list);
+    bucketing_point* tmp_point;                 //pointer to item in s->sorted_points
+    bucketing_cursor_w_pos* tmp_break_point;    //pointer pointing to item in break point list
+    int i = 0;
+    bucket_probs[0] = 0;
+    double total_sig = 0;                       //track total significance
 
-    int total_sig = 0;                  //track total significance of points in range
-    int total_lo_sig = 0;               //track total significance in low range
-    int total_hi_sig = 0;               //track total significance in high range
-    double p1 = 0;                      //probability of candidate lower bucket
-    double p2 = 0;                      //probability of candidate higher bucket
-    bucketing_point* tmp_point_ptr = 0; //pointer to get item from sorted points
-    double exp_cons_lq_break = 0;       //expected value if next point is lower than or equal to break point
-    double exp_cons_g_break = 0;        //expected value if next point is higher than break point
-    int break_val, max_val; //values at break point and max point
-    struct list_cursor* iter = list_cursor_clone(range->lo->lc);    //cursor to iterate through list
-
-    /* Loop through the range to collect statistics */
-    for (int i = range->lo->pos; i <= range->hi->pos; ++i, list_next(iter))
+    tmp_point = list_next_item(s->sorted_points);
+    tmp_break_point = list_next_item(break_point_list);
+    bucketing_point* tmp_point_of_break_point = 0;
+    if (!list_get(tmp_break_point->lc, (void**) &tmp_point_of_break_point))
+        return 1;
+    
+    /* loop to compute buckets' probabilities */
+    while(tmp_point)
     {
-        if (!list_get(iter, (void**) &tmp_point_ptr))
-            return -1;
 
-        total_sig += tmp_point_ptr->sig;
-        
-        if (i == break_index)
+        if (tmp_point->val <= tmp_point_of_break_point->val)
         {
-            break_val = tmp_point_ptr->val;
-            *break_point = bucketing_cursor_w_pos_create(list_cursor_clone(iter), break_index);
-            if (!(*break_point))
-                return -1;
-        }
-        
-        if (i == range->hi->pos)
-            max_val = tmp_point_ptr->val;
-        
-        if (i <= break_index)
-        {
-            p1 += tmp_point_ptr->sig;
-            exp_cons_lq_break += tmp_point_ptr->val * tmp_point_ptr->sig;
-            total_lo_sig += tmp_point_ptr->sig;
+            bucket_probs[i] += tmp_point->sig;
+            total_sig += tmp_point->sig;
+            tmp_point = list_next_item(s->sorted_points);
         }
         else
         {
-            p2 += tmp_point_ptr->sig;
-            exp_cons_g_break += tmp_point_ptr->val * tmp_point_ptr->sig;
-            total_hi_sig += tmp_point_ptr->sig;
+
+            ++i;
+            bucket_probs[i] = 0;
+            tmp_break_point = list_next_item(break_point_list);
+            if (!list_get(tmp_break_point->lc, (void**) &tmp_point_of_break_point))
+                return 1;
         }
     }
 
-    /* Update general statistics */
-    p1 /= total_sig;
-    p2 /= total_sig; 
-    exp_cons_lq_break /= total_lo_sig;
-    if (total_hi_sig == 0)
-        exp_cons_g_break = 0;
-    else
-        exp_cons_g_break /= total_hi_sig;
+    /* must divide by total significance to normalize to [0, 1] */
+    for (int i = 0; i < list_size(break_point_list); ++i)
+    {
+        bucket_probs[i] /= total_sig;    
+    }
 
-    /* Compute individual costs */
-    double cost_lower_hit = p1*(p1*(break_val - exp_cons_lq_break));
-    double cost_lower_miss = p1*(p2*(max_val - exp_cons_lq_break));
-    double cost_upper_miss = p2*(p1*(break_val + max_val - exp_cons_g_break));
-    double cost_upper_hit = p2*(p2*(max_val - exp_cons_g_break));
+    bucketing_bucket* tmp_bucket;               //pointer to a created bucket
+    bucketing_point* tmp_point_ptr = 0;         //pointer to what tmp_break_point->lc points
+    list_first_item(break_point_list);          //reset to beginning of break point list
+    i = 0;
 
-    /* Compute final cost */
-    double cost = cost_lower_hit + cost_lower_miss + cost_upper_miss + cost_upper_hit;
+    /* Loop through list of break points */
+    while ((tmp_break_point = list_next_item(break_point_list)) != NULL)
+    {
+        if (!list_get(tmp_break_point->lc, (void**) &tmp_point_ptr))
+            return 1;
+
+        tmp_bucket = bucketing_bucket_create(tmp_point_ptr->val, bucket_probs[i]);
+        if (!tmp_bucket)
+            return 1;
+
+        list_push_tail(s->sorted_buckets, tmp_bucket);
+        ++i;
+    }
     
-    list_cursor_destroy(iter);
+    /* Delete break point list */
+    if (bucketing_cursor_pos_list_clear(break_point_list, bucketing_cursor_w_pos_delete))
+        return 1;
 
-    return cost;
+    list_delete(break_point_list);
+    
+    return 0;
 }
+
+

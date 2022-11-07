@@ -111,7 +111,7 @@ typedef enum {
                                                                                       computed allocation to minimize resource waste. */
     WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT, /**< As above, but maximizing throughput. */
     
-    WORK_QUEUE_ALLOCATION_MODE_FAST_BUCKETING = CATEGORY_ALLOCATION_MODE_FAST_BUCKETING, /**< Use the fast bucketing algorithm to label resources */
+    WORK_QUEUE_ALLOCATION_MODE_GREEDY_BUCKETING = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING, /**< Use the greedy bucketing algorithm to label resources */
 
     WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING /**< Use the exhaustive bucketing algorithm to label resources */
 } work_queue_category_mode_t;

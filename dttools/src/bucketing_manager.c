@@ -9,8 +9,6 @@ bucketing_manager* bucket_manager_create(category* c){
     m->res_type_to_state = hash_table_create(0, 0);
     m->task_id_to_task_rmsummary = hash_table_create(0, 0);
     m->category = category;
-
-
 }
 
 //takes in a category c. c->autolabel_resource->mem = {0, 1}

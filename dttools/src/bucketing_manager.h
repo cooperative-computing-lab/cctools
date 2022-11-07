@@ -1,7 +1,10 @@
+#ifndef BUCKETING_MANAGER_H
+#define BUCKETING_MANAGER_H
+
 #include "rmsummary.h"
 #include "category.h"
 #include "hash_table.h"
-#include "bucketing_fast.h"
+#include "bucketing_greedy.h"
 #include "bucketing_exhaust.h"
 
 /* A bucketing manager has its bucketing mode, a table mapping resource
@@ -9,10 +12,10 @@
  * resource summary, and pointer to its task category */
 typedef struct
 {
-    category_mode_t mode;   //bucketing mode in {}
-    struct hash_table* res_type_to_bucketing_state;
-    struct hash_table* task_id_to_task_rmsummary;
-    category* category;
+    category_mode_t mode;   //bucketing mode in CATEGORY_ALLOCATION_MODE_{GREEDY/EXHAUSTIVE}_BUCKETING
+    struct hash_table* res_type_to_bucketing_state; //mapping of resource type to bucketing state
+    struct hash_table* task_id_to_task_rmsummary;   //mapping of task id to its previous resource summary
+    category* category; //pointer to category, category and bucketing manager is one-to-one mapping
 } 
 bucketing_manager;
 
@@ -47,7 +50,7 @@ int bucketing_manager_remove_resource_type(bucketing_manager* m, const char* r);
  * @param mode the mode of algorithm to change to
  * @return 0 if success
  * @return 1 if failure */
-int bucketing_manager_change_mode(bucketing_manager* m, category_mode_t mode);
+int bucketing_manager_change_add_mode(bucketing_manager* m, category_mode_t mode);
 
 /* Given a task id, the manager returns a predicted allocation
  * @param m the relevant manager
@@ -62,3 +65,5 @@ rmsummary* bucketing_manager_alloc(bucketing_manager* m, int task_id);
  * @return 0 if success
  * @return 1 if failure */
 int bucketing_manager_add(bucketing_manager* m, rmsummary* r);
+
+#endif

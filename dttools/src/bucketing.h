@@ -3,12 +3,12 @@
 
 #include "list.h"
 
-/* Bucketing has two operations, add and predict */ 
+/* Bucketing has two operations, add and predict */
 typedef enum
 {
-    add = 0,
-    predict,
-    null    //only used when initializing
+    BUCKETING_OP_ADD = 0,
+    BUCKETING_OP_PREDICT,
+    BUCKETING_OP_NULL    //only used when initializing
 } bucketing_operation;
 
 /* Each point (e.g., a task) in a bucket is a pair of value 
@@ -84,43 +84,7 @@ typedef struct
     /** End: externally provided fields **/ 
 } bucketing_state;
 
-/* List cursor with its position in a list */
-typedef struct
-{
-    struct list_cursor* lc;
-    int pos;
-} bucketing_cursor_w_pos;
-
-/* Range defined by a low cursor and a high cursor pointing to a list */
-typedef struct
-{
-    bucketing_cursor_w_pos* lo;
-    bucketing_cursor_w_pos* hi;
-} bucketing_bucket_range;
-
 /** Begin: APIs **/
-
-/* Create a bucketing point
- * @param val value of point
- * @param sig significance of point
- * @return pointer to created point
- * @return NULL if failure */
-bucketing_point* bucketing_point_create(double val, double sig);
-
-/* Delete a bucketing point
- * @param p the bucketing point to be deleted */
-void bucketing_point_delete(bucketing_point* p);
-
-/* Create a bucketing bucket
- * @param val value of bucket
- * @param prob probability of bucket
- * @return pointer to created bucket
- * @return NULL if failure */
-bucketing_bucket* bucketing_bucket_create(double val, double prob);
-
-/* Delete a bucketing bucket
- * @param b the bucket to be deleted */
-void bucketing_bucket_delete(bucketing_bucket* b);
 
 /* Create a bucketing state
  * @param default_value default value in sampling state
@@ -135,29 +99,6 @@ bucketing_state* bucketing_state_create(double default_value, int num_sampling_p
 /* Delete a bucketing state
  * @param s pointer to bucketing state to be deleted */
 void bucketing_state_delete(bucketing_state* s);
-
-/* Cursor but with position in list
- * @param lc pointer to list cursor
- * @param pos position of list cursor in a list
- * @return pointer to bucketing_cursor_w_pos structure if success
- * @return NULL if failure */
-bucketing_cursor_w_pos* bucketing_cursor_w_pos_create(struct list_cursor* lc, int pos);
-
-/* Delete a bucketing_cursor_w_pos structure
- * @param cursor_pos the structure to be deleted */
-void bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos* cursor_pos);
-
-/* Create a bucketing_bucket_range structure
- * @param lo low index
- * @param hi high index
- * @param l list that indices point to
- * @return pointer to a bucketing range if success
- * @return NULL if failure */
-bucketing_bucket_range* bucketing_bucket_range_create(int lo, int hi, struct list* l);
-
-/* Delete a bucketing_bucket_range
- * @param range the structure to be deleted */
-void bucketing_bucket_range_delete(bucketing_bucket_range* range);
 
 /* Add a point
  * @param val value of point to be added
@@ -176,61 +117,18 @@ int bucketing_add(double val, double sig, bucketing_state* s);
  * @return -1 if failure */
 double bucketing_predict(double prev_val, bucketing_state* s);
 
+/* Create a bucketing bucket
+ * @param val value of bucket
+ * @param prob probability of bucket
+ * @return pointer to created bucket
+ * @return NULL if failure */
+bucketing_bucket* bucketing_bucket_create(double val, double prob);
+
+/* Delete a bucketing bucket
+ * @param b the bucket to be deleted */
+void bucketing_bucket_delete(bucketing_bucket* b);
+
 /** End: APIs **/
-
-/** Begin: internals **/
-
-/* Insert a bucketing point into a sorted list of points in O(log(n))
- * @param l pointer to sorted list of points
- * @param p pointer to point
- * @return 0 if success
- * @return 1 if failure */
-int bucketing_insert_point_to_sorted_list(struct list* li, bucketing_point *p);
-
-/* Free the list with the function used to free a bucketing_cursor_pos
- * This does not destroy the list, only the elements inside
- * @param l pointer to list to destroy
- * @param f function to free bucketing_cursor_pos
- * @return 0 if success
- * @return 1 if failure */
-int bucketing_cursor_pos_list_clear(struct list* l, void (*f) (bucketing_cursor_w_pos*));
-
-/* Free the list with the function used to free a bucketing_bucket_range
- * This does not destroy the list, only the elements inside
- * @param l pointer to list to destroy
- * @param f function to free bucketing_bucket_range
- * @return 0 if success
- * @return 1 if failure */
-int bucketing_bucket_range_list_clear(struct list* l, void (*f) (bucketing_bucket_range*));
-
-/* Sort a list of bucketing_cursor_pos
- * @param l the list to be sorted
- * @param f the compare function
- * @return pointer to a sorted list of bucketing_cursor_pos
- * @return 0 if failure */
-struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (const void*, const void*));
-
-/* Compare position of two break points
- * @param p1 first break point
- * @param p2 second break point
- * @return negative if p1 < p2, 0 if p1 == p2, positive if p1 > p2 */
-int compare_break_points(const void* p1, const void* p2);
-
-/* Convert a list of bucketing_bucket to an array of those
- * @param bucket_list list of bucketing_bucket
- * @return pointer to array of bucketing_bucket
- * @return 0 if failure */
-bucketing_bucket** bucketing_bucket_list_to_array(struct list* bucket_list);
-
-/* Reweight the probabilities of a range of buckets to 1
- * @param bucket_array the array of bucketing_bucket*
- * @param lo index of low bucket
- * @param hi index of high bucket
- * @return array of reweighted probabilities
- * @return 0 if failure */
-double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, int lo, int hi);
-
-/** End: internals **/
 
 /** Begin: debug functions **/
 

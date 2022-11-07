@@ -1,14 +1,17 @@
 #include <stdlib.h>
 #include <math.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include "bucketing.h"
-#include "list.h"
 #include "random.h"
 
-//TODO: integrate debug in all bucketing files
+/** Begin: internals **/
 
-bucketing_point* bucketing_point_create(double val, double sig)
+/* Create a bucketing point
+ * @param val value of point
+ * @param sig significance of point
+ * @return pointer to created point
+ * @return NULL if failure */
+static bucketing_point* bucketing_point_create(double val, double sig)
 {
     bucketing_point* p = malloc(sizeof(*p));
     
@@ -21,30 +24,62 @@ bucketing_point* bucketing_point_create(double val, double sig)
     return p;
 }
 
-void bucketing_point_delete(bucketing_point *p)
+/* Delete a bucketing point
+ * @param p the bucketing point to be deleted */
+static void bucketing_point_delete(bucketing_point *p)
 {
     if (p)
         free(p);
 }
 
-bucketing_bucket* bucketing_bucket_create(double val, double prob)
+/* Insert a bucketing point into a sorted list of points in O(log(n))
+ * @param l pointer to sorted list of points
+ * @param p pointer to point
+ * @return 0 if success
+ * @return 1 if failure */
+static int bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point *p)
 {
-    bucketing_bucket* b = malloc(sizeof(*b));
+    struct list_cursor* lc = list_cursor_create(l);
+    
+    /* If list is empty, append new point to list */
+    if (list_length(l) == 0)
+    {
+        list_insert(lc, p);
+        list_cursor_destroy(lc);
+        return 0;
+    }
 
-    if (!b)
-        return b;
+    /* Linear insert a data point */
+    list_seek(lc, 0);
+    bucketing_point* bpp = 0;
+    int inserted = 0;
+    do
+    {
+        if (!list_get(lc, (void**) &bpp))
+            return 1;
 
-    b->val = val;
-    b->prob = prob;
+        if (bpp->val >= p->val)
+        {
+            list_insert(lc, p);
+            inserted = 1;
+            break;
+        }
+    }
+    while (list_next(lc));
 
-    return b;
+    /* Append point if it isn't inserted */
+    if (inserted == 0)
+    {
+        list_insert(lc, p);
+    }
+
+    list_cursor_destroy(lc);
+    return 0;
 }
 
-void bucketing_bucket_delete(bucketing_bucket* b)
-{
-    if (b)
-        free(b);
-}
+/** End: internals **/
+
+/** Begin: APIs **/
 
 bucketing_state* bucketing_state_create(double default_value, int num_sampling_points,
     double increase_rate, int max_num_buckets)
@@ -59,7 +94,7 @@ bucketing_state* bucketing_state_create(double default_value, int num_sampling_p
     s->sorted_buckets = list_create();
     s->num_points = 0;
     s->in_sampling_phase = 1;
-    s->prev_op = null;
+    s->prev_op = BUCKETING_OP_NULL;
     s->default_value = default_value;
     s->num_sampling_points = num_sampling_points;
     s->increase_rate = increase_rate;
@@ -72,77 +107,15 @@ void bucketing_state_delete(bucketing_state* s)
 {
     if (s)
     {
-        list_free(s->sorted_points);
+        list_clear(s->sorted_points, (void*) bucketing_point_delete);
         list_delete(s->sorted_points);
         
         /* pointers already free'd as sorted_points and sequence_points
          * share the same set of pointers */
         list_delete(s->sequence_points);
-        list_free(s->sorted_buckets);
+        list_clear(s->sorted_buckets, (void*) bucketing_bucket_delete);
         list_delete(s->sorted_buckets);
         free(s);
-    }
-}
-
-bucketing_cursor_w_pos* bucketing_cursor_w_pos_create(struct list_cursor* lc, int pos)
-{
-    bucketing_cursor_w_pos* cursor_pos = malloc(sizeof(*cursor_pos));
-    
-    if (!cursor_pos)
-        return cursor_pos;
-    
-    cursor_pos->lc = lc;
-    cursor_pos->pos = pos;
-
-    return cursor_pos;
-}
-
-void bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos* cursor_pos)
-{
-    if(cursor_pos)
-    {
-        list_cursor_destroy(cursor_pos->lc);
-        free(cursor_pos);
-    }
-}
-
-bucketing_bucket_range* bucketing_bucket_range_create(int lo, int hi, struct list* l)
-{
-    bucketing_bucket_range* range = malloc(sizeof(*range));
-    
-    if (!range)
-        return range;
-    
-    struct list_cursor* cursor_lo = list_cursor_create(l);
-    if (!list_seek(cursor_lo, lo))
-        return NULL;
-    
-    bucketing_cursor_w_pos* cursor_pos_lo = bucketing_cursor_w_pos_create(cursor_lo, lo);
-    if (!cursor_pos_lo)
-        return NULL;
-    
-    range->lo = cursor_pos_lo;
-    
-    struct list_cursor* cursor_hi = list_cursor_create(l);
-    if (!list_seek(cursor_hi, hi))
-        return NULL;
-    
-    bucketing_cursor_w_pos* cursor_pos_hi = bucketing_cursor_w_pos_create(cursor_hi, hi);
-    if (!cursor_pos_hi)
-        return NULL;
-    
-    range->hi = cursor_pos_hi;
-    
-    return range;
-}
-
-void bucketing_bucket_range_delete(bucketing_bucket_range* range)
-{
-    if (range)
-    {
-        bucketing_cursor_w_pos_delete(range->lo);
-        bucketing_cursor_w_pos_delete(range->hi);
-        free(range);
     }
 }
 
@@ -167,7 +140,7 @@ int bucketing_add(double val, double sig, bucketing_state* s)
     }
 
     /* set previous operation */
-    s->prev_op = add;
+    s->prev_op = BUCKETING_OP_ADD;
     
     return 0;
 }
@@ -175,7 +148,7 @@ int bucketing_add(double val, double sig, bucketing_state* s)
 double bucketing_predict(double prev_val, bucketing_state* s)
 {
     /* set previous operation */
-    s->prev_op = predict;
+    s->prev_op = BUCKETING_OP_PREDICT;
     
     /* in sampling phase */
     if (s->in_sampling_phase)
@@ -239,166 +212,30 @@ double bucketing_predict(double prev_val, bucketing_state* s)
     return -1;  //control should never reach here
 }
 
-int bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point *p)
+bucketing_bucket* bucketing_bucket_create(double val, double prob)
 {
-    struct list_cursor* lc = list_cursor_create(l);
-    
-    /* If list is empty, append new point to list */
-    if (list_length(l) == 0)
-    {
-        list_insert(lc, p);
-        list_cursor_destroy(lc);
-        return 0;
-    }
+    bucketing_bucket* b = malloc(sizeof(*b));
 
-    /* Linear insert a data point */
-    list_seek(lc, 0);
-    bucketing_point* bpp = 0;
-    int inserted = 0;
-    do
-    {
-        if (!list_get(lc, (void**) &bpp))
-            return 1;
+    if (!b)
+        return b;
 
-        if (bpp->val >= p->val)
-        {
-            list_insert(lc, p);
-            inserted = 1;
-            break;
-        }
-    }
-    while (list_next(lc));
+    b->val = val;
+    b->prob = prob;
 
-    /* Append point if it isn't inserted */
-    if (inserted == 0)
-    {
-        list_insert(lc, p);
-    }
-
-    list_cursor_destroy(lc);
-    return 0;
+    return b;
 }
 
-int bucketing_cursor_pos_list_clear(struct list* l, void (*f) (bucketing_cursor_w_pos*))
+/* Delete a bucketing bucket
+ * @param b the bucket to be deleted */
+void bucketing_bucket_delete(bucketing_bucket* b)
 {
-    if (!l)
-        return 0;
-
-    bucketing_cursor_w_pos* tmp;
-    
-    while ((tmp = list_pop_head(l)))
-        f(tmp);
-    
-    return 0;
+    if (b)
+        free(b);
 }
 
-int bucketing_bucket_range_list_clear(struct list* l, void (*f) (bucketing_bucket_range*))
-{
-    if (!l)
-        return 0;
+/** End: APIs **/
 
-    bucketing_bucket_range* tmp;
-    
-    while ((tmp = list_pop_head(l)))
-        f(tmp);
-    
-    return 0;
-}
-
-struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (const void*, const void*))
-{
-    if (!l)
-        return 0;
-    
-    unsigned int size = list_length(l);
-    unsigned int i = 0;
-    bucketing_cursor_w_pos** arr = malloc(size * sizeof(*arr));
-    if (!arr)
-        return 0;
-
-    struct list_cursor* lc = list_cursor_create(l);
-    
-    if (!list_seek(lc, 0))
-        return 0;
-
-    /* Save all elements to array */
-    while (list_get(lc, (void**) &arr[i]))
-    {
-        ++i;
-        list_next(lc);
-    }
-
-    /* Destroy the list but not its elements */
-    list_cursor_destroy(lc); 
-    list_delete(l);
-    
-    /* Qsort the array */
-    qsort(arr, size, sizeof(*arr), f);
-
-    struct list* ret = list_create();
-    lc = list_cursor_create(ret);
-
-    /* Put back elements to a new list */
-    for (i = 0; i < size; ++i)
-        list_insert(lc, arr[i]);
-    
-    list_cursor_destroy(lc);
-    free(arr);
-
-    return ret;
-}
-
-int compare_break_points(const void* p1, const void* p2)
-{
-    return (*((bucketing_cursor_w_pos**) p1))->pos - (*((bucketing_cursor_w_pos**) p2))->pos;
-}
-
-bucketing_bucket** bucketing_bucket_list_to_array(struct list* bucket_list)
-{
-    if (!bucket_list)
-        return 0;
-
-    list_first_item(bucket_list);
-    bucketing_bucket* tmp_buck;
-    bucketing_bucket** bucket_array = malloc(list_size(bucket_list) * sizeof(*bucket_array));
-    if (!bucket_array)
-        return 0;
-
-    int i = 0;
-    while ((tmp_buck = list_next_item(bucket_list)))
-    {
-        bucket_array[i] = tmp_buck;
-        ++i;
-    }
-
-    return bucket_array;
-}
-
-double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, int lo, int hi)
-{
-    if (!bucket_array)
-        return 0;
-
-    double* bucket_probs = malloc((hi - lo + 1) * sizeof(*bucket_probs));
-
-    if (!bucket_probs)
-        return 0;
-
-    /* get all probabilities of buckets in range */
-    double total_prob = 0;
-    for (int i = lo; i <= hi; ++i)
-    {
-        total_prob += bucket_array[i]->prob;
-    }
-
-    /* reweight to [0, 1] */
-    for (int i = lo; i <= hi; ++i)
-    {
-        bucket_probs[i - lo] = bucket_array[i]->prob / total_prob;
-    }
-
-    return bucket_probs;
-}
+/** Begin: debug functions **/
 
 void bucketing_sorted_buckets_print(struct list* l)
 {
@@ -425,3 +262,5 @@ void bucketing_sorted_points_print(struct list* l)
         ++i;
     }
 }
+
+/** End: debug functions **/

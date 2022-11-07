@@ -5,70 +5,186 @@
 #include "bucketing_exhaust.h"
 #include "list.h"
 
-int bucketing_exhaust_update_buckets(bucketing_state *s)
+/** Begin: internals **/
+
+/* Convert a list of bucketing_bucket to an array of those
+ * @param bucket_list list of bucketing_bucket
+ * @return pointer to array of bucketing_bucket
+ * @return 0 if failure */
+static bucketing_bucket** bucketing_bucket_list_to_array(struct list* bucket_list)
 {
-    if (!s)
-        return 1;
-
-    /* Destroy old list */
-    list_free(s->sorted_buckets);
-    list_delete(s->sorted_buckets);
-
-    /* Update with new list */
-    s->sorted_buckets = bucketing_exhaust_get_min_cost_bucket_list(s);
-    if (!(s->sorted_buckets))
-        return 1;
-    
-    return 0;
-}
-
-struct list* bucketing_exhaust_get_min_cost_bucket_list(bucketing_state* s)
-{
-    if (!s)
+    if (!bucket_list)
         return 0;
 
-    double cost;
-    double min_cost = -1;
-    struct list* best_bucket_list = 0;
-    struct list* bucket_list = 0;
+    list_first_item(bucket_list);
+    bucketing_bucket* tmp_buck;
+    bucketing_bucket** bucket_array = malloc(list_size(bucket_list) * sizeof(*bucket_array));
+    if (!bucket_array)
+        return 0;
 
-    /* try to see which number of buckets yields the lowest cost */
-    for (int i = 0; i < s->max_num_buckets; ++i)
+    int i = 0;
+    while ((tmp_buck = list_next_item(bucket_list)))
     {
-        /* get list of buckets */
-        bucket_list = bucketing_exhaust_get_buckets(s, i + 1);
-        if (!bucket_list)
-            return 0;
+        bucket_array[i] = tmp_buck;
+        ++i;
+    }
 
-        /* compute cost associated with bucket_list */
-        cost = bucketing_exhaust_compute_cost(s, bucket_list);
-        if (cost == -1)
-            return 0;
-        
-        /* get list with lowest cost */
-        if (min_cost == -1 || min_cost > cost)
+    return bucket_array;
+}
+
+/* Reweight the probabilities of a range of buckets to 1
+ * @param bucket_array the array of bucketing_bucket*
+ * @param lo index of low bucket
+ * @param hi index of high bucket
+ * @return array of reweighted probabilities
+ * @return 0 if failure */
+static double* bucketing_reweight_bucket_probs(bucketing_bucket** bucket_array, int lo, int hi)
+{
+    if (!bucket_array)
+        return 0;
+
+    double* bucket_probs = malloc((hi - lo + 1) * sizeof(*bucket_probs));
+
+    if (!bucket_probs)
+        return 0;
+
+    /* get all probabilities of buckets in range */
+    double total_prob = 0;
+    for (int i = lo; i <= hi; ++i)
+    {
+        total_prob += bucket_array[i]->prob;
+    }
+
+    /* reweight to [0, 1] */
+    for (int i = lo; i <= hi; ++i)
+    {
+        bucket_probs[i - lo] = bucket_array[i]->prob / total_prob;
+    }
+
+    return bucket_probs;
+}
+
+/* Compute the expectations of tasks' values in all buckets
+ * @param s the relevant bucketing state
+ * @param bucket_list the list of buckets
+ * @return pointer to a malloc'ed array of values
+ * @return 0 if failure */
+static double* bucketing_exhaust_compute_task_exps(bucketing_state* s, struct list* bucket_list)
+{
+    if (!s || !bucket_list)
+        return 0;
+
+    double* task_exps = calloc(list_size(bucket_list), sizeof(*task_exps));
+    if (!task_exps)
+        return 0;
+
+    bucketing_point* tmp_pnt;
+    bucketing_bucket* tmp_buck;
+    int i = 0;
+    double total_sig_buck = 0;
+    
+    list_first_item(s->sorted_points);
+    list_first_item(bucket_list);
+    tmp_pnt = list_next_item(s->sorted_points);
+    tmp_buck = list_next_item(bucket_list);
+
+    /* Loop though all points to compute expected value of task if it is in a given bucket */
+    while ((tmp_pnt))
+    {
+        if (tmp_pnt->val <= tmp_buck->val)
         {
-            min_cost = cost;
-
-            /* delete old best list if there's better list */
-            if (best_bucket_list)
-            {
-                list_clear(best_bucket_list, (void (*) (void*)) bucketing_bucket_delete);
-                list_delete(best_bucket_list);
-            }
-            best_bucket_list = bucket_list;
+            total_sig_buck += tmp_pnt->sig;
+            task_exps[i] += tmp_pnt->val * tmp_pnt->sig;
+            tmp_pnt = list_next_item(s->sorted_points);
         }
         else
         {
-            list_clear(bucket_list, (void (*) (void*)) bucketing_bucket_delete);
-            list_delete(bucket_list);           
+            task_exps[i] /= total_sig_buck;
+            ++i;
+            total_sig_buck = 0;
+            tmp_buck = list_next_item(bucket_list);
         }
     }
 
-    return best_bucket_list;
+    /* Update last task expectation of last bucket */
+    task_exps[i] /= total_sig_buck;
+
+    return task_exps;
 }
 
-struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
+/* Compute cost of a list of buckets using the relevant bucketing state
+ * @param s the relevant bucketing state
+ * @param bucket_list the list of buckets to be computed
+ * @return expected cost of the list of buckets 
+ * @return -1 if failure */
+static double bucketing_exhaust_compute_cost(bucketing_state* s, struct list* bucket_list)
+{
+    if (!s || !bucket_list)
+        return -1;
+
+    int N = list_size(bucket_list);
+    double cost_table[N][N];
+
+    /* Compute task expectation in each bucket */
+    double* task_exps = bucketing_exhaust_compute_task_exps(s, bucket_list);
+    if (!task_exps)
+        return -1;
+
+    bucketing_bucket** bucket_array = bucketing_bucket_list_to_array(bucket_list);
+    if (!bucket_array)
+        return -1;
+
+    /* i is task in which bucket, j is which bucket is chosen */
+    /* fill easy entries */
+    for (int j = 0; j < N; ++j)
+    {
+        for (int i = 0; i <= j; ++i)
+        {
+            cost_table[i][j] = bucket_array[j]->val - task_exps[i];
+        }
+    }
+
+    double* upper_bucket_probs;
+    /* fill entries that depend on other entries */
+    for (int i = N - 1; i > -1; --i) 
+    {
+        for (int j = i - 1; j > -1; --j)
+        {
+            cost_table[i][j] = bucket_array[j]->val;
+            upper_bucket_probs = bucketing_reweight_bucket_probs(bucket_array, j + 1, N - 1);
+            if (!upper_bucket_probs)
+                return -1;
+            
+            for (int k = j + 1; k < N; ++k)
+            {
+                cost_table[i][j] += upper_bucket_probs[k - (j + 1)] * cost_table[i][k];
+            }
+            free(upper_bucket_probs);
+        }
+    }
+
+    /* Compute final cost */
+    double expected_cost = 0;
+    for (int i = 0; i < N; ++i)
+    {
+        for (int j = 0; j < N; ++j) 
+        {
+            expected_cost += bucket_array[i]->prob * bucket_array[j]->prob * cost_table[i][j];
+        }
+    }
+    
+    free(bucket_array);
+    free(task_exps);
+    
+    return expected_cost;
+}
+
+/* Get the list of buckets from a list of points and the number of buckets
+ * @param s the relevant bucketing state
+ * @param n the number of buckets to get
+ * @return a list of bucketing_bucket
+ * @return 0 if failure */
+static struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
 {
     if (!s)
         return 0;
@@ -142,107 +258,75 @@ struct list* bucketing_exhaust_get_buckets(bucketing_state* s, int n)
     return ret;
 }
 
-double bucketing_exhaust_compute_cost(bucketing_state* s, struct list* bucket_list)
+/* Return list of buckets that have the lowest expected cost
+ * @param s the relevant bucketing state
+ * @return a list of bucketing_bucket
+ * @return 0 if failure */
+static struct list* bucketing_exhaust_get_min_cost_bucket_list(bucketing_state* s)
 {
-    if (!s || !bucket_list)
-        return -1;
+    if (!s)
+        return 0;
 
-    int N = list_size(bucket_list);
-    double cost_table[N][N];
+    double cost;
+    double min_cost = -1;
+    struct list* best_bucket_list = 0;
+    struct list* bucket_list = 0;
 
-    /* Compute task expectation in each bucket */
-    double* task_exps = bucketing_exhaust_compute_task_exps(s, bucket_list);
-    if (!task_exps)
-        return -1;
-
-    bucketing_bucket** bucket_array = bucketing_bucket_list_to_array(bucket_list);
-    if (!bucket_array)
-        return -1;
-
-    /* i is task in which bucket, j is which bucket is chosen */
-    /* fill easy entries */
-    for (int j = 0; j < N; ++j)
+    /* try to see which number of buckets yields the lowest cost */
+    for (int i = 0; i < s->max_num_buckets; ++i)
     {
-        for (int i = 0; i <= j; ++i)
-        {
-            cost_table[i][j] = bucket_array[j]->val - task_exps[i];
-        }
-    }
+        /* get list of buckets */
+        bucket_list = bucketing_exhaust_get_buckets(s, i + 1);
+        if (!bucket_list)
+            return 0;
 
-    double* upper_bucket_probs;
-    /* fill entries that depend on other entries */
-    for (int i = N - 1; i > -1; --i) 
-    {
-        for (int j = i - 1; j > -1; --j)
+        /* compute cost associated with bucket_list */
+        cost = bucketing_exhaust_compute_cost(s, bucket_list);
+        if (cost == -1)
+            return 0;
+        
+        /* get list with lowest cost */
+        if (min_cost == -1 || min_cost > cost)
         {
-            cost_table[i][j] = bucket_array[j]->val;
-            upper_bucket_probs = bucketing_reweight_bucket_probs(bucket_array, j + 1, N - 1);
-            if (!upper_bucket_probs)
-                return -1;
-            
-            for (int k = j + 1; k < N; ++k)
+            min_cost = cost;
+
+            /* delete old best list if there's better list */
+            if (best_bucket_list)
             {
-                cost_table[i][j] += upper_bucket_probs[k - (j + 1)] * cost_table[i][k];
+                list_clear(best_bucket_list, (void (*) (void*)) bucketing_bucket_delete);
+                list_delete(best_bucket_list);
             }
-            free(upper_bucket_probs);
-        }
-    }
-
-    /* Compute final cost */
-    double expected_cost = 0;
-    for (int i = 0; i < N; ++i)
-    {
-        for (int j = 0; j < N; ++j) 
-        {
-            expected_cost += bucket_array[i]->prob * bucket_array[j]->prob * cost_table[i][j];
-        }
-    }
-    
-    free(bucket_array);
-    free(task_exps);
-    
-    return expected_cost;
-}
-
-double* bucketing_exhaust_compute_task_exps(bucketing_state* s, struct list* bucket_list)
-{
-    if (!s || !bucket_list)
-        return 0;
-
-    double* task_exps = calloc(list_size(bucket_list), sizeof(*task_exps));
-    if (!task_exps)
-        return 0;
-
-    bucketing_point* tmp_pnt;
-    bucketing_bucket* tmp_buck;
-    int i = 0;
-    double total_sig_buck = 0;
-    
-    list_first_item(s->sorted_points);
-    list_first_item(bucket_list);
-    tmp_pnt = list_next_item(s->sorted_points);
-    tmp_buck = list_next_item(bucket_list);
-
-    /* Loop though all points to compute expected value of task if it is in a given bucket */
-    while ((tmp_pnt))
-    {
-        if (tmp_pnt->val <= tmp_buck->val)
-        {
-            total_sig_buck += tmp_pnt->sig;
-            task_exps[i] += tmp_pnt->val * tmp_pnt->sig;
-            tmp_pnt = list_next_item(s->sorted_points);
+            best_bucket_list = bucket_list;
         }
         else
         {
-            task_exps[i] /= total_sig_buck;
-            ++i;
-            total_sig_buck = 0;
-            tmp_buck = list_next_item(bucket_list);
+            list_clear(bucket_list, (void (*) (void*)) bucketing_bucket_delete);
+            list_delete(bucket_list);           
         }
     }
 
-    /* Update last task expectation of last bucket */
-    task_exps[i] /= total_sig_buck;
-
-    return task_exps;
+    return best_bucket_list;
 }
+
+/** End: internals **/
+
+/** Begin: APIs **/
+
+int bucketing_exhaust_update_buckets(bucketing_state *s)
+{
+    if (!s)
+        return 1;
+
+    /* Destroy old list */
+    list_free(s->sorted_buckets);
+    list_delete(s->sorted_buckets);
+
+    /* Update with new list */
+    s->sorted_buckets = bucketing_exhaust_get_min_cost_bucket_list(s);
+    if (!(s->sorted_buckets))
+        return 1;
+    
+    return 0;
+}
+
+/** End: APIs **/
