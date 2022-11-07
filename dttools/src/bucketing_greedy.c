@@ -1,9 +1,9 @@
 #include <stdlib.h>
-#include "bucketing_fast.h"
+#include "bucketing_greedy.h"
 #include "bucketing.h"
 #include "list.h"
 
-int bucketing_fast_update_buckets(bucketing_state* s)
+int bucketing_greedy_update_buckets(bucketing_state* s)
 {
     if (!s)
         return 1;
@@ -16,7 +16,7 @@ int bucketing_fast_update_buckets(bucketing_state* s)
     s->sorted_buckets = list_create();
 
     /* Find all break points */
-    struct list* break_point_list = bucketing_find_break_points(s);
+    struct list* break_point_list = bucketing_greedy_find_break_points(s);
     if (!break_point_list)
         return 1;
     
@@ -91,7 +91,7 @@ int bucketing_fast_update_buckets(bucketing_state* s)
     return 0;
 }
 
-struct list* bucketing_find_break_points(bucketing_state* s)
+struct list* bucketing_greedy_find_break_points(bucketing_state* s)
 {
     if (!s)
         return 0;
@@ -131,7 +131,7 @@ struct list* bucketing_find_break_points(bucketing_state* s)
         if (!list_get(lc, (void**) &bbr_ptr))
             return 0;
         
-        breakable = bucketing_fast_break_bucket(bbr_ptr, &break_point);
+        breakable = bucketing_greedy_break_bucket(bbr_ptr, &break_point);
         
         /* If bucket is breakable, break it. Else do nothing */
         if (breakable == 0)
@@ -200,7 +200,7 @@ struct list* bucketing_find_break_points(bucketing_state* s)
     return break_point_list;
 }
 
-int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_w_pos** break_point)
+int bucketing_greedy_break_bucket(bucketing_bucket_range* range, bucketing_cursor_w_pos** break_point)
 {
     if (!range)
         return -1;
@@ -212,7 +212,7 @@ int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_
     /* Loop through all points in range and choose 1 with the lowest cost */
     for (int i = range->lo->pos; i <= range->hi->pos; ++i)
     {
-        cost = bucketing_fast_policy(range, i, &tmp_break_point);
+        cost = bucketing_greedy_policy(range, i, &tmp_break_point);
         if (cost == -1)
             return -1;
 
@@ -242,7 +242,7 @@ int bucketing_fast_break_bucket(bucketing_bucket_range* range, bucketing_cursor_
     return 0;
 }
 
-double bucketing_fast_policy(bucketing_bucket_range* range, int break_index, bucketing_cursor_w_pos** break_point)
+double bucketing_greedy_policy(bucketing_bucket_range* range, int break_index, bucketing_cursor_w_pos** break_point)
 {
     if (!range)
         return -1;

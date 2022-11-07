@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "bucketing_fast.h"
+#include "bucketing_greedy.h"
 #include "bucketing.h"
 
 int main()
@@ -28,7 +28,7 @@ int main()
         if (i >= num_sampling_points - 1)
         {
             //printf("Finding buckets\n");
-            if (bucketing_fast_update_buckets(s))
+            if (bucketing_greedy_update_buckets(s))
                 return -1;
             //bucketing_sorted_buckets_print(s->sorted_buckets);
         }

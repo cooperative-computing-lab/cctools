@@ -9,8 +9,8 @@
  * resource summary, and pointer to its task category */
 typedef struct
 {
-    category_mode_t mode;
-    struct hash_table* res_type_to_state;
+    category_mode_t mode;   //bucketing mode in {}
+    struct hash_table* res_type_to_bucketing_state;
     struct hash_table* task_id_to_task_rmsummary;
     category* category;
 } 
