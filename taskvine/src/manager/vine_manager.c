@@ -307,7 +307,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 			remote_info->in_cache = 1;
 		}
 		vine_current_transfers_remove(q, id);
-		vine_current_transfers_print_table(q);
+		//vine_current_transfers_print_table(q);
 	}
 
 	return VINE_MSG_PROCESSED;

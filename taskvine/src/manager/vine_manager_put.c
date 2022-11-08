@@ -453,21 +453,32 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	return result;
 }
 
-static char *vine_manager_can_worker_transfer( struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
+static char *vine_manager_can_any_transfer( struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
 {
 		char *id;
 		struct vine_worker_info *peer;
 		struct vine_remote_file_info *remote_info;
 
+	
+		vine_current_transfers_print_table(q);
+
+		// check original source first
+		if(vine_current_transfers_source_in_use(q, f->source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
+		{
+			return f->source;
+		}
+		
+		// if busy, check workers
 		HASH_TABLE_ITERATE(q->worker_table, id, peer){
 			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)))
 			{
-				if(vine_current_transfers_source_in_use(q, f->source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
+				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
 				{
 					if(remote_info->in_cache)
 					{
-						debug(D_VINE, "This file is to be requested from worker: %s:%d", peer->transfer_addr, peer->transfer_port);
-						return string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+						debug(D_VINE, "This file is to be requested from source: %s:%d", peer->transfer_addr, peer->transfer_port);
+						return peer_source;
 					}
 				}else{
 					debug(D_VINE, "Vine transfer source busy: %s:%d", peer->transfer_addr, peer->transfer_port);
@@ -510,24 +521,28 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 	if(t->input_files) {
 		LIST_ITERATE(t->input_files,f) {
 			vine_result_code_t result;
-			char *peer_source;
-			if((peer_source = vine_manager_can_worker_transfer(q, w, f))) { 
-				struct vine_file *worker_file = vine_file_create(peer_source, f->remote_name, f->data, f->length, VINE_URL, f->flags);
+
+			// look for the best source for this file
+			char *source;
+			if((source = vine_manager_can_any_transfer(q, w, f))) { 
+				struct vine_file *worker_file = vine_file_create(source, f->remote_name, f->data, f->length, VINE_URL, f->flags);
 				free(worker_file->cached_name);
 				worker_file->cached_name = strdup(f->cached_name);
+
 				result = vine_manager_put_input_file(q, w, t, worker_file);
-				free(peer_source);
+				free(source);
 				vine_file_delete(worker_file);
-			} else {
-				result = vine_manager_put_input_file(q,w,t,f);
+			}else{
+				return 1;
 			}
-			
-			if(result != VINE_SUCCESS) {
+
+			if(result != VINE_SUCCESS)
+			{
 				return result;
 			}
+			
 		}
 	}
-
 	return VINE_SUCCESS;
 }
 
