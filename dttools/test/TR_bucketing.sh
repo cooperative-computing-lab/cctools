@@ -13,7 +13,7 @@ run()
     val1=$?
     ../src/bucketing_exhaust_test > /dev/null
     val2=$?
-    test "$val1" = "0" && "$val2" = "0"
+    (test $val1 = 0) && (test $val2 = 0)
     return $?
 }
 
