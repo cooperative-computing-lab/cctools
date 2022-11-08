@@ -1,4 +1,6 @@
+#include <stdlib.h>
 #include "bucketing_manager.c"
+#include "xxmalloc.h"
 
 bucketing_manager* bucket_manager_create(category* c){
     bucketing_manager* m = malloc(sizeof(*m));

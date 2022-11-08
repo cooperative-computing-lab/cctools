@@ -50,7 +50,7 @@ int bucketing_manager_remove_resource_type(bucketing_manager* m, const char* r);
  * @param mode the mode of algorithm to change to
  * @return 0 if success
  * @return 1 if failure */
-int bucketing_manager_change_add_mode(bucketing_manager* m, category_mode_t mode);
+int bucketing_manager_change_mode(bucketing_manager* m, category_mode_t mode);
 
 /* Given a task id, the manager returns a predicted allocation
  * @param m the relevant manager
