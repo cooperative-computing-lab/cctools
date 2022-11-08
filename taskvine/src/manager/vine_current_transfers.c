@@ -63,8 +63,13 @@ void vine_current_transfers_print_table(struct vine_manager *q)
     debug(D_VINE, "-----------------END-------------------------------");
 }
 
-
-
+// for use in hash_table_delete
+void vine_current_transfers_delete( struct vine_transfer_pair *p )
+{
+	if (p) {
+		free(p->source);
+	}
+}
 
 
 

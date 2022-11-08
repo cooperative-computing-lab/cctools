@@ -1017,7 +1017,7 @@ static int handle_manager(struct link *manager)
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_url(filename,length,mode,source,flags);
 			reset_idle_timer();
-			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
+			hash_table_insert(current_transfers, filename, transfer_id);
 			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
 		} else if(sscanf(line, "mini_task %"SCNd64" %s %"SCNd64" %o %d",&task_id,filename_encoded, &length, &mode, &flags)==5) {
 			url_decode(filename_encoded,filename,sizeof(filename));

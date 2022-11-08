@@ -465,7 +465,7 @@ static char *vine_manager_can_any_transfer( struct vine_manager *q, struct vine_
 		// check original source first
 		if(vine_current_transfers_source_in_use(q, f->source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
 		{
-			return f->source;
+			return strdup(f->source);
 		}
 		
 		// if busy, check workers
