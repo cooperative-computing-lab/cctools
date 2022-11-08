@@ -469,8 +469,8 @@ void vine_task_add_output_buffer(struct vine_task *t, const char *buffer_name, c
 
 void vine_task_add_input_command(struct vine_task *t, const char *cmd, const char *remote_name, vine_file_flags_t flags)
 {
-	if(strstr(cmd, "%%") == NULL) {
-		fatal("%s: command to transfer file does not contain %%%% specifier: %s", __func__, cmd);
+	if(!strstr(cmd, "%%") && !strstr(cmd,"$0") ) {
+		fatal("%s: command to transfer file does not contain %%%% or $0 specifier: %s", __func__, cmd);
 	}
 
 	struct vine_file *f = vine_file_command(cmd,0);

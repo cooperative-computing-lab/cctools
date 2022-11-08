@@ -206,35 +206,35 @@ if __name__ == '__main__':
 
     # Now generate an input file from a shell command:
     t = vine.Task("/bin/cat infile")
-    t.add_input_command("curl http://www.nd.edu -o %%","infile",cache=True)
+    t.add_input_command("curl https://www.nd.edu -o $0","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # second time should have it cached (though we can't tell from here)
     t = vine.Task("/bin/cat infile")
-    t.add_input_command("curl http://www.nd.edu -o %%","infile",cache=True)
+    t.add_input_command("curl https://www.nd.edu -o $0","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # Now generate an input file from a shell command:
     t = vine.Task("/bin/cat infile")
-    t.add_input_url("http://www.nd.edu","infile",cache=True)
+    t.add_input_url("https://www.nd.edu","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # second time should have it cached (though we can't tell from here)
     t = vine.Task("/bin/cat infile")
-    t.add_input_url("http://www.nd.edu","infile",cache=True)
+    t.add_input_url("https://www.nd.edu","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # generate an invalid remote input file, should get an input missing error.
     t = vine.Task("/bin/cat infile")
-    t.add_input_url("http://pretty-sure-this-is-not-a-valid-url.com","infile",cache=True)
+    t.add_input_url("https://pretty-sure-this-is-not-a-valid-url.com","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_INPUT_MISSING, 1)

@@ -330,7 +330,7 @@ static char *make_name_list( struct vine_file *f )
 		result = string_format("%s;%s",f->cached_name,tail);
 		free(tail);
 	} else {
-		result = strdup("");;
+		result = strdup("0");;
 	}
 
 	return result;
