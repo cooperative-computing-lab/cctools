@@ -754,7 +754,7 @@ static int do_put_url( const char *cache_name, int64_t size, int mode, const cha
 }
 
 /*
-Accept a url specification and queue it for later transfer.
+Accept a command that produces a file and queue it for later execution.
 */
 
 static int do_put_cmd( const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags, const char *requires )

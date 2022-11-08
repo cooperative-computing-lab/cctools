@@ -301,19 +301,40 @@ static char *expand_envnames(struct vine_worker_info *w, const char *source)
 	return expanded_name;
 }
 
-/* Replace $REQUIRES with the cachename of the required file. */
+/* Replace $1, $2, $3 with the cachename of the required file in that position. */
 
 static char * lookup_names( const char *name, void *arg )
 {
 	struct vine_file *f = arg;
 
-	if(!strcmp(name,"REQUIRES")) {
-		return strdup(f->requires->cached_name);
+	int n = atoi(name);
+	while(n>0 && f->requires) {
+		f = f->requires;
+		n--;
+	}
+
+	if(f && n==0) {
+		return strdup(f->cached_name);
 	} else {
-		return strdup("UNKNOWN");
-	}	
+		return strdup("invalid");
+	}
+	
 }
 
+static char *make_name_list( struct vine_file *f )
+{
+	char *result;
+	
+	if(f) {
+		char *tail = make_name_list(f->requires);
+		result = string_format("%s;%s",f->cached_name,tail);
+		free(tail);
+	} else {
+		result = strdup("");;
+	}
+
+	return result;
+}
 
 /*
 Send a url or remote command used to generate a cached file,
@@ -328,7 +349,8 @@ static vine_result_code_t vine_manager_put_special_if_not_cached( struct vine_ma
 
 	char *source;
 	if(tf->type==VINE_COMMAND) {
-		source = string_subst(tf->source,lookup_names,tf);
+		/* XXX string_subst apparently consumes the first argument -- fix this. */
+		source = string_subst(strdup(tf->source),lookup_names,tf);
 	} else {
 		source = strdup(tf->source);
 	}
@@ -340,7 +362,7 @@ static vine_result_code_t vine_manager_put_special_if_not_cached( struct vine_ma
 	// url_encode(tf->source,source_encoded,sizeof(source_encoded));
 	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
 
-	vine_manager_send(q,w,"%s %s %s %d %o %d %s\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777,tf->flags, tf->requires ? tf->requires->cached_name : "0" );
+	vine_manager_send(q,w,"%s %s %s %d %o %d %s\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777,tf->flags, make_name_list(tf->requires) );
 
 	if(tf->flags & VINE_CACHE) {
 		struct vine_remote_file_info *remote_info = vine_remote_file_info_create(tf->type,tf->length,time(0));

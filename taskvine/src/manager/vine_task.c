@@ -397,66 +397,74 @@ void vine_task_check_consistency( struct vine_task *t )
 	hash_table_delete(table);
 }
 
-void vine_task_add_input( struct vine_task *t, struct vine_file *f )
+void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags )
 {
-	if(!t || !f || !f->source || !f->remote_name) {
+	if(!t || !f || !f->source || !remote_name) {
 		fatal("%s: invalid null argument.",__func__);
 	}
 
-	if(f->remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,f->remote_name);
+	if(remote_name[0] == '/') {
+		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}
 
+	/* XXX the mount options should really be a separate structure. */
+	f->remote_name = xxstrdup(remote_name);
+	f->flags = flags;
+	
 	list_push_tail(t->input_files, f);
 }
 
-void vine_task_add_output( struct vine_task *t, struct vine_file *f )
+void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags )
 {
-	if(!t || !f || !f->source || !f->remote_name) {
+	if(!t || !f || !f->source || !remote_name) {
 		fatal("%s: invalid null argument.",__func__);
 	}
 
-	if(f->remote_name[0] == '/') {
-		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,f->remote_name);
+	if(remote_name[0] == '/') {
+		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}
+
+	/* XXX the mount options should really be a separate structure. */
+	f->remote_name = xxstrdup(remote_name);
+	f->flags = flags;
 
 	list_push_tail(t->output_files, f);
 }
 
 void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_local(local_name, remote_name, flags);
-	vine_task_add_input(t,f);
+	struct vine_file *f = vine_file_local(local_name);
+	vine_task_add_input(t,f,remote_name,flags);
 }
 
 void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_local(local_name, remote_name, flags);
-	vine_task_add_output(t,f);
+	struct vine_file *f = vine_file_local(local_name);
+	vine_task_add_output(t,f,remote_name,flags);
 }
 
 void vine_task_add_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_url(file_url, remote_name, flags);
-	vine_task_add_input(t,f);
+	struct vine_file *f = vine_file_url(file_url);
+	vine_task_add_input(t,f,remote_name,flags);
 }
 
 void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
 {
-	struct vine_file *f = vine_file_empty_dir(remote_name);
-	vine_task_add_input(t,f);
+	struct vine_file *f = vine_file_empty_dir();
+	vine_task_add_input(t,f,remote_name,VINE_NOCACHE);
 }
 
 void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_buffer("unnamed",data,length,remote_name,flags);
-	vine_task_add_input(t,f);
+	struct vine_file *f = vine_file_buffer("unnamed",data,length);
+	vine_task_add_input(t,f,remote_name,flags);
 }
 
 void vine_task_add_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_buffer(buffer_name,0,0,remote_name,flags);
-	vine_task_add_output(t,f);
+	struct vine_file *f = vine_file_buffer(buffer_name,0,0);
+	vine_task_add_output(t,f,remote_name,flags);
 }
 
 void vine_task_add_input_command(struct vine_task *t, const char *cmd, const char *remote_name, vine_file_flags_t flags)
@@ -465,8 +473,8 @@ void vine_task_add_input_command(struct vine_task *t, const char *cmd, const cha
 		fatal("%s: command to transfer file does not contain %%%% specifier: %s", __func__, cmd);
 	}
 
-	struct vine_file *f = vine_file_command(cmd,remote_name,flags,0);
-	vine_task_add_input(t,f);
+	struct vine_file *f = vine_file_command(cmd,0);
+	vine_task_add_input(t,f,remote_name,flags);
 }
 
 void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file) {

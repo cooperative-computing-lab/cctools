@@ -267,8 +267,10 @@ affect the binding to files.
 int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
 int send_cache_invalid( struct link *manager, const char *cachename, const char *message );
 
-int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager, vine_file_flags_t flags )
+static int vine_cache_ensure_single( struct vine_cache *c, const char *cachename, struct link *manager, vine_file_flags_t flags )
 {
+	if(!strcmp(cachename,"0")) return 1;
+
 	struct cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
 		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
@@ -303,11 +305,18 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 			and then have the opportunity to be unpacked below.
 			*/
 			result = (rename(cache_path,transfer_path)==0);
+			if(result) {
+				result = unpack_or_rename_target(f,transfer_path,cache_path,flags);
+			}
 			break;
 		  
 		case VINE_CACHE_TRANSFER:
 			debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
 			result = do_transfer(c,f->source,transfer_path,&error_message);
+			if(result) {
+				result = unpack_or_rename_target(f,transfer_path,cache_path,flags);
+			}
+
 			break;
 
 		case VINE_CACHE_COMMAND:
@@ -315,10 +324,8 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 			result = do_command(c,f->source,transfer_path,&error_message);
 			break;
 	}
+
 	chmod(cache_path,f->mode);
-	if(result) {
-		result = unpack_or_rename_target(f,transfer_path,cache_path,flags);
-	}
 
 	// Set the permissions as originally indicated.	
 
@@ -366,6 +373,31 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	free(transfer_path);
 	return result;
 }
+
+/*
+Ensure that a semi-colon separate list of files is available in the cache.
+*/
+
+int vine_cache_ensure( struct vine_cache *c, const char *cachename_list, struct link *manager, vine_file_flags_t flags )
+{
+	if(!strcmp(cachename_list,"0")) return 1;
+	
+	int result = 1;
+	char *listcopy = strdup(cachename_list);
+
+	char *saveptr = 0;
+	char *name = strtok_r(listcopy,";",&saveptr);
+	while(name) {
+		result = vine_cache_ensure_single(c,name,manager,flags);
+		if(!result) break;
+		name = strtok_r(0,";",&saveptr);
+	}
+
+	free(listcopy);
+	
+	return result;
+}
+
 
 
 

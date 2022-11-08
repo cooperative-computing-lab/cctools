@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
+#include <stdarg.h>
 
 /* Internal use: when the worker uses the client library, do not recompute cached names. */
 int vine_hack_do_not_compute_cached_name = 0;
@@ -93,7 +94,7 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 	memset(f, 0, sizeof(*f));
 
 	f->source = xxstrdup(source);
-	f->remote_name = xxstrdup(remote_name);
+	if(f->remote_name) f->remote_name = xxstrdup(remote_name);
 	f->type = type;
 	f->flags = flags;
 	f->length = length;
@@ -119,13 +120,16 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 
 struct vine_file *vine_file_clone(const struct vine_file *f )
 {
-	return vine_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags,f->requires);
+	if(!f) return 0;
+	return vine_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags,vine_file_clone(f->requires));
 }
 
 /* Delete a file object */
 
 void vine_file_delete(struct vine_file *f)
 {
+	if(!f) return;
+	vine_file_delete(f->requires);
 	free(f->source);
 	free(f->remote_name);
 	free(f->cached_name);
@@ -133,29 +137,42 @@ void vine_file_delete(struct vine_file *f)
 	free(f);
 }
 
-struct vine_file * vine_file_local( const char *source, const char *remote_name, vine_file_flags_t flags )
+struct vine_file * vine_file_local( const char *source )
 {
-	return vine_file_create(source,remote_name,0,0,VINE_FILE,flags,0);
+	return vine_file_create(source,0,0,0,VINE_FILE,0,0);
 }
 
-struct vine_file * vine_file_url( const char *source, const char *remote_name, vine_file_flags_t flags )
+struct vine_file * vine_file_url( const char *source )
 {
-	return vine_file_create(source,remote_name,0,0,VINE_URL,flags,0);
+	return vine_file_create(source,0,0,0,VINE_URL,0,0);
 }
 
-struct vine_file * vine_file_buffer( const char *buffer_name,const char *data, int length, const char *remote_name, vine_file_flags_t flags )
+struct vine_file * vine_file_buffer( const char *buffer_name,const char *data, int length )
 {
-	return vine_file_create(buffer_name,remote_name,data,length,VINE_BUFFER,flags,0);
+	return vine_file_create(buffer_name,0,data,length,VINE_BUFFER,0,0);
 }
 
-struct vine_file * vine_file_command( const char *cmd, const char *remote_name, vine_file_flags_t flags, struct vine_file *requires )
+struct vine_file * vine_file_empty_dir()
 {
-	return vine_file_create(cmd,remote_name,0,0,VINE_COMMAND,flags,requires);
+	return vine_file_create("unnamed",0,0,0,VINE_EMPTY_DIR,0,0);
 }
 
-struct vine_file * vine_file_empty_dir( const char *remote_name )
+struct vine_file * vine_file_command( const char *cmd, ... )
 {
-	return vine_file_create("unnamed",remote_name,0,0,VINE_EMPTY_DIR,VINE_NOCACHE,0);
-}
+	va_list args;
+	va_start(args,cmd);
 
+	struct vine_file *result = vine_file_create(cmd,0,0,0,VINE_COMMAND,0,0);
+	struct vine_file **tail = &result->requires;
+
+	while(1) {
+		struct vine_file *r = va_arg(args,struct vine_file *);
+		if(!r) break;
+
+		*tail = r;
+		tail = &r->requires;
+	}
+
+	return result;
+}
 
