@@ -41,14 +41,15 @@ int main(int argc, char *argv[])
 
 	for(i=0;i<10;i++) {
 			  
-		struct vine_task *t = vine_task_create("ls -lR cctools");
-		struct vine_file *u = vine_file_url(CCTOOLS_URL,"package.tar.gz",VINE_CACHE);
-		struct vine_file *f = vine_file_command("mkdir %%; tar xvzf $REQUIRES -C %%","cctools",VINE_CACHE,u);
-		vine_task_add_input(t,f);
+		struct vine_task *task = vine_task_create("ls -lR cctools");
+		struct vine_file *tar = vine_file_local("/usr/bin/tar");
+		struct vine_file *url = vine_file_url(CCTOOLS_URL);
+		struct vine_file *file = vine_file_command("mkdir $0; ./$1 xvzf $2 -C $0",tar,url,0);
+		vine_task_add_input(task,file,"cctools",VINE_CACHE);
 
-		int task_id = vine_submit(m, t);
+		int task_id = vine_submit(m, task);
 
-		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );
+		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(task) );
 	}
 
 	printf("waiting for tasks to complete...\n");
