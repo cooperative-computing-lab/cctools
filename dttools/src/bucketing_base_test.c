@@ -3,6 +3,7 @@
 #include "bucketing_greedy.h"
 #include "bucketing_exhaust.h"
 #include "category.h"
+#include "debug.h"
 
 int main(int argc, char** argv)
 {
@@ -12,14 +13,28 @@ int main(int argc, char** argv)
     int max_num_buckets = 10;
 
     category_mode_t mode;
-    if (strncmp(*(argv+1), "-greedy", 7) == 0)
+    if (argc == 2)
     {
-        mode = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING;
+        if (strncmp(*(argv+1), "-greedy", 7) == 0)
+        {
+            mode = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING;
+        }
+        else if (strncmp(*(argv+1), "-exhaust", 8) == 0)
+        {
+            mode = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING;
+        }
+        else
+        {
+            fatal("Invalid bucketing mode\n");
+            return 1;
+        }    
     }
-    else if (strncmp(*(argv+1), "-exhaust", 8) == 0)
+    else
     {
-        mode = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING;
+        fatal("Must provide type of bucketing mode\n");
+        return 1;
     }
+    
     //printf("Creating bucketing state\n");
     bucketing_state_t* s = bucketing_state_create(default_value, num_sampling_points, increase_rate, max_num_buckets, mode);
 
