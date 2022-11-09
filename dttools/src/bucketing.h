@@ -1,6 +1,7 @@
 #ifndef BUCKETING_H
 #define BUCKETING_H
 
+#include "category.h"
 #include "list.h"
 
 /* Bucketing has two operations, add and predict */
@@ -65,6 +66,9 @@ typedef struct
      * operation. */
     bucketing_operation_t prev_op;
 
+    /* the significance value of the next task to be added */
+    int next_task_sig;
+
     /** End: internally maintained fields **/
 
     /** Begin: externally provided fields **/
@@ -78,8 +82,11 @@ typedef struct
      * predicting phase */
     double increase_rate;
 
-    /* the maximum number of buckets to break (only exhaustive bucketing */
+    /* the maximum number of buckets to break (only exhaustive bucketing) */
     int max_num_buckets;
+
+    /* the update mode to use */
+    category_mode_t mode;
 
     /** End: externally provided fields **/ 
 } bucketing_state_t;
@@ -91,29 +98,29 @@ typedef struct
  * @param num_sampling_points number of needed sampling points
  * @param increase_rate rate to increase values
  * @param max_num_buckets the maximum number of buckets to find (only for exhaustive bucketing)
+ * @param mode specify which update mode of bucketing state
  * @return pointer to created bucketing state
  * @return 0 if failure */
 bucketing_state_t* bucketing_state_create(double default_value, int num_sampling_points,
-    double increase_rate, int max_num_buckets);
+    double increase_rate, int max_num_buckets, category_mode_t mode);
 
 /* Delete a bucketing state
  * @param s pointer to bucketing state to be deleted */
 void bucketing_state_delete(bucketing_state_t* s);
 
 /* Add a point
- * @param val value of point to be added
- * @param sig significance of point to be added
- * @param s the relevant bucketing state */
-void bucketing_add(double val, double sig, bucketing_state_t* s);
+ * @param s the relevant bucketing state 
+ * @param val value of point to be added */
+void bucketing_add(bucketing_state_t* s, double val);
 
 /* Predict a value, only predict when we need a new value, don't predict when prev value
  * (if available) is usable
+ * @param s the relevant bucketing_state_t
  * @param prev_val previous value to consider, -1 if no previous value, 
  * > 0 means a larger value is expected from prediction
- * @param s the relevant bucketing_state_t
  * @return the predicted value
  * @return -1 if failure */
-double bucketing_predict(double prev_val, bucketing_state_t* s);
+double bucketing_predict(bucketing_state_t* s, double prev_val);
 
 /* Create a bucketing bucket
  * @param val value of bucket

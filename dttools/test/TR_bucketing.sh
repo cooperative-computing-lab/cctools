@@ -9,9 +9,9 @@ prepare()
 
 run()
 {
-    ../src/bucketing_greedy_test > /dev/null
+    ../src/bucketing_base_test -greedy > /dev/null
     val1=$?
-    ../src/bucketing_exhaust_test > /dev/null
+    ../src/bucketing_base_test -exhaust > /dev/null
     val2=$?
     (test $val1 = 0) && (test $val2 = 0)
     return $?

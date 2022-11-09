@@ -38,3 +38,4 @@ mq_wait_test
 mq_store_test
 bucketing_greedy_test
 bucketing_exhaust_test
+bucketing_manager_test
