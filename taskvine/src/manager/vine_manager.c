@@ -4593,7 +4593,7 @@ int vine_enable_debug_log( struct vine_manager *m, const char *logfile )
 
 int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 {
-	q->perf_logfile = fopen(filename, "a");
+	q->perf_logfile = fopen(filename, "w");
 	if(q->perf_logfile) {
 		vine_perf_log_write_header(q);
 		vine_perf_log_write_update(q,1);
@@ -4607,7 +4607,7 @@ int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 
 int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 {
-	q->txn_logfile = fopen(filename, "a");
+	q->txn_logfile = fopen(filename, "w");
 	if(q->txn_logfile) {
 		debug(D_VINE, "transactions log enabled and is being written to %s\n", filename);
 		vine_txn_log_write_header(q);
