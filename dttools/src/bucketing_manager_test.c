@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "bucketing_manager.h"
+#include "debug.h"
 
 extern struct hash_table* info_of_resource_table;
 
@@ -14,6 +15,16 @@ int main(int argc, char** argv)
             mode = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING;
         else if (strncmp(*(argv+1), "-exhaust", 8) == 0)
             mode = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING;
+        else
+        {
+            fatal("invalid bucketing mode\n");
+            return 1;
+        }
+    }
+    else
+    {
+        fatal("must specify bucketing mode\n");
+        return 1;
     }
     double default_value;
     int num_sampling_points = 10;
