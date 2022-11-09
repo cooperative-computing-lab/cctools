@@ -521,10 +521,12 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 	if(t->input_files) {
 		LIST_ITERATE(t->input_files,f) {
 			vine_result_code_t result;
-
-			// look for the best source for this file
 			char *source;
-			if((source = vine_manager_can_any_transfer(q, w, f))) { 
+
+			if(f->type != VINE_URL) {
+				result = vine_manager_put_input_file(q, w, t, f);
+			}
+			else if((source = vine_manager_can_any_transfer(q, w, f)) && f->type == VINE_URL) { 
 				struct vine_file *worker_file = vine_file_create(source, f->remote_name, f->data, f->length, VINE_URL, f->flags);
 				free(worker_file->cached_name);
 				worker_file->cached_name = strdup(f->cached_name);
@@ -532,7 +534,8 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 				result = vine_manager_put_input_file(q, w, t, worker_file);
 				free(source);
 				vine_file_delete(worker_file);
-			}else{
+			}
+			else{
 				return 1;
 			}
 
