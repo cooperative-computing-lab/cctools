@@ -207,12 +207,14 @@ class Task(object):
             pass
 
     @staticmethod
-    def _determine_file_flags(cache=False, unpack=False, failure_only=False, success_only=False):
+    def _determine_file_flags(cache=False, unpack=False, watch=False, failure_only=False, success_only=False):
         flags = VINE_NOCACHE
         if cache:
             flags |= VINE_CACHE
         if unpack:
             flags |= VINE_UNPACK
+        if watch:
+            flags |= VINE_WATCH
         if failure_only:
             flags |= VINE_FAILURE_ONLY
         if success_only:
@@ -334,7 +336,6 @@ class Task(object):
     # @code
     # >>> task.add_input_url("http://www.google.com/","google.txt",cache=True)
     # @endcode
-
     def add_input_url(self, url, remote_name, cache=False, unpack=False):
         # swig expects strings
         if remote_name:
@@ -429,6 +430,7 @@ class Task(object):
     # @param local_name    The name of the file on local disk or shared filesystem.
     # @param remote_name   The name of the file at the execution site.
     # @param cache         Whether the file should be cached at workers. Default is False.
+    # @param watch         Watch the output file and send back changes as the task runs.
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
     # @param success_only  For output files, whether the file should be retrieved only when the task succeeds. Default is False.
     # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
@@ -439,7 +441,7 @@ class Task(object):
     # >>> task.add_input_file("/etc/hosts", cache = True)
     # >>> task.add_input_file("/etc/hosts", "hosts", cache = True)
     # @endcode
-    def add_output_file(self, local_name, remote_name=None, cache=False, failure_only=False, success_only=False):
+    def add_output_file(self, local_name, remote_name=None, cache=False, watch=False, failure_only=False, success_only=False):
         if local_name:
             local_name = str(local_name)
 
@@ -448,24 +450,25 @@ class Task(object):
         else:
             remote_name = os.path.basename(local_name)
 
-        flags = Task._determine_file_flags(cache=cache, failure_only=failure_only, success_only=success_only)
+        flags = Task._determine_file_flags(cache=cache, watch=watch, failure_only=failure_only, success_only=success_only)
         return vine_task_add_output_file(self._task, local_name, remote_name, flags)
 
     ##
     # Add an output buffer to the task.
     #
-    # @param self           Reference to the current task object.
-    # @param buffer_name    The logical name of the output buffer.
-    # @param remote_name    The name of the remote file to fetch.
-    # @param cache          Whether the file should be cached at workers (True/False)
+    # @param self          Reference to the current task object.
+    # @param buffer_name   The logical name of the output buffer.
+    # @param remote_name   The name of the remote file to fetch.
+    # @param cache         Whether the file should be cached at workers (True/False)
+    # @param watch         Watch the output file and send back changes as the task runs.
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
     # @param success_only  For output files, whether the file should be retrieved only when the task succeeds. Default is False.
-    def add_output_buffer(self, buffer_name, remote_name, cache=False, failure_only=False, success_only=False):
+    def add_output_buffer(self, buffer_name, remote_name, cache=False, watch=False, failure_only=False, success_only=False):
         if buffer_name:
             buffer_name = str(buffer_name)
         if remote_name:
             remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache=cache, failure_only=failure_only, success_only=success_only)
+        flags = Task._determine_file_flags(cache=cache, watch=watch, failure_only=failure_only, success_only=success_only)
         return vine_task_add_output_buffer(self._task, buffer_name, remote_name, flags)
 
 
