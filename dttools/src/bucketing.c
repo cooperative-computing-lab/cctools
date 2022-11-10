@@ -17,6 +17,9 @@
  * @return NULL if failure */
 static bucketing_point_t* bucketing_point_create(double val, double sig)
 {
+    if (val < 0)
+        warn(D_BUCKETING, "bucketing point cannot have value less than 0\n");
+
     bucketing_point_t* p = xxmalloc(sizeof(*p));
     
     p->val = val;
@@ -109,9 +112,43 @@ static void bucketing_update_buckets(bucketing_state_t* s)
 
 /** Begin: APIs **/
 
+bucketing_bucket_t* bucketing_bucket_create(double val, double prob)
+{
+    if (val < 0)
+        warn(D_BUCKETING, "bucket value cannot be less than 0\n");
+
+    bucketing_bucket_t* b = xxmalloc(sizeof(*b));
+
+    b->val = val;
+    b->prob = prob;
+
+    return b;
+}
+
+void bucketing_bucket_delete(bucketing_bucket_t* b)
+{
+    if (b)
+        free(b);
+}
+
 bucketing_state_t* bucketing_state_create(double default_value, int num_sampling_points,
     double increase_rate, int max_num_buckets, category_mode_t mode)
 {
+    if (default_value < 0)
+        warn(D_BUCKETING, "default value cannot be less than 0\n");
+
+    if (num_sampling_points < 1)
+        warn(D_BUCKETING, "number of sampling points cannot be less than 1\n");
+
+    if (increase_rate <= 1)
+        warn(D_BUCKETING, "increase rate must be greater than 1 to be meaningful\n");
+
+    if (max_num_buckets < 1 && mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING)
+        warn(D_BUCKETING, "The maximum number of buckets for exhaustive bucketing must be at least 1\n");
+    
+    if (mode != CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING && mode != CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING)
+        fatal("Invalid bucketing mode\n");
+
     bucketing_state_t* s = xxmalloc(sizeof(*s));
 
     s->sorted_points = list_create();
@@ -190,10 +227,17 @@ double bucketing_predict(bucketing_state_t* s, double prev_val)
     /* in sampling phase */
     if (s->in_sampling_phase)
     {
-        /* if new, return default value */
-        if (prev_val == -1)
+        /* if new or no resource, return default value */
+        if (prev_val == -1 || prev_val == 0)
             return s->default_value;
-        
+
+        /* prevous value must be -1 or greater than 0 */
+        else if (prev_val != -1 && prev_val < 0)
+        {
+            fatal("invalid previous value to predict\n");
+            return -1;
+        }
+
         /* otherwise increase to exponent level */
         else
         {
@@ -262,24 +306,6 @@ double bucketing_predict(bucketing_state_t* s, double prev_val)
     
     fatal("Control should never reach here\n");
     return -1; 
-}
-
-bucketing_bucket_t* bucketing_bucket_create(double val, double prob)
-{
-    bucketing_bucket_t* b = xxmalloc(sizeof(*b));
-
-    b->val = val;
-    b->prob = prob;
-
-    return b;
-}
-
-/* Delete a bucketing bucket
- * @param b the bucket to be deleted */
-void bucketing_bucket_delete(bucketing_bucket_t* b)
-{
-    if (b)
-        free(b);
 }
 
 /** End: APIs **/

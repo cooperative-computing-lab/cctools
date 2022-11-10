@@ -112,12 +112,13 @@ struct rmsummary* bucketing_manager_predict(bucketing_manager_t* m, int task_id)
     char* task_id_str = int_to_string(task_id);
     char* res_name;
     bucketing_state_t* state;
+
     struct rmsummary* old_res = hash_table_lookup(m->task_id_to_task_rmsummary, task_id_str);
     double old_val;
     struct rmsummary* pred_res = rmsummary_create(0);
     double pred_val;
+    
     struct hash_table* ht = m->res_type_to_bucketing_state;
-
     hash_table_firstkey(ht);
         
     while (hash_table_nextkey(ht, &res_name, (void**) &state))
@@ -133,9 +134,12 @@ struct rmsummary* bucketing_manager_predict(bucketing_manager_t* m, int task_id)
             if (old_val <= 0)   //uninitialized value means task needs new prediction
                 old_val = -1;
 
-            hash_table_remove(m->task_id_to_task_rmsummary, task_id_str);
         }
-
+        
+        if (old_val < 3)
+        {
+            old_val = 2;
+        }
         pred_val = bucketing_predict(state, old_val);
 
         if (pred_val == -1)
@@ -145,6 +149,12 @@ struct rmsummary* bucketing_manager_predict(bucketing_manager_t* m, int task_id)
         }
 
         rmsummary_set(pred_res, res_name, pred_val);
+    }
+
+    if (old_res)
+    {
+        hash_table_remove(m->task_id_to_task_rmsummary, task_id_str);
+        rmsummary_delete(old_res);
     }
 
     hash_table_insert(m->task_id_to_task_rmsummary, task_id_str, pred_res);

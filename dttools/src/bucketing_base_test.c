@@ -39,7 +39,7 @@ int main(int argc, char** argv)
     bucketing_state_t* s = bucketing_state_create(default_value, num_sampling_points, increase_rate, max_num_buckets, mode);
 
     int prime = 7000;
-    int num = 2000;
+    int num = 0;
     int multiple = 2;
     int iters = 50;
     double pred;
@@ -71,7 +71,8 @@ int main(int argc, char** argv)
             }
         }
 
-        avg_eff += num/alloc;
+        if (alloc > 0)
+            avg_eff += num/alloc;
         printf("average efficiency so far %lf\n", avg_eff/(i+1));
 
         bucketing_add(s, num);

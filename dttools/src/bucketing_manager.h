@@ -14,7 +14,7 @@ typedef struct
 {
     category_mode_t mode;   //bucketing mode in CATEGORY_ALLOCATION_MODE_{GREEDY/EXHAUSTIVE}_BUCKETING
     struct hash_table* res_type_to_bucketing_state; //mapping of resource type to bucketing state
-    struct hash_table* task_id_to_task_rmsummary;   //mapping of task id to its previous resource summary
+    struct hash_table* task_id_to_task_rmsummary;   //mapping of task id to its previous resource summary from either actual run or prediction
 } 
 bucketing_manager_t;
 
@@ -48,7 +48,7 @@ void bucketing_manager_remove_resource_type(bucketing_manager_t* m, const char* 
  * @param mode the mode of algorithm to change to */
 void bucketing_manager_set_mode(bucketing_manager_t* m, category_mode_t mode);
 
-/* Given a task id, the manager returns a predicted allocation
+/* Given a task id, the manager returns a predicted allocation and adds this prediction into internal state
  * @param m the relevant manager
  * @param task_id the task id
  * @return a pointer to a newly created rmsummary containing the prediction

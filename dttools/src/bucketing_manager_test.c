@@ -50,6 +50,7 @@ int main(int argc, char** argv)
     int iters = 50;
 
     struct rmsummary* task_r;
+    struct rmsummary* pred_task_r;
 
     int task_id = 1;
 
@@ -60,28 +61,21 @@ int main(int argc, char** argv)
         num_core = num_core * multiple % prime_core;
         num_mem = num_mem * multiple % prime_mem;
         num_disk = num_disk * multiple % prime_disk;
+        printf("iteration %d task w cores %d mem %d disk %d\n", i, num_core, num_mem, num_disk);
+
+        while((pred_task_r = bucketing_manager_predict(m, task_id)))
+        {
+            if (pred_task_r->cores >= num_core && pred_task_r->memory >= num_mem && pred_task_r->disk >= num_disk)
+            {
+                break;
+            }
+        }
+
         rmsummary_set(task_r, res_names[0], num_core);
         rmsummary_set(task_r, res_names[1], num_mem);
         rmsummary_set(task_r, res_names[2], num_disk);
-        //printf("iteration %d data value %d\n", i, num);
         bucketing_manager_add_task(m, task_id, task_r, 1);
-        //printf("value added\n");
-        //bucketing_sorted_points_print(s->sorted_points);
-        //if (i >= num_sampling_points - 1)
-        //{
-            //printf("Finding buckets\n");
-        //    bucketing_greedy_update_buckets(s);
-        //    bucketing_sorted_buckets_print(s->sorted_buckets);
-        //}
-        if (i == 9)
-        {
-            static int a = 1;
-            ++a;
-        }
-        bucketing_manager_predict(m, task_id);
         ++task_id;
-        //printf("Predicting value %lf\n", bucketing_predict(s, -1));
-        //printf("Sorted list length %d\n", list_length(s->sorted_points));
         //printf("----------------------------------\n");
     }
     bucketing_manager_delete(m);

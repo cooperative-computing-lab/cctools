@@ -303,7 +303,7 @@ static int bucketing_greedy_break_bucket(bucketing_bucket_range_t* range, bucket
             min_cost = cost;
             *break_point = tmp_break_point;
         }
-        else if (cost < min_cost)
+        else if (cost <= min_cost)
         {
             min_cost = cost;
             bucketing_cursor_w_pos_delete(*break_point);
