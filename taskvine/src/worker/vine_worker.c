@@ -1085,58 +1085,6 @@ static int task_resources_fit_eventually(struct vine_task *t)
 		(t->resources_requested->gpus   <= r->gpus.largest);
 }
 
-/*
-Return true if there exists some task that will produce
-cache_name as an output file.
-Note that this function has high algorithmic complexity,
-but we only expect a handful of tasks that produce a
-handful of output files, and so simplicity beats efficiency
-in this case.
-*/
-
-int some_task_will_provide( const char *cache_name )
-{
-	struct vine_task *t;
-	uint64_t taskid;
-	ITABLE_ITERATE(procs_table,taskid,t) {
-		if(t->output_files) {
-			struct vine_file *f;
-			LIST_ITERATE(t->output_files,f) {
-				if(!strcmp(f->cached_name,cache_name)) return 1;
-			}
-			
-		}
-	}
-	return 0;
-}
-
-/*
-Return true if this task's input files are ready to proceed.
-If the input file is present, that's good.
-If the input file is not present, but some other task will
-provide it, then we are not ready to proceed.
-But if neither is true, allow the task to proceed so that
-it can fail properly with an INPUT_MISS error.
-*/
-
-static int task_inputs_ready_now( struct vine_task *t )
-{
-	if(!t->input_files) return 1;
-
-	struct vine_file *f;
-	LIST_ITERATE(t->input_files,f) {
-		if(vine_cache_contains(global_cache,f->cached_name)) {
-			continue;
-		} else if(some_task_will_provide(f->cached_name)) {
-			return 0;
-		} else {
-			return 1;
-		}
-	}
-	
-	return 1;
-}
-
 void forsake_waiting_process(struct link *manager, struct vine_process *p)
 {
 	/* the task cannot run in this worker */
@@ -1298,7 +1246,7 @@ static void work_for_manager( struct link *manager )
 				p = list_pop_head(procs_waiting);
 				if(!p) {
 					break;
-				} else if(task_resources_fit_now(p->task) && task_inputs_ready_now(p->task)) {
+				} else if(task_resources_fit_now(p->task)) {
 					// attach the function name, port, and type to process, if applicable
 					if (p->task->coprocess) {
 						struct vine_coprocess *ready_coprocess = vine_coprocess_find_state(coprocess_info, number_of_coprocess_instances, VINE_COPROCESS_READY);
