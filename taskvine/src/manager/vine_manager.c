@@ -2406,106 +2406,29 @@ Note that the "infile" and "outfile" components of the task refer to
 files that have already been uploaded into the worker's cache by the manager.
 */
 
-
 static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	/* wrap command at the last minute, so that we have the updated information
-	 * about resources. */
 	struct rmsummary *limits = vine_manager_choose_resources_for_task(q, w, t);
 
 	char *command_line;
+
 	if(q->monitor_mode && !t->coprocess) {
 		command_line = vine_monitor_wrap(q, w, t, limits);
 	} else {
 		command_line = xxstrdup(t->command_line);
 	}
 
-	vine_result_code_t result = vine_manager_put_input_files(q, w, t);
+	vine_result_code_t result = vine_manager_put_task(q,w,t,command_line,limits,0);
 
-	if (result != VINE_SUCCESS) {
-		free(command_line);
-		return result;
-	}
-
-	vine_manager_send(q,w, "task %lld\n",  (long long) t->task_id);
-
-	long long cmd_len = strlen(command_line);
-	vine_manager_send(q,w, "cmd %lld\n", (long long) cmd_len);
-	link_putlstring(w->link, command_line, cmd_len, time(0) + q->short_timeout);
-	debug(D_VINE, "%s\n", command_line);
 	free(command_line);
-
-
-	if(t->coprocess) {
-		cmd_len = strlen(t->coprocess);
-		vine_manager_send(q,w, "coprocess %lld\n", (long long) cmd_len);
-		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + q->short_timeout);
-	}
-
-	vine_manager_send(q,w, "category %s\n", t->category);
-
-	vine_manager_send(q,w, "cores %s\n",  rmsummary_resource_to_str("cores", limits->cores, 0));
-	vine_manager_send(q,w, "gpus %s\n",   rmsummary_resource_to_str("gpus", limits->gpus, 0));
-	vine_manager_send(q,w, "memory %s\n", rmsummary_resource_to_str("memory", limits->memory, 0));
-	vine_manager_send(q,w, "disk %s\n",   rmsummary_resource_to_str("disk", limits->disk, 0));
-
-	/* Do not set end, wall_time if running the resource monitor. We let the monitor police these resources. */
-	if(q->monitor_mode == VINE_MON_DISABLED) {
-		if(limits->end > 0) {
-			vine_manager_send(q,w, "end_time %s\n",  rmsummary_resource_to_str("end", limits->end, 0));
-		}
-		if(limits->wall_time > 0) {
-			vine_manager_send(q,w, "wall_time %s\n", rmsummary_resource_to_str("wall_time", limits->wall_time, 0));
-		}
-	}
-
-	itable_insert(w->current_tasks_boxes, t->task_id, limits);
-	rmsummary_merge_override(t->resources_allocated, limits);
-
-	/* Note that even when environment variables after resources, values for
-	 * CORES, MEMORY, etc. will be set at the worker to the values of
-	 * set_*, if used. */
-	char *var;
-	LIST_ITERATE(t->env_list,var) {
-		vine_manager_send(q, w,"env %zu\n%s\n", strlen(var), var);
-	}
-
-	if(t->input_files) {
-		struct vine_file *tf;
-		LIST_ITERATE(t->input_files,tf) {
-			if(tf->type == VINE_EMPTY_DIR) {
-				vine_manager_send(q,w, "dir %s\n", tf->remote_name);
-			} else {
-				char remote_name_encoded[PATH_MAX];
-				url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
-				vine_manager_send(q,w, "infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
-			}
-		}
-	}
-
-	if(t->output_files) {
-		struct vine_file *tf;
-		LIST_ITERATE(t->output_files,tf) {
-			char remote_name_encoded[PATH_MAX];
-			url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
-			vine_manager_send(q,w, "outfile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
-		}
-	}
-
-	// vine_manager_send returns the number of bytes sent, or a number less than
-	// zero to indicate errors. We are lazy here, we only check the last
-	// message we sent to the worker (other messages may have failed above).
-	int result_msg = vine_manager_send(q,w,"end\n");
-
-	if(result_msg > -1)
-	{
+	
+	if(result==VINE_SUCCESS) {
+		itable_insert(w->current_tasks_boxes, t->task_id, limits);
+		rmsummary_merge_override(t->resources_allocated, limits);
 		debug(D_VINE, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
-		return VINE_SUCCESS;
 	}
-	else
-	{
-		return VINE_WORKER_FAILURE;
-	}
+
+	return result;
 }
 
 static void compute_manager_load(struct vine_manager *q, int task_activity) {

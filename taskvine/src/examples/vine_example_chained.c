@@ -41,10 +41,13 @@ int main(int argc, char *argv[])
 
 	for(i=0;i<10;i++) {
 			  
+		struct vine_task *minitask = vine_task_create("tar xvzf cctools.tar.gz");
+		vine_task_add_input_url(minitask,CCTOOLS_URL,"cctools.tar.gz",VINE_CACHE);
+		vine_task_add_output_file(minitask,"cctools","cctools-7.4.14-source",VINE_CACHE);
+
+		struct vine_file *file = vine_file_mini_task(minitask);
+		
 		struct vine_task *task = vine_task_create("ls -lR cctools");
-		struct vine_file *tar = vine_file_local("/usr/bin/tar");
-		struct vine_file *url = vine_file_url(CCTOOLS_URL);
-		struct vine_file *file = vine_file_command("mkdir $0; ./$1 xvzf $2 -C $0",tar,url,0);
 		vine_task_add_input(task,file,"cctools",VINE_CACHE);
 
 		int task_id = vine_submit(m, task);

@@ -100,7 +100,7 @@ typedef enum {
 	VINE_FILE = 1,              /**< A file or directory present at the manager. **/
 	VINE_URL,                   /**< A file obtained by downloading from a URL. */
 	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
-	VINE_COMMAND,               /**< A file obtained by executing a Unix command line. */
+	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
 	VINE_EMPTY_DIR              /**< An empty directory to create in the task sandbox. */
 } vine_file_t;
 
@@ -296,14 +296,10 @@ void vine_task_add_output_file(struct vine_task *t, const char *local_name, cons
 */
 void vine_task_add_input_url(struct vine_task *t, const char *url, const char *remote_name, vine_file_flags_t flags);
 
-/** Add a shell command to produce an input file for a task.
-@param t A task object.
-@param cmd The shell command to produce the file.   The command must contain a special symbol "%%" which indicates the destination of the file.
-For example, the command "grep frog /usr/dict/words > %%" would produce a file by searching for "frog" in the Unix dictionary.
-@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_add_input_file.
+/**
+XXX update documentation
 */
-void vine_task_add_input_command(struct vine_task *t, const char *cmd, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.

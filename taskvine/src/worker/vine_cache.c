@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "vine_cache.h"
+#include "vine_process.h"
 
 #include "xxmalloc.h"
 #include "hash_table.h"
@@ -34,10 +35,10 @@ struct cache_file {
 	int64_t actual_size;
 	int mode;
 	int complete;
-	char *requires;
+	struct vine_task *minitask;
 };
 
-struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, const char *requires )
+struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, struct vine_task *minitask )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
@@ -45,13 +46,12 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->actual_size = actual_size;
 	f->mode = mode;
 	f->complete = 0;
-	f->requires = xxstrdup(requires);
+	f->minitask = minitask;
 	return f;
 }
 
 void cache_file_delete( struct cache_file *f )
 {
-	free(f->requires);
 	free(f->source);
 	free(f);
 }
@@ -98,19 +98,40 @@ It may still be necessary to perform post-transfer processing of this file.
 
 int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode,"0");
+	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode,0);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
 
 /*
-Queue a remote file transfer or command execution to produce a file.
+Return true if the cache contains the requested item.
+*/
+
+int vine_cache_contains( struct vine_cache *c, const char *cachename )
+{
+	return hash_table_lookup(c->table,cachename)!=0;
+}
+
+/*
+Queue a remote file transfer to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue( struct vine_cache *c, vine_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags, const char *requires )
+int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
 {
-	struct cache_file *f = cache_file_create(type,source,size,mode,requires);
+	struct cache_file *f = cache_file_create(VINE_CACHE_TRANSFER,source,size,mode,0);
+	hash_table_insert(c->table,cachename,f);
+	return 1;
+}
+
+/*
+Queue a mini-task to produce a file.
+This entry will be materialized later in vine_cache_ensure.
+*/
+
+int vine_cache_queue_command( struct vine_cache *c, struct vine_task *minitask, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
+{
+	struct cache_file *f = cache_file_create(VINE_CACHE_COMMAND,"task",size,mode,minitask);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -187,18 +208,26 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 }
 
 /*
-Create a file by executing a shell command.
-The command should contain %% which indicates the path of the cache file to be created.
+Create a file by executing a minitask, which should produce the desired cachename.
+The minitask uses all the normal machinery to run a task synchronously,
+which should result in the desired file being placed into the cache.
+This will be double-checked below.
 */
 
-static int do_command( struct vine_cache *c, const char *command, const char *cache_path, char **error_message )
+static int do_command( struct vine_cache *c, struct vine_task *minitask, struct link *manager, char **error_message )
 {
-	chdir("cache");
-	char *full_command = string_replace_percents(command,cache_path);
-	int result = do_internal_command(c,full_command,error_message);
-	free(full_command);
-	chdir("..");
-	return result;
+	if(vine_process_execute_and_wait(minitask,c,manager)) {
+		*error_message = 0;
+		return 1;
+	} else {
+		const char *str = vine_task_get_stdout(minitask);
+		if(str) {
+			*error_message = xxstrdup(str);
+		} else {
+			*error_message = 0;
+		}
+		return 0;
+	}
 }
 
 /*
@@ -267,7 +296,7 @@ affect the binding to files.
 int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
 int send_cache_invalid( struct link *manager, const char *cachename, const char *message );
 
-static int vine_cache_ensure_single( struct vine_cache *c, const char *cachename, struct link *manager, vine_file_flags_t flags )
+int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager, vine_file_flags_t flags )
 {
 	if(!strcmp(cachename,"0")) return 1;
 
@@ -281,12 +310,6 @@ static int vine_cache_ensure_single( struct vine_cache *c, const char *cachename
 		debug(D_VINE,"cache: %s is already present.",cachename);
 		return 1;
 	}
-
-	/* Ensure the dependent file is there. */
-	/* XXX this doesn't check for success! */
-	/* XXX not sure what the right flags are here */
-	
-	vine_cache_ensure(c,f->requires,manager,VINE_CACHE);
 
 	char *error_message = 0;
 	char *cache_path = vine_cache_full_path(c,cachename);
@@ -321,7 +344,7 @@ static int vine_cache_ensure_single( struct vine_cache *c, const char *cachename
 
 		case VINE_CACHE_COMMAND:
 			debug(D_VINE,"cache: creating %s via shell command",cachename);
-			result = do_command(c,f->source,transfer_path,&error_message);
+			result = do_command(c,f->minitask,manager,&error_message);
 			break;
 	}
 
@@ -362,10 +385,10 @@ static int vine_cache_ensure_single( struct vine_cache *c, const char *cachename
 	*/
 	
 	if(!result) {
-		trash_file(cache_path);
 		trash_file(transfer_path);
 		if(!error_message) error_message = strdup("unknown");
 		send_cache_invalid(manager,cachename,error_message);
+		vine_cache_remove(c,cachename);
 	}
 	
 	if(error_message) free(error_message);
@@ -373,31 +396,4 @@ static int vine_cache_ensure_single( struct vine_cache *c, const char *cachename
 	free(transfer_path);
 	return result;
 }
-
-/*
-Ensure that a semi-colon separate list of files is available in the cache.
-*/
-
-int vine_cache_ensure( struct vine_cache *c, const char *cachename_list, struct link *manager, vine_file_flags_t flags )
-{
-	if(!strcmp(cachename_list,"0")) return 1;
-	
-	int result = 1;
-	char *listcopy = strdup(cachename_list);
-
-	char *saveptr = 0;
-	char *name = strtok_r(listcopy,";",&saveptr);
-	while(name) {
-		result = vine_cache_ensure_single(c,name,manager,flags);
-		if(!result) break;
-		name = strtok_r(0,";",&saveptr);
-	}
-
-	free(listcopy);
-	
-	return result;
-}
-
-
-
 

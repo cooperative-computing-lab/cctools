@@ -17,6 +17,7 @@ This module is private to the manager and should not be invoked by the end user.
 #include "vine_manager.h"
 
 vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
+vine_result_code_t vine_manager_put_task( struct vine_manager *m, struct vine_worker_info *w, struct vine_task *t, const char *command_line, struct rmsummary *limits, struct vine_file *target );
 
 #endif
 

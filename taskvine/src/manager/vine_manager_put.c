@@ -28,6 +28,8 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <dirent.h>
 
+char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *limits);
+
 /*
 Send a symbolic link to the remote worker.
 Note that the target of the link is sent
@@ -301,41 +303,6 @@ static char *expand_envnames(struct vine_worker_info *w, const char *source)
 	return expanded_name;
 }
 
-/* Replace $1, $2, $3 with the cachename of the required file in that position. */
-
-static char * lookup_names( const char *name, void *arg )
-{
-	struct vine_file *f = arg;
-
-	int n = atoi(name);
-	while(n>0 && f->requires) {
-		f = f->requires;
-		n--;
-	}
-
-	if(f && n==0) {
-		return strdup(f->cached_name);
-	} else {
-		return strdup("invalid");
-	}
-	
-}
-
-static char *make_name_list( struct vine_file *f )
-{
-	char *result;
-	
-	if(f) {
-		char *tail = make_name_list(f->requires);
-		result = string_format("%s;%s",f->cached_name,tail);
-		free(tail);
-	} else {
-		result = strdup("0");;
-	}
-
-	return result;
-}
-
 /*
 Send a url or remote command used to generate a cached file,
 if it has not already been cached there.  Note that the length
@@ -347,30 +314,33 @@ static vine_result_code_t vine_manager_put_special_if_not_cached( struct vine_ma
 {
 	if(hash_table_lookup(w->current_files,tf->cached_name)) return VINE_SUCCESS;
 
-	char *source;
-	if(tf->type==VINE_COMMAND) {
-		/* XXX string_subst apparently consumes the first argument -- fix this. */
-		source = string_subst(strdup(tf->source),lookup_names,tf);
-	} else {
-		source = strdup(tf->source);
-	}
-
 	char source_encoded[VINE_LINE_MAX];
 	char cached_name_encoded[VINE_LINE_MAX];
 
-	url_encode(source,source_encoded,sizeof(source_encoded));
-	// url_encode(tf->source,source_encoded,sizeof(source_encoded));
+	url_encode(tf->source,source_encoded,sizeof(source_encoded));
 	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
 
-	vine_manager_send(q,w,"%s %s %s %d %o %d %s\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777,tf->flags, make_name_list(tf->requires) );
+	vine_manager_send(q,w,"%s %s %s %d %o %d\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777,tf->flags );
 
 	if(tf->flags & VINE_CACHE) {
 		struct vine_remote_file_info *remote_info = vine_remote_file_info_create(tf->type,tf->length,time(0));
 		hash_table_insert(w->current_files,tf->cached_name,remote_info);
 	}
 
-	free(source);
-	
+	return VINE_SUCCESS;
+}
+
+static vine_result_code_t vine_manager_put_task_if_not_cached( struct vine_manager *q, struct vine_worker_info *w, struct vine_file *tf )
+{
+	if(hash_table_lookup(w->current_files,tf->cached_name)) return VINE_SUCCESS;
+
+	vine_manager_put_task(q,w,tf->mini_task,0,0,tf);
+
+	if(tf->flags & VINE_CACHE) {
+		struct vine_remote_file_info *remote_info = vine_remote_file_info_create(tf->type,tf->length,time(0));
+		hash_table_insert(w->current_files,tf->cached_name,remote_info);
+	}
+
 	return VINE_SUCCESS;
 }
 
@@ -381,11 +351,6 @@ If the file has a chained dependency, send that first.
 
 static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f)
 {
-	if(f->requires) {
-		vine_result_code_t r = vine_manager_put_input_file(q,w,t,f->requires);
-		if(r!=VINE_SUCCESS) return r;
-	}
-		
 	int64_t total_bytes = 0;
 	int64_t actual = 0;
 	vine_result_code_t result = VINE_SUCCESS; //return success unless something fails below
@@ -413,9 +378,9 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 		total_bytes = actual;
 		break;
 
-	case VINE_COMMAND:
-		debug(D_VINE, "%s (%s) will get %s via remote command \"%s\"", w->hostname, w->addrport, f->remote_name, f->source);
-		result = vine_manager_put_special_if_not_cached(q,w,t,f,"putcmd");
+	case VINE_MINI_TASK:
+		debug(D_VINE, "%s (%s) will get %s via mini task %d", w->hostname, w->addrport, f->remote_name, f->mini_task->task_id);
+		result = vine_manager_put_task_if_not_cached(q,w,f);
 		break;
 
 	case VINE_URL:
@@ -525,3 +490,96 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 	return VINE_SUCCESS;
 }
 
+/*
+Send the details of one task to a worker.
+Note that this function just performs serialization of the task definition.
+It does not perform any resource management.
+This allows it to be used for both regular tasks and mini tasks.
+*/
+
+vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, const char *command_line, struct rmsummary *limits, struct vine_file *target )
+{
+	vine_result_code_t result = vine_manager_put_input_files(q, w, t);
+	if(result!=VINE_SUCCESS) return result;
+
+	if(target) {
+		vine_manager_send(q,w, "putcmd %s %d %o %d\n",target->cached_name,target->length,0777,target->flags);
+	} else {
+		vine_manager_send(q,w, "task %lld\n",(long long)t->task_id);
+	}
+	
+	if(!command_line) {
+		command_line = t->command_line;
+	}
+	
+	long long cmd_len = strlen(command_line);
+	vine_manager_send(q,w, "cmd %lld\n", (long long) cmd_len);
+	link_putlstring(w->link, command_line, cmd_len, time(0) + q->short_timeout);
+	debug(D_VINE, "%s\n", command_line);
+
+	if(t->coprocess) {
+		cmd_len = strlen(t->coprocess);
+		vine_manager_send(q,w, "coprocess %lld\n", (long long) cmd_len);
+		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + q->short_timeout);
+	}
+
+	vine_manager_send(q,w, "category %s\n", t->category);
+
+	if(limits) {
+		vine_manager_send(q,w, "cores %s\n",  rmsummary_resource_to_str("cores", limits->cores, 0));
+		vine_manager_send(q,w, "gpus %s\n",   rmsummary_resource_to_str("gpus", limits->gpus, 0));
+		vine_manager_send(q,w, "memory %s\n", rmsummary_resource_to_str("memory", limits->memory, 0));
+		vine_manager_send(q,w, "disk %s\n",   rmsummary_resource_to_str("disk", limits->disk, 0));
+	
+		/* Do not set end, wall_time if running the resource monitor. We let the monitor police these resources. */
+		if(q->monitor_mode == VINE_MON_DISABLED) {
+			if(limits->end > 0) {
+				vine_manager_send(q,w, "end_time %s\n",  rmsummary_resource_to_str("end", limits->end, 0));
+			}
+			if(limits->wall_time > 0) {
+				vine_manager_send(q,w, "wall_time %s\n", rmsummary_resource_to_str("wall_time", limits->wall_time, 0));
+			}
+		}
+	}
+
+	/* Note that even when environment variables after resources, values for
+	 * CORES, MEMORY, etc. will be set at the worker to the values of
+	 * set_*, if used. */
+	char *var;
+	LIST_ITERATE(t->env_list,var) {
+		vine_manager_send(q, w,"env %zu\n%s\n", strlen(var), var);
+	}
+
+	if(t->input_files) {
+		struct vine_file *tf;
+		LIST_ITERATE(t->input_files,tf) {
+			if(tf->type == VINE_EMPTY_DIR) {
+				vine_manager_send(q,w, "dir %s\n", tf->remote_name);
+			} else {
+				char remote_name_encoded[PATH_MAX];
+				url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
+				vine_manager_send(q,w, "infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
+			}
+		}
+	}
+
+	if(t->output_files) {
+		struct vine_file *tf;
+		LIST_ITERATE(t->output_files,tf) {
+			char remote_name_encoded[PATH_MAX];
+			url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
+			vine_manager_send(q,w, "outfile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
+		}
+	}
+
+	// vine_manager_send returns the number of bytes sent, or a number less than
+	// zero to indicate errors. We are lazy here, we only check the last
+	// message we sent to the worker (other messages may have failed above).
+
+	int r = vine_manager_send(q,w,"end\n");
+	if(r>=0) {
+		return VINE_SUCCESS;
+	} else {
+		return VINE_WORKER_FAILURE;
+	}	
+}

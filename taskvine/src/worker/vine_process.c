@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "vine_gpus.h"
 #include "vine_protocol.h"
 #include "vine_coprocess.h"
+#include "vine_sandbox.h"
 
 #include "vine_file.h"
 
@@ -201,6 +202,53 @@ static char * load_input_file(struct vine_task *t) {
 	}
 
 	return buf;
+}
+
+/*
+Given a unix status returned by wait(), set the process exit code appropriately.
+*/
+
+void vine_process_set_exit_status( struct vine_process *p, int status )
+{
+	if (!WIFEXITED(status)){
+		p->exit_code = WTERMSIG(status);
+		debug(D_VINE, "task %d (pid %d) exited abnormally with signal %d",p->task->task_id,p->pid,p->exit_code);
+	} else {
+		p->exit_code = WEXITSTATUS(status);
+		debug(D_VINE, "task %d (pid %d) exited normally with exit code %d",p->task->task_id,p->pid,p->exit_code );
+	}
+}
+
+/*
+Execute a task synchronously and return true on success.
+*/
+
+int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, struct link *manager )
+{
+	struct vine_process *p = vine_process_create(task);
+
+	vine_sandbox_stagein(p,cache,manager);
+	
+	pid_t pid = vine_process_execute(p);
+	if(pid>0) {
+		int result, status;
+		do {
+			result = waitpid(pid,&status,0);
+		} while(result!=pid);
+
+		vine_process_set_exit_status(p,status);
+	} else {
+		p->exit_code = 1;
+	}
+	
+	vine_sandbox_stageout(p,cache);
+
+	/* Remove the task from the process so it is not deleted */
+	p->task = 0;
+
+	vine_process_delete(p);
+	
+	return 1;
 }
 
 pid_t vine_process_execute(struct vine_process *p )

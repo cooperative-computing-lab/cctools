@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "vine_file.h"
+#include "vine_task.h"
 
 #include "debug.h"
 #include "xxmalloc.h"
@@ -16,7 +17,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
-#include <stdarg.h>
 
 /* Internal use: when the worker uses the client library, do not recompute cached names. */
 int vine_hack_do_not_compute_cached_name = 0;
@@ -65,15 +65,19 @@ char *make_cached_name( const struct vine_file *f )
 		cache_file_id = file_count;
 	}
 
+	/* XXX hack to force caching for the moment */
+	cache_file_id = 0;
+	
 	switch(f->type) {
 		case VINE_FILE:
 		case VINE_EMPTY_DIR:
 			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), source_enc);
 			break;
-		case VINE_COMMAND:
-			return string_format("cmd-%d-%s", cache_file_id, md5_string(digest));
+		case VINE_MINI_TASK:
+			/* XXX This should be computed from the constituents of the mini task */
+			return string_format("task-%d-%s", cache_file_id, md5_string(digest));
 			break;
-		case VINE_URL:
+	       	case VINE_URL:
 			return string_format("url-%d-%s", cache_file_id, md5_string(digest));
 			break;
 		case VINE_BUFFER:
@@ -85,7 +89,7 @@ char *make_cached_name( const struct vine_file *f )
 
 /* Create a new file object with the given properties. */
 
-struct vine_file *vine_file_create(const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags, struct vine_file *requires )
+struct vine_file *vine_file_create(const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags, struct vine_task *mini_task )
 {
 	struct vine_file *f;
 
@@ -98,7 +102,7 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 	f->type = type;
 	f->flags = flags;
 	f->length = length;
-	f->requires = requires;
+	f->mini_task = mini_task;
 	
 	if(data) {
 		f->data = malloc(length);
@@ -121,7 +125,7 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 struct vine_file *vine_file_clone(const struct vine_file *f )
 {
 	if(!f) return 0;
-	return vine_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags,vine_file_clone(f->requires));
+	return vine_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags,vine_task_clone(f->mini_task));
 }
 
 /* Delete a file object */
@@ -129,7 +133,7 @@ struct vine_file *vine_file_clone(const struct vine_file *f )
 void vine_file_delete(struct vine_file *f)
 {
 	if(!f) return;
-	vine_file_delete(f->requires);
+	vine_task_delete(f->mini_task);
 	free(f->source);
 	free(f->remote_name);
 	free(f->cached_name);
@@ -157,22 +161,7 @@ struct vine_file * vine_file_empty_dir()
 	return vine_file_create("unnamed",0,0,0,VINE_EMPTY_DIR,0,0);
 }
 
-struct vine_file * vine_file_command( const char *cmd, ... )
+struct vine_file * vine_file_mini_task( struct vine_task *t )
 {
-	va_list args;
-	va_start(args,cmd);
-
-	struct vine_file *result = vine_file_create(cmd,0,0,0,VINE_COMMAND,0,0);
-	struct vine_file **tail = &result->requires;
-
-	while(1) {
-		struct vine_file *r = va_arg(args,struct vine_file *);
-		if(!r) break;
-
-		*tail = r;
-		tail = &r->requires;
-	}
-
-	return result;
+	return vine_file_create(t->command_line,0,0,0,VINE_MINI_TASK,0,t);
 }
-
