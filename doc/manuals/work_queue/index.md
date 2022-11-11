@@ -92,8 +92,8 @@ at each worker to speed up execution.
 Tasks come in three types:
 
 - A **standard task** is a single Unix command line to execute, along with its needed input files.  Upon completion, it will produce one or more output files to be returned to the manager.
-- A **PythonTask** is a single Python function to execute, along with its needed arguments.  Upon completion, it will produce a Python value (or an exception) as a result to return to the master.
-- A **RemoteTask** is used to invoke serverless functions by name. Upon completion, it will produce a json response which will be returned to the manager.
+- A **PythonTask** is a single Python function to execute, along with its needed arguments. Each task is executed in its own python interpreter.  Upon completion, it will produce a Python value (or an exception) as a result to return to the master.
+- A **RemoteTask** is used to invoke serverless functions by name. The functions are executed by a specified long running coprocess at the workers (e.g. a python interpreter). Upon completion, it will produce a json response which will be returned to the manager.
 
 All types of tasks share a common set of options.  Each task can be labelled with the **resources**
 (CPU cores, GPU devices, memory, disk space) that it needs to execute.  This allows each worker to pack the appropriate
@@ -470,6 +470,10 @@ conda install -y -p my-env -c conda-forge conda-pack
 # conda install -y -p my-env pip and conda install other modules, etc.
 conda run -p my-env conda-pack
 ```
+
+Since every function needs to launch a fresh instance of the python intepreter,
+overheads may dominate the execution for short running tasks (e.g. less than
+30s). For such cases we recommend to use `RemoteTask` instead.
 
 ## Running Managers and Workers
 
@@ -1669,8 +1673,14 @@ to make a progress bar or other user-visible information:
     ```
 
 ### Managing Remote Tasks
-A `RemoteTask` is a specialized form of task ran on workers with serverless coprocesses.
-To start a worker with a serverless coprocess, refer to the next section about running workers.
+
+With a `RemoteTask`, rather than sending the executable to run at a worker,
+Work Queue simply sends the name of a function. This function is executed by a
+coprocesses at the worker (i.e., in a serverless fashion). For short running
+tasks, this may avoid initialization overheads, as the coprocess (e.g. a python
+interpreter and its modules) is only initialized once, rather than every time
+per function.  To start a worker with a serverless coprocess, refer to the next
+section about running workers.
 
 Defining a `RemoteTask` involves specifying the name of the python function to execute, 
 as well as the name of the coprocess that contains that function.
