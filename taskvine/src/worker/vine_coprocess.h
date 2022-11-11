@@ -37,4 +37,3 @@ void vine_coprocess_shutdown_all_coprocesses(struct vine_coprocess *coprocess_in
 void vine_coprocess_measure_resources(struct vine_coprocess *coprocess_info, int number_of_coprocesses);
 int vine_coprocess_enforce_limit(struct vine_coprocess *coprocess);
 void vine_coprocess_update_state(struct vine_coprocess *coprocess_info, int number_of_coprocesses);
-void vine_coprocess_resources_send( struct link *manager, struct vine_resources *r, time_t stoptime );

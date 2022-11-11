@@ -2141,6 +2141,14 @@ static vine_msg_code_t handle_resource( struct vine_manager *q, struct vine_work
 			inuse = w->resources->workers.inuse;
 			w->resources->workers = r;
 			w->resources->workers.inuse = inuse;
+		} else if(string_prefix_is(resource_name, "coprocess_cores")) {
+			w->coprocess_resources->cores = r;
+		} else if(string_prefix_is(resource_name, "coprocess_memory")) {
+			w->coprocess_resources->memory = r;
+		} else if(string_prefix_is(resource_name, "coprocess_disk")) {
+			w->coprocess_resources->disk = r;
+		} else if(string_prefix_is(resource_name, "coprocess_gpus")) {
+			w->coprocess_resources->gpus = r;
 		}
 	} else {
 		return VINE_MSG_FAILURE;
@@ -2525,6 +2533,11 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	w->resources->disk.inuse   = 0;
 	w->resources->gpus.inuse   = 0;
 
+	w->coprocess_resources->cores.inuse  = 0;
+	w->coprocess_resources->memory.inuse = 0;
+	w->coprocess_resources->disk.inuse   = 0;
+	w->coprocess_resources->gpus.inuse   = 0;
+
 	update_max_worker(q, w);
 
 	if(w->resources->workers.total < 1)
@@ -2533,10 +2546,19 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	}
 
 	ITABLE_ITERATE(w->current_tasks_boxes,task_id,box) {
-		w->resources->cores.inuse     += box->cores;
-		w->resources->memory.inuse    += box->memory;
-		w->resources->disk.inuse      += box->disk;
-		w->resources->gpus.inuse      += box->gpus;
+		struct vine_task *t = itable_lookup(w->current_tasks, task_id);
+		if (t->coprocess) {
+			w->coprocess_resources->cores.inuse     += box->cores;
+			w->coprocess_resources->memory.inuse    += box->memory;
+			w->coprocess_resources->disk.inuse      += box->disk;
+			w->coprocess_resources->gpus.inuse      += box->gpus;
+		}
+		else {
+			w->resources->cores.inuse     += box->cores;
+			w->resources->memory.inuse    += box->memory;
+			w->resources->disk.inuse      += box->disk;
+			w->resources->gpus.inuse      += box->gpus;
+		}
 	}
 }
 

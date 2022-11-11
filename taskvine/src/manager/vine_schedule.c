@@ -49,7 +49,12 @@ static int check_worker_against_task(struct vine_manager *q, struct vine_worker_
 	}
 
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
-	struct vine_resources *r = w->resources;
+	struct vine_resources *r = NULL;
+	if (t->coprocess == NULL) {
+		r = w->resources;
+	} else {
+		r = w->coprocess_resources;
+	}
 
 	int ok = 1;
 

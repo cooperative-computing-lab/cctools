@@ -369,14 +369,3 @@ void vine_coprocess_update_state(struct vine_coprocess *coprocess_info, int numb
 		}
 	}
 }
-
-void vine_coprocess_resources_send( struct link *manager, struct vine_resources *r, time_t stoptime ) 
-{
-	/*
-	debug(D_WQ, "Sending coprocess resource description to manager:");
-	vine_resource_send(manager, &r->disk,    "coprocess_disk",   stoptime);
-	vine_resource_send(manager, &r->memory,  "coprocess_memory", stoptime);
-	vine_resource_send(manager, &r->gpus,    "coprocess_gpus",   stoptime);
-	vine_resource_send(manager, &r->cores,   "coprocess_cores",  stoptime);
-	*/
-}
