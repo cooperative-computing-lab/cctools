@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -8,9 +8,13 @@ See the file COPYING for details.
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "vine_coprocess.h"
+#include "vine_resources.h"
 #include "vine_protocol.h"
+#include "rmsummary.h"
+#include "rmonitor_poll.h"
 
 #include "debug.h"
 #include "domain_name_cache.h"
@@ -21,146 +25,86 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "process.h"
 #include "stringtools.h"
+#include "xxmalloc.h"
 
-static pid_t coprocess_pid = 0;
-static int coprocess_in[2];
-static int coprocess_out[2];
 static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
-
-int vine_coprocess_write(char *buffer, int len, int timeout)
+int vine_coprocess_write_to_link(char *buffer, int len, int timeout, struct link* link)
 {
-	struct pollfd read_poll = {coprocess_in[1], POLLOUT, 0};
-	int poll_result = poll(&read_poll, 1, timeout);
-	if (poll_result < 0)
-	{
-		if (errno == EINTR)
-		{
-			debug(D_VINE, "Polling coprocess interrupted, trying again");
-			return -1;
-		}
-		debug(D_VINE, "Polling coprocess pipe failed: %s\n", strerror(errno));
-		return -2;
+	timestamp_t curr_time = timestamp_get();
+	timestamp_t stoptime = curr_time + timeout;
+
+	int bytes_sent = link_printf(link, stoptime, "%s %d\n", buffer, len);
+	if(bytes_sent < 0) {
+		fatal("could not send input data size: %s", strerror(errno));
 	}
-	if (poll_result == 0) // check for timeout
-	{
-		debug(D_VINE, "writing to coprocess timed out\n");
-		return -3;
+
+	// send actual data
+	bytes_sent = link_write(link, buffer, len, stoptime);
+	if(bytes_sent < 0) {
+		fatal("could not send input data: %s", strerror(errno));
 	}
-	if ( !(read_poll.revents & POLLOUT)) // check we have data
-	{
-		debug(D_VINE, "Data able to be written to pipe: %s\n", strerror(errno));
-		return -2;
-	}
-	int bytes_written = write(coprocess_in[1], buffer, len);
-	if (bytes_written < 0)
-	{
-		if (errno == EINTR)
-		{
-			debug(D_VINE, "Write to coprocess interrupted\n");
-			return 0;
-		}
-		debug(D_VINE, "Write to coprocess failed: %s\n", strerror(errno));
-		return -2;
-	}
-	return bytes_written;
+	return bytes_sent;
 }
 
-int vine_coprocess_read(char *buffer, int len, int timeout){
-	struct pollfd read_poll = {coprocess_out[0], POLLIN, 0};
-	int poll_result = poll(&read_poll, 1, timeout);
-	if (poll_result < 0)
+int vine_coprocess_read_from_link(char *buffer, int len, int timeout, struct link* link){
+
+	timestamp_t curr_time = timestamp_get();
+	timestamp_t stoptime = curr_time + timeout;
+
+	char len_buffer[VINE_LINE_MAX];
+	int length, poll_result, bytes_read = 0;
+
+	struct link_info coprocess_link_info[] = {{link, LINK_READ, stoptime}};
+	poll_result = link_poll(coprocess_link_info, sizeof(coprocess_link_info) / sizeof(coprocess_link_info[0]), stoptime);
+	if (poll_result == 0) {
+		debug(D_WQ, "No data to read from coprocess\n");
+		return 0;
+	}
+	
+	link_readline(link, len_buffer, VINE_LINE_MAX, stoptime);
+	sscanf(len_buffer, "%d", &length);
+	
+	int current_bytes_read = 0;
+	while (1)
 	{
-		if (errno == EINTR)
-		{
-			debug(D_VINE, "Polling coprocess interrupted, trying again");
+		current_bytes_read = link_read(link, buffer + bytes_read, length - bytes_read, stoptime);
+		if (current_bytes_read < 0) {
+			debug(D_WQ, "Read from coprocess link failed\n");
 			return -1;
 		}
-		debug(D_VINE, "Polling coprocess pipe failed: %s\n", strerror(errno));
-		return -2;
-	}
-	if (poll_result == 0) // check for timeout
-	{
-		debug(D_VINE, "reading from coprocess timed out\n");
-		return -3;
-	}
-	if ( !(read_poll.revents & POLLIN)) // check we have data
-	{
-		debug(D_VINE, "Data not returned from pipe: %s\n", strerror(errno));
-		return -2;
+		else if (current_bytes_read == 0) {
+			debug(D_WQ, "Read from coprocess link failed: pipe closed\n");
+			return -1;
+		}
+		bytes_read += current_bytes_read;
+		if (bytes_read == length) {
+			break;
+		}
 	}
 
-	int bytes_read = read(coprocess_out[0], buffer, len - 1);
 	if (bytes_read < 0)
 	{
-		if (errno == EINTR)
-		{
-			debug(D_VINE, "Read from coprocess interrupted\n");
-			return 0;
-		}
-		debug(D_VINE, "Read from coprocess failed: %s\n", strerror(errno));
-		return -2;
+		debug(D_WQ, "Read from coprocess failed: %s\n", strerror(errno));
+		return -1;
 	}
 	buffer[bytes_read] = '\0';
+
 	return bytes_read;
 }
 
-char *vine_coprocess_setup(int *coprocess_port)
+int vine_coprocess_setup(struct vine_coprocess *coprocess)
 {
-	int json_offset, json_length = -1, cumulative_bytes_read = 0, buffer_offset = 0;
+	int bytes_read = 0;
 	char buffer[VINE_LINE_MAX];
-	char *envelope_size = NULL;
     char *name = NULL;
 
-	while (1)
-	{
-		int curr_bytes_read = vine_coprocess_read(buffer + buffer_offset, 4096 - buffer_offset, coprocess_max_timeout);
-		if (curr_bytes_read < 0) {
-			fatal("Unable to get information from coprocess\n");
-		}
-		if (curr_bytes_read == -1)
-		{
-			continue;
-		}
-		else if (curr_bytes_read == -3)
-		{
-			break;
-		}
-		cumulative_bytes_read += curr_bytes_read;
-
-		envelope_size = memchr(buffer, '\n', cumulative_bytes_read);
-		if ( envelope_size != NULL )
-		{
-			if (json_length == -1)
-			{
-				json_length = atoi(buffer);
-			}
-			if (json_length != -1)
-			{
-				json_offset = (int) (envelope_size - buffer) + 1;
-				while ( json_offset < cumulative_bytes_read )
-				{
-					if (buffer[json_offset] == '\n')
-					{
-						buffer_offset = -1;
-					}
-					json_offset++;
-				}
-			}
-		}
-		if (buffer_offset == -1)
-		{
-			break;
-		}
-		buffer_offset += curr_bytes_read;
+	bytes_read = vine_coprocess_read_from_link(buffer, VINE_LINE_MAX, coprocess_max_timeout, coprocess->read_link);
+	if (bytes_read < 0) {
+		fatal("Unable to get information from coprocess\n");
 	}
 
-	if ( ( (envelope_size - buffer + 1) + json_length + 1 ) != cumulative_bytes_read)
-	{
-		return NULL;
-	}
-
-	struct jx *item, *coprocess_json = jx_parse_string(envelope_size + 1);
+	struct jx *item, *coprocess_json = jx_parse_string(buffer);
 	void *i = NULL;
 	const char *key;
 	while ((item = jx_iterate_values(coprocess_json, &i))) {
@@ -175,11 +119,11 @@ char *vine_coprocess_setup(int *coprocess_port)
 		}
 		else if (!strcmp(key, "port")) {
 			char *temp_port = jx_print_string(item);
-			*coprocess_port = atoi(temp_port);
+			coprocess->port = atoi(temp_port);
 			free(temp_port);
 		}
 		else {
-			debug(D_VINE, "Unable to recognize key %s\n", key);
+			debug(D_WQ, "Unable to recognize key %s\n", key);
 		}
 	}
 
@@ -188,39 +132,44 @@ char *vine_coprocess_setup(int *coprocess_port)
     if(!name) {
 		fatal("couldn't find \"name\" in coprocess configuration\n");
     }
-    return name;
+
+	coprocess->name = name;
+
+    return 0;
 }
 
-char *vine_coprocess_start(char *command, int *coprocess_port) {
-	if (pipe(coprocess_in) || pipe(coprocess_out)) { // create pipes to communicate with the coprocess
+char *vine_coprocess_start(struct vine_coprocess *coprocess) {
+	if (pipe(coprocess->pipe_in) || pipe(coprocess->pipe_out)) { // create pipes to communicate with the coprocess
 		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
-		return NULL;
 	}
-	coprocess_pid = fork();
-	if(coprocess_pid > 0) {
-		char *name = vine_coprocess_setup(coprocess_port);
-
-		if (close(coprocess_in[0]) || close(coprocess_out[1])) {
+	coprocess->pid = fork();
+	if(coprocess->pid > 0) {
+		coprocess->read_link = link_attach_to_fd(coprocess->pipe_out[0]);
+		coprocess->write_link = link_attach_to_fd(coprocess->pipe_in[1]);
+		if (vine_coprocess_setup(coprocess)) {
+			fatal("Unable to setup coprocess");
+		}
+		if (close(coprocess->pipe_in[0]) || close(coprocess->pipe_out[1])) {
 			fatal("coprocess error parent: %s\n", strerror(errno));
 		}
-		debug(D_VINE, "coprocess running command %s\n", command);
-
-        return name;
+		debug(D_WQ, "coprocess running command %s\n", coprocess->command);
+		coprocess->state = VINE_COPROCESS_READY;
+        return coprocess->name;
 	}
-    else if(coprocess_pid == 0) {
-        if ( (close(coprocess_in[1]) < 0) || (close(coprocess_out[0]) < 0) ) {
+    else if(coprocess->pid == 0) {
+        if ( (close(coprocess->pipe_in[1]) < 0) || (close(coprocess->pipe_out[0]) < 0) ) {
             fatal("coprocess error: %s\n", strerror(errno));
         }
 
-        if (dup2(coprocess_in[0], 0) < 0) {
+        if (dup2(coprocess->pipe_in[0], 0) < 0) {
             fatal("coprocess could not attach to stdin: %s\n", strerror(errno));
         }
 
-        if (dup2(coprocess_out[1], 1) < 0) {
+        if (dup2(coprocess->pipe_out[1], 1) < 0) {
             fatal("coprocess could not attach pipe to stdout: %s\n", strerror(errno));
         }
-        execlp(command, command, (char *) 0);
-        fatal("failed to execute %s: %s\n", command, strerror(errno));
+        execlp(coprocess->command, coprocess->command, (char *) 0);
+        fatal("failed to execute %s: %s\n", coprocess->command, strerror(errno));
 	}
     else {
         fatal("couldn't create fork coprocess: %s\n", strerror(errno));
@@ -229,13 +178,20 @@ char *vine_coprocess_start(char *command, int *coprocess_port) {
     return NULL;
 }
 
-void vine_coprocess_terminate() {
-    process_kill_waitpid(coprocess_pid, 30);
+void vine_coprocess_terminate(struct vine_coprocess *coprocess) {
+    process_kill_waitpid(coprocess->pid, 30);
+	coprocess->state = VINE_COPROCESS_DEAD;
 }
 
-int vine_coprocess_check()
+void vine_coprocess_shutdown(struct vine_coprocess *coprocess_info, int num_coprocesses) {
+	for (int coprocess_index = 0; coprocess_index < num_coprocesses; coprocess_index++) {
+		vine_coprocess_terminate(coprocess_info + coprocess_index);
+	}
+}
+
+int vine_coprocess_check(struct vine_coprocess *coprocess)
 {
-	struct process_info *p = process_waitpid(coprocess_pid, 0);
+	struct process_info *p = process_waitpid(coprocess->pid, 0);
 	if (!p) {
         return 0;
 	}
@@ -244,9 +200,8 @@ int vine_coprocess_check()
     return 1;
 }
 
-char *vine_coprocess_run(const char *function_name, const char *function_input, int coprocess_port) {
+char *vine_coprocess_run(const char *function_name, const char *function_input, struct vine_coprocess *coprocess) {
 	char addr[DOMAIN_NAME_MAX];
-	int len;
 	int timeout = 60000000; // one minute, can be changed
 
 	if(!domain_name_lookup("localhost", addr)) {
@@ -257,51 +212,171 @@ char *vine_coprocess_run(const char *function_name, const char *function_input, 
 	time_t stoptime = curr_time + timeout;
 
 	int connected = 0;
-	struct link *link;
 	int tries = 0;
 	// retry connection for ~30 seconds
 	while(!connected && tries < 30) {
-		link = link_connect(addr, coprocess_port, stoptime);
-		if(link) {
+		coprocess->network_link = link_connect(addr, coprocess->port, stoptime);
+		if(coprocess->network_link) {
 			connected = 1;
 		} else {
 			tries++;
 			sleep(1);
 		}
 	}
-	// if we can't connect at all, cancel
-	if(!link) {
+	// if we can't connect at all, abort
+	if(!coprocess->network_link) {
 		fatal("connection error: %s", strerror(errno));
 	}
 
-	len = strlen(function_input);
 	curr_time = timestamp_get();
 	stoptime = curr_time + timeout;
-	// send the length of the data first
-	int bytes_sent = link_printf(link, stoptime, "%s %d\n", function_name, len);
+	int bytes_sent = link_printf(coprocess->network_link, stoptime, "%s %ld\n", function_name, strlen(function_input));
 	if(bytes_sent < 0) {
 		fatal("could not send input data size: %s", strerror(errno));
 	}
 
-	// send actual data
-	bytes_sent = link_write(link, function_input, len, stoptime);
-	if(bytes_sent < 0) {
-		fatal("could not send input data: %s", strerror(errno));
+	char *buffer = calloc(VINE_LINE_MAX, sizeof(char));
+	strcpy(buffer, function_input);
+	vine_coprocess_write_to_link(buffer, strlen(function_input), timeout, coprocess->network_link);
+
+	memset(buffer, 0, VINE_LINE_MAX * sizeof(char));
+	if (vine_coprocess_read_from_link(buffer, VINE_LINE_MAX, timeout, coprocess->network_link) < 0) {
+		free(buffer);
+		return NULL;
 	}
 
-	curr_time = timestamp_get();
-	stoptime = curr_time + timeout;
-	// read in the length of the response
-	char line[VINE_LINE_MAX];
-	int length;
-	link_readline(link, line, sizeof(line), stoptime);
-	sscanf(line, "output %d", &length);
-
-	char *output = calloc(length + 1, sizeof(char));
-	
-	// read the response
-	link_read(link, output, length, stoptime);
-
-	return output;
+	return buffer;
 }
 
+struct vine_coprocess *vine_coprocess_find_state(struct vine_coprocess *coprocess_info, int number_of_coprocesses, vine_coprocess_state_t state) {
+	for (int i = 0; i < number_of_coprocesses; i++) {
+		if ( (coprocess_info + i)->state == state) {
+			return coprocess_info + i;
+		}
+	}
+	return NULL;
+}
+
+struct vine_coprocess *vine_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct vine_resources *total_resources, char *coprocess_command, int number_of_coprocess_instances) {
+	if (number_of_coprocess_instances <= 0) return NULL;
+	int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : total_resources->cores.total);
+	int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : total_resources->memory.total);
+	int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : total_resources->disk.total);
+	int coprocess_gpus_normalized   = ( (coprocess_gpus > 0)   ? coprocess_gpus   : total_resources->gpus.total);
+
+	struct vine_coprocess * coprocess_info = malloc(sizeof(struct vine_coprocess) * number_of_coprocess_instances);
+	memset(coprocess_info, 0, sizeof(struct vine_coprocess) * number_of_coprocess_instances);
+	for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
+		struct vine_coprocess *curr_coprocess = &coprocess_info[coprocess_num];
+		coprocess_info[coprocess_num] = (struct vine_coprocess) {NULL, NULL, -1, -1, VINE_COPROCESS_UNINITIALIZED, {-1, -1}, {-1, -1}, NULL, NULL, NULL, 0, NULL};
+		curr_coprocess->command = xxstrdup(coprocess_command);
+		curr_coprocess->coprocess_resources = vine_resources_create();
+		curr_coprocess->coprocess_resources->cores.total  = coprocess_cores_normalized;
+		curr_coprocess->coprocess_resources->memory.total = coprocess_memory_normalized;
+		curr_coprocess->coprocess_resources->disk.total   = coprocess_disk_normalized;
+		curr_coprocess->coprocess_resources->gpus.total   = coprocess_gpus_normalized;
+		vine_coprocess_start(curr_coprocess);
+	}
+	return coprocess_info;
+}
+
+void vine_coprocess_shutdown_all_coprocesses(struct vine_coprocess *coprocess_info, int number_of_coprocess_instances) {
+	if (number_of_coprocess_instances <= 0) return;
+	vine_coprocess_shutdown(coprocess_info, number_of_coprocess_instances);
+	for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
+		struct vine_coprocess *curr_coprocess = &coprocess_info[coprocess_num];
+		link_detach(curr_coprocess->read_link);
+		link_detach(curr_coprocess->write_link);
+		link_detach(curr_coprocess->network_link);
+		free(curr_coprocess->name);
+		free(curr_coprocess->command);
+		vine_resources_delete(curr_coprocess->coprocess_resources);
+	}
+	free(coprocess_info);
+}
+
+void vine_coprocess_measure_resources(struct vine_coprocess *coprocess_info, int number_of_coprocesses) {
+	if (number_of_coprocesses <= 0) return;
+	for (int i = 0; i < number_of_coprocesses; i++)
+	{
+		struct vine_coprocess *curr_coprocess = &coprocess_info[i];
+		if (curr_coprocess->state == VINE_COPROCESS_DEAD || curr_coprocess->state == VINE_COPROCESS_UNINITIALIZED) {
+			continue;
+		}
+		struct rmsummary *resources = rmonitor_measure_process(curr_coprocess->pid);
+
+		debug(D_WQ, "Measuring resources of coprocess with pid %d\n", curr_coprocess->pid);
+		debug(D_WQ, "cores: %lf, memory: %lf, disk: %lf, gpus: %lf\n", resources->cores, resources->memory + resources->swap_memory, resources->disk, resources->gpus);
+		debug(D_WQ, "Max resources available to coprocess:\ncores: %"PRId64 " memory: %"PRId64 " disk: %"PRId64 " gpus: %"PRId64 "\n", curr_coprocess->coprocess_resources->cores.total, curr_coprocess->coprocess_resources->memory.total, curr_coprocess->coprocess_resources->disk.total, curr_coprocess->coprocess_resources->gpus.total);
+		curr_coprocess->coprocess_resources->cores.inuse = resources->cores;
+		curr_coprocess->coprocess_resources->memory.inuse = resources->memory + resources->swap_memory;
+		curr_coprocess->coprocess_resources->disk.inuse = resources->disk;
+		curr_coprocess->coprocess_resources->gpus.inuse = resources->gpus;
+
+	}
+}
+
+int vine_coprocess_enforce_limit(struct vine_coprocess *coprocess) {
+	if (coprocess == NULL || coprocess->state == VINE_COPROCESS_DEAD || coprocess->state == VINE_COPROCESS_UNINITIALIZED) {
+		return 1;
+	}
+	else if (
+		coprocess->coprocess_resources->cores.inuse  > coprocess->coprocess_resources->cores.total || 
+		coprocess->coprocess_resources->memory.inuse > coprocess->coprocess_resources->memory.total ||
+		coprocess->coprocess_resources->disk.inuse   > coprocess->coprocess_resources->disk.total ||
+		coprocess->coprocess_resources->gpus.inuse   > coprocess->coprocess_resources->gpus.total) {
+		debug(D_WQ, "Coprocess with pid %d has exceeded limits, killing coprocess\n", coprocess->pid);
+		vine_coprocess_terminate(coprocess);
+		return 0;
+	}
+	else {
+		return 1;
+	}
+}
+
+void vine_coprocess_update_state(struct vine_coprocess *coprocess_info, int number_of_coprocesses) {
+	for (int i = 0; i < number_of_coprocesses; i++) {
+		if (vine_coprocess_check(coprocess_info + i)) {
+			int status;
+			int result = waitpid(coprocess_info[i].pid, &status, 0);
+			if(result==0) {
+				fatal("Coprocess instace %d has both terminated and not terminated\n", i);
+			} else if(result<0) {
+				debug(D_WQ, "Waiting on coprocess with pid %d returned an error: %s", coprocess_info[i].pid, strerror(errno));
+			} else if(result>0) {
+				if (!WIFEXITED(status)){
+					debug(D_WQ, "Coprocess instance %d (pid %d) exited abnormally with signal %d", i, coprocess_info[i].pid, WTERMSIG(status));
+				}
+				else {
+					debug(D_WQ, "Coprocess instance %d (pid %d) exited normally with exit code %d", i, coprocess_info[i].pid, WEXITSTATUS(status));
+				}
+			}
+			coprocess_info[i].state = VINE_COPROCESS_DEAD;
+		}
+	}
+	for (int i = 0; i < number_of_coprocesses; i++)
+	{
+		if (coprocess_info[i].state == VINE_COPROCESS_DEAD) {
+			if (coprocess_info[i].num_restart_attempts >= 10) {
+				debug(D_WQ, "Coprocess instance %d has died more than 10 times, no longer attempting to restart\n", i);
+			}
+			if (close(coprocess_info[i].pipe_in[1]) || close(coprocess_info[i].pipe_out[0])) {
+				fatal("Unable to close pipes from dead coprocess: %s\n", strerror(errno));
+			}
+			debug(D_WQ, "Attempting to restart coprocess instance %d\n", i);
+			vine_coprocess_start(coprocess_info + i);
+			coprocess_info[i].num_restart_attempts++;
+		}
+	}
+}
+
+void vine_coprocess_resources_send( struct link *manager, struct vine_resources *r, time_t stoptime ) 
+{
+	/*
+	debug(D_WQ, "Sending coprocess resource description to manager:");
+	vine_resource_send(manager, &r->disk,    "coprocess_disk",   stoptime);
+	vine_resource_send(manager, &r->memory,  "coprocess_memory", stoptime);
+	vine_resource_send(manager, &r->gpus,    "coprocess_gpus",   stoptime);
+	vine_resource_send(manager, &r->cores,   "coprocess_cores",  stoptime);
+	*/
+}

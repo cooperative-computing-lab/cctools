@@ -209,8 +209,13 @@ static char *catalog_hosts = NULL;
 
 static char *coprocess_command = NULL;
 static char *coprocess_name = NULL;
-static int coprocess_port = -1;
+static int number_of_coprocess_instances = 0;
+struct vine_coprocess *coprocess_info = NULL;
 
+static int coprocess_cores = -1;
+static int coprocess_memory = -1;
+static int coprocess_disk = -1;
+static int coprocess_gpus = -1;
 static char *factory_name = NULL;
 
 struct vine_cache *global_cache = 0;
@@ -330,6 +335,10 @@ static void measure_worker_resources()
 
 	vine_gpus_init(r->gpus.total);
 
+	if (coprocess_command != NULL && coprocess_info != NULL) {
+		vine_coprocess_measure_resources(coprocess_info, number_of_coprocess_instances);
+	}
+
 	last_resources_measurement = time(0);
 }
 
@@ -369,6 +378,10 @@ static void send_resource_update(struct link *manager)
 	//if workers are set to expire in some time, send the expiration time to manager
 	if(manual_wall_time_option > 0) {
 		end_time = worker_start_time + (manual_wall_time_option * 1e6);
+	}
+
+	if (coprocess_info != NULL) {
+		vine_coprocess_resources_send(manager,coprocess_info->coprocess_resources,stoptime);
 	}
 
 	vine_resources_send(manager,total_resources,stoptime);
@@ -595,6 +608,10 @@ static int handle_completed_tasks(struct link *manager)
 			} else {
 				p->exit_code = WEXITSTATUS(status);
 				debug(D_VINE, "task %d (pid %d) exited normally with exit code %d",p->task->task_id,p->pid,p->exit_code);
+			}
+
+			if (p->coprocess != NULL) {
+				p->coprocess->state = VINE_COPROCESS_READY;
 			}
 
 			/* collect the resources associated with the process */
@@ -882,7 +899,7 @@ static int enforce_processes_limits()
 	if((time(0) - last_check_time) < check_resources_interval ) return 1;
 
 	ITABLE_ITERATE(procs_running,pid,p) {
-		if(!enforce_process_limits(p)) {
+		if(!enforce_process_limits(p) || !vine_coprocess_enforce_limit(p->coprocess)) {
 			finish_running_task(p, VINE_RESULT_RESOURCE_EXHAUSTION);
 			trash_file(p->sandbox);
 
@@ -1221,11 +1238,14 @@ static void work_for_manager( struct link *manager )
 					break;
 				} else if(task_resources_fit_now(p->task)) {
 					// attach the function name, port, and type to process, if applicable
-					if(coprocess_command) {
-						/* for coprocesses, p->task->command_line is the name
-						 * of the function to execute */
-						p->coprocess_name = xxstrdup(coprocess_name);
-						p->coprocess_port = coprocess_port;
+					if (p->task->coprocess) {
+						struct vine_coprocess *ready_coprocess = vine_coprocess_find_state(coprocess_info, number_of_coprocess_instances, VINE_COPROCESS_READY);
+						if (ready_coprocess == NULL) {
+							list_push_tail(procs_waiting, p);
+							continue;
+						}
+						p->coprocess = ready_coprocess;
+						ready_coprocess->state = VINE_COPROCESS_RUNNING;
 					}
 					start_process(p,manager);
 					task_event++;
@@ -1808,7 +1828,8 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
 	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION,
-	  LONG_OPT_FROM_FACTORY};
+	  LONG_OPT_FROM_FACTORY, LONG_OPT_NUM_COPROCESS, LONG_OPT_COPROCESS_CORES, 
+	  LONG_OPT_COPROCESS_MEMORY, LONG_OPT_COPROCESS_DISK, LONG_OPT_COPROCESS_GPUS};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1845,6 +1866,11 @@ static const struct option long_options[] = {
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
 	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
+	{"num_coprocesses",     required_argument,  0,  LONG_OPT_NUM_COPROCESS},
+	{"coprocess_cores",     required_argument,  0,  LONG_OPT_COPROCESS_CORES},
+	{"coprocess_memory",    required_argument,  0,  LONG_OPT_COPROCESS_MEMORY},
+	{"coprocess_disk",      required_argument,  0,  LONG_OPT_COPROCESS_DISK},
+	{"coprocess_gpus",      required_argument,  0,  LONG_OPT_COPROCESS_GPUS},
 	{"from-factory",        required_argument,  0,  LONG_OPT_FROM_FACTORY},
 	{0,0,0,0}
 };
@@ -2018,7 +2044,22 @@ int main(int argc, char *argv[])
 		case LONG_OPT_COPROCESS:
 			coprocess_command = calloc(PATH_MAX, sizeof(char));
 			path_absolute(optarg, coprocess_command, 1);
-			realloc(coprocess_command, strlen(coprocess_command)+1);
+			coprocess_command = realloc(coprocess_command, strlen(coprocess_command)+1);
+			break;
+		case LONG_OPT_NUM_COPROCESS:
+			number_of_coprocess_instances = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_CORES:
+			coprocess_cores = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_MEMORY:
+			coprocess_memory = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_DISK:
+			coprocess_disk = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_GPUS:
+			coprocess_gpus = atoi(optarg);
 			break;
 		case LONG_OPT_FROM_FACTORY:
 			if (factory_name) free(factory_name);
@@ -2106,10 +2147,16 @@ int main(int argc, char *argv[])
 		total_resources->disk.total,
 		total_resources->gpus.total);
 
-	if(coprocess_command) {
-		/* start coprocess per manager attempt */
-		coprocess_name = vine_coprocess_start(coprocess_command, &coprocess_port);
+	if(coprocess_command && (number_of_coprocess_instances > 0)) {
+		coprocess_info = vine_coprocess_initalize_all_coprocesses(coprocess_cores, coprocess_memory, coprocess_disk, coprocess_gpus, total_resources, coprocess_command, number_of_coprocess_instances);
+		coprocess_name = xxstrdup(coprocess_info[0].name);
 		hash_table_insert(features, coprocess_name, (void **) 1);
+	}
+	else {
+		if (number_of_coprocess_instances != 0)
+		{
+			fatal("No coprocess specified but number of coprocesses given\n");
+		}
 	}
 
 	while(1) {
@@ -2167,8 +2214,9 @@ int main(int argc, char *argv[])
 		sleep(backoff_interval);
 	}
 
-	if (coprocess_command) {
-		vine_coprocess_terminate();
+	if (coprocess_command && number_of_coprocess_instances > 0) {
+		vine_coprocess_shutdown_all_coprocesses(coprocess_info, number_of_coprocess_instances);
+		free(coprocess_command);
 		free(coprocess_name);
 	}
 
