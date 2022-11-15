@@ -326,8 +326,10 @@ set up their own input sandboxes.
 static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info *w, const char *line )
 {
 	char cachename[VINE_LINE_MAX];
+	char id[VINE_LINE_MAX];
 	int length;
-	if(sscanf(line,"cache-invalid %s %d",cachename,&length)==2) {
+
+	if(sscanf(line,"cache-invalid %s %d %s",cachename,&length, id)==3) {
 
 		char *message = malloc(length+1);
 		time_t stoptime = time(0) + q->long_timeout;
@@ -343,6 +345,7 @@ static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info
 		free(message);
 		
 		struct vine_remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
+		vine_current_transfers_remove(q, id);
 		if(remote_info) vine_remote_file_info_delete(remote_info);
 	}
 	return VINE_MSG_PROCESSED;
@@ -694,6 +697,8 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	uint64_t task_id;
 
 	if(!q || !w) return;
+	
+	vine_current_transfers_wipe_worker(q, w);
 
 	hash_table_clear(w->current_files,(void*)vine_remote_file_info_delete);
 

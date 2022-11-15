@@ -420,8 +420,13 @@ Send an asynchronmous message to the manager indicating that an item was success
 void send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
 {
 	char *transfer_id;
-	transfer_id = hash_table_lookup(current_transfers, cachename);
-	send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
+	if((transfer_id = hash_table_lookup(current_transfers, cachename))){
+		debug(D_VINE, "Sending Cache update transfer id: %s", transfer_id);
+		send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
+	}
+	else{
+		send_message(manager,"cache-update %s %lld %lld\n",cachename,(long long)size,(long long)transfer_time);
+	}
 	if(transfer_id)
 	{
 		hash_table_remove(current_transfers, cachename);
@@ -434,7 +439,12 @@ Send an asynchronous message to the manager indicating that an item previously q
 
 void send_cache_invalid( struct link *manager, const char *cachename, const char *message )
 {
+	char *transfer_id;
 	int length = strlen(message);
+	if((transfer_id = hash_table_lookup(current_transfers, cachename))){
+		debug(D_VINE, "Sending Cache invalid transfer id: %s", transfer_id);
+		send_message(manager,"cache-invalid %s %d %s\n",cachename, length, transfer_id);
+	}
 	send_message(manager,"cache-invalid %s %d\n",cachename,length);
 	link_write(manager,message,length,time(0)+active_timeout);
 }
@@ -1017,7 +1027,7 @@ static int handle_manager(struct link *manager)
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_url(filename,length,mode,source,flags);
 			reset_idle_timer();
-			hash_table_insert(current_transfers, filename, transfer_id);
+			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
 			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
 		} else if(sscanf(line, "mini_task %"SCNd64" %s %"SCNd64" %o %d",&task_id,filename_encoded, &length, &mode, &flags)==5) {
 			url_decode(filename_encoded,filename,sizeof(filename));
