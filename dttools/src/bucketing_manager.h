@@ -48,7 +48,7 @@ void bucketing_manager_remove_resource_type(bucketing_manager_t* m, const char* 
  * @param mode the mode of algorithm to change to */
 void bucketing_manager_set_mode(bucketing_manager_t* m, category_mode_t mode);
 
-/* Given a task id, the manager returns a predicted allocation and adds this prediction into internal state
+/* Given a task id, the manager returns a predicted allocation and adds this prediction into internal state. The caller is responsible for free'ing the returned value.
  * @param m the relevant manager
  * @param task_id the task id
  * @return a pointer to a newly created rmsummary containing the prediction
@@ -56,11 +56,11 @@ void bucketing_manager_set_mode(bucketing_manager_t* m, category_mode_t mode);
  * @return 0 if failure */
 struct rmsummary* bucketing_manager_predict(bucketing_manager_t* m, int task_id);
 
-/* Add a task's resource summary to the manager
+/* Add a task's resource summary to the manager. The caller is responsible for free'ing the parameter r after calling this function.
  * @param m the relevant manager
  * @param task_id task id of task to be added
  * @param r the resource summary of a task
  * @param success whether task succeeds in running or not (i.e., task doesn't exceed resource limits) */
-void bucketing_manager_add_task(bucketing_manager_t* m, int task_id, struct rmsummary* r, int success);
+void bucketing_manager_add_resource_report(bucketing_manager_t* m, int task_id, struct rmsummary* r, int success);
 
 #endif

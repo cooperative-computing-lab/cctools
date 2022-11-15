@@ -286,7 +286,8 @@ double bucketing_predict(bucketing_state_t* s, double prev_val)
             list_cursor_destroy(lc);
             return ret_val;
         }
-        
+       
+        /* skip the small buckets */
         if (bb_ptr->prob <= prev_val)
         {
             total_net_prob -= bb_ptr->prob;

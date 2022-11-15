@@ -35,11 +35,11 @@ int main(int argc, char** argv)
         return 1;
     }
     
-    //printf("Creating bucketing state\n");
+    printf("Creating bucketing state\n");
     bucketing_state_t* s = bucketing_state_create(default_value, num_sampling_points, increase_rate, max_num_buckets, mode);
 
     int prime = 7000;
-    int num = 0;
+    int num = 2000;
     int multiple = 2;
     int iters = 50;
     double pred;
@@ -49,7 +49,7 @@ int main(int argc, char** argv)
 
     double alloc = 0;
 
-    //printf("Adding values\n");
+    printf("Adding values\n");
     for (int i = 0; i < iters; ++i)
     {
         num = num * multiple % prime;

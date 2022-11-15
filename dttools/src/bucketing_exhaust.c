@@ -206,9 +206,26 @@ static struct list* bucketing_exhaust_get_buckets(bucketing_state_t* s, int n)
         return 0;
     }
 
-    double max_val = ((bucketing_point_t*) list_peek_tail(s->sorted_points))->val;    //max value in all points
-    
-    int steps = floor(log(max_val / n) / log(2));   //logarithmic steps to take below max_val/n
+    if (!s->sorted_points)
+    {
+        fatal("sorted list of points is empty\n");
+        return 0;
+    }
+
+    bucketing_point_t* tmp_point = list_peek_tail(s->sorted_points);
+    if (!tmp_point)
+    {
+        fatal("list of points is empty so can't get a list of buckets\n");
+        return 0;
+    }
+
+    double max_val = tmp_point->val;    //max value in all points
+   
+    int steps;
+    if (max_val == 0)   //corner case where max value is 0, so no possible steps are available
+        steps = 0;
+    else
+        steps = floor(log(max_val / n) / log(2));   //logarithmic steps to take below max_val/n
 
     /* No steps if steps is negative */
     if (steps < 0)
@@ -229,6 +246,10 @@ static struct list* bucketing_exhaust_get_buckets(bucketing_state_t* s, int n)
     int i = 0;              //track index to candidate buckets
     double prev_val = 0;    //previous seen value of point
     double candidate_probs[steps + n];  //probabilities of candidate buckets
+    for (i = 0; i < steps + n; ++i)
+        candidate_probs[i] = 0;
+
+    i = 0;
     list_first_item(s->sorted_points);
     bucketing_point_t* tmp = list_next_item(s->sorted_points);
 
@@ -291,7 +312,7 @@ static struct list* bucketing_exhaust_get_min_cost_bucket_list(bucketing_state_t
         return 0;
     }
 
-    double cost;
+    double cost = 0;
     double min_cost = -1;
     struct list* best_bucket_list = 0;
     struct list* bucket_list = 0;
