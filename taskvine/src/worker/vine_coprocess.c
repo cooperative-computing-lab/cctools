@@ -160,6 +160,7 @@ int vine_coprocess_start(struct vine_coprocess *coprocess) {
         if ( (close(coprocess->pipe_in[1]) < 0) || (close(coprocess->pipe_out[0]) < 0) ) {
             fatal("coprocess error: %s\n", strerror(errno));
         }
+
         if (dup2(coprocess->pipe_in[0], 0) < 0) {
             fatal("coprocess could not attach to stdin: %s\n", strerror(errno));
         }
@@ -255,8 +256,6 @@ struct vine_coprocess *vine_coprocess_find_state(struct vine_coprocess *coproces
 	}
 	return NULL;
 }
-
-
 
 struct vine_coprocess *vine_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct vine_resources *total_resources, char *coprocess_command, int number_of_coprocess_instances) {
 	if (number_of_coprocess_instances <= 0) return NULL;

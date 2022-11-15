@@ -211,6 +211,7 @@ static char *coprocess_command = NULL;
 static char *coprocess_name = NULL;
 static int number_of_coprocess_instances = 0;
 static int allocated_coprocess_space = 0;
+
 struct vine_coprocess *coprocess_info = NULL;
 
 static int coprocess_cores = -1;
