@@ -79,6 +79,7 @@ struct vine_process *vine_process_create(struct vine_task *vine_task )
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 	p->task = vine_task;
+	p->coprocess = NULL;
 	if(!create_sandbox_dir(p)) {
 		vine_process_delete(p);
 		return 0;
@@ -248,7 +249,7 @@ pid_t vine_process_execute(struct vine_process *p )
 		if(result == -1)
 			fatal("could not dup /dev/null to stdin: %s", strerror(errno));
 
-		if (p->coprocess_name == NULL) {
+		if (p->coprocess == NULL) {
 			result = dup2(p->output_fd, STDOUT_FILENO);
 			if(result == -1)
 				fatal("could not dup pipe to stdout: %s", strerror(errno));
@@ -262,7 +263,7 @@ pid_t vine_process_execute(struct vine_process *p )
 			char *input = load_input_file(p->task);
 
 			// call invoke_coprocess_function
-		 	char *output = vine_coprocess_run(p->task->command_line, input, p->coprocess_port);
+		 	char *output = vine_coprocess_run(p->task->command_line, input, p->coprocess);
 
 			// write data to output file
 			full_write(p->output_fd, output, strlen(output));

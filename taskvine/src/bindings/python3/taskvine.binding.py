@@ -1628,7 +1628,7 @@ class Manager(object):
     # @param task   A task description created from @ref taskvine::Task.
     def submit(self, task):
         if isinstance(task, RemoteTask):
-            task.add_buffer(json.dumps(task._event), "infile")
+            task.add_input_buffer(json.dumps(task._event), "infile")
         task_id = vine_submit(self._taskvine, task._task)
         self._task_table[task_id] = task
         return task_id

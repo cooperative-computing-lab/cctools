@@ -52,8 +52,7 @@ struct vine_process {
 	struct path_disk_size_info *disk_measurement_state;
 
 	/* variables for coprocess funciton calls */
-	char *coprocess_name;
-	int coprocess_port;
+	struct vine_coprocess *coprocess;
 };
 
 struct vine_process * vine_process_create( struct vine_task *task );
