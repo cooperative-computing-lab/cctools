@@ -218,7 +218,15 @@ pid_t vine_process_execute(struct vine_process *p )
 
 	p->execution_start = timestamp_get();
 
-	p->pid = fork();
+	if (!p->task->duty) {
+		p->pid = fork();
+	}
+	else {
+		p->coprocess = malloc(300);
+		memset(p->coprocess, 0, 300);
+		p->coprocess->command = "./network_function.py";
+		p->pid = vine_coprocess_start(p->coprocess);
+	}
 
 	if(p->pid > 0) {
 		// Make child process the leader of its own process group. This allows

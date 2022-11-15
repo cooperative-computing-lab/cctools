@@ -27,6 +27,7 @@ struct vine_task {
         int task_id;                  /**< A unique task id number. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
+	char *duty;                  /**< The name of the long term duty to start. For regular tasks it is NULL */
 	char *tag;                   /**< An optional user-defined logical name for the task. */
 	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref vine_task_set_category. If no explicit category is given, the label "default" is used. **/
 

@@ -123,6 +123,15 @@ class Task(object):
     # @param coprocess  The name of the coprocess.
     def set_coprocess(self, coprocess):
         return vine_task_set_coprocess(self._task, coprocess)
+    
+    ##
+    # Set the type of duty that the worker should start
+    # This is not needed for regular tasks.
+    #
+    # @param self       Reference to the current task object.
+    # @param coprocess  The duty type
+    def set_duty(self, duty):
+        return vine_task_set_duty(self._task, duty)
 
     ##
     # Set the worker selection scheduler for task.
@@ -1995,7 +2004,7 @@ class RemoteTask(Task):
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
-        Task.set_coprocess(self, coprocess)
+        Task.set_coprocess(self, "vine_worker_coprocess:" + coprocess)
     ##
     # Specify function arguments. Accepts arrays and dictionarys. This overrides any arguments passed during task creation
     # @param self             Reference to the current remote task object

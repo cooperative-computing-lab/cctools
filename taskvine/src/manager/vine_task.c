@@ -136,6 +136,7 @@ struct vine_task *vine_task_clone(const struct vine_task *task)
 
 	/* Static features of task are copied. */
 	if(task->coprocess) vine_task_set_coprocess(new,task->tag);
+	if(task->duty) vine_task_set_duty(new, task->duty);
 	if(task->tag) vine_task_set_tag(new, task->tag);
 	if(task->category) vine_task_set_category(new, task->category);
 
@@ -204,8 +205,20 @@ void vine_task_set_coprocess( struct vine_task *t, const char *coprocess )
 	}
 
 	if(coprocess) {
-		t->coprocess = string_format("vine_worker_coprocess:%s", coprocess);
+		t->coprocess = xxstrdup(coprocess);
 		vine_task_add_feature(t, t->coprocess);
+	}
+}
+
+void vine_task_set_duty( struct vine_task *t, const char *duty )
+{
+	if(t->duty) {
+		free(t->duty);
+		t->duty = NULL;
+	}
+
+	if(duty) {
+		t->duty = xxstrdup(duty);
 	}
 }
 
@@ -547,6 +560,7 @@ void vine_task_delete(struct vine_task *t)
 
 	free(t->command_line);
 	free(t->coprocess);
+	free(t->duty);
 	free(t->tag);
 	free(t->category);
 
@@ -729,6 +743,7 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 	if(t->category) jx_insert_string(j,"category",t->category);
 	jx_insert_string(j,"command",t->command_line);
 	if(t->coprocess) jx_insert_string(j,"coprocess",t->coprocess);
+	if(t->duty) jx_insert_string(j,"duty",t->duty);
 	if(t->worker) {
 		jx_insert_string(j, "addrport", t->worker->addrport);
 		jx_insert_string(j,"host",t->worker->hostname);

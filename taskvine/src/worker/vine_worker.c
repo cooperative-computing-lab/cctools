@@ -210,6 +210,7 @@ static char *catalog_hosts = NULL;
 static char *coprocess_command = NULL;
 static char *coprocess_name = NULL;
 static int number_of_coprocess_instances = 0;
+static int allocated_coprocess_space = 0;
 struct vine_coprocess *coprocess_info = NULL;
 
 static int coprocess_cores = -1;
@@ -687,6 +688,13 @@ static int do_task( struct link *manager, int task_id, time_t stoptime )
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
 			vine_task_set_coprocess(task,cmd);
+			debug(D_VINE,"rx: %s",cmd);
+			free(cmd);
+		} else if(sscanf(line,"duty %d",&length)==1) {
+			char *cmd = malloc(length+1);
+			link_read(manager,cmd,length,stoptime);
+			cmd[length] = 0;
+			vine_task_set_duty(task,cmd);
 			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {

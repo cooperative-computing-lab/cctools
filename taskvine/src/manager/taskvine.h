@@ -263,6 +263,12 @@ will only be sent to workers running the coprocess.
 */
 void vine_task_set_coprocess( struct vine_task *t, const char *name );
 
+/** Indicate the duty to be executed.
+@param t A task object.
+@param name The duty to be started at the worker end
+*/
+void vine_task_set_duty( struct vine_task *t, const char *name );
+
 /** Attach an input file or directory to a task.
 @param t A task object.
 @param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.

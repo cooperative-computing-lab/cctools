@@ -26,7 +26,7 @@ struct vine_coprocess {
     struct vine_resources *coprocess_resources;
 };
 
-char *vine_coprocess_start(struct vine_coprocess *coprocess);
+int vine_coprocess_start(struct vine_coprocess *coprocess);
 void vine_coprocess_terminate(struct vine_coprocess *coprocess);
 void vine_coprocess_shutdown(struct vine_coprocess *coprocess_info, int num_coprocesses);
 int vine_coprocess_check(struct vine_coprocess *coprocess);

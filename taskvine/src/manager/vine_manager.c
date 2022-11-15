@@ -2414,7 +2414,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	struct rmsummary *limits = vine_manager_choose_resources_for_task(q, w, t);
 
 	char *command_line;
-	if(q->monitor_mode && !t->coprocess) {
+	if(q->monitor_mode && !t->coprocess && !t->duty) {
 		command_line = vine_monitor_wrap(q, w, t, limits);
 	} else {
 		command_line = xxstrdup(t->command_line);
@@ -2440,6 +2440,11 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 		cmd_len = strlen(t->coprocess);
 		vine_manager_send(q,w, "coprocess %lld\n", (long long) cmd_len);
 		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + q->short_timeout);
+	}
+	if(t->duty) {
+		cmd_len = strlen(t->duty);
+		vine_manager_send(q,w, "duty %lld\n", (long long) cmd_len);
+		link_putlstring(w->link, t->duty, cmd_len, /* stoptime */ time(0) + q->short_timeout);
 	}
 
 	vine_manager_send(q,w, "category %s\n", t->category);

@@ -138,7 +138,7 @@ int vine_coprocess_setup(struct vine_coprocess *coprocess)
     return 0;
 }
 
-char *vine_coprocess_start(struct vine_coprocess *coprocess) {
+int vine_coprocess_start(struct vine_coprocess *coprocess) {
 	if (pipe(coprocess->pipe_in) || pipe(coprocess->pipe_out)) { // create pipes to communicate with the coprocess
 		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
 	}
@@ -154,13 +154,12 @@ char *vine_coprocess_start(struct vine_coprocess *coprocess) {
 		}
 		debug(D_WQ, "coprocess running command %s\n", coprocess->command);
 		coprocess->state = VINE_COPROCESS_READY;
-        return coprocess->name;
+        return coprocess->pid;
 	}
     else if(coprocess->pid == 0) {
         if ( (close(coprocess->pipe_in[1]) < 0) || (close(coprocess->pipe_out[0]) < 0) ) {
             fatal("coprocess error: %s\n", strerror(errno));
         }
-
         if (dup2(coprocess->pipe_in[0], 0) < 0) {
             fatal("coprocess could not attach to stdin: %s\n", strerror(errno));
         }
@@ -175,7 +174,7 @@ char *vine_coprocess_start(struct vine_coprocess *coprocess) {
         fatal("couldn't create fork coprocess: %s\n", strerror(errno));
     }
 
-    return NULL;
+    return 0;
 }
 
 void vine_coprocess_terminate(struct vine_coprocess *coprocess) {
@@ -256,6 +255,8 @@ struct vine_coprocess *vine_coprocess_find_state(struct vine_coprocess *coproces
 	}
 	return NULL;
 }
+
+
 
 struct vine_coprocess *vine_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct vine_resources *total_resources, char *coprocess_command, int number_of_coprocess_instances) {
 	if (number_of_coprocess_instances <= 0) return NULL;
