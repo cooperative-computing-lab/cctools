@@ -4589,8 +4589,6 @@ static int send_one_task( struct work_queue *q )
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 
-		//prepare_task(t);
-
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
 
