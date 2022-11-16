@@ -36,3 +36,5 @@ jx_merge_test
 mq_poll_test
 mq_wait_test
 mq_store_test
+bucketing_base_test
+bucketing_manager_test

@@ -13,6 +13,10 @@ SOURCES = \
 	auth_unix.c \
 	b64.c \
 	bitmap.c \
+	bucketing.c \
+	bucketing_exhaust.c \
+	bucketing_greedy.c \
+	bucketing_manager.c \
 	buffer.c \
 	catalog_query.c \
 	category.c \
@@ -129,6 +133,10 @@ HEADERS_PUBLIC = \
 	auth_ticket.h \
 	auth_unix.h \
 	bitmap.h \
+	bucketing.h \
+	bucketing_exhaust.h \
+	bucketing_greedy.h \
+	bucketing_manager.h \
 	buffer.h \
 	category.h \
 	cctools.h \
@@ -185,7 +193,7 @@ PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
-TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test jx_canonicalize_test jx_merge_test histogram_test category_test jx_binary_test mq_poll_test mq_wait_test mq_store_test
+TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test jx_canonicalize_test jx_merge_test histogram_test category_test jx_binary_test mq_poll_test mq_wait_test mq_store_test bucketing_base_test bucketing_manager_test
 
 all: $(TARGETS) catalog_query
 
