@@ -23,12 +23,11 @@ chirp_wrap.c CChirp.py: chirp.i chirp.binding.py
 	@echo "SWIG chirp.i (python)"
 	@$(CCTOOLS_SWIG) -o chirp_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src/ -I$(CCTOOLS_HOME)/chirp/src chirp.i
 	@cat -u CChirp.py chirp.binding.py > Chirp.py
-	ln -sf /System/Library/Frameworks/Python.framework .
 
 $(CHIRPPYTHONSO): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -rf $(OBJECTS) $(TARGETS) Python.framework Chirp.py CChirp.py chirp_wrap.c *.pyc __pycache__
+	rm -rf $(OBJECTS) $(TARGETS) Chirp.py CChirp.py chirp_wrap.c *.pyc __pycache__
 
 test:
 
