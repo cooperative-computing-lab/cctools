@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "vine_transfer_server.h"
 #include "vine_protocol.h"
 #include "vine_transfer.h"
+#include "domain_name_cache.h"
 
 #include "link.h"
 #include "url_encode.h"
@@ -96,6 +97,7 @@ void vine_transfer_server_stop()
 
 void vine_transfer_server_address( char *addr, int *port )
 {
+	domain_name_cache_guess(addr);
 	link_address_local(transfer_link,addr,port);
 }
 
