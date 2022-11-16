@@ -222,10 +222,10 @@ pid_t vine_process_execute(struct vine_process *p )
 		p->pid = fork();
 	}
 	else {
-		p->coprocess = malloc(300);
-		memset(p->coprocess, 0, 300);
-		p->coprocess->command = "./network_function.py";
-		p->pid = vine_coprocess_start(p->coprocess);
+		p->coprocess = vine_coprocess_initialize_coprocess(p->task->command_line);
+		vine_coprocess_specify_resources(p->coprocess, 0, 0, 0, 0);
+		p->pid = vine_coprocess_start(p->coprocess, p->sandbox);
+		return p->pid;
 	}
 
 	if(p->pid > 0) {

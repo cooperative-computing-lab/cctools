@@ -3,7 +3,7 @@ Copyright (C) 2022- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
-
+#include "list.h"
 typedef enum {
 	VINE_COPROCESS_UNINITIALIZED, /**< worker has not yet created coprocess instance **/
 	VINE_COPROCESS_READY,         /**< coprocess is ready to receive and run a RemoteTask **/
@@ -26,14 +26,14 @@ struct vine_coprocess {
     struct vine_resources *coprocess_resources;
 };
 
-int vine_coprocess_start(struct vine_coprocess *coprocess);
+int vine_coprocess_start(struct vine_coprocess *coprocess, char *sandbox);
 void vine_coprocess_terminate(struct vine_coprocess *coprocess);
-void vine_coprocess_shutdown(struct vine_coprocess *coprocess_info, int num_coprocesses);
 int vine_coprocess_check(struct vine_coprocess *coprocess);
 char *vine_coprocess_run(const char *function_name, const char *function_input, struct vine_coprocess *coprocess);
-struct vine_coprocess *vine_coprocess_find_state(struct vine_coprocess *coprocess_info, int number_of_coprocesses, vine_coprocess_state_t state);
-struct vine_coprocess *vine_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct vine_resources *total_resources, char *coprocess_command, int number_of_coprocess_instances); 
-void vine_coprocess_shutdown_all_coprocesses(struct vine_coprocess *coprocess_info, int number_of_coprocesses);
-void vine_coprocess_measure_resources(struct vine_coprocess *coprocess_info, int number_of_coprocesses);
+struct vine_coprocess *vine_coprocess_find_state(struct list *coprocess_list, vine_coprocess_state_t state);
+struct vine_coprocess *vine_coprocess_initialize_coprocess(char *coprocess_command);
+void vine_coprocess_specify_resources(struct vine_coprocess *coprocess, int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus);
+void vine_coprocess_shutdown_all_coprocesses(struct list *coprocess_list);
+void vine_coprocess_measure_resources(struct list *coprocess_list);
 int vine_coprocess_enforce_limit(struct vine_coprocess *coprocess);
-void vine_coprocess_update_state(struct vine_coprocess *coprocess_info, int number_of_coprocesses);
+void vine_coprocess_update_state(struct list *coprocess_list);

@@ -27,6 +27,11 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
+#define COPROCESS_CORES_DEFAULT 1
+#define COPROCESS_MEMORY_DEFAULT 500
+#define COPROCESS_DISK_DEFAULT 500
+#define COPROCESS_GPUS_DEFAULT 0
+
 static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
 int vine_coprocess_write_to_link(char *buffer, int len, int timeout, struct link* link)
@@ -138,7 +143,7 @@ int vine_coprocess_setup(struct vine_coprocess *coprocess)
     return 0;
 }
 
-int vine_coprocess_start(struct vine_coprocess *coprocess) {
+int vine_coprocess_start(struct vine_coprocess *coprocess, char *sandbox) {
 	if (pipe(coprocess->pipe_in) || pipe(coprocess->pipe_out)) { // create pipes to communicate with the coprocess
 		fatal("couldn't create coprocess pipes: %s\n", strerror(errno));
 	}
@@ -157,9 +162,9 @@ int vine_coprocess_start(struct vine_coprocess *coprocess) {
         return coprocess->pid;
 	}
     else if(coprocess->pid == 0) {
-        if ( (close(coprocess->pipe_in[1]) < 0) || (close(coprocess->pipe_out[0]) < 0) ) {
-            fatal("coprocess error: %s\n", strerror(errno));
-        }
+		if(sandbox && chdir(sandbox)) {
+			fatal("could not change directory into %s: %s", sandbox, strerror(errno));
+		}
 
         if (dup2(coprocess->pipe_in[0], 0) < 0) {
             fatal("coprocess could not attach to stdin: %s\n", strerror(errno));
@@ -183,9 +188,10 @@ void vine_coprocess_terminate(struct vine_coprocess *coprocess) {
 	coprocess->state = VINE_COPROCESS_DEAD;
 }
 
-void vine_coprocess_shutdown(struct vine_coprocess *coprocess_info, int num_coprocesses) {
-	for (int coprocess_index = 0; coprocess_index < num_coprocesses; coprocess_index++) {
-		vine_coprocess_terminate(coprocess_info + coprocess_index);
+void vine_coprocess_shutdown(struct list *coprocess_list) {
+	struct vine_coprocess *coprocess;
+	LIST_ITERATE(coprocess_list,coprocess){
+		vine_coprocess_terminate(coprocess);
 	}
 }
 
@@ -248,15 +254,37 @@ char *vine_coprocess_run(const char *function_name, const char *function_input, 
 	return buffer;
 }
 
-struct vine_coprocess *vine_coprocess_find_state(struct vine_coprocess *coprocess_info, int number_of_coprocesses, vine_coprocess_state_t state) {
-	for (int i = 0; i < number_of_coprocesses; i++) {
-		if ( (coprocess_info + i)->state == state) {
-			return coprocess_info + i;
+struct vine_coprocess *vine_coprocess_find_state(struct list *coprocess_list, vine_coprocess_state_t state) {
+	struct vine_coprocess *coprocess;
+	LIST_ITERATE(coprocess_list,coprocess){
+		if (coprocess->state == state) {
+			return coprocess;
 		}
 	}
 	return NULL;
 }
 
+struct vine_coprocess *vine_coprocess_initialize_coprocess(char *coprocess_command) {
+	struct vine_coprocess *coprocess = malloc(sizeof(struct vine_coprocess));
+	*coprocess = (struct vine_coprocess) {NULL, NULL, -1, -1, VINE_COPROCESS_UNINITIALIZED, {-1, -1}, {-1, -1}, NULL, NULL, NULL, 0, NULL};
+	coprocess->command = xxstrdup(coprocess_command);
+	return coprocess;
+}
+
+void vine_coprocess_specify_resources(struct vine_coprocess *coprocess, int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus) {
+	int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : COPROCESS_CORES_DEFAULT);
+	int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : COPROCESS_MEMORY_DEFAULT);
+	int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : COPROCESS_DISK_DEFAULT);
+	int coprocess_gpus_normalized   = ( (coprocess_gpus > 0)   ? coprocess_gpus   : COPROCESS_GPUS_DEFAULT);
+	
+	coprocess->coprocess_resources = vine_resources_create();
+	coprocess->coprocess_resources->cores.total  = coprocess_cores_normalized;
+	coprocess->coprocess_resources->memory.total = coprocess_memory_normalized;
+	coprocess->coprocess_resources->disk.total   = coprocess_disk_normalized;
+	coprocess->coprocess_resources->gpus.total   = coprocess_gpus_normalized;
+}
+
+/*
 struct vine_coprocess *vine_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct vine_resources *total_resources, char *coprocess_command, int number_of_coprocess_instances) {
 	if (number_of_coprocess_instances <= 0) return NULL;
 	int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : total_resources->cores.total);
@@ -279,39 +307,38 @@ struct vine_coprocess *vine_coprocess_initalize_all_coprocesses(int coprocess_co
 	}
 	return coprocess_info;
 }
+*/
 
-void vine_coprocess_shutdown_all_coprocesses(struct vine_coprocess *coprocess_info, int number_of_coprocess_instances) {
-	if (number_of_coprocess_instances <= 0) return;
-	vine_coprocess_shutdown(coprocess_info, number_of_coprocess_instances);
-	for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
-		struct vine_coprocess *curr_coprocess = &coprocess_info[coprocess_num];
-		link_detach(curr_coprocess->read_link);
-		link_detach(curr_coprocess->write_link);
-		link_detach(curr_coprocess->network_link);
-		free(curr_coprocess->name);
-		free(curr_coprocess->command);
-		vine_resources_delete(curr_coprocess->coprocess_resources);
+void vine_coprocess_shutdown_all_coprocesses(struct list *coprocess_list) {
+	struct vine_coprocess *coprocess;
+	if (list_size(coprocess_list) == 0) return;
+	vine_coprocess_shutdown(coprocess_list);
+	LIST_ITERATE(coprocess_list, coprocess){
+		link_detach(coprocess->read_link);
+		link_detach(coprocess->write_link);
+		link_detach(coprocess->network_link);
+		free(coprocess->name);
+		free(coprocess->command);
+		vine_resources_delete(coprocess->coprocess_resources);
 	}
-	free(coprocess_info);
 }
 
-void vine_coprocess_measure_resources(struct vine_coprocess *coprocess_info, int number_of_coprocesses) {
-	if (number_of_coprocesses <= 0) return;
-	for (int i = 0; i < number_of_coprocesses; i++)
-	{
-		struct vine_coprocess *curr_coprocess = &coprocess_info[i];
-		if (curr_coprocess->state == VINE_COPROCESS_DEAD || curr_coprocess->state == VINE_COPROCESS_UNINITIALIZED) {
+void vine_coprocess_measure_resources(struct list *coprocess_list) {
+	struct vine_coprocess *coprocess;
+	if (list_size(coprocess_list) == 0) return;
+	LIST_ITERATE(coprocess_list, coprocess) {
+		if (coprocess->state == VINE_COPROCESS_DEAD || coprocess->state == VINE_COPROCESS_UNINITIALIZED) {
 			continue;
 		}
-		struct rmsummary *resources = rmonitor_measure_process(curr_coprocess->pid);
+		struct rmsummary *resources = rmonitor_measure_process(coprocess->pid);
 
-		debug(D_WQ, "Measuring resources of coprocess with pid %d\n", curr_coprocess->pid);
+		debug(D_WQ, "Measuring resources of coprocess with pid %d\n", coprocess->pid);
 		debug(D_WQ, "cores: %lf, memory: %lf, disk: %lf, gpus: %lf\n", resources->cores, resources->memory + resources->swap_memory, resources->disk, resources->gpus);
-		debug(D_WQ, "Max resources available to coprocess:\ncores: %"PRId64 " memory: %"PRId64 " disk: %"PRId64 " gpus: %"PRId64 "\n", curr_coprocess->coprocess_resources->cores.total, curr_coprocess->coprocess_resources->memory.total, curr_coprocess->coprocess_resources->disk.total, curr_coprocess->coprocess_resources->gpus.total);
-		curr_coprocess->coprocess_resources->cores.inuse = resources->cores;
-		curr_coprocess->coprocess_resources->memory.inuse = resources->memory + resources->swap_memory;
-		curr_coprocess->coprocess_resources->disk.inuse = resources->disk;
-		curr_coprocess->coprocess_resources->gpus.inuse = resources->gpus;
+		debug(D_WQ, "Max resources available to coprocess:\ncores: %"PRId64 " memory: %"PRId64 " disk: %"PRId64 " gpus: %"PRId64 "\n", coprocess->coprocess_resources->cores.total, coprocess->coprocess_resources->memory.total, coprocess->coprocess_resources->disk.total, coprocess->coprocess_resources->gpus.total);
+		coprocess->coprocess_resources->cores.inuse = resources->cores;
+		coprocess->coprocess_resources->memory.inuse = resources->memory + resources->swap_memory;
+		coprocess->coprocess_resources->disk.inuse = resources->disk;
+		coprocess->coprocess_resources->gpus.inuse = resources->gpus;
 
 	}
 }
@@ -334,6 +361,7 @@ int vine_coprocess_enforce_limit(struct vine_coprocess *coprocess) {
 	}
 }
 
+/*
 void vine_coprocess_update_state(struct vine_coprocess *coprocess_info, int number_of_coprocesses) {
 	for (int i = 0; i < number_of_coprocesses; i++) {
 		if (vine_coprocess_check(coprocess_info + i)) {
@@ -369,3 +397,4 @@ void vine_coprocess_update_state(struct vine_coprocess *coprocess_info, int numb
 		}
 	}
 }
+*/

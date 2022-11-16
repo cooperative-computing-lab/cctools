@@ -208,11 +208,8 @@ static int released_by_manager = 0;
 static char *catalog_hosts = NULL;
 
 static char *coprocess_command = NULL;
-static char *coprocess_name = NULL;
 static int number_of_coprocess_instances = 0;
-static int allocated_coprocess_space = 0;
-
-struct vine_coprocess *coprocess_info = NULL;
+struct list *coprocess_list = NULL;
 
 static int coprocess_cores = -1;
 static int coprocess_memory = -1;
@@ -337,8 +334,8 @@ static void measure_worker_resources()
 
 	vine_gpus_init(r->gpus.total);
 
-	if (coprocess_command != NULL && coprocess_info != NULL) {
-		vine_coprocess_measure_resources(coprocess_info, number_of_coprocess_instances);
+	if (list_size(coprocess_list) != 0) {
+		vine_coprocess_measure_resources(coprocess_list);
 	}
 
 	last_resources_measurement = time(0);
@@ -382,8 +379,11 @@ static void send_resource_update(struct link *manager)
 		end_time = worker_start_time + (manual_wall_time_option * 1e6);
 	}
 
-	if (coprocess_info != NULL) {
-		vine_coprocess_resources_send(manager,coprocess_info->coprocess_resources,stoptime);
+	if (list_size(coprocess_list) != 0) {
+		list_first_item(coprocess_list);
+		struct vine_coprocess *coprocess = list_next_item(coprocess_list);
+		vine_resources_debug(coprocess->coprocess_resources);
+		vine_coprocess_resources_send(manager,coprocess->coprocess_resources,stoptime);
 	}
 
 	vine_resources_send(manager,total_resources,stoptime);
@@ -490,6 +490,13 @@ static int start_process( struct vine_process *p, struct link *manager )
 
 	pid = vine_process_execute(p);
 	if(pid<0) fatal("unable to fork process for task_id %d!",p->task->task_id);
+	if(p->task->duty) {
+		char *coprocess_name = string_format("vine_worker_coprocess:%s", "my_coprocess_example");
+		list_push_tail(coprocess_list, p->coprocess);
+		hash_table_insert(features, coprocess_name, (void **) 1);
+		send_features(manager);
+		send_resource_update(manager);
+	}
 
 	itable_insert(procs_running,p->pid,p);
 	
@@ -1248,7 +1255,7 @@ static void work_for_manager( struct link *manager )
 				} else if(task_resources_fit_now(p->task)) {
 					// attach the function name, port, and type to process, if applicable
 					if (p->task->coprocess) {
-						struct vine_coprocess *ready_coprocess = vine_coprocess_find_state(coprocess_info, number_of_coprocess_instances, VINE_COPROCESS_READY);
+						struct vine_coprocess *ready_coprocess = vine_coprocess_find_state(coprocess_list, VINE_COPROCESS_READY);
 						if (ready_coprocess == NULL) {
 							list_push_tail(procs_waiting, p);
 							continue;
@@ -2135,6 +2142,7 @@ int main(int argc, char *argv[])
 	procs_table    = itable_create(0);
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
+	coprocess_list = list_create();
 
 	watcher = vine_watcher_create();
 
@@ -2155,18 +2163,6 @@ int main(int argc, char *argv[])
 		total_resources->memory.total,
 		total_resources->disk.total,
 		total_resources->gpus.total);
-
-	if(coprocess_command && (number_of_coprocess_instances > 0)) {
-		coprocess_info = vine_coprocess_initalize_all_coprocesses(coprocess_cores, coprocess_memory, coprocess_disk, coprocess_gpus, total_resources, coprocess_command, number_of_coprocess_instances);
-		coprocess_name = xxstrdup(coprocess_info[0].name);
-		hash_table_insert(features, coprocess_name, (void **) 1);
-	}
-	else {
-		if (number_of_coprocess_instances != 0)
-		{
-			fatal("No coprocess specified but number of coprocesses given\n");
-		}
-	}
 
 	while(1) {
 		int result = 0;
@@ -2223,11 +2219,11 @@ int main(int argc, char *argv[])
 		sleep(backoff_interval);
 	}
 
-	if (coprocess_command && number_of_coprocess_instances > 0) {
-		vine_coprocess_shutdown_all_coprocesses(coprocess_info, number_of_coprocess_instances);
-		free(coprocess_command);
-		free(coprocess_name);
+	if (list_size(coprocess_list) > 0) {
+		vine_coprocess_shutdown_all_coprocesses(coprocess_list);
+		list_delete(coprocess_list);
 	}
+	if (coprocess_command) free(coprocess_command);
 
 	workspace_delete();
 
