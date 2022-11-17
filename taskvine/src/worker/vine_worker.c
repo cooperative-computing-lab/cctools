@@ -444,8 +444,9 @@ void send_cache_invalid( struct link *manager, const char *cachename, const char
 	if((transfer_id = hash_table_lookup(current_transfers, cachename))){
 		debug(D_VINE, "Sending Cache invalid transfer id: %s", transfer_id);
 		send_message(manager,"cache-invalid %s %d %s\n",cachename, length, transfer_id);
+	}else{
+		send_message(manager,"cache-invalid %s %d\n",cachename,length);
 	}
-	send_message(manager,"cache-invalid %s %d\n",cachename,length);
 	link_write(manager,message,length,time(0)+active_timeout);
 }
 

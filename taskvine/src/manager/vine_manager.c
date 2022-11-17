@@ -329,7 +329,7 @@ static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info
 	char id[VINE_LINE_MAX];
 	int length;
 
-	if(sscanf(line,"cache-invalid %s %d %s",cachename,&length, id)==3) {
+	if(sscanf(line,"cache-invalid %s %d %8s-%4s-%4s-%4s-%12s",cachename,&length, id, &id[8], &id[12], &id[16], &id[20])==7) {
 
 		char *message = malloc(length+1);
 		time_t stoptime = time(0) + q->long_timeout;
@@ -347,6 +347,21 @@ static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info
 		struct vine_remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
 		vine_current_transfers_remove(q, id);
 		if(remote_info) vine_remote_file_info_delete(remote_info);
+	}
+	else if(sscanf(line,"cache-invalid %s %d",cachename,&length)==2) {
+
+		char *message = malloc(length+1);
+		time_t stoptime = time(0) + q->long_timeout;
+		
+		int actual = link_read(w->link,message,length,stoptime);
+		if(actual!=length) {
+			free(message);
+			return VINE_MSG_FAILURE;
+		}
+		
+		message[length] = 0;
+		debug(D_VINE,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
+		free(message);	
 	}
 	return VINE_MSG_PROCESSED;
 }
