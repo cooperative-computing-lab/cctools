@@ -23,7 +23,6 @@ See the file COPYING for details.
 #include "rmsummary.h"
 #include "host_disk_info.h"
 #include "xxmalloc.h"
-#include "domain_name.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -473,9 +472,7 @@ static char *vine_manager_can_any_transfer( struct vine_manager *q, struct vine_
 		HASH_TABLE_ITERATE(q->worker_table, id, peer){
 			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)))
 			{
-				char addr[VINE_LINE_MAX];
-				domain_name_lookup(peer->hostname, addr);
-				char *peer_source =  string_format("worker://%s:%d/%s", addr, peer->transfer_port, f->cached_name);
+				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
 				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
 				{
 					if(remote_info->in_cache)

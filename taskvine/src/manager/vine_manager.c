@@ -357,9 +357,11 @@ on its own port to receive get requests from other workers.
 */
 
 static int handle_transfer_address( struct vine_manager *q, struct vine_worker_info *w, const char *line )
-{
+{	
+	int dummy_port;
 	if(sscanf(line,"transfer-address %s %d",w->transfer_addr,&w->transfer_port)) {
 		w->transfer_port_active = 1;
+		link_address_remote(w->link, w->transfer_addr, &dummy_port);
 		return VINE_MSG_PROCESSED;
 	} else {
 		return VINE_MSG_FAILURE;
