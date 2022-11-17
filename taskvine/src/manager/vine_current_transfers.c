@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 
-static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_info *to, char *source)
+static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_info *to, const char *source)
 {
     struct vine_transfer_pair *t = malloc(sizeof(struct vine_transfer_pair));
     t->to = to;
@@ -18,7 +18,7 @@ static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_i
 }
 
 // add a current transaction to the transfer table
-char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to, char *source)
+char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info *to, const char *source)
 {
     cctools_uuid_t uuid;
     cctools_uuid_create(&uuid);
@@ -31,7 +31,7 @@ char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info
 }
 
 // remove a completed transaction from the transfer table - i.e. open the source to an additional transfer
-int vine_current_transfers_remove(struct vine_manager *q, char *id)
+int vine_current_transfers_remove(struct vine_manager *q, const char *id)
 {
     if(hash_table_remove(q->current_transfer_table, id)) return 1;
     return 0;
@@ -39,7 +39,7 @@ int vine_current_transfers_remove(struct vine_manager *q, char *id)
 
 
 // count the number transfers coming from a specific source
-int vine_current_transfers_source_in_use(struct vine_manager *q, char *source)
+int vine_current_transfers_source_in_use(struct vine_manager *q, const char *source)
 {
     char *id;
     struct vine_transfer_pair *t;
