@@ -204,16 +204,22 @@ if __name__ == '__main__':
     t = q.wait(30)
     report_task(t, vine.VINE_RESULT_TASK_TIMEOUT, 9)
 
+    minitask = vine.Task("curl https://www.nd.edu -o output");
+    minitask.add_output_file("output","output",cache=True);
+
     # Now generate an input file from a shell command:
     t = vine.Task("/bin/cat infile")
-    t.add_input_command("curl https://www.nd.edu -o $0","infile",cache=True)
+    t.add_input_mini_task(minitask,"infile",cache=True);
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
+    minitask2 = vine.Task("curl https://www.nd.edu -o output");
+    minitask2.add_output_file("output","output",cache=True);
+
     # second time should have it cached (though we can't tell from here)
     t = vine.Task("/bin/cat infile")
-    t.add_input_command("curl https://www.nd.edu -o $0","infile",cache=True)
+    t.add_input_mini_task(minitask2,"infile",cache=True);
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)

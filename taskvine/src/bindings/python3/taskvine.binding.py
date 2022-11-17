@@ -263,11 +263,11 @@ class Task(object):
     # >>> task.add_input_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",flags=VINE_CACHE);
     # @endcode
 
-    def add_input_command(self, cmd, remote_name, flags=None, cache=None, failure_only=None):
+    def add_input_mini_task(self, mini_task, remote_name, flags=None, cache=None, failure_only=None):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return vine_task_add_input_command(self._task, cmd, remote_name, flags)
+        return vine_task_add_input_mini_task(self._task, mini_task._task, remote_name, flags)
 
     ##
     # Add a file piece to the task.

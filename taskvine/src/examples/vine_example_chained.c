@@ -45,11 +45,12 @@ int main(int argc, char *argv[])
 		vine_task_add_input_url(minitask,CCTOOLS_URL,"cctools.tar.gz",VINE_CACHE);
 		vine_task_add_output_file(minitask,"cctools","cctools-7.4.14-source",VINE_CACHE);
 
-		struct vine_file *file = vine_file_mini_task(minitask);
+		//struct vine_file *file = vine_file_mini_task(minitask);
 		
 		struct vine_task *task = vine_task_create("ls -lR cctools");
-		vine_task_add_input(task,file,"cctools",VINE_CACHE);
-
+		//vine_task_add_input(task,file,"cctools",VINE_CACHE);
+		vine_task_add_input_mini_task(task,minitask,"cctools",VINE_CACHE);
+		
 		int task_id = vine_submit(m, task);
 
 		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(task) );
