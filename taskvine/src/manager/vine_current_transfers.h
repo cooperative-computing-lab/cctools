@@ -11,7 +11,7 @@ See the file COPYING for details.
 
 struct vine_transfer_pair {
     struct vine_worker_info *to;
-    const char   *source;
+    char   *source;
 };
 
 char *vine_current_transfers_add(struct vine_manager *q,struct vine_worker_info *to, const char *source);
