@@ -16,7 +16,7 @@ struct vine_transfer_pair {
 
 char *vine_current_transfers_add(struct vine_manager *q,struct vine_worker_info *to, const char *source);
 
-int vine_current_transfers_remove(struct vine_manager *q,const char *id);
+int vine_current_transfers_remove(struct vine_manager *q, const char *id);
 
 int vine_current_transfers_source_in_use(struct vine_manager *q,const char *source);
 

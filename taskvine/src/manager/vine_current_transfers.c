@@ -13,7 +13,7 @@ static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_i
 {
     struct vine_transfer_pair *t = malloc(sizeof(struct vine_transfer_pair));
     t->to = to;
-    t->source = source;
+    t->source = strdup(source);
     return t;
 }
 

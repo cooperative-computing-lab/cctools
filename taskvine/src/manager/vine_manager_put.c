@@ -321,7 +321,7 @@ static vine_result_code_t vine_manager_put_url_if_not_cached( struct vine_manage
 	url_encode(tf->source,source_encoded,sizeof(source_encoded));
 	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
 									
-	char *transfer_id = vine_current_transfers_add(q, w, strdup(tf->source));
+	char *transfer_id = vine_current_transfers_add(q, w, tf->source);
 
 	vine_manager_send(q,w,"puturl %s %s %d %o %d\n",source_encoded, cached_name_encoded, tf->length, 0777,tf->flags );
 
