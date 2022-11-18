@@ -166,3 +166,20 @@ struct vine_file * vine_file_mini_task( struct vine_task *t )
 {
 	return vine_file_create(t->command_line,0,0,0,VINE_MINI_TASK,0,t);
 }
+
+struct vine_file * vine_file_untar( struct vine_file *f )
+{
+	struct vine_task *t = vine_task_create("mkdir output && tar xf input.tar -C output");
+	vine_task_add_input(t,f,"input.tar",VINE_CACHE);
+	vine_task_add_output(t,vine_file_local("output"),"output",VINE_CACHE);
+	return vine_file_mini_task(t);
+}
+
+struct vine_file * vine_file_untgz( struct vine_file *f )
+{
+	struct vine_task *t = vine_task_create("mkdir output && tar xzf input.tgz -C output");
+	vine_task_add_input(t,f,"input.tgz",VINE_CACHE);
+	vine_task_add_output(t,vine_file_local("output"),"output",VINE_CACHE);
+	return vine_file_mini_task(t);
+}
+

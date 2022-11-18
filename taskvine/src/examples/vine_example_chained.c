@@ -40,14 +40,10 @@ int main(int argc, char *argv[])
 	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
 
 	for(i=0;i<10;i++) {
-			  
-		struct vine_task *minitask = vine_task_create("tar xvzf cctools.tar.gz");
-		vine_task_add_input_url(minitask,CCTOOLS_URL,"cctools.tar.gz",VINE_CACHE);
-		vine_task_add_output_file(minitask,"cctools","cctools-7.4.14-source",VINE_CACHE);
 
+		struct vine_file *infile = vine_file_untgz(vine_file_url(CCTOOLS_URL));
 		struct vine_task *task = vine_task_create("ls -lR cctools");
-		vine_task_add_input_mini_task(task,minitask,"cctools",VINE_CACHE);
-		
+		vine_task_add_input(task,infile,"cctools",VINE_CACHE);		
 		int task_id = vine_submit(m, task);
 
 		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(task) );

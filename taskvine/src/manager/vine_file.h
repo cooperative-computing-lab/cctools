@@ -46,4 +46,7 @@ struct vine_file * vine_file_empty_dir();
 
 struct vine_file * vine_file_mini_task( struct vine_task *mini_task );
 
+struct vine_file * vine_file_untar( struct vine_file *f );
+struct vine_file * vine_file_untgz( struct vine_file *f );
+
 #endif
