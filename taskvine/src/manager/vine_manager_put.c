@@ -304,13 +304,13 @@ static char *expand_envnames(struct vine_worker_info *w, const char *source)
 }
 
 /*
-Send a url or remote command used to generate a cached file,
+Send a url to generate a cached file,
 if it has not already been cached there.  Note that the length
 may be an estimate at this point and will be updated by return
 message once the object is actually loaded into the cache.
 */
 
-static vine_result_code_t vine_manager_put_special_if_not_cached( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *tf, const char *typestring )
+static vine_result_code_t vine_manager_put_url_if_not_cached( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *tf )
 {
 	if(hash_table_lookup(w->current_files,tf->cached_name)) return VINE_SUCCESS;
 
@@ -320,7 +320,7 @@ static vine_result_code_t vine_manager_put_special_if_not_cached( struct vine_ma
 	url_encode(tf->source,source_encoded,sizeof(source_encoded));
 	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
 
-	vine_manager_send(q,w,"%s %s %s %d %o %d\n",typestring, source_encoded, cached_name_encoded, tf->length, 0777,tf->flags );
+	vine_manager_send(q,w,"puturl %s %s %d %o %d\n",source_encoded, cached_name_encoded, tf->length, 0777,tf->flags );
 
 	if(tf->flags & VINE_CACHE) {
 		struct vine_remote_file_info *remote_info = vine_remote_file_info_create(tf->type,tf->length,time(0));
@@ -330,7 +330,12 @@ static vine_result_code_t vine_manager_put_special_if_not_cached( struct vine_ma
 	return VINE_SUCCESS;
 }
 
-static vine_result_code_t vine_manager_put_task_if_not_cached( struct vine_manager *q, struct vine_worker_info *w, struct vine_file *tf )
+/*
+Send a mini_task that will be used to generate the target file,
+if it has not already been sent.
+*/
+
+static vine_result_code_t vine_manager_put_mini_task_if_not_cached( struct vine_manager *q, struct vine_worker_info *w, struct vine_file *tf )
 {
 	if(hash_table_lookup(w->current_files,tf->cached_name)) return VINE_SUCCESS;
 
@@ -379,13 +384,13 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 		break;
 
 	case VINE_MINI_TASK:
-		debug(D_VINE, "%s (%s) will get %s via mini task %d", w->hostname, w->addrport, f->remote_name, f->mini_task->task_id);
-		result = vine_manager_put_task_if_not_cached(q,w,f);
+		debug(D_VINE, "%s (%s) will produce %s via mini task %d", w->hostname, w->addrport, f->remote_name, f->mini_task->task_id);
+		result = vine_manager_put_mini_task_if_not_cached(q,w,f);
 		break;
 
 	case VINE_URL:
 		debug(D_VINE, "%s (%s) will get %s from url %s", w->hostname, w->addrport, f->remote_name, f->source);
-		result = vine_manager_put_special_if_not_cached(q,w,t,f,"puturl");
+		result = vine_manager_put_url_if_not_cached(q,w,t,f);
 		break;
 
 	case VINE_EMPTY_DIR:
@@ -503,7 +508,7 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 	if(result!=VINE_SUCCESS) return result;
 
 	if(target) {
-		vine_manager_send(q,w, "putcmd %s %d %o %d\n",target->cached_name,target->length,0777,target->flags);
+		vine_manager_send(q,w, "mini_task %lld %s %d %o %d\n",(long long)target->mini_task->task_id,target->cached_name,target->length,0777,target->flags);
 	} else {
 		vine_manager_send(q,w, "task %lld\n",(long long)t->task_id);
 	}

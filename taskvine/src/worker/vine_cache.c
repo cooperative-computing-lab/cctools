@@ -35,10 +35,10 @@ struct cache_file {
 	int64_t actual_size;
 	int mode;
 	int complete;
-	struct vine_task *minitask;
+	struct vine_task *mini_task;
 };
 
-struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, struct vine_task *minitask )
+struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, struct vine_task *mini_task )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
@@ -46,7 +46,7 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->actual_size = actual_size;
 	f->mode = mode;
 	f->complete = 0;
-	f->minitask = minitask;
+	f->mini_task = mini_task;
 	return f;
 }
 
@@ -129,9 +129,9 @@ Queue a mini-task to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue_command( struct vine_cache *c, struct vine_task *minitask, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
+int vine_cache_queue_command( struct vine_cache *c, struct vine_task *mini_task, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_COMMAND,"task",size,mode,minitask);
+	struct cache_file *f = cache_file_create(VINE_CACHE_MINI_TASK,"task",size,mode,mini_task);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -208,19 +208,19 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 }
 
 /*
-Create a file by executing a minitask, which should produce the desired cachename.
-The minitask uses all the normal machinery to run a task synchronously,
+Create a file by executing a mini_task, which should produce the desired cachename.
+The mini_task uses all the normal machinery to run a task synchronously,
 which should result in the desired file being placed into the cache.
 This will be double-checked below.
 */
 
-static int do_command( struct vine_cache *c, struct vine_task *minitask, struct link *manager, char **error_message )
+static int do_command( struct vine_cache *c, struct vine_task *mini_task, struct link *manager, char **error_message )
 {
-	if(vine_process_execute_and_wait(minitask,c,manager)) {
+	if(vine_process_execute_and_wait(mini_task,c,manager)) {
 		*error_message = 0;
 		return 1;
 	} else {
-		const char *str = vine_task_get_stdout(minitask);
+		const char *str = vine_task_get_stdout(mini_task);
 		if(str) {
 			*error_message = xxstrdup(str);
 		} else {
@@ -342,9 +342,9 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 
 			break;
 
-		case VINE_CACHE_COMMAND:
-			debug(D_VINE,"cache: creating %s via shell command",cachename);
-			result = do_command(c,f->minitask,manager,&error_message);
+		case VINE_CACHE_MINI_TASK:
+			debug(D_VINE,"cache: creating %s via mini task",cachename);
+			result = do_command(c,f->mini_task,manager,&error_message);
 			break;
 	}
 

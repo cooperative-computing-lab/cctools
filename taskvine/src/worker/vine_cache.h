@@ -26,7 +26,7 @@ struct link;
 typedef enum {
 	VINE_CACHE_FILE,
 	VINE_CACHE_TRANSFER,
-	VINE_CACHE_COMMAND,
+	VINE_CACHE_MINI_TASK,
 } vine_cache_type_t;
 
 struct vine_cache * vine_cache_create( const char *cachedir );

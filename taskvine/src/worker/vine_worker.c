@@ -757,20 +757,20 @@ static int do_put_url( const char *cache_name, int64_t size, int mode, const cha
 }
 
 /*
-Accept a command that produces a file and queue it for later execution.
+Accept a mini_task that is executed on demand to produce a specific file.
 */
 
-static int do_put_cmd( struct link *manager, time_t stoptime, const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
+static int do_put_mini_task( struct link *manager, time_t stoptime, const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
 {
-	struct vine_task *minitask = do_task_body(manager,0,stoptime);
-	if(!minitask) return 0;
+	struct vine_task *mini_task = do_task_body(manager,0,stoptime);
+	if(!mini_task) return 0;
 
 	/* XXX hacky hack -- the single output of the task must have the target cachename */
-	struct vine_file *output_file = list_peek_head(minitask->output_files);
+	struct vine_file *output_file = list_peek_head(mini_task->output_files);
 	free(output_file->cached_name);
 	output_file->cached_name = strdup(cache_name);
 	
-	return vine_cache_queue_command(global_cache,minitask,cache_name,size,mode,flags);
+	return vine_cache_queue_command(global_cache,mini_task,cache_name,size,mode,flags);
 }
 
 /*
@@ -1007,9 +1007,9 @@ static int handle_manager(struct link *manager)
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_url(filename,length,mode,source,flags);
 			reset_idle_timer();
-		} else if(sscanf(line, "putcmd %s %"SCNd64" %o %d",filename_encoded, &length, &mode, &flags)==4) {
+		} else if(sscanf(line, "mini_task %"SCNd64" %s %"SCNd64" %o %d",&task_id,filename_encoded, &length, &mode, &flags)==5) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_put_cmd(manager,time(0)+active_timeout,filename,length,mode,source,flags);
+			r = do_put_mini_task(manager,time(0)+active_timeout,filename,length,mode,source,flags);
 			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
