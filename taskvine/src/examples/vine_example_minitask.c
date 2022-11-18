@@ -10,11 +10,6 @@ An example of using file chaining to pull in dependencies of dependencies.
 
 #include "taskvine.h"
 
-/* This is a temporary hack to access functions not yet in the public API. */
-
-#include "vine_file.h"
-#include "vine_task.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

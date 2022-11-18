@@ -338,6 +338,24 @@ entire directory worth of data to a task, use @ref vine_task_add_input_file and 
 */
 void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name );
 
+/** Add a general file object as a input to a task.
+@param t A task object.
+@param f A file object, created by @ref vine_file_local, @ref vine_file_url, @ref vine_file_buffer, @ref vine_file_mini_task.
+@param remote_name The name of the file as it should appear in the task's sandbox.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
+*/
+
+void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags );
+
+/** Add a general file object as a output of a task.
+@param t A task object.
+@param f A file object, created by @ref vine_file_local or @ref vine_file_buffer.
+@param remote_name The name of the file as it will appear in the task's sandbox.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
+*/
+
+void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags );
+
 /** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result VINE_RESULT_MAX_RETRIES.
 @param t A task object.
 @param max_retries The number of retries.
@@ -615,6 +633,62 @@ For more information, consult the manual of the resource_monitor.
 */
 
 void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file);
+
+//@}
+
+/** @name Functions - Files */
+
+//@{
+
+/** Create a file object from a local file.
+@param source The path of the file on the local filesystem.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_local( const char *source );
+
+/** Create a file object from a remote URL.
+@param url The URL address of the object in text form.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_url( const char *url );
+
+/** Create a file object from a data buffer.
+@param name The abstract name of the buffer.
+@param data The contents of the buffer.
+@param length The length of the buffer, in bytes.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_buffer( const char *buffer_name, const char *data, int length );
+
+/** Create a file object representing an empty directory.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_empty_dir();
+
+/** Create a file object produced from a mini-task.
+@param mini_task The task which produces the data object.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_mini_task( struct vine_task *mini_task );
+
+/** Create a file object by unpacking a tar archive.
+@param f A file object representing a tar archive.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_untar( struct vine_file *f );
+
+/** Create a file object by unpacking a tgz archive.
+@param f A file object representing a tgz archive.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_untgz( struct vine_file *f );
 
 //@}
 

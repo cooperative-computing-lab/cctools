@@ -39,14 +39,4 @@ struct vine_file * vine_file_create( const char *source, const char *remote_name
 struct vine_file *vine_file_clone( const struct vine_file *file );
 void vine_file_delete( struct vine_file *f );
 
-struct vine_file * vine_file_local( const char *source );
-struct vine_file * vine_file_url( const char *url );
-struct vine_file * vine_file_buffer( const char *buffer_name, const char *data, int length );
-struct vine_file * vine_file_empty_dir();
-
-struct vine_file * vine_file_mini_task( struct vine_task *mini_task );
-
-struct vine_file * vine_file_untar( struct vine_file *f );
-struct vine_file * vine_file_untgz( struct vine_file *f );
-
 #endif
