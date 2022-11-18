@@ -208,35 +208,35 @@ if __name__ == '__main__':
     minitask.add_output_file("output","output",cache=True);
 
     # Now generate an input file from a shell command:
-    t = vine.Task("/bin/cat infile")
+    t = vine.Task("wc -l infile")
     t.add_input_mini_task(minitask,"infile",cache=True);
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # second time should have it cached (though we can't tell from here)
-    t = vine.Task("/bin/cat infile")
+    t = vine.Task("wc -l infile")
     t.add_input_mini_task(minitask,"infile",cache=True);
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # Now generate an input file from a shell command:
-    t = vine.Task("/bin/cat infile")
+    t = vine.Task("wc -l infile")
     t.add_input_url("https://www.nd.edu","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # second time should have it cached (though we can't tell from here)
-    t = vine.Task("/bin/cat infile")
+    t = vine.Task("wc -l infile")
     t.add_input_url("https://www.nd.edu","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # generate an invalid remote input file, should get an input missing error.
-    t = vine.Task("/bin/cat infile")
+    t = vine.Task("wc -l infile")
     t.add_input_url("https://pretty-sure-this-is-not-a-valid-url.com","infile",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
