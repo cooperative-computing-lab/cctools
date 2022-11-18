@@ -296,8 +296,16 @@ void vine_task_add_output_file(struct vine_task *t, const char *local_name, cons
 */
 void vine_task_add_input_url(struct vine_task *t, const char *url, const char *remote_name, vine_file_flags_t flags);
 
-/**
-XXX update documentation
+/** Add a file produced by a mini-task.
+Attaches a task definition to produce an input file by running a Unix command.
+This mini-task will be run on demand in order to produce the desired input file.
+This is useful if an input requires some prior step such as transferring,
+renaming, or unpacking to be useful.  A mini-task should be a short-running
+activity with minimal resource consumpion.
+@param t A task object.
+@param mini_task The mini-task to attach to the parent task.
+@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
+@param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_add_input_file.
 */
 void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_file_flags_t flags);
 
