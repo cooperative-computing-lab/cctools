@@ -226,6 +226,11 @@ int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, co
 		debug(D_VINE,"unpacking %s to %s via command %s",transfer_path,cache_path,command);
 		unix_result = system(command);
 		free(command);
+	} else if(flags & VINE_PONCHO_UNPACK){
+		command = string_format("poncho_package_run -u %s -e %s", cache_path, transfer_path);
+		debug(D_VINE,"unpacking %s to %s via command %s", transfer_path, cache_path, command);
+		unix_result = system(command);
+		free(command);
 	} else {
 		debug(D_VINE,"renaming %s to %s",transfer_path,cache_path);
 		unix_result = rename(transfer_path,cache_path);
@@ -299,13 +304,12 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 			result = do_command(c,f->source,transfer_path,&error_message);
 			break;
 	}
-
+	chmod(cache_path,f->mode);
 	if(result) {
 		result = unpack_or_rename_target(f,transfer_path,cache_path,flags);
 	}
 
 	// Set the permissions as originally indicated.	
-	chmod(cache_path,f->mode);
 
 	timestamp_t transfer_end = timestamp_get();
 	timestamp_t transfer_time = transfer_end - transfer_start;

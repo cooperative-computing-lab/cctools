@@ -47,6 +47,7 @@ typedef enum {
 	VINE_WATCH    = 4, /**< Watch the output file and send back changes as the task runs. */
 	VINE_FAILURE_ONLY = 8,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	VINE_SUCCESS_ONLY = 16, /**< Only return this output file if the task succeeded. */
+	VINE_PONCHO_UNPACK = 32, /**< Unpacks a Poncho environment into a directory on arrival. */
 } vine_file_flags_t;
 
 /** Select overall scheduling algorithm for matching tasks to workers. */
@@ -271,6 +272,7 @@ void vine_task_set_coprocess( struct vine_task *t, const char *name );
 - @ref VINE_CACHE indicates that the file/directory should be cached for later tasks. (recommended)
 - @ref VINE_NOCACHE indicates that the file should not be cached.
 - @ref VINE_UNPACK indicates that @a local_name is an archive (.tar, .tgz, .zip) that will be automatically unpacked into directory @a remote_name .
+- @ref VINE_PONCHO_UNPACK indicates that @a local_name is a PONCHO enviornment that will be automatically unpacked into directory @a remote_name .
 */
 void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags);
 

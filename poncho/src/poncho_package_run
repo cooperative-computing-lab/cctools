@@ -25,6 +25,7 @@ usage() {
     echo " -w, --wait-for-lock <secs> Number of seconds to wait to get a writing lock"
     echo "                            on <dir>. Default is 300"
     echo " -d, --debug                Print debug messages."
+    echo " -k, --keep-alive           Keeps unpacked and activated environment alive after execution"
     echo " --help-env-creation        Show instructions to create conda environments as tar files."
     echo " -h, --help                 Show this help screen."
     echo "command and args            Command to execute inside the given environment."
@@ -105,6 +106,9 @@ parse_arguments() {
                 shift
                 LOCK_WAIT="$1"
                 ;;
+	    -k | --keep-alive)
+		export PONCHO_KEEP_ALIVE=yes
+		;;
             --)
                 shift
                 break
@@ -125,9 +129,8 @@ parse_arguments() {
 
     if [[ $# -lt 1 ]]
     then
-        errmsg "no command line was specified."
-        usage
-        exit 1
+	logmsg No command was specified no command will be executed!
+        PONCHO_NO_COMMAND=yes
     fi
 
     final_arg_count=$#
@@ -153,16 +156,28 @@ function cleanup {
 
     logmsg total runtime: $(printf "%d.%0.3d seconds" "${s}" "${ms}")
 }
-trap cleanup EXIT
+
+
+PONCHO_KEEP_ALIVE=no
+PONCHO_NO_COMMAND=no
 
 parse_arguments "$@"
 
 #after shift, whatever is left is taken as the command line to execute.
 arg_counsumed=$?
+
 shift ${arg_counsumed}
 
 ENV_NAME_IS_DIR=no
 UNPACK_IS_TMP=no
+
+if [[ "${PONCHO_KEEP_ALIVE}" = no ]]
+then
+    trap cleanup EXIT
+else
+    logmsg unpacked environment will be kept alive
+fi
+	
 
 if [[ -d "${ENV_NAME}" ]]
 then
@@ -207,7 +222,7 @@ then
         exit 1
     fi
 
-    source ${UNPACK_TO}/bin/activate
+    export PATH=${UNPACK_TO}/bin:${PATH}
 
     if ! ${UNPACK_TO}/bin/conda-unpack
     then
@@ -221,6 +236,7 @@ else
 fi
 exit 0
 EOF
+
 
 if [[ "${ENV_NAME_IS_DIR}" = no ]]
 then
@@ -257,10 +273,14 @@ then
 fi
 
 # Finally run the command line:
-logmsg executing command line: "${@}"
-"${@}"
-status=$?
-
-logmsg command line exit code: $status
+if [[ "${PONCHO_NO_COMMAND}" = no ]]
+then
+    logmsg executing command line: "${@}"
+    "${@}"
+    status=$?
+    logmsg command line exit code: $status
+else
+    logmsg no command will be executed
+fi
 
 exit $status
