@@ -133,7 +133,8 @@ struct vine_file *vine_file_clone(const struct vine_file *f )
 void vine_file_delete(struct vine_file *f)
 {
 	if(!f) return;
-	vine_task_delete(f->mini_task);
+	/* XXX Hack: do not delete subtask which is referenced at top level of python program. */
+	// vine_task_delete(f->mini_task);
 	free(f->source);
 	free(f->remote_name);
 	free(f->cached_name);
