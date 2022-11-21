@@ -2621,6 +2621,49 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 }
 
 /*
+Iterate through task input files. 
+Assign a worker transfer if one is available.
+If every input file is accounted for, return a copy of the task
+with any modified transfers. If one of the files cannot be transfered due
+to limits on num transfers. return null
+*/
+static struct vine_task *vine_manager_sched_worker_transfer(struct vine_manager *q, struct vine_task *t)
+{
+		struct vine_file *f;
+		struct vine_task *tcp = t; //vine_task_clone(t);
+		int unable_to_source = 0;
+
+		LIST_ITERATE(tcp->input_files, f){
+			if(f->type == VINE_URL){
+				char *id;
+				struct vine_worker_info *peer;
+				struct vine_remote_file_info *remote_info;
+
+				HASH_TABLE_ITERATE(q->worker_table, id, peer){
+					if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache)
+					{
+						char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+						if(vine_current_transfers_source_in_use(q, peer_source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
+						{	
+	//							debug(D_VINE, "This file is to be requested from source: %s:%d", peer->transfer_addr, peer->transfer_port);
+							free(f->source);
+							f->source = peer_source;
+							unable_to_source = 0;
+						}else{
+							unable_to_source = 1;
+						}
+					}
+				}
+				if(unable_to_source && (vine_current_transfers_source_in_use(q, f->source) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
+					return NULL;
+				}
+			}
+		}
+
+		return tcp;
+}
+
+/*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
 the task to the worker.
@@ -2629,7 +2672,7 @@ the task to the worker.
 static int send_one_task( struct vine_manager *q )
 {
 	struct vine_task *t;
-	struct vine_worker_info *w;
+	struct vine_worker_info *w = NULL;
 
 	timestamp_t now = timestamp_get();
 
@@ -2639,11 +2682,15 @@ static int send_one_task( struct vine_manager *q )
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 
-		// Find the best worker for the task at the head of the list
-		w = vine_schedule_task_to_worker(q,t);
+		if((t = vine_manager_sched_worker_transfer(q, t)))
+		{
+			// Find the best worker for the task at the head of the list
+			w = vine_schedule_task_to_worker(q,t);
+		}
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
+		vine_current_transfers_print_table(q);
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
 

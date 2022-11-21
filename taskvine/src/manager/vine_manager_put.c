@@ -453,100 +453,45 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	return result;
 }
 
-static char *vine_manager_can_any_transfer( struct vine_manager *q, struct vine_worker_info *w, struct vine_file *f)
-{
-		char *id;
-		struct vine_worker_info *peer;
-		struct vine_remote_file_info *remote_info;
-
-	
-		vine_current_transfers_print_table(q);
-	
-		// check workers first 
-		HASH_TABLE_ITERATE(q->worker_table, id, peer){
-			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)))
-			{
-				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
-				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
-				{
-					if(remote_info->in_cache)
-					{
-						debug(D_VINE, "This file is to be requested from source: %s:%d", peer->transfer_addr, peer->transfer_port);
-						return peer_source;
-					}
-				}else{
-					debug(D_VINE, "Vine transfer source busy: %s:%d", peer->transfer_addr, peer->transfer_port);
-				}
-			}
-		}
-
-		// check original source
-		if(vine_current_transfers_source_in_use(q, f->source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
-		{
-			return strdup(f->source);
-		}
-		return NULL;
-}
-
 /* Send all input files needed by a task to the given worker. */
 
 vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t )
 {
-	struct vine_file *f;
-	struct stat s;
+		struct vine_file *f;
+		struct stat s;
 
-	// Check for existence of each input file first.
-	// If any one fails to exist, set the failure condition and return failure.
-	if(t->input_files) {
-		LIST_ITERATE(t->input_files,f) {
-			if(f->type == VINE_FILE) {
-				char * expanded_source = expand_envnames(w, f->source);
-				if(!expanded_source) {
-					vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
-					return VINE_APP_FAILURE;
-				}
-				if(stat(expanded_source, &s) != 0) {
-					debug(D_VINE,"Could not stat %s: %s\n", expanded_source, strerror(errno));
+		// Check for existence of each input file first.
+		// If any one fails to exist, set the failure condition and return failure.
+		if(t->input_files) {
+			LIST_ITERATE(t->input_files,f) {
+				if(f->type == VINE_FILE) {
+					char * expanded_source = expand_envnames(w, f->source);
+					if(!expanded_source) {
+						vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
+						return VINE_APP_FAILURE;
+					}
+					if(stat(expanded_source, &s) != 0) {
+						debug(D_VINE,"Could not stat %s: %s\n", expanded_source, strerror(errno));
+						free(expanded_source);
+						vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
+						return VINE_APP_FAILURE;
+					}
 					free(expanded_source);
-					vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
-					return VINE_APP_FAILURE;
 				}
-				free(expanded_source);
 			}
 		}
-	}
 
-	// Send each of the input files.
-	// If any one fails to be sent, return failure.
-	if(t->input_files) {
-		LIST_ITERATE(t->input_files,f) {
-			vine_result_code_t result;
-			char *source;
-
-			if(f->type != VINE_URL) {
-				result = vine_manager_put_input_file(q, w, t, f);
+		// Send each of the input files.
+		// If any one fails to be sent, return failure.
+		if(t->input_files) {
+			LIST_ITERATE(t->input_files,f) {
+				vine_result_code_t result = vine_manager_put_input_file(q,w,t,f);
+				if(result != VINE_SUCCESS) {
+					return result;
+				}
 			}
-			else if((source = vine_manager_can_any_transfer(q, w, f)) && f->type == VINE_URL) { 
-				struct vine_file *worker_file = vine_file_create(source, f->remote_name, f->data, f->length, VINE_URL, f->flags);
-				free(worker_file->cached_name);
-				worker_file->cached_name = strdup(f->cached_name);
-
-				result = vine_manager_put_input_file(q, w, t, worker_file);
-				free(source);
-				vine_file_delete(worker_file);
-			}
-			else{
-				return 1;
-			}
-
-			if(result != VINE_SUCCESS)
-			{
-				return result;
-			}
-			
 		}
-	}
-	return VINE_SUCCESS;
+		return VINE_SUCCESS;
 }
 
 /*
