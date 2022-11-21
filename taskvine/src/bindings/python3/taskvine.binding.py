@@ -244,14 +244,13 @@ class Task(object):
 
 
     ##
-    # Add an input file produced by a Unix shell command.
-    # The command will be executed at the worker and produce
+    # Add an input file produced by a mini task description.
+    # The mini-task will be executed at the worker and produce
     # a cacheable file that can be shared among multiple tasks.
-    #
-    # @param self           Reference to the current task object.
-    # @param command        The shell command which will produce the file.
-    #                       The command must contain the string %% which will be replaced with the cached location of the file.
-    # @param remote_name    The name of the file as seen by the task.
+    # @param self           A task object.
+    # @param mini_task      A task object that will produce the desired file.
+    #                       The task object must generate a single output file named by @ref add_output_file.
+    # @param remote_name    The name of the file as seen by the primary task.
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref vine_file_flags_t or'd together The most common are:
     #                       - @ref VINE_NOCACHE (default)
@@ -260,14 +259,21 @@ class Task(object):
     #
     # For example:
     # @code
-    # >>> task.add_input_command("curl http://www.example.com/mydata.gz | gunzip > %%","infile",flags=VINE_CACHE);
+    # >>> # Create a mini-task:
+    # >>> mini_task = Task("curl http://www.cnn.com > output.txt");
+    # >>> mini_task.add_output_file("output.txt","output.txt");
+    # >>> # Attach the output of the mini-task as the input of a main task:
+    # >>> task.add_input_mini_task(mini_task,"infile.txt",cache=True)
     # @endcode
 
     def add_input_mini_task(self, mini_task, remote_name, flags=None, cache=None, failure_only=None):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        return vine_task_add_input_mini_task(self._task, mini_task._task, remote_name, flags)
+        # The minitask must be duplicated, because the C object becomes "owned"
+        # by the parent task and will be deleted when the parent task goes away.
+        copy_of_mini_task = vine_task_clone(mini_task._task)
+        return vine_task_add_input_mini_task(self._task, copy_of_mini_task, remote_name, flags)
 
     ##
     # Add an empty directory to the task.
