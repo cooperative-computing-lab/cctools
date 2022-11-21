@@ -270,34 +270,6 @@ class Task(object):
         return vine_task_add_input_mini_task(self._task, mini_task._task, remote_name, flags)
 
     ##
-    # Add a file piece to the task.
-    #
-    # @param self           Reference to the current task object.
-    # @param local_name     The name of the file on local disk or shared filesystem.
-    # @param remote_name    The name of the file at the execution site.
-    # @param start_byte     The starting byte offset of the file piece to be transferred.
-    # @param end_byte       The ending byte offset of the file piece to be transferred.
-    # @param flags          May be zero to indicate no special handling, or any
-    #                       of the @ref vine_file_flags_t or'd together The most common are:
-    #                       - @ref VINE_NOCACHE (default)
-    #                       - @ref VINE_CACHE
-    #                       - @ref VINE_FAILURE_ONLY
-    # @param cache         Whether the file should be cached at workers (True/False)
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
-    def add_input_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, flags=None, cache=None, failure_only=None):
-
-        if local_name:
-            local_name = str(local_name)
-
-        if remote_name:
-            remote_name = str(remote_name)
-        else:
-            remote_name = os.path.basename(local_name)
-
-        flags = Task._determine_file_flags(flags, cache, failure_only)
-        return vine_task_add_input_piece(self._task, local_name, remote_name, start_byte, end_byte, flags)
-
-    ##
     # Add an empty directory to the task.
     # @param self           Reference to the current task object.
     # @param remote_name    The name of the directory at the remote execution site.
