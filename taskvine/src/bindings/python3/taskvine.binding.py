@@ -46,11 +46,135 @@ def cleanup_staging_directory():
 atexit.register(cleanup_staging_directory)
 
 ##
+# \class File
+#
+# TaskVine File Object
+#
+# The superclass of all TaskVine file types.
+
+class File(object):
+    def __del__(self):
+        try:
+            if self._file:
+                vine_file_delete(self._file)
+        except:
+            #ignore exceptions, in case task has been already collected
+            pass
+
+##
+# \class FileLocal
+#
+# TaskVine File object
+#
+# A file obtained from the local filesystem.
+
+class FileLocal(File):
+
+    ##
+    # Create a local file object.
+    #
+    # @param self       The current file object.
+    # @param path       The path to the local file.
+    
+    def __init__(self,path):
+        path = str(path)
+        self._file = vine_file_local(path)
+
+##
+# \class FileURL
+#
+# TaskVine URL object
+#
+# A file obtained from a remote URL.
+
+class FileURL(File):
+    ##
+    # Create a remote URL file object.
+    #
+    # @param self      The current file object.
+    # @param url       The url of the file.
+        
+    def __init__(self,url):
+        url = str(url)
+        self._file = vine_file_url(url)
+
+##
+# \class FileBuffer
+#
+# TaskVine Buffer object
+#
+# A file obtained from a buffer in memory.
+
+class FileBuffer(File):
+    ##
+    # Create a file from a buffer in memory.
+    #
+    # @param self       The current file object.
+    # @param name       The abstract name of the buffer.
+    # @param buffer     The contents of the buffer.
+        
+    def __init__(self,name,buffer):
+        name = str(name)
+        buffer = str(buffer)
+        self._file = vine_file_buffer(name,buffer,len(buffer))
+
+##
+# \class FileMiniTask
+#
+# TaskVine File object
+#
+# A file obtained from a mini-task.
+
+class FileMiniTask(File):
+    ##
+    # Create a file by executing a mini-task.
+    #
+    # @param self       The current file object.
+    # @param minitask   The task to execute in order to produce a file.
+        
+    def __init__(self,minitask):
+        self._file = vine_file_mini_task(minitask._task)
+
+##
+# \class FileUntar
+#
+# TaskVine File TAR Unpacker
+#
+# A wrapper to unpack a file in .tar form.
+
+class FileUntar(File):
+    ##
+    # Create a file by unpacking a tar file.
+    #
+    # @param self       The current file object.
+    # @param subfile    The file object to un-tar.
+        
+    def __init__(self,subfile):
+        self._file = vine_file_untar(vine_file_clone(subfile._file))
+
+##
+# \class FileUntgz
+#
+# TaskVine File TGZ Unpacker
+#
+# A wrapper to unpack a file in .tgz form.
+
+class FileUntgz(File):
+    ##
+    # Create a file by unpacking a compressed tar file.
+    #
+    # @param self       The current file object.
+    # @param subfile    The file object to un-tgz.
+        
+    def __init__(self,subfile):
+        self._file = vine_file_untgz(vine_file_clone(subfile._file))
+
+##
 # \class Task
 #
 # TaskVine Task object
 #
-# This class is used to create a task specification to be submimited to a Manager.
+# This class is used to create a task specification to be submitted to a Manager.
 
 class Task(object):
 
@@ -170,7 +294,7 @@ class Task(object):
         return vine_task_set_preferred_host(self._task, hostname)
 
     ##
-    # Add an input file to the task.
+    # Add a local input file to a task.
     #
     # @param self           Reference to the current task object.
     # @param local_name     The name of the file on local disk or shared filesystem.
@@ -201,18 +325,6 @@ class Task(object):
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
         return vine_task_add_input_file(self._task, local_name, remote_name, flags)
-
-    def add_output_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
-        if local_name:
-            local_name = str(local_name)
-
-        if remote_name:
-            remote_name = str(remote_name)
-        else:
-            remote_name = os.path.basename(local_name)
-
-        flags = Task._determine_file_flags(flags, cache, failure_only)
-        return vine_task_add_output_file(self._task, local_name, remote_name, flags)
 
     ## Add an input url to a task.
     #
@@ -276,6 +388,32 @@ class Task(object):
         return vine_task_add_input_mini_task(self._task, copy_of_mini_task, remote_name, flags)
 
     ##
+    # Add any input object to a task.
+    # 
+    # @param self           Reference to the current task object.
+    # @param file           A file object of class @ref File, such as @ref FileLocal, @ref FileBuffer, @ref FileURL, @ref FileMiniTask, @ref FileUntar, @FileUntgz.
+    # @param remote_name    The name of the file at the execution site.
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref vine_file_flags_t or'd together The most common are:
+    #                       - @ref VINE_NOCACHE (default)
+    #                       - @ref VINE_CACHE
+    # @param cache         Whether the file should be cached at workers (True/False)
+    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
+    #
+    # For example:
+    # @code
+    # >>> file = FileUntgz(FileURL(http://somewhere.edu/data.tgz))
+    # >>> task.add_input(file,"data",cache=True)
+    # @endcode
+
+    def add_input(self, file, remote_name, flags=None, cache=None, failure_only=None):
+        # SWIG expects strings
+        remote_name = str(remote_name)
+        flags = Task._determine_file_flags(flags, cache, failure_only)
+        copy_of_file = vine_file_clone(file._file)
+        return vine_task_add_input(self._task, copy_of_file, remote_name, flags)
+
+    ##
     # Add an empty directory to the task.
     # @param self           Reference to the current task object.
     # @param remote_name    The name of the directory at the remote execution site.
@@ -298,6 +436,39 @@ class Task(object):
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, None)
         return vine_task_add_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
+
+    ##
+    # Add a local output file to a task.
+    #
+    # @param self           Reference to the current task object.
+    # @param local_name     The name of the file on local disk or shared filesystem.
+    # @param remote_name    The name of the file at the execution site.
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref vine_file_flags_t or'd together The most common are:
+    #                       - @ref VINE_NOCACHE (default)
+    #                       - @ref VINE_CACHE
+    #                       - @ref VINE_WATCH
+    #                       - @ref VINE_FAILURE_ONLY
+    #                       - @ref VINE_SUCCESS_ONLY
+    # @param cache         Whether the file should be cached at workers (True/False)
+    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
+    #
+    # For example:
+    # @code
+    # >>> task.add_output_file("output.txt", "output.txt", cache = True)
+    # @endcode
+
+    def add_output_file(self, local_name, remote_name=None, flags=None, cache=None, failure_only=None):
+        if local_name:
+            local_name = str(local_name)
+
+        if remote_name:
+            remote_name = str(remote_name)
+        else:
+            remote_name = os.path.basename(local_name)
+
+        flags = Task._determine_file_flags(flags, cache, failure_only)
+        return vine_task_add_output_file(self._task, local_name, remote_name, flags)
 
     ##
     # Add an output buffer to the task.
@@ -341,6 +512,32 @@ class Task(object):
             buffer_name = str(buffer_name)
 
         return vine_task_get_output_buffer_length(self._task, buffer_name )
+
+    ##
+    # Add any output object to a task.
+    # 
+    # @param self           Reference to the current task object.
+    # @param file           A file object of class @ref File, such as @ref FileLocal or @ref FileBuffer.
+    # @param remote_name    The name of the file at the execution site.
+    # @param flags          May be zero to indicate no special handling, or any
+    #                       of the @ref vine_file_flags_t or'd together The most common are:
+    #                       - @ref VINE_NOCACHE (default)
+    #                       - @ref VINE_CACHE
+    # @param cache         Whether the file should be cached at workers (True/False)
+    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
+    #
+    # For example:
+    # @code
+    # >>> file = FileLocal("output.txt")
+    # >>> task.add_output(file,"out")
+    # @endcode
+
+    def add_output(self, file, remote_name, flags=None, cache=None, failure_only=None):
+        # SWIG expects strings
+        remote_name = str(remote_name)
+        flags = Task._determine_file_flags(flags, cache, failure_only)
+        copy_of_file = vine_file_clone(file,_file)
+        return vine_task_add_output(self._task, copy_of_file, remote_name, flags)
 
     ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
