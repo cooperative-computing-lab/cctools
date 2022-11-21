@@ -1,16 +1,24 @@
 ## @package taskvine
 #
-# python taskvine bindings.
+# Python API for the TaskVine workflow framework.
 #
-# The objects and methods provided by this package correspond to the native
-# C API in @ref vine_manager.h.
+# TaskVine is a framework for building large scale distributed data intensive
+# applications that run on clusters, clouds, grids, and similar distributed systems.
+# A TaskVine application consists of a main program that creates a @ref Manager object,
+# and then submits @ref Tasks that use @ref Files representing data sources.
+# The manager distributes tasks across available workers and returns results to
+# the main application.
 #
-# The SWIG-based Python bindings provide a higher-level interface that
-# revolves around the following objects:
+# See the <a href=http://cctools.readthedocs.io/en/latest/taskvine>TaskVine Manual</a> for complete documentation.
 #
-# - @ref taskvine::Manager
-# - @ref taskvine::Task
-# - @ref taskvine::Factory
+# - @ref Manager
+# - @ref Task / @ref PythonTask / @ref RemoteTask
+# - @ref File / @ref FileLocal / @ref FileURL / @ref FileBuffer / @ref FileMiniTask
+# - @ref Factory
+#
+# The objects and methods provided by this package correspond closely
+# to the native C API in @ref vine_manager.h.
+#
 
 import itertools
 import math
@@ -174,7 +182,7 @@ class FileUntgz(File):
 #
 # TaskVine Task object
 #
-# This class is used to create a task specification to be submitted to a Manager.
+# This class is used to create a task specification to be submitted to a @ref taskvine::Manager.
 
 class Task(object):
 
@@ -1061,10 +1069,14 @@ class PythonTaskNoResult(Exception):
     pass
 
 ##
-# python taskvine object
+# TaskVine Manager
 #
-# This class uses a dictionary to map between the task pointer objects and the
-# @ref taskvine::Task.
+# The manager class is the primary object for a TaskVine application.
+# To build an application, create a Manager instance, then create
+# @ref taskvine::Task objects and submit them with @ref taskvine::Manager::submit
+# Call @ref taskvine::Manager::wait to wait for tasks to complete.
+# Run one or more vine_workers to perform work on behalf of the manager object.
+
 class Manager(object):
     ##
     # Create a new manager.
