@@ -45,13 +45,13 @@ def cleanup_staging_directory():
 
 atexit.register(cleanup_staging_directory)
 
-
 ##
 # \class Task
 #
-# Python Task object
+# TaskVine Task object
 #
-# This class is used to create a task specification.
+# This class is used to create a task specification to be submimited to a Manager.
+
 class Task(object):
 
     ##
@@ -702,9 +702,11 @@ class Task(object):
 ##
 # \class PythonTask
 #
-# Python PythonTask object
+# TaskVine PythonTask object
 #
-# this class is used to create a python task
+# The class represents a Task specialized to execute remote Python code.
+#
+
 try:
     import dill
     pythontask_available = True
@@ -1954,9 +1956,10 @@ class Manager(object):
 ##
 # \class RemoteTask
 #
-# Python RemoteTask object
+# TaskVine RemoteTask object
 #
-# This class is used to create a task that will execute on a worker running a coprocess
+# This class represents a task specialized to execute remotely-defined functions at workers.
+
 class RemoteTask(Task):
     ##
     # Create a new remote task specification.
