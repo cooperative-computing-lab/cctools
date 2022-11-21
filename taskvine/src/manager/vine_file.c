@@ -98,7 +98,11 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 	memset(f, 0, sizeof(*f));
 
 	f->source = xxstrdup(source);
-	if(f->remote_name) f->remote_name = xxstrdup(remote_name);
+	if(remote_name) {
+		f->remote_name = xxstrdup(remote_name);
+	} else {
+		f->remote_name = 0;
+	}
 	f->type = type;
 	f->flags = flags;
 	f->length = length;
@@ -133,8 +137,7 @@ struct vine_file *vine_file_clone(const struct vine_file *f )
 void vine_file_delete(struct vine_file *f)
 {
 	if(!f) return;
-	/* XXX Hack: do not delete subtask which is referenced at top level of python program. */
-	// vine_task_delete(f->mini_task);
+	vine_task_delete(f->mini_task);
 	free(f->source);
 	free(f->remote_name);
 	free(f->cached_name);
