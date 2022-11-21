@@ -100,8 +100,7 @@ typedef enum {
 	VINE_FILE = 1,              /**< A file or directory present at the manager. **/
 	VINE_URL,                   /**< A file obtained by downloading from a URL. */
 	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
-	VINE_COMMAND,               /**< A file obtained by executing a Unix command line. */
-	VINE_FILE_PIECE,            /**< A portion of a file present at the manager. */
+	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
 	VINE_EMPTY_DIR              /**< An empty directory to create in the task sandbox. */
 } vine_file_t;
 
@@ -297,24 +296,18 @@ void vine_task_add_output_file(struct vine_task *t, const char *local_name, cons
 */
 void vine_task_add_input_url(struct vine_task *t, const char *url, const char *remote_name, vine_file_flags_t flags);
 
-/** Add a shell command to produce an input file for a task.
+/** Add a file produced by a mini-task.
+Attaches a task definition to produce an input file by running a Unix command.
+This mini-task will be run on demand in order to produce the desired input file.
+This is useful if an input requires some prior step such as transferring,
+renaming, or unpacking to be useful.  A mini-task should be a short-running
+activity with minimal resource consumpion.
 @param t A task object.
-@param cmd The shell command to produce the file.   The command must contain a special symbol "%%" which indicates the destination of the file.
-For example, the command "grep frog /usr/dict/words > %%" would produce a file by searching for "frog" in the Unix dictionary.
+@param mini_task The mini-task to attach to the parent task.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 @param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_add_input_file.
 */
-void vine_task_add_input_command(struct vine_task *t, const char *cmd, const char *remote_name, vine_file_flags_t flags);
-
-/** Add a piece of a file to a task.
-@param t A task object.
-@param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.
-@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param start_byte The starting byte offset of the file piece to be transferred.
-@param end_byte The ending byte offset of the file piece to be transferred.
-@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
-*/
-void vine_task_add_input_piece(struct vine_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, vine_file_flags_t flags);
+void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
@@ -344,6 +337,24 @@ entire directory worth of data to a task, use @ref vine_task_add_input_file and 
 @param remote_name The name of the empty directory in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 */
 void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name );
+
+/** Add a general file object as a input to a task.
+@param t A task object.
+@param f A file object, created by @ref vine_file_local, @ref vine_file_url, @ref vine_file_buffer, @ref vine_file_mini_task.
+@param remote_name The name of the file as it should appear in the task's sandbox.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
+*/
+
+void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags );
+
+/** Add a general file object as a output of a task.
+@param t A task object.
+@param f A file object, created by @ref vine_file_local or @ref vine_file_buffer.
+@param remote_name The name of the file as it will appear in the task's sandbox.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
+*/
+
+void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags );
 
 /** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result VINE_RESULT_MAX_RETRIES.
 @param t A task object.
@@ -625,6 +636,76 @@ void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapsh
 
 //@}
 
+/** @name Functions - Files */
+
+//@{
+
+/** Create a file object from a local file.
+@param source The path of the file on the local filesystem.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_local( const char *source );
+
+/** Create a file object from a remote URL.
+@param url The URL address of the object in text form.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_url( const char *url );
+
+/** Create a file object from a data buffer.
+@param name The abstract name of the buffer.
+@param data The contents of the buffer.
+@param length The length of the buffer, in bytes.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_buffer( const char *buffer_name, const char *data, int length );
+
+/** Create a file object representing an empty directory.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_empty_dir();
+
+/** Create a file object produced from a mini-task.
+@param mini_task The task which produces the data object.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_mini_task( struct vine_task *mini_task );
+
+/** Create a file object by unpacking a tar archive.
+@param f A file object representing a tar archive.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_untar( struct vine_file *f );
+
+/** Create a file object by unpacking a tgz archive.
+@param f A file object representing a tgz archive.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_untgz( struct vine_file *f );
+
+/** Clone a file object.
+@param f A file object.
+@return A clone of the argument f.
+*/
+
+struct vine_file *vine_file_clone( const struct vine_file *f );
+
+/** Delete a file object.
+@param f A file object.
+*/
+
+void vine_file_delete( struct vine_file *f );
+
+
+//@}
+
 /** @name Functions - Managers */
 
 //@{
@@ -821,7 +902,7 @@ The file or directory with the given local name specification is deleted from
 the workers' cache, so that a newer version may be used. Any running task using
 the file is canceled and resubmitted. Completed tasks waiting for retrieval are
 not affected.
-(Currently anonymous buffers and file pieces cannot be deleted once cached in a worker.)
+(Currently anonymous buffers cannot be deleted once cached in a worker.)
 @param m A manager object
 @param local_name The name of the file on local disk or shared filesystem, or uri.
 @param type One of:

@@ -600,15 +600,10 @@ static int handle_completed_tasks(struct link *manager)
 		if(result==0) {
 			// pid is still going
 		} else if(result<0) {
-		  debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)pid,strerror(errno));
+			debug(D_VINE, "wait4 on pid %d returned an error: %s",(int)pid,strerror(errno));
 		} else if(result>0) {
-			if (!WIFEXITED(status)){
-				p->exit_code = WTERMSIG(status);
-				debug(D_VINE, "task %d (pid %d) exited abnormally with signal %d",p->task->task_id,p->pid,p->exit_code);
-			} else {
-				p->exit_code = WEXITSTATUS(status);
-				debug(D_VINE, "task %d (pid %d) exited normally with exit code %d",p->task->task_id,p->pid,p->exit_code);
-			}
+			/* Translate the unix status into the process structure. */
+			vine_process_set_exit_status(p,status);
 
 			if (p->coprocess != NULL) {
 				p->coprocess->state = VINE_COPROCESS_READY;
@@ -654,7 +649,7 @@ Generate a vine_process wrapped around a vine_task,
 and deposit it into the waiting list.
 */
 
-static int do_task( struct link *manager, int task_id, time_t stoptime )
+static struct vine_task * do_task_body( struct link *manager, int task_id, time_t stoptime )
 {
 	char line[VINE_LINE_MAX];
 	char filename[VINE_LINE_MAX];
@@ -724,21 +719,29 @@ static int do_task( struct link *manager, int task_id, time_t stoptime )
 			free(env);
 		} else {
 			debug(D_VINE|D_NOTICE,"invalid command from manager: %s",line);
+			vine_task_delete(task);
 			return 0;
 		}
 	}
 
+	return task;
+}
+
+static int do_task( struct link *manager, int task_id, time_t stoptime )
+{
+	struct vine_task *task = do_task_body(manager,task_id,stoptime);
+	if(!task) return 0;
+	
 	last_task_received = task->task_id;
 
 	struct vine_process *p = vine_process_create(task);
 	if(!p) return 0;
 
-	// Every received task goes into procs_table.
 	itable_insert(procs_table,task_id,p);
 
 	normalize_resources(p);
-	list_push_tail(procs_waiting,p);
 
+	list_push_tail(procs_waiting,p);
 	vine_watcher_add_process(watcher,p);
 
 	return 1;
@@ -750,16 +753,24 @@ Accept a url specification and queue it for later transfer.
 
 static int do_put_url( const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
 {
-	return vine_cache_queue(global_cache,VINE_CACHE_TRANSFER,source,cache_name,size,mode,flags);
+	return vine_cache_queue_transfer(global_cache,source,cache_name,size,mode,flags);
 }
 
 /*
-Accept a url specification and queue it for later transfer.
+Accept a mini_task that is executed on demand to produce a specific file.
 */
 
-static int do_put_cmd( const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
+static int do_put_mini_task( struct link *manager, time_t stoptime, const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
 {
-	return vine_cache_queue(global_cache,VINE_CACHE_COMMAND,source,cache_name,size,mode,flags);
+	struct vine_task *mini_task = do_task_body(manager,0,stoptime);
+	if(!mini_task) return 0;
+
+	/* XXX hacky hack -- the single output of the task must have the target cachename */
+	struct vine_file *output_file = list_peek_head(mini_task->output_files);
+	free(output_file->cached_name);
+	output_file->cached_name = strdup(cache_name);
+	
+	return vine_cache_queue_command(global_cache,mini_task,cache_name,size,mode,flags);
 }
 
 /*
@@ -996,10 +1007,9 @@ static int handle_manager(struct link *manager)
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_url(filename,length,mode,source,flags);
 			reset_idle_timer();
-		} else if(sscanf(line, "putcmd %s %s %" SCNd64 " %o %d", source_encoded, filename_encoded, &length, &mode, &flags)==5) {
+		} else if(sscanf(line, "mini_task %"SCNd64" %s %"SCNd64" %o %d",&task_id,filename_encoded, &length, &mode, &flags)==5) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			url_decode(source_encoded,source,sizeof(source));
-			r = do_put_cmd(filename,length,mode,source,flags);
+			r = do_put_mini_task(manager,time(0)+active_timeout,filename,length,mode,source,flags);
 			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
@@ -1046,7 +1056,7 @@ static int handle_manager(struct link *manager)
 Return true if this task can run with the resources currently available.
 */
 
-static int task_resources_fit_now(struct vine_task *t)
+static int task_resources_fit_now( struct vine_task *t )
 {
 	return
 		(cores_allocated  + t->resources_requested->cores  <= local_resources->cores.total) &&

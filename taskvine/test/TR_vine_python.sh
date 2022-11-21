@@ -37,7 +37,6 @@ prepare()
 
 run()
 {
-	# send makeflow to the background, saving its exit status.
 	( ${CCTOOLS_PYTHON_TEST_EXEC} vine_test.py $PORT_FILE; echo $? > $STATUS_FILE ) &
 
 	# wait at most 15 seconds for vine to find a port.
