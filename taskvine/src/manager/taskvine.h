@@ -690,6 +690,20 @@ struct vine_file * vine_file_untar( struct vine_file *f );
 
 struct vine_file * vine_file_untgz( struct vine_file *f );
 
+/** Clone a file object.
+@param f A file object.
+@return A clone of the argument f.
+*/
+
+struct vine_file *vine_file_clone( const struct vine_file *f );
+
+/** Delete a file object.
+@param f A file object.
+*/
+
+void vine_file_delete( struct vine_file *f );
+
+
 //@}
 
 /** @name Functions - Managers */

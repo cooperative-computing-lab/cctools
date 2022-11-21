@@ -36,7 +36,5 @@ struct vine_file {
 };
 
 struct vine_file * vine_file_create( const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags, struct vine_task *mini_task );
-struct vine_file *vine_file_clone( const struct vine_file *file );
-void vine_file_delete( struct vine_file *f );
 
 #endif
