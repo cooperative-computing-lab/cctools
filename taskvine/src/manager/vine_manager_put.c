@@ -461,14 +461,8 @@ static char *vine_manager_can_any_transfer( struct vine_manager *q, struct vine_
 
 	
 		vine_current_transfers_print_table(q);
-
-		// check original source first
-		if(vine_current_transfers_source_in_use(q, f->source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
-		{
-			return strdup(f->source);
-		}
-		
-		// if busy, check workers
+	
+		// check workers first 
 		HASH_TABLE_ITERATE(q->worker_table, id, peer){
 			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)))
 			{
@@ -484,6 +478,12 @@ static char *vine_manager_can_any_transfer( struct vine_manager *q, struct vine_
 					debug(D_VINE, "Vine transfer source busy: %s:%d", peer->transfer_addr, peer->transfer_port);
 				}
 			}
+		}
+
+		// check original source
+		if(vine_current_transfers_source_in_use(q, f->source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
+		{
+			return strdup(f->source);
 		}
 		return NULL;
 }

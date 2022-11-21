@@ -7,7 +7,7 @@ See the file COPYING for details.
 #include "vine_worker_info.h"
 #include "uuid.h"
 
-#define VINE_FILE_SOURCE_MAX_TRANSFERS 3
+#define VINE_FILE_SOURCE_MAX_TRANSFERS 2
 
 struct vine_transfer_pair {
     struct vine_worker_info *to;
