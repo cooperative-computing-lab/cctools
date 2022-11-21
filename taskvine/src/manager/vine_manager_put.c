@@ -361,8 +361,6 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	vine_result_code_t result = VINE_SUCCESS; //return success unless something fails below
 	
 	if(f->flags & VINE_PONCHO_UNPACK){
-		
-		printf("file has VINE_PONCHO_UNPACK_FLAG, sending poncho_package_run\n");
 		char * poncho_path = path_which("poncho_package_run");
 		struct vine_file *p = vine_file_create(poncho_path , "poncho_package_run", 0, 0, VINE_FILE, VINE_CACHE,0);
 		vine_manager_put_input_file(q, w, t, p);
