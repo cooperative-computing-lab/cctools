@@ -132,6 +132,8 @@ static struct list *vine_task_string_list_clone(struct list *string_list)
 
 struct vine_task *vine_task_clone(const struct vine_task *task)
 {
+	if(!task) return 0;
+	
 	struct vine_task *new = vine_task_create(task->command_line);
 
 	/* Static features of task are copied. */
