@@ -9,13 +9,13 @@ extern struct hash_table* info_of_resource_table;
 
 int main(int argc, char** argv)
 {
-    category_mode_t mode;
+    bucketing_mode_t mode;
     if (argc == 2)
     {
         if (strncmp(*(argv+1), "-greedy", 7) == 0)
-            mode = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING;
+            mode = BUCKETING_MODE_GREEDY;
         else if (strncmp(*(argv+1), "-exhaust", 8) == 0)
-            mode = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING;
+            mode = BUCKETING_MODE_EXHAUSTIVE;
         else
         {
             fatal("invalid bucketing mode\n");

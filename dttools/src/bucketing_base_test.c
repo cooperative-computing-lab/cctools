@@ -17,11 +17,11 @@ int main(int argc, char** argv)
     {
         if (strncmp(*(argv+1), "-greedy", 7) == 0)
         {
-            mode = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING;
+            mode = BUCKETING_MODE_GREEDY;
         }
         else if (strncmp(*(argv+1), "-exhaust", 8) == 0)
         {
-            mode = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING;
+            mode = BUCKETING_MODE_EXHAUSTIVE;
         }
         else
         {

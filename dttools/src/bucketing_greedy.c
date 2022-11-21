@@ -3,6 +3,8 @@
 #include "xxmalloc.h"
 #include "debug.h"
 
+/** Begin: internals **/
+
 /* List cursor with its position in a list */
 typedef struct
 {
@@ -16,8 +18,6 @@ typedef struct
     bucketing_cursor_w_pos_t* lo;
     bucketing_cursor_w_pos_t* hi;
 } bucketing_bucket_range_t;
-
-/** Begin: internals **/
 
 /* Cursor but with position in list
  * @param lc pointer to list cursor
@@ -180,6 +180,9 @@ static struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (con
  * @return negative if p1 < p2, 0 if p1 == p2, positive if p1 > p2 */
 static int bucketing_compare_break_points(const void* p1, const void* p2)
 {
+    if (!p1 || !p2)
+        fatal("Cannot compare empty break points\n");
+        return 0;
     return (*((bucketing_cursor_w_pos_t**) p1))->pos - (*((bucketing_cursor_w_pos_t**) p2))->pos;
 }
 
