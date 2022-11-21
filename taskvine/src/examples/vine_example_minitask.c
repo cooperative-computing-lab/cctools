@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 /*
-An example of using file chaining to pull in dependencies of dependencies.
+An example of a task using a minitask (vine_file_untgz) to unpack a dependency before using it.
 */
 
 #include "taskvine.h"
@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
 	for(i=0;i<10;i++) {
 
 		struct vine_file *infile = vine_file_untgz(vine_file_url(CCTOOLS_URL));
-		struct vine_task *task = vine_task_create("ls -lR cctools");
+		struct vine_task *task = vine_task_create("ls -lR cctools | wc -l");
 		vine_task_add_input(task,infile,"cctools",VINE_CACHE);		
 		int task_id = vine_submit(m, task);
 
