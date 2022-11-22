@@ -2631,7 +2631,6 @@ static struct vine_task *vine_manager_sched_worker_transfer(struct vine_manager 
 {
 		struct vine_file *f;
 		struct vine_task *tcp = t; //vine_task_clone(t);
-		int unable_to_source = 0;
 
 		LIST_ITERATE(tcp->input_files, f){
 			if(f->type == VINE_URL){
@@ -2648,13 +2647,12 @@ static struct vine_task *vine_manager_sched_worker_transfer(struct vine_manager 
 	//							debug(D_VINE, "This file is to be requested from source: %s:%d", peer->transfer_addr, peer->transfer_port);
 							free(f->source);
 							f->source = peer_source;
-							unable_to_source = 0;
-						}else{
-							unable_to_source = 1;
+							continue;
 						}
 					}
 				}
-				if(unable_to_source && (vine_current_transfers_source_in_use(q, f->source) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
+				// if we were unable to find an available worker, and there are already VINE_FILE_SOURCE_MAX_TRANSFERS occuring 
+				if((vine_current_transfers_source_in_use(q, f->source) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
 					return NULL;
 				}
 			}
