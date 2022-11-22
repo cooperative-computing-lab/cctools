@@ -39,7 +39,7 @@ if __name__ == "__main__":
         t.add_input_file(
             "vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", cache=True
         )
-        t.add_output_file(output, "output", flags=vine.VINE_WATCH)
+        t.add_output_file(output, "output", watch=True)
         t.set_cores(1)
         m.submit(t)
 
