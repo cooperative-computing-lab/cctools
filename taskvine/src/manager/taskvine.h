@@ -690,6 +690,13 @@ struct vine_file * vine_file_untar( struct vine_file *f );
 
 struct vine_file * vine_file_untgz( struct vine_file *f );
 
+
+/** Create a file object by unpacking a poncho package.
+@param f A file object representing a tgz archive.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+struct vine_file * vine_file_unponcho( struct vine_file *f );
+
 /** Clone a file object.
 @param f A file object.
 @return A clone of the argument f.
