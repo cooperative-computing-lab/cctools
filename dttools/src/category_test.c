@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        category_accumulate_summary(c, s, NULL, -1, -1);
+        category_accumulate_summary(c, s, NULL);
     }
 
     print_times(c);

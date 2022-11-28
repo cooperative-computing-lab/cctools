@@ -11,6 +11,7 @@ int main(int argc, char** argv)
     int num_sampling_points = 10;
     double increase_rate = 2;
     int max_num_buckets = 10;
+    int update_epoch = 1;
 
     category_mode_t mode;
     if (argc == 2)
@@ -36,7 +37,7 @@ int main(int argc, char** argv)
     }
     
     printf("Creating bucketing state\n");
-    bucketing_state_t* s = bucketing_state_create(default_value, num_sampling_points, increase_rate, max_num_buckets, mode);
+    bucketing_state_t* s = bucketing_state_create(default_value, num_sampling_points, increase_rate, max_num_buckets, mode, update_epoch);
 
     int prime = 7000;
     int num = 2000;

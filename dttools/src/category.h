@@ -119,14 +119,19 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 void category_delete(struct hash_table *categories, const char *name);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 
-int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker, int taskid, int success);
+int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker);
+
+int category_bucketing_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker, int taskid, int success);
+
 int category_update_first_allocation(struct category *c, const struct rmsummary *max_worker);
 
 int category_in_steady_state(struct category *c);
 
 category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);
 
-const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid);
+const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
+
+const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid);
 
 const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
 

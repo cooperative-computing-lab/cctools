@@ -15,6 +15,16 @@ static char* int_to_string(int n)
     return s;
 }
 
+/* Add default resource types with default values per resource type to manager
+ * See this function's definition for more info
+ * @param m the bucketing manager */
+static void bucketing_manager_add_default_resource_types(bucketing_manager_t* m)
+{
+    bucketing_manager_add_resource_type(m, "cores", 1, 10, 2, 10, m->mode, 1);
+    bucketing_manager_add_resource_type(m, "memory", 1000, 10, 2, 10, m->mode, 1);
+    bucketing_manager_add_resource_type(m, "disk", 1000, 10, 2, 10, m->mode, 1);
+}
+
 /* End: internals */
 
 /* Begin: APIs */
@@ -73,7 +83,7 @@ void bucketing_manager_add_resource_type(bucketing_manager_t* m, const char* r,
         return;
     }
 
-    
+    bucketing_state_t* b; 
     /* only add resource type if it doesn't exist, warn otherwise */
     if (!hash_table_lookup(m->res_type_to_bucketing_state, r))
     {
@@ -81,28 +91,34 @@ void bucketing_manager_add_resource_type(bucketing_manager_t* m, const char* r,
         {
             if (!strncmp(r, "cores", strlen("cores")))
             {
-                
+                b = bucketing_state_create(1, 10, 2, 10, m->mode, 1);
+            }
+            else if (!strncmp(r, "memory", strlen("memory")))
+            {
+                b = bucketing_state_create(1000, 10, 2, 10, m->mode, 1);
+            }
+            else if (!strncmp(r, "disk", strlen("disk")))
+            {
+                b = bucketing_state_create(1000, 10, 2, 10, m->mode, 1);
+            }
+            else
+            {
+                warn(D_BUCKETING, "resource type %s is not supported to set default\n", r);
+                return;
             }
         }
         else
         {
-            bucketing_state_t* b = bucketing_state_create(default_value, num_sampling_points, increase_rate, max_num_buckets, m->mode, update_epoch);
-        
-            if (!hash_table_insert(m->res_type_to_bucketing_state, r, b))
-                fatal("Cannot insert bucketing state into bucket manager\n");
+            b = bucketing_state_create(default_value, num_sampling_points, increase_rate, max_num_buckets, m->mode, update_epoch);
         }
+        
+        if (!hash_table_insert(m->res_type_to_bucketing_state, r, b))
+            fatal("Cannot insert bucketing state into bucket manager\n");
     }
     else
     {
         warn(D_BUCKETING, "Ignoring request to add %s as a resource type as it already exists in the given bucketing manager\n", r);
     }
-}
-
-void bucketing_manager_add_default_resource_types(bucketing_manager_t* m)
-{
-    bucketing_manager_add_resource_type(m, "cores", 1, 10, 2, 10, 1);
-    bucketing_manager_add_resource_type(m, "memory", 1000, 10, 2, 10, 1);
-    bucketing_manager_add_resource_type(m, "disk", 1000, 10, 2, 10, 1);
 }
 
 void bucketing_manager_remove_resource_type(bucketing_manager_t* m, const char* r)
@@ -170,7 +186,7 @@ void bucketing_manager_tune_by_resource(bucketing_manager_t* m, const char* res_
     bucketing_state_t* tmp_s = hash_table_lookup(m->res_type_to_bucketing_state, res_name);
     if (!tmp_s)
     {
-        warn("Bucketing state is not keeping track of resource %s\n. Ignoring..", res_name);
+        warn(D_BUCKETING, "Bucketing state is not keeping track of resource %s\n. Ignoring..", res_name);
         return;
     }
     

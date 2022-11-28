@@ -43,6 +43,8 @@ static void bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos_t* cursor_pos)
         list_cursor_destroy(cursor_pos->lc);
         free(cursor_pos);
     }
+    else
+        warn(D_BUCKETING, "ignoring command to delete null pointer to bucketing_cursor_w_pos\n");
 }
 
 /* Create a bucketing_bucket_range_t structure
@@ -88,6 +90,8 @@ static void bucketing_bucket_range_delete(bucketing_bucket_range_t* range)
         bucketing_cursor_w_pos_delete(range->hi);
         free(range);
     }
+    else
+        warn(D_BUCKETING, "ignoring command to delete a null pointer to bucket range\n");
 }
 
 /* Free the list with the function used to free a bucketing_cursor_pos
@@ -181,8 +185,10 @@ static struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (con
 static int bucketing_compare_break_points(const void* p1, const void* p2)
 {
     if (!p1 || !p2)
+    {
         fatal("Cannot compare empty break points\n");
         return 0;
+    }
     return (*((bucketing_cursor_w_pos_t**) p1))->pos - (*((bucketing_cursor_w_pos_t**) p2))->pos;
 }
 

@@ -61,7 +61,10 @@ static void bucketing_insert_point_to_sorted_list(struct list* l, bucketing_poin
 
     /* Linear insert a data point */
     if (!list_seek(lc, 0))
+    {
         fatal("Cannot seek list to index 0\n");
+        return;
+    }
 
     bucketing_point_t* bpp = 0;
     int inserted = 0;
@@ -100,7 +103,6 @@ static int bucketing_ready_to_update_buckets(bucketing_state_t* s)
     
     /* Update when in predict phase and bucketing state is at the update epoch */
     if (!s->in_sampling_phase && 
-        num_points_since_predict_phase != 0 && 
         num_points_since_predict_phase % s->update_epoch == 0)
         return 1;
     return 0;
@@ -142,6 +144,8 @@ void bucketing_bucket_delete(bucketing_bucket_t* b)
 {
     if (b)
         free(b);
+    else
+        warn(D_BUCKETING, "ignoring command to delete a null pointer to a bucket\n");
 }
 
 bucketing_state_t* bucketing_state_create(double default_value, int num_sampling_points,
@@ -200,6 +204,8 @@ void bucketing_state_delete(bucketing_state_t* s)
         list_delete(s->sorted_buckets);
         free(s);
     }
+    else
+        warn(D_BUCKETING, "Ignoring command to delete empty bucketing state\n");
 }
 
 void bucketing_state_tune(bucketing_state_t* s, const char* field, void* val)
@@ -219,6 +225,7 @@ void bucketing_state_tune(bucketing_state_t* s, const char* field, void* val)
     if (!val)
     {
         fatal("No value to tune field %s in bucketing state to\n", field);
+        return;
     }
 
     if (!strncmp(field, "default_value", strlen("default_value")))

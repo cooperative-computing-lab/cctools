@@ -46,11 +46,6 @@ void bucketing_manager_add_resource_type(bucketing_manager_t* m, const char* r,
         int set_default, double default_value, int num_sampling_points, 
         double increase_rate, int max_num_buckets, int update_epoch);
 
-/* Add default resource types with default values per resource type to manager
- * See this function's definition for more info
- * @param m the bucketing manager */
-void bucketing_manager_add_default_resource_types(bucketing_manager_t* m);
-
 /* Remove a type of resource from the manager
  * Do nothing if this resource is not in manager
  * @param m the relevant manager

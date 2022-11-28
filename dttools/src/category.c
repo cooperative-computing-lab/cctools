@@ -571,8 +571,83 @@ int category_update_first_allocation(struct category *c, const struct rmsummary 
 	return 1;
 }
 
+int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker) {
+	int update = 0;
 
-int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker, int taskid, int success) {
+    /* if task doesn't have resources measured, return 0 */
+    if(!rs) {
+        return update;
+    }
+
+    /* get user explicitly given maximum value per resource */
+	const struct rmsummary *max  = c->max_allocation;
+
+    int new_maximum = 0;
+    if(!c->steady_state) {
+        /* count new maximums only in steady state. */
+        size_t i;
+
+        /* loop to consider labeled resources defined above */
+        for(i = 0; labeled_resources[i]; i++) {
+            const size_t o = labeled_resources[i];
+
+            if(rmsummary_get_by_offset(max, o) > 0) {
+                // an explicit maximum was given, so this resource r cannot
+                // trigger a new maximum
+                continue;
+            }
+
+            struct histogram *h = itable_lookup(c->histograms, o);
+            double max_seen = histogram_round_up(h, histogram_max_value(h));
+            if(rmsummary_get_by_offset(rs, o) > max_seen) {
+                // the measured is larger than what we have seen, thus we need
+                // to reset the first allocation.
+                new_maximum = 1;
+                break;
+            }
+        }
+    }
+
+	/* a new maximum has been seen, first-allocation is obsolete. */
+	if(new_maximum) {
+		rmsummary_delete(c->first_allocation);
+		c->first_allocation =  NULL;
+		c->completions_since_last_reset = 0;
+		update = 1;
+	}
+
+	c->steady_state = c->completions_since_last_reset >= first_allocation_every_n_tasks;
+
+	rmsummary_merge_max(c->max_resources_seen, rs);
+	if(rs && (!rs->exit_type || !strcmp(rs->exit_type, "normal"))) {
+        size_t i;
+        for(i = 0; labeled_resources[i]; i++) {
+            const size_t o = labeled_resources[i];
+
+            struct histogram *h = itable_lookup(c->histograms, o);
+            assert(h);
+
+            double value = rmsummary_get_by_offset(rs, o);
+            double wall_time = rs->wall_time;
+
+            category_inc_histogram_count(h, value, wall_time);
+        }
+
+		c->completions_since_last_reset++;
+
+        if(first_allocation_every_n_tasks > 0) {
+            if(c->completions_since_last_reset % first_allocation_every_n_tasks == 0) {
+                update |= category_update_first_allocation(c, max_worker);
+            }
+        }
+
+        c->total_tasks++;
+	}
+
+	return update;
+}
+
+int category_bucketing_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker, int taskid, int success) {
 	int update = 0;
 
     /* if task doesn't have resources measured, return 0 */
@@ -581,8 +656,9 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
     }
 
     //if category is in bucketing modes
-    if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING || c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING)
+    if (category_in_bucketing_mode(c))
     {
+        //only add resource report when resources are exhausted (success = 0) or task succeeds (success = 1)
         if (success != -1)
             bucketing_manager_add_resource_report(c->bucketing_manager, taskid, (struct rmsummary*) rs, success);
     }
@@ -684,7 +760,7 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 	while((s = list_pop_head(summaries))) {
 		if(s->category) {
 			c = category_lookup_or_create(categories, s->category);
-			category_accumulate_summary(c, s, NULL, -1, -1);
+			category_bucketing_accumulate_summary(c, s, NULL, -1, -1);
 		}
 		rmsummary_delete(s);
 	}
@@ -749,7 +825,7 @@ category_allocation_t category_next_label(struct category *c, category_allocatio
 	return current_label;
 }
 
-const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid) {
+const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
 	/* we keep an internal label so that the caller does not have to worry
 	 * about memory leaks. */
 	static struct rmsummary *internal = NULL;
@@ -774,9 +850,51 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
             /* Never go below what first_allocation computer */
             rmsummary_merge_max(internal, c->first_allocation);
         }
-        //taskid >=0 means real task needs prediction, -1 means function called for other purposes
-        else if (taskid >= 0 && (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING
-                || c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING))
+    }
+
+    /* load explicit category max values */
+    rmsummary_merge_override(internal, c->max_allocation);
+
+    if(category_in_steady_state(c) &&
+            (c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE ||
+            c->allocation_mode ==CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT) &&
+            request == CATEGORY_ALLOCATION_FIRST) {
+		rmsummary_merge_override(internal, c->first_allocation);
+	}
+
+	/* chip in user values if explicitly given */
+	rmsummary_merge_override(internal, user);
+
+	return internal;
+}
+
+//taskid >=0 means real task needs prediction, -1 means function called for other purposes
+const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid) {
+	/* we keep an internal label so that the caller does not have to worry
+	 * about memory leaks. */
+	static struct rmsummary *internal = NULL;
+
+	if(internal) {
+		rmsummary_delete(internal);
+	}
+
+	internal = rmsummary_create(-1);
+
+    if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED &&
+        c->allocation_mode != CATEGORY_ALLOCATION_MODE_MAX) {
+        if (category_in_steady_state(c) && 
+            c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE &&
+            c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT)
+        {
+            /* load max seen values, but only if not in fixed or max mode.
+             * In max mode, max seen is the first allocation, and next allocation
+             * is to use whole workers. */
+            rmsummary_merge_override(internal, c->max_resources_seen);
+
+            /* Never go below what first_allocation computer */
+            rmsummary_merge_max(internal, c->first_allocation);
+        }
+        else if (taskid >= 0 && category_in_bucketing_mode(c))
         {
             rmsummary_merge_override(internal, bucketing_manager_predict(c->bucketing_manager, taskid));
         }
@@ -800,7 +918,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 
 const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
 	static struct rmsummary *internal = NULL;
-	const struct rmsummary *allocation = category_dynamic_task_max_resources(c, user, request, -1);
+	const struct rmsummary *allocation = category_dynamic_task_max_resources(c, user, request);
 
 	if(internal) {
 		rmsummary_delete(internal);
