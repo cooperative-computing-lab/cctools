@@ -2679,10 +2679,16 @@ static int send_one_task( struct vine_manager *q )
 
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
-
-		if((t = vine_manager_sched_worker_transfer(q, t)))
+		
+		if(q->peer_transfers_enabled)
 		{
-			// Find the best worker for the task at the head of the list
+			if((t = vine_manager_sched_worker_transfer(q, t)))
+			{
+				// Find the best worker for the task at the head of the list
+				w = vine_schedule_task_to_worker(q,t);
+			}
+
+		}else{
 			w = vine_schedule_task_to_worker(q,t);
 		}
 
@@ -3125,7 +3131,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
-
+	
 	q->allocation_default_mode = VINE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
@@ -3134,6 +3140,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	vine_enable_disconnect_slow_workers(q, -1);
 
 	q->password = 0;
+
+	q->peer_transfers_enabled = 0;
 
 	q->resource_submit_multiplier = 1.0;
 
@@ -3226,6 +3234,10 @@ int vine_enable_monitoring_full(struct vine_manager *q, char *monitor_output_dir
 	}
 
 	return status;
+}
+
+int vine_enable_peer_transfers(struct vine_manager *q) {
+	
 }
 
 int vine_enable_disconnect_slow_workers_category(struct vine_manager *q, const char *category, double multiplier)

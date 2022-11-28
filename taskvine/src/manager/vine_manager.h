@@ -145,6 +145,9 @@ struct vine_manager {
 	struct rmsummary *current_max_worker;
 	struct rmsummary *max_task_resources_requested;
 
+	/* Peer Transfer Configuration */
+	int peer_transfers_enabled;
+
 	/* Various performance knobs that can be tuned. */
 
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */
