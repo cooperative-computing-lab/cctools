@@ -177,7 +177,7 @@ class FileUntgz(File):
     def __init__(self,subfile):
         self._file = vine_file_untgz(vine_file_clone(subfile._file))
 
-class FileUnponcho(File)
+class FileUnponcho(File):
     ##
     # Create a file by unpacking a poncho package.
     #
