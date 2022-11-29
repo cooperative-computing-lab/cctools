@@ -186,3 +186,15 @@ struct vine_file * vine_file_untgz( struct vine_file *f )
 	return vine_file_mini_task(t);
 }
 
+struct vine_file * vine_file_unponcho( struct vine_file *f)
+{
+
+	struct vine_task *t  = vine_task_create(string_format("./poncho_package_run --unpack-to output -e package.tar.gz"));
+	char * poncho_path = path_which("poncho_package_run");
+	vine_task_add_input(t, vine_file_local(poncho_path), "poncho_package_run", VINE_CACHE);
+	vine_task_add_input(t, f, "package.tar.gz", VINE_CACHE);
+	vine_task_add_output(t, vine_file_local("output"), "output", VINE_CACHE);
+	return vine_file_mini_task(t);
+
+}
+
