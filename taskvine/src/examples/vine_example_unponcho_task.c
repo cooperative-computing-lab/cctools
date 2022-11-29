@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 /*
-An example of a task using a minitask (vine_file_untgz) to unpack a dependency before using it.
+An example of a task using a minitask (vine_file_unponcho) to unpack a dependency before using it.
 */
 
 #include "taskvine.h"
