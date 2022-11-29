@@ -35,11 +35,11 @@ int main(int argc, char *argv[])
 
 	for(i=0;i<5;i++) {
 
-		struct vine_file *infile = vine_file_unponcho(vine_file_local("package.tar.gz"));
 		struct vine_task *task = vine_task_create("./poncho_package_run -d -e package python python_example.py");
+		//struct vine_file *infile = vine_file_unponcho(vine_file_local("package.tar.gz"));
+		vine_task_add_input(task, vine_file_local("package.tar.gz"),"package",VINE_CACHE);		
         	vine_task_add_input(task, vine_file_local("poncho_package_run"), "poncho_package_run", VINE_CACHE);
         	vine_task_add_input(task, vine_file_local("python_example.py"), "python_example.py", VINE_CACHE);
-		vine_task_add_input(task,infile,"package",VINE_CACHE);		
 		int task_id = vine_submit(m, task);
 
 		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(task) );
