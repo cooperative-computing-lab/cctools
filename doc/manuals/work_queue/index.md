@@ -344,7 +344,7 @@ If no task completes within the timeout, it returns null.
             print("Task {} has returned!".format(t.id))
 
             if t.return_status == 0:
-                print("command exit code:\n{}".format(t.exit_code))
+                print("command exit code:\n{}".format(t.return_status))
                 print("stdout:\n{}".format(t.output))
             else:
                 print("There was a problem executing the task.")
@@ -358,7 +358,7 @@ If no task completes within the timeout, it returns null.
             print("Task @{[$t->id]} has returned!\n");
 
             if($t->{return_status} == 0) {
-                print("command exit code:\n@{[$t->{exit_code}]}\n");
+                print("command exit code:\n@{[$t->{return_status}]}\n");
                 print("stdout:\n@{[$t->{output}]}\n");
             } else {
                 print("There was a problem executing the task.\n");
@@ -374,7 +374,7 @@ If no task completes within the timeout, it returns null.
         if(t) {
             printf("Task %d has returned!\n", t->taskid);
             if(t->return_status == 0) {
-                printf("command exit code: %d\n", t->exit_code);
+                printf("command exit code: %d\n", t->return_status);
                 printf("stdout: %s\n", t->output);
             } else {
                 printf("There was a problem executing the task.\n");
@@ -517,7 +517,7 @@ $ export PERL5LIB=${HOME}/cctools/lib/perl5/site_perl:${PERL5LIB}
 If you are writing a Work Queue application in C, you should compile it into an executable like this:
 
 ```sh
-$ gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -lwork_queue -ldttools -lm -lz
+$ gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -lwork_queue -ldttools -lcrypto -lssl -lm -lz
 ```
    
 ### Running a Manager Program
