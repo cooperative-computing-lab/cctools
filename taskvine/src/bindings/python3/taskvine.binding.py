@@ -1348,6 +1348,14 @@ class Manager(object):
     def enable_monitoring_full(self, dirname=None, watchdog=True):
         return vine_enable_monitoring_full(self._taskvine, dirname, watchdog)
 
+
+    ##
+    # Enable P2P worker transfer functionality. Off by default
+    # 
+    # @param self Reference to the current manager object.
+    def enable_peer_transfers(self):
+        return vine_enable_peer_transfers(self._taskvine)
+
     ##
     # Enable disconnect slow workers functionality for a given queue for tasks in
     # the "default" category, and for task which category does not set an

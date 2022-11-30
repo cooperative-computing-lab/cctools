@@ -1122,7 +1122,7 @@ static int task_resources_fit_now( struct vine_task *t )
 	return
 		(cores_allocated  + t->resources_requested->cores  <= local_resources->cores.total) &&
 		(memory_allocated + t->resources_requested->memory <= local_resources->memory.total) &&
-		(disk_allocated   + t->resources_requested->disk   <= local_resources->disk.total) &&
+		(1) && //disk_allocated   + t->resources_requested->disk   <= local_resources->disk.total) &&
 		(gpus_allocated   + t->resources_requested->gpus   <= local_resources->gpus.total);
 }
 
