@@ -23,7 +23,7 @@ def cleanup():
     shutil.rmtree(test_dir)
 atexit.register(cleanup)
 
-def report_task(task`, expected_result, expected_exit_code, expected_outputs=None):
+def report_task(task, expected_result, expected_exit_code, expected_outputs=None):
     error = False
     if not task:
         error = True
