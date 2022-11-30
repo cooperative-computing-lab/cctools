@@ -3237,7 +3237,8 @@ int vine_enable_monitoring_full(struct vine_manager *q, char *monitor_output_dir
 }
 
 int vine_enable_peer_transfers(struct vine_manager *q) {
-	
+	q->peer_transfers_enabled = 1;
+	return 1;
 }
 
 int vine_enable_disconnect_slow_workers_category(struct vine_manager *q, const char *category, double multiplier)

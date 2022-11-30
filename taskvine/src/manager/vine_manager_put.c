@@ -323,7 +323,7 @@ static vine_result_code_t vine_manager_put_url_if_not_cached( struct vine_manage
 									
 	char *transfer_id = vine_current_transfers_add(q, w, tf->source);
 
-	vine_manager_send(q,w,"puturl %s %s %d %o %d\n",source_encoded, cached_name_encoded, tf->length, 0777,tf->flags );
+	vine_manager_send(q,w,"puturl %s %s %d %o %d %s\n",source_encoded, cached_name_encoded, tf->length, 0777,tf->flags, transfer_id);
 
 	if(tf->flags & VINE_CACHE) {
 		struct vine_remote_file_info *remote_info = vine_remote_file_info_create(tf->type,tf->length,time(0));
