@@ -25,15 +25,15 @@ atexit.register(cleanup)
 
 def report_task(task, expected_result, expected_exit_code, expected_outputs=None):
     error = False
-    print("\nTask '{command}' report:".format(command=t.command))
     if not task:
         error = True
-        print("It was not completed by a worker.")
+        print("\nTask did not complete in expected time.")
     else:
-        print("result: {as_str} {as_int}".format(as_str=t.result_string, as_int=t.result))
-        print("exit code: {exit_code}".format(exit_code=t.exit_code))
-        if t.output:
-            print("stderr:\n+++\n{stderr}---".format(stderr=t.output.encode('ascii','replace')))
+        print("\nTask '{command}' report:".format(command=task.command))
+        print("result: {as_str} {as_int}".format(as_str=task.result_string, as_int=task.result))
+        print("exit code: {exit_code}".format(exit_code=task.exit_code))
+        if task.output:
+            print("stderr:\n+++\n{stderr}---".format(stderr=task.output.encode('ascii','replace')))
         if task.result != expected_result:
             error = True
             print("Should have finished with result '{result}', but got '{real}'.".format(result=expected_result, real=task.result))
@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    wait_time = 15
+    wait_time = 30 
 
     with open(path.join(test_dir, input_file), 'w') as f:
         f.write('hello world\n')
