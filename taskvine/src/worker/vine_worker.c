@@ -452,7 +452,7 @@ void send_cache_invalid( struct link *manager, const char *cachename, const char
 
 void send_transfer_address( struct link *manager )
 {
-	char addr[LINK_ADDRESS_MAX];
+	char addr[DOMAIN_NAME_MAX];
 	int port;
 	vine_transfer_server_address(addr,&port);
 	send_message(manager, "transfer-address %s %d\n",addr,port);
