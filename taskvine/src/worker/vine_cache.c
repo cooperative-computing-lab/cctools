@@ -7,6 +7,8 @@ See the file COPYING for details.
 #include "vine_cache.h"
 #include "vine_process.h"
 
+#include "vine_transfer.h"
+#include "vine_protocol.h"
 #include "xxmalloc.h"
 #include "hash_table.h"
 #include "debug.h"
@@ -231,6 +233,46 @@ static int do_command( struct vine_cache *c, struct vine_task *mini_task, struct
 }
 
 /*
+Transfer a single input file from a worker url to a local file name. 
+
+*/
+static int do_worker_transfer( struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message)
+{	
+	int port_num;
+	char addr[VINE_LINE_MAX], path[VINE_LINE_MAX];
+	int stoptime;	
+	struct link *worker_link;
+
+	// expect the form: worker://addr:port/path/to/file
+	sscanf(source_url, "worker://%99[^:]:%d/%s", addr, &port_num, path);
+
+	stoptime = time(0) + 15;
+	worker_link = link_connect(addr, port_num, stoptime);
+
+	if(worker_link == NULL)
+	{
+		*error_message = string_format("Could not establish connection with worker at: %s:%d", addr, port_num);
+		return 0;
+	}
+
+	if(!vine_transfer_get_any(worker_link, c, path, time(0) + 120))
+	{
+		*error_message = string_format("Could not transfer file %s from worker %s:%d", path, addr, port_num);
+		link_close(worker_link);
+		return 0;
+	}
+
+	link_close(worker_link);
+
+	// rename file to our expected cache name
+	char *received_filename = string_format("%s/%s", c->cache_dir, path);
+	rename(received_filename, cache_path);
+	free(received_filename);
+	
+	return 1;
+}
+
+/*
 For a given file that has been transferred into transfer_name,
 either unpack it into cache_name, or just rename it into place,
 depending on the flags of the file.
@@ -335,11 +377,14 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 		  
 		case VINE_CACHE_TRANSFER:
 			debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
-			result = do_transfer(c,f->source,transfer_path,&error_message);
+			if(strncmp(f->source, "worker://", 9) == 0){
+				result = do_worker_transfer(c, f->source, transfer_path, &error_message);
+			}else{ 
+				result = do_transfer(c,f->source,transfer_path,&error_message);
+			}
 			if(result) {
 				result = unpack_or_rename_target(f,transfer_path,cache_path,flags);
 			}
-
 			break;
 
 		case VINE_CACHE_MINI_TASK:

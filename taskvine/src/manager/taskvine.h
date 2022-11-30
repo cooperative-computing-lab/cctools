@@ -865,6 +865,9 @@ gigabyte sizes. This function is mostly used for debugging.)
 */
 int vine_enable_monitoring_full(struct vine_manager *m, char *monitor_output_directory, int watchdog);
 
+/** Enable taskvine peer transfers to be scheduled by the manager **/
+int vine_enable_peer_transfers(struct vine_manager *m);
+
 /** Set the minimum task_id of future submitted tasks.
 Further submitted tasks are guaranteed to have a task_id larger or equal to
 minid.  This function is useful to make task_ids consistent in a workflow that

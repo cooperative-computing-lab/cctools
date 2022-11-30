@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "vine_blocklist.h"
 #include "vine_txn_log.h"
 #include "vine_perf_log.h"
+#include "vine_current_transfers.h"
 
 #include "cctools.h"
 #include "envtools.h"
@@ -296,13 +297,17 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 	char cachename[VINE_LINE_MAX];
 	long long size;
 	long long transfer_time;
+	char id[VINE_LINE_MAX];
 
-	if(sscanf(line,"cache-update %s %lld %lld",cachename,&size,&transfer_time)==3) {
+	if(sscanf(line,"cache-update %s %lld %lld %s",cachename,&size,&transfer_time, id)==4) {
 		struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
 		if(remote_info) {
 			remote_info->size = size;
 			remote_info->transfer_time = transfer_time;
+			remote_info->in_cache = 1;
 		}
+		vine_current_transfers_remove(q, id);
+		//vine_current_transfers_print_table(q);
 	}
 
 	return VINE_MSG_PROCESSED;
@@ -321,8 +326,10 @@ set up their own input sandboxes.
 static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info *w, const char *line )
 {
 	char cachename[VINE_LINE_MAX];
+	char id[VINE_LINE_MAX];
 	int length;
-	if(sscanf(line,"cache-invalid %s %d",cachename,&length)==2) {
+
+	if(sscanf(line,"cache-invalid %s %d %8s-%4s-%4s-%4s-%12s",cachename,&length, id, &id[8], &id[12], &id[16], &id[20])==7) {
 
 		char *message = malloc(length+1);
 		time_t stoptime = time(0) + q->long_timeout;
@@ -338,7 +345,23 @@ static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info
 		free(message);
 		
 		struct vine_remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
+		vine_current_transfers_remove(q, id);
 		if(remote_info) vine_remote_file_info_delete(remote_info);
+	}
+	else if(sscanf(line,"cache-invalid %s %d",cachename,&length)==2) {
+
+		char *message = malloc(length+1);
+		time_t stoptime = time(0) + q->long_timeout;
+		
+		int actual = link_read(w->link,message,length,stoptime);
+		if(actual!=length) {
+			free(message);
+			return VINE_MSG_FAILURE;
+		}
+		
+		message[length] = 0;
+		debug(D_VINE,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
+		free(message);	
 	}
 	return VINE_MSG_PROCESSED;
 }
@@ -349,9 +372,11 @@ on its own port to receive get requests from other workers.
 */
 
 static int handle_transfer_address( struct vine_manager *q, struct vine_worker_info *w, const char *line )
-{
+{	
+	int dummy_port;
 	if(sscanf(line,"transfer-address %s %d",w->transfer_addr,&w->transfer_port)) {
 		w->transfer_port_active = 1;
+		link_address_remote(w->link, w->transfer_addr, &dummy_port);
 		return VINE_MSG_PROCESSED;
 	} else {
 		return VINE_MSG_FAILURE;
@@ -689,6 +714,8 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	uint64_t task_id;
 
 	if(!q || !w) return;
+	
+	vine_current_transfers_wipe_worker(q, w);
 
 	hash_table_clear(w->current_files,(void*)vine_remote_file_info_delete);
 
@@ -2594,6 +2621,47 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 }
 
 /*
+Iterate through task input files. 
+Assign a worker transfer if one is available.
+If every input file is accounted for, return a copy of the task
+with any modified transfers. If one of the files cannot be transfered due
+to limits on num transfers. return null
+*/
+static struct vine_task *vine_manager_sched_worker_transfer(struct vine_manager *q, struct vine_task *t)
+{
+		struct vine_file *f;
+		struct vine_task *tcp = t; //vine_task_clone(t);
+
+		LIST_ITERATE(tcp->input_files, f){
+			if(f->type == VINE_URL){
+				char *id;
+				struct vine_worker_info *peer;
+				struct vine_remote_file_info *remote_info;
+
+				HASH_TABLE_ITERATE(q->worker_table, id, peer){
+					if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache)
+					{
+						char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+						if(vine_current_transfers_source_in_use(q, peer_source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
+						{	
+	//							debug(D_VINE, "This file is to be requested from source: %s:%d", peer->transfer_addr, peer->transfer_port);
+							free(f->source);
+							f->source = peer_source;
+							continue;
+						}
+					}
+				}
+				// if we were unable to find an available worker, and there are already VINE_FILE_SOURCE_MAX_TRANSFERS occuring 
+				if((vine_current_transfers_source_in_use(q, f->source) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
+					return NULL;
+				}
+			}
+		}
+
+		return tcp;
+}
+
+/*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
 the task to the worker.
@@ -2602,7 +2670,7 @@ the task to the worker.
 static int send_one_task( struct vine_manager *q )
 {
 	struct vine_task *t;
-	struct vine_worker_info *w;
+	struct vine_worker_info *w = NULL;
 
 	timestamp_t now = timestamp_get();
 
@@ -2611,12 +2679,22 @@ static int send_one_task( struct vine_manager *q )
 
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
+		
+		if(q->peer_transfers_enabled)
+		{
+			if((t = vine_manager_sched_worker_transfer(q, t)))
+			{
+				// Find the best worker for the task at the head of the list
+				w = vine_schedule_task_to_worker(q,t);
+			}
 
-		// Find the best worker for the task at the head of the list
-		w = vine_schedule_task_to_worker(q,t);
+		}else{
+			w = vine_schedule_task_to_worker(q,t);
+		}
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
+		vine_current_transfers_print_table(q);
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
 
@@ -3013,6 +3091,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->worker_blocklist = hash_table_create(0, 0);
 
 	q->factory_table = hash_table_create(0, 0);
+	q->current_transfer_table = hash_table_create(0, 0);
 	q->fetch_factory = 0;
 
 	q->measured_local_resources = rmsummary_create(-1);
@@ -3052,7 +3131,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
-
+	
 	q->allocation_default_mode = VINE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
@@ -3061,6 +3140,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	vine_enable_disconnect_slow_workers(q, -1);
 
 	q->password = 0;
+
+	q->peer_transfers_enabled = 0;
 
 	q->resource_submit_multiplier = 1.0;
 
@@ -3153,6 +3234,11 @@ int vine_enable_monitoring_full(struct vine_manager *q, char *monitor_output_dir
 	}
 
 	return status;
+}
+
+int vine_enable_peer_transfers(struct vine_manager *q) {
+	q->peer_transfers_enabled = 1;
+	return 1;
 }
 
 int vine_enable_disconnect_slow_workers_category(struct vine_manager *q, const char *category, double multiplier)
@@ -3271,6 +3357,9 @@ void vine_delete(struct vine_manager *q)
 
 	hash_table_clear(q->worker_blocklist,(void*)vine_blocklist_info_delete);
 	hash_table_delete(q->worker_blocklist);
+
+	hash_table_clear(q->current_transfer_table,(void*)vine_current_transfers_delete);
+	hash_table_delete(q->current_transfer_table);
 
 	char *key;
 	struct category *c;

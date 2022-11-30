@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "vine_protocol.h"
 #include "vine_remote_file_info.h"
 #include "vine_txn_log.h"
+#include "vine_current_transfers.h"
 
 #include "debug.h"
 #include "timestamp.h"
@@ -319,8 +320,10 @@ static vine_result_code_t vine_manager_put_url_if_not_cached( struct vine_manage
 
 	url_encode(tf->source,source_encoded,sizeof(source_encoded));
 	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
+									
+	char *transfer_id = vine_current_transfers_add(q, w, tf->source);
 
-	vine_manager_send(q,w,"puturl %s %s %d %o %d\n",source_encoded, cached_name_encoded, tf->length, 0777,tf->flags );
+	vine_manager_send(q,w,"puturl %s %s %d %o %d %s\n",source_encoded, cached_name_encoded, tf->length, 0777,tf->flags, transfer_id);
 
 	if(tf->flags & VINE_CACHE) {
 		struct vine_remote_file_info *remote_info = vine_remote_file_info_create(tf->type,tf->length,time(0));
@@ -369,7 +372,6 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	timestamp_t open_time = timestamp_get();
 
 	switch (f->type) {
-
 	case VINE_BUFFER:
 		debug(D_VINE, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->length);
@@ -455,42 +457,41 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 
 vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t )
 {
-	struct vine_file *f;
-	struct stat s;
+		struct vine_file *f;
+		struct stat s;
 
-	// Check for existence of each input file first.
-	// If any one fails to exist, set the failure condition and return failure.
-	if(t->input_files) {
-		LIST_ITERATE(t->input_files,f) {
-			if(f->type == VINE_FILE) {
-				char * expanded_source = expand_envnames(w, f->source);
-				if(!expanded_source) {
-					vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
-					return VINE_APP_FAILURE;
-				}
-				if(stat(expanded_source, &s) != 0) {
-					debug(D_VINE,"Could not stat %s: %s\n", expanded_source, strerror(errno));
+		// Check for existence of each input file first.
+		// If any one fails to exist, set the failure condition and return failure.
+		if(t->input_files) {
+			LIST_ITERATE(t->input_files,f) {
+				if(f->type == VINE_FILE) {
+					char * expanded_source = expand_envnames(w, f->source);
+					if(!expanded_source) {
+						vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
+						return VINE_APP_FAILURE;
+					}
+					if(stat(expanded_source, &s) != 0) {
+						debug(D_VINE,"Could not stat %s: %s\n", expanded_source, strerror(errno));
+						free(expanded_source);
+						vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
+						return VINE_APP_FAILURE;
+					}
 					free(expanded_source);
-					vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
-					return VINE_APP_FAILURE;
 				}
-				free(expanded_source);
 			}
 		}
-	}
 
-	// Send each of the input files.
-	// If any one fails to be sent, return failure.
-	if(t->input_files) {
-		LIST_ITERATE(t->input_files,f) {
-			vine_result_code_t result = vine_manager_put_input_file(q,w,t,f);
-			if(result != VINE_SUCCESS) {
-				return result;
+		// Send each of the input files.
+		// If any one fails to be sent, return failure.
+		if(t->input_files) {
+			LIST_ITERATE(t->input_files,f) {
+				vine_result_code_t result = vine_manager_put_input_file(q,w,t,f);
+				if(result != VINE_SUCCESS) {
+					return result;
+				}
 			}
 		}
-	}
-
-	return VINE_SUCCESS;
+		return VINE_SUCCESS;
 }
 
 /*
