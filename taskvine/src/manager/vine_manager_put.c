@@ -363,12 +363,6 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 	int64_t actual = 0;
 	vine_result_code_t result = VINE_SUCCESS; //return success unless something fails below
 	
-	if(f->flags & VINE_PONCHO_UNPACK){
-		char * poncho_path = path_which("poncho_package_run");
-		struct vine_file *p = vine_file_create(poncho_path , "poncho_package_run", 0, 0, VINE_FILE, VINE_CACHE,0);
-		vine_manager_put_input_file(q, w, t, p);
-	}
-
 	timestamp_t open_time = timestamp_get();
 
 	switch (f->type) {
