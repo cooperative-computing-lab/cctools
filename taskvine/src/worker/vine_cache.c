@@ -242,9 +242,10 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 	char addr[VINE_LINE_MAX], path[VINE_LINE_MAX];
 	int stoptime;	
 	struct link *worker_link;
-
+	
 	// expect the form: worker://addr:port/path/to/file
 	sscanf(source_url, "worker://%99[^:]:%d/%s", addr, &port_num, path);
+	debug(D_VINE, "Setting up worker transfer file %s",source_url);
 
 	stoptime = time(0) + 15;
 	worker_link = link_connect(addr, port_num, stoptime);
@@ -264,11 +265,6 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 
 	link_close(worker_link);
 
-	// rename file to our expected cache name
-	char *received_filename = string_format("%s/%s", c->cache_dir, path);
-	rename(received_filename, cache_path);
-	free(received_filename);
-	
 	return 1;
 }
 
