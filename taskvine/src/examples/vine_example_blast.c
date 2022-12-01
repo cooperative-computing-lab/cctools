@@ -55,8 +55,8 @@ int main(int argc, char *argv[])
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 	  
 		vine_task_add_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
-		vine_task_add_input_url(t,BLAST_URL,"blastdir", VINE_CACHE|VINE_UNPACK );
-		vine_task_add_input_url(t,LANDMARK_URL,"landmark", VINE_CACHE|VINE_UNPACK );
+		vine_task_add_input(t,vine_file_untgz(vine_file_url(BLAST_URL)),"blastdir", VINE_CACHE );
+		vine_task_add_input(t,vine_file_untgz(vine_file_url(LANDMARK_URL)),"landmark", VINE_CACHE );
 		vine_task_set_env_var(t,"BLASTDB","landmark");
 
 		int task_id = vine_submit(m, t);
