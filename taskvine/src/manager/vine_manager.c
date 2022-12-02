@@ -2414,7 +2414,7 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	struct rmsummary *limits = vine_manager_choose_resources_for_task(q, w, t);
 
 	char *command_line;
-	if(q->monitor_mode && !t->coprocess && !t->duty) {
+	if(q->monitor_mode && !t->coprocess) {
 		command_line = vine_monitor_wrap(q, w, t, limits);
 	} else {
 		command_line = xxstrdup(t->command_line);
@@ -2440,11 +2440,6 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 		cmd_len = strlen(t->coprocess);
 		vine_manager_send(q,w, "coprocess %lld\n", (long long) cmd_len);
 		link_putlstring(w->link, t->coprocess, cmd_len, /* stoptime */ time(0) + q->short_timeout);
-	}
-	if(t->duty) {
-		cmd_len = strlen(t->duty);
-		vine_manager_send(q,w, "duty %lld\n", (long long) cmd_len);
-		link_putlstring(w->link, t->duty, cmd_len, /* stoptime */ time(0) + q->short_timeout);
 	}
 
 	vine_manager_send(q,w, "category %s\n", t->category);
@@ -2552,6 +2547,7 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 
 	ITABLE_ITERATE(w->current_tasks_boxes,task_id,box) {
 		struct vine_task *t = itable_lookup(w->current_tasks, task_id);
+		if (!t) return;
 		if (t->coprocess) {
 			w->coprocess_resources->cores.inuse     += box->cores;
 			w->coprocess_resources->memory.inuse    += box->memory;
@@ -3090,6 +3086,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->ready_list = list_create();
 
 	q->tasks          = itable_create(0);
+	q->duties         = hash_table_create(0, 0);
 
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
@@ -3363,6 +3360,7 @@ void vine_delete(struct vine_manager *q)
 
 	list_delete(q->ready_list);
 	itable_delete(q->tasks);
+	hash_table_delete(q->duties);
 
 	hash_table_delete(q->workers_with_available_results);
 
@@ -3781,6 +3779,50 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 
 	return vine_submit_internal(q, t);
 }
+
+static int vine_task_send_duty_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name) {
+	struct vine_task *t = hash_table_lookup(q->duties, name);
+	vine_manager_send(q,w, "duty %lld\n",  (long long) strlen(name));
+	link_putlstring(w->link, name, strlen(name), time(0) + q->short_timeout);
+	vine_result_code_t result = start_one_task(q, w, t);
+	return result;
+}
+
+static void vine_task_send_duty_to_workers(struct vine_manager *q, const char *name) {
+	char *worker_key, *feature_key, *feature;
+	struct vine_worker_info *w;
+
+	HASH_TABLE_ITERATE(q->worker_table,worker_key,w) {
+		if(!w->features) {
+			vine_task_send_duty_to_worker(q, w, name);
+			continue;
+		}
+
+		HASH_TABLE_ITERATE(q->duties,feature_key,feature) {
+			if(!hash_table_lookup(w->features, feature)) {
+				vine_task_send_duty_to_worker(q, w, name);
+			}
+		}
+	}
+}
+
+static void vine_task_send_duties_to_workers(struct vine_manager *q) {
+	char *duty;
+	struct vine_task *t;
+	HASH_TABLE_ITERATE(q->duties,duty,t) {
+		printf("%s %p\n", duty, t);
+		vine_task_send_duty_to_workers(q, duty);
+	}
+
+}
+
+void vine_task_install_duty( struct vine_manager *q, struct vine_task *t, const char *name ) {
+	t->task_id = -1;
+	hash_table_insert(q->duties, name, t);
+	t->time_when_submitted = timestamp_get();
+	vine_task_send_duties_to_workers(q);
+}
+
 
 void vine_block_host_with_timeout(struct vine_manager *q, const char *hostname, time_t timeout)
 {

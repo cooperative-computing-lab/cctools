@@ -124,14 +124,6 @@ class Task(object):
     def set_coprocess(self, coprocess):
         return vine_task_set_coprocess(self._task, coprocess)
     
-    ##
-    # Set the type of duty that the worker should start
-    # This is not needed for regular tasks.
-    #
-    # @param self       Reference to the current task object.
-    # @param coprocess  The duty type
-    def set_duty(self, duty):
-        return vine_task_set_duty(self._task, duty)
 
     ##
     # Set the worker selection scheduler for task.
@@ -1641,6 +1633,16 @@ class Manager(object):
         task_id = vine_submit(self._taskvine, task._task)
         self._task_table[task_id] = task
         return task_id
+    
+    ##
+    # Submit a duty to install on all connected workers 
+    #
+    #
+    # @param self   Reference to the current manager object.
+    # @param task   A task description created from @ref taskvine::Task.
+    # @param name   Name of the duty to be installed.
+    def install_duty(self, task, name):
+        vine_task_install_duty(self._taskvine, task._task, "duty_coprocess:" + name)
 
     ##
     # Wait for tasks to complete.
@@ -2004,7 +2006,7 @@ class RemoteTask(Task):
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
-        Task.set_coprocess(self, "vine_worker_coprocess:" + coprocess)
+        Task.set_coprocess(self, "duty_coprocess:" + coprocess)
     ##
     # Specify function arguments. Accepts arrays and dictionarys. This overrides any arguments passed during task creation
     # @param self             Reference to the current remote task object

@@ -218,10 +218,9 @@ pid_t vine_process_execute(struct vine_process *p )
 
 	p->execution_start = timestamp_get();
 
-	if (!p->task->duty) {
+	if (p->task->task_id >= 0) {
 		p->pid = fork();
-	}
-	else {
+	} else {
 		p->coprocess = vine_coprocess_initialize_coprocess(p->task->command_line);
 		vine_coprocess_specify_resources(p->coprocess, 0, 0, 0, 0);
 		p->pid = vine_coprocess_start(p->coprocess, p->sandbox);

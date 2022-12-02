@@ -93,6 +93,7 @@ struct vine_manager {
 	struct list   *ready_list;      /* List of vine_task that are waiting to execute. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
+	struct hash_table *duties;      /* Maps duty name -> vine_task of duty with that name. */
 
 	/* Primary data structures for tracking worker state. */
 

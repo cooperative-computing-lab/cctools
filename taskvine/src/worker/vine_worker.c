@@ -217,6 +217,8 @@ static int coprocess_disk = -1;
 static int coprocess_gpus = -1;
 static char *factory_name = NULL;
 
+struct list *duty_list = NULL;
+
 struct vine_cache *global_cache = 0;
 
 extern int vine_hack_do_not_compute_cached_name;
@@ -490,8 +492,8 @@ static int start_process( struct vine_process *p, struct link *manager )
 
 	pid = vine_process_execute(p);
 	if(pid<0) fatal("unable to fork process for task_id %d!",p->task->task_id);
-	if(p->task->duty) {
-		char *coprocess_name = string_format("vine_worker_coprocess:%s", "my_coprocess_example");
+	if (p->coprocess) {
+		char *coprocess_name = "duty_coprocess:coprocess";
 		list_push_tail(coprocess_list, p->coprocess);
 		hash_table_insert(features, coprocess_name, (void **) 1);
 		send_features(manager);
@@ -696,13 +698,6 @@ static int do_task( struct link *manager, int task_id, time_t stoptime )
 			link_read(manager,cmd,length,stoptime);
 			cmd[length] = 0;
 			vine_task_set_coprocess(task,cmd);
-			debug(D_VINE,"rx: %s",cmd);
-			free(cmd);
-		} else if(sscanf(line,"duty %d",&length)==1) {
-			char *cmd = malloc(length+1);
-			link_read(manager,cmd,length,stoptime);
-			cmd[length] = 0;
-			vine_task_set_duty(task,cmd);
 			debug(D_VINE,"rx: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", localname, taskname_encoded, &flags)) {
@@ -1045,6 +1040,13 @@ static int handle_manager(struct link *manager)
 			r = 0;
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
+			r = 1;
+		} else if(sscanf(line,"duty %ld",&length)==1) {
+			char *duty_name = malloc(length+1);
+			link_read(manager,duty_name,length,time(0)+active_timeout);
+			duty_name[length] = 0;
+			debug(D_VINE,"rx: duty %s", duty_name);
+			list_push_tail(duty_list, duty_name);
 			r = 1;
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
@@ -2143,6 +2145,7 @@ int main(int argc, char *argv[])
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
 	coprocess_list = list_create();
+	duty_list = list_create();
 
 	watcher = vine_watcher_create();
 

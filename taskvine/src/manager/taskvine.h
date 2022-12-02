@@ -263,12 +263,6 @@ will only be sent to workers running the coprocess.
 */
 void vine_task_set_coprocess( struct vine_task *t, const char *name );
 
-/** Indicate the duty to be executed.
-@param t A task object.
-@param name The duty to be started at the worker end
-*/
-void vine_task_set_duty( struct vine_task *t, const char *name );
-
 /** Attach an input file or directory to a task.
 @param t A task object.
 @param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.
@@ -677,6 +671,13 @@ Once returned, it is safe to re-submit the same take object via @ref vine_submit
 @return An integer task_id assigned to the submitted task.
 */
 int vine_submit(struct vine_manager *m, struct vine_task *t);
+
+/** Indicate the duty to be installed on all workers connected to the manager.
+The duty is expected to run on all workers until they disconnect from the manager.
+@param t A task object.
+@param name The duty to be installed
+*/
+void vine_task_install_duty( struct vine_manager *q, struct vine_task *t, const char *name );
 
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
