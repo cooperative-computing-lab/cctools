@@ -43,11 +43,9 @@ expected events.
 typedef enum {
 	VINE_NOCACHE  = 0, /**< Do not cache file at execution site. (default) */
 	VINE_CACHE    = 1, /**< Cache file at execution site for later use. */
-	VINE_UNPACK   = 2, /**< Unpack this archive (.tar .tgz .zip) into a directory on arrival. */
-	VINE_WATCH    = 4, /**< Watch the output file and send back changes as the task runs. */
-	VINE_FAILURE_ONLY = 8,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
-	VINE_SUCCESS_ONLY = 16, /**< Only return this output file if the task succeeded. */
-	VINE_PONCHO_UNPACK = 32, /**< Unpacks a Poncho environment into a directory on arrival. */
+	VINE_WATCH    = 2, /**< Watch the output file and send back changes as the task runs. */
+	VINE_FAILURE_ONLY = 4,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
+	VINE_SUCCESS_ONLY = 8, /**< Only return this output file if the task succeeded. */
 } vine_file_flags_t;
 
 /** Select overall scheduling algorithm for matching tasks to workers. */
@@ -270,8 +268,6 @@ void vine_task_set_coprocess( struct vine_task *t, const char *name );
 @param flags	May be zero or more of the following @ref vine_file_flags_t logical-ored together:
 - @ref VINE_CACHE indicates that the file/directory should be cached for later tasks. (recommended)
 - @ref VINE_NOCACHE indicates that the file should not be cached.
-- @ref VINE_UNPACK indicates that @a local_name is an archive (.tar, .tgz, .zip) that will be automatically unpacked into directory @a remote_name .
-- @ref VINE_PONCHO_UNPACK indicates that @a local_name is a PONCHO enviornment that will be automatically unpacked into directory @a remote_name .
 */
 void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags);
 
@@ -677,19 +673,13 @@ struct vine_file * vine_file_empty_dir();
 struct vine_file * vine_file_mini_task( struct vine_task *mini_task );
 
 /** Create a file object by unpacking a tar archive.
+The archive may be compressed in any of the ways supported
+by tar, and so this function supports extensions .tar, .tar.gz, .tgz, tar.bz2, and so forth.
 @param f A file object representing a tar archive.
 @return A general file object for use by @ref vine_task_add_input.
 */
 
 struct vine_file * vine_file_untar( struct vine_file *f );
-
-/** Create a file object by unpacking a tgz archive.
-@param f A file object representing a tgz archive.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-
-struct vine_file * vine_file_untgz( struct vine_file *f );
-
 
 /** Create a file object by unpacking a poncho package.
 @param f A file object representing a tgz archive.

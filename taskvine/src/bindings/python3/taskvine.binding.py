@@ -160,23 +160,6 @@ class FileUntar(File):
     def __init__(self,subfile):
         self._file = vine_file_untar(vine_file_clone(subfile._file))
 
-##
-# \class FileUntgz
-#
-# TaskVine File TGZ Unpacker
-#
-# A wrapper to unpack a file in .tgz form.
-
-class FileUntgz(File):
-    ##
-    # Create a file by unpacking a compressed tar file.
-    #
-    # @param self       The current file object.
-    # @param subfile    The file object to un-tgz.
-        
-    def __init__(self,subfile):
-        self._file = vine_file_untgz(vine_file_clone(subfile._file))
-
 class FileUnponcho(File):
     ##
     # Create a file by unpacking a poncho package.
@@ -222,8 +205,6 @@ class Task(object):
         flags = VINE_NOCACHE
         if cache:
             flags |= VINE_CACHE
-        if unpack:
-            flags |= VINE_UNPACK
         if watch:
             flags |= VINE_WATCH
         if failure_only:
@@ -312,7 +293,6 @@ class Task(object):
     # @param local_name    The name of the file on local disk or shared filesystem.
     # @param remote_name   The name of the file at the execution site.
     # @param cache         Whether the file should be cached at workers. Default is False.
-    # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
     #
     # For example:
     # @code
@@ -320,7 +300,7 @@ class Task(object):
     # >>> task.add_input_file("/etc/hosts", cache = True)
     # >>> task.add_input_file("/etc/hosts", "hosts", cache = True)
     # @endcode
-    def add_input_file(self, local_name, remote_name=None, cache=False, unpack=False):
+    def add_input_file(self, local_name, remote_name=None, cache=False ):
 
         # swig expects strings:
         if local_name:
@@ -331,7 +311,7 @@ class Task(object):
         else:
             remote_name = os.path.basename(local_name)
 
-        flags = Task._determine_file_flags(cache, unpack)
+        flags = Task._determine_file_flags(cache)
         return vine_task_add_input_file(self._task, local_name, remote_name, flags)
 
 
@@ -341,13 +321,12 @@ class Task(object):
     # @param url           The url of the file to provide.
     # @param remote_name   The name of the file as seen by the task.
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
     #
     # For example:
     # @code
     # >>> task.add_input_url("http://www.google.com/","google.txt",cache=True)
     # @endcode
-    def add_input_url(self, url, remote_name, cache=False, unpack=False):
+    def add_input_url(self, url, remote_name, cache=False ):
         # swig expects strings
         if remote_name:
             remote_name = str(remote_name)
@@ -355,7 +334,7 @@ class Task(object):
         if url:
             url = str(url)
 
-        flags = Task._determine_file_flags(cache, unpack)
+        flags = Task._determine_file_flags(cache)
         return vine_task_add_input_url(self._task, url, remote_name, flags)
 
 
@@ -368,7 +347,6 @@ class Task(object):
     #                       The task object must generate a single output file named by @ref add_output_file.
     # @param remote_name    The name of the file as seen by the primary task.
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
     #
     # For example:
     # @code
@@ -379,10 +357,10 @@ class Task(object):
     # >>> task.add_input_mini_task(mini_task,"infile.txt",cache=True)
     # @endcode
 
-    def add_input_mini_task(self, mini_task, remote_name, cache=False, unpack=False, failure_only=None):
+    def add_input_mini_task(self, mini_task, remote_name, cache=False, failure_only=None):
         if remote_name:
             remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache=cache, unpack=unpack, failure_only=failure_only)
+        flags = Task._determine_file_flags(cache=cache, failure_only=failure_only)
         # The minitask must be duplicated, because the C object becomes "owned"
         # by the parent task and will be deleted when the parent task goes away.
         copy_of_mini_task = vine_task_clone(mini_task._task)
@@ -395,7 +373,6 @@ class Task(object):
     # @param file           A file object of class @ref File, such as @ref FileLocal, @ref FileBuffer, @ref FileURL, @ref FileMiniTask, @ref FileUntar, @FileUntgz.
     # @param remote_name    The name of the file at the execution site.
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
     #
     # For example:
     # @code
@@ -428,10 +405,10 @@ class Task(object):
     # @param remote_name    The name of the remote file to create.
     # @param flags          May take the same values as @ref add_file.
     # @param cache          Whether the file should be cached at workers (True/False)
-    def add_input_buffer(self, buffer, remote_name, cache=False, unpack=False):
+    def add_input_buffer(self, buffer, remote_name, cache=False ):
         if remote_name:
             remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache, unpack)
+        flags = Task._determine_file_flags(cache)
         return vine_task_add_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
@@ -444,7 +421,6 @@ class Task(object):
     # @param watch         Watch the output file and send back changes as the task runs.
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
     # @param success_only  For output files, whether the file should be retrieved only when the task succeeds. Default is False.
-    # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
     #
     # For example:
     # @code
