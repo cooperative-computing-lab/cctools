@@ -2660,7 +2660,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		HASH_TABLE_ITERATE(q->worker_table, id, peer){
 			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache) {
 				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
-				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_FILE_SOURCE_MAX_TRANSFERS) {	
+				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_WORKER_SOURCE_MAX_TRANSFERS) {	
 					vine_file_delete(f->substitute);
 					f->substitute = vine_file_substitute_url(f,peer_source);
 					free(peer_source);
@@ -3183,6 +3183,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->password = 0;
 
 	q->peer_transfers_enabled = 0;
+	q->file_source_max_transfers = VINE_FILE_SOURCE_MAX_TRANSFERS;
 
 	q->resource_submit_multiplier = 1.0;
 
@@ -3277,10 +3278,17 @@ int vine_enable_monitoring_full(struct vine_manager *q, char *monitor_output_dir
 	return status;
 }
 
-int vine_enable_peer_transfers(struct vine_manager *q) {
+int vine_enable_peer_transfers(struct vine_manager *q) 
+{
 	q->peer_transfers_enabled = 1;
 	return 1;
 }
+
+int vine_set_file_source_max_transfers(struct vine_manager *q, int c)
+{
+	q->file_source_max_transfers = c;
+	return 1;
+} 
 
 int vine_enable_disconnect_slow_workers_category(struct vine_manager *q, const char *category, double multiplier)
 {

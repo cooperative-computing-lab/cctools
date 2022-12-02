@@ -877,6 +877,8 @@ int vine_enable_monitoring_full(struct vine_manager *m, char *monitor_output_dir
 /** Enable taskvine peer transfers to be scheduled by the manager **/
 int vine_enable_peer_transfers(struct vine_manager *m);
 
+int vine_set_file_source_max_transfers(struct vine_manager *m, int c);
+
 /** Set the minimum task_id of future submitted tasks.
 Further submitted tasks are guaranteed to have a task_id larger or equal to
 minid.  This function is useful to make task_ids consistent in a workflow that
