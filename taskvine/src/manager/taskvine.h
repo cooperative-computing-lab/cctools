@@ -673,19 +673,13 @@ struct vine_file * vine_file_empty_dir();
 struct vine_file * vine_file_mini_task( struct vine_task *mini_task );
 
 /** Create a file object by unpacking a tar archive.
+The archive may be compressed in any of the ways supported
+by tar, and so this function supports extensions .tar, .tar.gz, .tgz, tar.bz2, and so forth.
 @param f A file object representing a tar archive.
 @return A general file object for use by @ref vine_task_add_input.
 */
 
 struct vine_file * vine_file_untar( struct vine_file *f );
-
-/** Create a file object by unpacking a tgz archive.
-@param f A file object representing a tgz archive.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-
-struct vine_file * vine_file_untgz( struct vine_file *f );
-
 
 /** Create a file object by unpacking a poncho package.
 @param f A file object representing a tgz archive.
