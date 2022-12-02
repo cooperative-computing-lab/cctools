@@ -1041,7 +1041,7 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
 			r = 1;
-		} else if(sscanf(line,"duty %ld",&length)==1) {
+		} else if(sscanf(line,"duty %" SCNd64,&length)==1) {
 			char *duty_name = malloc(length+1);
 			link_read(manager,duty_name,length,time(0)+active_timeout);
 			duty_name[length] = 0;
