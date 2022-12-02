@@ -131,6 +131,9 @@ static void aggregate_workers_resources( struct vine_manager *q, struct vine_res
 static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int task_id);
 static void release_all_workers( struct vine_manager *q );
 
+static void vine_task_send_duty_to_workers(struct vine_manager *q, const char *name);
+static void vine_task_send_duties_to_workers(struct vine_manager *q);
+
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
 static int count_workers( struct vine_manager *q, vine_worker_type_t type )
@@ -845,6 +848,8 @@ static void add_worker(struct vine_manager *q)
 	w->addrport = string_format("%s:%d",addr,port);
 
 	hash_table_insert(q->worker_table, w->hashkey, w);
+
+	vine_task_send_duties_to_workers(q);
 }
 
 /* Delete a single file on a remote worker. */
@@ -3810,7 +3815,6 @@ static void vine_task_send_duties_to_workers(struct vine_manager *q) {
 	char *duty;
 	struct vine_task *t;
 	HASH_TABLE_ITERATE(q->duties,duty,t) {
-		printf("%s %p\n", duty, t);
 		vine_task_send_duty_to_workers(q, duty);
 	}
 
