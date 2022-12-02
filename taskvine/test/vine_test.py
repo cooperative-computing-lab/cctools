@@ -205,7 +205,7 @@ if __name__ == '__main__':
     report_task(t, vine.VINE_RESULT_TASK_TIMEOUT, 9)
 
     # Pull down data from a url and unpack it via a minitask
-    f = vine.FileUntgz(vine.FileURL("http://ccl.cse.nd.edu/software/files/cctools-7.4.14-source.tar.gz"))
+    f = vine.FileUntar(vine.FileURL("http://ccl.cse.nd.edu/software/files/cctools-7.4.14-source.tar.gz"))
     t = vine.Task("ls -lR cctools | wc -l")
     t.add_input(f,"cctools",cache=True)
     q.submit(t)
