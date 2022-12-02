@@ -3765,8 +3765,6 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 	rmsummary_merge_override(limits, max);
 
 	int use_whole_worker = 1;
-
-	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 	if(q->proportional_resources) {
 		double max_proportion = -1;
 		if(w->resources->cores.largest > 0) {

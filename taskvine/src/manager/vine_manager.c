@@ -2324,9 +2324,7 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 	rmsummary_merge_override(limits, max);
 
 	int use_whole_worker = 1;
-
-	struct category *c = vine_category_lookup_or_create(q, t->category);
-	if(q->force_proportional_resources || c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
+	if(q->proportional_resources) {
 		double max_proportion = -1;
 		if(w->resources->cores.largest > 0) {
 			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.largest);
@@ -2356,14 +2354,14 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 
 			// adjust max_proportion so that an integer number of tasks fit the
 			// worker.
-			if(q->force_proportional_resources) {
+			if(q->proportional_whole_tasks) {
 				max_proportion = 1.0/(floor(1.0/max_proportion));
 			}
 
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
 			 * Otherwise they get a proportion according to specified
 			 * resources. Tasks will get at least one core. */
-			if(q->force_proportional_resources || limits->cores < 0) {
+			if(limits->cores < 0) {
 				if(limits->gpus > 0) {
 					limits->cores = 0;
 				} else {
@@ -2376,11 +2374,11 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 				limits->gpus = 0;
 			}
 
-			if(q->force_proportional_resources || limits->memory < 0) {
+			if(limits->memory < 0) {
 				limits->memory = MAX(1, floor(w->resources->memory.largest * max_proportion));
 			}
 
-			if(q->force_proportional_resources || limits->disk < 0) {
+			if(limits->disk < 0) {
 				limits->disk = MAX(1, floor(w->resources->disk.largest * max_proportion));
 			}
 		}
@@ -4457,8 +4455,11 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-retrieve-many")){
 		q->wait_retrieve_many = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "force-proportional-resources")){
-		q->force_proportional_resources = MAX(0, (int)value);
+	} else if(!strcmp(name, "force-proportional-resources") || !strcmp(name, "proportional-resources")) {
+		q->proportional_resources = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "force-proportional-resources-whole-tasks") || !strcmp(name, "proportional-whole-tasks")) {
+		q->proportional_whole_tasks = MAX(0, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
