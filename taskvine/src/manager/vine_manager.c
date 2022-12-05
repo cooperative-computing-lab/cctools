@@ -3383,7 +3383,7 @@ void vine_delete(struct vine_manager *q)
 
 	if(q->catalog_hosts) free(q->catalog_hosts);
 
-	/* XXX this may be a leak, should workers be deleted as well? */
+	hash_table_clear(q->worker_table,(void*)vine_worker_delete);
 	hash_table_delete(q->worker_table);
 
 	hash_table_clear(q->factory_table,(void*)vine_factory_info_delete);
