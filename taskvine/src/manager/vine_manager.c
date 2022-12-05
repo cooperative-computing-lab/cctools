@@ -301,19 +301,17 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 
 	if(sscanf(line,"cache-update %s %lld %lld %s",cachename,&size,&transfer_time, id)==4) {
 		struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
-		if(remote_info) {
-			remote_info->size = size;
-			remote_info->transfer_time = transfer_time;
-			remote_info->in_cache = 1;
-		} else {
-			debug(D_VINE,"warning: unexpected cache-update message: %s %lld %lld %s",cachename,size,transfer_time,id);
+
+		if(!remote_info) {
+			debug(D_VINE,"warning: unexpected cache-update message for %s",cachename);
 			/* XXX what is the correct file type to use here? */
 			remote_info = vine_remote_file_info_create(VINE_FILE,size,time(0));
-			remote_info->size = size;
-			remote_info->transfer_time = transfer_time;
-			remote_info->in_cache = 1;
 			hash_table_insert(w->current_files,cachename,remote_info);
 		}
+
+		remote_info->size = size;
+		remote_info->transfer_time = transfer_time;
+		remote_info->in_cache = 1;
 		
 		vine_current_transfers_remove(q, id);
 	}
@@ -2627,49 +2625,77 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 }
 
 /*
-Iterate through task input files. 
-Assign a worker transfer if one is available.
-If every input file is accounted for, return a copy of the task
-with any modified transfers. If one of the files cannot be transfered due
-to limits on num transfers. return null
+Determine whether there is transfer capacity to assign this task to this worker.
+Returns true on success, false on failure.
+Modifies the task's files to indicate the desired source of the transfer.
 */
-static struct vine_task *vine_manager_sched_worker_transfer(struct vine_manager *q, struct vine_task *t)
+
+static int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-		struct vine_file *f;
+	struct vine_file *f;
 
-		LIST_ITERATE(t->input_files, f){
-			if(f->type == VINE_URL || f->type==VINE_TEMP ){
-				char *id;
-				struct vine_worker_info *peer;
-				struct vine_remote_file_info *remote_info;
+	LIST_ITERATE(t->input_files, f){
+		/* Only consider peer transfer urls and temps for now. */
+		if(f->type!=VINE_URL && f->type!=VINE_TEMP) continue;
 
-				HASH_TABLE_ITERATE(q->worker_table, id, peer){
-					if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache)
-					{
-						char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
-						if(vine_current_transfers_source_in_use(q, peer_source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
-						{	
-							// debug(D_VINE, "This file is to be requested from source: %s:%d", peer->transfer_addr, peer->transfer_port);
-							free(f->source);
-							f->source = peer_source;
-							continue;
-						}
-					}
-				}
-				if(f->type==VINE_URL) {
-					// if we were unable to find an available worker, and there are already VINE_FILE_SOURCE_MAX_TRANSFERS occuring 
-					if((vine_current_transfers_source_in_use(q, f->source) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
-						return NULL;
-					}
+		/* Is the file already present on that worker? */
+		struct vine_remote_file_info *remote_info;
+		remote_info = hash_table_lookup(w->current_files,f->cached_name);
+		if(remote_info) continue;
+		
+		char *id;
+		struct vine_worker_info *peer;
+		int found_match = 0;
+		
+		/* If not, then search for an available peer to provide it. */
+		/* Provide a substitute file object to describe the peer. */
+		
+		HASH_TABLE_ITERATE(q->worker_table, id, peer){
+			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache) {
+				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_FILE_SOURCE_MAX_TRANSFERS) {	
+					vine_file_delete(f->substitute);
+					f->substitute = vine_file_substitute_url(f,peer_source);
+					free(peer_source);
+					found_match = 1;
+					break;
 				} else {
-					/* For all other types, there is no source. */
-					return NULL;
+					free(peer_source);
 				}
-				
 			}
+
 		}
 
-		return t;
+		/* If that resulted in a match, move on to the next file. */
+		if(found_match) continue;
+
+		/*
+		If no match was found, the behavior depends on the original file type.
+		URLs can fetch from the original if capacity is available.
+		TEMPs can only fetch from peers, so no match is fatal.
+		Any other kind can be provided by the manager at dispatch.
+		*/
+		
+		if(f->type==VINE_URL) {
+			/* For a URL transfer, we can fall back to the original if capacity is available. */
+			
+			if((vine_current_transfers_source_in_use(q, f->source) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
+				debug(D_VINE,"task %lld has no ready transfer source for url %s",(long long)t->task_id,f->source);
+				return 0;
+			} else {
+				/* keep going */
+			}
+		} else if(f->type==VINE_TEMP) {
+			debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long long)t->task_id,f->cached_name);
+			return 0;
+		} else {
+			/* keep going */
+		}
+	}
+
+	debug(D_VINE,"task %lld has a ready transfer source for all files",(long long)t->task_id);
+		
+	return 1;
 }
 
 /*
@@ -2691,21 +2717,18 @@ static int send_one_task( struct vine_manager *q )
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
 		
-		if(q->peer_transfers_enabled)
-		{
-			if((t = vine_manager_sched_worker_transfer(q, t)))
-			{
-				// Find the best worker for the task at the head of the list
-				w = vine_schedule_task_to_worker(q,t);
-			}
-
-		}else{
-			w = vine_schedule_task_to_worker(q,t);
-		}
+		// Find the best worker for the task at the head of the list
+		w = vine_schedule_task_to_worker(q,t);
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
-		vine_current_transfers_print_table(q);
+
+		// Check if there is transfer capacity available.
+		if(q->peer_transfers_enabled)
+		{
+			if(!vine_manager_transfer_capacity_available(q,w,t)) continue;
+		}
+
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
 
@@ -3036,7 +3059,7 @@ static void vine_invalidate_cached_file_internal(struct vine_manager *q, const c
 }
 
 void vine_invalidate_cached_file(struct vine_manager *q, const char *local_name, vine_file_t type) {
-	struct vine_file *f = vine_file_create(local_name, local_name, 0, 0, type, VINE_CACHE, 0);
+	struct vine_file *f = vine_file_create(local_name, local_name, 0, 0, 0, type, VINE_CACHE, 0);
 	vine_invalidate_cached_file_internal(q, f->cached_name);
 	vine_file_delete(f);
 }

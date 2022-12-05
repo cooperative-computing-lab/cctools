@@ -33,8 +33,11 @@ struct vine_file {
 	char *cached_name;	// Name of file in the worker's cache directory.
 	char *data;		// Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
+	struct vine_file *substitute; // Fetch from this substitute file source instead.
 };
 
-struct vine_file * vine_file_create( const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags, struct vine_task *mini_task );
+struct vine_file * vine_file_create( const char *source, const char *remote_name, const char *cached_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags, struct vine_task *mini_task );
+
+struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source );
 
 #endif
