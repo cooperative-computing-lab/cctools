@@ -138,7 +138,9 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 struct vine_file *vine_file_clone(const struct vine_file *f )
 {
 	if(!f) return 0;
-	return vine_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags,vine_task_clone(f->mini_task));
+	struct vine_file *nf = vine_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags,vine_task_clone(f->mini_task));
+	nf->cached_name = strdup(f->cached_name);
+	return nf;
 }
 
 /* Delete a file object */
