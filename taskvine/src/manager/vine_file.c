@@ -164,7 +164,7 @@ struct vine_file * vine_file_url( const char *source )
 	return vine_file_create(source,0,0,0,VINE_URL,0,0);
 }
 
-struct vind_file * vine_file_temp()
+struct vine_file * vine_file_temp()
 {
 	return vine_file_create("temp",0,0,0,VINE_TEMP,0,0);
 }

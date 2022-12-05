@@ -305,7 +305,16 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 			remote_info->size = size;
 			remote_info->transfer_time = transfer_time;
 			remote_info->in_cache = 1;
+		} else {
+			debug(D_VINE,"warning: unexpected cache-update message: %s %lld %lld %s",cachename,size,transfer_time,id);
+			/* XXX what is the correct file type to use here? */
+			remote_info = vine_remote_file_info_create(VINE_FILE,size,time(0));
+			remote_info->size = size;
+			remote_info->transfer_time = transfer_time;
+			remote_info->in_cache = 1;
+			hash_table_insert(w->current_files,cachename,remote_info);
 		}
+		
 		vine_current_transfers_remove(q, id);
 	}
 
