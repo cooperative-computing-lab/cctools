@@ -236,11 +236,12 @@ struct work_queue {
 	char *debug_path;
 	int tlq_port;
 	char *tlq_url;
-  
+
 	int fetch_factory;
 
 	int wait_retrieve_many;
-	int force_proportional_resources;
+	int proportional_resources;
+	int proportional_whole_tasks;
 };
 
 struct work_queue_worker {
@@ -3764,9 +3765,7 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 	rmsummary_merge_override(limits, max);
 
 	int use_whole_worker = 1;
-
-	struct category *c = work_queue_category_lookup_or_create(q, t->category);
-	if(q->force_proportional_resources || c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
+	if(q->proportional_resources) {
 		double max_proportion = -1;
 		if(w->resources->cores.largest > 0) {
 			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.largest);
@@ -3796,14 +3795,14 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 
 			// adjust max_proportion so that an integer number of tasks fit the
 			// worker.
-			if(q->force_proportional_resources) {
+			if(q->proportional_whole_tasks) {
 				max_proportion = 1.0/(floor(1.0/max_proportion));
 			}
 
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
 			 * Otherwise they get a proportion according to specified
 			 * resources. Tasks will get at least one core. */
-			if(q->force_proportional_resources || limits->cores < 0) {
+			if(limits->cores < 0) {
 				if(limits->gpus > 0) {
 					limits->cores = 0;
 				} else {
@@ -3816,11 +3815,11 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 				limits->gpus = 0;
 			}
 
-			if(q->force_proportional_resources || limits->memory < 0) {
+			if(limits->memory < 0) {
 				limits->memory = MAX(1, floor(w->resources->memory.largest * max_proportion));
 			}
 
-			if(q->force_proportional_resources || limits->disk < 0) {
+			if(limits->disk < 0) {
 				limits->disk = MAX(1, floor(w->resources->disk.largest * max_proportion));
 			}
 		}
@@ -5904,6 +5903,9 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 
 	q->wait_for_workers = 0;
 
+	q->proportional_resources = 1;
+	q->proportional_whole_tasks = 1;
+
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
@@ -7399,8 +7401,11 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-retrieve-many")){
 		q->wait_retrieve_many = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "force-proportional-resources")){
-		q->force_proportional_resources = MAX(0, (int)value);
+	} else if(!strcmp(name, "force-proportional-resources") || !strcmp(name, "proportional-resources")) {
+		q->proportional_resources = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "force-proportional-resources-whole-tasks") || !strcmp(name, "proportional-whole-tasks")) {
+		q->proportional_whole_tasks = MAX(0, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);

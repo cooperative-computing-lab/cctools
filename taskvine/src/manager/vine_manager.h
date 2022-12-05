@@ -162,7 +162,8 @@ struct vine_manager {
 	int wait_for_workers;         /* wait for these many workers to connect before dispatching tasks at start of execution. */
 	int fetch_factory;            /* If true, manager queries catalog for factory configuration. */
 	int wait_retrieve_many;       /* If true, main loop consumes multiple completed tasks at once. */
-	int force_proportional_resources;  /* If true, tasks divide worker resources proportionally. */
+	int proportional_resources;   /* If true, tasks divide worker resources proportionally. */
+	int proportional_whole_tasks; /* If true, round-up proportions to whole number of tasks. */
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
 	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */
