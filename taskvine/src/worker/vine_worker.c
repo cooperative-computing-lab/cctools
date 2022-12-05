@@ -425,7 +425,7 @@ void send_cache_update( struct link *manager, const char *cachename, int64_t siz
 		send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
 	}
 	else{
-		send_message(manager,"cache-update %s %lld %lld\n",cachename,(long long)size,(long long)transfer_time);
+		send_message(manager,"cache-update %s %lld %lld X\n",cachename,(long long)size,(long long)transfer_time);
 	}
 	if(transfer_id)
 	{
