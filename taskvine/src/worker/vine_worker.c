@@ -520,7 +520,7 @@ account for the resources as necessary.
 Should maintain parallel structure to start_process() above.
 */
 
-static void reap_process( struct vine_process *p )
+static void reap_process( struct vine_process *p, struct link *manager )
 {
 	p->execution_end = timestamp_get();
 
@@ -531,7 +531,7 @@ static void reap_process( struct vine_process *p )
 
 	vine_gpus_free(p->task->task_id);
 
-	if(!vine_sandbox_stageout(p,global_cache)) {
+	if(!vine_sandbox_stageout(p,global_cache,manager)) {
 		p->result = VINE_RESULT_OUTPUT_MISSING;
 		p->exit_code = 1;
 	}
@@ -630,7 +630,7 @@ static int handle_completed_tasks(struct link *manager)
 			}
 
 			/* collect the resources associated with the process */
-			reap_process(p);
+			reap_process(p,manager);
 			
 			/* must reset the table iterator because an item was removed. */
 			itable_firstkey(procs_running);
