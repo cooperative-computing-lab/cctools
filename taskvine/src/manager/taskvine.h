@@ -97,9 +97,10 @@ typedef enum {
 typedef enum {
 	VINE_FILE = 1,              /**< A file or directory present at the manager. **/
 	VINE_URL,                   /**< A file obtained by downloading from a URL. */
+	VINE_TEMP,		    /**< A temporary file created as an output of a task. */
 	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
 	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
-	VINE_EMPTY_DIR              /**< An empty directory to create in the task sandbox. */
+	VINE_EMPTY_DIR,              /**< An empty directory to create in the task sandbox. */
 } vine_file_t;
 
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
@@ -649,6 +650,14 @@ struct vine_file * vine_file_local( const char *source );
 */
 
 struct vine_file * vine_file_url( const char *url );
+
+/** Create a scratch file object.
+A scratch file has no initial content, but is created
+as the output of a task, and may be consumed by other tasks.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_temp();
 
 /** Create a file object from a data buffer.
 @param name The abstract name of the buffer.

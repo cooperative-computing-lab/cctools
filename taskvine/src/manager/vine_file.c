@@ -80,6 +80,15 @@ char *make_cached_name( const struct vine_file *f )
 	       	case VINE_URL:
 			return string_format("url-%d-%s", cache_file_id, md5_string(digest));
 			break;
+		case VINE_TEMP:
+			/* A temporary file has no initial content. */
+			/* Replace with task-derived string once known. */
+			{
+			char cookie[17];
+			string_cookie(cookie,16);
+			return string_format("temp-%d-%s", cache_file_id, cookie);
+			break;
+			}
 		case VINE_BUFFER:
 		default:
 			return string_format("buffer-%d-%s", cache_file_id, md5_string(digest));
@@ -153,6 +162,11 @@ struct vine_file * vine_file_local( const char *source )
 struct vine_file * vine_file_url( const char *source )
 {
 	return vine_file_create(source,0,0,0,VINE_URL,0,0);
+}
+
+struct vind_file * vine_file_temp()
+{
+	return vine_file_create("temp",0,0,0,VINE_TEMP,0,0);
 }
 
 struct vine_file * vine_file_buffer( const char *buffer_name,const char *data, int length )

@@ -307,7 +307,6 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 			remote_info->in_cache = 1;
 		}
 		vine_current_transfers_remove(q, id);
-		//vine_current_transfers_print_table(q);
 	}
 
 	return VINE_MSG_PROCESSED;
@@ -2628,10 +2627,9 @@ to limits on num transfers. return null
 static struct vine_task *vine_manager_sched_worker_transfer(struct vine_manager *q, struct vine_task *t)
 {
 		struct vine_file *f;
-		struct vine_task *tcp = t; //vine_task_clone(t);
 
-		LIST_ITERATE(tcp->input_files, f){
-			if(f->type == VINE_URL){
+		LIST_ITERATE(t->input_files, f){
+			if(f->type == VINE_URL || f->type==VINE_TEMP ){
 				char *id;
 				struct vine_worker_info *peer;
 				struct vine_remote_file_info *remote_info;
@@ -2642,21 +2640,27 @@ static struct vine_task *vine_manager_sched_worker_transfer(struct vine_manager 
 						char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
 						if(vine_current_transfers_source_in_use(q, peer_source) < VINE_FILE_SOURCE_MAX_TRANSFERS)
 						{	
-	//							debug(D_VINE, "This file is to be requested from source: %s:%d", peer->transfer_addr, peer->transfer_port);
+							// debug(D_VINE, "This file is to be requested from source: %s:%d", peer->transfer_addr, peer->transfer_port);
 							free(f->source);
 							f->source = peer_source;
 							continue;
 						}
 					}
 				}
-				// if we were unable to find an available worker, and there are already VINE_FILE_SOURCE_MAX_TRANSFERS occuring 
-				if((vine_current_transfers_source_in_use(q, f->source) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
+				if(f->type==VINE_URL) {
+					// if we were unable to find an available worker, and there are already VINE_FILE_SOURCE_MAX_TRANSFERS occuring 
+					if((vine_current_transfers_source_in_use(q, f->source) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
+						return NULL;
+					}
+				} else {
+					/* For all other types, there is no source. */
 					return NULL;
 				}
+				
 			}
 		}
 
-		return tcp;
+		return t;
 }
 
 /*

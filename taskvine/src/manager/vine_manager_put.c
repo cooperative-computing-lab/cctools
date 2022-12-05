@@ -402,6 +402,10 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 		}
 		break;
 		}
+	case VINE_TEMP:
+		debug(D_VINE, "%s (%s) will use temp file %s", w->hostname, w->addrport, f->source);
+		// Do nothing.  Temporary files are created and used in place.
+		break;
 	}
 
 	if(result == VINE_SUCCESS) {
