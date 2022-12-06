@@ -365,7 +365,7 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	/* If the send succeeded, then record the cached information. */
 	if(result==VINE_SUCCESS) {
 		if(f->flags & VINE_CACHE) {
-			struct vine_remote_file_info *remote_info = vine_remote_file_info_create(f->type,info.st_size,info.st_mtime);
+			struct vine_remote_file_info *remote_info = vine_remote_file_info_create(info.st_size,info.st_mtime);
 			hash_table_insert(w->current_files,f->cached_name,remote_info);
 		}
 	}

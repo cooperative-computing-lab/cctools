@@ -6,10 +6,9 @@ See the file COPYING for details.
 
 #include "vine_remote_file_info.h"
 
-struct vine_remote_file_info * vine_remote_file_info_create( vine_file_t type, int64_t size, time_t mtime )
+struct vine_remote_file_info * vine_remote_file_info_create( int64_t size, time_t mtime )
 {
 	struct vine_remote_file_info *rinfo = malloc(sizeof(*rinfo));
-	rinfo->type = type;
 	rinfo->size = size;
 	rinfo->mtime = mtime;
 	rinfo->transfer_time = 0;

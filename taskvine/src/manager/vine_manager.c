@@ -304,8 +304,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 
 		if(!remote_info) {
 			debug(D_VINE,"warning: unexpected cache-update message for %s",cachename);
-			/* XXX what is the correct file type to use here? */
-			remote_info = vine_remote_file_info_create(VINE_FILE,size,time(0));
+			remote_info = vine_remote_file_info_create(size,time(0));
 			hash_table_insert(w->current_files,cachename,remote_info);
 		}
 
