@@ -95,13 +95,13 @@ char * vine_cache_full_path( struct vine_cache *c, const char *cachename )
 
 /*
 Add a file to the cache manager (already created in the proper place) and note its size.
-It may still be necessary to perform post-transfer processing of this file.
 */
 
 int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename )
 {
 	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode,0);
 	hash_table_insert(c->table,cachename,f);
+	f->complete = 1;
 	return 1;
 }
 
