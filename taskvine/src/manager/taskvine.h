@@ -895,13 +895,13 @@ void vine_unblock_host(struct vine_manager *m, const char *hostname);
 */
 void vine_unblock_all(struct vine_manager *m);
 
-/** Invalidate cached file.
+/** Remove a file from worker's caches.
 The file or directory with the given specification is deleted from the workers' cache.
 Completed tasks waiting for retrieval are not affected.
 @param m A manager object
 @param f Any file object.
 */
-void vine_invalidate_cached_file(struct vine_manager *m, struct vine_file *f );
+void vine_remove_file(struct vine_manager *m, struct vine_file *f );
 
 /** Get manager statistics (only from manager).
 @param m A manager object

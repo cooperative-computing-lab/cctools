@@ -3024,7 +3024,7 @@ Search for workers with that file, cancel any tasks using that
 file, and then remove it.
 */
 
-static void vine_invalidate_cached_file_internal(struct vine_manager *q, const char *filename)
+static void vine_remove_file_internal(struct vine_manager *q, const char *filename)
 {
 	char *key;
 	struct vine_worker_info *w;
@@ -3057,9 +3057,9 @@ static void vine_invalidate_cached_file_internal(struct vine_manager *q, const c
 	}
 }
 
-void vine_invalidate_cached_file(struct vine_manager *q, struct vine_file *f )
+void vine_remove_file(struct vine_manager *q, struct vine_file *f )
 {
-	vine_invalidate_cached_file_internal(q, f->cached_name);
+	vine_remove_file_internal(q, f->cached_name);
 }
 
 /******************************************************/
