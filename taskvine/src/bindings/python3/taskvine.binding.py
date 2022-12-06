@@ -160,6 +160,13 @@ class FileUntar(File):
     def __init__(self,subfile):
         self._file = vine_file_untar(vine_file_clone(subfile._file))
 
+##
+# \class FilePoncho
+#
+# TaskVine File PONCHO Unpacker
+#
+# A wrapper to unpack a file in poncho package form.
+
 class FileUnponcho(File):
     ##
     # Create a file by unpacking a poncho package.
@@ -169,6 +176,24 @@ class FileUnponcho(File):
         
     def __init__(self,subfile):
         self._file = vine_file_unponcho(vine_file_clone(subfile._file))
+
+
+##
+# \class FileUnstarch
+#
+# TaskVine File Starch Unpacker
+#
+# A wrapper to unpack a file in .sfx form.
+
+class FileUnstarch(File):
+    ##
+    # Create a file by unpacking a starch package.
+    #
+    # @param self       The current file object.
+    # @param subfile    The file object to un-tgz.
+        
+    def __init__(self,subfile):
+        self._file = vine_file_unstarch(vine_file_clone(subfile._file))
 
 
 ##

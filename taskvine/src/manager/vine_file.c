@@ -188,3 +188,11 @@ struct vine_file * vine_file_unponcho( struct vine_file *f)
 	return vine_file_mini_task(t);
 }
 
+struct vine_file * vine_file_unstarch( struct vine_file *f )
+{
+	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
+	vine_task_add_input(t,f,"package.sfx",VINE_CACHE);
+	vine_task_add_output(t,vine_file_local("output"),"output",VINE_CACHE);
+	return vine_file_mini_task(t);
+}
+
