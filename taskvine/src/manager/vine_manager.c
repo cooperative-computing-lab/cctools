@@ -3059,10 +3059,9 @@ static void vine_invalidate_cached_file_internal(struct vine_manager *q, const c
 	}
 }
 
-void vine_invalidate_cached_file(struct vine_manager *q, const char *local_name, vine_file_t type) {
-	struct vine_file *f = vine_file_create(local_name, local_name, 0, 0, 0, type, VINE_CACHE, 0);
+void vine_invalidate_cached_file(struct vine_manager *q, struct vine_file *f )
+{
 	vine_invalidate_cached_file_internal(q, f->cached_name);
-	vine_file_delete(f);
 }
 
 /******************************************************/

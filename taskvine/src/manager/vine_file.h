@@ -24,6 +24,17 @@ This module is private to the manager and should not be invoked by the end user.
 
 #include <sys/types.h>
 
+/** Select the type of an input or output file to attach to a task. */
+
+typedef enum {
+	VINE_FILE = 1,              /**< A file or directory present at the manager. **/
+	VINE_URL,                   /**< A file obtained by downloading from a URL. */
+	VINE_TEMP,		    /**< A temporary file created as an output of a task. */
+	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
+	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
+	VINE_EMPTY_DIR,              /**< An empty directory to create in the task sandbox. */
+} vine_file_t;
+
 struct vine_file {
 	vine_file_t type;       // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
 	vine_file_flags_t flags;// Special handling: VINE_CACHE for caching, VINE_WATCH for watching, etc.
