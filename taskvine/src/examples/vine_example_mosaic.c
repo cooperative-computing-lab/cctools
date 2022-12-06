@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
 	for(i=0;i<36;i++) {
 		char filename[256];
 		sprintf(filename,"%d.cat.jpg",i);
-		vine_task_add_input(t,temp_file[i],filename,VINE_CACHE);
+		vine_task_add_input(t,vine_file_clone(temp_file[i]),filename,VINE_CACHE);
 	}
 	vine_task_add_input_file(t,"montage.sfx","montage.sfx",VINE_NOCACHE);
 	vine_task_add_output_file(t,"mosaic.jpg","mosaic.jpg",VINE_NOCACHE);
