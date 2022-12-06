@@ -2099,7 +2099,7 @@ static struct jx *construct_status_message( struct vine_manager *q, const char *
 		jx_delete(a);
 		a = categories_to_jx(q);
 	} else {
-		debug(D_WQ, "Unknown status request: '%s'", request);
+		debug(D_VINE, "Unknown status request: '%s'", request);
 		jx_delete(a);
 		a = NULL;
 	}
@@ -2123,7 +2123,7 @@ static vine_msg_code_t handle_queue_status( struct vine_manager *q, struct vine_
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
 	if(!a) {
-		debug(D_WQ, "Unknown status request: '%s'", line);
+		debug(D_VINE, "Unknown status request: '%s'", line);
 		return VINE_MSG_FAILURE;
 	}
 
@@ -3222,7 +3222,7 @@ int vine_enable_monitoring(struct vine_manager *q, char *monitor_output_director
 
 	if(!q->monitor_exe)
 	{
-		warn(D_WQ, "Could not find the resource monitor executable. Disabling monitoring.\n");
+		warn(D_VINE, "Could not find the resource monitor executable. Disabling monitoring.\n");
 		return 0;
 	}
 
