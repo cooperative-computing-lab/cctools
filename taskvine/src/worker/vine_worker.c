@@ -421,10 +421,8 @@ void send_cache_update( struct link *manager, const char *cachename, int64_t siz
 {
 	char *transfer_id;
 	if((transfer_id = hash_table_lookup(current_transfers, cachename))){
-		debug(D_VINE, "Sending Cache update transfer id: %s", transfer_id);
 		send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
-	}
-	else{
+	} else {
 		send_message(manager,"cache-update %s %lld %lld X\n",cachename,(long long)size,(long long)transfer_time);
 	}
 	if(transfer_id)
