@@ -2627,8 +2627,9 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 
 /*
 Determine whether there is transfer capacity to assign this task to this worker.
-Returns true on success, false on failure.
-Modifies the task's files to indicate the desired source of the transfer.
+Returns true on success, false if there are insufficient transfer sources.
+If a file can be fetched from a substitute source,
+this function modifies the file->substitute field to reflect that source.
 */
 
 static int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
@@ -2636,9 +2637,6 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 	struct vine_file *f;
 
 	LIST_ITERATE(t->input_files, f){
-		/* Only consider peer transfer urls and temps for now. */
-		if(f->type!=VINE_URL && f->type!=VINE_TEMP) continue;
-
 		/* Is the file already present on that worker? */
 		struct vine_remote_file_info *remote_info;
 		remote_info = hash_table_lookup(w->current_files,f->cached_name);
