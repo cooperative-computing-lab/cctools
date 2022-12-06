@@ -18,6 +18,9 @@ on remote machines.  To make the tasks portable, the program "/usr/bin/convert"
 is packaged up into a self-contained archive "convert.sfx" which contains
 the executable and all of its dynamic dependencies.  This allows the
 use of arbitrary workers without regard to their software environment.
+
+- Output is sent to temporary files on workers, which are then consumed
+by the final "montage" task, regardless of location.
 */
 
 #include "taskvine.h"
@@ -42,6 +45,13 @@ int main(int argc, char *argv[])
 
 	printf("Converting /usr/bin/convert into convert.sfx...\n");
 	r = system("starch -x /usr/bin/convert -c convert convert.sfx");
+	if(r!=0) {
+		printf("%s: failed to run starch, is it in your PATH?\n",argv[0]);
+		return 1;
+	}
+	
+	printf("Converting /usr/bin/montage into montage.sfx...\n");
+	r = system("starch -x /usr/bin/montage -c montage montage.sfx");
 	if(r!=0) {
 		printf("%s: failed to run starch, is it in your PATH?\n",argv[0]);
 		return 1;
@@ -100,12 +110,13 @@ int main(int argc, char *argv[])
 
 	printf("Combining images into mosaic.jpg...\n");
 
-	t = vine_task_create("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg");
+	t = vine_task_create("./montage.sfx `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg");
 	for(i=0;i<36;i++) {
 		char filename[256];
 		sprintf(filename,"%d.cat.jpg",i);
 		vine_task_add_input(t,temp_file[i],filename,VINE_CACHE);
 	}
+	vine_task_add_input_file(t,"montage.sfx","montage.sfx",VINE_NOCACHE);
 	vine_task_add_output_file(t,"mosaic.jpg","mosaic.jpg",VINE_NOCACHE);
 
 	int task_id = vine_submit(m,t);
