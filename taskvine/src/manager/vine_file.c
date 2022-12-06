@@ -174,9 +174,9 @@ struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *so
 	return vine_file_create(source,0,f->cached_name,0,f->length,VINE_URL,0,0);
 }
 
-struct vine_file * vine_file_temp()
+struct vine_file * vine_file_temp( const char *unique_name )
 {
-	return vine_file_create("temp",0,0,0,0,VINE_TEMP,0,0);
+	return vine_file_create("temp",0,unique_name,0,0,VINE_TEMP,0,0);
 }
 
 struct vine_file * vine_file_buffer( const char *buffer_name,const char *data, int length )
