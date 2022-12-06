@@ -885,7 +885,9 @@ static void add_worker(struct vine_manager *q)
 static void delete_worker_file( struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags ) {
 	if(!(flags & except_flags)) {
 		vine_manager_send(q,w, "unlink %s\n", filename);
-		hash_table_remove(w->current_files, filename);
+		struct vine_remote_file_info *remote_info;
+		remote_info = hash_table_remove(w->current_files, filename);
+		vine_remote_file_info_delete(remote_info);
 	}
 }
 
