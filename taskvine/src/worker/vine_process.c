@@ -25,6 +25,8 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "domain_name.h"
 #include "full_io.h"
+#include "hash_table.h"
+#include "list.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -47,6 +49,9 @@ Create temporary directories inside as well.
 */
 
 extern char * workspace;
+
+extern struct list *duty_list;
+extern struct hash_table *duty_ids;
 
 static int create_sandbox_dir( struct vine_process *p )
 {
@@ -206,7 +211,6 @@ static char * load_input_file(struct vine_task *t) {
 pid_t vine_process_execute(struct vine_process *p )
 {
 	// make warning
-
 	fflush(NULL);		/* why is this necessary? */
 
 	p->output_file_name = strdup(task_output_template);
@@ -218,13 +222,21 @@ pid_t vine_process_execute(struct vine_process *p )
 
 	p->execution_start = timestamp_get();
 
-	if (p->task->task_id >= 0) {
+	char *duty_name;
+	int duty_id;
+	int is_duty = 0;
+	HASH_TABLE_ITERATE(duty_ids,duty_name,duty_id) {
+		if (duty_id == p->task->task_id) {
+			is_duty = 1;
+		}
+	}	
+
+	if (!is_duty) {
 		p->pid = fork();
 	} else {
 		p->coprocess = vine_coprocess_initialize_coprocess(p->task->command_line);
 		vine_coprocess_specify_resources(p->coprocess, 0, 0, 0, 0);
 		p->pid = vine_coprocess_start(p->coprocess, p->sandbox);
-		return p->pid;
 	}
 
 	if(p->pid > 0) {

@@ -1645,6 +1645,15 @@ class Manager(object):
         vine_task_install_duty(self._taskvine, task._task, "duty_coprocess:" + name)
 
     ##
+    # Remove a duty from all connected workers
+    #
+    #
+    # @param self   Reference to the current manager object.
+    # @param name   Name of the duty to be removed.
+    def remove_duty(self, name):
+        vine_task_remove_duty(self._taskvine, "duty_coprocess:" + name)
+
+    ##
     # Wait for tasks to complete.
     #
     # This call will block until the timeout has elapsed

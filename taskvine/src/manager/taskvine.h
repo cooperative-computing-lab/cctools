@@ -679,6 +679,11 @@ The duty is expected to run on all workers until they disconnect from the manage
 */
 void vine_task_install_duty( struct vine_manager *q, struct vine_task *t, const char *name );
 
+/** Indicate the duty to be removed from all connected workers
+@param name The duty to be removed
+*/
+void vine_task_remove_duty( struct vine_manager *q, const char *name );
+
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
 If a task has completed, the corresponding task object will be returned by this function.

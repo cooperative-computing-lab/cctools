@@ -218,6 +218,7 @@ static int coprocess_gpus = -1;
 static char *factory_name = NULL;
 
 struct list *duty_list = NULL;
+struct hash_table *duty_ids = NULL;
 
 struct vine_cache *global_cache = 0;
 
@@ -1028,6 +1029,17 @@ static int handle_manager(struct link *manager)
 				kill_all_tasks();
 				r = 1;
 			}
+		} else if(sscanf(line, "kill_duty %" SCNd64, &length) == 1) {
+			char *duty_name = malloc(length+1);
+			link_read(manager,duty_name,length,time(0)+active_timeout);
+			duty_name[length] = 0;
+			task_id = (long int)hash_table_lookup(duty_ids, duty_name);
+			debug(D_VINE,"rx: killing duty %s %" SCNd64, duty_name, task_id);
+			kill(((struct vine_process *)itable_lookup(procs_table, task_id))->pid, SIGKILL);
+			list_remove(duty_list, duty_name);
+			hash_table_remove(features, duty_name);
+			list_remove(coprocess_list, ((struct vine_process *)itable_lookup(procs_table, task_id))->coprocess);
+			r = do_kill(task_id);
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
@@ -1041,12 +1053,13 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
 			r = 1;
-		} else if(sscanf(line,"duty %" SCNd64,&length)==1) {
+		} else if(sscanf(line,"duty %" SCNd64 " %" SCNd64,&length, &task_id)==2) {
 			char *duty_name = malloc(length+1);
 			link_read(manager,duty_name,length,time(0)+active_timeout);
 			duty_name[length] = 0;
-			debug(D_VINE,"rx: duty %s", duty_name);
+			debug(D_VINE,"rx: duty %s, id %" SCNd64, duty_name, task_id);
 			list_push_tail(duty_list, duty_name);
+			hash_table_insert(duty_ids, duty_name, (void **)task_id);
 			r = 1;
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
@@ -2146,6 +2159,7 @@ int main(int argc, char *argv[])
 	procs_complete = itable_create(0);
 	coprocess_list = list_create();
 	duty_list = list_create();
+	duty_ids = hash_table_create(0, 0);
 
 	watcher = vine_watcher_create();
 
