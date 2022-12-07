@@ -241,7 +241,7 @@ int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *ca
 		p->exit_code = 1;
 	}
 	
-	vine_sandbox_stageout(p,cache);
+	vine_sandbox_stageout(p,cache,manager);
 
 	/* Remove the task from the process so it is not deleted */
 	p->task = 0;

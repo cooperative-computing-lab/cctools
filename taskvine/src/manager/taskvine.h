@@ -92,16 +92,6 @@ typedef enum {
 	VINE_TASK_CANCELED,           /**< Task was canceled before completion **/
 } vine_task_state_t;
 
-/** Select the type of an input or output file to attach to a task. */
-
-typedef enum {
-	VINE_FILE = 1,              /**< A file or directory present at the manager. **/
-	VINE_URL,                   /**< A file obtained by downloading from a URL. */
-	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
-	VINE_MINI_TASK,             /**< A file obtained by executing a Unix command line. */
-	VINE_EMPTY_DIR              /**< An empty directory to create in the task sandbox. */
-} vine_file_t;
-
 /** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
 
 typedef enum {
@@ -650,6 +640,17 @@ struct vine_file * vine_file_local( const char *source );
 
 struct vine_file * vine_file_url( const char *url );
 
+/** Create a scratch file object.
+A scratch file has no initial content, but is created
+as the output of a task, and may be consumed by other tasks.
+@param unique_name If desired, the user may manually assign
+a globally-unique name to this file.  If null, the system will
+assign an internal unique name.  (recommended)
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_temp( const char *unique_name );
+
 /** Create a file object from a data buffer.
 @param name The abstract name of the buffer.
 @param data The contents of the buffer.
@@ -897,19 +898,13 @@ void vine_unblock_host(struct vine_manager *m, const char *hostname);
 */
 void vine_unblock_all(struct vine_manager *m);
 
-/** Invalidate cached file.
-The file or directory with the given local name specification is deleted from
-the workers' cache, so that a newer version may be used. Any running task using
-the file is canceled and resubmitted. Completed tasks waiting for retrieval are
-not affected.
-(Currently anonymous buffers cannot be deleted once cached in a worker.)
+/** Remove a file from worker's caches.
+The file or directory with the given specification is deleted from the workers' cache.
+Completed tasks waiting for retrieval are not affected.
 @param m A manager object
-@param local_name The name of the file on local disk or shared filesystem, or uri.
-@param type One of:
-- @ref VINE_FILE
-- @ref VINE_URL
+@param f Any file object.
 */
-void vine_invalidate_cached_file(struct vine_manager *m, const char *local_name, vine_file_t type);
+void vine_remove_file(struct vine_manager *m, struct vine_file *f );
 
 /** Get manager statistics (only from manager).
 @param m A manager object
