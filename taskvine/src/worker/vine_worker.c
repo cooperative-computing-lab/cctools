@@ -494,9 +494,15 @@ static int start_process( struct vine_process *p, struct link *manager )
 	pid = vine_process_execute(p);
 	if(pid<0) fatal("unable to fork process for task_id %d!",p->task->task_id);
 	if (p->coprocess) {
-		char *coprocess_name = "duty_coprocess:coprocess";
+		char *duty_name = NULL;
+		int duty_id;
+
+		HASH_TABLE_ITERATE(duty_ids,duty_name,duty_id) {
+			if (duty_id == p->task->task_id)
+				break;
+		}
 		list_push_tail(coprocess_list, p->coprocess);
-		hash_table_insert(features, coprocess_name, (void **) 1);
+		hash_table_insert(features, duty_name, (void **) 1);
 		send_features(manager);
 		send_resource_update(manager);
 	}

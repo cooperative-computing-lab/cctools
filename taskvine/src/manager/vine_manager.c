@@ -131,8 +131,8 @@ static void aggregate_workers_resources( struct vine_manager *q, struct vine_res
 static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int task_id);
 static void release_all_workers( struct vine_manager *q );
 
-static void vine_task_send_duty_to_workers(struct vine_manager *q, const char *name);
-static void vine_task_send_duties_to_workers(struct vine_manager *q);
+static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char *name);
+static void vine_manager_send_duties_to_workers(struct vine_manager *q);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -849,7 +849,7 @@ static void add_worker(struct vine_manager *q)
 
 	hash_table_insert(q->worker_table, w->hashkey, w);
 
-	vine_task_send_duties_to_workers(q);
+	vine_manager_send_duties_to_workers(q);
 }
 
 /* Delete a single file on a remote worker. */
@@ -3785,7 +3785,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	return vine_submit_internal(q, t);
 }
 
-static int vine_task_send_duty_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name) {
+static int vine_manager_send_duty_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name) {
 	struct vine_task *t = vine_task_clone(hash_table_lookup(q->duties, name));
 	t->task_id = q->next_task_id;
 	q->next_task_id++;
@@ -3795,41 +3795,41 @@ static int vine_task_send_duty_to_worker(struct vine_manager *q, struct vine_wor
 	return result;
 }
 
-static void vine_task_send_duty_to_workers(struct vine_manager *q, const char *name) {
+static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char *name) {
 	char *worker_key, *feature_key, *feature;
 	struct vine_worker_info *w;
 
 	HASH_TABLE_ITERATE(q->worker_table,worker_key,w) {
 		if(!w->features) {
-			vine_task_send_duty_to_worker(q, w, name);
+			vine_manager_send_duty_to_worker(q, w, name);
 			continue;
 		}
 
 		HASH_TABLE_ITERATE(q->duties,feature_key,feature) {
 			if(!hash_table_lookup(w->features, feature)) {
-				vine_task_send_duty_to_worker(q, w, name);
+				vine_manager_send_duty_to_worker(q, w, name);
 			}
 		}
 	}
 }
 
-static void vine_task_send_duties_to_workers(struct vine_manager *q) {
+static void vine_manager_send_duties_to_workers(struct vine_manager *q) {
 	char *duty;
 	struct vine_task *t;
 	HASH_TABLE_ITERATE(q->duties,duty,t) {
-		vine_task_send_duty_to_workers(q, duty);
+		vine_manager_send_duty_to_workers(q, duty);
 	}
 
 }
 
-void vine_task_install_duty( struct vine_manager *q, struct vine_task *t, const char *name ) {
+void vine_manager_install_duty( struct vine_manager *q, struct vine_task *t, const char *name ) {
 	t->task_id = -1;
 	hash_table_insert(q->duties, name, t);
 	t->time_when_submitted = timestamp_get();
-	vine_task_send_duties_to_workers(q);
+	vine_manager_send_duties_to_workers(q);
 }
 
-void vine_task_remove_duty( struct vine_manager *q, const char *name ) {
+void vine_manager_remove_duty( struct vine_manager *q, const char *name ) {
 	char *worker_key;
 	struct vine_worker_info *w;
 
