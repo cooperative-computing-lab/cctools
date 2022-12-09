@@ -28,13 +28,15 @@ documentation and/or software.
 
 #include "md5.h"
 #include "xxmalloc.h"
+#include "stringtools.h"
+#include "path.h"
 
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
-
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -366,6 +368,46 @@ const char *md5_string(unsigned char digest[16])
 	}
 	str[32] = 0;
 	return str;
+}
+
+const char * md5_file_or_dir(char * src)
+{
+        struct stat info;
+        if(stat(src, &info) != 0) return 0; 
+        if(S_ISDIR(info.st_mode)){
+                struct dirent *d;
+                DIR *dir = opendir(src);
+                if(!dir) return 0;
+                unsigned char digest[MD5_DIGEST_LENGTH];
+                char * path;
+                const char * hash = 0;
+                int init = 0;
+                while((d=readdir(dir))){
+                        if(!strcmp(d->d_name,".")) continue;
+                        if(!strcmp(d->d_name,"..")) continue;
+                        path = path_concat(src, d->d_name);
+                        if(init){
+                                char * str = string_format("%s%s", hash, md5_file_or_dir(path));
+                                md5_buffer((str), strlen(str), digest);
+                                hash = md5_string(digest);
+                        }
+                        else{
+                                init = 1;
+                                hash = md5_file_or_dir(path);
+                        }
+                }
+                return hash;
+        }
+        else if(S_ISREG(info.st_mode)){
+                unsigned char digest[MD5_DIGEST_LENGTH];
+                const char * hash;
+                md5_file(src, digest);
+                hash = md5_string(digest);
+                return hash;
+        }
+        else{
+                return 0;
+        }
 }
 
 char *md5_cal(const char *s) {

@@ -41,47 +41,6 @@ unique identifier where no name is available.
 */
 
 
-/* creates a hash for a single file or directory */
-
-const char * merkle(char * src){
-	struct stat info;
-	if(stat(src, &info) != 0) return 0; // couldn't stat file
-	if(S_ISDIR(info.st_mode)){
-		struct dirent *d;	
-		DIR *dir = opendir(src);
-		if(!dir) return 0;
-		unsigned char digest[MD5_DIGEST_LENGTH];
-		char * path;
-		const char * hash = 0;
-		int init = 0;
-		while((d=readdir(dir))){
-			if(!strcmp(d->d_name,".")) continue;
-            		if(!strcmp(d->d_name,"..")) continue;
-			path = path_concat(src, d->d_name);
-			if(init){
-				char * str = string_format("%s%s", hash, merkle(path));
-				md5_buffer((str), strlen(str), digest);
-				hash = md5_string(digest);
-			}
-			else{
-				init = 1;
-				hash = merkle(path);	
-			}
-		}
-		return hash; // return hash of hashes
-	}
-	else if(S_ISREG(info.st_mode)){
-		unsigned char digest[MD5_DIGEST_LENGTH];
-		const char * hash;
-		md5_file(src, digest);
-		hash = md5_string(digest);
-		return hash;
-		
-	}
-	else{
-		return 0;
-	}
-}
 
 char *make_cached_name( const struct vine_file *f )
 {
@@ -99,12 +58,13 @@ char *make_cached_name( const struct vine_file *f )
 			md5_buffer("buffer", 6, digest );
 		}
 	} else if(f->type == VINE_FILE) {
-		/* XXX check for hashing options*/
-		merkle_hash = merkle(f->source);
-		//md5_buffer(f->source,strlen(f->source),digest);
+		merkle_hash = md5_file_or_dir(f->source);
+		if(!merkle_hash){
+			md5_buffer(f->source,strlen(f->source),digest);
+			merkle_hash = md5_string(digest);
+		}
 		url_encode(path_basename(f->source), source_enc, PATH_MAX);
 	} else if(f->type == VINE_URL){
-		/* XXX curl header of file and cycle though options(eTag, md5, modified date?)*/
 		md5_buffer(f->source,strlen(f->source),digest);
 		url_encode(path_basename(f->source), source_enc, PATH_MAX);
 	} else if(f->type == VINE_MINI_TASK){
@@ -128,8 +88,10 @@ char *make_cached_name( const struct vine_file *f )
 	
 	switch(f->type) {
 		case VINE_FILE:
-		case VINE_EMPTY_DIR:
 			return string_format("file-%d-%s-%s", cache_file_id, merkle_hash, source_enc);
+			break;
+		case VINE_EMPTY_DIR:
+			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), source_enc);
 			break;
 		case VINE_MINI_TASK:
 			/* XXX This should be computed from the constituents of the mini task */
