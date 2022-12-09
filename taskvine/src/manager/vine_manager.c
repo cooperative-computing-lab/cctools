@@ -3796,19 +3796,19 @@ static int vine_manager_send_duty_to_worker(struct vine_manager *q, struct vine_
 }
 
 static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char *name) {
-	char *worker_key, *feature_key, *feature;
+	char *worker_key;
 	struct vine_worker_info *w;
 
 	HASH_TABLE_ITERATE(q->worker_table,worker_key,w) {
 		if(!w->features) {
 			vine_manager_send_duty_to_worker(q, w, name);
+			w->features = hash_table_create(4,0);
+			hash_table_insert(w->features, name, (void **) 1);
 			continue;
 		}
-
-		HASH_TABLE_ITERATE(q->duties,feature_key,feature) {
-			if(!hash_table_lookup(w->features, feature)) {
-				vine_manager_send_duty_to_worker(q, w, name);
-			}
+		if(!hash_table_lookup(w->features, name)) {
+			vine_manager_send_duty_to_worker(q, w, name);
+			hash_table_insert(w->features, name, (void **) 1);
 		}
 	}
 }

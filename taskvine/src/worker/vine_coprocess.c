@@ -119,7 +119,7 @@ int vine_coprocess_setup(struct vine_coprocess *coprocess)
 		}
 		if (!strcmp(key, "name")) {
             if(item->type == JX_STRING) {
-                name = string_format("vine_worker_coprocess:%s", item->u.string_value);
+                name = string_format("duty_coprocess:%s", item->u.string_value);
             }
 		}
 		else if (!strcmp(key, "port")) {
@@ -254,10 +254,10 @@ char *vine_coprocess_run(const char *function_name, const char *function_input, 
 	return buffer;
 }
 
-struct vine_coprocess *vine_coprocess_find_state(struct list *coprocess_list, vine_coprocess_state_t state) {
+struct vine_coprocess *vine_coprocess_find_state(struct list *coprocess_list, vine_coprocess_state_t state, char *coprocess_name) {
 	struct vine_coprocess *coprocess;
 	LIST_ITERATE(coprocess_list,coprocess){
-		if (coprocess->state == state) {
+		if (coprocess->state == state && !strcmp(coprocess->name, coprocess_name)) {
 			return coprocess;
 		}
 	}

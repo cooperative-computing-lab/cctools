@@ -222,16 +222,7 @@ pid_t vine_process_execute(struct vine_process *p )
 
 	p->execution_start = timestamp_get();
 
-	char *duty_name;
-	int duty_id;
-	int is_duty = 0;
-	HASH_TABLE_ITERATE(duty_ids,duty_name,duty_id) {
-		if (duty_id == p->task->task_id) {
-			is_duty = 1;
-		}
-	}	
-
-	if (!is_duty) {
+	if (!vine_process_get_duty_name(p)) {
 		p->pid = fork();
 	} else {
 		p->coprocess = vine_coprocess_initialize_coprocess(p->task->command_line);
@@ -382,6 +373,17 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 	p->sandbox_file_count = state->last_file_count_complete;
 
 	return result;
+}
+
+char * vine_process_get_duty_name( struct vine_process *p) {
+	char *duty_name;
+	int duty_id;
+	HASH_TABLE_ITERATE(duty_ids,duty_name,duty_id) {
+		if (duty_id == p->task->task_id) {
+			return duty_name;
+		}
+	}
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */

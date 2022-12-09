@@ -481,11 +481,12 @@ static int start_process( struct vine_process *p, struct link *manager )
 		itable_insert(procs_complete,p->task->task_id,p);
 		return 0;
 	}
-	
-	cores_allocated += t->resources_requested->cores;
-	memory_allocated += t->resources_requested->memory;
-	disk_allocated += t->resources_requested->disk;
-	gpus_allocated += t->resources_requested->gpus;
+	if (!p->coprocess || vine_process_get_duty_name(p)) {
+		cores_allocated += t->resources_requested->cores;
+		memory_allocated += t->resources_requested->memory;
+		disk_allocated += t->resources_requested->disk;
+		gpus_allocated += t->resources_requested->gpus;
+	}
 
 	if(t->resources_requested->gpus>0) {
 		vine_gpus_allocate(t->resources_requested->gpus,t->task_id);
@@ -495,16 +496,20 @@ static int start_process( struct vine_process *p, struct link *manager )
 	if(pid<0) fatal("unable to fork process for task_id %d!",p->task->task_id);
 	if (p->coprocess) {
 		char *duty_name = NULL;
-		int duty_id;
+		int duty_id = -1, iterate_id;
 
-		HASH_TABLE_ITERATE(duty_ids,duty_name,duty_id) {
-			if (duty_id == p->task->task_id)
+		HASH_TABLE_ITERATE(duty_ids,duty_name,iterate_id) {
+			if (iterate_id == p->task->task_id){
+				duty_id = iterate_id;
 				break;
+			}
 		}
-		list_push_tail(coprocess_list, p->coprocess);
-		hash_table_insert(features, duty_name, (void **) 1);
-		send_features(manager);
-		send_resource_update(manager);
+		if (duty_id > 0) {
+			list_push_tail(coprocess_list, p->coprocess);
+			hash_table_insert(features, duty_name, (void **) 1);
+			send_features(manager);
+			send_resource_update(manager);
+		}
 	}
 
 	itable_insert(procs_running,p->pid,p);
@@ -522,10 +527,12 @@ static void reap_process( struct vine_process *p )
 {
 	p->execution_end = timestamp_get();
 
-	cores_allocated  -= p->task->resources_requested->cores;
-	memory_allocated -= p->task->resources_requested->memory;
-	disk_allocated   -= p->task->resources_requested->disk;
-	gpus_allocated   -= p->task->resources_requested->gpus;
+	if (!p->coprocess || vine_process_get_duty_name(p)) {
+		cores_allocated  -= p->task->resources_requested->cores;
+		memory_allocated -= p->task->resources_requested->memory;
+		disk_allocated   -= p->task->resources_requested->disk;
+		gpus_allocated   -= p->task->resources_requested->gpus;
+	}
 
 	vine_gpus_free(p->task->task_id);
 
@@ -824,10 +831,12 @@ static int do_kill(int task_id)
 
 	if(itable_remove(procs_running, p->pid)) {
 		vine_process_kill(p);
-		cores_allocated -= p->task->resources_requested->cores;
-		memory_allocated -= p->task->resources_requested->memory;
-		disk_allocated -= p->task->resources_requested->disk;
-		gpus_allocated -= p->task->resources_requested->gpus;
+		if (!p->coprocess || vine_process_get_duty_name(p)) {
+			cores_allocated -= p->task->resources_requested->cores;
+			memory_allocated -= p->task->resources_requested->memory;
+			disk_allocated -= p->task->resources_requested->disk;
+			gpus_allocated -= p->task->resources_requested->gpus;
+		}
 		vine_gpus_free(task_id);
 	}
 
@@ -1276,7 +1285,7 @@ static void work_for_manager( struct link *manager )
 				} else if(task_resources_fit_now(p->task)) {
 					// attach the function name, port, and type to process, if applicable
 					if (p->task->coprocess) {
-						struct vine_coprocess *ready_coprocess = vine_coprocess_find_state(coprocess_list, VINE_COPROCESS_READY);
+						struct vine_coprocess *ready_coprocess = vine_coprocess_find_state(coprocess_list, VINE_COPROCESS_READY, p->task->coprocess);
 						if (ready_coprocess == NULL) {
 							list_push_tail(procs_waiting, p);
 							continue;

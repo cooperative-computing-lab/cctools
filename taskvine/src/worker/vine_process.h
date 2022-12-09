@@ -62,5 +62,6 @@ void  vine_process_delete( struct vine_process *p );
 void  vine_process_compute_disk_needed( struct vine_process *p );
 
 int vine_process_measure_disk(struct vine_process *p, int max_time_on_measurement);
+char *vine_process_get_duty_name(struct vine_process *p);
 
 #endif
