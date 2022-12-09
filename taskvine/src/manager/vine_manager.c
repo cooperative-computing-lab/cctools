@@ -2552,7 +2552,7 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 
 	ITABLE_ITERATE(w->current_tasks_boxes,task_id,box) {
 		struct vine_task *t = itable_lookup(w->current_tasks, task_id);
-		if (!t) continue;;
+		if (!t) continue;
 		if (t->coprocess) {
 			w->coprocess_resources->cores.inuse     += box->cores;
 			w->coprocess_resources->memory.inuse    += box->memory;

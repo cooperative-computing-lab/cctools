@@ -207,14 +207,8 @@ static int released_by_manager = 0;
 
 static char *catalog_hosts = NULL;
 
-static char *coprocess_command = NULL;
-static int number_of_coprocess_instances = 0;
 struct list *coprocess_list = NULL;
 
-static int coprocess_cores = -1;
-static int coprocess_memory = -1;
-static int coprocess_disk = -1;
-static int coprocess_gpus = -1;
 static char *factory_name = NULL;
 
 struct list *duty_list = NULL;
@@ -1864,7 +1858,6 @@ static void show_help(const char *cmd)
 
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
-	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_BANDWIDTH,
@@ -1873,9 +1866,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION,
-	  LONG_OPT_FROM_FACTORY, LONG_OPT_NUM_COPROCESS, LONG_OPT_COPROCESS_CORES, 
-	  LONG_OPT_COPROCESS_MEMORY, LONG_OPT_COPROCESS_DISK, LONG_OPT_COPROCESS_GPUS};
+	  LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION, LONG_OPT_FROM_FACTORY};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1911,12 +1902,6 @@ static const struct option long_options[] = {
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
-	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
-	{"num_coprocesses",     required_argument,  0,  LONG_OPT_NUM_COPROCESS},
-	{"coprocess_cores",     required_argument,  0,  LONG_OPT_COPROCESS_CORES},
-	{"coprocess_memory",    required_argument,  0,  LONG_OPT_COPROCESS_MEMORY},
-	{"coprocess_disk",      required_argument,  0,  LONG_OPT_COPROCESS_DISK},
-	{"coprocess_gpus",      required_argument,  0,  LONG_OPT_COPROCESS_GPUS},
 	{"from-factory",        required_argument,  0,  LONG_OPT_FROM_FACTORY},
 	{0,0,0,0}
 };
@@ -2087,26 +2072,6 @@ int main(int argc, char *argv[])
 		case LONG_OPT_USE_SSL:
 			manual_ssl_option=1;
 			break;
-		case LONG_OPT_COPROCESS:
-			coprocess_command = calloc(PATH_MAX, sizeof(char));
-			path_absolute(optarg, coprocess_command, 1);
-			coprocess_command = realloc(coprocess_command, strlen(coprocess_command)+1);
-			break;
-		case LONG_OPT_NUM_COPROCESS:
-			number_of_coprocess_instances = atoi(optarg);
-			break;
-		case LONG_OPT_COPROCESS_CORES:
-			coprocess_cores = atoi(optarg);
-			break;
-		case LONG_OPT_COPROCESS_MEMORY:
-			coprocess_memory = atoi(optarg);
-			break;
-		case LONG_OPT_COPROCESS_DISK:
-			coprocess_disk = atoi(optarg);
-			break;
-		case LONG_OPT_COPROCESS_GPUS:
-			coprocess_gpus = atoi(optarg);
-			break;
 		case LONG_OPT_FROM_FACTORY:
 			if (factory_name) free(factory_name);
 			factory_name = xxstrdup(optarg);
@@ -2255,7 +2220,6 @@ int main(int argc, char *argv[])
 		vine_coprocess_shutdown_all_coprocesses(coprocess_list);
 		list_delete(coprocess_list);
 	}
-	if (coprocess_command) free(coprocess_command);
 
 	workspace_delete();
 
