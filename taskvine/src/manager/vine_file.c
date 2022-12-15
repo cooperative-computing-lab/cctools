@@ -95,11 +95,13 @@ const char *make_url_cached_name(const struct vine_file *f)
 				return md5_string(digest);
 			}
 			if(sscanf(line, "Last-Modified: %s", hash_src)){
-				md5_buffer(hash_src, strlen(hash_src), digest);
+				buffer = string_combine(line, f->source);
+				md5_buffer(buffer, strlen(buffer), digest);
 				return md5_string(digest);
 			}
 			if(sscanf(line, "last-modified: %s", hash_src)){
-				md5_buffer(hash_src, strlen(hash_src), digest);
+				buffer = string_combine(line, f->source);
+				md5_buffer(buffer, strlen(buffer), digest);
 				return md5_string(digest);
 			}
 		}
