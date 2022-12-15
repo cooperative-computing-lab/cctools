@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "md5.h"
 #include "url_encode.h"
 #include "stringtools.h"
+#include "copy_stream.h"
 #include "path.h"
 
 #include <stdlib.h>
@@ -39,7 +40,104 @@ In each of the other file types, a similar approach is taken,
 including a hash and a name where one is known, or another
 unique identifier where no name is available.
 */
+int do_command(char * command, char **buffer){
+	FILE * stream = popen(command, "r");
+	int result = 0;
+        if(stream){
+                copy_stream_to_buffer(stream, buffer, 0);
+                int exit_status = pclose(stream);
+                if(exit_status==0){
+                        result = 1;
+                }
+                else{
+                        // command failed
+                        result = 0;
+                }
+        }
+        else{
+		result = 0;
+                // couldn't execute command
+        }
+	return result;
+}
 
+const char *make_url_cached_name(const struct vine_file *f)
+{
+	int result = 0;
+
+	int STR_MAX = 256;
+	char line[STR_MAX];
+	char hash_src[STR_MAX];
+	char * buffer;
+	unsigned char digest[MD5_DIGEST_LENGTH];
+
+	char tmp[] = "curl_tmp.XXXXXX";
+	mkstemp(tmp); 
+
+	char * command = string_format("curl -I -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", tmp, f->source);
+	result = do_command(command, &buffer);
+
+	if(result){
+		FILE * fp;
+		fp = fopen(tmp, "r");
+		if(!fp) return 0;	
+		while(fgets(line, STR_MAX, fp)){
+			if(sscanf(line, "Content-MD5: %s", hash_src)){
+				md5_buffer(hash_src, strlen(hash_src), digest);
+				return md5_string(digest);
+			}
+			if(sscanf(line, "content-md5: %s", hash_src)){
+				md5_buffer(hash_src, strlen(hash_src), digest);
+				return md5_string(digest);
+			}
+			if(sscanf(line, "ETag: %s", hash_src)){
+				md5_buffer(hash_src, strlen(hash_src), digest);
+				return md5_string(digest);
+			}
+			if(sscanf(line, "Last-Modified: %s", hash_src)){
+				md5_buffer(hash_src, strlen(hash_src), digest);
+				return md5_string(digest);
+			}
+			if(sscanf(line, "last-modified: %s", hash_src)){
+				md5_buffer(hash_src, strlen(hash_src), digest);
+				return md5_string(digest);
+			}
+		}
+		return 0;
+	}
+	else{
+		return 0;
+	}
+
+	/*
+	if(result){
+
+		command = string_format("grep -i content-md5 %s", output)'
+		result = do_command(comand, &buffer);
+		if(result){
+			md5_buffer(buffer, strlen(buffer), digest);
+			return md5_string(digest);
+		}
+		command = string_format("grep -i etag %s", output);
+		result = do_command(command, &buffer);
+		if(result){
+			md5_buffer(buffer, strlen(buffer), digest);
+			return md5_string(digest);
+		}
+		command = string_format("grep -i last-modified %s", output);
+		result = do_command(command, &buffer);
+		if(result){
+			buffer = string_combine(buffer, f->source);
+			md5_buffer(buffer, strlen(buffer), digest);
+			return md5_string(digest);
+		}
+		return 0; // There is no meta data to use	
+	}
+	else{
+		return 0; // could not curl;
+	}
+	*/
+}
 
 
 char *make_cached_name( const struct vine_file *f )
@@ -49,7 +147,7 @@ char *make_cached_name( const struct vine_file *f )
 
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	char source_enc[PATH_MAX];
-	const char * merkle_hash;
+	const char * hash;
 
 	if(f->type == VINE_BUFFER) {
 		if(f->data) {
@@ -58,14 +156,19 @@ char *make_cached_name( const struct vine_file *f )
 			md5_buffer("buffer", 6, digest );
 		}
 	} else if(f->type == VINE_FILE) {
-		merkle_hash = md5_file_or_dir(f->source);
-		if(!merkle_hash){
+		hash = md5_file_or_dir(f->source);
+		if(!hash){
 			md5_buffer(f->source,strlen(f->source),digest);
-			merkle_hash = md5_string(digest);
+			hash = md5_string(digest);
 		}
 		url_encode(path_basename(f->source), source_enc, PATH_MAX);
 	} else if(f->type == VINE_URL){
-		md5_buffer(f->source,strlen(f->source),digest);
+		hash = make_url_cached_name(f);
+		if(!hash){
+			md5_buffer(f->source,strlen(f->source),digest);
+			hash = md5_string(digest);
+			
+		}
 		url_encode(path_basename(f->source), source_enc, PATH_MAX);
 	} else if(f->type == VINE_MINI_TASK){
 		md5_buffer(f->source,strlen(f->source),digest);
@@ -88,7 +191,7 @@ char *make_cached_name( const struct vine_file *f )
 	
 	switch(f->type) {
 		case VINE_FILE:
-			return string_format("file-%d-%s-%s", cache_file_id, merkle_hash, source_enc);
+			return string_format("file-%d-%s-%s", cache_file_id, hash, source_enc);
 			break;
 		case VINE_EMPTY_DIR:
 			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), source_enc);
@@ -98,7 +201,7 @@ char *make_cached_name( const struct vine_file *f )
 			return string_format("task-%d-%s", cache_file_id, md5_string(digest));
 			break;
 	       	case VINE_URL:
-			return string_format("url-%d-%s", cache_file_id, md5_string(digest));
+			return string_format("url-%d-%s", cache_file_id, hash);
 			break;
 		case VINE_BUFFER:
 		default:
