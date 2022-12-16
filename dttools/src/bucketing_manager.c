@@ -20,11 +20,10 @@ static char* int_to_string(int n)
  * @param m the bucketing manager */
 static void bucketing_manager_add_default_resource_types(bucketing_manager_t* m)
 {
-    bucketing_manager_add_resource_type(m, "cores", 1, 10, 2, 10, m->mode, 1);
-    bucketing_manager_add_resource_type(m, "memory", 1000, 10, 2, 10, m->mode, 1);
-    bucketing_manager_add_resource_type(m, "disk", 1000, 10, 2, 10, m->mode, 1);
+    bucketing_manager_add_resource_type(m, "cores", 0, 1, 10, 2, 10, 1);
+    bucketing_manager_add_resource_type(m, "memory", 0, 1000, 10, 2, 10, 1);
+    bucketing_manager_add_resource_type(m, "disk", 0, 1000, 10, 2, 10, 1);
 }
-
 /* End: internals */
 
 /* Begin: APIs */
@@ -47,15 +46,11 @@ bucketing_manager_t* bucketing_manager_create(bucketing_mode_t mode)
     return m;
 }
 
-void bucketing_manager_initialize(bucketing_manager_t* m, bucketing_mode_t mode)
+bucketing_manager_t* bucketing_manager_initialize(bucketing_mode_t mode)
 {
-    if (m)
-    {
-        warn(D_BUCKETING, "Ignoring initialization of a non-empty bucketing manager\n");
-        return;
-    }
-    m = bucketing_manager_create(mode);
+    bucketing_manager_t* m = bucketing_manager_create(mode);
     bucketing_manager_add_default_resource_types(m);
+    return m;
 }
 
 void bucketing_manager_delete(bucketing_manager_t* m)

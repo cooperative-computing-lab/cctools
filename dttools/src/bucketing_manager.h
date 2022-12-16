@@ -23,9 +23,9 @@ bucketing_manager_t;
 bucketing_manager_t* bucketing_manager_create(bucketing_mode_t mode);
 
 /* Create and initialize a bucketing manager
- * @param m pointer to a bucketing manager to be created and initialized
- * @param mode algorithm to do bucketing */
-void bucketing_manager_initialize(bucketing_manager_t* m, bucketing_mode_t mode);
+ * @param mode algorithm to do bucketing
+ * @return pointer to a created and initialized bucketing manager */
+bucketing_manager_t* bucketing_manager_initialize(bucketing_mode_t mode);
 
 /* Delete a bucketing manager
  * @param m the manager to be deleted */
@@ -35,7 +35,7 @@ void bucketing_manager_delete(bucketing_manager_t* m);
  * Do nothing if this resource is already in manager
  * @param m the relevant manager
  * @param r the string of the resource (e.g., "cores")
- * @param set_default set default values for resource, only support cores, memory, and disk
+ * @param set_default set default values for resource, only support cores, memory, and disk and ignore the rest of the arguments
  * see this function's definition for more info
  * @param default_value the first base value to allocate new tasks (e.g.,"mem": 1000 means try 1GBs of mem to new tasks)
  * @param num_sampling_points number of sampling points

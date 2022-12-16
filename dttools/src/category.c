@@ -158,7 +158,7 @@ void category_specify_allocation_mode(struct category *c, int mode) {
         if (!c->bucketing_manager)
         {
             bucketing_mode_t bmode = c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING ? BUCKETING_MODE_GREEDY : BUCKETING_MODE_EXHAUSTIVE;
-            bucketing_manager_initialize(c->bucketing_manager, bmode);
+            c->bucketing_manager = bucketing_manager_initialize(bmode);
         }
     }
 
@@ -839,8 +839,8 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
     if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED &&
         c->allocation_mode != CATEGORY_ALLOCATION_MODE_MAX) {
         if (category_in_steady_state(c) && 
-            c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE &&
-            c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT)
+            (c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE ||
+            c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT))
         {
             /* load max seen values, but only if not in fixed or max mode.
              * In max mode, max seen is the first allocation, and next allocation
@@ -883,8 +883,8 @@ const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct cat
     if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED &&
         c->allocation_mode != CATEGORY_ALLOCATION_MODE_MAX) {
         if (category_in_steady_state(c) && 
-            c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE &&
-            c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT)
+            (c->allocation_mode == CATEGORY_ALLOCATION_MODE_MIN_WASTE ||
+            c->allocation_mode == CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT))
         {
             /* load max seen values, but only if not in fixed or max mode.
              * In max mode, max seen is the first allocation, and next allocation

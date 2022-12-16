@@ -214,7 +214,8 @@ static double bucketing_greedy_policy(bucketing_bucket_range_t* range, int break
     bucketing_point_t* tmp_point_ptr = 0; //pointer to get item from sorted points
     double exp_cons_lq_break = 0;       //expected value if next point is lower than or equal to break point
     double exp_cons_g_break = 0;        //expected value if next point is higher than break point
-    int break_val, max_val; //values at break point and max point
+    int break_val = -1; //value at break point
+    int max_val = -1;   //value at max point
     struct list_cursor* iter = list_cursor_clone(range->lo->lc);    //cursor to iterate through list
 
     /* Loop through the range to collect statistics */
