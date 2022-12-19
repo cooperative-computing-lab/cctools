@@ -7726,10 +7726,8 @@ static void write_transaction(struct work_queue *q, const char *str) {
 	if(!q->transactions_logfile)
 		return;
 
-	fprintf(q->transactions_logfile, "%" PRIu64, timestamp_get());
-	fprintf(q->transactions_logfile, " %d", getpid());
-	fprintf(q->transactions_logfile, " %s", str);
-	fprintf(q->transactions_logfile, "\n");
+	fprintf(q->transactions_logfile, "%" PRIu64 " %d %s\n", timestamp_get(),getpid(),str);
+	fflush(q->transactions_logfile);
 }
 
 static void write_transaction_task(struct work_queue *q, struct work_queue_task *t) {

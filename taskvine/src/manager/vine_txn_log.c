@@ -44,10 +44,8 @@ void vine_txn_log_write(struct vine_manager *q, const char *str)
 	if(!q->txn_logfile)
 		return;
 
-	fprintf(q->txn_logfile, "%" PRIu64, timestamp_get());
-	fprintf(q->txn_logfile, " %d", getpid());
-	fprintf(q->txn_logfile, " %s", str);
-	fprintf(q->txn_logfile, "\n");
+	fprintf(q->txn_logfile, "%" PRIu64 " %d %s\n", timestamp_get(),getpid(),str);
+	fflush(q->txn_logfile);
 }
 
 void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
