@@ -1819,8 +1819,8 @@ class Manager(object):
     # @param self       Reference to the current manager object.
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.  Use an integer to set the timeout or the constant @ref
-    #                   VINE_WAITFORTASK to block until a task has completed.
-    def wait(self, timeout=VINE_WAITFORTASK):
+    #                   VINE_WAIT_FOREVER to block until a task has completed.
+    def wait(self, timeout=VINE_WAIT_FOREVER):
         return self.wait_for_tag(None, timeout)
 
     ##
@@ -1833,7 +1833,7 @@ class Manager(object):
     # @param tag        Desired tag. If None, then it is equivalent to self.wait(timeout)
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
-    def wait_for_tag(self, tag, timeout=VINE_WAITFORTASK):
+    def wait_for_tag(self, tag, timeout=VINE_WAIT_FOREVER):
         task_pointer = vine_wait_for_tag(self._taskvine, tag, timeout)
         if task_pointer:
             task = self._task_table[vine_task_get_id(task_pointer)]
@@ -1851,7 +1851,7 @@ class Manager(object):
     # @param task_id        Desired task_id. If -1, then it is equivalent to self.wait(timeout)
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
-    def wait_for_task_id(self, task_id, timeout=VINE_WAITFORTASK):
+    def wait_for_task_id(self, task_id, timeout=VINE_WAIT_FOREVER):
         task_pointer = vine_wait_for_task_id(self._taskvine, task_id, timeout)
         if task_pointer:
             task = self._task_table[vine_task_get_id(task_pointer)]
