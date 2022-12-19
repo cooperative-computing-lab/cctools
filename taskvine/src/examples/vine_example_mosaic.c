@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
 	printf("Submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );
 
 	printf("Waiting for tasks to complete...\n");
-	t = vine_wait(m,VINE_WAITFORTASK);
+	t = vine_wait(m,VINE_WAIT_FOREVER);
 	
 	printf("All tasks complete!\n");
 

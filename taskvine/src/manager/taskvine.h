@@ -36,7 +36,7 @@ expected events.
 
 #define VINE_DEFAULT_PORT 9123               /**< Default taskvine port number. */
 #define VINE_RANDOM_PORT  0                  /**< Indicates that any port may be chosen. */
-#define VINE_WAITFORTASK  -1                 /**< Timeout value to wait for a task to complete before returning. */
+#define VINE_WAIT_FOREVER -1                 /**< Timeout value to wait for a task to complete before returning. */
 
 /** Select optional handling for input and output files: caching, unpacking, watching, etc. **/
 
@@ -764,7 +764,7 @@ If the task could not, then the <tt>result</tt> field will be non-zero and the
 <tt>return_status</tt> field will be undefined.
 
 @param m A manager object
-@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref VINE_WAITFORTASK to block until a task has completed.
+@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref VINE_WAIT_FOREVER to block until a task has completed.
 @returns A completed task description, or null if the manager is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
 */
 struct vine_task *vine_wait(struct vine_manager *m, int timeout);
@@ -774,7 +774,7 @@ struct vine_task *vine_wait(struct vine_manager *m, int timeout);
 Similar to @ref vine_wait, but guarantees that the returned task has the specified tag.
 @param m A manager object
 @param tag The desired tag. If NULL, then tasks are returned regardless of their tag.
-@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref VINE_WAITFORTASK to block until a task has completed.
+@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref VINE_WAIT_FOREVER to block until a task has completed.
 @returns A completed task description, or null if the manager is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
 */
 struct vine_task *vine_wait_for_tag(struct vine_manager *m, const char *tag, int timeout);
@@ -783,7 +783,7 @@ struct vine_task *vine_wait_for_tag(struct vine_manager *m, const char *tag, int
 Similar to @ref vine_wait, but guarantees that the returned task has the specified task_id.
 @param m A manager object
 @param task_id The desired task_id. If -1, then tasks are returned regardless of their task_id.
-@param timeout The number of seconds to wait for a completed task before returning. Use an integer time to set the timeout or the constant @ref VINE_WAITFORTASK to block until a task has completed.
+@param timeout The number of seconds to wait for a completed task before returning. Use an integer time to set the timeout or the constant @ref VINE_WAIT_FOREVER to block until a task has completed.
 @returns A completed task description, or null if the manager is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
 */
 struct vine_task *vine_wait_for_task_id(struct vine_manager *m, int task_id, int timeout);

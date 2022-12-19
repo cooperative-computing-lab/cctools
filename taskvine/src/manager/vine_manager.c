@@ -3890,7 +3890,7 @@ struct vine_task *vine_wait_for_tag(struct vine_manager *q, const char *tag, int
 		timeout = 1;
 	}
 
-	if(timeout != VINE_WAITFORTASK && timeout < 0) {
+	if(timeout != VINE_WAIT_FOREVER && timeout < 0) {
 		debug(D_NOTICE|D_VINE, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
 		timeout = 5;
 	}
@@ -3908,7 +3908,7 @@ struct vine_task *vine_wait_for_task_id(struct vine_manager *q, int task_id, int
 		timeout = 1;
 	}
 
-	if(timeout != VINE_WAITFORTASK && timeout < 0) {
+	if(timeout != VINE_WAIT_FOREVER && timeout < 0) {
 		debug(D_NOTICE|D_VINE, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
 		timeout = 5;
 	}
@@ -4021,7 +4021,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	print_password_warning(q);
 
 	// compute stoptime
-	time_t stoptime = (timeout == VINE_WAITFORTASK) ? 0 : time(0) + timeout;
+	time_t stoptime = (timeout == VINE_WAIT_FOREVER) ? 0 : time(0) + timeout;
 
 	int result;
 	struct vine_task *t = NULL;
