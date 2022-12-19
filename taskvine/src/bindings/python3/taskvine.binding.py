@@ -265,6 +265,7 @@ class Task(object):
     # @param coprocess  The name of the coprocess.
     def set_coprocess(self, coprocess):
         return vine_task_set_coprocess(self._task, coprocess)
+    
 
     ##
     # Set the worker selection scheduler for task.
@@ -1810,6 +1811,25 @@ class Manager(object):
         task_id = vine_submit(self._taskvine, task._task)
         self._task_table[task_id] = task
         return task_id
+    
+    ##
+    # Submit a duty to install on all connected workers 
+    #
+    #
+    # @param self   Reference to the current manager object.
+    # @param task   A task description created from @ref taskvine::Task.
+    # @param name   Name of the duty to be installed.
+    def install_duty(self, task, name):
+        vine_manager_install_duty(self._taskvine, task._task, "duty_coprocess:" + name)
+
+    ##
+    # Remove a duty from all connected workers
+    #
+    #
+    # @param self   Reference to the current manager object.
+    # @param name   Name of the duty to be removed.
+    def remove_duty(self, name):
+        vine_manager_remove_duty(self._taskvine, "duty_coprocess:" + name)
 
     ##
     # Wait for tasks to complete.
@@ -2174,7 +2194,7 @@ class RemoteTask(Task):
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
-        Task.set_coprocess(self, coprocess)
+        Task.set_coprocess(self, "duty_coprocess:" + coprocess)
     ##
     # Specify function arguments. Accepts arrays and dictionarys. This overrides any arguments passed during task creation
     # @param self             Reference to the current remote task object
