@@ -103,7 +103,46 @@ should not be cached. That is, generating a cachename could lead to possible con
 
 
 */
-const char *make_url_cached_name(const struct vine_file *f)
+const char * make_mt_cached_name(const struct vine_file *f){
+	char * buffer;
+	char * file_buffer;
+	struct vine_file * file;
+	unsigned char digest[MD5_DIGEST_LENGTH];
+	buffer = string_format("{\ncmd = \"%s\"\n", f->source);
+	if(f->mini_task->input_files){
+		buffer = string_combine(buffer, "inputs = ");
+		LIST_ITERATE(f->mini_task->input_files, file){
+			if(file->type == VINE_BUFFER){
+				file_buffer = string_format("{ name: \"%s\", source: \"%s\"}, ", file->data, file->cached_name);
+				buffer = string_combine(buffer, file_buffer);
+			}
+			else{
+				file_buffer = string_format("{ name: \"%s\", source: \"%s\"}, ", file->source, file->cached_name);
+				buffer = string_combine(buffer, file_buffer);
+			}
+		}
+		buffer = string_combine(buffer, "\n");
+	}
+	if(f->mini_task->output_files){
+		buffer = string_combine(buffer, "outputs = ");
+		LIST_ITERATE(f->mini_task->output_files, file){
+			if(file->type == VINE_BUFFER){
+				file_buffer = string_format("{ name: \"%s\"}, " , file->data);
+				buffer = string_combine(buffer, file_buffer);
+			}
+			else{
+				file_buffer = string_format("{ name: \"%s\"}, ", file->source);
+				buffer = string_combine(buffer, file_buffer);
+			}
+		}
+		buffer = string_combine(buffer, "\n");
+	}
+	printf("%s", buffer);
+	md5_buffer(buffer,strlen(buffer),digest);
+       	return md5_string(digest);
+	
+}
+const char * make_url_cached_name(const struct vine_file *f)
 {
 	int val = 0;
 	int STR_MAX = 256;
@@ -186,8 +225,11 @@ char *make_cached_name( const struct vine_file *f )
 		}
 		url_encode(path_basename(f->source), source_enc, PATH_MAX);
 	} else if(f->type == VINE_MINI_TASK){
-		md5_buffer(f->source,strlen(f->source),digest);
-		url_encode(path_basename(f->source), source_enc, PATH_MAX);
+		hash = make_mt_cached_name(f);
+		if(!hash){
+			md5_buffer(f->source,strlen(f->source),digest);
+			hash = md5_string(digest);
+		}
 	} else {
 		md5_buffer(f->source,strlen(f->source),digest);
 		url_encode(path_basename(f->source), source_enc, PATH_MAX);
@@ -213,7 +255,7 @@ char *make_cached_name( const struct vine_file *f )
 			break;
 		case VINE_MINI_TASK:
 			/* XXX This should be computed from the constituents of the mini task */
-			return string_format("task-%d-%s", cache_file_id, md5_string(digest));
+			return string_format("task-%d-%s", cache_file_id, hash);
 			break;
 	       	case VINE_URL:
 			return string_format("url-%d-%s", cache_file_id, hash);
@@ -224,6 +266,7 @@ char *make_cached_name( const struct vine_file *f )
 			break;
 	}
 }
+
 
 /* Create a new file object with the given properties. */
 
