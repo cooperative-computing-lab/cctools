@@ -619,7 +619,7 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 	c->steady_state = c->completions_since_last_reset >= first_allocation_every_n_tasks;
 
 	int i;
-    for (i = 0; labeld_resources[i]; i++) {
+    for (i = 0; labeled_resources[i]; i++) {
         const size_t o = labeled_resources[i];
         double max = MAX(rmsummary_get_by_offset(rs, o), rmsummary_get_by_offset(c->max_resources_seen, o));
         rmsummary_set_by_offset(c->max_resources_seen, o, max);
