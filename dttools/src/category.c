@@ -901,7 +901,9 @@ const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct cat
         }
         else if (taskid >= 0 && category_in_bucketing_mode(c))
         {
-            rmsummary_merge_override(internal, bucketing_manager_predict(c->bucketing_manager, taskid));
+            struct rmsummary* bucketing_prediction = bucketing_manager_predict(c->bucketing_manager, taskid);
+            rmsummary_merge_override(internal, bucketing_prediction);
+            free(bucketing_prediction);
         }
     }
 
