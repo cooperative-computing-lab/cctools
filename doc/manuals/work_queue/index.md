@@ -2045,8 +2045,8 @@ tasks. It is activated as follows:
 
 === "C"
     ```C
-   work_queue_specify_transactions_log(q, "my.tr.log");
-   ```
+    work_queue_specify_transactions_log(q, "my.tr.log");
+    ```
 
 The first few lines of the log document the possible log records:
 
