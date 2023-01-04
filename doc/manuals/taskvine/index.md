@@ -1651,8 +1651,8 @@ tasks. It is activated as follows:
 
 === "C"
     ```C
-   vine_enable_transactions_log(q, "my.tr.log");
-   ```
+    vine_enable_transactions_log(q, "my.tr.log");
+    ```
 
 The first few lines of the log document the possible log records:
 
