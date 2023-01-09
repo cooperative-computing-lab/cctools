@@ -170,4 +170,28 @@ extern gid_t pfs_gid;
 	(b).stx_rdev_minor = (a).stx_rdev_minor;
 #endif
 
+
+#ifndef COPY_STAT_TO_STATX
+#define COPY_STAT_TO_STATX( a, b )\
+	memset(&(b),0,sizeof(b));\
+	(b).stx_blksize = (a).st_blksize;\
+	(b).stx_nlink = (a).st_nlink;\
+	(b).stx_uid = (a).st_uid;\
+	(b).stx_gid = (a).st_gid;\
+	(b).stx_mode = (a).st_mode;\
+	(b).stx_ino = (a).st_ino;\
+	(b).stx_size = (a).st_size;\
+	(b).stx_blocks = (a).st_blocks;\
+	(b).stx_atime.tv_sec = (a).st_atime;\
+	(b).stx_atime.tv_nsec = 0;\
+	(b).stx_mtime.tv_sec = (a).st_mtime;\
+	(b).stx_mtime.tv_nsec = 0;\
+	(b).stx_ctime.tv_sec = (a).st_ctime;\
+	(b).stx_ctime.tv_nsec = 0;\
+	(b).stx_dev_major = (a).st_dev;\
+	(b).stx_rdev_major = (a).st_rdev;\
+	(b).stx_dev_minor = 1;\
+	(b).stx_rdev_minor = 1;
+#endif
+
 #endif

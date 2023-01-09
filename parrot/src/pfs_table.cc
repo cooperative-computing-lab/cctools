@@ -1553,8 +1553,10 @@ int pfs_table::statx( const char *name, int flags, unsigned int mask, struct pfs
 	pfs_name pname;
 	int result = -1;
 
+	int follow_symlink = !(flags & AT_SYMLINK_NOFOLLOW);
+
 	/* You don't need to have read permission on a file to stat it. */
-	if(resolve_name(0,name,&pname,F_OK)) {
+	if(resolve_name(0,name,&pname,F_OK,follow_symlink)) {
 		result = pname.service->statx(&pname,flags,mask,b);
 		if(result>=0 && b->stx_blksize < 1) {
 			b->stx_blksize = pname.service->get_block_size();
