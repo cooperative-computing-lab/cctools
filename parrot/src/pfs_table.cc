@@ -1095,7 +1095,6 @@ int pfs_table::fstat( int fd, struct pfs_stat *b )
 	return result;
 }
 
-
 int pfs_table::fstatfs( int fd, struct pfs_statfs *buf )
 {
 	CHECK_FD(fd);
@@ -1548,6 +1547,27 @@ int pfs_table::stat( const char *n, struct pfs_stat *b )
 
 	return result;
 }
+
+int pfs_table::statx( const char *name, int flags, unsigned int mask, struct pfs_statx *b )
+{
+	pfs_name pname;
+	int result = -1;
+
+	/* You don't need to have read permission on a file to stat it. */
+	if(resolve_name(0,name,&pname,F_OK)) {
+		result = pname.service->statx(&pname,flags,mask,b);
+		if(result>=0 && b->stx_blksize < 1) {
+			b->stx_blksize = pname.service->get_block_size();
+		} else if(errno==ENOENT && !pname.hostport[0]) {
+			pfs_service_emulate_statx(&pname,b);
+			b->stx_mode = S_IFDIR | 0555;
+			result = 0;
+		}
+	}
+
+	return result;
+}
+
 
 int pfs_table::statfs( const char *n, struct pfs_statfs *b )
 {

@@ -417,6 +417,19 @@ RETRY:
 		}
 		END
 	}
+	virtual int statx( pfs_name *name, int flags, unsigned int mask, struct pfs_statx *buf ) {
+		stats_inc("parrot.local.statx", 1);
+		int result;
+		struct statx lbuf;
+		memset(&lbuf,0,sizeof(lbuf));
+		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
+		debug(D_LOCAL,"statx %s %p",name->rest,buf);
+		result = ::statx(AT_FDCWD,name->rest,flags,mask,&lbuf);
+		if(result>=0){
+				COPY_STATX(lbuf,*buf);
+		}
+		END
+	}
 	virtual int access( pfs_name *name, mode_t mode ) {
 		stats_inc("parrot.local.access", 1);
 		int result;
