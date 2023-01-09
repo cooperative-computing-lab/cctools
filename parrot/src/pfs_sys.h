@@ -50,6 +50,8 @@ char *		pfs_getcwd( char *path, pfs_size_t size );
 int		pfs_stat( const char *name, struct pfs_stat *buf );
 int		pfs_statfs( const char *path, struct pfs_statfs *buf );
 int		pfs_lstat( const char *name, struct pfs_stat *buf );
+int		pfs_statx( int dirfd, const char *pathname, int flags, unsigned int mask, struct pfs_statx *buf );
+
 int		pfs_access( const char *name, mode_t mode );
 int		pfs_chmod( const char *name, mode_t mode );
 int		pfs_chown( const char *name, struct pfs_process *p, uid_t uid, gid_t gid );
