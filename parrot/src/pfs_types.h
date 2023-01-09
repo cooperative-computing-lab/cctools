@@ -59,6 +59,36 @@ struct pfs_statfs {
 	INT64_T f_ffree;
 };
 
+struct pfs_statx_timestamp {
+	INT64_T tv_sec;
+	UINT32_T tv_nsec;
+};
+
+struct pfs_statx {
+	UINT32_T stx_mask;
+	UINT32_T stx_blksize;
+	UINT64_T stx_attributes;
+	UINT32_T stx_nlink;
+	UINT32_T stx_uid;
+	UINT32_T stx_gid;
+	UINT16_T stx_mode;
+	UINT64_T stx_ino;
+	UINT64_T stx_size;
+	UINT64_T stx_blocks;
+	UINT64_T stx_attributes_mask;
+
+	struct pfs_statx_timestamp stx_atime;
+	struct pfs_statx_timestamp stx_btime;
+	struct pfs_statx_timestamp stx_ctime;
+	struct pfs_statx_timestamp stx_mtime;
+
+	UINT32_T stx_rdev_major;
+	UINT32_T stx_rdev_minor;
+
+	UINT32_T stx_dev_major;
+	UINT32_T stx_dev_minor;
+};
+
 extern uid_t pfs_uid;
 extern gid_t pfs_gid;
 
@@ -108,6 +138,36 @@ extern gid_t pfs_gid;
 	(b).f_bfree = (a).f_bfree;\
 	(b).f_files = (a).f_files;\
 	(b).f_ffree = (a).f_ffree;
+#endif
+
+#ifndef COPY_STATX_TIMESTAMP
+#define COPY_STATX_TIMESTAMP( a, b )\
+	(b).tv_sec = (a).tv_sec;\
+	(b).tv_nsec = (a).tv_nsec;
+#endif
+
+#ifndef COPY_STATX
+#define COPY_STATX( a, b )\
+	memset(&(b),0,sizeof(b));\
+	(b).stx_mask = (a).stx_mask;\
+	(b).stx_blksize = (a).stx_blksize;\
+	(b).stx_attributes = (a).stx_attributes;\
+	(b).stx_nlink = (a).stx_nlink;\
+	(b).stx_uid = (a).stx_uid;\
+	(b).stx_gid = (a).stx_gid;\
+	(b).stx_mode = (a).stx_mode;\
+	(b).stx_ino = (a).stx_ino;\
+	(b).stx_size = (a).stx_size;\
+	(b).stx_blocks = (a).stx_blocks;\
+	(b).stx_attributes_mask = (a).stx_attributes_mask;\
+	COPY_STATX_TIMESTAMP((a).stx_atime, (b).stx_atime);\
+	COPY_STATX_TIMESTAMP((a).stx_btime, (b).stx_btime);\
+	COPY_STATX_TIMESTAMP((a).stx_ctime, (b).stx_ctime);\
+	COPY_STATX_TIMESTAMP((a).stx_mtime, (b).stx_mtime);\
+	(b).stx_dev_major = (a).stx_dev_major;\
+	(b).stx_rdev_major = (a).stx_rdev_major;\
+	(b).stx_dev_minor = (a).stx_dev_minor;\
+	(b).stx_rdev_minor = (a).stx_rdev_minor;
 #endif
 
 #endif
