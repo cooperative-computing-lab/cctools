@@ -103,11 +103,28 @@ should not be cached. That is, generating a cachename could lead to possible con
 
 
 */
-const char * make_mt_cached_name(const struct vine_file *f){
+struct vine_file * retrieve_url(const struct vine_file *f){
+	
+	char source_enc[PATH_MAX];
+	url_encode(path_basename(f->source), source_enc, PATH_MAX);
+	char * command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", source_enc, f->source);
+	FILE * stream = popen(command, "r");
+	if(stream  == 0) return 0; // failed to execute curl
+	int exit_status = pclose(stream);
+	if(exit_status == 6) return 0; // curl could not resolve host;
+	if(exit_status == 0){
+		return vine_file_create(source_enc, f->remote_name, 0, 0, VINE_FILE, f->flags, 0);
+	}
+	else {
+		return 0;
+	}
+	return 0;
+}
+
+char * vine_task_to_json(const struct vine_file *f){
 	char * buffer;
 	char * file_buffer;
 	struct vine_file * file;
-	unsigned char digest[MD5_DIGEST_LENGTH];
 	buffer = string_format("{\ncmd = \"%s\"\n", f->source);
 	if(f->mini_task->input_files){
 		buffer = string_combine(buffer, "inputs = ");
@@ -137,14 +154,20 @@ const char * make_mt_cached_name(const struct vine_file *f){
 		}
 		buffer = string_combine(buffer, "\n");
 	}
-	printf("%s", buffer);
+	return buffer;
+}
+
+const char * make_mt_cached_name(const struct vine_file *f){
+
+	unsigned char digest[MD5_DIGEST_LENGTH];
+	char * buffer = vine_task_to_json(f);
 	md5_buffer(buffer,strlen(buffer),digest);
        	return md5_string(digest);
-	
+
 }
 const char * make_url_cached_name(const struct vine_file *f)
 {
-	int val = 0;
+	int val = FOUND_NONE;
 	int STR_MAX = 256;
 	char line[STR_MAX];
 	char hash_src[STR_MAX];
@@ -153,43 +176,44 @@ const char * make_url_cached_name(const struct vine_file *f)
 
 	char * command = string_format("curl -I -sSL i --verbose --stderr /dev/stdout \"%s\"", f->source);
 	FILE * stream = popen(command, "r");
+	if(stream == 0) return 0; // curl failed to execute 
 	while(fgets(line, STR_MAX, stream) != NULL){
 		if(sscanf(line, "Content-MD5: %s", hash_src)){
-			val = 3;
+			val = FOUND_MD5;
 			break;
 		}
 		if(sscanf(line, "content-md5: %s", hash_src)){
-			val = 3;
+			val = FOUND_MD5;
 			break;
 		}
-		if(val < 2 && sscanf(line, "ETag: %s", hash_src)){
-			val = 2;
+		if(val < FOUND_ET && sscanf(line, "ETag: %s", hash_src)){
+			val = FOUND_ET;
 		}
-		if(val < 2 && sscanf(line, "etag: %s", hash_src)){
-			val = 2;
+		if(val < FOUND_ET && sscanf(line, "etag: %s", hash_src)){
+			val = FOUND_ET;
 		}
-		if(val < 1 && sscanf(line, "Last-Modified: %s", hash_src)){
-			val = 1;
+		if(val < FOUND_LM && sscanf(line, "Last-Modified: %s", hash_src)){
+			val = FOUND_LM;
 		}
-		if(val < 1 && sscanf(line, "last-modified: %s", hash_src)){
-			val = 1;
+		if(val < FOUND_LM && sscanf(line, "last-modified: %s", hash_src)){
+			val = FOUND_LM;
 		}
 	}
-	pclose(stream);
+	int exit_status = pclose(stream);
+	if(exit_status != 0) return 0; // Curl executes but retuns an error
 	switch(val){
-		case 0:
+		case FOUND_NONE:
 			return 0;
-		case 1:
+		case FOUND_LM:
 			buffer = string_combine(hash_src, f->source); // + server
 			md5_buffer(buffer,strlen(buffer),digest);
-                        return md5_string(digest);
-		case 2:
+                        return string_combine("LM-md5-", md5_string(digest));
+		case FOUND_ET:
 			md5_buffer(hash_src, (strlen(hash_src)), digest); // + server
-                        return md5_string(digest);
-		case 3:
+                        return string_combine("ET-md5-", md5_string(digest));
+		case FOUND_MD5:
 			md5_buffer(hash_src, (strlen(hash_src)), digest);
-                        return md5_string(digest);
-
+                        return string_combine("md5-", md5_string(digest));
 	}
 	return 0;
 }
@@ -208,32 +232,23 @@ char *make_cached_name( const struct vine_file *f )
 		if(f->data) {
 			md5_buffer(f->data, f->length, digest);
 		} else {
-			md5_buffer("buffer", 6, digest );
+			md5_buffer("buffer", 6, digest);
 		}
+		hash = md5_string(digest);
 	} else if(f->type == VINE_FILE) {
 		hash = md5_file_or_dir(f->source);
-		if(!hash){
-			md5_buffer(f->source,strlen(f->source),digest);
-			hash = md5_string(digest);
-		}
 		url_encode(path_basename(f->source), source_enc, PATH_MAX);
 	} else if(f->type == VINE_URL){
 		hash = make_url_cached_name(f);
-		if(!hash){
-			md5_buffer(f->source,strlen(f->source),digest);
-			hash = md5_string(digest);
-		}
 		url_encode(path_basename(f->source), source_enc, PATH_MAX);
 	} else if(f->type == VINE_MINI_TASK){
 		hash = make_mt_cached_name(f);
-		if(!hash){
-			md5_buffer(f->source,strlen(f->source),digest);
-			hash = md5_string(digest);
-		}
 	} else {
 		md5_buffer(f->source,strlen(f->source),digest);
+		hash = md5_string(digest);
 		url_encode(path_basename(f->source), source_enc, PATH_MAX);
 	}
+	if(!hash) return 0;
 
 	/* 0 for cache files, file_count for non-cache files. With this, non-cache
 	 * files cannot be shared among tasks, and can be safely deleted once a
@@ -248,21 +263,21 @@ char *make_cached_name( const struct vine_file *f )
 	
 	switch(f->type) {
 		case VINE_FILE:
-			return string_format("file-%d-%s-%s", cache_file_id, hash, source_enc);
+			return string_format("file-%d-md5-%s-%s", cache_file_id, hash, source_enc);
 			break;
 		case VINE_EMPTY_DIR:
-			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), source_enc);
+			return string_format("file-%d-md5-%s-%s", cache_file_id, md5_string(digest), source_enc);
 			break;
 		case VINE_MINI_TASK:
 			/* XXX This should be computed from the constituents of the mini task */
-			return string_format("task-%d-%s", cache_file_id, hash);
+			return string_format("task-%d-md5-%s", cache_file_id, hash);
 			break;
 	       	case VINE_URL:
-			return string_format("url-%d-%s", cache_file_id, hash);
+			return string_format("url-%d-%s-%s", cache_file_id, hash, source_enc);
 			break;
 		case VINE_BUFFER:
 		default:
-			return string_format("buffer-%d-%s", cache_file_id, md5_string(digest));
+			return string_format("buffer-md5-%d-%s", cache_file_id, md5_string(digest));
 			break;
 	}
 }
@@ -299,7 +314,13 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 	if(vine_hack_do_not_compute_cached_name) {
   		f->cached_name = xxstrdup(f->source);
 	} else {
-		f->cached_name = make_cached_name(f);
+		char * cache_name = make_cached_name(f);
+		if(cache_name == 0 && type == VINE_URL){
+			struct vine_file *new_file = retrieve_url(f);
+		       	free(f);
+			f = new_file;
+		}
+		f->cached_name = cache_name;
 	}
 
 	return f;
@@ -361,7 +382,6 @@ struct vine_file * vine_file_untar( struct vine_file *f )
 
 struct vine_file * vine_file_unponcho( struct vine_file *f)
 {
-
 	struct vine_task *t  = vine_task_create(string_format("./poncho_package_run --unpack-to output -e package.tar.gz"));
 	char * poncho_path = path_which("poncho_package_run");
 	vine_task_add_input(t, vine_file_local(poncho_path), "poncho_package_run", VINE_CACHE);

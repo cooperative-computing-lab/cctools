@@ -38,6 +38,14 @@ expected events.
 #define VINE_RANDOM_PORT  0                  /**< Indicates that any port may be chosen. */
 #define VINE_WAITFORTASK  -1                 /**< Timeout value to wait for a task to complete before returning. */
 
+/** **/
+typedef enum {
+	FOUND_NONE = 0,
+	FOUND_LM,
+	FOUND_ET,
+	FOUND_MD5,
+} vine_url_cache_t;
+
 /** Select optional handling for input and output files: caching, unpacking, watching, etc. **/
 
 typedef enum {
