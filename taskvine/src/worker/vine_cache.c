@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/fcntl.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -69,9 +70,51 @@ struct vine_cache * vine_cache_create( const char *cache_dir )
 }
 
 /*
+Load exsiting cache directory into cache structure.
+*/
+void vine_cache_load(struct vine_cache *c)
+{
+	DIR *dir = opendir(c->cache_dir);
+	if(dir){
+		debug(D_VINE, "loading cache at: %s", c->cache_dir);
+		struct dirent *d;
+		while((d=readdir(dir))){
+			debug(D_VINE, "found %s in cache at: %s",d->d_name, c->cache_dir);
+			struct stat info;
+			char *cache_path = vine_cache_full_path(c,d->d_name);
+			if(stat(cache_path, &info)==0){
+				if(!strncmp(d->d_name, "file", strlen("file"))){
+					vine_cache_addfile(c, info.st_size, info.st_mode, d->d_name);
+					debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
+				}
+				else if(!strncmp(d->d_name, "url", strlen("url"))){
+				}
+			}
+			else{
+					debug(D_VINE,"could not stat: %s in cache: %s error %s", d->d_name, c->cache_dir, strerror(errno));
+			}
+		}
+	}	
+}
+
+int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
+/*
+send cache updates to manager from existing cache_directory 
+*/
+void vine_init_update(struct vine_cache *c, struct link *manager)
+{
+	struct cache_file *f;
+	char * cachename;
+	HASH_TABLE_ITERATE(c->table, cachename, f){
+		debug(D_VINE,"sending cache update to manager cachename: %s source %s", cachename, f->source);
+		timestamp_t transfer_time = timestamp_get();
+		send_cache_update(manager,cachename,f->actual_size,transfer_time);
+	}
+}
+
+/*
 Delete the cache manager structure, though not the underlying files.
 */
-
 void vine_cache_delete( struct vine_cache *c )
 {
 	hash_table_clear(c->table,(void*)cache_file_delete);
@@ -293,7 +336,6 @@ will happen.  We need to better separate flags that affect files vs flags that
 affect the binding to files.
 */
 
-int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
 int send_cache_invalid( struct link *manager, const char *cachename, const char *message );
 
 int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager, vine_file_flags_t flags )

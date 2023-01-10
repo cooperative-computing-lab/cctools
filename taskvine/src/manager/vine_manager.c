@@ -405,7 +405,11 @@ static vine_msg_code_t vine_manager_recv_no_retry(struct vine_manager *q, struct
 		result = handle_cache_update(q, w, line);
 	} else if (string_prefix_is(line, "cache-invalid")) {
 		result = handle_cache_invalid(q, w, line);
-	} else if (string_prefix_is(line, "transfer-address")) {
+	} 
+//	else if (string_prefix_is(line, "worker-init")) {
+//		result = handle_worker_init(q, w, line);
+//	} 
+	else if (string_prefix_is(line, "transfer-address")) {
 		result = handle_transfer_address(q, w, line);
 	} else if( sscanf(line,"GET %s HTTP/%*d.%*d",path)==1) {
 	        result = handle_http_request(q,w,path,stoptime);

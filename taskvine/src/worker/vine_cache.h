@@ -31,6 +31,8 @@ typedef enum {
 
 struct vine_cache * vine_cache_create( const char *cachedir );
 void vine_cache_delete( struct vine_cache *c );
+void vine_cache_load( struct vine_cache *c );
+void vine_init_update(struct vine_cache *c, struct link *manager);
 
 char *vine_cache_full_path( struct vine_cache *c, const char *cachename );
 

@@ -39,6 +39,10 @@ static int check_worker_against_task(struct vine_manager *q, struct vine_worker_
 		return 0;
 	}
 
+	if(w->worker_init) {
+		return 0;
+	}
+
 	if ( w->factory_name ) {
 		struct vine_factory_info *f = vine_factory_info_lookup(q,w->factory_name);
 		if ( f && f->connected_workers > f->max_workers ) return 0;
