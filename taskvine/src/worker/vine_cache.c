@@ -88,6 +88,16 @@ void vine_cache_load(struct vine_cache *c)
 					debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
 				}
 				else if(!strncmp(d->d_name, "url", strlen("url"))){
+					vine_cache_addfile(c, info.st_size, info.st_mode, d->d_name);
+					debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
+				}
+				else if(!strncmp(d->d_name, "buffer", strlen("buffer"))){
+					vine_cache_addfile(c, info.st_size, info.st_mode, d->d_name);
+					debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
+				}
+				else if(!strncmp(d->d_name, "task", strlen("task"))){
+					vine_cache_addfile(c, info.st_size, info.st_mode, d->d_name);
+					debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
 				}
 			}
 			else{

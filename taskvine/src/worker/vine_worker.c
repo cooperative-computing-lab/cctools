@@ -1389,6 +1389,7 @@ static int workspace_prepare()
 			result = create_dir(cachedir,0777);
 	}
 	else{
+			result = 1;
 			debug(D_VINE,"cache directory already exists!");
 	}
 	global_cache = vine_cache_create(cachedir);
