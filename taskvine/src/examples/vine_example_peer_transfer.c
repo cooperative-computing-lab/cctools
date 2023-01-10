@@ -45,18 +45,25 @@ int main(int argc, char *argv[])
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));
 		return 1;
-	}
+	}	
 	printf("listening on port %d...\n", vine_port(m));
+	
+	if(argv[1] &&(strcmp(argv[1], "-peer") == 0)){
+		printf("Peer transfers enabled\n");
+		vine_enable_peer_transfers(m);
+		vine_set_file_source_max_transfers(m, atoi(argv[2]));
+		vine_enable_transactions_log(m, "my.transactions.log");
+	}
 
 	vine_enable_debug_log(m,"manager.log");
 	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
 
-	for(i=0;i<10;i++) {
+	for(i=0;i<1000;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 	  
 		vine_task_add_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
-		vine_task_add_input(t,vine_file_untar(vine_file_url(BLAST_URL)),"blastdir", VINE_CACHE );
-		vine_task_add_input(t,vine_file_untar(vine_file_url(LANDMARK_URL)),"landmark", VINE_CACHE );
+		vine_task_add_input_url(t,BLAST_URL,"blastdir", VINE_CACHE|VINE_UNPACK );
+		vine_task_add_input_url(t,LANDMARK_URL,"landmark", VINE_CACHE|VINE_UNPACK );
 		vine_task_set_env_var(t,"BLASTDB","landmark");
 
 		int task_id = vine_submit(m, t);
