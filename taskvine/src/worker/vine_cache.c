@@ -105,6 +105,7 @@ void vine_cache_load(struct vine_cache *c)
 			}
 		}
 	}	
+	closedir(dir);
 }
 
 int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
