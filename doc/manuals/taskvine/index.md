@@ -231,9 +231,9 @@ Here is how to describe the files needed by this task:
     ```C
     # vine_task_add_file(t, "name at manager", "name when copied at execution site", ...)
 
-    vine_task_add_file(t, "/usr/bin/gzip", "gzip",       WORK_QUEUE_INPUT,  WORK_QUEUE_CACHE);
-    vine_task_add_file(t, "my-file",       "my-file",    WORK_QUEUE_INPUT,  WORK_QUEUE_NOCACHE);
-    vine_task_add_file(t, "my-file.gz",    "my-file.gz", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+    vine_task_add_file(t, "/usr/bin/gzip", "gzip",       VINE_INPUT,  VINE_CACHE);
+    vine_task_add_file(t, "my-file",       "my-file",    VINE_INPUT,  VINE_NOCACHE);
+    vine_task_add_file(t, "my-file.gz",    "my-file.gz", VINE_OUTPUT, VINE_NOCACHE);
     ```
 
 When the task actually executes, the worker will create a **sandbox** directory,
@@ -241,7 +241,7 @@ which serves as the working directory for the task.  Each of the input files
 and directories will be copied into the sandbox directory.
 The task outputs should be written into the current working directory.
 The path of the sandbox directory is exported to
-the execution environment of each worker through the `WORK_QUEUE_SANDBOX` shell
+the execution environment of each worker through the `VINE_SANDBOX` shell
 environment variable. This shell variable can be used in the execution
 environment of the worker to describe and access the locations of files in the
 sandbox directory.
@@ -415,8 +415,8 @@ conda run -p my-env conda-pack
 
 ## Running Managers and Workers
 
-This section makes use of a simple but complete exmample of a Work
-Queue manager application to demonstrate various features.
+This section makes use of a simple but complete exmample of a
+TaskVine application to demonstrate various features.
 
 Donload the example file for the language of your choice:
 
@@ -454,8 +454,8 @@ $ gcc taskvine_example.c -o taskvine_example -I${HOME}/cctools/include/cctools -
 
 The example application simply compresses a bunch of files in parallel. The
 files to be compressed must be listed on the command line. Each will be
-transmitted to a remote worker, compressed, and then sent back to the Work
-Queue manager. To compress files `a`, `b`, and `c` with this example
+transmitted to a remote worker, compressed, and then sent back to the
+manager. To compress files `a`, `b`, and `c` with this example
 application, run it as:
 
 
@@ -1040,22 +1040,22 @@ Automatic resource management is enabled per category as follows:
     ```python
     m.enable_monitoring()
     m.set_category_resources_max('my-category-a', {})
-    m.set_category_mode('my-category-a', m.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    m.set_category_mode('my-category-a', m.VINE_ALLOCATION_MODE_MAX_THROUGHPUT)
 
     m.set_category_resources_max('my-category-b', {'cores': 2})
-    m.set_category_mode('my-category-b', m.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    m.set_category_mode('my-category-b', m.VINE_ALLOCATION_MODE_MAX_THROUGHPUT)
     ```
 
 === "C"
     ```C
     vine_enable_monitoring(m,0,0);
     vine_set_category_resources_max(m, "my-category-a", NULL);
-    vine_set_category_mode(m, "my-category-a", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
+    vine_set_category_mode(m, "my-category-a", VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
 
     struct rmsummary *r = rmsummary_create(-1);
     r->cores = 2;
     vine_set_category_resources_max(m, "my-category-b", r);
-    vine_set_category_mode(m, "my-category-b", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
+    vine_set_category_mode(m, "my-category-b", VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
     rmsummary_delete(r);
     ```
 
@@ -1232,7 +1232,7 @@ limit on the number of retries:
     ```
 
 When a task cannot be completed in the set number of tries,
-then the task result is set to  `WORK_QUEUE_RESULT_MAX_RETRIES`.
+then the task result is set to  `VINE_RESULT_MAX_RETRIES`.
 
 ### Pipelined Submission
 
@@ -1266,12 +1266,12 @@ tasks that require it:
 
 === "Python"
     ```python
-    t.add_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=WORK_QUEUE_INPUT, cache=True)
+    t.add_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=VINE_INPUT, cache=True)
     ```
 
 === "C"
     ```c
-    vine_task_add_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
+    vine_task_add_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", VINE_INPUT, VINE_CACHE)
     ```
 
 (Note that `add_url` does not currently support output data.)
@@ -1287,12 +1287,12 @@ a URL and then unpack into the directory `data`:
 
 === "Python"
     ```python
-    t.add_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , type=WORK_QUEUE_INPUT, cache=True)
+    t.add_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , type=VINE_INPUT, cache=True)
     ```
 
 === "C"
     ```c
-    vine_task_add_file_command(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
+    vine_task_add_file_command(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", VINE_INPUT, VINE_CACHE)
     ```
 
 (Note that `add_file_command` does not currently support output data.)
@@ -1300,19 +1300,19 @@ a URL and then unpack into the directory `data`:
 ### Watching Output Files
 
 If you would like to see the output of a task as it is produced, add
-`WORK_QUEUE_WATCH` to the flags argument of `add_file`. This will
+`VINE_WATCH` to the flags argument of `add_file`. This will
 cause the worker to periodically send output appended to that file back to the
 manager. This is useful for a program that produces a log or progress bar as
 part of its output.
 
 === "Python"
     ```python
-    t.add_output_file("my-file", flags = vine.WORK_QUEUE_WATCH)
+    t.add_output_file("my-file", flags = vine.VINE_WATCH)
     ```
 
 === "C"
     ```C
-    vine_task_add_file(t, "my-file", "my-file", WORK_QUEUE_OUTPUT, WORK_QUEUE_WATCH);
+    vine_task_add_file(t, "my-file", "my-file", VINE_OUTPUT, VINE_WATCH);
     ```
 
 ### Optional Output Files
@@ -1320,20 +1320,20 @@ part of its output.
 It is sometimes useful to return an output file only in the case of a failed task.
 For example, if your task generates a very large debugging output file `debug.out`,
 then you might not want to keep the file if the task succeeded.  In this case,
-you can add the `WORK_QUEUE_FAILURE_ONLY` flag to indicate that a file should
+you can add the `VINE_FAILURE_ONLY` flag to indicate that a file should
 only be returned in the event of failure:
 
 === "Python"
     ```python
-    t.add_output_file("debug.out", flags = vine.WORK_QUEUE_FAILURE_ONLY)
+    t.add_output_file("debug.out", flags = vine.VINE_FAILURE_ONLY)
     ```
 
 === "C"
     ```C
-    vine_task_add_file(t, "debug.out", "debug.out", WORK_QUEUE_OUTPUT, WORK_QUEUE_FAILURE_ONLY);
+    vine_task_add_file(t, "debug.out", "debug.out", VINE_OUTPUT, VINE_FAILURE_ONLY);
     ```
 
-In a similar way, the `WORK_QUEUE_SUCCESS_ONLY` flag indicates that an output file
+In a similar way, the `VINE_SUCCESS_ONLY` flag indicates that an output file
 should only be returned if the task actually succeeded.
 
 ### Disconnect slow workers
@@ -1379,7 +1379,7 @@ corresponding to the resolved file name. For example:
 
 === "C"
     ```C
-    vine_task_add_file(t,"my-executable.$OS.$ARCH","./my-exe",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+    vine_task_add_file(t,"my-executable.$OS.$ARCH","./my-exe",VINE_INPUT,VINE_CACHE);
     ```
 
 This will transfer `my-executable.Linux.x86_64` to workers running on a Linux
@@ -1388,7 +1388,7 @@ with an i686 architecture.
 
 Note this feature is specifically designed for specifying and distingushing
 input file names for different platforms and architectures. Also, this is
-different from the $WORK_QUEUE_SANDBOX shell environment variable that exports
+different from the $VINE_SANDBOX shell environment variable that exports
 the location of the working directory of the worker to its execution
 environment.
 
@@ -1593,8 +1593,8 @@ $ vine_worker -d all -o worker.debug -M myproject
 
 ### Statistics Log
 
-The statistics logs contains a time series of the statistics collected by Work
-Queue, such as number of tasks waiting and completed, number of workers busy,
+The statistics logs contains a time series of the statistics collected by the manager,
+such as number of tasks waiting and completed, number of workers busy,
 total number of cores available, etc. The log is activated as follows:
 
 === "Python"
