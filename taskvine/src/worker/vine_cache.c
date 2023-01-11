@@ -262,7 +262,8 @@ static int do_worker_transfer( struct vine_cache *c, const char *source_url, con
 		link_close(worker_link);
 		return 0;
 	}
-
+		
+	
 	link_close(worker_link);
 
 	return 1;
@@ -282,6 +283,8 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 	
 	if(strncmp(source_url, "worker://", 9) == 0){
 		result = do_worker_transfer(c,source_url,transfer_path,error_message);
+		free(transfer_path);
+		return result;
 	} else { 
 		result = do_curl_transfer(c,source_url,transfer_path,error_message);
 	}
