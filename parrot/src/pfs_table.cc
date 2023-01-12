@@ -1553,15 +1553,19 @@ int pfs_table::statx( const char *name, int flags, unsigned int mask, struct pfs
 	pfs_name pname;
 	int result = -1;
 
-	int follow_symlink = !(flags & AT_SYMLINK_NOFOLLOW);
+	int follow_links = !(flags & AT_SYMLINK_NOFOLLOW);
 
 	/* You don't need to have read permission on a file to stat it. */
-	if(resolve_name(0,name,&pname,F_OK,follow_symlink)) {
+	if(resolve_name(0,name,&pname,F_OK,follow_links)) {
 		result = pname.service->statx(&pname,flags,mask,b);
 		if(result>=0 && b->stx_blksize < 1) {
 			b->stx_blksize = pname.service->get_block_size();
 		} else if(errno==ENOENT && !pname.hostport[0]) {
-			pfs_service_emulate_statx(&pname,b);
+			struct pfs_stat stat_b;
+			struct pfs_statx statx_b;
+			pfs_service_emulate_stat(&pname,&stat_b);
+			COPY_STAT_TO_STATX(stat_b, statx_b);
+			memcpy(b, &statx_b, sizeof(*b));
 			b->stx_mode = S_IFDIR | 0555;
 			result = 0;
 		}

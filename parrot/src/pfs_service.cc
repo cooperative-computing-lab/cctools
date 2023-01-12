@@ -70,8 +70,27 @@ int pfs_service::stat( pfs_name *name, struct pfs_stat *buf )
 }
 
 int pfs_service::statx( pfs_name *name, int flags, unsigned int mask, struct pfs_statx *buf ) {
-	pfs_service_emulate_statx(name,buf);
-	return 0;
+	//try with stat and copy to statx
+	struct pfs_stat info_stat;
+	struct pfs_statx info_statx;
+
+	int follow_links = 1;
+
+#ifdef AT_SYMLINK_NOFOLLOW
+	follow_links = !(flags & AT_SYMLINK_NOFOLLOW);
+#endif
+
+	int rc;
+	if(follow_links) {
+		rc = stat(name, &info_stat);
+	} else {
+		rc = lstat(name, &info_stat);
+	}
+
+	COPY_STAT_TO_STATX(info_stat, info_statx);
+	memcpy(buf, &info_statx, sizeof(*buf));
+
+	return rc;
 }
 
 int pfs_service::statfs( pfs_name *name, struct pfs_statfs *buf )
@@ -422,32 +441,6 @@ void pfs_service_emulate_stat( pfs_name *name, struct pfs_stat *buf )
 	if(start_time==0) start_time = time(0);
 	buf->st_ctime = buf->st_atime = buf->st_mtime = start_time;
 	buf->st_blksize = default_block_size;
-}
-
-void pfs_service_emulate_statx(pfs_name *name, struct pfs_statx *buf ) {
-	static time_t start_time = 0;
-	memset(buf,0,sizeof(*buf));
-
-	buf->stx_rdev_major = (dev_t) 0;
-	buf->stx_rdev_minor = (dev_t) 0;
-	buf->stx_dev_major = (dev_t) 0;
-	buf->stx_dev_minor = (dev_t) 0;
-
-	if(name) {
-		buf->stx_ino = hash_string(name->rest);
-	} else {
-		buf->stx_ino = 0;
-	}
-	buf->stx_mode = S_IFREG | S_IRWXU | S_IRWXG | S_IRWXO ;
-	buf->stx_uid = getuid();
-	buf->stx_gid = getgid();
-	buf->stx_nlink = 1;
-	buf->stx_size = 0;
-	if(start_time==0) start_time = time(0);
-
-	buf->stx_atime.tv_sec = buf->stx_btime.tv_sec = buf->stx_ctime.tv_sec = buf->stx_mtime.tv_sec = start_time;
-
-	buf->stx_blksize = default_block_size;
 }
 
 static struct hash_table *table = 0;

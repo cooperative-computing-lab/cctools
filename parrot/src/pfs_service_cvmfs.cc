@@ -1505,25 +1505,6 @@ class pfs_service_cvmfs:public pfs_service {
 		return rc;
 	}
 
-	virtual int statx(pfs_name *name, int flags, unsigned int mask, struct pfs_statx *info) {
-		struct pfs_stat info_stat;
-		struct pfs_statx info_statx;
-
-		debug(D_NOTICE, "%s", name->path);
-
-		int follow_leaf_symlinks = !(AT_SYMLINK_NOFOLLOW & flags);
-
-		int rc = anystat(name,&info_stat,follow_leaf_symlinks,1);
-		if( rc == -1 && errno == EAGAIN ) {
-			class pfs_service *local = pfs_service_lookup_default();
-			return local->statx(name,flags,mask,info);
-		} else {
-			COPY_STAT_TO_STATX(info_stat, info_statx);
-			memcpy(info, &info_statx, sizeof(*info));
-		}
-		return rc;
-	}
-
 	virtual int access(pfs_name * name, mode_t mode) {
 		struct pfs_stat info;
 		if(this->stat(name, &info) == 0) {
