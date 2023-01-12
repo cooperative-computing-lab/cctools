@@ -242,4 +242,19 @@ void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info
 	buffer_free(&B);
 }
 
+void vine_txn_log_write_cache_update(struct vine_manager *q, struct vine_worker_info *w, size_t size_in_bytes, int time_in_usecs, const char *name )
+{
+	struct buffer B;
+
+	buffer_init(&B);
+	buffer_printf(&B, "CACHE-UPDATE");
+	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
+	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
+	buffer_printf(&B, " %s", name);
+
+	vine_txn_log_write(q, buffer_tostring(&B));
+	buffer_free(&B);
+}
+
+
 
