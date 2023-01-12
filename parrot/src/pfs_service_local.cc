@@ -417,6 +417,7 @@ RETRY:
 		}
 		END
 	}
+#ifdef HAS_STATX
 	virtual int statx( pfs_name *name, int flags, unsigned int mask, struct pfs_statx *buf ) {
 		stats_inc("parrot.local.statx", 1);
 		int result;
@@ -430,6 +431,7 @@ RETRY:
 		}
 		END
 	}
+#endif
 	virtual int access( pfs_name *name, mode_t mode ) {
 		stats_inc("parrot.local.access", 1);
 		int result;
