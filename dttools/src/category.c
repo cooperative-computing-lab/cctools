@@ -903,7 +903,7 @@ const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct cat
         {
             struct rmsummary* bucketing_prediction = bucketing_manager_predict(c->bucketing_manager, taskid);
             rmsummary_merge_override(internal, bucketing_prediction);
-            free(bucketing_prediction);
+            rmsummary_delete(bucketing_prediction);
         }
     }
 
