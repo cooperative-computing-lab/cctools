@@ -283,8 +283,10 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 	
 	if(strncmp(source_url, "worker://", 9) == 0){
 		result = do_worker_transfer(c,source_url,transfer_path,error_message);
-		free(transfer_path);
-		return result;
+		if(result){
+			debug(D_VINE, "received file from worker");
+			rename(cache_path, transfer_path);
+		}
 	} else { 
 		result = do_curl_transfer(c,source_url,transfer_path,error_message);
 	}
