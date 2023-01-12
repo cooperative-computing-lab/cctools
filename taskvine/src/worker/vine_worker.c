@@ -1465,7 +1465,6 @@ static void workspace_delete()
 	is inside the workspace.  Abort if we really cannot clean up.
 	*/
 
-//	unlink_recursive(workspace);
 
 	free(workspace);
 }

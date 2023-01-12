@@ -47,7 +47,6 @@ struct vine_worker_info {
 	int  transfer_port_active;
 
 	/* Worker condition that may affect task start or cancellation. */
-	int  worker_init;                       // if 1, worker does not accept tasks. 
 	int  draining;                          // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
 	int  alarm_slow_worker;                 // if 1, no task has finished since a slow running task triggered a disconnection.
 	                                        // 0 otherwise. A 2nd task triggering disconnection will cause the worker to disconnect
