@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 	if(argv[1] &&(strcmp(argv[1], "-peer") == 0)){
 		printf("Peer transfers enabled\n");
 		vine_enable_peer_transfers(m);
-		vine_set_file_source_max_transfers(m, atoi(argv[2]));
+		vine_tune(m, "file-source-max-transfers", 2);
 		vine_enable_transactions_log(m, "my.transactions.log");
 	}
 
