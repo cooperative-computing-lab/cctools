@@ -148,6 +148,7 @@ struct vine_manager {
 
 	/* Peer Transfer Configuration */
 	int peer_transfers_enabled;
+	int file_source_max_transfers;
 
 	/* Various performance knobs that can be tuned. */
 

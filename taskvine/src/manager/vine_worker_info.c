@@ -59,7 +59,7 @@ void vine_worker_delete( struct vine_worker_info *w )
 
 	vine_resources_delete(w->resources);
 	vine_resources_delete(w->coprocess_resources);
-	hash_table_clear(w->features,(void*)free);
+	hash_table_clear(w->features, 0);
 	hash_table_delete(w->features);
 	free(w->stats);
 
