@@ -8,6 +8,8 @@ link=link.txt
 expected=expected.out
 from_parrot=parrot.out
 
+tmp_dir=${PWD}/parrot_temp_dir
+
 prepare()
 {
 	set -e 
@@ -22,20 +24,29 @@ run()
 {
 	set -e
 
-	stat -L --terse $file $link 2>/dev/null > $expected
-	parrot -dall -- stat -L --terse $file $link > $from_parrot
+	stat $file $link 2>/dev/null > $expected
+	parrot -- stat $file $link > $from_parrot
+	
+	diff $expected $from_parrot
 
-	if ! diff $expected $from_parrot
+	if ! parrot --check-driver cvmfs
 	then
-		return 1
-	else
 		return 0
 	fi
+
+	# check that symlinks are correctly detected
+	cvmfs_symlink=/cvmfs/cms.cern.ch/bin/scramv1
+	parrot -t${tmp_dir} -- sh -c "[ -L ${cvmfs_symlink} ]";
+
+	target=$(parrot -t${tmp_dir} -- realpath $cvmfs_symlink | tail -n1)
+	parrot -t${tmp_dir}  /bin/sh -c "[ -f $target ]";
+
+	return 0
 }
 
 clean()
 {
-	rm -rf $file $link $expected $from_parrot
+	rm -rf $file $link $expected $from_parrot $tmp_dir
 	return 0
 }
 
