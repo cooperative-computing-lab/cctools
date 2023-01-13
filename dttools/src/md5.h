@@ -54,6 +54,7 @@ which  must be converted to a human readable form with @ref md5_string.
 
 int md5_file(const char *filename, unsigned char digest[MD5_DIGEST_LENGTH]);
 
+const char *md5_dir_rec(char *src);
 /** Converts either a file or directory to a string of the its hashed contents.
  @param src The path to source file or a directory
  @returns A static pointer to the string;
