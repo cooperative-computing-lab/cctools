@@ -112,7 +112,6 @@ typedef enum {
 } vine_url_cache_t;
 
 struct vine_file * retrieve_url(const struct vine_file *f){
-	
 	char source_enc[PATH_MAX];
 	url_encode(path_basename(f->source), source_enc, PATH_MAX);
 	char * command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", source_enc, f->source);
@@ -139,6 +138,7 @@ const char * make_mt_cached_name(const struct vine_file *f){
 }
 const char * make_url_cached_name(const struct vine_file *f)
 {
+	// DIRECTORY cache names might need the name of the files
 	int val = FOUND_NONE;
 	int STR_MAX = 256;
 	char line[STR_MAX];
@@ -172,20 +172,24 @@ const char * make_url_cached_name(const struct vine_file *f)
 		}
 	}
 	int exit_status = pclose(stream);
+	char * prefix;
 	if(exit_status != 0) return 0; // Curl executes but retuns an error
 	switch(val){
 		case FOUND_NONE:
 			return 0;
 		case FOUND_LM:
+			prefix = string_format("LM-md5-");
 			buffer = string_combine(hash_src, f->source); // + server
 			md5_buffer(buffer,strlen(buffer),digest);
-                        return string_combine("LM-md5-", md5_string(digest));
+                        return string_combine(prefix, md5_string(digest));
 		case FOUND_ET:
+			prefix = string_format("ET-md5-");
 			md5_buffer(hash_src, (strlen(hash_src)), digest); // + server
-                        return string_combine("ET-md5-", md5_string(digest));
+                        return string_combine(prefix, md5_string(digest));
 		case FOUND_MD5:
+			prefix = string_format("md5-");
 			md5_buffer(hash_src, (strlen(hash_src)), digest);
-                        return string_combine("md5-", md5_string(digest));
+                        return string_combine(prefix, md5_string(digest));
 	}
 	return 0;
 }

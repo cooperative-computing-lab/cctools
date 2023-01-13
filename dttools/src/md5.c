@@ -381,19 +381,24 @@ const char * md5_file_or_dir(char * src)
                 unsigned char digest[MD5_DIGEST_LENGTH];
                 char * path;
                 const char * hash = 0;
+                const char * next_hash = 0;
                 int init = 0;
                 while((d=readdir(dir))){
                         if(!strcmp(d->d_name,".")) continue;
                         if(!strcmp(d->d_name,"..")) continue;
                         path = path_concat(src, d->d_name);
                         if(init){
-                                char * str = string_format("%s%s", hash, md5_file_or_dir(path));
+								
+                                next_hash = md5_file_or_dir(path);
+								if(next_hash == 0) return 0;
+                                char * str = string_format("%s%s", hash, next_hash);
                                 md5_buffer((str), strlen(str), digest);
                                 hash = md5_string(digest);
                         }
                         else{
                                 init = 1;
                                 hash = md5_file_or_dir(path);
+								if(hash == 0) return 0;
                         }
                 }
                 return hash;
