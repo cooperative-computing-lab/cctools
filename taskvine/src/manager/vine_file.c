@@ -120,7 +120,7 @@ struct vine_file * retrieve_url(const struct vine_file *f){
 	int exit_status = pclose(stream);
 	if(exit_status == 6) return 0; // curl could not resolve host;
 	if(exit_status == 0){
-		return vine_file_create(source_enc, f->remote_name, 0, 0, VINE_FILE, f->flags, 0);
+		return vine_file_create(source_enc, f->remote_name, 0, 0, 0, VINE_FILE, f->flags, 0);
 	}
 	else {
 		return 0;
