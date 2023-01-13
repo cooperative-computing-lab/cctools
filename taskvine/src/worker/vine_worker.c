@@ -1119,6 +1119,8 @@ Return true if this task can run with the resources currently available.
 
 static int task_resources_fit_now( struct vine_task *t )
 {
+	/* XXX removed disk space check due to problems running workers locally or multiple workers on a single node
+	 * since default tasks request the entire reported disk space. questionable if this check useful in practice.*/
 	return
 		(cores_allocated  + t->resources_requested->cores  <= local_resources->cores.total) &&
 		(memory_allocated + t->resources_requested->memory <= local_resources->memory.total) &&
