@@ -2663,6 +2663,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_WORKER_SOURCE_MAX_TRANSFERS) {	
 					vine_file_delete(f->substitute);
 					f->substitute = vine_file_substitute_url(f,peer_source);
+					vine_current_transfers_add(q, w, peer_source); 
 					free(peer_source);
 					found_match = 1;
 					break;
@@ -2682,26 +2683,32 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		TEMPs can only fetch from peers, so no match is fatal.
 		Any other kind can be provided by the manager at dispatch.
 		*/
-		
 		if(f->type==VINE_URL) {
 			/* For a URL transfer, we can fall back to the original if capacity is available. */
-			
-			if((vine_current_transfers_source_in_use(q, f->source) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
+			int i;
+			if(((i = vine_current_transfers_source_in_use(q, f->source)) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
 				debug(D_VINE,"task %lld has no ready transfer source for url %s",(long long)t->task_id,f->source);
 				return 0;
 			} else {
 				/* keep going */
+				vine_current_transfers_add(q, w, f->source);
+				debug(D_VINE, "%d current uses of source %s", i, f->source);
 			}
 		} else if(f->type==VINE_TEMP) {
 			debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long long)t->task_id,f->cached_name);
 			return 0;
-		} else {
+		} else if(f->type==VINE_MINI_TASK) {
+			if(!vine_manager_transfer_capacity_available(q, w, f->mini_task)){
+				return 0;
+			}
+		}
+		else {
 			/* keep going */
 		}
 	}
 
+	vine_current_transfers_print_table(q);
 	debug(D_VINE,"task %lld has a ready transfer source for all files",(long long)t->task_id);
-		
 	return 1;
 }
 
@@ -2732,7 +2739,7 @@ static int send_one_task( struct vine_manager *q )
 
 		// Check if there is transfer capacity available.
 		if(q->peer_transfers_enabled)
-		{
+		{	
 			if(!vine_manager_transfer_capacity_available(q,w,t)) continue;
 		}
 
@@ -3280,6 +3287,7 @@ int vine_enable_monitoring_full(struct vine_manager *q, char *monitor_output_dir
 
 int vine_enable_peer_transfers(struct vine_manager *q) 
 {
+	debug(D_VINE, "Peer Transfers enabled");
 	q->peer_transfers_enabled = 1;
 	return 1;
 }
