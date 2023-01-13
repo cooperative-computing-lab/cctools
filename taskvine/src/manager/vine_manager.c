@@ -2663,7 +2663,6 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_WORKER_SOURCE_MAX_TRANSFERS) {	
 					vine_file_delete(f->substitute);
 					f->substitute = vine_file_substitute_url(f,peer_source);
-					vine_current_transfers_add(q, w, peer_source); 
 					free(peer_source);
 					found_match = 1;
 					break;
@@ -2685,17 +2684,14 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		*/
 		if(f->type==VINE_URL) {
 			/* For a URL transfer, we can fall back to the original if capacity is available. */
-			int i;
-			if(((i = vine_current_transfers_source_in_use(q, f->source)) >= VINE_FILE_SOURCE_MAX_TRANSFERS)){
-				debug(D_VINE,"task %lld has no ready transfer source for url %s",(long long)t->task_id,f->source);
+			if(vine_current_transfers_source_in_use(q, f->source) >= q->file_source_max_transfers){
+			//	debug(D_VINE,"task %lld has no ready transfer source for url %s : %d in use",(long long)t->task_id,f->source, vine_current_transfers_source_in_use(q,f->source));
 				return 0;
 			} else {
 				/* keep going */
-				vine_current_transfers_add(q, w, f->source);
-				debug(D_VINE, "%d current uses of source %s", i, f->source);
 			}
 		} else if(f->type==VINE_TEMP) {
-			debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long long)t->task_id,f->cached_name);
+			//  debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long long)t->task_id,f->cached_name);
 			return 0;
 		} else if(f->type==VINE_MINI_TASK) {
 			if(!vine_manager_transfer_capacity_available(q, w, f->mini_task)){
@@ -2707,7 +2703,6 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		}
 	}
 
-	vine_current_transfers_print_table(q);
 	debug(D_VINE,"task %lld has a ready transfer source for all files",(long long)t->task_id);
 	return 1;
 }
@@ -3291,12 +3286,6 @@ int vine_enable_peer_transfers(struct vine_manager *q)
 	q->peer_transfers_enabled = 1;
 	return 1;
 }
-
-int vine_set_file_source_max_transfers(struct vine_manager *q, int c)
-{
-	q->file_source_max_transfers = c;
-	return 1;
-} 
 
 int vine_enable_disconnect_slow_workers_category(struct vine_manager *q, const char *category, double multiplier)
 {
@@ -4577,6 +4566,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 
 	} else if(!strcmp(name, "force-proportional-resources-whole-tasks") || !strcmp(name, "proportional-whole-tasks")) {
 		q->proportional_whole_tasks = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "file-source-max-transfers")){
+		q->file_source_max_transfers = MAX(1, (int)value); 
 
 	} else {
 		debug(D_NOTICE|D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);

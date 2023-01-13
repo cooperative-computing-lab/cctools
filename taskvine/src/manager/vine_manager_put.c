@@ -208,7 +208,7 @@ static vine_result_code_t vine_manager_put_url( struct vine_manager *q, struct v
 	url_encode(tf->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
 									
 	char *transfer_id = vine_current_transfers_add(q, w, tf->source);
-
+	vine_current_transfers_print_table(q);
 	vine_manager_send(q,w,"puturl %s %s %d %o %d %s\n",source_encoded, cached_name_encoded, tf->length, 0777,tf->flags, transfer_id);
 
 	return VINE_SUCCESS;
