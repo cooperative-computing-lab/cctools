@@ -331,6 +331,8 @@
 322	64	execveat		stub_execveat
 323	common	userfaultfd		sys_userfaultfd
 324	common	membarrier		sys_membarrier
+332 64      statx           sys_statx
+
 
 #
 # x32-specific system call numbers start at 512 to avoid cache impact

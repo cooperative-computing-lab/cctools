@@ -26,6 +26,8 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "domain_name.h"
 #include "full_io.h"
+#include "hash_table.h"
+#include "list.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -48,6 +50,9 @@ Create temporary directories inside as well.
 */
 
 extern char * workspace;
+
+extern struct list *duty_list;
+extern struct hash_table *duty_ids;
 
 static int create_sandbox_dir( struct vine_process *p )
 {
@@ -241,7 +246,7 @@ int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *ca
 		p->exit_code = 1;
 	}
 	
-	vine_sandbox_stageout(p,cache);
+	vine_sandbox_stageout(p,cache,manager);
 
 	/* Remove the task from the process so it is not deleted */
 	p->task = 0;
@@ -254,7 +259,6 @@ int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *ca
 pid_t vine_process_execute(struct vine_process *p )
 {
 	// make warning
-
 	fflush(NULL);		/* why is this necessary? */
 
 	p->output_file_name = strdup(task_output_template);
@@ -266,7 +270,13 @@ pid_t vine_process_execute(struct vine_process *p )
 
 	p->execution_start = timestamp_get();
 
-	p->pid = fork();
+	if (!vine_process_get_duty_name(p)) {
+		p->pid = fork();
+	} else {
+		p->coprocess = vine_coprocess_initialize_coprocess(p->task->command_line);
+		vine_coprocess_specify_resources(p->coprocess, 0, 0, 0, 0);
+		p->pid = vine_coprocess_start(p->coprocess, p->sandbox);
+	}
 
 	if(p->pid > 0) {
 		// Make child process the leader of its own process group. This allows
@@ -411,6 +421,17 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 	p->sandbox_file_count = state->last_file_count_complete;
 
 	return result;
+}
+
+char * vine_process_get_duty_name( struct vine_process *p) {
+	char *duty_name;
+	int duty_id;
+	HASH_TABLE_ITERATE(duty_ids,duty_name,duty_id) {
+		if (duty_id == p->task->task_id) {
+			return duty_name;
+		}
+	}
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */

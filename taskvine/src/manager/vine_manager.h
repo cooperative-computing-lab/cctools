@@ -93,6 +93,7 @@ struct vine_manager {
 	struct list   *ready_list;      /* List of vine_task that are waiting to execute. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
+	struct hash_table *duties;      /* Maps duty name -> vine_task of duty with that name. */
 
 	/* Primary data structures for tracking worker state. */
 
@@ -147,6 +148,7 @@ struct vine_manager {
 
 	/* Peer Transfer Configuration */
 	int peer_transfers_enabled;
+	int file_source_max_transfers;
 
 	/* Various performance knobs that can be tuned. */
 
@@ -162,7 +164,8 @@ struct vine_manager {
 	int wait_for_workers;         /* wait for these many workers to connect before dispatching tasks at start of execution. */
 	int fetch_factory;            /* If true, manager queries catalog for factory configuration. */
 	int wait_retrieve_many;       /* If true, main loop consumes multiple completed tasks at once. */
-	int force_proportional_resources;  /* If true, tasks divide worker resources proportionally. */
+	int proportional_resources;   /* If true, tasks divide worker resources proportionally. */
+	int proportional_whole_tasks; /* If true, round-up proportions to whole number of tasks. */
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
 	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */

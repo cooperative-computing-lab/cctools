@@ -71,7 +71,7 @@ int vine_json_submit(struct vine_manager *m, const char *str);
 @param m A manager object.
 @param timeout The number of seconds to wait for a completed task before
 returning. Use an integer time to set the timeout or the constant
-@ref VINE_WAITFORTASK to block until a task has completed.
+@ref VINE_WAIT_FOREVER to block until a task has completed.
 @return A JSON description of the completed task or the
  timeout was reached without a completed task, or there is completed child
 process (call @ref process_wait to retrieve the status of the completed

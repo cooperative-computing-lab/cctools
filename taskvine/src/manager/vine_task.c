@@ -243,7 +243,7 @@ void vine_task_set_coprocess( struct vine_task *t, const char *coprocess )
 	}
 
 	if(coprocess) {
-		t->coprocess = string_format("vine_worker_coprocess:%s", coprocess);
+		t->coprocess = xxstrdup(coprocess);
 		vine_task_add_feature(t, t->coprocess);
 	}
 }
