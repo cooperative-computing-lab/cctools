@@ -47,8 +47,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
-#define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/runos.py"
-#define CCTOOLS_VC3_BUILDER_PATH "/afs/crc.nd.edu/group/ccl/software/vc3-builder-src/vc3-builder"
+#define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/runos"
 
 typedef enum {
 	FORMAT_TABLE,
@@ -465,14 +464,9 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	if(runos_os){
-		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
-		char* temp = string_format("python %s %s %s",CCTOOLS_RUNOS_PATH,runos_os,vc3_cmd);
-		free(vc3_cmd);
+		char* temp = string_format("%s %s %s",CCTOOLS_RUNOS_PATH,runos_os,cmd);
 		free(cmd);
 		cmd = temp;
-		temp = string_format("%s,%s",files,"vc3-builder");
-		free(files);
-		files = temp;
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
@@ -1562,7 +1556,9 @@ int main(int argc, char *argv[])
 	}
 
 	char* cmd;
-	if(worker_command != NULL){
+	if(runos_os) {
+		worker_command = xxstrdup("work_queue_worker");
+	} else if(worker_command != NULL) {
 		cmd = string_format("cp '%s' '%s'",worker_command,scratch_dir);
 		if(system(cmd)){
 			fprintf(stderr,"work_queue_factory: Could not Access specified worker binary.\n");
@@ -1572,7 +1568,7 @@ int main(int argc, char *argv[])
 		char *tmp = xxstrdup(path_basename(worker_command));
 		free(worker_command);
 		worker_command = tmp;
-	}else{
+	} else {
 		worker_command = xxstrdup("work_queue_worker");
 		cmd = string_format("cp \"$(which %s)\" '%s'",worker_command,scratch_dir);
 		if (system(cmd)) {
@@ -1580,15 +1576,6 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
-	}
-
-	if(runos_os) {
-		cmd = string_format("cp '%s' '%s'",  CCTOOLS_VC3_BUILDER_PATH, scratch_dir);
-		int k = system(cmd);
-		if (k) {
-			fprintf(stderr, "can't copy vc3-builder! Please make sure it's at `%s`. Error code: %i\n",  CCTOOLS_VC3_BUILDER_PATH, k);
-			exit(EXIT_FAILURE);
-		}
 	}
 
 	if(password_file) {
