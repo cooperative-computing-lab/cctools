@@ -103,6 +103,14 @@ should not be cached. That is, generating a cachename could lead to possible con
 
 
 */
+
+typedef enum {
+	FOUND_NONE = 0,
+	FOUND_LM,
+	FOUND_ET,
+	FOUND_MD5,
+} vine_url_cache_t;
+
 struct vine_file * retrieve_url(const struct vine_file *f){
 	
 	char source_enc[PATH_MAX];
@@ -121,46 +129,10 @@ struct vine_file * retrieve_url(const struct vine_file *f){
 	return 0;
 }
 
-char * vine_task_to_json(const struct vine_file *f){
-	char * buffer;
-	char * file_buffer;
-	struct vine_file * file;
-	buffer = string_format("{\ncmd = \"%s\"\n", f->source);
-	if(f->mini_task->input_files){
-		buffer = string_combine(buffer, "inputs = ");
-		LIST_ITERATE(f->mini_task->input_files, file){
-			if(file->type == VINE_BUFFER){
-				file_buffer = string_format("{ name: \"%s\", source: \"%s\"}, ", file->data, file->cached_name);
-				buffer = string_combine(buffer, file_buffer);
-			}
-			else{
-				file_buffer = string_format("{ name: \"%s\", source: \"%s\"}, ", file->source, file->cached_name);
-				buffer = string_combine(buffer, file_buffer);
-			}
-		}
-		buffer = string_combine(buffer, "\n");
-	}
-	if(f->mini_task->output_files){
-		buffer = string_combine(buffer, "outputs = ");
-		LIST_ITERATE(f->mini_task->output_files, file){
-			if(file->type == VINE_BUFFER){
-				file_buffer = string_format("{ name: \"%s\"}, " , file->data);
-				buffer = string_combine(buffer, file_buffer);
-			}
-			else{
-				file_buffer = string_format("{ name: \"%s\"}, ", file->source);
-				buffer = string_combine(buffer, file_buffer);
-			}
-		}
-		buffer = string_combine(buffer, "\n");
-	}
-	return buffer;
-}
-
 const char * make_mt_cached_name(const struct vine_file *f){
 
 	unsigned char digest[MD5_DIGEST_LENGTH];
-	char * buffer = vine_task_to_json(f);
+	char * buffer = vine_task_to_json(f->mini_task);
 	md5_buffer(buffer,strlen(buffer),digest);
        	return md5_string(digest);
 
@@ -269,7 +241,6 @@ char *make_cached_name( const struct vine_file *f )
 			return string_format("file-%d-md5-%s-%s", cache_file_id, md5_string(digest), source_enc);
 			break;
 		case VINE_MINI_TASK:
-			/* XXX This should be computed from the constituents of the mini task */
 			return string_format("task-%d-md5-%s", cache_file_id, hash);
 			break;
 	       	case VINE_URL:
