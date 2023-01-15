@@ -451,6 +451,9 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 	if(remote_name[0] == '/') {
 		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}
+	if(!strncmp(f->cached_name, "of", strlen("of"))){
+		fatal("could not create cache name for file");
+	}
 
 	/* XXX the mount options should really be a separate structure. */
 	f->remote_name = xxstrdup(remote_name);
@@ -473,8 +476,6 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 	f->remote_name = xxstrdup(remote_name);
 	f->flags = flags;
 
-	int rand_num = (rand() % 100000) + 1;
-	f->cached_name = string_format("output-file-%d-%s", rand_num, f->source);
 
 	list_push_tail(t->output_files, f);
 }

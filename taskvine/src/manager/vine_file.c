@@ -235,8 +235,7 @@ char *make_cached_name( const struct vine_file *f )
 	}
 
 	/* XXX hack to force caching for the moment */
-	cache_file_id = 0;
-	
+	cache_file_id = 0;	
 	switch(f->type) {
 		case VINE_FILE:
 			return string_format("file-%d-md5-%s-%s", cache_file_id, hash, source_enc);
@@ -294,7 +293,7 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 	} else {
 		f->data = 0;
 	}
-  if(vine_hack_do_not_compute_cached_name) {
+  	if(vine_hack_do_not_compute_cached_name) {
 		f->cached_name = xxstrdup(f->source);
 	} else if(cached_name) {
 		f->cached_name = xxstrdup(cached_name);
@@ -304,7 +303,12 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 		if(cache_name == 0 && type == VINE_URL){
 			struct vine_file *new_file = retrieve_url(f);
 			if(!new_file){
-				cache_name = 0;
+				unsigned char digest[MD5_DIGEST_LENGTH];
+				const char * hash;
+				md5_buffer(f->source,strlen(f->source),digest);
+				hash = md5_string(digest);
+				int rand_num = (rand() % 100000) + 1;
+				f->cached_name = string_format("of-%d-%s", rand_num, hash);
 			}
 			else{
 		       		free(f);
@@ -315,7 +319,12 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 		}
 		else if(cache_name == 0){
 			/* could not genertate cache name*/
-			cache_name = 0;
+			unsigned char digest[MD5_DIGEST_LENGTH];
+			const char * hash;
+			md5_buffer(f->source,strlen(f->source),digest);
+			hash = md5_string(digest);
+			int rand_num = (rand() % 100000) + 1;
+        		f->cached_name = string_format("of-%d-%s", rand_num, hash);
 		}
 		f->cached_name = cache_name;
 	}
