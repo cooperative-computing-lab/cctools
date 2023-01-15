@@ -442,6 +442,10 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 		fatal("%s: invalid null argument.",__func__);
 	}
 
+	if(!f->cached_name){
+		fatal("Could not generate cache name for vine file: %s", f->source);
+	}
+
 	if(remote_name[0] == '/') {
 		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}

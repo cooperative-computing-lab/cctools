@@ -303,14 +303,19 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 		char * cache_name = make_cached_name(f);
 		if(cache_name == 0 && type == VINE_URL){
 			struct vine_file *new_file = retrieve_url(f);
-			if(!new_file) fatal("could not generate cache name vine file: %s", f->source);
-		       	free(f);
-			f = new_file;
-			return f;
+			if(!new_file){
+				cache_name = 0;
+			}
+			else{
+		       		free(f);
+				f = new_file;
+				return f;
+			}
 
 		}
 		else if(cache_name == 0){
-			fatal("could not generate cache name vine file: %s", f->source);
+			/* could not genertate cache name*/
+			cache_name = 0;
 		}
 		f->cached_name = cache_name;
 	}
