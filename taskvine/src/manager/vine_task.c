@@ -473,10 +473,8 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 	f->remote_name = xxstrdup(remote_name);
 	f->flags = flags;
 
-	if(f->cached_name == 0){
-		int rand_num = (rand() % 100000) + 1;
-		f->cached_name = string_format("output-file-%d-%s", rand_num, f->source);
-	}
+	int rand_num = (rand() % 100000) + 1;
+	f->cached_name = string_format("output-file-%d-%s", rand_num, f->source);
 
 	list_push_tail(t->output_files, f);
 }
