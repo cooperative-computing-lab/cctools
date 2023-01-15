@@ -24,6 +24,8 @@ See the file COPYING for details.
 #include <assert.h>
 #include <string.h>
 #include <math.h>
+#include "random.h"
+
 
 char * vine_task_to_json(struct vine_task *t){
         // This needs to be generated consistently such that input and output files are ordered the same each time.
@@ -470,6 +472,11 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 	/* XXX the mount options should really be a separate structure. */
 	f->remote_name = xxstrdup(remote_name);
 	f->flags = flags;
+
+	if(f->cached_name == 0){
+		int rand_num = (rand() % 100000) + 1;
+		f->cached_name = string_format("output-file-%d-%s", rand_num, f->source);
+	}
 
 	list_push_tail(t->output_files, f);
 }
