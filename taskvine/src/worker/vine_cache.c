@@ -84,40 +84,18 @@ void vine_cache_load(struct vine_cache *c)
 			int64_t nbytes, nfiles;
 			char *cache_path = vine_cache_full_path(c,d->d_name);
 			if(stat(cache_path, &info)==0){
-				if(!strncmp(d->d_name, "file", strlen("file"))){
-					if(S_ISREG(info.st_mode)){
-						vine_cache_addfile(c, info.st_size, info.st_mode, d->d_name);
-						debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
-					}
-					else if(S_ISDIR(info.st_mode)){
-                				path_disk_size_info_get(cache_path,&nbytes,&nfiles); 
-						vine_cache_addfile(c, nbytes, info.st_mode, d->d_name);
-						debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
-					}
-				}
-				else if(!strncmp(d->d_name, "url", strlen("url"))){
+				if(S_ISREG(info.st_mode)){
 					vine_cache_addfile(c, info.st_size, info.st_mode, d->d_name);
 					debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
 				}
-				else if(!strncmp(d->d_name, "buffer", strlen("buffer"))){
-					vine_cache_addfile(c, info.st_size, info.st_mode, d->d_name);
+				else if(S_ISDIR(info.st_mode)){
+                			path_disk_size_info_get(cache_path,&nbytes,&nfiles); 
+					vine_cache_addfile(c, nbytes, info.st_mode, d->d_name);
 					debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
 				}
-				else if(!strncmp(d->d_name, "task", strlen("task"))){
-					if(S_ISREG(info.st_mode)){
-                                                vine_cache_addfile(c, info.st_size, info.st_mode, d->d_name);
-                                                debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
-                                        }
-                                        else if(S_ISDIR(info.st_mode)){
-                                                path_disk_size_info_get(cache_path,&nbytes,&nfiles);
-                                                vine_cache_addfile(c, nbytes, info.st_mode, d->d_name);
-                                                debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
-                                        }
-
-				}
-			}
+			}	
 			else{
-					debug(D_VINE,"could not stat: %s in cache: %s error %s", d->d_name, c->cache_dir, strerror(errno));
+				debug(D_VINE,"could not stat: %s in cache: %s error %s", d->d_name, c->cache_dir, strerror(errno));
 			}
 			free(cache_path);	
 		}
