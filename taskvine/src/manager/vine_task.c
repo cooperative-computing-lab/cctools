@@ -453,7 +453,6 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 	}
 	if(!strncmp(f->cached_name, "of", strlen("of"))){
 		/* XXX cache name could not be generated for input file. The file may not exist. The task will likely fail*/
-		f->cached_name = 0;
 	}
 
 	/* XXX the mount options should really be a separate structure. */
