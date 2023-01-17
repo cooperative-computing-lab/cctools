@@ -399,12 +399,12 @@ const char * md5_dir_rec(char * src){
 				free(str);
 				}
 				else{
-						init = 1;
-						hash = md5_file_or_dir(path);
-						if(hash == 0){
-							closedir(dir);
-							return 0;
-						}
+					init = 1;
+					hash = md5_file_or_dir(path);
+					if(hash == 0){
+						closedir(dir);
+						return 0;
+					}
 				}
 		}
 		closedir(dir);
