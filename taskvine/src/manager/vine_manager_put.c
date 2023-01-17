@@ -337,6 +337,7 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	} else if(!f->cached_name){ 
 		debug(D_NOTICE|D_VINE,"Cache name could not be generated for input file %s", f->source);
 		vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
+		if(f->type==VINE_URL) t->exit_code = 1;
 		return VINE_APP_FAILURE;
 
 	} else{

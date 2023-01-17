@@ -371,85 +371,84 @@ const char *md5_string(unsigned char digest[16])
 }
 const char * md5_dir_rec(char * src){
         
-		struct stat info;
-        if(stat(src, &info) != 0) return 0; 
-		if(S_ISDIR(info.st_mode)){
-				/* XXX Directories need to read in the same order to generate hash consistently*/
-                struct dirent *d;
-                DIR * dir = opendir(src);
-                if(!dir) return 0;
-                unsigned char digest[MD5_DIGEST_LENGTH];
-                char * path;
-                const char * hash = 0;
-                const char * next_hash = 0;
-                int init = 0;
-                while((d=readdir(dir))){
-                        if(!strcmp(d->d_name,".")) continue;
-                        if(!strcmp(d->d_name,"..")) continue;
-                        path = path_concat(src, d->d_name);
-                        if(init){
-								
-                                next_hash = md5_file_or_dir(path);
-								if(next_hash == 0){
-										closedir(dir);
-										return 0;
-								};
-                                char * str = string_format("%s%s", hash, next_hash);
-                                md5_buffer((str), strlen(str), digest);
-                                hash = md5_string(digest);
-								free(str);
-                        }
-                        else{
-                                init = 1;
-                                hash = md5_file_or_dir(path);
-								if(hash == 0){
-										closedir(dir);
-										return 0;
-								}
-                        }
-                }
-				closedir(dir);
-                return hash;
-        }
-        else if(S_ISREG(info.st_mode)){
-                unsigned char digest[MD5_DIGEST_LENGTH];
-                const char * content_hash;
-				const char * name_hash;
-                md5_file(src, digest);
-                content_hash = md5_string(digest);
-				md5_buffer(src, strlen(src), digest);
-               	name_hash = md5_string(digest);
-
-				const char * hash;
-                char * str = string_format("%s%s", content_hash, name_hash);
-                md5_buffer((str), strlen(str), digest);
-                hash = md5_string(digest);
+	struct stat info;
+	if(stat(src, &info) != 0) return 0; 
+	if(S_ISDIR(info.st_mode)){
+		/* XXX Directories need to read in the same order to generate hash consistently*/
+		struct dirent *d;
+		DIR * dir = opendir(src);
+		if(!dir) return 0;
+		unsigned char digest[MD5_DIGEST_LENGTH];
+		char * path;
+		const char * hash = 0;
+		const char * next_hash = 0;
+		int init = 0;
+		while((d=readdir(dir))){
+			if(!strcmp(d->d_name,".")) continue;
+			if(!strcmp(d->d_name,"..")) continue;
+			path = path_concat(src, d->d_name);
+			if(init){				
+				next_hash = md5_file_or_dir(path);
+				if(next_hash == 0){
+					closedir(dir);
+					return 0;
+				}
+				char * str = string_format("%s%s", hash, next_hash);
+				md5_buffer((str), strlen(str), digest);
+				hash = md5_string(digest);
 				free(str);
-                return hash;
-        }
+				}
+				else{
+						init = 1;
+						hash = md5_file_or_dir(path);
+						if(hash == 0){
+							closedir(dir);
+							return 0;
+						}
+				}
+		}
+		closedir(dir);
+		return hash;
+	}
+	else if(S_ISREG(info.st_mode)){
+		unsigned char digest[MD5_DIGEST_LENGTH];
+		const char * content_hash;
+		const char * name_hash;
+		md5_file(src, digest);
+		content_hash = md5_string(digest);
+		md5_buffer(src, strlen(src), digest);
+		name_hash = md5_string(digest);
 
-		return 0;
+		const char * hash;
+		char * str = string_format("%s%s", content_hash, name_hash);
+		md5_buffer((str), strlen(str), digest);
+		hash = md5_string(digest);
+		free(str);
+		return hash;
+	}
+
+	return 0;
 }
 const char * md5_file_or_dir(char * src)
 {
-		struct stat info;
-        if(stat(src, &info) != 0) return 0; 
-        if(S_ISDIR(info.st_mode)){
-				const char * hash;
-				hash = md5_dir_rec(src);
-				if(hash == 0) return 0;
-				return hash;
-        }
-        else if(S_ISREG(info.st_mode)){
-                unsigned char digest[MD5_DIGEST_LENGTH];
-                const char * hash;
-                md5_file(src, digest);
-                hash = md5_string(digest);
-                return hash;
-        }
-        else{
-                return 0;
-        }
+	struct stat info;
+	if(stat(src, &info) != 0) return 0; 
+    if(S_ISDIR(info.st_mode)){
+		const char * hash;
+		hash = md5_dir_rec(src);
+		if(hash == 0) return 0;
+		return hash;
+	}
+	else if(S_ISREG(info.st_mode)){
+		unsigned char digest[MD5_DIGEST_LENGTH];
+		const char * hash;
+		md5_file(src, digest);
+		hash = md5_string(digest);
+		return hash;
+	}
+	else{
+		return 0;
+	}
 }
 
 char *md5_cal(const char *s) {
