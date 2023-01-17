@@ -451,7 +451,7 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 	if(remote_name[0] == '/') {
 		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}
-	if(!strncmp(f->cached_name, "of", strlen("of"))){
+	if(!strncmp(f->cached_name, "output", strlen("output"))){
 		/* XXX cache name could not be generated for input file. The file may not exist. The task will likely fail*/
 		f->cached_name = 0;
 	}

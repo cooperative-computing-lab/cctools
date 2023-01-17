@@ -308,7 +308,7 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 				md5_buffer(f->source,strlen(f->source),digest);
 				hash = md5_string(digest);
 				int rand_num = (rand() % 100000) + 1;
-				f->cached_name = string_format("of-%d-%s", rand_num, hash);
+				f->cached_name = string_format("output-%d-%s", rand_num, hash);
 				return f;
 			}
 			else{
@@ -325,7 +325,7 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 			md5_buffer(f->source,strlen(f->source),digest);
 			hash = md5_string(digest);
 			int rand_num = (rand() % 100000) + 1;
-        		f->cached_name = string_format("of-%d-%s", rand_num, hash);
+        		f->cached_name = string_format("output-%d-%s", rand_num, hash);
 			return f;
 		}
 		f->cached_name = cache_name;
