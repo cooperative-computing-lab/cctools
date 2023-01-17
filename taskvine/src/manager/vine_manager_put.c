@@ -334,7 +334,12 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 			vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
 			return VINE_APP_FAILURE;
 		}
-	} else {
+	} else if(!f->cached_name){ 
+		debug(D_NOTICE|D_VINE,"Cache name could not be generated for input file %s", f->source);
+		vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
+		return VINE_APP_FAILURE;
+
+	} else{
 		/* Any other type, just record dummy values for size and time, until we know better. */
 		info.st_size = f->length;
 		info.st_mtime = time(0);
