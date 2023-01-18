@@ -49,7 +49,12 @@ static int check_worker_against_task(struct vine_manager *q, struct vine_worker_
 	}
 
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
-	struct vine_resources *r = w->resources;
+	struct vine_resources *r = NULL;
+	if (t->coprocess == NULL) {
+		r = w->resources;
+	} else {
+		r = w->coprocess_resources;
+	}
 
 	int ok = 1;
 
@@ -121,7 +126,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 		if( check_worker_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
 			LIST_ITERATE(t->input_files,tf) {
-				if((tf->type == VINE_FILE || tf->type == VINE_FILE_PIECE) && (tf->flags & VINE_CACHE)) {
+				if(tf->type == VINE_FILE  && (tf->flags & VINE_CACHE)) {
 					remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 					if(remote_info)
 						task_cached_bytes += remote_info->size;

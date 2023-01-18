@@ -43,8 +43,8 @@ if __name__ == "__main__":
         )
 
         t.add_input_buffer(query_string, "query.file", cache=True)
-        t.add_input_url(blast_url, "blastdir", flags=vine.VINE_UNPACK, cache=True)
-        t.add_input_url(landmark_url, "landmark", flags=vine.VINE_UNPACK, cache=True)
+        t.add_input(vine.FileUntar(vine.FileURL(blast_url)), "blastdir", cache=True )
+        t.add_input(vine.FileUntar(vine.FileURL(landmark_url)), "landmark", cache=True )
         t.set_env_var("BLASTDB", value="landmark")
 
         task_id = m.submit(t)

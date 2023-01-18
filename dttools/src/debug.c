@@ -100,6 +100,7 @@ static struct flag_info table[] = {
 	{"jx", D_JX},
 	{"ssl", D_SSL},
 	{"all", D_ALL},
+	{"bucketing", D_BUCKETING},
 	{"time", 0},		/* backwards compatibility */
 	{"pid", 0},		/* backwards compatibility */
 	{0, 0}

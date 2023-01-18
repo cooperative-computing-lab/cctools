@@ -590,7 +590,13 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 
 	c->steady_state = c->completions_since_last_reset >= first_allocation_every_n_tasks;
 
-	rmsummary_merge_max(c->max_resources_seen, rs);
+    /* load new max values */
+    int i;
+    for(i = 0; labeled_resources[i]; i++) {
+        const size_t o = labeled_resources[i];
+        double max = MAX(rmsummary_get_by_offset(rs, o), rmsummary_get_by_offset(c->max_resources_seen, o));
+        rmsummary_set_by_offset(c->max_resources_seen, o, max);
+    }
 	if(rs && (!rs->exit_type || !strcmp(rs->exit_type, "normal"))) {
         size_t i;
         for(i = 0; labeled_resources[i]; i++) {
@@ -721,7 +727,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
     if(category_in_steady_state(c) &&
             c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED &&
             c->allocation_mode != CATEGORY_ALLOCATION_MODE_MAX) {
-        /* load max seen values values, but only if not in fixed or max mode.
+        /* load max seen values, but only if not in fixed or max mode.
          * In max mode, max seen is the first allocation, and next allocation
          * is to use whole workers. */
         rmsummary_merge_override(internal, c->max_resources_seen);
@@ -739,7 +745,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 		rmsummary_merge_override(internal, c->first_allocation);
 	}
 
-	/* chip in user values if explicitely given */
+	/* chip in user values if explicitly given */
 	rmsummary_merge_override(internal, user);
 
 	return internal;

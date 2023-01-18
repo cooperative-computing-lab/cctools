@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "vine_file.h"
+#include "vine_task.h"
 
 #include "debug.h"
 #include "xxmalloc.h"
@@ -64,20 +65,30 @@ char *make_cached_name( const struct vine_file *f )
 		cache_file_id = file_count;
 	}
 
+	/* XXX hack to force caching for the moment */
+	cache_file_id = 0;
+	
 	switch(f->type) {
 		case VINE_FILE:
 		case VINE_EMPTY_DIR:
 			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), source_enc);
 			break;
-		case VINE_FILE_PIECE:
-			return string_format("piece-%d-%s-%s-%lld-%lld",cache_file_id, md5_string(digest),source_enc,(long long)f->offset,(long long)f->piece_length);
+		case VINE_MINI_TASK:
+			/* XXX This should be computed from the constituents of the mini task */
+			return string_format("task-%d-%s", cache_file_id, md5_string(digest));
 			break;
-		case VINE_COMMAND:
-			return string_format("cmd-%d-%s", cache_file_id, md5_string(digest));
-			break;
-		case VINE_URL:
+	       	case VINE_URL:
 			return string_format("url-%d-%s", cache_file_id, md5_string(digest));
 			break;
+		case VINE_TEMP:
+			/* A temporary file has no initial content. */
+			/* Replace with task-derived string once known. */
+			{
+			char cookie[17];
+			string_cookie(cookie,16);
+			return string_format("temp-%d-%s", cache_file_id, cookie);
+			break;
+			}
 		case VINE_BUFFER:
 		default:
 			return string_format("buffer-%d-%s", cache_file_id, md5_string(digest));
@@ -87,7 +98,7 @@ char *make_cached_name( const struct vine_file *f )
 
 /* Create a new file object with the given properties. */
 
-struct vine_file *vine_file_create(const char *source, const char *remote_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags)
+struct vine_file *vine_file_create(const char *source, const char *remote_name, const char *cached_name, const char *data, int length, vine_file_t type, vine_file_flags_t flags, struct vine_task *mini_task )
 {
 	struct vine_file *f;
 
@@ -96,11 +107,16 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 	memset(f, 0, sizeof(*f));
 
 	f->source = xxstrdup(source);
-	f->remote_name = xxstrdup(remote_name);
+	if(remote_name) {
+		f->remote_name = xxstrdup(remote_name);
+	} else {
+		f->remote_name = 0;
+	}
 	f->type = type;
 	f->flags = flags;
 	f->length = length;
-
+	f->mini_task = mini_task;
+	
 	if(data) {
 		f->data = malloc(length);
 		memcpy(f->data,data,length);
@@ -108,12 +124,16 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 		f->data = 0;
 	}
 
-	if(vine_hack_do_not_compute_cached_name) {
-  		f->cached_name = xxstrdup(f->source);
+	if(cached_name) {
+		f->cached_name = xxstrdup(cached_name);
 	} else {
-		f->cached_name = make_cached_name(f);
+		if(vine_hack_do_not_compute_cached_name) {
+			f->cached_name = xxstrdup(f->source);
+		} else {
+			f->cached_name = make_cached_name(f);
+		}
 	}
-
+	
 	return f;
 }
 
@@ -121,16 +141,82 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 
 struct vine_file *vine_file_clone(const struct vine_file *f )
 {
-	return vine_file_create(f->source,f->remote_name,f->data,f->length,f->type,f->flags);
+	if(!f) return 0;
+	return vine_file_create(f->source,f->remote_name,f->cached_name,f->data,f->length,f->type,f->flags,vine_task_clone(f->mini_task));
 }
 
 /* Delete a file object */
 
 void vine_file_delete(struct vine_file *f)
 {
+	if(!f) return;
+	vine_file_delete(f->substitute);
+	vine_task_delete(f->mini_task);
 	free(f->source);
 	free(f->remote_name);
 	free(f->cached_name);
 	free(f->data);
 	free(f);
 }
+
+struct vine_file * vine_file_local( const char *source )
+{
+	return vine_file_create(source,0,0,0,0,VINE_FILE,0,0);
+}
+
+struct vine_file * vine_file_url( const char *source )
+{
+	return vine_file_create(source,0,0,0,0,VINE_URL,0,0);
+}
+
+struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source )
+{
+	return vine_file_create(source,0,f->cached_name,0,f->length,VINE_URL,0,0);
+}
+
+struct vine_file * vine_file_temp( const char *unique_name )
+{
+	return vine_file_create("temp",0,unique_name,0,0,VINE_TEMP,0,0);
+}
+
+struct vine_file * vine_file_buffer( const char *buffer_name,const char *data, int length )
+{
+	return vine_file_create(buffer_name,0,0,data,length,VINE_BUFFER,0,0);
+}
+
+struct vine_file * vine_file_empty_dir()
+{
+	return vine_file_create("unnamed",0,0,0,0,VINE_EMPTY_DIR,0,0);
+}
+
+struct vine_file * vine_file_mini_task( struct vine_task *t )
+{
+	return vine_file_create(t->command_line,0,0,0,0,VINE_MINI_TASK,0,t);
+}
+
+struct vine_file * vine_file_untar( struct vine_file *f )
+{
+	struct vine_task *t = vine_task_create("mkdir output && tar xf input -C output");
+	vine_task_add_input(t,f,"input",VINE_CACHE);
+	vine_task_add_output(t,vine_file_local("output"),"output",VINE_CACHE);
+	return vine_file_mini_task(t);
+}
+
+struct vine_file * vine_file_unponcho( struct vine_file *f)
+{
+	struct vine_task *t  = vine_task_create("./poncho_package_run --unpack-to output -e package.tar.gz");
+	char * poncho_path = path_which("poncho_package_run");
+	vine_task_add_input(t, vine_file_local(poncho_path), "poncho_package_run", VINE_CACHE);
+	vine_task_add_input(t, f, "package.tar.gz", VINE_CACHE);
+	vine_task_add_output(t, vine_file_local("output"), "output", VINE_CACHE);
+	return vine_file_mini_task(t);
+}
+
+struct vine_file * vine_file_unstarch( struct vine_file *f )
+{
+	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
+	vine_task_add_input(t,f,"package.sfx",VINE_CACHE);
+	vine_task_add_output(t,vine_file_local("output"),"output",VINE_CACHE);
+	return vine_file_mini_task(t);
+}
+

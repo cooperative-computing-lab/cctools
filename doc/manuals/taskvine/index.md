@@ -709,27 +709,66 @@ as in the following example:
     vine_task_set_run_time_min(t,10)     # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
     ```
 
-When all cores, memory, and disk are specified, taskvine will simply fit as
-many tasks as possible without going above the resources available at a
-particular worker. When the maximum running time is specified, taskvine will
-kill any task that exceeds its maximum running time. The minimum running time,
-if specified, helps taskvine decide which worker best fits which task.
-Specifying tasks' running time is especially helpful in clusters where workers
-may have a hard threshold of their running time.
+When the maximum running time is specified, taskvine will kill any task that
+exceeds its maximum running time. The minimum running time, if specified, helps
+taskvine decide which worker best fits which task.  Specifying tasks' running
+time is especially helpful in clusters where workers may have a hard threshold
+of their running time.
 
-When some of the resources are left unspecified, then taskvine tries to find
-some reasonable defaults as follows:
+Resources are allocated according to the following rules:
 
-- If no resources are specified, or all resources are specified to be 0, then a
-  single task from the category will consume a **whole worker**.
-- Unspecified gpus are always zero.
-- If a task specifies gpus, then the default cores is zero.
-- Unspecified cores, memory and disk will get a default according to the
-  proportion the specified resources will use at a worker, rounding-up. Thus,
-  if task specifies that it will use two cores, but does not specify memory or
-  disk, it will be allocated %50 of memory and disk in 4-core workers, or %25
-  in 8-core workers. When more than one resource is specified, the default uses
-  the largest proportion.
+1. If the task does not specify any resources, then it is allocated a whole worker.
+2. The task will be allocated as least as much of the value of the resources
+  specified. E.g., a task that specifies two cores will be allocated at
+  least two cores.
+3. If gpus remain unspecified, then the task is allocated zero gpus.
+4. If a task specifies gpus, but does not specify cores, then the task is allocated zero cores.
+5. In all other cases, cores, memory, and disk of the worker are divided
+  evenly according to the maximum proportion of specified task
+  requirements over worker resources. The proportions are rounded up so that
+  only whole number of tasks could fit in the worker.
+
+As an example, consider a task that only specifies 1 core, and does not specify
+any other resource, and a worker with 4 cores, 12 GB of memory, and 36 GB of
+disk. According to the rules above:
+
+- Rule 1 does not apply, as at least one resource (cores) was specified.
+- According to rule 2, the task will get at least one core.
+- According to rule 3, the task will not be allocated any gpus.
+- Rule 4 does not apply, as no gpus were specified, and cores were specified.
+- For rule 5, the task requires 1 core, and the worker has 4 cores. This gives a proportion
+  of 1/4=0.25. Thus, the task is assigned 25% of the memory and disk (3 GB and
+  9 GB respectively).
+
+As another example, now assume that the task specifies 1 cores and 6 GB of memory:
+
+- Rules 1 to 4 are as the last example, only that now the task will get at
+  least 6 GB of memory.
+- From cores we get a proportion of 1/4=0.25, and from memory 6GB/12GB=0.5.
+  The memory proportion dictates the allocation as it is the largest. This
+  means that the task will get assigned 50% of the cores (2), memory
+  (6 GB), and disk (18 GB).
+
+Note that proportions are 'rounded up', as the following example shows.
+Consider now that the task requires 1 cores, 6GB of memory, and 27 GB of disk:
+
+- Rules 1 to 4 are as before, only that now the worker will get at
+  least 30 GB of disk.
+- The proportions are 1/4=0.25 for cores, 6GB/12GB=0.5 for memory, and
+  27GB/36GB=0.75 for disk. This would assign 3 cores, 9 memory, and 27
+  to the task. However, this would mean that no other task of this size would
+  be able to run in the worker. Rather than assign 75% of the resources and
+  risk an preventable failure because of resource exhaustion, the task is
+  assigned 100% of the resources from the worker. More generally, allocations
+  are rounded up so that only a whole number of tasks can be fit in the worker.
+
+!!! note
+    If you want TaskVine to exactly allocate the resources you have
+    specified, use the `proportional-resources` and `proportional-whole-tasks`
+    parameters as shown [here](#specialized-and-experimental-settings).  In
+    general, however, we have found that using proportions nicely adapts to the
+    underlying available resources, and leads to very few resource exhaustion
+    failures while still using worker resources efficiently.
 
 The current taskvine implementation only accepts whole integers for its
 resources, which means that no worker can concurrently execute more tasks than
@@ -1612,8 +1651,8 @@ tasks. It is activated as follows:
 
 === "C"
     ```C
-   vine_enable_transactions_log(q, "my.tr.log");
-   ```
+    vine_enable_transactions_log(q, "my.tr.log");
+    ```
 
 The first few lines of the log document the possible log records:
 
@@ -1749,7 +1788,8 @@ change.
 | Parameter | Description | Default Value |
 |-----------|-------------|---------------|
 | category-steady-n-tasks | Minimum number of successful tasks to use a sample for automatic resource allocation modes<br>after encountering a new resource maximum. | 25 |
-| force-proportional-resources | When task with requirement r of resources is allocated in a worker,<br>divide the resources of the worker evenly so that only a whole number<br> of tasks with requirement r fit in the worker. <br> Use in conjunction with [task resources](#task-resources) | 0 |
+| proportional-resources | If set to 0, do not assign resources proportionally to tasks. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
+| proportional-whole-tasks | Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
 | hungry-minimum          | Smallest number of waiting tasks in the queue before declaring it hungry | 10 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |

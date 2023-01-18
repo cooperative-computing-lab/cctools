@@ -319,7 +319,7 @@ void *list_peek_tail(struct list *list);
 
 /** Peek at the current element in the iteration.
 @param list The list to peek.
-@return The item at the list head, or null if list is empty.
+@return The item at the current internal iterator, or null if list is empty.
 */
 void *list_peek_current(struct list *list);
 
@@ -368,7 +368,7 @@ void list_first_item(struct list *list);
 This function returns the current list item,
 and advances the internal iterator to the next item.
 @param list The list to traverse.
-@return The current item in the list.
+@return The current item in the list, NULL if end of list.
 */
 
 void *list_next_item(struct list *list);

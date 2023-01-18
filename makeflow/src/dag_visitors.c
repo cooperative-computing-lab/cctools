@@ -1184,6 +1184,12 @@ struct jx *category_allocation_to_json(category_allocation_t c) {
 		case CATEGORY_ALLOCATION_ERROR:
 			return jx_string("error");
 			break;
+		case CATEGORY_ALLOCATION_GREEDY_BUCKETING:
+			return jx_string("greedy bucketing");
+			break;
+		case CATEGORY_ALLOCATION_EXHAUSTIVE_BUCKETING:
+			return jx_string("exhaustive bucketing");
+			break;
 	}
 	return jx_null();
 }

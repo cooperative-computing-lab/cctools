@@ -1,5 +1,10 @@
 #!/bin/sh
 
+if [ X$1 != X ]
+then
+	CCTOOLS_PACKAGES_TEST=$1
+fi
+
 if [ ! -r config.mk ]; then
 	echo "Please run ./configure && make before executing the test script"
 	exit 1

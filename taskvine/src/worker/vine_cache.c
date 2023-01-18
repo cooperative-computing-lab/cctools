@@ -5,7 +5,10 @@ See the file COPYING for details.
 */
 
 #include "vine_cache.h"
+#include "vine_process.h"
 
+#include "vine_transfer.h"
+#include "vine_protocol.h"
 #include "xxmalloc.h"
 #include "hash_table.h"
 #include "debug.h"
@@ -34,9 +37,10 @@ struct cache_file {
 	int64_t actual_size;
 	int mode;
 	int complete;
+	struct vine_task *mini_task;
 };
 
-struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode )
+struct cache_file * cache_file_create( vine_cache_type_t type, const char *source, int64_t actual_size, int mode, struct vine_task *mini_task )
 {
 	struct cache_file *f = malloc(sizeof(*f));
 	f->type = type;
@@ -44,6 +48,7 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 	f->actual_size = actual_size;
 	f->mode = mode;
 	f->complete = 0;
+	f->mini_task = mini_task;
 	return f;
 }
 
@@ -90,24 +95,45 @@ char * vine_cache_full_path( struct vine_cache *c, const char *cachename )
 
 /*
 Add a file to the cache manager (already created in the proper place) and note its size.
-It may still be necessary to perform post-transfer processing of this file.
 */
 
 int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode);
+	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode,0);
+	hash_table_insert(c->table,cachename,f);
+	f->complete = 1;
+	return 1;
+}
+
+/*
+Return true if the cache contains the requested item.
+*/
+
+int vine_cache_contains( struct vine_cache *c, const char *cachename )
+{
+	return hash_table_lookup(c->table,cachename)!=0;
+}
+
+/*
+Queue a remote file transfer to produce a file.
+This entry will be materialized later in vine_cache_ensure.
+*/
+
+int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
+{
+	struct cache_file *f = cache_file_create(VINE_CACHE_TRANSFER,source,size,mode,0);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
 
 /*
-Queue a remote file transfer or command execution to produce a file.
+Queue a mini-task to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue( struct vine_cache *c, vine_cache_type_t type, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
+int vine_cache_queue_command( struct vine_cache *c, struct vine_task *mini_task, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
 {
-	struct cache_file *f = cache_file_create(type,source,size,mode);
+	struct cache_file *f = cache_file_create(VINE_CACHE_MINI_TASK,"task",size,mode,mini_task);
 	hash_table_insert(c->table,cachename,f);
 	return 1;
 }
@@ -175,7 +201,7 @@ Transfer a single input file from a url to a local filename by using /usr/bin/cu
 --stderr Send errors to /dev/stdout so that they are observed by popen.
 */
 
-static int do_transfer( struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message )
+static int do_curl_transfer( struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message )
 {
 	char * command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"",cache_path,source_url);
 	int result = do_internal_command(c,command,error_message);
@@ -184,60 +210,103 @@ static int do_transfer( struct vine_cache *c, const char *source_url, const char
 }
 
 /*
-Create a file by executing a shell command.
-The command should contain %% which indicates the path of the cache file to be created.
+Create a file by executing a mini_task, which should produce the desired cachename.
+The mini_task uses all the normal machinery to run a task synchronously,
+which should result in the desired file being placed into the cache.
+This will be double-checked below.
 */
 
-static int do_command( struct vine_cache *c, const char *command, const char *cache_path, char **error_message )
+static int do_mini_task( struct vine_cache *c, struct vine_task *mini_task, struct link *manager, char **error_message )
 {
-	char *full_command = string_replace_percents(command,cache_path);
-	int result = do_internal_command(c,full_command,error_message);
-	free(full_command);
-	return result;
-}
-
-/*
-For a given file that has been transferred into transfer_name,
-either unpack it into cache_name, or just rename it into place,
-depending on the flags of the file.
-Returns true on success, false otherwise.
-*/
-
-int unpack_or_rename_target( struct cache_file *f, const char *transfer_path, const char *cache_path, vine_file_flags_t flags )
-{
-	int unix_result;
-	char *command;
-
-	if(flags & VINE_UNPACK) {
-		if(string_suffix_is(f->source,".tar")) {
-			mkdir(cache_path,0700);
-			command = string_format("tar xf %s -C %s",transfer_path,cache_path);
-		} else if(string_suffix_is(f->source,".tar.gz") || string_suffix_is(f->source,".tgz")) {
-			mkdir(cache_path,0700);
-			command = string_format("tar xzf %s -C %s",transfer_path,cache_path);
-		} else if(string_suffix_is(f->source,".gz")) {
-			command = string_format("gunzip <%s >%s",transfer_path,cache_path);
-		} else if(string_suffix_is(f->source,".zip")) {
-			mkdir(cache_path,0700);
-			command = string_format("unzip %s -d %s",transfer_path,cache_path);
-		} else {
-			command = strdup("false");
-		}
-		debug(D_VINE,"unpacking %s to %s via command %s",transfer_path,cache_path,command);
-		unix_result = system(command);
-		free(command);
-	} else {
-		debug(D_VINE,"renaming %s to %s",transfer_path,cache_path);
-		unix_result = rename(transfer_path,cache_path);
-	}
-
-	if(unix_result==0) {
+	if(vine_process_execute_and_wait(mini_task,c,manager)) {
+		*error_message = 0;
 		return 1;
 	} else {
-		debug(D_VINE,"command failed: %s",strerror(errno));
+		const char *str = vine_task_get_stdout(mini_task);
+		if(str) {
+			*error_message = xxstrdup(str);
+		} else {
+			*error_message = 0;
+		}
 		return 0;
 	}
 }
+
+/*
+Transfer a single input file from a worker url to a local file name. 
+
+*/
+static int do_worker_transfer( struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message)
+{	
+	int port_num;
+	char addr[VINE_LINE_MAX], path[VINE_LINE_MAX];
+	int stoptime;	
+	struct link *worker_link;
+	
+	// expect the form: worker://addr:port/path/to/file
+	sscanf(source_url, "worker://%99[^:]:%d/%s", addr, &port_num, path);
+	debug(D_VINE, "Setting up worker transfer file %s",source_url);
+
+	stoptime = time(0) + 15;
+	worker_link = link_connect(addr, port_num, stoptime);
+
+	if(worker_link == NULL)
+	{
+		*error_message = string_format("Could not establish connection with worker at: %s:%d", addr, port_num);
+		return 0;
+	}
+
+	if(!vine_transfer_get_any(worker_link, c, path, time(0) + 120))
+	{
+		*error_message = string_format("Could not transfer file %s from worker %s:%d", path, addr, port_num);
+		link_close(worker_link);
+		return 0;
+	}
+		
+	
+	link_close(worker_link);
+
+	return 1;
+}
+
+/*
+Transfer a single obejct into the cache,
+whether by worker or via curl.
+Use a temporary transfer path while downloading,
+and then rename it into the proper place.
+*/
+
+static int do_transfer( struct vine_cache *c, const char *source_url, const char *cache_path, char **error_message)
+{
+	char *transfer_path = string_format("%s.transfer",cache_path);
+	int result = 0;
+	
+	if(strncmp(source_url, "worker://", 9) == 0){
+		result = do_worker_transfer(c,source_url,transfer_path,error_message);
+		if(result){
+			debug(D_VINE, "received file from worker");
+			rename(cache_path, transfer_path);
+		}
+	} else { 
+		result = do_curl_transfer(c,source_url,transfer_path,error_message);
+	}
+
+	if(result) {
+		if(rename(transfer_path,cache_path)==0) {
+			debug(D_VINE,"cache: renamed %s to %s",transfer_path,cache_path);
+		} else {
+			debug(D_VINE,"cache: failed to rename %s to %s: %s",transfer_path,cache_path,strerror(errno));
+			result = 0;
+		}
+	}
+
+	if(!result) trash_file(transfer_path);
+	
+	free(transfer_path);
+
+	return result;
+}
+
 
 /*
 Ensure that a given cached entry is fully materialized in the cache,
@@ -246,12 +315,6 @@ true, otherwise return false.
 
 It is a little odd that the manager link is passed as an argument here,
 but it is needed in order to send back the necessary update/invalid messages.
-
-XXX There is a subtle problem here.  File flags like UNPACK are associated
-with the task definition, rather than the file definition.  If two or more
-tasks specify the same input file but with different flags, unexpected things
-will happen.  We need to better separate flags that affect files vs flags that
-affect the binding to files.
 */
 
 int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
@@ -259,6 +322,8 @@ int send_cache_invalid( struct link *manager, const char *cachename, const char 
 
 int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager, vine_file_flags_t flags )
 {
+	if(!strcmp(cachename,"0")) return 1;
+
 	struct cache_file *f = hash_table_lookup(c->table,cachename);
 	if(!f) {
 		debug(D_VINE,"cache: %s is unknown, perhaps it failed to transfer earlier?",cachename);
@@ -269,10 +334,9 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 		debug(D_VINE,"cache: %s is already present.",cachename);
 		return 1;
 	}
-	
+
 	char *error_message = 0;
 	char *cache_path = vine_cache_full_path(c,cachename);
-	char *transfer_path = string_format("%s.transfer",cache_path);
 
 	int result = 0;
 
@@ -281,31 +345,23 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	switch(f->type) {
 		case VINE_CACHE_FILE:
 			debug(D_VINE,"cache: manager already delivered %s",cachename);
-			/*
-			This odd little rename here is to make manager-delivered files
-			look like transfer/command files, which arrive into .transfer files,
-			and then have the opportunity to be unpacked below.
-			*/
-			result = (rename(cache_path,transfer_path)==0);
+			result = 1;
 			break;
 		  
 		case VINE_CACHE_TRANSFER:
 			debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
-			result = do_transfer(c,f->source,transfer_path,&error_message);
+			result = do_transfer(c,f->source,cache_path,&error_message);
 			break;
 
-		case VINE_CACHE_COMMAND:
-			debug(D_VINE,"cache: creating %s via shell command",cachename);
-			result = do_command(c,f->source,transfer_path,&error_message);
+		case VINE_CACHE_MINI_TASK:
+			debug(D_VINE,"cache: creating %s via mini task",cachename);
+			result = do_mini_task(c,f->mini_task,manager,&error_message);
 			break;
 	}
 
-	if(result) {
-		result = unpack_or_rename_target(f,transfer_path,cache_path,flags);
-	}
+	chmod(cache_path,f->mode);
 
 	// Set the permissions as originally indicated.	
-	chmod(cache_path,f->mode);
 
 	timestamp_t transfer_end = timestamp_get();
 	timestamp_t transfer_time = transfer_end - transfer_start;
@@ -340,17 +396,13 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	*/
 	
 	if(!result) {
-		trash_file(cache_path);
-		trash_file(transfer_path);
 		if(!error_message) error_message = strdup("unknown");
 		send_cache_invalid(manager,cachename,error_message);
+		vine_cache_remove(c,cachename);
 	}
 	
 	if(error_message) free(error_message);
 	free(cache_path);
-	free(transfer_path);
 	return result;
 }
-
-
 
