@@ -373,29 +373,13 @@ const char *md5_string(unsigned char digest[16])
 const char *md5_dir_rec(char *src){
         
 	struct stat info;
-	if(!stat(src, &info)) return 0; 
-	if(S_ISREG(info.st_mode)){
-		unsigned char digest[MD5_DIGEST_LENGTH];
-		const char *content_hash;
-		const char *name_hash;
-		md5_file(src, digest);
-		content_hash = md5_string(digest);
-		md5_buffer(src, strlen(src), digest);
-		name_hash = md5_string(digest);
-
-		const char *hash;
-		char *str = string_format("%s%s", content_hash, name_hash);
-		md5_buffer((str), strlen(str), digest);
-		hash = md5_string(digest);
-		free(str);
-		return hash;
-	}
+	unsigned char digest[MD5_DIGEST_LENGTH];
+	if(stat(src, &info)) return 0; 
 	if(S_ISDIR(info.st_mode)){
 		/* XXX Directories need to read in the same order to generate hash consistently*/
 		struct dirent *d;
 		DIR * dir = opendir(src);
 		if(!dir) return 0;
-		unsigned char digest[MD5_DIGEST_LENGTH];
 		char *path;
 		const char *hash = 0;
 		const char *next_hash = 0;
@@ -423,9 +407,24 @@ const char *md5_dir_rec(char *src){
 						return 0;
 					}
 				}
-			free(path);
+		free(path);
 		}
 		closedir(dir);
+		return hash;
+	}
+	else if(S_ISREG(info.st_mode)){
+		const char *content_hash;
+		const char *name_hash;
+		md5_file(src, digest);
+		content_hash = md5_string(digest);
+		md5_buffer(src, strlen(src), digest);
+		name_hash = md5_string(digest);
+
+		const char *hash;
+		char *str = string_format("%s%s", content_hash, name_hash);
+		md5_buffer((str), strlen(str), digest);
+		hash = md5_string(digest);
+		free(str);
 		return hash;
 	}
 
@@ -434,18 +433,17 @@ const char *md5_dir_rec(char *src){
 const char *md5_file_or_dir(char *src)
 {
 	struct stat info;
-	if(stat(src, &info) != 0) return 0; 
-	if(S_ISREG(info.st_mode)){
-		unsigned char digest[MD5_DIGEST_LENGTH];
-		const char *hash;
-		md5_file(src, digest);
-		hash = md5_string(digest);
-		return hash;
-	}
+	const char *hash;
+	unsigned char digest[MD5_DIGEST_LENGTH];
+	if(stat(src, &info)) return 0; 
 	if(S_ISDIR(info.st_mode)){
-		const char *hash;
 		hash = md5_dir_rec(src);
 		if(hash == 0) return 0;
+		return hash;
+	}
+	else if(S_ISREG(info.st_mode)){
+		md5_file(src, digest);
+		hash = md5_string(digest);
 		return hash;
 	}
 	else{

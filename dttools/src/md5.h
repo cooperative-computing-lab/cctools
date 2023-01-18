@@ -41,7 +41,6 @@ which  must be converted to a human readable form with @ref md5_string.
 @param length Length of the buffer in bytes.
 @param digest Pointer to a buffer to store the digest.
 */
-
 void md5_buffer(const void *buffer, size_t length, unsigned char digest[MD5_DIGEST_LENGTH]);
 
 /** Checksum a local file.
@@ -51,28 +50,24 @@ which  must be converted to a human readable form with @ref md5_string.
 @param digest Pointer to a buffer to store the digest.
 @return One on success, zero on failure.
 */
-
 int md5_file(const char *filename, unsigned char digest[MD5_DIGEST_LENGTH]);
 
-/** Converts either a file or directory to a string of the its hashed contents.
-@param src The path to source file or a directory
+/** Converts either a directory to a string of the its hashed contents.
+@param src The path to the source directory
 @returns A static pointer to the string;
 */
-
 const char *md5_dir_rec(char *src);
 
 /** Converts either a file or directory to a string of the its hashed contents.
-@param src The path to source file or a directory
+@param src The path to the source file or a directory
 @returns A static pointer to the string;
 */
-
 const char *md5_file_or_dir(char *src);
 
 /** Convert an MD5 digest into a printable string.
 @param digest A binary digest returned from @ref md5_file, @ref md5_buffer, or @ref chirp_reli_md5.
 @returns A static pointer to a human readable form of the digest.
 */
-
 const char *md5_string(unsigned char digest[MD5_DIGEST_LENGTH]);
 
 /* md5_cal calculates the md5 checksum of string s.
@@ -80,7 +75,6 @@ const char *md5_string(unsigned char digest[MD5_DIGEST_LENGTH]);
 return the md5 checksum of s on success, return NULL on failure.
 The caller should free the returned string.
 */
-
 char *md5_cal(const char *s);
 
 #endif
