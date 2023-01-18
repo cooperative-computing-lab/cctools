@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "vine_blocklist.h"
 #include "vine_txn_log.h"
 #include "vine_perf_log.h"
+#include "vine_current_transfers.h"
 
 #include "cctools.h"
 #include "envtools.h"
@@ -130,6 +131,9 @@ void vine_disable_monitoring(struct vine_manager *q);
 static void aggregate_workers_resources( struct vine_manager *q, struct vine_resources *total, struct hash_table *features);
 static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int task_id);
 static void release_all_workers( struct vine_manager *q );
+
+static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char *name);
+static void vine_manager_send_duties_to_workers(struct vine_manager *q);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -296,13 +300,24 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 	char cachename[VINE_LINE_MAX];
 	long long size;
 	long long transfer_time;
+	char id[VINE_LINE_MAX];
 
-	if(sscanf(line,"cache-update %s %lld %lld",cachename,&size,&transfer_time)==3) {
+	if(sscanf(line,"cache-update %s %lld %lld %s",cachename,&size,&transfer_time, id)==4) {
 		struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
-		if(remote_info) {
-			remote_info->size = size;
-			remote_info->transfer_time = transfer_time;
+
+		if(!remote_info) {
+			debug(D_VINE,"warning: unexpected cache-update message for %s",cachename);
+			remote_info = vine_remote_file_info_create(size,time(0));
+			hash_table_insert(w->current_files,cachename,remote_info);
 		}
+
+		remote_info->size = size;
+		remote_info->transfer_time = transfer_time;
+		remote_info->in_cache = 1;
+		
+		vine_current_transfers_remove(q, id);
+
+		vine_txn_log_write_cache_update(q,w,size,transfer_time,cachename);
 	}
 
 	return VINE_MSG_PROCESSED;
@@ -321,8 +336,10 @@ set up their own input sandboxes.
 static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info *w, const char *line )
 {
 	char cachename[VINE_LINE_MAX];
+	char id[VINE_LINE_MAX];
 	int length;
-	if(sscanf(line,"cache-invalid %s %d",cachename,&length)==2) {
+
+	if(sscanf(line,"cache-invalid %s %d %8s-%4s-%4s-%4s-%12s",cachename,&length, id, &id[8], &id[12], &id[16], &id[20])==7) {
 
 		char *message = malloc(length+1);
 		time_t stoptime = time(0) + q->long_timeout;
@@ -338,7 +355,23 @@ static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info
 		free(message);
 		
 		struct vine_remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
+		vine_current_transfers_remove(q, id);
 		if(remote_info) vine_remote_file_info_delete(remote_info);
+	}
+	else if(sscanf(line,"cache-invalid %s %d",cachename,&length)==2) {
+
+		char *message = malloc(length+1);
+		time_t stoptime = time(0) + q->long_timeout;
+		
+		int actual = link_read(w->link,message,length,stoptime);
+		if(actual!=length) {
+			free(message);
+			return VINE_MSG_FAILURE;
+		}
+		
+		message[length] = 0;
+		debug(D_VINE,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
+		free(message);	
 	}
 	return VINE_MSG_PROCESSED;
 }
@@ -349,9 +382,11 @@ on its own port to receive get requests from other workers.
 */
 
 static int handle_transfer_address( struct vine_manager *q, struct vine_worker_info *w, const char *line )
-{
+{	
+	int dummy_port;
 	if(sscanf(line,"transfer-address %s %d",w->transfer_addr,&w->transfer_port)) {
 		w->transfer_port_active = 1;
+		link_address_remote(w->link, w->transfer_addr, &dummy_port);
 		return VINE_MSG_PROCESSED;
 	} else {
 		return VINE_MSG_FAILURE;
@@ -689,6 +724,8 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	uint64_t task_id;
 
 	if(!q || !w) return;
+	
+	vine_current_transfers_wipe_worker(q, w);
 
 	hash_table_clear(w->current_files,(void*)vine_remote_file_info_delete);
 
@@ -845,6 +882,8 @@ static void add_worker(struct vine_manager *q)
 	w->addrport = string_format("%s:%d",addr,port);
 
 	hash_table_insert(q->worker_table, w->hashkey, w);
+
+	vine_manager_send_duties_to_workers(q);
 }
 
 /* Delete a single file on a remote worker. */
@@ -852,7 +891,9 @@ static void add_worker(struct vine_manager *q)
 static void delete_worker_file( struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags ) {
 	if(!(flags & except_flags)) {
 		vine_manager_send(q,w, "unlink %s\n", filename);
-		hash_table_remove(w->current_files, filename);
+		struct vine_remote_file_info *remote_info;
+		remote_info = hash_table_remove(w->current_files, filename);
+		vine_remote_file_info_delete(remote_info);
 	}
 }
 
@@ -2066,7 +2107,7 @@ static struct jx *construct_status_message( struct vine_manager *q, const char *
 		jx_delete(a);
 		a = categories_to_jx(q);
 	} else {
-		debug(D_WQ, "Unknown status request: '%s'", request);
+		debug(D_VINE, "Unknown status request: '%s'", request);
 		jx_delete(a);
 		a = NULL;
 	}
@@ -2090,7 +2131,7 @@ static vine_msg_code_t handle_queue_status( struct vine_manager *q, struct vine_
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
 	if(!a) {
-		debug(D_WQ, "Unknown status request: '%s'", line);
+		debug(D_VINE, "Unknown status request: '%s'", line);
 		return VINE_MSG_FAILURE;
 	}
 
@@ -2297,9 +2338,7 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 	rmsummary_merge_override(limits, max);
 
 	int use_whole_worker = 1;
-
-	struct category *c = vine_category_lookup_or_create(q, t->category);
-	if(q->force_proportional_resources || c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
+	if(q->proportional_resources) {
 		double max_proportion = -1;
 		if(w->resources->cores.largest > 0) {
 			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.largest);
@@ -2329,14 +2368,14 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 
 			// adjust max_proportion so that an integer number of tasks fit the
 			// worker.
-			if(q->force_proportional_resources) {
+			if(q->proportional_whole_tasks) {
 				max_proportion = 1.0/(floor(1.0/max_proportion));
 			}
 
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
 			 * Otherwise they get a proportion according to specified
 			 * resources. Tasks will get at least one core. */
-			if(q->force_proportional_resources || limits->cores < 0) {
+			if(limits->cores < 0) {
 				if(limits->gpus > 0) {
 					limits->cores = 0;
 				} else {
@@ -2349,11 +2388,11 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 				limits->gpus = 0;
 			}
 
-			if(q->force_proportional_resources || limits->memory < 0) {
+			if(limits->memory < 0) {
 				limits->memory = MAX(1, floor(w->resources->memory.largest * max_proportion));
 			}
 
-			if(q->force_proportional_resources || limits->disk < 0) {
+			if(limits->disk < 0) {
 				limits->disk = MAX(1, floor(w->resources->disk.largest * max_proportion));
 			}
 		}
@@ -2470,6 +2509,7 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 
 	ITABLE_ITERATE(w->current_tasks_boxes,task_id,box) {
 		struct vine_task *t = itable_lookup(w->current_tasks, task_id);
+		if (!t) continue;
 		if (t->coprocess) {
 			w->coprocess_resources->cores.inuse     += box->cores;
 			w->coprocess_resources->memory.inuse    += box->memory;
@@ -2594,6 +2634,80 @@ static void reap_task_from_worker(struct vine_manager *q, struct vine_worker_inf
 }
 
 /*
+Determine whether there is transfer capacity to assign this task to this worker.
+Returns true on success, false if there are insufficient transfer sources.
+If a file can be fetched from a substitute source,
+this function modifies the file->substitute field to reflect that source.
+*/
+
+static int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
+{
+	struct vine_file *f;
+
+	LIST_ITERATE(t->input_files, f){
+		/* Is the file already present on that worker? */
+		struct vine_remote_file_info *remote_info;
+		remote_info = hash_table_lookup(w->current_files,f->cached_name);
+		if(remote_info) continue;
+		
+		char *id;
+		struct vine_worker_info *peer;
+		int found_match = 0;
+		
+		/* If not, then search for an available peer to provide it. */
+		/* Provide a substitute file object to describe the peer. */
+		
+		HASH_TABLE_ITERATE(q->worker_table, id, peer){
+			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache) {
+				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_WORKER_SOURCE_MAX_TRANSFERS) {	
+					vine_file_delete(f->substitute);
+					f->substitute = vine_file_substitute_url(f,peer_source);
+					free(peer_source);
+					found_match = 1;
+					break;
+				} else {
+					free(peer_source);
+				}
+			}
+
+		}
+
+		/* If that resulted in a match, move on to the next file. */
+		if(found_match) continue;
+
+		/*
+		If no match was found, the behavior depends on the original file type.
+		URLs can fetch from the original if capacity is available.
+		TEMPs can only fetch from peers, so no match is fatal.
+		Any other kind can be provided by the manager at dispatch.
+		*/
+		if(f->type==VINE_URL) {
+			/* For a URL transfer, we can fall back to the original if capacity is available. */
+			if(vine_current_transfers_source_in_use(q, f->source) >= q->file_source_max_transfers){
+			//	debug(D_VINE,"task %lld has no ready transfer source for url %s : %d in use",(long long)t->task_id,f->source, vine_current_transfers_source_in_use(q,f->source));
+				return 0;
+			} else {
+				/* keep going */
+			}
+		} else if(f->type==VINE_TEMP) {
+			//  debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long long)t->task_id,f->cached_name);
+			return 0;
+		} else if(f->type==VINE_MINI_TASK) {
+			if(!vine_manager_transfer_capacity_available(q, w, f->mini_task)){
+				return 0;
+			}
+		}
+		else {
+			/* keep going */
+		}
+	}
+
+	debug(D_VINE,"task %lld has a ready transfer source for all files",(long long)t->task_id);
+	return 1;
+}
+
+/*
 Advance the state of the system by selecting one task available
 to run, finding the best worker for that task, and then committing
 the task to the worker.
@@ -2602,7 +2716,7 @@ the task to the worker.
 static int send_one_task( struct vine_manager *q )
 {
 	struct vine_task *t;
-	struct vine_worker_info *w;
+	struct vine_worker_info *w = NULL;
 
 	timestamp_t now = timestamp_get();
 
@@ -2611,12 +2725,19 @@ static int send_one_task( struct vine_manager *q )
 
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
-
+		
 		// Find the best worker for the task at the head of the list
 		w = vine_schedule_task_to_worker(q,t);
 
 		// If there is no suitable worker, consider the next task.
 		if(!w) continue;
+
+		// Check if there is transfer capacity available.
+		if(q->peer_transfers_enabled)
+		{	
+			if(!vine_manager_transfer_capacity_available(q,w,t)) continue;
+		}
+
 		// Otherwise, remove it from the ready list and start it:
 		commit_task_to_worker(q,w,t);
 
@@ -2913,7 +3034,7 @@ Search for workers with that file, cancel any tasks using that
 file, and then remove it.
 */
 
-static void vine_invalidate_cached_file_internal(struct vine_manager *q, const char *filename)
+static void vine_remove_file_internal(struct vine_manager *q, const char *filename)
 {
 	char *key;
 	struct vine_worker_info *w;
@@ -2946,10 +3067,9 @@ static void vine_invalidate_cached_file_internal(struct vine_manager *q, const c
 	}
 }
 
-void vine_invalidate_cached_file(struct vine_manager *q, const char *local_name, vine_file_t type) {
-	struct vine_file *f = vine_file_create(local_name, local_name, 0, 0, type, VINE_CACHE, 0);
-	vine_invalidate_cached_file_internal(q, f->cached_name);
-	vine_file_delete(f);
+void vine_remove_file(struct vine_manager *q, struct vine_file *f )
+{
+	vine_remove_file_internal(q, f->cached_name);
 }
 
 /******************************************************/
@@ -3008,11 +3128,13 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->ready_list = list_create();
 
 	q->tasks          = itable_create(0);
+	q->duties         = hash_table_create(0, 0);
 
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
 
 	q->factory_table = hash_table_create(0, 0);
+	q->current_transfer_table = hash_table_create(0, 0);
 	q->fetch_factory = 0;
 
 	q->measured_local_resources = rmsummary_create(-1);
@@ -3052,7 +3174,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
-
+	
 	q->allocation_default_mode = VINE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
@@ -3061,6 +3183,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	vine_enable_disconnect_slow_workers(q, -1);
 
 	q->password = 0;
+
+	q->peer_transfers_enabled = 0;
+	q->file_source_max_transfers = VINE_FILE_SOURCE_MAX_TRANSFERS;
 
 	q->resource_submit_multiplier = 1.0;
 
@@ -3107,7 +3232,7 @@ int vine_enable_monitoring(struct vine_manager *q, char *monitor_output_director
 
 	if(!q->monitor_exe)
 	{
-		warn(D_WQ, "Could not find the resource monitor executable. Disabling monitoring.\n");
+		warn(D_VINE, "Could not find the resource monitor executable. Disabling monitoring.\n");
 		return 0;
 	}
 
@@ -3153,6 +3278,13 @@ int vine_enable_monitoring_full(struct vine_manager *q, char *monitor_output_dir
 	}
 
 	return status;
+}
+
+int vine_enable_peer_transfers(struct vine_manager *q) 
+{
+	debug(D_VINE, "Peer Transfers enabled");
+	q->peer_transfers_enabled = 1;
+	return 1;
 }
 
 int vine_enable_disconnect_slow_workers_category(struct vine_manager *q, const char *category, double multiplier)
@@ -3263,7 +3395,7 @@ void vine_delete(struct vine_manager *q)
 
 	if(q->catalog_hosts) free(q->catalog_hosts);
 
-	/* XXX this may be a leak, should workers be deleted as well? */
+	hash_table_clear(q->worker_table,(void*)vine_worker_delete);
 	hash_table_delete(q->worker_table);
 
 	hash_table_clear(q->factory_table,(void*)vine_factory_info_delete);
@@ -3271,6 +3403,9 @@ void vine_delete(struct vine_manager *q)
 
 	hash_table_clear(q->worker_blocklist,(void*)vine_blocklist_info_delete);
 	hash_table_delete(q->worker_blocklist);
+
+	hash_table_clear(q->current_transfer_table,(void*)vine_current_transfers_delete);
+	hash_table_delete(q->current_transfer_table);
 
 	char *key;
 	struct category *c;
@@ -3281,6 +3416,7 @@ void vine_delete(struct vine_manager *q)
 
 	list_delete(q->ready_list);
 	itable_delete(q->tasks);
+	hash_table_delete(q->duties);
 
 	hash_table_delete(q->workers_with_available_results);
 
@@ -3700,6 +3836,63 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	return vine_submit_internal(q, t);
 }
 
+static int vine_manager_send_duty_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name) {
+	struct vine_task *t = vine_task_clone(hash_table_lookup(q->duties, name));
+	t->task_id = q->next_task_id;
+	q->next_task_id++;
+	vine_manager_send(q,w, "duty %lld %lld\n",  (long long) strlen(name), (long long)t->task_id);
+	link_putlstring(w->link, name, strlen(name), time(0) + q->short_timeout);
+	vine_result_code_t result = start_one_task(q, w, t);
+	return result;
+}
+
+static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char *name) {
+	char *worker_key;
+	struct vine_worker_info *w;
+
+	HASH_TABLE_ITERATE(q->worker_table,worker_key,w) {
+		if(!w->features) {
+			vine_manager_send_duty_to_worker(q, w, name);
+			w->features = hash_table_create(4,0);
+			hash_table_insert(w->features, name, (void **) 1);
+			continue;
+		}
+		if(!hash_table_lookup(w->features, name)) {
+			vine_manager_send_duty_to_worker(q, w, name);
+			hash_table_insert(w->features, name, (void **) 1);
+		}
+	}
+}
+
+static void vine_manager_send_duties_to_workers(struct vine_manager *q) {
+	char *duty;
+	struct vine_task *t;
+	HASH_TABLE_ITERATE(q->duties,duty,t) {
+		vine_manager_send_duty_to_workers(q, duty);
+	}
+
+}
+
+void vine_manager_install_duty( struct vine_manager *q, struct vine_task *t, const char *name ) {
+	t->task_id = -1;
+	hash_table_insert(q->duties, name, t);
+	t->time_when_submitted = timestamp_get();
+	vine_manager_send_duties_to_workers(q);
+}
+
+void vine_manager_remove_duty( struct vine_manager *q, const char *name ) {
+	char *worker_key;
+	struct vine_worker_info *w;
+
+	HASH_TABLE_ITERATE(q->worker_table,worker_key,w) {
+		if(w->features) {
+			vine_manager_send(q,w,"kill_duty %ld\n", strlen(name));
+			vine_manager_send(q,w,"%s", name);
+			hash_table_remove(w->features, name);
+		}
+	}
+}
+
 void vine_block_host_with_timeout(struct vine_manager *q, const char *hostname, time_t timeout)
 {
 	return vine_blocklist_block(q,hostname,timeout);
@@ -3769,7 +3962,7 @@ struct vine_task *vine_wait_for_tag(struct vine_manager *q, const char *tag, int
 		timeout = 1;
 	}
 
-	if(timeout != VINE_WAITFORTASK && timeout < 0) {
+	if(timeout != VINE_WAIT_FOREVER && timeout < 0) {
 		debug(D_NOTICE|D_VINE, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
 		timeout = 5;
 	}
@@ -3787,7 +3980,7 @@ struct vine_task *vine_wait_for_task_id(struct vine_manager *q, int task_id, int
 		timeout = 1;
 	}
 
-	if(timeout != VINE_WAITFORTASK && timeout < 0) {
+	if(timeout != VINE_WAIT_FOREVER && timeout < 0) {
 		debug(D_NOTICE|D_VINE, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
 		timeout = 5;
 	}
@@ -3900,7 +4093,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 	print_password_warning(q);
 
 	// compute stoptime
-	time_t stoptime = (timeout == VINE_WAITFORTASK) ? 0 : time(0) + timeout;
+	time_t stoptime = (timeout == VINE_WAIT_FOREVER) ? 0 : time(0) + timeout;
 
 	int result;
 	struct vine_task *t = NULL;
@@ -4368,8 +4561,14 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-retrieve-many")){
 		q->wait_retrieve_many = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "force-proportional-resources")){
-		q->force_proportional_resources = MAX(0, (int)value);
+	} else if(!strcmp(name, "force-proportional-resources") || !strcmp(name, "proportional-resources")) {
+		q->proportional_resources = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "force-proportional-resources-whole-tasks") || !strcmp(name, "proportional-whole-tasks")) {
+		q->proportional_whole_tasks = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "file-source-max-transfers")){
+		q->file_source_max_transfers = MAX(1, (int)value); 
 
 	} else {
 		debug(D_NOTICE|D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);

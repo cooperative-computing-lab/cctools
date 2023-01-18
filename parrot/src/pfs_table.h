@@ -77,6 +77,7 @@ public:
 
 	/* operations on services */
 	int	stat( const char *name, struct pfs_stat *buf );
+	int	statx( const char *pathname, int flags, unsigned int mask, struct pfs_statx *buf );
 	int	statfs( const char *path, struct pfs_statfs *buf );
 	int	lstat( const char *name, struct pfs_stat *buf );
 	int	access( const char *name, mode_t mode );

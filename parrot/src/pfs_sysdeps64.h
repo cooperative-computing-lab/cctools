@@ -94,6 +94,36 @@ struct pfs_kernel_statfs {
 		INT64_T f_spare[6];
 };
 
+struct pfs_kernel_statx_timestamp {
+	INT64_T tv_sec;
+	UINT32_T tv_nsec;
+};
+
+struct pfs_kernel_statx {
+	UINT32_T stx_mask;
+	UINT32_T stx_blksize;
+	UINT64_T stx_attributes;
+	UINT32_T stx_nlink;
+	UINT32_T stx_uid;
+	UINT32_T stx_gid;
+	UINT16_T stx_mode;
+	UINT64_T stx_ino;
+	UINT64_T stx_size;
+	UINT64_T stx_blocks;
+	UINT64_T stx_attributes_mask;
+
+	struct pfs_kernel_statx_timestamp stx_atime;
+	struct pfs_kernel_statx_timestamp stx_btime;
+	struct pfs_kernel_statx_timestamp stx_ctime;
+	struct pfs_kernel_statx_timestamp stx_mtime;
+
+	UINT32_T stx_rdev_major;
+	UINT32_T stx_rdev_minor;
+
+	UINT32_T stx_dev_major;
+	UINT32_T stx_dev_minor;
+};
+
 struct pfs_kernel_iovec {
 	void     *iov_base;
 	UINT64_T  iov_len;

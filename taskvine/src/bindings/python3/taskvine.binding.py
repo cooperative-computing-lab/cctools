@@ -161,21 +161,11 @@ class FileUntar(File):
         self._file = vine_file_untar(vine_file_clone(subfile._file))
 
 ##
-# \class FileUntgz
+# \class FilePoncho
 #
-# TaskVine File TGZ Unpacker
+# TaskVine File PONCHO Unpacker
 #
-# A wrapper to unpack a file in .tgz form.
-
-class FileUntgz(File):
-    ##
-    # Create a file by unpacking a compressed tar file.
-    #
-    # @param self       The current file object.
-    # @param subfile    The file object to un-tgz.
-        
-    def __init__(self,subfile):
-        self._file = vine_file_untgz(vine_file_clone(subfile._file))
+# A wrapper to unpack a file in poncho package form.
 
 class FileUnponcho(File):
     ##
@@ -186,6 +176,24 @@ class FileUnponcho(File):
         
     def __init__(self,subfile):
         self._file = vine_file_unponcho(vine_file_clone(subfile._file))
+
+
+##
+# \class FileUnstarch
+#
+# TaskVine File Starch Unpacker
+#
+# A wrapper to unpack a file in .sfx form.
+
+class FileUnstarch(File):
+    ##
+    # Create a file by unpacking a starch package.
+    #
+    # @param self       The current file object.
+    # @param subfile    The file object to un-tgz.
+        
+    def __init__(self,subfile):
+        self._file = vine_file_unstarch(vine_file_clone(subfile._file))
 
 
 ##
@@ -222,8 +230,6 @@ class Task(object):
         flags = VINE_NOCACHE
         if cache:
             flags |= VINE_CACHE
-        if unpack:
-            flags |= VINE_UNPACK
         if watch:
             flags |= VINE_WATCH
         if failure_only:
@@ -259,6 +265,7 @@ class Task(object):
     # @param coprocess  The name of the coprocess.
     def set_coprocess(self, coprocess):
         return vine_task_set_coprocess(self._task, coprocess)
+    
 
     ##
     # Set the worker selection scheduler for task.
@@ -312,7 +319,6 @@ class Task(object):
     # @param local_name    The name of the file on local disk or shared filesystem.
     # @param remote_name   The name of the file at the execution site.
     # @param cache         Whether the file should be cached at workers. Default is False.
-    # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
     #
     # For example:
     # @code
@@ -320,7 +326,7 @@ class Task(object):
     # >>> task.add_input_file("/etc/hosts", cache = True)
     # >>> task.add_input_file("/etc/hosts", "hosts", cache = True)
     # @endcode
-    def add_input_file(self, local_name, remote_name=None, cache=False, unpack=False):
+    def add_input_file(self, local_name, remote_name=None, cache=False ):
 
         # swig expects strings:
         if local_name:
@@ -331,7 +337,7 @@ class Task(object):
         else:
             remote_name = os.path.basename(local_name)
 
-        flags = Task._determine_file_flags(cache, unpack)
+        flags = Task._determine_file_flags(cache)
         return vine_task_add_input_file(self._task, local_name, remote_name, flags)
 
 
@@ -341,13 +347,12 @@ class Task(object):
     # @param url           The url of the file to provide.
     # @param remote_name   The name of the file as seen by the task.
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
     #
     # For example:
     # @code
     # >>> task.add_input_url("http://www.google.com/","google.txt",cache=True)
     # @endcode
-    def add_input_url(self, url, remote_name, cache=False, unpack=False):
+    def add_input_url(self, url, remote_name, cache=False ):
         # swig expects strings
         if remote_name:
             remote_name = str(remote_name)
@@ -355,7 +360,7 @@ class Task(object):
         if url:
             url = str(url)
 
-        flags = Task._determine_file_flags(cache, unpack)
+        flags = Task._determine_file_flags(cache)
         return vine_task_add_input_url(self._task, url, remote_name, flags)
 
 
@@ -368,7 +373,6 @@ class Task(object):
     #                       The task object must generate a single output file named by @ref add_output_file.
     # @param remote_name    The name of the file as seen by the primary task.
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
     #
     # For example:
     # @code
@@ -379,10 +383,10 @@ class Task(object):
     # >>> task.add_input_mini_task(mini_task,"infile.txt",cache=True)
     # @endcode
 
-    def add_input_mini_task(self, mini_task, remote_name, cache=False, unpack=False, failure_only=None):
+    def add_input_mini_task(self, mini_task, remote_name, cache=False, failure_only=None):
         if remote_name:
             remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache=cache, unpack=unpack, failure_only=failure_only)
+        flags = Task._determine_file_flags(cache=cache, failure_only=failure_only)
         # The minitask must be duplicated, because the C object becomes "owned"
         # by the parent task and will be deleted when the parent task goes away.
         copy_of_mini_task = vine_task_clone(mini_task._task)
@@ -395,7 +399,6 @@ class Task(object):
     # @param file           A file object of class @ref File, such as @ref FileLocal, @ref FileBuffer, @ref FileURL, @ref FileMiniTask, @ref FileUntar, @FileUntgz.
     # @param remote_name    The name of the file at the execution site.
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
     #
     # For example:
     # @code
@@ -428,10 +431,10 @@ class Task(object):
     # @param remote_name    The name of the remote file to create.
     # @param flags          May take the same values as @ref add_file.
     # @param cache          Whether the file should be cached at workers (True/False)
-    def add_input_buffer(self, buffer, remote_name, cache=False, unpack=False):
+    def add_input_buffer(self, buffer, remote_name, cache=False ):
         if remote_name:
             remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache, unpack)
+        flags = Task._determine_file_flags(cache)
         return vine_task_add_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
@@ -444,7 +447,6 @@ class Task(object):
     # @param watch         Watch the output file and send back changes as the task runs.
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
     # @param success_only  For output files, whether the file should be retrieved only when the task succeeds. Default is False.
-    # @param unpack        Whether to unpack this archive (.tar, .tgz, .zip) into a directory on arrival. Default is False.
     #
     # For example:
     # @code
@@ -1346,6 +1348,14 @@ class Manager(object):
     def enable_monitoring_full(self, dirname=None, watchdog=True):
         return vine_enable_monitoring_full(self._taskvine, dirname, watchdog)
 
+
+    ##
+    # Enable P2P worker transfer functionality. Off by default
+    # 
+    # @param self Reference to the current manager object.
+    def enable_peer_transfers(self):
+        return vine_enable_peer_transfers(self._taskvine)
+
     ##
     # Enable disconnect slow workers functionality for a given queue for tasks in
     # the "default" category, and for task which category does not set an
@@ -1809,6 +1819,25 @@ class Manager(object):
         task_id = vine_submit(self._taskvine, task._task)
         self._task_table[task_id] = task
         return task_id
+    
+    ##
+    # Submit a duty to install on all connected workers 
+    #
+    #
+    # @param self   Reference to the current manager object.
+    # @param task   A task description created from @ref taskvine::Task.
+    # @param name   Name of the duty to be installed.
+    def install_duty(self, task, name):
+        vine_manager_install_duty(self._taskvine, task._task, "duty_coprocess:" + name)
+
+    ##
+    # Remove a duty from all connected workers
+    #
+    #
+    # @param self   Reference to the current manager object.
+    # @param name   Name of the duty to be removed.
+    def remove_duty(self, name):
+        vine_manager_remove_duty(self._taskvine, "duty_coprocess:" + name)
 
     ##
     # Wait for tasks to complete.
@@ -1818,8 +1847,8 @@ class Manager(object):
     # @param self       Reference to the current manager object.
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.  Use an integer to set the timeout or the constant @ref
-    #                   VINE_WAITFORTASK to block until a task has completed.
-    def wait(self, timeout=VINE_WAITFORTASK):
+    #                   VINE_WAIT_FOREVER to block until a task has completed.
+    def wait(self, timeout=VINE_WAIT_FOREVER):
         return self.wait_for_tag(None, timeout)
 
     ##
@@ -1832,7 +1861,7 @@ class Manager(object):
     # @param tag        Desired tag. If None, then it is equivalent to self.wait(timeout)
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
-    def wait_for_tag(self, tag, timeout=VINE_WAITFORTASK):
+    def wait_for_tag(self, tag, timeout=VINE_WAIT_FOREVER):
         task_pointer = vine_wait_for_tag(self._taskvine, tag, timeout)
         if task_pointer:
             task = self._task_table[vine_task_get_id(task_pointer)]
@@ -1850,7 +1879,7 @@ class Manager(object):
     # @param task_id        Desired task_id. If -1, then it is equivalent to self.wait(timeout)
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
-    def wait_for_task_id(self, task_id, timeout=VINE_WAITFORTASK):
+    def wait_for_task_id(self, task_id, timeout=VINE_WAIT_FOREVER):
         task_pointer = vine_wait_for_task_id(self._taskvine, task_id, timeout)
         if task_pointer:
             task = self._task_table[vine_task_get_id(task_pointer)]
@@ -2173,7 +2202,7 @@ class RemoteTask(Task):
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
-        Task.set_coprocess(self, coprocess)
+        Task.set_coprocess(self, "duty_coprocess:" + coprocess)
     ##
     # Specify function arguments. Accepts arrays and dictionarys. This overrides any arguments passed during task creation
     # @param self             Reference to the current remote task object

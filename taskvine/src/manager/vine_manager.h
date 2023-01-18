@@ -93,6 +93,7 @@ struct vine_manager {
 	struct list   *ready_list;      /* List of vine_task that are waiting to execute. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
+	struct hash_table *duties;      /* Maps duty name -> vine_task of duty with that name. */
 
 	/* Primary data structures for tracking worker state. */
 
@@ -100,6 +101,7 @@ struct vine_manager {
 	struct hash_table *worker_blocklist; /* Maps hostname -> vine_blocklist_info */
 	struct hash_table *factory_table;    /* Maps factory_name -> vine_factory_info */
 	struct hash_table *workers_with_available_results;  /* Maps link -> vine_worker_info */
+	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
 
 	/* Primary scheduling controls. */
 
@@ -144,6 +146,10 @@ struct vine_manager {
 	struct rmsummary *current_max_worker;
 	struct rmsummary *max_task_resources_requested;
 
+	/* Peer Transfer Configuration */
+	int peer_transfers_enabled;
+	int file_source_max_transfers;
+
 	/* Various performance knobs that can be tuned. */
 
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */
@@ -158,7 +164,8 @@ struct vine_manager {
 	int wait_for_workers;         /* wait for these many workers to connect before dispatching tasks at start of execution. */
 	int fetch_factory;            /* If true, manager queries catalog for factory configuration. */
 	int wait_retrieve_many;       /* If true, main loop consumes multiple completed tasks at once. */
-	int force_proportional_resources;  /* If true, tasks divide worker resources proportionally. */
+	int proportional_resources;   /* If true, tasks divide worker resources proportionally. */
+	int proportional_whole_tasks; /* If true, round-up proportions to whole number of tasks. */
 	double resource_submit_multiplier; /* Factor to permit overcommitment of resources at each worker.  */
 	double bandwidth_limit;            /* Artificial limit on bandwidth of manager<->worker transfers. */
 	int disk_avail_threshold; /* Ensure this minimum amount of available disk space. (in MB) */

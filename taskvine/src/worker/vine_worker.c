@@ -195,6 +195,9 @@ static struct list   *procs_waiting = NULL;
 // These are additional pointers into procs_table.
 static struct itable *procs_complete = NULL;
 
+// Table of current transfers and their id
+static struct hash_table *current_transfers = NULL;
+
 //User specified features this worker provides.
 static struct hash_table *features = NULL;
 
@@ -208,16 +211,12 @@ static int released_by_manager = 0;
 
 static char *catalog_hosts = NULL;
 
-static char *coprocess_command = NULL;
-static char *coprocess_name = NULL;
-static int number_of_coprocess_instances = 0;
-struct vine_coprocess *coprocess_info = NULL;
+struct list *coprocess_list = NULL;
 
-static int coprocess_cores = -1;
-static int coprocess_memory = -1;
-static int coprocess_disk = -1;
-static int coprocess_gpus = -1;
 static char *factory_name = NULL;
+
+struct list *duty_list = NULL;
+struct hash_table *duty_ids = NULL;
 
 struct vine_cache *global_cache = 0;
 
@@ -336,8 +335,8 @@ static void measure_worker_resources()
 
 	vine_gpus_init(r->gpus.total);
 
-	if (coprocess_command != NULL && coprocess_info != NULL) {
-		vine_coprocess_measure_resources(coprocess_info, number_of_coprocess_instances);
+	if (list_size(coprocess_list) != 0) {
+		vine_coprocess_measure_resources(coprocess_list);
 	}
 
 	last_resources_measurement = time(0);
@@ -381,8 +380,11 @@ static void send_resource_update(struct link *manager)
 		end_time = worker_start_time + (manual_wall_time_option * 1e6);
 	}
 
-	if (coprocess_info != NULL) {
-		vine_coprocess_resources_send(manager,coprocess_info->coprocess_resources,stoptime);
+	if (list_size(coprocess_list) != 0) {
+		list_first_item(coprocess_list);
+		struct vine_coprocess *coprocess = list_next_item(coprocess_list);
+		vine_resources_debug(coprocess->coprocess_resources);
+		vine_coprocess_resources_send(manager,coprocess->coprocess_resources,stoptime);
 	}
 
 	vine_resources_send(manager,total_resources,stoptime);
@@ -417,7 +419,16 @@ Send an asynchronmous message to the manager indicating that an item was success
 
 void send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
 {
-	send_message(manager,"cache-update %s %lld %lld\n",cachename,(long long)size,(long long)transfer_time);
+	char *transfer_id;
+	if((transfer_id = hash_table_lookup(current_transfers, cachename))){
+		send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
+	} else {
+		send_message(manager,"cache-update %s %lld %lld X\n",cachename,(long long)size,(long long)transfer_time);
+	}
+	if(transfer_id)
+	{
+		hash_table_remove(current_transfers, cachename);
+	}
 }
 
 /*
@@ -426,8 +437,14 @@ Send an asynchronous message to the manager indicating that an item previously q
 
 void send_cache_invalid( struct link *manager, const char *cachename, const char *message )
 {
+	char *transfer_id;
 	int length = strlen(message);
-	send_message(manager,"cache-invalid %s %d\n",cachename,length);
+	if((transfer_id = hash_table_lookup(current_transfers, cachename))){
+		debug(D_VINE, "Sending Cache invalid transfer id: %s", transfer_id);
+		send_message(manager,"cache-invalid %s %d %s\n",cachename, length, transfer_id);
+	}else{
+		send_message(manager,"cache-invalid %s %d\n",cachename,length);
+	}
 	link_write(manager,message,length,time(0)+active_timeout);
 }
 
@@ -478,11 +495,12 @@ static int start_process( struct vine_process *p, struct link *manager )
 		itable_insert(procs_complete,p->task->task_id,p);
 		return 0;
 	}
-	
-	cores_allocated += t->resources_requested->cores;
-	memory_allocated += t->resources_requested->memory;
-	disk_allocated += t->resources_requested->disk;
-	gpus_allocated += t->resources_requested->gpus;
+	if (!p->coprocess || vine_process_get_duty_name(p)) {
+		cores_allocated += t->resources_requested->cores;
+		memory_allocated += t->resources_requested->memory;
+		disk_allocated += t->resources_requested->disk;
+		gpus_allocated += t->resources_requested->gpus;
+	}
 
 	if(t->resources_requested->gpus>0) {
 		vine_gpus_allocate(t->resources_requested->gpus,t->task_id);
@@ -490,6 +508,23 @@ static int start_process( struct vine_process *p, struct link *manager )
 
 	pid = vine_process_execute(p);
 	if(pid<0) fatal("unable to fork process for task_id %d!",p->task->task_id);
+	if (p->coprocess) {
+		char *duty_name = NULL;
+		int duty_id = -1, iterate_id;
+
+		HASH_TABLE_ITERATE(duty_ids,duty_name,iterate_id) {
+			if (iterate_id == p->task->task_id){
+				duty_id = iterate_id;
+				break;
+			}
+		}
+		if (duty_id > 0) {
+			list_push_tail(coprocess_list, p->coprocess);
+			hash_table_insert(features, duty_name, (void **) 1);
+			send_features(manager);
+			send_resource_update(manager);
+		}
+	}
 
 	itable_insert(procs_running,p->pid,p);
 	
@@ -502,18 +537,20 @@ account for the resources as necessary.
 Should maintain parallel structure to start_process() above.
 */
 
-static void reap_process( struct vine_process *p )
+static void reap_process( struct vine_process *p, struct link *manager )
 {
 	p->execution_end = timestamp_get();
 
-	cores_allocated  -= p->task->resources_requested->cores;
-	memory_allocated -= p->task->resources_requested->memory;
-	disk_allocated   -= p->task->resources_requested->disk;
-	gpus_allocated   -= p->task->resources_requested->gpus;
+	if (!p->coprocess || vine_process_get_duty_name(p)) {
+		cores_allocated  -= p->task->resources_requested->cores;
+		memory_allocated -= p->task->resources_requested->memory;
+		disk_allocated   -= p->task->resources_requested->disk;
+		gpus_allocated   -= p->task->resources_requested->gpus;
+	}
 
 	vine_gpus_free(p->task->task_id);
 
-	if(!vine_sandbox_stageout(p,global_cache)) {
+	if(!vine_sandbox_stageout(p,global_cache,manager)) {
 		p->result = VINE_RESULT_OUTPUT_MISSING;
 		p->exit_code = 1;
 	}
@@ -612,7 +649,7 @@ static int handle_completed_tasks(struct link *manager)
 			}
 
 			/* collect the resources associated with the process */
-			reap_process(p);
+			reap_process(p,manager);
 			
 			/* must reset the table iterator because an item was removed. */
 			itable_firstkey(procs_running);
@@ -819,10 +856,12 @@ static int do_kill(int task_id)
 
 	if(itable_remove(procs_running, p->pid)) {
 		vine_process_kill(p);
-		cores_allocated -= p->task->resources_requested->cores;
-		memory_allocated -= p->task->resources_requested->memory;
-		disk_allocated -= p->task->resources_requested->disk;
-		gpus_allocated -= p->task->resources_requested->gpus;
+		if (!p->coprocess || vine_process_get_duty_name(p)) {
+			cores_allocated -= p->task->resources_requested->cores;
+			memory_allocated -= p->task->resources_requested->memory;
+			disk_allocated -= p->task->resources_requested->disk;
+			gpus_allocated -= p->task->resources_requested->gpus;
+		}
 		vine_gpus_free(task_id);
 	}
 
@@ -988,6 +1027,7 @@ static int handle_manager(struct link *manager)
 	char filename[VINE_LINE_MAX];
 	char source_encoded[VINE_LINE_MAX];
 	char source[VINE_LINE_MAX];
+	char transfer_id[VINE_LINE_MAX];
 	int64_t length;
 	int64_t task_id = 0;
 	int flags;
@@ -1004,11 +1044,13 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = vine_transfer_get_dir(manager,global_cache,filename,time(0)+active_timeout);
 			reset_idle_timer();
-		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o %d", source_encoded, filename_encoded, &length, &mode, &flags)==5) {
+		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o %d %s", source_encoded, filename_encoded, &length, &mode, &flags, transfer_id)==6) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			url_decode(source_encoded,source,sizeof(source));
 			r = do_put_url(filename,length,mode,source,flags);
 			reset_idle_timer();
+			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
+			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
 		} else if(sscanf(line, "mini_task %"SCNd64" %s %"SCNd64" %o %d",&task_id,filename_encoded, &length, &mode, &flags)==5) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_put_mini_task(manager,time(0)+active_timeout,filename,length,mode,source,flags);
@@ -1029,6 +1071,17 @@ static int handle_manager(struct link *manager)
 				kill_all_tasks();
 				r = 1;
 			}
+		} else if(sscanf(line, "kill_duty %" SCNd64, &length) == 1) {
+			char *duty_name = malloc(length+1);
+			link_read(manager,duty_name,length,time(0)+active_timeout);
+			duty_name[length] = 0;
+			task_id = (long int)hash_table_lookup(duty_ids, duty_name);
+			debug(D_VINE,"rx: killing duty %s %" SCNd64, duty_name, task_id);
+			kill(((struct vine_process *)itable_lookup(procs_table, task_id))->pid, SIGKILL);
+			list_remove(duty_list, duty_name);
+			hash_table_remove(features, duty_name);
+			list_remove(coprocess_list, ((struct vine_process *)itable_lookup(procs_table, task_id))->coprocess);
+			r = do_kill(task_id);
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
 		} else if(!strncmp(line, "exit", 5)) {
@@ -1041,6 +1094,14 @@ static int handle_manager(struct link *manager)
 			r = 0;
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
+			r = 1;
+		} else if(sscanf(line,"duty %" SCNd64 " %" SCNd64,&length, &task_id)==2) {
+			char *duty_name = malloc(length+1);
+			link_read(manager,duty_name,length,time(0)+active_timeout);
+			duty_name[length] = 0;
+			debug(D_VINE,"rx: duty %s, id %" SCNd64, duty_name, task_id);
+			list_push_tail(duty_list, duty_name);
+			hash_table_insert(duty_ids, duty_name, (void **)task_id);
 			r = 1;
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
@@ -1060,10 +1121,12 @@ Return true if this task can run with the resources currently available.
 
 static int task_resources_fit_now( struct vine_task *t )
 {
+	/* XXX removed disk space check due to problems running workers locally or multiple workers on a single node
+	 * since default tasks request the entire reported disk space. questionable if this check useful in practice.*/
 	return
 		(cores_allocated  + t->resources_requested->cores  <= local_resources->cores.total) &&
 		(memory_allocated + t->resources_requested->memory <= local_resources->memory.total) &&
-		(disk_allocated   + t->resources_requested->disk   <= local_resources->disk.total) &&
+		(1) && //disk_allocated   + t->resources_requested->disk   <= local_resources->disk.total) &&
 		(gpus_allocated   + t->resources_requested->gpus   <= local_resources->gpus.total);
 }
 
@@ -1251,7 +1314,7 @@ static void work_for_manager( struct link *manager )
 				} else if(task_resources_fit_now(p->task)) {
 					// attach the function name, port, and type to process, if applicable
 					if (p->task->coprocess) {
-						struct vine_coprocess *ready_coprocess = vine_coprocess_find_state(coprocess_info, number_of_coprocess_instances, VINE_COPROCESS_READY);
+						struct vine_coprocess *ready_coprocess = vine_coprocess_find_state(coprocess_list, VINE_COPROCESS_READY, p->task->coprocess);
 						if (ready_coprocess == NULL) {
 							list_push_tail(procs_waiting, p);
 							continue;
@@ -1840,7 +1903,6 @@ static void show_help(const char *cmd)
 
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
-	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_BANDWIDTH,
@@ -1849,9 +1911,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION,
-	  LONG_OPT_FROM_FACTORY, LONG_OPT_NUM_COPROCESS, LONG_OPT_COPROCESS_CORES, 
-	  LONG_OPT_COPROCESS_MEMORY, LONG_OPT_COPROCESS_DISK, LONG_OPT_COPROCESS_GPUS};
+	  LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION, LONG_OPT_FROM_FACTORY};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -1887,12 +1947,6 @@ static const struct option long_options[] = {
 	{"parent-death",        no_argument,        0,  LONG_OPT_PARENT_DEATH},
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
-	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
-	{"num_coprocesses",     required_argument,  0,  LONG_OPT_NUM_COPROCESS},
-	{"coprocess_cores",     required_argument,  0,  LONG_OPT_COPROCESS_CORES},
-	{"coprocess_memory",    required_argument,  0,  LONG_OPT_COPROCESS_MEMORY},
-	{"coprocess_disk",      required_argument,  0,  LONG_OPT_COPROCESS_DISK},
-	{"coprocess_gpus",      required_argument,  0,  LONG_OPT_COPROCESS_GPUS},
 	{"from-factory",        required_argument,  0,  LONG_OPT_FROM_FACTORY},
 	{0,0,0,0}
 };
@@ -1906,7 +1960,7 @@ int main(int argc, char *argv[])
 	catalog_hosts = CATALOG_HOST;
 
 	features = hash_table_create(4, 0);
-
+	current_transfers = hash_table_create(0, 0);
 	worker_start_time = timestamp_get();
 
 	set_worker_id();
@@ -2063,26 +2117,6 @@ int main(int argc, char *argv[])
 		case LONG_OPT_USE_SSL:
 			manual_ssl_option=1;
 			break;
-		case LONG_OPT_COPROCESS:
-			coprocess_command = calloc(PATH_MAX, sizeof(char));
-			path_absolute(optarg, coprocess_command, 1);
-			coprocess_command = realloc(coprocess_command, strlen(coprocess_command)+1);
-			break;
-		case LONG_OPT_NUM_COPROCESS:
-			number_of_coprocess_instances = atoi(optarg);
-			break;
-		case LONG_OPT_COPROCESS_CORES:
-			coprocess_cores = atoi(optarg);
-			break;
-		case LONG_OPT_COPROCESS_MEMORY:
-			coprocess_memory = atoi(optarg);
-			break;
-		case LONG_OPT_COPROCESS_DISK:
-			coprocess_disk = atoi(optarg);
-			break;
-		case LONG_OPT_COPROCESS_GPUS:
-			coprocess_gpus = atoi(optarg);
-			break;
 		case LONG_OPT_FROM_FACTORY:
 			if (factory_name) free(factory_name);
 			factory_name = xxstrdup(optarg);
@@ -2148,6 +2182,9 @@ int main(int argc, char *argv[])
 	procs_table    = itable_create(0);
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
+	coprocess_list = list_create();
+	duty_list = list_create();
+	duty_ids = hash_table_create(0, 0);
 
 	watcher = vine_watcher_create();
 
@@ -2168,18 +2205,6 @@ int main(int argc, char *argv[])
 		total_resources->memory.total,
 		total_resources->disk.total,
 		total_resources->gpus.total);
-
-	if(coprocess_command && (number_of_coprocess_instances > 0)) {
-		coprocess_info = vine_coprocess_initalize_all_coprocesses(coprocess_cores, coprocess_memory, coprocess_disk, coprocess_gpus, total_resources, coprocess_command, number_of_coprocess_instances);
-		coprocess_name = xxstrdup(coprocess_info[0].name);
-		hash_table_insert(features, coprocess_name, (void **) 1);
-	}
-	else {
-		if (number_of_coprocess_instances != 0)
-		{
-			fatal("No coprocess specified but number of coprocesses given\n");
-		}
-	}
 
 	while(1) {
 		int result = 0;
@@ -2236,10 +2261,9 @@ int main(int argc, char *argv[])
 		sleep(backoff_interval);
 	}
 
-	if (coprocess_command && number_of_coprocess_instances > 0) {
-		vine_coprocess_shutdown_all_coprocesses(coprocess_info, number_of_coprocess_instances);
-		free(coprocess_command);
-		free(coprocess_name);
+	if (list_size(coprocess_list) > 0) {
+		vine_coprocess_shutdown_all_coprocesses(coprocess_list);
+		list_delete(coprocess_list);
 	}
 
 	workspace_delete();

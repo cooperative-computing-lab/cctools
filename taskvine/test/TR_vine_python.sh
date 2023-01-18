@@ -51,6 +51,19 @@ run()
 	status=$(cat $STATUS_FILE)
 	if [ $status -ne 0 ]
 	then
+		# display log files in case of failure.
+		if [ -f master.log  ]
+		then
+			echo "master log:"
+			cat master.log
+		fi
+
+		if [ -f worker.log  ]
+		then
+			echo "worker log:"
+			cat worker.log
+		fi
+
 		exit 1
 	fi
 
