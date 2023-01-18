@@ -105,17 +105,17 @@ should not be cached. That is, generating a cachename could lead to possible con
 */
 
 typedef enum {
-	FOUND_NONE = 0,
-	FOUND_LM,
-	FOUND_ET,
-	FOUND_MD5,
+	VINE_FOUND_NONE = 0,
+	VINE_FOUND_LM,
+	VINE_FOUND_ET,
+	VINE_FOUND_MD5,
 } vine_url_cache_t;
 
-struct vine_file * retrieve_url(const struct vine_file *f){
+struct vine_file *retrieve_url(const struct vine_file *f){
 	char source_enc[PATH_MAX];
 	url_encode(path_basename(f->source), source_enc, PATH_MAX);
-	char * command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", source_enc, f->source);
-	FILE * stream = popen(command, "r");
+	char *command = string_format("curl -sSL --stderr /dev/stdout -o \"%s\" \"%s\"", source_enc, f->source);
+	FILE *stream = popen(command, "r");
 	if(stream  == 0) return 0; // failed to execute curl
 	int exit_status = pclose(stream);
 	if(exit_status == 6) return 0; // curl could not resolve host;
@@ -128,68 +128,72 @@ struct vine_file * retrieve_url(const struct vine_file *f){
 	return 0;
 }
 
-const char * make_mt_cached_name(const struct vine_file *f){
+const char *make_mt_cached_name(const struct vine_file *f){
 
 	unsigned char digest[MD5_DIGEST_LENGTH];
-	char * buffer = vine_task_to_json(f->mini_task);
+	char *buffer = vine_task_to_json(f->mini_task);
 	md5_buffer(buffer,strlen(buffer),digest);
        	return md5_string(digest);
 
 }
-const char * make_url_cached_name(const struct vine_file *f)
+const char *make_url_cached_name(const struct vine_file *f)
 {
 	// DIRECTORY cache names might need the name of the files
-	int val = FOUND_NONE;
+	int val = VINE_FOUND_NONE;
 	int STR_MAX = 256;
 	char line[STR_MAX];
 	char hash_src[STR_MAX];
-	char * buffer;
+	char *buffer;
 	unsigned char digest[MD5_DIGEST_LENGTH];
 
-	char * command = string_format("curl -I -sSL i --verbose --stderr /dev/stdout \"%s\"", f->source);
-	FILE * stream = popen(command, "r");
+	char *command = string_format("curl -I -sSL i --verbose --stderr /dev/stdout \"%s\"", f->source);
+	FILE *stream = popen(command, "r");
 	if(stream == 0) return 0; // curl failed to execute 
 	while(fgets(line, STR_MAX, stream) != NULL){
 		if(sscanf(line, "Content-MD5: %s", hash_src)){
-			val = FOUND_MD5;
+			val = VINE_FOUND_MD5;
 			break;
 		}
 		if(sscanf(line, "content-md5: %s", hash_src)){
-			val = FOUND_MD5;
+			val = VINE_FOUND_MD5;
 			break;
 		}
-		if(val < FOUND_ET && sscanf(line, "ETag: %s", hash_src)){
-			val = FOUND_ET;
+		if(val < VINE_FOUND_ET && sscanf(line, "ETag: %s", hash_src)){
+			val = VINE_FOUND_ET;
 		}
-		if(val < FOUND_ET && sscanf(line, "etag: %s", hash_src)){
-			val = FOUND_ET;
+		if(val < VINE_FOUND_ET && sscanf(line, "etag: %s", hash_src)){
+			val = VINE_FOUND_ET;
 		}
-		if(val < FOUND_LM && sscanf(line, "Last-Modified: %s", hash_src)){
-			val = FOUND_LM;
+		if(val < VINE_FOUND_LM && sscanf(line, "Last-Modified: %s", hash_src)){
+			val = VINE_FOUND_LM;
 		}
-		if(val < FOUND_LM && sscanf(line, "last-modified: %s", hash_src)){
-			val = FOUND_LM;
+		if(val < VINE_FOUND_LM && sscanf(line, "last-modified: %s", hash_src)){
+			val = VINE_FOUND_LM;
 		}
 	}
 	int exit_status = pclose(stream);
-	char * prefix;
+	char *prefix;
 	if(exit_status != 0) return 0; // Curl executes but retuns an error
 	switch(val){
-		case FOUND_NONE:
+		case VINE_FOUND_NONE:
 			return 0;
-		case FOUND_LM:
+			break;
+		case VINE_FOUND_LM:
 			prefix = string_format("LM-md5-");
 			buffer = string_combine(hash_src, f->source); // + server
 			md5_buffer(buffer,strlen(buffer),digest);
                         return string_combine(prefix, md5_string(digest));
-		case FOUND_ET:
+			break;
+		case VINE_FOUND_ET:
 			prefix = string_format("ET-md5-");
 			md5_buffer(hash_src, (strlen(hash_src)), digest); // + server
                         return string_combine(prefix, md5_string(digest));
-		case FOUND_MD5:
+			break;
+		case VINE_FOUND_MD5:
 			prefix = string_format("md5-");
 			md5_buffer(hash_src, (strlen(hash_src)), digest);
                         return string_combine(prefix, md5_string(digest));
+			break;
 	}
 	return 0;
 }
@@ -202,7 +206,7 @@ char *make_cached_name( const struct vine_file *f )
 
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	char source_enc[PATH_MAX];
-	const char * hash;
+	const char *hash;
 
 	if(f->type == VINE_BUFFER) {
 		if(f->data) {
@@ -299,12 +303,12 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 		f->cached_name = xxstrdup(cached_name);
 	} else {
 
-		char * cache_name = make_cached_name(f);
+		char *cache_name = make_cached_name(f);
 		if(cache_name == 0 && type == VINE_URL){
 			struct vine_file *new_file = retrieve_url(f);
 			if(!new_file){	
 				unsigned char digest[MD5_DIGEST_LENGTH];
-				const char * hash;
+				const char *hash;
 				md5_buffer(f->source,strlen(f->source),digest);
 				hash = md5_string(digest);
 				int rand_num = (rand() % 100000) + 1;
@@ -321,7 +325,7 @@ struct vine_file *vine_file_create(const char *source, const char *remote_name, 
 		else if(cache_name == 0){
 			/* could not genertate cache name*/
 			unsigned char digest[MD5_DIGEST_LENGTH];
-			const char * hash;
+			const char *hash;
 			md5_buffer(f->source,strlen(f->source),digest);
 			hash = md5_string(digest);
 			int rand_num = (rand() % 100000) + 1;
