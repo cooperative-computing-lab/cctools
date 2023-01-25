@@ -1007,7 +1007,7 @@ class PythonTask(Task):
 
     specify_package = specify_environment
 
-    def __del__(self):
+    def __del__(self, os=os, sys=sys):
         try:
             if self._tmpdir and os.path.exists(self._tmpdir):
                 shutil.rmtree(self._tmpdir)
