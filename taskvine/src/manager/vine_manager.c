@@ -2656,7 +2656,6 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		int found_match = 0;
 		
 		/* If not, then search for an available peer to provide it. */
-		
 		/* If the file is a mini task specification, check its file dependencies for availability */
 		/* Do not peer transfer the mini task itself */
 		if(f->type==VINE_MINI_TASK) {
