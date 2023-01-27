@@ -9,6 +9,8 @@ See the file COPYING for details.
 
 #include "debug.h"
 
+static char *last_id; 
+
 static struct vine_transfer_pair *vine_transfer_pair_create(struct vine_worker_info *to, const char *source)
 {
     struct vine_transfer_pair *t = malloc(sizeof(struct vine_transfer_pair));
@@ -25,7 +27,8 @@ char *vine_current_transfers_add(struct vine_manager *q, struct vine_worker_info
 
     char *transfer_id = strdup(uuid.str);  
     struct vine_transfer_pair *t = vine_transfer_pair_create(to, source);
-
+	
+    last_id = transfer_id;
     hash_table_insert(q->current_transfer_table, transfer_id, t);
     return transfer_id;
 }
@@ -49,6 +52,12 @@ int vine_current_transfers_source_in_use(struct vine_manager *q, const char *sou
     	if(strcmp(source, t->source) == 0) c++;
     }
     return c;
+}
+
+// last id inserted into the table. Only for transaction log purposes. 
+char *vine_current_transfers_get_last_id(struct vine_manager *q)
+{
+   return last_id;
 }
 
 // remove all transactions involving a worker from the transfer table - if a worker failed or is being deleted intentionally

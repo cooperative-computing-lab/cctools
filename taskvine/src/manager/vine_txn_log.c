@@ -227,7 +227,7 @@ void vine_txn_log_write_worker_resources(struct vine_manager *q, struct vine_wor
 }
 
 
-void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f, size_t size_in_bytes, int time_in_usecs, int is_input )
+void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f, size_t size_in_bytes, int time_in_usecs, int is_input, char *id)
 {
 	struct buffer B;
 	buffer_init(&B);
@@ -238,12 +238,13 @@ void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
 	buffer_printf(&B, " %s", f->remote_name);
+	if(id) buffer_printf(&B, " %s", id);
 
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
 }
 
-void vine_txn_log_write_cache_update(struct vine_manager *q, struct vine_worker_info *w, size_t size_in_bytes, int time_in_usecs, const char *name )
+void vine_txn_log_write_cache_update(struct vine_manager *q, struct vine_worker_info *w, size_t size_in_bytes, int time_in_usecs, const char *name, const char *id)
 {
 	struct buffer B;
 
@@ -252,6 +253,7 @@ void vine_txn_log_write_cache_update(struct vine_manager *q, struct vine_worker_
 	buffer_printf(&B, " %s", name);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
+	buffer_printf(&B, " %s", id);
 
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);

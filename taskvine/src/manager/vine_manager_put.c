@@ -287,7 +287,8 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 		q->stats->bytes_sent += total_bytes;
 
 		// Write to the transaction log.
-		vine_txn_log_write_transfer(q, w, t, f, total_bytes, elapsed_time, 1);
+		char *id = vine_current_transfers_get_last_id(q);
+		if(t->task_id != 0) vine_txn_log_write_transfer(q, w, t, f, total_bytes, elapsed_time, 1, id);
 
 		// Avoid division by zero below.
 		if(elapsed_time==0) elapsed_time = 1;

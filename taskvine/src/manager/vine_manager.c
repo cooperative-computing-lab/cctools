@@ -316,8 +316,9 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 		remote_info->in_cache = 1;
 		
 		vine_current_transfers_remove(q, id);
-
-		vine_txn_log_write_cache_update(q,w,size,transfer_time,cachename);
+		
+	   /* Do not write a cache-update to the log without an ID . such as a mini-task or buffer */
+	   if(strcmp(id, "X") != 0)vine_txn_log_write_cache_update(q,w,size,transfer_time,cachename, id);
 	}
 
 	return VINE_MSG_PROCESSED;
@@ -2655,22 +2656,31 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		int found_match = 0;
 		
 		/* If not, then search for an available peer to provide it. */
-		/* Provide a substitute file object to describe the peer. */
 		
-		HASH_TABLE_ITERATE(q->worker_table, id, peer){
-			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache) {
-				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
-				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_WORKER_SOURCE_MAX_TRANSFERS) {	
-					vine_file_delete(f->substitute);
-					f->substitute = vine_file_substitute_url(f,peer_source);
-					free(peer_source);
-					found_match = 1;
-					break;
-				} else {
-					free(peer_source);
-				}
+		/* If the file is a mini task specification, check its file dependencies for availability */
+		/* Do not peer transfer the mini task itself */
+		if(f->type==VINE_MINI_TASK) {
+			if(!vine_manager_transfer_capacity_available(q, w, f->mini_task)){
+				return 0;
 			}
+		}
+		else {
+			/* Provide a substitute file object to describe the peer. */
+			HASH_TABLE_ITERATE(q->worker_table, id, peer){
+				if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache) {
+					char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+					if(vine_current_transfers_source_in_use(q, peer_source) < VINE_WORKER_SOURCE_MAX_TRANSFERS) {	
+						vine_file_delete(f->substitute);
+						f->substitute = vine_file_substitute_url(f,peer_source);
+						free(peer_source);
+						found_match = 1;
+						break;
+					} else {
+						free(peer_source);
+					}
+				}
 
+			}
 		}
 
 		/* If that resulted in a match, move on to the next file. */
@@ -2690,13 +2700,10 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 			} else {
 				/* keep going */
 			}
-		} else if(f->type==VINE_TEMP) {
+		} 
+		else if(f->type==VINE_TEMP) {
 			//  debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long long)t->task_id,f->cached_name);
 			return 0;
-		} else if(f->type==VINE_MINI_TASK) {
-			if(!vine_manager_transfer_capacity_available(q, w, f->mini_task)){
-				return 0;
-			}
 		}
 		else {
 			/* keep going */
