@@ -136,7 +136,7 @@ void category_specify_first_allocation_guess(struct category *c, const struct rm
 	rmsummary_merge_max(c->first_allocation, s);
 }
 
-static int category_in_bucketing_mode(struct category* c)
+int category_in_bucketing_mode(struct category* c)
 {
     if (c->allocation_mode == CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING ||
         c->allocation_mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING)

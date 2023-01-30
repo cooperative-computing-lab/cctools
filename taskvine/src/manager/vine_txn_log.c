@@ -129,7 +129,7 @@ void vine_txn_log_write_category(struct vine_manager *q, struct category *c)
 	buffer_init(&B);
 
 	buffer_printf(&B, "CATEGORY %s MAX ", c->name);
-	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX), 1);
+	rmsummary_print_buffer(&B, category_bucketing_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX, -1), 1);
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
@@ -150,6 +150,12 @@ void vine_txn_log_write_category(struct vine_manager *q, struct category *c)
 		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
 			mode = "MAX_THROUGHPUT";
 			break;
+        case CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING:
+            mode = "GREEDY_BUCKETING";
+            break;
+        case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
+            mode = "EXHAUSTIVE_BUCKETING";
+            break;
 		case CATEGORY_ALLOCATION_MODE_FIXED:
 		default:
 			mode = "FIXED";
@@ -157,7 +163,7 @@ void vine_txn_log_write_category(struct vine_manager *q, struct category *c)
 	}
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
-	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
+	rmsummary_print_buffer(&B, category_bucketing_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
 	vine_txn_log_write(q, buffer_tostring(&B));
 
 	buffer_free(&B);

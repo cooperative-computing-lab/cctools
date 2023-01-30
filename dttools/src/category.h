@@ -123,6 +123,8 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 
 int category_bucketing_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker, int taskid, int success);
 
+int category_in_bucketing_mode(struct category* c);
+
 int category_update_first_allocation(struct category *c, const struct rmsummary *max_worker);
 
 int category_in_steady_state(struct category *c);

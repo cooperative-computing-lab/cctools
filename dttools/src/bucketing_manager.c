@@ -292,7 +292,7 @@ void bucketing_manager_add_resource_report(bucketing_manager_t* m, int task_id, 
     hash_table_insert(m->task_id_to_task_rmsummary, task_id_str, new_r);
     
     /* if task successfully finishes then clear out its index in internal table */
-    if (success)
+    if (success == 1)
     {
         struct hash_table* ht = m->res_type_to_bucketing_state;
         char* res_name;
