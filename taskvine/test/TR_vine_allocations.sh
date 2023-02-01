@@ -6,7 +6,7 @@ set -ex
 import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
 
-export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
+export PATH=$(pwd)/../src/worker:$(pwd)/../../batch_job/src:$PATH
 export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
 STATUS_FILE=vine.status
