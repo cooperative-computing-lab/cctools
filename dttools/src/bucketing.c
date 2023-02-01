@@ -18,7 +18,7 @@
  * @return NULL if failure */
 static bucketing_point_t* bucketing_point_create(double val, double sig)
 {
-    if (val < 0)
+    if (val < 0 && val != -1)   //some tasks run too fast so resource report usually is -1
         warn(D_BUCKETING, "bucketing point cannot have value less than 0\n");
 
     bucketing_point_t* p = xxmalloc(sizeof(*p));

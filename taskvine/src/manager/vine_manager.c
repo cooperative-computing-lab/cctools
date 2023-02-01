@@ -3174,7 +3174,10 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
-	
+
+	q->proportional_resources = 1;
+	q->proportional_whole_tasks = 1;
+
 	q->allocation_default_mode = VINE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
