@@ -1088,6 +1088,7 @@ class Manager(object):
         self._stats = None
         self._stats_hierarchy = None
         self._task_table = {}
+        self._duty_table = {}
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -1828,6 +1829,7 @@ class Manager(object):
     # @param task   A task description created from @ref taskvine::Task.
     # @param name   Name of the duty to be installed.
     def install_duty(self, task, name):
+        self._duty_table[name] = task
         vine_manager_install_duty(self._taskvine, task._task, "duty_coprocess:" + name)
 
     ##
@@ -1837,6 +1839,7 @@ class Manager(object):
     # @param self   Reference to the current manager object.
     # @param name   Name of the duty to be removed.
     def remove_duty(self, name):
+        del self._duty_table[name]
         vine_manager_remove_duty(self._taskvine, "duty_coprocess:" + name)
 
     ##
