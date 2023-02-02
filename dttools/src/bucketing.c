@@ -18,9 +18,6 @@
  * @return NULL if failure */
 static bucketing_point_t* bucketing_point_create(double val, double sig)
 {
-    if (val < 0 && val != -1)   //some tasks run too fast so resource report usually is -1
-        warn(D_BUCKETING, "bucketing point cannot have value less than 0\n");
-
     bucketing_point_t* p = xxmalloc(sizeof(*p));
     
     p->val = val;
@@ -33,10 +30,7 @@ static bucketing_point_t* bucketing_point_create(double val, double sig)
  * @param p the bucketing point to be deleted */
 static void bucketing_point_delete(bucketing_point_t *p)
 {
-    if (p)
-        free(p);
-    else
-        warn(D_BUCKETING, "Ignoring command to delete bucketing point as it is empty\n");
+    free(p);
 }
 
 /* Insert a bucketing point into a sorted list of points in O(log(n))
@@ -87,7 +81,9 @@ static void bucketing_insert_point_to_sorted_list(struct list* l, bucketing_poin
 
     /* Append point if it isn't inserted */
     if (inserted == 0)
+    {
         list_insert(lc, p);
+    }
 
     list_cursor_destroy(lc);
 }
@@ -104,7 +100,9 @@ static int bucketing_ready_to_update_buckets(bucketing_state_t* s)
     /* Update when in predict phase and bucketing state is at the update epoch */
     if (!s->in_sampling_phase && 
         num_points_since_predict_phase % s->update_epoch == 0)
+    {
         return 1;
+    }
     return 0;
 }
 
@@ -142,32 +140,47 @@ bucketing_bucket_t* bucketing_bucket_create(double val, double prob)
 
 void bucketing_bucket_delete(bucketing_bucket_t* b)
 {
-    if (b)
-        free(b);
-    else
-        warn(D_BUCKETING, "ignoring command to delete a null pointer to a bucket\n");
+    free(b);
 }
 
 bucketing_state_t* bucketing_state_create(double default_value, int num_sampling_points,
     double increase_rate, int max_num_buckets, bucketing_mode_t mode, int update_epoch)
 {
     if (default_value < 0)
+    {
         warn(D_BUCKETING, "default value cannot be less than 0\n");
+        default_value = 1;
+    }
 
     if (num_sampling_points < 1)
+    {
         warn(D_BUCKETING, "number of sampling points cannot be less than 1\n");
+        num_sampling_points = 1;
+    }
 
     if (increase_rate <= 1)
+    {
         warn(D_BUCKETING, "increase rate must be greater than 1 to be meaningful\n");
+        increase_rate = 2;
+    }
 
     if (max_num_buckets < 1 && mode == BUCKETING_MODE_EXHAUSTIVE)
+    {
         warn(D_BUCKETING, "The maximum number of buckets for exhaustive bucketing must be at least 1\n");
+        max_num_buckets = 1;
+    }
     
     if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE)
+    {
         fatal("Invalid bucketing mode\n");
+        mode = BUCKETING_MODE_GREEDY;
+    }
 
     if (update_epoch < 1)
+    {
         fatal("Update epoch for bucketing cannot be less than 1\n");
+        update_epoch = 1;
+    }
 
     bucketing_state_t* s = xxmalloc(sizeof(*s));
 
@@ -204,44 +217,46 @@ void bucketing_state_delete(bucketing_state_t* s)
         list_delete(s->sorted_buckets);
         free(s);
     }
-    else
-        warn(D_BUCKETING, "Ignoring command to delete empty bucketing state\n");
 }
 
 void bucketing_state_tune(bucketing_state_t* s, const char* field, void* val)
 {
-    if (!s)
-    {
+    if (!s){
         fatal("No bucketing state to tune\n");
         return;
     }
 
-    if (!field)
-    {
+    if (!field){
         fatal("No field in bucketing state to tune\n");
         return;
     }
 
-    if (!val)
-    {
+    if (!val){
         fatal("No value to tune field %s in bucketing state to\n", field);
         return;
     }
 
-    if (!strncmp(field, "default_value", strlen("default_value")))
+    if (!strncmp(field, "default_value", strlen("default_value"))){
         s->default_value = *((double*) val);
-    else if (!strncmp(field, "num_sampling_points", strlen("num_sampling_points")))
+    }
+    else if (!strncmp(field, "num_sampling_points", strlen("num_sampling_points"))){
         s->num_sampling_points = *((int*) val);
-    else if (!strncmp(field, "increase_rate", strlen("increase_rate")))
+    }
+    else if (!strncmp(field, "increase_rate", strlen("increase_rate"))){
         s->increase_rate = *((double*) val);
-    else if (!strncmp(field, "max_num_buckets", strlen("max_num_buckets")))
+    }
+    else if (!strncmp(field, "max_num_buckets", strlen("max_num_buckets"))){
         s->num_sampling_points = *((int*) val);
-    else if (!strncmp(field, "mode", strlen("mode")))
+    }
+    else if (!strncmp(field, "mode", strlen("mode"))){
         s->num_sampling_points = *((bucketing_mode_t*) val);
-    else if (!strncmp(field, "update_epoch", strlen("update_epoch")))
+    }
+    else if (!strncmp(field, "update_epoch", strlen("update_epoch"))){
         s->update_epoch = *((int*) val);
-    else
+    }
+    else{
         warn(D_BUCKETING, "Cannot tune field %s as it doesn't exist\n", field);
+    }
 }
 
 void bucketing_add(bucketing_state_t* s, double val)
@@ -290,7 +305,9 @@ double bucketing_predict(bucketing_state_t* s, double prev_val)
     {
         /* if new or empty resource, return default value */
         if (prev_val == -1 || prev_val == 0)
+        {
             return s->default_value;
+        }
 
         /* prevous value must be -1 or greater than 0 */
         else if (prev_val != -1 && prev_val < 0)

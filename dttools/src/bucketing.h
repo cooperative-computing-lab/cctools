@@ -4,15 +4,13 @@
 #include "list.h"
 
 /* all modes of bucketing */
-typedef enum
-{
+typedef enum{
     BUCKETING_MODE_GREEDY,
     BUCKETING_MODE_EXHAUSTIVE
 } bucketing_mode_t;
 
 /* Bucketing has two operations, add and predict */
-typedef enum
-{
+typedef enum{
     BUCKETING_OP_ADD = 0,
     BUCKETING_OP_PREDICT,
     BUCKETING_OP_NULL    //only used when initializing
@@ -119,6 +117,7 @@ void bucketing_bucket_delete(bucketing_bucket_t* b);
  * @param increase_rate rate to increase values
  * @param max_num_buckets the maximum number of buckets to find (only for exhaustive bucketing)
  * @param mode specify which update mode of bucketing state
+ * @param update_epoch number of iterations to wait before updating the bucketing state
  * @return pointer to created bucketing state
  * @return 0 if failure */
 bucketing_state_t* bucketing_state_create(double default_value, int num_sampling_points,

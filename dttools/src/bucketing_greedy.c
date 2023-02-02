@@ -43,8 +43,6 @@ static void bucketing_cursor_w_pos_delete(bucketing_cursor_w_pos_t* cursor_pos)
         list_cursor_destroy(cursor_pos->lc);
         free(cursor_pos);
     }
-    else
-        warn(D_BUCKETING, "ignoring command to delete null pointer to bucketing_cursor_w_pos\n");
 }
 
 /* Create a bucketing_bucket_range_t structure

@@ -5,6 +5,16 @@
 
 /* Begin: internals */
 
+/* List of default parameters for a bucketing manager */
+static const double default_cores = 1;
+static const double default_mem = 1000;
+static const double default_disk = 1000;
+static const double default_gpus = 0;
+static const int default_num_sampling_points = 10;
+static const double default_increase_rate = 2;
+static const double default_max_num_buckets = 10;
+static const int default_update_epoch = 1;
+
 /* Convert an int to its string representation
  * @param n the integer
  * @return a malloc'ed string in decimal of n */
@@ -20,9 +30,18 @@ static char* int_to_string(int n)
  * @param m the bucketing manager */
 static void bucketing_manager_add_default_resource_types(bucketing_manager_t* m)
 {
-    bucketing_manager_add_resource_type(m, "cores", 0, 1, 10, 2, 10, 1);
-    bucketing_manager_add_resource_type(m, "memory", 0, 1000, 10, 2, 10, 1);
-    bucketing_manager_add_resource_type(m, "disk", 0, 1000, 10, 2, 10, 1);
+    bucketing_manager_add_resource_type(m, "cores", 0, 
+            default_cores, default_num_sampling_points, default_increase_rate, 
+            default_max_num_buckets, default_update_epoch);
+    bucketing_manager_add_resource_type(m, "mem", 0, 
+            default_mem, default_num_sampling_points, default_increase_rate, 
+            default_max_num_buckets, default_update_epoch);
+    bucketing_manager_add_resource_type(m, "disk", 0, 
+            default_disk, default_num_sampling_points, default_increase_rate, 
+            default_max_num_buckets, default_update_epoch);
+    bucketing_manager_add_resource_type(m, "gpus", 0, 
+            default_gpus, default_num_sampling_points, default_increase_rate, 
+            default_max_num_buckets, default_update_epoch);
 }
 /* End: internals */
 
@@ -84,17 +103,25 @@ void bucketing_manager_add_resource_type(bucketing_manager_t* m, const char* r,
     {
         if (set_default)
         {
-            if (!strncmp(r, "cores", strlen("cores")))
+            if (!strcmp(r, "cores"))
             {
-                b = bucketing_state_create(1, 10, 2, 10, m->mode, 1);
+                b = bucketing_state_create(default_cores, default_num_sampling_points, 
+                        default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
             }
-            else if (!strncmp(r, "memory", strlen("memory")))
+            else if (!strcmp(r, "memory"))
             {
-                b = bucketing_state_create(1000, 10, 2, 10, m->mode, 1);
+                b = bucketing_state_create(default_mem, default_num_sampling_points, 
+                        default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
             }
-            else if (!strncmp(r, "disk", strlen("disk")))
+            else if (!strcmp(r, "disk"))
             {
-                b = bucketing_state_create(1000, 10, 2, 10, m->mode, 1);
+                b = bucketing_state_create(default_disk, default_num_sampling_points, 
+                        default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
+            }
+            else if (!strcmp(r, "gpus"))
+            {
+                b = bucketing_state_create(default_gpus, default_num_sampling_points, 
+                        default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
             }
             else
             {
