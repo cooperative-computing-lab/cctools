@@ -1990,7 +1990,6 @@ class Manager(object):
                 t = self.wait_for_task_id(t_id, 10)
 
                 if t:
-                    print(t.output)
                     results[tasks[t.id]] = t.output
                     n += 1
                     break
