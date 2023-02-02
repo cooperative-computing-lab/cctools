@@ -234,7 +234,7 @@ static struct list* bucketing_exhaust_get_buckets(bucketing_state_t* s, int n)
     double candidate_vals[steps + n];
 
     /* fill candidate values with logarithmic increase */
-    for (int i = 0; i < steps; ++i){
+    for (int i = 0; i < steps; ++i) {
         candidate_vals[i] = pow(2, i);
     }
     /* fill candidate values with linear increase */

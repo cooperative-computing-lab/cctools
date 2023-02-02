@@ -172,13 +172,13 @@ bucketing_state_t* bucketing_state_create(double default_value, int num_sampling
     
     if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE)
     {
-        fatal("Invalid bucketing mode\n");
+        warn("Invalid bucketing mode\n");
         mode = BUCKETING_MODE_GREEDY;
     }
 
     if (update_epoch < 1)
     {
-        fatal("Update epoch for bucketing cannot be less than 1\n");
+        warn("Update epoch for bucketing cannot be less than 1\n");
         update_epoch = 1;
     }
 
@@ -236,25 +236,25 @@ void bucketing_state_tune(bucketing_state_t* s, const char* field, void* val)
         return;
     }
 
-    if (!strncmp(field, "default_value", strlen("default_value"))){
+    if (!strncmp(field, "default_value", strlen("default_value"))) {
         s->default_value = *((double*) val);
     }
-    else if (!strncmp(field, "num_sampling_points", strlen("num_sampling_points"))){
+    else if (!strncmp(field, "num_sampling_points", strlen("num_sampling_points"))) {
         s->num_sampling_points = *((int*) val);
     }
-    else if (!strncmp(field, "increase_rate", strlen("increase_rate"))){
+    else if (!strncmp(field, "increase_rate", strlen("increase_rate"))) {
         s->increase_rate = *((double*) val);
     }
-    else if (!strncmp(field, "max_num_buckets", strlen("max_num_buckets"))){
+    else if (!strncmp(field, "max_num_buckets", strlen("max_num_buckets"))) {
         s->num_sampling_points = *((int*) val);
     }
-    else if (!strncmp(field, "mode", strlen("mode"))){
+    else if (!strncmp(field, "mode", strlen("mode"))) {
         s->num_sampling_points = *((bucketing_mode_t*) val);
     }
-    else if (!strncmp(field, "update_epoch", strlen("update_epoch"))){
+    else if (!strncmp(field, "update_epoch", strlen("update_epoch"))) {
         s->update_epoch = *((int*) val);
     }
-    else{
+    else {
         warn(D_BUCKETING, "Cannot tune field %s as it doesn't exist\n", field);
     }
 }

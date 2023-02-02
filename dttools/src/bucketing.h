@@ -4,13 +4,13 @@
 #include "list.h"
 
 /* all modes of bucketing */
-typedef enum{
+typedef enum {
     BUCKETING_MODE_GREEDY,
     BUCKETING_MODE_EXHAUSTIVE
 } bucketing_mode_t;
 
 /* Bucketing has two operations, add and predict */
-typedef enum{
+typedef enum {
     BUCKETING_OP_ADD = 0,
     BUCKETING_OP_PREDICT,
     BUCKETING_OP_NULL    //only used when initializing
