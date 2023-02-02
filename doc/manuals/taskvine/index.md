@@ -580,7 +580,7 @@ Your job 153099 ("worker.sh") has been submitted
 ...
 ```
 
-### taskvine Status Display
+### TaskVine Online Status Display
 
 An additional benefit of using a project name is that you can
 now use the [taskvine_status](../man_pages/taskvine_status) command
@@ -598,10 +598,10 @@ yang-analysis-355     login.crc.nd.edu          9100    8932    4873    10007   
 ```
 
 The same information is available in a more graphical form online
-at the [taskvine Status Display](http://ccl.cse.nd.edu/software/taskvine/status),
+at the [TaskVine Online Status](http://ccl.cse.nd.edu/software/taskvine/status),
 which looks like this:
 
-<img src=examples/work-queue-status-example.png>
+<img src=examples/vine-status-example.png>
 
 ### Managing Workers with the taskvine Factory
 
