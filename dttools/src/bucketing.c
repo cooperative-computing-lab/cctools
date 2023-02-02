@@ -172,13 +172,13 @@ bucketing_state_t* bucketing_state_create(double default_value, int num_sampling
     
     if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE)
     {
-        warn("Invalid bucketing mode\n");
+        warn(D_BUCKETING, "Invalid bucketing mode\n");
         mode = BUCKETING_MODE_GREEDY;
     }
 
     if (update_epoch < 1)
     {
-        warn("Update epoch for bucketing cannot be less than 1\n");
+        warn(D_BUCKETING, "Update epoch for bucketing cannot be less than 1\n");
         update_epoch = 1;
     }
 
