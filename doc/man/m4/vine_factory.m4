@@ -139,7 +139,7 @@ If you want to start workers that match any project that begins
 with barney, use a regular expression:
 
 LONGCODE_BEGIN
-vine_factory -T condor -M barney.\* -t 300
+vine_factory -T condor -M "barney*" -t 300
 LONGCODE_END
 
 If running on condor, you may manually specify condor requirements:

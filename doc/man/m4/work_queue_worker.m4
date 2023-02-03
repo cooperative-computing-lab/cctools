@@ -6,11 +6,11 @@ BOLD(work_queue_worker) - worker process for executing tasks
 dispatched through Work Queue
 
 SECTION(SYNOPSIS)
-CODE(work_queue_worker [options] PARAM(managerhost) PARAM(port))
+CODE(work_queue_worker [options] PARAM(manager_host) PARAM(manager_port))
 
-CODE(work_queue_worker [options] PARAM(managerhost:port]))
+CODE(work_queue_worker [options] PARAM(manager_host:manager_port]))
 
-CODE(work_queue_worker [options] "PARAM(managerhost:port;[managerhost:port;managerhost:port;...])))
+CODE(work_queue_worker [options] "PARAM(manager_host:manager_port;[manager_host:manager_port;manager_host:manager_port;...])))
 
 CODE(work_queue_worker [options] -M PARAM(projectname))
 

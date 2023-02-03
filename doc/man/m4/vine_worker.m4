@@ -6,11 +6,11 @@ BOLD(vine_worker) - worker process for executing tasks
 dispatched through TaskVine
 
 SECTION(SYNOPSIS)
-CODE(vine_worker [options] PARAM(managerhost) PARAM(port))
+CODE(vine_worker [options] PARAM(manager_host) PARAM(manager_port))
 
-CODE(vine_worker [options] PARAM(managerhost:port]))
+CODE(vine_worker [options] PARAM(manager_host:manager_port]))
 
-CODE(vine_worker [options] "PARAM(managerhost:port;[managerhost:port;managerhost:port;...])))
+CODE(vine_worker [options] "PARAM(manager_host:manager_port;[manager_host:port;manager_host:port;...])))
 
 CODE(vine_worker [options] -M PARAM(projectname))
 
