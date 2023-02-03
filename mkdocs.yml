@@ -19,6 +19,7 @@ nav:
         - Catalog Server: 'catalog/index.md'
         - Poncho: 'poncho/index.md'
     - Research Prototypes:
+        - TaskVine: 'taskvine/index.md'
         - AWE: 'awe/index.md'
         - Confuga: 'confuga/index.md'
         - Umbrella: 'umbrella/index.md'

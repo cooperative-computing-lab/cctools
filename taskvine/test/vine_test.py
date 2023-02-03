@@ -204,8 +204,9 @@ if __name__ == '__main__':
     t = q.wait(30)
     report_task(t, vine.VINE_RESULT_TASK_TIMEOUT, 9)
 
-    # Pull down data from a url and unpack it via a minitask
-    f = vine.FileUntar(vine.FileURL("http://ccl.cse.nd.edu/software/files/cctools-7.4.14-source.tar.gz"))
+    # Pull down data from a url and unpack it via a minitask.
+    # Note that we use a local file url of a small tarball to test the mechanism without placing a load on the network.
+    f = vine.FileUntar(vine.FileURL("file://dummy.tar.gz"))
     t = vine.Task("ls -lR cctools | wc -l")
     t.add_input(f,"cctools",cache=True)
     q.submit(t)

@@ -46,6 +46,12 @@ or C   ([example](work_queue/examples/work_queue_example.c)|[api](api/html/work_
 
 ## Research Prototypes
 
+- [**TaskVine**](taskvine) is our third-generation workflow system
+for building data-intensive workflow applications.  TaskVine applications
+consist of many chained tasks that pull in external data into a cluster,
+where computed results can be cached and re-used by later tasks,
+even in successive workflows.
+
 - [**Accelerated Weighted Ensemble**](awe) (AWE) is an ensemble
   molecular dynamics applications that uses Work Queue to scale
   out molecular simulations to thousands of GPUs on multipel clusters.
