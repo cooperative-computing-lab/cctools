@@ -1,0 +1,25 @@
+#! /bin/sh
+
+set -e
+
+if [ ! -d /cctools ]
+then
+    echo "Please mount the cctools source directory at /cctools"
+    echo "(E.g., in docker use: -v /path/to/cctools:/cctools)"
+    exit 1
+fi
+
+cd /cctools
+
+./configure --without-system-{doc,makeflow,prune,resource_monitor,umbrella,weaver} --with-fuse-path ${VC3_ROOT_FUSE} --with-e2fsprogs-path ${VC3_ROOT_E2FSPROGS} --with-openssl-path ${VC3_ROOT_OPENSSL} --with-uuid-path ${VC3_ROOT_UUID} --with-cvmfs-path ${VC3_ROOT_LIBCVMFS}
+make clean
+
+(cd dttools/src && make)
+(cd chirp/src && make)
+(cd ftp_lite/src && make)
+(cd grow/src && make)
+(cd parrot/src && make parrot_cvmfs_static_run && cp parrot_cvmfs_static_run /cctools/parrot_run)
+
+echo "Static parrot run at: /cctools/parrot_run"
+
+
