@@ -29,6 +29,9 @@ prepare()
 	/bin/echo hello world > input.file
 	/bin/cp /bin/echo executable.file
 
+	# Make a small tarball for testing url downloads.
+	tar czf dummy.tar.gz TR*.sh
+
 	mkdir -p testdir
 	cp input.file executable.file testdir
 
@@ -79,6 +82,7 @@ clean()
 	rm -rf output.file
 	rm -rf executable.file
 	rm -rf testdir
+	rm -rf dummy.tar.gz
 
 	exit 0
 }
