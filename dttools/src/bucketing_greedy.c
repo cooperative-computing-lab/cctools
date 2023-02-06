@@ -88,8 +88,9 @@ static void bucketing_bucket_range_delete(bucketing_bucket_range_t* range)
         bucketing_cursor_w_pos_delete(range->hi);
         free(range);
     }
-    else
+    else {
         warn(D_BUCKETING, "ignoring command to delete a null pointer to bucket range\n");
+    }
 }
 
 /* Free the list with the function used to free a bucketing_cursor_pos
