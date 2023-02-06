@@ -8009,12 +8009,15 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 		case WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:
 		case WORK_QUEUE_RESULT_DISK_ALLOC_FULL:
 		case WORK_QUEUE_RESULT_OUTPUT_TRANSFER_ERROR:
-			if (t->result == WORK_QUEUE_RESULT_SUCCESS)
+			if (t->result == WORK_QUEUE_RESULT_SUCCESS) {
 				success = 1;
-			else if (t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION)
+			}
+			else if (t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 				success = 0;
-			else
+			}
+			else {
 				success = -1;
+			}
 			if(category_bucketing_accumulate_summary(c, t->resources_measured, q->current_max_worker, t->taskid, success)) {
 				write_transaction_category(q, c);
 			}

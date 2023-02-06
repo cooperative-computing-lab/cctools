@@ -221,17 +221,17 @@ void bucketing_state_delete(bucketing_state_t* s)
 
 void bucketing_state_tune(bucketing_state_t* s, const char* field, void* val)
 {
-    if (!s){
+    if (!s) {
         fatal("No bucketing state to tune\n");
         return;
     }
 
-    if (!field){
+    if (!field) {
         fatal("No field in bucketing state to tune\n");
         return;
     }
 
-    if (!val){
+    if (!val) {
         fatal("No value to tune field %s in bucketing state to\n", field);
         return;
     }
