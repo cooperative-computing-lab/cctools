@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 #include "bucketing.h"
 #include "random.h"
 #include "xxmalloc.h"
@@ -17,9 +18,6 @@
  * @return NULL if failure */
 static bucketing_point_t* bucketing_point_create(double val, double sig)
 {
-    if (val < 0)
-        warn(D_BUCKETING, "bucketing point cannot have value less than 0\n");
-
     bucketing_point_t* p = xxmalloc(sizeof(*p));
     
     p->val = val;
@@ -32,8 +30,7 @@ static bucketing_point_t* bucketing_point_create(double val, double sig)
  * @param p the bucketing point to be deleted */
 static void bucketing_point_delete(bucketing_point_t *p)
 {
-    if (p)
-        free(p);
+    free(p);
 }
 
 /* Insert a bucketing point into a sorted list of points in O(log(n))
@@ -42,6 +39,11 @@ static void bucketing_point_delete(bucketing_point_t *p)
 static void bucketing_insert_point_to_sorted_list(struct list* l, bucketing_point_t *p)
 {
     struct list_cursor* lc = list_cursor_create(l);
+    if (!lc)
+    {
+        fatal("Cannot create list cursor\n");
+        return;
+    }
     
     /* If list is empty, append new point to list */
     if (list_length(l) == 0)
@@ -52,7 +54,12 @@ static void bucketing_insert_point_to_sorted_list(struct list* l, bucketing_poin
     }
 
     /* Linear insert a data point */
-    list_seek(lc, 0);
+    if (!list_seek(lc, 0))
+    {
+        fatal("Cannot seek list to index 0\n");
+        return;
+    }
+
     bucketing_point_t* bpp = 0;
     int inserted = 0;
     do
@@ -88,8 +95,14 @@ static void generate_next_task_sig(bucketing_state_t* s)
 
 static int bucketing_ready_to_update_buckets(bucketing_state_t* s)
 {
-    if (!s->in_sampling_phase)
+    int num_points_since_predict_phase = s->num_points - s->num_sampling_points;
+    
+    /* Update when in predict phase and bucketing state is at the update epoch */
+    if (!s->in_sampling_phase && 
+        num_points_since_predict_phase % s->update_epoch == 0)
+    {
         return 1;
+    }
     return 0;
 }
 
@@ -97,10 +110,10 @@ static void bucketing_update_buckets(bucketing_state_t* s)
 {
     switch (s->mode)
     {
-        case CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING:
+        case BUCKETING_MODE_GREEDY:
             bucketing_greedy_update_buckets(s);
             break;
-        case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
+        case BUCKETING_MODE_EXHAUSTIVE:
             bucketing_exhaust_update_buckets(s);
             break;
         default:
@@ -127,42 +140,65 @@ bucketing_bucket_t* bucketing_bucket_create(double val, double prob)
 
 void bucketing_bucket_delete(bucketing_bucket_t* b)
 {
-    if (b)
-        free(b);
+    free(b);
 }
 
 bucketing_state_t* bucketing_state_create(double default_value, int num_sampling_points,
-    double increase_rate, int max_num_buckets, category_mode_t mode)
+    double increase_rate, int max_num_buckets, bucketing_mode_t mode, int update_epoch)
 {
     if (default_value < 0)
+    {
         warn(D_BUCKETING, "default value cannot be less than 0\n");
+        default_value = 1;
+    }
 
     if (num_sampling_points < 1)
+    {
         warn(D_BUCKETING, "number of sampling points cannot be less than 1\n");
+        num_sampling_points = 1;
+    }
 
     if (increase_rate <= 1)
+    {
         warn(D_BUCKETING, "increase rate must be greater than 1 to be meaningful\n");
+        increase_rate = 2;
+    }
 
-    if (max_num_buckets < 1 && mode == CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING)
+    if (max_num_buckets < 1 && mode == BUCKETING_MODE_EXHAUSTIVE)
+    {
         warn(D_BUCKETING, "The maximum number of buckets for exhaustive bucketing must be at least 1\n");
+        max_num_buckets = 1;
+    }
     
-    if (mode != CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING && mode != CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING)
-        fatal("Invalid bucketing mode\n");
+    if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE)
+    {
+        warn(D_BUCKETING, "Invalid bucketing mode\n");
+        mode = BUCKETING_MODE_GREEDY;
+    }
+
+    if (update_epoch < 1)
+    {
+        warn(D_BUCKETING, "Update epoch for bucketing cannot be less than 1\n");
+        update_epoch = 1;
+    }
 
     bucketing_state_t* s = xxmalloc(sizeof(*s));
 
     s->sorted_points = list_create();
     s->sequence_points = list_create();
     s->sorted_buckets = list_create();
+    
     s->num_points = 0;
     s->in_sampling_phase = 1;
     s->prev_op = BUCKETING_OP_NULL;
     s->next_task_sig = 1;
+    
     s->default_value = default_value;
     s->num_sampling_points = num_sampling_points;
     s->increase_rate = increase_rate;
     s->max_num_buckets = max_num_buckets;
     s->mode = mode;
+    s->update_epoch = update_epoch;
 
     return s;
 }
@@ -180,6 +216,46 @@ void bucketing_state_delete(bucketing_state_t* s)
         list_clear(s->sorted_buckets, (void*) bucketing_bucket_delete);
         list_delete(s->sorted_buckets);
         free(s);
+    }
+}
+
+void bucketing_state_tune(bucketing_state_t* s, const char* field, void* val)
+{
+    if (!s) {
+        fatal("No bucketing state to tune\n");
+        return;
+    }
+
+    if (!field) {
+        fatal("No field in bucketing state to tune\n");
+        return;
+    }
+
+    if (!val) {
+        fatal("No value to tune field %s in bucketing state to\n", field);
+        return;
+    }
+
+    if (!strncmp(field, "default_value", strlen("default_value"))) {
+        s->default_value = *((double*) val);
+    }
+    else if (!strncmp(field, "num_sampling_points", strlen("num_sampling_points"))) {
+        s->num_sampling_points = *((int*) val);
+    }
+    else if (!strncmp(field, "increase_rate", strlen("increase_rate"))) {
+        s->increase_rate = *((double*) val);
+    }
+    else if (!strncmp(field, "max_num_buckets", strlen("max_num_buckets"))) {
+        s->num_sampling_points = *((int*) val);
+    }
+    else if (!strncmp(field, "mode", strlen("mode"))) {
+        s->num_sampling_points = *((bucketing_mode_t*) val);
+    }
+    else if (!strncmp(field, "update_epoch", strlen("update_epoch"))) {
+        s->update_epoch = *((int*) val);
+    }
+    else {
+        warn(D_BUCKETING, "Cannot tune field %s as it doesn't exist\n", field);
     }
 }
 
@@ -227,9 +303,11 @@ double bucketing_predict(bucketing_state_t* s, double prev_val)
     /* in sampling phase */
     if (s->in_sampling_phase)
     {
-        /* if new or no resource, return default value */
+        /* if new or empty resource, return default value */
         if (prev_val == -1 || prev_val == 0)
+        {
             return s->default_value;
+        }
 
         /* prevous value must be -1 or greater than 0 */
         else if (prev_val != -1 && prev_val < 0)
@@ -237,7 +315,7 @@ double bucketing_predict(bucketing_state_t* s, double prev_val)
             fatal("invalid previous value to predict\n");
             return -1;
         }
-
+        
         /* otherwise increase to exponent level */
         else
         {
@@ -247,6 +325,11 @@ double bucketing_predict(bucketing_state_t* s, double prev_val)
     }
 
     struct list_cursor* lc = list_cursor_create(s->sorted_buckets); //cursor to iterate
+    if (!lc)
+    {
+        fatal("Cannot create list cursor\n");
+        return -1;
+    }
     
     /* reset to 0 */
     if (!list_seek(lc, 0))

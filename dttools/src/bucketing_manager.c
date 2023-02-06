@@ -5,6 +5,16 @@
 
 /* Begin: internals */
 
+/* List of default parameters for a bucketing manager */
+static const double default_cores = 1;
+static const double default_mem = 1000;
+static const double default_disk = 1000;
+static const double default_gpus = 0;
+static const int default_num_sampling_points = 10;
+static const double default_increase_rate = 2;
+static const double default_max_num_buckets = 10;
+static const int default_update_epoch = 1;
+
 /* Convert an int to its string representation
  * @param n the integer
  * @return a malloc'ed string in decimal of n */
@@ -15,16 +25,34 @@ static char* int_to_string(int n)
     return s;
 }
 
+/* Add default resource types with default values per resource type to manager
+ * See this function's definition for more info
+ * @param m the bucketing manager */
+static void bucketing_manager_add_default_resource_types(bucketing_manager_t* m)
+{
+    bucketing_manager_add_resource_type(m, "cores", 0, 
+            default_cores, default_num_sampling_points, default_increase_rate, 
+            default_max_num_buckets, default_update_epoch);
+    bucketing_manager_add_resource_type(m, "mem", 0, 
+            default_mem, default_num_sampling_points, default_increase_rate, 
+            default_max_num_buckets, default_update_epoch);
+    bucketing_manager_add_resource_type(m, "disk", 0, 
+            default_disk, default_num_sampling_points, default_increase_rate, 
+            default_max_num_buckets, default_update_epoch);
+    bucketing_manager_add_resource_type(m, "gpus", 0, 
+            default_gpus, default_num_sampling_points, default_increase_rate, 
+            default_max_num_buckets, default_update_epoch);
+}
 /* End: internals */
 
 /* Begin: APIs */
 
-bucketing_manager_t* bucketing_manager_create(category_mode_t mode)
+bucketing_manager_t* bucketing_manager_create(bucketing_mode_t mode)
 {    
     bucketing_manager_t* m = xxmalloc(sizeof(*m));
     
     /* only support two bucketing modes */
-    if (mode != CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING && mode != CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING)
+    if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE)
     {
         fatal("Invalid bucketing mode\n");
         return 0;
@@ -34,6 +62,13 @@ bucketing_manager_t* bucketing_manager_create(category_mode_t mode)
     m->res_type_to_bucketing_state = hash_table_create(0, 0);
     m->task_id_to_task_rmsummary = hash_table_create(0, 0);
 
+    return m;
+}
+
+bucketing_manager_t* bucketing_manager_initialize(bucketing_mode_t mode)
+{
+    bucketing_manager_t* m = bucketing_manager_create(mode);
+    bucketing_manager_add_default_resource_types(m);
     return m;
 }
 
@@ -52,7 +87,9 @@ void bucketing_manager_delete(bucketing_manager_t* m)
     free(m);
 }
 
-void bucketing_manager_add_resource_type(bucketing_manager_t* m, const char* r, double default_value, int num_sampling_points, double increase_rate, int max_num_buckets)
+void bucketing_manager_add_resource_type(bucketing_manager_t* m, const char* r, 
+        int set_default, double default_value, int num_sampling_points, 
+        double increase_rate, int max_num_buckets, int update_epoch)
 {
     if (!m)
     {
@@ -60,15 +97,49 @@ void bucketing_manager_add_resource_type(bucketing_manager_t* m, const char* r, 
         return;
     }
 
-    /* only add resource type if it doesn't exist, do nothing otherwise */
+    bucketing_state_t* b; 
+    /* only add resource type if it doesn't exist, warn otherwise */
     if (!hash_table_lookup(m->res_type_to_bucketing_state, r))
     {
-        bucketing_state_t* b = bucketing_state_create(default_value, num_sampling_points, increase_rate, max_num_buckets, m->mode);
+        if (set_default)
+        {
+            if (!strcmp(r, "cores"))
+            {
+                b = bucketing_state_create(default_cores, default_num_sampling_points, 
+                        default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
+            }
+            else if (!strcmp(r, "memory"))
+            {
+                b = bucketing_state_create(default_mem, default_num_sampling_points, 
+                        default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
+            }
+            else if (!strcmp(r, "disk"))
+            {
+                b = bucketing_state_create(default_disk, default_num_sampling_points, 
+                        default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
+            }
+            else if (!strcmp(r, "gpus"))
+            {
+                b = bucketing_state_create(default_gpus, default_num_sampling_points, 
+                        default_increase_rate, default_max_num_buckets, m->mode, default_update_epoch);
+            }
+            else
+            {
+                warn(D_BUCKETING, "resource type %s is not supported to set default\n", r);
+                return;
+            }
+        }
+        else
+        {
+            b = bucketing_state_create(default_value, num_sampling_points, increase_rate, max_num_buckets, m->mode, update_epoch);
+        }
         
         if (!hash_table_insert(m->res_type_to_bucketing_state, r, b))
-        {
             fatal("Cannot insert bucketing state into bucket manager\n");
-        }
+    }
+    else
+    {
+        warn(D_BUCKETING, "Ignoring request to add %s as a resource type as it already exists in the given bucketing manager\n", r);
     }
 }
 
@@ -89,7 +160,7 @@ void bucketing_manager_remove_resource_type(bucketing_manager_t* m, const char* 
     }
 }
 
-void bucketing_manager_set_mode(bucketing_manager_t* m, category_mode_t mode)
+void bucketing_manager_set_mode(bucketing_manager_t* m, bucketing_mode_t mode)
 {
     if (!m)
     {
@@ -98,7 +169,7 @@ void bucketing_manager_set_mode(bucketing_manager_t* m, category_mode_t mode)
     }
 
     /* can only set two modes of bucketing */
-    if (mode != CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING && mode != CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING)
+    if (mode != BUCKETING_MODE_GREEDY && mode != BUCKETING_MODE_EXHAUSTIVE)
     {
         fatal("Invalid bucketing mode\n");
         return;
@@ -107,7 +178,42 @@ void bucketing_manager_set_mode(bucketing_manager_t* m, category_mode_t mode)
     m->mode = mode;
 }
 
-//TODO: add set functions to set bucketing state external fields
+void bucketing_manager_tune_by_resource(bucketing_manager_t* m, const char* res_name, 
+        const char* field, void* val)
+{
+    if (!m)
+    {
+        fatal("No manager to tune\n");
+        return;
+    }
+
+    if (!res_name)
+    {
+        fatal("No resource to tune\n");
+        return;
+    }
+
+    if (!field)
+    {
+        fatal("No field to tune bucketing state of resource %s", res_name);
+        return;
+    }
+
+    if (!val)
+    {
+        fatal("No value to tune field %s of bucketing state of resource %s to", field, res_name);
+        return;
+    }
+
+    bucketing_state_t* tmp_s = hash_table_lookup(m->res_type_to_bucketing_state, res_name);
+    if (!tmp_s)
+    {
+        warn(D_BUCKETING, "Bucketing state is not keeping track of resource %s\n. Ignoring..", res_name);
+        return;
+    }
+    
+    bucketing_state_tune(tmp_s, field, val);
+}
 
 struct rmsummary* bucketing_manager_predict(bucketing_manager_t* m, int task_id)
 {
@@ -213,7 +319,7 @@ void bucketing_manager_add_resource_report(bucketing_manager_t* m, int task_id, 
     hash_table_insert(m->task_id_to_task_rmsummary, task_id_str, new_r);
     
     /* if task successfully finishes then clear out its index in internal table */
-    if (success)
+    if (success == 1)
     {
         struct hash_table* ht = m->res_type_to_bucketing_state;
         char* res_name;

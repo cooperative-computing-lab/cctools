@@ -9,13 +9,13 @@ extern struct hash_table* info_of_resource_table;
 
 int main(int argc, char** argv)
 {
-    category_mode_t mode;
+    bucketing_mode_t mode;
     if (argc == 2)
     {
         if (strncmp(*(argv+1), "-greedy", 7) == 0)
-            mode = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING;
+            mode = BUCKETING_MODE_GREEDY;
         else if (strncmp(*(argv+1), "-exhaust", 8) == 0)
-            mode = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING;
+            mode = BUCKETING_MODE_EXHAUSTIVE;
         else
         {
             fatal("invalid bucketing mode\n");
@@ -31,6 +31,8 @@ int main(int argc, char** argv)
     int num_sampling_points = 10;
     double increase_rate = 2;
     int max_num_buckets = 10;
+    int update_epoch = 1;
+    int set_default = 0;
 
     twister_init_genrand64(15112022);
 
@@ -40,7 +42,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < 3; ++i)
     {
         default_value = i == 0 ? 1 : 1000;
-        bucketing_manager_add_resource_type(m, res_names[i], default_value, num_sampling_points, increase_rate, max_num_buckets);
+        bucketing_manager_add_resource_type(m, res_names[i], set_default, default_value, num_sampling_points, increase_rate, max_num_buckets, update_epoch);
     }
 
     int prime_mem = 7000;

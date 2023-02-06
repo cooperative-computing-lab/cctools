@@ -3174,7 +3174,10 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
-	
+
+	q->proportional_resources = 1;
+	q->proportional_whole_tasks = 1;
+
 	q->allocation_default_mode = VINE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
@@ -4816,6 +4819,20 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t) {
 			if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
 				vine_txn_log_write_category(q, c);
 			}
+
+			//if in bucketing mode, add resources measured to bucketing manager
+			if (category_in_bucketing_mode(c))
+			{
+				int success; //1 if success, 0 if resource exhaustion, -1 otherwise
+				if (t->result == VINE_RESULT_SUCCESS)
+					success = 1;
+				else if (t->result == VINE_RESULT_RESOURCE_EXHAUSTION)
+					success = 0;
+				else
+					success = -1;
+				if (success != -1)
+					bucketing_manager_add_resource_report(c->bucketing_manager, t->task_id, t->resources_measured, success);
+			}
 			break;
 		case VINE_RESULT_INPUT_MISSING:
 		case VINE_RESULT_OUTPUT_MISSING:
@@ -4862,6 +4879,8 @@ int vine_set_category_mode(struct vine_manager *q, const char *category, vine_ca
 		case CATEGORY_ALLOCATION_MODE_MAX:
 		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
 		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
+		case CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING:
+		case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
 			break;
 		default:
 			notice(D_VINE, "Unknown category mode specified.");
@@ -4892,7 +4911,7 @@ const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, 
 
 	struct category *c = vine_category_lookup_or_create(q, t->category);
 
-	return category_dynamic_task_max_resources(c, t->resources_requested, t->resource_request);
+	return category_bucketing_dynamic_task_max_resources(c, t->resources_requested, t->resource_request, t->task_id);
 }
 
 const struct rmsummary *vine_manager_task_resources_min(struct vine_manager *q, struct vine_task *t) {

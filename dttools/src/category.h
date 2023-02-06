@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "itable.h"
 #include "histogram.h"
 #include "timestamp.h"
+#include "bucketing_manager.h"
 
 /** \enum category_allocation_t
   Valid states for the lifetime of automatic resource allocations for a single task.
@@ -81,6 +82,9 @@ struct category {
 
 	struct itable *histograms;
 
+    /* manager for bucketing mode, if applicable */
+    bucketing_manager_t* bucketing_manager;
+
 	int64_t total_tasks;
 
 	/* completions since last time first-allocation was updated. */
@@ -116,6 +120,11 @@ void category_delete(struct hash_table *categories, const char *name);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 
 int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker);
+
+int category_bucketing_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker, int taskid, int success);
+
+int category_in_bucketing_mode(struct category* c);
+
 int category_update_first_allocation(struct category *c, const struct rmsummary *max_worker);
 
 int category_in_steady_state(struct category *c);
@@ -123,6 +132,8 @@ int category_in_steady_state(struct category *c);
 category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);
 
 const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
+
+const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid);
 
 const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
 

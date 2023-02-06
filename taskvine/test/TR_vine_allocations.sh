@@ -6,11 +6,11 @@ set -ex
 import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
 
-export PATH=$(pwd)/../src:$(pwd)/../../batch_job/src:$PATH
+export PATH=$(pwd)/../src/worker:$(pwd)/../../batch_job/src:$PATH
 export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
 
-STATUS_FILE=wq.status
-PORT_FILE=wq.port
+STATUS_FILE=vine.status
+PORT_FILE=vine.port
 
 check_needed()
 {
@@ -34,7 +34,7 @@ run()
 	gpus=8
 
 	# send makeflow to the background, saving its exit status.
-	${CCTOOLS_PYTHON_TEST_EXEC} wq_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
+	${CCTOOLS_PYTHON_TEST_EXEC} vine_alloc_test.py $PORT_FILE $cores $memory $disk $gpus; echo $? > $STATUS_FILE
 
 	# retrieve wq script exit status
 	status=$(cat $STATUS_FILE)

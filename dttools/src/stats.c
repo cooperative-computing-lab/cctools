@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include <assert.h>
 #include <inttypes.h>
+#include <stdlib.h>
 #include "stats.h"
 #include "hash_table.h"
 #include "xxmalloc.h"
