@@ -4,6 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 #include "list.h"
+#include "taskvine.h"
 typedef enum {
 	VINE_COPROCESS_UNINITIALIZED, /**< worker has not yet created coprocess instance **/
 	VINE_COPROCESS_READY,         /**< coprocess is ready to receive and run a RemoteTask **/
@@ -32,7 +33,7 @@ int vine_coprocess_check(struct vine_coprocess *coprocess);
 char *vine_coprocess_run(const char *function_name, const char *function_input, struct vine_coprocess *coprocess);
 struct vine_coprocess *vine_coprocess_find_state(struct list *coprocess_list, vine_coprocess_state_t state, char *coprocess_name);
 struct vine_coprocess *vine_coprocess_initialize_coprocess(char *coprocess_command);
-void vine_coprocess_specify_resources(struct vine_coprocess *coprocess, int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus);
+void vine_coprocess_specify_resources(struct vine_coprocess *coprocess, struct rmsummary *allocated_resources);
 void vine_coprocess_shutdown_all_coprocesses(struct list *coprocess_list);
 void vine_coprocess_measure_resources(struct list *coprocess_list);
 int vine_coprocess_enforce_limit(struct vine_coprocess *coprocess);

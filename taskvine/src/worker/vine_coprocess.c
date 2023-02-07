@@ -252,11 +252,12 @@ struct vine_coprocess *vine_coprocess_initialize_coprocess(char *coprocess_comma
 	return coprocess;
 }
 
-void vine_coprocess_specify_resources(struct vine_coprocess *coprocess, int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus) {
-	int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : COPROCESS_CORES_DEFAULT);
-	int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : COPROCESS_MEMORY_DEFAULT);
-	int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : COPROCESS_DISK_DEFAULT);
-	int coprocess_gpus_normalized   = ( (coprocess_gpus > 0)   ? coprocess_gpus   : COPROCESS_GPUS_DEFAULT);
+void vine_coprocess_specify_resources(struct vine_coprocess *coprocess, struct rmsummary *allocated_resources) {
+	printf("%lf %lf %lf %lf\n", allocated_resources->cores, allocated_resources->memory, allocated_resources->disk, allocated_resources->gpus);
+	int coprocess_cores_normalized  = ( (allocated_resources->cores > 0)  ? allocated_resources->cores  : COPROCESS_CORES_DEFAULT);
+	int coprocess_memory_normalized = ( (allocated_resources->memory > 0) ? allocated_resources->memory : COPROCESS_MEMORY_DEFAULT);
+	int coprocess_disk_normalized   = ( (allocated_resources->disk > 0)   ? allocated_resources->disk   : COPROCESS_DISK_DEFAULT);
+	int coprocess_gpus_normalized   = ( (allocated_resources->gpus > 0)   ? allocated_resources->gpus   : COPROCESS_GPUS_DEFAULT);
 	
 	coprocess->coprocess_resources = vine_resources_create();
 	coprocess->coprocess_resources->cores.total  = coprocess_cores_normalized;
@@ -264,31 +265,6 @@ void vine_coprocess_specify_resources(struct vine_coprocess *coprocess, int copr
 	coprocess->coprocess_resources->disk.total   = coprocess_disk_normalized;
 	coprocess->coprocess_resources->gpus.total   = coprocess_gpus_normalized;
 }
-
-/*
-struct vine_coprocess *vine_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct vine_resources *total_resources, char *coprocess_command, int number_of_coprocess_instances) {
-	if (number_of_coprocess_instances <= 0) return NULL;
-	int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : total_resources->cores.total);
-	int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : total_resources->memory.total);
-	int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : total_resources->disk.total);
-	int coprocess_gpus_normalized   = ( (coprocess_gpus > 0)   ? coprocess_gpus   : total_resources->gpus.total);
-
-	struct vine_coprocess * coprocess_info = malloc(sizeof(struct vine_coprocess) * number_of_coprocess_instances);
-	memset(coprocess_info, 0, sizeof(struct vine_coprocess) * number_of_coprocess_instances);
-	for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
-		struct vine_coprocess *curr_coprocess = &coprocess_info[coprocess_num];
-		coprocess_info[coprocess_num] = (struct vine_coprocess) {NULL, NULL, -1, -1, VINE_COPROCESS_UNINITIALIZED, {-1, -1}, {-1, -1}, NULL, NULL, NULL, 0, NULL};
-		curr_coprocess->command = xxstrdup(coprocess_command);
-		curr_coprocess->coprocess_resources = vine_resources_create();
-		curr_coprocess->coprocess_resources->cores.total  = coprocess_cores_normalized;
-		curr_coprocess->coprocess_resources->memory.total = coprocess_memory_normalized;
-		curr_coprocess->coprocess_resources->disk.total   = coprocess_disk_normalized;
-		curr_coprocess->coprocess_resources->gpus.total   = coprocess_gpus_normalized;
-		vine_coprocess_start(curr_coprocess);
-	}
-	return coprocess_info;
-}
-*/
 
 void vine_coprocess_shutdown_all_coprocesses(struct list *coprocess_list) {
 	struct vine_coprocess *coprocess;
