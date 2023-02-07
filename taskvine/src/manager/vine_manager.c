@@ -4745,8 +4745,7 @@ static void aggregate_workers_resources( struct vine_manager *q, struct vine_res
 }
 
 /* This simple wrapper function allows us to hide the debug.h interface from the end user. */
-
-int vine_enable_debug_log( struct vine_manager *m, const char *logfile )
+int vine_enable_debug_log( const char *logfile )
 {
 	debug_config("vine_manager");
 	debug_config_file(logfile);
