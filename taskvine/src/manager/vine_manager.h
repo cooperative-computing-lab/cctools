@@ -149,7 +149,7 @@ struct vine_manager {
 	/* Peer Transfer Configuration */
 	int peer_transfers_enabled;
 	int file_source_max_transfers;
-
+	int worker_source_max_transfers;
 	/* Various performance knobs that can be tuned. */
 
 	int short_timeout;            /* Timeout in seconds to send/recv a brief message from worker */
