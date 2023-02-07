@@ -108,13 +108,7 @@ def main():
                             response = "".join(all_chunks)
                             os.waitid(os.P_PID, p, os.WEXITED)
 
-                    #response_length_msg = f"{len(response)}\n".encode("utf-8")
-                    #sys.stderr.buffer.write(f"{response}\n".encode("utf-8"))
                     print(response, flush=True)
-                    #sys.stdout.buffer.write(f"{response}\n".encode("utf-8"))
-                    #sys.stdout.buffer.flush()
-                    # send response
-                    #conn.sendall(response)
 
                     break
             else:
