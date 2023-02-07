@@ -984,7 +984,8 @@ class PythonTask(Task):
                 shutil.rmtree(self._tmpdir)
 
         except Exception as e:
-            sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
+            if sys:
+                sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
 
 
     def _serialize_python_function(self, func, args, kwargs):
