@@ -169,6 +169,7 @@ int vine_coprocess_start(struct vine_coprocess *coprocess, char *sandbox) {
         if (dup2(coprocess->pipe_out[1], 1) < 0) {
             fatal("coprocess could not attach pipe to stdout: %s\n", strerror(errno));
         }
+		setpgid(0, 0);
         execlp(coprocess->command, coprocess->command, (char *) 0);
         fatal("failed to execute %s: %s\n", coprocess->command, strerror(errno));
 	}
