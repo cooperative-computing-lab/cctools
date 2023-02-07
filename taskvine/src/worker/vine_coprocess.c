@@ -221,14 +221,6 @@ char *vine_coprocess_run(const char *function_name, const char *function_input, 
 	char *buffer = calloc(VINE_LINE_MAX, sizeof(char));
 	memset(buffer, 0, VINE_LINE_MAX * sizeof(char));
 	link_readline(coprocess->read_link, buffer, VINE_LINE_MAX, stoptime);
-	//link_readline(coprocess->read_link, buffer, VINE_LINE_MAX, stoptime);
-	//fprintf(stderr, "HEYA %s HYEA\n", buffer);
-	/*
-	if (vine_coprocess_read_from_link(buffer, VINE_LINE_MAX, timeout, coprocess->read_link) < 0) {
-		free(buffer);
-		return NULL;
-	}
-	*/
 
 	return buffer;
 }
@@ -253,7 +245,6 @@ struct vine_coprocess *vine_coprocess_initialize_coprocess(char *coprocess_comma
 }
 
 void vine_coprocess_specify_resources(struct vine_coprocess *coprocess, struct rmsummary *allocated_resources) {
-	printf("%lf %lf %lf %lf\n", allocated_resources->cores, allocated_resources->memory, allocated_resources->disk, allocated_resources->gpus);
 	int coprocess_cores_normalized  = ( (allocated_resources->cores > 0)  ? allocated_resources->cores  : COPROCESS_CORES_DEFAULT);
 	int coprocess_memory_normalized = ( (allocated_resources->memory > 0) ? allocated_resources->memory : COPROCESS_MEMORY_DEFAULT);
 	int coprocess_disk_normalized   = ( (allocated_resources->disk > 0)   ? allocated_resources->disk   : COPROCESS_DISK_DEFAULT);
