@@ -53,9 +53,16 @@ static void vine_transfer_process( struct vine_cache *cache )
 {
 	while(1) {
 		struct link *lnk = link_accept(transfer_link,time(0)+60);
-		if(lnk) {
-			vine_transfer_handler(lnk,cache);
-			link_close(lnk);
+		pid_t p = fork();
+		if(p==0)
+		{
+			if(lnk) {
+				vine_transfer_handler(lnk,cache);
+				link_close(lnk);
+			}
+			_exit(0);
+		} else {
+			continue;
 		}
 	}
 }
