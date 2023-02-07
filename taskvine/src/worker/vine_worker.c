@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "vine_watcher.h"
 #include "vine_gpus.h"
 #include "vine_file.h"
+#include "vine_cache.h"
 #include "vine_coprocess.h"
 #include "vine_sandbox.h"
 #include "vine_transfer.h"
@@ -454,6 +455,7 @@ void send_transfer_address( struct link *manager )
 	vine_transfer_server_address(addr,&port);
 	send_message(manager, "transfer-address %s %d\n",addr,port);
 }
+
 
 /*
 Send the initial "ready" message to the manager with the version and so forth.
@@ -1365,7 +1367,7 @@ static int workspace_create()
 	// Setup working space(dir)
 	if(!workspace) {
 		const char *workdir = system_tmp_dir(user_specified_workdir);
-		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
+		workspace = string_format("%s/worker-%d", workdir, (int) getuid());
 	}
 
 	printf( "vine_worker: creating workspace %s\n", workspace);
@@ -1442,9 +1444,17 @@ The workspace consists of the following directories:
 static int workspace_prepare()
 {
 	debug(D_VINE,"preparing workspace %s",workspace);
-
+	
 	char *cachedir = string_format("%s/cache",workspace);
-	int result = create_dir(cachedir,0777);
+	struct stat info;
+	int result;
+	if(!(stat(cachedir, &info)==0 && S_ISDIR(info.st_mode))){  
+			result = create_dir(cachedir,0777);
+	}
+	else{
+			result = 1;
+			debug(D_VINE,"cache directory already exists!");
+	}
 	global_cache = vine_cache_create(cachedir);
 	free(cachedir);
 
@@ -1481,6 +1491,7 @@ static void workspace_cleanup()
 			if(!strcmp(d->d_name,".")) continue;
 			if(!strcmp(d->d_name,"..")) continue;
 			if(!strcmp(d->d_name,"trash")) continue;
+			if(!strcmp(d->d_name,"cache")) continue;
 			trash_file(d->d_name);
 		}
 		closedir(dir);
@@ -1517,7 +1528,6 @@ static void workspace_delete()
 	is inside the workspace.  Abort if we really cannot clean up.
 	*/
 
-	unlink_recursive(workspace);
 
 	free(workspace);
 }
@@ -1596,6 +1606,8 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 	}
 
 	workspace_prepare();
+	vine_cache_load(global_cache);
+	vine_init_update(global_cache, manager);
 
 	measure_worker_resources();
 
