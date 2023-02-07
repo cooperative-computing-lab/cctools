@@ -81,6 +81,8 @@ void vine_cache_load(struct vine_cache *c)
 		debug(D_VINE, "loading cache at: %s", c->cache_dir);
 		struct dirent *d;
 		while((d=readdir(dir))){
+			if(!strcmp(d->d_name,".")) continue;
+			if(!strcmp(d->d_name,"..")) continue;
 			debug(D_VINE, "found %s in cache at: %s",d->d_name, c->cache_dir);
 			struct stat info;
 			int64_t nbytes, nfiles;
