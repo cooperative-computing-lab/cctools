@@ -315,7 +315,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 		remote_info->size = size;
 		remote_info->transfer_time = transfer_time;
 		remote_info->in_cache = 1;
-		
+
 		vine_current_transfers_remove(q, id);
 
 		vine_txn_log_write_cache_update(q,w,size,transfer_time,cachename);
@@ -3117,6 +3117,13 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 		return 0;
 	}
 
+	// set debug logfile as soon as possible need to manually use runtime_dir
+	// as the manager has not been created yet, but we would like to have debug
+	// information of its creation.
+	char *debug_tmp = string_format("%s/logs/debug", runtime_dir);
+	vine_enable_debug_log(debug_tmp);
+	free(debug_tmp);
+
 	q->manager_link = link_serve(port);
 	if(!q->manager_link) {
 		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
@@ -3219,7 +3226,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 		}
 	}
 
-	vine_enable_perf_log(q, vine_get_runtime_path_log(q, "perfomance"));
+	vine_enable_perf_log(q, vine_get_runtime_path_log(q, "performance"));
 	vine_enable_transactions_log(q, vine_get_runtime_path_log(q, "transactions"));
 
 	vine_perf_log_write_update(q, 1);
