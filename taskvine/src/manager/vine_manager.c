@@ -3480,6 +3480,8 @@ void vine_delete(struct vine_manager *q)
 	rmsummary_delete(q->current_max_worker);
 	rmsummary_delete(q->max_task_resources_requested);
 
+	debug(D_VINE, "manager log end\n");
+
 	free(q);
 }
 
