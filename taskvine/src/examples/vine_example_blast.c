@@ -41,6 +41,8 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
+    vine_set_runtime_info_path("vine-runtime/vine-example-blast");
+
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));
@@ -48,12 +50,11 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_enable_debug_log(m,"manager.log");
 	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
 
 	for(i=0;i<10;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
-	  
+
 		vine_task_add_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
 		vine_task_add_input(t,vine_file_untar(vine_file_url(BLAST_URL)),"blastdir", VINE_CACHE );
 		vine_task_add_input(t,vine_file_untar(vine_file_url(LANDMARK_URL)),"landmark", VINE_CACHE );

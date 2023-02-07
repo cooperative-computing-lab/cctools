@@ -22,6 +22,8 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
+	vine_set_runtime_info_path("vine-runtime/vine_example_unponcho_worker");
+
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));
@@ -29,7 +31,6 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_enable_debug_log(m,"manager.log");
 	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
 	vine_set_name(m, "bslydelg_test");
 

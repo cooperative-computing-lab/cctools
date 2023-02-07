@@ -34,14 +34,14 @@ int main(int argc, char *argv[])
 	struct vine_manager *m;
 	struct vine_task *t;
 
+	vine_set_runtime_info_path("vine-runtime/vine_example_watch");
+
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("Couldn't create manager: %s\n", strerror(errno));
 		return 1;
 	}
 	printf("Listening on port %d...\n", vine_port(m));
-
-	vine_enable_debug_log(m,"manager.log");
 
 	int i;
 	for(i=0;i<10;i++) {
