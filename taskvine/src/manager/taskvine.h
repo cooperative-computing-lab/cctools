@@ -1190,6 +1190,11 @@ void vine_set_category_first_allocation_guess(struct vine_manager *m,  const cha
 */
 void vine_initialize_categories(struct vine_manager *m, struct rmsummary *max, const char *summaries_file);
 
+/** Sets the path where runtime info directories (logs and staging) are created.
+@param path A directory
+*/
+void vine_set_runtime_info_path(const char *path);
+
 
 //@}
 

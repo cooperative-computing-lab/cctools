@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "vine_txn_log.h"
 #include "vine_perf_log.h"
 #include "vine_current_transfers.h"
+#include "vine_runtime_dir.h"
 
 #include "cctools.h"
 #include "envtools.h"
@@ -928,7 +929,7 @@ static void delete_uncacheable_files( struct vine_manager *q, struct vine_worker
 
 static char *monitor_file_name(struct vine_manager *q, struct vine_task *t, const char *ext) {
 	char *dir;
-	
+
 	if(t->monitor_output_directory) {
 		dir = t->monitor_output_directory;
 	} else if(q->monitor_output_directory) {
@@ -3110,6 +3111,12 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	if (getenv("VINE_HIGH_PORT"))
 		setenv("TCP_HIGH_PORT", getenv("VINE_HIGH_PORT"), 0);
 
+	char *runtime_dir = vine_runtime_directory_create();
+	if(!runtime_dir) {
+		debug(D_NOTICE, "Could not create runtime directories");
+		return 0;
+	}
+
 	q->manager_link = link_serve(port);
 	if(!q->manager_link) {
 		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
@@ -3119,6 +3126,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 		char address[LINK_ADDRESS_MAX];
 		link_address_local(q->manager_link, address, &q->port);
 	}
+
+	q->runtime_directory = runtime_dir;
 
 	q->ssl_key = key ? strdup(key) : 0;
 	q->ssl_cert = cert ? strdup(cert) : 0;
@@ -3209,6 +3218,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 			q->bandwidth_limit = 0;
 		}
 	}
+
+	vine_enable_perf_log(q, vine_get_runtime_path_log(q, "perfomance"));
+	vine_enable_transactions_log(q, vine_get_runtime_path_log(q, "transactions"));
 
 	vine_perf_log_write_update(q, 1);
 
