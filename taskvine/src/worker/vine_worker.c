@@ -120,7 +120,7 @@ static int sigchld_received_flag = 0;
 char *password = 0;
 
 // Allow worker to use symlinks when link() fails.  Enabled by default.
-int symlinks_enabled = 1;
+int vine_worker_symlinks_enabled = 1;
 
 // Worker id. A unique id for this worker instance.
 static char *worker_id;
@@ -417,7 +417,7 @@ static int send_keepalive(struct link *manager, int force_resources)
 Send an asynchronmous message to the manager indicating that an item was successfully loaded into the cache, along with its size in bytes and transfer time in usec.
 */
 
-void send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
+void vine_worker_send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
 {
 	char *transfer_id;
 	if((transfer_id = hash_table_lookup(current_transfers, cachename))){
@@ -435,7 +435,7 @@ void send_cache_update( struct link *manager, const char *cachename, int64_t siz
 Send an asynchronous message to the manager indicating that an item previously queued in the cache is invalid because it could not be loaded.  Accompanied by a corresponding error message.
 */
 
-void send_cache_invalid( struct link *manager, const char *cachename, const char *message )
+void vine_worker_send_cache_invalid( struct link *manager, const char *cachename, const char *message )
 {
 	char *transfer_id;
 	int length = strlen(message);
@@ -448,7 +448,11 @@ void send_cache_invalid( struct link *manager, const char *cachename, const char
 	link_write(manager,message,length,time(0)+active_timeout);
 }
 
-void send_transfer_address( struct link *manager )
+/*
+Send an asynchronous message to the manager indicating where the worker is listening for transfers.
+*/
+
+static void send_transfer_address( struct link *manager )
 {
 	char addr[LINK_ADDRESS_MAX];
 	int port;
@@ -2093,7 +2097,7 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case LONG_OPT_DISABLE_SYMLINKS:
-			symlinks_enabled = 0;
+			vine_worker_symlinks_enabled = 0;
 			break;
 		case LONG_OPT_SINGLE_SHOT:
 			single_shot_mode = 1;

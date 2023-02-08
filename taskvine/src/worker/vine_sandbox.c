@@ -4,6 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "vine_worker.h"
 #include "vine_sandbox.h"
 #include "vine_cache.h"
 #include "vine_task.h"
@@ -19,9 +20,6 @@ See the file COPYING for details.
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-
-extern int symlinks_enabled;
-void send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
 
 char * vine_sandbox_full_path( struct vine_process *p, const char *sandbox_name )
 {
@@ -50,7 +48,7 @@ static int ensure_input_file( struct vine_process *p, struct vine_file *f, struc
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_VINE,"input: link %s -> %s",cache_path,sandbox_path);
-		result = file_link_recursive(cache_path,sandbox_path,symlinks_enabled);
+		result = file_link_recursive(cache_path,sandbox_path,vine_worker_symlinks_enabled);
 		if(!result) debug(D_VINE,"couldn't link %s into sandbox as %s: %s",cache_path,sandbox_path,strerror(errno));
 	}
 	
@@ -115,7 +113,7 @@ static int transfer_output_file( struct vine_process *p, struct vine_file *f, st
 		struct stat info;
 		if(stat(cache_path,&info)==0) {
 			vine_cache_addfile(cache,info.st_size,info.st_mode,f->cached_name);
-			send_cache_update(manager,f->cached_name,info.st_size,0);
+			vine_worker_send_cache_update(manager,f->cached_name,info.st_size,0);
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
 			debug(D_VINE,"output: failed to stat %s: %s",cache_path,strerror(errno));

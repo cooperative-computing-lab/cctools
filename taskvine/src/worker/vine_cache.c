@@ -4,11 +4,13 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "vine_worker.h"
 #include "vine_cache.h"
 #include "vine_process.h"
 
 #include "vine_transfer.h"
 #include "vine_protocol.h"
+
 #include "xxmalloc.h"
 #include "hash_table.h"
 #include "debug.h"
@@ -107,7 +109,6 @@ void vine_cache_load(struct vine_cache *c)
 	closedir(dir);
 }
 
-int send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
 /*
 send cache updates to manager from existing cache_directory 
 */
@@ -118,7 +119,7 @@ void vine_init_update(struct vine_cache *c, struct link *manager)
 	HASH_TABLE_ITERATE(c->table, cachename, f){
 		debug(D_VINE,"sending cache update to manager cachename: %s source %s", cachename, f->source);
 		timestamp_t transfer_time = timestamp_get();
-		send_cache_update(manager,cachename,f->actual_size,transfer_time);
+		vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time);
 	}
 }
 
@@ -368,8 +369,6 @@ It is a little odd that the manager link is passed as an argument here,
 but it is needed in order to send back the necessary update/invalid messages.
 */
 
-int send_cache_invalid( struct link *manager, const char *cachename, const char *message );
-
 int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager, vine_file_flags_t flags )
 {
 	if(!strcmp(cachename,"0")) return 1;
@@ -427,7 +426,7 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 			f->actual_size = nbytes;
 			f->complete = 1;
 			debug(D_VINE,"cache: created %s with size %lld in %lld usec",cachename,(long long)f->actual_size,(long long)transfer_time);
-			send_cache_update(manager,cachename,f->actual_size,transfer_time);
+			vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time);
 			result = 1;
 		} else {
 			debug(D_VINE,"cache: command succeeded but did not create %s",cachename);
@@ -447,7 +446,7 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	
 	if(!result) {
 		if(!error_message) error_message = strdup("unknown");
-		send_cache_invalid(manager,cachename,error_message);
+		vine_worker_send_cache_invalid(manager,cachename,error_message);
 		vine_cache_remove(c,cachename);
 	}
 	
