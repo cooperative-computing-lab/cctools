@@ -239,7 +239,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 {
 	int64_t total_bytes = 0;
 	vine_result_code_t result = VINE_SUCCESS; //return success unless something fails below
-	
+
 	timestamp_t open_time = timestamp_get();
 
 	switch (f->type) {
@@ -287,7 +287,9 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 		q->stats->bytes_sent += total_bytes;
 
 		// Write to the transaction log.
-		vine_txn_log_write_transfer(q, w, t, f, total_bytes, elapsed_time, 1);
+        if(f->type == VINE_FILE || f->type == VINE_BUFFER) {
+            vine_txn_log_write_transfer(q, w, t, f, total_bytes, elapsed_time, 1);
+        }
 
 		// Avoid division by zero below.
 		if(elapsed_time==0) elapsed_time = 1;
