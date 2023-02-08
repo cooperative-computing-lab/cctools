@@ -572,7 +572,7 @@ static void report_task_complete( struct link *manager, struct vine_process *p )
 	fstat(p->output_fd, &st);
 	output_length = st.st_size;
 	lseek(p->output_fd, 0, SEEK_SET);
-	send_message(manager, "result %d %d %lld %llu %d\n", p->result, p->exit_code, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->task_id);
+	send_message(manager, "result %d %d %lld %llu %llu %d\n", p->result, p->exit_code, (long long) output_length, (unsigned long long) p->execution_start, (unsigned long long) p->execution_end, p->task->task_id);
 	link_stream_from_fd(manager, p->output_fd, output_length, time(0)+active_timeout);
 
 	total_task_execution_time += (p->execution_end - p->execution_start);
