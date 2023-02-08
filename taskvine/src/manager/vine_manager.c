@@ -3506,7 +3506,7 @@ void vine_disable_monitoring(struct vine_manager *q) {
 	if(q->monitor_mode && q->monitor_summary_filename) {
 		fclose(q->monitor_file);
 
-		char template[] = "rmonitor-summaries-XXXXXX";
+		char *template = vine_get_runtime_path_log(q, "rmonitor-summaries.json");
 		int final_fd = mkstemp(template);
 		int summs_fd = open(q->monitor_summary_filename, O_RDONLY);
 
