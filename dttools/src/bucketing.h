@@ -1,12 +1,16 @@
 #ifndef BUCKETING_H
 #define BUCKETING_H
 
-#include "category.h"
 #include "list.h"
 
+/* all modes of bucketing */
+typedef enum {
+    BUCKETING_MODE_GREEDY,
+    BUCKETING_MODE_EXHAUSTIVE
+} bucketing_mode_t;
+
 /* Bucketing has two operations, add and predict */
-typedef enum
-{
+typedef enum {
     BUCKETING_OP_ADD = 0,
     BUCKETING_OP_PREDICT,
     BUCKETING_OP_NULL    //only used when initializing
@@ -86,41 +90,15 @@ typedef struct
     int max_num_buckets;
 
     /* the update mode to use */
-    category_mode_t mode;
+    bucketing_mode_t mode;
+
+    /* The number of iterations before another bucketing happens */
+    int update_epoch;
 
     /** End: externally provided fields **/ 
 } bucketing_state_t;
 
 /** Begin: APIs **/
-
-/* Create a bucketing state
- * @param default_value default value in sampling state
- * @param num_sampling_points number of needed sampling points
- * @param increase_rate rate to increase values
- * @param max_num_buckets the maximum number of buckets to find (only for exhaustive bucketing)
- * @param mode specify which update mode of bucketing state
- * @return pointer to created bucketing state
- * @return 0 if failure */
-bucketing_state_t* bucketing_state_create(double default_value, int num_sampling_points,
-    double increase_rate, int max_num_buckets, category_mode_t mode);
-
-/* Delete a bucketing state
- * @param s pointer to bucketing state to be deleted */
-void bucketing_state_delete(bucketing_state_t* s);
-
-/* Add a point
- * @param s the relevant bucketing state 
- * @param val value of point to be added */
-void bucketing_add(bucketing_state_t* s, double val);
-
-/* Predict a value, only predict when we need a new value, don't predict when prev value
- * (if available) is usable
- * @param s the relevant bucketing_state_t
- * @param prev_val previous value to consider, -1 if no previous value, 
- * > 0 means a larger value is expected from prediction
- * @return the predicted value
- * @return -1 if failure */
-double bucketing_predict(bucketing_state_t* s, double prev_val);
 
 /* Create a bucketing bucket
  * @param val value of bucket
@@ -132,6 +110,43 @@ bucketing_bucket_t* bucketing_bucket_create(double val, double prob);
 /* Delete a bucketing bucket
  * @param b the bucket to be deleted */
 void bucketing_bucket_delete(bucketing_bucket_t* b);
+
+/* Create a bucketing state
+ * @param default_value default value in sampling state
+ * @param num_sampling_points number of needed sampling points
+ * @param increase_rate rate to increase values
+ * @param max_num_buckets the maximum number of buckets to find (only for exhaustive bucketing)
+ * @param mode specify which update mode of bucketing state
+ * @param update_epoch number of iterations to wait before updating the bucketing state
+ * @return pointer to created bucketing state
+ * @return 0 if failure */
+bucketing_state_t* bucketing_state_create(double default_value, int num_sampling_points,
+    double increase_rate, int max_num_buckets, bucketing_mode_t mode, int update_epoch);
+
+/* Delete a bucketing state
+ * @param s pointer to bucketing state to be deleted */
+void bucketing_state_delete(bucketing_state_t* s);
+
+/* Tune externally provided fields
+ * @param s the bucketing state
+ * @param field string describing the field, must be the same as external fields
+ * defined in bucketing state
+ * @param val value to be casted inside this function, -1 otherwise */
+void bucketing_state_tune(bucketing_state_t* s, const char* field, void* val);
+
+/* Add a point
+ * @param s the relevant bucketing state 
+ * @param val value of point to be added */
+void bucketing_add(bucketing_state_t* s, double val);
+
+/* Predict a value, only predict when we need a new higher value, don't predict when prev value
+ * (if available) is usable
+ * @param s the relevant bucketing_state_t
+ * @param prev_val previous value to consider, -1 if no previous value, 
+ * > 0 means a larger value is expected from prediction
+ * @return the predicted value
+ * @return -1 if failure */
+double bucketing_predict(bucketing_state_t* s, double prev_val);
 
 /** End: APIs **/
 

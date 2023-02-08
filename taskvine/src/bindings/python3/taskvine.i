@@ -16,6 +16,7 @@
 	#include "timestamp.h"
 	#include "taskvine.h"
 	#include "rmsummary.h"
+    #include "vine_task.h"
 %}
 
 /* We compile with -D__LARGE64_FILES, thus off_t is at least 64bit.
@@ -46,7 +47,7 @@ treat it as an output parameter to be filled in. */
 %include "taskvine.h"
 %include "rmsummary.h"
 %include "category.h"
-
+%include "vine_task.h"
 
 
 

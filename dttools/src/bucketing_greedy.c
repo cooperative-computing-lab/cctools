@@ -3,6 +3,8 @@
 #include "xxmalloc.h"
 #include "debug.h"
 
+/** Begin: internals **/
+
 /* List cursor with its position in a list */
 typedef struct
 {
@@ -16,8 +18,6 @@ typedef struct
     bucketing_cursor_w_pos_t* lo;
     bucketing_cursor_w_pos_t* hi;
 } bucketing_bucket_range_t;
-
-/** Begin: internals **/
 
 /* Cursor but with position in list
  * @param lc pointer to list cursor
@@ -87,6 +87,9 @@ static void bucketing_bucket_range_delete(bucketing_bucket_range_t* range)
         bucketing_cursor_w_pos_delete(range->lo);
         bucketing_cursor_w_pos_delete(range->hi);
         free(range);
+    }
+    else {
+        warn(D_BUCKETING, "ignoring command to delete a null pointer to bucket range\n");
     }
 }
 
@@ -180,6 +183,11 @@ static struct list* bucketing_cursor_pos_list_sort(struct list* l, int (*f) (con
  * @return negative if p1 < p2, 0 if p1 == p2, positive if p1 > p2 */
 static int bucketing_compare_break_points(const void* p1, const void* p2)
 {
+    if (!p1 || !p2)
+    {
+        fatal("Cannot compare empty break points\n");
+        return 0;
+    }
     return (*((bucketing_cursor_w_pos_t**) p1))->pos - (*((bucketing_cursor_w_pos_t**) p2))->pos;
 }
 
@@ -205,7 +213,8 @@ static double bucketing_greedy_policy(bucketing_bucket_range_t* range, int break
     bucketing_point_t* tmp_point_ptr = 0; //pointer to get item from sorted points
     double exp_cons_lq_break = 0;       //expected value if next point is lower than or equal to break point
     double exp_cons_g_break = 0;        //expected value if next point is higher than break point
-    int break_val, max_val; //values at break point and max point
+    int break_val = -1; //value at break point
+    int max_val = -1;   //value at max point
     struct list_cursor* iter = list_cursor_clone(range->lo->lc);    //cursor to iterate through list
 
     /* Loop through the range to collect statistics */
@@ -358,7 +367,11 @@ static struct list* bucketing_greedy_find_break_points(bucketing_state_t* s)
         return 0;
     }
 
-    list_push_tail(bucket_range_list, init_range);
+    if (!list_push_tail(bucket_range_list, init_range))
+    {
+        fatal("Cannot push init_range bucket to end of list\n");
+        return 0;
+    }
 
     bucketing_bucket_range_t* lo_bucket_range;    //create low bucket, if possible
     bucketing_bucket_range_t* hi_bucket_range;    //create high bucket, if possible
@@ -388,7 +401,11 @@ static struct list* bucketing_greedy_find_break_points(bucketing_state_t* s)
         /* If bucket is breakable, break it. Else do nothing */
         if (breakable == 0)
         {
-            list_push_tail(break_point_list, break_point);
+            if (!list_push_tail(break_point_list, break_point))
+            {
+                fatal("Cannot push break point to end of break point list\n");
+                return 0;
+            }
 
             /* cannot spawn low bucket */
             if (break_point->pos == bbr_ptr->lo->pos)
@@ -405,7 +422,11 @@ static struct list* bucketing_greedy_find_break_points(bucketing_state_t* s)
                         return 0;
                     }
 
-                    list_push_tail(bucket_range_list, hi_bucket_range);   
+                    if (!list_push_tail(bucket_range_list, hi_bucket_range))
+                    {
+                        fatal("Cannot push high bucket to bucket range list\n");
+                        return 0;
+                    }
                 }
             }
 
@@ -422,7 +443,11 @@ static struct list* bucketing_greedy_find_break_points(bucketing_state_t* s)
                         return 0;
                     }
 
-                    list_push_tail(bucket_range_list, hi_bucket_range);
+                    if (!list_push_tail(bucket_range_list, hi_bucket_range))
+                    {
+                        fatal("Cannot push high bucket to bucket range list\n");
+                        return 0;
+                    }
                 }
                 lo_bucket_range = bucketing_bucket_range_create(bbr_ptr->lo->pos, break_point->pos, s->sorted_points);
                 if (!lo_bucket_range)
@@ -431,7 +456,11 @@ static struct list* bucketing_greedy_find_break_points(bucketing_state_t* s)
                     return 0;
                 }
 
-                list_push_tail(bucket_range_list, lo_bucket_range);
+                if (!list_push_tail(bucket_range_list, lo_bucket_range))
+                {
+                    fatal("Cannot push low bucket to bucket range list\n");
+                    return 0;
+                }
             } 
         }
         else if (breakable == -1)
@@ -450,7 +479,11 @@ static struct list* bucketing_greedy_find_break_points(bucketing_state_t* s)
         return 0;
     }
 
-    list_push_tail(break_point_list, last_break_point);
+    if (!list_push_tail(break_point_list, last_break_point))
+    {
+        fatal("Cannot push last break point to break point list\n");
+        return 0;
+    }
 
     /* Sort in increasing order */
     break_point_list = bucketing_cursor_pos_list_sort(break_point_list, bucketing_compare_break_points);
@@ -504,8 +537,17 @@ void bucketing_greedy_update_buckets(bucketing_state_t* s)
     bucket_probs[0] = 0;
     double total_sig = 0;                       //track total significance
 
-    tmp_point = list_next_item(s->sorted_points);
-    tmp_break_point = list_next_item(break_point_list);
+    if (!(tmp_point = list_next_item(s->sorted_points)))
+    {
+        fatal("bucketing: cannot get tmp point\n");
+        return;
+    }
+    
+    if (!(tmp_break_point = list_next_item(break_point_list)))
+    {
+        fatal("bucketing: cannot get tmp break point\n");
+        return;
+    }
     bucketing_point_t* tmp_point_of_break_point = 0;
     if (!list_get(tmp_break_point->lc, (void**) &tmp_point_of_break_point))
     {
@@ -564,7 +606,11 @@ void bucketing_greedy_update_buckets(bucketing_state_t* s)
             return;
         }
 
-        list_push_tail(s->sorted_buckets, tmp_bucket);
+        if (!list_push_tail(s->sorted_buckets, tmp_bucket))
+        {
+            fatal("Cannot push tmp bucket to sorted buckets\n");
+            return;
+        }
         ++i;
     }
     

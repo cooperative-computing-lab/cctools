@@ -52,6 +52,7 @@ if cctools_tmpdir:
 else:
     staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-')
 
+
 def cleanup_staging_directory():
     try:
         shutil.rmtree(staging_directory)
@@ -1013,7 +1014,8 @@ class PythonTask(Task):
                 shutil.rmtree(self._tmpdir)
 
         except Exception as e:
-            sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
+            if sys:
+                sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
 
 
     def _serialize_python_function(self, func, args, kwargs):

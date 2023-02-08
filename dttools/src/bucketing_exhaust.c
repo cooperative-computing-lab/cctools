@@ -234,12 +234,21 @@ static struct list* bucketing_exhaust_get_buckets(bucketing_state_t* s, int n)
     double candidate_vals[steps + n];
 
     /* fill candidate values with logarithmic increase */
-    for (int i = 0; i < steps; ++i)
+    for (int i = 0; i < steps; ++i) {
         candidate_vals[i] = pow(2, i);
-        
+    }
     /* fill candidate values with linear increase */
     for (int i = 0; i < n; ++i) 
-        candidate_vals[i + steps] = max_val * (i + 1) / (n * 1.0);
+    {
+        if (i == (n-1))
+        {
+            candidate_vals[i + steps] = max_val;
+        }
+        else
+        {
+            candidate_vals[i + steps] = max_val * (i + 1) / (n * 1.0);
+        }
+    }
         
     double buck_sig = 0;    //track signficance of a bucket
     double total_sig = 0;   //track total significance

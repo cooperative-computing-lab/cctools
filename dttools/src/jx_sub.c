@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 
 static struct jx * jx_sub_call( struct jx *func, struct jx *args, struct jx *ctx) {

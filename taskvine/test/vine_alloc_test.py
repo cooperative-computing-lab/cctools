@@ -7,8 +7,8 @@ import sys
 import taskvine as vine
 
 def check_task(category, category_mode, max, min, expected):
-    q.set_category_resource_max(category, max)
-    q.set_category_resource_min(category, min)
+    q.set_category_resources_max(category, max)
+    q.set_category_resources_min(category, min)
     q.set_category_mode(category, category_mode)
 
     t = vine.Task('/bin/echo hello')
@@ -105,6 +105,18 @@ with worker:
             max = {},
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
+
+    check_task('greedy_bucketing',
+            vine.VINE_ALLOCATION_MODE_GREEDY_BUCKETING,
+            max = {},
+            min = {},
+            expected = {'cores': 1, 'memory': 1000, 'disk': 1000, 'gpus': 0})
+
+    check_task('exhaustive_bucketing',
+            vine.VINE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING,
+            max = {},
+            min = {},
+            expected = {'cores': 1, 'memory': 1000, 'disk': 1000, 'gpus': 0})
 
     q.set_category_first_allocation_guess('auto_with_guess', {'cores': 1, 'memory': 2, 'disk': 3})
     check_task('auto_with_guess',

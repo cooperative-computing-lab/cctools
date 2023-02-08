@@ -984,7 +984,8 @@ class PythonTask(Task):
                 shutil.rmtree(self._tmpdir)
 
         except Exception as e:
-            sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
+            if sys:
+                sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
 
 
     def _serialize_python_function(self, func, args, kwargs):
@@ -1918,10 +1919,13 @@ class Manager(object):
         n = 0
         for i in range(size+1):
             while not self.empty() and n < size:
-
-                t = self.wait_for_tag(str(i), 1)
+                for key, value in tasks.items():
+                    if value == i:
+                        t_id = key
+                        break
+                t = self.wait_for_task_id(t_id, 1)
                 if t:
-                    results[tasks[vine_task_get_id(t)]] = list(vine_task_get_stdout(t))
+                    results[tasks[t.id]] = list(t.output)
                     n += 1
                     break
 
@@ -1980,10 +1984,14 @@ class Manager(object):
         for i in range(num_task):
 
             while not self.empty() and n < num_task:
-                t = self.wait_for_tag(str(i), 10)
+                for key, value in tasks.items():
+                    if value == i:
+                        t_id = key
+                        break
+                t = self.wait_for_task_id(t_id, 10)
 
                 if t:
-                    results[tasks[vine_task_get_id(t)]] = vine_task_get_stdout(t)
+                    results[tasks[t.id]] = t.output
                     n += 1
                     break
  
@@ -2006,7 +2014,8 @@ class Manager(object):
 
     def tree_reduce(self, fn, seq, chunk_size=2): 
         tasks = {}
-        
+        num_task = 0
+
         while len(seq) > 1:
             size = math.ceil(len(seq)/chunk_size)
             results = [None] * size
@@ -2022,16 +2031,20 @@ class Manager(object):
 
                 p_task.set_tag(str(i))
                 self.submit(p_task)
-                tasks[p_task.id] = i
+                tasks[p_task.id] = num_task
+                num_task += 1
 
             n = 0
             for i in range(size+1):
-
                 while not self.empty() and n < size:
-                    t = self.wait_for_tag(str(i), 10)
+                    for key, value in tasks.items():
+                        if value == num_task - size + i:
+                            t_id = key
+                            break
+                    t = self.wait_for_task_id(t_id, 10)
 
                     if t:
-                        results[tasks[vine_task_get_id(t)]] = vine_task_get_stdout(t)
+                        results[i] = t.output
                         n += 1
                         break
 
@@ -2069,9 +2082,13 @@ class Manager(object):
         n = 0
         for i in range(size+1):
             while not self.empty() and n < size:
-                t = self.wait_for_tag(str(i), 1)                
+                for key, value in tasks.items():
+                    if value == i:
+                        t_id = key
+                        break
+                t = self.wait_for_task_id(t_id, 1)                
                 if t:
-                    results[tasks[vine_task_get_id(t)]] = list(json.loads(vine_task_get_stdout(t))["Result"])
+                    results[tasks[t.id]] = list(json.loads(t.output)["Result"])
                     n += 1
                     break
 
@@ -2123,9 +2140,13 @@ class Manager(object):
         n = 0
         for i in range(num_task):
             while not self.empty() and n < num_task:
-                t = self.wait_for_tag(str(i), 10)
+                for key, value in tasks.items():
+                    if value == i:
+                        t_id = key
+                        break
+                t = self.wait_for_task_id(t_id, 1)
                 if t:
-                    results[tasks[vine_task_get_id(t)]] = json.loads(vine_task_get_stdout(t))["Result"]
+                    results[tasks[t.id]] = json.loads(t.output)["Result"]
                     n += 1
                     break
          
@@ -2148,6 +2169,7 @@ class Manager(object):
     # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
     def remote_tree_reduce(self, fn, seq, coprocess, name, chunk_size=2): 
         tasks = {}
+        num_task = 0
         
         while len(seq) > 1:
             size = math.ceil(len(seq)/chunk_size)
@@ -2162,16 +2184,21 @@ class Manager(object):
 
                 p_task.set_tag(str(i))
                 self.submit(p_task)
-                tasks[p_task.id] = i
+                tasks[p_task.id] = num_task
+                num_task += 1
 
             n = 0
             for i in range(size+1):
 
                 while not self.empty() and n < size:
-                    t = self.wait_for_tag(str(i), 10)
+                    for key, value in tasks.items():
+                        if value == num_task - size + i:
+                            t_id = key
+                            break
+                    t = self.wait_for_task_id(t_id, 10)
 
                     if t:
-                        results[tasks[vine_task_get_id(t)]] = json.loads(vine_task_get_stdout(t))["Result"]
+                        results[i] = json.loads(t.output)["Result"]
                         n += 1
                         break
 

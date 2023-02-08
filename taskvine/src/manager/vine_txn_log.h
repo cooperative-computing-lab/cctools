@@ -17,7 +17,7 @@ This module is private to the manager and should not be invoked by the end user.
 #include "vine_manager.h"
 
 void vine_txn_log_write_header( struct vine_manager *q );
-void vine_txn_log_write(struct vine_manager *q, const char *str);
+void vine_txn_log_write_manager(struct vine_manager *q, const char *str);
 void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t);
 void vine_txn_log_write_category(struct vine_manager *q, struct category *c);
 void vine_txn_log_write_worker(struct vine_manager *q, struct vine_worker_info *w, int leaving, vine_worker_disconnect_reason_t reason_leaving);

@@ -2,30 +2,25 @@
 
 # TaskVine User's Manual
 
-**TaskVine is our next-generation framework for constructing
-data intensive applications.  The software and documentation
-are currently under active development, and so may not be
-fully up to date.**
-
 ## Overview
 
 TaskVine is an framework for building large scale data
 intensive dynamic workflows that run on high performance computing (HPC)
-clusters, cloud service providers, and other distributed computing systems.
+clusters, GPU clusters, cloud service providers, and other distributed computing systems.
 
 A TaskVine application consists of a manager and a large number of
 worker processes.  The application generates a large number of small
 tasks, which are distributed to workers.
-As tasks access external input data and produce their own outputs,
-more and more data is pulled into local storage on cluster nodes.  This
-data is used to accelerate future tasks and avoid re-computing exisiting
-results.  The application gradually grows "like a vine" through
+As tasks access external data sources and produce their own outputs,
+more and more data is pulled into local storage on cluster nodes.
+This data is used to accelerate future tasks and avoid re-computing exisiting results.
+The application gradually grows "like a vine" through
 the cluster.
 
 TaskVine manager applications can be written in Python or C
 on Linux or OSX platforms.  Individual tasks can be simple
 Python functions, complex Unix applications, or serverless function
-invocations.  Several different programming models can be used,
+invocations. Several different programming models can be used,
 including submit-wait, task futures, and bulk-synchronous-parallel.
 
 TaskVine is easy to deploy on existing HPC and cloud facilities.
@@ -34,9 +29,10 @@ arranges for all necessary task dependencies to be moved to workers,
 making the system self-hosting.  Applications regularly consist of
 millions of tasks running on thousands of workers.
 
-TaskVine is our next-generation workflow system, build on our nearly
-twenty years of experience building scalable applications in high energy physics,
-bioinformatics, molecular dynamics, machine learning, and other fields.
+TaskVine is our third-generation workflow system, built on our
+twenty years of experience creating scalable applications in
+fields such as high energy physics, bioinformatics, molecular dynamics,
+and machine learning.
 
 ## Quick Start in Python
 
@@ -50,7 +46,6 @@ Then, open a terminal and install `ndcctools` like this:
 ```
 conda install -c conda-forge ndcctools
 ```
-
 
 Using a text editor, create a manager program called `manager.py` like this:
 
@@ -96,7 +91,8 @@ Read on to learn how to build more complex applications and run large numbers of
 
 A TaskVine application is a large parallel application consisting of a **manager** and multiple **workers**.
 The manager defines a large number of **tasks**, each of which is a discrete unit
-of work that can be executed in parallel.  Each task is submitted to a **queue**, which makes
+of work that can be executed in parallel.
+Each task is submitted to a **manager**, which makes
 it available for a worker to execute.  Each worker connects to the manager, receives tasks
 to execute, and returns results back to the manager. The manager receives results in the order that
 they complete, and may submit further tasks as needed. Commonly used files are cached
@@ -120,8 +116,6 @@ cloud, then you can run your workers inside of virtual machines.  We provide a n
 scripts to facilitate starting workers this way, or you can arrange things yourself to
 simply run the `vine_worker` executable.
 
-
-
 ## Writing a Manager Program
 
 A manager program can be written in Python, or C.
@@ -131,15 +125,15 @@ The full API documentation for each language is here:
 - [TaskVine Python API](../api/html/namespacetaskvinePython.html)
 - [TaskVine C API](../api/html/taskvine_8h.html)
 
-The basic outline of a TaskVine manager is:
+The basic outline of a manager program is:
 
-1. Create and configure the tasks' queue.
-2. Create tasks and add them to the queue.
+1. Create the manager object.
+2. Create tasks and attach input files.
 3. Wait for a task to complete.
-4. Process the result of one task.
+4. Process the outputs of that task.
 5. If more tasks are outstanding, return to step 3.
 
-### Creating a Queue
+### Creating a Manager Object
 
 To begin, you must import the TaskVine library, and then create a Manager object.
 You may specific a specific port number to listen on like this:
@@ -149,8 +143,8 @@ You may specific a specific port number to listen on like this:
     # Import the taskvine library
     import taskvine as vine
 
-    # Create a new queue listening on port 9123
-    q = vine.Manager(9123)
+    # Create a new manager listening on port 9123
+    m = vine.Manager(9123)
     ```
 
 === "C"
@@ -159,25 +153,25 @@ You may specific a specific port number to listen on like this:
     #include "taskvine.h"
 
     /* Create a new queue listening on port 9123 */
-    struct taskvine *q = vine_create(9123);
+    struct taskvine *m = vine_create(9123);
     ```
 
 Of course, that specific port might already be in use, and so you may
-specify zero to indicate any available port, and then use `q.port` to
+specify zero to indicate any available port, and then use `m.port` to
 discover which port was obtained:
 
 === "Python"
     ```python
-    # Create a new queue listening on any port
-    q = vine.Manager(0)
-    print("listening on port {}".format(q.port))
+    # Create a new manager listening on any port
+    m = vine.Manager(0)
+    print("listening on port {}".format(m.port))
     ```
 
 === "C"
     ```
-    /* Create a new queue listening on any port */
-    struct taskvine *q = vine_create(0);
-    printf("listening on port %d\n",vine_port(q));
+    /* Create a new manager listening on any port */
+    struct taskvine *m = vine_create(0);
+    printf("listening on port %d\n",vine_port(m));
 
     ```
 
@@ -237,9 +231,9 @@ Here is how to describe the files needed by this task:
     ```C
     # vine_task_add_file(t, "name at manager", "name when copied at execution site", ...)
 
-    vine_task_add_file(t, "/usr/bin/gzip", "gzip",       WORK_QUEUE_INPUT,  WORK_QUEUE_CACHE);
-    vine_task_add_file(t, "my-file",       "my-file",    WORK_QUEUE_INPUT,  WORK_QUEUE_NOCACHE);
-    vine_task_add_file(t, "my-file.gz",    "my-file.gz", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+    vine_task_add_file(t, "/usr/bin/gzip", "gzip",       VINE_INPUT,  VINE_CACHE);
+    vine_task_add_file(t, "my-file",       "my-file",    VINE_INPUT,  VINE_NOCACHE);
+    vine_task_add_file(t, "my-file.gz",    "my-file.gz", VINE_OUTPUT, VINE_NOCACHE);
     ```
 
 When the task actually executes, the worker will create a **sandbox** directory,
@@ -247,7 +241,7 @@ which serves as the working directory for the task.  Each of the input files
 and directories will be copied into the sandbox directory.
 The task outputs should be written into the current working directory.
 The path of the sandbox directory is exported to
-the execution environment of each worker through the `WORK_QUEUE_SANDBOX` shell
+the execution environment of each worker through the `VINE_SANDBOX` shell
 environment variable. This shell variable can be used in the execution
 environment of the worker to describe and access the locations of files in the
 sandbox directory.
@@ -288,12 +282,12 @@ to a task:
 
 === "Python"
     ```python
-    taskid = q.submit(t)
+    taskid = m.submit(t)
     ```
 
 === "C"
     ```C
-    int taskid = vine_submit(q,t);
+    int taskid = vine_submit(m,t);
     ```
 
 Once all tasks are submitted, use `wait` to wait until a task completes,
@@ -303,8 +297,8 @@ If no task completes within the timeout, it returns null.
 
 === "Python"
     ```python
-    while not q.empty():
-        t = q.wait(5)
+    while not m.empty():
+        t = m.wait(5)
         if t:
             print("Task {} has returned!".format(t.id))
 
@@ -318,7 +312,7 @@ If no task completes within the timeout, it returns null.
 === "C"
     ```C
     while(!vine_empty(q)) {
-        struct vine_task *t = vine_wait(q,5);
+        struct vine_task *t = vine_wait(m,5);
         if(t) {
             printf("Task %d has returned!\n", t->taskid);
             if(t->return_status == 0) {
@@ -383,8 +377,8 @@ You can examine the result of a PythonTask like this:
 
 === "Python"
     ```
-    while not q.empty():
-        t = q.wait(5)
+    while not m.empty():
+        t = m.wait(5)
         if t:
             x = t.output
             if isinstance(x,Exception):
@@ -421,8 +415,8 @@ conda run -p my-env conda-pack
 
 ## Running Managers and Workers
 
-This section makes use of a simple but complete exmample of a Work
-Queue manager application to demonstrate various features.
+This section makes use of a simple but complete exmample of a
+TaskVine application to demonstrate various features.
 
 Donload the example file for the language of your choice:
 
@@ -460,8 +454,8 @@ $ gcc taskvine_example.c -o taskvine_example -I${HOME}/cctools/include/cctools -
 
 The example application simply compresses a bunch of files in parallel. The
 files to be compressed must be listed on the command line. Each will be
-transmitted to a remote worker, compressed, and then sent back to the Work
-Queue manager. To compress files `a`, `b`, and `c` with this example
+transmitted to a remote worker, compressed, and then sent back to the
+manager. To compress files `a`, `b`, and `c` with this example
 application, run it as:
 
 
@@ -550,12 +544,12 @@ For example, to have a taskvine manager advertise its project name as
 
 === "Python"
     ```python
-    q = vine.Manager(name = "myproject")
+    m = vine.Manager(name = "myproject")
     ```
 
 === "C"
     ```C
-    vine_set_name(q, "myproject");
+    vine_set_name(m, "myproject");
     ```
 
 To start a worker for this manager, specify the project name (`myproject`) to
@@ -586,7 +580,7 @@ Your job 153099 ("worker.sh") has been submitted
 ...
 ```
 
-### taskvine Status Display
+### TaskVine Online Status Display
 
 An additional benefit of using a project name is that you can
 now use the [taskvine_status](../man_pages/taskvine_status) command
@@ -604,10 +598,10 @@ yang-analysis-355     login.crc.nd.edu          9100    8932    4873    10007   
 ```
 
 The same information is available in a more graphical form online
-at the [taskvine Status Display](http://ccl.cse.nd.edu/software/taskvine/status),
+at the [TaskVine Online Status](http://ccl.cse.nd.edu/software/taskvine/status),
 which looks like this:
 
-<img src=examples/work-queue-status-example.png>
+<img src=examples/vine-status-example.png>
 
 ### Managing Workers with the taskvine Factory
 
@@ -660,8 +654,8 @@ workers.memory = 4000
 workers.disk = 5000
 workers.max_workers = 20
 with workers:
-    while not q.empty():
-        t = q.wait(5)
+    while not m.empty():
+        t = m.wait(5)
         ...
 ```
 
@@ -879,22 +873,22 @@ these limits. You can enable monitoring and enforcement as follows:
     ```python
     # Measure the resources used by tasks, and terminate tasks that go above their
     # resources:
-    q.enable_monitoring()
+    m.enable_monitoring()
 
     # Measure the resources used by tasks, but do not terminate tasks that go above
     # declared resources:
-    q.enable_monitoring(watchdog=False)
+    m.enable_monitoring(watchdog=False)
     ```
 
 === "C"
     ```C
     # Measure the resources used by tasks, and terminate tasks that go above their
     # resources:
-    vine_enable_monitoring(q,0,0)
+    vine_enable_monitoring(m,0,0)
 
     # Measure the resources used by tasks, but do not terminate tasks that go above
     # declared resources:
-    vine_enable_monitoring(q,0,1)
+    vine_enable_monitoring(m,0,1)
     ```
 
 When monitoring is enabled, you can explore the resources measured when a task
@@ -902,7 +896,7 @@ returns:
 
 === "Python"
     ```python
-    t = q.wait(5)
+    t = m.wait(5)
     if t:
         print("Task used {} cores, {} MB memory, {} MB disk",
             t.resources_measured.cores,
@@ -918,7 +912,7 @@ returns:
 
 === "C"
     ```C
-    vine_task *t = vine_wait(q,5);
+    vine_task *t = vine_wait(m,5);
     if(t) {
         printf("Task used %f cores, %f MB memory, %f MB disk",
             t->resources_measured->cores,
@@ -944,7 +938,7 @@ report format is JSON, as its filename has the form
     t = vine.Task(...)
     t.set_monitor_output("my-resources-output")
     ...
-    taskid = q.submit(t)
+    taskid = m.submit(t)
     ```
 
 === "C"
@@ -952,7 +946,7 @@ report format is JSON, as its filename has the form
     struct vine_task *t = vine_task_create(...);
     vine_set_monitor_output("my-resources-output");
     ...
-    int taskid = vine_submti(q, t);
+    int taskid = vine_submti(m, t);
     ```
 
 taskvine also measures other resources, such as peak `bandwidth`,
@@ -972,9 +966,9 @@ We can create some categories with their resource description as follows:
 === "Python"
     ```python
     # memory and disk values in MB.
-    q.set_category_resources_max('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
-    q.set_category_resources_max('my-category-b', {'cores': 1})
-    q.set_category_resources_max('my-category-c', {})
+    m.set_category_resources_max('my-category-a', {'cores': 2, 'memory': 1024, 'disk': 2048, 'gpus': 0})
+    m.set_category_resources_max('my-category-b', {'cores': 1})
+    m.set_category_resources_max('my-category-c', {})
     ```
 
 === "C"
@@ -1044,24 +1038,24 @@ Automatic resource management is enabled per category as follows:
 
 === "Python"
     ```python
-    q.enable_monitoring()
-    q.set_category_resources_max('my-category-a', {})
-    q.set_category_mode('my-category-a', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    m.enable_monitoring()
+    m.set_category_resources_max('my-category-a', {})
+    m.set_category_mode('my-category-a', m.VINE_ALLOCATION_MODE_MAX_THROUGHPUT)
 
-    q.set_category_resources_max('my-category-b', {'cores': 2})
-    q.set_category_mode('my-category-b', q.WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
+    m.set_category_resources_max('my-category-b', {'cores': 2})
+    m.set_category_mode('my-category-b', m.VINE_ALLOCATION_MODE_MAX_THROUGHPUT)
     ```
 
 === "C"
     ```C
-    vine_enable_monitoring(q,0,0);
-    vine_set_category_resources_max(q, "my-category-a", NULL);
-    vine_set_category_mode(q, "my-category-a", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
+    vine_enable_monitoring(m,0,0);
+    vine_set_category_resources_max(m, "my-category-a", NULL);
+    vine_set_category_mode(m, "my-category-a", VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
 
     struct rmsummary *r = rmsummary_create(-1);
     r->cores = 2;
-    vine_set_category_resources_max(q, "my-category-b", r);
-    vine_set_category_mode(q, "my-category-b", WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
+    vine_set_category_resources_max(m, "my-category-b", r);
+    vine_set_category_mode(m, "my-category-b", VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
     rmsummary_delete(r);
     ```
 
@@ -1074,14 +1068,14 @@ automatic resource computation will never go below the values set:
 
 === "Python"
     ```python
-    q.set_category_resources_min('my-category-a', {'memory': 512})
+    m.set_category_resources_min('my-category-a', {'memory': 512})
     ```
 
 === "C"
     ```C
     struct rmsummary *r = rmsummary_create(-1);
     r->memory = 512;
-    $q->set_category_resources_min("my-category-a", r);
+    vine_set_category_resources_min(m,"my-category-a", r);
     rmsummary_delete(r);
     ```
 
@@ -1154,11 +1148,11 @@ creating the queue:
     ```python
     # Import the taskvine library
     import taskvine as vine
-    q = vine.Manager(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
+    m = vine.Manager(port=9123, ssl=('MY_KEY.pem', 'MY_CERT.pem'))
 
     # Alternatively, you can set ssl=True and let the python API generate
     # temporary ssl credentials for the queue:
-    q = vine.Manager(port=9123, ssl=True)
+    m = vine.Manager(port=9123, ssl=True)
     ```
 
 === "C"
@@ -1167,7 +1161,7 @@ creating the queue:
     #include "taskvine.h"
 
     /* Create a new queue listening on port 9123 */
-    struct taskvine *q = vine_ssl_create(9123, 'MY_KEY.pem', 'MY_CERT.pem');
+    struct taskvine *m = vine_ssl_create(9123, 'MY_KEY.pem', 'MY_CERT.pem');
     ```
 
 
@@ -1199,12 +1193,12 @@ Then, modify your manager program to use the password:
 
 === "Python"
     ```python
-    q.set_password_file("mypwfile")
+    m.set_password_file("mypwfile")
     ```
 
 === "C"
     ```C
-    vine_set_password_file(q,"mypwfile");
+    vine_set_password_file(m,"mypwfile");
     ```
 
 
@@ -1238,7 +1232,7 @@ limit on the number of retries:
     ```
 
 When a task cannot be completed in the set number of tries,
-then the task result is set to  `WORK_QUEUE_RESULT_MAX_RETRIES`.
+then the task result is set to  `VINE_RESULT_MAX_RETRIES`.
 
 ### Pipelined Submission
 
@@ -1250,7 +1244,7 @@ warranted:
 
 === "Python"
     ```python
-    if q.hungry():
+    if m.hungry():
         # submit more tasks...
     ```
 
@@ -1272,12 +1266,12 @@ tasks that require it:
 
 === "Python"
     ```python
-    t.add_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=WORK_QUEUE_INPUT, cache=True)
+    t.add_url("http://somewhere.com/data.tar.gz", "data.tar.gz", type=VINE_INPUT, cache=True)
     ```
 
 === "C"
     ```c
-    vine_task_add_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
+    vine_task_add_url(t,"http://somewhere.com/data.tar.gz", "data.tar.gz", VINE_INPUT, VINE_CACHE)
     ```
 
 (Note that `add_url` does not currently support output data.)
@@ -1293,12 +1287,12 @@ a URL and then unpack into the directory `data`:
 
 === "Python"
     ```python
-    t.add_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , type=WORK_QUEUE_INPUT, cache=True)
+    t.add_file_command("curl http://somewhere.com/data.tar.gz | tar cvzf -", "data" , type=VINE_INPUT, cache=True)
     ```
 
 === "C"
     ```c
-    vine_task_add_file_command(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE)
+    vine_task_add_file_command(t,"curl http://somewhere.com/data.txt | tar cvzf -", "data", VINE_INPUT, VINE_CACHE)
     ```
 
 (Note that `add_file_command` does not currently support output data.)
@@ -1306,19 +1300,19 @@ a URL and then unpack into the directory `data`:
 ### Watching Output Files
 
 If you would like to see the output of a task as it is produced, add
-`WORK_QUEUE_WATCH` to the flags argument of `add_file`. This will
+`VINE_WATCH` to the flags argument of `add_file`. This will
 cause the worker to periodically send output appended to that file back to the
 manager. This is useful for a program that produces a log or progress bar as
 part of its output.
 
 === "Python"
     ```python
-    t.add_output_file("my-file", flags = vine.WORK_QUEUE_WATCH)
+    t.add_output_file("my-file", flags = vine.VINE_WATCH)
     ```
 
 === "C"
     ```C
-    vine_task_add_file(t, "my-file", "my-file", WORK_QUEUE_OUTPUT, WORK_QUEUE_WATCH);
+    vine_task_add_file(t, "my-file", "my-file", VINE_OUTPUT, VINE_WATCH);
     ```
 
 ### Optional Output Files
@@ -1326,20 +1320,20 @@ part of its output.
 It is sometimes useful to return an output file only in the case of a failed task.
 For example, if your task generates a very large debugging output file `debug.out`,
 then you might not want to keep the file if the task succeeded.  In this case,
-you can add the `WORK_QUEUE_FAILURE_ONLY` flag to indicate that a file should
+you can add the `VINE_FAILURE_ONLY` flag to indicate that a file should
 only be returned in the event of failure:
 
 === "Python"
     ```python
-    t.add_output_file("debug.out", flags = vine.WORK_QUEUE_FAILURE_ONLY)
+    t.add_output_file("debug.out", flags = vine.VINE_FAILURE_ONLY)
     ```
 
 === "C"
     ```C
-    vine_task_add_file(t, "debug.out", "debug.out", WORK_QUEUE_OUTPUT, WORK_QUEUE_FAILURE_ONLY);
+    vine_task_add_file(t, "debug.out", "debug.out", VINE_OUTPUT, VINE_FAILURE_ONLY);
     ```
 
-In a similar way, the `WORK_QUEUE_SUCCESS_ONLY` flag indicates that an output file
+In a similar way, the `VINE_SUCCESS_ONLY` flag indicates that an output file
 should only be returned if the task actually succeeded.
 
 ### Disconnect slow workers
@@ -1354,13 +1348,13 @@ worker is disconnected and blacklisted.
 === "Python"
     ```python
     # Disconnect workers that are executing tasks twice as slow as compared to the average.
-    q.enable_disconnect_slow_workers(2)
+    m.enable_disconnect_slow_workers(2)
     ```
 
 === "C"
     ```C
     // Disconnect workers that are executing tasks twice as slow as compared to the average.
-    vine_enable_disconnect_slow_workers(q, 2);
+    vine_enable_disconnect_slow_workers(m, 2);
     ```
 
 Tasks terminated this way are automatically retried in some other worker.
@@ -1385,7 +1379,7 @@ corresponding to the resolved file name. For example:
 
 === "C"
     ```C
-    vine_task_add_file(t,"my-executable.$OS.$ARCH","./my-exe",WORK_QUEUE_INPUT,WORK_QUEUE_CACHE);
+    vine_task_add_file(t,"my-executable.$OS.$ARCH","./my-exe",VINE_INPUT,VINE_CACHE);
     ```
 
 This will transfer `my-executable.Linux.x86_64` to workers running on a Linux
@@ -1394,7 +1388,7 @@ with an i686 architecture.
 
 Note this feature is specifically designed for specifying and distingushing
 input file names for different platforms and architectures. Also, this is
-different from the $WORK_QUEUE_SANDBOX shell environment variable that exports
+different from the $VINE_SANDBOX shell environment variable that exports
 the location of the working directory of the worker to its execution
 environment.
 
@@ -1413,13 +1407,13 @@ either their `taskid` or `tag`. For example:
     t = vine.Task(...)
     t.set_tag("my-tag")
 
-    taskid = q.submit(t)
+    taskid = m.submit(t)
 
     # cancel task by id. Return the canceled task.
-    t = q.cancel_by_taskid(taskid)
+    t = m.cancel_by_taskid(taskid)
 
     # or cancel task by tag. Return the canceled task.
-    t = q.cancel_by_tasktag("my-tag")
+    t = m.cancel_by_tasktag("my-tag")
     ```
 
 === "C"
@@ -1428,13 +1422,13 @@ either their `taskid` or `tag`. For example:
     struct vine_task *t = vine_task_create("...");
     vine_set_task(t, "my-tag");
 
-    int taskid = vine_submit(q, t);
+    int taskid = vine_submit(m, t);
 
     // cancel task by id. Return the canceled task.
-    t = vine_cancel_by_taskid(q, taskid);
+    t = vine_cancel_by_taskid(m, taskid);
 
     # or cancel task by tag. Return the canceled task.
-    t = vine_cancel_by_tasktag(q, "my-tag");
+    t = vine_cancel_by_tasktag(m, "my-tag");
     ```
 
 
@@ -1443,7 +1437,7 @@ either their `taskid` or `tag`. For example:
     want to cancel all the tasks with the same tag, you can use loop until
     `cancel_by_task` does not return a task, as in:
 ```
-    while q->cancel_by_taskid("my-tag"):
+    while m.cancel_by_taskid("my-tag"):
         pass
 ```
 
@@ -1456,18 +1450,18 @@ feature. For example:
 
 === "Python"
     ```python
-    t = q.wait(5)
+    t = m.wait(5)
 
     # if t fails given a worker misconfiguration:
-    q.blacklist(t.hostname)
+    m.blacklist(t.hostname)
     ```
 
 === "C"
     ```C
-    struct vine_task *t = vine_wait(q, t);
+    struct vine_task *t = vine_wait(m, t);
 
     //if t fails given a worker misconfiguration:
-    vine_blacklist_add(q, t->{hostname});
+    vine_blacklist_add(m, t->{hostname});
     ```
 
 ### Performance Statistics
@@ -1478,14 +1472,14 @@ to make a progress bar or other user-visible information:
 
 === "Python"
     ```python
-    stats = q.stats
+    stats = m.stats
     print(stats.workers_busy)
     ```
 
 === "C"
     ```C
     struct vine_stats stats;
-    vine_get_stats(q, &stats);
+    vine_get_stats(m, &stats);
     printf("%d\n", stats->workers_connected);
     ```
 
@@ -1506,7 +1500,7 @@ the error will appear in the results.
 def fn(a):
     return a*a
 
-q.map(fn, arry, chunk_size)
+m.map(fn, arry, chunk_size)
 ```
 
 #### Pair
@@ -1523,7 +1517,7 @@ more expensive functions work better with smaller ones. Errors will be placed in
 def fn(pair):
     return pair[0] * pair[1]
 
-q.pair(fn, seq1, seq2, chunk_size)
+m.pair(fn, seq1, seq2, chunk_size)
 ```
 
 #### Tree Reduce
@@ -1541,7 +1535,7 @@ Also, the minimum chunk size is 2, as going 1 element at time would not reduce t
 def fn(seq):
     return max(seq)
 
-q.treeReduce(fn, arry, chunk_size)
+m.treeReduce(fn, arry, chunk_size)
 ```
 
 Below is an example of all three abstractions, and their expected output:
@@ -1575,7 +1569,7 @@ find failures, bugs, and other errors. To activate debug output:
 
 === "Python"
     ```python
-    q = vine.Manager(debug_log = "my.debug.log")
+    m = vine.Manager(debug_log = "my.debug.log")
     ```
 
 === "C"
@@ -1599,18 +1593,18 @@ $ vine_worker -d all -o worker.debug -M myproject
 
 ### Statistics Log
 
-The statistics logs contains a time series of the statistics collected by Work
-Queue, such as number of tasks waiting and completed, number of workers busy,
+The statistics logs contains a time series of the statistics collected by the manager,
+such as number of tasks waiting and completed, number of workers busy,
 total number of cores available, etc. The log is activated as follows:
 
 === "Python"
     ```python
-    q = vine.Manager(stats_log = "my.statslog")
+    m = vine.Manager(stats_log = "my.statslog")
     ```
 
 === "C"
     ```C
-    vine_enable_perf_log(q, "my.stats.log");
+    vine_enable_perf_log(m, "my.stats.log");
     ```
 
 The time series are presented in columns, with the leftmost column as a
@@ -1646,12 +1640,12 @@ tasks. It is activated as follows:
 
 === "Python"
     ```python
-    q = vine.Manager(transactions_log = "my.tr.log")
+    m = vine.Manager(transactions_log = "my.tr.log")
     ```
 
 === "C"
     ```C
-    vine_enable_transactions_log(q, "my.tr.log");
+    vine_enable_transactions_log(m, "my.tr.log");
     ```
 
 The first few lines of the log document the possible log records:
@@ -1793,16 +1787,16 @@ change.
 | hungry-minimum          | Smallest number of waiting tasks in the queue before declaring it hungry | 10 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
-| wait-retrieve-many      | Rather than immediately returning when a task is done, `q.wait(timeout)` retrieves and dispatches as many tasks<br> as `timeout` allows. Warning: This may exceed the capacity of the manager to receive results. | 0 |
+| wait-retrieve-many      | Rather than immediately returning when a task is done, `m.wait(timeout)` retrieves and dispatches as many tasks<br> as `timeout` allows. Warning: This may exceed the capacity of the manager to receive results. | 0 |
 
 === "Python"
     ```python
-    q.tune("hungry-minumum", 20)
+    m.tune("hungry-minumum", 20)
     ```
 
 === "C"
     ```
-    vine_tune(q, "hungry-minumum", 20)
+    vine_tune(m, "hungry-minumum", 20)
     ```
 
 

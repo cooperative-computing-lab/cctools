@@ -36,6 +36,9 @@ prepare()
 	mkdir -p testdir
 	cp input.file executable.file testdir
 
+	# Make a small tarball for testing url downloads.
+	tar czf dummy.tar.gz TR*.sh
+
 	subj="/C=US/ST=Indiana/L=South Bend/O=University of Notre Dame/OU=CCL-CSE/CN=ccl.cse.nd.edu"
 
 	openssl req -x509 -newkey rsa:4096 -keyout ${KEY_FILE} -out ${CERT_FILE} -sha256 -days 1 -nodes -subj "${subj}"
@@ -78,6 +81,7 @@ clean()
 	rm -rf output.file
 	rm -rf executable.file
 	rm -rf testdir
+	rm -rf dummy.tar.gz
 
 	exit 0
 }
