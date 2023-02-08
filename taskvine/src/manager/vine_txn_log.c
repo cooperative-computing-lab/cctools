@@ -28,7 +28,7 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id host:port CONNECTION\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id RESOURCES {resources}\n");
-	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id CACHE-UPDATE filename sizeinmb walltime\n");
+	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id CACHE_UPDATE filename sizeinmb walltime\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id TRANSFER (INPUT|OUTPUT) taskid filename sizeinmb walltime\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MAX {resources_max_per_task}\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}\n");
@@ -253,7 +253,7 @@ void vine_txn_log_write_cache_update(struct vine_manager *q, struct vine_worker_
 	struct buffer B;
 
 	buffer_init(&B);
-	buffer_printf(&B, "WORKER %s CACHE-UPDATE", w->workerid);
+	buffer_printf(&B, "WORKER %s CACHE_UPDATE", w->workerid);
 	buffer_printf(&B, " %s", name);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
