@@ -33,7 +33,7 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}\n");
-	fprintf(q->txn_logfile, "# time manager_pid TASK task_id RUNNING worker_address (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING_RETRIEVAL worker_address\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TRANSFER (INPUT|OUTPUT) task_id cache_flag sizeinmb walltime filename\n");
@@ -99,7 +99,7 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 		const char *worker_str = "worker-info-not-available";
 
 		if(w) {
-			worker_str = w->addrport;
+			worker_str = w->workerid;
 			buffer_printf(&B, " %s ", worker_str);
 
 			if(state == VINE_TASK_RUNNING) {
