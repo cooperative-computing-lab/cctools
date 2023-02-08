@@ -3446,7 +3446,7 @@ void vine_delete(struct vine_manager *q)
 	}
 
 	if(q->txn_logfile) {
-		vine_txn_log_write(q, "MANAGER END");
+		vine_txn_log_write_manager(q, "END");
 
 		if(fclose(q->txn_logfile) != 0) {
 			debug(D_VINE, "unable to write transactions log: %s\n", strerror(errno));
@@ -4758,14 +4758,14 @@ int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 	if(q->txn_logfile) {
 		debug(D_VINE, "transactions log enabled and is being written to %s\n", filename);
 		vine_txn_log_write_header(q);
-		vine_txn_log_write(q, "MANAGER START");
+		vine_txn_log_write_manager(q, "START");
 		return 1;
 	} else {
 		debug(D_NOTICE | D_VINE, "couldn't open transactions logfile %s: %s\n", filename, strerror(errno));
 		return 0;
 	}
 }
-	
+
 void vine_accumulate_task(struct vine_manager *q, struct vine_task *t) {
 	const char *name   = t->category ? t->category : "default";
 	struct category *c = vine_category_lookup_or_create(q, name);
