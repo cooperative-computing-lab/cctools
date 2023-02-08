@@ -28,6 +28,7 @@ struct vine_worker_info * vine_worker_create( struct link * lnk )
 	w->workerid = 0;
 
 	w->resources = vine_resources_create();
+	w->coprocess_resources = vine_resources_create();
 	w->features  = hash_table_create(0,0);
 	w->stats     = calloc(1, sizeof(struct vine_stats));
 
@@ -57,7 +58,8 @@ void vine_worker_delete( struct vine_worker_info *w )
 	free(w->hashkey);
 
 	vine_resources_delete(w->resources);
-	hash_table_clear(w->features,(void*)free);
+	vine_resources_delete(w->coprocess_resources);
+	hash_table_clear(w->features, 0);
 	hash_table_delete(w->features);
 	free(w->stats);
 
@@ -72,15 +74,15 @@ void vine_worker_delete( struct vine_worker_info *w )
 static void current_tasks_to_jx( struct jx *j, struct vine_worker_info *w )
 {
 	struct vine_task *t;
-	uint64_t taskid;
+	uint64_t task_id;
 	int n = 0;
 
-	itable_firstkey(w->current_tasks);
-	while(itable_nextkey(w->current_tasks, &taskid, (void**)&t)) {
+	ITABLE_ITERATE(w->current_tasks,task_id,t) {
+
 		char task_string[VINE_LINE_MAX];
 
 		sprintf(task_string, "current_task_%03d_id", n);
-		jx_insert_integer(j,task_string,t->taskid);
+		jx_insert_integer(j,task_string,t->task_id);
 
 		sprintf(task_string, "current_task_%03d_command", n);
 		jx_insert_string(j,task_string,t->command_line);

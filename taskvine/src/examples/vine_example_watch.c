@@ -41,16 +41,16 @@ int main(int argc, char *argv[])
 	}
 	printf("Listening on port %d...\n", vine_port(m));
 
-	vine_specify_debug_log(m,"manager.log");
+	vine_enable_debug_log(m,"manager.log");
 
 	int i;
 	for(i=0;i<10;i++) {
 		char output[256];
 		sprintf(output,"output.%d",i);
 		t = vine_task_create("./vine_example_watch_trickle.sh > output");
-		vine_task_specify_input_file(t, "vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", VINE_CACHE );
-		vine_task_specify_output_file(t, output, "output", VINE_WATCH );
-		vine_task_specify_cores(t,1);
+		vine_task_add_input_file(t, "vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", VINE_CACHE );
+		vine_task_add_output_file(t, output, "output", VINE_WATCH );
+		vine_task_set_cores(t,1);
 		vine_submit(m, t);
 	}
 
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 		t = vine_wait(m, 5);
 		if(t) {
 			vine_result_t r = vine_task_get_result(t);
-                        int id = vine_task_get_taskid(t);
+                        int id = vine_task_get_id(t);
 
 			if(r==VINE_RESULT_SUCCESS) {
 				printf("Task %d complete: %s\n",id,vine_task_get_command(t));

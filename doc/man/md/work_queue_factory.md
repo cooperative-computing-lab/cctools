@@ -75,7 +75,8 @@ General options:
 - **-F**,**--foremen-name=_&lt;project&gt;_**<br /> Foremen to serve, can be a regular expression.
 - **--catalog=_&lt;host:port&gt;_**<br /> Catalog server to query for managers.
 - **-P**,**--password=_&lt;pwdfile&gt;_**<br /> Password file for workers to authenticate.
-- **-S**,**--scratch-dir=_&lt;dir&gt;_**<br /> Use this scratch dir for factory. Default is /tmp/wq-factory-$UID.
+- **-S**,**--scratch-dir=_&lt;dir&gt;_**<br /> Use this scratch dir for factory. Default is /tmp/wq-factory-$UID. 
+Also configurable through environment variables **CCTOOLS_TEMP** or **TMPDIR**
 - **--run-factory-as-manager**<br /> Force factory to run itself as a manager.
 - **--parent-death**<br /> Exit if parent process dies.
 - **-d**,**--debug=_&lt;subsystem&gt;_**<br /> Enable debugging for this subsystem.
@@ -160,7 +161,7 @@ If you want to start workers that match any project that begins
 with barney, use a regular expression:
 
 ```
-work_queue_factory -T condor -M barney.\* -t 300
+work_queue_factory -T condor -M "barney.*" -t 300
 ```
 
 If running on condor, you may manually specify condor requirements:
@@ -211,7 +212,7 @@ The capacity measurement currently assumes single-core tasks running on single-c
 workers, and behaves unexpectedly with multi-core tasks or multi-core workers.
 
 ## COPYRIGHT
-The Cooperative Computing Tools are Copyright (C) 2005-2022 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
+The Cooperative Computing Tools are Copyright (C) 2022 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.
 
 ## SEE ALSO
 

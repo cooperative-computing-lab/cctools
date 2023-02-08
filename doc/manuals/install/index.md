@@ -101,7 +101,7 @@ the software repository and build it:
 ```sh
 git clone git://github.com/cooperative-computing-lab/cctools.git cctools-src
 cd cctools-src
-./configure --with-base-dir $CONDA_PREFIX --prefix $HOME/cctools
+./configure --with-base-dir $CONDA_PREFIX --prefix $CONDA_PREFIX
 make
 make install
 ```
@@ -325,4 +325,4 @@ in the App Store or on the installation disk.
 
 ## License
 
-The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005- The University of Notre Dame.    All rights reserved.   This software is distributed under the GNU General Public License.  
+The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2022 The University of Notre Dame.    All rights reserved.   This software is distributed under the GNU General Public License.  

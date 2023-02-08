@@ -4,12 +4,12 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-
 #include "vine_process.h"
 #include "vine_manager.h"
 #include "vine_gpus.h"
 #include "vine_protocol.h"
 #include "vine_coprocess.h"
+#include "vine_sandbox.h"
 
 #include "vine_file.h"
 
@@ -26,6 +26,8 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "domain_name.h"
 #include "full_io.h"
+#include "hash_table.h"
+#include "list.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -49,15 +51,18 @@ Create temporary directories inside as well.
 
 extern char * workspace;
 
+extern struct list *duty_list;
+extern struct hash_table *duty_ids;
+
 static int create_sandbox_dir( struct vine_process *p )
 {
 	p->cache_dir = string_format("%s/cache",workspace);
-  	p->sandbox = string_format("%s/t.%d", workspace,p->task->taskid);
+  	p->sandbox = string_format("%s/t.%d", workspace,p->task->task_id);
 
 	if(!create_dir(p->sandbox, 0777)) return 0;
 
 	char tmpdir_template[1024];
-	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
+	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->task_id);
 	if(mkdtemp(tmpdir_template) == NULL) {
 		return 0;
 	}
@@ -80,6 +85,7 @@ struct vine_process *vine_process_create(struct vine_task *vine_task )
 	struct vine_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 	p->task = vine_task;
+	p->coprocess = NULL;
 	if(!create_sandbox_dir(p)) {
 		vine_process_delete(p);
 		return 0;
@@ -130,8 +136,8 @@ static void export_environment( struct vine_process *p )
 {
 	struct list *env_list = p->task->env_list;
 	char *name;
-	list_first_item(env_list);
-	while((name=list_next_item(env_list))) {
+
+	LIST_ITERATE(env_list,name) {
 		char *value = strchr(name,'=');
 		if(value) {
 			*value = 0;
@@ -153,30 +159,30 @@ static void export_environment( struct vine_process *p )
 	}
 }
 
-static void specify_integer_env_var( struct vine_process *p, const char *name, int64_t value) {
+static void set_integer_env_var( struct vine_process *p, const char *name, int64_t value) {
 	char *value_str = string_format("%" PRId64, value);
-	vine_task_specify_env(p->task, name, value_str);
+	vine_task_set_env_var(p->task, name, value_str);
 	free(value_str);
 }
 
-static void specify_resources_vars(struct vine_process *p) {
+static void set_resources_vars(struct vine_process *p) {
 	if(p->task->resources_requested->cores > 0) {
-		specify_integer_env_var(p, "CORES", p->task->resources_requested->cores);
-		specify_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
+		set_integer_env_var(p, "CORES", p->task->resources_requested->cores);
+		set_integer_env_var(p, "OMP_NUM_THREADS", p->task->resources_requested->cores);
 	}
 
 	if(p->task->resources_requested->memory > 0) {
-		specify_integer_env_var(p, "MEMORY", p->task->resources_requested->memory);
+		set_integer_env_var(p, "MEMORY", p->task->resources_requested->memory);
 	}
 
 	if(p->task->resources_requested->disk > 0) {
-		specify_integer_env_var(p, "DISK", p->task->resources_requested->disk);
+		set_integer_env_var(p, "DISK", p->task->resources_requested->disk);
 	}
 
 	if(p->task->resources_requested->gpus > 0) {
-		specify_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
-		char *str = vine_gpus_to_string(p->task->taskid);
-		vine_task_specify_env(p->task,"CUDA_VISIBLE_DEVICES",str);
+		set_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
+		char *str = vine_gpus_to_string(p->task->task_id);
+		vine_task_set_env_var(p->task,"CUDA_VISIBLE_DEVICES",str);
 		free(str);
 	}
 }
@@ -203,10 +209,56 @@ static char * load_input_file(struct vine_task *t) {
 	return buf;
 }
 
+/*
+Given a unix status returned by wait(), set the process exit code appropriately.
+*/
+
+void vine_process_set_exit_status( struct vine_process *p, int status )
+{
+	if (!WIFEXITED(status)){
+		p->exit_code = WTERMSIG(status);
+		debug(D_VINE, "task %d (pid %d) exited abnormally with signal %d",p->task->task_id,p->pid,p->exit_code);
+	} else {
+		p->exit_code = WEXITSTATUS(status);
+		debug(D_VINE, "task %d (pid %d) exited normally with exit code %d",p->task->task_id,p->pid,p->exit_code );
+	}
+}
+
+/*
+Execute a task synchronously and return true on success.
+*/
+
+int vine_process_execute_and_wait( struct vine_task *task, struct vine_cache *cache, struct link *manager )
+{
+	struct vine_process *p = vine_process_create(task);
+
+	vine_sandbox_stagein(p,cache,manager);
+	
+	pid_t pid = vine_process_execute(p);
+	if(pid>0) {
+		int result, status;
+		do {
+			result = waitpid(pid,&status,0);
+		} while(result!=pid);
+
+		vine_process_set_exit_status(p,status);
+	} else {
+		p->exit_code = 1;
+	}
+	
+	vine_sandbox_stageout(p,cache,manager);
+
+	/* Remove the task from the process so it is not deleted */
+	p->task = 0;
+
+	vine_process_delete(p);
+	
+	return 1;
+}
+
 pid_t vine_process_execute(struct vine_process *p )
 {
 	// make warning
-
 	fflush(NULL);		/* why is this necessary? */
 
 	p->output_file_name = strdup(task_output_template);
@@ -218,7 +270,13 @@ pid_t vine_process_execute(struct vine_process *p )
 
 	p->execution_start = timestamp_get();
 
-	p->pid = fork();
+	if (!vine_process_get_duty_name(p)) {
+		p->pid = fork();
+	} else {
+		p->coprocess = vine_coprocess_initialize_coprocess(p->task->command_line);
+		vine_coprocess_specify_resources(p->coprocess, 0, 0, 0, 0);
+		p->pid = vine_coprocess_start(p->coprocess, p->sandbox);
+	}
 
 	if(p->pid > 0) {
 		// Make child process the leader of its own process group. This allows
@@ -249,7 +307,7 @@ pid_t vine_process_execute(struct vine_process *p )
 		if(result == -1)
 			fatal("could not dup /dev/null to stdin: %s", strerror(errno));
 
-		if (p->coprocess_name == NULL) {
+		if (p->coprocess == NULL) {
 			result = dup2(p->output_fd, STDOUT_FILENO);
 			if(result == -1)
 				fatal("could not dup pipe to stdout: %s", strerror(errno));
@@ -263,7 +321,7 @@ pid_t vine_process_execute(struct vine_process *p )
 			char *input = load_input_file(p->task);
 
 			// call invoke_coprocess_function
-		 	char *output = vine_coprocess_run(p->task->command_line, input, p->coprocess_port);
+		 	char *output = vine_coprocess_run(p->task->command_line, input, p->coprocess);
 
 			// write data to output file
 			full_write(p->output_fd, output, strlen(output));
@@ -275,8 +333,8 @@ pid_t vine_process_execute(struct vine_process *p )
 
 		clear_environment();
 
-		/* overwrite CORES, MEMORY, or DISK variables, if the task used specify_* */
-		specify_resources_vars(p);
+		/* overwrite CORES, MEMORY, or DISK variables, if the task used set_* */
+		set_resources_vars(p);
 
 		export_environment(p);
 
@@ -296,7 +354,7 @@ void vine_process_kill(struct vine_process *p)
 	if(elapsed_time_execution_start / 1000000 < 3)
 		sleep(3 - (elapsed_time_execution_start / 1000000));
 
-	debug(D_VINE, "terminating task %d pid %d", p->task->taskid, p->pid);
+	debug(D_VINE, "terminating task %d pid %d", p->task->task_id, p->pid);
 
 	// Send signal to process group of child which is denoted by -ve value of child pid.
 	// This is done to ensure delivery of signal to processes forked by the child.
@@ -319,15 +377,15 @@ void  vine_process_compute_disk_needed( struct vine_process *p ) {
 
 	p->disk = t->resources_requested->disk;
 
-	/* task did not specify its disk usage. */
+	/* task did not set its disk usage. */
 	if(p->disk < 0)
 		return;
 
 	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((f = list_next_item(t->input_files))) {
-			if(f->type != VINE_FILE && f->type != VINE_FILE_PIECE)
-					continue;
+		LIST_ITERATE(t->input_files,f) {
+
+			if(f->type!=VINE_FILE)
+				continue;
 
 			if(stat(f->cached_name, &s) < 0)
 				continue;
@@ -363,6 +421,17 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 	p->sandbox_file_count = state->last_file_count_complete;
 
 	return result;
+}
+
+char * vine_process_get_duty_name( struct vine_process *p) {
+	char *duty_name;
+	int duty_id;
+	HASH_TABLE_ITERATE(duty_ids,duty_name,duty_id) {
+		if (duty_id == p->task->task_id) {
+			return duty_name;
+		}
+	}
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */

@@ -1,6 +1,6 @@
 /*
 Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2005- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -633,6 +633,50 @@ static void decode_statfs( struct pfs_process *p, int entering, INT64_T syscall,
 		tracer_result_set(p->tracer, 0);
 	}
 }
+
+
+#ifdef HAS_STATX
+static void decode_statx( struct pfs_process *p, int entering, const INT64_T *args )
+{
+	if(entering) {
+		char path[PFS_PATH_MAX];
+		struct pfs_statx buf;
+
+		tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0);
+
+		//args:
+		//int dirfd, const char *pathname, int flags, unsigned int mask, struct statx *statxbuf
+		p->syscall_result = pfs_statx(args[0],path,args[2],args[3],&buf);
+
+		if(p->syscall_result>=0) {
+			struct pfs_kernel_statx kbuf;
+			COPY_STATX(buf,kbuf);
+			ssize_t count = tracer_copy_out(p->tracer, &kbuf, POINTER(args[4]), sizeof(kbuf), TRACER_O_ATOMIC|TRACER_O_FAST);
+			if (count == (ssize_t)sizeof(kbuf)) {
+				divert_to_dummy(p, 0);
+			} else if (count == -1 && errno != ENOSYS) {
+				debug(D_DEBUG, "tracer memory write failed: %s", strerror(errno));\
+				divert_to_dummy(p, -errno);
+			} else if(pfs_channel_alloc(0,sizeof(struct pfs_kernel_statx),&p->io_channel_offset)) {
+				char *local_addr = pfs_channel_base() + p->io_channel_offset;
+				memcpy(local_addr,&kbuf,sizeof(kbuf));
+				divert_to_channel(p,SYSCALL64_pread64,POINTER(args[4]),sizeof(kbuf),p->io_channel_offset);
+			} else {
+				divert_to_dummy(p,-ENOMEM);
+			}
+		} else {
+			divert_to_dummy(p,-errno);
+		}
+	} else if (!p->syscall_dummy) {
+		INT64_T actual;
+		tracer_result_get(p->tracer,&actual);
+		debug(D_DEBUG, "channel read %" PRId64, actual);
+		pfs_channel_free(p->io_channel_offset);
+		tracer_result_set(p->tracer, 0);
+	}
+}
+#endif
+
 
 static int fix_execve ( struct pfs_process *p, uintptr_t old_user_argv, const char *exe, const char *replace_arg0, const char *arg1, const char *arg2 )
 {
@@ -2188,7 +2232,11 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_statfs:
 			decode_statfs(p,entering,SYSCALL64_statfs,args);
 			break;
-
+#ifdef HAS_STATX
+		case SYSCALL64_statx:
+			decode_statx(p,entering,args);
+			break;
+#endif
 		case SYSCALL64_access:
 			if(entering) {
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,path,POINTER(args[0]),sizeof(path),0));

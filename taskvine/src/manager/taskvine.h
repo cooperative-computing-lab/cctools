@@ -25,8 +25,8 @@ no special capabilities.
 From the application perspective, the programmer creates a manager with @ref vine_create,
 defines a number of tasks with @ref vine_task_create, submits the tasks to the manager
 with @ref vine_submit, and then monitors completion with @ref vine_wait.
-Tasks are further described by attaching data objects via @ref vine_task_specify_input_file,
-@ref vine_task_specify_input_url and related functions.
+Tasks are further described by attaching data objects via @ref vine_task_add_input_file,
+@ref vine_task_add_input_url and related functions.
 
 The taskvine framework provides a large number of fault tolerance, resource management,
 and performance monitoring features that enable the construction of applications that
@@ -36,17 +36,16 @@ expected events.
 
 #define VINE_DEFAULT_PORT 9123               /**< Default taskvine port number. */
 #define VINE_RANDOM_PORT  0                  /**< Indicates that any port may be chosen. */
-#define VINE_WAITFORTASK  -1                 /**< Timeout value to wait for a task to complete before returning. */
+#define VINE_WAIT_FOREVER -1                 /**< Timeout value to wait for a task to complete before returning. */
 
 /** Select optional handling for input and output files: caching, unpacking, watching, etc. **/
 
 typedef enum {
 	VINE_NOCACHE  = 0, /**< Do not cache file at execution site. (default) */
 	VINE_CACHE    = 1, /**< Cache file at execution site for later use. */
-	VINE_UNPACK   = 2, /**< Unpack this archive (.tar .tgz .zip) into a directory on arrival. */
-	VINE_WATCH    = 4, /**< Watch the output file and send back changes as the task runs. */
-	VINE_FAILURE_ONLY = 8,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
-	VINE_SUCCESS_ONLY = 16, /**< Only return this output file if the task succeeded. */
+	VINE_WATCH    = 2, /**< Watch the output file and send back changes as the task runs. */
+	VINE_FAILURE_ONLY = 4,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
+	VINE_SUCCESS_ONLY = 8, /**< Only return this output file if the task succeeded. */
 } vine_file_flags_t;
 
 /** Select overall scheduling algorithm for matching tasks to workers. */
@@ -93,18 +92,7 @@ typedef enum {
 	VINE_TASK_CANCELED,           /**< Task was canceled before completion **/
 } vine_task_state_t;
 
-/** Select the type of an input or output file to attach to a task. */
-
-typedef enum {
-	VINE_FILE = 1,              /**< A file or directory present at the manager. **/
-	VINE_URL,                   /**< A file obtained by downloading from a URL. */
-	VINE_BUFFER,                /**< A file obtained from data in the manager's memory space. */
-	VINE_COMMAND,               /**< A file obtained by executing a Unix command line. */
-	VINE_FILE_PIECE,            /**< A portion of a file present at the manager. */
-	VINE_EMPTY_DIR              /**< An empty directory to create in the task sandbox. */
-} vine_file_t;
-
-/** Select how to allocate resources for similar tasks with @ref vine_specify_category_mode */
+/** Select how to allocate resources for similar tasks with @ref vine_set_category_mode */
 
 typedef enum {
 	/** When monitoring is disabled, all tasks run as VINE_ALLOCATION_MODE_FIXED.
@@ -126,7 +114,11 @@ typedef enum {
 	VINE_ALLOCATION_MODE_MIN_WASTE = CATEGORY_ALLOCATION_MODE_MIN_WASTE,
 
 	/** As above, but maximizing throughput. */
-	VINE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
+	VINE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT,
+
+    VINE_ALLOCATION_MODE_GREEDY_BUCKETING = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING,
+
+    VINE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING
 } vine_category_mode_t;
 
 /** Statistics describing a manager. */
@@ -141,12 +133,12 @@ struct vine_stats {
 
 	/* Cumulative stats for workers: */
 	int workers_joined;       /**< Total number of worker connections that were established to the manager. */
-	int workers_removed;      /**< Total number of worker connections that were released by the manager, idled-out, fast-aborted, or lost. */
+	int workers_removed;      /**< Total number of worker connections that were terminated. */
 	int workers_released;     /**< Total number of worker connections that were asked by the manager to disconnect. */
 	int workers_idled_out;    /**< Total number of worker that disconnected for being idle. */
-	int workers_fast_aborted; /**< Total number of worker connections terminated for being too slow. (see @ref vine_activate_fast_abort) */
-	int workers_blocked ;     /**< Total number of workers blocked by the manager. (Includes workers_fast_aborted.) */
-	int workers_lost;         /**< Total number of worker connections that were unexpectedly lost. (does not include idled-out or fast-aborted) */
+	int workers_slow;         /**< Total number of workers disconnected for being too slow. (see @ref vine_enable_disconnect_slow_workers) */
+	int workers_blocked ;     /**< Total number of workers blocked by the manager. (Includes workers_slow.) */
+	int workers_lost;         /**< Total number of worker connections that were unexpectedly lost. (does not include workers_idle_out or workers_slow) */
 
 	/* Stats for the current state of tasks: */
 	int tasks_waiting;        /**< Number of tasks waiting to be dispatched. */
@@ -199,7 +191,7 @@ struct vine_stats {
 	int64_t total_memory;     /**< Total memory in MB aggregated across the connected workers. */
 	int64_t total_disk;	      /**< Total disk space in MB aggregated across the connected workers. */
 	int64_t total_gpus;       /**< Total number of gpus aggregated across the connected workers. */
-  
+
 	int64_t committed_cores;  /**< Committed number of cores aggregated across the connected workers. */
 	int64_t committed_memory; /**< Committed memory in MB aggregated across the connected workers. */
 	int64_t committed_disk;	  /**< Committed disk space in MB aggregated across the connected workers. */
@@ -228,11 +220,11 @@ struct vine_stats {
 //@{
 
 /** Create a new task object.
-Once created and elaborated with functions such as @ref vine_task_specify_input_file
-and @ref vine_task_specify_input_buffer, the task should be passed to @ref vine_submit.
+Once created and elaborated with functions such as @ref vine_task_add_input_file
+and @ref vine_task_add_input_buffer, the task should be passed to @ref vine_submit.
 @param full_command The shell command line or coprocess functions to be
 executed by the task.  If null, the command will be given later by @ref
-vine_task_specify_command
+vine_task_set_command
 @return A new task object, or null if it could not be created.
 */
 struct vine_task *vine_task_create(const char *full_command);
@@ -254,14 +246,14 @@ void vine_task_delete(struct vine_task *t);
 @param t A task object.
 @param cmd The command to be executed.  This string will be duplicated by this call, so the argument may be freed or re-used afterward.
 */
-void vine_task_specify_command( struct vine_task *t, const char *cmd );
+void vine_task_set_command( struct vine_task *t, const char *cmd );
 
 /** Indicate the command to be executed.
 @param t A task object.
 @param name The coprocess name that will execute the command at the worker. The task
 will only be sent to workers running the coprocess.
 */
-void vine_task_specify_coprocess( struct vine_task *t, const char *name );
+void vine_task_set_coprocess( struct vine_task *t, const char *name );
 
 /** Attach an input file or directory to a task.
 @param t A task object.
@@ -270,9 +262,8 @@ void vine_task_specify_coprocess( struct vine_task *t, const char *name );
 @param flags	May be zero or more of the following @ref vine_file_flags_t logical-ored together:
 - @ref VINE_CACHE indicates that the file/directory should be cached for later tasks. (recommended)
 - @ref VINE_NOCACHE indicates that the file should not be cached.
-- @ref VINE_UNPACK indicates that @a local_name is an archive (.tar, .tgz, .zip) that will be automatically unpacked into directory @a remote_name .
 */
-void vine_task_specify_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags);
 
 /** Attach an output file or directory to a task.
 @param t A task object.
@@ -285,98 +276,110 @@ void vine_task_specify_input_file(struct vine_task *t, const char *local_name, c
 - @ref VINE_FAILURE_ONLY indicates the file should only be returned if the task fails.
 - @ref VINE_SUCCESS_ONLY indicates the file should only be returned if the task succeeds.
 */
-void vine_task_specify_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags);
 
 /** Add a url as an input for a task.
 @param t A task object.
 @param url The source URL to be accessed to provide the file.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_specify_input_file.
+@param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_add_input_file.
 */
-void vine_task_specify_input_url(struct vine_task *t, const char *url, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_input_url(struct vine_task *t, const char *url, const char *remote_name, vine_file_flags_t flags);
 
-/** Add a shell command to produce an input file for a task.
+/** Add a file produced by a mini-task.
+Attaches a task definition to produce an input file by running a Unix command.
+This mini-task will be run on demand in order to produce the desired input file.
+This is useful if an input requires some prior step such as transferring,
+renaming, or unpacking to be useful.  A mini-task should be a short-running
+activity with minimal resource consumpion.
 @param t A task object.
-@param cmd The shell command to produce the file.   The command must contain a special symbol "%%" which indicates the destination of the file.
-For example, the command "grep frog /usr/dict/words > %%" would produce a file by searching for "frog" in the Unix dictionary.
+@param mini_task The mini-task to attach to the parent task.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_specify_input_file.
+@param flags May be zero or more @ref vine_file_flags_t logical-ored together. See @ref vine_task_add_input_file.
 */
-void vine_task_specify_input_command(struct vine_task *t, const char *cmd, const char *remote_name, vine_file_flags_t flags);
-
-/** Add a piece of a file to a task.
-@param t A task object.
-@param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.
-@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param start_byte The starting byte offset of the file piece to be transferred.
-@param end_byte The ending byte offset of the file piece to be transferred.
-@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_specify_input_file.
-*/
-void vine_task_specify_input_piece(struct vine_task *t, const char *local_name, const char *remote_name, off_t start_byte, off_t end_byte, vine_file_flags_t flags);
+void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_file_flags_t flags);
 
 /** Add an input buffer to a task.
 @param t A task object.
 @param data The data to be passed as an input file.
 @param length The length of the buffer, in bytes
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_specify_input_file.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
 */
 
-void vine_task_specify_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags);
 
 /** Add an output buffer to a task.
 @param t A task object.
 @param data The logical name of the buffer, to be used with @ref vine_task_get_output_buffer.
 @param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_specify_output_file.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_output_file.
 */
-void vine_task_specify_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags);
+void vine_task_add_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags);
 
 /** Add an empty directory to a task.
 This is very occasionally needed for applications that expect
 certain directories to exist in the working directory, prior to producing output.
 This function does not transfer any data to the task, but just creates
 a directory in its working sandbox.  If you want to transfer an
-entire directory worth of data to a task, use @ref vine_task_specify_input_file and simply give a directory name.
+entire directory worth of data to a task, use @ref vine_task_add_input_file and simply give a directory name.
 @param t A task object.
 @param remote_name The name of the empty directory in the task sandbox.  Must be a relative path name: it may not begin with a slash.
 */
-void vine_task_specify_empty_dir( struct vine_task *t, const char *remote_name );
+void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name );
+
+/** Add a general file object as a input to a task.
+@param t A task object.
+@param f A file object, created by @ref vine_file_local, @ref vine_file_url, @ref vine_file_buffer, @ref vine_file_mini_task.
+@param remote_name The name of the file as it should appear in the task's sandbox.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
+*/
+
+void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags );
+
+/** Add a general file object as a output of a task.
+@param t A task object.
+@param f A file object, created by @ref vine_file_local or @ref vine_file_buffer.
+@param remote_name The name of the file as it will appear in the task's sandbox.
+@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_input_file.
+*/
+
+void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags );
 
 /** Specify the number of times this task is retried on worker errors. If less than one, the task is retried indefinitely (this the default). A task that did not succeed after the given number of retries is returned with result VINE_RESULT_MAX_RETRIES.
 @param t A task object.
 @param max_retries The number of retries.
 */
 
-void vine_task_specify_max_retries( struct vine_task *t, int64_t max_retries );
+void vine_task_set_retries( struct vine_task *t, int64_t max_retries );
 
 /** Specify the amount of disk space required by a task.
 @param t A task object.
 @param memory The amount of disk space required by the task, in megabytes.
 */
 
-void vine_task_specify_memory( struct vine_task *t, int64_t memory );
+void vine_task_set_memory( struct vine_task *t, int64_t memory );
 
 /** Specify the amount of disk space required by a task.
 @param t A task object.
 @param disk The amount of disk space required by the task, in megabytes.
 */
 
-void vine_task_specify_disk( struct vine_task *t, int64_t disk );
+void vine_task_set_disk( struct vine_task *t, int64_t disk );
 
 /** Specify the number of cores required by a task.
 @param t A task object.
 @param cores The number of cores required by the task.
 */
 
-void vine_task_specify_cores( struct vine_task *t, int cores );
+void vine_task_set_cores( struct vine_task *t, int cores );
 
 /** Specify the number of gpus required by a task.
 @param t A task object.
 @param gpus The number of gpus required by the task.
 */
 
-void vine_task_specify_gpus( struct vine_task *t, int gpus );
+void vine_task_set_gpus( struct vine_task *t, int gpus );
 
 /** Specify the maximum end time allowed for the task (in microseconds since the
 Epoch). If less than 1, then no end time is specified (this is the default).
@@ -385,33 +388,25 @@ This is useful, for example, when the task uses certificates that expire.
 @param useconds Number of useconds since the Epoch.
 */
 
-void vine_task_specify_end_time( struct vine_task *t, int64_t useconds );
+void vine_task_set_time_end( struct vine_task *t, int64_t useconds );
 
-/** Specify the minimum start time allowed for the task (in microseconds since the
-Epoch). If less than 1, then no minimum start time is specified (this is the default).
+/** Specify the minimum start time allowed for the task (in microseconds since
+ the Epoch). The task will only be submitted to workers after the specified time.
+ If less than 1, then no minimum start time is specified (this is the default).
 @param t A task object.
 @param useconds Number of useconds since the Epoch.
 */
 
-void vine_task_specify_start_time_min( struct vine_task *t, int64_t useconds );
+void vine_task_set_time_start( struct vine_task *t, int64_t useconds );
 
-/** Specify the maximum time (in microseconds) the task is allowed to run in a
+/** Specify the maximum time (in seconds) the task is allowed to run in a
 worker. This time is accounted since the the moment the task starts to run
 in a worker.  If less than 1, then no maximum time is specified (this is the default).
 @param t A task object.
-@param useconds Maximum number of seconds the task may run in a worker.
-*/
-
-void vine_task_specify_running_time( struct vine_task *t, int64_t useconds );
-
-/** Specify the maximum time (in seconds) the task is allowed to run in a worker.
-This time is accounted since the moment the task starts to run in a worker.
-If less than 1, then no maximum time is specified (this is the default).
-Note: same effect as vine_task_specify_running_time.
-@param t A task object.
 @param seconds Maximum number of seconds the task may run in a worker.
 */
-void vine_task_specify_running_time_max( struct vine_task *t, int64_t seconds );
+
+void vine_task_set_time_max( struct vine_task *t, int64_t seconds );
 
 /** Specify the minimum time (in seconds) the task is expected to run in a worker.
 This time is accounted since the moment the task starts to run in a worker.
@@ -419,7 +414,7 @@ If less than 1, then no minimum time is specified (this is the default).
 @param t A task object.
 @param seconds Minimum number of seconds the task may run in a worker.
 */
-void vine_task_specify_running_time_min( struct vine_task *t, int64_t seconds );
+void vine_task_set_time_min( struct vine_task *t, int64_t seconds );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the manager, but is provided for the user's convenience
@@ -427,20 +422,20 @@ in identifying tasks when they complete.
 @param t A task object.
 @param tag The tag to attach to task t.
 */
-void vine_task_specify_tag(struct vine_task *t, const char *tag);
+void vine_task_set_tag(struct vine_task *t, const char *tag);
 
 /** Label the task with the given category. It is expected that tasks with the same category
-have similar resources requirements (e.g. for fast abort).
+have similar resources requirements (e.g. to disconnect slow workers).
 @param t A task object.
 @param category The name of the category to use.
 */
-void vine_task_specify_category(struct vine_task *t, const char *category);
+void vine_task_set_category(struct vine_task *t, const char *category);
 
 /** Label the task with a user-defined feature. The task will only run on a worker that provides (--feature option) such feature.
 @param t A task object.
 @param name The name of the feature.
 */
-void vine_task_specify_feature(struct vine_task *t, const char *name);
+void vine_task_add_feature(struct vine_task *t, const char *name);
 
 /** Specify the priority of this task relative to others in the queue.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list, regardless of the priority.
@@ -448,28 +443,28 @@ Tasks with a higher priority value run first. If no priority is given, a task is
 @param priority The priority of the task.
 */
 
-void vine_task_specify_priority(struct vine_task *t, double priority );
+void vine_task_set_priority(struct vine_task *t, double priority );
 
 /** Specify an environment variable to be added to the task.
 @param t A task object
 @param name Name of the variable.
 @param value Value of the variable.
 */
-void vine_task_specify_env( struct vine_task *t, const char *name, const char *value );
+void vine_task_set_env_var( struct vine_task *t, const char *name, const char *value );
 
 /** Select the scheduling algorithm for a single task.
-To change the scheduling algorithm for all tasks, use @ref vine_specify_algorithm instead.
+To change the scheduling algorithm for all tasks, use @ref vine_set_scheduler instead.
 @param t A task object.
 @param algorithm The algorithm to use in assigning this task to a worker. For possible values, see @ref vine_schedule_t.
 */
-void vine_task_specify_algorithm(struct vine_task *t, vine_schedule_t algorithm);
+void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm);
 
 /** Specify a custom name for the monitoring summary. If @ref vine_enable_monitoring is also enabled, the summary is also written to that directory.
 @param t A task object.
 @param monitor_output Resource summary file.
 */
 
-void vine_task_specify_monitor_output(struct vine_task *t, const char *monitor_output);
+void vine_task_set_monitor_output(struct vine_task *t, const char *monitor_output);
 
 /** Get the command line of the task.
 @param t A task object.
@@ -480,7 +475,7 @@ const char * vine_task_get_command( struct vine_task *t );
 
 /** Get the tag associated with the task.
 @param t A task object.
-@return The tag string set by @ref vine_task_specify_tag.
+@return The tag string set by @ref vine_task_set_tag.
 */
 
 const char * vine_task_get_tag( struct vine_task *t );
@@ -490,7 +485,7 @@ const char * vine_task_get_tag( struct vine_task *t );
 @return The integer task ID assigned at creation time.
 */
 
-int vine_task_get_taskid( struct vine_task *t );
+int vine_task_get_id( struct vine_task *t );
 
 /** Get the end result of the task.
 If the result is @ref VINE_RESULT_SUCCESS, then the
@@ -529,11 +524,11 @@ output of the task.  If the task did not run to completion,
 then this function returns null.
 */
 
-const char * vine_task_get_output( struct vine_task *t );
+const char * vine_task_get_stdout( struct vine_task *t );
 
 /** Get an output buffer of the task.
 @param t A task object.
-@param buffer_name The name of the output buffer, given by @ref vine_task_specify_output_buffer
+@param buffer_name The name of the output buffer, given by @ref vine_task_add_output_buffer
 @return A pointer to the contents of the buffer.  The buffer is null-terminated, and so can
 be used directly as a string, if it is expected to contain text.  If the buffer is expected
 to contain binary data, use @ref vine_task_get_output_buffer_length to determine the length.
@@ -545,7 +540,7 @@ const char * vine_task_get_output_buffer( struct vine_task *t, const char *buffe
 
 /** Get the length of an output buffer.
 @param t A task object.
-@param buffer_name The name of the output buffer, given by @ref vine_task_specify_output_buffer
+@param buffer_name The name of the output buffer, given by @ref vine_task_add_output_buffer
 @return The length of the buffer in bytes, or zero if the buffer is not available.
 */
 
@@ -627,7 +622,95 @@ For more information, consult the manual of the resource_monitor.
 @param monitor_snapshot_file A filename.
 */
 
-void vine_task_specify_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file);
+void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file);
+
+//@}
+
+/** @name Functions - Files */
+
+//@{
+
+/** Create a file object from a local file.
+@param source The path of the file on the local filesystem.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_local( const char *source );
+
+/** Create a file object from a remote URL.
+@param url The URL address of the object in text form.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_url( const char *url );
+
+/** Create a scratch file object.
+A scratch file has no initial content, but is created
+as the output of a task, and may be consumed by other tasks.
+@param unique_name If desired, the user may manually assign
+a globally-unique name to this file.  If null, the system will
+assign an internal unique name.  (recommended)
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_temp( const char *unique_name );
+
+/** Create a file object from a data buffer.
+@param name The abstract name of the buffer.
+@param data The contents of the buffer.
+@param length The length of the buffer, in bytes.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_buffer( const char *buffer_name, const char *data, int length );
+
+/** Create a file object representing an empty directory.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_empty_dir();
+
+/** Create a file object produced from a mini-task.
+@param mini_task The task which produces the data object.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_mini_task( struct vine_task *mini_task );
+
+/** Create a file object by unpacking a tar archive.
+The archive may be compressed in any of the ways supported
+by tar, and so this function supports extensions .tar, .tar.gz, .tgz, tar.bz2, and so forth.
+@param f A file object representing a tar archive.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+
+struct vine_file * vine_file_untar( struct vine_file *f );
+
+/** Create a file object by unpacking a poncho package.
+@param f A file object representing a tgz archive.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+struct vine_file * vine_file_unponcho( struct vine_file *f );
+
+/** Create a file object by unpacking a starch package.
+@param f A file object representing a sfx archive.
+@return A general file object for use by @ref vine_task_add_input.
+*/
+struct vine_file * vine_file_unstarch( struct vine_file *f );
+
+/** Clone a file object.
+@param f A file object.
+@return A clone of the argument f.
+*/
+
+struct vine_file *vine_file_clone( const struct vine_file *f );
+
+/** Delete a file object.
+@param f A file object.
+*/
+
+void vine_file_delete( struct vine_file *f );
+
 
 //@}
 
@@ -645,7 +728,7 @@ Users may modify the behavior of @ref vine_create by setting the following envir
 - <b>VINE_PRIORITY</b>: This sets the priority of the manager, which is used by workers to sort managers such that higher priority managers will be served first (if unset, the default is 10).
 
 If the manager has a project name, then manager statistics and information will be
-reported to a catalog server.  To specify the catalog server, the user may set
+reported to a catalog server.  To set the catalog server, the user may set
 the <b>CATALOG_HOST</b> and <b>CATALOG_PORT</b> environmental variables as described in @ref catalog_query_create.
 
 @param port The port number to listen on.  If zero is specified, then the port stored in the <b>VINE_PORT</b> environment variable is used if available. If it isn't, or if -1 is specified, the first unused port between <b>VINE_LOW_PORT</b> and <b>VINE_HIGH_PORT</b> (1024 and 32767 by default) is chosen.
@@ -676,9 +759,21 @@ control and should not be inspected until returned via @ref vine_wait.
 Once returned, it is safe to re-submit the same take object via @ref vine_submit.
 @param m A manager object
 @param t A task object returned from @ref vine_task_create.
-@return An integer taskid assigned to the submitted task.
+@return An integer task_id assigned to the submitted task.
 */
 int vine_submit(struct vine_manager *m, struct vine_task *t);
+
+/** Indicate the duty to be installed on all workers connected to the manager.
+The duty is expected to run on all workers until they disconnect from the manager.
+@param t A task object.
+@param name The duty to be installed
+*/
+void vine_manager_install_duty( struct vine_manager *q, struct vine_task *t, const char *name );
+
+/** Indicate the duty to be removed from all connected workers
+@param name The duty to be removed
+*/
+void vine_manager_remove_duty( struct vine_manager *q, const char *name );
 
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
@@ -691,7 +786,7 @@ If the task could not, then the <tt>result</tt> field will be non-zero and the
 <tt>return_status</tt> field will be undefined.
 
 @param m A manager object
-@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref VINE_WAITFORTASK to block until a task has completed.
+@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref VINE_WAIT_FOREVER to block until a task has completed.
 @returns A completed task description, or null if the manager is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
 */
 struct vine_task *vine_wait(struct vine_manager *m, int timeout);
@@ -701,10 +796,19 @@ struct vine_task *vine_wait(struct vine_manager *m, int timeout);
 Similar to @ref vine_wait, but guarantees that the returned task has the specified tag.
 @param m A manager object
 @param tag The desired tag. If NULL, then tasks are returned regardless of their tag.
-@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref VINE_WAITFORTASK to block until a task has completed.
+@param timeout The number of seconds to wait for a completed task before returning.  Use an integer time to set the timeout or the constant @ref VINE_WAIT_FOREVER to block until a task has completed.
 @returns A completed task description, or null if the manager is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
 */
 struct vine_task *vine_wait_for_tag(struct vine_manager *m, const char *tag, int timeout);
+
+/** Wait for a task with a given task_id to complete.
+Similar to @ref vine_wait, but guarantees that the returned task has the specified task_id.
+@param m A manager object
+@param task_id The desired task_id. If -1, then tasks are returned regardless of their task_id.
+@param timeout The number of seconds to wait for a completed task before returning. Use an integer time to set the timeout or the constant @ref VINE_WAIT_FOREVER to block until a task has completed.
+@returns A completed task description, or null if the manager is empty, or the timeout was reached without a completed task, or there is completed child process (call @ref process_wait to retrieve the status of the completed child process).
+*/
+struct vine_task *vine_wait_for_task_id(struct vine_manager *m, int task_id, int timeout);
 
 /** Determine whether the manager is 'hungry' for more tasks.
 While the manager can handle a very large number of tasks,
@@ -740,13 +844,13 @@ int vine_port(struct vine_manager *m);
 @param m A manager object
 @param name The new project name.
 */
-void vine_specify_name(struct vine_manager *m, const char *name);
+void vine_set_name(struct vine_manager *m, const char *name);
 
 /** Get the project name of the manager.
 @param m A manager object
 @return The project name of the manager.
 */
-const char *vine_name(struct vine_manager *m);
+const char *vine_get_name(struct vine_manager *m);
 
 /** Enables resource monitoring on the give manager.
 It generates a resource summary per task, which is written to the given
@@ -756,7 +860,7 @@ updated with the resources measured, and no summary file is kept unless
 explicitely given by vine_task's monitor_output_file.
 @param m A manager object
 @param monitor_output_directory The name of the output directory. If NULL,
-summaries are kept only when monitor_output_directory is specify per task, but
+summaries are kept only when monitor_output_directory is set per task, but
 resources_measured from vine_task is updated.  @return 1 on success, 0 if
 @param watchdog if not 0, kill tasks that exhaust declared resources.
 @return 1 on success, o if monitoring was not enabled.
@@ -774,17 +878,20 @@ gigabyte sizes. This function is mostly used for debugging.)
 */
 int vine_enable_monitoring_full(struct vine_manager *m, char *monitor_output_directory, int watchdog);
 
-/** Set the minimum taskid of future submitted tasks.
-Further submitted tasks are guaranteed to have a taskid larger or equal to
-minid.  This function is useful to make taskids consistent in a workflow that
+/** Enable taskvine peer transfers to be scheduled by the manager **/
+int vine_enable_peer_transfers(struct vine_manager *m);
+
+/** Set the minimum task_id of future submitted tasks.
+Further submitted tasks are guaranteed to have a task_id larger or equal to
+minid.  This function is useful to make task_ids consistent in a workflow that
 consists of sequential managers. (Note: This function is rarely used).  If the
-minimum id provided is smaller than the last taskid computed, the minimum id
+minimum id provided is smaller than the last task_id computed, the minimum id
 provided is ignored.
 @param m A manager object
-@param minid Minimum desired taskid
-@return Returns the actual minimum taskid for future tasks.
+@param minid Minimum desired task_id
+@return Returns the actual minimum task_id for future tasks.
 */
-int vine_specify_min_taskid(struct vine_manager *m, int minid);
+int vine_set_task_id_min(struct vine_manager *m, int minid);
 
 /** Block workers in hostname from working for manager q.
 @param m A manager object
@@ -813,31 +920,19 @@ void vine_unblock_host(struct vine_manager *m, const char *hostname);
 */
 void vine_unblock_all(struct vine_manager *m);
 
-/** Invalidate cached file.
-The file or directory with the given local name specification is deleted from
-the workers' cache, so that a newer version may be used. Any running task using
-the file is canceled and resubmitted. Completed tasks waiting for retrieval are
-not affected.
-(Currently anonymous buffers and file pieces cannot be deleted once cached in a worker.)
+/** Remove a file from worker's caches.
+The file or directory with the given specification is deleted from the workers' cache.
+Completed tasks waiting for retrieval are not affected.
 @param m A manager object
-@param local_name The name of the file on local disk or shared filesystem, or uri.
-@param type One of:
-- @ref VINE_FILE
-- @ref VINE_URL
+@param f Any file object.
 */
-void vine_invalidate_cached_file(struct vine_manager *m, const char *local_name, vine_file_t type);
+void vine_remove_file(struct vine_manager *m, struct vine_file *f );
 
 /** Get manager statistics (only from manager).
 @param m A manager object
 @param s A pointer to a buffer that will be filed with statistics.
 */
 void vine_get_stats(struct vine_manager *m, struct vine_stats *s);
-
-/** Get statistics of the manager.
-@param m A manager object
-@param s A pointer to a buffer that will be filed with statistics.
-*/
-void vine_get_stats_hierarchy(struct vine_manager *m, struct vine_stats *s);
 
 /** Get the task statistics for the given category.
 @param m A manager object
@@ -855,10 +950,10 @@ struct rmsummary **vine_summarize_workers(struct vine_manager *m);
 
 /** Get the current state of the task.
 @param m A manager object
-@param taskid The taskid of the task.
+@param task_id The task_id of the task.
 @return One of: VINE_TASK(UNKNOWN|READY|RUNNING|RESULTS|RETRIEVED|DONE)
 */
-vine_task_state_t vine_task_state(struct vine_manager *m, int taskid);
+vine_task_state_t vine_task_state(struct vine_manager *m, int task_id);
 
 /** Limit the manager bandwidth when transferring files to and from workers.
 @param m A manager object
@@ -872,28 +967,28 @@ void vine_set_bandwidth_limit(struct vine_manager *m, const char *bandwidth);
 */
 double vine_get_effective_bandwidth(struct vine_manager *m);
 
-/** Turn on or off fast abort functionality for a given manager for tasks without
-an explicit category. Given the multiplier, abort a task which running time is
-larger than the average times the multiplier.  Fast-abort is computed per task
+/** Enable disconnect slow workers functionality for a given manager for tasks without
+an explicit category. Given the multiplier, disconnect a worker when it is executing a task
+with a running time is
+larger than the average times the multiplier.  The average is s computed per task
 category. The value specified here applies to all the categories for which @ref
-vine_activate_fast_abort_category was not explicitely called.
+vine_enable_disconnect_slow_workers_category was not explicitely called.
 @param m A manager object
-@param multiplier The multiplier of the average task time at which point to abort; if less than zero, fast_abort is deactivated (the default).
+@param multiplier The multiplier of the average task time at which point to disconnect; Disabled if less than 1.
 @returns 0 if activated, 1 if deactivated.
 */
-int vine_activate_fast_abort(struct vine_manager *m, double multiplier);
+int vine_enable_disconnect_slow_workers(struct vine_manager *m, double multiplier);
 
 
-/** Turn on or off fast abort functionality for a given category. Given the
-multiplier, abort a task which running time is larger than the average times the
-multiplier.  The value specified here applies only to tasks in the given category.
-(Note: vine_activate_fast_abort_category(q, "default", n) is the same as vine_activate_fast_abort(q, n).)
+/** Enable disconnect slow workers functionality for a given category. As @ref vine_enable_disconnect_slow_workers, but for a single
+task category.
+(Note: vine_enable_disconnect_slow_workers_category(q, "default", n) is the same as vine_enable_disconnect_slow_workers(q, n).)
 @param m A manager object
 @param category A category name.
-@param multiplier The multiplier of the average task time at which point to abort; if zero, fast_abort is deactivated. If less than zero (default), use the fast abort of the "default" category.
+@param multiplier The multiplier of the average task time at which point to disconnect; If less than one (default), use the multiplier of the "default" category.
 @returns 0 if activated, 1 if deactivated.
 */
-int vine_activate_fast_abort_category(struct vine_manager *m, const char *category, double multiplier);
+int vine_enable_disconnect_slow_workers_category(struct vine_manager *m, const char *category, double multiplier);
 
 
 /** Set the draining mode per worker hostname.
@@ -904,7 +999,7 @@ and if empty they are shutdown.
 @param hostname The hostname running the worker.
 @param drain_flag Draining mode.
 */
-int vine_specify_draining_by_hostname(struct vine_manager *m, const char *hostname, int drain_flag);
+int vine_set_draining_by_hostname(struct vine_manager *m, const char *hostname, int drain_flag);
 
 /** Turn on or off first-allocation labeling for a given category. By default, cores, memory, and disk are labeled, and gpus are unlabeled. Turn on/off other specific resources use @ref vine_enable_category_resource
 @param m A manager object
@@ -912,9 +1007,9 @@ int vine_specify_draining_by_hostname(struct vine_manager *m, const char *hostna
 @param mode     One of @ref vine_category_mode_t.
 @returns 1 if mode is valid, 0 otherwise.
 */
-int vine_specify_category_mode(struct vine_manager *m, const char *category, vine_category_mode_t mode);
+int vine_set_category_mode(struct vine_manager *m, const char *category, vine_category_mode_t mode);
 
-/** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref vine_specify_category_mode.
+/** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref vine_set_category_mode.
 @param m A manager object
 @param category A category name.
 @param resource A resource name.
@@ -928,13 +1023,13 @@ This function controls which <b>worker</b> will be selected for a given task.
 @param m A manager object
 @param algorithm The algorithm to use in assigning a task to a worker. See @ref vine_schedule_t for possible values.
 */
-void vine_specify_algorithm(struct vine_manager *m, vine_schedule_t algorithm);
+void vine_set_scheduler(struct vine_manager *m, vine_schedule_t algorithm);
 
 /** Change the priority for a given manager.
 @param m A manager object
 @param priority The new priority of the manager.  Higher priority managers will attract workers first.
 */
-void vine_specify_priority(struct vine_manager *m, int priority);
+void vine_set_priority(struct vine_manager *m, int priority);
 
 /** Specify the number of tasks not yet submitted to the manager.
 It is used by vine_factory to determine the number of workers to launch.
@@ -944,74 +1039,67 @@ num tasks left + num tasks running + num tasks read.
 @param m A manager object
 @param ntasks Number of tasks yet to be submitted.
 */
-void vine_specify_num_tasks_left(struct vine_manager *m, int ntasks);
-
-/** Specify the catalog server the manager should report to.
-@param m A manager object
-@param hostname The catalog server's hostname.
-@param port The port the catalog server is listening on.
-*/
-void vine_specify_catalog_server(struct vine_manager *m, const char *hostname, int port);
+void vine_set_tasks_left_count(struct vine_manager *m, int ntasks);
 
 /** Specify the catalog server(s) the manager should report to.
 @param m A manager object
 @param hosts The catalog servers given as a comma delimited list of hostnames or hostname:port
 */
-void vine_specify_catalog_servers(struct vine_manager *m, const char *hosts);
+void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
 
 /** Cancel a submitted task using its task id and remove it from manager.
 @param m A manager object
-@param id The taskid returned from @ref vine_submit.
+@param id The task_id returned from @ref vine_submit.
 @return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
 */
-struct vine_task *vine_cancel_by_taskid(struct vine_manager *m, int id);
+struct vine_task *vine_cancel_by_task_id(struct vine_manager *m, int id);
 
 /** Cancel a submitted task using its tag and remove it from manager.
 @param m A manager object
-@param tag The tag name assigned to task using @ref vine_task_specify_tag.
+@param tag The tag name assigned to task using @ref vine_task_set_tag.
 @return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
 */
-struct vine_task *vine_cancel_by_tasktag(struct vine_manager *m, const char *tag);
+struct vine_task *vine_cancel_by_task_tag(struct vine_manager *m, const char *tag);
 
 /** Cancel all submitted tasks and remove them from the manager.
 @param m A manager object
 @return A struct list of all of the tasks canceled.  Each task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
 */
-struct list * vine_cancel_all_tasks(struct vine_manager *m);
+struct list * vine_tasks_cancel(struct vine_manager *m);
 
 /** Shut down workers connected to the manager. Gives a best effort and then returns the number of workers given the shut down order.
 @param m A manager object
 @param n The number to shut down. All workers if given "0".
 */
-int vine_shut_down_workers(struct vine_manager *m, int n);
+int vine_workers_shutdown(struct vine_manager *m, int n);
 
 /** Turn on the debugging log output and send to the named file.
 @param m A manager object
 @param logfile The filename.
 @return 1 if logfile was opened, 0 otherwise.
 */
-int vine_specify_debug_log( struct vine_manager *m, const char *logfile );
+int vine_enable_debug_log( struct vine_manager *m, const char *logfile );
 
 /** Add a performance log file that records cummulative statistics of the connected workers and submitted tasks.
 @param m A manager object
 @param logfile The filename.
 @return 1 if logfile was opened, 0 otherwise.
 */
-int vine_specify_perf_log(struct vine_manager *m, const char *logfile);
+int vine_enable_perf_log(struct vine_manager *m, const char *logfile);
 
 /** Add a log file that records the states of the connected workers and tasks.
 @param m A manager object
 @param logfile The filename.
 @return 1 if logfile was opened, 0 otherwise.
 */
-int vine_specify_transactions_log(struct vine_manager *m, const char *logfile);
+int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
 
 /** Add a mandatory password that each worker must present.
 @param m A manager object
 @param password The password to require.
 */
 
-void vine_specify_password( struct vine_manager *m, const char *password );
+void vine_set_password( struct vine_manager *m, const char *password );
 
 /** Add a mandatory password file that each worker must present.
 @param m A manager object
@@ -1019,35 +1107,35 @@ void vine_specify_password( struct vine_manager *m, const char *password );
 @return True if the password was loaded, false otherwise.
 */
 
-int vine_specify_password_file( struct vine_manager *m, const char *file );
+int vine_set_password_file( struct vine_manager *m, const char *file );
 
 /** Change the keepalive interval for a given manager.
 @param m A manager object
 @param interval The minimum number of seconds to wait before sending new keepalive checks to workers.
 */
-void vine_specify_keepalive_interval(struct vine_manager *m, int interval);
+void vine_set_keepalive_interval(struct vine_manager *m, int interval);
 
 /** Change the keepalive timeout for identifying dead workers for a given manager.
 @param m A manager object
 @param timeout The minimum number of seconds to wait for a keepalive response from worker before marking it as dead.
 */
-void vine_specify_keepalive_timeout(struct vine_manager *m, int timeout);
+void vine_set_keepalive_timeout(struct vine_manager *m, int timeout);
 
 /** Set the preference for using hostname over IP address to connect.
 'by_ip' uses IP addresses from the network interfaces of the manager (standard behavior), 'by_hostname' to use the hostname at the manager, or 'by_apparent_ip' to use the address of the manager as seen by the catalog server.
 @param m A manager object
 @param preferred_connection An string to indicate using 'by_ip' or a 'by_hostname'.
 */
-void vine_manager_preferred_connection(struct vine_manager *m, const char *preferred_connection);
+void vine_set_manager_preferred_connection(struct vine_manager *m, const char *preferred_connection);
 
 /** Tune advanced parameters for manager.
 @param m A manager object
 @param name The name of the parameter to tune
  - "resource-submit-multiplier" Treat each worker as having ({cores,memory,gpus} * multiplier) when submitting tasks. This allows for tasks to wait at a worker rather than the manager. (default = 1.0)
  - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
- - "transfer-outlier-factor" Transfer that are this many times slower than the average will be aborted.  (default=10x)
+ - "transfer-outlier-factor" Transfer that are this many times slower than the average will be terminated.  (default=10x)
  - "default-transfer-rate" The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
- - "fast-abort-multiplier" Set the multiplier of the average task time at which point to abort; if negative or zero fast_abort is deactivated. (default=0)
+ - "disconnect-slow-workers-factor" Set the multiplier of the average task time at which point to disconnect; deactivated if less than 1. (default=0)
  - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
  - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
  - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
@@ -1065,35 +1153,35 @@ rm specifies the maximum resources a task in the default category may use.
 @param m  Reference to the current manager object.
 @param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
-void vine_specify_max_resources(struct vine_manager *m,  const struct rmsummary *rm);
+void vine_set_resources_max(struct vine_manager *m,  const struct rmsummary *rm);
 
 /** Sets the minimum resources a task without an explicit category ("default" category).
 rm specifies the maximum resources a task in the default category may use.
 @param m  Reference to the current manager object.
 @param rm Structure indicating maximum values. See @ref rmsummary for possible fields.
 */
-void vine_specify_min_resources(struct vine_manager *m,  const struct rmsummary *rm);
+void vine_set_resources_min(struct vine_manager *m,  const struct rmsummary *rm);
 
 /** Sets the maximum resources a task in the category may use.
 @param m         Reference to the current manager object.
 @param category  Name of the category.
 @param rm Structure indicating minimum values. See @ref rmsummary for possible fields.
 */
-void vine_specify_category_max_resources(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
+void vine_set_category_resources_max(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Sets the minimum resources a task in the category may use.
 @param m         Reference to the current manager object.
 @param category  Name of the category.
 @param rm Structure indicating minimum values. See @ref rmsummary for possible fields.
 */
-void vine_specify_category_min_resources(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
+void vine_set_category_resources_min(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Set the initial guess for resource autolabeling for the given category.
 @param m         Reference to the current manager object.
 @param category  Name of the category.
 @param rm Structure indicating maximum values. Autolabeling available for cores, memory, disk, and gpus
 */
-void vine_specify_category_first_allocation_guess(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
+void vine_set_category_first_allocation_guess(struct vine_manager *m,  const char *category, const struct rmsummary *rm);
 
 /** Initialize first value of categories
 @param m     Reference to the current manager object.

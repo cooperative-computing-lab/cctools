@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2014- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -236,11 +236,12 @@ struct work_queue {
 	char *debug_path;
 	int tlq_port;
 	char *tlq_url;
-  
+
 	int fetch_factory;
 
 	int wait_retrieve_many;
-	int force_proportional_resources;
+	int proportional_resources;
+	int proportional_whole_tasks;
 };
 
 struct work_queue_worker {
@@ -261,6 +262,7 @@ struct work_queue_worker {
 
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
+	struct work_queue_resources *coprocess_resources;
 	struct hash_table           *features;
 
 	char *workerid;
@@ -1270,6 +1272,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 	itable_delete(w->current_tasks_boxes);
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
+	work_queue_resources_delete(w->coprocess_resources);
 	free(w->workerid);
 
 	if(w->features)
@@ -1378,6 +1381,7 @@ static void add_worker(struct work_queue *q)
 	w->last_update_msg_time = w->start_time;
 
 	w->resources = work_queue_resources_create();
+	w->coprocess_resources = work_queue_resources_create();
 
 	w->workerid = NULL;
 
@@ -3165,6 +3169,15 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 			w->resources->workers = r;
 			w->resources->workers.inuse = inuse;
 		}
+		else if(string_prefix_is(resource_name, "coprocess_cores")) {
+			w->coprocess_resources->cores = r;
+		} else if(string_prefix_is(resource_name, "coprocess_memory")) {
+			w->coprocess_resources->memory = r;
+		} else if(string_prefix_is(resource_name, "coprocess_disk")) {
+			w->coprocess_resources->disk = r;
+		} else if(string_prefix_is(resource_name, "coprocess_gpus")) {
+			w->coprocess_resources->gpus = r;
+		}
 	} else {
 		return MSG_FAILURE;
 	}
@@ -3752,9 +3765,7 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 	rmsummary_merge_override(limits, max);
 
 	int use_whole_worker = 1;
-
-	struct category *c = work_queue_category_lookup_or_create(q, t->category);
-	if(q->force_proportional_resources || c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
+	if(q->proportional_resources) {
 		double max_proportion = -1;
 		if(w->resources->cores.largest > 0) {
 			max_proportion = MAX(max_proportion, limits->cores / w->resources->cores.largest);
@@ -3784,14 +3795,14 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 
 			// adjust max_proportion so that an integer number of tasks fit the
 			// worker.
-			if(q->force_proportional_resources) {
+			if(q->proportional_whole_tasks) {
 				max_proportion = 1.0/(floor(1.0/max_proportion));
 			}
 
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
 			 * Otherwise they get a proportion according to specified
 			 * resources. Tasks will get at least one core. */
-			if(q->force_proportional_resources || limits->cores < 0) {
+			if(limits->cores < 0) {
 				if(limits->gpus > 0) {
 					limits->cores = 0;
 				} else {
@@ -3804,11 +3815,11 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 				limits->gpus = 0;
 			}
 
-			if(q->force_proportional_resources || limits->memory < 0) {
+			if(limits->memory < 0) {
 				limits->memory = MAX(1, floor(w->resources->memory.largest * max_proportion));
 			}
 
-			if(q->force_proportional_resources || limits->disk < 0) {
+			if(limits->disk < 0) {
 				limits->disk = MAX(1, floor(w->resources->disk.largest * max_proportion));
 			}
 		}
@@ -4115,7 +4126,14 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	}
 
 	struct rmsummary *l = task_worker_box_size(q, w, t);
-	struct work_queue_resources *r = w->resources;
+	struct work_queue_resources *r = NULL;
+	if (t->coprocess == NULL) {
+		r = w->resources;
+	} else {
+		r = w->coprocess_resources;
+	}
+
+	
 
 	int ok = 1;
 
@@ -4134,6 +4152,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	if((l->gpus > r->gpus.total) || (r->gpus.inuse + l->gpus > overcommitted_resource_total(q, r->gpus.total))) {
 		ok = 0;
 	}
+
 
 	//if worker's end time has not been received
 	if(w->end_time < 0){
@@ -4433,6 +4452,11 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 	w->resources->disk.inuse   = 0;
 	w->resources->gpus.inuse   = 0;
 
+	w->coprocess_resources->cores.inuse  = 0;
+	w->coprocess_resources->memory.inuse = 0;
+	w->coprocess_resources->disk.inuse   = 0;
+	w->coprocess_resources->gpus.inuse   = 0;
+
 	update_max_worker(q, w);
 
 	if(w->resources->workers.total < 1)
@@ -4442,10 +4466,19 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 
 	itable_firstkey(w->current_tasks_boxes);
 	while(itable_nextkey(w->current_tasks_boxes, &taskid, (void **)& box)) {
-		w->resources->cores.inuse     += box->cores;
-		w->resources->memory.inuse    += box->memory;
-		w->resources->disk.inuse      += box->disk;
-		w->resources->gpus.inuse      += box->gpus;
+		struct work_queue_task *t = itable_lookup(w->current_tasks, taskid);
+		if (t->coprocess) {
+			w->coprocess_resources->cores.inuse     += box->cores;
+			w->coprocess_resources->memory.inuse    += box->memory;
+			w->coprocess_resources->disk.inuse      += box->disk;
+			w->coprocess_resources->gpus.inuse      += box->gpus;
+		}
+		else {
+			w->resources->cores.inuse     += box->cores;
+			w->resources->memory.inuse    += box->memory;
+			w->resources->disk.inuse      += box->disk;
+			w->resources->gpus.inuse      += box->gpus;
+		}
 	}
 }
 
@@ -5039,7 +5072,6 @@ void work_queue_task_specify_coprocess( struct work_queue_task *t, const char *c
 		free(t->coprocess);
 		t->coprocess = NULL;
 	}
-
 	if(coprocess) {
 		t->coprocess = string_format("wq_worker_coprocess:%s", coprocess);
 		work_queue_task_specify_feature(t, t->coprocess);
@@ -5870,6 +5902,9 @@ struct work_queue *work_queue_ssl_create(int port, const char *key, const char *
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
+
+	q->proportional_resources = 1;
+	q->proportional_whole_tasks = 1;
 
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
@@ -7366,8 +7401,11 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-retrieve-many")){
 		q->wait_retrieve_many = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "force-proportional-resources")){
-		q->force_proportional_resources = MAX(0, (int)value);
+	} else if(!strcmp(name, "force-proportional-resources") || !strcmp(name, "proportional-resources")) {
+		q->proportional_resources = MAX(0, (int)value);
+
+	} else if(!strcmp(name, "force-proportional-resources-whole-tasks") || !strcmp(name, "proportional-whole-tasks")) {
+		q->proportional_whole_tasks = MAX(0, (int)value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
@@ -7688,10 +7726,8 @@ static void write_transaction(struct work_queue *q, const char *str) {
 	if(!q->transactions_logfile)
 		return;
 
-	fprintf(q->transactions_logfile, "%" PRIu64, timestamp_get());
-	fprintf(q->transactions_logfile, " %d", getpid());
-	fprintf(q->transactions_logfile, " %s", str);
-	fprintf(q->transactions_logfile, "\n");
+	fprintf(q->transactions_logfile, "%" PRIu64 " %d %s\n", timestamp_get(),getpid(),str);
+	fflush(q->transactions_logfile);
 }
 
 static void write_transaction_task(struct work_queue *q, struct work_queue_task *t) {
@@ -7773,7 +7809,7 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 	buffer_init(&B);
 
 	buffer_printf(&B, "CATEGORY %s MAX ", c->name);
-	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX), 1);
+	rmsummary_print_buffer(&B, category_bucketing_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX, -1), 1);
 	write_transaction(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
@@ -7798,10 +7834,16 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 		default:
 			mode = "FIXED";
 			break;
+		case CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING:
+			mode = "GREEDY_BUCKETING";
+			break;
+		case CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
+			mode = "EXHAUSTIVE_BUCKETING";
+			break;
 	}
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
-	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
+	rmsummary_print_buffer(&B, category_bucketing_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST, -1), 1);
 	write_transaction(q, buffer_tostring(&B));
 
 	buffer_free(&B);
@@ -7958,6 +8000,7 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 		}
 	}
 
+	int success;	//1 if success, 0 if resource exhaustion, -1 if other errors
 	/* accumulate resource summary to category only if task result makes it meaningful. */
 	switch(t->result) {
 		case WORK_QUEUE_RESULT_SUCCESS:
@@ -7966,7 +8009,16 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 		case WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:
 		case WORK_QUEUE_RESULT_DISK_ALLOC_FULL:
 		case WORK_QUEUE_RESULT_OUTPUT_TRANSFER_ERROR:
-			if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
+			if (t->result == WORK_QUEUE_RESULT_SUCCESS) {
+				success = 1;
+			}
+			else if (t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+				success = 0;
+			}
+			else {
+				success = -1;
+			}
+			if(category_bucketing_accumulate_summary(c, t->resources_measured, q->current_max_worker, t->taskid, success)) {
 				write_transaction_category(q, c);
 			}
 			break;
@@ -8011,10 +8063,12 @@ void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  c
 int work_queue_specify_category_mode(struct work_queue *q, const char *category, work_queue_category_mode_t mode) {
 
 	switch(mode) {
-		case CATEGORY_ALLOCATION_MODE_FIXED:
-		case CATEGORY_ALLOCATION_MODE_MAX:
-		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
-		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
+		case WORK_QUEUE_ALLOCATION_MODE_FIXED:
+		case WORK_QUEUE_ALLOCATION_MODE_MAX:
+		case WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE:
+		case WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT:
+		case WORK_QUEUE_ALLOCATION_MODE_GREEDY_BUCKETING:
+		case WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING:
 			break;
 		default:
 			notice(D_WQ, "Unknown category mode specified.");
@@ -8045,7 +8099,7 @@ const struct rmsummary *task_max_resources(struct work_queue *q, struct work_que
 
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 
-	return category_dynamic_task_max_resources(c, t->resources_requested, t->resource_request);
+	return category_bucketing_dynamic_task_max_resources(c, t->resources_requested, t->resource_request, t->taskid);
 }
 
 const struct rmsummary *task_min_resources(struct work_queue *q, struct work_queue_task *t) {

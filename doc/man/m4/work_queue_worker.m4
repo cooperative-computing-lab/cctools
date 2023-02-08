@@ -6,11 +6,11 @@ BOLD(work_queue_worker) - worker process for executing tasks
 dispatched through Work Queue
 
 SECTION(SYNOPSIS)
-CODE(work_queue_worker [options] PARAM(managerhost) PARAM(port))
+CODE(work_queue_worker [options] PARAM(manager_host) PARAM(manager_port))
 
-CODE(work_queue_worker [options] PARAM(managerhost:port]))
+CODE(work_queue_worker [options] PARAM(manager_host:manager_port]))
 
-CODE(work_queue_worker [options] "PARAM(managerhost:port;[managerhost:port;managerhost:port;...])))
+CODE(work_queue_worker [options] "PARAM(manager_host:manager_port;[manager_host:manager_port;manager_host:manager_port;...])))
 
 CODE(work_queue_worker [options] -M PARAM(projectname))
 
@@ -61,7 +61,7 @@ OPTION_ARG(i, min-backoff, time)Set initial value for backoff interval when work
 OPTION_ARG(b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a manager. (default=60s)
 OPTION_ARG(A, arch, arch)Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
 OPTION_ARG(O, os, os)Set the operating system string the worker reports to its supervisor. (default=the value reported by uname)
-OPTION_ARG(s, workdir, path)Set the location where the worker should create its working directory. (default=/tmp)
+OPTION_ARG(s, workdir, path)Set the location where the worker should create its working directory. (default=/tmp). Also configurable through environment variables BOLD(CCTOOLS_TEMP) or BOLD(TMPDIR).
 OPTION_ARG_LONG(bandwidth, mbps)Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)
 OPTION_ARG_LONG(cores, n)Set the number of cores this worker should use.  Set it to 0 to have the worker use all of the available resources. (default=1)
 OPTION_ARG_LONG(gpus, n)Set the number of GPUs this worker should use. If less than 0 or not given, try to detect gpus available.

@@ -199,7 +199,7 @@ site](http://ccl.cse.nd.edu/) and subscribe to our [mailing
 list](http://ccl.cse.nd.edu/software/help.shtml).
 
 
-Prune is Copyright (C) 2014- The University of Notre Dame.  
+Prune is Copyright (C) 2022 The University of Notre Dame.  
 All rights reserved.  
 This software is distributed under the GNU General Public License.  
 See the file COPYING for details.

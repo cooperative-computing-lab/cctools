@@ -1,6 +1,6 @@
 /*
 Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2005- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -92,6 +92,36 @@ struct pfs_kernel_statfs {
 	INT64_T f_fsid;
 		INT64_T f_namelen;
 		INT64_T f_spare[6];
+};
+
+struct pfs_kernel_statx_timestamp {
+	INT64_T tv_sec;
+	UINT32_T tv_nsec;
+};
+
+struct pfs_kernel_statx {
+	UINT32_T stx_mask;
+	UINT32_T stx_blksize;
+	UINT64_T stx_attributes;
+	UINT32_T stx_nlink;
+	UINT32_T stx_uid;
+	UINT32_T stx_gid;
+	UINT16_T stx_mode;
+	UINT64_T stx_ino;
+	UINT64_T stx_size;
+	UINT64_T stx_blocks;
+	UINT64_T stx_attributes_mask;
+
+	struct pfs_kernel_statx_timestamp stx_atime;
+	struct pfs_kernel_statx_timestamp stx_btime;
+	struct pfs_kernel_statx_timestamp stx_ctime;
+	struct pfs_kernel_statx_timestamp stx_mtime;
+
+	UINT32_T stx_rdev_major;
+	UINT32_T stx_rdev_minor;
+
+	UINT32_T stx_dev_major;
+	UINT32_T stx_dev_minor;
 };
 
 struct pfs_kernel_iovec {

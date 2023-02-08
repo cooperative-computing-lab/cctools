@@ -20,7 +20,7 @@ def my_sum(x, y, negate=False):
     return s
 
 # Create a new queue
-queue = vine.TaskVine(port=[9123,9130])
+queue = vine.Manager(port=[9123,9130])
 print("listening on port {}".format(queue.port))
 with open(port_file, "w") as f:
     f.write(str(queue.port))
@@ -30,7 +30,7 @@ with open(port_file, "w") as f:
 print("submitting tasks...")
 for value in range(1,10):
     task = vine.PythonTask(my_sum, value, value)
-    task.specify_cores(1)
+    task.set_cores(1)
     queue.submit(task)
 
 # add task outputs
@@ -45,7 +45,7 @@ while not queue.empty():
 # Submit several tasks for execution:
 for value in range(1,10):
     task = vine.PythonTask(my_sum, value, value, negate=True)
-    task.specify_cores(1)
+    task.set_cores(1)
     queue.submit(task)
 
 # add task outputs

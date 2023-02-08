@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2013- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -31,6 +31,7 @@ void work_queue_resources_delete( struct work_queue_resources *r );
 void work_queue_resources_debug( struct work_queue_resources *r );
 void work_queue_resources_measure_locally( struct work_queue_resources *r, const char *workspace );
 void work_queue_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime );
+void work_queue_coprocess_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime );
 void work_queue_resources_clear( struct work_queue_resources *r );
 void work_queue_resources_add( struct work_queue_resources *total, struct work_queue_resources *r );
 void work_queue_resources_add_to_jx( struct work_queue_resources *r, struct jx *j );

@@ -25,7 +25,7 @@ void vine_perf_log_write_header( struct vine_manager *q )
 		// workers current:
 		" workers_connected workers_init workers_idle workers_busy workers_able"
 		// workers cumulative:
-		" workers_joined workers_removed workers_released workers_idled_out workers_blocked workers_fast_aborted workers_lost"
+		" workers_joined workers_removed workers_released workers_idled_out workers_blocked workers_slow workers_lost"
 		// tasks current:
 		" tasks_waiting tasks_on_workers tasks_running tasks_with_results"
 		// tasks cumulative
@@ -57,10 +57,9 @@ void vine_perf_log_write_update( struct vine_manager *q, int force )
 	}
 
 	vine_get_stats(q, &s);
-	debug(D_VINE, "workers connections -- known: %d, connecting: %d, available: %d.",
+	debug(D_VINE, "workers connections -- known: %d, connecting: %d",
 			s.workers_connected,
-			s.workers_init,
-			vine_manager_available_workers(q));
+			s.workers_init);
 
 	q->time_last_log_stats = now;
 
@@ -86,7 +85,7 @@ void vine_perf_log_write_update( struct vine_manager *q, int force )
 	buffer_printf(&B, " %d", s.workers_released);
 	buffer_printf(&B, " %d", s.workers_idled_out);
 	buffer_printf(&B, " %d", s.workers_blocked);
-	buffer_printf(&B, " %d", s.workers_fast_aborted);
+	buffer_printf(&B, " %d", s.workers_slow);
 	buffer_printf(&B, " %d", s.workers_lost);
 
 	/* Stats for the current state of tasks: */

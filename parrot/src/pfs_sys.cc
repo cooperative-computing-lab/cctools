@@ -1,6 +1,6 @@
 /*
 Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2005- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -292,6 +292,35 @@ int pfs_lstat( const char *path, struct pfs_stat *buf )
 	BEGIN
 	debug(D_LIBCALL,"lstat %s %p",path,buf);
 	result = pfs_current->table->lstat(path,buf);
+	END
+}
+
+int pfs_statx( int dirfd, const char *pathname, int flags, unsigned int mask, struct pfs_statx *buf ) {
+	BEGIN
+	char newpath[PFS_PATH_MAX];
+
+	//statx:
+	//If pathname starts with a /, it is absolute and it is the path used.
+	//Otherwise, if pathname is not NULL or an empty string, it is taken as a
+	//relative path from dirfd. dirfd must be a file descriptor to an opened
+	//directory, or AT_FDCWD. If AT_FDCWD, paths are relative to the current
+	//workind directory.
+	//Otherwise, if pathnames is NULL or the empty string, and flags has
+	//AT_EMPTY_PATH, then the path is taken from the dirfd.
+	//Further, if flags contains AT_SYMLINK_NOFOLLOW, then statx does not
+	//dereference the path if it points to a symlink.
+
+	const char *path_ptr = pathname;
+	//when pathname is the empty string, or NULL, then statx behaves like stat*at functions.
+	if(!pathname || strnlen(pathname, 1) == 0) {
+		path_ptr = NULL;
+	}
+
+	if (pfs_current->table->complete_at_path(dirfd,path_ptr,newpath) == -1) return -1;
+	debug(D_LIBCALL,"statx %s %p",newpath,buf);
+
+	//newpath is an absolute path after complete_at_path, thus we can drop the dirfd argument to statx
+	result = pfs_current->table->statx(newpath,flags,mask,buf);
 	END
 }
 

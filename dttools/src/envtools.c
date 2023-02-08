@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2010- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -98,6 +98,32 @@ int env_replace( const char *infile, const char *outfile ){
 	fclose(INPUT);
 
 	return 0;
+}
+
+const char *system_tmp_dir(const char *override_tmp_dir)
+{
+	const char *tmp_dir;
+	if(override_tmp_dir) {
+		return override_tmp_dir;
+	}
+	else if((tmp_dir = getenv("CCTOOLS_TEMP")) && access(tmp_dir, R_OK|W_OK|X_OK) == 0){
+		return tmp_dir;
+	}
+	else if((tmp_dir = getenv("_CONDOR_SCRATCH_DIR")) && access(tmp_dir, R_OK|W_OK|X_OK) == 0){
+		return tmp_dir;
+	}
+	else if((tmp_dir = getenv("TMPDIR")) && access(tmp_dir, R_OK|W_OK|X_OK) == 0){
+		return tmp_dir;
+	}
+	else if((tmp_dir = getenv("TEMP")) && access(tmp_dir, R_OK|W_OK|X_OK) == 0){
+		return tmp_dir;
+	}
+	else if((tmp_dir = getenv("TMP")) && access(tmp_dir, R_OK|W_OK|X_OK) == 0){
+		return tmp_dir;
+	}
+	else {
+		return "/tmp";
+	}
 }
 
 /* vim: set noexpandtab tabstop=4: */

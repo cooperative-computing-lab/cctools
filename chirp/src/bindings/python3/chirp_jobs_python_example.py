@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-import Chirp
+import chirp
 
 def make_job(job_number):
     job = { 'executable' : './my_script',
@@ -26,11 +26,11 @@ if __name__ == '__main__':
     executable = sys.argv[2]
 
     try:
-        client = Chirp.Client(hostport,
+        client = chirp.Client(hostport,
                               authentication = ['unix'],
                               timeout = 15,
                               debug   = True)
-    except Chirp.AuthenticationFailure as e:
+    except chirp.AuthenticationFailure as e:
          print("Could not authenticate using: %s" % ', '.join(e.value))
          sys.exit(1)
 
@@ -57,7 +57,7 @@ if __name__ == '__main__':
                     client.job_reap( state['id'] )
                 elif state['status'] == 'ERRORED':
                     client.job_kill( state['id'] )
-            except Chirp.ChirpJobError:
+            except chirp.ChirpJobError:
                 print('error trying to clean job ' + str(state['id']))
 
             jobs_running -= 1

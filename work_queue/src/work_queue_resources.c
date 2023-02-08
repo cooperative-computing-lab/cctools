@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2013- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -87,6 +87,15 @@ void work_queue_resources_send( struct link *manager, struct work_queue_resource
 
 	/* send the tag last, the manager knows when the resource update is complete */
 	link_printf(manager, stoptime, "resource tag %"PRId64"\n", r->tag);
+}
+
+void work_queue_coprocess_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime ) 
+{
+	debug(D_WQ, "Sending coprocess resource description to manager:");
+	work_queue_resource_send(manager, &r->disk,    "coprocess_disk",   stoptime);
+	work_queue_resource_send(manager, &r->memory,  "coprocess_memory", stoptime);
+	work_queue_resource_send(manager, &r->gpus,    "coprocess_gpus",   stoptime);
+	work_queue_resource_send(manager, &r->cores,   "coprocess_cores",  stoptime);
 }
 
 void work_queue_resources_debug( struct work_queue_resources *r )

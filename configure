@@ -1333,6 +1333,7 @@ optional_function pread       unistd.h   HAS_PREAD USE_PREAD
 optional_function pread64     unistd.h   USE_PREAD64
 optional_function pwrite      unistd.h   HAS_PWRITE USE_PWRITE
 optional_function pwrite64    unistd.h   USE_PWRITE64
+optional_function statx       sys/stat.h HAS_STATX
 optional_function strchrnul   string.h   HAVE_STRCHRNUL
 optional_function strsignal   string.h   HAS_STRSIGNAL
 optional_function usleep      unistd.h   HAS_USLEEP HAVE_USLEEP

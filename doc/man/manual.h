@@ -2,7 +2,7 @@ ifdef(`HTML',`include(manual_html.h)')dnl
 ifdef(`MD',`include(manual_md.h)')dnl
 ifdef(`MAN',`include(manual_man.h)')dnl
 changecom(`@@')dnl
-define(COPYRIGHT_BOILERPLATE,The Cooperative Computing Tools are Copyright (C) 2005-2022 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.)dnl
+define(COPYRIGHT_BOILERPLATE,The Cooperative Computing Tools are Copyright (C) 2022 The University of Notre Dame.  This software is distributed under the GNU General Public License.  See the file COPYING for details.)dnl
 dnl
 define(SEE_ALSO_MAKEFLOW,
 `LIST_BEGIN
@@ -16,6 +16,13 @@ define(SEE_ALSO_WORK_QUEUE,
 LIST_ITEM(MANUAL(Cooperative Computing Tools Documentation,"../index.html"))
 LIST_ITEM(MANUAL(Work Queue User Manual,"../workqueue.html"))
 LIST_ITEM(MANPAGE(work_queue_worker,1) MANPAGE(work_queue_status,1) MANPAGE(work_queue_factory,1) MANPAGE(condor_submit_workers,1) MANPAGE(sge_submit_workers,1) MANPAGE(torque_submit_workers,1) )
+LIST_END')dnl
+dnl
+define(SEE_ALSO_TASK_VINE,
+`LIST_BEGIN
+LIST_ITEM(MANUAL(Cooperative Computing Tools Documentation,"../index.html"))
+LIST_ITEM(MANUAL(TaskVine User Manual,"../taskvine.html"))
+LIST_ITEM(MANPAGE(vine_worker,1) MANPAGE(vine_status,1) MANPAGE(vine_factory,1) MANPAGE(vine_graph_log,1) )
 LIST_END')dnl
 dnl
 define(SEE_ALSO_PARROT,

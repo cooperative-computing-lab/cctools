@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014- The University of Notre Dame
+ * Copyright (C) 2022 The University of Notre Dame
  * This software is distributed under the GNU General Public License.
  * See the file COPYING for details.
  */
@@ -42,6 +42,12 @@ void    random_init (void);
  * @return a random int64_t.
  */
 int64_t random_int64 (void);
+
+/** Get a random double from (0, 1)
+ *
+ * @return a random double from (0, 1)
+ */
+double random_double (void);
 
 /** Insert random data into an array.
  *

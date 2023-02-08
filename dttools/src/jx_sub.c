@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2021- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 
 static struct jx * jx_sub_call( struct jx *func, struct jx *args, struct jx *ctx) {

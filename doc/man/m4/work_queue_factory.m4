@@ -53,7 +53,8 @@ OPTION_ARG(M,manager-name,project) Project name of managers to server, can be re
 OPTION_ARG(F,foremen-name,project) Foremen to serve, can be a regular expression.
 OPTION_ARG_LONG(catalog,host:port) Catalog server to query for managers.
 OPTION_ARG(P,password,pwdfile) Password file for workers to authenticate.
-OPTION_ARG(S,scratch-dir,dir) Use this scratch dir for factory. Default is /tmp/wq-factory-$UID.
+OPTION_ARG(S,scratch-dir,dir) Use this scratch dir for factory. Default is /tmp/wq-factory-$UID. 
+Also configurable through environment variables BOLD(CCTOOLS_TEMP) or BOLD(TMPDIR)
 OPTION_FLAG_LONG(run-factory-as-manager) Force factory to run itself as a manager.
 OPTION_FLAG_LONG(parent-death) Exit if parent process dies.
 OPTION_ARG(d,debug,subsystem) Enable debugging for this subsystem.
@@ -138,7 +139,7 @@ If you want to start workers that match any project that begins
 with barney, use a regular expression:
 
 LONGCODE_BEGIN
-work_queue_factory -T condor -M barney.\* -t 300
+work_queue_factory -T condor -M "barney.*" -t 300
 LONGCODE_END
 
 If running on condor, you may manually specify condor requirements:

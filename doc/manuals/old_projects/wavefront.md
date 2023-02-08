@@ -2,7 +2,7 @@
 
 **Last edited: June 2013**
 
-Wavefront is Copyright (C) 2010- The University of Notre Dame.  
+Wavefront is Copyright (C) 2022 The University of Notre Dame.  
 All rights reserved.  
 This software is distributed under the GNU General Public License.  
 See the file COPYING for details.

@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 
 extern int symlinks_enabled;
+void send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time );
 
 char * vine_sandbox_full_path( struct vine_process *p, const char *sandbox_name )
 {
@@ -45,7 +46,7 @@ static int ensure_input_file( struct vine_process *p, struct vine_file *f, struc
 		result = create_dir(sandbox_path, 0700);
 		if(!result) debug(D_VINE,"couldn't create directory %s: %s", sandbox_path, strerror(errno));
 
-	} else if(vine_cache_ensure(cache,f->cached_name,manager)) {
+	} else if(vine_cache_ensure(cache,f->cached_name,manager,f->flags)) {
 		/* All other types, link the cached object into the sandbox */
 	    	create_dir_parents(sandbox_path,0777);
 		debug(D_VINE,"input: link %s -> %s",cache_path,sandbox_path);
@@ -71,8 +72,7 @@ int vine_sandbox_stagein( struct vine_process *p, struct vine_cache *cache, stru
 	int result=1;
 	
 	if(t->input_files) {
-		list_first_item(t->input_files);
-		while((f = list_next_item(t->input_files))) {
+		LIST_ITERATE(t->input_files,f) {
 			result = ensure_input_file(p,f,cache,manager);
 			if(!result) break;
 		}
@@ -89,7 +89,7 @@ then attempt a recursive copy.
 Inform the cache of the added file.
 */
 
-static int transfer_output_file( struct vine_process *p, struct vine_file *f, struct vine_cache *cache )
+static int transfer_output_file( struct vine_process *p, struct vine_file *f, struct vine_cache *cache, struct link *manager )
 {
 	char *cache_path = vine_cache_full_path(cache,f->cached_name);
 	char *sandbox_path = vine_sandbox_full_path(p,f->remote_name);
@@ -109,10 +109,13 @@ static int transfer_output_file( struct vine_process *p, struct vine_file *f, st
 		result = 1;
 	}
 
+
+
 	if(result) {
 		struct stat info;
 		if(stat(cache_path,&info)==0) {
-			vine_cache_addfile(cache,info.st_size,f->cached_name);
+			vine_cache_addfile(cache,info.st_size,info.st_mode,f->cached_name);
+			send_cache_update(manager,f->cached_name,info.st_size,0);
 		} else {
 			// This seems implausible given that the rename/copy succeded, but we still have to check...
 			debug(D_VINE,"output: failed to stat %s: %s",cache_path,strerror(errno));
@@ -133,12 +136,11 @@ created, we still want the task to be marked as completed and sent back to the
 manager.  The manager will handle the consequences of missing output files.
 */
 
-int vine_sandbox_stageout( struct vine_process *p, struct vine_cache *cache )
+int vine_sandbox_stageout( struct vine_process *p, struct vine_cache *cache, struct link *manager )
 {
 	struct vine_file *f;
-	list_first_item(p->task->output_files);
-	while((f = list_next_item(p->task->output_files))) {
-		transfer_output_file(p,f,cache);
+	LIST_ITERATE(p->task->output_files,f) {
+		transfer_output_file(p,f,cache,manager);
 	}
 
 	return 1;

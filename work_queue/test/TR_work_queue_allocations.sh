@@ -29,8 +29,8 @@ run()
 {
 	# worker resources (used by worker in factory in wq_alloc_test.py):
 	cores=4
-	memory=200
-	disk=200
+	memory=2000
+	disk=2000
 	gpus=8
 
 	# send makeflow to the background, saving its exit status.

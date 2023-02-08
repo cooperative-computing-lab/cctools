@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2022- The University of Notre Dame
+# Copyright (C) 2022 The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
@@ -50,7 +50,9 @@ read, write = os.pipe()
 
 def send_configuration(config):
     config_string = json.dumps(config)
-    print(len(config_string) + 1, "\\n", config_string, flush=True)
+    config_cmd = f"{len(config_string) + 1}\\n{config_string}\\n"
+    sys.stdout.write(config_cmd)
+    sys.stdout.flush()
 
 def main():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -126,7 +128,7 @@ def main():
 
                     response_size = len(response)
 
-                    size_msg = "output {}\\n".format(response_size)
+                    size_msg = "{}\\n".format(response_size)
 
                     # send the size of response
                     conn.sendall(size_msg.encode('utf-8'))

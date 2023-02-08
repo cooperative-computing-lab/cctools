@@ -1,6 +1,6 @@
 /*
 Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2005- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -30,6 +30,7 @@ public:
 	virtual pfs_dir * getdir( pfs_name *name );
 
 	virtual int stat( pfs_name *name, struct pfs_stat *buf );
+	virtual int statx( pfs_name *name, int flags, unsigned int mask, struct pfs_statx *buf );
 	virtual int statfs( pfs_name *name, struct pfs_statfs *buf );
 	virtual int lstat( pfs_name *name, struct pfs_stat *buf );
 	virtual int unlink( pfs_name *name );
@@ -83,6 +84,7 @@ void pfs_service_print();
 
 void pfs_service_emulate_statfs( struct pfs_statfs *buf );
 void pfs_service_emulate_stat( pfs_name *name, struct pfs_stat *buf );
+void pfs_service_emulate_statx( pfs_name *name, struct pfs_statx *buf );
 
 void pfs_service_set_block_size( int bs );
 int  pfs_service_get_block_size();

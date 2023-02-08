@@ -1016,7 +1016,7 @@ CMS Applications with Umbrella.
 
 # Further Information
 
-Umbrella is Copyright (C) 2015 The University of Notre Dame.  
+Umbrella is Copyright (C) 2022 The University of Notre Dame.  
 All rights reserved.  
 This software is distributed under the GNU General Public License.  
 See the file COPYING for details.

@@ -49,7 +49,12 @@ static int check_worker_against_task(struct vine_manager *q, struct vine_worker_
 	}
 
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
-	struct vine_resources *r = w->resources;
+	struct vine_resources *r = NULL;
+	if (t->coprocess == NULL) {
+		r = w->resources;
+	} else {
+		r = w->coprocess_resources;
+	}
 
 	int ok = 1;
 
@@ -92,8 +97,7 @@ static int check_worker_against_task(struct vine_manager *q, struct vine_worker_
 			return 0;
 
 		char *feature;
-		list_first_item(t->feature_list);
-		while((feature = list_next_item(t->feature_list))) {
+		LIST_ITERATE(t->feature_list,feature) {
 			if(!hash_table_lookup(w->features, feature))
 				return 0;
 		}
@@ -122,7 +126,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 		if( check_worker_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
 			LIST_ITERATE(t->input_files,tf) {
-				if((tf->type == VINE_FILE || tf->type == VINE_FILE_PIECE) && (tf->flags & VINE_CACHE)) {
+				if(tf->type == VINE_FILE  && (tf->flags & VINE_CACHE)) {
 					remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 					if(remote_info)
 						task_cached_bytes += remote_info->size;
@@ -413,13 +417,13 @@ void vine_schedule_check_for_large_tasks( struct vine_manager *q )
 
 	struct rmsummary *largest_unfit_task = rmsummary_create(-1);
 
-	list_first_item(q->ready_list);
-	while( (t = list_next_item(q->ready_list))){
+	LIST_ITERATE(q->ready_list,t) {
+
 		// check each task against the queue of connected workers
 		vine_resource_bitmask_t bit_set = is_task_larger_than_any_worker(q,t);
 		if(bit_set) {
-			rmsummary_merge_max(largest_unfit_task, vine_manager_task_max_resources(q, t));
-			rmsummary_merge_max(largest_unfit_task, vine_manager_task_min_resources(q, t));
+			rmsummary_merge_max(largest_unfit_task, vine_manager_task_resources_max(q, t));
+			rmsummary_merge_max(largest_unfit_task, vine_manager_task_resources_min(q, t));
 		}
 		if (bit_set & CORES_BIT) {
 			unfit_core++;

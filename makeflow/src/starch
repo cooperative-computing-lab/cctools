@@ -63,6 +63,8 @@ if [ -z "$SFX_DIR" ]; then
     if [ ! -z "$SFX_UNIQUE" ] && [ "$SFX_UNIQUE" = 1 ]; then
         SFX_DIR=`mktemp -d -u $SFX_DIR.XXXXXX`
     fi
+else
+    dir_lock=".${SFX_DIR}.lock"
 fi
 
 extract_real () {

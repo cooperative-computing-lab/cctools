@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2013- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -1183,6 +1183,12 @@ struct jx *category_allocation_to_json(category_allocation_t c) {
 			break;
 		case CATEGORY_ALLOCATION_ERROR:
 			return jx_string("error");
+			break;
+		case CATEGORY_ALLOCATION_GREEDY_BUCKETING:
+			return jx_string("greedy bucketing");
+			break;
+		case CATEGORY_ALLOCATION_EXHAUSTIVE_BUCKETING:
+			return jx_string("exhaustive bucketing");
 			break;
 	}
 	return jx_null();

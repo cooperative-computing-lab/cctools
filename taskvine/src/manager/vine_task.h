@@ -24,11 +24,11 @@ End user may only use the API described in taskvine.h
 struct vine_task {
         /***** Fixed properties of task at submit time. ******/
 
-        int taskid;                  /**< A unique task id number. */
+        int task_id;                  /**< A unique task id number. */
 	char *command_line;          /**< The program(s) to execute, as a shell command line. */
 	char *coprocess;             /**< The name of the coprocess name in the worker that executes this task. For regular tasks it is NULL. */
 	char *tag;                   /**< An optional user-defined logical name for the task. */
-	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref vine_task_specify_category. If no explicit category is given, the label "default" is used. **/
+	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref vine_task_set_category. If no explicit category is given, the label "default" is used. **/
 
 	char *monitor_output_directory;	/**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref vine_enable_monitoring */
 	char *monitor_snapshot_file;    /**< Filename the monitor checks to produce snapshots. */
@@ -50,10 +50,10 @@ struct vine_task {
 	struct vine_worker_info *worker;    /**< Worker to which this task has been dispatched. */
 	int try_count;               /**< The number of times the task has been dispatched to a worker. If larger than max_retries, the task failes with @ref VINE_RESULT_MAX_RETRIES. */
 	int exhausted_attempts;      /**< Number of times the task failed given exhausted resources. */
-	int fast_abort_count;        /**< Number of times this task has been terminated for running too long. */
+	int workers_slow;            /**< Number of times this task has been terminated for running too long. */
 
 	/***** Results of task once it has reached completion. *****/
-  
+
 	vine_result_t result;          /**< The result of the task (see @ref vine_result_t */
 	int exit_code;               /**< The exit code of the command line. */
 	char *output;                /**< The standard output of the task. */
@@ -86,12 +86,12 @@ struct vine_task {
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
 };
 
-int  vine_task_update_result(struct vine_task *t, vine_result_t new_result );
-void vine_task_specify_resources(struct vine_task *t, const struct rmsummary *rm);
+int  vine_task_set_result(struct vine_task *t, vine_result_t new_result);
+void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm);
 void vine_task_clean( struct vine_task *t, int full_clean );
 void vine_task_check_consistency( struct vine_task *t );
 
-const char *vine_task_state_string( vine_task_state_t task_state );
+const char *vine_task_state_to_string( vine_task_state_t task_state );
 
 struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t );
 

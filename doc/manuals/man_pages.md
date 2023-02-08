@@ -18,6 +18,13 @@ for a broader discussion of how each tool is used.
   * [makeflow_ec2_cleanup(1)](man_pages/makeflow_ec2_cleanup.md)
   * [condor_submit_makeflow(1)](man_pages/condor_submit_makeflow.md)
 
+## TaskVine
+
+  * [vine_worker(1)](man_pages/vine_worker.md)
+  * [vine_status(1)](man_pages/vine_status.md)
+  * [vine_graph_log(1)](man_pages/vine_graph_log.md)
+  * [vine_factory(1)](man_pages/work_queue_factory.md)
+
 ## Work Queue
 
   * [work_queue_worker(1)](man_pages/work_queue_worker.md)

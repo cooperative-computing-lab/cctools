@@ -1,6 +1,6 @@
 /*
 Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2005- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -100,6 +100,7 @@ static struct flag_info table[] = {
 	{"jx", D_JX},
 	{"ssl", D_SSL},
 	{"all", D_ALL},
+	{"bucketing", D_BUCKETING},
 	{"time", 0},		/* backwards compatibility */
 	{"pid", 0},		/* backwards compatibility */
 	{0, 0}

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2008- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -109,7 +109,11 @@ typedef enum {
                                                                                 connects. */
     WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE      = CATEGORY_ALLOCATION_MODE_MIN_WASTE, /**< As above, but tasks are first tried with an automatically
                                                                                       computed allocation to minimize resource waste. */
-    WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT /**< As above, but maximizing throughput. */
+    WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT, /**< As above, but maximizing throughput. */
+    
+    WORK_QUEUE_ALLOCATION_MODE_GREEDY_BUCKETING = CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING, /**< Use the greedy bucketing algorithm to label resources */
+
+    WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING = CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING /**< Use the exhaustive bucketing algorithm to label resources */
 } work_queue_category_mode_t;
 
 

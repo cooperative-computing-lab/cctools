@@ -1,6 +1,6 @@
 /*
 Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2005- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -77,6 +77,7 @@ public:
 
 	/* operations on services */
 	int	stat( const char *name, struct pfs_stat *buf );
+	int	statx( const char *pathname, int flags, unsigned int mask, struct pfs_statx *buf );
 	int	statfs( const char *path, struct pfs_statfs *buf );
 	int	lstat( const char *name, struct pfs_stat *buf );
 	int	access( const char *name, mode_t mode );

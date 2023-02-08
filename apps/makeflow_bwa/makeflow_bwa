@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-#Copyright (C) 2013- The University of Notre Dame
+#Copyright (C) 2022 The University of Notre Dame
 #This software is distributed under the GNU General Public License.
 #See the file COPYING for details.
 #
@@ -99,7 +99,7 @@ def write_fastq_reduce(destination):
 		fastq_r.write('''
 #!/usr/bin/perl
 #
-#Copyright (C) 2013- The University of Notre Dame
+#Copyright (C) 2022 The University of Notre Dame
 #This software is distributed under the GNU General Public License.
 #See the file COPYING for details.
 #
@@ -170,7 +170,7 @@ def write_cat_bwa(destination):
 	try:
 		cat_bwa.write('''#!/usr/bin/perl
 #
-#Copyright (C) 2013- The University of Notre Dame
+#Copyright (C) 2022 The University of Notre Dame
 #This software is distributed under the GNU General Public License.
 #See the file COPYING for details.
 #

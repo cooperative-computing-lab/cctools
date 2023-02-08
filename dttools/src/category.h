@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2015- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "itable.h"
 #include "histogram.h"
 #include "timestamp.h"
+#include "bucketing_manager.h"
 
 /** \enum category_allocation_t
   Valid states for the lifetime of automatic resource allocations for a single task.
@@ -22,7 +23,9 @@ typedef enum {
 	CATEGORY_ALLOCATION_FIRST = 0,       /**< No automatic allocation, or using first step value of the two-step policy. */
 	CATEGORY_ALLOCATION_AUTO  = 0,       /**< Same as FIRST, FIRST is deprecated */
 	CATEGORY_ALLOCATION_MAX,             /**< Using max of category. (2nd step of two-step policy) */
-	CATEGORY_ALLOCATION_ERROR            /**< No valid resources could be found. (E.g., after 2nd step fails) */
+	CATEGORY_ALLOCATION_ERROR,            /**< No valid resources could be found. (E.g., after 2nd step fails) */
+    CATEGORY_ALLOCATION_GREEDY_BUCKETING,    /**< Use the greedy bucketing algorithm to label resources */
+    CATEGORY_ALLOCATION_EXHAUSTIVE_BUCKETING, /**< Use the exhaustive bucketing algorithm to label resources */
 } category_allocation_t;
 
 
@@ -53,8 +56,13 @@ typedef enum {
                                           tried with an automatically computed
                                          * allocation to minimize resource
                                          * waste. */
-    CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT /**< As above, but maximizing
+    CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT, /**< As above, but maximizing
                                               throughput. */
+    CATEGORY_ALLOCATION_MODE_GREEDY_BUCKETING, /**< Use the greedy bucketing 
+                                               algorithm to label resources */
+    
+    CATEGORY_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING   /**< Use the exhaustive 
+                                                      bucketing algorithm to label resources */
 } category_mode_t;
 
 
@@ -73,6 +81,9 @@ struct category {
 	struct rmsummary *autolabel_resource;
 
 	struct itable *histograms;
+
+    /* manager for bucketing mode, if applicable */
+    bucketing_manager_t* bucketing_manager;
 
 	int64_t total_tasks;
 
@@ -109,6 +120,11 @@ void category_delete(struct hash_table *categories, const char *name);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 
 int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker);
+
+int category_bucketing_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker, int taskid, int success);
+
+int category_in_bucketing_mode(struct category* c);
+
 int category_update_first_allocation(struct category *c, const struct rmsummary *max_worker);
 
 int category_in_steady_state(struct category *c);
@@ -116,6 +132,8 @@ int category_in_steady_state(struct category *c);
 category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);
 
 const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
+
+const struct rmsummary *category_bucketing_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request, int taskid);
 
 const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
 

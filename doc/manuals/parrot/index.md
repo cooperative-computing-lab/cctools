@@ -870,5 +870,5 @@ For more information, please see [Getting Help](../help) or visit the [Cooperati
 
 ## Copyright
 
-CCTools is Copyright (C) 2019- The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
+CCTools is Copyright (C) 2022 The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
 details.

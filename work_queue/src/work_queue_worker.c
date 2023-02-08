@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2008- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include "work_queue_sandbox.h"
 
 #include "cctools.h"
+#include "envtools.h"
 #include "macros.h"
 #include "catalog_query.h"
 #include "domain_name_cache.h"
@@ -229,7 +230,13 @@ static int tlq_port = 0;
 
 static char *coprocess_command = NULL;
 static char *coprocess_name = NULL;
-static int coprocess_port = -1;
+static int number_of_coprocess_instances = 0;
+struct work_queue_coprocess *coprocess_info = NULL;
+
+static int coprocess_cores = -1;
+static int coprocess_memory = -1;
+static int coprocess_disk = -1;
+static int coprocess_gpus = -1;
 
 static char *factory_name = NULL;
 
@@ -358,6 +365,10 @@ static void measure_worker_resources()
 
 	work_queue_gpus_init(r->gpus.total);
 
+	if (coprocess_command != NULL && coprocess_info != NULL) {
+		work_queue_coprocess_measure_resources(coprocess_info, number_of_coprocess_instances);
+	}
+
 	last_resources_measurement = time(0);
 }
 
@@ -403,6 +414,10 @@ static void send_resource_update(struct link *manager)
 		if(manual_wall_time_option > 0) {
 			end_time = worker_start_time + (manual_wall_time_option * 1e6);
 		}
+	}
+
+	if (coprocess_info != NULL) {
+		work_queue_coprocess_resources_send(manager,coprocess_info->coprocess_resources,stoptime);
 	}
 
 	work_queue_resources_send(manager,total_resources,stoptime);
@@ -755,12 +770,19 @@ static int handle_completed_tasks(struct link *manager)
 					p->task->disk_allocation_exhausted = 1;
 				}
 			}
-
+			
+			if (p->coprocess != NULL) {
+				struct work_queue_coprocess *cop= (struct work_queue_coprocess *) p->coprocess;
+				cop->state = WORK_QUEUE_COPROCESS_READY;
+			}
+			
 			/* collect the resources associated with the process */
 			reap_process(p);
 			
 			/* must reset the table iterator because an item was removed. */
 			itable_firstkey(procs_running);
+
+
 		}
 
 	}
@@ -1369,7 +1391,7 @@ static int enforce_processes_limits()
 
 	itable_firstkey(procs_table);
 	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
-		if(!enforce_process_limits(p)) {
+		if(!enforce_process_limits(p) || !work_queue_coprocess_enforce_limit(p->coprocess)) {
 			finish_running_task(p, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
 			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
@@ -1737,18 +1759,19 @@ static void work_for_manager(struct link *manager)
 			struct work_queue_process *p;
 			int visited;
 			int waiting = list_size(procs_waiting);
-
 			for(visited = 0; visited < waiting; visited++) {
 				p = list_pop_head(procs_waiting);
 				if(!p) {
 					break;
 				} else if(task_resources_fit_now(p->task)) {
-					// attach the function name, port, and type to process, if applicable
-					if(coprocess_command) {
-						/* for coprocesses, p->task->command_line is the name
-						 * of the function to execute */
-						p->coprocess_name = xxstrdup(coprocess_name);
-						p->coprocess_port = coprocess_port;
+					if (p->task->coprocess) {
+						struct work_queue_coprocess *ready_coprocess = work_queue_coprocess_find_state(coprocess_info, number_of_coprocess_instances, WORK_QUEUE_COPROCESS_READY);
+						if (ready_coprocess == NULL) {
+							list_push_tail(procs_waiting, p);
+							continue;
+						}
+						p->coprocess = ready_coprocess;
+						ready_coprocess->state = WORK_QUEUE_COPROCESS_RUNNING;
 					}
 					start_process(p,manager);
 					task_event++;
@@ -1849,23 +1872,8 @@ static int workspace_create()
 	char absolute[WORK_QUEUE_LINE_MAX];
 
 	// Setup working space(dir)
-	const char *workdir;
-	const char *workdir_tmp;
-	if (user_specified_workdir) {
-		workdir = user_specified_workdir;
-	} else if((workdir_tmp = getenv("_CONDOR_SCRATCH_DIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TMPDIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TEMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else if((workdir_tmp = getenv("TMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
-		workdir = workdir_tmp;
-	} else {
-		workdir = "/tmp";
-	}
-
 	if(!workspace) {
+		const char *workdir = system_tmp_dir(user_specified_workdir);
 		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
 
@@ -2395,6 +2403,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
+	printf( " %-30s Specify the number of coprocesses for serverless functions that the worker should maintain. A coprocess must be specified.\n", "--num_coprocesses=<number>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2403,8 +2412,9 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT,
 	  LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
 	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ, LONG_OPT_PARENT_DEATH, LONG_OPT_CONN_MODE,
-	  LONG_OPT_USE_SSL, LONG_OPT_COPROCESS, LONG_OPT_PYTHON_FUNCTION,
-	  LONG_OPT_FROM_FACTORY};
+	  LONG_OPT_USE_SSL, LONG_OPT_PYTHON_FUNCTION, LONG_OPT_FROM_FACTORY, LONG_OPT_COPROCESS,
+	  LONG_OPT_NUM_COPROCESS, LONG_OPT_COPROCESS_CORES, 
+	  LONG_OPT_COPROCESS_MEMORY, LONG_OPT_COPROCESS_DISK, LONG_OPT_COPROCESS_GPUS};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2451,6 +2461,11 @@ static const struct option long_options[] = {
 	{"connection-mode",     required_argument,  0,  LONG_OPT_CONN_MODE},
 	{"ssl",                 no_argument,        0,  LONG_OPT_USE_SSL},
 	{"coprocess",           required_argument,  0,  LONG_OPT_COPROCESS},
+	{"num_coprocesses",     required_argument,  0,  LONG_OPT_NUM_COPROCESS},
+	{"coprocess_cores",     required_argument,  0,  LONG_OPT_COPROCESS_CORES},
+	{"coprocess_memory",    required_argument,  0,  LONG_OPT_COPROCESS_MEMORY},
+	{"coprocess_disk",      required_argument,  0,  LONG_OPT_COPROCESS_DISK},
+	{"coprocess_gpus",      required_argument,  0,  LONG_OPT_COPROCESS_GPUS},
 	{"from-factory",        required_argument,  0,  LONG_OPT_FROM_FACTORY},
 	{0,0,0,0}
 };
@@ -2703,6 +2718,21 @@ int main(int argc, char *argv[])
 			path_absolute(optarg, coprocess_command, 1);
 			realloc(coprocess_command, strlen(coprocess_command)+1);
 			break;
+		case LONG_OPT_NUM_COPROCESS:
+			number_of_coprocess_instances = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_CORES:
+			coprocess_cores = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_MEMORY:
+			coprocess_memory = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_DISK:
+			coprocess_disk = atoi(optarg);
+			break;
+		case LONG_OPT_COPROCESS_GPUS:
+			coprocess_gpus = atoi(optarg);
+			break;
 		case LONG_OPT_FROM_FACTORY:
 			if (factory_name) free(factory_name);
 			factory_name = xxstrdup(optarg);
@@ -2856,10 +2886,16 @@ int main(int argc, char *argv[])
 		total_resources->disk.total,
 		total_resources->gpus.total);
 
-	if(coprocess_command) {
-		/* start coprocess per manager attempt */
-		coprocess_name = work_queue_coprocess_start(coprocess_command, &coprocess_port);
+	if(coprocess_command && (number_of_coprocess_instances > 0)) {
+		coprocess_info = work_queue_coprocess_initalize_all_coprocesses(coprocess_cores, coprocess_memory, coprocess_disk, coprocess_gpus, total_resources, coprocess_command, number_of_coprocess_instances);
+		coprocess_name = xxstrdup(coprocess_info[0].name);
 		hash_table_insert(features, coprocess_name, (void **) 1);
+	}
+	else {
+		if (number_of_coprocess_instances != 0)
+		{
+			fatal("No coprocess specified but number of coprocesses given\n");
+		}
 	}
 
 	while(1) {
@@ -2917,8 +2953,9 @@ int main(int argc, char *argv[])
 		sleep(backoff_interval);
 	}
 
-	if (coprocess_command) {
-		work_queue_coprocess_terminate();
+	if (coprocess_command && number_of_coprocess_instances > 0) {
+		work_queue_coprocess_shutdown_all_coprocesses(coprocess_info, number_of_coprocess_instances);
+		free(coprocess_command);
 		free(coprocess_name);
 	}
 

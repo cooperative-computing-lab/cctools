@@ -1,4 +1,4 @@
-## @package WorkQueuePython
+## @package work_queue
 #
 # Python Work Queue bindings.
 #
@@ -45,9 +45,14 @@ def specify_port_range(low_port, high_port):
     os.environ['TCP_HIGH_PORT'] = str(high_port)
 
 cctools_debug_config('work_queue_python')
+cctools_tmpdir = os.getenv('CCTOOLS_TEMP', None)
+
+if cctools_tmpdir:
+    staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-', dir=cctools_tmpdir)
+else:
+    staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-')
 
 
-staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-')
 def cleanup_staging_directory():
     try:
         shutil.rmtree(staging_directory)
@@ -1009,7 +1014,8 @@ class PythonTask(Task):
                 shutil.rmtree(self._tmpdir)
 
         except Exception as e:
-            sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
+            if sys:
+                sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
 
 
     def _serialize_python_function(self, func, args, kwargs):

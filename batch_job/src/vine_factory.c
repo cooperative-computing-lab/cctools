@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2014- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -77,6 +77,7 @@ static int tasks_per_worker = -1;
 static int autosize = 0;
 static int worker_timeout = 300;
 static int consider_capacity = 0;
+static int debug_workers = 0;
 
 static char *project_regex = 0;
 static char *submission_regex = 0;
@@ -103,6 +104,9 @@ static char *wrapper_command = 0;
 struct list *wrapper_inputs = 0;
 
 static char *worker_command = 0;
+
+/* Unique number assigned to each worker instance for troubleshooting. */
+static int worker_instance = 0;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -149,11 +153,11 @@ int manager_workers_capacity(struct jx *j) {
 	const int disk = resources->disk;
 	const int gpus = resources->gpus;
 
-	debug(D_WQ, "capacity_tasks: %d", capacity_tasks);
-	debug(D_WQ, "capacity_cores: %d", capacity_cores);
-	debug(D_WQ, "capacity_memory: %d", capacity_memory);
-	debug(D_WQ, "capacity_disk: %d", capacity_disk);
-	debug(D_WQ, "capacity_gpus: %d", capacity_gpus);
+	debug(D_VINE, "capacity_tasks: %d", capacity_tasks);
+	debug(D_VINE, "capacity_cores: %d", capacity_cores);
+	debug(D_VINE, "capacity_memory: %d", capacity_memory);
+	debug(D_VINE, "capacity_disk: %d", capacity_disk);
+	debug(D_VINE, "capacity_gpus: %d", capacity_gpus);
 
 	// first, assume one task per worker
 	int capacity = capacity_tasks;
@@ -249,7 +253,7 @@ struct list* do_direct_query( const char *manager_host, int manager_port )
 	}
 
 	if(password) {
-		debug(D_WQ,"authenticating to manager");
+		debug(D_VINE,"authenticating to manager");
 		if(!link_auth_password(l,password,stoptime)) {
 			fprintf(stderr,"vine_factory: wrong password for manager.\n");
 			link_close(l);
@@ -342,7 +346,7 @@ static int count_workers_needed( struct list *managers_list, int only_not_runnin
 			need = MIN(need, capacity);
 		}
 
-		debug(D_WQ,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tw+tl+tr,capacity,need,tr);
+		debug(D_VINE,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tw+tl+tr,capacity,need,tr);
 		needed_workers += need;
 		managers++;
 	}
@@ -389,31 +393,40 @@ static void set_worker_resources_options( struct batch_queue *queue )
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
-	char *worker;
 
-	worker = string_format("./%s", worker_command);
+	char *worker_log_file = 0;
+	char *debug_worker_options = 0;
+	
+	if(debug_workers) {
+		worker_instance++;
+		worker_log_file = string_format("worker.%d.log",worker_instance);
+		debug_worker_options = string_format("-d all -o %s",worker_log_file);
+	}
+	
+	char *worker = string_format("./%s", worker_command);
 	if(using_catalog) {
 		cmd = string_format(
-		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s %s %s",
+		"%s -M %s -t %d -C '%s' %s %s %s %s %s %s",
 		worker,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
+		debug_workers ? debug_worker_options : "",
 		factory_name ? string_format("--from-factory \"%s\"", factory_name) : "",
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
 		extra_worker_args ? extra_worker_args : ""
 		);
-	}
-	else {
+	} else {
 		cmd = string_format(
-		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s %s",
+		"%s %s %d -t %d -C '%s' %s %s %s %s %s",
 		worker,
 		manager_host,
 		manager_port,
 		worker_timeout,
 		catalog_host,
+		debug_workers ? debug_worker_options : "",
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		manual_ssl_option ? "--ssl" : "",
@@ -446,10 +459,12 @@ static int submit_worker( struct batch_queue *queue )
 		files = newfiles;
 	}
 
-	debug(D_WQ,"submitting worker: %s",cmd);
+	debug(D_VINE,"submitting worker: %s",cmd);
 
-	int status = batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
+	int status = batch_job_submit(queue,cmd,files,worker_log_file,batch_env,resources);
 
+	free(worker_log_file);
+	free(debug_worker_options);
 	free(cmd);
 	free(files);
 	free(worker);
@@ -507,7 +522,7 @@ static int submit_workers( struct batch_queue *queue, struct itable *job_table, 
 	for(i=0;i<count;i++) {
 		int jobid = submit_worker(queue);
 		if(jobid>0) {
-			debug(D_WQ,"worker job %d submitted",jobid);
+			debug(D_VINE,"worker job %d submitted",jobid);
 			itable_insert(job_table,jobid,(void*)1);
 		} else {
 			break;
@@ -521,14 +536,14 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 	uint64_t jobid;
 	void *value;
 
-	debug(D_WQ,"removing all remaining worker jobs...");
+	debug(D_VINE,"removing all remaining worker jobs...");
 	int count = itable_size(job_table);
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table,&jobid,&value)) {
-		debug(D_WQ,"removing job %"PRId64,jobid);
+		debug(D_VINE,"removing job %"PRId64,jobid);
 		batch_job_remove(queue,jobid);
 	}
-	debug(D_WQ,"%d workers removed.",count);
+	debug(D_VINE,"%d workers removed.",count);
 
 }
 
@@ -923,7 +938,7 @@ static void mainloop( struct batch_queue *queue )
 			}
 		}
 	
-		debug(D_WQ,"evaluating manager list...");
+		debug(D_VINE,"evaluating manager list...");
 		int workers_connected = count_workers_connected(managers_list);
 		int workers_needed = 0;
 
@@ -933,7 +948,7 @@ static void mainloop( struct batch_queue *queue )
 			 * managers' list. The rest of the tasks will be counted as waiting
 			 * or running on the foremen. */
 			workers_needed = count_workers_needed(managers_list, /* do not count running tasks */ 1);
-			debug(D_WQ,"evaluating foremen list...");
+			debug(D_VINE,"evaluating foremen list...");
 			foremen_list    = vine_catalog_query(catalog_host,-1,foremen_regex);
 
 			/* add workers on foremen. Also, subtract foremen from workers
@@ -941,26 +956,26 @@ static void mainloop( struct batch_queue *queue )
 			workers_needed    += count_workers_needed(foremen_list, 0);
 			workers_connected += MAX(count_workers_connected(foremen_list) - list_size(foremen_list), 0);
 
-			debug(D_WQ,"%d total workers needed across %d foremen",workers_needed,list_size(foremen_list));
+			debug(D_VINE,"%d total workers needed across %d foremen",workers_needed,list_size(foremen_list));
 		} else {
 			/* If there are no foremen, workers needed are computed directly
 			 * from the tasks running, waiting, and left from the managers'
 			 * list. */
 			workers_needed = count_workers_needed(managers_list, 0);
-			debug(D_WQ,"%d total workers needed across %d managers",
+			debug(D_VINE,"%d total workers needed across %d managers",
 					workers_needed,
 					managers_list ? list_size(managers_list) : 0);
 		}
 
-		debug(D_WQ,"raw workers needed: %d", workers_needed);
+		debug(D_VINE,"raw workers needed: %d", workers_needed);
 
 		if(workers_needed > workers_max) {
-			debug(D_WQ,"applying maximum of %d workers",workers_max);
+			debug(D_VINE,"applying maximum of %d workers",workers_max);
 			workers_needed = workers_max;
 		}
 
 		if(workers_needed < workers_min) {
-			debug(D_WQ,"applying minimum of %d workers",workers_min);
+			debug(D_VINE,"applying minimum of %d workers",workers_min);
 			workers_needed = workers_min;
 		}
 
@@ -973,7 +988,7 @@ static void mainloop( struct batch_queue *queue )
 		int workers_waiting_to_connect = workers_submitted - workers_connected;
 
 		if(workers_waiting_to_connect < 0) {
-			debug(D_WQ,"at least %d workers have already connected from other sources", -workers_waiting_to_connect);
+			debug(D_VINE,"at least %d workers have already connected from other sources", -workers_waiting_to_connect);
 			new_workers_needed -= abs(workers_waiting_to_connect);
 
 			// this factory has no workers_waiting_to_connect
@@ -981,23 +996,23 @@ static void mainloop( struct batch_queue *queue )
 		}
 
 		if(workers_waiting_to_connect > 0) {
-			debug(D_WQ,"waiting for %d previously submitted workers to connect", workers_waiting_to_connect);
+			debug(D_VINE,"waiting for %d previously submitted workers to connect", workers_waiting_to_connect);
 		}
 
 		// Apply workers_per_cycle. Never have more than workers_per_cycle waiting to connect.
 		if(workers_per_cycle > 0 && (new_workers_needed + workers_waiting_to_connect) > workers_per_cycle) {
-			debug(D_WQ,"applying maximum workers per cycle of %d",workers_per_cycle);
+			debug(D_VINE,"applying maximum workers per cycle of %d",workers_per_cycle);
 			new_workers_needed = MAX(0, workers_per_cycle - workers_waiting_to_connect);
 		}
 
-		debug(D_WQ,"workers needed: %d",    workers_needed);
-		debug(D_WQ,"workers submitted: %d", workers_submitted);
-		debug(D_WQ,"workers requested: %d", MAX(0, new_workers_needed));
+		debug(D_VINE,"workers needed: %d",    workers_needed);
+		debug(D_VINE,"workers submitted: %d", workers_submitted);
+		debug(D_VINE,"workers requested: %d", MAX(0, new_workers_needed));
 
 		struct jx *j = factory_to_jx(managers_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
 		char *update_str = jx_print_string(j);
-		debug(D_WQ, "Sending status to the catalog server(s) at %s ...", catalog_host);
+		debug(D_VINE, "Sending status to the catalog server(s) at %s ...", catalog_host);
 		catalog_query_send_update(catalog_host, update_str);
 		print_stats(j);
 		free(update_str);
@@ -1006,15 +1021,15 @@ static void mainloop( struct batch_queue *queue )
 		update_blocked_hosts(queue, managers_list);
 
 		if(new_workers_needed > 0) {
-			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
+			debug(D_VINE,"submitting %d new workers to reach target",new_workers_needed);
 			workers_submitted += submit_workers(queue,job_table,new_workers_needed);
 		} else if(new_workers_needed < 0) {
-			debug(D_WQ,"too many workers, will wait for some to exit");
+			debug(D_VINE,"too many workers, will wait for some to exit");
 		} else {
-			debug(D_WQ,"target number of workers is reached.");
+			debug(D_VINE,"target number of workers is reached.");
 		}
 
-		debug(D_WQ,"checking for exited workers...");
+		debug(D_VINE,"checking for exited workers...");
 		time_t stoptime = time(0)+5;
 
 		while(1) {
@@ -1024,7 +1039,7 @@ static void mainloop( struct batch_queue *queue )
 			if(jobid>0) {
 				if(itable_lookup(job_table,jobid)) {
 					itable_remove(job_table,jobid);
-					debug(D_WQ,"worker job %"PRId64" exited",jobid);
+					debug(D_VINE,"worker job %"PRId64" exited",jobid);
 					workers_submitted--;
 				} else {
 					// it may have been a job from a previous run.
@@ -1090,6 +1105,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Use this scratch dir for factory.\n","-S,--scratch-dir");
 	printf(" %-30s (default: /tmp/vine-factory-$uid).\n","");
 	printf(" %-30s Exit if parent process dies.\n", "--parent-death");
+	printf(" %-30s Enable debug log for each remote worker in scratch dir.\n","--debug-workers");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Send debugging to this file.\n", "-o,--debug-file=<file>");
 	printf(" %-30s Specify the size of the debug file.\n", "-O,--debug-file-size=<mb>");
@@ -1155,8 +1171,9 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_PARENT_DEATH,
 		LONG_OPT_PYTHON_PACKAGE,
 		LONG_OPT_USE_SSL,
-		LONG_OPT_FACTORY_NAME
-	};
+		LONG_OPT_FACTORY_NAME,
+		LONG_OPT_DEBUG_WORKERS,
+};
 
 static const struct option long_options[] = {
 	{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
@@ -1171,6 +1188,7 @@ static const struct option long_options[] = {
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
 	{"debug-file-size", required_argument, 0, 'O'},
+	{"debug-workers", no_argument, 0, LONG_OPT_DEBUG_WORKERS },
 	{"disk",   required_argument,  0,  LONG_OPT_DISK},
 	{"env", required_argument, 0, LONG_OPT_ENVIRONMENT_VARIABLE},
 	{"extra-options", required_argument, 0, 'E'},
@@ -1359,6 +1377,9 @@ int main(int argc, char *argv[])
 			case 'O':
 				debug_config_file_size(string_metric_parse(optarg));
 				break;
+			case LONG_OPT_DEBUG_WORKERS:
+				debug_workers = 1;
+				break;
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				exit(EXIT_SUCCESS);
@@ -1457,13 +1478,12 @@ int main(int argc, char *argv[])
 	that jobs are submitting from a single shared filesystem.
 	Changing to /tmp only works in the case of Condor.
 	*/
-
 	if(!scratch_dir) {
+		const char *scratch_parent_dir = ".";
 		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-			scratch_dir = string_format("/tmp/vine-factory-%d",getuid());
-		} else {
-			scratch_dir = string_format("vine-factory-%d",getuid());
+			scratch_parent_dir = system_tmp_dir(NULL);
 		}
+		scratch_dir = string_format("%s/vine-factory-%d", scratch_parent_dir, getuid());
 	}
 
 	if(!create_dir(scratch_dir,0777)) {

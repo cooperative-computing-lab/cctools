@@ -1,11 +1,12 @@
 /*
-Copyright (C) 2017- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
 #include <assert.h>
 #include <inttypes.h>
+#include <stdlib.h>
 #include "stats.h"
 #include "hash_table.h"
 #include "xxmalloc.h"

@@ -24,7 +24,7 @@ See the file COPYING for details.
 /*
 The watcher keeps a linked list of files that must be watched.
 For each one, it tracks the path and size (obviously) but also
-the taskid and logical path, so that it can send back enough
+the task_id and logical path, so that it can send back enough
 info for the manager to match the updates up with the right file.
 */
 
@@ -33,7 +33,7 @@ struct vine_watcher {
 };
 
 struct entry {
-	int64_t taskid;
+	int64_t task_id;
 	char *physical_path;
 	char *logical_path;
 	int64_t size;
@@ -47,10 +47,10 @@ static void entry_delete( struct entry *e )
 	free(e);
 }
 
-static struct entry * entry_create( int64_t taskid, char *physical_path, char *logical_path )
+static struct entry * entry_create( int64_t task_id, char *physical_path, char *logical_path )
 {
 	struct entry *e = malloc(sizeof(*e));
-	e->taskid = taskid;
+	e->task_id = task_id;
 	e->physical_path = physical_path;
 	e->logical_path = logical_path;
 	e->size = 0;
@@ -88,13 +88,13 @@ void vine_watcher_add_process( struct vine_watcher *w, struct vine_process *p )
 {
 	struct vine_file *f;
 
-	list_first_item(p->task->output_files);
-	while((f=list_next_item(p->task->output_files))) {
+	LIST_ITERATE(p->task->output_files,f) {
+
 		if(f->flags & VINE_WATCH) {
 
 			struct entry *e;
 			e = entry_create(
-				p->task->taskid,
+				p->task->task_id,
 				string_format("%s/%s",p->sandbox,f->remote_name),
 				strdup(f->remote_name)
 			);
@@ -116,7 +116,7 @@ void vine_watcher_remove_process( struct vine_watcher *w, struct vine_process *p
 
 	for(i=0;i<size;i++) {
 		e = list_pop_head(w->watchlist);
-		if(e->taskid == p->task->taskid) {
+		if(e->task_id == p->task->task_id) {
 			entry_delete(e);
 		} else {
 			list_push_tail(w->watchlist,e);
@@ -129,7 +129,7 @@ void vine_watcher_remove_process( struct vine_watcher *w, struct vine_process *p
 Check to see if any watched files have changed since the last look.
 If any one file has changed, it is not necessary to look for any more,
 since the files will be rescanned in vine_watcher_send_results.
-Also, note that the debug message does not specify the specific file;
+Also, note that the debug message does not print the specific file;
 we don't want the user to be thrown off by missing messages about
 files not examined.
 */
@@ -138,8 +138,7 @@ int vine_watcher_check( struct vine_watcher *w )
 {
 	struct entry *e;
 
-	list_first_item(w->watchlist);
-	while((e=list_next_item(w->watchlist))) {
+	LIST_ITERATE(w->watchlist,e) {
 		struct stat info;
 		if(e->do_not_watch) continue;
 		if(stat(e->physical_path,&info)==0) {
@@ -169,8 +168,7 @@ int vine_watcher_send_changes( struct vine_watcher *w, struct link *manager, tim
 {
 	struct entry *e;
 
-	list_first_item(w->watchlist);
-	while((e=list_next_item(w->watchlist))) {
+	LIST_ITERATE(w->watchlist,e) {
 		struct stat info;
 		if(e->do_not_watch) continue;
 		if(stat(e->physical_path,&info)==0) {
@@ -185,7 +183,7 @@ int vine_watcher_send_changes( struct vine_watcher *w, struct link *manager, tim
 				}
 
 				lseek(fd,offset,SEEK_SET);
-				link_printf(manager,stoptime,"update %"PRId64" %s %"PRId64" %"PRId64"\n",e->taskid,e->logical_path,offset,length);
+				link_printf(manager,stoptime,"update %"PRId64" %s %"PRId64" %"PRId64"\n",e->task_id,e->logical_path,offset,length);
 				int actual = link_stream_from_fd(manager,fd,length,stoptime);
 				close(fd);
 				if(actual!=length) return 0;

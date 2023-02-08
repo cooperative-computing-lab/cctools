@@ -104,10 +104,23 @@ with worker:
             min = {},
             expected = {'cores': worker_cores, 'memory': worker_memory, 'disk': worker_disk, 'gpus': 0})
 
+    check_task('greedy_bucketing',
+            wq.WORK_QUEUE_ALLOCATION_MODE_GREEDY_BUCKETING,
+            max={},
+            min={},
+            expected={'cores': 1, 'memory': 1000, 'disk': 1000, 'gpus': 0})
+
+    check_task('exhaustive_bucketing',
+            wq.WORK_QUEUE_ALLOCATION_MODE_EXHAUSTIVE_BUCKETING,
+            max={},
+            min={},
+            expected={'cores': 1, 'memory': 1000, 'disk': 1000, 'gpus': 0})
+
     q.specify_category_first_allocation_guess('auto_with_guess', {'cores': 1, 'memory': 2, 'disk': 3})
     check_task('auto_with_guess',
             wq.WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE,
             max = {},
             min = {},
             expected = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 0})
+
 

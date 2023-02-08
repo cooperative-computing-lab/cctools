@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2022- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #include "vine_manager_summarize.h"
 #include "vine_worker_info.h"
@@ -79,8 +84,8 @@ struct rmsummary ** vine_manager_summarize_workers( struct vine_manager *q )
 
 	struct hash_table *workers_count = hash_table_create(0, 0);
 
-	hash_table_firstkey(q->worker_table);
-	while(hash_table_nextkey(q->worker_table, &id, (void**) &w)) {
+	HASH_TABLE_ITERATE(q->worker_table,id,w) {
+
 		if (w->resources->tag < 0) {
 			// worker has not yet declared resources
 			continue;
@@ -112,8 +117,7 @@ struct rmsummary ** vine_manager_summarize_workers( struct vine_manager *q )
 	int count = 0;
 	struct rmsummary **worker_data = (struct rmsummary **) malloc((hash_table_size(workers_count) + 1) * sizeof(struct rmsummary *));
 
-	hash_table_firstkey(workers_count);
-	while(hash_table_nextkey(workers_count, &resources_key, (void**) &s)) {
+	HASH_TABLE_ITERATE(workers_count,resources_key,s) {
 		worker_data[count] = s;
 		count++;
 	}

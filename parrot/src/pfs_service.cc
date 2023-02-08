@@ -1,7 +1,7 @@
 
 /*
 Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2005- The University of Notre Dame
+Copyright (C) 2022 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -67,6 +67,30 @@ int pfs_service::stat( pfs_name *name, struct pfs_stat *buf )
 {
 	pfs_service_emulate_stat(name,buf);
 	return 0;
+}
+
+int pfs_service::statx( pfs_name *name, int flags, unsigned int mask, struct pfs_statx *buf ) {
+	//try with stat and copy to statx
+	struct pfs_stat info_stat;
+	struct pfs_statx info_statx;
+
+	int follow_links = 1;
+
+#ifdef AT_SYMLINK_NOFOLLOW
+	follow_links = !(flags & AT_SYMLINK_NOFOLLOW);
+#endif
+
+	int rc;
+	if(follow_links) {
+		rc = stat(name, &info_stat);
+	} else {
+		rc = lstat(name, &info_stat);
+	}
+
+	COPY_STAT_TO_STATX(info_stat, info_statx);
+	memcpy(buf, &info_statx, sizeof(*buf));
+
+	return rc;
 }
 
 int pfs_service::statfs( pfs_name *name, struct pfs_statfs *buf )

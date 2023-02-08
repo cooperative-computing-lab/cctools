@@ -63,7 +63,7 @@ environment document:
     ...
 }
 
-@return An integer taskid assigned to the submitted task.
+@return An integer task_id assigned to the submitted task.
 */
 int vine_json_submit(struct vine_manager *m, const char *str);
 
@@ -71,20 +71,20 @@ int vine_json_submit(struct vine_manager *m, const char *str);
 @param m A manager object.
 @param timeout The number of seconds to wait for a completed task before
 returning. Use an integer time to set the timeout or the constant
-@ref VINE_WAITFORTASK to block until a task has completed.
+@ref VINE_WAIT_FOREVER to block until a task has completed.
 @return A JSON description of the completed task or the
  timeout was reached without a completed task, or there is completed child
 process (call @ref process_wait to retrieve the status of the completed
 child process). Return string should be freed using free().
 
-{ "command_line" : <i>string</i> , "tag" : <i>string</i> , "output" : <i>string</i> , "taskid" :
+{ "command_line" : <i>string</i> , "tag" : <i>string</i> , "output" : <i>string</i> , "task_id" :
 <i>integer</i> , "return_status" : <i>integer</i> , "result" : <i>integer</i> }
 
 */
 char *vine_json_wait(struct vine_manager *m, int timeout);
 
 /** Determine whether the manager is 'hungry' for more tasks.
-While the TaskVine can handle a very large number of tasks,
+While a taskvine Manager can handle a very large number of tasks,
 it runs most efficiently when the number of tasks is slightly
 larger than the number of active workers.  This function gives
 the user of a flexible application a hint about whether it would
