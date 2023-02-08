@@ -10,8 +10,10 @@ See the file COPYING for details.
 #include "vine_transfer.h"
 
 #include "link.h"
+#include "process.h"
 #include "url_encode.h"
 #include "debug.h"
+
 
 #include <errno.h>
 #include <unistd.h>
@@ -52,18 +54,25 @@ static void vine_transfer_handler( struct link *lnk, struct vine_cache *cache )
 static void vine_transfer_process( struct vine_cache *cache )
 {
 	while(1) {
-		struct link *lnk = link_accept(transfer_link,time(0)+60);
+		struct link *lnk = link_accept(transfer_link,time(0)+10);
 		pid_t p = fork();
+
+		/* If we are the child, perform the transfer.
+		 * If we are the parent, and the link was valid, continue.
+		 * If we are the parent but the link timed out, take the time
+		 * to clean up any child processes. */
 		if(p==0)
-		{
+		{	
 			if(lnk) {
 				vine_transfer_handler(lnk,cache);
 				link_close(lnk);
 			}
 			_exit(0);
-		} else {
+		} else if(lnk) {
 			continue;
 		}
+
+		wait(NULL); 
 	}
 }
 
