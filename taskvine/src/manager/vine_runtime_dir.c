@@ -75,7 +75,7 @@ char *vine_get_runtime_path_log(struct vine_manager *m, const char *path) {
     return string_format("%s/logs/%s", m->runtime_directory, path ? path : "");
 }
 
-char *vine_get_path_runtime_staging(struct vine_manager *m, const char *path) {
+char *vine_get_runtime_path_staging(struct vine_manager *m, const char *path) {
     return string_format("%s/staging/%s", m->runtime_directory, path ? path : "");
 }
 

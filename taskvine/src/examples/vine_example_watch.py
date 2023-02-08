@@ -30,9 +30,7 @@ if __name__ == "__main__":
         sys.exit(1)
     print("listening on port", m.port)
 
-    m.enable_debug_log("manager.log")
     n = 3
-
     for i in range(n):
         output = "output." + str(i)
         t = vine.Task("./vine_example_watch_trickle.sh > output")

@@ -53,7 +53,6 @@ if __name__ == "__main__":
         sys.exit(1)
     print("listening on port", m.port)
 
-    m.enable_debug_log("manager.log")
     m.set_scheduler(vine.VINE_SCHEDULE_FILES)
 
     for i in range(url_count):

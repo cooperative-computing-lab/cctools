@@ -83,7 +83,7 @@ class FileLocal(File):
     #
     # @param self       The current file object.
     # @param path       The path to the local file.
-    
+
     def __init__(self,path):
         path = str(path)
         self._file = vine_file_local(path)
@@ -1075,15 +1075,13 @@ class Manager(object):
     # @param self       Reference to the current manager object.
     # @param port       The port number to listen on. If zero, then a random port is chosen. A range of possible ports (low, hight) can be also specified instead of a single integer.
     # @param name       The project name to use.
-    # @param stats_log  The name of a file to write the queue's statistics log.
-    # @param transactions_log  The name of a file to write the queue's transactions log.
-    # @param debug_log  The name of a file to write the queue's debug log.
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
+    # @param run_info_dir Directory to write log and staging files per run. If None, defaults to "vine-runtime"
     # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
     #
     # @see vine_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None, ssl=None):
+    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, run_info_dir=None, ssl=None):
         self._shutdown = shutdown
         self._taskvine = None
         self._stats = None
@@ -1103,8 +1101,9 @@ class Manager(object):
             raise ValueError('port should be a single integer, or a sequence of two integers')
 
         try:
-            if debug_log:
-                self.enable_debug_log(debug_log)
+            if run_info_dir:
+                self.set_runtime_info_path(run_info_dir)
+
             self._stats = vine_stats()
             self._stats_hierarchy = vine_stats()
 
@@ -1112,12 +1111,6 @@ class Manager(object):
             self._taskvine = vine_ssl_create(port, ssl_key, ssl_cert)
             if not self._taskvine:
                 raise Exception('Could not create queue on port {}'.format(port))
-
-            if stats_log:
-                self.enable_perf_log(stats_log)
-
-            if transactions_log:
-                self.enable_transactions_log(transactions_log)
 
             if name:
                 vine_set_name(self._taskvine, name)
@@ -1500,28 +1493,12 @@ class Manager(object):
         return vine_set_catalog_servers(self._taskvine, catalogs)
 
     ##
-    # Specify a debug log file that records the manager actions in detail.
+    # Specify a directory to write logs and staging files.
     #
     # @param self     Reference to the current manager object.
-    # @param logfile  Filename.
-    def enable_debug_log(self, logfile):
-        return vine_enable_debug_log(self._taskvine, logfile)
-
-    ##
-    # Specify a performance log file that records the cummulative stats of connected workers and submitted tasks.
-    #
-    # @param self     Reference to the current manager object.
-    # @param logfile  Filename.
-    def enable_perf_log(self, logfile):
-        return vine_enable_perf_log(self._taskvine, logfile)
-
-    ##
-    # Specify a log file that records the states of tasks.
-    #
-    # @param self     Reference to the current manager object.
-    # @param logfile  Filename.
-    def enable_transactions_log(self, logfile):
-        vine_enable_transactions_log(self._taskvine, logfile)
+    # @param dirname  A directory name
+    def set_runtime_info_path(self, dir):
+        vine_set_runtime_info_path(self._taskvine, dirname)
 
     ##
     # Add a mandatory password that each worker must present.
