@@ -1397,7 +1397,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	int task_status, exit_status;
 	uint64_t task_id;
 	int64_t output_length, retrieved_output_length;
-	timestamp_t execution_time;
+	timestamp_t execution_time, start_time, end_time;
 
 	int64_t actual;
 
@@ -1407,12 +1407,14 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 
 	//Format: task completion status, exit status (exit code or signal), output length, execution time, task_id
 
-	int n = sscanf(line, "result %d %d %"SCNd64 "%"SCNd64" %" SCNd64"", &task_status, &exit_status, &output_length, &execution_time, &task_id);
+	int n = sscanf(line, "result %d %d %"SCNd64 " %"SCNd64 " %"SCNd64" %" SCNd64"", &task_status, &exit_status, &output_length, &start_time, &end_time, &task_id);
 
-	if(n < 5) {
+	if(n < 6) {
 		debug(D_VINE, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return VINE_WORKER_FAILURE;
 	}
+
+	execution_time = end_time - start_time;
 
 	t = itable_lookup(w->current_tasks, task_id);
 	if(!t) {
@@ -1435,6 +1437,8 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 	observed_execution_time = timestamp_get() - t->time_when_commit_end;
 
 	t->time_workers_execute_last = observed_execution_time > execution_time ? execution_time : observed_execution_time;
+	t->time_workers_execute_last_start = start_time;
+	t->time_workers_execute_last_end = end_time;
 
 	t->time_workers_execute_all += t->time_workers_execute_last;
 
