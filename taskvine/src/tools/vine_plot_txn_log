@@ -197,9 +197,13 @@ def parse_workers(log):
                 (reason, exit_code, limits, measured) = arg.split(maxsplit=3)
                 limits = json.loads(limits)
                 measured = json.loads(measured)
+                worker_start = float(measured["time_worker_start"][0])
+                worker_end = float(measured["time_worker_end"][0])
                 if reason == "SUCCESS":
                     worker_id = worker_of_task[taskid]
                     worker_info[worker_id]["tasks"][taskid]["done"] = time
+                    worker_info[worker_id]["tasks"][taskid]["worker_start"] = worker_start
+                    worker_info[worker_id]["tasks"][taskid]["worker_stop"] = worker_end
             continue
 
 
@@ -273,11 +277,18 @@ def plot_cache_updates(first_task_zero):
     plt.barh(fetch_ys, fetch_widths, left=fetch_lefts, color="mistyrose", label='Curl URL')
 
 def plot_workers(title='Worker Info', all_info=False, save=None, cache_updates=False, flip=False, resources=False, 
-                    marked_done=False, input_transfers=False, output_transfers=False, xticks=None, yticks=None, first_task_zero=False):
+                    marked_done=False, input_transfers=False, output_transfers=False, xticks=None, yticks=None, first_task_zero=False, worker_time=False):
     count = 0
     ref = manager_start
+    start = "start"
+    stop = "stop"
+    if worker_time:
+        start = "worker_start"
+        stop = "worker_stop"
     done_xs = []
     done_ys = []
+    wr_xs = []
+    wr_ys = []
     it_lefts = []
     ot_lefts = []
     it_ys = []
@@ -321,20 +332,25 @@ def plot_workers(title='Worker Info', all_info=False, save=None, cache_updates=F
                     x = worker_info[worker]["tasks"][task]["done"] - ref
                     done_xs.append(x)
                     done_ys.append(count)
+                # WAITING RETRIEVAL MARKERS
+                if "stop" in worker_info[worker]["tasks"][task] and worker_time:
+                    x = worker_info[worker]["tasks"][task]["stop"] - ref
+                    wr_xs.append(x)
+                    wr_ys.append(count)
 
                 # TASKS
                 if flip:
                     if t_count%2 == 1:
-                        widths.append(worker_info[worker]["tasks"][task]["stop"] - worker_info[worker]["tasks"][task]["start"])
+                        widths.append(worker_info[worker]["tasks"][task][stop] - worker_info[worker]["tasks"][task][start])
                         lefts.append(worker_info[worker]["tasks"][task]["start"] - ref)
                         ys.append(count)
                     else:
-                        widths2.append(worker_info[worker]["tasks"][task]["stop"] - worker_info[worker]["tasks"][task]["start"])
+                        widths2.append(worker_info[worker]["tasks"][task][stop] - worker_info[worker]["tasks"][task][start])
                         lefts2.append(worker_info[worker]["tasks"][task]["start"] - ref)
                         ys2.append(count)
                     t_count += 1
                 else:
-                    widths.append(worker_info[worker]["tasks"][task]["stop"] - worker_info[worker]["tasks"][task]["start"])
+                    widths.append(worker_info[worker]["tasks"][task][stop] - worker_info[worker]["tasks"][task][start])
                     lefts.append(worker_info[worker]["tasks"][task]["start"] - ref)
                     ys.append(count)
 
@@ -360,6 +376,9 @@ def plot_workers(title='Worker Info', all_info=False, save=None, cache_updates=F
     # PLOT DONE MARKERS
     if all_info or marked_done:
         plt.plot(done_xs, done_ys, 'g+', label='Marked Done')
+    # PLOT DONE MARKERS
+    if worker_time:
+        plt.plot(wr_xs, wr_ys, 'r+', label='Waiting Retrieval')
     # PLOT INPUT TRANSFERS
     if all_info or input_transfers:
         plt.barh(it_ys, it_widths, left=it_lefts, color="black", label='Input Transfers')
@@ -410,8 +429,9 @@ if __name__ == "__main__":
     parser.add_argument('-x', nargs=3, help='change scale for x ticks -x <start> <step_size> <steps>')
     parser.add_argument('-y', nargs=3, help='change scale for y ticks -y <start> <step_size> <steps>')
     parser.add_argument('-z', action='store_true', help='uses workers first task as zero')
+    parser.add_argument('--worker-time', action='store_true', help='uses time measured on worker')
     args = parser.parse_args()
-
+    print(args.worker_time)
     if args.mode == "Workers":
         parse_workers(args.log)
         plot_workers(title=args.title,
@@ -425,7 +445,8 @@ if __name__ == "__main__":
                     output_transfers=args.o,
                     xticks = args.x,
                     yticks = args.y,
-                    first_task_zero = args.z)
+                    first_task_zero = args.z,
+                    worker_time = args.worker_time)
     elif args.mode == "Manager":
         parse_manager(args.log)
         plot_manager(title=args.title,
