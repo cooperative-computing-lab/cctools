@@ -468,12 +468,16 @@ static void report_worker_ready( struct link *manager )
 	domain_name_cache_guess(hostname);
 	send_message(manager,"taskvine %d %s %s %s %d.%d.%d\n",VINE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_message(manager, "info worker-id %s\n", worker_id);
+	vine_init_update(global_cache, manager);
+
 	send_features(manager);
 	send_keepalive(manager, 1);
 	send_transfer_address(manager);
 	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
-	if (factory_name)
+
+	if (factory_name) {
 		send_message(manager, "info from-factory %s\n", factory_name);
+	}
 }
 
 /*
@@ -1607,11 +1611,11 @@ static int serve_manager_by_hostport( const char *host, int port, const char *ve
 
 	workspace_prepare();
 	vine_cache_load(global_cache);
-	vine_init_update(global_cache, manager);
 
 	measure_worker_resources();
 
 	report_worker_ready(manager);
+
 	work_for_manager(manager);
 
 	if(abort_signal_received) {
