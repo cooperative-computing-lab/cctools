@@ -29,6 +29,7 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id host:port DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id RESOURCES {resources}\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id CACHE-UPDATE filename sizeinmb walltime\n");
+	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id TRANSFER (INPUT|OUTPUT) taskid filename sizeinmb walltime\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MAX {resources_max_per_task}\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}\n");
@@ -36,7 +37,6 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING_RETRIEVAL worker_address\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
-	fprintf(q->txn_logfile, "# time manager_pid TRANSFER (INPUT|OUTPUT) task_id cache_flag sizeinmb walltime filename\n");
 	fprintf(q->txn_logfile, "\n");
 }
 
@@ -237,13 +237,12 @@ void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info
 {
 	struct buffer B;
 	buffer_init(&B);
-	buffer_printf(&B, "TRANSFER ");
+	buffer_printf(&B, "WORKER %s TRANSFER ", w->workerid);
 	buffer_printf(&B, is_input ? "INPUT":"OUTPUT");
 	buffer_printf(&B, " %d", t->task_id);
-	buffer_printf(&B, " %d", f->flags & VINE_CACHE);
+	buffer_printf(&B, " %s", f->remote_name);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
-	buffer_printf(&B, " %s", f->remote_name);
 
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
