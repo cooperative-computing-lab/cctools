@@ -28,11 +28,11 @@
 dispatched through TaskVine
 
 ## SYNOPSIS
-**vine_worker [options] _&lt;managerhost&gt;_ _&lt;port&gt;_**
+**vine_worker [options] _&lt;manager_host&gt;_ _&lt;manager_port&gt;_**
 
-**vine_worker [options] _&lt;managerhost:port]&gt;_**
+**vine_worker [options] _&lt;manager_host:manager_port]&gt;_**
 
-**vine_worker [options] "_&lt;managerhost:port;[managerhost:port;managerhost:port;...]&gt;_**)
+**vine_worker [options] "_&lt;manager_host:manager_port;[manager_host:port;manager_host:port;...]&gt;_**)
 
 **vine_worker [options] -M _&lt;projectname&gt;_**
 
