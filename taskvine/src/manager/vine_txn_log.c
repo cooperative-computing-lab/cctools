@@ -20,6 +20,17 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <unistd.h>
 
+void vine_txn_log_write(struct vine_manager *q, const char *str)
+{
+	if(!q->txn_logfile)
+		return;
+
+	fprintf(q->txn_logfile, "%" PRIu64 " %d %s\n", timestamp_get(),getpid(),str);
+	fflush(q->txn_logfile);
+}
+
+
+
 void vine_txn_log_write_header( struct vine_manager *q )
 {
 	setvbuf(q->txn_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
@@ -38,15 +49,6 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING_RETRIEVAL worker_address\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
 	fprintf(q->txn_logfile, "\n");
-}
-
-void vine_txn_log_write(struct vine_manager *q, const char *str)
-{
-	if(!q->txn_logfile)
-		return;
-
-	fprintf(q->txn_logfile, "%" PRIu64 " %d %s\n", timestamp_get(),getpid(),str);
-	fflush(q->txn_logfile);
 }
 
 void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
