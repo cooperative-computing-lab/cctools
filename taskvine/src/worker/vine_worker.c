@@ -471,13 +471,14 @@ static void report_worker_ready( struct link *manager )
 	vine_init_update(global_cache, manager);
 
 	send_features(manager);
-	send_keepalive(manager, 1);
 	send_transfer_address(manager);
 	send_message(manager, "info worker-end-time %" PRId64 "\n", (int64_t) DIV_INT_ROUND_UP(end_time, USECOND));
 
 	if (factory_name) {
 		send_message(manager, "info from-factory %s\n", factory_name);
 	}
+
+	send_keepalive(manager, 1);
 }
 
 /*
