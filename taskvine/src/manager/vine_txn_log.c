@@ -86,10 +86,14 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 			}
 
 			struct jx *m = rmsummary_to_json(t->resources_measured, /* only resources */ 1);
-			jx_insert(m, jx_string("vine_input_size"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
-			jx_insert(m, jx_string("vine_output_size"), jx_arrayv(jx_double(t->bytes_received/((double) MEGABYTE)), jx_string("MB"), NULL));
-			jx_insert(m, jx_string("vine_input_time"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
-			jx_insert(m, jx_string("vine_output_time"), jx_arrayv(jx_double((t->time_when_done - t->time_when_retrieval)/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_insert(m, jx_string("size_input_mgr"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
+			jx_insert(m, jx_string("size_output_mgr"), jx_arrayv(jx_double(t->bytes_received/((double) MEGABYTE)), jx_string("MB"), NULL));
+
+			jx_insert(m, jx_string("time_input_mgr"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_insert(m, jx_string("time_output_mgr"), jx_arrayv(jx_double((t->time_when_done - t->time_when_retrieval)/((double) ONE_SECOND)), jx_string("s"), NULL));
+
+			jx_insert(m, jx_string("time_worker_start"), jx_arrayv(jx_double(t->time_workers_execute_last_start/((double) ONE_SECOND)), jx_string("s"), NULL));
+			jx_insert(m, jx_string("time_worker_end"), jx_arrayv(jx_double(t->time_workers_execute_last_end/((double) ONE_SECOND)), jx_string("s"), NULL));
 			jx_print_buffer(m, &B);
 			jx_delete(m);
 		} else {
