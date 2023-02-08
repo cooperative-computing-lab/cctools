@@ -28,11 +28,11 @@
 dispatched through Work Queue
 
 ## SYNOPSIS
-**work_queue_worker [options] _&lt;managerhost&gt;_ _&lt;port&gt;_**
+**work_queue_worker [options] _&lt;manager_host&gt;_ _&lt;manager_port&gt;_**
 
-**work_queue_worker [options] _&lt;managerhost:port]&gt;_**
+**work_queue_worker [options] _&lt;manager_host:manager_port]&gt;_**
 
-**work_queue_worker [options] "_&lt;managerhost:port;[managerhost:port;managerhost:port;...]&gt;_**)
+**work_queue_worker [options] "_&lt;manager_host:manager_port;[manager_host:manager_port;manager_host:manager_port;...]&gt;_**)
 
 **work_queue_worker [options] -M _&lt;projectname&gt;_**
 
