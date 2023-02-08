@@ -930,16 +930,24 @@ static void delete_uncacheable_files( struct vine_manager *q, struct vine_worker
 static char *monitor_file_name(struct vine_manager *q, struct vine_task *t, const char *ext) {
 	char *dir;
 
+	int free_dir = 0;
+
 	if(t->monitor_output_directory) {
 		dir = t->monitor_output_directory;
 	} else if(q->monitor_output_directory) {
 		dir = q->monitor_output_directory;
 	} else {
-		dir = "./";
+		dir = vine_get_runtime_path_staging(q, NULL);
 	}
 
-	return string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME "%s",
+	char *name = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME "%s",
 			dir, getpid(), t->task_id, ext ? ext : "");
+
+	if(free_dir) {
+		free(dir);
+	}
+
+	return name;
 }
 
 /* Extract the resources consumed by a task by reading the appropriate resource monitor file. */

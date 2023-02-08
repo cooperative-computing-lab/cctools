@@ -79,10 +79,6 @@ char *vine_get_path_runtime_staging(struct vine_manager *m, const char *path) {
     return string_format("%s/staging/%s", m->runtime_directory, path ? path : "");
 }
 
-char *vine_runtime_path_staging(struct vine_manager *m, const char *path) {
-    return string_format("%s/staging/%s", m->runtime_directory, path ? path : "");
-}
-
 void vine_set_runtime_info_path(const char *path) {
     assert(path);
     vine_runtime_info_path = xxstrdup(path);
