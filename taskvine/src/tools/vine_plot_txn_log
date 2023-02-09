@@ -11,6 +11,7 @@ import sys
 import argparse
 import json
 
+plt.style.use('tableau-colorblind10')
 worker_info = {}
 worker_of_task = {}
 manager_start = -1
