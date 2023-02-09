@@ -10,6 +10,8 @@ See the file COPYING for details.
 #include "vine_cache.h"
 #include "link.h"
 
+#define VINE_TRANSFER_PROC_MAX_CHILD 8
+
 void vine_transfer_server_start( struct vine_cache *cache );
 void vine_transfer_server_stop();
 void vine_transfer_server_address( char *addr, int *port );

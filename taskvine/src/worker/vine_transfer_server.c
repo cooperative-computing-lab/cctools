@@ -53,26 +53,39 @@ static void vine_transfer_handler( struct link *lnk, struct vine_cache *cache )
 
 static void vine_transfer_process( struct vine_cache *cache )
 {
+	static int child_count = 0;
+	
+	/* 
+	If link is real, fork. Check if we are at the max
+	child count. If we are over, or link_accept timed out,
+	take the time to wait() on all exited children
+	*/
 	while(1) {
 		struct link *lnk = link_accept(transfer_link,time(0)+10);
-		pid_t p = fork();
 
-		/* If we are the child, perform the transfer.
-		 * If we are the parent, and the link was valid, continue.
-		 * If we are the parent but the link timed out, take the time
-		 * to clean up any child processes. */
+		child_count++;
+		pid_t p = fork();
 		if(p==0)
 		{	
-			if(lnk) {
+			if(lnk)
+			{
 				vine_transfer_handler(lnk,cache);
 				link_close(lnk);
 			}
 			_exit(0);
-		} else if(lnk) {
-			continue;
+		} 
+		else 
+		{
+			if(child_count < VINE_TRANSFER_PROC_MAX_CHILD) {
+				continue;
+			}
 		}
 
-		wait(NULL); 
+		debug(D_VINE, "Transfer Server: waiting on all exited children. Reached %d", child_count);
+		while(waitpid(-1, NULL, WNOHANG) > 0)
+		{
+			child_count--;
+		}
 	}
 }
 
