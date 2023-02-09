@@ -6,7 +6,6 @@ See the file COPYING for details.
 
 #include "taskvine.h"
 
-#include "cctools.h"
 #include "debug.h"
 #include "cctools.h"
 #include "path.h"
@@ -132,8 +131,6 @@ void show_help( const char *cmd )
 	printf("-Z <file>  Write listening port to this file.\n");
 	printf("-p <port>  Listen on this port.\n");
 	printf("-N <name>  Advertise this project name.\n");
-	printf("-d <flag>  Enable debugging for this subsystem.\n");
-	printf("-o <file>  Send debugging output to this file.\n");
 	printf("-v         Show version information.\n");
 	printf("-h         Show this help screen.\n");
 }
@@ -146,14 +143,8 @@ int main(int argc, char *argv[])
 	int monitor_flag = 0;
 	int c;
 
-	while((c = getopt(argc, argv, "d:o:mN:p:Z:vh"))!=-1) {
+	while((c = getopt(argc, argv, "d:mN:p:Z:vh"))!=-1) {
 		switch (c) {
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'o':
-			debug_config_file(optarg);
-			break;
 		case 'p':
 			port = atoi(optarg);
 			break;
@@ -180,7 +171,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-    vine_set_runtime_info_path("vine-runtime/vine_benchmark");
+    vine_set_runtime_info_path("vine_benchmark_info");
 
 	struct vine_manager *q = vine_create(port);
 	if(!q) fatal("couldn't listen on any port!");

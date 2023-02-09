@@ -22,7 +22,8 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
-	vine_set_runtime_info_path("vine-runtime/vine_example_unponcho_worker");
+    //runtime logs will be written to vine_example_unponcho_worker_info/%Y-%m-%dT%H:%M:%S
+	vine_set_runtime_info_path("vine_example_unponcho_worker_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {

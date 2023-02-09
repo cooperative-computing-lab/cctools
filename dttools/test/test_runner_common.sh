@@ -166,6 +166,12 @@ check_needed()
 	return 0
 }
 
+latest_vine_debug_log()
+{
+	echo "vine-runtime/$(/bin/ls -1 -r vine-runtime | /bin/head -n1)/debug"
+}
+
+
 # For OS X
 if ! echo $PATH | grep /sbin > /dev/null 2>&1; then
 	export PATH=$PATH:/usr/sbin:/sbin

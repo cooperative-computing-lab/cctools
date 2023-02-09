@@ -41,15 +41,16 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
-	vine_set_runtime_info_path("vine-runtime/vine_example_peer_transfer");
+    //runtime logs will be written to vine_example_peer_info/%Y-%m-%dT%H:%M:%S
+	vine_set_runtime_info_path("vine_example_peer_transfer_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));
 		return 1;
-	}	
+	}
 	printf("listening on port %d...\n", vine_port(m));
-	
+
 	if(argv[1] &&(strcmp(argv[1], "-peer") == 0)){
 		printf("Peer transfers enabled\n");
 		vine_enable_peer_transfers(m);

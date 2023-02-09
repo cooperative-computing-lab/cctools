@@ -59,7 +59,6 @@ worker.gpus=worker_gpus
 worker.debug="all"
 worker.debug_file="factory.log"
 
-
 with worker:
     r = {'cores': 1, 'memory': 2, 'disk': 3, 'gpus': 4}
     check_task('all_specified', vine.VINE_ALLOCATION_MODE_FIXED, max = r, min = {}, expected = r)

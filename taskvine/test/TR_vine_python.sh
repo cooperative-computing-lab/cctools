@@ -55,10 +55,11 @@ run()
 	if [ $status -ne 0 ]
 	then
 		# display log files in case of failure.
-		if [ -f master.log  ]
+        logfile=$(latest_vine_debug_log)
+		if [ -f ${logfile}  ]
 		then
 			echo "master log:"
-			cat master.log
+            cat ${logfile}
 		fi
 
 		if [ -f worker.log  ]
@@ -83,6 +84,8 @@ clean()
 	rm -rf executable.file
 	rm -rf testdir
 	rm -rf dummy.tar.gz
+
+	rm -rf vine-runtime
 
 	exit 0
 }

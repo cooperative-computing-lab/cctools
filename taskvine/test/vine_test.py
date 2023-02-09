@@ -77,7 +77,7 @@ if __name__ == '__main__':
     os.chmod(path.join(test_dir, exec_file), stat.S_IRWXU)
 
 
-    q = vine.Manager(port=0, ssl=(args.ssl_key, args.ssl_cert), debug_log="manager.log")
+    q = vine.Manager(port=0, ssl=(args.ssl_key, args.ssl_cert))
 
     with open(args.port_file, 'w') as f:
         print('Writing port {port} to file {file}'.format(port=q.port, file=args.port_file))

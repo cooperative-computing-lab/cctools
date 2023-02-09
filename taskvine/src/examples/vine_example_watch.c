@@ -34,7 +34,8 @@ int main(int argc, char *argv[])
 	struct vine_manager *m;
 	struct vine_task *t;
 
-	vine_set_runtime_info_path("vine-runtime/vine_example_watch");
+    //runtime logs will be written to vine_example_watch_info/%Y-%m-%dT%H:%M:%S
+	vine_set_runtime_info_path("vine_example_watch_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
