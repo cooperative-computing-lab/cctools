@@ -2660,21 +2660,21 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		
 		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
-		
-		HASH_TABLE_ITERATE(q->worker_table, id, peer){
-			if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache) {
-				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
-				if(vine_current_transfers_source_in_use(q, peer_source) < VINE_WORKER_SOURCE_MAX_TRANSFERS) {	
-					vine_file_delete(f->substitute);
-					f->substitute = vine_file_substitute_url(f,peer_source);
-					free(peer_source);
-					found_match = 1;
-					break;
-				} else {
-					free(peer_source);
+		if(f->type != VINE_MINI_TASK){	
+			HASH_TABLE_ITERATE(q->worker_table, id, peer){
+				if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache) {
+					char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+					if(vine_current_transfers_source_in_use(q, peer_source) < q->worker_source_max_transfers) {	
+						vine_file_delete(f->substitute);
+						f->substitute = vine_file_substitute_url(f,peer_source);
+						free(peer_source);
+						found_match = 1;
+						break;
+					} else {
+						free(peer_source);
+					}
 				}
 			}
-
 		}
 
 		/* If that resulted in a match, move on to the next file. */
@@ -3193,6 +3193,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->peer_transfers_enabled = 0;
 	q->file_source_max_transfers = VINE_FILE_SOURCE_MAX_TRANSFERS;
+	q->worker_source_max_transfers = VINE_WORKER_SOURCE_MAX_TRANSFERS;
 
 	q->resource_submit_multiplier = 1.0;
 
@@ -4577,6 +4578,9 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "file-source-max-transfers")){
 		q->file_source_max_transfers = MAX(1, (int)value); 
 
+	} else if(!strcmp(name, "worker-source-max-transfers")){
+		q->worker_source_max_transfers = MAX(1, (int)value);
+	
 	} else {
 		debug(D_NOTICE|D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;

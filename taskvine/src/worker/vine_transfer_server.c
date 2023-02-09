@@ -10,8 +10,10 @@ See the file COPYING for details.
 #include "vine_transfer.h"
 
 #include "link.h"
+#include "process.h"
 #include "url_encode.h"
 #include "debug.h"
+
 
 #include <errno.h>
 #include <unistd.h>
@@ -51,11 +53,43 @@ static void vine_transfer_handler( struct link *lnk, struct vine_cache *cache )
 
 static void vine_transfer_process( struct vine_cache *cache )
 {
+	static int child_count = 0;
+	
+	/* 
+	If link is real, fork. Check if we are at the max
+	child count. If we are over, or link_accept timed out,
+	do a blocking wait on an exited child. If we are under 
+	the limit, collect all exited tasks and return to recv
+	*/
 	while(1) {
-		struct link *lnk = link_accept(transfer_link,time(0)+60);
-		if(lnk) {
-			vine_transfer_handler(lnk,cache);
-			link_close(lnk);
+		struct link *lnk = link_accept(transfer_link,time(0)+10);
+
+		child_count++;
+		pid_t p = fork();
+		if(p==0)
+		{	
+			if(lnk)
+			{
+				vine_transfer_handler(lnk,cache);
+				link_close(lnk);
+			}
+			_exit(0);
+		} 
+		else 
+		{
+			if(child_count < VINE_TRANSFER_PROC_MAX_CHILD) {
+				while(waitpid(-1, NULL, WNOHANG) > 0)
+				{
+					child_count--;
+				}
+				continue;
+			}
+		}
+
+		debug(D_VINE, "Transfer Server: waiting on exited child. Reached %d", child_count);
+		if(waitpid(-1, NULL, 0) > 0)
+		{
+			child_count--;
 		}
 	}
 }

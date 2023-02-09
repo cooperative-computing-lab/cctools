@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "uuid.h"
 
 #define VINE_FILE_SOURCE_MAX_TRANSFERS 1
-#define VINE_WORKER_SOURCE_MAX_TRANSFERS 1 // static 1 until if/when multiple transfer ports are opened up on worker transfer server
+#define VINE_WORKER_SOURCE_MAX_TRANSFERS 3 // static 1 until if/when multiple transfer ports are opened up on worker transfer server
 
 
 struct vine_transfer_pair {
