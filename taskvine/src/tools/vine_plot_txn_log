@@ -25,9 +25,7 @@ manager_info = {"Start":-1,
                 "Transfers":[],}
 
 def parse_manager(log):
-    filename = log
     lines = open(log, 'r').read().splitlines()
-
     for line in lines:
         if line.startswith("#"):
             continue
@@ -35,40 +33,41 @@ def parse_manager(log):
         try:
             (time, managerpid, subject, target, event, arg) = line.split(maxsplit=5)
         except ValueError:
-            continue
+            try:
+                (time, managerpid, subject, target, event) = line.split(maxsplit=4)
+            except ValueError:
+                continue
 
-        time = int(time)/1000000
-
+        time = float(time)/1000000
+        
         if subject == "MANAGER":
             managerpid = target
             if event == "START":
                 manager_info["Start"] = time
             continue
-
         if subject == "WORKER":
             worker_id = target
             if worker_id == "(null)":
                 continue
-
             if event == "CONNECTION":
-                manager_info["Connections"].append(time)
+                manager_info["Connections"].append(time - manager_info["Start"])
             elif event == "DISCONNECTION":
-                manager_info["Disconnections"].append(time)
+                manager_info["Disconnections"].append(time - manager_info["Start"])
             elif event == "RESOURCES":
-                manager_info["Resource Updates"].append(time)
+                manager_info["Resource Updates"].append(time - manager_info["Start"])
             elif event == "CACHE_UPDATE":
-                manager_info["Cache Updates"].append(time)
+                manager_info["Cache Updates"].append(time - manager_info["Start"])
             elif event == "TRANSFER":
-                manager_info["Transfers"].append(time)
+                manager_info["Transfers"].append(time - manager_info["Start"])
             continue
 
         if subject == "TASK":
             if event == "RUNNING":
-                manager_info["Tasks Sent"].append(time)
+                manager_info["Tasks Sent"].append(time - manager_info["Start"])
             elif event == "WAITING_RETRIEVAL":
-                manager_info["Waiting Retrieval"].append(time)
+                manager_info["Waiting Retrieval"].append(time - manager_info["Start"])
             elif event == "DONE":
-                manager_info["Marked Done"].append(time)
+                manager_info["Marked Done"].append(time - manager_info["Start"])
             continue
 
 def plot_manager(title='Manager Info', all_info=False, save=None, connections=False, disconnections=False,
@@ -140,7 +139,10 @@ def parse_workers(log):
         try:
             (time, managerpid, subject, target, event, arg) = line.split(maxsplit=5)
         except ValueError:
-            continue
+            try:
+                (time, managerpid, subject, target, event) = line.split(maxsplit=4)
+            except ValueError:
+                continue
 
         time = int(time)/1000000
 
@@ -431,7 +433,6 @@ if __name__ == "__main__":
     parser.add_argument('-z', action='store_true', help='uses workers first task as zero')
     parser.add_argument('--worker-time', action='store_true', help='uses time measured on worker')
     args = parser.parse_args()
-    print(args.worker_time)
     if args.mode == "Workers":
         parse_workers(args.log)
         plot_workers(title=args.title,
