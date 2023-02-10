@@ -1084,12 +1084,12 @@ class Manager(object):
     # @param port       The port number to listen on. If zero, then a random port is chosen. A range of possible ports (low, hight) can be also specified instead of a single integer.
     # @param name       The project name to use.
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
-    # @param run_info_dir Directory to write log and staging files per run. If None, defaults to "vine-run-info"
+    # @param run_info_path Directory to write log and staging files per run. If None, defaults to "vine-run-info"
     # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
     #
     # @see vine_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, run_info_dir="vine-run-info", ssl=None):
+    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, run_info_path="vine-run-info", ssl=None):
         self._shutdown = shutdown
         self._taskvine = None
         self._stats = None
@@ -1109,8 +1109,8 @@ class Manager(object):
             raise ValueError('port should be a single integer, or a sequence of two integers')
 
         try:
-            if run_info_dir:
-                self.set_runtime_info_path(run_info_dir)
+            if run_info_path:
+                self.set_runtime_info_path(run_info_path)
 
             self._stats = vine_stats()
             self._stats_hierarchy = vine_stats()

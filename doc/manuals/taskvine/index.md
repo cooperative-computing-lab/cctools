@@ -1556,56 +1556,66 @@ Pair: [2, 4, 6, 8, 4, 8, 12, 16, 6, 12, 18, 24, 8, 18, 24, 32]
 Tree: 8
 ```
 
+
 ## Logging facilities
 
-We can observe the lifetime of the queue through three different logs:
+A taskvine manager produces three logs: `debug`, `performance`, and
+`transactions`. These logs are always enabled, and appear in the current
+working directory in the sudirectories:
+
+```sh
+vine-run-info/YYYY-mm-ddTHH:MM:SS/logs
+
+# for example: vine-run-info/2023-02-10T09\:08\:47/logs
+```
+
+If you need to change the prefix `vine-run-info` to some other directory, use
+
+=== "Python"
+    ```python
+    # logs appear at /new/desired/path/%Y-%m-%dT%H:%M:%S/logs
+    m = vine.Manager(run_info_path="/new/desired/path")
+    ```
+
+=== "C"
+    // logs appear at /new/desired/path/%Y-%m-%dT%H:%M:%S/logs
+    vine_set_runtime_info_path("/new/desired/path")
+    struct taskvine *m = vine_create(0);
+    ```
+
+If the new path is not absolute, it is taken relative to the current working
+directory.
+
+If set, the environment variable `VINE_RUNTIME_INFO_DIR` determines the logging
+directory. If `VINE_RUNTIME_INFO_DIR` is not an absolute path, then it is taken
+relative to the current logging prefix (i.e. `vine-run-info/` by default).
 
 
 ### Debug Log
 
 The debug log prints unstructured messages as the queue transfers files and
 tasks, workers connect and report resources, etc. This is specially useful to
-find failures, bugs, and other errors. To activate debug output:
+find failures, bugs, and other errors. It is located by default at:
 
-=== "Python"
-    ```python
-    m = vine.Manager(debug_log = "my.debug.log")
-    ```
-
-=== "C"
-    ```C
-    #include "debug.h"
-    cctools_debug_flags_set("all");
-    cctools_debug_config_file("my.debug.log");
-    ```
-
-The `all` flag causes debug messages from every subsystem called by taskvine
-to be printed. More information about the debug flags are
-[here](api/html/debug_8h.html).
-
+```sh
+vine-run-info/%Y-%m-%dT%H:%M:%S/logs/debug
+```
 
 To enable debugging at the worker, set the `-d` option:
-
 
 ```sh
 $ vine_worker -d all -o worker.debug -M myproject
 ```
 
-### Statistics Log
+### Performance Log
 
-The statistics logs contains a time series of the statistics collected by the manager,
+The performance log contains a time series of the statistics collected by the manager,
 such as number of tasks waiting and completed, number of workers busy,
-total number of cores available, etc. The log is activated as follows:
+total number of cores available, etc. The log is located by default at:
 
-=== "Python"
-    ```python
-    m = vine.Manager(stats_log = "my.statslog")
-    ```
-
-=== "C"
-    ```C
-    vine_enable_perf_log(m, "my.stats.log");
-    ```
+```sh
+vine-run-info/%Y-%m-%dT%H:%M:%S/logs/performance
+```
 
 The time series are presented in columns, with the leftmost column as a
 timestamp in microseconds. The first row always contains the name of the
@@ -1636,17 +1646,11 @@ taskvine applications.
 
 Finally, the transactions log records the lifetime of tasks and workers. It is
 specially useful for tracking the resources requested, allocated, and used by
-tasks. It is activated as follows:
+tasks. It is located by default at:
 
-=== "Python"
-    ```python
-    m = vine.Manager(transactions_log = "my.tr.log")
-    ```
-
-=== "C"
-    ```C
-    vine_enable_transactions_log(m, "my.tr.log");
-    ```
+```sh
+vine-run-info/%Y-%m-%dT%H:%M:%S/logs/transactions
+```
 
 The first few lines of the log document the possible log records:
 
