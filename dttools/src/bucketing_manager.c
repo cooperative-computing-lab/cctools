@@ -30,17 +30,17 @@ static char* int_to_string(int n)
  * @param m the bucketing manager */
 static void bucketing_manager_add_default_resource_types(bucketing_manager_t* m)
 {
-    bucketing_manager_add_resource_type(m, "cores", 0, 
-            default_cores, default_num_sampling_points, default_increase_rate, 
+    bucketing_manager_add_resource_type(m, "cores", 0,
+            default_cores, default_num_sampling_points, default_increase_rate,
             default_max_num_buckets, default_update_epoch);
-    bucketing_manager_add_resource_type(m, "mem", 0, 
-            default_mem, default_num_sampling_points, default_increase_rate, 
+    bucketing_manager_add_resource_type(m, "memory", 0,
+            default_mem, default_num_sampling_points, default_increase_rate,
             default_max_num_buckets, default_update_epoch);
-    bucketing_manager_add_resource_type(m, "disk", 0, 
-            default_disk, default_num_sampling_points, default_increase_rate, 
+    bucketing_manager_add_resource_type(m, "disk", 0,
+            default_disk, default_num_sampling_points, default_increase_rate,
             default_max_num_buckets, default_update_epoch);
-    bucketing_manager_add_resource_type(m, "gpus", 0, 
-            default_gpus, default_num_sampling_points, default_increase_rate, 
+    bucketing_manager_add_resource_type(m, "gpus", 0,
+            default_gpus, default_num_sampling_points, default_increase_rate,
             default_max_num_buckets, default_update_epoch);
 }
 /* End: internals */
