@@ -39,6 +39,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "username.h"
 #include "create_dir.h"
+#include "unlink_recursive.h"
 #include "xxmalloc.h"
 #include "load_average.h"
 #include "buffer.h"
@@ -344,17 +345,17 @@ static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info
 
 		char *message = malloc(length+1);
 		time_t stoptime = time(0) + q->long_timeout;
-		
+
 		int actual = link_read(w->link,message,length,stoptime);
 		if(actual!=length) {
 			free(message);
 			return VINE_MSG_FAILURE;
 		}
-		
+
 		message[length] = 0;
 		debug(D_VINE,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
 		free(message);
-		
+
 		struct vine_remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
 		vine_current_transfers_remove(q, id);
 		if(remote_info) vine_remote_file_info_delete(remote_info);
@@ -363,16 +364,16 @@ static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info
 
 		char *message = malloc(length+1);
 		time_t stoptime = time(0) + q->long_timeout;
-		
+
 		int actual = link_read(w->link,message,length,stoptime);
 		if(actual!=length) {
 			free(message);
 			return VINE_MSG_FAILURE;
 		}
-		
+
 		message[length] = 0;
 		debug(D_VINE,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
-		free(message);	
+		free(message);
 	}
 	return VINE_MSG_PROCESSED;
 }
@@ -383,7 +384,7 @@ on its own port to receive get requests from other workers.
 */
 
 static int handle_transfer_address( struct vine_manager *q, struct vine_worker_info *w, const char *line )
-{	
+{
 	int dummy_port;
 	if(sscanf(line,"transfer-address %s %d",w->transfer_addr,&w->transfer_port)) {
 		w->transfer_port_active = 1;
@@ -725,7 +726,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	uint64_t task_id;
 
 	if(!q || !w) return;
-	
+
 	vine_current_transfers_wipe_worker(q, w);
 
 	hash_table_clear(w->current_files,(void*)vine_remote_file_info_delete);
@@ -3457,15 +3458,19 @@ void vine_delete(struct vine_manager *q)
 	list_clear(q->task_info_list,(void*)vine_task_info_delete);
 	list_delete(q->task_info_list);
 
+	char *staging = vine_get_runtime_path_staging(q, NULL);
+	if(!access(staging, F_OK)) {
+		debug(D_VINE, "deleting %s", staging);
+		unlink_recursive(staging);
+	}
+	free(staging);
+
 	free(q->stats);
 	free(q->stats_disconnected_workers);
 	free(q->stats_measure);
 
-	if(q->name)
-		free(q->name);
-
-	if(q->manager_preferred_connection)
-		free(q->manager_preferred_connection);
+	free(q->name);
+	free(q->manager_preferred_connection);
 
 	free(q->poll_table);
 	free(q->ssl_cert);

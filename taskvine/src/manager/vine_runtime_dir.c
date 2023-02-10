@@ -5,16 +5,51 @@ See the file COPYING for details.
 */
 
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "taskvine.h"
 #include "vine_manager.h"
 #include "assert.h"
 #include "create_dir.h"
+#include "list.h"
 #include "path.h"
 #include "stringtools.h"
+#include "unlink_recursive.h"
 #include "xxmalloc.h"
 
 static char *vine_runtime_info_path = "vine-runtime";
+
+static struct list *known_staging_dirs = NULL;
+
+void cleanup_staging_dirs() {
+    if(!known_staging_dirs) {
+        return;
+    }
+
+    char *path = NULL;
+    LIST_ITERATE(known_staging_dirs, path) {
+        if(!access(path, F_OK)) {
+            unlink_recursive(path);
+        }
+    }
+
+    list_free(known_staging_dirs);
+    list_delete(known_staging_dirs);
+
+    known_staging_dirs = NULL;
+}
+
+
+void register_staging_dir(const char *path) {
+    if(!known_staging_dirs) {
+        known_staging_dirs = list_create();
+        atexit(cleanup_staging_dirs);
+    }
+
+    list_push_head(known_staging_dirs, xxstrdup(path));
+}
 
 
 char *vine_runtime_directory_create() {
@@ -66,6 +101,7 @@ char *vine_runtime_directory_create() {
 	if(!create_dir(tmp, 755)) {
         return NULL;
     }
+    register_staging_dir(tmp);
 	free(tmp);
 
     return runtime_dir;
@@ -83,3 +119,4 @@ void vine_set_runtime_info_path(const char *path) {
     assert(path);
     vine_runtime_info_path = xxstrdup(path);
 }
+
