@@ -44,14 +44,6 @@ def set_port_range(low_port, high_port):
     os.environ['TCP_LOW_PORT'] = str(low_port)
     os.environ['TCP_HIGH_PORT'] = str(high_port)
 
-staging_directory = tempfile.mkdtemp(prefix='vine-py-staging-')
-def cleanup_staging_directory():
-    try:
-        shutil.rmtree(staging_directory)
-    except Exception as e:
-        sys.stderr.write('could not delete {}: {}\n'.format(staging_directory, e))
-
-atexit.register(cleanup_staging_directory)
 
 ##
 # \class File
@@ -2361,20 +2353,16 @@ class Factory(object):
         self._config_file = None
         self._factory_proc = None
         self._log_file = log_file
-
-        (tmp, self._error_file) = tempfile.mkstemp(
-                dir=staging_directory,
-                prefix='vine-factory-err-')
-        os.close(tmp)
+        self._error_file = None
+        self._scratch_safe_to_delete = False
 
         self._opts = {}
 
         self._set_manager(manager_name, manager_host_port)
         self._opts['batch-type'] = batch_type
         self._opts['worker-binary'] = self._find_exe(worker_binary, 'vine_worker')
-        self._opts['scratch-dir'] = None
-
         self._factory_binary = self._find_exe(factory_binary, 'vine_factory')
+        self._opts['scratch-dir'] = None
 
     def _set_manager(self, manager_name, manager_host_port):
         if not (manager_name or manager_host_port):
@@ -2495,17 +2483,25 @@ class Factory(object):
     def start(self):
         if self._factory_proc is not None:
             raise RuntimeError('Factory was already started')
-        (tmp, self._config_file) = tempfile.mkstemp(
-                dir=staging_directory,
-                prefix='vine-factory-config-',
-                suffix='.json')
 
         if not self.scratch_dir:
-            self.scratch_dir = tempfile.mkdtemp(
-                    dir=staging_directory,
-                    prefix="vine-factory-scratch-")
+            candidate = os.getcwd()
+            if candidate.startswith("/afs") and self.batch_type == "condor":
+                candidate = os.environ.get("TMPDIR", "/tmp")
+            candidate = os.path.join(candidate, f"vine-factory-{os.getuid()}")
+            if not os.path.exists(candidate):
+                os.makedirs(candidate)
+            self.scratch_dir = candidate
 
-        os.close(tmp)
+        # specialize scratch_dir for this run
+        self.scratch_dir = tempfile.mkdtemp(prefix="vine-factory-", dir=self.scratch_dir)
+        self._scratch_safe_to_delete = True
+
+        atexit.register(lambda: os.path.exists(self.scratch_dir) and shutil.rmtree(self.scratch_dir))
+
+        self._error_file = os.path.join(self.scratch_dir, "error.log")
+        self._config_file = os.path.join(self.scratch_dir, "config.json")
+
         self._write_config()
         logfd = open(self._log_file, 'a')
         errfd = open(self._error_file, 'w')
@@ -2538,10 +2534,9 @@ class Factory(object):
         self._factory_proc.terminate()
         self._factory_proc.wait()
         self._factory_proc = None
-        os.unlink(self._config_file)
-        os.unlink(self._error_file)
         self._config_file = None
-
+        if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
+            shutil.rmtree(self.scratch_dir)
 
     def __enter__(self):
          return self.start()
@@ -2554,6 +2549,9 @@ class Factory(object):
     def __del__(self):
         if self._factory_proc is not None:
             self.stop()
+
+        if os and shutil and self._staging_dir:
+            shutil.rmtree(self._staging_dir)
 
 
     def _write_config(self):
