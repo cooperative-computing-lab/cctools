@@ -85,7 +85,7 @@ clean()
 	rm -rf testdir
 	rm -rf dummy.tar.gz
 
-	rm -rf vine-runtime
+	rm -rf vine-run-info
 
 	exit 0
 }

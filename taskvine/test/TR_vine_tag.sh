@@ -53,7 +53,7 @@ clean()
 	rm -f $STATUS_FILE
 	rm -f $PORT_FILE
 
-	rm -rf vine-runtime
+	rm -rf vine-run-info
 
 	exit 0
 }

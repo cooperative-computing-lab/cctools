@@ -61,7 +61,7 @@ EOF
 
 clean()
 {
-	rm -f master.script vine-runtime master.port worker.log output.* input.*
+	rm -f master.script vine-run-info master.port worker.log output.* input.*
 }
 
 dispatch "$@"

@@ -56,7 +56,7 @@ clean()
 	rm -rf executable.file
 	rm -rf testdir
 
-	rm -rf vine-runtime
+	rm -rf vine-run-info
 
 	exit 0
 }
