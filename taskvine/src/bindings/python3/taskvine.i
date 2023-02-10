@@ -17,6 +17,7 @@
 	#include "taskvine.h"
 	#include "rmsummary.h"
     #include "vine_task.h"
+    #include "vine_runtime_dir.h"
 %}
 
 /* We compile with -D__LARGE64_FILES, thus off_t is at least 64bit.
@@ -27,8 +28,9 @@ long long int is guaranteed to be at least 64bit. */
 %ignore vdebug;
 %ignore debug;
 
-/* returns a char*, enable automatic free */
-%newobject work_queue_status;
+/* return a char*, enable automatic free */
+%newobject vine_status;
+%newobject vine_get_runtime_path_staging;
 
 /* These return pointers to lists defined in list.h. We aren't
  * wrapping methods in list.h and so ignore these. */
@@ -48,6 +50,7 @@ treat it as an output parameter to be filled in. */
 %include "rmsummary.h"
 %include "category.h"
 %include "vine_task.h"
+%include "vine_runtime_dir.h"
 
 
 

@@ -139,7 +139,7 @@ class FileMiniTask(File):
     #
     # @param self       The current file object.
     # @param minitask   The task to execute in order to produce a file.
-        
+
     def __init__(self,minitask):
         self._file = vine_file_mini_task(minitask._task)
 
@@ -156,7 +156,6 @@ class FileUntar(File):
     #
     # @param self       The current file object.
     # @param subfile    The file object to un-tar.
-        
     def __init__(self,subfile):
         self._file = vine_file_untar(vine_file_clone(subfile._file))
 
@@ -166,7 +165,6 @@ class FileUntar(File):
 # TaskVine File PONCHO Unpacker
 #
 # A wrapper to unpack a file in poncho package form.
-
 class FileUnponcho(File):
     ##
     # Create a file by unpacking a poncho package.
@@ -191,7 +189,6 @@ class FileUnstarch(File):
     #
     # @param self       The current file object.
     # @param subfile    The file object to un-tgz.
-        
     def __init__(self,subfile):
         self._file = vine_file_unstarch(vine_file_clone(subfile._file))
 
@@ -237,6 +234,15 @@ class Task(object):
         if success_only:
             flags |= VINE_SUCCESS_ONLY
         return flags
+
+    ##
+    # Finalizes the task definition once the manager that will execute is run.
+    # This function is run by the manager before registering the task for
+    # execution.
+    #
+    # @param self 	Reference to the current python task object
+    def submit_finalize(self, manager):
+        pass
 
     ##
     # Return a copy of this task
@@ -919,29 +925,40 @@ class PythonTask(Task):
     # @param args	arguments used in function to be executed by task
     # @param kwargs	keyword arguments used in function to be executed by task
     def __init__(self, func, *args, **kwargs):
-        self._id = str(uuid.uuid4())
-        self._tmpdir = tempfile.mkdtemp(dir=staging_directory)
-
         if not pythontask_available:
             raise RuntimeError("PythonTask is not available. The dill module is missing.")
 
-        self._func_file = os.path.join(self._tmpdir, 'function_{}.p'.format(self._id))
-        self._args_file = os.path.join(self._tmpdir, 'args_{}.p'.format(self._id))
-        self._out_file = os.path.join(self._tmpdir, 'out_{}.p'.format(self._id))
-        self._wrapper = os.path.join(self._tmpdir, 'pytask_wrapper.py'.format(self._id))
-
         self._pp_run = None
         self._env_file  = None
-
-        self._serialize_python_function(func, args, kwargs)
-        self._create_wrapper()
-
-        self._command = self._python_function_command()
-
         self._output_loaded = False
         self._output = None
+        self._tmpdir = None
 
+        self._id = str(uuid.uuid4())
+        self._func_file = f'function_{self._id}.p'
+        self._args_file = f'args_{self._id}.p'
+        self._out_file = f'out_{self._id}.p'
+        self._wrapper = f'pytask_wrapper_{self._id}.py'
+        self._command = self._python_function_command()
+
+        # we delay any PythonTask initialization until the task is submitted to
+        # a manager. This is because we don't know the staging directory where
+        # the task should write its files.
+        self._fn_def = (func, args, kwargs)
         super(PythonTask, self).__init__(self._command)
+
+
+    ##
+    # Finalizes the task definition once the manager that will execute is run.
+    # This function is run by the manager before registering the task for
+    # execution.
+    #
+    # @param self 	Reference to the current python task object
+    def submit_finalize(self, manager):
+        self._tmpdir = tempfile.mkdtemp(dir=manager.staging_directory)
+        self._serialize_python_function(*self._fn_def)
+        self._fn_def = None # avoid possible memory leak
+        self._create_wrapper()
         self._add_IO_files()
 
     ##
@@ -982,16 +999,15 @@ class PythonTask(Task):
         try:
             if self._tmpdir and os.path.exists(self._tmpdir):
                 shutil.rmtree(self._tmpdir)
-
         except Exception as e:
             if sys:
                 sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
 
 
     def _serialize_python_function(self, func, args, kwargs):
-        with open(self._func_file, 'wb') as wf:
+        with open(os.path.join(self._tmpdir, self._func_file), 'wb') as wf:
             dill.dump(func, wf, recurse=True)
-        with open(self._args_file, 'wb') as wf:
+        with open(os.path.join(self._tmpdir, self._args_file), 'wb') as wf:
             dill.dump([args, kwargs], wf, recurse=True)
 
 
@@ -1003,10 +1019,10 @@ class PythonTask(Task):
 
         command = '{py_exec} {wrapper} {function} {args} {out}'.format(
                 py_exec=py_exec,
-                wrapper=os.path.basename(self._wrapper),
-                function=os.path.basename(self._func_file),
-                args=os.path.basename(self._args_file),
-                out=os.path.basename(self._out_file))
+                wrapper=self._wrapper,
+                function=self._func_file,
+                args=self._args_file,
+                out=self._out_file)
 
         if self._env_file:
             command = './{pprun} -e {tar} --unpack-to "$VINE_SANDBOX"/{unpack}-env {cmd}'.format(
@@ -1019,16 +1035,16 @@ class PythonTask(Task):
 
 
     def _add_IO_files(self):
-        self.add_input_file(self._wrapper, cache=True)
-        self.add_input_file(self._func_file, cache=False)
-        self.add_input_file(self._args_file, cache=False)
-        self.add_output_file(self._out_file, cache=False)
+        self.add_input_file(os.path.join(self._tmpdir, self._wrapper), cache=True)
+        self.add_input_file(os.path.join(self._tmpdir, self._func_file), cache=False)
+        self.add_input_file(os.path.join(self._tmpdir, self._args_file), cache=False)
+        self.add_output_file(os.path.join(self._tmpdir, self._out_file), cache=False)
 
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
     def _create_wrapper(self):
-        with open(self._wrapper, 'w') as f:
+        with open(os.path.join(self._tmpdir, self._wrapper), 'w') as f:
             f.write(textwrap.dedent('''\
                 try:
                     import sys
@@ -1081,7 +1097,7 @@ class Manager(object):
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
     #
     # @see vine_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, run_info_dir=None, ssl=None):
+    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, run_info_dir="vine-runtime", ssl=None):
         self._shutdown = shutdown
         self._taskvine = None
         self._stats = None
@@ -1140,11 +1156,11 @@ class Manager(object):
             return ssl
 
         (tmp, key) = tempfile.mkstemp(
-                dir=staging_directory,
+                dir=self.staging_directory,
                 prefix='key')
         os.close(tmp)
         (tmp, cert) = tempfile.mkstemp(
-                dir=staging_directory,
+                dir=self.staging_directory,
                 prefix='cert')
         os.close(tmp)
 
@@ -1175,6 +1191,12 @@ class Manager(object):
     @property
     def port(self):
         return vine_port(self._taskvine)
+
+    ##
+    # Get the staging directory of the manager
+    @property
+    def staging_directory(self):
+        return vine_get_runtime_path_staging(self._taskvine, None)
 
     ##
     # Get queue statistics.
@@ -1792,14 +1814,13 @@ class Manager(object):
     # @param self   Reference to the current manager object.
     # @param task   A task description created from @ref taskvine::Task.
     def submit(self, task):
-        if isinstance(task, RemoteTask):
-            task.add_input_buffer(json.dumps(task._event), "infile")
+        task.submit_finalize(self)
         task_id = vine_submit(self._taskvine, task._task)
         self._task_table[task_id] = task
         return task_id
-    
+
     ##
-    # Submit a duty to install on all connected workers 
+    # Submit a duty to install on all connected workers
     #
     #
     # @param self   Reference to the current manager object.
@@ -2200,33 +2221,45 @@ class RemoteTask(Task):
     # @param
     # @param command    The shell command line to be exected by the task.
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
-    # @param kwargs	    keyword arguments used in function to be executed by task. 
+    # @param kwargs	    keyword arguments used in function to be executed by task.
     def __init__(self, fn, coprocess, *args, **kwargs):
         Task.__init__(self, fn)
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
         Task.set_coprocess(self, "duty_coprocess:" + coprocess)
+
     ##
-    # Specify function arguments. Accepts arrays and dictionarys. This overrides any arguments passed during task creation
+    # Finalizes the task definition once the manager that will execute is run.
+    # This function is run by the manager before registering the task for
+    # execution.
+    #
+    # @param self 	Reference to the current python task object
+    def submit_finalize(self, manager):
+        self.add_input_buffer(json.dumps(task._event), "infile")
+
+    ##
+    # Specify function arguments. Accepts arrays and dictionarys. This
+    # overrides any arguments passed during task creation
     # @param self             Reference to the current remote task object
     # @param args             An array of positional args to be passed to the function
     # @param kwargs           A dictionary of keyword arguments to be passed to the function
     def set_fn_args(self, args=[], kwargs={}):
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
+
     ##
     # Specify how the remote task should execute
     # @param self                     Reference to the current remote task object
-    # @param remote_task_exec_method  Can be one of "fork", "direct", or "thread". Fork creates a child process to execute the function, direct has the worker directly call the function, and thread spawns a thread to execute the function
+    # @param remote_task_exec_method  Can be one of "fork", "direct", or
+    # "thread". Fork creates a child process to execute the function, direct
+    # has the worker directly call the function, and thread spawns a thread to
+    # execute the function
     def set_exec_method(self, remote_task_exec_method):
         if remote_task_exec_method not in ["fork", "direct", "thread"]:
             print("Error, vine_exec_method must be one of fork, direct, or thread")
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
-
-
-# test
 
 ##
 # \class Factory
