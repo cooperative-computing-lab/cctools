@@ -3235,8 +3235,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 		}
 	}
 
-	vine_enable_perf_log(q, vine_get_runtime_path_log(q, "performance"));
-	vine_enable_transactions_log(q, vine_get_runtime_path_log(q, "transactions"));
+	vine_enable_perf_log(q, "performance");
+	vine_enable_transactions_log(q, "transactions");
 
 	vine_perf_log_write_update(q, 1);
 
@@ -3488,6 +3488,7 @@ void vine_delete(struct vine_manager *q)
 			debug(D_VINE, "unable to write transactions log: %s\n", strerror(errno));
 		}
 	}
+	free(q->runtime_directory);
 
 	rmsummary_delete(q->measured_local_resources);
 	rmsummary_delete(q->current_max_worker);
@@ -4777,7 +4778,10 @@ int vine_enable_debug_log( const char *logfile )
 
 int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 {
-	q->perf_logfile = fopen(filename, "w");
+	char *logpath = vine_get_runtime_path_log(q, filename);
+	q->perf_logfile = fopen(logpath, "w");
+	free(logpath);
+
 	if(q->perf_logfile) {
 		vine_perf_log_write_header(q);
 		vine_perf_log_write_update(q,1);
@@ -4791,7 +4795,10 @@ int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 
 int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 {
-	q->txn_logfile = fopen(filename, "w");
+	char *logpath = vine_get_runtime_path_log(q, filename);
+	q->txn_logfile = fopen(logpath, "w");
+	free(logpath);
+
 	if(q->txn_logfile) {
 		debug(D_VINE, "transactions log enabled and is being written to %s\n", filename);
 		vine_txn_log_write_header(q);
