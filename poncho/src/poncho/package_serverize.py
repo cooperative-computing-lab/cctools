@@ -55,42 +55,24 @@ def send_configuration(config):
     sys.stdout.flush()
 
 def main():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        # modify the port argument to be 0 to listen on an arbitrary port
-        s.bind(('localhost', 0))
-    except Exception as e:
-        s.close()
-        print(e)
-        exit(1)
-
-    # information to print to stdout for worker
     config = {
-            "name": name(),
-            "port": s.getsockname()[1],
-            }
-
+        "name": name(),
+    }
     send_configuration(config)
-
     while True:
-        s.listen()
-        conn, addr = s.accept()
-        print('Network function: connection from {}'.format(addr), file=sys.stderr)
         while True:
-            # peek at message to find newline to get the size
-            event_size = None
-            line = conn.recv(100, socket.MSG_PEEK)
-            eol = line.find(b'\\n')
-            if eol >= 0:
-                size = eol+1
-                # actually read the size of the event
-                input_spec = conn.recv(size).decode('utf-8').split()
-                function_name = input_spec[0]
-                event_size = int(input_spec[1])
-            try:
+            # wait for message from worker about what function to execute
+            line = input()
+            print(f"Network function received task: {line}", file=sys.stderr, flush=True)
+            if len(line) >= 0:
+                function_name, event_size = line.split(" ")
                 if event_size:
                     # receive the bytes containing the event and turn it into a string
-                    event_str = conn.recv(event_size).decode("utf-8")
+                    event_str = input()
+                    if len(event_str) != int(event_size):
+                        print(event_str, len(event_str), event_size, file=sys.stderr)
+                        print("Size of event does not match what was sent: exiting", file=sys.stderr)
+                        exit(0)
                     # turn the event into a python dictionary
                     event = json.loads(event_str)
                     # see if the user specified an execution method
@@ -102,9 +84,9 @@ def main():
                         p = threading.Thread(target=globals()[function_name], args=(event_str, q))
                         p.start()
                         p.join()
-                        response = json.dumps(q.get()).encode("utf-8")
+                        response = json.dumps(q.get())
                     elif exec_method == "direct":
-                        response = json.dumps(globals()[function_name](event)).encode("utf-8")
+                        response = json.dumps(globals()[function_name](event))
                     else:
                         p = os.fork()
                         if p == 0:
@@ -123,22 +105,14 @@ def main():
                             while (len(chunk) >= 65536):
                                 chunk = os.read(read, 65536).decode("utf-8")
                                 all_chunks.append(chunk)
-                            response = "".join(all_chunks).encode("utf-8")
+                            response = "".join(all_chunks)
                             os.waitid(os.P_PID, p, os.WEXITED)
 
-                    response_size = len(response)
-
-                    size_msg = "{}\\n".format(response_size)
-
-                    # send the size of response
-                    conn.sendall(size_msg.encode('utf-8'))
-
-                    # send response
-                    conn.sendall(response)
+                    print(response, flush=True)
 
                     break
-            except Exception as e:
-                print("Network function encountered exception ", str(e), file=sys.stderr)
+            else:
+                print("Network function could not read from worker\n", file=sys.stderr)
     return 0
 
 '''
