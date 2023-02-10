@@ -939,6 +939,7 @@ static char *monitor_file_name(struct vine_manager *q, struct vine_task *t, cons
 		dir = q->monitor_output_directory;
 	} else {
 		dir = vine_get_runtime_path_staging(q, NULL);
+		free_dir = 1;
 	}
 
 	char *name = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME "%s",
