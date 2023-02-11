@@ -21,10 +21,14 @@ manager_info = {"Start":-1,
                 "Disconnections":[],
                 "Resource Updates":[],
                 "Cache Updates":[],
+                "CacheTime":{},
                 "Tasks Sent":[],
                 "Waiting Retrieval":[],
                 "Marked Done":[],
-                "Transfers":[],}
+                "Transfers":[],
+                "TaskMap":{},
+                "TaskDone": {},
+                }
 
 def parse_manager(log):
     lines = open(log, 'r').read().splitlines()
@@ -72,6 +76,86 @@ def parse_manager(log):
                 manager_info["Marked Done"].append(time - manager_info["Start"])
             continue
 
+def parse_tasks(log):
+    lines = open(log, 'r').read().splitlines()
+    for line in lines:
+        if line.startswith("#"):
+            continue
+
+        try:
+            (time, managerpid, subject, target, event, arg) = line.split(maxsplit=5)
+        except ValueError:
+            try:
+                (time, managerpid, subject, target, event) = line.split(maxsplit=4)
+            except ValueError:
+                continue
+
+        time = float(time)/1000000
+        
+        if subject == "MANAGER":
+            managerpid = target
+            if event == "START":
+                manager_info["Start"] = time
+            continue
+        if subject == "WORKER":
+            worker_id = target
+            if worker_id == "(null)":
+                continue
+            if event == "CONNECTION":
+                manager_info["Connections"].append(time - manager_info["Start"])
+            elif event == "DISCONNECTION":
+                manager_info["Disconnections"].append(time - manager_info["Start"])
+            elif event == "RESOURCES":
+                manager_info["Resource Updates"].append(time - manager_info["Start"])
+            elif event == "CACHE_UPDATE":
+                manager_info["Cache Updates"].append(time - manager_info["Start"])
+                if float(arg.split()[-1]) != 0:
+                    manager_info["CacheTime"].update([(worker_id, arg.split()[-1])])
+            elif event == "TRANSFER":
+                manager_info["Transfers"].append(time - manager_info["Start"])
+            continue
+
+        if subject == "TASK":
+            if event == "RUNNING":
+                manager_info["Tasks Sent"].append(time - manager_info["Start"])
+                manager_info["TaskMap"].update([(int(target), arg.split()[0])])
+            elif event == "WAITING_RETRIEVAL":
+                manager_info["Waiting Retrieval"].append(time - manager_info["Start"])
+                manager_info["TaskDone"].update([(int(target), time - manager_info["Start"])])
+            elif event == "DONE":
+                manager_info["Marked Done"].append(time - manager_info["Start"])
+                
+            continue
+
+def plot_tasks(title='Manager Info', all_info=False, save=None, connections=False, disconnections=False,
+                resources=False, cache_updates=False, tasks_sent=False, waiting_retrieval=False, 
+                marked_done=False, input_transfers=False, output_transfers=False, xticks=None, yticks=None):
+
+    dcache = manager_info["CacheTime"]
+    dtasks = manager_info["TaskMap"]
+
+    task_cachetime = {}
+
+    # map cache update time to task id
+    for task, worker in dtasks.items():
+        for cworker, cachetime in dcache.items():
+            if worker == cworker:
+                task_cachetime.update([(task, cachetime)])
+
+    stimes = list(task_cachetime.values())
+    times = [float(t) for t in stimes]
+
+    ys = range(len(manager_info["Tasks Sent"]))
+
+    dwidths = sorted(manager_info["TaskDone"].items())
+    lwidths = [float(i[1]) for i in dwidths]
+    widths = [i[0] - i[1] for i in zip(lwidths, manager_info["Tasks Sent"])]
+
+    plt.barh(ys, width=widths, left=manager_info["Tasks Sent"], label="Tasks")
+    plt.barh(ys, width=times, left=manager_info["Tasks Sent"], color="orange", label="Transfers")
+    plt.legend()
+    plt.show()
+   
 def plot_manager(title='Manager Info', all_info=False, save=None, connections=False, disconnections=False,
                 resources=False, cache_updates=False, tasks_sent=False, waiting_retrieval=False, 
                 marked_done=False, input_transfers=False, output_transfers=False, xticks=None, yticks=None):
@@ -318,11 +402,11 @@ def plot_workers(title='Worker Info', all_info=False, save=None, cache_updates=F
     widths2 = []
     lefts = []
     lefts2 = []
-    zero = zero[0]
+    zero = []
     # PLOT CACHE UPDATES
     if all_info or cache_updates:
         plot_cache_updates(zero)
-
+        
     # PLOT RESOURCES REPORTS
     if all_info or resources:
         plot_resource_updates(zero)
@@ -431,6 +515,10 @@ def plot_workers(title='Worker Info', all_info=False, save=None, cache_updates=F
         plt.savefig(save)
     plt.show()
 
+
+    
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Plot worker information from transaction lof file.')
     parser.add_argument('log', help='Path to transaction log file')
@@ -494,4 +582,19 @@ if __name__ == "__main__":
                     yticks = args.y,
                     input_transfers=args.i,
                     output_transfers=args.o)
-            
+    elif args.mode == "Tasks":
+        parse_tasks(args.log)
+        plot_tasks(title=args.title,
+                    save=args.save,
+                    all_info=args.a,
+                    connections = args.c,
+                    disconnections = args.d,
+                    resources=args.r,
+                    cache_updates=args.u,
+                    tasks_sent=args.s,
+                    waiting_retrieval=args.w,
+                    marked_done=args.m,
+                    xticks = args.x,
+                    yticks = args.y,
+                    input_transfers=args.i,
+                    output_transfers=args.o)
