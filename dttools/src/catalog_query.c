@@ -308,7 +308,7 @@ static int catalog_update_protocol()
 		return 0;
 	} else {
 		debug(D_NOTICE,"CATALOG_UPDATE_PROTOCOL=%s but should be 'udp' or 'tcp' instead.",protocol);
-		return 1;
+		return 0;
 	}
 }
 
