@@ -36,7 +36,7 @@ A catalog server provides naming and discovery for multiple components
 of the Cooperative Computing Tools, particularly the Chirp distributed
 filesystem and the Work Queue distributed programming framework.
 Services that wish to be known on the network periodically publish
-their information to the catalog server via a short UDP packet.
+their information to the catalog server via a short TCP or UDP update.
 Clients wishing to discover services by name may query the catalog
 by issuing an HTTP request to the catalog server and will receive
 back a listing of all known services.
