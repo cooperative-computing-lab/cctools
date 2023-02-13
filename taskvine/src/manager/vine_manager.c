@@ -3130,7 +3130,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	// set debug logfile as soon as possible need to manually use runtime_dir
 	// as the manager has not been created yet, but we would like to have debug
 	// information of its creation.
-	char *debug_tmp = string_format("%s/logs/debug", runtime_dir);
+	char *debug_tmp = string_format("%s/vine-logs/debug", runtime_dir);
 	vine_enable_debug_log(debug_tmp);
 	free(debug_tmp);
 

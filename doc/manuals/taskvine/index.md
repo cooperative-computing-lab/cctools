@@ -1564,21 +1564,21 @@ A taskvine manager produces three logs: `debug`, `performance`, and
 working directory in the sudirectories:
 
 ```sh
-vine-run-info/YYYY-mm-ddTHH:MM:SS/logs
+vine-run-info/YYYY-mm-ddTHH:MM:SS/vine-logs
 
-# for example: vine-run-info/2023-02-10T09\:08\:47/logs
+# for example: vine-run-info/2023-02-10T09\:08\:47/vine-logs
 ```
 
 If you need to change the prefix `vine-run-info` to some other directory, use
 
 === "Python"
     ```python
-    # logs appear at /new/desired/path/%Y-%m-%dT%H:%M:%S/logs
+    # logs appear at /new/desired/path/%Y-%m-%dT%H:%M:%S/vine-logs
     m = vine.Manager(run_info_path="/new/desired/path")
     ```
 
 === "C"
-    // logs appear at /new/desired/path/%Y-%m-%dT%H:%M:%S/logs
+    // logs appear at /new/desired/path/%Y-%m-%dT%H:%M:%S/vine-logs
     vine_set_runtime_info_path("/new/desired/path")
     struct taskvine *m = vine_create(0);
     ```
@@ -1598,7 +1598,7 @@ tasks, workers connect and report resources, etc. This is specially useful to
 find failures, bugs, and other errors. It is located by default at:
 
 ```sh
-vine-run-info/%Y-%m-%dT%H:%M:%S/logs/debug
+vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/debug
 ```
 
 To enable debugging at the worker, set the `-d` option:
@@ -1614,7 +1614,7 @@ such as number of tasks waiting and completed, number of workers busy,
 total number of cores available, etc. The log is located by default at:
 
 ```sh
-vine-run-info/%Y-%m-%dT%H:%M:%S/logs/performance
+vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/performance
 ```
 
 The time series are presented in columns, with the leftmost column as a
@@ -1649,7 +1649,7 @@ specially useful for tracking the resources requested, allocated, and used by
 tasks. It is located by default at:
 
 ```sh
-vine-run-info/%Y-%m-%dT%H:%M:%S/logs/transactions
+vine-run-info/%Y-%m-%dT%H:%M:%S/vine-logs/transactions
 ```
 
 The first few lines of the log document the possible log records:

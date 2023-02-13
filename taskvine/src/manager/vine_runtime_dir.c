@@ -91,7 +91,7 @@ char *vine_runtime_directory_create() {
 	free(runtime_dir);
 	runtime_dir = xxstrdup(pabs);
 
-	char *tmp = string_format("%s/logs", runtime_dir);
+	char *tmp = string_format("%s/vine-logs", runtime_dir);
 	if(!create_dir(tmp, 755)) {
         return NULL;
     }
@@ -108,7 +108,7 @@ char *vine_runtime_directory_create() {
 }
 
 char *vine_get_runtime_path_log(struct vine_manager *m, const char *path) {
-    return string_format("%s/logs/%s", m->runtime_directory, path ? path : "");
+    return string_format("%s/vine-logs/%s", m->runtime_directory, path ? path : "");
 }
 
 char *vine_get_runtime_path_staging(struct vine_manager *m, const char *path) {
