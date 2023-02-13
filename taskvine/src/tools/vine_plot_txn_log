@@ -152,7 +152,14 @@ def plot_tasks(title='Manager Info', all_info=False, save=None, connections=Fals
     widths = [i[0] - i[1] for i in zip(lwidths, manager_info["Tasks Sent"])]
 
     plt.barh(ys, width=widths, left=manager_info["Tasks Sent"], label="Tasks")
-    plt.barh(ys, width=times, left=manager_info["Tasks Sent"], color="orange", label="Transfers")
+    
+    if input_transfers or all_info:
+        plt.barh(ys, width=times, left=manager_info["Tasks Sent"], color="orange", label="Transfers")
+    if waiting_retrieval or all_info:
+        plt.plot(manager_info["Waiting Retrieval"], ys, "r+", label="Waiting Retrieval")
+    if marked_done or all_info:
+        plt.plot(manager_info["Marked Done"], ys, "g+", label="Marked Done")
+    
     plt.legend()
     plt.show()
    
