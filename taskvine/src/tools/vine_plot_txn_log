@@ -452,7 +452,17 @@ if __name__ == "__main__":
     parser.add_argument('-y', nargs=3, help='change scale for y ticks -y <start> <step_size> <steps>')
     parser.add_argument('-z', nargs=1, help='changes refrence point for 0 Default: manager start (WorkerFirstTask|ManagerFirstTask)')
     parser.add_argument('--worker-time', action='store_true', help='uses time measured on worker')
+    parser.add_argument('--tex', action='store_true', help='use tex fonts')
     args = parser.parse_args()
+
+    if args.tex:
+        font = {'family' : 'serif',
+                'serif': ['Computer Modern Roman'],
+                'weight' : 'normal',
+                'size'   : 11}
+        plt.rc('font', **font)
+        plt.rc('text', usetex=True)
+
     if args.mode == "Workers":
         parse_workers(args.log)
         plot_workers(title=args.title,
