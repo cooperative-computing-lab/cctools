@@ -409,7 +409,7 @@ static int log_replay( struct deltadb *db, const char *filename, time_t snapshot
 
 					/* Now process the remainder of the line as a new command. */
 					int position = strlen(key) + strlen(name) + 2;
-					strcpy(line,&line[position]);
+					line = &line[position];
 					goto reconsider;
 				} else {
 					/* Invalid type: the line is totally corrupted. */
