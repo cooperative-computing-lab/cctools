@@ -5,7 +5,7 @@
 # TaskVine is a framework for building large scale distributed data intensive
 # applications that run on clusters, clouds, grids, and similar distributed systems.
 # A TaskVine application consists of a main program that creates a @ref Manager object,
-# and then submits @ref Tasks that use @ref Files representing data sources.
+# and then submits @ref Task objects that use @ref File objects representing data sources.
 # The manager distributes tasks across available workers and returns results to
 # the main application.
 #
@@ -17,8 +17,7 @@
 # - @ref Factory
 #
 # The objects and methods provided by this package correspond closely
-# to the native C API in @ref vine_manager.h.
-#
+# to the native C API.
 
 import itertools
 import math
@@ -233,6 +232,7 @@ class Task(object):
     # execution.
     #
     # @param self 	Reference to the current python task object
+    # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
         pass
 
@@ -380,11 +380,10 @@ class Task(object):
     # >>> # Attach the output of the mini-task as the input of a main task:
     # >>> task.add_input_mini_task(mini_task,"infile.txt",cache=True)
     # @endcode
-
-    def add_input_mini_task(self, mini_task, remote_name, cache=False, failure_only=None):
+    def add_input_mini_task(self, mini_task, remote_name, cache=False)
         if remote_name:
             remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache=cache, failure_only=failure_only)
+        flags = Task._determine_file_flags(cache=cache)
         # The minitask must be duplicated, because the C object becomes "owned"
         # by the parent task and will be deleted when the parent task goes away.
         copy_of_mini_task = vine_task_clone(mini_task._task)
@@ -394,13 +393,14 @@ class Task(object):
     # Add any input object to a task.
     #
     # @param self           Reference to the current task object.
-    # @param file           A file object of class @ref File, such as @ref FileLocal, @ref FileBuffer, @ref FileURL, @ref FileMiniTask, @ref FileUntar, @FileUntgz.
+    # @param file           A file object of class @ref File, such as @ref FileLocal, @ref FileBuffer, @ref FileURL, @ref FileMiniTask, @ref FileUntar
     # @param remote_name    The name of the file at the execution site.
     # @param cache         Whether the file should be cached at workers (True/False)
+    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
     #
     # For example:
     # @code
-    # >>> file = FileUntgz(FileURL(http://somewhere.edu/data.tgz))
+    # >>> file = FileUntar(FileURL(http://somewhere.edu/data.tgz))
     # >>> task.add_input(file,"data",cache=True)
     # @endcode
     def add_input(self, file, remote_name, cache=None, failure_only=None):
@@ -427,7 +427,6 @@ class Task(object):
     # @param self           Reference to the current task object.
     # @param buffer         The contents of the buffer to pass as input.
     # @param remote_name    The name of the remote file to create.
-    # @param flags          May take the same values as @ref add_file.
     # @param cache          Whether the file should be cached at workers (True/False)
     def add_input_buffer(self, buffer, remote_name, cache=False ):
         if remote_name:
@@ -946,6 +945,7 @@ class PythonTask(Task):
     # execution.
     #
     # @param self 	Reference to the current python task object
+    # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
         self._tmpdir = tempfile.mkdtemp(dir=manager.staging_directory)
         self._serialize_python_function(*self._fn_def)
@@ -1422,17 +1422,6 @@ class Manager(object):
         return vine_set_scheduler(self._taskvine, scheduler)
 
     ##
-    # Set the order for dispatching submitted tasks in the queue.
-    #
-    # @param self       Reference to the current manager object.
-    # @param order      One of the following schedulers to use in dispatching
-    #                   submitted tasks to workers:
-    #                   - @ref VINE_TASK_ORDER_FIFO
-    #                   - @ref VINE_TASK_ORDER_LIFO
-    def set_task_order(self, order):
-        return vine_set_task_order(self._taskvine, order)
-
-    ##
     # Change the project name for the given queue.
     #
     # @param self   Reference to the current manager object.
@@ -1504,7 +1493,7 @@ class Manager(object):
     #
     # @param self       Reference to the current manager object.
     # @param catalogs   The catalog servers given as a comma delimited list of hostnames or hostname:port
-    def set_catalog_servers(self, hostname, port):
+    def set_catalog_servers(self, catalogs):
         return vine_set_catalog_servers(self._taskvine, catalogs)
 
     ##
@@ -1661,7 +1650,7 @@ class Manager(object):
     # Cancel task identified by its tag and remove from the given queue.
     #
     # @param self   Reference to the current manager object.
-    # @param tag    The tag assigned to task using @ref set_tag.
+    # @param tag    The tag assigned to task using @ref Task.set_tag.
     def cancel_by_task_tag(self, tag):
         task = None
         task_pointer = vine_cancel_by_task_tag(self._taskvine, tag)
@@ -1673,7 +1662,7 @@ class Manager(object):
     # Cancel all tasks of the given category and remove them from the queue.
     #
     # @param self   Reference to the current manager object.
-    # @param tag    The tag assigned to task using @ref set_tag.
+    # @param category The name of the category to cancel.
     def cancel_by_category(self, category):
         canceled_tasks = []
         ids_to_cancel = []
@@ -1889,21 +1878,21 @@ class Manager(object):
     # @param self       Reference to the current manager object.
     # @param fn         The function that will be called on each element
     # @param seq        The sequence that will call the function
-    # @param chunk_size The number of elements to process at once
+    # @param chunksize  The number of elements to process at once
 
-    def map(self, fn, array, chunk_size=1):
-        size = math.ceil(len(array)/chunk_size)
+    def map(self, fn, seq, chunksize=1):
+        size = math.ceil(len(seq)/chunksize)
         results = [None] * size
         tasks = {}
 
         for i in range(size):
-            start = i*chunk_size
-            end = start + chunk_size
+            start = i*chunksize
+            end = start + chunksize
 
-            if end > len(array):
-                p_task = PythonTask(map, fn, array[start:])
+            if end > len(seq):
+                p_task = PythonTask(map, fn, seq[start:])
             else:
-                p_task = PythonTask(map, fn, array[start:end])
+                p_task = PythonTask(map, fn, seq[start:end])
 
             p_task.set_tag(str(i))
             self.submit(p_task)
@@ -1933,7 +1922,9 @@ class Manager(object):
     # @param fn       The function that will be called on each element
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
-    def pair(self, fn, seq1, seq2, chunk_size=1, env=None):
+    # @param chunksize  Number of pairs to process at once (default is 1)
+    # @param env      Filename of a python environment tarball (conda or poncho)
+    def pair(self, fn, seq1, seq2, chunksize=1, env=None):
         def fpairs(fn, s):
             results = []
 
@@ -1942,7 +1933,7 @@ class Manager(object):
 
             return results
 
-        size = math.ceil((len(seq1) * len(seq2))/chunk_size)
+        size = math.ceil((len(seq1) * len(seq2))/chunksize)
         results = [None] * size
         tasks = {}
         task = []
@@ -1951,7 +1942,7 @@ class Manager(object):
 
         for item in itertools.product(seq1, seq2):
 
-            if num == chunk_size:
+            if num == chunksize:
                 p_task = PythonTask(fpairs, fn, task)
                 if env:
                     p_task.set_environment(env)
@@ -1987,7 +1978,7 @@ class Manager(object):
                     results[tasks[t.id]] = t.output
                     n += 1
                     break
- 
+
         return [item for elem in results for item in elem]
 
 
@@ -2003,19 +1994,18 @@ class Manager(object):
     # @param self       Reference to the current manager object.
     # @param fn         The function that will be called on each element
     # @param seq        The seq that will be reduced
-    # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
-
-    def tree_reduce(self, fn, seq, chunk_size=2): 
+    # @param chunksize The number of elements per Task (for tree reduc, must be greater than 1)
+    def tree_reduce(self, fn, seq, chunksize=2):
         tasks = {}
         num_task = 0
 
         while len(seq) > 1:
-            size = math.ceil(len(seq)/chunk_size)
+            size = math.ceil(len(seq)/chunksize)
             results = [None] * size
-        
+
             for i in range(size):
-                start = i*chunk_size
-                end = start + chunk_size
+                start = i*chunksize
+                end = start + chunksize
 
                 if end > len(seq):
                     p_task = PythonTask(fn, seq[start:])
@@ -2046,7 +2036,7 @@ class Manager(object):
         return seq[0]
 
     ##
-    # Maps a function to elements in a sequence using taskvine remote task 
+    # Maps a function to elements in a sequence using taskvine remote task
     #
     # Similar to regular map function in python, but creates a task to execute each function on a worker running a coprocess
     #
@@ -2054,24 +2044,24 @@ class Manager(object):
     # @param fn         The function that will be called on each element. This function exists in coprocess.
     # @param seq        The sequence that will call the function
     # @param coprocess  The name of the coprocess that contains the function fn.
-    # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
-    # @param chunk_size The number of elements to process at once
-    def remote_map(self, fn, array, coprocess, name, chunk_size=1):
-        size = math.ceil(len(array)/chunk_size)
+    # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
+    # @param chunksize The number of elements to process at once
+    def remote_map(self, fn, seq, coprocess, name, chunksize=1):
+        size = math.ceil(len(seq)/chunksize)
         results = [None] * size
         tasks = {}
 
         for i in range(size):
-            start = i*chunk_size
-            end = min(len(array), start+chunk_size)
+            start = i*chunksize
+            end = min(len(seq), start+chunksize)
 
-            event = json.dumps({name : array[start:end]})
+            event = json.dumps({name : seq[start:end]})
             p_task = RemoteTask(fn, event, coprocess)
-            
+
             p_task.set_tag(str(i))
             self.submit(p_task)
             tasks[p_task.id] = i
-               
+
         n = 0
         for i in range(size+1):
             while not self.empty() and n < size:
@@ -2079,7 +2069,7 @@ class Manager(object):
                     if value == i:
                         t_id = key
                         break
-                t = self.wait_for_task_id(t_id, 1)                
+                t = self.wait_for_task_id(t_id, 1)
                 if t:
                     results[tasks[t.id]] = list(json.loads(t.output)["Result"])
                     n += 1
@@ -2098,10 +2088,10 @@ class Manager(object):
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
     # @param coprocess  The name of the coprocess that contains the function fn.
-    # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
-    # @param chunk_size The number of elements to process at once
-    def remote_pair(self, fn, seq1, seq2, coprocess, name, chunk_size=1):
-        size = math.ceil((len(seq1) * len(seq2))/chunk_size)
+    # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
+    # @param chunksize The number of elements to process at once
+    def remote_pair(self, fn, seq1, seq2, coprocess, name, chunksize=1):
+        size = math.ceil((len(seq1) * len(seq2))/chunksize)
         results = [None] * size
         tasks = {}
         task = []
@@ -2109,12 +2099,12 @@ class Manager(object):
         num_task = 0
 
         for item in itertools.product(seq1, seq2):
-            if num == chunk_size:
+            if num == chunksize:
                 event = json.dumps({name : task})
                 p_task = RemoteTask(fn, event, coprocess)
                 p_task.set_tag(str(num_task))
                 self.submit(p_task)
-                tasks[p_task.id] = num_task                
+                tasks[p_task.id] = num_task
                 num = 0
                 num_task += 1
                 task.clear()
@@ -2158,19 +2148,19 @@ class Manager(object):
     # @param fn         The function that will be called on each element. Exists on the coprocess
     # @param seq        The seq that will be reduced
     # @param coprocess  The name of the coprocess that contains the function fn.
-    # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
-    # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
-    def remote_tree_reduce(self, fn, seq, coprocess, name, chunk_size=2): 
+    # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
+    # @param chunksize The number of elements per Task (for tree reduc, must be greater than 1)
+    def remote_tree_reduce(self, fn, seq, coprocess, name, chunksize=2):
         tasks = {}
         num_task = 0
-        
+
         while len(seq) > 1:
-            size = math.ceil(len(seq)/chunk_size)
+            size = math.ceil(len(seq)/chunksize)
             results = [None] * size
 
             for i in range(size):
-                start = i*chunk_size
-                end = min(len(seq), start+chunk_size)
+                start = i*chunksize
+                end = min(len(seq), start+chunksize)
 
                 event = json.dumps({name : seq[start:end]})
                 p_task = RemoteTask(fn, event, coprocess)
@@ -2205,7 +2195,6 @@ class Manager(object):
 # TaskVine RemoteTask object
 #
 # This class represents a task specialized to execute remotely-defined functions at workers.
-
 class RemoteTask(Task):
     ##
     # Create a new remote task specification.
@@ -2230,11 +2219,12 @@ class RemoteTask(Task):
     # execution.
     #
     # @param self 	Reference to the current python task object
+    # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
         self.add_input_buffer(json.dumps(task._event), "infile")
 
     ##
-    # Specify function arguments. Accepts arrays and dictionarys. This
+    # Specify function arguments. Accepts arrays and dictionaries. This
     # overrides any arguments passed during task creation
     # @param self             Reference to the current remote task object
     # @param args             An array of positional args to be passed to the function
