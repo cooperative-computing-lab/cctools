@@ -89,6 +89,17 @@ class FileLocal(File):
         self._file = vine_file_local(path)
 
 ##
+class FileTemp(File):
+
+    ##
+    # Create an anonymous temporary file object.
+    #
+    # @param self       The current file object.
+    
+    def __init__(self):
+        self._file = vine_file_temp()
+
+##
 # \class FileURL
 #
 # TaskVine URL object
