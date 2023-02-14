@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "vine_task.h"
 #include "vine_worker_info.h"
 #include "vine_file.h"
+#include "vine_mount.h"
 
 #include "list.h"
 #include "rmsummary.h"
@@ -43,8 +44,8 @@ struct vine_task *vine_task_create(const char *command_line)
 	if(command_line) t->command_line = xxstrdup(command_line);
 	t->category = xxstrdup("default");
 
-	t->input_files = list_create();
-	t->output_files = list_create();
+	t->input_mounts = list_create();
+	t->output_mounts = list_create();
 	t->env_list = list_create();
 	t->feature_list = list_create();
 
@@ -105,14 +106,14 @@ void vine_task_clean( struct vine_task *t, int full_clean )
 	t->state = VINE_TASK_READY;
 }
 
-static struct list *vine_task_file_list_clone(struct list *list)
+static struct list *vine_task_mount_list_clone(struct list *list)
 {
 	struct list *new = list_create();
-	struct vine_file *old_file, *new_file;
-
-	LIST_ITERATE(list,old_file) {
-		new_file = vine_file_clone(old_file);
-		list_push_tail(new, new_file);
+	struct vine_mount *old_mount, *new_mount;
+	
+	LIST_ITERATE(list,old_mount) {
+		new_mount = vine_mount_clone(old_mount);
+		list_push_tail(new, new_mount);
 	}
 	return new;
 }
@@ -149,8 +150,8 @@ struct vine_task *vine_task_clone(const struct vine_task *task)
 		vine_task_set_snapshot_file(new, task->monitor_snapshot_file);
 	}
 
-	new->input_files  = vine_task_file_list_clone(task->input_files);
-	new->output_files = vine_task_file_list_clone(task->output_files);
+	new->input_mounts  = vine_task_mount_list_clone(task->input_mounts);
+	new->output_mounts = vine_task_mount_list_clone(task->output_mounts);
 	new->env_list     = vine_task_string_list_clone(task->env_list);
 	new->feature_list = vine_task_string_list_clone(task->feature_list);
 
@@ -371,15 +372,15 @@ Emit warnings if inconsistencies are detected, but keep going otherwise.
 void vine_task_check_consistency( struct vine_task *t )
 {
 	struct hash_table *table = hash_table_create(0,0);
-	struct vine_file *f;
+	struct vine_mount *m;
 
 	/* Cannot have multiple input files mapped to the same remote name. */
 
-	LIST_ITERATE(t->input_files,f) {
-		if(hash_table_lookup(table,f->remote_name)) {
-			fprintf(stderr,"warning: task %d has more than one input file named %s\n",t->task_id,f->remote_name);
+	LIST_ITERATE(t->input_mounts,m) {
+		if(hash_table_lookup(table,m->remote_name)) {
+			fprintf(stderr,"warning: task %d has more than one input file named %s\n",t->task_id,m->remote_name);
 		} else {
-			hash_table_insert(table,f->remote_name,f->remote_name);
+			hash_table_insert(table,m->remote_name,m->remote_name);
 		}
 	}
 
@@ -387,11 +388,11 @@ void vine_task_check_consistency( struct vine_task *t )
 
 	/* Cannot have multiple output files bring back the same file. */
 
-	LIST_ITERATE(t->output_files,f) {
-		if(f->type==VINE_FILE && hash_table_lookup(table,f->source)) {
-			fprintf(stderr,"warning: task %d has more than one output file named %s\n",t->task_id,f->source);
+	LIST_ITERATE(t->output_mounts,m) {
+		if(m->file->type==VINE_FILE && hash_table_lookup(table,m->file->source)) {
+			fprintf(stderr,"warning: task %d has more than one output file named %s\n",t->task_id,m->file->source);
 		} else {
-			hash_table_insert(table,f->remote_name,f->source);
+			hash_table_insert(table,m->file->remote_name,m->file->source);
 		}
 	}
 
@@ -409,11 +410,9 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}
 
-	/* XXX the mount options should really be a separate structure. */
-	f->remote_name = xxstrdup(remote_name);
-	f->flags = flags;
+	struct vine_mount *m = vine_mount_create(file,remote_name,flags,0);
 	
-	list_push_tail(t->input_files, f);
+	list_push_tail(t->input_mounts, m);
 }
 
 void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags )
@@ -426,11 +425,9 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}
 
-	/* XXX the mount options should really be a separate structure. */
-	f->remote_name = xxstrdup(remote_name);
-	f->flags = flags;
-
-	list_push_tail(t->output_files, f);
+	struct vine_mount *m = vine_mount_create(file,remote_name,flags,0);
+	
+	list_push_tail(t->output_mounts, m);
 }
 
 void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
@@ -546,11 +543,11 @@ void vine_task_delete(struct vine_task *t)
 	free(t->monitor_output_directory);
 	free(t->monitor_snapshot_file);
 
-	list_clear(t->input_files,(void*)vine_file_delete);
-	list_delete(t->input_files);
+	list_clear(t->input_mounts,(void*)vine_file_delete);
+	list_delete(t->input_mounts);
 
-	list_clear(t->output_files,(void*)vine_file_delete);
-	list_delete(t->output_files);
+	list_clear(t->output_mounts,(void*)vine_file_delete);
+	list_delete(t->output_mounts);
 
 	list_clear(t->env_list,(void*)free);
 	list_delete(t->env_list);
@@ -573,7 +570,7 @@ static struct vine_file * find_output_buffer( struct vine_task *t, const char *n
 {
 	struct vine_file *f;
 
-	LIST_ITERATE(t->output_files,f) {
+	LIST_ITERATE(t->output_mounts,f) {
 		if(f->type==VINE_BUFFER && !strcmp(f->source,name)) {
 			return f;
 		}

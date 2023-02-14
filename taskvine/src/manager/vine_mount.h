@@ -17,7 +17,8 @@ struct vine_mount {
 	struct vine_file *substitute; // For transfer purposes, fetch from this substitute source instead.
 };
 
-struct vine_mount * vine_mount_create( struct vine_file *f, const char *remote_name, vine_file_flags_t flags );
+struct vine_mount * vine_mount_create( struct vine_file *f, const char *remote_name, vine_file_flags_t flags, struct vine_file *substitute );
+struct vine_mount * vine_mount_clone( struct vine_mount *m );
 void vine_mount_delete( struct vine_mount *m );
 
 #endif

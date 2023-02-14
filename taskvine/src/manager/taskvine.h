@@ -703,7 +703,7 @@ struct vine_file * vine_file_unstarch( struct vine_file *f );
 @return A clone of the argument f.
 */
 
-struct vine_file *vine_file_clone( const struct vine_file *f );
+struct vine_file *vine_file_clone( struct vine_file *f );
 
 /** Delete a file object.
 @param f A file object.
