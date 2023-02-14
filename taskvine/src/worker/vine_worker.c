@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "vine_watcher.h"
 #include "vine_gpus.h"
 #include "vine_file.h"
+#include "vine_mount.h"
 #include "vine_cache.h"
 #include "vine_coprocess.h"
 #include "vine_sandbox.h"
@@ -814,9 +815,9 @@ static int do_put_mini_task( struct link *manager, time_t stoptime, const char *
 	if(!mini_task) return 0;
 
 	/* XXX hacky hack -- the single output of the task must have the target cachename */
-	struct vine_file *output_file = list_peek_head(mini_task->output_files);
-	free(output_file->cached_name);
-	output_file->cached_name = strdup(cache_name);
+	struct vine_mount *output_mount = list_peek_head(mini_task->output_mounts);
+	free(output_mount->file->cached_name);
+	output_mount->file->cached_name = strdup(cache_name);
 	
 	return vine_cache_queue_command(global_cache,mini_task,cache_name,size,mode,flags);
 }
