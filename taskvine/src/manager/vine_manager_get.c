@@ -74,8 +74,7 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 			r = VINE_APP_FAILURE;
 		}
 	} else if(sscanf(line,"error %s %d",name_encoded,&errornum)==2) {
-		debug(D_VINE, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,f->remote_name,strerror(errornum));
-
+		debug(D_VINE, "%s (%s): could not access buffer %s (%s)",w->hostname,w->addrport,f->source,strerror(errornum));
 		/* Mark the task as missing an output, but return success to keep going. */
 		vine_task_set_result(t, VINE_RESULT_OUTPUT_MISSING);
 		r = VINE_SUCCESS;
@@ -309,7 +308,7 @@ static vine_result_code_t vine_manager_get_dir_contents( struct vine_manager *q,
 Get a single output file, located at the worker under 'cached_name'.
 */
 
-vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f )
+vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_mount *m, struct vine_file *f )
 {
 	int64_t total_bytes = 0;
 	vine_result_code_t result = VINE_SUCCESS; //return success unless something fails below.
@@ -361,7 +360,7 @@ vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct 
 	}
 
 	// If the transfer was successful, make a record of it in the cache.
-	if(result == VINE_SUCCESS && f->flags & VINE_CACHE) {
+	if(result == VINE_SUCCESS && m->flags & VINE_CACHE) {
 		struct stat local_info;
 		if (stat(f->source,&local_info) == 0) {
 			struct vine_remote_file_info *remote_info = vine_remote_file_info_create(local_info.st_size,local_info.st_mtime);
@@ -378,24 +377,24 @@ vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct 
 
 vine_result_code_t vine_manager_get_output_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t )
 {
-	struct vine_file *f;
 	vine_result_code_t result = VINE_SUCCESS;
 
-	if(t->output_files) {
-		LIST_ITERATE(t->output_files,f) {
+	if(t->output_mounts) {
+		struct vine_mount *m;
+		LIST_ITERATE(t->output_mounts,m) {
 			// non-file objects are handled by the worker.
-			if(f->type!=VINE_FILE && f->type!=VINE_BUFFER) continue;
+			if(m->file->type!=VINE_FILE && m->file->type!=VINE_BUFFER) continue;
 		     
 			int task_succeeded = (t->result==VINE_RESULT_SUCCESS && t->exit_code==0);
 
 			// skip failure-only files on success 
-			if(f->flags&VINE_FAILURE_ONLY && task_succeeded) continue;
+			if(m->flags&VINE_FAILURE_ONLY && task_succeeded) continue;
 
  			// skip success-only files on failure
-			if(f->flags&VINE_SUCCESS_ONLY && !task_succeeded) continue;
+			if(m->flags&VINE_SUCCESS_ONLY && !task_succeeded) continue;
 
 			// otherwise, get the file.
-			result = vine_manager_get_output_file(q,w,t,f);
+			result = vine_manager_get_output_file(q,w,t,m,m->file);
 
 			//if success or app-level failure, continue to get other files.
 			//if worker failure, return.
@@ -418,15 +417,15 @@ usually because the task has failed, and we want to know why.
 
 vine_result_code_t vine_manager_get_monitor_output_file( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t )
 {
-	struct vine_file *f;
 	vine_result_code_t result = VINE_SUCCESS;
 
 	const char *summary_name = RESOURCE_MONITOR_REMOTE_NAME ".summary";
 
-	if(t->output_files) {
-		LIST_ITERATE(t->output_files,f) {
-			if(!strcmp(summary_name, f->remote_name)) {
-				result = vine_manager_get_output_file(q,w,t,f);
+	struct vine_mount *m;
+	if(t->output_mounts) {
+		LIST_ITERATE(t->output_mounts,m) {
+			if(!strcmp(summary_name, m->remote_name)) {
+				result = vine_manager_get_output_file(q,w,t,m,m->file);
 				break;
 			}
 		}
