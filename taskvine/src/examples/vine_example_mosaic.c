@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 		sprintf(outfile, "%d.cat.jpg",i);
 		sprintf(command, "./convert.sfx -swirl %d cat.jpg %d.cat.jpg", i*10, i);
 
-		temp_file[i] = vine_file_temp(0);
+		temp_file[i] = vine_file_temp();
 		
 		t = vine_task_create(command);
 		vine_task_add_input_file(t, "convert.sfx", "convert.sfx", VINE_CACHE);
