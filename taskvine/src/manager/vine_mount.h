@@ -1,0 +1,25 @@
+#ifndef VINE_MOUNT_H
+#define VINE_MOUNT_H
+
+/** @file vine_mount.h
+A vine_mount describes the binding between a task and a file,
+indicating where a file should be mounted in the name space,
+and any special handling for that file.  Note that multiple
+vine_tasks may mount the same vine_file differently, but the underlying
+vine_file should not change.
+*/
+
+
+struct vine_mount {
+	struct vine_file *file;       // The file object to be mounted.
+	char *remote_name;	      // Name of file as it appears to the task.
+	vine_file_flags_t flags;      // Special handling: VINE_CACHE for caching, VINE_WATCH for watching, etc.
+	struct vine_file *substitute; // For transfer purposes, fetch from this substitute source instead.
+};
+
+struct vine_mount * vine_mount_create( struct vine_file *f, const char *remote_name, vine_file_flags_t flags );
+void vine_mount_delete( struct vine_mount *m );
+
+#endif
+
+
