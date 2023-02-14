@@ -7,7 +7,7 @@ information and interact remotely. Various services and tools send periodic
 updates to a catalog server to advertise their presence and vital details such
 as addresses, resources, and performance. Tools like `chirp_status` and
 `work_queue_status` query the server to displays servers that are currently
-running. Catalog updates are sent via UDP, and the catalog server exposes a
+running. Catalog updates are sent via TCP or UDP, and the catalog server exposes a
 JSON interface to view status and make queries.
 
 By default, the cctools software makes use of the central catalog server (and
@@ -133,14 +133,21 @@ Bash:
 export CATALOG_COMPRESS_UPDATES=on
 ```
 
-By default, catalog updates are sent via the UDP protocol, which is fast and
-efficient for small ( <1KB) messages. If you have large messages or unusual
-networking conditions, you can alternatively send catalog updates via TCP
-instead. To do this, set the following environment variable:
+By default, catalog updates are sent via the TCP protocol,
+which is the most likely to succeed across various networking
+environments.  However, it can cause brief delays while waiting
+to connect to the catalog server.
+
+If you have a large number of clients with frequent updates,
+and are in the same networking domain as the catalog server,
+you can alternatively send catalog updates via UDP packets instead.
+To do this, set the following environment variable:
     
 ```sh
-CATALOG_UPDATE_PROTOCOL=tcp
+CATALOG_UPDATE_PROTOCOL=udp
 ```
+
+(Prior to v7.4.16, the default was to send update via UDP.)
 
 ## Multiple Catalog Servers
 

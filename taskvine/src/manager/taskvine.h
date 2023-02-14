@@ -1070,26 +1070,6 @@ struct list * vine_tasks_cancel(struct vine_manager *m);
 */
 int vine_workers_shutdown(struct vine_manager *m, int n);
 
-/** Turn on the debugging log output and send to the named file.
-@param m A manager object
-@param logfile The filename.
-@return 1 if logfile was opened, 0 otherwise.
-*/
-int vine_enable_debug_log( struct vine_manager *m, const char *logfile );
-
-/** Add a performance log file that records cummulative statistics of the connected workers and submitted tasks.
-@param m A manager object
-@param logfile The filename.
-@return 1 if logfile was opened, 0 otherwise.
-*/
-int vine_enable_perf_log(struct vine_manager *m, const char *logfile);
-
-/** Add a log file that records the states of the connected workers and tasks.
-@param m A manager object
-@param logfile The filename.
-@return 1 if logfile was opened, 0 otherwise.
-*/
-int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
 
 /** Add a mandatory password that each worker must present.
 @param m A manager object
@@ -1186,6 +1166,11 @@ void vine_set_category_first_allocation_guess(struct vine_manager *m,  const cha
 @param summaries_file JSON file with resource summaries.
 */
 void vine_initialize_categories(struct vine_manager *m, struct rmsummary *max, const char *summaries_file);
+
+/** Sets the path where runtime info directories (logs and staging) are created.
+@param path A directory
+*/
+void vine_set_runtime_info_path(const char *path);
 
 
 //@}
