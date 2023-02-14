@@ -6,7 +6,7 @@ from datetime import timedelta
 from string import Template
 
 
-class StatusDisplay():
+class StatusDisplay:
     resources = ["cores", "gpus", "memory", "disk"]
 
     def __init__(self, interval=10):
@@ -59,7 +59,7 @@ class StatusDisplay():
         header = ["application resources"] + StatusDisplay.resources
         rs.append(header)
 
-        for (s, l) in suffixes:
+        for s, l in suffixes:
             d = self._dict_from_q(queue_s, s)
             rs.append(self.resources_to_row(d, l, "na"))
 
@@ -71,7 +71,7 @@ class StatusDisplay():
 
         categories = queue_s["categories"]
         largest_worker = None
-        if queue_s['workers_connected'] > 0:
+        if queue_s["workers_connected"] > 0:
             largest_worker = self._dict_from_q(queue_s, "largest")
 
         categories.sort(key=lambda c: c["category"])
@@ -87,12 +87,12 @@ class StatusDisplay():
                 ct.append(["current workers are too small!"] + larger_worker)
 
             allocs = [
-                    ("max_seen", "largest seen", "na"),
-                    ("first_allocation", "current allocation", "whole worker"),
-                    ("max_allocation", "maximum allocation", "whole worker"),
-                    ]
+                ("max_seen", "largest seen", "na"),
+                ("first_allocation", "current allocation", "whole worker"),
+                ("max_allocation", "maximum allocation", "whole worker"),
+            ]
 
-            for (k, l, na) in allocs:
+            for k, l, na in allocs:
                 try:
                     alloc = self.resources_to_row(c[k], l, na)
                     if alloc:
@@ -108,21 +108,26 @@ class StatusDisplay():
         if not queue_s:
             return None
 
-        stats = ["port",
-                "tasks_done", "tasks_waiting", "tasks_running",
-                "tasks_exhausted_attempts",
-                "workers_connected", "workers_busy", ]
+        stats = [
+            "port",
+            "tasks_done",
+            "tasks_waiting",
+            "tasks_running",
+            "tasks_exhausted_attempts",
+            "workers_connected",
+            "workers_busy",
+        ]
 
         pairs = list((key.replace("_", " "), str(queue_s[key])) for key in stats)
 
-        pairs.append(("sent", self.with_units("disk", queue_s["bytes_sent"]/1e6, "na")))
-        pairs.append(("received", self.with_units("disk", queue_s["bytes_received"]/1e6, "na")))
+        pairs.append(("sent", self.with_units("disk", queue_s["bytes_sent"] / 1e6, "na")))
+        pairs.append(("received", self.with_units("disk", queue_s["bytes_received"] / 1e6, "na")))
 
-        pairs.append(("total send time", str(timedelta(seconds=math.ceil(queue_s["time_send"]/1e6)))))
-        pairs.append(("total receive time", str(timedelta(seconds=math.ceil(queue_s["time_send"]/1e6)))))
-        pairs.append(("total good task time", str(timedelta(seconds=math.ceil(queue_s["time_workers_execute_good"]/1e6)))))
-        pairs.append(("total task time", str(timedelta(seconds=math.ceil(queue_s["time_workers_execute"]/1e6)))))
-        pairs.append(("runtime", str(timedelta(seconds=math.ceil(time.time() - queue_s["time_when_started"]/1e6)))))
+        pairs.append(("total send time", str(timedelta(seconds=math.ceil(queue_s["time_send"] / 1e6)))))
+        pairs.append(("total receive time", str(timedelta(seconds=math.ceil(queue_s["time_send"] / 1e6)))))
+        pairs.append(("total good task time", str(timedelta(seconds=math.ceil(queue_s["time_workers_execute_good"] / 1e6)))))
+        pairs.append(("total task time", str(timedelta(seconds=math.ceil(queue_s["time_workers_execute"] / 1e6)))))
+        pairs.append(("runtime", str(timedelta(seconds=math.ceil(time.time() - queue_s["time_when_started"] / 1e6)))))
 
         return pairs
 
@@ -131,9 +136,9 @@ class StatusDisplay():
             return None
 
         try:
-            app_info = app_s['application_info']
-            values = app_info['values']
-            units = app_info.get('units', {})
+            app_info = app_s["application_info"]
+            values = app_info["values"]
+            units = app_info.get("units", {})
         except KeyError:
             return None
 
@@ -211,7 +216,7 @@ class StatusDisplay():
 
 
 class JupyterDisplay(StatusDisplay):
-    style = '''
+    style = """
         <style>
           table {
             border: 1px solid white;
@@ -232,9 +237,10 @@ class JupyterDisplay(StatusDisplay):
             background-color: #ffcccc;
           }
         </style>
-    '''
+    """
 
-    tbl_fmt = Template(f'''
+    tbl_fmt = Template(
+        f"""
         <head>
         {style}
         </head>
@@ -244,12 +250,13 @@ class JupyterDisplay(StatusDisplay):
         $rows
         </table>
         </body>
-    ''')
+    """
+    )
 
     hdr_fmt = Template('<th colspan="$span"> $value </th>')
-    cell_fmt = Template('<td> $value </td>')
+    cell_fmt = Template("<td> $value </td>")
     cell_over_fmt = Template('<td class="over"> $value </td>')
-    row_fmt = Template('<tr> $cells </tr>')
+    row_fmt = Template("<tr> $cells </tr>")
 
     def __init__(self, interval=10):
         super().__init__(interval)
@@ -258,7 +265,8 @@ class JupyterDisplay(StatusDisplay):
         try:
             import IPython
             import ipywidgets as ws
-            if 'IPKernelApp' in IPython.get_ipython().config:
+
+            if "IPKernelApp" in IPython.get_ipython().config:
                 self._queue_display = ws.HTML(value="")
                 self._app_display = ws.HTML(value="")
                 self._worker_display = ws.HTML(value="")
@@ -302,17 +310,23 @@ class JupyterDisplay(StatusDisplay):
         for rs in groups:
             rows.append(self.make_row(rs[0], fmt=lambda v: JupyterDisplay.hdr_fmt.substitute(value=v, span=0)))
             rows.extend(map(lambda r: self.make_row(r), rs[1:]))
-        return self.make_table('', rows)
+        return self.make_table("", rows)
 
     def make_table(self, header, rows):
         return JupyterDisplay.tbl_fmt.substitute(header=header, rows="\n".join(rows))
 
     def make_row(self, cells_info, fmt=None):
         if not fmt:
-            fmt = lambda v: JupyterDisplay.cell_fmt.substitute(value=v)
+
+            def fmt(v):
+                JupyterDisplay.cell_fmt.substitute(value=v)
+
             try:
                 if cells_info[0][-1] == "!":
-                    fmt = lambda v: JupyterDisplay.cell_over_fmt.substitute(value=v)
+
+                    def fmt(v):
+                        JupyterDisplay.cell_over_fmt.substitute(value=v)
+
             except IndexError:
                 pass
         cells = map(lambda v: fmt(v), cells_info)

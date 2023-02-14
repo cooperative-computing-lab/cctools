@@ -617,6 +617,12 @@ const char * vine_task_get_tag( struct vine_task *t )
 	return t->tag;
 }
 
+const char * vine_task_get_category( struct vine_task *t )
+{
+	return t->category;
+}
+
+
 int vine_task_get_id( struct vine_task *t )
 {
 	return t->task_id;
