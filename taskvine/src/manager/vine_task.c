@@ -24,6 +24,45 @@ See the file COPYING for details.
 #include <assert.h>
 #include <string.h>
 #include <math.h>
+#include "random.h"
+
+
+char * vine_task_to_json(struct vine_task *t){
+        // This needs to be generated consistently such that input and output files are ordered the same each time.
+        char * buffer;
+        char * file_buffer;
+        struct vine_file * file;
+        buffer = string_format("{\ncmd = \"%s\"\n", t->command_line);
+        if(t->input_files){
+                buffer = string_combine(buffer, "inputs = ");
+                LIST_ITERATE(t->input_files, file){
+                        if(file->type == VINE_BUFFER){
+                                file_buffer = string_format("{ name: \"%s\", source: \"%s\"}, ", file->data, file->cached_name);
+                                buffer = string_combine(buffer, file_buffer);
+                        }
+                        else{
+                                file_buffer = string_format("{ name: \"%s\", source: \"%s\"}, ", file->source, file->cached_name);
+                                buffer = string_combine(buffer, file_buffer);
+                        }
+                }
+                buffer = string_combine(buffer, "\n");
+        }
+        if(t->output_files){
+                buffer = string_combine(buffer, "outputs = ");
+                LIST_ITERATE(t->output_files, file){
+                        if(file->type == VINE_BUFFER){
+                                file_buffer = string_format("{ name: \"%s\"}, " , file->data);
+                                buffer = string_combine(buffer, file_buffer);
+                        }
+                        else{
+                                file_buffer = string_format("{ name: \"%s\"}, ", file->source);
+                                buffer = string_combine(buffer, file_buffer);
+                        }
+                }
+                buffer = string_combine(buffer, "\n");
+        }
+        return buffer;
+}
 
 struct vine_task *vine_task_create(const char *command_line)
 {
@@ -405,8 +444,16 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 		fatal("%s: invalid null argument.",__func__);
 	}
 
+	if(!f->cached_name){
+		fatal("Could not generate cache name for vine file: %s", f->source);
+	}
+
 	if(remote_name[0] == '/') {
 		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
+	}
+	if(!strncmp(f->cached_name, "output", strlen("output"))){
+		/* XXX cache name could not be generated for input file. The file may not exist. The task will likely fail*/
+		f->cached_name = 0;
 	}
 
 	/* XXX the mount options should really be a separate structure. */
@@ -429,6 +476,7 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 	/* XXX the mount options should really be a separate structure. */
 	f->remote_name = xxstrdup(remote_name);
 	f->flags = flags;
+
 
 	list_push_tail(t->output_files, f);
 }
