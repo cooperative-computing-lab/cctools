@@ -1,4 +1,5 @@
-## @package work_queue
+##
+# @package work_queue
 #
 # Python Work Queue bindings.
 #
@@ -28,36 +29,41 @@ import atexit
 import time
 import math
 
+
 def set_debug_flag(*flags):
     for flag in flags:
         cctools_debug_flags_set(flag)
 
+
 def specify_debug_log(logfile):
-    set_debug_flag('all')
+    set_debug_flag("all")
     cctools_debug_config_file_size(0)
     cctools_debug_config_file(logfile)
 
+
 def specify_port_range(low_port, high_port):
     if low_port > high_port:
-        raise TypeError('low_port {} should be smaller than high_port {}'.format(low_port, high_port))
+        raise TypeError("low_port {} should be smaller than high_port {}".format(low_port, high_port))
 
-    os.environ['TCP_LOW_PORT'] = str(low_port)
-    os.environ['TCP_HIGH_PORT'] = str(high_port)
+    os.environ["TCP_LOW_PORT"] = str(low_port)
+    os.environ["TCP_HIGH_PORT"] = str(high_port)
 
-cctools_debug_config('work_queue_python')
-cctools_tmpdir = os.getenv('CCTOOLS_TEMP', None)
+
+cctools_debug_config("work_queue_python")
+cctools_tmpdir = os.getenv("CCTOOLS_TEMP", None)
 
 if cctools_tmpdir:
-    staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-', dir=cctools_tmpdir)
+    staging_directory = tempfile.mkdtemp(prefix="wq-py-staging-", dir=cctools_tmpdir)
 else:
-    staging_directory = tempfile.mkdtemp(prefix='wq-py-staging-')
+    staging_directory = tempfile.mkdtemp(prefix="wq-py-staging-")
 
 
 def cleanup_staging_directory():
     try:
         shutil.rmtree(staging_directory)
     except Exception as e:
-        sys.stderr.write('could not delete {}: {}\n'.format(staging_directory, e))
+        sys.stderr.write("could not delete {}: {}\n".format(staging_directory, e))
+
 
 atexit.register(cleanup_staging_directory)
 
@@ -69,7 +75,6 @@ atexit.register(cleanup_staging_directory)
 #
 # This class is used to create a task specification.
 class Task(object):
-
     ##
     # Create a new task specification.
     #
@@ -80,14 +85,14 @@ class Task(object):
 
         self._task = work_queue_task_create(command)
         if not self._task:
-            raise Exception('Unable to create internal Task structure')
+            raise Exception("Unable to create internal Task structure")
 
     def __del__(self):
         try:
             if self._task:
                 work_queue_task_delete(self._task)
-        except:
-            #ignore exceptions, in case task has been already collected
+        except Exception:
+            # ignore exceptions, in case task has been already collected
             pass
 
     @staticmethod
@@ -121,7 +126,6 @@ class Task(object):
         new._task = work_queue_task_clone(self._task)
         return new
 
-
     ##
     # Set the command to be executed by the task.
     #
@@ -129,7 +133,6 @@ class Task(object):
     # @param command    The command to be executed.
     def specify_command(self, command):
         return work_queue_task_specify_command(self._task, command)
-
 
     ##
     # Set the coprocess at the worker that should execute the task's command.
@@ -178,14 +181,6 @@ class Task(object):
         return work_queue_task_specify_feature(self._task, name)
 
     ##
-    # Indicate that the task would be optimally run on a given host.
-    #
-    # @param self       Reference to the current task object.
-    # @param hostname   The hostname to which this task would optimally be sent.
-    def specify_preferred_host(self, hostname):
-        return work_queue_task_specify_preferred_host(self._task, hostname)
-
-    ##
     # Add a file to the task.
     #
     # @param self           Reference to the current task object.
@@ -208,7 +203,6 @@ class Task(object):
     # >>> task.specify_file("/etc/hosts", "hosts", type=WORK_QUEUE_INPUT, cache = True)
     # @endcode
     def specify_file(self, local_name, remote_name=None, type=None, flags=None, cache=None, failure_only=None):
-
         # swig expects strings:
         if local_name:
             local_name = str(local_name)
@@ -235,6 +229,7 @@ class Task(object):
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE (default)
     #                       - @ref WORK_QUEUE_CACHE
+    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     # @param cache         Whether the file should be cached at workers (True/False)
     #
     # For example:
@@ -243,13 +238,12 @@ class Task(object):
     # @endcode
 
     def specify_url(self, url, remote_name, type=None, flags=None, cache=None, failure_only=None):
-
         if type is None:
             type = WORK_QUEUE_INPUT
 
-        if type==WORK_QUEUE_OUTPUT:
+        if type == WORK_QUEUE_OUTPUT:
             raise ValueError("specify_url does not currently support output files.")
-        
+
         # swig expects strings
         if remote_name:
             remote_name = str(remote_name)
@@ -259,7 +253,6 @@ class Task(object):
 
         flags = Task._determine_file_flags(flags, cache, failure_only)
         return work_queue_task_specify_url(self._task, url, remote_name, type, flags)
-
 
     ##
     # Add an input file produced by a Unix shell command.
@@ -275,6 +268,7 @@ class Task(object):
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE (default)
     #                       - @ref WORK_QUEUE_CACHE
+    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     # @param cache         Whether the file should be cached at workers (True/False)
     #
     # For example:
@@ -286,7 +280,7 @@ class Task(object):
         if type is None:
             type = WORK_QUEUE_INPUT
 
-        if type==WORK_QUEUE_OUTPUT:
+        if type == WORK_QUEUE_OUTPUT:
             raise ValueError("specify_file_command does not currently support output files.")
 
         # swig expects strings
@@ -313,7 +307,6 @@ class Task(object):
     # @param cache         Whether the file should be cached at workers (True/False)
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
     def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, type=None, flags=None, cache=None, failure_only=None):
-
         if local_name:
             local_name = str(local_name)
 
@@ -386,7 +379,6 @@ class Task(object):
         flags = Task._determine_file_flags(flags, cache, None)
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
-
     ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
     # to take a snapshot of the task resources. Snapshots appear in the JSON
@@ -448,8 +440,6 @@ class Task(object):
     # @param filename       The name of the snapshot events specification
     def specify_snapshot_file(self, filename):
         return work_queue_specify_snapshot_file(self._task, filename)
-
-
 
     ##
     # Indicate the number of times the task should be retried. If 0 (the
@@ -572,7 +562,6 @@ class Task(object):
     @property
     def algorithm(self):
         return self._task.worker_selection_algorithm
-
 
     ##
     # Get the standard output of the task. Must be called only after the task
@@ -902,7 +891,6 @@ class Task(object):
 
         return self._task.resources_measured.limits_exceeded
 
-
     ##
     # Get the resources the task requested to run. For valid fields see
     # @ref resources_measured.
@@ -932,11 +920,13 @@ class Task(object):
 # this class is used to create a python task
 try:
     import dill
+
     pythontask_available = True
 except Exception:
     # Note that the intended exception here is ModuleNotFoundError.
     # However, that type does not exist in Python 2
     pythontask_available = False
+
 
 class PythonTask(Task):
     ##
@@ -953,13 +943,13 @@ class PythonTask(Task):
         if not pythontask_available:
             raise RuntimeError("PythonTask is not available. The dill module is missing.")
 
-        self._func_file = os.path.join(self._tmpdir, 'function_{}.p'.format(self._id))
-        self._args_file = os.path.join(self._tmpdir, 'args_{}.p'.format(self._id))
-        self._out_file = os.path.join(self._tmpdir, 'out_{}.p'.format(self._id))
-        self._wrapper = os.path.join(self._tmpdir, 'pytask_wrapper.py'.format(self._id))
+        self._func_file = os.path.join(self._tmpdir, "function_{}.p".format(self._id))
+        self._args_file = os.path.join(self._tmpdir, "args_{}.p".format(self._id))
+        self._out_file = os.path.join(self._tmpdir, "out_{}.p".format(self._id))
+        self._wrapper = os.path.join(self._tmpdir, "pytask_wrapper_{}.py".format(self._id))
 
         self._pp_run = None
-        self._env_file  = None
+        self._env_file = None
 
         self._serialize_python_function(func, args, kwargs)
         self._create_wrapper()
@@ -981,7 +971,7 @@ class PythonTask(Task):
         if not self._output_loaded:
             if self.result == WORK_QUEUE_RESULT_SUCCESS:
                 try:
-                    with open(os.path.join(self._tmpdir, 'out_{}.p'.format(self._id)), 'rb') as f:
+                    with open(os.path.join(self._tmpdir, "out_{}.p".format(self._id)), "rb") as f:
                         self._output = dill.load(f)
                 except Exception as e:
                     self._output = e
@@ -991,11 +981,10 @@ class PythonTask(Task):
             self._output_loaded = True
         return self._output
 
-
     def specify_environment(self, env_file):
         if env_file:
             self._env_file = env_file
-            self._pp_run = shutil.which('poncho_package_run')
+            self._pp_run = shutil.which("poncho_package_run")
 
             if not self._pp_run:
                 raise RuntimeError("Could not find poncho_package_run in PATH.")
@@ -1015,38 +1004,37 @@ class PythonTask(Task):
 
         except Exception as e:
             if sys:
-                sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
-
+                sys.stderr.write("could not delete {}: {}\n".format(self._tmpdir, e))
 
     def _serialize_python_function(self, func, args, kwargs):
-        with open(self._func_file, 'wb') as wf:
+        with open(self._func_file, "wb") as wf:
             dill.dump(func, wf, recurse=True)
-        with open(self._args_file, 'wb') as wf:
+        with open(self._args_file, "wb") as wf:
             dill.dump([args, kwargs], wf, recurse=True)
-
 
     def _python_function_command(self):
         if self._env_file:
-            py_exec="python"
+            py_exec = "python"
         else:
-            py_exec=f"python{sys.version_info[0]}"
+            py_exec = f"python{sys.version_info[0]}"
 
-        command = '{py_exec} {wrapper} {function} {args} {out}'.format(
-                py_exec=py_exec,
-                wrapper=os.path.basename(self._wrapper),
-                function=os.path.basename(self._func_file),
-                args=os.path.basename(self._args_file),
-                out=os.path.basename(self._out_file))
+        command = "{py_exec} {wrapper} {function} {args} {out}".format(
+            py_exec=py_exec,
+            wrapper=os.path.basename(self._wrapper),
+            function=os.path.basename(self._func_file),
+            args=os.path.basename(self._args_file),
+            out=os.path.basename(self._out_file),
+        )
 
         if self._env_file:
             command = './{pprun} -e {tar} --unpack-to "$WORK_QUEUE_SANDBOX"/{unpack}-env {cmd}'.format(
                 pprun=os.path.basename(self._pp_run),
                 unpack=os.path.basename(self._env_file),
                 tar=os.path.basename(self._env_file),
-                cmd=command)
+                cmd=command,
+            )
 
         return command
-
 
     def _specify_IO_files(self):
         self.specify_input_file(self._wrapper, cache=True)
@@ -1054,12 +1042,13 @@ class PythonTask(Task):
         self.specify_input_file(self._args_file, cache=False)
         self.specify_output_file(self._out_file, cache=False)
 
-
     ##
     # creates the wrapper script which will execute the function. pickles output.
     def _create_wrapper(self):
-        with open(self._wrapper, 'w') as f:
-            f.write(textwrap.dedent('''\
+        with open(self._wrapper, "w") as f:
+            f.write(
+                textwrap.dedent(
+                    """\
                 try:
                     import sys
                     import dill
@@ -1081,13 +1070,14 @@ class PythonTask(Task):
                 with open(out, 'wb') as f:
                     dill.dump(exec_out, f)
 
-                print(exec_out)'''))
-
-
+                print(exec_out)"""
+                )
+            )
 
 
 class PythonTaskNoResult(Exception):
     pass
+
 
 ##
 # Python Work Queue object
@@ -1128,7 +1118,7 @@ class WorkQueue(object):
             # if not a range, ignore
             pass
         except ValueError:
-            raise ValueError('port should be a single integer, or a sequence of two integers')
+            raise ValueError("port should be a single integer, or a sequence of two integers")
 
         if status_display_interval and status_display_interval >= 1:
             self._info_widget = JupyterDisplay(interval=status_display_interval)
@@ -1142,7 +1132,7 @@ class WorkQueue(object):
             ssl_key, ssl_cert = self._setup_ssl(ssl)
             self._work_queue = work_queue_ssl_create(port, ssl_key, ssl_cert)
             if not self._work_queue:
-                raise Exception('Could not create queue on port {}'.format(port))
+                raise Exception("Could not create queue on port {}".format(port))
 
             if stats_log:
                 self.specify_log(stats_log)
@@ -1153,10 +1143,9 @@ class WorkQueue(object):
             if name:
                 work_queue_specify_name(self._work_queue, name)
         except Exception as e:
-            raise Exception('Unable to create internal Work Queue structure: {}'.format(e))
+            raise Exception("Unable to create internal Work Queue structure: {}".format(e))
 
         self._update_status_display()
-
 
     def _free_queue(self):
         try:
@@ -1166,8 +1155,8 @@ class WorkQueue(object):
                 self._update_status_display(force=True)
                 work_queue_delete(self._work_queue)
                 self._work_queue = None
-        except:
-            #ignore exceptions, as we are going away...
+        except Exception:
+            # ignore exceptions, as we are going away...
             pass
 
     def __enter__(self):
@@ -1187,20 +1176,16 @@ class WorkQueue(object):
         if ssl is not True:
             return ssl
 
-        (tmp, key) = tempfile.mkstemp(
-                dir=staging_directory,
-                prefix='key')
+        (tmp, key) = tempfile.mkstemp(dir=staging_directory, prefix="key")
         os.close(tmp)
-        (tmp, cert) = tempfile.mkstemp(
-                dir=staging_directory,
-                prefix='cert')
+        (tmp, cert) = tempfile.mkstemp(dir=staging_directory, prefix="cert")
         os.close(tmp)
 
-        cmd=f"openssl req -x509 -newkey rsa:4096 -keyout {key} -out {cert} x-sha256 -days 365 -nodes -batch".split()
+        cmd = f"openssl req -x509 -newkey rsa:4096 -keyout {key} -out {cert} x-sha256 -days 365 -nodes -batch".split()
 
-        output=""
+        output = ""
         try:
-            output=subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+            output = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
         except subprocess.CalledProcessError as e:
             print(f"could not create temporary SSL key and cert {e}.\n{output}")
             raise e
@@ -1315,12 +1300,15 @@ class WorkQueue(object):
             s = rmsummayArray_getitem(from_c, count)
             if not s:
                 break
-            workers.append({
-                'workers': int(s.workers),
-                'cores': int(s.cores),
-                'gpus': int(s.gpus),
-                'memory': int(s.memory),
-                'disk': int(s.disk)})
+            workers.append(
+                {
+                    "workers": int(s.workers),
+                    "cores": int(s.cores),
+                    "gpus": int(s.gpus),
+                    "memory": int(s.memory),
+                    "disk": int(s.disk),
+                }
+            )
             rmsummary_delete(s)
             count += 1
         delete_rmsummayArray(from_c)
@@ -1375,9 +1363,10 @@ class WorkQueue(object):
     def task_state(self, taskid):
         return work_queue_task_state(self._work_queue, taskid)
 
-    ## Enables resource monitoring of tasks in the queue, and writes a summary
-    #  per task to the directory given. Additionally, all summaries are
-    #  consolidate into the file all_summaries-PID.log
+    ##
+    # Enables resource monitoring of tasks in the queue, and writes a summary
+    # per task to the directory given. Additionally, all summaries are
+    # consolidate into the file all_summaries-PID.log
     #
     #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
@@ -1387,10 +1376,11 @@ class WorkQueue(object):
     def enable_monitoring(self, dirname=None, watchdog=True):
         return work_queue_enable_monitoring(self._work_queue, dirname, watchdog)
 
-    ## As @ref enable_monitoring, but it also generates a time series and a debug file.
-    #  WARNING: Such files may reach gigabyte sizes for long running tasks.
+    ##
+    # As @ref enable_monitoring, but it also generates a time series and a debug file.
+    # WARNING: Such files may reach gigabyte sizes for long running tasks.
     #
-    #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
+    # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
     # @param self   Reference to the current work queue object.
     # @param dirname    Directory name for the monitor output.
@@ -1513,7 +1503,8 @@ class WorkQueue(object):
     def specify_priority(self, priority):
         return work_queue_specify_priority(self._work_queue, priority)
 
-    ## Specify the number of tasks not yet submitted to the queue.
+    ##
+    # Specify the number of tasks not yet submitted to the queue.
     # It is used by work_queue_factory to determine the number of workers to launch.
     # If not specified, it defaults to 0.
     # work_queue_factory considers the number of tasks as:
@@ -1595,7 +1586,6 @@ class WorkQueue(object):
     def specify_max_resources(self, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
-            old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
         return work_queue_specify_max_resources(self._work_queue, rm)
 
@@ -1615,7 +1605,6 @@ class WorkQueue(object):
     def specify_min_resources(self, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
-            old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
         return work_queue_specify_min_resources(self._work_queue, rm)
 
@@ -1636,7 +1625,6 @@ class WorkQueue(object):
     def specify_category_max_resources(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
-            old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
         return work_queue_specify_category_max_resources(self._work_queue, category, rm)
 
@@ -1657,7 +1645,6 @@ class WorkQueue(object):
     def specify_category_min_resources(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
-            old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
         return work_queue_specify_category_min_resources(self._work_queue, category, rm)
 
@@ -1678,7 +1665,6 @@ class WorkQueue(object):
     def specify_category_first_allocation_guess(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
-            old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
         return work_queue_specify_category_first_allocation_guess(self._work_queue, category, rm)
 
@@ -1729,9 +1715,8 @@ class WorkQueue(object):
             if task.category == category:
                 ids_to_cancel.append(task.id)
 
-        canceled_tasks =  [self.cancel_by_taskid(id) for id in ids_to_cancel]
+        canceled_tasks = [self.cancel_by_taskid(id) for id in ids_to_cancel]
         return canceled_tasks
-
 
     ##
     # Shutdown workers connected to queue.
@@ -1905,28 +1890,27 @@ class WorkQueue(object):
     # @param chunk_size The number of elements to process at once
 
     def map(self, fn, array, chunk_size=1):
-        size = math.ceil(len(array)/chunk_size)
+        size = math.ceil(len(array) / chunk_size)
         results = [None] * size
         tasks = {}
 
         for i in range(size):
-            start = i*chunk_size
+            start = i * chunk_size
             end = start + chunk_size
 
             if end > len(array):
                 p_task = PythonTask(map, fn, array[start:])
             else:
                 p_task = PythonTask(map, fn, array[start:end])
-            
+
             p_task.specify_tag(str(i))
             self.submit(p_task)
             tasks[p_task.id] = i
-               
-        n = 0
-        for i in range(size+1):
-            while not self.empty() and n < size:
 
-                t = self.wait_for_tag(str(i), 1)                
+        n = 0
+        for i in range(size + 1):
+            while not self.empty() and n < size:
+                t = self.wait_for_tag(str(i), 1)
                 if t:
                     results[tasks[t.id]] = list(t.output)
                     n += 1
@@ -1947,12 +1931,12 @@ class WorkQueue(object):
         def fpairs(fn, s):
             results = []
 
-            for p in s:    
+            for p in s:
                 results.append(fn(p))
 
             return results
-       
-        size = math.ceil((len(seq1) * len(seq2))/chunk_size)
+
+        size = math.ceil((len(seq1) * len(seq2)) / chunk_size)
         results = [None] * size
         tasks = {}
         task = []
@@ -1960,15 +1944,14 @@ class WorkQueue(object):
         num_task = 0
 
         for item in itertools.product(seq1, seq2):
-
             if num == chunk_size:
                 p_task = PythonTask(fpairs, fn, task)
                 if env:
                     p_task.specify_environment(env)
-                
+
                 p_task.specify_tag(str(num_task))
                 self.submit(p_task)
-                tasks[p_task.id] = num_task                
+                tasks[p_task.id] = num_task
                 num = 0
                 num_task += 1
                 task.clear()
@@ -1985,7 +1968,6 @@ class WorkQueue(object):
 
         n = 0
         for i in range(num_task):
-
             while not self.empty() and n < num_task:
                 t = self.wait_for_tag(str(i), 10)
 
@@ -1993,9 +1975,8 @@ class WorkQueue(object):
                     results[tasks[t.id]] = t.output
                     n += 1
                     break
- 
-        return [item for elem in results for item in elem]
 
+        return [item for elem in results for item in elem]
 
     ##
     # Reduces a sequence until only one value is left, and then returns that value.
@@ -2011,15 +1992,15 @@ class WorkQueue(object):
     # @param seq        The seq that will be reduced
     # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
 
-    def tree_reduce(self, fn, seq, chunk_size=2): 
+    def tree_reduce(self, fn, seq, chunk_size=2):
         tasks = {}
-        
+
         while len(seq) > 1:
-            size = math.ceil(len(seq)/chunk_size)
+            size = math.ceil(len(seq) / chunk_size)
             results = [None] * size
-        
+
             for i in range(size):
-                start = i*chunk_size
+                start = i * chunk_size
                 end = start + chunk_size
 
                 if end > len(seq):
@@ -2032,8 +2013,7 @@ class WorkQueue(object):
                 tasks[p_task.id] = i
 
             n = 0
-            for i in range(size+1):
-
+            for i in range(size + 1):
                 while not self.empty() and n < size:
                     t = self.wait_for_tag(str(i), 10)
 
@@ -2047,7 +2027,7 @@ class WorkQueue(object):
         return seq[0]
 
     ##
-    # Maps a function to elements in a sequence using work_queue remote task 
+    # Maps a function to elements in a sequence using work_queue remote task
     #
     # Similar to regular map function in python, but creates a task to execute each function on a worker running a coprocess
     #
@@ -2055,35 +2035,34 @@ class WorkQueue(object):
     # @param fn         The function that will be called on each element. This function exists in coprocess.
     # @param seq        The sequence that will call the function
     # @param coprocess  The name of the coprocess that contains the function fn.
-    # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
+    # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
     # @param chunk_size The number of elements to process at once
     def remote_map(self, fn, array, coprocess, name, chunk_size=1):
-        size = math.ceil(len(array)/chunk_size)
+        size = math.ceil(len(array) / chunk_size)
         results = [None] * size
         tasks = {}
 
         for i in range(size):
-            start = i*chunk_size
-            end = min(len(array), start+chunk_size)
+            start = i * chunk_size
+            end = min(len(array), start + chunk_size)
 
-            event = json.dumps({name : array[start:end]})
+            event = json.dumps({name: array[start:end]})
             p_task = RemoteTask(fn, event, coprocess)
-            
+
             p_task.specify_tag(str(i))
             self.submit(p_task)
             tasks[p_task.id] = i
-               
+
         n = 0
-        for i in range(size+1):
+        for i in range(size + 1):
             while not self.empty() and n < size:
-                t = self.wait_for_tag(str(i), 1)                
+                t = self.wait_for_tag(str(i), 1)
                 if t:
                     results[tasks[t.id]] = list(json.loads(t.output)["Result"])
                     n += 1
                     break
 
         return [item for elem in results for item in elem]
-
 
     ##
     # Returns the values for a function of each pair from 2 sequences using remote task
@@ -2095,10 +2074,10 @@ class WorkQueue(object):
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
     # @param coprocess  The name of the coprocess that contains the function fn.
-    # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
+    # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
     # @param chunk_size The number of elements to process at once
     def remote_pair(self, fn, seq1, seq2, coprocess, name, chunk_size=1):
-        size = math.ceil((len(seq1) * len(seq2))/chunk_size)
+        size = math.ceil((len(seq1) * len(seq2)) / chunk_size)
         results = [None] * size
         tasks = {}
         task = []
@@ -2107,11 +2086,11 @@ class WorkQueue(object):
 
         for item in itertools.product(seq1, seq2):
             if num == chunk_size:
-                event = json.dumps({name : task})
+                event = json.dumps({name: task})
                 p_task = RemoteTask(fn, event, coprocess)
                 p_task.specify_tag(str(num_task))
                 self.submit(p_task)
-                tasks[p_task.id] = num_task                
+                tasks[p_task.id] = num_task
                 num = 0
                 num_task += 1
                 task.clear()
@@ -2120,7 +2099,7 @@ class WorkQueue(object):
             num += 1
 
         if len(task) > 0:
-            event = json.dumps({name : task})
+            event = json.dumps({name: task})
             p_task = RemoteTask(fn, event, coprocess)
             p_task.specify_tag(str(num_task))
             self.submit(p_task)
@@ -2135,9 +2114,9 @@ class WorkQueue(object):
                     results[tasks[t.id]] = json.loads(t.output)["Result"]
                     n += 1
                     break
-         
+
         return [item for elem in results for item in elem]
-    
+
     ##
     # Reduces a sequence until only one value is left, and then returns that value.
     # The sequence is reduced by passing a pair of elements into a function and
@@ -2151,20 +2130,20 @@ class WorkQueue(object):
     # @param fn         The function that will be called on each element. Exists on the coprocess
     # @param seq        The seq that will be reduced
     # @param coprocess  The name of the coprocess that contains the function fn.
-    # @param name       This defines the key in the event json that wraps the data sent to the coprocess. 
+    # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
     # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
-    def remote_tree_reduce(self, fn, seq, coprocess, name, chunk_size=2): 
+    def remote_tree_reduce(self, fn, seq, coprocess, name, chunk_size=2):
         tasks = {}
-        
+
         while len(seq) > 1:
-            size = math.ceil(len(seq)/chunk_size)
+            size = math.ceil(len(seq) / chunk_size)
             results = [None] * size
 
             for i in range(size):
-                start = i*chunk_size
-                end = min(len(seq), start+chunk_size)
+                start = i * chunk_size
+                end = min(len(seq), start + chunk_size)
 
-                event = json.dumps({name : seq[start:end]})
+                event = json.dumps({name: seq[start:end]})
                 p_task = RemoteTask(fn, event, coprocess)
 
                 p_task.specify_tag(str(i))
@@ -2172,8 +2151,7 @@ class WorkQueue(object):
                 tasks[p_task.id] = i
 
             n = 0
-            for i in range(size+1):
-
+            for i in range(size + 1):
                 while not self.empty() and n < size:
                     t = self.wait_for_tag(str(i), 10)
 
@@ -2185,6 +2163,7 @@ class WorkQueue(object):
             seq = results
 
         return seq[0]
+
 
 ##
 # \class RemoteTask
@@ -2202,13 +2181,14 @@ class RemoteTask(Task):
     # @param
     # @param command    The shell command line to be exected by the task.
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
-    # @param kwargs	    keyword arguments used in function to be executed by task. 
+    # @param kwargs	    keyword arguments used in function to be executed by task.
     def __init__(self, fn, coprocess, *args, **kwargs):
         Task.__init__(self, fn)
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
         Task.specify_coprocess(self, coprocess)
+
     ##
     # Specify function arguments. Accepts arrays and dictionarys. This overrides any arguments passed during task creation
     # @param self             Reference to the current remote task object
@@ -2217,6 +2197,7 @@ class RemoteTask(Task):
     def specify_fn_args(self, args=[], kwargs={}):
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
+
     ##
     # Specify how the remote task should execute
     # @param self                     Reference to the current remote task object
@@ -2339,48 +2320,48 @@ class Factory(object):
     # If factory_binary or worker_binary is not
     # specified, $PATH will be searched.
     def __init__(
-            self, batch_type,
-            manager_name=None,
-            manager_host_port=None,
-            factory_binary=None, worker_binary=None,
-            log_file=os.devnull):
-
+        self,
+        batch_type,
+        manager_name=None,
+        manager_host_port=None,
+        factory_binary=None,
+        worker_binary=None,
+        log_file=os.devnull,
+    ):
         self._config_file = None
         self._factory_proc = None
         self._log_file = log_file
 
-        (tmp, self._error_file) = tempfile.mkstemp(
-                dir=staging_directory,
-                prefix='wq-factory-err-')
+        (tmp, self._error_file) = tempfile.mkstemp(dir=staging_directory, prefix="wq-factory-err-")
         os.close(tmp)
 
         self._opts = {}
 
         self._set_manager(manager_name, manager_host_port)
-        self._opts['batch-type'] = batch_type
-        self._opts['worker-binary'] = self._find_exe(worker_binary, 'work_queue_worker')
-        self._opts['scratch-dir'] = None
+        self._opts["batch-type"] = batch_type
+        self._opts["worker-binary"] = self._find_exe(worker_binary, "work_queue_worker")
+        self._opts["scratch-dir"] = None
 
-        self._factory_binary = self._find_exe(factory_binary, 'work_queue_factory')
+        self._factory_binary = self._find_exe(factory_binary, "work_queue_factory")
 
     def _set_manager(self, manager_name, manager_host_port):
         if not (manager_name or manager_host_port):
-            raise ValueError('Either manager_name or, manager_host_port should be specified.')
+            raise ValueError("Either manager_name or, manager_host_port should be specified.")
 
         if manager_name and manager_host_port:
-            raise ValueError('Master should be specified by a name, or by a host and port. Not both.')
+            raise ValueError("Master should be specified by a name, or by a host and port. Not both.")
 
         if manager_name:
-            self._opts['manager-name'] = manager_name
+            self._opts["manager-name"] = manager_name
             return
 
         if manager_host_port:
             try:
-                (host, port) = [x for x in manager_host_port.split(':') if x]
-                self._opts['manager-host'] = host
-                self._opts['manager-port'] = port
+                (host, port) = [x for x in manager_host_port.split(":") if x]
+                self._opts["manager-host"] = host
+                self._opts["manager-port"] = port
             except (TypeError, ValueError):
-                raise ValueError('manager_name is not of the form HOST:PORT')
+                raise ValueError("manager_name is not of the form HOST:PORT")
 
     def _find_exe(self, path, default):
         if path is None:
@@ -2388,43 +2369,35 @@ class Factory(object):
         else:
             out = path
         if out is None or not os.access(out, os.F_OK):
-            raise OSError(
-                errno.ENOENT,
-                'Command not found',
-                out or default)
+            raise OSError(errno.ENOENT, "Command not found", out or default)
         if not os.access(out, os.X_OK):
-            raise OSError(
-                errno.EPERM,
-                os.strerror(errno.EPERM),
-                out)
+            raise OSError(errno.EPERM, os.strerror(errno.EPERM), out)
         return os.path.abspath(out)
 
-
     def __getattr__(self, name):
-        if name[0] == '_':
+        if name[0] == "_":
             # For names that start with '_', immediately return the attribute.
             # If the name does not start with '_' we assume is a factory option.
             return object.__getattribute__(self, name)
 
         # original command line options use - instead of _. _ is required by
         # the naming conventions of python (otherwise - is taken as 'minus')
-        name_with_hyphens = name.replace('_', '-')
+        name_with_hyphens = name.replace("_", "-")
 
         if name_with_hyphens in Factory._command_line_options:
             try:
-                return object.__getattribute__(self, '_opts')[name_with_hyphens]
+                return object.__getattribute__(self, "_opts")[name_with_hyphens]
             except KeyError:
                 raise KeyError("{} is a valid factory attribute, but has not been set yet.".format(name))
         else:
             raise AttributeError("{} is not a supported option".format(name))
 
-
     def __setattr__(self, name, value):
         # original command line options use - instead of _. _ is required by
         # the naming conventions of python (otherwise - is taken as 'minus')
-        name_with_hyphens = name.replace('_', '-')
+        name_with_hyphens = name.replace("_", "-")
 
-        if name[0] == '_':
+        if name[0] == "_":
             # For names that start with '_', immediately set the attribute.
             # If the name does not start with '_' we assume is a factory option.
             object.__setattr__(self, name, value)
@@ -2435,7 +2408,7 @@ class Factory(object):
                 self._opts[name_with_hyphens] = value
                 self._write_config()
             elif name_with_hyphens in Factory._command_line_options:
-                raise AttributeError('{} cannot be changed once the factory is running.'.format(name))
+                raise AttributeError("{} cannot be changed once the factory is running.".format(name))
             else:
                 raise AttributeError("{} is not a supported option".format(name))
         else:
@@ -2445,16 +2418,14 @@ class Factory(object):
                 raise AttributeError("{} is not a supported option".format(name))
 
     def _construct_command_line(self):
-	# check for environment file
+        # check for environment file
         args = [self._factory_binary]
 
-        args += ['--parent-death']
-        args += ['--config-file', self._config_file]
+        args += ["--parent-death"]
+        args += ["--config-file", self._config_file]
 
-        if self._opts['batch-type'] == 'local':
-            self._opts['extra-options'] = self._opts.get('extra-options', '') + ' --parent-death'
-
-        flags = [opt for opt in Factory._command_line_options if opt[0] != ":"]
+        if self._opts["batch-type"] == "local":
+            self._opts["extra-options"] = self._opts.get("extra-options", "") + " --parent-death"
 
         for opt in self._opts:
             if opt not in Factory._command_line_options:
@@ -2466,11 +2437,10 @@ class Factory(object):
             else:
                 args.append("--{}={}".format(opt, self._opts[opt]))
 
-        if 'manager-host' in self._opts:
-            args += [self._opts['manager-host'], self._opts['manager-port']]
+        if "manager-host" in self._opts:
+            args += [self._opts["manager-host"], self._opts["manager-port"]]
 
         return args
-
 
     ##
     # Start a factory process.
@@ -2481,27 +2451,18 @@ class Factory(object):
     # may be useful to provision workers from inside a Jupyter notebook.
     def start(self):
         if self._factory_proc is not None:
-            raise RuntimeError('Factory was already started')
-        (tmp, self._config_file) = tempfile.mkstemp(
-                dir=staging_directory,
-                prefix='wq-factory-config-',
-                suffix='.json')
+            raise RuntimeError("Factory was already started")
+        (tmp, self._config_file) = tempfile.mkstemp(dir=staging_directory, prefix="wq-factory-config-", suffix=".json")
 
         if not self.scratch_dir:
-            self.scratch_dir = tempfile.mkdtemp(
-                    dir=staging_directory,
-                    prefix="wq-factory-scratch-")
+            self.scratch_dir = tempfile.mkdtemp(dir=staging_directory, prefix="wq-factory-scratch-")
 
         os.close(tmp)
         self._write_config()
-        logfd = open(self._log_file, 'a')
-        errfd = open(self._error_file, 'w')
-        devnull = open(os.devnull, 'w')
-        self._factory_proc = subprocess.Popen(
-            self._construct_command_line(),
-            stdin=devnull,
-            stdout=logfd,
-            stderr=errfd)
+        logfd = open(self._log_file, "a")
+        errfd = open(self._error_file, "w")
+        devnull = open(os.devnull, "w")
+        self._factory_proc = subprocess.Popen(self._construct_command_line(), stdin=devnull, stdout=logfd, stderr=errfd)
         devnull.close()
         logfd.close()
         errfd.close()
@@ -2513,15 +2474,14 @@ class Factory(object):
         if status:
             with open(self._error_file) as error_f:
                 error_log = error_f.read()
-                raise RuntimeError('Could not execute work_queue_factory. Exited with status: {}\n{}'.format(str(status), error_log))
+                raise RuntimeError("Could not execute work_queue_factory. Exited with status: {}\n{}".format(str(status), error_log))
         return self
-
 
     ##
     # Stop the factory process.
     def stop(self):
         if self._factory_proc is None:
-            raise RuntimeError('Factory not yet started')
+            raise RuntimeError("Factory not yet started")
         self._factory_proc.terminate()
         self._factory_proc.wait()
         self._factory_proc = None
@@ -2529,32 +2489,29 @@ class Factory(object):
         os.unlink(self._error_file)
         self._config_file = None
 
-
     def __enter__(self):
-         return self.start()
-
+        return self.start()
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
-
 
     def __del__(self):
         if self._factory_proc is not None:
             self.stop()
 
-
     def _write_config(self):
         if self._config_file is None:
             return
 
-        opts_subset = dict([(opt, self._opts[opt]) for opt in self._opts if opt in Factory._config_file_options ])
-        with open(self._config_file, 'w') as f:
+        opts_subset = dict([(opt, self._opts[opt]) for opt in self._opts if opt in Factory._config_file_options])
+        with open(self._config_file, "w") as f:
             json.dump(opts_subset, f, indent=4)
 
     def specify_environment(self, env):
         self._env_file = env
 
     specify_package = specify_environment
+
 
 def rmsummary_snapshots(self):
     if self.snapshots_count < 1:
@@ -2565,5 +2522,6 @@ def rmsummary_snapshots(self):
         snapshot = rmsummary_get_snapshot(self, i)
         snapshots.append(snapshot)
     return snapshots
+
 
 rmsummary.snapshots = property(rmsummary_snapshots)
