@@ -2664,14 +2664,14 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		struct vine_remote_file_info *remote_info;
 		remote_info = hash_table_lookup(w->current_files,f->cached_name);
 		if(remote_info) continue;
-		
+
 		char *id;
 		struct vine_worker_info *peer;
 		int found_match = 0;
-		
+
 		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
-		if(f->type != VINE_MINI_TASK){	
+		if(f->type != VINE_MINI_TASK) {
 			HASH_TABLE_ITERATE(q->worker_table, id, peer){
 				if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache) {
 					char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
@@ -2740,7 +2740,7 @@ static int send_one_task( struct vine_manager *q )
 
 		// Skip task if min requested start time not met.
 		if(t->resources_requested->start > now) continue;
-		
+
 		// Find the best worker for the task at the head of the list
 		w = vine_schedule_task_to_worker(q,t);
 
@@ -2749,7 +2749,7 @@ static int send_one_task( struct vine_manager *q )
 
 		// Check if there is transfer capacity available.
 		if(q->peer_transfers_enabled)
-		{	
+		{
 			if(!vine_manager_transfer_capacity_available(q,w,t)) continue;
 		}
 
@@ -4725,7 +4725,7 @@ void vine_get_stats_category(struct vine_manager *q, const char *category, struc
 	s->workers_able  = count_workers_for_waiting_tasks(q, largest_seen_resources(q, c->name));
 }
 
-char *vine_status(struct vine_manager *q, const char *request) {
+char *vine_get_status(struct vine_manager *q, const char *request) {
 	struct jx *a = construct_status_message(q, request);
 
 	if(!a) {

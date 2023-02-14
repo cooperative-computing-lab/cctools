@@ -385,7 +385,7 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 
 /** Indicate the command to be executed.
 @param t A task object.
-@param cmd The coprocess name that will execute the command at the worker. The task
+@param coprocess_name The coprocess name that will execute the command at the worker. The task
 will only be sent to workers running the coprocess.
 */
 void work_queue_task_specify_coprocess( struct work_queue_task *t, const char *coprocess_name );
