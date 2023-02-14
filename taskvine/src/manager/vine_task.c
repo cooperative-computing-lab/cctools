@@ -575,9 +575,10 @@ void vine_task_delete(struct vine_task *t)
 
 static struct vine_file * find_output_buffer( struct vine_task *t, const char *name )
 {
-	struct vine_file *f;
+	struct vine_mount *m;
 
-	LIST_ITERATE(t->output_mounts,f) {
+	LIST_ITERATE(t->output_mounts,m) {
+		struct vine_file *f = m->file;
 		if(f->type==VINE_BUFFER && !strcmp(f->source,name)) {
 			return f;
 		}
