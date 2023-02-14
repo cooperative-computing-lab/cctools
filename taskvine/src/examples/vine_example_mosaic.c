@@ -36,6 +36,9 @@ int main(int argc, char *argv[])
 	struct vine_manager *m;
 	struct vine_task *t;
 
+    //runtime logs will be written to vine_example_mosaic_info/%Y-%m-%dT%H:%M:%S
+	vine_set_runtime_info_path("vine_example_mosaic_info");
+
 	printf("Checking that /usr/bin/convert is installed...\n");
 	int r = access("/usr/bin/convert",X_OK);
 	if(r!=0) {
@@ -64,7 +67,6 @@ int main(int argc, char *argv[])
 	}
 	printf("Listening on port %d...\n", vine_port(m));
 
-	vine_enable_debug_log(m,"manager.log");
 	vine_enable_peer_transfers(m);
 
 	struct vine_file *temp_file[36];

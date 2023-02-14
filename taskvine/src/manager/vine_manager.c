@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "vine_txn_log.h"
 #include "vine_perf_log.h"
 #include "vine_current_transfers.h"
+#include "vine_runtime_dir.h"
 
 #include "cctools.h"
 #include "envtools.h"
@@ -38,6 +39,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "username.h"
 #include "create_dir.h"
+#include "unlink_recursive.h"
 #include "xxmalloc.h"
 #include "load_average.h"
 #include "buffer.h"
@@ -314,7 +316,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 		remote_info->size = size;
 		remote_info->transfer_time = transfer_time;
 		remote_info->in_cache = 1;
-		
+
 		vine_current_transfers_remove(q, id);
 
 		vine_txn_log_write_cache_update(q,w,size,transfer_time,cachename);
@@ -343,17 +345,17 @@ static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info
 
 		char *message = malloc(length+1);
 		time_t stoptime = time(0) + q->long_timeout;
-		
+
 		int actual = link_read(w->link,message,length,stoptime);
 		if(actual!=length) {
 			free(message);
 			return VINE_MSG_FAILURE;
 		}
-		
+
 		message[length] = 0;
 		debug(D_VINE,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
 		free(message);
-		
+
 		struct vine_remote_file_info *remote_info = hash_table_remove(w->current_files,cachename);
 		vine_current_transfers_remove(q, id);
 		if(remote_info) vine_remote_file_info_delete(remote_info);
@@ -362,16 +364,16 @@ static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info
 
 		char *message = malloc(length+1);
 		time_t stoptime = time(0) + q->long_timeout;
-		
+
 		int actual = link_read(w->link,message,length,stoptime);
 		if(actual!=length) {
 			free(message);
 			return VINE_MSG_FAILURE;
 		}
-		
+
 		message[length] = 0;
 		debug(D_VINE,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
-		free(message);	
+		free(message);
 	}
 	return VINE_MSG_PROCESSED;
 }
@@ -382,7 +384,7 @@ on its own port to receive get requests from other workers.
 */
 
 static int handle_transfer_address( struct vine_manager *q, struct vine_worker_info *w, const char *line )
-{	
+{
 	int dummy_port;
 	if(sscanf(line,"transfer-address %s %d",w->transfer_addr,&w->transfer_port)) {
 		w->transfer_port_active = 1;
@@ -724,7 +726,7 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	uint64_t task_id;
 
 	if(!q || !w) return;
-	
+
 	vine_current_transfers_wipe_worker(q, w);
 
 	hash_table_clear(w->current_files,(void*)vine_remote_file_info_delete);
@@ -928,17 +930,26 @@ static void delete_uncacheable_files( struct vine_manager *q, struct vine_worker
 
 static char *monitor_file_name(struct vine_manager *q, struct vine_task *t, const char *ext) {
 	char *dir;
-	
+
+	int free_dir = 0;
+
 	if(t->monitor_output_directory) {
 		dir = t->monitor_output_directory;
 	} else if(q->monitor_output_directory) {
 		dir = q->monitor_output_directory;
 	} else {
-		dir = "./";
+		dir = vine_get_runtime_path_staging(q, NULL);
+		free_dir = 1;
 	}
 
-	return string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME "%s",
+	char *name = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME "%s",
 			dir, getpid(), t->task_id, ext ? ext : "");
+
+	if(free_dir) {
+		free(dir);
+	}
+
+	return name;
 }
 
 /* Extract the resources consumed by a task by reading the appropriate resource monitor file. */
@@ -3110,6 +3121,19 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	if (getenv("VINE_HIGH_PORT"))
 		setenv("TCP_HIGH_PORT", getenv("VINE_HIGH_PORT"), 0);
 
+	char *runtime_dir = vine_runtime_directory_create();
+	if(!runtime_dir) {
+		debug(D_NOTICE, "Could not create runtime directories");
+		return 0;
+	}
+
+	// set debug logfile as soon as possible need to manually use runtime_dir
+	// as the manager has not been created yet, but we would like to have debug
+	// information of its creation.
+	char *debug_tmp = string_format("%s/vine-logs/debug", runtime_dir);
+	vine_enable_debug_log(debug_tmp);
+	free(debug_tmp);
+
 	q->manager_link = link_serve(port);
 	if(!q->manager_link) {
 		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
@@ -3119,6 +3143,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 		char address[LINK_ADDRESS_MAX];
 		link_address_local(q->manager_link, address, &q->port);
 	}
+
+	q->runtime_directory = runtime_dir;
 
 	q->ssl_key = key ? strdup(key) : 0;
 	q->ssl_cert = cert ? strdup(cert) : 0;
@@ -3210,6 +3236,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 			q->bandwidth_limit = 0;
 		}
 	}
+
+	vine_enable_perf_log(q, "performance");
+	vine_enable_transactions_log(q, "transactions");
 
 	vine_perf_log_write_update(q, 1);
 
@@ -3431,15 +3460,19 @@ void vine_delete(struct vine_manager *q)
 	list_clear(q->task_info_list,(void*)vine_task_info_delete);
 	list_delete(q->task_info_list);
 
+	char *staging = vine_get_runtime_path_staging(q, NULL);
+	if(!access(staging, F_OK)) {
+		debug(D_VINE, "deleting %s", staging);
+		unlink_recursive(staging);
+	}
+	free(staging);
+
 	free(q->stats);
 	free(q->stats_disconnected_workers);
 	free(q->stats_measure);
 
-	if(q->name)
-		free(q->name);
-
-	if(q->manager_preferred_connection)
-		free(q->manager_preferred_connection);
+	free(q->name);
+	free(q->manager_preferred_connection);
 
 	free(q->poll_table);
 	free(q->ssl_cert);
@@ -3457,10 +3490,13 @@ void vine_delete(struct vine_manager *q)
 			debug(D_VINE, "unable to write transactions log: %s\n", strerror(errno));
 		}
 	}
+	free(q->runtime_directory);
 
 	rmsummary_delete(q->measured_local_resources);
 	rmsummary_delete(q->current_max_worker);
 	rmsummary_delete(q->max_task_resources_requested);
+
+	debug(D_VINE, "manager log end\n");
 
 	free(q);
 }
@@ -3486,7 +3522,7 @@ void vine_disable_monitoring(struct vine_manager *q) {
 	if(q->monitor_mode && q->monitor_summary_filename) {
 		fclose(q->monitor_file);
 
-		char template[] = "rmonitor-summaries-XXXXXX";
+		char *template = vine_get_runtime_path_log(q, "rmonitor-summaries.json");
 		int final_fd = mkstemp(template);
 		int summs_fd = open(q->monitor_summary_filename, O_RDONLY);
 
@@ -4737,8 +4773,7 @@ static void aggregate_workers_resources( struct vine_manager *q, struct vine_res
 }
 
 /* This simple wrapper function allows us to hide the debug.h interface from the end user. */
-
-int vine_enable_debug_log( struct vine_manager *m, const char *logfile )
+int vine_enable_debug_log( const char *logfile )
 {
 	debug_config("vine_manager");
 	debug_config_file(logfile);
@@ -4748,7 +4783,10 @@ int vine_enable_debug_log( struct vine_manager *m, const char *logfile )
 
 int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 {
-	q->perf_logfile = fopen(filename, "w");
+	char *logpath = vine_get_runtime_path_log(q, filename);
+	q->perf_logfile = fopen(logpath, "w");
+	free(logpath);
+
 	if(q->perf_logfile) {
 		vine_perf_log_write_header(q);
 		vine_perf_log_write_update(q,1);
@@ -4762,7 +4800,10 @@ int vine_enable_perf_log(struct vine_manager *q, const char *filename)
 
 int vine_enable_transactions_log(struct vine_manager *q, const char *filename)
 {
-	q->txn_logfile = fopen(filename, "w");
+	char *logpath = vine_get_runtime_path_log(q, filename);
+	q->txn_logfile = fopen(logpath, "w");
+	free(logpath);
+
 	if(q->txn_logfile) {
 		debug(D_VINE, "transactions log enabled and is being written to %s\n", filename);
 		vine_txn_log_write_header(q);

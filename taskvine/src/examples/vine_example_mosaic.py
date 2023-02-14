@@ -46,8 +46,6 @@ if __name__ == "__main__":
         sys.exit(1)
     print("listening on port", m.port)
 
-    m.enable_debug_log("manager.log")
-
     for i in range(0, 360, 10):
         outfile = str(i) + ".cat.jpg"
         command = "./convert.sfx -swirl " + str(i) + " cat.jpg " + str(i) + ".cat.jpg"
