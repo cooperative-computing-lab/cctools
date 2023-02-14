@@ -9,6 +9,7 @@ vine_tasks may mount the same vine_file differently, but the underlying
 vine_file should not change.
 */
 
+#include "vine_file.h"
 
 struct vine_mount {
 	struct vine_file *file;       // The file object to be mounted.

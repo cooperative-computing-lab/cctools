@@ -392,7 +392,7 @@ void vine_task_check_consistency( struct vine_task *t )
 		if(m->file->type==VINE_FILE && hash_table_lookup(table,m->file->source)) {
 			fprintf(stderr,"warning: task %d has more than one output file named %s\n",t->task_id,m->file->source);
 		} else {
-			hash_table_insert(table,m->file->remote_name,m->file->source);
+			hash_table_insert(table,m->remote_name,m->file->source);
 		}
 	}
 
@@ -410,7 +410,7 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}
 
-	struct vine_mount *m = vine_mount_create(file,remote_name,flags,0);
+	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
 	
 	list_push_tail(t->input_mounts, m);
 }
@@ -425,7 +425,7 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}
 
-	struct vine_mount *m = vine_mount_create(file,remote_name,flags,0);
+	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
 	
 	list_push_tail(t->output_mounts, m);
 }
