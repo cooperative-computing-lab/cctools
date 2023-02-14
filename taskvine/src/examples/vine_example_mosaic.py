@@ -46,8 +46,6 @@ if __name__ == "__main__":
         sys.exit(1)
     print("listening on port", m.port)
 
-    m.enable_debug_log("manager.log")
-
     temp_files = []
     for i in range(0, 36):
         temp_files.append(vine.FileTemp())
