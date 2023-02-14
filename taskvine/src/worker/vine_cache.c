@@ -171,7 +171,7 @@ Queue a remote file transfer to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
+int vine_cache_queue_transfer( struct vine_cache *c, const char *source, const char *cachename, int64_t size, int mode )
 {
 	struct cache_file *f = cache_file_create(VINE_CACHE_TRANSFER,source,size,mode,0);
 	hash_table_insert(c->table,cachename,f);
@@ -183,7 +183,7 @@ Queue a mini-task to produce a file.
 This entry will be materialized later in vine_cache_ensure.
 */
 
-int vine_cache_queue_command( struct vine_cache *c, struct vine_task *mini_task, const char *cachename, int64_t size, int mode, vine_file_flags_t flags )
+int vine_cache_queue_command( struct vine_cache *c, struct vine_task *mini_task, const char *cachename, int64_t size, int mode )
 {
 	struct cache_file *f = cache_file_create(VINE_CACHE_MINI_TASK,"task",size,mode,mini_task);
 	hash_table_insert(c->table,cachename,f);
@@ -369,7 +369,7 @@ It is a little odd that the manager link is passed as an argument here,
 but it is needed in order to send back the necessary update/invalid messages.
 */
 
-int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager, vine_file_flags_t flags )
+int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link *manager )
 {
 	if(!strcmp(cachename,"0")) return 1;
 

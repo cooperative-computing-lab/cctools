@@ -210,8 +210,7 @@ static vine_result_code_t vine_manager_put_url( struct vine_manager *q, struct v
 									
 	char *transfer_id = vine_current_transfers_add(q, w, f->source);
 	vine_current_transfers_print_table(q);
-	/* XXX Note that fifth argument used to be flags (0) should be removed from protocol */
-	vine_manager_send(q,w,"puturl %s %s %d %o %d %s\n",source_encoded, cached_name_encoded, f->length, 0777, 0, transfer_id);
+	vine_manager_send(q,w,"puturl %s %s %d %o %s\n",source_encoded, cached_name_encoded, f->length, 0777, transfer_id);
 
 	return VINE_SUCCESS;
 }
@@ -405,8 +404,7 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 	if(result!=VINE_SUCCESS) return result;
 
 	if(target) {
-		/* XXX Note the final argument was flags but is unused; should be removed from protocol. */
-		vine_manager_send(q,w, "mini_task %lld %s %d %o %d\n",(long long)target->mini_task->task_id,target->cached_name,target->length,0777,0);
+		vine_manager_send(q,w, "mini_task %lld %s %d %o\n",(long long)target->mini_task->task_id,target->cached_name,target->length,0777);
 	} else {
 		vine_manager_send(q,w, "task %lld\n",(long long)t->task_id);
 	}
