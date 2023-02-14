@@ -545,7 +545,7 @@ class Task(object):
         # SWIG expects strings
         remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        copy_of_file = vine_file_clone(file,_file)
+        copy_of_file = vine_file_clone(file._file)
         return vine_task_add_output(self._task, copy_of_file, remote_name, flags)
 
     ##
