@@ -1,4 +1,5 @@
-## @package taskvine
+##
+# @package taskvine
 #
 # Python API for the TaskVine workflow framework.
 #
@@ -34,14 +35,13 @@ import textwrap
 import shutil
 import atexit
 import time
-import math
 
 def set_port_range(low_port, high_port):
     if low_port > high_port:
-        raise TypeError('low_port {} should be smaller than high_port {}'.format(low_port, high_port))
+        raise TypeError("low_port {} should be smaller than high_port {}".format(low_port, high_port))
 
-    os.environ['TCP_LOW_PORT'] = str(low_port)
-    os.environ['TCP_HIGH_PORT'] = str(high_port)
+    os.environ["TCP_LOW_PORT"] = str(low_port)
+    os.environ["TCP_HIGH_PORT"] = str(high_port)
 
 
 ##
@@ -50,15 +50,15 @@ def set_port_range(low_port, high_port):
 # TaskVine File Object
 #
 # The superclass of all TaskVine file types.
-
 class File(object):
     def __del__(self):
         try:
             if self._file:
                 vine_file_delete(self._file)
-        except:
-            #ignore exceptions, in case task has been already collected
+        except Exception:
+            # ignore exceptions, in case task has been already collected
             pass
+
 
 ##
 # \class FileLocal
@@ -66,18 +66,17 @@ class File(object):
 # TaskVine File object
 #
 # A file obtained from the local filesystem.
-
 class FileLocal(File):
-
     ##
     # Create a local file object.
     #
     # @param self       The current file object.
     # @param path       The path to the local file.
 
-    def __init__(self,path):
+    def __init__(self, path):
         path = str(path)
         self._file = vine_file_local(path)
+
 
 ##
 # \class FileURL
@@ -86,16 +85,18 @@ class FileLocal(File):
 #
 # A file obtained from a remote URL.
 
+
 class FileURL(File):
     ##
     # Create a remote URL file object.
     #
     # @param self      The current file object.
     # @param url       The url of the file.
-        
-    def __init__(self,url):
+
+    def __init__(self, url):
         url = str(url)
         self._file = vine_file_url(url)
+
 
 ##
 # \class FileBuffer
@@ -104,6 +105,7 @@ class FileURL(File):
 #
 # A file obtained from a buffer in memory.
 
+
 class FileBuffer(File):
     ##
     # Create a file from a buffer in memory.
@@ -111,11 +113,12 @@ class FileBuffer(File):
     # @param self       The current file object.
     # @param name       The abstract name of the buffer.
     # @param buffer     The contents of the buffer.
-        
-    def __init__(self,name,buffer):
+
+    def __init__(self, name, buffer):
         name = str(name)
         buffer = str(buffer)
-        self._file = vine_file_buffer(name,buffer,len(buffer))
+        self._file = vine_file_buffer(name, buffer, len(buffer))
+
 
 ##
 # \class FileMiniTask
@@ -124,6 +127,7 @@ class FileBuffer(File):
 #
 # A file obtained from a mini-task.
 
+
 class FileMiniTask(File):
     ##
     # Create a file by executing a mini-task.
@@ -131,8 +135,9 @@ class FileMiniTask(File):
     # @param self       The current file object.
     # @param minitask   The task to execute in order to produce a file.
 
-    def __init__(self,minitask):
+    def __init__(self, minitask):
         self._file = vine_file_mini_task(minitask._task)
+
 
 ##
 # \class FileUntar
@@ -141,14 +146,16 @@ class FileMiniTask(File):
 #
 # A wrapper to unpack a file in .tar form.
 
+
 class FileUntar(File):
     ##
     # Create a file by unpacking a tar file.
     #
     # @param self       The current file object.
     # @param subfile    The file object to un-tar.
-    def __init__(self,subfile):
+    def __init__(self, subfile):
         self._file = vine_file_untar(vine_file_clone(subfile._file))
+
 
 ##
 # \class FilePoncho
@@ -162,8 +169,8 @@ class FileUnponcho(File):
     #
     # @param self       The current file object.
     # @param subfile    The file object to un-tgz.
-        
-    def __init__(self,subfile):
+
+    def __init__(self, subfile):
         self._file = vine_file_unponcho(vine_file_clone(subfile._file))
 
 
@@ -174,13 +181,14 @@ class FileUnponcho(File):
 #
 # A wrapper to unpack a file in .sfx form.
 
+
 class FileUnstarch(File):
     ##
     # Create a file by unpacking a starch package.
     #
     # @param self       The current file object.
     # @param subfile    The file object to un-tgz.
-    def __init__(self,subfile):
+    def __init__(self, subfile):
         self._file = vine_file_unstarch(vine_file_clone(subfile._file))
 
 
@@ -191,8 +199,8 @@ class FileUnstarch(File):
 #
 # This class is used to create a task specification to be submitted to a @ref taskvine::Manager.
 
-class Task(object):
 
+class Task(object):
     ##
     # Create a new task specification.
     #
@@ -203,14 +211,14 @@ class Task(object):
 
         self._task = vine_task_create(command)
         if not self._task:
-            raise Exception('Unable to create internal Task structure')
+            raise Exception("Unable to create internal Task structure")
 
     def __del__(self):
         try:
             if self._task:
                 vine_task_delete(self._task)
-        except:
-            #ignore exceptions, in case task has been already collected
+        except Exception:
+            # ignore exceptions, in case task has been already collected
             pass
 
     @staticmethod
@@ -245,7 +253,6 @@ class Task(object):
         new._task = vine_task_clone(self._task)
         return new
 
-
     ##
     # Set the command to be executed by the task.
     #
@@ -253,7 +260,6 @@ class Task(object):
     # @param command    The command to be executed.
     def set_command(self, command):
         return vine_task_set_command(self._task, command)
-
 
     ##
     # Set the coprocess at the worker that should execute the task's command.
@@ -263,7 +269,6 @@ class Task(object):
     # @param coprocess  The name of the coprocess.
     def set_coprocess(self, coprocess):
         return vine_task_set_coprocess(self._task, coprocess)
-    
 
     ##
     # Set the worker selection scheduler for task.
@@ -303,14 +308,6 @@ class Task(object):
         return vine_task_add_feature(self._task, name)
 
     ##
-    # Indicate that the task would be optimally run on a given host.
-    #
-    # @param self       Reference to the current task object.
-    # @param hostname   The hostname to which this task would optimally be sent.
-    def set_preferred_host(self, hostname):
-        return vine_task_set_preferred_host(self._task, hostname)
-
-    ##
     # Add a local input file to a task.
     #
     # @param self          Reference to the current task object.
@@ -324,8 +321,7 @@ class Task(object):
     # >>> task.add_input_file("/etc/hosts", cache = True)
     # >>> task.add_input_file("/etc/hosts", "hosts", cache = True)
     # @endcode
-    def add_input_file(self, local_name, remote_name=None, cache=False ):
-
+    def add_input_file(self, local_name, remote_name=None, cache=False):
         # swig expects strings:
         if local_name:
             local_name = str(local_name)
@@ -338,8 +334,8 @@ class Task(object):
         flags = Task._determine_file_flags(cache)
         return vine_task_add_input_file(self._task, local_name, remote_name, flags)
 
-
-    ## Add an input url to a task.
+    ##
+    # Add an input url to a task.
     #
     # @param self          Reference to the current task object.
     # @param url           The url of the file to provide.
@@ -350,7 +346,7 @@ class Task(object):
     # @code
     # >>> task.add_input_url("http://www.google.com/","google.txt",cache=True)
     # @endcode
-    def add_input_url(self, url, remote_name, cache=False ):
+    def add_input_url(self, url, remote_name, cache=False):
         # swig expects strings
         if remote_name:
             remote_name = str(remote_name)
@@ -360,7 +356,6 @@ class Task(object):
 
         flags = Task._determine_file_flags(cache)
         return vine_task_add_input_url(self._task, url, remote_name, flags)
-
 
     ##
     # Add an input file produced by a mini task description.
@@ -380,7 +375,7 @@ class Task(object):
     # >>> # Attach the output of the mini-task as the input of a main task:
     # >>> task.add_input_mini_task(mini_task,"infile.txt",cache=True)
     # @endcode
-    def add_input_mini_task(self, mini_task, remote_name, cache=False)
+    def add_input_mini_task(self, mini_task, remote_name, cache=False):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(cache=cache)
@@ -410,16 +405,14 @@ class Task(object):
         copy_of_file = vine_file_clone(file._file)
         return vine_task_add_input(self._task, copy_of_file, remote_name, flags)
 
-
     ##
     # Add an empty directory to the task.
     # @param self           Reference to the current task object.
     # @param remote_name    The name of the directory at the remote execution site.
-    def add_empty_dir(self, remote_name=None ):
+    def add_empty_dir(self, remote_name=None):
         if remote_name:
             remote_name = str(remote_name)
-
-        return vine_task_add_empty_dir(task,remote_name);
+        return vine_task_add_empty_dir(self._task, remote_name)
 
     ##
     # Add an input buffer to the task.
@@ -428,7 +421,7 @@ class Task(object):
     # @param buffer         The contents of the buffer to pass as input.
     # @param remote_name    The name of the remote file to create.
     # @param cache          Whether the file should be cached at workers (True/False)
-    def add_input_buffer(self, buffer, remote_name, cache=False ):
+    def add_input_buffer(self, buffer, remote_name, cache=False):
         if remote_name:
             remote_name = str(remote_name)
         flags = Task._determine_file_flags(cache)
@@ -481,7 +474,6 @@ class Task(object):
         flags = Task._determine_file_flags(cache=cache, watch=watch, failure_only=failure_only, success_only=success_only)
         return vine_task_add_output_buffer(self._task, buffer_name, remote_name, flags)
 
-
     ##
     # Get an output buffer of the task.
     #
@@ -489,11 +481,11 @@ class Task(object):
     # @param buffer_name    The logical name of the output buffer.
     # @return               The bytes of the returned file.
 
-    def get_output_buffer(self, buffer_name ):
+    def get_output_buffer(self, buffer_name):
         if buffer_name:
             buffer_name = str(buffer_name)
 
-        return vine_task_get_output_buffer(self._task, buffer_name )
+        return vine_task_get_output_buffer(self._task, buffer_name)
 
     ##
     # Get the length of an output buffer.
@@ -502,15 +494,15 @@ class Task(object):
     # @param buffer_name    The logical name of the output buffer.
     # @return               The length of the output buffer.
 
-    def get_output_buffer_length(self, buffer_name ):
+    def get_output_buffer_length(self, buffer_name):
         if buffer_name:
             buffer_name = str(buffer_name)
 
-        return vine_task_get_output_buffer_length(self._task, buffer_name )
+        return vine_task_get_output_buffer_length(self._task, buffer_name)
 
     ##
     # Add any output object to a task.
-    # 
+    #
     # @param self           Reference to the current task object.
     # @param file           A file object of class @ref File, such as @ref FileLocal or @ref FileBuffer.
     # @param remote_name    The name of the file at the execution site.
@@ -531,7 +523,7 @@ class Task(object):
         # SWIG expects strings
         remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        copy_of_file = vine_file_clone(file,_file)
+        copy_of_file = vine_file_clone(file._file)
         return vine_task_add_output(self._task, copy_of_file, remote_name, flags)
 
     ##
@@ -594,9 +586,7 @@ class Task(object):
     # @param self           Reference to the current task object.
     # @param filename       The name of the snapshot events specification
     def set_snapshot_file(self, filename):
-        return vine_set_snapshot_file(self._task, filename)
-
-
+        return vine_task_set_snapshot_file(self._task, filename)
 
     ##
     # Indicate the number of times the task should be retried. If 0 (the
@@ -685,7 +675,7 @@ class Task(object):
     @property
     def category(self):
         return vine_task_get_category(self._task)
-    
+
     ##
     # Get the shell command executed by the task.
     # @code
@@ -704,7 +694,7 @@ class Task(object):
     @property
     def std_output(self):
         return vine_task_get_stdout(self._task)
-    
+
     ##
     # Get the standard output of the task. (Same as t.std_output for regular
     # taskvine tasks) Must be called only after the task completes execution.
@@ -733,7 +723,7 @@ class Task(object):
     @property
     def exit_code(self):
         return vine_task_get_exit_code(self._task)
-    
+
     ##
     # Get the result of the task as an integer code, such as successful, missing file, etc.
     # See @ref vine_result_t for possible values.  Must be called only
@@ -779,8 +769,8 @@ class Task(object):
     # >>> print(t.get_metric("total_submissions")
     # @endcode
     @property
-    def get_metric(self,name):
-        return vine_task_get_metric(self._task,name)
+    def get_metric(self, name):
+        return vine_task_get_metric(self._task, name)
 
     ##
     # Get the address and port of the host on which the task ran.
@@ -869,7 +859,6 @@ class Task(object):
 
         return self._task.resources_measured.limits_exceeded
 
-
     ##
     # Get the resources the task requested to run. For valid fields see
     # @ref resources_measured.
@@ -901,11 +890,13 @@ class Task(object):
 
 try:
     import dill
+
     pythontask_available = True
 except Exception:
     # Note that the intended exception here is ModuleNotFoundError.
     # However, that type does not exist in Python 2
     pythontask_available = False
+
 
 class PythonTask(Task):
     ##
@@ -920,16 +911,16 @@ class PythonTask(Task):
             raise RuntimeError("PythonTask is not available. The dill module is missing.")
 
         self._pp_run = None
-        self._env_file  = None
+        self._env_file = None
         self._output_loaded = False
         self._output = None
         self._tmpdir = None
 
         self._id = str(uuid.uuid4())
-        self._func_file = f'function_{self._id}.p'
-        self._args_file = f'args_{self._id}.p'
-        self._out_file = f'out_{self._id}.p'
-        self._wrapper = f'pytask_wrapper_{self._id}.py'
+        self._func_file = f"function_{self._id}.p"
+        self._args_file = f"args_{self._id}.p"
+        self._out_file = f"out_{self._id}.p"
+        self._wrapper = f"pytask_wrapper_{self._id}.py"
         self._command = self._python_function_command()
 
         # we delay any PythonTask initialization until the task is submitted to
@@ -937,7 +928,6 @@ class PythonTask(Task):
         # the task should write its files.
         self._fn_def = (func, args, kwargs)
         super(PythonTask, self).__init__(self._command)
-
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -949,7 +939,7 @@ class PythonTask(Task):
     def submit_finalize(self, manager):
         self._tmpdir = tempfile.mkdtemp(dir=manager.staging_directory)
         self._serialize_python_function(*self._fn_def)
-        self._fn_def = None # avoid possible memory leak
+        self._fn_def = None  # avoid possible memory leak
         self._create_wrapper()
         self._add_IO_files()
 
@@ -962,7 +952,7 @@ class PythonTask(Task):
         if not self._output_loaded:
             if self.result == VINE_RESULT_SUCCESS:
                 try:
-                    with open(os.path.join(self._tmpdir, 'out_{}.p'.format(self._id)), 'rb') as f:
+                    with open(os.path.join(self._tmpdir, "out_{}.p".format(self._id)), "rb") as f:
                         self._output = dill.load(f)
                 except Exception as e:
                     self._output = e
@@ -972,11 +962,10 @@ class PythonTask(Task):
             self._output_loaded = True
         return self._output
 
-
     def set_environment(self, env_file):
         if env_file:
             self._env_file = env_file
-            self._pp_run = shutil.which('poncho_package_run')
+            self._pp_run = shutil.which("poncho_package_run")
 
             if not self._pp_run:
                 raise RuntimeError("Could not find poncho_package_run in PATH.")
@@ -993,38 +982,26 @@ class PythonTask(Task):
                 shutil.rmtree(self._tmpdir)
         except Exception as e:
             if sys:
-                sys.stderr.write('could not delete {}: {}\n'.format(self._tmpdir, e))
-
+                sys.stderr.write("could not delete {}: {}\n".format(self._tmpdir, e))
 
     def _serialize_python_function(self, func, args, kwargs):
-        with open(os.path.join(self._tmpdir, self._func_file), 'wb') as wf:
+        with open(os.path.join(self._tmpdir, self._func_file), "wb") as wf:
             dill.dump(func, wf, recurse=True)
-        with open(os.path.join(self._tmpdir, self._args_file), 'wb') as wf:
+        with open(os.path.join(self._tmpdir, self._args_file), "wb") as wf:
             dill.dump([args, kwargs], wf, recurse=True)
-
 
     def _python_function_command(self):
         if self._env_file:
-            py_exec="python"
+            py_exec = "python"
         else:
-            py_exec=f"python{sys.version_info[0]}"
+            py_exec = f"python{sys.version_info[0]}"
 
-        command = '{py_exec} {wrapper} {function} {args} {out}'.format(
-                py_exec=py_exec,
-                wrapper=self._wrapper,
-                function=self._func_file,
-                args=self._args_file,
-                out=self._out_file)
+        command = "{py_exec} {wrapper} {function} {args} {out}".format(py_exec=py_exec, wrapper=self._wrapper, function=self._func_file, args=self._args_file, out=self._out_file)
 
         if self._env_file:
-            command = './{pprun} -e {tar} --unpack-to "$VINE_SANDBOX"/{unpack}-env {cmd}'.format(
-                pprun=os.path.basename(self._pp_run),
-                unpack=os.path.basename(self._env_file),
-                tar=os.path.basename(self._env_file),
-                cmd=command)
+            command = './{pprun} -e {tar} --unpack-to "$VINE_SANDBOX"/{unpack}-env {cmd}'.format(pprun=os.path.basename(self._pp_run), unpack=os.path.basename(self._env_file), tar=os.path.basename(self._env_file), cmd=command)
 
         return command
-
 
     def _add_IO_files(self):
         self.add_input_file(os.path.join(self._tmpdir, self._wrapper), cache=True)
@@ -1032,12 +1009,13 @@ class PythonTask(Task):
         self.add_input_file(os.path.join(self._tmpdir, self._args_file), cache=False)
         self.add_output_file(os.path.join(self._tmpdir, self._out_file), cache=False)
 
-
     ##
     # creates the wrapper script which will execute the function. pickles output.
     def _create_wrapper(self):
-        with open(os.path.join(self._tmpdir, self._wrapper), 'w') as f:
-            f.write(textwrap.dedent('''\
+        with open(os.path.join(self._tmpdir, self._wrapper), "w") as f:
+            f.write(
+                textwrap.dedent(
+                    """\
                 try:
                     import sys
                     import dill
@@ -1059,13 +1037,14 @@ class PythonTask(Task):
                 with open(out, 'wb') as f:
                     dill.dump(exec_out, f)
 
-                print(exec_out)'''))
-
-
+                print(exec_out)"""
+                )
+            )
 
 
 class PythonTaskNoResult(Exception):
     pass
+
 
 ##
 # TaskVine Manager
@@ -1075,6 +1054,7 @@ class PythonTaskNoResult(Exception):
 # @ref taskvine::Task objects and submit them with @ref taskvine::Manager::submit
 # Call @ref taskvine::Manager::wait to wait for tasks to complete.
 # Run one or more vine_workers to perform work on behalf of the manager object.
+
 
 class Manager(object):
     ##
@@ -1107,7 +1087,7 @@ class Manager(object):
             # if not a range, ignore
             pass
         except ValueError:
-            raise ValueError('port should be a single integer, or a sequence of two integers')
+            raise ValueError("port should be a single integer, or a sequence of two integers")
 
         try:
             if run_info_path:
@@ -1119,13 +1099,12 @@ class Manager(object):
             ssl_key, ssl_cert = self._setup_ssl(ssl)
             self._taskvine = vine_ssl_create(port, ssl_key, ssl_cert)
             if not self._taskvine:
-                raise Exception('Could not create queue on port {}'.format(port))
+                raise Exception("Could not create queue on port {}".format(port))
 
             if name:
                 vine_set_name(self._taskvine, name)
         except Exception as e:
-            raise Exception('Unable to create internal taskvine structure: {}'.format(e))
-
+            raise Exception("Unable to create internal taskvine structure: {}".format(e))
 
     def _free_queue(self):
         try:
@@ -1134,8 +1113,8 @@ class Manager(object):
                     self.shutdown_workers(0)
                 vine_delete(self._taskvine)
                 self._taskvine = None
-        except:
-            #ignore exceptions, as we are going away...
+        except Exception:
+            # ignore exceptions, as we are going away...
             pass
 
     def __del__(self):
@@ -1148,20 +1127,16 @@ class Manager(object):
         if ssl is not True:
             return ssl
 
-        (tmp, key) = tempfile.mkstemp(
-                dir=self.staging_directory,
-                prefix='key')
+        (tmp, key) = tempfile.mkstemp(dir=self.staging_directory, prefix="key")
         os.close(tmp)
-        (tmp, cert) = tempfile.mkstemp(
-                dir=self.staging_directory,
-                prefix='cert')
+        (tmp, cert) = tempfile.mkstemp(dir=self.staging_directory, prefix="cert")
         os.close(tmp)
 
-        cmd=f"openssl req -x509 -newkey rsa:4096 -keyout {key} -out {cert} x-sha256 -days 365 -nodes -batch".split()
+        cmd = f"openssl req -x509 -newkey rsa:4096 -keyout {key} -out {cert} x-sha256 -days 365 -nodes -batch".split()
 
-        output=""
+        output = ""
         try:
-            output=subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+            output = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
         except subprocess.CalledProcessError as e:
             print(f"could not create temporary SSL key and cert {e}.\n{output}")
             raise e
@@ -1206,20 +1181,6 @@ class Manager(object):
         return self._stats
 
     ##
-    # Get worker hierarchy statistics.
-    # @code
-    # >>> print(q.stats_hierarchy)
-    # @endcode
-    # The fields in @ref stats_hierarchy can also be individually accessed through this call. For example:
-    # @code
-    # >>> print(q.stats_hierarchy.workers_busy)
-    # @endcode
-    @property
-    def stats_hierarchy(self):
-        vine_get_stats_hierarchy(self._taskvine, self._stats_hierarchy)
-        return self._stats_hierarchy
-
-    ##
     # Get the task statistics for the given category.
     #
     # @param self   Reference to the current manager object.
@@ -1248,7 +1209,7 @@ class Manager(object):
     # tasks_info = q.status("tasks")
     # @endcode
     def status(self, request):
-        info_raw = vine_status(self._work_queue, request)
+        info_raw = vine_get_status(self._work_queue, request)
         info_json = json.loads(info_raw)
         del info_raw
         return info_json
@@ -1274,12 +1235,7 @@ class Manager(object):
             s = rmsummayArray_getitem(from_c, count)
             if not s:
                 break
-            workers.append({
-                'workers': int(s.workers),
-                'cores': int(s.cores),
-                'gpus': int(s.gpus),
-                'memory': int(s.memory),
-                'disk': int(s.disk)})
+            workers.append({"workers": int(s.workers), "cores": int(s.cores), "gpus": int(s.gpus), "memory": int(s.memory), "disk": int(s.disk)})
             rmsummary_delete(s)
             count += 1
         delete_rmsummayArray(from_c)
@@ -1334,11 +1290,12 @@ class Manager(object):
     def task_state(self, task_id):
         return vine_task_state(self._taskvine, task_id)
 
-    ## Enables resource monitoring of tasks in the queue, and writes a summary
-    #  per task to the directory given. Additionally, all summaries are
-    #  consolidate into the file all_summaries-PID.log
+    ##
+    # Enables resource monitoring of tasks in the queue, and writes a summary
+    # per task to the directory given. Additionally, all summaries are
+    # consolidate into the file all_summaries-PID.log
     #
-    #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
+    # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
     # @param self   Reference to the current manager object.
     # @param dirname    Directory name for the monitor output.
@@ -1346,10 +1303,12 @@ class Manager(object):
     def enable_monitoring(self, dirname=None, watchdog=True):
         return vine_enable_monitoring(self._taskvine, dirname, watchdog)
 
-    ## As @ref enable_monitoring, but it also generates a time series and a debug file.
-    #  WARNING: Such files may reach gigabyte sizes for long running tasks.
+    ##
+    # As @ref enable_monitoring, but it also generates a time series and a
+    # debug file.
+    # WARNING: Such files may reach gigabyte sizes for long running tasks.
     #
-    #  Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
+    # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
     # @param self   Reference to the current manager object.
     # @param dirname    Directory name for the monitor output.
@@ -1357,10 +1316,9 @@ class Manager(object):
     def enable_monitoring_full(self, dirname=None, watchdog=True):
         return vine_enable_monitoring_full(self._taskvine, dirname, watchdog)
 
-
     ##
     # Enable P2P worker transfer functionality. Off by default
-    # 
+    #
     # @param self Reference to the current manager object.
     def enable_peer_transfers(self):
         return vine_enable_peer_transfers(self._taskvine)
@@ -1464,7 +1422,8 @@ class Manager(object):
     def set_priority(self, priority):
         return vine_set_priority(self._taskvine, priority)
 
-    ## Specify the number of tasks not yet submitted to the queue.
+    ##
+    # Specify the number of tasks not yet submitted to the queue.
     # It is used by vine_factory to determine the number of workers to launch.
     # If not specified, it defaults to 0.
     # vine_factory considers the number of tasks as:
@@ -1473,20 +1432,6 @@ class Manager(object):
     # @param ntasks Number of tasks yet to be submitted.
     def tasks_left_count(self, ntasks):
         return vine_set_tasks_left_count(self._taskvine, ntasks)
-
-    ##
-    # Specify the manager mode for the given queue.
-    # (Kept for compatibility. It is no-op.)
-    #
-    # @param self   Reference to the current manager object.
-    # @param mode   This may be one of the following values: VINE_MASTER_MODE_STANDALONE or VINE_MASTER_MODE_CATALOG.
-    def set_manager_mode(self, mode):
-        return vine_set_manager_mode(self._taskvine, mode)
-
-    ##
-    # See set_manager_mode
-    def set_master_mode(self, mode):
-        return vine_set_manager_mode(self._taskvine, mode)
 
     ##
     # Specify the catalog servers the manager should report to.
@@ -1537,7 +1482,6 @@ class Manager(object):
     def set_resources_max(self, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
-            old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
         return vine_set_resources_max(self._taskvine, rm)
 
@@ -1557,7 +1501,6 @@ class Manager(object):
     def set_resources_min(self, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
-            old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
         return vine_set_resources_min(self._taskvine, rm)
 
@@ -1578,7 +1521,6 @@ class Manager(object):
     def set_category_resources_max(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
-            old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
         return vine_set_category_resources_max(self._taskvine, category, rm)
 
@@ -1599,7 +1541,6 @@ class Manager(object):
     def set_category_resources_min(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
-            old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
         return vine_set_category_resources_min(self._taskvine, category, rm)
 
@@ -1620,7 +1561,6 @@ class Manager(object):
     def set_category_first_allocation_guess(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
-            old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
         return vine_set_category_first_allocation_guess(self._taskvine, category, rm)
 
@@ -1671,9 +1611,8 @@ class Manager(object):
             if task.category == category:
                 ids_to_cancel.append(task.id)
 
-        canceled_tasks =  [self.cancel_by_task_id(id) for id in ids_to_cancel]
+        canceled_tasks = [self.cancel_by_task_id(id) for id in ids_to_cancel]
         return canceled_tasks
-
 
     ##
     # Shutdown workers connected to queue.
@@ -1727,15 +1666,6 @@ class Manager(object):
     def blacklist_clear(self, host=None):
         return self.unblock_host(host)
 
-    ##
-    # Delete file from workers's caches.
-    #
-    # @param self   Reference to the current manager object.
-    # @param local_name   Name of the file as seen by the manager.
-    def invalidate_cache_file(self, local_name):
-        if local_name:
-            local_name = str(local_name)
-        return vine_invalidate_cached_file(self._taskvine, local_name, VINE_FILE)
 
     ##
     # Change keepalive interval for a given queue.
@@ -1754,14 +1684,6 @@ class Manager(object):
     #                 from worker before marking it as dead.
     def set_keepalive_timeout(self, timeout):
         return vine_set_keepalive_timeout(self._taskvine, timeout)
-
-    ##
-    # Turn on manager capacity measurements.
-    #
-    # @param self     Reference to the current manager object.
-    #
-    def estimate_capacity(self):
-        return vine_set_estimate_capacity_on(self._taskvine, 1)
 
     ##
     # Tune advanced parameters.
@@ -1881,12 +1803,12 @@ class Manager(object):
     # @param chunksize  The number of elements to process at once
 
     def map(self, fn, seq, chunksize=1):
-        size = math.ceil(len(seq)/chunksize)
+        size = math.ceil(len(seq) / chunksize)
         results = [None] * size
         tasks = {}
 
         for i in range(size):
-            start = i*chunksize
+            start = i * chunksize
             end = start + chunksize
 
             if end > len(seq):
@@ -1899,7 +1821,7 @@ class Manager(object):
             tasks[p_task.id] = i
 
         n = 0
-        for i in range(size+1):
+        for i in range(size + 1):
             while not self.empty() and n < size:
                 for key, value in tasks.items():
                     if value == i:
@@ -1933,7 +1855,7 @@ class Manager(object):
 
             return results
 
-        size = math.ceil((len(seq1) * len(seq2))/chunksize)
+        size = math.ceil((len(seq1) * len(seq2)) / chunksize)
         results = [None] * size
         tasks = {}
         task = []
@@ -1941,7 +1863,6 @@ class Manager(object):
         num_task = 0
 
         for item in itertools.product(seq1, seq2):
-
             if num == chunksize:
                 p_task = PythonTask(fpairs, fn, task)
                 if env:
@@ -1966,7 +1887,6 @@ class Manager(object):
 
         n = 0
         for i in range(num_task):
-
             while not self.empty() and n < num_task:
                 for key, value in tasks.items():
                     if value == i:
@@ -1980,7 +1900,6 @@ class Manager(object):
                     break
 
         return [item for elem in results for item in elem]
-
 
     ##
     # Reduces a sequence until only one value is left, and then returns that value.
@@ -2000,11 +1919,11 @@ class Manager(object):
         num_task = 0
 
         while len(seq) > 1:
-            size = math.ceil(len(seq)/chunksize)
+            size = math.ceil(len(seq) / chunksize)
             results = [None] * size
 
             for i in range(size):
-                start = i*chunksize
+                start = i * chunksize
                 end = start + chunksize
 
                 if end > len(seq):
@@ -2018,7 +1937,7 @@ class Manager(object):
                 num_task += 1
 
             n = 0
-            for i in range(size+1):
+            for i in range(size + 1):
                 while not self.empty() and n < size:
                     for key, value in tasks.items():
                         if value == num_task - size + i:
@@ -2047,15 +1966,15 @@ class Manager(object):
     # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
     # @param chunksize The number of elements to process at once
     def remote_map(self, fn, seq, coprocess, name, chunksize=1):
-        size = math.ceil(len(seq)/chunksize)
+        size = math.ceil(len(seq) / chunksize)
         results = [None] * size
         tasks = {}
 
         for i in range(size):
-            start = i*chunksize
-            end = min(len(seq), start+chunksize)
+            start = i * chunksize
+            end = min(len(seq), start + chunksize)
 
-            event = json.dumps({name : seq[start:end]})
+            event = json.dumps({name: seq[start:end]})
             p_task = RemoteTask(fn, event, coprocess)
 
             p_task.set_tag(str(i))
@@ -2063,7 +1982,7 @@ class Manager(object):
             tasks[p_task.id] = i
 
         n = 0
-        for i in range(size+1):
+        for i in range(size + 1):
             while not self.empty() and n < size:
                 for key, value in tasks.items():
                     if value == i:
@@ -2076,7 +1995,6 @@ class Manager(object):
                     break
 
         return [item for elem in results for item in elem]
-
 
     ##
     # Returns the values for a function of each pair from 2 sequences using remote task
@@ -2091,7 +2009,7 @@ class Manager(object):
     # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
     # @param chunksize The number of elements to process at once
     def remote_pair(self, fn, seq1, seq2, coprocess, name, chunksize=1):
-        size = math.ceil((len(seq1) * len(seq2))/chunksize)
+        size = math.ceil((len(seq1) * len(seq2)) / chunksize)
         results = [None] * size
         tasks = {}
         task = []
@@ -2100,7 +2018,7 @@ class Manager(object):
 
         for item in itertools.product(seq1, seq2):
             if num == chunksize:
-                event = json.dumps({name : task})
+                event = json.dumps({name: task})
                 p_task = RemoteTask(fn, event, coprocess)
                 p_task.set_tag(str(num_task))
                 self.submit(p_task)
@@ -2113,7 +2031,7 @@ class Manager(object):
             num += 1
 
         if len(task) > 0:
-            event = json.dumps({name : task})
+            event = json.dumps({name: task})
             p_task = RemoteTask(fn, event, coprocess)
             p_task.set_tag(str(num_task))
             self.submit(p_task)
@@ -2132,9 +2050,9 @@ class Manager(object):
                     results[tasks[t.id]] = json.loads(t.output)["Result"]
                     n += 1
                     break
-         
+
         return [item for elem in results for item in elem]
-    
+
     ##
     # Reduces a sequence until only one value is left, and then returns that value.
     # The sequence is reduced by passing a pair of elements into a function and
@@ -2155,14 +2073,14 @@ class Manager(object):
         num_task = 0
 
         while len(seq) > 1:
-            size = math.ceil(len(seq)/chunksize)
+            size = math.ceil(len(seq) / chunksize)
             results = [None] * size
 
             for i in range(size):
-                start = i*chunksize
-                end = min(len(seq), start+chunksize)
+                start = i * chunksize
+                end = min(len(seq), start + chunksize)
 
-                event = json.dumps({name : seq[start:end]})
+                event = json.dumps({name: seq[start:end]})
                 p_task = RemoteTask(fn, event, coprocess)
 
                 p_task.set_tag(str(i))
@@ -2171,8 +2089,7 @@ class Manager(object):
                 num_task += 1
 
             n = 0
-            for i in range(size+1):
-
+            for i in range(size + 1):
                 while not self.empty() and n < size:
                     for key, value in tasks.items():
                         if value == num_task - size + i:
@@ -2188,6 +2105,7 @@ class Manager(object):
             seq = results
 
         return seq[0]
+
 
 ##
 # \class RemoteTask
@@ -2221,7 +2139,7 @@ class RemoteTask(Task):
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
-        self.add_input_buffer(json.dumps(task._event), "infile")
+        self.add_input_buffer(json.dumps(self._event), "infile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
@@ -2336,13 +2254,7 @@ class Factory(object):
     # `manager_name` or, `manager_host_port` should be specified.
     # If factory_binary or worker_binary is not
     # specified, $PATH will be searched.
-    def __init__(
-            self, batch_type,
-            manager_name=None,
-            manager_host_port=None,
-            factory_binary=None, worker_binary=None,
-            log_file=os.devnull):
-
+    def __init__(self, batch_type, manager_name=None, manager_host_port=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
         self._config_file = None
         self._factory_proc = None
         self._log_file = log_file
@@ -2352,29 +2264,29 @@ class Factory(object):
         self._opts = {}
 
         self._set_manager(manager_name, manager_host_port)
-        self._opts['batch-type'] = batch_type
-        self._opts['worker-binary'] = self._find_exe(worker_binary, 'vine_worker')
-        self._factory_binary = self._find_exe(factory_binary, 'vine_factory')
-        self._opts['scratch-dir'] = None
+        self._opts["batch-type"] = batch_type
+        self._opts["worker-binary"] = self._find_exe(worker_binary, "vine_worker")
+        self._factory_binary = self._find_exe(factory_binary, "vine_factory")
+        self._opts["scratch-dir"] = None
 
     def _set_manager(self, manager_name, manager_host_port):
         if not (manager_name or manager_host_port):
-            raise ValueError('Either manager_name or, manager_host_port should be specified.')
+            raise ValueError("Either manager_name or, manager_host_port should be specified.")
 
         if manager_name and manager_host_port:
-            raise ValueError('Master should be specified by a name, or by a host and port. Not both.')
+            raise ValueError("Master should be specified by a name, or by a host and port. Not both.")
 
         if manager_name:
-            self._opts['manager-name'] = manager_name
+            self._opts["manager-name"] = manager_name
             return
 
         if manager_host_port:
             try:
-                (host, port) = [x for x in manager_host_port.split(':') if x]
-                self._opts['manager-host'] = host
-                self._opts['manager-port'] = port
+                (host, port) = [x for x in manager_host_port.split(":") if x]
+                self._opts["manager-host"] = host
+                self._opts["manager-port"] = port
             except (TypeError, ValueError):
-                raise ValueError('manager_name is not of the form HOST:PORT')
+                raise ValueError("manager_name is not of the form HOST:PORT")
 
     def _find_exe(self, path, default):
         if path is None:
@@ -2382,43 +2294,35 @@ class Factory(object):
         else:
             out = path
         if out is None or not os.access(out, os.F_OK):
-            raise OSError(
-                errno.ENOENT,
-                'Command not found',
-                out or default)
+            raise OSError(errno.ENOENT, "Command not found", out or default)
         if not os.access(out, os.X_OK):
-            raise OSError(
-                errno.EPERM,
-                os.strerror(errno.EPERM),
-                out)
+            raise OSError(errno.EPERM, os.strerror(errno.EPERM), out)
         return os.path.abspath(out)
 
-
     def __getattr__(self, name):
-        if name[0] == '_':
+        if name[0] == "_":
             # For names that start with '_', immediately return the attribute.
             # If the name does not start with '_' we assume is a factory option.
             return object.__getattribute__(self, name)
 
         # original command line options use - instead of _. _ is required by
         # the naming conventions of python (otherwise - is taken as 'minus')
-        name_with_hyphens = name.replace('_', '-')
+        name_with_hyphens = name.replace("_", "-")
 
         if name_with_hyphens in Factory._command_line_options:
             try:
-                return object.__getattribute__(self, '_opts')[name_with_hyphens]
+                return object.__getattribute__(self, "_opts")[name_with_hyphens]
             except KeyError:
                 raise KeyError("{} is a valid factory attribute, but has not been set yet.".format(name))
         else:
             raise AttributeError("{} is not a supported option".format(name))
 
-
     def __setattr__(self, name, value):
         # original command line options use - instead of _. _ is required by
         # the naming conventions of python (otherwise - is taken as 'minus')
-        name_with_hyphens = name.replace('_', '-')
+        name_with_hyphens = name.replace("_", "-")
 
-        if name[0] == '_':
+        if name[0] == "_":
             # For names that start with '_', immediately set the attribute.
             # If the name does not start with '_' we assume is a factory option.
             object.__setattr__(self, name, value)
@@ -2429,7 +2333,7 @@ class Factory(object):
                 self._opts[name_with_hyphens] = value
                 self._write_config()
             elif name_with_hyphens in Factory._command_line_options:
-                raise AttributeError('{} cannot be changed once the factory is running.'.format(name))
+                raise AttributeError("{} cannot be changed once the factory is running.".format(name))
             else:
                 raise AttributeError("{} is not a supported option".format(name))
         else:
@@ -2439,16 +2343,14 @@ class Factory(object):
                 raise AttributeError("{} is not a supported option".format(name))
 
     def _construct_command_line(self):
-	# check for environment file
+        # check for environment file
         args = [self._factory_binary]
 
-        args += ['--parent-death']
-        args += ['--config-file', self._config_file]
+        args += ["--parent-death"]
+        args += ["--config-file", self._config_file]
 
-        if self._opts['batch-type'] == 'local':
-            self._opts['extra-options'] = self._opts.get('extra-options', '') + ' --parent-death'
-
-        flags = [opt for opt in Factory._command_line_options if opt[0] != ":"]
+        if self._opts["batch-type"] == "local":
+            self._opts["extra-options"] = self._opts.get("extra-options", "") + " --parent-death"
 
         for opt in self._opts:
             if opt not in Factory._command_line_options:
@@ -2460,11 +2362,10 @@ class Factory(object):
             else:
                 args.append("--{}={}".format(opt, self._opts[opt]))
 
-        if 'manager-host' in self._opts:
-            args += [self._opts['manager-host'], self._opts['manager-port']]
+        if "manager-host" in self._opts:
+            args += [self._opts["manager-host"], self._opts["manager-port"]]
 
         return args
-
 
     ##
     # Start a factory process.
@@ -2475,7 +2376,7 @@ class Factory(object):
     # may be useful to provision workers from inside a Jupyter notebook.
     def start(self):
         if self._factory_proc is not None:
-            raise RuntimeError('Factory was already started')
+            raise RuntimeError("Factory was already started")
 
         if not self.scratch_dir:
             candidate = os.getcwd()
@@ -2496,14 +2397,10 @@ class Factory(object):
         self._config_file = os.path.join(self.scratch_dir, "config.json")
 
         self._write_config()
-        logfd = open(self._log_file, 'a')
-        errfd = open(self._error_file, 'w')
-        devnull = open(os.devnull, 'w')
-        self._factory_proc = subprocess.Popen(
-            self._construct_command_line(),
-            stdin=devnull,
-            stdout=logfd,
-            stderr=errfd)
+        logfd = open(self._log_file, "a")
+        errfd = open(self._error_file, "w")
+        devnull = open(os.devnull, "w")
+        self._factory_proc = subprocess.Popen(self._construct_command_line(), stdin=devnull, stdout=logfd, stderr=errfd)
         devnull.close()
         logfd.close()
         errfd.close()
@@ -2515,15 +2412,14 @@ class Factory(object):
         if status:
             with open(self._error_file) as error_f:
                 error_log = error_f.read()
-                raise RuntimeError('Could not execute vine_factory. Exited with status: {}\n{}'.format(str(status), error_log))
+                raise RuntimeError("Could not execute vine_factory. Exited with status: {}\n{}".format(str(status), error_log))
         return self
-
 
     ##
     # Stop the factory process.
     def stop(self):
         if self._factory_proc is None:
-            raise RuntimeError('Factory not yet started')
+            raise RuntimeError("Factory not yet started")
         self._factory_proc.terminate()
         self._factory_proc.wait()
         self._factory_proc = None
@@ -2532,12 +2428,10 @@ class Factory(object):
             shutil.rmtree(self.scratch_dir)
 
     def __enter__(self):
-         return self.start()
-
+        return self.start()
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
-
 
     def __del__(self):
         if self._factory_proc is not None:
@@ -2546,17 +2440,17 @@ class Factory(object):
         if os and shutil and self._staging_dir:
             shutil.rmtree(self._staging_dir)
 
-
     def _write_config(self):
         if self._config_file is None:
             return
 
-        opts_subset = dict([(opt, self._opts[opt]) for opt in self._opts if opt in Factory._config_file_options ])
-        with open(self._config_file, 'w') as f:
+        opts_subset = dict([(opt, self._opts[opt]) for opt in self._opts if opt in Factory._config_file_options])
+        with open(self._config_file, "w") as f:
             json.dump(opts_subset, f, indent=4)
 
     def set_environment(self, env):
         self._env_file = env
+
 
 def rmsummary_snapshots(self):
     if self.snapshots_count < 1:
@@ -2567,5 +2461,6 @@ def rmsummary_snapshots(self):
         snapshot = rmsummary_get_snapshot(self, i)
         snapshots.append(snapshot)
     return snapshots
+
 
 rmsummary.snapshots = property(rmsummary_snapshots)

@@ -480,6 +480,13 @@ const char * vine_task_get_command( struct vine_task *t );
 
 const char * vine_task_get_tag( struct vine_task *t );
 
+/** Get the category associated with the task.
+@param t A task object.
+@return The category string set by @ref vine_task_set_category.
+*/
+
+const char * vine_task_get_category( struct vine_task *t );
+
 /** Get the unique ID of the task.
 @param t A task object.
 @return The integer task ID assigned at creation time.
@@ -610,7 +617,7 @@ All fields but label are optional.
 
             events:
             label        Name that identifies the snapshot. Only alphanumeric, -,
-                         and _ characters are allowed. 
+                         and _ characters are allowed.
             on-create    Take a snapshot every time the file is created. Default: false
             on-truncate  Take a snapshot when the file is truncated.    Default: false
             pattern      Take a snapshot when a line matches the regexp pattern.    Default: none
@@ -928,18 +935,25 @@ Completed tasks waiting for retrieval are not affected.
 */
 void vine_remove_file(struct vine_manager *m, struct vine_file *f );
 
-/** Get manager statistics (only from manager).
+/** Get manager statistics (only from manager)
 @param m A manager object
-@param s A pointer to a buffer that will be filed with statistics.
+@param s A pointer to a buffer that will be filed with statistics
 */
 void vine_get_stats(struct vine_manager *m, struct vine_stats *s);
 
 /** Get the task statistics for the given category.
 @param m A manager object
-@param c A category name.
-@param s A pointer to a buffer that will be filed with statistics.
+@param c A category name
+@param s A pointer to a buffer that will be filed with statistics
 */
 void vine_get_stats_category(struct vine_manager *m, const char *c, struct vine_stats *s);
+
+
+/** Get manager information as json
+@param m A manager object
+@param request One of: queue, tasks, workers, or categories
+*/
+char *vine_get_status(struct vine_manager *m, const char *request);
 
 
 /** Summary data for all workers in buffer.
