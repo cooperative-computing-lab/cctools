@@ -33,7 +33,7 @@
 
 
 The **catalog_update** tool allows users to manually send an update to a
-catalog server via a short UDP packet.
+catalog server via TCP or UDP.
 
 ## OPTIONS
 

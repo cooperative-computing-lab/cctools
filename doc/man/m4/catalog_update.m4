@@ -11,7 +11,7 @@ SECTION(DESCRIPTION)
 
 PARA
 The CODE(catalog_update) tool allows users to manually send an update to a
-catalog server via a short UDP packet.
+catalog server via TCP or UDP.
 
 SECTION(OPTIONS)
 
