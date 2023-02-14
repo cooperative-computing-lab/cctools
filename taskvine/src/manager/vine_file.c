@@ -58,7 +58,7 @@ char *make_cached_name( const struct vine_file *f )
 	}
 
 	/* XXX hack to force caching for the moment */
-	int cache_file_id = 0;
+	int cache_file_id = file_count;
 	
 	switch(f->type) {
 		case VINE_FILE:
