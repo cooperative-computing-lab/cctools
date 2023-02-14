@@ -260,7 +260,7 @@ class Task(object):
     # a cacheable file that can be shared among multiple tasks.
     #
     # @param self           Reference to the current task object.
-    # @param command        The shell command which will produce the file.
+    # @param cmd            The shell command which will produce the file.
     #                       The command must contain the string %% which will be replaced with the cached location of the file.
     # @param remote_name    The name of the file as seen by the task.
     # @param type           Must be @ref WORK_QUEUE_INPUT.  (Output is not currently supported.)
@@ -1694,7 +1694,7 @@ class WorkQueue(object):
     # Cancel task identified by its tag and remove from the given queue.
     #
     # @param self   Reference to the current work queue object.
-    # @param tag    The tag assigned to task using @ref specify_tag.
+    # @param tag    The tag assigned to task using @ref Task.specify_tag.
     def cancel_by_tasktag(self, tag):
         task = None
         task_pointer = work_queue_cancel_by_tasktag(self._work_queue, tag)
@@ -1706,7 +1706,7 @@ class WorkQueue(object):
     # Cancel all tasks of the given category and remove them from the queue.
     #
     # @param self   Reference to the current work queue object.
-    # @param tag    The tag assigned to task using @ref specify_tag.
+    # @param category The name of the category to cancel.
     def cancel_by_category(self, category):
         canceled_tasks = []
         ids_to_cancel = []
@@ -1887,21 +1887,21 @@ class WorkQueue(object):
     # @param self       Reference to the current work queue object.
     # @param fn         The function that will be called on each element
     # @param seq        The sequence that will call the function
-    # @param chunk_size The number of elements to process at once
+    # @param chunksize The number of elements to process at once
 
-    def map(self, fn, array, chunk_size=1):
-        size = math.ceil(len(array) / chunk_size)
+    def map(self, fn, seq, chunksize=1):
+        size = math.ceil(len(seq) / chunksize)
         results = [None] * size
         tasks = {}
 
         for i in range(size):
-            start = i * chunk_size
-            end = start + chunk_size
+            start = i * chunksize
+            end = start + chunksize
 
-            if end > len(array):
-                p_task = PythonTask(map, fn, array[start:])
+            if end > len(seq):
+                p_task = PythonTask(map, fn, seq[start:])
             else:
-                p_task = PythonTask(map, fn, array[start:end])
+                p_task = PythonTask(map, fn, seq[start:end])
 
             p_task.specify_tag(str(i))
             self.submit(p_task)
@@ -1927,7 +1927,10 @@ class WorkQueue(object):
     # @param fn       The function that will be called on each element
     # @param seq1     The first seq that will be used to generate pairs
     # @param seq2     The second seq that will be used to generate pairs
-    def pair(self, fn, seq1, seq2, chunk_size=1, env=None):
+    # @param chunksize The number of pairs to process at once
+    # @param env      Poncho or conda environment tarball filename
+
+    def pair(self, fn, seq1, seq2, chunksize=1, env=None):
         def fpairs(fn, s):
             results = []
 
@@ -1936,7 +1939,7 @@ class WorkQueue(object):
 
             return results
 
-        size = math.ceil((len(seq1) * len(seq2)) / chunk_size)
+        size = math.ceil((len(seq1) * len(seq2)) / chunksize)
         results = [None] * size
         tasks = {}
         task = []
@@ -1944,7 +1947,7 @@ class WorkQueue(object):
         num_task = 0
 
         for item in itertools.product(seq1, seq2):
-            if num == chunk_size:
+            if num == chunksize:
                 p_task = PythonTask(fpairs, fn, task)
                 if env:
                     p_task.specify_environment(env)
@@ -1990,18 +1993,18 @@ class WorkQueue(object):
     # @param self       Reference to the current work queue object.
     # @param fn         The function that will be called on each element
     # @param seq        The seq that will be reduced
-    # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
+    # @param chunksize The number of elements per Task (for tree reduc, must be greater than 1)
 
-    def tree_reduce(self, fn, seq, chunk_size=2):
+    def tree_reduce(self, fn, seq, chunksize=2):
         tasks = {}
 
         while len(seq) > 1:
-            size = math.ceil(len(seq) / chunk_size)
+            size = math.ceil(len(seq) / chunksize)
             results = [None] * size
 
             for i in range(size):
-                start = i * chunk_size
-                end = start + chunk_size
+                start = i * chunksize
+                end = start + chunksize
 
                 if end > len(seq):
                     p_task = PythonTask(fn, seq[start:])
@@ -2036,17 +2039,17 @@ class WorkQueue(object):
     # @param seq        The sequence that will call the function
     # @param coprocess  The name of the coprocess that contains the function fn.
     # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
-    # @param chunk_size The number of elements to process at once
-    def remote_map(self, fn, array, coprocess, name, chunk_size=1):
-        size = math.ceil(len(array) / chunk_size)
+    # @param chunksize The number of elements to process at once
+    def remote_map(self, fn, seq, coprocess, name, chunksize=1):
+        size = math.ceil(len(seq) / chunksize)
         results = [None] * size
         tasks = {}
 
         for i in range(size):
-            start = i * chunk_size
-            end = min(len(array), start + chunk_size)
+            start = i * chunksize
+            end = min(len(seq), start + chunksize)
 
-            event = json.dumps({name: array[start:end]})
+            event = json.dumps({name: seq[start:end]})
             p_task = RemoteTask(fn, event, coprocess)
 
             p_task.specify_tag(str(i))
@@ -2075,9 +2078,9 @@ class WorkQueue(object):
     # @param seq2     The second seq that will be used to generate pairs
     # @param coprocess  The name of the coprocess that contains the function fn.
     # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
-    # @param chunk_size The number of elements to process at once
-    def remote_pair(self, fn, seq1, seq2, coprocess, name, chunk_size=1):
-        size = math.ceil((len(seq1) * len(seq2)) / chunk_size)
+    # @param chunksize The number of elements to process at once
+    def remote_pair(self, fn, seq1, seq2, coprocess, name, chunksize=1):
+        size = math.ceil((len(seq1) * len(seq2)) / chunksize)
         results = [None] * size
         tasks = {}
         task = []
@@ -2085,7 +2088,7 @@ class WorkQueue(object):
         num_task = 0
 
         for item in itertools.product(seq1, seq2):
-            if num == chunk_size:
+            if num == chunksize:
                 event = json.dumps({name: task})
                 p_task = RemoteTask(fn, event, coprocess)
                 p_task.specify_tag(str(num_task))
@@ -2131,17 +2134,17 @@ class WorkQueue(object):
     # @param seq        The seq that will be reduced
     # @param coprocess  The name of the coprocess that contains the function fn.
     # @param name       This defines the key in the event json that wraps the data sent to the coprocess.
-    # @param chunk_size The number of elements per Task (for tree reduc, must be greater than 1)
-    def remote_tree_reduce(self, fn, seq, coprocess, name, chunk_size=2):
+    # @param chunksize The number of elements per Task (for tree reduc, must be greater than 1)
+    def remote_tree_reduce(self, fn, seq, coprocess, name, chunksize=2):
         tasks = {}
 
         while len(seq) > 1:
-            size = math.ceil(len(seq) / chunk_size)
+            size = math.ceil(len(seq) / chunksize)
             results = [None] * size
 
             for i in range(size):
-                start = i * chunk_size
-                end = min(len(seq), start + chunk_size)
+                start = i * chunksize
+                end = min(len(seq), start + chunksize)
 
                 event = json.dumps({name: seq[start:end]})
                 p_task = RemoteTask(fn, event, coprocess)
