@@ -306,7 +306,10 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 		struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
 
 		if(!remote_info) {
-			debug(D_VINE,"warning: unexpected cache-update message for %s",cachename);
+			/*
+			If an unsolicited cache-update arrives, then the worker
+			is telling us about something from a previous run.
+			*/
 			remote_info = vine_remote_file_info_create(size,time(0));
 			hash_table_insert(w->current_files,cachename,remote_info);
 		}
