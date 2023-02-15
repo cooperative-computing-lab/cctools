@@ -209,7 +209,7 @@ A mini-task cache name is computed from the hash of:
 - The name of the file extracted from the task.
 */
 
-const char *make_mini_task_cached_name(const struct vine_file *f)
+char *make_mini_task_cached_name(const struct vine_file *f)
 {
 	unsigned char digest[MD5_DIGEST_LENGTH];
 
@@ -221,7 +221,7 @@ const char *make_mini_task_cached_name(const struct vine_file *f)
 	free(buffer);
 	free(taskstr);
 	
-	return md5_string(digest);
+	return strdup(md5_string(digest));
 }
 
 /*
@@ -232,49 +232,56 @@ Returns a string that must be freed with free().
 char *vine_cached_name( const struct vine_file *f )
 {
 	unsigned char digest[MD5_DIGEST_LENGTH];
-	const char *hash;
-
+	char *hash, *name;
 	char random[17];
 
 	switch(f->type) {
 		case VINE_FILE:
 			/* A file is identified by its content. */
 			hash = md5_file_or_dir(f->source);
-			return string_format("file-md5-%s",hash);
+			name = string_format("file-md5-%s",hash);
+			free(hash);
 			break;
 		case VINE_EMPTY_DIR:
 			/* All empty dirs have the same content! */
-			return string_format("empty");
+			name = string_format("empty");
 			break;
 		case VINE_MINI_TASK:
 			/* A mini task is idenfied by the task properties. */
 			hash = make_mini_task_cached_name(f);
-			return string_format("task-md5-%s",hash);
+			name = string_format("task-md5-%s",hash);
+			free(hash);
 			break;
 	       	case VINE_URL:
 			/* A url is identified by its metadata. */
 			hash = make_url_cached_name(f);
-			return string_format("url-md5-%s",hash);
+			name = string_format("url-md5-%s",hash);
+			free(hash);
 			break;
 		case VINE_TEMP:
 			/* An empty temporary file gets a random name. */
 			/* Until we later have a better name for it.*/
 			string_cookie(random,16);
-			return string_format("temp-rnd-%s",random);
+			name = string_format("temp-rnd-%s",random);
 			break;
 		case VINE_BUFFER:
-		default:
 			if(f->data) {
 				/* If the buffer exists, then checksum the content. */ 
 				md5_buffer(f->data, f->length, digest);
-				hash = md5_string(digest);
-				return string_format("buffer-md5-%s",hash);
+				const char *hash = md5_string(digest);
+				name = string_format("buffer-md5-%s",hash);
 			} else {
 				/* If the buffer doesn't exist yet, then give a random name. */
 				/* Until we later have a better name for it.*/
 				string_cookie(random,16);
-				return string_format("buffer-rnd-%s",random);
+				name = string_format("buffer-rnd-%s",random);
 			}
 			break;
+		default:
+			fatal("invalid file type %d",f->type);
+			name = strdup("notreached");
+			break;
 	}
+
+	return name;
 }
