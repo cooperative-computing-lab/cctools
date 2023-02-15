@@ -90,7 +90,7 @@ should not be cached. That is, generating a cachename could lead to possible con
 */
 
 typedef enum {
-	VINE_FOUND_URL,
+	VINE_FOUND_NONE,
 	VINE_FOUND_LM,
 	VINE_FOUND_ET,
 	VINE_FOUND_MD5,
@@ -104,7 +104,7 @@ or if all else fails, just the URL itself.
 
 static vine_url_cache_t get_url_properties( const char *url, char *tag )
 {
-	vine_url_cache_t val = VINE_FOUND_URL;
+	vine_url_cache_t val = VINE_FOUND_NONE;
 	char line[VINE_LINE_MAX];
 
 	/*
@@ -155,9 +155,17 @@ static vine_url_cache_t get_url_properties( const char *url, char *tag )
 
 	int result = pclose(stream);
 
-	/* If curl executes but the url cannot be fetched, we need to know quickly. */
-	if(result!=0) fatal("curl could not fetch header for url %s!",url);
-			
+	/*
+	If curl executes but the url cannot be fetched,
+	then we cannot just halt here but warn and keep
+	going with a hash based on the URL.
+	*/
+
+	if(result!=0) {
+		debug(D_VINE|D_NOTICE,"Unable to fetch properties of url %s!  Continuing optimistically..",url);
+		val = VINE_FOUND_NONE;
+	}
+
 	free(command);
 	
 	return val;
@@ -183,7 +191,7 @@ static char *make_url_cached_name( const struct vine_file *f )
        	vine_url_cache_t val = get_url_properties(f->source,tag);
 
 	switch(val){
-		case VINE_FOUND_URL:
+		case VINE_FOUND_NONE:
 			/* Checksum the URL alone. */
 			method = "md5-url";
 			content = string_format("%s",f->source);
