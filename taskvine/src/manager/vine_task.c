@@ -768,40 +768,44 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 	return j;
 }
 
-char * vine_task_to_json(struct vine_task *t){
-        // This needs to be generated consistently such that input and output files are ordered the same each time.
-        char * buffer;
-        char * file_buffer;
-        struct vine_file * file;
-        buffer = string_format("{\ncmd = \"%s\"\n", t->command_line);
-        if(t->input_files){
-                buffer = string_combine(buffer, "inputs = ");
-                LIST_ITERATE(t->input_files, file){
-                        if(file->type == VINE_BUFFER){
-                                file_buffer = string_format("{ name: \"%s\", source: \"%s\"}, ", file->data, file->cached_name);
-                                buffer = string_combine(buffer, file_buffer);
-                        }
-                        else{
-                                file_buffer = string_format("{ name: \"%s\", source: \"%s\"}, ", file->source, file->cached_name);
-                                buffer = string_combine(buffer, file_buffer);
-                        }
-                }
-                buffer = string_combine(buffer, "\n");
-        }
-        if(t->output_files){
-                buffer = string_combine(buffer, "outputs = ");
-                LIST_ITERATE(t->output_files, file){
-                        if(file->type == VINE_BUFFER){
-                                file_buffer = string_format("{ name: \"%s\"}, " , file->data);
-                                buffer = string_combine(buffer, file_buffer);
-                        }
-                        else{
-                                file_buffer = string_format("{ name: \"%s\"}, ", file->source);
-                                buffer = string_combine(buffer, file_buffer);
-                        }
-                }
-                buffer = string_combine(buffer, "\n");
-        }
-        return buffer;
+char * vine_task_to_json(struct vine_task *t)
+{
+	// This needs to be generated consistently such that input and output files are ordered the same each time.
+	char * buffer;
+	char * file_buffer;
+
+	struct vine_file *file;
+	struct vine_mount *m;
+
+	buffer = string_format("{\ncmd = \"%s\"\n", t->command_line);
+
+	if(t->input_mounts){
+		buffer = string_combine(buffer, "inputs = ");
+		LIST_ITERATE(t->input_mounts,m) {
+			file = m->file;
+			if(file->type == VINE_BUFFER){
+				file_buffer = string_format("{ name: \"%s\", source: \"%s\"}, ", file->data, file->cached_name);
+			} else{
+				file_buffer = string_format("{ name: \"%s\", source: \"%s\"}, ", file->source, file->cached_name);
+			}
+			buffer = string_combine(buffer, file_buffer);
+		}
+		buffer = string_combine(buffer, "\n");
+	}
+
+	if(t->output_mounts){
+		buffer = string_combine(buffer, "outputs = ");
+		LIST_ITERATE(t->output_mounts,m) {
+			file = m->file;
+			if(file->type == VINE_BUFFER){
+				file_buffer = string_format("{ name: \"%s\"}, ", file->data);
+			} else {
+				file_buffer = string_format("{ name: \"%s\"}, ", file->source);
+			}
+			buffer = string_combine(buffer, file_buffer);
+		}
+		buffer = string_combine(buffer, "\n");
+	}
+	return buffer;
 }
 
