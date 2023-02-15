@@ -370,102 +370,69 @@ const char *md5_string(unsigned char digest[16])
 	return str;
 }
 
-const char *md5_dir_rec(char *src){
-        
-	struct stat info;
+/*
+Compute the recursive hash of a directory by building up a string like this:
+
+	filea:hash-of-filea
+	fileb:hash-of-fileb
+	dirc:hash-of-dirc
+
+And then compute the hash of that string.
+
+Returns an allocated string that must be freed.
+*/
+
+char *md5_dir( const char *path )
+{
+	/* XXX Directories need to read in the same order to generate hash consistently*/
+	DIR * dir = opendir(path);
+	if(!dir) return 0;
+
+	char *dirstring=strdup("");
+	
+	struct dirent *d;
+	while((d=readdir(dir))){
+		if(!strcmp(d->d_name,".")) continue;
+		if(!strcmp(d->d_name,"..")) continue;
+
+		char *subpath = string_format("%s/%s",path,d->d_name);
+		char *subhash = md5_file_or_dir(subpath);
+		char *line = string_format("%s:%s\n",d->d_name,subhash);
+
+		dirstring = string_combine(dirstring,line);
+
+		free(subpath);
+		free(subhash);
+		free(line);
+	}
+
+	closedir(dir);
+
+	printf("checksum of %s: %s\n\n",path,dirstring);
+	
 	unsigned char digest[MD5_DIGEST_LENGTH];
-	if(stat(src, &info)) return 0; 
-	if(S_ISDIR(info.st_mode)){
-		/* XXX Directories need to read in the same order to generate hash consistently*/
-		struct dirent *d;
-		DIR * dir = opendir(src);
-		if(!dir) return 0;
-		char *path;
-		const char *hash = 0;
-		const char *next_hash = 0;
-		int init = 0;
-		while((d=readdir(dir))){
-			if(!strcmp(d->d_name,".")) continue;
-			if(!strcmp(d->d_name,"..")) continue;
-			path = path_concat(src, d->d_name);
-			if(init){				
-				next_hash = md5_file_or_dir(path);
-				if(next_hash == 0){
-					closedir(dir);
-					return 0;
-				}
-				char *str = string_format("%s%s", hash, next_hash);
-				md5_buffer((str), strlen(str), digest);
-				hash = md5_string(digest);
-				free(str);
-				}
-				else{
-					init = 1;
-					hash = md5_file_or_dir(path);
-					if(hash == 0){
-						closedir(dir);
-						return 0;
-					}
-				}
-		free(path);
-		}
-		closedir(dir);
-		return hash;
-	}
-	else if(S_ISREG(info.st_mode)){
-		const char *content_hash;
-		const char *name_hash;
-		md5_file(src, digest);
-		content_hash = md5_string(digest);
-		md5_buffer(src, strlen(src), digest);
-		name_hash = md5_string(digest);
+	md5_buffer(dirstring, strlen(dirstring), digest);
 
-		const char *hash;
-		char *str = string_format("%s%s", content_hash, name_hash);
-		md5_buffer((str), strlen(str), digest);
-		hash = md5_string(digest);
-		free(str);
-		return hash;
-	}
-
-	return 0;
+	free(dirstring);
+	
+	return strdup(md5_string(digest));
 }
-const char *md5_file_or_dir(char *src)
+
+char *md5_file_or_dir( const char *path )
 {
 	struct stat info;
-	const char *hash;
 	unsigned char digest[MD5_DIGEST_LENGTH];
-	if(stat(src, &info)) return 0; 
-	if(S_ISDIR(info.st_mode)){
-		hash = md5_dir_rec(src);
-		if(hash == 0) return 0;
-		return hash;
-	}
-	else if(S_ISREG(info.st_mode)){
-		md5_file(src, digest);
-		hash = md5_string(digest);
-		return hash;
-	}
-	else{
+
+	if(stat(path, &info)) return 0; 
+
+	if(S_ISDIR(info.st_mode)) {
+		return md5_dir(path);
+	} else if(S_ISREG(info.st_mode)) {
+		md5_file(path, digest);
+		return strdup(md5_string(digest));
+	} else {
 		return 0;
 	}
-}
-
-char *md5_cal(const char *s) {
-	unsigned char digest[MD5_DIGEST_LENGTH_HEX];
-	md5_context_t context;
-	char *p = NULL;
-
-	p = malloc(sizeof(char) * (MD5_DIGEST_LENGTH_HEX+1));
-	if(!p) {
-		return NULL;
-	}
-
-	md5_init(&context);
-	md5_update(&context, (const unsigned char *)s, strlen(s));
-	md5_final(digest, &context);
-	sprintf(p, "%s", md5_string(digest));
-	return p;
 }
 
 /* vim: set noexpandtab tabstop=4: */

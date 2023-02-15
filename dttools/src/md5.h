@@ -43,6 +43,12 @@ which  must be converted to a human readable form with @ref md5_string.
 */
 void md5_buffer(const void *buffer, size_t length, unsigned char digest[MD5_DIGEST_LENGTH]);
 
+/** Convert an MD5 digest into a printable string.
+@param digest A binary digest returned from @ref md5_file, @ref md5_buffer, or @ref chirp_reli_md5.
+@returns A static pointer to a human readable form of the digest.
+*/
+const char *md5_string(unsigned char digest[MD5_DIGEST_LENGTH]);
+
 /** Checksum a local file.
 Note that this function produces a digest in binary form
 which  must be converted to a human readable form with @ref md5_string.
@@ -52,29 +58,16 @@ which  must be converted to a human readable form with @ref md5_string.
 */
 int md5_file(const char *filename, unsigned char digest[MD5_DIGEST_LENGTH]);
 
-/** Converts either a directory to a string of the its hashed contents.
+/** Converts a directory to a string of its hashed contents.
 @param src The path to the source directory
-@returns A static pointer to the string;
+@returns An allocated string that must be freed.
 */
-const char *md5_dir_rec(char *src);
+char *md5_dir( const char *path );
 
-/** Converts either a file or directory to a string of the its hashed contents.
+/** Converts either a file or directory to a string of its hashed contents.
 @param src The path to the source file or a directory
-@returns A static pointer to the string;
+@returns An allocated string that must be freed.
 */
-const char *md5_file_or_dir(char *src);
-
-/** Convert an MD5 digest into a printable string.
-@param digest A binary digest returned from @ref md5_file, @ref md5_buffer, or @ref chirp_reli_md5.
-@returns A static pointer to a human readable form of the digest.
-*/
-const char *md5_string(unsigned char digest[MD5_DIGEST_LENGTH]);
-
-/* md5_cal calculates the md5 checksum of string s.
-@param s: a string pointer
-return the md5 checksum of s on success, return NULL on failure.
-The caller should free the returned string.
-*/
-char *md5_cal(const char *s);
+char *md5_file_or_dir( const char *path );
 
 #endif
