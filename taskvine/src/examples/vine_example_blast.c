@@ -53,12 +53,15 @@ int main(int argc, char *argv[])
 
 	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
 
+	struct vine_file *software = vine_file_untar(vine_file_url(BLAST_URL));
+	struct vine_file *database = vine_file_untar(vine_file_url(LANDMARK_URL));
+	
 	for(i=0;i<10;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 
 		vine_task_add_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
-		vine_task_add_input(t,vine_file_untar(vine_file_url(BLAST_URL)),"blastdir", VINE_CACHE );
-		vine_task_add_input(t,vine_file_untar(vine_file_url(LANDMARK_URL)),"landmark", VINE_CACHE );
+		vine_task_add_input(t,software,"blastdir", VINE_CACHE );
+		vine_task_add_input(t,database,"landmark", VINE_CACHE );
 		vine_task_set_env_var(t,"BLASTDB","landmark");
 
 		int task_id = vine_submit(m, t);
@@ -85,6 +88,9 @@ int main(int argc, char *argv[])
 
 	printf("all tasks complete!\n");
 
+	vine_file_delete(software);
+	vine_file_delete(database);
+	
 	vine_delete(m);
 
 	return 0;

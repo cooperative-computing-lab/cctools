@@ -654,13 +654,10 @@ struct vine_file * vine_file_url( const char *url );
 /** Create a scratch file object.
 A scratch file has no initial content, but is created
 as the output of a task, and may be consumed by other tasks.
-@param unique_name If desired, the user may manually assign
-a globally-unique name to this file.  If null, the system will
-assign an internal unique name.  (recommended)
 @return A general file object for use by @ref vine_task_add_input.
 */
 
-struct vine_file * vine_file_temp( const char *unique_name );
+struct vine_file * vine_file_temp();
 
 /** Create a file object from a data buffer.
 @param name The abstract name of the buffer.
@@ -710,7 +707,7 @@ struct vine_file * vine_file_unstarch( struct vine_file *f );
 @return A clone of the argument f.
 */
 
-struct vine_file *vine_file_clone( const struct vine_file *f );
+struct vine_file *vine_file_clone( struct vine_file *f );
 
 /** Delete a file object.
 @param f A file object.

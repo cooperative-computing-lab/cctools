@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "vine_watcher.h"
 #include "vine_gpus.h"
 #include "vine_file.h"
+#include "vine_mount.h"
 #include "vine_cache.h"
 #include "vine_coprocess.h"
 #include "vine_sandbox.h"
@@ -799,26 +800,26 @@ static int do_task( struct link *manager, int task_id, time_t stoptime )
 Accept a url specification and queue it for later transfer.
 */
 
-static int do_put_url( const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
+static int do_put_url( const char *cache_name, int64_t size, int mode, const char *source )
 {
-	return vine_cache_queue_transfer(global_cache,source,cache_name,size,mode,flags);
+	return vine_cache_queue_transfer(global_cache,source,cache_name,size,mode);
 }
 
 /*
 Accept a mini_task that is executed on demand to produce a specific file.
 */
 
-static int do_put_mini_task( struct link *manager, time_t stoptime, const char *cache_name, int64_t size, int mode, const char *source, vine_file_flags_t flags )
+static int do_put_mini_task( struct link *manager, time_t stoptime, const char *cache_name, int64_t size, int mode, const char *source )
 {
 	struct vine_task *mini_task = do_task_body(manager,0,stoptime);
 	if(!mini_task) return 0;
 
 	/* XXX hacky hack -- the single output of the task must have the target cachename */
-	struct vine_file *output_file = list_peek_head(mini_task->output_files);
-	free(output_file->cached_name);
-	output_file->cached_name = strdup(cache_name);
+	struct vine_mount *output_mount = list_peek_head(mini_task->output_mounts);
+	free(output_mount->file->cached_name);
+	output_mount->file->cached_name = strdup(cache_name);
 	
-	return vine_cache_queue_command(global_cache,mini_task,cache_name,size,mode,flags);
+	return vine_cache_queue_command(global_cache,mini_task,cache_name,size,mode);
 }
 
 /*
@@ -1043,7 +1044,6 @@ static int handle_manager(struct link *manager)
 	char transfer_id[VINE_LINE_MAX];
 	int64_t length;
 	int64_t task_id = 0;
-	int flags;
 	int mode, r, n;
 
 	if(recv_message(manager, line, sizeof(line), idle_stoptime )) {
@@ -1057,16 +1057,16 @@ static int handle_manager(struct link *manager)
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = vine_transfer_get_dir(manager,global_cache,filename,time(0)+active_timeout);
 			reset_idle_timer();
-		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o %d %s", source_encoded, filename_encoded, &length, &mode, &flags, transfer_id)==6) {
+		} else if(sscanf(line, "puturl %s %s %" SCNd64 " %o %s", source_encoded, filename_encoded, &length, &mode, transfer_id)==5) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			url_decode(source_encoded,source,sizeof(source));
-			r = do_put_url(filename,length,mode,source,flags);
+			r = do_put_url(filename,length,mode,source);
 			reset_idle_timer();
 			hash_table_insert(current_transfers, strdup(filename), strdup(transfer_id));
 			debug(D_VINE, "Insert ID-File pair into transfer table : %s :: %s", filename, transfer_id);
-		} else if(sscanf(line, "mini_task %"SCNd64" %s %"SCNd64" %o %d",&task_id,filename_encoded, &length, &mode, &flags)==5) {
+		} else if(sscanf(line, "mini_task %"SCNd64" %s %"SCNd64" %o",&task_id,filename_encoded, &length, &mode)==4) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			r = do_put_mini_task(manager,time(0)+active_timeout,filename,length,mode,source,flags);
+			r = do_put_mini_task(manager,time(0)+active_timeout,filename,length,mode,source);
 			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));

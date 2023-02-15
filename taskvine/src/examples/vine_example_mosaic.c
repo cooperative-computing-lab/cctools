@@ -79,12 +79,12 @@ int main(int argc, char *argv[])
 		sprintf(outfile, "%d.cat.jpg",i);
 		sprintf(command, "./convert.sfx -swirl %d cat.jpg %d.cat.jpg", i*10, i);
 
-		temp_file[i] = vine_file_temp(0);
+		temp_file[i] = vine_file_temp();
 		
 		t = vine_task_create(command);
 		vine_task_add_input_file(t, "convert.sfx", "convert.sfx", VINE_CACHE);
 		vine_task_add_input_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", VINE_CACHE );
-		vine_task_add_output(t,vine_file_clone(temp_file[i]),outfile,VINE_CACHE);
+		vine_task_add_output(t,temp_file[i],outfile,VINE_CACHE);
 
 		vine_task_set_cores(t,1);
 
@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 	for(i=0;i<36;i++) {
 		char filename[256];
 		sprintf(filename,"%d.cat.jpg",i);
-		vine_task_add_input(t,vine_file_clone(temp_file[i]),filename,VINE_CACHE);
+		vine_task_add_input(t,temp_file[i],filename,VINE_CACHE);
 	}
 	vine_task_add_input_file(t,"montage.sfx","montage.sfx",VINE_NOCACHE);
 	vine_task_add_output_file(t,"mosaic.jpg","mosaic.jpg",VINE_NOCACHE);
@@ -126,6 +126,9 @@ int main(int argc, char *argv[])
 
 	printf("Waiting for tasks to complete...\n");
 	t = vine_wait(m,VINE_WAIT_FOREVER);
+
+	vine_task_delete(t);
+	for(i=0; i<36; i++) vine_file_delete(temp_file[i]);
 	
 	printf("All tasks complete!\n");
 

@@ -46,10 +46,14 @@ if __name__ == "__main__":
         sys.exit(1)
     print("listening on port", m.port)
 
-    for i in range(0, 360, 10):
+    temp_files = []
+    for i in range(0, 36):
+        temp_files.append(vine.FileTemp())
+        
+    for i in range(0, 36):
         outfile = str(i) + ".cat.jpg"
-        command = "./convert.sfx -swirl " + str(i) + " cat.jpg " + str(i) + ".cat.jpg"
-
+        command = "./convert.sfx -swirl " + str(i*10) + " cat.jpg output.jpg"
+        
         t = vine.Task(command)
         t.add_input_file("convert.sfx", "convert.sfx", cache=True)
         t.add_input_url(
@@ -57,7 +61,7 @@ if __name__ == "__main__":
             "cat.jpg",
             cache=True,
         )
-        t.add_output_file(outfile, outfile, cache=False)
+        t.add_output(temp_files[i],"output.jpg",cache=True)
 
         t.set_cores(1)
 
@@ -75,17 +79,18 @@ if __name__ == "__main__":
 
             if r == vine.VINE_RESULT_SUCCESS:
                 print("Task " + str(id) + " complete: " + command)
-        else:
-            print("Task " + str(id) + " falied: " + command)
-
-    print("All tasks complete!")
+            else:
+                print("Task " + str(id) + " failed: " + command)
 
     print("Combining images into mosaic.jpg...")
-    os.system(
-        "montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg"
-    )
 
-    print("Deleting intermediate images...")
-    for i in range(0, 360, 10):
-        filename = str(i) + ".cat.jpg"
-        os.unlink(filename)
+    t = vine.Task("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg")
+    t.add_input_file("convert.sfx", "convert.sfx", cache=True)
+    for i in range(0, 36):
+        t.add_input(temp_files[i],str(i*10)+".cat.jpg",cache=True)
+    t.add_output_file("mosaic.jpg", cache=True)
+
+    m.submit(t)
+    t = m.wait(vine.VINE_WAIT_FOREVER)
+    
+    print("All tasks complete!")

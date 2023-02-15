@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "vine_protocol.h"
 #include "vine_task.h"
 #include "vine_file.h"
+#include "vine_mount.h"
 #include "vine_resources.h"
 #include "vine_worker_info.h"
 #include "vine_remote_file_info.h"
@@ -308,7 +309,10 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 		struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
 
 		if(!remote_info) {
-			debug(D_VINE,"warning: unexpected cache-update message for %s",cachename);
+			/*
+			If an unsolicited cache-update arrives, then the worker
+			is telling us about something from a previous run.
+			*/
 			remote_info = vine_remote_file_info_create(size,time(0));
 			hash_table_insert(w->current_files,cachename,remote_info);
 		}
@@ -890,7 +894,8 @@ static void add_worker(struct vine_manager *q)
 
 /* Delete a single file on a remote worker. */
 
-static void delete_worker_file( struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags ) {
+static void delete_worker_file( struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags )
+{
 	if(!(flags & except_flags)) {
 		vine_manager_send(q,w, "unlink %s\n", filename);
 		struct vine_remote_file_info *remote_info;
@@ -901,13 +906,12 @@ static void delete_worker_file( struct vine_manager *q, struct vine_worker_info 
 
 /* Delete all files in a list except those that match one or more of the "except_flags" */
 
-static void delete_worker_files( struct vine_manager *q, struct vine_worker_info *w, struct list *files, int except_flags ) {
-	struct vine_file *tf;
-
-	if(!files) return;
-
-	LIST_ITERATE(files,tf) {
-		delete_worker_file(q, w, tf->cached_name, tf->flags, except_flags);
+static void delete_worker_files( struct vine_manager *q, struct vine_worker_info *w, struct list *mount_list, int except_flags )
+{
+	if(!mount_list) return;
+	struct vine_mount *m;
+	LIST_ITERATE(mount_list,m) {
+		delete_worker_file(q, w, m->file->cached_name, m->flags, except_flags);
 	}
 }
 
@@ -915,15 +919,15 @@ static void delete_worker_files( struct vine_manager *q, struct vine_worker_info
 
 static void delete_task_output_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	delete_worker_files(q, w, t->output_files, 0);
+	delete_worker_files(q, w, t->output_mounts, 0);
 }
 
 /* Delete only the uncacheable output files of a given task. */
 
 static void delete_uncacheable_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t )
 {
-	delete_worker_files(q, w, t->input_files, VINE_CACHE );
-	delete_worker_files(q, w, t->output_files, VINE_CACHE );
+	delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
+	delete_worker_files(q, w, t->output_mounts, VINE_CACHE );
 }
 
 /* Determine the resource monitor file name that should be associated with this task. */
@@ -1358,12 +1362,12 @@ static vine_result_code_t get_update( struct vine_manager *q, struct vine_worker
 
 	time_t stoptime = time(0) + vine_manager_transfer_time(q,w,t,length);
 
-	struct vine_file *f;
+	struct vine_mount *m;
 	const char *local_name = 0;
 
-	LIST_ITERATE(t->output_files,f) {
-		if(!strcmp(path,f->remote_name)) {
-			local_name = f->source;
+	LIST_ITERATE(t->output_mounts,m) {
+		if(!strcmp(path,m->remote_name)) {
+			local_name = m->file->source;
 			break;
 		}
 	}
@@ -1437,7 +1441,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 
 	if(task_status == VINE_RESULT_FORSAKEN) {
 		// Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_files, VINE_CACHE );
+		delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
 
 		/* task will be resubmitted, so we do not update any of the execution stats */
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
@@ -2657,12 +2661,12 @@ this function modifies the file->substitute field to reflect that source.
 
 static int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	struct vine_file *f;
+	struct vine_mount *m;
 
-	LIST_ITERATE(t->input_files, f){
+	LIST_ITERATE(t->input_mounts, m){
 		/* Is the file already present on that worker? */
 		struct vine_remote_file_info *remote_info;
-		remote_info = hash_table_lookup(w->current_files,f->cached_name);
+		remote_info = hash_table_lookup(w->current_files,m->file->cached_name);
 		if(remote_info) continue;
 
 		char *id;
@@ -2671,13 +2675,13 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 
 		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
-		if(f->type != VINE_MINI_TASK) {
+		if(m->file->type != VINE_MINI_TASK) {
 			HASH_TABLE_ITERATE(q->worker_table, id, peer){
-				if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache) {
-					char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+				if((remote_info = hash_table_lookup(peer->current_files, m->file->cached_name)) && remote_info->in_cache) {
+					char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, m->file->cached_name);
 					if(vine_current_transfers_source_in_use(q, peer_source) < q->worker_source_max_transfers) {	
-						vine_file_delete(f->substitute);
-						f->substitute = vine_file_substitute_url(f,peer_source);
+						vine_file_delete(m->substitute);
+						m->substitute = vine_file_substitute_url(m->file,peer_source);
 						free(peer_source);
 						found_match = 1;
 						break;
@@ -2697,23 +2701,22 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		TEMPs can only fetch from peers, so no match is fatal.
 		Any other kind can be provided by the manager at dispatch.
 		*/
-		if(f->type==VINE_URL) {
+		if(m->file->type==VINE_URL) {
 			/* For a URL transfer, we can fall back to the original if capacity is available. */
-			if(vine_current_transfers_source_in_use(q, f->source) >= q->file_source_max_transfers){
-			//	debug(D_VINE,"task %lld has no ready transfer source for url %s : %d in use",(long long)t->task_id,f->source, vine_current_transfers_source_in_use(q,f->source));
+			if(vine_current_transfers_source_in_use(q, m->file->source) >= q->file_source_max_transfers){
+			//	debug(D_VINE,"task %lld has no ready transfer source for url %s : %d in use",(long long)t->task_id,m->file->source, vine_current_transfers_source_in_use(q,m->file->source));
 				return 0;
 			} else {
 				/* keep going */
 			}
-		} else if(f->type==VINE_TEMP) {
-			//  debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long long)t->task_id,f->cached_name);
+		} else if(m->file->type==VINE_TEMP) {
+			//  debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long long)t->task_id,m->file->cached_name);
 			return 0;
-		} else if(f->type==VINE_MINI_TASK) {
-			if(!vine_manager_transfer_capacity_available(q, w, f->mini_task)){
+		} else if(m->file->type==VINE_MINI_TASK) {
+			if(!vine_manager_transfer_capacity_available(q, w, m->file->mini_task)){
 				return 0;
 			}
-		}
-		else {
+		} else {
 			/* keep going */
 		}
 	}
@@ -3013,10 +3016,10 @@ static int cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, vi
 		debug(D_VINE, "Task with id %d has been cancelled at worker %s (%s) and removed.", t->task_id, w->hostname, w->addrport);
 
 		//Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_files, VINE_CACHE );
+		delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
 
 		//Delete all output files since they are not needed as the task was cancelled.
-		delete_worker_files(q, w, t->output_files, 0);
+		delete_worker_files(q, w, t->output_mounts, 0);
 
 		//update tables.
 		reap_task_from_worker(q, w, t, new_state);
@@ -3062,16 +3065,16 @@ static void vine_remove_file_internal(struct vine_manager *q, const char *filena
 		uint64_t task_id;
 		ITABLE_ITERATE(w->current_tasks,task_id,t) {
 
-			struct vine_file *f;
-			LIST_ITERATE(t->input_files,f) {
-				if(strcmp(filename, f->cached_name) == 0) {
+			struct vine_mount *m;
+			LIST_ITERATE(t->input_mounts,m) {
+				if(strcmp(filename, m->file->cached_name) == 0) {
 					cancel_task_on_worker(q, t, VINE_TASK_READY);
 					continue;
 				}
 			}
 
-			LIST_ITERATE(t->output_files,f) {
-				if(strcmp(filename, f->cached_name) == 0) {
+			LIST_ITERATE(t->output_mounts,m) {
+				if(strcmp(filename, m->file->cached_name) == 0) {
 					cancel_task_on_worker(q, t, VINE_TASK_READY);
 					continue;
 				}
@@ -4498,10 +4501,10 @@ struct list * vine_tasks_cancel(struct vine_manager *q)
 		vine_manager_send(q,w,"kill -1\n");
 		ITABLE_ITERATE(w->current_tasks,task_id,t) {
 			//Delete any input files that are not to be cached.
-			delete_worker_files(q, w, t->input_files, VINE_CACHE );
+			delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
 
 			//Delete all output files since they are not needed as the task was canceled.
-			delete_worker_files(q, w, t->output_files, 0);
+			delete_worker_files(q, w, t->output_mounts, 0);
 			reap_task_from_worker(q, w, t, VINE_TASK_CANCELED);
 
 			list_push_tail(l, t);
