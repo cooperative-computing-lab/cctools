@@ -66,6 +66,10 @@ def main():
             print(f"Network function received task: {line}", file=sys.stderr, flush=True)
             if len(line) >= 0:
                 function_name, event_size = line.split(" ")
+                sandbox = input()
+                if not sandbox:
+                    print("Unable to read sandbox: exiting", file=sys.stderr)
+                    exit(0)
                 if event_size:
                     # receive the bytes containing the event and turn it into a string
                     event_str = input()
@@ -80,16 +84,19 @@ def main():
                     print('Network function: recieved event: {}'.format(event), file=sys.stderr)
                     if exec_method == "thread":
                         # create a forked process for function handler
+                        os.chdir(sandbox)
                         q = queue.Queue()
                         p = threading.Thread(target=globals()[function_name], args=(event_str, q))
                         p.start()
                         p.join()
                         response = json.dumps(q.get())
                     elif exec_method == "direct":
+                        os.chdir(sandbox)
                         response = json.dumps(globals()[function_name](event))
                     else:
                         p = os.fork()
                         if p == 0:
+                            os.chdir(sandbox)
                             response =globals()[function_name](event)
                             os.write(write, json.dumps(response).encode("utf-8"))
                             os._exit(-1)
