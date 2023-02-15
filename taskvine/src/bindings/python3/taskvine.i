@@ -29,7 +29,7 @@ long long int is guaranteed to be at least 64bit. */
 %ignore debug;
 
 /* return a char*, enable automatic free */
-%newobject vine_status;
+%newobject vine_get_status;
 %newobject vine_get_runtime_path_staging;
 
 /* These return pointers to lists defined in list.h. We aren't

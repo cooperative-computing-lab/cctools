@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "vine_watcher.h"
 #include "vine_process.h"
 #include "vine_file.h"
+#include "vine_mount.h"
 
 #include "list.h"
 #include "debug.h"
@@ -86,17 +87,17 @@ directory chosen for the running process.
 
 void vine_watcher_add_process( struct vine_watcher *w, struct vine_process *p )
 {
-	struct vine_file *f;
+	struct vine_mount *m;
+	
+	LIST_ITERATE(p->task->output_mounts,m) {
 
-	LIST_ITERATE(p->task->output_files,f) {
-
-		if(f->flags & VINE_WATCH) {
+		if(m->flags & VINE_WATCH) {
 
 			struct entry *e;
 			e = entry_create(
 				p->task->task_id,
-				string_format("%s/%s",p->sandbox,f->remote_name),
-				strdup(f->remote_name)
+				string_format("%s/%s",p->sandbox,m->remote_name),
+				strdup(m->remote_name)
 			);
 
 			list_push_tail(w->watchlist,e);

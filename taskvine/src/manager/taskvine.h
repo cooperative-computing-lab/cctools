@@ -480,6 +480,13 @@ const char * vine_task_get_command( struct vine_task *t );
 
 const char * vine_task_get_tag( struct vine_task *t );
 
+/** Get the category associated with the task.
+@param t A task object.
+@return The category string set by @ref vine_task_set_category.
+*/
+
+const char * vine_task_get_category( struct vine_task *t );
+
 /** Get the unique ID of the task.
 @param t A task object.
 @return The integer task ID assigned at creation time.
@@ -610,7 +617,7 @@ All fields but label are optional.
 
             events:
             label        Name that identifies the snapshot. Only alphanumeric, -,
-                         and _ characters are allowed. 
+                         and _ characters are allowed.
             on-create    Take a snapshot every time the file is created. Default: false
             on-truncate  Take a snapshot when the file is truncated.    Default: false
             pattern      Take a snapshot when a line matches the regexp pattern.    Default: none
@@ -647,13 +654,10 @@ struct vine_file * vine_file_url( const char *url );
 /** Create a scratch file object.
 A scratch file has no initial content, but is created
 as the output of a task, and may be consumed by other tasks.
-@param unique_name If desired, the user may manually assign
-a globally-unique name to this file.  If null, the system will
-assign an internal unique name.  (recommended)
 @return A general file object for use by @ref vine_task_add_input.
 */
 
-struct vine_file * vine_file_temp( const char *unique_name );
+struct vine_file * vine_file_temp();
 
 /** Create a file object from a data buffer.
 @param name The abstract name of the buffer.
@@ -703,7 +707,7 @@ struct vine_file * vine_file_unstarch( struct vine_file *f );
 @return A clone of the argument f.
 */
 
-struct vine_file *vine_file_clone( const struct vine_file *f );
+struct vine_file *vine_file_clone( struct vine_file *f );
 
 /** Delete a file object.
 @param f A file object.
@@ -928,18 +932,25 @@ Completed tasks waiting for retrieval are not affected.
 */
 void vine_remove_file(struct vine_manager *m, struct vine_file *f );
 
-/** Get manager statistics (only from manager).
+/** Get manager statistics (only from manager)
 @param m A manager object
-@param s A pointer to a buffer that will be filed with statistics.
+@param s A pointer to a buffer that will be filed with statistics
 */
 void vine_get_stats(struct vine_manager *m, struct vine_stats *s);
 
 /** Get the task statistics for the given category.
 @param m A manager object
-@param c A category name.
-@param s A pointer to a buffer that will be filed with statistics.
+@param c A category name
+@param s A pointer to a buffer that will be filed with statistics
 */
 void vine_get_stats_category(struct vine_manager *m, const char *c, struct vine_stats *s);
+
+
+/** Get manager information as json
+@param m A manager object
+@param request One of: queue, tasks, workers, or categories
+*/
+char *vine_get_status(struct vine_manager *m, const char *request);
 
 
 /** Summary data for all workers in buffer.
