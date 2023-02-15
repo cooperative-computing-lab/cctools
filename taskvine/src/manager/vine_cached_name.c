@@ -107,6 +107,22 @@ static vine_url_cache_t get_url_properties( const char *url, char *tag )
 	vine_url_cache_t val = VINE_FOUND_URL;
 	char line[VINE_LINE_MAX];
 
+	/*
+	Odd hack: We occasionally use file:// URLs with curl as
+	a roundabout way of getting a worker to side-load a file
+	from a shared filesystem.  In that case, there is no server
+	to get headers from.  Instead, just have the manager checksum directly.
+	*/
+
+	if(!strncmp(url,"file://",7)) {
+		char *hash = md5_file_or_dir(&url[7]);
+		strcpy(tag,hash);
+		free(hash);
+		return VINE_FOUND_MD5;
+	}
+
+	/* Otherwise, proceed to use curl to get the headers. */
+	
 	char *command = string_format("curl -I -sSL i --verbose --stderr /dev/stdout \"%s\"",url);
 
 	FILE *stream = popen(command, "r");
