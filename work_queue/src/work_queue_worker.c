@@ -2402,8 +2402,11 @@ static void show_help(const char *cmd)
 	printf(" %-30s Single-shot mode -- quit immediately after disconnection.\n", "--single-shot");
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
+
+	/* hide coprocess from current release
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
 	printf( " %-30s Specify the number of coprocesses for serverless functions that the worker should maintain. A coprocess must be specified.\n", "--coprocesses-total=<number>");
+	*/
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
