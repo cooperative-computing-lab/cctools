@@ -1590,6 +1590,8 @@ cat <<EOF >>config.mk
 CCTOOLS_HOME=${source_path}
 CCTOOLS_INSTALL_DIR=${install_path}
 
+CCTOOLS_OPSYS=${BUILD_SYS}
+
 CCTOOLS_PACKAGES=${packages}
 
 CCTOOLS_CC=${CCTOOLS_CC}
