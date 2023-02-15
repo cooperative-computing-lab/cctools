@@ -5,6 +5,8 @@ set -e
 
 import_config_val CCTOOLS_PYTHON_TEST_EXEC
 import_config_val CCTOOLS_PYTHON_TEST_DIR
+import_config_val CCTOOLS_OPSYS
+
 PONCHO_PACKAGE_SERVERIZE=$(cd "$(dirname "$0")/../../poncho/src/"; pwd)/poncho_package_serverize
 
 export PYTHONPATH=$(pwd)/../src/bindings/${CCTOOLS_PYTHON_TEST_DIR}:$PYTHONPATH
@@ -16,6 +18,7 @@ check_needed()
 {
 	[ -n "${CCTOOLS_PYTHON_TEST_EXEC}" ] || return 1
 	"${CCTOOLS_PYTHON_TEST_EXEC}" -c "import dill" || return 1
+	[ "${CCTOOLS_OPSYS}" = DARWIN ] && return 1
 
 	return 0
 }
