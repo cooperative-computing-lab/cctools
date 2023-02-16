@@ -1278,7 +1278,7 @@ then
 		openssl_static_ldflags="${openssl_path}/lib/libssl.a ${openssl_path}/lib/libcrypto.a"
 	fi
 
-	report_detection openssl_static "${openssl_static_avail}" auto "${CONDA_PREFIX}"
+	report_detection openssl_static "${openssl_static_avail}" auto "${openssl_path}"
 fi
 
 
@@ -1754,6 +1754,7 @@ printf "%-15s %3s\n" ext2fs ${ext2fs_avail}
 printf "%-15s %3s\n" fuse ${fuse_avail}
 printf "%-15s %3s\n" "makeflow mpi" ${mpi_avail}
 printf "%-15s %3s\n" openssl ${openssl_avail}
+printf "%-15s %3s\n" openssl_static ${openssl_static_avail}
 printf "%-15s %3s\n" readline ${readline_avail}
 
 echo ""
