@@ -68,8 +68,6 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
-
 	printf("setting up input files...\n");
 	struct vine_file *script = vine_file_local("vine_example_gutenberg_script.sh");
 	struct vine_file *files[URL_COUNT];
