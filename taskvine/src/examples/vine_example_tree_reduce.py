@@ -15,11 +15,7 @@ lists = [[1,10,10000,100,1000],
         [12,34,56,78,90]]
 
 if __name__ == "__main__":
-    try:
-        m = vine.Manager()
-    except IOError as e:
-        print("couldn't create manager:", e.errno)
-        sys.exit(1)
+    m = vine.Manager()
     print("listening on port", m.port)
 
     m.set_scheduler(vine.VINE_SCHEDULE_FILES)

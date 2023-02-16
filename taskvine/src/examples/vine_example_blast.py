@@ -27,11 +27,7 @@ blast_url = "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-b
 landmark_url = "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz"
 
 if __name__ == "__main__":
-    try:
-        m = vine.Manager()
-    except IOError as e:
-        print("couldn't create manager:", e.errno)
-        sys.exit(1)
+    m = vine.Manager()
     print("listening on port", m.port)
 
     m.set_scheduler(vine.VINE_SCHEDULE_FILES)

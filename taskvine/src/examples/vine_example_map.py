@@ -14,11 +14,7 @@ birthyears = [[2017,2019,2015,2018,2020],
             [1980,1975,1978,1983,1977]]
 
 if __name__ == "__main__":
-    try:
-        m = vine.Manager()
-    except IOError as e:
-        print("couldn't create manager:", e.errno)
-        sys.exit(1)
+    m = vine.Manager()
     print("listening on port", m.port)
 
     m.set_scheduler(vine.VINE_SCHEDULE_FILES)

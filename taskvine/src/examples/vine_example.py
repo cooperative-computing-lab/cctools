@@ -40,12 +40,7 @@ if __name__ == "__main__":
     # We create the tasks queue using the default port. If this port is already
     # been used by another program, you can try setting port = 0 to use an
     # available port.
-    try:
-        q = vine.Manager()
-    except Exception:
-        print("Instantiation of taskvine Manager failed!")
-        raise
-
+    q = vine.Manager()
     print("listening on port %d..." % q.port)
 
     # We create and dispatch a task for each filename given in the argument list
