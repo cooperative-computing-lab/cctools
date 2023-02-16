@@ -34,7 +34,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	f->type = type;
 	f->length = length;
 	f->mini_task = mini_task;
-	
+
 	if(data) {
 		f->data = malloc(length);
 		memcpy(f->data,data,length);
@@ -56,7 +56,7 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	debug(D_VINE,"cached name: %s\n",f->cached_name);
 
 	f->refcount = 1;
-	
+
 	return f;
 }
 
@@ -80,7 +80,7 @@ void vine_file_delete(struct vine_file *f)
 
 	f->refcount--;
 	if(f->refcount>0) return;
-	
+
 	vine_task_delete(f->mini_task);
 	free(f->source);
 	free(f->cached_name);
@@ -133,7 +133,7 @@ struct vine_file * vine_file_untar( struct vine_file *f )
 
 struct vine_file * vine_file_unponcho( struct vine_file *f)
 {
-	struct vine_task *t  = vine_task_create("./poncho_package_run --unpack-to output -e package.tar.gz");
+	struct vine_task *t = vine_task_create("./poncho_package_run --unpack-to output -e package.tar.gz");
 	char * poncho_path = path_which("poncho_package_run");
 	vine_task_add_input(t, vine_file_local(poncho_path), "poncho_package_run", VINE_CACHE);
 	vine_task_add_input(t, f, "package.tar.gz", VINE_CACHE);
@@ -149,3 +149,5 @@ struct vine_file * vine_file_unstarch( struct vine_file *f )
 	return vine_file_mini_task(t);
 }
 
+
+/* vim: set noexpandtab tabstop=4: */

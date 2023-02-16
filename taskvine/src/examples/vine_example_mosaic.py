@@ -39,21 +39,17 @@ if __name__ == "__main__":
         print(sys.argv[0], ": failed to run starch, is it in your PATH?")
         sys.exit(1)
 
-    try:
-        m = vine.Manager()
-    except IOError as e:
-        print("couldn't create manager:", e.errno)
-        sys.exit(1)
+    m = vine.Manager()
     print("listening on port", m.port)
 
     temp_files = []
     for i in range(0, 36):
         temp_files.append(vine.FileTemp())
-        
+
     for i in range(0, 36):
         outfile = str(i) + ".cat.jpg"
         command = "./convert.sfx -swirl " + str(i*10) + " cat.jpg output.jpg"
-        
+
         t = vine.Task(command)
         t.add_input_file("convert.sfx", "convert.sfx", cache=True)
         t.add_input_url(
@@ -92,5 +88,5 @@ if __name__ == "__main__":
 
     m.submit(t)
     t = m.wait(vine.VINE_WAIT_FOREVER)
-    
+
     print("All tasks complete!")
