@@ -26,8 +26,10 @@ if __name__ == "__main__":
 
     try:
         convert = sys.argv[1]
+        montage = sys.argv[2]
     except IndexError:
         convert = "/usr/bin/convert"
+        montage = "/usr/bin/montage"
 
     print(f"Checking that {convert} is installed...")
     if not os.access(convert, os.X_OK):
@@ -39,6 +41,11 @@ if __name__ == "__main__":
         print(sys.argv[0], ": failed to run starch, is it in your PATH?")
         sys.exit(1)
 
+    print(f"Converting {montage} into montage.sfx...")
+    if os.system(f"starch -x {montage} -c montage montage.sfx") != 0:
+        print(sys.argv[0], ": failed to run starch, is it in your PATH?")
+        sys.exit(1)
+
     m = vine.Manager()
     print("listening on port", m.port)
 
@@ -46,17 +53,17 @@ if __name__ == "__main__":
     for i in range(0, 36):
         temp_files.append(vine.FileTemp())
 
+    montage_file = vine.FileLocal("montage.sfx");
+    convert_file = vine.FileLocal("convert.sfx");
+    image_file = vine.FileURL("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg");
+    
     for i in range(0, 36):
         outfile = str(i) + ".cat.jpg"
         command = "./convert.sfx -swirl " + str(i*10) + " cat.jpg output.jpg"
 
         t = vine.Task(command)
-        t.add_input_file("convert.sfx", "convert.sfx", cache=True)
-        t.add_input_url(
-            "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg",
-            "cat.jpg",
-            cache=True,
-        )
+        t.add_input(convert_file, "convert.sfx", cache=True)
+        t.add_input(image_file,"cat.jpg",cache=True)
         t.add_output(temp_files[i],"output.jpg",cache=True)
 
         t.set_cores(1)
@@ -81,10 +88,10 @@ if __name__ == "__main__":
     print("Combining images into mosaic.jpg...")
 
     t = vine.Task("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg")
-    t.add_input_file("convert.sfx", "convert.sfx", cache=True)
+    t.add_input(montage_file, "montage.sfx", cache=True)
     for i in range(0, 36):
-        t.add_input(temp_files[i],str(i*10)+".cat.jpg",cache=True)
-    t.add_output_file("mosaic.jpg", cache=True)
+        t.add_input(temp_files[i],str(i*10)+".cat.jpg",cache=False)
+    t.add_output_file("mosaic.jpg", cache=False)
 
     m.submit(t)
     t = m.wait(vine.VINE_WAIT_FOREVER)
