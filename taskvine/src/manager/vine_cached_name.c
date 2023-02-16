@@ -91,8 +91,8 @@ should not be cached. That is, generating a cachename could lead to possible con
 
 typedef enum {
 	VINE_FOUND_NONE,
-	VINE_FOUND_LM,
-	VINE_FOUND_ET,
+	VINE_FOUND_LAST_MODIFIED,
+	VINE_FOUND_ETAG,
 	VINE_FOUND_MD5,
 } vine_url_cache_t;
 
@@ -139,17 +139,17 @@ static vine_url_cache_t get_url_properties( const char *url, char *tag )
 			val = VINE_FOUND_MD5;
 			break;
 		}
-		if(val < VINE_FOUND_ET && sscanf(line, "ETag: %s",tag)){
-			val = VINE_FOUND_ET;
+		if(val < VINE_FOUND_ETAG && sscanf(line, "ETag: %s",tag)){
+			val = VINE_FOUND_ETAG;
 		}
-		if(val < VINE_FOUND_ET && sscanf(line, "etag: %s",tag)){
-			val = VINE_FOUND_ET;
+		if(val < VINE_FOUND_ETAG && sscanf(line, "etag: %s",tag)){
+			val = VINE_FOUND_ETAG;
 		}
-		if(val < VINE_FOUND_LM && sscanf(line, "Last-Modified: %s",tag)){
-			val = VINE_FOUND_LM;
+		if(val < VINE_FOUND_LAST_MODIFIED && sscanf(line, "Last-Modified: %s",tag)){
+			val = VINE_FOUND_LAST_MODIFIED;
 		}
-		if(val < VINE_FOUND_LM && sscanf(line, "last-modified: %s",tag)){
-			val = VINE_FOUND_LM;
+		if(val < VINE_FOUND_LAST_MODIFIED && sscanf(line, "last-modified: %s",tag)){
+			val = VINE_FOUND_LAST_MODIFIED;
 		}
 	}
 
@@ -199,7 +199,7 @@ static char *make_url_cached_name( const struct vine_file *f )
 			hash = md5_string(digest);
 			free(content);
 			break;
-		case VINE_FOUND_LM:
+		case VINE_FOUND_LAST_MODIFIED:
 			/* Checksum the URL and last-modified-time. */
 			method = "md5-lm";
 			content = string_format("%s-%s",f->source,tag);
@@ -207,7 +207,7 @@ static char *make_url_cached_name( const struct vine_file *f )
 			hash = md5_string(digest);
 			free(content);
 			break;
-		case VINE_FOUND_ET:
+		case VINE_FOUND_ETAG:
 			/* Checksum the URL and ETag. */
 			method = "md5-et";
 			content = string_format("%s-%s",f->source,tag);
