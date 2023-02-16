@@ -24,8 +24,6 @@ if __name__ == "__main__":
     m = vine.Manager()
     print("listening on port", m.port)
 
-    m.set_scheduler(vine.VINE_SCHEDULE_FILES)
-
     for i in range(10):
         t = vine.Task("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file")
 

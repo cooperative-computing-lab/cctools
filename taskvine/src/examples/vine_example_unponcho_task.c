@@ -32,8 +32,6 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
-
 	struct vine_file *package = vine_file_local("package.tar.gz");
 	struct vine_file *poncho = vine_file_local("poncho_package_run");
 	struct vine_file *script = vine_file_local("python_example.py");

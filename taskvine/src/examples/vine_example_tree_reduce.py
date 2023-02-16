@@ -18,8 +18,6 @@ if __name__ == "__main__":
     m = vine.Manager()
     print("listening on port", m.port)
 
-    m.set_scheduler(vine.VINE_SCHEDULE_FILES)
-
     print("reducing arrays...")
 
     for i in range(len(lists)):

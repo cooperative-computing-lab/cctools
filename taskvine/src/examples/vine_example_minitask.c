@@ -34,8 +34,6 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
-
 	struct vine_file *package = vine_file_untar(vine_file_url(CCTOOLS_URL));
 
 	for(i=0;i<10;i++) {

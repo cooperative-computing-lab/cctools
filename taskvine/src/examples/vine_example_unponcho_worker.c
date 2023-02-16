@@ -32,9 +32,6 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
-	vine_set_name(m, "bslydelg_test");
-
 	for(i=0;i<5;i++) {
 
 		struct vine_task *task = vine_task_create("./poncho_package_run -d -e package python python_example.py");
