@@ -384,7 +384,7 @@ def plot_cache_updates(zero):
 
 def plot_workers(title='Worker Info', all_info=False, save=None, cache_updates=False, flip=False, resources=False, 
                     marked_done=False, input_transfers=False, output_transfers=False, xticks=None, yticks=None, 
-                    zero=None, worker_time=False):
+                    zero=["default"], worker_time=False):
     count = 0
     start = "start"
     stop = "stop"
@@ -409,7 +409,7 @@ def plot_workers(title='Worker Info', all_info=False, save=None, cache_updates=F
     widths2 = []
     lefts = []
     lefts2 = []
-    zero = []
+    zero = zero[0]
     # PLOT CACHE UPDATES
     if all_info or cache_updates:
         plot_cache_updates(zero)
@@ -545,7 +545,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', action='store_true', help='display tasks sent')
     parser.add_argument('-x', nargs=3, help='change scale for x ticks -x <start> <step_size> <steps>')
     parser.add_argument('-y', nargs=3, help='change scale for y ticks -y <start> <step_size> <steps>')
-    parser.add_argument('-z', nargs=1, help='changes refrence point for 0 Default: manager start (WorkerFirstTask|ManagerFirstTask)')
+    parser.add_argument('-z', nargs=1, help='changes refrence point for 0 Default: manager start (WorkerFirstTask|ManagerFirstTask)', default=["default"])
     parser.add_argument('--worker-time', action='store_true', help='uses time measured on worker')
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
     args = parser.parse_args()
