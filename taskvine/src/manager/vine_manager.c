@@ -3184,7 +3184,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
 
-	q->worker_selection_algorithm = VINE_SCHEDULE_FCFS;
+	q->worker_selection_algorithm = VINE_SCHEDULE_FILES;
 	q->process_pending_check = 0;
 
 	q->short_timeout = 5;
