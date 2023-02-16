@@ -3139,7 +3139,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->manager_link = link_serve(port);
 	if(!q->manager_link) {
-		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
+		debug(D_NOTICE, "Could not create manager on port %i.", port);
 		free(q);
 		return 0;
 	} else {
