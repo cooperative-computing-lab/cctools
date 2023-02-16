@@ -5,6 +5,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create a packed environment from a spec.')
     parser.add_argument('spec', help='Read in a spec file, or - for stdin.')
     parser.add_argument('output', help='Write output from conda-pack to the given file.')
+    parser.add_argument('-m', action='store_true', help='Uses mamba instead of conda')
 
     args = parser.parse_args()
-    create.pack_env(args.spec, output=args.output)
+    create.pack_env(args.spec, output=args.output, mamba=args.m)

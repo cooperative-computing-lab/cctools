@@ -20,9 +20,9 @@ from packaging import version
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+executable = 'conda'
 
-
-def pack_env(spec, output):
+def pack_env(spec, output, mamba):
 
     # record packages installed as editable from pip
     local_pip_pkgs = _find_local_pip()
@@ -30,6 +30,12 @@ def pack_env(spec, output):
     with tempfile.TemporaryDirectory() as env_dir:
         logger.info('Creating temporary environment in {}'.format(env_dir))
 
+        # Checks for a mamba executable if specified
+        logger.info('Using mamba for environment creation...')
+        if mamba:
+            _check_mamba(env_dir)
+
+        print(executable)
         # creates conda spec file from poncho spec file
         logger.info('Converting spec file...')
         conda_spec = create_conda_spec(spec, env_dir, local_pip_pkgs)
@@ -43,7 +49,10 @@ def pack_env(spec, output):
 
         # create conda environment in temp directory
         logger.info('Populating environment...')
-        _run_conda_command(env_dir, 'env create', '--file', env_dir + '/conda_spec.yml')
+        if mamba:
+            _run_conda_command(env_dir, 'create', '--file', env_dir + '/conda_spec.yml', '--yes')
+        else:
+            _run_conda_command(env_dir, 'env create', '--file', env_dir + '/conda_spec.yml')
 
         logger.info('Adding local packages...')
         for (name, path) in conda_spec['pip_local'].items():
@@ -61,9 +70,33 @@ def pack_env(spec, output):
     return output
 
 
+
+def _check_mamba(env_dir):
+
+    mamba_exec = shutil.which('mamba')
+
+    global executable
+    if mamba_exec:
+        logger.info('mamba executable found within path...')
+        executable = mamba_exec
+    else:
+        logger.info('mamba executable not found within path...')
+        logger.info('retrieving micromamba...')
+        curl_out = env_dir + '/curl_out'
+        tar_out = env_dir + '/micromamba'
+        os.mkdir(tar_out)
+        subprocess.check_output(['curl', '-Ls', 'https://micro.mamba.pm/api/micromamba/linux-64/latest', '-o', curl_out])
+        subprocess.check_output(['tar', '-xvjf', curl_out, '-C', tar_out])
+        executable = tar_out + '/bin/micromamba'
+
+
 def _run_conda_command(environment, command, *args):
-    all_args = ['conda'] + command.split()
-    all_args = all_args + ['--prefix={}'.format(str(environment))] + list(args)
+    all_args = [executable] + command.split()
+    
+    if executable == 'conda':
+        all_args = all_args + ['--prefix={}'.format(str(environment))] + list(args)
+    else:
+        all_args = all_args + ['--prefix={}/env'.format(str(environment))] + list(args)
 
     try:
         subprocess.check_output(all_args)
@@ -248,6 +281,8 @@ def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
             logger.warning("pip package {} was found as pip --editable, but it is not part of the spec. Ignoring local installation.".format(pip_name))
 
     with open(out_dir + '/conda_spec.yml',  'w') as jf:
+        json.dump(conda_spec, jf, indent=4)
+    with open('./conda_spec.yml',  'w') as jf:
         json.dump(conda_spec, jf, indent=4)
 
     # adding local pips to the spec after writing file, as conda complains of
