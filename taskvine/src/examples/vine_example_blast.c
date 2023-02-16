@@ -12,7 +12,7 @@ and landmark database from NCBI, and then performs a short query.
 
 The query is provided by a string (but presented to the task as a file.)
 Both the downloads are automatically unpacked, cached, and shared
-with all the same tasks on the worker.
+across all workers efficiently.
 */
 
 
@@ -41,8 +41,8 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
-    //runtime logs will be written to vine_example_blast_info/%Y-%m-%dT%H:%M:%S
-    vine_set_runtime_info_path("vine_example_blast_info");
+	//runtime logs will be written to vine_example_blast_info/%Y-%m-%dT%H:%M:%S
+	vine_set_runtime_info_path("vine_example_blast_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
