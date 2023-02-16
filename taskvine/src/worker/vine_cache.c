@@ -85,22 +85,21 @@ void vine_cache_load(struct vine_cache *c)
 		while((d=readdir(dir))){
 			if(!strcmp(d->d_name,".")) continue;
 			if(!strcmp(d->d_name,"..")) continue;
-			debug(D_VINE, "found %s in cache at: %s",d->d_name, c->cache_dir);
+
+			debug(D_VINE, "found %s in cache",d->d_name);
+
 			struct stat info;
 			int64_t nbytes, nfiles;
 			char *cache_path = vine_cache_full_path(c,d->d_name);
+
 			if(stat(cache_path, &info)==0){
 				if(S_ISREG(info.st_mode)){
 					vine_cache_addfile(c, info.st_size, info.st_mode, d->d_name);
-					debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
-				}
-				else if(S_ISDIR(info.st_mode)){
+				} else if(S_ISDIR(info.st_mode)){
                 			path_disk_size_info_get(cache_path,&nbytes,&nfiles); 
 					vine_cache_addfile(c, nbytes, info.st_mode, d->d_name);
-					debug(D_VINE,"loaded: %s into cache at: %s", d->d_name, c->cache_dir);
 				}
-			}	
-			else{
+			} else {
 				debug(D_VINE,"could not stat: %s in cache: %s error %s", d->d_name, c->cache_dir, strerror(errno));
 			}
 			free(cache_path);	
@@ -117,7 +116,6 @@ void vine_init_update(struct vine_cache *c, struct link *manager)
 	struct cache_file *f;
 	char * cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f){
-		debug(D_VINE,"sending cache update to manager cachename: %s source %s", cachename, f->source);
 		timestamp_t transfer_time = timestamp_get();
 		vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time);
 	}
