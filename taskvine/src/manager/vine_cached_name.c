@@ -128,7 +128,7 @@ static vine_url_cache_t get_url_properties( const char *url, char *tag )
 
 	/* Otherwise, proceed to use curl to get the headers. */
 	
-	char *command = string_format("curl -I -sSL i --verbose --stderr /dev/stdout \"%s\"",url);
+	char *command = string_format("curl -IL --verbose --stderr /dev/stdout \"%s\"",url);
 
 	FILE *stream = popen(command, "r");
 
