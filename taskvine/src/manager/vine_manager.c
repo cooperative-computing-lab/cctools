@@ -3234,6 +3234,10 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
+	
+	q->receives = 1;
+	q->prefer_receives = 0;
+	q->receive_all_from_worker = 1;
 
 	q->proportional_resources = 1;
 	q->proportional_whole_tasks = 1;
@@ -4224,7 +4228,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// retrieve results from workers
 		N = hash_table_size(q->workers_with_available_results);
 		if(N > 0) {
-			int task_ready = task_state_any(q, VINE_TASK_READY);
+			int task_ready = !!task_state_any(q, VINE_TASK_READY);
 			int receives = q->receives;
 			int received = 0;
 			char *key;
@@ -4235,7 +4239,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				hash_table_remove(q->workers_with_available_results, key);
 				hash_table_firstkey(q->workers_with_available_results);
 				if(q->receive_all_from_worker){
-						recieve_all_tasks_from_worker(q, w);
+						receive_all_tasks_from_worker(q, w);
 						received++;
 						events++;
 						compute_manager_load(q, 1);
@@ -4246,21 +4250,21 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			if(q->receive_all_from_worker && q->prefer_receives) continue;	
 		}
 		// recieve one task from any worker
-		if(!q->receieve_all_from_worker){
-				int tasks_received = 0
+		if(!q->receive_all_from_worker){
+				int tasks_received = 0;
 				result = receive_one_task(q);
 				if(result){
 					tasks_received++;
 					events++;
 					compute_manager_load(q, 1);
-						while(result && tasks_recieved < q->receives){
+						while(result && tasks_received < q->receives){
 							result = receive_one_task(q);
-							if result{
+							if(result){
 								tasks_received++;
 								compute_manager_load(q, 1);
 							}
 					}
-					if(q->prefer->receives) continue;
+					if(q->prefer_receives) continue;
 				}
 		}
 
@@ -4654,7 +4658,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "set-receives")) {
+	} else if(!strcmp(name, "receives")) {
 		q->receives = MAX(1, (int)value);
 
 	} else if(!strcmp(name, "prefer-receives")) {
