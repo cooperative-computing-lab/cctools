@@ -19,7 +19,7 @@ years = [3000,3010]
 ###############################
 ##########  STAGE 0 ##########
 ###############################
-print 'Stage 0'
+print('Stage 0')
 
 folder = './simulated_data/'
 f = []
@@ -70,7 +70,7 @@ for year in years:
     for i in range(0,concurrency):
         key_sorted_data[year].append( [] )
 
-print 'Stage 3'
+print('Stage 3')
 
 
 map_all = prune.file_add( 'map_all' )
@@ -111,7 +111,7 @@ for u in range(0,concurrency):
         year_ar[ year ] = []
     year_blocks.append( year_ar )
 
-print 'Stage 4'
+print('Stage 4')
 
 for u in range(0,concurrency):
 
@@ -164,7 +164,7 @@ prune.export( year_blocks[ 0 ][ 3000 ], 'year_blocks.%i.%i.txt'%(0,3000) )
 
 blocks = []
 
-print 'Stage 5'
+print('Stage 5')
 
 for u in range(0,concurrency):
     blocks.append( {} )
@@ -206,7 +206,7 @@ prune.export( blocks[ 0 ][ 6010 ], 'blocks.0.6010.txt' )
 
 grouped_blocks = []
 
-print 'Stage 6'
+print('Stage 6')
 
 dups = prune.file_add( 'dups' )
 for u in range(0,concurrency):
@@ -243,7 +243,7 @@ prune.export( grouped_blocks[ 1 ][ 6010 ], 'grouped_blocks.1.6010.txt' )
 
 matched_blocks = []
 final_ids = []
-print 'Stage 7'
+print('Stage 7')
 
 matches = prune.file_add( 'matches' )
 for u in range(0,concurrency):
@@ -261,7 +261,7 @@ for u in range(0,concurrency):
 
             final_ids.append( block_matches )
 
-print 'final_ids = %s' % (final_ids)
+print('final_ids = %s' % (final_ids))
 
 
 ###### Execute the workflow ######
