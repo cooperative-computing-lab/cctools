@@ -84,7 +84,7 @@ typedef enum {
 
 typedef enum {
 	VINE_TASK_UNKNOWN = 0,       /**< There is no such task **/
-	VINE_TASK_READY,             /**< Task is ready to be run, waiting in queue **/
+	VINE_TASK_READY,             /**< Task is ready to be run, waiting in manager **/
 	VINE_TASK_RUNNING,           /**< Task has been dispatched to some worker **/
 	VINE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
 	VINE_TASK_RETRIEVED,         /**< Task results are available at the manager **/
@@ -147,7 +147,7 @@ struct vine_stats {
 	int tasks_with_results;   /**< Number of tasks with retrieved results and waiting to be returned to user. */
 
 	/* Cumulative stats for tasks: */
-	int tasks_submitted;           /**< Total number of tasks submitted to the queue. */
+	int tasks_submitted;           /**< Total number of tasks submitted to the manager. */
 	int tasks_dispatched;          /**< Total number of tasks dispatch to workers. */
 	int tasks_done;                /**< Total number of tasks completed and returned to user. (includes tasks_failed) */
 	int tasks_failed;              /**< Total number of tasks completed and returned to user with result other than VINE_RESULT_SUCCESS. */
@@ -164,7 +164,7 @@ struct vine_stats {
 	timestamp_t time_send_good;    /**< Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS. */
 	timestamp_t time_receive_good; /**< Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS. */
 	timestamp_t time_status_msgs;  /**< Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. */
-	timestamp_t time_internal;     /**< Total time the queue spents in internal processing. */
+	timestamp_t time_internal;     /**< Total time the manager spents in internal processing. */
 	timestamp_t time_polling;      /**< Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message). */
 	timestamp_t time_application;  /**< Total time spent outside vine_wait. */
 
@@ -437,7 +437,7 @@ void vine_task_set_category(struct vine_task *t, const char *category);
 */
 void vine_task_add_feature(struct vine_task *t, const char *name);
 
-/** Specify the priority of this task relative to others in the queue.
+/** Specify the priority of this task relative to others in the manager.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list, regardless of the priority.
 @param t A task object.
 @param priority The priority of the task.
@@ -948,7 +948,7 @@ void vine_get_stats_category(struct vine_manager *m, const char *c, struct vine_
 
 /** Get manager information as json
 @param m A manager object
-@param request One of: queue, tasks, workers, or categories
+@param request One of: manager, tasks, workers, or categories
 */
 char *vine_get_status(struct vine_manager *m, const char *request);
 

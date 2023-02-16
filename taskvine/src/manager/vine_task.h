@@ -97,5 +97,6 @@ void vine_task_check_consistency( struct vine_task *t );
 const char *vine_task_state_to_string( vine_task_state_t task_state );
 
 struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t );
+char * vine_task_to_json(struct vine_task *t);
 
 #endif

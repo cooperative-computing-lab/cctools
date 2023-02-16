@@ -26,7 +26,7 @@ EOF
 	port=`cat master.port`
 
 	echo "starting worker"
-	vine_worker -o worker.log localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
+	vine_worker -o worker.log -d all localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
 
 	echo "checking for output"
 	i=0
