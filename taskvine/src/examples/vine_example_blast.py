@@ -16,15 +16,9 @@
 import taskvine as vine
 import sys
 
-query_string = """>P01013 GENE X PROTEIN (OVALBUMIN-RELATED)
-QIKDLLVSSSTDLDTTLVLVNAIYFKGMWKTAFNAEDTREMPFHVTKQESKPVQMMCMNNSFNVATLPAE
-KMKILELPFASGDLSMLVLLPDEVSDLERIEKTINFEKLTEWTNPNTMEKRRVKVYLPQMKIEEKYNLTS
-VLMALGMTDLFIPSANLTGISSAESLKISQAVHGAFMELSEDGIEMAGSTGVIEDIKHSPESEQFRADHP
-FLFLIKHNPTNTIVYFGRYWSP"""
-
-blast_url = "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz"
-
-landmark_url = "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz"
+query = vine.FileBuffer("query",">P01013 GENE X PROTEIN (OVALBUMIN-RELATED)\nQIKDLLVSSSTDLDTTLVLVNAIYFKGMWKTAFNAEDTREMPFHVTKQESKPVQMMCMNNSFNVATLPAE\nKMKILELPFASGDLSMLVLLPDEVSDLERIEKTINFEKLTEWTNPNTMEKRRVKVYLPQMKIEEKYNLTS\nVLMALGMTDLFIPSANLTGISSAESLKISQAVHGAFMELSEDGIEMAGSTGVIEDIKHSPESEQFRADHP\nFLFLIKHNPTNTIVYFGRYWSP")
+blast = vine.FileUntar(vine.FileURL("https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz"))
+landmark = vine.FileUntar(vine.FileURL("https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz"))
 
 if __name__ == "__main__":
     m = vine.Manager()
@@ -33,13 +27,11 @@ if __name__ == "__main__":
     m.set_scheduler(vine.VINE_SCHEDULE_FILES)
 
     for i in range(10):
-        t = vine.Task(
-            "blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file"
-        )
+        t = vine.Task("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file")
 
-        t.add_input_buffer(query_string, "query.file", cache=True)
-        t.add_input(vine.FileUntar(vine.FileURL(blast_url)), "blastdir", cache=True )
-        t.add_input(vine.FileUntar(vine.FileURL(landmark_url)), "landmark", cache=True )
+        t.add_input(query, "query.file", cache=True)
+        t.add_input(blast, "blastdir", cache=True )
+        t.add_input(landmark, "landmark", cache=True )
         t.set_env_var("BLASTDB", value="landmark")
 
         task_id = m.submit(t)

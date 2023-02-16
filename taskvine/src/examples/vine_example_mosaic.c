@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	struct vine_manager *m;
 	struct vine_task *t;
 
-    //runtime logs will be written to vine_example_mosaic_info/%Y-%m-%dT%H:%M:%S
+	//runtime logs will be written to vine_example_mosaic_info/%Y-%m-%dT%H:%M:%S
 	vine_set_runtime_info_path("vine_example_mosaic_info");
 
 	printf("Checking that /usr/bin/convert is installed...\n");
@@ -69,7 +69,9 @@ int main(int argc, char *argv[])
 
 	vine_enable_peer_transfers(m);
 
-	struct vine_file *temp_file[36];
+	struct vine_file *convert = vine_file_local("convert.sfx");
+	struct vine_file *image = vine_file_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg");
+      	struct vine_file *temp_file[36];
 
 	int i;
 	for(i=0; i<36; i++) {
@@ -82,8 +84,8 @@ int main(int argc, char *argv[])
 		temp_file[i] = vine_file_temp();
 		
 		t = vine_task_create(command);
-		vine_task_add_input_file(t, "convert.sfx", "convert.sfx", VINE_CACHE);
-		vine_task_add_input_url(t,"https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", "cat.jpg", VINE_CACHE );
+		vine_task_add_input(t,convert,"convert.sfx", VINE_CACHE);
+		vine_task_add_input(t,image,"cat.jpg", VINE_CACHE );
 		vine_task_add_output(t,temp_file[i],outfile,VINE_CACHE);
 
 		vine_task_set_cores(t,1);
@@ -116,9 +118,9 @@ int main(int argc, char *argv[])
 	for(i=0;i<36;i++) {
 		char filename[256];
 		sprintf(filename,"%d.cat.jpg",i);
-		vine_task_add_input(t,temp_file[i],filename,VINE_CACHE);
+		vine_task_add_input(t,temp_file[i],filename,VINE_NOCACHE);
 	}
-	vine_task_add_input_file(t,"montage.sfx","montage.sfx",VINE_NOCACHE);
+	vine_task_add_input_file(t,"montage.sfx","montage.sfx",VINE_CACHE);
 	vine_task_add_output_file(t,"mosaic.jpg","mosaic.jpg",VINE_NOCACHE);
 
 	int task_id = vine_submit(m,t);
@@ -127,11 +129,12 @@ int main(int argc, char *argv[])
 	printf("Waiting for tasks to complete...\n");
 	t = vine_wait(m,VINE_WAIT_FOREVER);
 
-	vine_task_delete(t);
-	for(i=0; i<36; i++) vine_file_delete(temp_file[i]);
-	
 	printf("All tasks complete!\n");
 
+	vine_file_delete(convert);
+	vine_file_delete(image);
+	for(i=0; i<36; i++) vine_file_delete(temp_file[i]);
+	vine_task_delete(t);
 	vine_delete(m);
 
 	return 0;
