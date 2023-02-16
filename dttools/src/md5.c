@@ -420,8 +420,6 @@ char *md5_dir( const char *path )
 
 	closedir(dir);
 
-	printf("checksum of %s: %s\n\n",path,dirstring);
-	
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	md5_buffer(dirstring, strlen(dirstring), digest);
 
