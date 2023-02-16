@@ -2764,6 +2764,33 @@ static int send_one_task( struct vine_manager *q )
 
 	return 0;
 }
+/*
+Advance the state of the system by finding a worker that has tasks
+waiting to be retrieved, then fetch the outputs of those tasks,
+and mark it as done.
+*/
+static int receive_all_tasks_from_worker( struct vine_manager *q, struct vine_worker_info *w )
+{
+    struct vine_task *t;
+    uint64_t task_id;
+
+    ITABLE_ITERATE(w->current_tasks,task_id,t) {
+        if( t->state==VINE_TASK_WAITING_RETRIEVAL) {
+            fetch_output_from_worker(q, w, task_id);
+            // Shutdown worker if appropriate.
+            if ( w->factory_name ) {
+                struct vine_factory_info *f = vine_factory_info_lookup(q,w->factory_name);
+                if ( f && f->connected_workers > f->max_workers &&
+                        itable_size(w->current_tasks) < 1 ) {
+                    debug(D_VINE, "Final task received from worker %s, shutting down.", w->hostname);
+                    shut_down_worker(q, w);
+                }
+            }
+
+        }
+    }
+    return 0;
+}
 
 /*
 Advance the state of the system by finding any task that is
