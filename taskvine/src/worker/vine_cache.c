@@ -111,13 +111,14 @@ void vine_cache_load(struct vine_cache *c)
 /*
 send cache updates to manager from existing cache_directory 
 */
-void vine_init_update(struct vine_cache *c, struct link *manager)
+
+void vine_cache_scan(struct vine_cache *c, struct link *manager)
 {
 	struct cache_file *f;
 	char * cachename;
 	HASH_TABLE_ITERATE(c->table, cachename, f){
-		timestamp_t transfer_time = timestamp_get();
-		vine_worker_send_cache_update(manager,cachename,f->actual_size,transfer_time);
+		/* XXX the worker doesn't know how long it took to transfer. */
+		vine_worker_send_cache_update(manager,cachename,f->actual_size,0);
 	}
 }
 
