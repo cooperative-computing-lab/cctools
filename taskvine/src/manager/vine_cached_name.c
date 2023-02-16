@@ -224,7 +224,7 @@ static char *make_url_cached_name( const struct vine_file *f )
 
 	debug(D_VINE,"using checksum method %s for url %s",method,f->source);
 	
-	return string_format("url-%s-%s",method,hash);
+	return string_format("%s-%s",method,hash);
 }
 
 /*
@@ -285,7 +285,7 @@ char *vine_cached_name( const struct vine_file *f )
 	       	case VINE_URL:
 			/* A url is identified by its metadata. */
 			hash = make_url_cached_name(f);
-			name = string_format("url-md5-%s",hash);
+			name = string_format("url-%s",hash);
 			free(hash);
 			break;
 		case VINE_TEMP:
