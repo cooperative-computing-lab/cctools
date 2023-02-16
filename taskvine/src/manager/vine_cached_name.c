@@ -261,10 +261,16 @@ char *vine_cached_name( const struct vine_file *f )
 
 	switch(f->type) {
 		case VINE_FILE:
-			/* A file is identified by its content. */
 			hash = md5_file_or_dir(f->source);
-			name = string_format("file-md5-%s",hash);
-			free(hash);
+			if(hash) {
+				/* An existing file is identified by its content. */
+				name = string_format("file-md5-%s",hash);
+				free(hash);
+			} else {
+				/* A pending file gets a random name. */
+				string_cookie(random,16);
+				name = string_format("file-rnd-%s",random);
+			}
 			break;
 		case VINE_EMPTY_DIR:
 			/* All empty dirs have the same content! */
