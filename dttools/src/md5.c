@@ -28,13 +28,16 @@ documentation and/or software.
 
 #include "md5.h"
 #include "xxmalloc.h"
+#include "stringtools.h"
+#include "path.h"
+#include "debug.h"
 
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
-
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -368,21 +371,98 @@ const char *md5_string(unsigned char digest[16])
 	return str;
 }
 
-char *md5_cal(const char *s) {
-	unsigned char digest[MD5_DIGEST_LENGTH_HEX];
-	md5_context_t context;
-	char *p = NULL;
+char *md5_cal(const char *s)
+{
+ 	unsigned char digest[MD5_DIGEST_LENGTH_HEX];
+ 	md5_context_t context;
+	md5_init(&context);
+ 	md5_update(&context, (const unsigned char *)s, strlen(s));
+ 	md5_final(digest, &context);
+	return strdup(md5_string(digest));
+}
+	
+/*
+Compute the recursive hash of a directory by building up a string like this:
 
-	p = malloc(sizeof(char) * (MD5_DIGEST_LENGTH_HEX+1));
-	if(!p) {
-		return NULL;
+	filea:hash-of-filea
+	fileb:hash-of-fileb
+	dirc:hash-of-dirc
+
+And then compute the hash of that string.
+
+Returns an allocated string that must be freed.
+
+XXX For consistency, this should sort the directory entries before hashing.
+*/
+
+char *md5_dir( const char *path )
+{
+	DIR * dir = opendir(path);
+	if(!dir) return 0;
+
+	char *dirstring=strdup("");
+	
+	struct dirent *d;
+	while((d=readdir(dir))){
+		if(!strcmp(d->d_name,".")) continue;
+		if(!strcmp(d->d_name,"..")) continue;
+
+		char *subpath = string_format("%s/%s",path,d->d_name);
+		char *subhash = md5_file_or_dir(subpath);
+		char *line = string_format("%s:%s\n",d->d_name,subhash);
+
+		dirstring = string_combine(dirstring,line);
+
+		free(subpath);
+		free(subhash);
+		free(line);
 	}
 
-	md5_init(&context);
-	md5_update(&context, (const unsigned char *)s, strlen(s));
-	md5_final(digest, &context);
-	sprintf(p, "%s", md5_string(digest));
-	return p;
+	closedir(dir);
+
+	printf("checksum of %s: %s\n\n",path,dirstring);
+	
+	unsigned char digest[MD5_DIGEST_LENGTH];
+	md5_buffer(dirstring, strlen(dirstring), digest);
+
+	free(dirstring);
+	
+	return strdup(md5_string(digest));
+}
+
+char *md5_symlink( const char *path, int linklength )
+{
+	unsigned char digest[MD5_DIGEST_LENGTH];
+	
+	char *linktext = xxmalloc(linklength);
+	ssize_t actual = readlink(path,linktext,linklength);
+	if(actual!=linklength) {
+		free(linktext);
+		return 0;
+	} else {
+		md5_buffer(linktext,linklength,digest);
+		return strdup(md5_string(digest));
+	}
+}
+	
+char *md5_file_or_dir( const char *path )
+{
+	struct stat info;
+	unsigned char digest[MD5_DIGEST_LENGTH];
+
+	if(lstat(path, &info)) return 0; 
+
+	if(S_ISDIR(info.st_mode)) {
+		return md5_dir(path);
+	} else if(S_ISREG(info.st_mode)) {
+		md5_file(path, digest);
+		return strdup(md5_string(digest));
+	} else if(S_ISLNK(info.st_mode)) {
+		return md5_symlink(path,info.st_size);
+	} else {
+		debug(D_NOTICE,	"unexpected file type: %s is not a file, directory, or symlink.",path);
+		return 0;
+	}
 }
 
 /* vim: set noexpandtab tabstop=4: */

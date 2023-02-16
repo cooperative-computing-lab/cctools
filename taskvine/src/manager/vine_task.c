@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include <assert.h>
 #include <string.h>
 #include <math.h>
+#include "random.h"
 
 struct vine_task *vine_task_create(const char *command_line)
 {
@@ -723,6 +724,11 @@ static void priority_add_to_jx(struct jx *j, double priority)
 	free(str);
 }
 
+/*
+Converts a task into JX format for the purpose of performance
+and status reporting, without file details.
+*/
+
 struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 {
 	struct jx *j = jx_object(0);
@@ -766,3 +772,42 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 
 	return j;
 }
+
+/*
+Converts a task into a JSON string for the purposes of provenance.
+This function must include all of the functional inputs to a task
+that affect its outputs (command, environment, sandbox) but not
+performance and resource details that do not affect the output.
+*/
+
+char * vine_task_to_json(struct vine_task *t)
+{
+	char * buffer;
+	char * file_buffer;
+
+	struct vine_mount *m;
+
+	buffer = string_format("{\ncmd = \"%s\"\n", t->command_line);
+
+	if(t->input_mounts){
+		buffer = string_combine(buffer, "inputs = ");
+		LIST_ITERATE(t->input_mounts,m) {
+			file_buffer = string_format("{ name: \"%s\", content: \"%s\"}, ", m->remote_name, m->file->cached_name);
+			buffer = string_combine(buffer, file_buffer);
+			free(file_buffer);
+		}
+		buffer = string_combine(buffer, "\n");
+	}
+
+	if(t->output_mounts){
+		buffer = string_combine(buffer, "outputs = ");
+		LIST_ITERATE(t->output_mounts,m) {
+			file_buffer = string_format("{ name: \"%s\" }, ", m->remote_name);
+			buffer = string_combine(buffer, file_buffer);
+			free(file_buffer);
+		}
+		buffer = string_combine(buffer, "\n");
+	}
+	return buffer;
+}
+
