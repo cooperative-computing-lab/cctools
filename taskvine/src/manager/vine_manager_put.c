@@ -352,9 +352,16 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	/* Has this file already been sent and cached? */
 	struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,f->cached_name);
 
-	/* If so, check that it hasn't changed, and return success. */
-	if(remote_info) {
-		if(f->type==VINE_FILE && (info.st_size!=remote_info->size || info.st_mtime!=remote_info->mtime)) {
+	/*
+	If so, check that it hasn't changed, and return success.
+	XXX The mtime might not be set (0) if the file was cached
+	from a previous session.  This would work better if the
+	mtime was sent in file transfers, and then returned by
+	cache-update messages.
+	*/
+	
+	if(remote_info && f->type==VINE_FILE) {
+		if(info.st_size!=remote_info->size || ((info.st_mtime!=remote_info->mtime) && (remote_info->mtime!=0))) {
 			debug(D_NOTICE|D_VINE,"File %s has changed since it was first cached!",f->source);
 			debug(D_NOTICE|D_VINE,"You may be getting inconsistent results.");
 		}
