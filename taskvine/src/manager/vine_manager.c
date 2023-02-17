@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "vine_protocol.h"
 #include "vine_task.h"
 #include "vine_file.h"
+#include "vine_mount.h"
 #include "vine_resources.h"
 #include "vine_worker_info.h"
 #include "vine_remote_file_info.h"
@@ -117,13 +118,13 @@ static int task_request_count( struct vine_manager *q, const char *category, cat
 
 static vine_msg_code_t handle_http_request( struct vine_manager *q, struct vine_worker_info *w, const char *path, time_t stoptime );
 static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worker_info *w, const char *line);
-static vine_msg_code_t handle_queue_status(struct vine_manager *q, struct vine_worker_info *w, const char *line, time_t stoptime);
+static vine_msg_code_t handle_manager_status(struct vine_manager *q, struct vine_worker_info *w, const char *line, time_t stoptime);
 static vine_msg_code_t handle_resource(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static vine_msg_code_t handle_duty_update(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 
-static struct jx * queue_to_jx( struct vine_manager *q );
-static struct jx * queue_lean_to_jx( struct vine_manager *q );
+static struct jx * manager_to_jx( struct vine_manager *q );
+static struct jx * manager_lean_to_jx( struct vine_manager *q );
 
 char *vine_monitor_wrap(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct rmsummary *limits);
 
@@ -309,7 +310,10 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 		struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,cachename);
 
 		if(!remote_info) {
-			debug(D_VINE,"warning: unexpected cache-update message for %s",cachename);
+			/*
+			If an unsolicited cache-update arrives, then the worker
+			is telling us about something from a previous run.
+			*/
 			remote_info = vine_remote_file_info_create(size,time(0));
 			hash_table_insert(w->current_files,cachename,remote_info);
 		}
@@ -423,8 +427,8 @@ static vine_msg_code_t vine_manager_recv_no_retry(struct vine_manager *q, struct
 		result = VINE_MSG_PROCESSED;
 	} else if(string_prefix_is(line, "taskvine")) {
 		result = handle_taskvine(q, w, line);
-	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status") || string_prefix_is(line, "wable_status") || string_prefix_is(line, "resources_status")) {
-		result = handle_queue_status(q, w, line, stoptime);
+	} else if (string_prefix_is(line,"manager_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status") || string_prefix_is(line, "wable_status") || string_prefix_is(line, "resources_status")) {
+		result = handle_manager_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
 		result = VINE_MSG_PROCESSED;
@@ -478,26 +482,26 @@ Compute the expected transfer rate of the manage in bytes/second,
 and return the basis of that computation in *data_source.
 */
 
-static double get_queue_transfer_rate(struct vine_manager *q, char **data_source)
+static double get_manager_transfer_rate(struct vine_manager *q, char **data_source)
 {
-	double queue_transfer_rate; // bytes per second
+	double manager_transfer_rate; // bytes per second
 	int64_t     q_total_bytes_transferred = q->stats->bytes_sent + q->stats->bytes_received;
 	timestamp_t q_total_transfer_time     = q->stats->time_send  + q->stats->time_receive;
 
 	// Note q_total_transfer_time is timestamp_t with units of microseconds.
 	if(q_total_transfer_time>1000000) {
-		queue_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
+		manager_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
 		if (data_source) {
-			*data_source = xxstrdup("overall queue");
+			*data_source = xxstrdup("overall manager");
 		}
 	} else {
-		queue_transfer_rate = q->default_transfer_rate;
+		manager_transfer_rate = q->default_transfer_rate;
 		if (data_source) {
 			*data_source = xxstrdup("conservative default");
 		}
 	}
 
-	return queue_transfer_rate;
+	return manager_transfer_rate;
 }
 
 /*
@@ -505,7 +509,7 @@ Select an appropriate timeout value for the transfer of a certain number of byte
 We do not know in advance how fast the system will perform.
 
 So do this by starting with an assumption of bandwidth taken from the worker,
-from the queue, or from a (slow) default number, depending on what information is available.
+from the manager, or from a (slow) default number, depending on what information is available.
 The timeout is chosen to be a multiple of the expected transfer time from the assumed bandwidth.
 
 The overall effect is to reject transfers that are 10x slower than what has been seen before.
@@ -524,7 +528,7 @@ int vine_manager_transfer_time(struct vine_manager *q, struct vine_worker_info *
 		avg_transfer_rate = 1000000 * w->total_bytes_transferred / w->total_transfer_time;
 		data_source = xxstrdup("worker's observed");
 	} else {
-		avg_transfer_rate = get_queue_transfer_rate(q, &data_source);
+		avg_transfer_rate = get_manager_transfer_rate(q, &data_source);
 	}
 
 	double tolerable_transfer_rate = avg_transfer_rate / q->transfer_outlier_factor; // bytes per second
@@ -671,7 +675,7 @@ static void update_write_catalog(struct vine_manager *q )
 	if (!q->name) return; 
 
 	// Generate the manager status in an jx, and print it to a buffer.
-	struct jx *j = queue_to_jx(q);
+	struct jx *j = manager_to_jx(q);
 	char *str = jx_print_string(j);
 
 	// Send the buffer.
@@ -679,7 +683,7 @@ static void update_write_catalog(struct vine_manager *q )
 	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
 
 		// If the send failed b/c the buffer is too big, send the lean version instead.
-		struct jx *lj = queue_lean_to_jx(q);
+		struct jx *lj = manager_lean_to_jx(q);
 		char *lstr = jx_print_string(lj);
 		catalog_query_send_update(q->catalog_hosts,lstr);
 		free(lstr);
@@ -891,7 +895,8 @@ static void add_worker(struct vine_manager *q)
 
 /* Delete a single file on a remote worker. */
 
-static void delete_worker_file( struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags ) {
+static void delete_worker_file( struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags )
+{
 	if(!(flags & except_flags)) {
 		vine_manager_send(q,w, "unlink %s\n", filename);
 		struct vine_remote_file_info *remote_info;
@@ -902,13 +907,12 @@ static void delete_worker_file( struct vine_manager *q, struct vine_worker_info 
 
 /* Delete all files in a list except those that match one or more of the "except_flags" */
 
-static void delete_worker_files( struct vine_manager *q, struct vine_worker_info *w, struct list *files, int except_flags ) {
-	struct vine_file *tf;
-
-	if(!files) return;
-
-	LIST_ITERATE(files,tf) {
-		delete_worker_file(q, w, tf->cached_name, tf->flags, except_flags);
+static void delete_worker_files( struct vine_manager *q, struct vine_worker_info *w, struct list *mount_list, int except_flags )
+{
+	if(!mount_list) return;
+	struct vine_mount *m;
+	LIST_ITERATE(mount_list,m) {
+		delete_worker_file(q, w, m->file->cached_name, m->flags, except_flags);
 	}
 }
 
@@ -916,15 +920,15 @@ static void delete_worker_files( struct vine_manager *q, struct vine_worker_info
 
 static void delete_task_output_files(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	delete_worker_files(q, w, t->output_files, 0);
+	delete_worker_files(q, w, t->output_mounts, 0);
 }
 
 /* Delete only the uncacheable output files of a given task. */
 
 static void delete_uncacheable_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t )
 {
-	delete_worker_files(q, w, t->input_files, VINE_CACHE );
-	delete_worker_files(q, w, t->output_files, VINE_CACHE );
+	delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
+	delete_worker_files(q, w, t->output_mounts, VINE_CACHE );
 }
 
 /* Determine the resource monitor file name that should be associated with this task. */
@@ -1091,7 +1095,7 @@ static void fetch_output_from_worker(struct vine_manager *q, struct vine_worker_
 	delete_uncacheable_files(q,w,t);
 
 	/* if q is monitoring, append the task summary to the single
-	 * queue summary, update t->resources_used, and delete the task summary. */
+	 * manager summary, update t->resources_used, and delete the task summary. */
 	if(q->monitor_mode) {
 		read_measured_resources(q, t);
 
@@ -1359,12 +1363,12 @@ static vine_result_code_t get_update( struct vine_manager *q, struct vine_worker
 
 	time_t stoptime = time(0) + vine_manager_transfer_time(q,w,t,length);
 
-	struct vine_file *f;
+	struct vine_mount *m;
 	const char *local_name = 0;
 
-	LIST_ITERATE(t->output_files,f) {
-		if(!strcmp(path,f->remote_name)) {
-			local_name = f->source;
+	LIST_ITERATE(t->output_mounts,m) {
+		if(!strcmp(path,m->remote_name)) {
+			local_name = m->file->source;
 			break;
 		}
 	}
@@ -1438,7 +1442,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 
 	if(task_status == VINE_RESULT_FORSAKEN) {
 		// Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_files, VINE_CACHE );
+		delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
 
 		/* task will be resubmitted, so we do not update any of the execution stats */
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
@@ -1819,12 +1823,12 @@ static struct jx *categories_to_jx(struct vine_manager *q)
 }
 
 /*
-queue_to_jx examines the overall queue status and creates
+manager_to_jx examines the overall manager status and creates
 an jx expression which can be sent directly to the
 user that connects via vine_status.
 */
 
-static struct jx * queue_to_jx( struct vine_manager *q )
+static struct jx * manager_to_jx( struct vine_manager *q )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
@@ -1900,7 +1904,7 @@ static struct jx * queue_to_jx( struct vine_manager *q )
 	// tasks_complete is deprecated, but the old vine_status expects it.
 	jx_insert_integer(j,"tasks_complete",info.tasks_done);
 
-	//send info on queue
+	//send info on manager
 	jx_insert_integer(j,"time_when_started",info.time_when_started);
 	jx_insert_integer(j,"time_send",info.time_send);
 	jx_insert_integer(j,"time_receive",info.time_receive);
@@ -1935,7 +1939,7 @@ static struct jx * queue_to_jx( struct vine_manager *q )
 	//add the stats per category
 	jx_insert(j, jx_string("categories"), categories_to_jx(q));
 
-	//add total resources used/needed by the queue
+	//add total resources used/needed by the manager
 	struct rmsummary *total = total_resources_needed(q);
 	jx_insert_integer(j,"tasks_total_cores",total->cores);
 	jx_insert_integer(j,"tasks_total_memory",total->memory);
@@ -1947,13 +1951,13 @@ static struct jx * queue_to_jx( struct vine_manager *q )
 }
 
 /*
-queue_lean_to_jx examines the overall queue status and creates
+manager_lean_to_jx examines the overall manager status and creates
 an jx expression which can be sent to the catalog.
-It different from queue_to_jx in that only the minimum information that
+It different from manager_to_jx in that only the minimum information that
 workers, vine_status and the vine_factory need.
 */
 
-static struct jx * queue_lean_to_jx( struct vine_manager *q )
+static struct jx * manager_lean_to_jx( struct vine_manager *q )
 {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
@@ -2042,7 +2046,7 @@ static void handle_data_index( struct vine_manager *q, struct vine_worker_info *
 
 	buffer_printf(&buf,"<h1>taskvine data API</h1>");
         buffer_printf(&buf,"<ul>\n");
-	buffer_printf(&buf,"<li> <a href=\"/queue_status\">Queue Status</a>\n");
+	buffer_printf(&buf,"<li> <a href=\"/manager_status\">Queue Status</a>\n");
 	buffer_printf(&buf,"<li> <a href=\"/task_status\">Task Status</a>\n");
 	buffer_printf(&buf,"<li> <a href=\"/worker_status\">Worker Status</a>\n");
 	buffer_printf(&buf,"<li> <a href=\"/resources_status\">Resources Status</a>\n");
@@ -2078,7 +2082,7 @@ static vine_msg_code_t handle_http_request( struct vine_manager *q, struct vine_
 	        // Other requests get raw JSON data.
 		vine_manager_send(q,w,"Access-Control-Allow-Origin: *\n");
 		vine_manager_send(q,w,"Content-type: text/plain\n\n");
-		handle_queue_status(q, w, &path[1], stoptime );
+		handle_manager_status(q, w, &path[1], stoptime );
 	}
 
 	// Return success but require a disconnect now.
@@ -2086,15 +2090,15 @@ static vine_msg_code_t handle_http_request( struct vine_manager *q, struct vine_
 }
 
 /*
-Process a queue status request which returns raw JSON.
+Process a manager status request which returns raw JSON.
 This could come via the HTTP interface, or via a plain request.
 */
 
 static struct jx *construct_status_message( struct vine_manager *q, const char *request ) {
 	struct jx *a = jx_array(NULL);
 
-	if(!strcmp(request, "queue_status") || !strcmp(request, "queue") || !strcmp(request, "resources_status")) {
-		struct jx *j = queue_to_jx( q );
+	if(!strcmp(request, "manager_status") || !strcmp(request, "manager") || !strcmp(request, "resources_status")) {
+		struct jx *j = manager_to_jx( q );
 		if(j) {
 			jx_array_insert(a, j);
 		}
@@ -2132,11 +2136,11 @@ static struct jx *construct_status_message( struct vine_manager *q, const char *
 }
 
 /*
-Handle a queue status message by composing a response and sending it.
+Handle a manager status message by composing a response and sending it.
 */
 
 
-static vine_msg_code_t handle_queue_status( struct vine_manager *q, struct vine_worker_info *target, const char *line, time_t stoptime )
+static vine_msg_code_t handle_manager_status( struct vine_manager *q, struct vine_worker_info *target, const char *line, time_t stoptime )
 {
 	struct link *l = target->link;
 
@@ -2658,12 +2662,12 @@ this function modifies the file->substitute field to reflect that source.
 
 static int vine_manager_transfer_capacity_available(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t)
 {
-	struct vine_file *f;
+	struct vine_mount *m;
 
-	LIST_ITERATE(t->input_files, f){
+	LIST_ITERATE(t->input_mounts, m){
 		/* Is the file already present on that worker? */
 		struct vine_remote_file_info *remote_info;
-		remote_info = hash_table_lookup(w->current_files,f->cached_name);
+		remote_info = hash_table_lookup(w->current_files,m->file->cached_name);
 		if(remote_info) continue;
 
 		char *id;
@@ -2672,13 +2676,13 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 
 		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
-		if(f->type != VINE_MINI_TASK) {
+		if(m->file->type != VINE_MINI_TASK) {
 			HASH_TABLE_ITERATE(q->worker_table, id, peer){
-				if((remote_info = hash_table_lookup(peer->current_files, f->cached_name)) && remote_info->in_cache) {
-					char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, f->cached_name);
+				if((remote_info = hash_table_lookup(peer->current_files, m->file->cached_name)) && remote_info->in_cache) {
+					char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, m->file->cached_name);
 					if(vine_current_transfers_source_in_use(q, peer_source) < q->worker_source_max_transfers) {	
-						vine_file_delete(f->substitute);
-						f->substitute = vine_file_substitute_url(f,peer_source);
+						vine_file_delete(m->substitute);
+						m->substitute = vine_file_substitute_url(m->file,peer_source);
 						free(peer_source);
 						found_match = 1;
 						break;
@@ -2698,23 +2702,22 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		TEMPs can only fetch from peers, so no match is fatal.
 		Any other kind can be provided by the manager at dispatch.
 		*/
-		if(f->type==VINE_URL) {
+		if(m->file->type==VINE_URL) {
 			/* For a URL transfer, we can fall back to the original if capacity is available. */
-			if(vine_current_transfers_source_in_use(q, f->source) >= q->file_source_max_transfers){
-			//	debug(D_VINE,"task %lld has no ready transfer source for url %s : %d in use",(long long)t->task_id,f->source, vine_current_transfers_source_in_use(q,f->source));
+			if(vine_current_transfers_source_in_use(q, m->file->source) >= q->file_source_max_transfers){
+			//	debug(D_VINE,"task %lld has no ready transfer source for url %s : %d in use",(long long)t->task_id,m->file->source, vine_current_transfers_source_in_use(q,m->file->source));
 				return 0;
 			} else {
 				/* keep going */
 			}
-		} else if(f->type==VINE_TEMP) {
-			//  debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long long)t->task_id,f->cached_name);
+		} else if(m->file->type==VINE_TEMP) {
+			//  debug(D_VINE,"task %lld has no ready transfer source for temp %s",(long long)t->task_id,m->file->cached_name);
 			return 0;
-		} else if(f->type==VINE_MINI_TASK) {
-			if(!vine_manager_transfer_capacity_available(q, w, f->mini_task)){
+		} else if(m->file->type==VINE_MINI_TASK) {
+			if(!vine_manager_transfer_capacity_available(q, w, m->file->mini_task)){
 				return 0;
 			}
-		}
-		else {
+		} else {
 			/* keep going */
 		}
 	}
@@ -2986,18 +2989,18 @@ static int shutdown_drained_workers(struct vine_manager *q) {
 
 static int task_tag_comparator(void *t, const void *r) {
 
-	struct vine_task *task_in_queue = t;
+	struct vine_task *task_in_manager = t;
 	const char *task_tag = r;
 
-	if(!task_in_queue->tag && !task_tag) {
+	if(!task_in_manager->tag && !task_tag) {
 		return 1;
 	}
 
-	if(!task_in_queue->tag || !task_tag) {
+	if(!task_in_manager->tag || !task_tag) {
 		return 0;
 	}
 
-	return !strcmp(task_in_queue->tag, task_tag);
+	return !strcmp(task_in_manager->tag, task_tag);
 }
 
 /*
@@ -3014,10 +3017,10 @@ static int cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, vi
 		debug(D_VINE, "Task with id %d has been cancelled at worker %s (%s) and removed.", t->task_id, w->hostname, w->addrport);
 
 		//Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_files, VINE_CACHE );
+		delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
 
 		//Delete all output files since they are not needed as the task was cancelled.
-		delete_worker_files(q, w, t->output_files, 0);
+		delete_worker_files(q, w, t->output_mounts, 0);
 
 		//update tables.
 		reap_task_from_worker(q, w, t, new_state);
@@ -3063,16 +3066,16 @@ static void vine_remove_file_internal(struct vine_manager *q, const char *filena
 		uint64_t task_id;
 		ITABLE_ITERATE(w->current_tasks,task_id,t) {
 
-			struct vine_file *f;
-			LIST_ITERATE(t->input_files,f) {
-				if(strcmp(filename, f->cached_name) == 0) {
+			struct vine_mount *m;
+			LIST_ITERATE(t->input_mounts,m) {
+				if(strcmp(filename, m->file->cached_name) == 0) {
 					cancel_task_on_worker(q, t, VINE_TASK_READY);
 					continue;
 				}
 			}
 
-			LIST_ITERATE(t->output_files,f) {
-				if(strcmp(filename, f->cached_name) == 0) {
+			LIST_ITERATE(t->output_mounts,m) {
+				if(strcmp(filename, m->file->cached_name) == 0) {
 					cancel_task_on_worker(q, t, VINE_TASK_READY);
 					continue;
 				}
@@ -3100,7 +3103,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 {
 	struct vine_manager *q = malloc(sizeof(*q));
 	if(!q) {
-		fprintf(stderr, "Error: failed to allocate memory for queue.\n");
+		fprintf(stderr, "Error: failed to allocate memory for manager.\n");
 		return 0;
 	}
 	char *envstring;
@@ -3137,7 +3140,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->manager_link = link_serve(port);
 	if(!q->manager_link) {
-		debug(D_NOTICE, "Could not create work_queue on port %i.", port);
+		debug(D_NOTICE, "Could not create manager on port %i.", port);
 		free(q);
 		return 0;
 	} else {
@@ -3182,7 +3185,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
 
-	q->worker_selection_algorithm = VINE_SCHEDULE_FCFS;
+	q->worker_selection_algorithm = VINE_SCHEDULE_FILES;
 	q->process_pending_check = 0;
 
 	q->short_timeout = 5;
@@ -3634,7 +3637,7 @@ static double vine_task_priority(void *item) {
 	return t->priority;
 }
 
-/* Put a given task on the ready list, taking into account the task priority and the queue schedule. */
+/* Put a given task on the ready list, taking into account the task priority and the manager schedule. */
 
 static void push_task_to_ready_list( struct vine_manager *q, struct vine_task *t )
 {
@@ -4165,7 +4168,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
    - drain workers from factories
    - if new workers, connect n of them
    - expired tasks?                          Yes: mark expired tasks as retrieved and go to S.
-   - queue empty?                            Yes: return null
+   - manager empty?                            Yes: return null
    - go to S
 */
 	int events = 0;
@@ -4211,7 +4214,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 				// return completed task (t) to the user. We do not return right
 				// away, and instead break out of the loop to correctly update the
-				// queue time statistics.
+				// manager time statistics.
 				events++;
 				END_ACCUM_TIME(q, time_internal);
 
@@ -4330,7 +4333,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		vine_manager_send_duties_to_workers(q, stoptime);
 		END_ACCUM_TIME(q, time_internal);
 
-		// return if queue is empty and something interesting already happened
+		// return if manager is empty and something interesting already happened
 		// in this wait.
 		if(events > 0) {
 			BEGIN_ACCUM_TIME(q, time_internal);
@@ -4364,12 +4367,12 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 }
 
 //check if workers' resources are available to execute more tasks
-//queue should have at least q->hungry_minimum ready tasks
-//@param: 	struct vine_manager* - pointer to queue
+//manager should have at least q->hungry_minimum ready tasks
+//@param: 	struct vine_manager* - pointer to manager
 //@return: 	1 if hungry, 0 otherwise
 int vine_hungry(struct vine_manager *q)
 {
-	//check if queue is initialized
+	//check if manager is initialized
 	//return false if not
 	if (q == NULL){
 		return 0;
@@ -4378,7 +4381,7 @@ int vine_hungry(struct vine_manager *q)
 	struct vine_stats qstats;
 	vine_get_stats(q, &qstats);
 
-	//if number of ready tasks is less than q->hungry_minimum, then queue is hungry
+	//if number of ready tasks is less than q->hungry_minimum, then manager is hungry
 	if (qstats.tasks_waiting < q->hungry_minimum){
 		return 1;
 	}
@@ -4495,7 +4498,7 @@ struct vine_task *vine_cancel_by_task_id(struct vine_manager *q, int task_id) {
 	matched_task = itable_lookup(q->tasks, task_id);
 
 	if(!matched_task) {
-		debug(D_VINE, "Task with id %d is not found in queue.", task_id);
+		debug(D_VINE, "Task with id %d is not found in manager.", task_id);
 		return NULL;
 	}
 
@@ -4522,7 +4525,7 @@ struct vine_task *vine_cancel_by_task_tag(struct vine_manager *q, const char* ta
 
 	}
 
-	debug(D_VINE, "Task with tag %s is not found in queue.", task_tag);
+	debug(D_VINE, "Task with tag %s is not found in manager.", task_tag);
 	return NULL;
 }
 
@@ -4545,10 +4548,10 @@ struct list * vine_tasks_cancel(struct vine_manager *q)
 		vine_manager_send(q,w,"kill -1\n");
 		ITABLE_ITERATE(w->current_tasks,task_id,t) {
 			//Delete any input files that are not to be cached.
-			delete_worker_files(q, w, t->input_files, VINE_CACHE );
+			delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
 
 			//Delete all output files since they are not needed as the task was canceled.
-			delete_worker_files(q, w, t->output_files, 0);
+			delete_worker_files(q, w, t->output_mounts, 0);
 			reap_task_from_worker(q, w, t, VINE_TASK_CANCELED);
 
 			list_push_tail(l, t);
@@ -4689,8 +4692,8 @@ void vine_set_bandwidth_limit(struct vine_manager *q, const char *bandwidth)
 
 double vine_get_effective_bandwidth(struct vine_manager *q)
 {
-	double queue_bandwidth = get_queue_transfer_rate(q, NULL)/MEGABYTE; //return in MB per second
-	return queue_bandwidth;
+	double manager_bandwidth = get_manager_transfer_rate(q, NULL)/MEGABYTE; //return in MB per second
+	return manager_bandwidth;
 }
 
 void vine_get_stats(struct vine_manager *q, struct vine_stats *s)

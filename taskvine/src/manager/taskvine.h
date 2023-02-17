@@ -53,9 +53,9 @@ typedef enum {
 typedef enum {
 	VINE_SCHEDULE_UNSET = 0, /**< Internal use only. */
 	VINE_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
-	VINE_SCHEDULE_FILES,     /**< Select worker that has the most data required by the task. */
+	VINE_SCHEDULE_FILES,     /**< Select worker that has the most data required by the task. (default) */
 	VINE_SCHEDULE_TIME,      /**< Select worker that has the fastest execution time on previous tasks. */
-	VINE_SCHEDULE_RAND,      /**< Select a random worker. (default) */
+	VINE_SCHEDULE_RAND,      /**< Select a random worker. */
 	VINE_SCHEDULE_WORST      /**< Select the worst fit worker (the worker with more unused resources). */
 } vine_schedule_t;
 
@@ -84,7 +84,7 @@ typedef enum {
 
 typedef enum {
 	VINE_TASK_UNKNOWN = 0,       /**< There is no such task **/
-	VINE_TASK_READY,             /**< Task is ready to be run, waiting in queue **/
+	VINE_TASK_READY,             /**< Task is ready to be run, waiting in manager **/
 	VINE_TASK_RUNNING,           /**< Task has been dispatched to some worker **/
 	VINE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
 	VINE_TASK_RETRIEVED,         /**< Task results are available at the manager **/
@@ -147,7 +147,7 @@ struct vine_stats {
 	int tasks_with_results;   /**< Number of tasks with retrieved results and waiting to be returned to user. */
 
 	/* Cumulative stats for tasks: */
-	int tasks_submitted;           /**< Total number of tasks submitted to the queue. */
+	int tasks_submitted;           /**< Total number of tasks submitted to the manager. */
 	int tasks_dispatched;          /**< Total number of tasks dispatch to workers. */
 	int tasks_done;                /**< Total number of tasks completed and returned to user. (includes tasks_failed) */
 	int tasks_failed;              /**< Total number of tasks completed and returned to user with result other than VINE_RESULT_SUCCESS. */
@@ -164,7 +164,7 @@ struct vine_stats {
 	timestamp_t time_send_good;    /**< Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS. */
 	timestamp_t time_receive_good; /**< Total time spent in sending data to workers for tasks with result VINE_RESULT_SUCCESS. */
 	timestamp_t time_status_msgs;  /**< Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. */
-	timestamp_t time_internal;     /**< Total time the queue spents in internal processing. */
+	timestamp_t time_internal;     /**< Total time the manager spents in internal processing. */
 	timestamp_t time_polling;      /**< Total time blocking waiting for worker communications (i.e., manager idle waiting for a worker message). */
 	timestamp_t time_application;  /**< Total time spent outside vine_wait. */
 
@@ -437,7 +437,7 @@ void vine_task_set_category(struct vine_task *t, const char *category);
 */
 void vine_task_add_feature(struct vine_task *t, const char *name);
 
-/** Specify the priority of this task relative to others in the queue.
+/** Specify the priority of this task relative to others in the manager.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list, regardless of the priority.
 @param t A task object.
 @param priority The priority of the task.
@@ -651,16 +651,24 @@ struct vine_file * vine_file_local( const char *source );
 
 struct vine_file * vine_file_url( const char *url );
 
+
+/** Create a file object of a remote file accessible from an xrootd server.
+@param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
+@param proxy A @ref vine_file of the X509 proxy to use. If NULL, the
+environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
+in that order. If no proxy is present, the transfer is tried without authentication.
+@return A general file object for use by @ref
+vine_task_add_input.
+*/
+struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy );
+
 /** Create a scratch file object.
 A scratch file has no initial content, but is created
 as the output of a task, and may be consumed by other tasks.
-@param unique_name If desired, the user may manually assign
-a globally-unique name to this file.  If null, the system will
-assign an internal unique name.  (recommended)
 @return A general file object for use by @ref vine_task_add_input.
 */
 
-struct vine_file * vine_file_temp( const char *unique_name );
+struct vine_file * vine_file_temp();
 
 /** Create a file object from a data buffer.
 @param name The abstract name of the buffer.
@@ -710,7 +718,7 @@ struct vine_file * vine_file_unstarch( struct vine_file *f );
 @return A clone of the argument f.
 */
 
-struct vine_file *vine_file_clone( const struct vine_file *f );
+struct vine_file *vine_file_clone( struct vine_file *f );
 
 /** Delete a file object.
 @param f A file object.
@@ -951,7 +959,7 @@ void vine_get_stats_category(struct vine_manager *m, const char *c, struct vine_
 
 /** Get manager information as json
 @param m A manager object
-@param request One of: queue, tasks, workers, or categories
+@param request One of: manager, tasks, workers, or categories
 */
 char *vine_get_status(struct vine_manager *m, const char *request);
 

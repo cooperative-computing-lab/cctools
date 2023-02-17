@@ -57,8 +57,6 @@ int main(int argc, char *argv[])
 		vine_tune(m, "file-source-max-transfers", 2);
 	}
 
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
-
 	for(i=0;i<1000;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 	  

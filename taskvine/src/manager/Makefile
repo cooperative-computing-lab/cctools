@@ -13,7 +13,10 @@ SOURCES = \
 	vine_resources.c \
 	vine_task.c \
 	vine_file.c \
+	vine_mount.c \
 	vine_txn_log.c \
+	vine_cached_name.c \
+	vine_checksum.c \
 	vine_perf_log.c \
 	vine_remote_file_info.c \
 	vine_factory_info.c \

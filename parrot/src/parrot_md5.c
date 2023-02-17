@@ -24,7 +24,7 @@ int main( int argc, char *argv[] )
 
 	for(i=1;i<argc;i++) {
 		if(parrot_md5(argv[i],digest)>=0 || md5_file(argv[i],digest)) {
-			printf("%s %s\n",md5_string(digest),argv[i]);
+			printf("%s %s\n",md5_to_string(digest),argv[i]);
 		} else {
 			fprintf(stderr,"parrot_md5: %s: %s\n",argv[i],strerror(errno));
 		}

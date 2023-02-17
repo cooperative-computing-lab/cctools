@@ -7,7 +7,6 @@ BOLD(poncho_package_create) - command-line utility for creating a Conda virtual 
 SECTION(SYNOPSIS)
 
 CODE(poncho_package_create [options] PARAM(dependency-file) PARAM(PARAM(output-path)))
-CODE(poncho_package_create [options] PARAM(dependency-file) PARAM(PARAM(output-path)))
 
 SECTION(DESCRIPTION)
 
@@ -19,7 +18,9 @@ The CODE(dependency-file) argument is the path (relative or absolute) to the a J
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_FLAG_SHORT(h)        Show this help message
+OPTION_ARG_LONG(conda-executable, path) Location of conda executable to use. If not given, mamba, $CONDA_EXE, conda, and microconda are tried, in that order.
+OPTION_FLAG_LONG(no-microconda) Do not try to download microconda if a conda executable is not found.
+OPTION_FLAG(h, help)               Show the help message.
 OPTIONS_END
 SECTION(EXIT STATUS)
 
@@ -27,7 +28,7 @@ On success, returns zero. On failure, returns non-zero.
 
 SECTION(EXAMPLE)
 
-CODE($ poncho_package_create dependencies.json example_venv.tar.gz)
+CODE(poncho_package_create dependencies.json example_venv.tar.gz)
 
 This will create an example_venv.tar.gz environment tarball within the current working directory, which can then be exported to different machines for execution.
 

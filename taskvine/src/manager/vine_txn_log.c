@@ -233,13 +233,13 @@ void vine_txn_log_write_worker_resources(struct vine_manager *q, struct vine_wor
 }
 
 
-void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f, size_t size_in_bytes, int time_in_usecs, int is_input )
+void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_mount *m, struct vine_file *f, size_t size_in_bytes, int time_in_usecs, int is_input )
 {
 	struct buffer B;
 	buffer_init(&B);
 	buffer_printf(&B, "WORKER %s TRANSFER ", w->workerid);
 	buffer_printf(&B, is_input ? "INPUT":"OUTPUT");
-	buffer_printf(&B, " %s", f->remote_name);
+	buffer_printf(&B, " %s", m->remote_name);
 	buffer_printf(&B, " %f", size_in_bytes / ((double) MEGABYTE));
 	buffer_printf(&B, " %f", time_in_usecs / ((double) USECOND));
 
