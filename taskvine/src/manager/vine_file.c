@@ -50,7 +50,10 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		f->cached_name = xxstrdup(cached_name);
 	} else {
 		/* Otherwise we need to figure it out ourselves from the content. */
-		f->cached_name = vine_cached_name(f);
+		/* This may give us the actual size of the object along the way. */
+		ssize_t totalsize = 0;
+		f->cached_name = vine_cached_name(f,&totalsize);
+		if(length==0) f->length = totalsize;
 	}
 
 	debug(D_VINE,"cached name: %s\n",f->cached_name);
