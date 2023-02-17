@@ -21,6 +21,7 @@ from packaging import version
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+
 conda_exec = 'conda'
 
 def _find_conda_executable(conda_executable, env_dir, download_micromamba=True):
@@ -30,29 +31,29 @@ def _find_conda_executable(conda_executable, env_dir, download_micromamba=True):
     candidate = shutil.which('mamba')
     if candidate:
         logger.info('found mamba')
-        return candidate
+        return (candidate, False)
 
     if 'CONDA_EXE' in os.environ:
         candidate = shutil.which(os.environ['CONDA_EXE'])
         if candidate:
             logger.info('found conda via CONDA_EXE')
-            return candidate
+            return (candidate, False)
 
     candidate = shutil.which('conda')
     if candidate:
         logger.info('found conda')
-        return candidate
+        return (candidate, False)
 
     candidate = shutil.which('micromamba')
     if candidate:
         logger.info('found micromamba')
-        return candidate
+        return (candidate, True)
 
     if download_micromamba:
         candidate = _download_micromamba(env_dir)
         if candidate:
             logger.info('installed micromamba')
-            return candidate
+            return (candidate, True)
 
     raise FileNotFoundError('could not find a working conda executable')
 
@@ -77,7 +78,7 @@ def _download_micromamba(env_dir):
     os.mkdir(f"{env_dir}/bin")
     try:
         subprocess.run(f"curl -Ls https://micro.mamba.pm/api/micromamba/{platform}-{arch}/latest | tar xj -C {env_dir}/bin --strip-components=1 bin/micromamba",
-                shell=True, check=True)
+                shell=True, check=True, capture_output=True)
     except subprocess.CalledProcessError:
         logger.error("could not install micromamba.")
 
@@ -91,7 +92,7 @@ def pack_env(spec, output, conda_executable=None, download_micromamba=None):
         logger.info('creating temporary environment in {}'.format(env_dir))
 
         global conda_exec
-        conda_exec = _find_conda_executable(conda_executable, env_dir, download_micromamba)
+        (conda_exec, needs_confirmation) = _find_conda_executable(conda_executable, env_dir, download_micromamba)
 
         logger.info(f'using conda executable {conda_exec}')
         # creates conda spec file from poncho spec file
@@ -107,7 +108,7 @@ def pack_env(spec, output, conda_executable=None, download_micromamba=None):
 
         # create conda environment in temp directory
         logger.info('populating environment...')
-        _run_conda_command(env_dir, 'env create', '--file', env_dir + '/conda_spec.yml')
+        _run_conda_command(env_dir, needs_confirmation, 'env create', '--file', env_dir + '/conda_spec.yml')
 
         logger.info('adding local packages...')
         for (name, path) in conda_spec['pip_local'].items():
@@ -129,8 +130,11 @@ def pack_env(spec, output, conda_executable=None, download_micromamba=None):
 
 
 
-def _run_conda_command(environment, command, *args):
+def _run_conda_command(environment, needs_confirmation, command, *args):
     all_args = [conda_exec] + command.split()
+    if needs_confirmation:
+        all_args.append('--yes')
+
     all_args = all_args + ['--prefix={}/env'.format(str(environment))] + list(args)
 
     try:
@@ -197,9 +201,9 @@ def _install_local_pip(env_dir, pip_name, pip_path):
     out, err = process.communicate()
     pip_version = out.decode('utf-8').split()[1]
     if version.parse(pip_version) < version.parse('22.1'):
-        _run_conda_command(env_dir, 'run', 'pip', 'install', '--use-feature=in-tree-build', pip_path)
+        _run_conda_command(env_dir, False, 'run', 'pip', 'install', '--use-feature=in-tree-build', pip_path)
     else:
-        _run_conda_command(env_dir, 'run', 'pip', 'install', pip_path)
+        _run_conda_command(env_dir, False, 'run', 'pip', 'install', pip_path)
 
 
 def http_data(spec, out_dir):
