@@ -1,3 +1,8 @@
+/*
+Copyright (C) 2023- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #include "vine_checksum.h"
 
@@ -24,7 +29,7 @@ Returns an allocated string that must be freed.
 XXX For consistency, this should sort the directory entries before hashing.
 */
 
-char *vine_checksum_dir( const char *path )
+static char *vine_checksum_dir( const char *path, ssize_t *totalsize )
 {
 	DIR * dir = opendir(path);
 	if(!dir) return 0;
@@ -37,7 +42,7 @@ char *vine_checksum_dir( const char *path )
 		if(!strcmp(d->d_name,"..")) continue;
 
 		char *subpath = string_format("%s/%s",path,d->d_name);
-		char *subhash = vine_checksum_any(subpath);
+		char *subhash = vine_checksum_any(subpath,totalsize);
 		char *line = string_format("%s:%s\n",d->d_name,subhash);
 
 		dirstring = string_combine(dirstring,line);
@@ -56,14 +61,14 @@ char *vine_checksum_dir( const char *path )
 	return result;
 }
 
-char *vine_checksum_file( const char *path )
+static char *vine_checksum_file( const char *path )
 {
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	md5_file(path, digest);
 	return xxstrdup(md5_to_string(digest));
 }
 
-char *vine_checksum_symlink( const char *path, ssize_t linklength )
+static char *vine_checksum_symlink( const char *path, ssize_t linklength )
 {
 	char *linktext = xxmalloc(linklength+1);
 	ssize_t actual = readlink(path,linktext,linklength);
@@ -78,7 +83,7 @@ char *vine_checksum_symlink( const char *path, ssize_t linklength )
 	}
 }
 	
-char *vine_checksum_any( const char *path )
+char *vine_checksum_any( const char *path, ssize_t *totalsize )
 {
 	struct stat info;
 
@@ -87,8 +92,10 @@ char *vine_checksum_any( const char *path )
 	if(S_ISDIR(info.st_mode)) {
 		return vine_checksum_dir(path);
 	} else if(S_ISREG(info.st_mode)) {
+		*totalsize += info.st_size;
 		return vine_checksum_file(path);
 	} else if(S_ISLNK(info.st_mode)) {
+		*totalsize += info.st_size;
 		return vine_checksum_symlink(path,info.st_size);
 	} else {
 		debug(D_NOTICE,	"unexpected file type: %s is not a file, directory, or symlink.",path);
