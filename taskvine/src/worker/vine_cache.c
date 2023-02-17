@@ -379,7 +379,7 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	}
 
 	if(f->complete) {
-		debug(D_VINE,"cache: %s is already present.",cachename);
+		/* File is already present in the cache. */
 		return 1;
 	}
 
