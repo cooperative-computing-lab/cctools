@@ -532,20 +532,20 @@ if __name__ == "__main__":
     parser.add_argument('mode', help='changes mode in which information can be diplayed (-Workers|-Tasks|-Manager)')
     parser.add_argument('title', nargs='?', default ='Worker Info', help='Title of the plot')
     parser.add_argument('save', nargs='?', default = None, help='Save Figure')
-    parser.add_argument('-a', action='store_true', help='display all from the transaction log')
-    parser.add_argument('-f', action='store_true', help='flip colors between tasks')
-    parser.add_argument('-u', action='store_true', help='display cache updates')
-    parser.add_argument('-r', action='store_true', help='display resource updates')
-    parser.add_argument('-d', action='store_true', help='display disconnections')
-    parser.add_argument('-c', action='store_true', help='display connections')
-    parser.add_argument('-m', action='store_true', help='display marked done')
-    parser.add_argument('-w', action='store_true', help='display waiting retrieval')
-    parser.add_argument('-i', action='store_true', help='display input transfers')
-    parser.add_argument('-o', action='store_true', help='display output transfers')
-    parser.add_argument('-s', action='store_true', help='display tasks sent')
-    parser.add_argument('-x', nargs=3, help='change scale for x ticks -x <start> <step_size> <steps>')
-    parser.add_argument('-y', nargs=3, help='change scale for y ticks -y <start> <step_size> <steps>')
-    parser.add_argument('-z', nargs=1, help='changes refrence point for 0 Default: manager start (WorkerFirstTask|ManagerFirstTask)', default=["default"])
+    parser.add_argument('--all-info', action='store_true', help='display all from the transaction log')
+    parser.add_argument('--flip-tasks', action='store_true', help='flip colors between tasks')
+    parser.add_argument('--cache-updates', action='store_true', help='display cache updates')
+    parser.add_argument('--resource-updates', action='store_true', help='display resource updates')
+    parser.add_argument('--disconections', action='store_true', help='display disconnections')
+    parser.add_argument('--connections', action='store_true', help='display connections')
+    parser.add_argument('--marked-done', action='store_true', help='display marked done')
+    parser.add_argument('--waiting-retrieval', action='store_true', help='display waiting retrieval')
+    parser.add_argument('--input-transfers', action='store_true', help='display input transfers')
+    parser.add_argument('--output-trasnsfers', action='store_true', help='display output transfers')
+    parser.add_argument('--tasks-sent', action='store_true', help='display tasks sent')
+    parser.add_argument('--xticks', nargs=3, help='change scale for x ticks -x <start> <step_size> <steps>')
+    parser.add_argument('--yticks', nargs=3, help='change scale for y ticks -y <start> <step_size> <steps>')
+    parser.add_argument('--zero', nargs=1, help='changes refrence point for 0 Default: manager start (WorkerFirstTask|ManagerFirstTask)', default=["default"])
     parser.add_argument('--worker-time', action='store_true', help='uses time measured on worker')
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
     args = parser.parse_args()
@@ -561,47 +561,47 @@ if __name__ == "__main__":
     if args.mode == "Workers":
         parse_workers(args.log)
         plot_workers(title=args.title,
-                    all_info=args.a,
+                    all_info=args.all_info,
                     save=args.save,
-                    flip=args.f,
-                    cache_updates=args.u,
-                    resources=args.r,
-                    marked_done=args.m,
-                    input_transfers=args.i,
-                    output_transfers=args.o,
-                    xticks = args.x,
-                    yticks = args.y,
-                    zero=args.z,
+                    flip=args.flip_tasks,
+                    cache_updates=args.cache_updates,
+                    resources=args.resource_updates,
+                    marked_done=args.marked_done,
+                    input_transfers=args.input_transfers,
+                    output_transfers=args.output_transfers,
+                    xticks = args.xticks,
+                    yticks = args.yticks,
+                    zero=args.zero,
                     worker_time = args.worker_time)
     elif args.mode == "Manager":
         parse_manager(args.log)
         plot_manager(title=args.title,
                     save=args.save,
-                    all_info=args.a,
-                    connections = args.c,
-                    disconnections = args.d,
-                    resources=args.r,
-                    cache_updates=args.u,
-                    tasks_sent=args.s,
-                    waiting_retrieval=args.w,
-                    marked_done=args.m,
-                    xticks = args.x,
-                    yticks = args.y,
-                    input_transfers=args.i,
-                    output_transfers=args.o)
+                    all_info=args.all_info,
+                    connections = args.connections,
+                    disconnections = args.disconnections,
+                    resources=args.resource_updates,
+                    cache_updates=args.cache_updates,
+                    tasks_sent=args.tasks_sent,
+                    waiting_retrieval=args.waiting_retrieval,
+                    marked_done=args.marked_done,
+                    xticks = args.xticks,
+                    yticks = args.yticks,
+                    input_transfers=args.input_transfers,
+                    output_transfers=args.output_transfers)
     elif args.mode == "Tasks":
         parse_tasks(args.log)
         plot_tasks(title=args.title,
                     save=args.save,
-                    all_info=args.a,
-                    connections = args.c,
-                    disconnections = args.d,
-                    resources=args.r,
-                    cache_updates=args.u,
-                    tasks_sent=args.s,
-                    waiting_retrieval=args.w,
-                    marked_done=args.m,
-                    xticks = args.x,
-                    yticks = args.y,
-                    input_transfers=args.i,
-                    output_transfers=args.o)
+                    all_info=args.aall_info,
+                    connections = args.connections,
+                    disconnections = args.disconnections,
+                    resources=args.resource_updates,
+                    cache_updates=args.cache_updates,
+                    tasks_sent=args.tasks-sent,
+                    waiting_retrieval=args.waiting_retrieval,
+                    marked_done=args.marked_done,
+                    xticks = args.xticks,
+                    yticks = args.yticks,
+                    input_transfers=args.input_transfers,
+                    output_transfers=args.output_transfers)
