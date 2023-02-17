@@ -87,13 +87,13 @@ def pack_env(spec, output, conda_executable=None, download_micromamba=None):
     # record packages installed as editable from pip
     local_pip_pkgs = _find_local_pip()
 
-    with tempfile.TemporaryDirectory() as env_dir:
+    with tempfile.TemporaryDirectory(prefix="poncho_env") as env_dir:
         logger.info('creating temporary environment in {}'.format(env_dir))
 
         global conda_exec
         conda_exec = _find_conda_executable(conda_executable, env_dir, download_micromamba)
 
-        logger.info(f'using conda_executable {conda_exec}')
+        logger.info(f'using conda executable {conda_exec}')
         # creates conda spec file from poncho spec file
         logger.info('converting spec file...')
         conda_spec = create_conda_spec(spec, env_dir, local_pip_pkgs)
@@ -113,12 +113,15 @@ def pack_env(spec, output, conda_executable=None, download_micromamba=None):
         for (name, path) in conda_spec['pip_local'].items():
             _install_local_pip(env_dir, name, path)
 
+        logger.info('copying spec to environment...')
+        shutil.copy(f'{env_dir}/conda_spec.yml', f'{env_dir}/env/conda_spec.yml')
+
         logger.info('generating environment file...')
 
         # Bug breaks bundling common packages (e.g. python).
         # ignore_missing_files may be safe to remove in the future.
         # https://github.com/conda/conda-pack/issues/145
-        conda_pack.pack(prefix=env_dir, output=str(output), force=True, ignore_missing_files=True)
+        conda_pack.pack(prefix=f'{env_dir}/env', output=str(output), force=True, ignore_missing_files=True)
 
         logger.info('to activate environment run poncho_package_run -e {} <command>'.format(output))
 
@@ -128,11 +131,7 @@ def pack_env(spec, output, conda_executable=None, download_micromamba=None):
 
 def _run_conda_command(environment, command, *args):
     all_args = [conda_exec] + command.split()
-
-    if conda_exec == 'conda':
-        all_args = all_args + ['--prefix={}'.format(str(environment))] + list(args)
-    else:
-        all_args = all_args + ['--prefix={}/env'.format(str(environment))] + list(args)
+    all_args = all_args + ['--prefix={}/env'.format(str(environment))] + list(args)
 
     try:
         subprocess.check_output(all_args)
@@ -264,7 +263,7 @@ def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
     # packages in the spec that are installed in the current environment with
     # pip --editable
     local_reqs = set()
-    
+
     if 'conda' in poncho_spec:
 
         conda_spec['channels'] = poncho_spec['conda'].get('channels', ['conda-forge', 'defaults'])
