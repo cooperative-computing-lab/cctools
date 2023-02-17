@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "vine_file.h"
 #include "vine_task.h"
 #include "vine_protocol.h"
+#include "vine_checksum.h"
 
 #include "stringtools.h"
 #include "md5.h"
@@ -120,7 +121,7 @@ static vine_url_cache_t get_url_properties( const char *url, char *tag )
 	*/
 
 	if(!strncmp(url,"file://",7)) {
-		char *hash = md5_file_or_dir(&url[7]);
+		char *hash = vine_checksum_any(&url[7]);
 		strcpy(tag,hash);
 		free(hash);
 		return VINE_FOUND_MD5;
@@ -266,7 +267,7 @@ char *vine_cached_name( const struct vine_file *f )
 
 	switch(f->type) {
 		case VINE_FILE:
-			hash = md5_file_or_dir(f->source);
+			hash = vine_checksum_any(f->source);
 			if(hash) {
 				/* An existing file is identified by its content. */
 				name = string_format("file-md5-%s",hash);

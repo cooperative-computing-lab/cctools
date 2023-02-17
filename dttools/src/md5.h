@@ -66,16 +66,4 @@ which  must be converted to a human readable form with @ref md5_to_string.
 */
 int md5_file(const char *filename, unsigned char digest[MD5_DIGEST_LENGTH]);
 
-/** Converts a directory to a string of its hashed contents.
-@param src The path to the source directory
-@returns An allocated string that must be freed.
-*/
-char *md5_dir( const char *path );
-
-/** Converts either a file or directory to a string of its hashed contents.
-@param src The path to the source file or a directory
-@returns An allocated string that must be freed.
-*/
-char *md5_file_or_dir( const char *path );
-
 #endif
