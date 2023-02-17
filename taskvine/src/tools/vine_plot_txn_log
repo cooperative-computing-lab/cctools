@@ -309,15 +309,15 @@ def parse_workers(log):
             continue
 
 
-def plot_resource_updates(zero):
+def plot_resource_updates(origin):
     xs = []
     ys = []
     y = 0
     ref = manager_start
     for worker in worker_info:
-        if zero == "ManagerFirstTask":
+        if origin == "ManagerFirstTask":
             ref = first_running
-        elif zero == "WorkerFirstTask":
+        elif origin == "WorkerFirstTask":
             ref = worker_info[worker]["first_task"]
         y += 1
         for resource_update in worker_info[worker]["resources"]:
@@ -327,7 +327,7 @@ def plot_resource_updates(zero):
                 ys.append(y)
     plt.plot(xs , ys, 'm+', label='Resource Updates')
 
-def plot_cache_updates(zero):
+def plot_cache_updates(origin):
     xs = []
     ys = []
 
@@ -341,9 +341,9 @@ def plot_cache_updates(zero):
     ref = manager_start
     y = 0
     for worker in worker_info:
-        if zero == "ManagerFirstTask":
+        if origin == "ManagerFirstTask":
             ref = first_running
-        elif zero == "WorkerFirstTask":
+        elif origin == "WorkerFirstTask":
             ref = worker_info[worker]["first_task"]
         y += 1
         for cache_update in worker_info[worker]["cache_updates"]:
@@ -384,7 +384,7 @@ def plot_cache_updates(zero):
 
 def plot_workers(title='Worker Info', all_info=False, save=None, cache_updates=False, flip=False, resources=False, 
                     marked_done=False, input_transfers=False, output_transfers=False, xticks=None, yticks=None, 
-                    zero=["default"], worker_time=False):
+                    origin=["default"], worker_time=False):
     count = 0
     start = "start"
     stop = "stop"
@@ -409,19 +409,19 @@ def plot_workers(title='Worker Info', all_info=False, save=None, cache_updates=F
     widths2 = []
     lefts = []
     lefts2 = []
-    zero = zero[0]
+    origin = origin[0]
     # PLOT CACHE UPDATES
     if all_info or cache_updates:
-        plot_cache_updates(zero)
+        plot_cache_updates(origin)
         
     # PLOT RESOURCES REPORTS
     if all_info or resources:
-        plot_resource_updates(zero)
+        plot_resource_updates(origin)
 
     for worker in worker_info:
-        if zero == "ManagerFirstTask":
+        if origin == "ManagerFirstTask":
             ref = first_running
-        elif zero == "WorkerFirstTask":
+        elif origin == "WorkerFirstTask":
             ref = worker_info[worker]["first_task"]
     
         count += 1
@@ -536,16 +536,16 @@ if __name__ == "__main__":
     parser.add_argument('--flip-tasks', action='store_true', help='flip colors between tasks')
     parser.add_argument('--cache-updates', action='store_true', help='display cache updates')
     parser.add_argument('--resource-updates', action='store_true', help='display resource updates')
-    parser.add_argument('--disconections', action='store_true', help='display disconnections')
+    parser.add_argument('--disconnections', action='store_true', help='display disconnections')
     parser.add_argument('--connections', action='store_true', help='display connections')
     parser.add_argument('--marked-done', action='store_true', help='display marked done')
     parser.add_argument('--waiting-retrieval', action='store_true', help='display waiting retrieval')
     parser.add_argument('--input-transfers', action='store_true', help='display input transfers')
-    parser.add_argument('--output-trasnsfers', action='store_true', help='display output transfers')
+    parser.add_argument('--output-transfers', action='store_true', help='display output transfers')
     parser.add_argument('--tasks-sent', action='store_true', help='display tasks sent')
     parser.add_argument('--xticks', nargs=3, help='change scale for x ticks -x <start> <step_size> <steps>')
     parser.add_argument('--yticks', nargs=3, help='change scale for y ticks -y <start> <step_size> <steps>')
-    parser.add_argument('--zero', nargs=1, help='changes refrence point for 0 Default: manager start (WorkerFirstTask|ManagerFirstTask)', default=["default"])
+    parser.add_argument('--origin', nargs=1, help='changes refrence point for 0 Default: manager start (WorkerFirstTask|ManagerFirstTask)', default=["default"])
     parser.add_argument('--worker-time', action='store_true', help='uses time measured on worker')
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
     args = parser.parse_args()
@@ -571,7 +571,7 @@ if __name__ == "__main__":
                     output_transfers=args.output_transfers,
                     xticks = args.xticks,
                     yticks = args.yticks,
-                    zero=args.zero,
+                    origin=args.origin,
                     worker_time = args.worker_time)
     elif args.mode == "Manager":
         parse_manager(args.log)
@@ -593,12 +593,12 @@ if __name__ == "__main__":
         parse_tasks(args.log)
         plot_tasks(title=args.title,
                     save=args.save,
-                    all_info=args.aall_info,
+                    all_info=args.all_info,
                     connections = args.connections,
                     disconnections = args.disconnections,
                     resources=args.resource_updates,
                     cache_updates=args.cache_updates,
-                    tasks_sent=args.tasks-sent,
+                    tasks_sent=args.tasks_sent,
                     waiting_retrieval=args.waiting_retrieval,
                     marked_done=args.marked_done,
                     xticks = args.xticks,
