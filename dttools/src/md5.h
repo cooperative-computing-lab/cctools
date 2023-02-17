@@ -16,6 +16,7 @@ See the file COPYING for details.
 #define md5_buffer cctools_md5_buffer
 #define md5_file cctools_md5_file
 #define md5_to_string cctools_md5_to_string
+#define md5_of_string cctools_md5_of_string
 
 /** @file md5.h
 Routines for computing MD5 checksums.
