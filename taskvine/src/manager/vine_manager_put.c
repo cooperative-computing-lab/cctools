@@ -342,8 +342,7 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 		vine_task_set_result(t, VINE_RESULT_INPUT_MISSING);
 		if(f->type==VINE_URL) t->exit_code = 1;
 		return VINE_APP_FAILURE;
-
-	} else{
+	} else {
 		/* Any other type, just record dummy values for size and time, until we know better. */
 		info.st_size = f->length;
 		info.st_mtime = time(0);
@@ -360,11 +359,12 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	cache-update messages.
 	*/
 	
-	if(remote_info && f->type==VINE_FILE) {
-		if(info.st_size!=remote_info->size || ((info.st_mtime!=remote_info->mtime) && (remote_info->mtime!=0))) {
+	if(remote_info) {
+		if(f->type==VINE_FILE && (info.st_size!=remote_info->size || ((info.st_mtime!=remote_info->mtime) && (remote_info->mtime!=0)))) {
 			debug(D_NOTICE|D_VINE,"File %s has changed since it was first cached!",f->source);
 			debug(D_NOTICE|D_VINE,"You may be getting inconsistent results.");
 		}
+		/* If the file is already cached, don't send it. */
 		return VINE_SUCCESS;
 	}
 
