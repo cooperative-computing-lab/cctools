@@ -49,12 +49,12 @@ void md5_buffer(const void *buffer, size_t length, unsigned char digest[MD5_DIGE
 */
 const char *md5_string(unsigned char digest[MD5_DIGEST_LENGTH]);
 
-/* md5_cal calculates the md5 checksum of string s.
+/* md5_of_string calculates the md5 checksum of string s.
  * @param s: a string pointer
  * return the md5 checksum of s on success, return NULL on failure.
  * The caller should free the returned string.
  */
-char *md5_cal(const char *s);
+char *md5_of_string(const char *s);
 
 /** Checksum a local file.
 Note that this function produces a digest in binary form

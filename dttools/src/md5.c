@@ -371,7 +371,7 @@ const char *md5_string(unsigned char digest[16])
 	return str;
 }
 
-char *md5_cal(const char *s)
+char *md5_of_string(const char *s)
 {
  	unsigned char digest[MD5_DIGEST_LENGTH_HEX];
  	md5_context_t context;
