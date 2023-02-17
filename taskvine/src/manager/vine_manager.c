@@ -4140,7 +4140,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
    - task completed?                         Yes: return completed task to user
    - update catalog if appropriate
    - retrieve workers status messages
-   - tasks waiting to be retrieved?          Yes: retrieve one task and go to S.
+   - tasks waiting to be retrieved?          Yes: retrieve all tasks from one worker.
    - tasks waiting to be dispatched?         Yes: dispatch one task and go to S.
    - send keepalives to appropriate workers
    - disconnect slow workers
@@ -4226,6 +4226,8 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		q->busy_waiting_flag = 0;
 
 		// retrieve results from workers
+		// rectrieve all available tasks from worker if retrieve_all_waiting_tasks_from_worker.
+		// If no tasks are ready to be sent retrieve all from available workers
 		N = hash_table_size(q->workers_with_available_results);
 		if(N > 0) {
 			int task_ready = !!task_state_any(q, VINE_TASK_READY);
@@ -4239,7 +4241,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				hash_table_remove(q->workers_with_available_results, key);
 				hash_table_firstkey(q->workers_with_available_results);
 				if(q->retrieve_all_waiting_tasks_from_worker){
+						BEGIN_ACCUM_TIME(q, time_receive);
 						receive_all_tasks_from_worker(q, w);
+						END_ACCUM_TIME(q, time_receive);
 						received++;
 						events++;
 						compute_manager_load(q, 1);
@@ -4249,16 +4253,20 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			}
 			if(q->retrieve_all_waiting_tasks_from_worker && q->main_loop_prefer_receives) continue;	
 		}
-		// recieve one task from any worker
+		// recieve one task from any worker if NOT retrieve_all_waiting_tasks_from_worker
 		if(!q->retrieve_all_waiting_tasks_from_worker){
 				int tasks_received = 0;
+				BEGIN_ACCUM_TIME(q, time_receive);
 				result = receive_one_task(q);
+				END_ACCUM_TIME(q, time_receive);
 				if(result){
 					tasks_received++;
 					events++;
 					compute_manager_load(q, 1);
 						while(result && tasks_received < q->main_loop_max_receives){
+							BEGIN_ACCUM_TIME(q, time_receive);
 							result = receive_one_task(q);
+							END_ACCUM_TIME(q, time_receive);
 							if(result){
 								tasks_received++;
 								compute_manager_load(q, 1);
