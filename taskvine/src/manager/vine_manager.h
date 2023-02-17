@@ -163,9 +163,9 @@ struct vine_manager {
 	int keepalive_timeout;	      /* Keepalive response must be received within this time, otherwise worker disconnected. */
 	int hungry_minimum;           /* Minimum number of waiting tasks to consider queue not hungry. */
 	int wait_for_workers;         /* Wait for these many workers to connect before dispatching tasks at start of execution. */
-	int receives;                 /* Do at most this number of receives of either receive_one_task or receive_all_tasks_from_worker. */
-	int prefer_receives;          /* Prefer to receive tasks, if a task has been received, restart the loop. */
-	int receive_all_from_worker;  /* receive all tasks from a worker as opposed to recieving one of any task*/
+	int main_loop_max_receives;                 /* Do at most this number of receives of either receive_one_task or receive_all_tasks_from_worker. */
+	int main_loop_prefer_receives;          /* Prefer to receive tasks, if a task has been received, restart the loop. */
+	int retrieve_all_waiting_tasks_from_worker;  /* receive all tasks from a worker as opposed to recieving one of any task*/
 	int fetch_factory;            /* If true, manager queries catalog for factory configuration. */
 	int wait_retrieve_many;       /* If true, main loop consumes multiple completed tasks at once. */
 	int proportional_resources;   /* If true, tasks divide worker resources proportionally. */
