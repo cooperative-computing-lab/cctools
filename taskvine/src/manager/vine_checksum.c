@@ -90,12 +90,11 @@ char *vine_checksum_any( const char *path, ssize_t *totalsize )
 	if(lstat(path, &info)) return 0; 
 
 	if(S_ISDIR(info.st_mode)) {
-		return vine_checksum_dir(path);
+		return vine_checksum_dir(path,totalsize);
 	} else if(S_ISREG(info.st_mode)) {
 		*totalsize += info.st_size;
 		return vine_checksum_file(path);
 	} else if(S_ISLNK(info.st_mode)) {
-		*totalsize += info.st_size;
 		return vine_checksum_symlink(path,info.st_size);
 	} else {
 		debug(D_NOTICE,	"unexpected file type: %s is not a file, directory, or symlink.",path);
