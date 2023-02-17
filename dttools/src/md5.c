@@ -360,7 +360,7 @@ int md5_file(const char *filename, unsigned char digest[MD5_DIGEST_LENGTH])
 	return 1;
 }
 
-const char *md5_string(unsigned char digest[16])
+const char *md5_to_string(unsigned char digest[16])
 {
 	static char str[33];
 	int i;
@@ -378,7 +378,7 @@ char *md5_of_string(const char *s)
 	md5_init(&context);
  	md5_update(&context, (const unsigned char *)s, strlen(s));
  	md5_final(digest, &context);
-	return strdup(md5_string(digest));
+	return strdup(md5_to_string(digest));
 }
 	
 /*
@@ -425,7 +425,7 @@ char *md5_dir( const char *path )
 
 	free(dirstring);
 	
-	return strdup(md5_string(digest));
+	return strdup(md5_to_string(digest));
 }
 
 char *md5_symlink( const char *path, int linklength )
@@ -439,7 +439,7 @@ char *md5_symlink( const char *path, int linklength )
 		return 0;
 	} else {
 		md5_buffer(linktext,linklength,digest);
-		return strdup(md5_string(digest));
+		return strdup(md5_to_string(digest));
 	}
 }
 	
@@ -454,7 +454,7 @@ char *md5_file_or_dir( const char *path )
 		return md5_dir(path);
 	} else if(S_ISREG(info.st_mode)) {
 		md5_file(path, digest);
-		return strdup(md5_string(digest));
+		return strdup(md5_to_string(digest));
 	} else if(S_ISLNK(info.st_mode)) {
 		return md5_symlink(path,info.st_size);
 	} else {

@@ -1602,20 +1602,20 @@ char *make_cached_name( const struct work_queue_file *f )
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
 		case WORK_QUEUE_DIRECTORY:
-			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), payload_enc);
+			return string_format("file-%d-%s-%s", cache_file_id, md5_to_string(digest), payload_enc);
 			break;
 		case WORK_QUEUE_FILE_PIECE:
-			return string_format("piece-%d-%s-%s-%lld-%lld",cache_file_id, md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
+			return string_format("piece-%d-%s-%s-%lld-%lld",cache_file_id, md5_to_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
 			break;
 		case WORK_QUEUE_REMOTECMD:
-			return string_format("cmd-%d-%s", cache_file_id, md5_string(digest));
+			return string_format("cmd-%d-%s", cache_file_id, md5_to_string(digest));
 			break;
 		case WORK_QUEUE_URL:
-			return string_format("url-%d-%s", cache_file_id, md5_string(digest));
+			return string_format("url-%d-%s", cache_file_id, md5_to_string(digest));
 			break;
 		case WORK_QUEUE_BUFFER:
 		default:
-			return string_format("buffer-%d-%s", cache_file_id, md5_string(digest));
+			return string_format("buffer-%d-%s", cache_file_id, md5_to_string(digest));
 			break;
 	}
 }

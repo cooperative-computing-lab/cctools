@@ -1790,7 +1790,7 @@ void set_worker_id()
 	unsigned char digest[MD5_DIGEST_LENGTH];
 
 	md5_buffer(salt_and_pepper, strlen(salt_and_pepper), digest);
-	worker_id = string_format("worker-%s", md5_string(digest));
+	worker_id = string_format("worker-%s", md5_to_string(digest));
 
 	free(salt_and_pepper);
 }
