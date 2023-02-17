@@ -150,4 +150,52 @@ struct vine_file * vine_file_unstarch( struct vine_file *f )
 }
 
 
+static char * find_x509_proxy()
+{
+	const char *from_env = getenv("X509_USER_PROXY");
+
+	if(from_env) {
+		return xxstrdup(from_env);
+	} else {
+		uid_t uid = getuid();
+		const char *tmpdir = getenv("TMPDIR");
+		if(!tmpdir) {
+			tmpdir = "/tmp";
+		}
+
+		char *from_uid = string_format("%s/x509up_u%u", tmpdir, uid);
+		if(!access(from_uid, R_OK)) {
+			return from_uid;
+		}
+	}
+
+	return NULL;
+}
+
+struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy )
+{
+	if(!proxy) {
+		char *proxy_filename = find_x509_proxy();
+		if(proxy_filename) {
+			proxy = vine_file_local(proxy_filename);
+			free(proxy_filename);
+		}
+	}
+
+	char *command = string_format("xrdcp %s output.root", source);
+	struct vine_task *t = vine_task_create(command);
+
+	vine_task_add_output(t,vine_file_local("output.root"),"output.root",VINE_CACHE);
+
+	if(proxy) {
+		vine_task_set_env_var(t, "X509_USER_PROXY", "proxy509");
+		vine_task_add_input(t,proxy,"proxy509.pem",VINE_CACHE);
+	}
+
+	free(command);
+
+	return vine_file_mini_task(t);
+}
+
+
 /* vim: set noexpandtab tabstop=4: */

@@ -651,6 +651,17 @@ struct vine_file * vine_file_local( const char *source );
 
 struct vine_file * vine_file_url( const char *url );
 
+
+/** Create a file object of a remote file accessible from an xrootd server.
+@param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
+@param proxy A @ref vine_file of the X509 proxy to use. If NULL, the
+environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
+in that order. If no proxy is present, the transfer is tried without authentication.
+@return A general file object for use by @ref
+vine_task_add_input.
+*/
+struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy );
+
 /** Create a scratch file object.
 A scratch file has no initial content, but is created
 as the output of a task, and may be consumed by other tasks.

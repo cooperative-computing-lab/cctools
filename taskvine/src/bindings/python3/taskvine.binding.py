@@ -203,6 +203,25 @@ class FileUnstarch(File):
         self._file = vine_file_unstarch(vine_file_clone(subfile._file))
 
 
+class FileXrootD(File):
+
+    ##
+    # Create a file object of a remote file accessible from an xrootd server.
+    #
+    # @param self   The current file object.
+    # @param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
+    # @param proxy  A @ref File of the X509 proxy to use. If None, the
+    #               environment variable X509_USER_PROXY and the file
+    #               "$TMPDIR/$UID" are considered in that order. If no proxy is
+    #               present, the transfer is tried without authentication.
+
+    def __init__(self, source, proxy=None):
+        proxy_c = None
+        if proxy:
+            proxy_c = proxy._file
+        self._file = vine_file_xrootd(source, proxy_c)
+
+
 ##
 # \class Task
 #
