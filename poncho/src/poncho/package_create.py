@@ -16,84 +16,120 @@ import hashlib
 import shutil
 import logging
 import re
+from platform import uname
 from packaging import version
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
-executable = 'conda'
+conda_exec = 'conda'
 
-def pack_env(spec, output, mamba):
+def _find_conda_executable(conda_executable, env_dir, download_micromamba=True):
+    if conda_executable:
+        return conda_executable
 
+    candidate = shutil.which('mamba')
+    if candidate:
+        logger.info('found mamba')
+        return candidate
+
+    if 'CONDA_EXE' in os.environ:
+        candidate = shutil.which(os.environ['CONDA_EXE'])
+        if candidate:
+            logger.info('found conda via CONDA_EXE')
+            return candidate
+
+    candidate = shutil.which('conda')
+    if candidate:
+        logger.info('found conda')
+        return candidate
+
+    candidate = shutil.which('micromamba')
+    if candidate:
+        logger.info('found micromamba')
+        return candidate
+
+    if download_micromamba:
+        candidate = _download_micromamba(env_dir)
+        if candidate:
+            logger.info('installed micromamba')
+            return candidate
+
+    raise FileNotFoundError('could not find a working conda executable')
+
+
+def _download_micromamba(env_dir):
+    # mimics what src/install.sh does in micromamba release, but install
+    # micromamba to a custom directory
+    logger.info('downloading micromamba...')
+
+    arch = uname().machine
+    osys = uname().system
+
+    if osys == "Linux":
+        platform = "linux"
+        if arch not in ["aarch64", "ppc64le"]:
+            arch = "64"
+    elif osys == "Darwin":
+        platform = "osx"
+        if arch not in ["arm64"]:
+            arch = "64"
+
+    os.mkdir(f"{env_dir}/bin")
+    try:
+        subprocess.run(f"curl -Ls https://micro.mamba.pm/api/micromamba/{platform}-{arch}/latest | tar xj -C {env_dir}/bin --strip-components=1 bin/micromamba",
+                shell=True, check=True)
+    except subprocess.CalledProcessError:
+        logger.error("could not install micromamba.")
+
+    return os.path.join(env_dir, "bin", "micromamba")
+
+def pack_env(spec, output, conda_executable=None, download_micromamba=None):
     # record packages installed as editable from pip
     local_pip_pkgs = _find_local_pip()
 
     with tempfile.TemporaryDirectory() as env_dir:
-        logger.info('Creating temporary environment in {}'.format(env_dir))
+        logger.info('creating temporary environment in {}'.format(env_dir))
 
-        # Checks for a mamba executable if specified
-        logger.info('Using mamba for environment creation...')
-        if mamba:
-            _check_mamba(env_dir)
+        global conda_exec
+        conda_exec = _find_conda_executable(conda_executable, env_dir, download_micromamba)
 
-        print(executable)
+        logger.info(f'using conda_executable {conda_exec}')
         # creates conda spec file from poncho spec file
-        logger.info('Converting spec file...')
+        logger.info('converting spec file...')
         conda_spec = create_conda_spec(spec, env_dir, local_pip_pkgs)
 
         # fetch data via git and https
-        logger.info('Fetching git data...')
+        logger.info('fetching git data...')
         git_data(spec, env_dir)
 
-        logger.info('Fetching http data...')
+        logger.info('fetching http data...')
         http_data(spec, env_dir)
 
         # create conda environment in temp directory
-        logger.info('Populating environment...')
-        if mamba:
-            _run_conda_command(env_dir, 'create', '--file', env_dir + '/conda_spec.yml', '--yes')
-        else:
-            _run_conda_command(env_dir, 'env create', '--file', env_dir + '/conda_spec.yml')
+        logger.info('populating environment...')
+        _run_conda_command(env_dir, 'env create', '--file', env_dir + '/conda_spec.yml')
 
-        logger.info('Adding local packages...')
+        logger.info('adding local packages...')
         for (name, path) in conda_spec['pip_local'].items():
             _install_local_pip(env_dir, name, path)
 
-        logger.info('Generating environment file...')
+        logger.info('generating environment file...')
 
         # Bug breaks bundling common packages (e.g. python).
         # ignore_missing_files may be safe to remove in the future.
         # https://github.com/conda/conda-pack/issues/145
         conda_pack.pack(prefix=env_dir, output=str(output), force=True, ignore_missing_files=True)
 
-        logger.info('To activate environment run poncho_package_run -e {} <command>'.format(output))
+        logger.info('to activate environment run poncho_package_run -e {} <command>'.format(output))
 
     return output
 
 
 
-def _check_mamba(env_dir):
-
-    mamba_exec = shutil.which('mamba')
-
-    global executable
-    if mamba_exec:
-        logger.info('mamba executable found within path...')
-        executable = mamba_exec
-    else:
-        logger.info('mamba executable not found within path...')
-        logger.info('retrieving micromamba...')
-        curl_out = env_dir + '/curl_out'
-        tar_out = env_dir + '/micromamba'
-        os.mkdir(tar_out)
-        subprocess.check_output(['curl', '-Ls', 'https://micro.mamba.pm/api/micromamba/linux-64/latest', '-o', curl_out])
-        subprocess.check_output(['tar', '-xvjf', curl_out, '-C', tar_out])
-        executable = tar_out + '/bin/micromamba'
-
-
 def _run_conda_command(environment, command, *args):
-    all_args = [executable] + command.split()
-    
-    if executable == 'conda':
+    all_args = [conda_exec] + command.split()
+
+    if conda_exec == 'conda':
         all_args = all_args + ['--prefix={}'.format(str(environment))] + list(args)
     else:
         all_args = all_args + ['--prefix={}/env'.format(str(environment))] + list(args)
@@ -101,7 +137,7 @@ def _run_conda_command(environment, command, *args):
     try:
         subprocess.check_output(all_args)
     except subprocess.CalledProcessError as e:
-        logger.warning("Error executing: {}".format(' '.join(all_args)))
+        logger.warning("error executing: {}".format(' '.join(all_args)))
         print(e.output.decode())
         sys.exit(1)
 
@@ -155,7 +191,7 @@ def git_data(spec, out_dir):
 
 
 def _install_local_pip(env_dir, pip_name, pip_path):
-    logger.info("Installing {} from editable pip".format(pip_path))
+    logger.info("installing {} from editable pip".format(pip_path))
     # TODO GET pip version
     pip_exec = shutil.which('pip')
     process = subprocess.Popen([pip_exec, '-V'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -251,7 +287,6 @@ def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
                         conda_spec['dependencies'].remove(dep)
 
             conda_spec['dependencies'] = list(conda_spec['dependencies'])
-        
         # OLD FORMAT
         else:
 
@@ -266,7 +301,7 @@ def create_conda_spec(spec_file, out_dir, local_pip_pkgs):
 
 
             pip_pkgs = set(poncho_spec.get('pip', []))
-            
+
             for dep in list(pip_pkgs):
                 only_name = re.sub("[!~=<>].*$", "", dep)  # remove possible version from spec
                 if only_name in local_pip_pkgs:
