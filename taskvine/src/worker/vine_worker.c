@@ -2191,8 +2191,7 @@ int main(int argc, char *argv[])
 	
 	chdir(workspace);
 
-	trash_file("cache");
-	trash_empty();
+	unlink_recursive("cache");
 
 	procs_running  = itable_create(0);
 	procs_table    = itable_create(0);
