@@ -12,7 +12,7 @@ and landmark database from NCBI, and then performs a short query.
 
 The query is provided by a string (but presented to the task as a file.)
 Both the downloads are automatically unpacked, cached, and shared
-with all the same tasks on the worker.
+across all workers efficiently.
 */
 
 
@@ -41,6 +41,9 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
+	//runtime logs will be written to vine_example_blast_info/%Y-%m-%dT%H:%M:%S
+	vine_set_runtime_info_path("vine_example_blast_info");
+
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));
@@ -48,15 +51,15 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_enable_debug_log(m,"manager.log");
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
-
+	struct vine_file *software = vine_file_untar(vine_file_url(BLAST_URL));
+	struct vine_file *database = vine_file_untar(vine_file_url(LANDMARK_URL));
+	
 	for(i=0;i<10;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
-	  
+
 		vine_task_add_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
-		vine_task_add_input(t,vine_file_untar(vine_file_url(BLAST_URL)),"blastdir", VINE_CACHE );
-		vine_task_add_input(t,vine_file_untar(vine_file_url(LANDMARK_URL)),"landmark", VINE_CACHE );
+		vine_task_add_input(t,software,"blastdir", VINE_CACHE );
+		vine_task_add_input(t,database,"landmark", VINE_CACHE );
 		vine_task_set_env_var(t,"BLASTDB","landmark");
 
 		int task_id = vine_submit(m, t);
@@ -83,6 +86,9 @@ int main(int argc, char *argv[])
 
 	printf("all tasks complete!\n");
 
+	vine_file_delete(software);
+	vine_file_delete(database);
+	
 	vine_delete(m);
 
 	return 0;

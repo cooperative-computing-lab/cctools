@@ -17,7 +17,7 @@ desired_tag_order = "7 5 9 6 3 8 2 1".split()
 alpha_order = sorted(desired_tag_order)
 done_order = []
 
-q = vine.Manager(port=0, debug_log='debug.log')
+q = vine.Manager(port=0)
 with open(port_file, 'w') as f:
     print('Writing port {port} to file {file}'.format(port=q.port, file=port_file))
     f.write(str(q.port))

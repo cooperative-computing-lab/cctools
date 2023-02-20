@@ -31,7 +31,7 @@ quit
 EOF
 
 	echo "starting manager"
-	(${VALGRIND} --log-file=manager.valgrind -- vine_benchmark -d all -o manager.log -Z manager.port < manager.script; echo $? > manager.exitcode ) &
+	(${VALGRIND} --log-file=manager.valgrind -- vine_benchmark -Z manager.port < manager.script; echo $? > manager.exitcode ) &
 
 	echo "waiting for manager to get ready"
 	wait_for_file_creation manager.port 15
@@ -67,7 +67,7 @@ EOF
 
 clean()
 {
-	rm -f manager.script manager.log manager.port manager.exitcode manager.valgrind worker.log worker.exitcode worker.valgrind output.* input.*
+	rm -f manager.script vine_benchmark_info manager.port manager.exitcode manager.valgrind worker.log worker.exitcode worker.valgrind output.* input.*
 }
 
 dispatch "$@"

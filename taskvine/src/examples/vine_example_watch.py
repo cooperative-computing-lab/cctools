@@ -23,16 +23,10 @@ import taskvine as vine
 import sys
 
 if __name__ == "__main__":
-    try:
-        m = vine.Manager()
-    except IOError as e:
-        print("couldn't create manager:", e.errno)
-        sys.exit(1)
+    m = vine.Manager()
     print("listening on port", m.port)
 
-    m.enable_debug_log("manager.log")
     n = 3
-
     for i in range(n):
         output = "output." + str(i)
         t = vine.Task("./vine_example_watch_trickle.sh > output")

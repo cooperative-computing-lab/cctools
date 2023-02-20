@@ -131,6 +131,7 @@ struct vine_manager {
 
 	/* Logging configuration. */
 
+    char *runtime_directory;
 	FILE *perf_logfile; /* Performance logfile for tracking metrics by time. */
 	FILE *txn_logfile;  /* Transaction logfile for recording every event of interest. */
 
@@ -195,6 +196,29 @@ const struct rmsummary *vine_manager_task_resources_max(struct vine_manager *q, 
 struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t );
 
 int64_t overcommitted_resource_total(struct vine_manager *q, int64_t total);
+
+/** Turn on the debugging log output and send to the named file.
+ * (Note it does not need the vine_manager structure, as it is enabled before
+ * the manager is created.)
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_debug_log( const char *logfile );
+
+/** Add a performance log file that records cummulative statistics of the connected workers and submitted tasks.
+@param m A manager object
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_perf_log(struct vine_manager *m, const char *logfile);
+
+/** Add a log file that records the states of the connected workers and tasks.
+@param m A manager object
+@param logfile The filename.
+@return 1 if logfile was opened, 0 otherwise.
+*/
+int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
+
 
 /* The expected format of files created by the resource monitor.*/
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-%d-task-%d"

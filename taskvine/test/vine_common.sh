@@ -18,7 +18,7 @@ quit
 EOF
 
 	echo "starting master"
-	vine_benchmark -d all -o master.log -Z master.port < master.script &
+	vine_benchmark -Z master.port < master.script &
 
 	echo "waiting for master to get ready"
 	wait_for_file_creation master.port 5
@@ -26,7 +26,7 @@ EOF
 	port=`cat master.port`
 
 	echo "starting worker"
-	vine_worker -d all -o worker.log localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
+	vine_worker -o worker.log -d all localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
 
 	echo "checking for output"
 	i=0
@@ -37,10 +37,11 @@ EOF
 		then
 			echo "$file is missing!"
 
-			if [ -f master.log  ]
+			logfile=$(latest_vine_debug_log)
+			if [ -f ${logfile}  ]
 			then
 				echo "master log:"
-				cat master.log
+				cat ${logfile}
 			fi
 
 			if [ -f worker.log  ]
@@ -60,7 +61,7 @@ EOF
 
 clean()
 {
-	rm -f master.script master.log master.port worker.log output.* input.*
+	rm -rf master.script vine-run-info vine_benchmark_info master.port worker.log output.* input.*
 }
 
 dispatch "$@"

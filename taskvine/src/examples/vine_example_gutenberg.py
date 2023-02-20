@@ -46,15 +46,8 @@ urls = [
 url_count = 25
 
 if __name__ == "__main__":
-    try:
-        m = vine.Manager()
-    except IOError as e:
-        print("couldn't create manager:", e.errno)
-        sys.exit(1)
+    m = vine.Manager()
     print("listening on port", m.port)
-
-    m.enable_debug_log("manager.log")
-    m.set_scheduler(vine.VINE_SCHEDULE_FILES)
 
     for i in range(url_count):
         for j in range(url_count):

@@ -22,16 +22,15 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
+    //runtime logs will be written to vine_example_unponcho_worker_info/%Y-%m-%dT%H:%M:%S
+	vine_set_runtime_info_path("vine_example_unponcho_worker_info");
+
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));
 		return 1;
 	}
 	printf("listening on port %d...\n", vine_port(m));
-
-	vine_enable_debug_log(m,"manager.log");
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
-	vine_set_name(m, "bslydelg_test");
 
 	for(i=0;i<5;i++) {
 

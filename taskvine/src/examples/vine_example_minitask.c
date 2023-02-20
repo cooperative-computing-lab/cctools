@@ -24,6 +24,9 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
+	//runtime logs will be written to vine_example_minitask_info/%Y-%m-%dT%H:%M:%S
+	vine_set_runtime_info_path("vine_example_minitask_info");
+
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));
@@ -31,14 +34,11 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_enable_debug_log(m,"manager.log");
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
+	struct vine_file *package = vine_file_untar(vine_file_url(CCTOOLS_URL));
 
 	for(i=0;i<10;i++) {
-
-		struct vine_file *infile = vine_file_untar(vine_file_url(CCTOOLS_URL));
 		struct vine_task *task = vine_task_create("ls -lR cctools | wc -l");
-		vine_task_add_input(task,infile,"cctools",VINE_CACHE);		
+		vine_task_add_input(task,package,"cctools",VINE_CACHE);		
 		int task_id = vine_submit(m, task);
 
 		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(task) );
@@ -63,6 +63,7 @@ int main(int argc, char *argv[])
 
 	printf("all tasks complete!\n");
 
+	vine_file_delete(package);
 	vine_delete(m);
 
 	return 0;

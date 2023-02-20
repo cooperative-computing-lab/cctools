@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "vine_factory_info.h"
 #include "vine_blocklist.h"
 #include "vine_file.h"
+#include "vine_mount.h"
 #include "vine_remote_file_info.h"
 
 #include "debug.h"
@@ -120,14 +121,14 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 	int64_t most_task_cached_bytes = 0;
 	int64_t task_cached_bytes;
 	struct vine_remote_file_info *remote_info;
-	struct vine_file *tf;
+	struct vine_mount *m;
 
 	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 		if( check_worker_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
-			LIST_ITERATE(t->input_files,tf) {
-				if(tf->type == VINE_FILE  && (tf->flags & VINE_CACHE)) {
-					remote_info = hash_table_lookup(w->current_files, tf->cached_name);
+			LIST_ITERATE(t->input_mounts,m) {
+				if(m->file->type == VINE_FILE  && (m->flags & VINE_CACHE)) {
+					remote_info = hash_table_lookup(w->current_files, m->file->cached_name);
 					if(remote_info)
 						task_cached_bytes += remote_info->size;
 				}

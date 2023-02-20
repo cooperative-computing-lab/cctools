@@ -33,8 +33,8 @@ struct vine_task {
 	char *monitor_output_directory;	/**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref vine_enable_monitoring */
 	char *monitor_snapshot_file;    /**< Filename the monitor checks to produce snapshots. */
 
-	struct list *input_files;    /**< The files to transfer to the worker and place in the executing directory. */
-	struct list *output_files;   /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
+	struct list *input_mounts;    /**< The mounted files expected as inputs. */
+	struct list *output_mounts;   /**< The mounted files expected as outputs. */
 	struct list *env_list;       /**< Environment variables applied to the task. */
 	struct list *feature_list;   /**< User-defined features this task requires. (See vine_worker's --feature option.) */
 
@@ -97,5 +97,6 @@ void vine_task_check_consistency( struct vine_task *t );
 const char *vine_task_state_to_string( vine_task_state_t task_state );
 
 struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t );
+char * vine_task_to_json(struct vine_task *t);
 
 #endif

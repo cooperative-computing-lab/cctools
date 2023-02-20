@@ -290,18 +290,25 @@ char *catalog_query_compress_update(const char *text, unsigned long *data_length
 	}
 }
 
+/*
+Determine what protocol to use for catalog updates.
+If none is given, default to TCP updates, which are
+more likely to make it through various network
+translation devices.
+*/
+
 static int catalog_update_protocol()
 {
 	const char *protocol = getenv("CATALOG_UPDATE_PROTOCOL");
 	if(!protocol) {
-		return 1;
+		return 0;
 	} else if(!strcmp(protocol,"udp")) {
 		return 1;
 	} else if(!strcmp(protocol,"tcp")) {
 		return 0;
 	} else {
 		debug(D_NOTICE,"CATALOG_UPDATE_PROTOCOL=%s but should be 'udp' or 'tcp' instead.",protocol);
-		return 1;
+		return 0;
 	}
 }
 
