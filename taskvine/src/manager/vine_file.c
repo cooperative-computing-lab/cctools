@@ -56,8 +56,6 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		if(length==0) f->length = totalsize;
 	}
 
-	debug(D_VINE,"cached name: %s\n",f->cached_name);
-
 	f->refcount = 1;
 
 	return f;

@@ -310,10 +310,11 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 
 		if(!remote_info) {
 			/*
-			If an unsolicited cache-update arrives, then the worker
-			is telling us about something from a previous run.
+			If an unsolicited cache-update arrives, there are several possibilities:
+			- The worker is telling us about an item from a previous run.
+			- The file was created as an output of a task.
 			*/
-			remote_info = vine_remote_file_info_create(size,time(0));
+			remote_info = vine_remote_file_info_create(size,0);
 			hash_table_insert(w->current_files,cachename,remote_info);
 		}
 
