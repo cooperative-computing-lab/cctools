@@ -354,7 +354,7 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 
 	/* If so, check that it hasn't changed, and return success. */
 	if(remote_info) {
-		if(f->type==VINE_FILE && (info.st_size!=remote_info->size || info.st_mtime!=remote_info->mtime)) {
+		if(f->type==VINE_FILE && info.st_size!=remote_info->size) {
 			debug(D_NOTICE|D_VINE,"File %s has changed since it was first cached!",f->source);
 			debug(D_NOTICE|D_VINE,"You may be getting inconsistent results.");
 		}
