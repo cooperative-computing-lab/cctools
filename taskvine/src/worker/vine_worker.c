@@ -2187,15 +2187,12 @@ int main(int argc, char *argv[])
 	debug(D_VINE, "VINE_SANDBOX set to %s.\n", workspace);
 	setenv("VINE_SANDBOX", workspace, 0);
 
-	struct stat info;
-	// detele existing cache directory if it exists
-	if (stat("cache", &info)==0){ 
-		trash_file("cache");
-		trash_empty();
-	}
 	// change to workspace
 	
 	chdir(workspace);
+
+	trash_file("cache");
+	trash_empty();
 
 	procs_running  = itable_create(0);
 	procs_table    = itable_create(0);
@@ -2285,10 +2282,8 @@ int main(int argc, char *argv[])
 		list_delete(coprocess_list);
 	}
 	
-	if (stat("cache", &info)==0){ 
-		trash_file("cache");
-		trash_empty();
-	}
+	trash_file("cache");
+	trash_empty();
 
 	workspace_delete();
 
