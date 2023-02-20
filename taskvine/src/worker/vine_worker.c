@@ -1379,7 +1379,7 @@ static int workspace_create()
 	// Setup working space(dir)
 	if(!workspace) {
 		const char *workdir = system_tmp_dir(user_specified_workdir);
-		workspace = string_format("%s/worker-%d", workdir, (int) getuid());
+		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
 
 	printf( "vine_worker: creating workspace %s\n", workspace);
@@ -1540,7 +1540,7 @@ static void workspace_delete()
 	is inside the workspace.  Abort if we really cannot clean up.
 	*/
 
-
+	unlink_recursive(workspace);
 	free(workspace);
 }
 
@@ -2187,7 +2187,14 @@ int main(int argc, char *argv[])
 	debug(D_VINE, "VINE_SANDBOX set to %s.\n", workspace);
 	setenv("VINE_SANDBOX", workspace, 0);
 
+	struct stat info;
+	// detele existing cache directory if it exists
+	if (stat("cache", &info)==0){ 
+		trash_file("cache");
+		trash_empty();
+	}
 	// change to workspace
+	
 	chdir(workspace);
 
 	procs_running  = itable_create(0);
@@ -2276,6 +2283,11 @@ int main(int argc, char *argv[])
 	if (list_size(coprocess_list) > 0) {
 		vine_coprocess_shutdown_all_coprocesses(coprocess_list);
 		list_delete(coprocess_list);
+	}
+	
+	if (stat("cache", &info)==0){ 
+		trash_file("cache");
+		trash_empty();
 	}
 
 	workspace_delete();
