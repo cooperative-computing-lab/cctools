@@ -85,7 +85,7 @@ class FileTemp(File):
     # Create an anonymous temporary file object.
     #
     # @param self       The current file object.
-    
+
     def __init__(self):
         self._file = vine_file_temp()
 
@@ -201,6 +201,25 @@ class FileUnstarch(File):
     # @param subfile    The file object to un-tgz.
     def __init__(self, subfile):
         self._file = vine_file_unstarch(vine_file_clone(subfile._file))
+
+
+class FileXrootD(File):
+
+    ##
+    # Create a file object of a remote file accessible from an xrootd server.
+    #
+    # @param self   The current file object.
+    # @param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
+    # @param proxy  A @ref File of the X509 proxy to use. If None, the
+    #               environment variable X509_USER_PROXY and the file
+    #               "$TMPDIR/$UID" are considered in that order. If no proxy is
+    #               present, the transfer is tried without authentication.
+
+    def __init__(self, source, proxy=None):
+        proxy_c = None
+        if proxy:
+            proxy_c = proxy._file
+        self._file = vine_file_xrootd(source, proxy_c)
 
 
 ##
@@ -1115,7 +1134,8 @@ class Manager(object):
             if name:
                 vine_set_name(self._taskvine, name)
         except Exception as e:
-            raise Exception("Unable to create internal taskvine structure: {}".format(e))
+            sys.stderr.write("Unable to create internal taskvine structure.")
+            raise
 
     def _free_manager(self):
         try:

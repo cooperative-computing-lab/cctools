@@ -50,7 +50,10 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		f->cached_name = xxstrdup(cached_name);
 	} else {
 		/* Otherwise we need to figure it out ourselves from the content. */
-		f->cached_name = vine_cached_name(f);
+		/* This may give us the actual size of the object along the way. */
+		ssize_t totalsize = 0;
+		f->cached_name = vine_cached_name(f,&totalsize);
+		if(length==0) f->length = totalsize;
 	}
 
 	f->refcount = 1;
@@ -144,6 +147,54 @@ struct vine_file * vine_file_unstarch( struct vine_file *f )
 	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
 	vine_task_add_input(t,f,"package.sfx",VINE_CACHE);
 	vine_task_add_output(t,vine_file_local("output"),"output",VINE_CACHE);
+	return vine_file_mini_task(t);
+}
+
+
+static char * find_x509_proxy()
+{
+	const char *from_env = getenv("X509_USER_PROXY");
+
+	if(from_env) {
+		return xxstrdup(from_env);
+	} else {
+		uid_t uid = getuid();
+		const char *tmpdir = getenv("TMPDIR");
+		if(!tmpdir) {
+			tmpdir = "/tmp";
+		}
+
+		char *from_uid = string_format("%s/x509up_u%u", tmpdir, uid);
+		if(!access(from_uid, R_OK)) {
+			return from_uid;
+		}
+	}
+
+	return NULL;
+}
+
+struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy )
+{
+	if(!proxy) {
+		char *proxy_filename = find_x509_proxy();
+		if(proxy_filename) {
+			proxy = vine_file_local(proxy_filename);
+			free(proxy_filename);
+		}
+	}
+
+	char *command = string_format("xrdcp %s output.root", source);
+	struct vine_task *t = vine_task_create(command);
+
+	vine_task_add_output(t,vine_file_local("output.root"),"output.root",VINE_CACHE);
+
+	if(proxy) {
+		vine_task_set_env_var(t, "X509_USER_PROXY", "proxy509");
+		vine_task_add_input(t,proxy,"proxy509.pem",VINE_CACHE);
+	}
+
+	free(command);
+
 	return vine_file_mini_task(t);
 }
 

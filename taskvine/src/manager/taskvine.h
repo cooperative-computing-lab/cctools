@@ -53,9 +53,9 @@ typedef enum {
 typedef enum {
 	VINE_SCHEDULE_UNSET = 0, /**< Internal use only. */
 	VINE_SCHEDULE_FCFS,      /**< Select worker on a first-come-first-serve basis. */
-	VINE_SCHEDULE_FILES,     /**< Select worker that has the most data required by the task. */
+	VINE_SCHEDULE_FILES,     /**< Select worker that has the most data required by the task. (default) */
 	VINE_SCHEDULE_TIME,      /**< Select worker that has the fastest execution time on previous tasks. */
-	VINE_SCHEDULE_RAND,      /**< Select a random worker. (default) */
+	VINE_SCHEDULE_RAND,      /**< Select a random worker. */
 	VINE_SCHEDULE_WORST      /**< Select the worst fit worker (the worker with more unused resources). */
 } vine_schedule_t;
 
@@ -650,6 +650,17 @@ struct vine_file * vine_file_local( const char *source );
 */
 
 struct vine_file * vine_file_url( const char *url );
+
+
+/** Create a file object of a remote file accessible from an xrootd server.
+@param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
+@param proxy A @ref vine_file of the X509 proxy to use. If NULL, the
+environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
+in that order. If no proxy is present, the transfer is tried without authentication.
+@return A general file object for use by @ref
+vine_task_add_input.
+*/
+struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy );
 
 /** Create a scratch file object.
 A scratch file has no initial content, but is created

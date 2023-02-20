@@ -30,7 +30,7 @@ Routines for computing Hash-based Message Authentication Codes.
 int hmac(const void *buffer, size_t buffer_length, const void *key, size_t key_length, unsigned char *digest, size_t digest_len, size_t block_size, void (*hash_func) (const void *, size_t, unsigned char *));
 
 /** Generate HMAC using md5 hash function
-Note that this function produces a digest in binary form which must be converted to a human readable form with md5_string.
+Note that this function produces a digest in binary form which must be converted to a human readable form with md5_to_string.
 @param buffer Pointer to a memory buffer.
 @param buffer_length Length of the buffer in bytes.
 @param key Pointer to a buffer containing the key for hashing.

@@ -628,14 +628,14 @@ INT64_T chirp_reli_hash(const char *host, const char *path, const char *algorith
 /** Checksum a remote file. (DEPRECATED: use @ref chirp_reli_hash)
 This MD5 checksum is performed remotely by the file server, so it is much more
 efficient than computing one by invoking a local command.  Note that the data
-is returned in <b>binary</b> digest form.  Use @ref md5_string to convert the
+is returned in <b>binary</b> digest form.  Use @ref md5_to_string to convert the
 digest into a human readable form.
 @param host The name and port of the Chirp server to access.
 @param path The pathname of the file to access.
 @param digest The buffer to place the binary checksum digest.
 @param stoptime The absolute time at which to abort.
 @return On success, returns length of digest.  On failure, returns less than zero and sets errno.
-@see md5_string
+@see md5_to_string
 */
 
 INT64_T chirp_reli_md5(const char *host, const char *path, unsigned char digest[CHIRP_DIGEST_MAX], time_t stoptime);

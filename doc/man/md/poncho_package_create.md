@@ -29,7 +29,6 @@
 ## SYNOPSIS
 
 **poncho_package_create [options] _&lt;dependency-file&gt;_ _&lt;_&lt;output-path&gt;_&gt;_**
-**poncho_package_create [options] _&lt;dependency-file&gt;_ _&lt;_&lt;output-path&gt;_&gt;_**
 
 ## DESCRIPTION
 
@@ -41,7 +40,9 @@ The **dependency-file** argument is the path (relative or absolute) to the a JSO
 
 ## OPTIONS
 
-- **-h**<br />        Show this help message
+- **--conda-executable=_&lt;path&gt;_**<br /> Location of conda executable to use. If not given, mamba, $CONDA_EXE, conda, and microconda are tried, in that order.
+- **--no-microconda**<br /> Do not try to download microconda if a conda executable is not found.
+- **-h**,**--help**<br />               Show the help message.
 
 ## EXIT STATUS
 
@@ -49,7 +50,7 @@ On success, returns zero. On failure, returns non-zero.
 
 ## EXAMPLE
 
-**$ poncho_package_create dependencies.json example_venv.tar.gz**
+**poncho_package_create dependencies.json example_venv.tar.gz**
 
 This will create an example_venv.tar.gz environment tarball within the current working directory, which can then be exported to different machines for execution.
 

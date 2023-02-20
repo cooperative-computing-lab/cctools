@@ -51,8 +51,6 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
-
 	struct vine_file *software = vine_file_untar(vine_file_url(BLAST_URL));
 	struct vine_file *database = vine_file_untar(vine_file_url(LANDMARK_URL));
 	
