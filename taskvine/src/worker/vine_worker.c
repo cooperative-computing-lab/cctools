@@ -1379,7 +1379,7 @@ static int workspace_create()
 	// Setup working space(dir)
 	if(!workspace) {
 		const char *workdir = system_tmp_dir(user_specified_workdir);
-		workspace = string_format("%s/worker-%d", workdir, (int) getuid());
+		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
 
 	printf( "vine_worker: creating workspace %s\n", workspace);
@@ -1540,7 +1540,7 @@ static void workspace_delete()
 	is inside the workspace.  Abort if we really cannot clean up.
 	*/
 
-
+	unlink_recursive(workspace);
 	free(workspace);
 }
 
@@ -2188,7 +2188,10 @@ int main(int argc, char *argv[])
 	setenv("VINE_SANDBOX", workspace, 0);
 
 	// change to workspace
+	
 	chdir(workspace);
+
+	unlink_recursive("cache");
 
 	procs_running  = itable_create(0);
 	procs_table    = itable_create(0);
@@ -2277,6 +2280,9 @@ int main(int argc, char *argv[])
 		vine_coprocess_shutdown_all_coprocesses(coprocess_list);
 		list_delete(coprocess_list);
 	}
+	
+	trash_file("cache");
+	trash_empty();
 
 	workspace_delete();
 
