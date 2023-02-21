@@ -145,7 +145,7 @@ def parse_tasks(log):
                 manager_info["Duties Sent"].append(time - manager_info["Start"])
             elif target == "START":
                 manager_info["Duties Started"].append(time - manager_info["Start"])
-                manager_info["DutyMap"].update([(int(event), arg)])
+                manager_info["DutyMap"].update([(int(event), (arg, time - manager_info["Start"], 0))])
 
             continue
 
@@ -156,9 +156,11 @@ def plot_tasks(title='Manager Info', all_info=False, save=None, connections=Fals
     dcache = manager_info["CacheTime"]
     dtasks = manager_info["TaskMap"]
     tasks_sent = [manager_info["TaskMap"][x][1] for x in sorted(manager_info["TaskMap"])]
+    duties_sent =  [manager_info["DutyMap"][x][1] for x in sorted(manager_info["DutyMap"])]
     task_failure_ids = [x for x in sorted(manager_info["TaskMap"]) if manager_info["TaskMap"][x][2] != None]
 
     task_cachetime = {}
+    duty_cachetime = {}
 
     # map cache update time to task id
     for task, (worker, _, _) in dtasks.items():
@@ -166,10 +168,18 @@ def plot_tasks(title='Manager Info', all_info=False, save=None, connections=Fals
             if worker == cworker:
                 task_cachetime.update([(task, cachetime)])
 
+    for duty, (worker, _, _) in manager_info["DutyMap"].items():
+        for cworker, cachetime in dcache.items():
+            if worker == cworker:
+                duty_cachetime.update([(duty, cachetime)])
+
     stimes = list(task_cachetime.values())
     times = [float(t) for t in stimes]
 
-    ys = range(1, len(manager_info["TaskMap"].keys()) + 1)
+    ys = [x for x in sorted(manager_info["TaskMap"])]
+
+    duty_ys = [x for x in sorted(manager_info["DutyMap"])]
+    duty_times = [duty_cachetime[x] for x in duty_ys]
     
     dwidths = sorted(manager_info["TaskDone"].items())
     lwidths = [float(i[1]) for i in dwidths]
@@ -181,6 +191,7 @@ def plot_tasks(title='Manager Info', all_info=False, save=None, connections=Fals
     
     if input_transfers or all_info:
         plt.barh(ys, width=times, left=tasks_sent, color="orange", label="Transfers")
+        plt.barh(duty_ys, width=duty_times, left=duties_sent, color="darkorange", label="Duty Transfers")
     if waiting_retrieval or all_info:
         plt.plot(manager_info["Waiting Retrieval"], ys, "r+", label="Waiting Retrieval")
     if marked_done or all_info:
