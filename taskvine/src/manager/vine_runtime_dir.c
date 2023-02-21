@@ -82,7 +82,7 @@ char *vine_runtime_directory_create() {
 	}
 
 	setenv("VINE_RUNTIME_INFO_DIR", runtime_dir, 1);
-	if(!create_dir(runtime_dir, 755)) {
+	if(!create_dir(runtime_dir, 0755)) {
         return NULL;
     }
 
@@ -92,13 +92,13 @@ char *vine_runtime_directory_create() {
 	runtime_dir = xxstrdup(pabs);
 
 	char *tmp = string_format("%s/vine-logs", runtime_dir);
-	if(!create_dir(tmp, 755)) {
+	if(!create_dir(tmp, 0755)) {
         return NULL;
     }
 	free(tmp);
 
 	tmp = string_format("%s/staging", runtime_dir);
-	if(!create_dir(tmp, 755)) {
+	if(!create_dir(tmp, 0755)) {
         return NULL;
     }
     register_staging_dir(tmp);
