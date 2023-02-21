@@ -309,14 +309,6 @@ void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_t
 
 void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags);
 
-/** Add an output buffer to a task.
-@param t A task object.
-@param data The logical name of the buffer, to be used with @ref vine_task_get_output_buffer.
-@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_file_flags_t or'd together. See @ref vine_task_add_output_file.
-*/
-void vine_task_add_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags);
-
 /** Add an empty directory to a task.
 This is very occasionally needed for applications that expect
 certain directories to exist in the working directory, prior to producing output.
@@ -533,26 +525,6 @@ then this function returns null.
 
 const char * vine_task_get_stdout( struct vine_task *t );
 
-/** Get an output buffer of the task.
-@param t A task object.
-@param buffer_name The name of the output buffer, given by @ref vine_task_add_output_buffer
-@return A pointer to the contents of the buffer.  The buffer is null-terminated, and so can
-be used directly as a string, if it is expected to contain text.  If the buffer is expected
-to contain binary data, use @ref vine_task_get_output_buffer_length to determine the length.
-Do not attempt to free this pointer, it will be freed when the task is deleted.
-Returns null if the task is not complete or the buffer is not available for some reason.
-*/
-
-const char * vine_task_get_output_buffer( struct vine_task *t, const char *buffer_name );
-
-/** Get the length of an output buffer.
-@param t A task object.
-@param buffer_name The name of the output buffer, given by @ref vine_task_add_output_buffer
-@return The length of the buffer in bytes, or zero if the buffer is not available.
-*/
-
-int vine_task_get_output_buffer_length( struct vine_task *t, const char *buffer_name );
-
 /** Get the address and port of the worker on which the task ran.
 @param t A task object.
 @return A null-terminated string containing the address
@@ -671,13 +643,12 @@ as the output of a task, and may be consumed by other tasks.
 struct vine_file * vine_file_temp();
 
 /** Create a file object from a data buffer.
-@param name The abstract name of the buffer.
 @param data The contents of the buffer.
 @param length The length of the buffer, in bytes.
 @return A general file object for use by @ref vine_task_add_input.
 */
 
-struct vine_file * vine_file_buffer( const char *buffer_name, const char *data, int length );
+struct vine_file * vine_file_buffer( const char *data, int length );
 
 /** Create a file object representing an empty directory.
 @return A general file object for use by @ref vine_task_add_input.
@@ -712,6 +683,19 @@ struct vine_file * vine_file_unponcho( struct vine_file *f );
 @return A general file object for use by @ref vine_task_add_input.
 */
 struct vine_file * vine_file_unstarch( struct vine_file *f );
+
+/** Get the contents of a vine file.
+Typically used to examine an output buffer returned from a file.
+@param f A file object created by @ref vine_file_buffer.
+@return A constant pointer to the buffer contents, or null if not available.
+*/
+const char * vine_file_contents( struct vine_file *f );
+
+/** Get the length of a vine file.
+@param f A file object.
+@return The length of the file, or zero if unknown.
+*/
+int64_t vine_file_length( struct vine_file *f );
 
 /** Clone a file object.
 @param f A file object.

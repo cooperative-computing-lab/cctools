@@ -36,8 +36,10 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 	f->mini_task = mini_task;
 
 	if(data) {
-		f->data = malloc(length);
+		/* Terminate with a null, just in case the user tries to treat this as a C string. */
+		f->data = malloc(length+1);
 		memcpy(f->data,data,length);
+		f->data[length] = 0;
 	} else {
 		f->data = 0;
 	}
@@ -89,6 +91,20 @@ void vine_file_delete(struct vine_file *f)
 	free(f);
 }
 
+/* Return the contents of a buffer file, or null. */
+
+const char * vine_file_contents( struct vine_file *f )
+{
+	return f->data;
+}
+
+/* Return the length of any kind of file. */
+
+int64_t vine_file_length( struct vine_file *f )
+{
+	return f->length;
+}
+
 struct vine_file * vine_file_local( const char *source )
 {
 	return vine_file_create(source,0,0,0,VINE_FILE,0);
@@ -109,9 +125,9 @@ struct vine_file * vine_file_temp()
 	return vine_file_create("temp",0,0,0,VINE_TEMP,0);
 }
 
-struct vine_file * vine_file_buffer( const char *buffer_name,const char *data, int length )
+struct vine_file * vine_file_buffer( const char *data, int length )
 {
-	return vine_file_create(buffer_name,0,data,length,VINE_BUFFER,0);
+	return vine_file_create("buffer",0,data,length,VINE_BUFFER,0);
 }
 
 struct vine_file * vine_file_empty_dir()
