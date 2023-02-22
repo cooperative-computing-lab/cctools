@@ -65,6 +65,7 @@ char *vine_runtime_directory_create() {
      */
 
 	char *runtime_dir = NULL;
+    int symlink_most_recent = 0;
 	if(getenv("VINE_RUNTIME_INFO_DIR")) {
 		runtime_dir = xxstrdup(getenv("VINE_RUNTIME_INFO_DIR"));
 	} else {
@@ -73,6 +74,8 @@ char *vine_runtime_directory_create() {
 		struct tm *tm_info = localtime(&now);
 		strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", tm_info);
 		runtime_dir = xxstrdup(buf);
+
+        symlink_most_recent = 1;
 	}
 
 	if(strncmp(runtime_dir, "/", 1)) {
@@ -103,6 +106,13 @@ char *vine_runtime_directory_create() {
     }
     register_staging_dir(tmp);
 	free(tmp);
+
+    if(symlink_most_recent) {
+        char *tmp = path_concat(vine_runtime_info_path, "most-recent");
+        unlink(tmp);
+        symlink(runtime_dir, tmp);
+        free(tmp);
+    }
 
     return runtime_dir;
 }
