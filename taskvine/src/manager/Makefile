@@ -22,6 +22,7 @@ SOURCES = \
 	vine_task_info.c \
 	vine_blocklist.c \
 	vine_current_transfers.c \
+	vine_remote_file_table.c \
 	vine_runtime_dir.c
 
 PUBLIC_HEADERS = taskvine.h
