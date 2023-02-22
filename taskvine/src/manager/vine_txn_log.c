@@ -36,7 +36,7 @@ void vine_txn_log_write_header( struct vine_manager *q )
 {
 	setvbuf(q->txn_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
 
-	fprintf(q->txn_logfile, "# time manager_pid MANAGER manager_pid START|END\n");
+	fprintf(q->txn_logfile, "# time manager_pid MANAGER manager_pid START|END time_from_origin\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id CONNECTION host:port\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id RESOURCES {resources}\n");
@@ -264,9 +264,14 @@ void vine_txn_log_write_cache_update(struct vine_manager *q, struct vine_worker_
 void vine_txn_log_write_manager(struct vine_manager *q, const char *event)
 {
 	struct buffer B;
+    int64_t time_from_origin = 0;
+
+    if(strcmp("START", event)) {
+        time_from_origin = timestamp_get() - q->stats->time_when_started;
+    }
 
 	buffer_init(&B);
-	buffer_printf(&B, "MANAGER %d %s", getpid(), event);
+	buffer_printf(&B, "MANAGER %d %s %" PRId64, getpid(), event, time_from_origin);
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
 }
