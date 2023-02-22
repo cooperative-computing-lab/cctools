@@ -139,6 +139,8 @@ class FileBuffer(File):
     # @param self       The current file object.
     # @param buffer     The contents of the buffer, or None for an empty output buffer.
     def __init__(self, buffer=None):
+        # because of the swig typemap, vine_file_buffer(data, size) is changed
+        # to a function with just one argument.
         self._file = vine_file_buffer(buffer)
 
 ##
