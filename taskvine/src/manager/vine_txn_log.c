@@ -45,7 +45,7 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MAX {resources_max_per_task}\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}\n");
-	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) attempt_number {resources_requested}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING_RETRIEVAL worker_id\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
@@ -68,7 +68,7 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 			/* do not add any info */
 	} else if(state == VINE_TASK_READY) {
 		const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
-		buffer_printf(&B, " %s %s ", t->category, allocation);
+		buffer_printf(&B, " %s %s %d ", t->category, allocation, t->try_count+1);
 		rmsummary_print_buffer(&B, vine_manager_task_resources_min(q, t), 1);
 	} else if(state == VINE_TASK_CANCELED) {
 			/* do not add any info */
