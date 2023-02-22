@@ -73,7 +73,7 @@ class File(object):
     #
     # @param self       A file object.
     
-    def length(self):
+    def __len__(self):
         return vine_file_length(self._file)
     
 ##
