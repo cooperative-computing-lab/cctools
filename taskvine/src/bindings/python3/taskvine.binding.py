@@ -138,13 +138,8 @@ class FileBuffer(File):
     #
     # @param self       The current file object.
     # @param buffer     The contents of the buffer, or None for an empty output buffer.
-
     def __init__(self, buffer=None):
-        if not buffer:
-            self._file = vine_file_buffer(None,0)
-        else:
-            buffer = bytes(buffer,"ascii")
-            self._file = vine_file_buffer(buffer, len(buffer))
+        self._file = vine_file_buffer(buffer)
 
 ##
 # \class FileMiniTask
