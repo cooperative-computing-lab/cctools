@@ -3471,10 +3471,6 @@ void vine_delete(struct vine_manager *q)
 	}
 	free(staging);
 
-	free(q->stats);
-	free(q->stats_disconnected_workers);
-	free(q->stats_measure);
-
 	free(q->name);
 	free(q->manager_preferred_connection);
 
@@ -3487,6 +3483,10 @@ void vine_delete(struct vine_manager *q)
 		fclose(q->perf_logfile);
 	}
 
+	rmsummary_delete(q->measured_local_resources);
+	rmsummary_delete(q->current_max_worker);
+	rmsummary_delete(q->max_task_resources_requested);
+
 	if(q->txn_logfile) {
 		vine_txn_log_write_manager(q, "END");
 
@@ -3494,11 +3494,11 @@ void vine_delete(struct vine_manager *q)
 			debug(D_VINE, "unable to write transactions log: %s\n", strerror(errno));
 		}
 	}
-	free(q->runtime_directory);
 
-	rmsummary_delete(q->measured_local_resources);
-	rmsummary_delete(q->current_max_worker);
-	rmsummary_delete(q->max_task_resources_requested);
+	free(q->runtime_directory);
+	free(q->stats);
+	free(q->stats_disconnected_workers);
+	free(q->stats_measure);
 
 	debug(D_VINE, "manager log end\n");
 

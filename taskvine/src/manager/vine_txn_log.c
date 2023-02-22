@@ -36,7 +36,7 @@ void vine_txn_log_write_header( struct vine_manager *q )
 {
 	setvbuf(q->txn_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
 
-	fprintf(q->txn_logfile, "# time manager_pid MANAGER manager_pid START|END\n");
+	fprintf(q->txn_logfile, "# time manager_pid MANAGER manager_pid START|END time_from_origin\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id CONNECTION host:port\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)\n");
 	fprintf(q->txn_logfile, "# time manager_pid WORKER worker_id RESOURCES {resources}\n");
@@ -45,7 +45,7 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MAX {resources_max_per_task}\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}\n");
 	fprintf(q->txn_logfile, "# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}\n");
-	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) {resources_requested}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) attempt_number {resources_requested}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING_RETRIEVAL worker_id\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
@@ -68,7 +68,7 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 			/* do not add any info */
 	} else if(state == VINE_TASK_READY) {
 		const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
-		buffer_printf(&B, " %s %s ", t->category, allocation);
+		buffer_printf(&B, " %s %s %d ", t->category, allocation, t->try_count+1);
 		rmsummary_print_buffer(&B, vine_manager_task_resources_min(q, t), 1);
 	} else if(state == VINE_TASK_CANCELED) {
 			/* do not add any info */
@@ -87,14 +87,17 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
         }
 
         struct jx *m = rmsummary_to_json(t->resources_measured, /* only resources */ 1);
-        jx_insert(m, jx_string("size_input_mgr"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
         jx_insert(m, jx_string("size_output_mgr"), jx_arrayv(jx_double(t->bytes_received/((double) MEGABYTE)), jx_string("MB"), NULL));
+        jx_insert(m, jx_string("size_input_mgr"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
 
-        jx_insert(m, jx_string("time_input_mgr"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
         jx_insert(m, jx_string("time_output_mgr"), jx_arrayv(jx_double((t->time_when_done - t->time_when_retrieval)/((double) ONE_SECOND)), jx_string("s"), NULL));
+        jx_insert(m, jx_string("time_input_mgr"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
 
-        jx_insert(m, jx_string("time_worker_start"), jx_arrayv(jx_double(t->time_workers_execute_last_start/((double) ONE_SECOND)), jx_string("s"), NULL));
         jx_insert(m, jx_string("time_worker_end"), jx_arrayv(jx_double(t->time_workers_execute_last_end/((double) ONE_SECOND)), jx_string("s"), NULL));
+        jx_insert(m, jx_string("time_worker_start"), jx_arrayv(jx_double(t->time_workers_execute_last_start/((double) ONE_SECOND)), jx_string("s"), NULL));
+
+        jx_insert(m, jx_string("time_commit_end"), jx_arrayv(jx_double(t->time_when_commit_end/((double) ONE_SECOND)), jx_string("s"), NULL));
+        jx_insert(m, jx_string("time_commit_start"), jx_arrayv(jx_double(t->time_when_commit_start/((double) ONE_SECOND)), jx_string("s"), NULL));
         jx_print_buffer(m, &B);
         jx_delete(m);
 	} else {
@@ -264,9 +267,14 @@ void vine_txn_log_write_cache_update(struct vine_manager *q, struct vine_worker_
 void vine_txn_log_write_manager(struct vine_manager *q, const char *event)
 {
 	struct buffer B;
+    int64_t time_from_origin = 0;
+
+    if(strcmp("START", event)) {
+        time_from_origin = timestamp_get() - q->stats->time_when_started;
+    }
 
 	buffer_init(&B);
-	buffer_printf(&B, "MANAGER %d %s", getpid(), event);
+	buffer_printf(&B, "MANAGER %d %s %" PRId64, getpid(), event, time_from_origin);
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
 }
