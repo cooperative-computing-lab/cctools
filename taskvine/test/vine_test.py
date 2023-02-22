@@ -125,10 +125,10 @@ if __name__ == '__main__':
 
     # Execute a task that only communicates through buffers:
 
-    inbuf   = vine.FileBuffer("This is only a test!");
+    inbuf   = vine.FileBuffer(bytes("This is only a test!", "utf-8"));
     outbuf1 = vine.FileBuffer();
     outbuf2 = vine.FileBuffer();
-    
+
     t = vine.Task("cp input.txt output1.txt && cp input.txt output2.txt")
     t.add_input(inbuf,"input.txt")
     t.add_output(outbuf1,"output1.txt")
