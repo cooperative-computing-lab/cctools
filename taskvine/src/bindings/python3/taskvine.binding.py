@@ -140,10 +140,10 @@ class FileBuffer(File):
     # @param buffer     The contents of the buffer, or None for an empty output buffer.
 
     def __init__(self, buffer=None):
-        if buffer is None:
-            self._file = vine_file_buffer(None,0);
+        if not buffer:
+            self._file = vine_file_buffer(None,0)
         else:
-            buffer = str(buffer)
+            buffer = bytes(buffer,"ascii")
             self._file = vine_file_buffer(buffer, len(buffer))
 
 ##
