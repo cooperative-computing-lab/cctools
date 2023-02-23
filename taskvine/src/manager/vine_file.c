@@ -22,7 +22,7 @@ int vine_hack_do_not_compute_cached_name = 0;
 
 /* Create a new file object with the given properties. */
 
-struct vine_file *vine_file_create(const char *source, const char *cached_name, const char *data, int length, vine_file_t type, struct vine_task *mini_task )
+struct vine_file *vine_file_create(const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task )
 {
 	struct vine_file *f;
 
@@ -32,14 +32,14 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 
 	f->source = xxstrdup(source);
 	f->type = type;
-	f->length = length;
+	f->size = size;
 	f->mini_task = mini_task;
 
 	if(data) {
 		/* Terminate with a null, just in case the user tries to treat this as a C string. */
-		f->data = malloc(length+1);
-		memcpy(f->data,data,length);
-		f->data[length] = 0;
+		f->data = malloc(size+1);
+		memcpy(f->data,data,size);
+		f->data[size] = 0;
 	} else {
 		f->data = 0;
 	}
@@ -55,7 +55,9 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		/* This may give us the actual size of the object along the way. */
 		ssize_t totalsize = 0;
 		f->cached_name = vine_cached_name(f,&totalsize);
-		if(length==0) f->length = totalsize;
+		if(size==0) {
+			f->size = totalsize;
+		}
 	}
 
 	f->refcount = 1;
@@ -98,11 +100,11 @@ const char * vine_file_contents( struct vine_file *f )
 	return f->data;
 }
 
-/* Return the length of any kind of file. */
+/* Return the size of any kind of file. */
 
-int64_t vine_file_length( struct vine_file *f )
+size_t vine_file_size( struct vine_file *f )
 {
-	return f->length;
+	return f->size;
 }
 
 struct vine_file * vine_file_local( const char *source )
@@ -117,7 +119,7 @@ struct vine_file * vine_file_url( const char *source )
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source )
 {
-	return vine_file_create(source,f->cached_name,0,f->length,VINE_URL,0);
+	return vine_file_create(source,f->cached_name,0,f->size,VINE_URL,0);
 }
 
 struct vine_file * vine_file_temp()
@@ -125,9 +127,9 @@ struct vine_file * vine_file_temp()
 	return vine_file_create("temp",0,0,0,VINE_TEMP,0);
 }
 
-struct vine_file * vine_file_buffer( const char *data, int length )
+struct vine_file * vine_file_buffer( const char *data, size_t size )
 {
-	return vine_file_create("buffer",0,data,length,VINE_BUFFER,0);
+	return vine_file_create("buffer",0,data,size,VINE_BUFFER,0);
 }
 
 struct vine_file * vine_file_empty_dir()

@@ -36,16 +36,16 @@ typedef enum {
 } vine_file_t;
 
 struct vine_file {
-	vine_file_t type;       // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
-	int length;		// Length of source data, if known.
-	char *source;		// Name of source file, url, buffer.
-	char *cached_name;	// Name of file in the worker's cache directory.
-	char *data;		// Raw data for an input or output buffer.
+	vine_file_t type;   // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
+	char *source;       // Name of source file, url, buffer.
+	char *cached_name;  // Name of file in the worker's cache directory.
+	size_t size;        // Length of source data, if known.
+	char *data;         // Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
-	int refcount;		// Number of references from a task object, delete when zero.
+	int refcount;       // Number of references from a task object, delete when zero.
 };
 
-struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, int length, vine_file_t type, struct vine_task *mini_task );
+struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task );
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source );
 

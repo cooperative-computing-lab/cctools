@@ -303,8 +303,8 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 			break;
 		case VINE_BUFFER:
 			if(f->data) {
-				/* If the buffer exists, then checksum the content. */ 
-				md5_buffer(f->data, f->length, digest);
+				/* If the buffer exists, then checksum the content. */
+				md5_buffer(f->data, f->size, digest);
 				const char *hash = md5_to_string(digest);
 				name = string_format("buffer-md5-%s",hash);
 			} else {

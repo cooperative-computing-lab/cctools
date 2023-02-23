@@ -23,6 +23,7 @@
 /* We compile with -D__LARGE64_FILES, thus off_t is at least 64bit.
 long long int is guaranteed to be at least 64bit. */
 %typemap(in) off_t = long long int;
+%typemap(in) size_t = unsigned long long;
 
 /* vdebug() takes va_list as arg but SWIG can't wrap such functions. */
 %ignore vdebug;
@@ -44,9 +45,9 @@ treat it as an output parameter to be filled in. */
 
 
 /* Convert a python buffer into a vine buffer */
-/* Note!! This changes any C function with the signature f(const char *data, int length) into
+/* Note!! This changes any C function with the signature f(const char *buffer, size_t size) into
 a swig function f(data) */
-%typemap(in, numinputs=1) (const char *data, int length) {
+%typemap(in, numinputs=1) (const char *buffer, size_t size) {
     if ($input == Py_None) {
         $1 = NULL;
         $2 = 0;

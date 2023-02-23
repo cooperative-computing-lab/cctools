@@ -64,18 +64,16 @@ class File(object):
     # Typically used to return the contents of an output buffer.
     #
     # @param self       A file object.
-    
     def contents(self):
         return vine_file_contents(self._file)
 
     ##
-    # Return the length of a file object.
+    # Return the size of a file object, in bytes.
     #
     # @param self       A file object.
-    
     def __len__(self):
-        return vine_file_length(self._file)
-    
+        return vine_file_size(self._file)
+
 ##
 # \class FileLocal
 #
