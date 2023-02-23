@@ -5078,5 +5078,59 @@ struct vine_file *vine_manager_file_local( struct vine_manager *m, const char *s
 	return vine_manager_declare_file(m, f);
 }
 
+struct vine_file *vine_manager_file_url( struct vine_manager *m, const char *source )
+{
+	struct vine_file *f = vine_file_url(source);
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_manager_file_temp( struct vine_manager *m )
+{
+	struct vine_file *f = vine_file_temp();
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_manager_file_buffer( struct vine_manager *m, const char *buffer, size_t size )
+{
+	struct vine_file *f = vine_file_buffer(buffer, size);
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_manager_file_empty_dir( struct vine_manager *m )
+{
+	struct vine_file *f = vine_file_empty_dir();
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_manager_file_mini_task( struct vine_manager *m, struct vine_task *t )
+{
+	struct vine_file *f = vine_file_mini_task(t);
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_manager_file_untar( struct vine_manager *m, struct vine_file *f)
+{
+	struct vine_file *t = vine_file_untar(f);
+	return vine_manager_declare_file(m, t);
+}
+
+struct vine_file *vine_manager_file_unponcho( struct vine_manager *m, struct vine_file *f)
+{
+	struct vine_file *t = vine_file_unponcho(f);
+	return vine_manager_declare_file(m, t);
+}
+
+struct vine_file *vine_manager_file_unstarch( struct vine_manager *m, struct vine_file *f)
+{
+	struct vine_file *t = vine_file_unstarch(f);
+	return vine_manager_declare_file(m, t);
+}
+
+struct vine_file *vine_manager_file_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy)
+{
+	struct vine_file *t = vine_file_xrootd(source, proxy);
+	return vine_manager_declare_file(m, t);
+}
+
 
 /* vim: set noexpandtab tabstop=4: */
