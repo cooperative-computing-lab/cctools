@@ -247,7 +247,7 @@ static int update_all_catalogs(const char *url)
 
 	const char *host;
 	LIST_ITERATE(catalog_host_list,host) {
-		catalog_query_send_update(item,message,CATALOG_UPDATE_BACKGROUND);
+		catalog_query_send_update(host,message,CATALOG_UPDATE_BACKGROUND);
 	}
 
 	free(message);
