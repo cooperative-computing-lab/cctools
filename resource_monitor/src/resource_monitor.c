@@ -496,7 +496,7 @@ int send_catalog_update(struct rmsummary *s, int force) {
 	char *str = jx_print_string(j);
 
 	debug(D_RMON, "Sending resources snapshot to catalog server(s) at %s ...", catalog_hosts);
-	int status = catalog_query_send_update_conditional(catalog_hosts, str);
+	int status = catalog_query_send_update(catalog_hosts, str, CATALOG_UPDATE_BACKGROUND|CATALOG_UPDATE_CONDITIONAL);
 
 	free(str);
 	jx_delete(j);

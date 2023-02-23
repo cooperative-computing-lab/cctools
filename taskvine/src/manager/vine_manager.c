@@ -678,12 +678,12 @@ static void update_write_catalog(struct vine_manager *q )
 
 	// Send the buffer.
 	debug(D_VINE, "Advertising manager status to the catalog server(s) at %s ...", q->catalog_hosts);
-	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
+	if(!catalog_query_send_update(q->catalog_hosts, str, CATALOG_UPDATE_BACKGROUND|CATALOG_UPDATE_CONDITIONAL)) {
 
 		// If the send failed b/c the buffer is too big, send the lean version instead.
 		struct jx *lj = manager_lean_to_jx(q);
 		char *lstr = jx_print_string(lj);
-		catalog_query_send_update(q->catalog_hosts,lstr);
+		catalog_query_send_update(q->catalog_hosts,lstr,CATALOG_UPDATE_BACKGROUND);
 		free(lstr);
 		jx_delete(lj);
 	}

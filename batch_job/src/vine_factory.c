@@ -1013,7 +1013,7 @@ static void mainloop( struct batch_queue *queue )
 
 		char *update_str = jx_print_string(j);
 		debug(D_VINE, "Sending status to the catalog server(s) at %s ...", catalog_host);
-		catalog_query_send_update(catalog_host, update_str);
+		catalog_query_send_update(catalog_host,update_str,0);
 		print_stats(j);
 		free(update_str);
 		jx_delete(j);
