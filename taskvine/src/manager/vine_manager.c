@@ -5029,4 +5029,23 @@ int vine_set_task_id_min(struct vine_manager *q, int minid) {
 }
 
 
+/* File functions */
+
+/*
+Request to delete a file by its id
+Decrement the reference count and delete if zero.
+*/
+void vine_manager_file_delete(struct vine_manager *m, struct vine_file *f)
+{
+	if(!f) {
+		return;
+	}
+
+	if(f->refcount == 1) {
+		hash_table_remove(m->file_table, f->file_id);
+	}
+
+	vine_file_delete(f);
+}
+
 /* vim: set noexpandtab tabstop=4: */

@@ -20,9 +20,28 @@ See the file COPYING for details.
 /* Internal use: when the worker uses the client library, do not recompute cached names. */
 int vine_hack_do_not_compute_cached_name = 0;
 
-/* Create a new file object with the given properties. */
+/* Returns file refcount. If refcount is 0, the file has been deleted. */
+int vine_file_delete(struct vine_file *f)
+{
+	if(f) {
+		f->refcount--;
+		if(f->refcount>0) {
+			return f->refcount;
+		}
 
-struct vine_file *vine_file_create(const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task )
+		vine_task_delete(f->mini_task);
+		free(f->source);
+		free(f->cached_name);
+		free(f->file_id);
+		free(f->data);
+		free(f);
+	}
+
+	return 0;
+}
+
+/* Create a new file object with the given properties. */
+struct vine_file *vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task )
 {
 	struct vine_file *f;
 
@@ -74,25 +93,6 @@ struct vine_file *vine_file_clone( struct vine_file *f )
 	if(!f) return 0;
 	f->refcount++;
 	return f;
-}
-
-/*
-Request to delete a file object.
-Decrement the reference count and delete if zero.
-*/
-
-void vine_file_delete(struct vine_file *f)
-{
-	if(!f) return;
-
-	f->refcount--;
-	if(f->refcount>0) return;
-
-	vine_task_delete(f->mini_task);
-	free(f->source);
-	free(f->cached_name);
-	free(f->data);
-	free(f);
 }
 
 /* Return the contents of a buffer file, or null. */
