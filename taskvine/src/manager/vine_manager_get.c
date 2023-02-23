@@ -51,18 +51,18 @@ static vine_result_code_t vine_manager_get_buffer( struct vine_manager *q, struc
 
 	if(sscanf(line,"file %s %" SCNd64 " 0%o",name_encoded,&size,&mode)==3) {
 
-		f->length = size;
-		debug(D_VINE, "Receiving buffer %s (size: %"PRId64" bytes) from %s (%s) ...", f->source, (int64_t)f->length, w->addrport, w->hostname);
+		f->size = size;
+		debug(D_VINE, "Receiving buffer %s (size: %"PRId64" bytes) from %s (%s) ...", f->source, (int64_t)f->size, w->addrport, w->hostname);
 
 		f->data = malloc(size+1);
 		if(f->data) {
-			time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->length);
+			time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->size);
 
-			ssize_t actual = link_read(w->link,f->data,f->length,stoptime);
-			if(actual==f->length) {
+			ssize_t actual = link_read(w->link,f->data,f->size,stoptime);
+			if(actual >= 0 && (size_t)actual == f->size) {
 				/* While not strictly necessary, add a null terminator to facilitate printing text data. */
-				f->data[f->length] = 0;
-				*total_size += f->length;
+				f->data[f->size] = 0;
+				*total_size += f->size;
 				r = VINE_SUCCESS;
 			} else {
 				/* If insufficient data was read, the connection must be broken. */

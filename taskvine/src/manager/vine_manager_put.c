@@ -207,10 +207,10 @@ static vine_result_code_t vine_manager_put_url( struct vine_manager *q, struct v
 
 	url_encode(f->source,source_encoded,sizeof(source_encoded));
 	url_encode(f->cached_name,cached_name_encoded,sizeof(cached_name_encoded));
-									
+
 	char *transfer_id = vine_current_transfers_add(q, w, f->source);
 	vine_current_transfers_print_table(q);
-	vine_manager_send(q,w,"puturl %s %s %d %o %s\n",source_encoded, cached_name_encoded, f->length, 0777, transfer_id);
+	vine_manager_send(q,w,"puturl %s %s %lld %o %s\n",source_encoded, cached_name_encoded, (long long)f->size, 0777, transfer_id);
 
 	return VINE_SUCCESS;
 }
@@ -219,15 +219,15 @@ static vine_result_code_t vine_manager_put_url( struct vine_manager *q, struct v
 
 vine_result_code_t vine_manager_put_buffer( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_file *f, int64_t *total_bytes )
 {
-	time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->length);
-	vine_manager_send(q,w, "file %s %d %o\n",f->cached_name, f->length, 0777 );
-	int64_t actual = link_putlstring(w->link, f->data, f->length, stoptime);
-	if(actual!=f->length) {
-		return VINE_WORKER_FAILURE;
-		*total_bytes = 0;
-	} else {
+	time_t stoptime = time(0) + vine_manager_transfer_time(q, w, t, f->size);
+	vine_manager_send(q,w, "file %s %lld %o\n",f->cached_name, (long long)f->size, 0777 );
+	int64_t actual = link_putlstring(w->link, f->data, f->size, stoptime);
+	if(actual >= 0 && (size_t)actual ==f->size) {
 		*total_bytes = actual;
 		return VINE_SUCCESS;
+	} else {
+		*total_bytes = 0;
+		return VINE_WORKER_FAILURE;
 	}
 }
  
@@ -344,7 +344,7 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 		return VINE_APP_FAILURE;
 	} else {
 		/* Any other type, just record dummy values for size and time, until we know better. */
-		info.st_size = f->length;
+		info.st_size = f->size;
 		info.st_mtime = time(0);
 	}
 
@@ -417,15 +417,15 @@ vine_result_code_t vine_manager_put_task(struct vine_manager *q, struct vine_wor
 	if(result!=VINE_SUCCESS) return result;
 
 	if(target) {
-		vine_manager_send(q,w, "mini_task %lld %s %d %o\n",(long long)target->mini_task->task_id,target->cached_name,target->length,0777);
+		vine_manager_send(q,w, "mini_task %lld %s %lld %o\n",(long long)target->mini_task->task_id,target->cached_name,(long long)target->size,0777);
 	} else {
 		vine_manager_send(q,w, "task %lld\n",(long long)t->task_id);
 	}
-	
+
 	if(!command_line) {
 		command_line = t->command_line;
 	}
-	
+
 	long long cmd_len = strlen(command_line);
 	vine_manager_send(q,w, "cmd %lld\n", (long long) cmd_len);
 	link_putlstring(w->link, command_line, cmd_len, time(0) + q->short_timeout);

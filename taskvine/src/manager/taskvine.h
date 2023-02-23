@@ -643,12 +643,12 @@ as the output of a task, and may be consumed by other tasks.
 struct vine_file * vine_file_temp();
 
 /** Create a file object from a data buffer.
-@param data The contents of the buffer.
-@param length The length of the buffer, in bytes.
+@param buffer The contents of the buffer.
+@param size The length of the buffer, in bytes.
 @return A general file object for use by @ref vine_task_add_input.
 */
 
-struct vine_file * vine_file_buffer( const char *data, int length );
+struct vine_file * vine_file_buffer( const char *buffer, size_t size );
 
 /** Create a file object representing an empty directory.
 @return A general file object for use by @ref vine_task_add_input.
@@ -695,7 +695,7 @@ const char * vine_file_contents( struct vine_file *f );
 @param f A file object.
 @return The length of the file, or zero if unknown.
 */
-int64_t vine_file_length( struct vine_file *f );
+size_t vine_file_size( struct vine_file *f );
 
 /** Clone a file object.
 @param f A file object.
