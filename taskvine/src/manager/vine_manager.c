@@ -2674,7 +2674,11 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		struct vine_worker_info *peer;
 		int found_match = 0;
 
-		// if this is mounted on a shared mini-task we need to make sure any old substitute is gone
+		/* If there is a singly declared mini task dependency linked to multiple created tasks, they
+		 * will all share the same reference to it, and consequently share its input file(s). 
+		 * We modify the object each time we schedule a peer transfer by adding a substitute url.
+		 * We must clear the substitute pointer each task we send to ensure we aren't using
+		 * a previously scheduled url. */
 		vine_file_delete(m->substitute);
 		m->substitute = NULL;
 
