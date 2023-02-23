@@ -40,8 +40,30 @@ long long int is guaranteed to be at least 64bit. */
 
 /* When we enounter buffer_length in the prototype of vine_task_get_output_buffer,
 treat it as an output parameter to be filled in. */
-
 %apply int *OUTPUT { int *buffer_length };
+
+
+/* Convert a python buffer into a vine buffer */
+/* Note!! This changes any C function with the signature f(const char *data, int length) into
+a swig function f(data) */
+%typemap(in, numinputs=1) (const char *data, int length) {
+    if ($input == Py_None) {
+        $1 = NULL;
+        $2 = 0;
+    } else {
+        Py_buffer view;
+        if (PyObject_GetBuffer($input, &view, PyBUF_SIMPLE) != 0) {
+            PyErr_SetString(
+                    PyExc_TypeError,
+                    "in method '$symname', argument $argnum is not a simple buffer");
+            SWIG_fail;
+        }
+        $1 = view.buf;
+        $2 = view.len;
+        PyBuffer_Release(&view);
+    }
+}
+%typemap(doc) const char *data, int length "$1_name: a readable buffer (e.g. a bytes object)"
 
 %include "stdint.i"
 %include "int_sizes.h"

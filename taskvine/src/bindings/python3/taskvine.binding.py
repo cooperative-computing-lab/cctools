@@ -59,7 +59,23 @@ class File(object):
             # ignore exceptions, in case task has been already collected
             pass
 
+    ##
+    # Return the contents of a file object as a string.
+    # Typically used to return the contents of an output buffer.
+    #
+    # @param self       A file object.
+    
+    def contents(self):
+        return vine_file_contents(self._file)
 
+    ##
+    # Return the length of a file object.
+    #
+    # @param self       A file object.
+    
+    def __len__(self):
+        return vine_file_length(self._file)
+    
 ##
 # \class FileLocal
 #
@@ -116,20 +132,23 @@ class FileURL(File):
 #
 # A file obtained from a buffer in memory.
 
-
 class FileBuffer(File):
     ##
     # Create a file from a buffer in memory.
     #
     # @param self       The current file object.
-    # @param name       The abstract name of the buffer.
-    # @param buffer     The contents of the buffer.
-
-    def __init__(self, name, buffer):
-        name = str(name)
-        buffer = str(buffer)
-        self._file = vine_file_buffer(name, buffer, len(buffer))
-
+    # @param buffer     The contents of the buffer, or None for an empty output buffer.
+    #
+    # For example:
+    # @code
+    # # The following are equivalent
+    # >>> s = "hello pirate ♆"
+    # >>> FileBuffer(bytes(s, "utf-8"))
+    # @endcode
+    def __init__(self, buffer=None):
+        # because of the swig typemap, vine_file_buffer(data, size) is changed
+        # to a function with just one argument.
+        self._file = vine_file_buffer(buffer)
 
 ##
 # \class FileMiniTask
@@ -485,50 +504,6 @@ class Task(object):
 
         flags = Task._determine_file_flags(cache=cache, watch=watch, failure_only=failure_only, success_only=success_only)
         return vine_task_add_output_file(self._task, local_name, remote_name, flags)
-
-    ##
-    # Add an output buffer to the task.
-    #
-    # @param self          Reference to the current task object.
-    # @param buffer_name   The logical name of the output buffer.
-    # @param remote_name   The name of the remote file to fetch.
-    # @param cache         Whether the file should be cached at workers (True/False)
-    # @param watch         Watch the output file and send back changes as the task runs.
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
-    # @param success_only  For output files, whether the file should be retrieved only when the task succeeds. Default is False.
-    def add_output_buffer(self, buffer_name, remote_name, cache=False, watch=False, failure_only=False, success_only=False):
-        if buffer_name:
-            buffer_name = str(buffer_name)
-        if remote_name:
-            remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache=cache, watch=watch, failure_only=failure_only, success_only=success_only)
-        return vine_task_add_output_buffer(self._task, buffer_name, remote_name, flags)
-
-    ##
-    # Get an output buffer of the task.
-    #
-    # @param self           Reference to the current task object.
-    # @param buffer_name    The logical name of the output buffer.
-    # @return               The bytes of the returned file.
-
-    def get_output_buffer(self, buffer_name):
-        if buffer_name:
-            buffer_name = str(buffer_name)
-
-        return vine_task_get_output_buffer(self._task, buffer_name)
-
-    ##
-    # Get the length of an output buffer.
-    #
-    # @param self           Reference to the current task object.
-    # @param buffer_name    The logical name of the output buffer.
-    # @return               The length of the output buffer.
-
-    def get_output_buffer_length(self, buffer_name):
-        if buffer_name:
-            buffer_name = str(buffer_name)
-
-        return vine_task_get_output_buffer_length(self._task, buffer_name)
 
     ##
     # Add any output object to a task.
