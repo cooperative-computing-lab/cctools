@@ -2674,6 +2674,10 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		struct vine_worker_info *peer;
 		int found_match = 0;
 
+		// if this is mounted on a shared mini-task we need to make sure any old substitute is gone
+		vine_file_delete(m->substitute);
+		m->substitute = NULL;
+
 		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
 		if(m->file->type != VINE_MINI_TASK) {
@@ -2681,7 +2685,6 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 				if((remote_info = hash_table_lookup(peer->current_files, m->file->cached_name)) && remote_info->in_cache) {
 					char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, m->file->cached_name);
 					if(vine_current_transfers_source_in_use(q, peer_source) < q->worker_source_max_transfers) {	
-						vine_file_delete(m->substitute);
 						m->substitute = vine_file_substitute_url(m->file,peer_source);
 						free(peer_source);
 						found_match = 1;
