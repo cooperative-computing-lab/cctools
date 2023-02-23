@@ -103,6 +103,10 @@ struct vine_manager {
 	struct hash_table *workers_with_available_results;  /* Maps link -> vine_worker_info */
 	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
 
+	/* Primary data structures for tracking files. */
+
+    struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
+
 	/* Primary scheduling controls. */
 
 	vine_schedule_t worker_selection_algorithm;    /* Mode for selecting best worker for task in main scheduler. */
