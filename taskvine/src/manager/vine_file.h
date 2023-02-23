@@ -50,5 +50,17 @@ struct vine_file * vine_file_create( const char *source, const char *cached_name
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source );
 int vine_file_delete( struct vine_file *f );
+struct vine_file *vine_file_clone( struct vine_file *f );
+
+struct vine_file *vine_file_local( const char *source );
+struct vine_file *vine_file_url( const char *source );
+struct vine_file *vine_file_temp();
+struct vine_file *vine_file_buffer( const char *buffer, size_t size );
+struct vine_file *vine_file_empty_dir( );
+struct vine_file *vine_file_mini_task( struct vine_task *t );
+struct vine_file *vine_file_untar( struct vine_file *f );
+struct vine_file *vine_file_unponcho( struct vine_file *f );
+struct vine_file *vine_file_unstarch( struct vine_file *f );
+struct vine_file *vine_file_xrootd( const char *source, struct vine_file *proxy );
 
 #endif
