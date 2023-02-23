@@ -2673,7 +2673,6 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		struct vine_worker_info *peer;
 		int found_match = 0;
 		
-		debug(D_VINE, "Starting to send file %s", m->file->source);
 
 		/* If there is a singly declared mini task dependency linked to multiple created tasks, they
 		 * will all share the same reference to it, and consequently share its input file(s). 
@@ -2687,21 +2686,16 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		/* Provide a substitute file object to describe the peer. */
 		if(m->file->type != VINE_MINI_TASK) 
 		{
-			if((peer = vine_remote_file_table_query(q, m->file->cached_name)))
+			vine_file_delete(m->substitute);
+			if((peer = vine_remote_file_table_find_worker(q, m->file->cached_name)))
 			{
 				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, m->file->cached_name);
-				if(vine_current_transfers_source_in_use(q, peer_source) < q->worker_source_max_transfers) 
-				{
-					int p = vine_current_transfers_source_in_use(q, peer_source);
-					debug(D_VINE, "current sources in use %d, max is %d, sending another!", p, q->worker_source_max_transfers);	
-					vine_file_delete(m->substitute);
-					m->substitute = vine_file_substitute_url(m->file,peer_source);
-					free(peer_source);
-					found_match = 1;
-					break;
-				}
-			}
-		}	
+				m->substitute = vine_file_substitute_url(m->file,peer_source);
+				free(peer_source);
+				found_match = 1;
+				break;
+			}	
+		}
 
 		/* If that resulted in a match, move on to the next file. */
 		if(found_match) continue;
@@ -2714,9 +2708,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		*/
 		if(m->file->type==VINE_URL) {
 			/* For a URL transfer, we can fall back to the original if capacity is available. */
-				debug(D_VINE,"task %lld sending normal transfer url %s : %d in use",(long long)t->task_id,m->file->source, vine_current_transfers_source_in_use(q,m->file->source));
 			if(vine_current_transfers_source_in_use(q, m->file->source) >= q->file_source_max_transfers){
-				debug(D_VINE,"task %lld has no ready transfer source for url %s : %d in use",(long long)t->task_id,m->file->source, vine_current_transfers_source_in_use(q,m->file->source));
 				return 0;
 			} else {
 				/* keep going */

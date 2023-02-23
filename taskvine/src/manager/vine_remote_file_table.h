@@ -15,7 +15,7 @@ struct vine_remote_file_info *vine_remote_file_table_remove(struct vine_worker_i
 
 struct vine_remote_file_info *vine_remote_file_table_lookup(struct vine_worker_info *w, const char *cachename);
 
-struct vine_worker_info *vine_remote_file_table_query(struct vine_manager *q, const char *cachename);
+struct vine_worker_info *vine_remote_file_table_find_worker(struct vine_manager *q, const char *cachename);
 
 #endif
 
