@@ -5048,4 +5048,35 @@ void vine_manager_file_delete(struct vine_manager *m, struct vine_file *f)
 	vine_file_delete(f);
 }
 
+struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_file *f)
+{
+	if(!f) {
+		return NULL;
+	}
+
+	struct vine_file *previous = vine_manager_lookup_file(m, f->file_id);
+
+	if(previous) {
+	/* This file has been declared before. We delete the new instance and
+	 * increase the refcount of the previous. */
+		vine_file_delete(f);
+		vine_file_clone(previous);
+		f = previous;
+	}
+
+	return f;
+}
+
+struct vine_file *vine_manager_lookup_file( struct vine_manager *m, const char *file_id )
+{
+	return hash_table_lookup(m->file_table, file_id);
+}
+
+struct vine_file *vine_manager_file_local( struct vine_manager *m, const char *source )
+{
+	struct vine_file *f = vine_file_local(source);
+	return vine_manager_declare_file(m, f);
+}
+
+
 /* vim: set noexpandtab tabstop=4: */

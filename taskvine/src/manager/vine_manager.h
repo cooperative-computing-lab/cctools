@@ -181,6 +181,11 @@ These are not public API functions, but utility methods that may
 be called on the manager object by other elements of the manager process.
 */
 
+/* Declares file f. If a file with the same f->file_id is already declared, f
+ * is ****deleted**** and the previous file is returned. Otherwise f is returned. */
+struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_file *f);
+struct vine_file *vine_manager_lookup_file(struct vine_manager *q, const char *file_id);
+
 /* Send a printf-style message to a remote worker. */
 #ifndef SWIG
 __attribute__ (( format(printf,3,4) ))
