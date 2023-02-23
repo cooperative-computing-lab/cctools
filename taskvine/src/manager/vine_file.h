@@ -39,6 +39,7 @@ struct vine_file {
 	vine_file_t type;   // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
 	char *source;       // Name of source file, url, buffer.
 	char *cached_name;  // Name of file in the worker's cache directory.
+	char *file_id;      // Unique name of this source and cached_name
 	size_t size;        // Length of source data, if known.
 	char *data;         // Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.

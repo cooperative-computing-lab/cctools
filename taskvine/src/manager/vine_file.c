@@ -60,6 +60,8 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		}
 	}
 
+	f->file_id = vine_file_id(f);
+
 	f->refcount = 1;
 
 	return f;
