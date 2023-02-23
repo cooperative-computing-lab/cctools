@@ -272,4 +272,9 @@ void vine_txn_log_write_manager(struct vine_manager *q, const char *event)
 }
 
 
-
+void vine_txn_log_write_duty_update(struct vine_manager *q, struct vine_worker_info *w, int duty_id, const char *status) {
+	struct buffer B;
+	buffer_init(&B);
+	buffer_printf(&B, "DUTY %d %s %s", duty_id, status, w->workerid);
+	vine_txn_log_write(q, buffer_tostring(&B));
+}

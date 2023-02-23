@@ -3892,14 +3892,7 @@ static int vine_manager_send_duty_to_worker(struct vine_manager *q, struct vine_
 	link_putlstring(w->link, name, strlen(name), time(0) + q->short_timeout);
 	vine_result_code_t result = start_one_task(q, w, t);
 
-	if(q->txn_logfile)
-	{
-		struct buffer B;
-		buffer_init(&B);
-		buffer_printf(&B, "DUTY SEND %d %s", t->task_id, w->workerid);
-		fprintf(q->txn_logfile, "%" PRIu64 " %d %s\n", timestamp_get(),getpid(),buffer_tostring(&B));
-		fflush(q->txn_logfile);
-	}
+	vine_txn_log_write_duty_update(q, w, t->task_id, "SEND");
 
 	return result;
 }
@@ -3914,14 +3907,16 @@ static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char
 		if (!w->workerid){
 			continue;
 		}
-		debug(D_VINE, "Sending duty %s to worker %s\n", name, w->workerid);
+		
 		if(!w->features) {
+			debug(D_VINE, "Sending duty %s to worker %s\n", name, w->workerid);
 			vine_manager_send_duty_to_worker(q, w, name);
 			w->features = hash_table_create(4,0);
 			hash_table_insert(w->features, name, (void **) 1);
 			continue;
 		}
 		if(!hash_table_lookup(w->features, name)) {
+			debug(D_VINE, "Sending duty %s to worker %s\n", name, w->workerid);
 			vine_manager_send_duty_to_worker(q, w, name);
 			hash_table_insert(w->features, name, (void **) 1);
 		}
@@ -3969,14 +3964,8 @@ static vine_msg_code_t handle_duty_update(struct vine_manager *q, struct vine_wo
 	}
 
 	debug(D_VINE, "Duty %d started on worker %s\n", duty_id, w->workerid);
-	if(q->txn_logfile)
-	{
-		struct buffer B;
-		buffer_init(&B);
-		buffer_printf(&B, "DUTY START %d %s", duty_id, w->workerid);
-		fprintf(q->txn_logfile, "%" PRIu64 " %d %s\n", timestamp_get(),getpid(),buffer_tostring(&B));
-		fflush(q->txn_logfile);
-	}
+
+	vine_txn_log_write_duty_update(q, w, duty_id, status);
 	
 	return VINE_MSG_PROCESSED;
 }

@@ -80,9 +80,9 @@ def parse_manager(log):
             continue
 
         if subject == "DUTY":
-            if target == "SEND":
+            if event == "SEND":
                 manager_info["Duties Sent"].append(time - manager_info["Start"])
-            elif target == "START":
+            elif event == "STARTED":
                 manager_info["Duties Started"].append(time - manager_info["Start"])
 
 def parse_tasks(log):
@@ -141,11 +141,11 @@ def parse_tasks(log):
             continue
 
         if subject == "DUTY":
-            if target == "SEND":
+            if event == "SEND":
                 manager_info["Duties Sent"].append(time - manager_info["Start"])
-            elif target == "START":
+            elif event == "STARTED":
                 manager_info["Duties Started"].append(time - manager_info["Start"])
-                manager_info["DutyMap"].update([(int(event), (arg, time - manager_info["Start"], 0))])
+                manager_info["DutyMap"].update([(int(target), (arg, time - manager_info["Start"], 0))])
 
             continue
 
@@ -178,8 +178,8 @@ def plot_tasks(title='Manager Info', all_info=False, save=None, connections=Fals
 
     ys = [x for x in sorted(manager_info["TaskMap"])]
 
-    duty_ys = [x for x in sorted(manager_info["DutyMap"])]
-    duty_times = [duty_cachetime[x] for x in duty_ys]
+    duty_ys = [int(x) for x in sorted(manager_info["DutyMap"])]
+    duty_times = [float(duty_cachetime[x]) for x in duty_ys]
     
     dwidths = sorted(manager_info["TaskDone"].items())
     lwidths = [float(i[1]) for i in dwidths]
@@ -190,15 +190,17 @@ def plot_tasks(title='Manager Info', all_info=False, save=None, connections=Fals
     plt.barh(ys, width=widths, left=tasks_sent, label="Tasks", color="blue")
     
     if input_transfers or all_info:
-        plt.barh(ys, width=times, left=tasks_sent, color="orange", label="Transfers")
-        plt.barh(duty_ys, width=duty_times, left=duties_sent, color="darkorange", label="Duty Transfers")
+        plt.barh(ys + duty_ys, width=times + duty_times, left=tasks_sent + duties_sent, color="orange", label="Transfers")
     if waiting_retrieval or all_info:
         plt.plot(manager_info["Waiting Retrieval"], ys, "r+", label="Waiting Retrieval")
     if marked_done or all_info:
         plt.plot(manager_info["Marked Done"], ys, "g+", label="Marked Done")
     
+    plt.tick_params(axis='both', which='major', labelsize=15)
     plt.legend()
     plt.show()
+    if save:
+        plt.savefig(save)
    
 def plot_manager(title='Manager Info', all_info=False, save=None, connections=False, disconnections=False,
                 resources=False, cache_updates=False, tasks_sent=False, waiting_retrieval=False, 
@@ -346,12 +348,12 @@ def parse_workers(log):
             continue
             
         if subject == "DUTY":
-            if target == "SEND":
+            if event == "SEND":
                 worker_id = arg
-                worker_info[worker_id]["duties"][event] = {"sent":time, "started": -1}
-            elif target == "START":
+                worker_info[worker_id]["duties"][target] = {"sent":time, "started": -1}
+            elif event == "STARTED":
                 worker_id = arg
-                worker_info[worker_id]["duties"][event]["started"] = time
+                worker_info[worker_id]["duties"][target]["started"] = time
 
 
 def plot_resource_updates(origin):
