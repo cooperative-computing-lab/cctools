@@ -609,6 +609,20 @@ void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapsh
 
 //@{
 
+/** Get the contents of a vine file.
+Typically used to examine an output buffer returned from a file.
+@param f A file object created by @ref vine_file_buffer.
+@return A constant pointer to the buffer contents, or null if not available.
+*/
+const char * vine_file_contents( struct vine_file *f );
+
+/** Get the length of a vine file.
+@param f A file object.
+@return The length of the file, or zero if unknown.
+*/
+size_t vine_file_size( struct vine_file *f );
+
+
 /** Declare a file object from a local file
 @param m A manager object
 @param source The path of the file on the local filesystem
