@@ -121,6 +121,7 @@ static vine_msg_code_t handle_taskvine(struct vine_manager *q, struct vine_worke
 static vine_msg_code_t handle_manager_status(struct vine_manager *q, struct vine_worker_info *w, const char *line, time_t stoptime);
 static vine_msg_code_t handle_resource(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 static vine_msg_code_t handle_feature(struct vine_manager *q, struct vine_worker_info *w, const char *line);
+static void handle_duty_update(struct vine_manager *q, struct vine_worker_info *w, const char *line);
 
 static struct jx * manager_to_jx( struct vine_manager *q );
 static struct jx * manager_lean_to_jx( struct vine_manager *q );
@@ -135,8 +136,8 @@ static void aggregate_workers_resources( struct vine_manager *q, struct vine_res
 static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout, const char *tag, int task_id);
 static void release_all_workers( struct vine_manager *q );
 
-static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char *name);
-static void vine_manager_send_duties_to_workers(struct vine_manager *q);
+static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char *name, time_t stoptime);
+static void vine_manager_send_duties_to_workers(struct vine_manager *q, time_t stoptime);
 
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
@@ -286,6 +287,8 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 		if(f->connected_workers+1 > f->max_workers) {
 			shut_down_worker(q, w);
 		}
+	} else if (string_prefix_is(field, "duty-update")) {
+		handle_duty_update(q, w, value);
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -889,8 +892,6 @@ static void add_worker(struct vine_manager *q)
 	w->addrport = string_format("%s:%d",addr,port);
 
 	hash_table_insert(q->worker_table, w->hashkey, w);
-
-	vine_manager_send_duties_to_workers(q);
 }
 
 /* Delete a single file on a remote worker. */
@@ -3914,32 +3915,43 @@ static int vine_manager_send_duty_to_worker(struct vine_manager *q, struct vine_
 	vine_manager_send(q,w, "duty %lld %lld\n",  (long long) strlen(name), (long long)t->task_id);
 	link_putlstring(w->link, name, strlen(name), time(0) + q->short_timeout);
 	vine_result_code_t result = start_one_task(q, w, t);
+
+	vine_txn_log_write_duty_update(q, w, t->task_id, VINE_DUTY_SENT);
+
 	return result;
 }
 
-static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char *name) {
+static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char *name, time_t stoptime) {
 	char *worker_key;
 	struct vine_worker_info *w;
 
 	HASH_TABLE_ITERATE(q->worker_table,worker_key,w) {
+		if (stoptime < time(0)) {
+			return;
+		}
+		if (!w->workerid) {
+			continue;
+		}
+		
 		if(!w->features) {
-			vine_manager_send_duty_to_worker(q, w, name);
 			w->features = hash_table_create(4,0);
-			hash_table_insert(w->features, name, (void **) 1);
 			continue;
 		}
 		if(!hash_table_lookup(w->features, name)) {
+			debug(D_VINE, "Sending duty %s to worker %s\n", name, w->workerid);
 			vine_manager_send_duty_to_worker(q, w, name);
 			hash_table_insert(w->features, name, (void **) 1);
 		}
 	}
 }
 
-static void vine_manager_send_duties_to_workers(struct vine_manager *q) {
+static void vine_manager_send_duties_to_workers(struct vine_manager *q, time_t stoptime) {
 	char *duty;
 	struct vine_task *t;
 	HASH_TABLE_ITERATE(q->duties,duty,t) {
-		vine_manager_send_duty_to_workers(q, duty);
+		if (stoptime < time(0))
+			return;
+		vine_manager_send_duty_to_workers(q, duty, stoptime);
 	}
 
 }
@@ -3948,7 +3960,6 @@ void vine_manager_install_duty( struct vine_manager *q, struct vine_task *t, con
 	t->task_id = -1;
 	hash_table_insert(q->duties, name, t);
 	t->time_when_submitted = timestamp_get();
-	vine_manager_send_duties_to_workers(q);
 }
 
 void vine_manager_remove_duty( struct vine_manager *q, const char *name ) {
@@ -3963,6 +3974,24 @@ void vine_manager_remove_duty( struct vine_manager *q, const char *name ) {
 		}
 	}
 }
+
+static void handle_duty_update(struct vine_manager *q, struct vine_worker_info *w, const char *line) {
+	int duty_id = 0;
+	vine_duty_state_t state;
+
+	int n = sscanf(line, "%d %d", &duty_id, (int *) &state);
+	if(n != 2) {
+		debug(D_VINE, "Duty %d update message is corrupt.", duty_id);
+		return;
+	}
+
+	if(state == VINE_DUTY_STARTED) {
+		debug(D_VINE, "Duty %d started on %s\n", duty_id, w->workerid);
+	}
+
+	vine_txn_log_write_duty_update(q, w, duty_id, state);
+}
+
 
 void vine_block_host_with_timeout(struct vine_manager *q, const char *hostname, time_t timeout)
 {
@@ -4309,6 +4338,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				break;
 			}
 		}
+
+		// attempt to send duties to connected workers
+		BEGIN_ACCUM_TIME(q, time_send);
+		vine_manager_send_duties_to_workers(q, stoptime);
+		END_ACCUM_TIME(q, time_send);
 
 		// return if manager is empty and something interesting already happened
 		// in this wait.
