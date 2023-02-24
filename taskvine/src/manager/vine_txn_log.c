@@ -49,7 +49,7 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING_RETRIEVAL worker_id\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}\n");
-	fprintf(q->txn_logfile, "# time manager_pid DUTY duty_id worker-id (WAITING|SENT|STARTED|FAILURE)");
+	fprintf(q->txn_logfile, "# time manager_pid DUTY duty_id (WAITING|SENT|STARTED|FAILURE) worker_id");
 	fprintf(q->txn_logfile, "\n");
 }
 
@@ -276,7 +276,7 @@ void vine_txn_log_write_manager(struct vine_manager *q, const char *event)
 void vine_txn_log_write_duty_update(struct vine_manager *q, struct vine_worker_info *w, int duty_id, vine_duty_state_t state) {
 	struct buffer B;
 	buffer_init(&B);
-	buffer_printf(&B, "DUTY %d %s", duty_id, w->workerid);
+	buffer_printf(&B, "DUTY %d", duty_id);
 
     const char *status = "UNKNOWN";
     switch(state) {
@@ -295,6 +295,7 @@ void vine_txn_log_write_duty_update(struct vine_manager *q, struct vine_worker_i
     }
 
     buffer_printf(&B, " %s", status);
+    buffer_printf(&B, " %s", w->workerid);
 
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
