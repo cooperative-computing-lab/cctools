@@ -61,6 +61,15 @@ typedef enum {
 	VINE_WORKER_DISCONNECT_FAILURE
 } vine_worker_disconnect_reason_t;
 
+/* States known about duties */
+
+typedef enum {
+	VINE_DUTY_WAITING = 0,
+	VINE_DUTY_SENT,
+	VINE_DUTY_STARTED,
+	VINE_DUTY_FAILURE
+} vine_duty_state_t;
+
 struct vine_worker_info;
 struct vine_task;
 struct vine_file;

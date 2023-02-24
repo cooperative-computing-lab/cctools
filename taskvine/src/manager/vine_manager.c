@@ -3892,7 +3892,7 @@ static int vine_manager_send_duty_to_worker(struct vine_manager *q, struct vine_
 	link_putlstring(w->link, name, strlen(name), time(0) + q->short_timeout);
 	vine_result_code_t result = start_one_task(q, w, t);
 
-	vine_txn_log_write_duty_update(q, w, t->task_id, "send");
+	vine_txn_log_write_duty_update(q, w, t->task_id, VINE_DUTY_SENT);
 
 	return result;
 }
@@ -3953,17 +3953,19 @@ void vine_manager_remove_duty( struct vine_manager *q, const char *name ) {
 
 static void handle_duty_update(struct vine_manager *q, struct vine_worker_info *w, const char *line) {
 	int duty_id = 0;
-	char status[VINE_LINE_MAX];
+	vine_duty_state_t state;
 
-	int n = sscanf(line, "%d %s", &duty_id, status);
-
+	int n = sscanf(line, "%d %d", &duty_id, (int *) &state);
 	if(n != 2) {
+		debug(D_VINE, "Duty %d update message is corrupt.", duty_id);
 		return;
 	}
 
-	debug(D_VINE, "Duty %d started on worker %s\n", duty_id, w->workerid);
+	if(state == VINE_DUTY_STARTED) {
+		debug(D_VINE, "Duty %d started on %s\n", duty_id, w->workerid);
+	}
 
-	vine_txn_log_write_duty_update(q, w, duty_id, status);
+	vine_txn_log_write_duty_update(q, w, duty_id, state);
 }
 
 

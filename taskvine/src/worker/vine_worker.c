@@ -530,13 +530,13 @@ static int start_process( struct vine_process *p, struct link *manager )
 			list_push_tail(coprocess_list, p->coprocess);
 			hash_table_insert(features, duty_name, (void **) 1);
 			send_features(manager);
-			send_message(manager, "info duty-update %d %s\n", p->task->task_id, "started");
+			send_message(manager, "info duty-update %d %d\n", p->task->task_id, VINE_DUTY_STARTED);
 			send_resource_update(manager);
 		}
 	}
 
 	itable_insert(procs_running,p->pid,p);
-	
+
 	return 1;
 }
 
