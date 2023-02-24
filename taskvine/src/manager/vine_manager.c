@@ -5112,15 +5112,15 @@ struct vine_file *vine_declare_untar( struct vine_manager *m, struct vine_file *
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_declare_unponcho( struct vine_manager *m, struct vine_file *f)
+struct vine_file *vine_declare_poncho( struct vine_manager *m, struct vine_file *f)
 {
-	struct vine_file *t = vine_file_unponcho(f);
+	struct vine_file *t = vine_file_poncho(f);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_declare_unstarch( struct vine_manager *m, struct vine_file *f)
+struct vine_file *vine_declare_starch( struct vine_manager *m, struct vine_file *f)
 {
-	struct vine_file *t = vine_file_unstarch(f);
+	struct vine_file *t = vine_file_starch(f);
 	return vine_manager_declare_file(m, t);
 }
 

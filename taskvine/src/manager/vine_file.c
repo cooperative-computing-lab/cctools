@@ -152,7 +152,7 @@ struct vine_file * vine_file_untar( struct vine_file *f )
 	return vine_file_mini_task(t);
 }
 
-struct vine_file * vine_file_unponcho( struct vine_file *f)
+struct vine_file * vine_file_poncho( struct vine_file *f)
 {
 	struct vine_task *t = vine_task_create("./poncho_package_run --unpack-to output -e package.tar.gz");
 	char * poncho_path = path_which("poncho_package_run");
@@ -162,7 +162,7 @@ struct vine_file * vine_file_unponcho( struct vine_file *f)
 	return vine_file_mini_task(t);
 }
 
-struct vine_file * vine_file_unstarch( struct vine_file *f )
+struct vine_file * vine_file_starch( struct vine_file *f )
 {
 	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
 	vine_task_add_input(t,f,"package.sfx",VINE_CACHE);

@@ -683,7 +683,7 @@ struct vine_file * vine_declare_untar( struct vine_manager *m, struct vine_file 
 @param m A manager object
 @param f A file object corresponding to poncho or conda-pack tarball
 */
-struct vine_file * vine_declare_unponcho( struct vine_manager *m, struct vine_file *f );
+struct vine_file * vine_declare_poncho( struct vine_manager *m, struct vine_file *f );
 
 
 /** Create a file object by unpacking a starch package.
@@ -691,7 +691,7 @@ struct vine_file * vine_declare_unponcho( struct vine_manager *m, struct vine_fi
 @param f A file object representing a sfx archive.
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_unstarch( struct vine_manager *m, struct vine_file *f );
+struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file *f );
 
 
 /** Delete a file object

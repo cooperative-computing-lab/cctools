@@ -59,8 +59,8 @@ struct vine_file *vine_file_buffer( const char *buffer, size_t size );
 struct vine_file *vine_file_empty_dir( );
 struct vine_file *vine_file_mini_task( struct vine_task *t );
 struct vine_file *vine_file_untar( struct vine_file *f );
-struct vine_file *vine_file_unponcho( struct vine_file *f );
-struct vine_file *vine_file_unstarch( struct vine_file *f );
+struct vine_file *vine_file_poncho( struct vine_file *f );
+struct vine_file *vine_file_starch( struct vine_file *f );
 struct vine_file *vine_file_xrootd( const char *source, struct vine_file *proxy );
 
 #endif

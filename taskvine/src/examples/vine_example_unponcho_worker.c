@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 /*
-An example of a task using a minitask (vine_declare_unponcho) to unpack a dependency before using it.
+An example of a task using a minitask (vine_declare_poncho) to unpack a dependency before using it.
 */
 
 #include "taskvine.h"
@@ -22,8 +22,8 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
-	// runtime logs will be written to vine_example_unponcho_worker_info/%Y-%m-%dT%H:%M:%S
-	vine_set_runtime_info_path("vine_example_unponcho_worker_info");
+	// runtime logs will be written to vine_example_poncho_worker_info/%Y-%m-%dT%H:%M:%S
+	vine_set_runtime_info_path("vine_example_poncho_worker_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
 	struct vine_file *script = vine_declare_file(m, "python_example.py");
 
 	struct vine_file *poncho_tarball = vine_declare_file(m, "package.tar.gz");
-	struct vine_file *poncho_expansion = vine_declare_unponcho(m, poncho_tarball);
+	struct vine_file *poncho_expansion = vine_declare_poncho(m, poncho_tarball);
 
 	for(i=0;i<5;i++) {
 

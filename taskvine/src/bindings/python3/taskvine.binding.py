@@ -199,7 +199,7 @@ class FileUnponcho(File):
     # @param subfile    The file object to un-tgz.
 
     def __init__(self, subfile):
-        self._file = vine_file_unponcho(vine_file_clone(subfile._file))
+        self._file = vine_file_poncho(vine_file_clone(subfile._file))
 
 
 ##
@@ -217,7 +217,7 @@ class FileUnstarch(File):
     # @param self       The current file object.
     # @param subfile    The file object to un-tgz.
     def __init__(self, subfile):
-        self._file = vine_file_unstarch(vine_file_clone(subfile._file))
+        self._file = vine_file_starch(vine_file_clone(subfile._file))
 
 
 class FileXrootD(File):
