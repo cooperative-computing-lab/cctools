@@ -199,7 +199,7 @@ int work_queue_coprocess_check(struct work_queue_coprocess *coprocess)
     return 1;
 }
 
-char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess) {
+char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess, int task_id) {
 	char addr[DOMAIN_NAME_MAX];
 	int timeout = 60000000; // one minute, can be changed
 
@@ -229,7 +229,7 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 
 	curr_time = timestamp_get();
 	stoptime = curr_time + timeout;
-	int bytes_sent = link_printf(coprocess->network_link, stoptime, "%s %ld\n", function_name, strlen(function_input));
+	int bytes_sent = link_printf(coprocess->network_link, stoptime, "%s %d %ld\n", function_name, task_id, strlen(function_input));
 	if(bytes_sent < 0) {
 		fatal("could not send input data size: %s", strerror(errno));
 	}

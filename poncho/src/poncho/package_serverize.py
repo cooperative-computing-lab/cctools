@@ -10,6 +10,7 @@ from poncho import package_create as create
 import argparse
 import json
 import os
+import stat
 import ast
 import tarfile
 import hashlib
@@ -181,7 +182,8 @@ def main():
                 # actually read the size of the event
                 input_spec = conn.recv(size).decode('utf-8').split()
                 function_name = input_spec[0]
-                event_size = int(input_spec[1])
+                task_id = int(input_spec[1])
+                event_size = int(input_spec[2])
             try:
                 if event_size:
                     # receive the bytes containing the event and turn it into a string
@@ -191,6 +193,7 @@ def main():
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
                     print('Network function: recieved event: {}'.format(event), file=sys.stderr)
+                    os.chdir(f"t.{task_id}")
                     if exec_method == "thread":
                         # create a forked process for function handler
                         q = queue.Queue()
@@ -226,6 +229,7 @@ def main():
                     conn.sendall(size_msg.encode('utf-8'))
                     # send response
                     conn.sendall(response)
+                    os.chdir("..")
                     break
             except Exception as e:
                 print("Network function encountered exception ", str(e), file=sys.stderr)
@@ -286,6 +290,8 @@ def create_network_function(path, funcs, dest, version):
 		output_file.write("\n")
 	output_file.write(init_function)
 	output_file.close()
+	st = os.stat(dest)
+	os.chmod(dest, st.st_mode | stat.S_IEXEC)
 
 def sort_spec(spec):
     sorted_spec = json.load(spec)
