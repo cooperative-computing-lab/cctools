@@ -16,5 +16,5 @@ if __name__ == "__main__":
     if not args.pack:
         serverize.create_network_function(args.src, args.function, args.dest, args.version)
     else:
-        serverize.create_network_function(args.src, args.function, args.dest, args.varsion)
+        serverize.create_network_function(args.src, args.function, args.dest, args.version)
         serverize.pack_network_function(args.src, args.pack)
