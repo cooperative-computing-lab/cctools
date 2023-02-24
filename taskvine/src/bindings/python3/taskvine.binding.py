@@ -77,25 +77,11 @@ class File(object):
 #
 # This class is used to create a task specification to be submitted to a @ref taskvine::Manager.
 class Task(object):
-    ##
-    # Create a new task specification.
-    #
-    # @param self       Reference to the current task object.
-    # @param command    The shell command line to be exected by the task.
-    def __init__(self, command):
-        self._task = None
 
-        self._task = vine_task_create(command)
-        if not self._task:
-            raise Exception("Unable to create internal Task structure")
-
-    def __del__(self):
-        try:
-            if self._task:
-                vine_task_delete(self._task)
-        except Exception:
-            # ignore exceptions, in case task has been already collected
-            pass
+    # Private constructor method used by TaskVine.Manager.declareTask
+    
+    def __init__(self, _task ):
+        self._task = _task
 
     @staticmethod
     def _determine_file_flags(cache=False, unpack=False, watch=False, failure_only=False, success_only=False):
@@ -119,15 +105,6 @@ class Task(object):
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
         pass
-
-    ##
-    # Return a copy of this task
-    #
-    def clone(self):
-        """Return a (deep)copy this task that can also be submitted to the taskvine."""
-        new = copy.copy(self)
-        new._task = vine_task_clone(self._task)
-        return new
 
     ##
     # Set the command to be executed by the task.
@@ -1542,6 +1519,16 @@ class Manager(object):
     def tune(self, name, value):
         return vine_tune(self._taskvine, name, value)
 
+    ##
+    # Declare a new task object.
+    # Returns a Task that can be further elaborated with
+    # @ref add_input, @ref add_output, @ref set_cores and
+    # similar methods.  Once fully elaborated, call @ref submit
+    # to submit the task for execution.
+
+    def declareTask(self, command):
+        return Task( vine_declare_task(self._taskvine, command ) )
+    
     ##
     # Submit a task to the manager.
     #
