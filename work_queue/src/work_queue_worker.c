@@ -2714,12 +2714,18 @@ int main(int argc, char *argv[])
 			manual_ssl_option=1;
 			break;
 		case LONG_OPT_COPROCESS:
-			coprocess_command = path_which(optarg);
-			if (coprocess_command == NULL) {
-				coprocess_command = calloc(PATH_MAX, sizeof(char));
-				path_absolute(optarg, coprocess_command, 1);
-				realloc(coprocess_command, strlen(coprocess_command)+1);
+			// if no / in filepath, call which on the executable name to find its path
+			// if we can't find it, we call path_absolute to check if its in local directory
+			if (strchr(optarg, '/') == NULL) {
+				coprocess_command = path_which(optarg);
+				// found
+				if (coprocess_command != NULL) {
+					break;
+				}
 			}
+			coprocess_command = calloc(PATH_MAX, sizeof(char));
+			path_absolute(optarg, coprocess_command, 1);
+			realloc(coprocess_command, strlen(coprocess_command)+1);
 			break;
 		case LONG_OPT_NUM_COPROCESS:
 			number_of_coprocess_instances = atoi(optarg);
