@@ -51,13 +51,8 @@ def set_port_range(low_port, high_port):
 #
 # The superclass of all TaskVine file types.
 class File(object):
-    def __del__(self):
-        try:
-            if self._file:
-                vine_file_delete(self._file)
-        except Exception:
-            # ignore exceptions, in case task has been already collected
-            pass
+    def __init__(self, manager, *args, **kwargs):
+        return NotImplemented
 
     ##
     # Return the contents of a file object as a string.
@@ -85,23 +80,29 @@ class FileLocal(File):
     # Create a local file object.
     #
     # @param self       The current file object.
+    # @param manager    The manager to declare this file.
     # @param path       The path to the local file.
-
-    def __init__(self, path):
+    def __init__(self, manager, path):
         path = str(path)
-        self._file = vine_file_local(path)
+        self._file = vine_declare_file(manager._taskvine, path)
 
 
 ##
+# \class FileTemp
+#
+# TaskVine FileTemp object
+#
+# A scratch file has no initial content, but is created as the output of a
+# task, and may be consumed by other tasks.
 class FileTemp(File):
-
     ##
     # Create an anonymous temporary file object.
     #
     # @param self       The current file object.
+    # @param manager    The manager to declare this file.
+    def __init__(self, manager):
+        self._file = vine_declare_temp(manager._taskvine)
 
-    def __init__(self):
-        self._file = vine_file_temp()
 
 ##
 # \class FileURL
@@ -109,18 +110,16 @@ class FileTemp(File):
 # TaskVine URL object
 #
 # A file obtained from a remote URL.
-
-
 class FileURL(File):
     ##
     # Create a remote URL file object.
     #
     # @param self      The current file object.
+    # @param manager    The manager to declare this file.
     # @param url       The url of the file.
-
-    def __init__(self, url):
+    def __init__(self, manager, url):
         url = str(url)
-        self._file = vine_file_url(url)
+        self._file = vine_declare_url(manager._taskvine, url)
 
 
 ##
@@ -129,12 +128,12 @@ class FileURL(File):
 # TaskVine Buffer object
 #
 # A file obtained from a buffer in memory.
-
 class FileBuffer(File):
     ##
     # Create a file from a buffer in memory.
     #
     # @param self       The current file object.
+    # @param manager    The manager to declare this file.
     # @param buffer     The contents of the buffer, or None for an empty output buffer.
     #
     # For example:
@@ -143,10 +142,11 @@ class FileBuffer(File):
     # >>> s = "hello pirate ♆"
     # >>> FileBuffer(bytes(s, "utf-8"))
     # @endcode
-    def __init__(self, buffer=None):
-        # because of the swig typemap, vine_file_buffer(data, size) is changed
+    def __init__(self, manager, buffer=None):
+        # because of the swig typemap, vine_declare_buffer(data, size) is changed
         # to a function with just one argument.
-        self._file = vine_file_buffer(buffer)
+        self._file = vine_declare_buffer(manager._taskvine, buffer)
+
 
 ##
 # \class FileMiniTask
@@ -154,17 +154,15 @@ class FileBuffer(File):
 # TaskVine File object
 #
 # A file obtained from a mini-task.
-
-
 class FileMiniTask(File):
     ##
     # Create a file by executing a mini-task.
     #
     # @param self       The current file object.
+    # @param manager    The manager to declare this file.
     # @param minitask   The task to execute in order to produce a file.
-
-    def __init__(self, minitask):
-        self._file = vine_file_mini_task(minitask._task)
+    def __init__(self, manager, minitask):
+        self._file = vine_declare_mini_task(manager._taskvine, minitask._task)
 
 
 ##
@@ -173,70 +171,67 @@ class FileMiniTask(File):
 # TaskVine File TAR Unpacker
 #
 # A wrapper to unpack a file in .tar form.
-
-
 class FileUntar(File):
     ##
     # Create a file by unpacking a tar file.
     #
     # @param self       The current file object.
-    # @param subfile    The file object to un-tar.
-    def __init__(self, subfile):
-        self._file = vine_file_untar(vine_file_clone(subfile._file))
+    # @param manager    The manager to declare this file.
+    # @param tarball    The file object to un-tar.
+    def __init__(self, manager, tarball):
+        self._file = vine_declare_untar(manager._taskvine, tarball._file)
 
 
 ##
 # \class FilePoncho
 #
-# TaskVine File PONCHO Unpacker
+# TaskVine File Poncho Setup
 #
-# A wrapper to unpack a file in poncho package form.
-class FileUnponcho(File):
+# A wrapper to setup a Poncho environment from its package tarball
+class FilePoncho(File):
     ##
-    # Create a file by unpacking a poncho package.
+    # Create a file by from a poncho package tarball.
     #
-    # @param self       The current file object.
-    # @param subfile    The file object to un-tgz.
-
-    def __init__(self, subfile):
-        self._file = vine_file_poncho(vine_file_clone(subfile._file))
+    # @param self       The current file object
+    # @param manager    The manager to declare this file
+    # @param package    The poncho environment tarball
+    def __init__(self, manager, package):
+        self._file = vine_declare_poncho(manager._taskvine, package._file)
 
 
 ##
-# \class FileUnstarch
+# \class FileStarch
 #
-# TaskVine File Starch Unpacker
+# TaskVine File Starch setup
 #
-# A wrapper to unpack a file in .sfx form.
-
-
+# A wrapper to setup a starch file from its .sfx package
 class FileUnstarch(File):
     ##
     # Create a file by unpacking a starch package.
     #
-    # @param self       The current file object.
-    # @param subfile    The file object to un-tgz.
-    def __init__(self, subfile):
-        self._file = vine_file_starch(vine_file_clone(subfile._file))
+    # @param self       The current file object
+    # @param manager    The manager to declare this file
+    # @param starch     The startch .sfx file
+    def __init__(self, manager, starch):
+        self._file = vine_declare_starch(manager._taskvine, starch._file)
 
 
 class FileXrootD(File):
-
     ##
     # Create a file object of a remote file accessible from an xrootd server.
     #
-    # @param self   The current file object.
-    # @param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
+    # @param self     The current file object.
+    # @param manager  The manager to declare this file.
+    # @param source   The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
     # @param proxy  A @ref File of the X509 proxy to use. If None, the
     #               environment variable X509_USER_PROXY and the file
     #               "$TMPDIR/$UID" are considered in that order. If no proxy is
     #               present, the transfer is tried without authentication.
-
-    def __init__(self, source, proxy=None):
+    def __init__(self, manager, source, proxy=None):
         proxy_c = None
         if proxy:
             proxy_c = proxy._file
-        self._file = vine_file_xrootd(source, proxy_c)
+        self._file = vine_declare_xrootd(manager._taskvine, source, proxy_c)
 
 
 ##
@@ -245,8 +240,6 @@ class FileXrootD(File):
 # TaskVine Task object
 #
 # This class is used to create a task specification to be submitted to a @ref taskvine::Manager.
-
-
 class Task(object):
     ##
     # Create a new task specification.
@@ -449,8 +442,7 @@ class Task(object):
         # SWIG expects strings
         remote_name = str(remote_name)
         flags = Task._determine_file_flags(cache=cache, failure_only=None)
-        copy_of_file = vine_file_clone(file._file)
-        return vine_task_add_input(self._task, copy_of_file, remote_name, flags)
+        return vine_task_add_input(self._task, file._file, remote_name, flags)
 
     ##
     # Add an empty directory to the task.
@@ -526,8 +518,7 @@ class Task(object):
         # SWIG expects strings
         remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        copy_of_file = vine_file_clone(file._file)
-        return vine_task_add_output(self._task, copy_of_file, remote_name, flags)
+        return vine_task_add_output(self._task, file._file, remote_name, flags)
 
     ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
@@ -1106,7 +1097,7 @@ class Manager(object):
 
             if name:
                 vine_set_name(self._taskvine, name)
-        except Exception as e:
+        except Exception:
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
 
