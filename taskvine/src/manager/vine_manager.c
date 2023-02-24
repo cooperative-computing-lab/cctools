@@ -5055,12 +5055,10 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 	}
 
 	struct vine_file *previous = vine_manager_lookup_file(m, f->file_id);
-
 	if(previous) {
 	/* This file has been declared before. We delete the new instance and
-	 * increase the refcount of the previous. */
+	 * return previous. */
 		vine_file_delete(f);
-		vine_file_clone(previous);
 		f = previous;
 	}
 
