@@ -1792,9 +1792,9 @@ change.
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
 | wait-retrieve-many      | Rather than immediately returning when a task is done, `m.wait(timeout)` retrieves and dispatches as many tasks<br> as `timeout` allows. Warning: This may exceed the capacity of the manager to receive results. | 0 |
-| main-loop-max-receives | Sets the max number of receives for the manager to do in the main loop. This is receives of either `receive_one_task` or `receive_all_tasks_from_worker` | 1 |
-| main-loop-prefer-receives | If set to 1, main loop restarts after receiving at least one task | 0 |
-| retrieve-all-waiting-tasks-from-worker | If set to 1, use `receive_all_tasks_from_worker`. If set to 0, use `receive_one_task` | 1 |
+| max-receives | Sets the max number of receives for the manager to do in the main loop. This is receives of either `receive_one_task` or `receive_all_tasks_from_worker` | 1 |
+| prefer-receives | If set to 1, main loop restarts after receiving at least one task | 0 |
+| retrieve-complete-per-worker | If 0, then retrieve one completed result per worker before deciding to dispatch new tasks or connect new workers. If 1, retrieve all completed results from a worker instead. | 1 |
 
 
 === "Python"

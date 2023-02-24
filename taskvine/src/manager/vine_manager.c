@@ -3235,9 +3235,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->wait_for_workers = 0;
 	
-	q->main_loop_max_receives = 1;
-	q->main_loop_prefer_receives = 0;
-	q->retrieve_all_waiting_tasks_from_worker = 1;
+	q->max_receives = 1;
+	q->prefer_receives = 0;
+	q->retrieve_complete_per_worker = 1;
 
 	q->proportional_resources = 1;
 	q->proportional_whole_tasks = 1;
@@ -4226,12 +4226,12 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		q->busy_waiting_flag = 0;
 
 		// retrieve results from workers
-		// rectrieve all available tasks from worker if retrieve_all_waiting_tasks_from_worker.
+		// rectrieve all available tasks from worker if retrieve_complete_per_worker.
 		// If no tasks are ready to be sent retrieve all from available workers
 		N = hash_table_size(q->workers_with_available_results);
 		if(N > 0) {
 			int task_ready = !!task_state_any(q, VINE_TASK_READY);
-			int receives = q->main_loop_max_receives;
+			int receives = q->max_receives;
 			int received = 0;
 			char *key;
 			struct vine_worker_info *w;
@@ -4240,7 +4240,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				get_available_results(q, w);
 				hash_table_remove(q->workers_with_available_results, key);
 				hash_table_firstkey(q->workers_with_available_results);
-				if(q->retrieve_all_waiting_tasks_from_worker){
+				if(q->retrieve_complete_per_worker){
 						BEGIN_ACCUM_TIME(q, time_receive);
 						receive_all_tasks_from_worker(q, w);
 						END_ACCUM_TIME(q, time_receive);
@@ -4251,10 +4251,10 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				if(task_ready && received == receives) break;
 		
 			}
-			if(q->retrieve_all_waiting_tasks_from_worker && q->main_loop_prefer_receives) continue;	
+			if(q->retrieve_complete_per_worker && q->prefer_receives) continue;	
 		}
-		// recieve one task from any worker if NOT retrieve_all_waiting_tasks_from_worker
-		if(!q->retrieve_all_waiting_tasks_from_worker){
+		// recieve one task from any worker if NOT retrieve_complete_per_worker
+		if(!q->retrieve_complete_per_worker){
 				int tasks_received = 0;
 				BEGIN_ACCUM_TIME(q, time_receive);
 				result = receive_one_task(q);
@@ -4263,7 +4263,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 					tasks_received++;
 					events++;
 					compute_manager_load(q, 1);
-						while(result && tasks_received < q->main_loop_max_receives){
+						while(result && tasks_received < q->max_receives){
 							BEGIN_ACCUM_TIME(q, time_receive);
 							result = receive_one_task(q);
 							END_ACCUM_TIME(q, time_receive);
@@ -4272,7 +4272,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 								compute_manager_load(q, 1);
 							}
 					}
-					if(q->main_loop_prefer_receives) continue;
+					if(q->prefer_receives) continue;
 				}
 		}
 
@@ -4667,14 +4667,14 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "main-loop-max-receives")) {
-		q->main_loop_max_receives = MAX(1, (int)value);
+	} else if(!strcmp(name, "max-receives")) {
+		q->max_receives = MAX(1, (int)value);
 
-	} else if(!strcmp(name, "main-loop-prefer-receives")) {
-		q->main_loop_prefer_receives = MAX(0, (int)value);
+	} else if(!strcmp(name, "prefer-receives")) {
+		q->prefer_receives = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "retrieve-all-waiting-tasks-from-worker")) {
-		q->retrieve_all_waiting_tasks_from_worker = MAX(0, (int)value);
+	} else if(!strcmp(name, "retrieve-complete-per-worker")) {
+		q->retrieve_complete_per_worker = MAX(0, (int)value);
 
 	}else if(!strcmp(name, "wait-retrieve-many")){
 		q->wait_retrieve_many = MAX(0, (int)value);
