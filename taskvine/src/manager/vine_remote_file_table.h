@@ -4,6 +4,12 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+
+/*
+ * Abstract the files posessed by the workers to a single "table"
+ */
+
+
 #ifndef VINE_REMOTE_FILE_TABLE_H
 #define VINE_REMOTE_FILE_TABLE_H
 

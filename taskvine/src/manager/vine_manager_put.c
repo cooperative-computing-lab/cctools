@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "vine_mount.h"
 #include "vine_protocol.h"
 #include "vine_remote_file_info.h"
+#include "vine_remote_file_table.h"
 #include "vine_txn_log.h"
 #include "vine_current_transfers.h"
 
@@ -349,7 +350,7 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	}
 
 	/* Has this file already been sent and cached? */
-	struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,f->cached_name);
+	struct vine_remote_file_info *remote_info = vine_remote_file_table_lookup(w,f->cached_name);
 
 	/*
 	If so, check that it hasn't changed, and return success.
@@ -382,7 +383,7 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	if(result==VINE_SUCCESS) {
 		if(m->flags & VINE_CACHE) {
 			struct vine_remote_file_info *remote_info = vine_remote_file_info_create(info.st_size,info.st_mtime);
-			hash_table_insert(w->current_files,f->cached_name,remote_info);
+			vine_remote_file_table_insert(w,f->cached_name,remote_info);
 		}
 	}
 	

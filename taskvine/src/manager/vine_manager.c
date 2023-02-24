@@ -3062,7 +3062,7 @@ static void vine_remove_file_internal(struct vine_manager *q, const char *filena
 	struct vine_worker_info *w;
 	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 
-		if(!hash_table_lookup(w->current_files, filename))
+		if(!vine_remote_file_table_lookup(w, filename))
 			continue;
 
 		struct vine_task *t;

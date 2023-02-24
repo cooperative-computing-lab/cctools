@@ -15,23 +15,27 @@ See the file COPYING for details.
 
 #include "debug.h"
 
+// add a file to the remote file table. 
 int vine_remote_file_table_insert(struct vine_worker_info *w, const char *cachename, struct vine_remote_file_info *remote_info)
 {
 	hash_table_insert(w->current_files, cachename, remote_info);
 	return 1;
 }
 
+// remove a file from the remote file table.
 struct vine_remote_file_info *vine_remote_file_table_remove(struct vine_worker_info *w, const char *cachename)
 {
 	return hash_table_remove(w->current_files, cachename);
 }
 
+// lookup a file in posession of a specific worker
 struct vine_remote_file_info *vine_remote_file_table_lookup(struct vine_worker_info *w, const char *cachename)
 {
 	struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files, cachename);
 	return remote_info;
 }
 
+// find a worker in posession of a specific file, and is ready to transfer it. 
 struct vine_worker_info *vine_remote_file_table_find_worker(struct vine_manager *q, const char *cachename)
 {
 	char *id;
