@@ -80,9 +80,9 @@ def parse_manager(log):
             continue
 
         if subject == "DUTY":
-            if event == "send":
+            if event == "SENT":
                 manager_info["Duties Sent"].append(time - manager_info["Start"])
-            elif event == "started":
+            elif event == "STARTED":
                 manager_info["Duties Started"].append(time - manager_info["Start"])
 
 def parse_tasks(log):
@@ -141,9 +141,9 @@ def parse_tasks(log):
             continue
 
         if subject == "DUTY":
-            if event == "send":
+            if event == "SENT":
                 manager_info["Duties Sent"].append(time - manager_info["Start"])
-            elif event == "started":
+            elif event == "STARTED":
                 manager_info["Duties Started"].append(time - manager_info["Start"])
                 manager_info["DutyMap"].update([(int(target), (arg, time - manager_info["Start"], 0))])
 
@@ -348,10 +348,10 @@ def parse_workers(log):
             continue
             
         if subject == "DUTY":
-            if event == "send":
+            if event == "SENT":
                 worker_id = arg
                 worker_info[worker_id]["duties"][target] = {"sent":time, "started": -1}
-            elif event == "started":
+            elif event == "STARTED":
                 worker_id = arg
                 worker_info[worker_id]["duties"][target]["started"] = time
 
