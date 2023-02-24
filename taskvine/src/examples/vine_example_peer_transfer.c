@@ -57,16 +57,16 @@ int main(int argc, char *argv[])
 		vine_tune(m, "file-source-max-transfers", 2);
 	}
 
-	struct vine_file *blast_url = vine_manager_file_url(m, BLAST_URL);
-	struct vine_file *landm_url = vine_manager_file_url(m, LANDMARK_URL);
+	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL);
+	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL);
 
-	struct vine_file *software = vine_manager_file_untar(m, blast_url);
-	struct vine_file *database = vine_manager_file_untar(m, landm_url);
+	struct vine_file *software = vine_declare_untar(m, blast_url);
+	struct vine_file *database = vine_declare_untar(m, landm_url);
 
 	for(i=0;i<1000;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 
-		struct vine_file *query = vine_manager_file_buffer(m, query_string, strlen(query_string));
+		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string));
 
 		vine_task_add_input(t, query, "query.file", VINE_NOCACHE);
 		vine_task_add_input(t,software,"blastdir", VINE_CACHE );

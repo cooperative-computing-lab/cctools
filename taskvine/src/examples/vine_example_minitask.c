@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 /*
-An example of a task using a minitask (vine_manager_file_untar) to unpack a dependency before using it.
+An example of a task using a minitask (vine_declare_untar) to unpack a dependency before using it.
 */
 
 #include "taskvine.h"
@@ -35,8 +35,8 @@ int main(int argc, char *argv[])
 	printf("listening on port %d...\n", vine_port(m));
 
 
-	struct vine_file *url = vine_manager_file_url(m, CCTOOLS_URL);
-	struct vine_file *package = vine_manager_file_untar(m, url);
+	struct vine_file *url = vine_declare_url(m, CCTOOLS_URL);
+	struct vine_file *package = vine_declare_untar(m, url);
 
 	for(i=0;i<10;i++) {
 		struct vine_task *task = vine_task_create("ls -lR cctools | wc -l");

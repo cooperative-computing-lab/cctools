@@ -5035,7 +5035,7 @@ int vine_set_task_id_min(struct vine_manager *q, int minid) {
 Request to delete a file by its id
 Decrement the reference count and delete if zero.
 */
-void vine_manager_file_delete(struct vine_manager *m, struct vine_file *f)
+void vine_declare_delete(struct vine_manager *m, struct vine_file *f)
 {
 	if(!f) {
 		return;
@@ -5072,61 +5072,61 @@ struct vine_file *vine_manager_lookup_file( struct vine_manager *m, const char *
 	return hash_table_lookup(m->file_table, file_id);
 }
 
-struct vine_file *vine_manager_file_local( struct vine_manager *m, const char *source )
+struct vine_file *vine_declare_file( struct vine_manager *m, const char *source )
 {
 	struct vine_file *f = vine_file_local(source);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_manager_file_url( struct vine_manager *m, const char *source )
+struct vine_file *vine_declare_url( struct vine_manager *m, const char *source )
 {
 	struct vine_file *f = vine_file_url(source);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_manager_file_temp( struct vine_manager *m )
+struct vine_file *vine_declare_temp( struct vine_manager *m )
 {
 	struct vine_file *f = vine_file_temp();
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_manager_file_buffer( struct vine_manager *m, const char *buffer, size_t size )
+struct vine_file *vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size )
 {
 	struct vine_file *f = vine_file_buffer(buffer, size);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_manager_file_empty_dir( struct vine_manager *m )
+struct vine_file *vine_declare_empty_dir( struct vine_manager *m )
 {
 	struct vine_file *f = vine_file_empty_dir();
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_manager_file_mini_task( struct vine_manager *m, struct vine_task *t )
+struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *t )
 {
 	struct vine_file *f = vine_file_mini_task(t);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_manager_file_untar( struct vine_manager *m, struct vine_file *f)
+struct vine_file *vine_declare_untar( struct vine_manager *m, struct vine_file *f)
 {
 	struct vine_file *t = vine_file_untar(f);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_manager_file_unponcho( struct vine_manager *m, struct vine_file *f)
+struct vine_file *vine_declare_unponcho( struct vine_manager *m, struct vine_file *f)
 {
 	struct vine_file *t = vine_file_unponcho(f);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_manager_file_unstarch( struct vine_manager *m, struct vine_file *f)
+struct vine_file *vine_declare_unstarch( struct vine_manager *m, struct vine_file *f)
 {
 	struct vine_file *t = vine_file_unstarch(f);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_manager_file_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy)
+struct vine_file *vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy)
 {
 	struct vine_file *t = vine_file_xrootd(source, proxy);
 	return vine_manager_declare_file(m, t);

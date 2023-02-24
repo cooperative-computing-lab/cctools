@@ -69,8 +69,8 @@ int main(int argc, char *argv[])
 
 	vine_enable_peer_transfers(m);
 
-	struct vine_file *convert = vine_manager_file_local(m, "convert.sfx");
-	struct vine_file *image = vine_manager_file_url(m, "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg");
+	struct vine_file *convert = vine_declare_file(m, "convert.sfx");
+	struct vine_file *image = vine_declare_url(m, "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg");
 
 	struct vine_file *temp_file[36];
 
@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 		sprintf(outfile, "%d.cat.jpg",i);
 		sprintf(command, "./convert.sfx -swirl %d cat.jpg %d.cat.jpg", i*10, i);
 
-		temp_file[i] = vine_manager_file_temp(m);
+		temp_file[i] = vine_declare_temp(m);
 
 		t = vine_task_create(command);
 

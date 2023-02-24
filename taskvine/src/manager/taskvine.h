@@ -614,7 +614,7 @@ void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapsh
 @param source The path of the file on the local filesystem
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
-struct vine_file * vine_manager_file_local( struct vine_manager *m, const char *source );
+struct vine_file * vine_declare_file( struct vine_manager *m, const char *source );
 
 
 /** Declare a file object from a remote URL.
@@ -622,7 +622,7 @@ struct vine_file * vine_manager_file_local( struct vine_manager *m, const char *
 @param url The URL address of the object in text form.
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_manager_file_url( struct vine_manager *m, const char *url );
+struct vine_file * vine_declare_url( struct vine_manager *m, const char *url );
 
 
 /** Create a file object of a remote file accessible from an xrootd server.
@@ -633,7 +633,7 @@ environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
 in that order. If no proxy is present, the transfer is tried without authentication.
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_manager_file_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy );
+struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy );
 
 
 /** Create a scratch file object.
@@ -642,7 +642,7 @@ as the output of a task, and may be consumed by other tasks.
 @param m A manager object
 @return A file object to use in @ref vine_task_add_input, @ref vine_task_add_output
 */
-struct vine_file * vine_manager_file_temp( struct vine_manager *m );
+struct vine_file * vine_declare_temp( struct vine_manager *m );
 
 
 /** Create a file object from a data buffer.
@@ -652,14 +652,14 @@ struct vine_file * vine_manager_file_temp( struct vine_manager *m );
 @param size The length of the buffer, in bytes.
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
-struct vine_file * vine_manager_file_buffer( struct vine_manager *m, const char *buffer, size_t size );
+struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size );
 
 
 /** Create a file object representing an empty directory.
 @param m A manager object
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
-struct vine_file * vine_manager_file_empty_dir( struct vine_manager *m );
+struct vine_file * vine_declare_empty_dir( struct vine_manager *m );
 
 
 /** Create a file object produced from a mini-task
@@ -667,7 +667,7 @@ struct vine_file * vine_manager_file_empty_dir( struct vine_manager *m );
 @param mini_task The task which produces the file
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file *vine_manager_file_mini_task( struct vine_manager *m, struct vine_task *mini_task );
+struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *mini_task );
 
 
 /** Create a file object by unpacking a tar archive.
@@ -676,14 +676,14 @@ by tar, and so this function supports extensions .tar, .tar.gz, .tgz, tar.bz2, a
 @param m A manager object
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_manager_file_untar( struct vine_manager *m, struct vine_file *f );
+struct vine_file * vine_declare_untar( struct vine_manager *m, struct vine_file *f );
 
 
 /** Create a file object by unpacking a poncho package
 @param m A manager object
 @param f A file object corresponding to poncho or conda-pack tarball
 */
-struct vine_file * vine_manager_file_unponcho( struct vine_manager *m, struct vine_file *f );
+struct vine_file * vine_declare_unponcho( struct vine_manager *m, struct vine_file *f );
 
 
 /** Create a file object by unpacking a starch package.
@@ -691,14 +691,14 @@ struct vine_file * vine_manager_file_unponcho( struct vine_manager *m, struct vi
 @param f A file object representing a sfx archive.
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_manager_file_unstarch( struct vine_manager *m, struct vine_file *f );
+struct vine_file * vine_declare_unstarch( struct vine_manager *m, struct vine_file *f );
 
 
 /** Delete a file object
 @param m A manager object
 @param f A file object
 */
-void vine_manager_file_delete( struct vine_manager *m, struct vine_file *f );
+void vine_declare_delete( struct vine_manager *m, struct vine_file *f );
 
 
 //@}
