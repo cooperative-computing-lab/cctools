@@ -1215,8 +1215,8 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		rmsummary_delete(r);
 	}
 
-	itable_clear(w->current_tasks);
-	itable_clear(w->current_tasks_boxes);
+	itable_clear(w->current_tasks,0);
+	itable_clear(w->current_tasks_boxes,0);
 	w->finished_tasks = 0;
 }
 
