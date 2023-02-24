@@ -103,7 +103,8 @@ struct vine_manager {
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
 	struct hash_table *duties;      /* Maps duty name -> vine_task of duty with that name. */
-
+	struct itable *task_cleanup_table; /* Map taskid -> task of all tasks for cleanup purposes. */
+	
 	/* Primary data structures for tracking worker state. */
 
 	struct hash_table *worker_table;     /* Maps link -> vine_worker_info */

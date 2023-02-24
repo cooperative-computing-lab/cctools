@@ -756,8 +756,8 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 		rmsummary_delete(r);
 	}
 
-	itable_clear(w->current_tasks);
-	itable_clear(w->current_tasks_boxes);
+	itable_clear(w->current_tasks,0);
+	itable_clear(w->current_tasks_boxes,0);
 
 	w->finished_tasks = 0;
 }
@@ -3171,7 +3171,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->tasks          = itable_create(0);
 	q->duties         = hash_table_create(0, 0);
-
+	q->task_cleanup_table = itable_create(0);
+	
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
 
@@ -3456,6 +3457,9 @@ void vine_delete(struct vine_manager *q)
 	vine_disable_monitoring(q);
 
 	if(q->catalog_hosts) free(q->catalog_hosts);
+
+	itable_clear(q->task_cleanup_table,(void*)vine_task_delete);
+	itable_delete(q->task_cleanup_table);
 
 	hash_table_clear(q->worker_table,(void*)vine_worker_delete);
 	hash_table_delete(q->worker_table);
@@ -3865,47 +3869,45 @@ static int task_request_count( struct vine_manager *q, const char *category, cat
 	return count;
 }
 
-static int vine_submit_internal(struct vine_manager *q, struct vine_task *t)
+struct vine_task * vine_declare_task( struct vine_manager *m, const char *command )
 {
-	itable_insert(q->tasks, t->task_id, t);
+	struct vine_task *t = vine_task_create(command);
 
-	/* Ensure category structure is created. */
-	vine_category_lookup_or_create(q, t->category);
+	/* Generate a unique taskid */
+	t->task_id = m->next_task_id;
+	m->next_task_id++;
 
-	change_task_state(q, t, VINE_TASK_READY);
+	/* Add to the cleanup table so that the user doesn't have to delete. */
+	itable_insert(m->task_cleanup_table,t->task_id,t);
 
-	t->time_when_submitted = timestamp_get();
-	q->stats->tasks_submitted++;
-
-	if(q->monitor_mode != VINE_MON_DISABLED)
-		vine_monitor_add_files(q, t);
-
-	rmsummary_merge_max(q->max_task_resources_requested, t->resources_requested);
-
-	return (t->task_id);
+	return t;
 }
 
-int vine_submit(struct vine_manager *q, struct vine_task *t)
+int vine_submit(struct vine_manager *m, struct vine_task *t)
 {
-	if(t->task_id > 0) {
-		if(task_in_terminal_state(q, t)) {
-			/* this task struct has been submitted before. We keep all the
-			 * definitions, but reset all of the stats. */
-			vine_task_clean(t, /* full clean */ 1);
-		} else {
-			fatal("Task %d has been already submitted and is not in any final state.", t->task_id);
-		}
+	if(task_in_terminal_state(m, t)) {
+		fatal("task %lld (%s) was submitted more than once, which is not permitted",t->task_id,t->command_line);
 	}
-
-	t->task_id = q->next_task_id;
-
-	//Increment task_id. So we get a unique task_id for every submit.
-	q->next_task_id++;
 
 	/* Issue warnings if the files are set up strangely. */
 	vine_task_check_consistency(t);
 
-	return vine_submit_internal(q, t);
+	itable_insert(m->tasks, t->task_id, t);
+
+	/* Ensure category structure is created. */
+	vine_category_lookup_or_create(m, t->category);
+
+	change_task_state(m, t, VINE_TASK_READY);
+
+	t->time_when_submitted = timestamp_get();
+	m->stats->tasks_submitted++;
+
+	if(m->monitor_mode != VINE_MON_DISABLED)
+		vine_monitor_add_files(m, t);
+
+	rmsummary_merge_max(m->max_task_resources_requested, t->resources_requested);
+
+	return (t->task_id);
 }
 
 static int vine_manager_send_duty_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name) {

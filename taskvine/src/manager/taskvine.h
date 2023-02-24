@@ -219,29 +219,6 @@ struct vine_stats {
 
 //@{
 
-/** Create a new task object.
-Once created and elaborated with functions such as @ref vine_task_add_input_file
-and @ref vine_task_add_input_buffer, the task should be passed to @ref vine_submit.
-@param full_command The shell command line or coprocess functions to be
-executed by the task.  If null, the command will be given later by @ref
-vine_task_set_command
-@return A new task object, or null if it could not be created.
-*/
-struct vine_task *vine_task_create(const char *full_command);
-
-/** Create a copy of a task
-Create a functionally identical copy of a task that
-can be re-submitted via @ref vine_submit.
-@return A new task object
-*/
-struct vine_task *vine_task_clone(const struct vine_task *task);
-
-/** Delete a task.
-This may be called on tasks after they are returned from @ref vine_wait.
-@param t The task to delete.
-*/
-void vine_task_delete(struct vine_task *t);
-
 /** Indicate the command to be executed.
 @param t A task object.
 @param cmd The command to be executed.  This string will be duplicated by this call, so the argument may be freed or re-used afterward.

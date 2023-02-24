@@ -89,6 +89,10 @@ struct vine_task {
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
 };
 
+struct vine_task *vine_task_create(const char *full_command);
+struct vine_task *vine_task_clone(const struct vine_task *task);
+void vine_task_delete(struct vine_task *t);
+
 int  vine_task_set_result(struct vine_task *t, vine_result_t new_result);
 void vine_task_set_resources(struct vine_task *t, const struct rmsummary *rm);
 void vine_task_clean( struct vine_task *t, int full_clean );
