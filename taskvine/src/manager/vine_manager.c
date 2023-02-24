@@ -288,7 +288,6 @@ static vine_msg_code_t handle_info(struct vine_manager *q, struct vine_worker_in
 			shut_down_worker(q, w);
 		}
 	} else if (string_prefix_is(field, "duty-update")) {
-		printf("duty update %s | %s\n", field, value);
 		handle_duty_update(q, w, value);
 	}
 
