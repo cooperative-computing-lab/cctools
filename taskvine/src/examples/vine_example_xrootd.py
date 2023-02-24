@@ -65,11 +65,11 @@ if __name__ == "__main__":
     # if not give, taskvine will try to find one in the default places
     # (X509_USER_PROXY, or /tmp/x509up_uUID)
     proxy_file = None
-    # proxy_file = vine.vine_file_local("myproxy.pem")
+    # proxy_file = vine.FileLocal(m, "myproxy.pem")
 
     for root_file in root_files:
         t = vine.PythonTask(count_events, "myroot.file")
-        t.add_input(vine.FileXrootD(root_file, proxy_file), "myroot.file", cache=True)
+        t.add_input(vine.FileXrootD(m, root_file, proxy_file), "myroot.file", cache=True)
         t.set_environment(env_with_xrootd)
 
         task_id = m.submit(t)
