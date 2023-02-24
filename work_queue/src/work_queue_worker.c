@@ -2714,9 +2714,12 @@ int main(int argc, char *argv[])
 			manual_ssl_option=1;
 			break;
 		case LONG_OPT_COPROCESS:
-			coprocess_command = calloc(PATH_MAX, sizeof(char));
-			path_absolute(optarg, coprocess_command, 1);
-			realloc(coprocess_command, strlen(coprocess_command)+1);
+			coprocess_command = path_which(optarg);
+			if (coprocess_command == NULL) {
+				coprocess_command = calloc(PATH_MAX, sizeof(char));
+				path_absolute(optarg, coprocess_command, 1);
+				realloc(coprocess_command, strlen(coprocess_command)+1);
+			}
 			break;
 		case LONG_OPT_NUM_COPROCESS:
 			number_of_coprocess_instances = atoi(optarg);

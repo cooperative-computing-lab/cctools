@@ -167,7 +167,7 @@ char *work_queue_coprocess_start(struct work_queue_coprocess *coprocess) {
         if (dup2(coprocess->pipe_out[1], 1) < 0) {
             fatal("coprocess could not attach pipe to stdout: %s\n", strerror(errno));
         }
-        execlp(coprocess->command, coprocess->command, (char *) 0);
+        execl("/bin/sh", "sh", "-c", coprocess->command, (char *) 0);
         fatal("failed to execute %s: %s\n", coprocess->command, strerror(errno));
 	}
     else {
