@@ -375,6 +375,16 @@ EOF
 	esac
 done
 
+if [[ -n "$CONDA_PREFIX" ]]
+then
+	if [[ "$base_root" != "${CONDA_PREFIX}" ]]
+	then
+		echo 'Detected conda. Assuming --with-base-dir "${CONDA_PREFIX}"'
+		base_root="${CONDA_PREFIX}"
+	fi
+fi
+
+
 SOURCE=$RELEASE
 if [ -n "$build_label" ]; then
 	SOURCE="$SOURCE $build_label"
@@ -1268,7 +1278,7 @@ then
 		openssl_static_ldflags="${openssl_path}/lib/libssl.a ${openssl_path}/lib/libcrypto.a"
 	fi
 
-	report_detection openssl_static "${openssl_static_avail}" auto "${CONDA_PREFIX}"
+	report_detection openssl_static "${openssl_static_avail}" auto "${openssl_path}"
 fi
 
 
@@ -1590,6 +1600,8 @@ cat <<EOF >>config.mk
 CCTOOLS_HOME=${source_path}
 CCTOOLS_INSTALL_DIR=${install_path}
 
+CCTOOLS_OPSYS=${BUILD_SYS}
+
 CCTOOLS_PACKAGES=${packages}
 
 CCTOOLS_CC=${CCTOOLS_CC}
@@ -1742,6 +1754,7 @@ printf "%-15s %3s\n" ext2fs ${ext2fs_avail}
 printf "%-15s %3s\n" fuse ${fuse_avail}
 printf "%-15s %3s\n" "makeflow mpi" ${mpi_avail}
 printf "%-15s %3s\n" openssl ${openssl_avail}
+printf "%-15s %3s\n" openssl_static ${openssl_static_avail}
 printf "%-15s %3s\n" readline ${readline_avail}
 
 echo ""

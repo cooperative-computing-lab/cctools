@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "vine_sandbox.h"
 
 #include "vine_file.h"
+#include "vine_mount.h"
 
 #include "debug.h"
 #include "errno.h"
@@ -370,9 +371,11 @@ void vine_process_kill(struct vine_process *p)
  * files). In this way, we can only measure the size of the sandbox when
  * enforcing limits on the process, as a task should never write directly to
  * the cache. */
-void  vine_process_compute_disk_needed( struct vine_process *p ) {
+
+void vine_process_compute_disk_needed( struct vine_process *p )
+{
 	struct vine_task *t = p->task;
-	struct vine_file *f;
+	struct vine_mount *m;
 	struct stat s;
 
 	p->disk = t->resources_requested->disk;
@@ -381,13 +384,13 @@ void  vine_process_compute_disk_needed( struct vine_process *p ) {
 	if(p->disk < 0)
 		return;
 
-	if(t->input_files) {
-		LIST_ITERATE(t->input_files,f) {
+	if(t->input_mounts) {
+		LIST_ITERATE(t->input_mounts,m) {
 
-			if(f->type!=VINE_FILE)
+			if(m->file->type!=VINE_FILE)
 				continue;
 
-			if(stat(f->cached_name, &s) < 0)
+			if(stat(m->file->cached_name, &s) < 0)
 				continue;
 
 			/* p->disk is in MD, st_size in bytes. */

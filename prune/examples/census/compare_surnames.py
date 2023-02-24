@@ -19,7 +19,7 @@ years = [3000,3010]
 ###############################
 ##########  STAGE 0 ##########
 ###############################
-print 'Stage 0'
+print('Stage 0')
 
 folder = './simulated_data/'
 f = []
@@ -36,7 +36,7 @@ for fname in f:
     if year in years:
         original_file_id = prune.file_add( folder+fname )
         normalized_data_keys[year].append( original_file_id )
-        print 'Input: ' + original_file_id + ' (' + folder+fname + ')'
+        print('Input: ' + original_file_id + ' (' + folder+fname + ')')
 
 
 
@@ -57,7 +57,7 @@ counts = {}
 for year in years:
     counts[year] = []
 
-print 'Stage 3'
+print('Stage 3')
 
 # Count words ocurrences in the data
 counter = prune.file_add( 'count' )
@@ -72,7 +72,7 @@ for year in years:
         # prune.file_dump( counts[year][-1], 'count%i.txt'%year )
 
 for year in years:
-    print 'counts[%i] = %s' % (year, counts[year])
+    print('counts[%i] = %s' % (year, counts[year]))
 
 
 ##############################
@@ -80,7 +80,7 @@ for year in years:
 ##############################
 
 
-print 'Stage 4'
+print('Stage 4')
 
 # Summarize words ocurrence counts by year
 countsummer = prune.file_add( 'count_sum' )
@@ -97,7 +97,7 @@ for year in years:
 
 
 for year in years:
-    print 'counts[%i] = \'%s\'' % (year, counts[year])
+    print('counts[%i] = \'%s\'' % (year, counts[year]))
 
 
 
@@ -110,7 +110,7 @@ for year in years:
 
 frequencies = {}
 
-print 'Stage 5'
+print('Stage 5')
 
 # Summarize total words ocurrence counts
 countsummer = prune.file_add( 'count_sum' )
@@ -119,7 +119,7 @@ for year in years:
     ar += [counts[year]]
 ar2 = ['input'+str(i) for i in range(1,len(ar)+1)]
 cmd = "python count_sum.all %s > output" % (' '.join(ar2))
-print cmd
+print(cmd)
 counts_all, = prune.task_add( returns=['output'],
                     env=prune.nil, cmd=cmd,
                     args=[countsummer]+ar, params=['count_sum.all']+ar2 )
@@ -131,7 +131,7 @@ prune.execute( worker_type='local', cores=8 )
 
 prune.file_dump( counts_all, 'counts_all.txt' )
 
-print 'counts_all = \'%s\'' % (counts_all)
+print('counts_all = \'%s\'' % (counts_all))
 
 
 
@@ -145,7 +145,7 @@ print 'counts_all = \'%s\'' % (counts_all)
 fields = ['CY','CS','CC','CT','HS','FM','PN', 'FN','GN','BY','BP','SX', 'RL','ET','RC','AG']
 filtered = {}
 
-print 'Stage 6'
+print('Stage 6')
 
 for field in fields:
     # Filter into field types
@@ -158,7 +158,7 @@ for field in fields:
 
 
 for field in fields:
-    print 'filtered[\'%s\'] = \'%s\'' % (field, filtered[field])
+    print('filtered[\'%s\'] = \'%s\'' % (field, filtered[field]))
 
 
 
@@ -171,7 +171,7 @@ for field in fields:
 
 frequent_values = {}
 
-print 'Stage 7'
+print('Stage 7')
 
 for field in fields:
     frequent_values[field], = prune.task_add( returns=['output'],
@@ -179,7 +179,7 @@ for field in fields:
                         args=[filtered[field]], params=['input'+field] )
 
 for field in fields:
-    print 'frequent_values[\'%s\'] = \'%s\'' % (field, frequent_values[field])
+    print('frequent_values[\'%s\'] = \'%s\'' % (field, frequent_values[field]))
 
 
 ###### Execute the workflow ######
@@ -195,7 +195,7 @@ prune.file_dump( frequent_values['FN'], 'most_frequent_FN.txt' )
 ##############################
 ##########  STAGE 8 ##########
 ##############################
-print 'Stage 8'
+print('Stage 8')
 
 zipped_jellyfish_folder = prune.file_add( 'jellyfish.tar.gz' )
 jelly_env = prune.envi_add(engine='wrapper', open='tar -zxf jellyfish.tar.gz', close='rm -rf jellyfish', args=[zipped_jellyfish_folder], params=['jellyfish.tar.gz'])
@@ -207,7 +207,7 @@ max_comparison = 25
 all_top_matches = []
 for i in range(0, max_comparison):
     cmd = "python compare_word input_data %i  > output_data" % (i)
-    print cmd
+    print(cmd)
     top_matches, = prune.task_add( returns=['output_data'],
                             env=jelly_env, cmd=cmd,
                             args=[frequent_values['FN'],compare_words], params=['input_data','compare_word'] )

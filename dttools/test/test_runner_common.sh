@@ -169,7 +169,7 @@ check_needed()
 latest_vine_debug_log()
 {
 	base=${1:-vine-run-info}
-	echo "$(/bin/ls -1 -r -d ${base}/* 2>/dev/null | /bin/head -n1)/vine-logs/debug"
+	echo "${base}/most-recent/vine-logs/debug"
 }
 
 

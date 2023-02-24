@@ -125,20 +125,23 @@ if __name__ == '__main__':
 
     # Execute a task that only communicates through buffers:
 
-    original = "This is only a test!";
+    inbuf   = vine.FileBuffer(bytes("This is only a test!", "utf-8"));
+    outbuf1 = vine.FileBuffer();
+    outbuf2 = vine.FileBuffer();
+
     t = vine.Task("cp input.txt output1.txt && cp input.txt output2.txt")
-    t.add_input_buffer(original,"input.txt")
-    t.add_output_buffer("out1","output1.txt")
-    t.add_output_buffer("out2","output2.txt")
+    t.add_input(inbuf,"input.txt")
+    t.add_output(outbuf1,"output1.txt")
+    t.add_output(outbuf2,"output2.txt")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
-    if t.get_output_buffer("out1") != original or t.get_output_buffer("out2") != original:
-        print("incorrect output:\nout1: {}\nout2: {}\n".format(t.get_output_buffer("out1"),t.get_output_buffer("out2")))
+    if outbuf1.contents() != inbuf.contents() or outbuf2.contents() != inbuf.contents():
+        print("incorrect output:\nout1: {}\nout2: {}\n".format(outbuf1.contents(),outbuf2.contents()))
         sys.exit(1)
     else:
-        print("buffer outputs match the inputs.")
+        print("buffer outputs match: {}".format(inbuf.contents()))
 
 
 

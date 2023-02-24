@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 
 	// Test Str 1
 	hmac_md5("Hi There", 8, "\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b", 16, md5_digest);
-	string = md5_string(md5_digest);
+	string = md5_to_string(md5_digest);
 	if(verbose) {
 		printf("MD5 Test 1 ref: \t0x%s\n", md5_ref1);
 		printf("MD5 Test 1 digest:\t0x%s\n", string);
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 	}
 
 	hmac_md5("what do ya want for nothing?", 28, "Jefe", 4, md5_digest);
-	string = md5_string(md5_digest);
+	string = md5_to_string(md5_digest);
 	if(verbose) {
 		printf("\n");
 		printf("MD5 Test 2 ref: \t0x%s\n", md5_ref2);
@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 	memset(data, '\xDD', 50);
 	data[50] = 0;
 	hmac_md5(data, 50, "\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA\xAA", 16, md5_digest);
-	string = md5_string(md5_digest);
+	string = md5_to_string(md5_digest);
 	if(verbose) {
 		printf("\n");
 		printf("MD5 Test 3 ref: \t0x%s\n", md5_ref3);

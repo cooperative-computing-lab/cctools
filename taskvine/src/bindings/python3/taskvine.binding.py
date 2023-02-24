@@ -59,6 +59,20 @@ class File(object):
             # ignore exceptions, in case task has been already collected
             pass
 
+    ##
+    # Return the contents of a file object as a string.
+    # Typically used to return the contents of an output buffer.
+    #
+    # @param self       A file object.
+    def contents(self):
+        return vine_file_contents(self._file)
+
+    ##
+    # Return the size of a file object, in bytes.
+    #
+    # @param self       A file object.
+    def __len__(self):
+        return vine_file_size(self._file)
 
 ##
 # \class FileLocal
@@ -77,6 +91,17 @@ class FileLocal(File):
         path = str(path)
         self._file = vine_file_local(path)
 
+
+##
+class FileTemp(File):
+
+    ##
+    # Create an anonymous temporary file object.
+    #
+    # @param self       The current file object.
+
+    def __init__(self):
+        self._file = vine_file_temp()
 
 ##
 # \class FileURL
@@ -105,20 +130,23 @@ class FileURL(File):
 #
 # A file obtained from a buffer in memory.
 
-
 class FileBuffer(File):
     ##
     # Create a file from a buffer in memory.
     #
     # @param self       The current file object.
-    # @param name       The abstract name of the buffer.
-    # @param buffer     The contents of the buffer.
-
-    def __init__(self, name, buffer):
-        name = str(name)
-        buffer = str(buffer)
-        self._file = vine_file_buffer(name, buffer, len(buffer))
-
+    # @param buffer     The contents of the buffer, or None for an empty output buffer.
+    #
+    # For example:
+    # @code
+    # # The following are equivalent
+    # >>> s = "hello pirate ♆"
+    # >>> FileBuffer(bytes(s, "utf-8"))
+    # @endcode
+    def __init__(self, buffer=None):
+        # because of the swig typemap, vine_file_buffer(data, size) is changed
+        # to a function with just one argument.
+        self._file = vine_file_buffer(buffer)
 
 ##
 # \class FileMiniTask
@@ -190,6 +218,25 @@ class FileUnstarch(File):
     # @param subfile    The file object to un-tgz.
     def __init__(self, subfile):
         self._file = vine_file_unstarch(vine_file_clone(subfile._file))
+
+
+class FileXrootD(File):
+
+    ##
+    # Create a file object of a remote file accessible from an xrootd server.
+    #
+    # @param self   The current file object.
+    # @param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
+    # @param proxy  A @ref File of the X509 proxy to use. If None, the
+    #               environment variable X509_USER_PROXY and the file
+    #               "$TMPDIR/$UID" are considered in that order. If no proxy is
+    #               present, the transfer is tried without authentication.
+
+    def __init__(self, source, proxy=None):
+        proxy_c = None
+        if proxy:
+            proxy_c = proxy._file
+        self._file = vine_file_xrootd(source, proxy_c)
 
 
 ##
@@ -455,50 +502,6 @@ class Task(object):
 
         flags = Task._determine_file_flags(cache=cache, watch=watch, failure_only=failure_only, success_only=success_only)
         return vine_task_add_output_file(self._task, local_name, remote_name, flags)
-
-    ##
-    # Add an output buffer to the task.
-    #
-    # @param self          Reference to the current task object.
-    # @param buffer_name   The logical name of the output buffer.
-    # @param remote_name   The name of the remote file to fetch.
-    # @param cache         Whether the file should be cached at workers (True/False)
-    # @param watch         Watch the output file and send back changes as the task runs.
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
-    # @param success_only  For output files, whether the file should be retrieved only when the task succeeds. Default is False.
-    def add_output_buffer(self, buffer_name, remote_name, cache=False, watch=False, failure_only=False, success_only=False):
-        if buffer_name:
-            buffer_name = str(buffer_name)
-        if remote_name:
-            remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache=cache, watch=watch, failure_only=failure_only, success_only=success_only)
-        return vine_task_add_output_buffer(self._task, buffer_name, remote_name, flags)
-
-    ##
-    # Get an output buffer of the task.
-    #
-    # @param self           Reference to the current task object.
-    # @param buffer_name    The logical name of the output buffer.
-    # @return               The bytes of the returned file.
-
-    def get_output_buffer(self, buffer_name):
-        if buffer_name:
-            buffer_name = str(buffer_name)
-
-        return vine_task_get_output_buffer(self._task, buffer_name)
-
-    ##
-    # Get the length of an output buffer.
-    #
-    # @param self           Reference to the current task object.
-    # @param buffer_name    The logical name of the output buffer.
-    # @return               The length of the output buffer.
-
-    def get_output_buffer_length(self, buffer_name):
-        if buffer_name:
-            buffer_name = str(buffer_name)
-
-        return vine_task_get_output_buffer_length(self._task, buffer_name)
 
     ##
     # Add any output object to a task.
@@ -1063,7 +1066,7 @@ class Manager(object):
     # @param self       Reference to the current manager object.
     # @param port       The port number to listen on. If zero, then a random port is chosen. A range of possible ports (low, hight) can be also specified instead of a single integer.
     # @param name       The project name to use.
-    # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
+    # @param shutdown   Automatically shutdown workers when manager is finished. Disabled by default.
     # @param run_info_path Directory to write log and staging files per run. If None, defaults to "vine-run-info"
     # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
@@ -1099,14 +1102,15 @@ class Manager(object):
             ssl_key, ssl_cert = self._setup_ssl(ssl)
             self._taskvine = vine_ssl_create(port, ssl_key, ssl_cert)
             if not self._taskvine:
-                raise Exception("Could not create queue on port {}".format(port))
+                raise Exception("Could not create manager on port {}".format(port))
 
             if name:
                 vine_set_name(self._taskvine, name)
         except Exception as e:
-            raise Exception("Unable to create internal taskvine structure: {}".format(e))
+            sys.stderr.write("Unable to create internal taskvine structure.")
+            raise
 
-    def _free_queue(self):
+    def _free_manager(self):
         try:
             if self._taskvine:
                 if self._shutdown:
@@ -1118,7 +1122,7 @@ class Manager(object):
             pass
 
     def __del__(self):
-        self._free_queue()
+        self._free_manager()
 
     def _setup_ssl(self, ssl):
         if not ssl:
@@ -1143,7 +1147,7 @@ class Manager(object):
         return (key, cert)
 
     ##
-    # Get the project name of the queue.
+    # Get the project name of the manager.
     # @code
     # >>> print(q.name)
     # @endcode
@@ -1152,7 +1156,7 @@ class Manager(object):
         return vine_get_name(self._taskvine)
 
     ##
-    # Get the listening port of the queue.
+    # Get the listening port of the manager.
     # @code
     # >>> print(q.port)
     # @endcode
@@ -1167,7 +1171,7 @@ class Manager(object):
         return vine_get_runtime_path_staging(self._taskvine, None)
 
     ##
-    # Get queue statistics.
+    # Get manager statistics.
     # @code
     # >>> print(q.stats)
     # @endcode
@@ -1200,16 +1204,16 @@ class Manager(object):
         return stats
 
     ##
-    # Get queue information as list of dictionaries
+    # Get manager information as list of dictionaries
     # @param self Reference to the current manager object
-    # @param request One of: "queue", "tasks", "workers", or "categories"
+    # @param request One of: "manager", "tasks", "workers", or "categories"
     # For example:
     # @code
     # import json
     # tasks_info = q.status("tasks")
     # @endcode
     def status(self, request):
-        info_raw = vine_get_status(self._work_queue, request)
+        info_raw = vine_get_status(self._work_manager, request)
         info_json = json.loads(info_raw)
         del info_raw
         return info_json
@@ -1291,7 +1295,7 @@ class Manager(object):
         return vine_task_state(self._taskvine, task_id)
 
     ##
-    # Enables resource monitoring of tasks in the queue, and writes a summary
+    # Enables resource monitoring of tasks in the manager, and writes a summary
     # per task to the directory given. Additionally, all summaries are
     # consolidate into the file all_summaries-PID.log
     #
@@ -1324,7 +1328,7 @@ class Manager(object):
         return vine_enable_peer_transfers(self._taskvine)
 
     ##
-    # Enable disconnect slow workers functionality for a given queue for tasks in
+    # Enable disconnect slow workers functionality for a given manager for tasks in
     # the "default" category, and for task which category does not set an
     # explicit multiplier.
     #
@@ -1334,7 +1338,7 @@ class Manager(object):
         return vine_enable_disconnect_slow_workers(self._taskvine, multiplier)
 
     ##
-    # Enable disconnect slow workers functionality for a given queue.
+    # Enable disconnect slow workers functionality for a given manager.
     #
     # @param self       Reference to the current manager object.
     # @param name       Name of the category.
@@ -1352,7 +1356,7 @@ class Manager(object):
         return vine_set_draining_by_hostname(self._taskvine, hostname, drain_mode)
 
     ##
-    # Determine whether there are any known tasks queued, running, or waiting to be collected.
+    # Determine whether there are any known tasks managerd, running, or waiting to be collected.
     #
     # Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
     #
@@ -1361,7 +1365,7 @@ class Manager(object):
         return vine_empty(self._taskvine)
 
     ##
-    # Determine whether the queue can support more tasks.
+    # Determine whether the manager can support more tasks.
     #
     # Returns the number of additional tasks it can support if "hungry" and 0 if "sated".
     #
@@ -1370,7 +1374,7 @@ class Manager(object):
         return vine_hungry(self._taskvine)
 
     ##
-    # Set the worker selection scheduler for queue.
+    # Set the worker selection scheduler for manager.
     #
     # @param self       Reference to the current manager object.
     # @param scheduler  One of the following schedulers to use in assigning a
@@ -1380,7 +1384,7 @@ class Manager(object):
         return vine_set_scheduler(self._taskvine, scheduler)
 
     ##
-    # Change the project name for the given queue.
+    # Change the project name for the given manager.
     #
     # @param self   Reference to the current manager object.
     # @param name   The new project name.
@@ -1415,7 +1419,7 @@ class Manager(object):
         return vine_set_task_id_min(self._taskvine, minid)
 
     ##
-    # Change the project priority for the given queue.
+    # Change the project priority for the given manager.
     #
     # @param self       Reference to the current manager object.
     # @param priority   An integer that presents the priorty of this manager manager. The higher the value, the higher the priority.
@@ -1423,7 +1427,7 @@ class Manager(object):
         return vine_set_priority(self._taskvine, priority)
 
     ##
-    # Specify the number of tasks not yet submitted to the queue.
+    # Specify the number of tasks not yet submitted to the manager.
     # It is used by vine_factory to determine the number of workers to launch.
     # If not specified, it defaults to 0.
     # vine_factory considers the number of tasks as:
@@ -1575,7 +1579,7 @@ class Manager(object):
         return vine_initialize_categories(self._taskvine, rm, filename)
 
     ##
-    # Cancel task identified by its task_id and remove from the given queue.
+    # Cancel task identified by its task_id and remove from the given manager.
     #
     # @param self   Reference to the current manager object.
     # @param id     The task_id returned from @ref submit.
@@ -1587,7 +1591,7 @@ class Manager(object):
         return task
 
     ##
-    # Cancel task identified by its tag and remove from the given queue.
+    # Cancel task identified by its tag and remove from the given manager.
     #
     # @param self   Reference to the current manager object.
     # @param tag    The tag assigned to task using @ref Task.set_tag.
@@ -1599,7 +1603,7 @@ class Manager(object):
         return task
 
     ##
-    # Cancel all tasks of the given category and remove them from the queue.
+    # Cancel all tasks of the given category and remove them from the manager.
     #
     # @param self   Reference to the current manager object.
     # @param category The name of the category to cancel.
@@ -1615,7 +1619,7 @@ class Manager(object):
         return canceled_tasks
 
     ##
-    # Shutdown workers connected to queue.
+    # Shutdown workers connected to manager.
     #
     # Gives a best effort and then returns the number of workers given the shutdown order.
     #
@@ -1668,7 +1672,7 @@ class Manager(object):
 
 
     ##
-    # Change keepalive interval for a given queue.
+    # Change keepalive interval for a given manager.
     #
     # @param self     Reference to the current manager object.
     # @param interval Minimum number of seconds to wait before sending new keepalive
@@ -1677,7 +1681,7 @@ class Manager(object):
         return vine_set_keepalive_interval(self._taskvine, interval)
 
     ##
-    # Change keepalive timeout for a given queue.
+    # Change keepalive timeout for a given manager.
     #
     # @param self     Reference to the current manager object.
     # @param timeout  Minimum number of seconds to wait for a keepalive response
@@ -1701,7 +1705,7 @@ class Manager(object):
     # - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
     # - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
     # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
-    # - "hungry-minimum" Mimimum number of tasks to consider queue not hungry. (default=10)
+    # - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
     # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
     # - "wait_retrieve_many" Parameter to alter how vine_wait works. If set to 0, vine_wait breaks out of the while loop whenever a task changes to VINE_TASK_DONE (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
     # @param value The value to set the parameter to.
@@ -1711,7 +1715,7 @@ class Manager(object):
         return vine_tune(self._taskvine, name, value)
 
     ##
-    # Submit a task to the queue.
+    # Submit a task to the manager.
     #
     # It is safe to re-submit a task returned by @ref wait.
     #
