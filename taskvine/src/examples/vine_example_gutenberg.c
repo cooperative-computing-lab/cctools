@@ -69,10 +69,13 @@ int main(int argc, char *argv[])
 	printf("listening on port %d...\n", vine_port(m));
 
 	printf("setting up input files...\n");
-	struct vine_file *script = vine_file_local("vine_example_gutenberg_script.sh");
+	struct vine_file *script = vine_declare_file(m, "vine_example_gutenberg_script.sh");
 	struct vine_file *files[URL_COUNT];
-	for(i=0;i<URL_COUNT;i++) files[i] = vine_file_url(urls[i]);
-		
+
+	for(i=0;i<URL_COUNT;i++) {
+		files[i] = vine_declare_url(m, urls[i]);
+	}
+
 	printf("submitting tasks...\n");
 	for(i=0;i<URL_COUNT;i++) {
 		for(j=0;j<URL_COUNT;j++) {
@@ -109,8 +112,9 @@ int main(int argc, char *argv[])
 
 	printf("all tasks complete!\n");
 
-	vine_file_delete(script);
 	vine_delete(m);
 
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

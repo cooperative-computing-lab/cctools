@@ -45,8 +45,8 @@ treat it as an output parameter to be filled in. */
 
 
 /* Convert a python buffer into a vine buffer */
-/* Note!! This changes any C function with the signature f(const char *buffer, size_t size) into
-a swig function f(data) */
+/* Note!! This changes any C function with the signature f(struct vine_manager *m, const char *buffer, size_t size)
+into a swig function f(data) */
 %typemap(in, numinputs=1) (const char *buffer, size_t size) {
     if ($input == Py_None) {
         $1 = NULL;

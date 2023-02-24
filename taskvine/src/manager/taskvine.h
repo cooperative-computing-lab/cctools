@@ -609,81 +609,6 @@ void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapsh
 
 //@{
 
-/** Create a file object from a local file.
-@param source The path of the file on the local filesystem.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-
-struct vine_file * vine_file_local( const char *source );
-
-/** Create a file object from a remote URL.
-@param url The URL address of the object in text form.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-
-struct vine_file * vine_file_url( const char *url );
-
-
-/** Create a file object of a remote file accessible from an xrootd server.
-@param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
-@param proxy A @ref vine_file of the X509 proxy to use. If NULL, the
-environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
-in that order. If no proxy is present, the transfer is tried without authentication.
-@return A general file object for use by @ref
-vine_task_add_input.
-*/
-struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy );
-
-/** Create a scratch file object.
-A scratch file has no initial content, but is created
-as the output of a task, and may be consumed by other tasks.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-
-struct vine_file * vine_file_temp();
-
-/** Create a file object from a data buffer.
-@param buffer The contents of the buffer.
-@param size The length of the buffer, in bytes.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-
-struct vine_file * vine_file_buffer( const char *buffer, size_t size );
-
-/** Create a file object representing an empty directory.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-
-struct vine_file * vine_file_empty_dir();
-
-/** Create a file object produced from a mini-task.
-@param mini_task The task which produces the data object.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-
-struct vine_file * vine_file_mini_task( struct vine_task *mini_task );
-
-/** Create a file object by unpacking a tar archive.
-The archive may be compressed in any of the ways supported
-by tar, and so this function supports extensions .tar, .tar.gz, .tgz, tar.bz2, and so forth.
-@param f A file object representing a tar archive.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-
-struct vine_file * vine_file_untar( struct vine_file *f );
-
-/** Create a file object by unpacking a poncho package.
-@param f A file object representing a tgz archive.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-struct vine_file * vine_file_unponcho( struct vine_file *f );
-
-/** Create a file object by unpacking a starch package.
-@param f A file object representing a sfx archive.
-@return A general file object for use by @ref vine_task_add_input.
-*/
-struct vine_file * vine_file_unstarch( struct vine_file *f );
-
 /** Get the contents of a vine file.
 Typically used to examine an output buffer returned from a file.
 @param f A file object created by @ref vine_file_buffer.
@@ -697,18 +622,97 @@ const char * vine_file_contents( struct vine_file *f );
 */
 size_t vine_file_size( struct vine_file *f );
 
-/** Clone a file object.
-@param f A file object.
-@return A clone of the argument f.
+
+/** Declare a file object from a local file
+@param m A manager object
+@param source The path of the file on the local filesystem
+@return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
+struct vine_file * vine_declare_file( struct vine_manager *m, const char *source );
 
-struct vine_file *vine_file_clone( struct vine_file *f );
 
-/** Delete a file object.
-@param f A file object.
+/** Declare a file object from a remote URL.
+@param m A manager object
+@param url The URL address of the object in text form.
+@return A file object to use in @ref vine_task_add_input
 */
+struct vine_file * vine_declare_url( struct vine_manager *m, const char *url );
 
-void vine_file_delete( struct vine_file *f );
+
+/** Create a file object of a remote file accessible from an xrootd server.
+@param m A manager object
+@param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
+@param proxy A proxy file object (e.g. from @ref vine_file_local) of a X509 proxy to use. If NULL, the
+environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
+in that order. If no proxy is present, the transfer is tried without authentication.
+@return A file object to use in @ref vine_task_add_input
+*/
+struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy );
+
+
+/** Create a scratch file object.
+A scratch file has no initial content, but is created
+as the output of a task, and may be consumed by other tasks.
+@param m A manager object
+@return A file object to use in @ref vine_task_add_input, @ref vine_task_add_output
+*/
+struct vine_file * vine_declare_temp( struct vine_manager *m );
+
+
+/** Create a file object from a data buffer.
+@param m A manager object
+@param name The abstract name of the buffer.
+@param buffer The contents of the buffer.
+@param size The length of the buffer, in bytes.
+@return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
+*/
+struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size );
+
+
+/** Create a file object representing an empty directory.
+@param m A manager object
+@return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
+*/
+struct vine_file * vine_declare_empty_dir( struct vine_manager *m );
+
+
+/** Create a file object produced from a mini-task
+@param m A manager object
+@param mini_task The task which produces the file
+@return A file object to use in @ref vine_task_add_input
+*/
+struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *mini_task );
+
+
+/** Create a file object by unpacking a tar archive.
+The archive may be compressed in any of the ways supported
+by tar, and so this function supports extensions .tar, .tar.gz, .tgz, tar.bz2, and so forth.
+@param m A manager object
+@return A file object to use in @ref vine_task_add_input
+*/
+struct vine_file * vine_declare_untar( struct vine_manager *m, struct vine_file *f );
+
+
+/** Create a file object by unpacking a poncho package
+@param m A manager object
+@param f A file object corresponding to poncho or conda-pack tarball
+*/
+struct vine_file * vine_declare_poncho( struct vine_manager *m, struct vine_file *f );
+
+
+/** Create a file object by unpacking a starch package.
+@param m A manager object
+@param f A file object representing a sfx archive.
+@return A file object to use in @ref vine_task_add_input
+*/
+struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file *f );
+
+
+/** Delete a file object
+@param m A manager object
+@param f A file object
+*/
+void vine_declare_delete( struct vine_manager *m, struct vine_file *f );
 
 
 //@}

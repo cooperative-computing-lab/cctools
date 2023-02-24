@@ -103,6 +103,10 @@ struct vine_manager {
 	struct hash_table *workers_with_available_results;  /* Maps link -> vine_worker_info */
 	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
 
+	/* Primary data structures for tracking files. */
+
+    struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
+
 	/* Primary scheduling controls. */
 
 	vine_schedule_t worker_selection_algorithm;    /* Mode for selecting best worker for task in main scheduler. */
@@ -176,6 +180,11 @@ struct vine_manager {
 These are not public API functions, but utility methods that may
 be called on the manager object by other elements of the manager process.
 */
+
+/* Declares file f. If a file with the same f->file_id is already declared, f
+ * is ****deleted**** and the previous file is returned. Otherwise f is returned. */
+struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_file *f);
+struct vine_file *vine_manager_lookup_file(struct vine_manager *q, const char *file_id);
 
 /* Send a printf-style message to a remote worker. */
 #ifndef SWIG

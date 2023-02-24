@@ -3174,6 +3174,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->worker_table = hash_table_create(0, 0);
 	q->worker_blocklist = hash_table_create(0, 0);
 
+	q->file_table = hash_table_create(0, 0);
+
 	q->factory_table = hash_table_create(0, 0);
 	q->current_transfer_table = hash_table_create(0, 0);
 	q->fetch_factory = 0;
@@ -3428,6 +3430,17 @@ int vine_set_password_file( struct vine_manager *q, const char *file )
 	return copy_file_to_buffer(file,&q->password,NULL)>0;
 }
 
+static void vine_file_delete_force(struct vine_file *f) {
+	if(!f) {
+		return;
+	}
+
+	int refcount;
+	do {
+		refcount = vine_file_delete(f);
+	} while(refcount > 0);
+}
+
 void vine_delete(struct vine_manager *q)
 {
 	if(!q) return;
@@ -3454,6 +3467,9 @@ void vine_delete(struct vine_manager *q)
 
 	hash_table_clear(q->current_transfer_table,(void*)vine_current_transfers_delete);
 	hash_table_delete(q->current_transfer_table);
+
+	hash_table_clear(q->file_table,(void*)vine_file_delete_force);
+	hash_table_delete(q->file_table);
 
 	char *key;
 	struct category *c;
@@ -5021,6 +5037,108 @@ int vine_set_task_id_min(struct vine_manager *q, int minid) {
 	}
 
 	return q->next_task_id;
+}
+
+
+/* File functions */
+
+/*
+Request to delete a file by its id
+Decrement the reference count and delete if zero.
+*/
+void vine_declare_delete(struct vine_manager *m, struct vine_file *f)
+{
+	if(!f) {
+		return;
+	}
+
+	if(f->refcount == 1) {
+		hash_table_remove(m->file_table, f->file_id);
+	}
+
+	vine_file_delete(f);
+}
+
+struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_file *f)
+{
+	if(!f) {
+		return NULL;
+	}
+
+	struct vine_file *previous = vine_manager_lookup_file(m, f->file_id);
+	if(previous) {
+	/* This file has been declared before. We delete the new instance and
+	 * return previous. */
+		vine_file_delete(f);
+		f = previous;
+	}
+
+	return f;
+}
+
+struct vine_file *vine_manager_lookup_file( struct vine_manager *m, const char *file_id )
+{
+	return hash_table_lookup(m->file_table, file_id);
+}
+
+struct vine_file *vine_declare_file( struct vine_manager *m, const char *source )
+{
+	struct vine_file *f = vine_file_local(source);
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_declare_url( struct vine_manager *m, const char *source )
+{
+	struct vine_file *f = vine_file_url(source);
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_declare_temp( struct vine_manager *m )
+{
+	struct vine_file *f = vine_file_temp();
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size )
+{
+	struct vine_file *f = vine_file_buffer(buffer, size);
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_declare_empty_dir( struct vine_manager *m )
+{
+	struct vine_file *f = vine_file_empty_dir();
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *t )
+{
+	struct vine_file *f = vine_file_mini_task(t);
+	return vine_manager_declare_file(m, f);
+}
+
+struct vine_file *vine_declare_untar( struct vine_manager *m, struct vine_file *f)
+{
+	struct vine_file *t = vine_file_untar(f);
+	return vine_manager_declare_file(m, t);
+}
+
+struct vine_file *vine_declare_poncho( struct vine_manager *m, struct vine_file *f)
+{
+	struct vine_file *t = vine_file_poncho(f);
+	return vine_manager_declare_file(m, t);
+}
+
+struct vine_file *vine_declare_starch( struct vine_manager *m, struct vine_file *f)
+{
+	struct vine_file *t = vine_file_starch(f);
+	return vine_manager_declare_file(m, t);
+}
+
+struct vine_file *vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy)
+{
+	struct vine_file *t = vine_file_xrootd(source, proxy);
+	return vine_manager_declare_file(m, t);
 }
 
 

@@ -69,9 +69,10 @@ int main(int argc, char *argv[])
 
 	vine_enable_peer_transfers(m);
 
-	struct vine_file *convert = vine_file_local("convert.sfx");
-	struct vine_file *image = vine_file_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg");
-      	struct vine_file *temp_file[36];
+	struct vine_file *convert = vine_declare_file(m, "convert.sfx");
+	struct vine_file *image = vine_declare_url(m, "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg");
+
+	struct vine_file *temp_file[36];
 
 	int i;
 	for(i=0; i<36; i++) {
@@ -81,10 +82,11 @@ int main(int argc, char *argv[])
 		sprintf(outfile, "%d.cat.jpg",i);
 		sprintf(command, "./convert.sfx -swirl %d cat.jpg %d.cat.jpg", i*10, i);
 
-		temp_file[i] = vine_file_temp();
-		
+		temp_file[i] = vine_declare_temp(m);
+
 		t = vine_task_create(command);
-		vine_task_add_input(t,convert,"convert.sfx", VINE_CACHE);
+
+		vine_task_add_input(t,convert,"convert.sfx",VINE_CACHE);
 		vine_task_add_input(t,image,"cat.jpg", VINE_CACHE );
 		vine_task_add_output(t,temp_file[i],outfile,VINE_CACHE);
 
@@ -131,11 +133,10 @@ int main(int argc, char *argv[])
 
 	printf("All tasks complete!\n");
 
-	vine_file_delete(convert);
-	vine_file_delete(image);
-	for(i=0; i<36; i++) vine_file_delete(temp_file[i]);
 	vine_task_delete(t);
 	vine_delete(m);
 
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */
