@@ -78,7 +78,6 @@ def main():
                     event = json.loads(event_str)
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
-                    print('Network function: recieved event: {}'.format(event), file=sys.stderr)
                     if exec_method == "thread":
                         # create a forked process for function handler
                         q = queue.Queue()
