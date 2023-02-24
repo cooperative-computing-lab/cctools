@@ -1793,7 +1793,7 @@ change.
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
 | wait-retrieve-many      | Rather than immediately returning when a task is done, `m.wait(timeout)` retrieves and dispatches as many tasks<br> as `timeout` allows. Warning: This may exceed the capacity of the manager to receive results. | 0 |
 | max-receives | Sets the max number of receives to do at a single time. Where a receive is an operation retrieving one or more completed results from a worker.  | 1 |
-| prefer-receives | If set to 1, the manager prefers reciving tasks rather than dispatching tasks. | 0 |
+| prefer-receives | If set to 1, the manager prefers receiving tasks rather than dispatching tasks. | 0 |
 | retrieve-complete-per-worker | If 0, then retrieve one completed result per worker before deciding to dispatch new tasks or connect new workers. If 1, retrieve all completed results from a worker instead. | 1 |
 
 
