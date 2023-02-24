@@ -277,4 +277,5 @@ void vine_txn_log_write_duty_update(struct vine_manager *q, struct vine_worker_i
 	buffer_init(&B);
 	buffer_printf(&B, "DUTY %d %s %s", duty_id, status, w->workerid);
 	vine_txn_log_write(q, buffer_tostring(&B));
+	buffer_free(&B);
 }
