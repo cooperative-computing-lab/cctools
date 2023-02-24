@@ -124,9 +124,9 @@ if __name__ == '__main__':
     report_task(t, vine.VINE_RESULT_SUCCESS, 0, [path.join(test_dir, 'outs', output)])
 
     # Execute a task that only communicates through buffers:
-    inbuf   = vine.FileBuffer(q, bytes("This is only a test!", "utf-8"))
-    outbuf1 = vine.FileBuffer(q)
-    outbuf2 = vine.FileBuffer(q)
+    inbuf   = q.declare_buffer(bytes("This is only a test!", "utf-8"))
+    outbuf1 = q.declare_buffer()
+    outbuf2 = q.declare_buffer()
 
     t = vine.Task("cp input.txt output1.txt && cp input.txt output2.txt")
     t.add_input(inbuf,"input.txt")
@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     # Pull down data from a url and unpack it via a minitask.
     # Note that we use a local file url of a small tarball to test the mechanism without placing a load on the network.
-    f = vine.FileUntar(q, vine.FileURL(q, "file://dummy.tar.gz"))
+    f = q.declare_untar(q.declare_url("file://dummy.tar.gz"))
     t = vine.Task("ls -lR cctools | wc -l")
     t.add_input(f,"cctools",cache=True)
     q.submit(t)

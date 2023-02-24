@@ -26,13 +26,13 @@ if __name__ == "__main__":
     m = vine.Manager()
     print("listening on port", m.port)
 
-    query_buffer = vine.FileBuffer(m, query)
+    query_buffer = m.declare_buffer(query)
 
-    blast_url = vine.FileURL(m, "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz")
-    blast = vine.FileUntar(m, blast_url)
+    blast_url = m.declare_url("https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz")
+    blast = m.declare_untar(blast_url)
 
-    landmark_url = vine.FileURL(m, "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz")
-    landmark = vine.FileUntar(m, landmark_url)
+    landmark_url = m.declare_url("https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz")
+    landmark = m.declare_untar(landmark_url)
 
     for i in range(10):
         t = vine.Task("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file")
