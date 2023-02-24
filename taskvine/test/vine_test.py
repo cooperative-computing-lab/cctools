@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    wait_time = 30 
+    wait_time = 30
 
     with open(path.join(test_dir, input_file), 'w') as f:
         f.write('hello world\n')
@@ -124,10 +124,9 @@ if __name__ == '__main__':
     report_task(t, vine.VINE_RESULT_SUCCESS, 0, [path.join(test_dir, 'outs', output)])
 
     # Execute a task that only communicates through buffers:
-
-    inbuf   = vine.FileBuffer(bytes("This is only a test!", "utf-8"));
-    outbuf1 = vine.FileBuffer();
-    outbuf2 = vine.FileBuffer();
+    inbuf   = vine.FileBuffer(q, bytes("This is only a test!", "utf-8"))
+    outbuf1 = vine.FileBuffer(q)
+    outbuf2 = vine.FileBuffer(q)
 
     t = vine.Task("cp input.txt output1.txt && cp input.txt output2.txt")
     t.add_input(inbuf,"input.txt")
@@ -209,13 +208,13 @@ if __name__ == '__main__':
 
     # Pull down data from a url and unpack it via a minitask.
     # Note that we use a local file url of a small tarball to test the mechanism without placing a load on the network.
-    f = vine.FileUntar(vine.FileURL("file://dummy.tar.gz"))
+    f = vine.FileUntar(q, vine.FileURL(q, "file://dummy.tar.gz"))
     t = vine.Task("ls -lR cctools | wc -l")
     t.add_input(f,"cctools",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
-    
+
     # Create an explicit minitask description to run curl
     minitask = vine.Task("curl https://www.nd.edu -o output");
     minitask.add_output_file("output","output",cache=True);
