@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include "vine_file.h"
 #include "vine_protocol.h"
 #include "vine_remote_file_info.h"
-#include "vine_remote_file_table.h"
+#include "vine_file_replica_table.h"
 #include "vine_txn_log.h"
 
 #include "debug.h"
@@ -365,7 +365,7 @@ vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct 
 		struct stat local_info;
 		if (stat(f->source,&local_info) == 0) {
 			struct vine_remote_file_info *remote_info = vine_remote_file_info_create(local_info.st_size,local_info.st_mtime);
-			vine_remote_file_table_insert(w, f->cached_name, remote_info);
+			vine_file_replica_table_insert(w, f->cached_name, remote_info);
 		} else {
 			debug(D_NOTICE, "Cannot stat file %s: %s", f->source, strerror(errno));
 		}

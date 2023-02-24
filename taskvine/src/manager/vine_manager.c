@@ -23,7 +23,7 @@ See the file COPYING for details.
 #include "vine_perf_log.h"
 #include "vine_current_transfers.h"
 #include "vine_runtime_dir.h"
-#include "vine_remote_file_table.h"
+#include "vine_file_replica_table.h"
 
 #include "cctools.h"
 #include "envtools.h"
@@ -307,7 +307,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 	char id[VINE_LINE_MAX];
 
 	if(sscanf(line,"cache-update %s %lld %lld %s",cachename,&size,&transfer_time, id)==4) {
-		struct vine_remote_file_info *remote_info = vine_remote_file_table_lookup(w, cachename); 
+		struct vine_remote_file_info *remote_info = vine_file_replica_table_lookup(w, cachename); 
 
 		if(!remote_info) {
 			/*
@@ -316,7 +316,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 			- The file was created as an output of a task.
 			*/
 			remote_info = vine_remote_file_info_create(size,0);
-			vine_remote_file_table_insert(w, cachename, remote_info); 
+			vine_file_replica_table_insert(w, cachename, remote_info); 
 		}
 
 		remote_info->size = size;
@@ -362,7 +362,7 @@ static int handle_cache_invalid( struct vine_manager *q, struct vine_worker_info
 		debug(D_VINE,"%s (%s) invalidated %s with error: %s",w->hostname,w->addrport,cachename,message);
 		free(message);
 
-		struct vine_remote_file_info *remote_info = vine_remote_file_table_remove(w, cachename); 
+		struct vine_remote_file_info *remote_info = vine_file_replica_table_remove(w, cachename); 
 		vine_current_transfers_remove(q, id);
 		if(remote_info) vine_remote_file_info_delete(remote_info);
 	}
@@ -901,7 +901,7 @@ static void delete_worker_file( struct vine_manager *q, struct vine_worker_info 
 	if(!(flags & except_flags)) {
 		vine_manager_send(q,w, "unlink %s\n", filename);
 		struct vine_remote_file_info *remote_info;
-		remote_info = vine_remote_file_table_remove(w, filename);
+		remote_info = vine_file_replica_table_remove(w, filename);
 		vine_remote_file_info_delete(remote_info);
 	}
 }
@@ -2668,7 +2668,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 	LIST_ITERATE(t->input_mounts, m){
 		/* Is the file already present on that worker? */
 		struct vine_remote_file_info *remote_info;
-		if((remote_info = vine_remote_file_table_lookup(w, m->file->cached_name))) continue;
+		if((remote_info = vine_file_replica_table_lookup(w, m->file->cached_name))) continue;
 
 		struct vine_worker_info *peer;
 		int found_match = 0;
@@ -2687,7 +2687,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		if(m->file->type != VINE_MINI_TASK) 
 		{
 			vine_file_delete(m->substitute);
-			if((peer = vine_remote_file_table_find_worker(q, m->file->cached_name)))
+			if((peer = vine_file_replica_table_find_worker(q, m->file->cached_name)))
 			{
 				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, m->file->cached_name);
 				m->substitute = vine_file_substitute_url(m->file,peer_source);
@@ -3062,7 +3062,7 @@ static void vine_remove_file_internal(struct vine_manager *q, const char *filena
 	struct vine_worker_info *w;
 	HASH_TABLE_ITERATE(q->worker_table,key,w) {
 
-		if(!vine_remote_file_table_lookup(w, filename))
+		if(!vine_file_replica_table_lookup(w, filename))
 			continue;
 
 		struct vine_task *t;
