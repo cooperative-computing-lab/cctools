@@ -50,6 +50,8 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->env_list = list_create();
 	t->feature_list = list_create();
 
+	t->refcount = 1;
+
 	t->resource_request   = CATEGORY_ALLOCATION_FIRST;
 	t->worker_selection_algorithm = VINE_SCHEDULE_UNSET;
 
@@ -535,6 +537,9 @@ int vine_task_set_result(struct vine_task *t, vine_result_t new_result)
 void vine_task_delete(struct vine_task *t)
 {
 	if(!t) return;
+
+	t->refcount--;
+	if(t->refcount>0) return;
 
 	free(t->command_line);
 	free(t->coprocess);

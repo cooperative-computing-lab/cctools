@@ -44,6 +44,9 @@ struct vine_task {
 	int max_retries;             /**< Number of times the task is tried to be executed on some workers until success. If less than one, the task is retried indefinitely. See try_count below.*/
 	int64_t min_running_time;    /**< Minimum time (in seconds) the task needs to run. (see vine_worker --wall-time)*/
 
+	/***** Garbage collecion state. *****/
+	int refcount;
+
 	/***** Internal state of task as it works towards completion. *****/
 
 	vine_task_state_t state;       /**< Current state of task: READY, RUNNING, etc */

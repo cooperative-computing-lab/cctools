@@ -3883,6 +3883,19 @@ struct vine_task * vine_declare_task( struct vine_manager *m, const char *comman
 	return t;
 }
 
+void vine_drop_task( struct vine_manager *m, struct vine_task *t )
+{
+        if(!t) {
+                return;
+        }
+
+        if(t->refcount == 1) {
+                itable_remove(m->task_cleanup_table, t->task_id);
+        }
+
+        vine_task_delete(t);
+}
+
 int vine_submit(struct vine_manager *m, struct vine_task *t)
 {
 	if(task_in_terminal_state(m, t)) {
@@ -5082,7 +5095,8 @@ int vine_set_task_id_min(struct vine_manager *q, int minid) {
 Request to delete a file by its id
 Decrement the reference count and delete if zero.
 */
-void vine_declare_delete(struct vine_manager *m, struct vine_file *f)
+
+void vine_drop_file(struct vine_manager *m, struct vine_file *f)
 {
 	if(!f) {
 		return;
