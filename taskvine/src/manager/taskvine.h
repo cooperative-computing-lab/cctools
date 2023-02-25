@@ -23,10 +23,10 @@ Both the manager and worker processes run with ordinary user privileges and requ
 no special capabilities.
 
 From the application perspective, the programmer creates a manager with @ref vine_create,
-defines a number of tasks with @ref vine_task_create, submits the tasks to the manager
-with @ref vine_submit, and then monitors completion with @ref vine_wait.
-Tasks are further described by attaching data objects via @ref vine_task_add_input_file,
-@ref vine_task_add_input_url and related functions.
+defines a number of files and tasks with @ref vine_define_file and @ref vine_define_task.
+Tasks are further described by attaching data objects via @ref vine_task_add_input,
+@ref vine_task_add_output and related functions.  Tasks are submitted with @ref vine_submit
+and then monitored for completion with @ref vine_wait.
 
 The taskvine framework provides a large number of fault tolerance, resource management,
 and performance monitoring features that enable the construction of applications that
