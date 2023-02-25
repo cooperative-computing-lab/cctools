@@ -28,7 +28,7 @@ See the file COPYING for details.
 #include <limits.h>
 
 
-int submit_tasks(struct vine_manager *q, int input_size, int run_time, int output_size, int count, char *category )
+int submit_tasks(struct vine_manager *m, int input_size, int run_time, int output_size, int count, char *category )
 {
 	static int ntasks=0;
 	char output_file[128];
@@ -53,7 +53,7 @@ int submit_tasks(struct vine_manager *q, int input_size, int run_time, int outpu
 
 		ntasks++;
 
-		struct vine_task *t = vine_task_create(command);
+		struct vine_task *t = vine_declare_task(m,command);
 		vine_task_add_input_file(t, input_file, "infile", VINE_CACHE);
 		vine_task_add_output_file(t, output_file, "outfile", VINE_NOCACHE);
 		vine_task_set_cores(t,1);
@@ -61,22 +61,22 @@ int submit_tasks(struct vine_manager *q, int input_size, int run_time, int outpu
 		if(category && strlen(category) > 0)
 			vine_task_set_category(t, category);
 
-		vine_submit(q, t);
+		vine_submit(m, t);
 	}
 
 	return 1;
 }
 
-void wait_for_all_tasks( struct vine_manager *q )
+void wait_for_all_tasks( struct vine_manager *m )
 {
 	struct vine_task *t;
-	while(!vine_empty(q)) {
-		t = vine_wait(q,5);
-		if(t) vine_task_delete(t);
+	while(!vine_empty(m)) {
+		t = vine_wait(m,5);
+		if(t) vine_drop_task(m,t);
 	}
 }
 
-void mainloop( struct vine_manager *q )
+void mainloop( struct vine_manager *m )
 {
 	char line[1024];
 	char category[1024];
@@ -100,10 +100,10 @@ void mainloop( struct vine_manager *q )
 			sleep(sleep_time);
 		} else if(!strcmp(line,"wait")) {
 			printf("waiting for all tasks...\n");
-			wait_for_all_tasks(q);
+			wait_for_all_tasks(m);
 		} else if(sscanf(line, "submit %d %d %d %d %s",&input_size, &run_time, &output_size, &count, category) >= 4) {
 			printf("submitting %d tasks...\n",count);
-			submit_tasks(q,input_size,run_time,output_size,count,category);
+			submit_tasks(m,input_size,run_time,output_size,count,category);
 		} else if(!strcmp(line,"quit") || !strcmp(line,"exit")) {
 			break;
 		} else if(!strcmp(line,"help")) {
@@ -173,32 +173,32 @@ int main(int argc, char *argv[])
 
     vine_set_runtime_info_path("vine_benchmark_info");
 
-	struct vine_manager *q = vine_create(port);
-	if(!q) fatal("couldn't listen on any port!");
+	struct vine_manager *m = vine_create(port);
+	if(!m) fatal("couldn't listen on any port!");
 
-	printf("listening on port %d...\n", vine_port(q));
+	printf("listening on port %d...\n", vine_port(m));
 
 	if(port_file) {
 		FILE *file = fopen(port_file,"w");
 		if(!file) fatal("couldn't open %s: %s",port_file,strerror(errno));
-		fprintf(file,"%d\n",vine_port(q));
+		fprintf(file,"%d\n",vine_port(m));
 		fclose(file);
 	}
 
 	if(project_name) {
-		vine_set_name(q,project_name);
+		vine_set_name(m,project_name);
 	}
 
 	if(monitor_flag) {
 		unlink_recursive("vine_benchmark_monitor");
-		vine_enable_monitoring(q, "vine_benchmark_monitorr", 1);
-		vine_set_category_mode(q, NULL, VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
+		vine_enable_monitoring(m, "vine_benchmark_monitorr", 1);
+		vine_set_category_mode(m, NULL, VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
 	}
 
 
-	mainloop(q);
+	mainloop(m);
 
-	vine_delete(q);
+	vine_delete(m);
 
 	return 0;
 }
