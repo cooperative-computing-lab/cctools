@@ -580,6 +580,13 @@ For more information, consult the manual of the resource_monitor.
 
 void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file);
 
+/** Delete a task object.
+@param m A vine_manager object.
+@param t A vine_task object.
+*/
+
+void vine_drop_task( struct vine_manager *m, struct vine_task *t );
+
 //@}
 
 /** @name Functions - Files */
@@ -689,7 +696,7 @@ struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file
 @param m A manager object
 @param f A file object
 */
-void vine_declare_delete( struct vine_manager *m, struct vine_file *f );
+void vine_drop_file( struct vine_manager *m, struct vine_file *f );
 
 
 //@}
