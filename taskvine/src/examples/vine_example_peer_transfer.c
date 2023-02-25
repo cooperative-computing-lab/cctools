@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
-    //runtime logs will be written to vine_example_peer_info/%Y-%m-%dT%H:%M:%S
+	//runtime logs will be written to vine_example_peer_info/%Y-%m-%dT%H:%M:%S
 	vine_set_runtime_info_path("vine_example_peer_transfer_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
@@ -57,12 +57,20 @@ int main(int argc, char *argv[])
 		vine_tune(m, "file-source-max-transfers", 2);
 	}
 
+	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL);
+	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL);
+
+	struct vine_file *software = vine_declare_untar(m, blast_url);
+	struct vine_file *database = vine_declare_untar(m, landm_url);
+
 	for(i=0;i<1000;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
-	  
-		vine_task_add_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
-		vine_task_add_input(t, vine_file_untar(vine_file_url(BLAST_URL)), "blastdir", VINE_CACHE);
-		vine_task_add_input(t, vine_file_untar(vine_file_url(LANDMARK_URL)), "landmark", VINE_CACHE);
+
+		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string));
+
+		vine_task_add_input(t, query, "query.file", VINE_NOCACHE);
+		vine_task_add_input(t,software,"blastdir", VINE_CACHE );
+		vine_task_add_input(t,database,"landmark", VINE_CACHE );
 		vine_task_set_env_var(t,"BLASTDB","landmark");
 
 		int task_id = vine_submit(m, t);
@@ -93,3 +101,5 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

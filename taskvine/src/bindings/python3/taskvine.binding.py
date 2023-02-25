@@ -14,7 +14,7 @@
 #
 # - @ref Manager
 # - @ref Task / @ref PythonTask / @ref RemoteTask
-# - @ref File / @ref FileLocal / @ref FileURL / @ref FileBuffer / @ref FileMiniTask
+# - @ref File
 # - @ref Factory
 #
 # The objects and methods provided by this package correspond closely
@@ -51,13 +51,8 @@ def set_port_range(low_port, high_port):
 #
 # The superclass of all TaskVine file types.
 class File(object):
-    def __del__(self):
-        try:
-            if self._file:
-                vine_file_delete(self._file)
-        except Exception:
-            # ignore exceptions, in case task has been already collected
-            pass
+    def __init__(self, internal_file):
+        self._file = internal_file
 
     ##
     # Return the contents of a file object as a string.
@@ -74,170 +69,6 @@ class File(object):
     def __len__(self):
         return vine_file_size(self._file)
 
-##
-# \class FileLocal
-#
-# TaskVine File object
-#
-# A file obtained from the local filesystem.
-class FileLocal(File):
-    ##
-    # Create a local file object.
-    #
-    # @param self       The current file object.
-    # @param path       The path to the local file.
-
-    def __init__(self, path):
-        path = str(path)
-        self._file = vine_file_local(path)
-
-
-##
-class FileTemp(File):
-
-    ##
-    # Create an anonymous temporary file object.
-    #
-    # @param self       The current file object.
-
-    def __init__(self):
-        self._file = vine_file_temp()
-
-##
-# \class FileURL
-#
-# TaskVine URL object
-#
-# A file obtained from a remote URL.
-
-
-class FileURL(File):
-    ##
-    # Create a remote URL file object.
-    #
-    # @param self      The current file object.
-    # @param url       The url of the file.
-
-    def __init__(self, url):
-        url = str(url)
-        self._file = vine_file_url(url)
-
-
-##
-# \class FileBuffer
-#
-# TaskVine Buffer object
-#
-# A file obtained from a buffer in memory.
-
-class FileBuffer(File):
-    ##
-    # Create a file from a buffer in memory.
-    #
-    # @param self       The current file object.
-    # @param buffer     The contents of the buffer, or None for an empty output buffer.
-    #
-    # For example:
-    # @code
-    # # The following are equivalent
-    # >>> s = "hello pirate ♆"
-    # >>> FileBuffer(bytes(s, "utf-8"))
-    # @endcode
-    def __init__(self, buffer=None):
-        # because of the swig typemap, vine_file_buffer(data, size) is changed
-        # to a function with just one argument.
-        self._file = vine_file_buffer(buffer)
-
-##
-# \class FileMiniTask
-#
-# TaskVine File object
-#
-# A file obtained from a mini-task.
-
-
-class FileMiniTask(File):
-    ##
-    # Create a file by executing a mini-task.
-    #
-    # @param self       The current file object.
-    # @param minitask   The task to execute in order to produce a file.
-
-    def __init__(self, minitask):
-        self._file = vine_file_mini_task(minitask._task)
-
-
-##
-# \class FileUntar
-#
-# TaskVine File TAR Unpacker
-#
-# A wrapper to unpack a file in .tar form.
-
-
-class FileUntar(File):
-    ##
-    # Create a file by unpacking a tar file.
-    #
-    # @param self       The current file object.
-    # @param subfile    The file object to un-tar.
-    def __init__(self, subfile):
-        self._file = vine_file_untar(vine_file_clone(subfile._file))
-
-
-##
-# \class FilePoncho
-#
-# TaskVine File PONCHO Unpacker
-#
-# A wrapper to unpack a file in poncho package form.
-class FileUnponcho(File):
-    ##
-    # Create a file by unpacking a poncho package.
-    #
-    # @param self       The current file object.
-    # @param subfile    The file object to un-tgz.
-
-    def __init__(self, subfile):
-        self._file = vine_file_unponcho(vine_file_clone(subfile._file))
-
-
-##
-# \class FileUnstarch
-#
-# TaskVine File Starch Unpacker
-#
-# A wrapper to unpack a file in .sfx form.
-
-
-class FileUnstarch(File):
-    ##
-    # Create a file by unpacking a starch package.
-    #
-    # @param self       The current file object.
-    # @param subfile    The file object to un-tgz.
-    def __init__(self, subfile):
-        self._file = vine_file_unstarch(vine_file_clone(subfile._file))
-
-
-class FileXrootD(File):
-
-    ##
-    # Create a file object of a remote file accessible from an xrootd server.
-    #
-    # @param self   The current file object.
-    # @param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
-    # @param proxy  A @ref File of the X509 proxy to use. If None, the
-    #               environment variable X509_USER_PROXY and the file
-    #               "$TMPDIR/$UID" are considered in that order. If no proxy is
-    #               present, the transfer is tried without authentication.
-
-    def __init__(self, source, proxy=None):
-        proxy_c = None
-        if proxy:
-            proxy_c = proxy._file
-        self._file = vine_file_xrootd(source, proxy_c)
-
 
 ##
 # \class Task
@@ -245,8 +76,6 @@ class FileXrootD(File):
 # TaskVine Task object
 #
 # This class is used to create a task specification to be submitted to a @ref taskvine::Manager.
-
-
 class Task(object):
     ##
     # Create a new task specification.
@@ -434,23 +263,23 @@ class Task(object):
     ##
     # Add any input object to a task.
     #
-    # @param self           Reference to the current task object.
-    # @param file           A file object of class @ref File, such as @ref FileLocal, @ref FileBuffer, @ref FileURL, @ref FileMiniTask, @ref FileUntar
-    # @param remote_name    The name of the file at the execution site.
+    # @param self          Reference to the current task object.
+    # @param file          A file object of class @ref File, such as from @ref declare_file, @ref declare_buffer, @ref declare_url, etc.
+    # @param remote_name   The name of the file at the execution site.
     # @param cache         Whether the file should be cached at workers (True/False)
     # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
     #
     # For example:
     # @code
-    # >>> file = FileUntar(FileURL(http://somewhere.edu/data.tgz))
-    # >>> task.add_input(file,"data",cache=True)
+    # >>> url = m.declare_url(http://somewhere.edu/data.tgz)
+    # >>> f = m.declare_untar(url)
+    # >>> task.add_input(f,"data",cache=True)
     # @endcode
     def add_input(self, file, remote_name, cache=None, failure_only=None):
         # SWIG expects strings
         remote_name = str(remote_name)
         flags = Task._determine_file_flags(cache=cache, failure_only=None)
-        copy_of_file = vine_file_clone(file._file)
-        return vine_task_add_input(self._task, copy_of_file, remote_name, flags)
+        return vine_task_add_input(self._task, file._file, remote_name, flags)
 
     ##
     # Add an empty directory to the task.
@@ -507,7 +336,7 @@ class Task(object):
     # Add any output object to a task.
     #
     # @param self           Reference to the current task object.
-    # @param file           A file object of class @ref File, such as @ref FileLocal or @ref FileBuffer.
+    # @param file           A file object of class @ref File, such as from @ref declare_file, or @ref declare_buffer
     # @param remote_name    The name of the file at the execution site.
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref vine_file_flags_t or'd together The most common are:
@@ -518,7 +347,7 @@ class Task(object):
     #
     # For example:
     # @code
-    # >>> file = FileLocal("output.txt")
+    # >>> file = m.declare_file("output.txt")
     # >>> task.add_output(file,"out")
     # @endcode
 
@@ -526,8 +355,7 @@ class Task(object):
         # SWIG expects strings
         remote_name = str(remote_name)
         flags = Task._determine_file_flags(flags, cache, failure_only)
-        copy_of_file = vine_file_clone(file._file)
-        return vine_task_add_output(self._task, copy_of_file, remote_name, flags)
+        return vine_task_add_output(self._task, file._file, remote_name, flags)
 
     ##
     # When monitoring, indicates a json-encoded file that instructs the monitor
@@ -1106,7 +934,7 @@ class Manager(object):
 
             if name:
                 vine_set_name(self._taskvine, name)
-        except Exception as e:
+        except Exception:
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
 
@@ -2109,6 +1937,106 @@ class Manager(object):
             seq = results
 
         return seq[0]
+
+
+    ##
+    # Declare a file obtained from the local filesystem.
+    #
+    # @param self    The manager to register this file
+    # @param path    The path to the local file
+    def declare_file(self, path):
+        f = vine_declare_file(self._taskvine, path)
+        return File(f)
+
+    ##
+    # Declare an anonymous file has no initial content, but is created as the
+    # output of a task, and may be consumed by other tasks.
+    #
+    # @param manager    The manager to register this file
+    def declare_temp(self):
+        f = vine_declare_temp(self._taskvine)
+        return File(f)
+
+    ##
+    # Declare a file obtained from a remote URL.
+    #
+    # @param self    The manager to register this file
+    # @param url     The url of the file.
+    def declare_url(self, url):
+        url = str(url)
+        f = vine_declare_url(self._taskvine, url)
+        return File(f)
+
+    ##
+    # Declare a file created from a buffer in memory.
+    #
+    # @param self    The manager to register this file
+    # @param buffer  The contents of the buffer, or None for an empty output buffer
+    #
+    # For example:
+    # @code
+    # >>> s = "hello pirate ♆"
+    # >>> f = m.declare_buffer(bytes(s, "utf-8"))
+    # >>> print(f.contents())
+    # >>> "hello pirate ♆"
+    # @endcode
+    def declare_buffer(self, buffer=None):
+        # because of the swig typemap, vine_declare_buffer(m, buffer, size) is changed
+        # to a function with just two arguments.
+        f = vine_declare_buffer(self._taskvine, buffer)
+        return File(f)
+
+    ##
+    # Declare a file created by executing a mini-task.
+    #
+    # @param self     The manager to register this file
+    # @param minitask The task to execute in order to produce a file
+    def declare_minitask(self, minitask):
+        f = vine_declare_mini_task(self._taskvine, minitask._task)
+        return File(f)
+
+    ##
+    # Declare a file created by by unpacking a tar file.
+    #
+    # @param manager    The manager to register this file
+    # @param tarball    The file object to un-tar
+    def declare_untar(self, tarball):
+        f = vine_declare_untar(self._taskvine, tarball._file)
+        return File(f)
+
+    ##
+    # Declare a file that sets up a poncho environment
+    #
+    # @param self    The manager to register this file
+    # @param package The poncho or conda-pack environment tarball
+    def declare_poncho(self, package):
+        f = vine_declare_poncho(self._taskvine, package._file)
+        return File(f)
+
+    ##
+    # Declare a file create a file by unpacking a starch package.
+    #
+    # @param self    The manager to register this file
+    # @param starch  The startch .sfx file
+    def declare_starch(self, starch):
+        f = vine_declare_starch(self._taskvine, starch._file)
+        return File(f)
+
+    ##
+    # Declare a file from accessible from an xrootd server.
+    #
+    # @param self   The manager to register this file.
+    # @param source The URL address of the root file in text form as: "root://XROOTSERVER[:port]//path/to/file"
+    # @param proxy  A @ref File of the X509 proxy to use. If None, the
+    #               environment variable X509_USER_PROXY and the file
+    #               "$TMPDIR/$UID" are considered in that order. If no proxy is
+    #               present, the transfer is tried without authentication.
+    def declare_xrootd(self, source, proxy=None):
+        proxy_c = None
+        if proxy:
+            proxy_c = proxy._file
+        self._file = vine_declare_xrootd(self._taskvine, source, proxy_c)
+
 
 
 ##

@@ -51,12 +51,12 @@ if __name__ == "__main__":
 
     temp_files = []
     for i in range(0, 36):
-        temp_files.append(vine.FileTemp())
+        temp_files.append(m.declare_temp())
 
-    montage_file = vine.FileLocal("montage.sfx");
-    convert_file = vine.FileLocal("convert.sfx");
-    image_file = vine.FileURL("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg");
-    
+    montage_file = m.declare_file("montage.sfx")
+    convert_file = m.declare_file("convert.sfx")
+    image_file = m.declare_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg")
+
     for i in range(0, 36):
         outfile = str(i) + ".cat.jpg"
         command = "./convert.sfx -swirl " + str(i*10) + " cat.jpg output.jpg"
