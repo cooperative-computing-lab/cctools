@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
 			} else {
 				printf("task %d failed: %s\n",id,vine_result_string(r));
 			}
-			vine_task_delete(t);
+			vine_drop_task(m,t);
 		}
 	}
 

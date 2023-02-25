@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
 			} else {
 				printf("Task %d failed: %s\n",id,vine_result_string(r));
 			}
-			vine_task_delete(t);
+			vine_drop_task(m,t);
 		}
 	}
 
@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
 
 	printf("All tasks complete!\n");
 
-	vine_task_delete(t);
+	vine_drop_task(m,t);
 	vine_delete(m);
 
 	return 0;
