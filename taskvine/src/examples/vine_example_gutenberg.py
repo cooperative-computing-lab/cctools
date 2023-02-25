@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     for i in range(url_count):
         for j in range(url_count):
-            t = vine.Task("./vine_example_gutenberg_script.sh filea.txt fileb.txt")
+            t = m.declareTask("./vine_example_gutenberg_script.sh filea.txt fileb.txt")
 
             t.add_input_file(
                 "vine_example_gutenberg_script.sh",

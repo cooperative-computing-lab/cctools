@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
 
 
 	for(i=0;i<10;i++) {
-		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
+		struct vine_task *t = vine_declare_task(m,"blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 
 		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string));
 		vine_task_add_input(t, query, "query.file", VINE_NOCACHE);
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 			} else {
 				printf("task %d failed: %s\n",id,vine_result_string(r));
 			}
-			vine_task_delete(t);
+			//vine_task_delete(t);
 		}
 	}
 

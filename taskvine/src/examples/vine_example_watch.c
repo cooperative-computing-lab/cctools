@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 	for(i=0;i<10;i++) {
 		char output[256];
 		sprintf(output,"output.%d",i);
-		t = vine_task_create("./vine_example_watch_trickle.sh > output");
+		t = vine_declare_task(m,"./vine_example_watch_trickle.sh > output");
 		vine_task_add_input_file(t, "vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", VINE_CACHE );
 		vine_task_add_output_file(t, output, "output", VINE_WATCH );
 		vine_task_set_cores(t,1);

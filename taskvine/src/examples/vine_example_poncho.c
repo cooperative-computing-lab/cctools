@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 
 	for(i=0;i<5;i++) {
 
-		struct vine_task *task = vine_task_create("python python_example.py");
+		struct vine_task *task = vine_declare_task(m,"python python_example.py");
 
 		vine_task_add_input(task, script, "python_example.py", VINE_CACHE);
 		vine_task_add_input(task, poncho_expansion, "package", VINE_CACHE);

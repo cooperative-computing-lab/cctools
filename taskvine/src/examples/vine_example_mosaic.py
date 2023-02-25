@@ -61,7 +61,7 @@ if __name__ == "__main__":
         outfile = str(i) + ".cat.jpg"
         command = "./convert.sfx -swirl " + str(i*10) + " cat.jpg output.jpg"
 
-        t = vine.Task(command)
+        t = m.declareTask(command)
         t.add_input(convert_file, "convert.sfx", cache=True)
         t.add_input(image_file,"cat.jpg",cache=True)
         t.add_output(temp_files[i],"output.jpg",cache=True)
@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     print("Combining images into mosaic.jpg...")
 
-    t = vine.Task("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg")
+    t = m.declareTask("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg")
     t.add_input(montage_file, "montage.sfx", cache=True)
     for i in range(0, 36):
         t.add_input(temp_files[i],str(i*10)+".cat.jpg",cache=False)

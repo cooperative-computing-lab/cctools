@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 	struct vine_file *database = vine_declare_untar(m, landm_url);
 
 	for(i=0;i<1000;i++) {
-		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
+		struct vine_task *t = vine_declare_task(m,"blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 
 		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string));
 

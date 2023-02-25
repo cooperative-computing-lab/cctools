@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 	struct vine_file *package = vine_declare_untar(m, url);
 
 	for(i=0;i<10;i++) {
-		struct vine_task *task = vine_task_create("ls -lR cctools | wc -l");
+		struct vine_task *task = vine_declare_task(m,"ls -lR cctools | wc -l");
 		vine_task_add_input(task,package,"cctools",VINE_CACHE);
 		int task_id = vine_submit(m, task);
 

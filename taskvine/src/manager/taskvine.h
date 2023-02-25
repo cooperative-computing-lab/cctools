@@ -733,6 +733,8 @@ This function should only be called after @ref vine_empty returns true.
 */
 void vine_delete(struct vine_manager *m);
 
+struct vine_task * vine_declare_task( struct vine_manager *m, const char *command );
+
 /** Submit a task to a manager.
 Once a task is submitted to a manager, it is not longer under the user's
 control and should not be inspected until returned via @ref vine_wait.

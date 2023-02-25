@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
 
 		temp_file[i] = vine_declare_temp(m);
 
-		t = vine_task_create(command);
+		t = vine_declare_task(m,command);
 
 		vine_task_add_input(t,convert,"convert.sfx",VINE_CACHE);
 		vine_task_add_input(t,image,"cat.jpg", VINE_CACHE );
@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 
 	printf("Combining images into mosaic.jpg...\n");
 
-	t = vine_task_create("./montage.sfx `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg");
+	t = vine_declare_task(m,"./montage.sfx `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg");
 	for(i=0;i<36;i++) {
 		char filename[256];
 		sprintf(filename,"%d.cat.jpg",i);

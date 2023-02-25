@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 	printf("submitting tasks...\n");
 	for(i=0;i<URL_COUNT;i++) {
 		for(j=0;j<URL_COUNT;j++) {
-			struct vine_task *t = vine_task_create("./vine_example_gutenberg_script.sh filea.txt fileb.txt");
+			struct vine_task *t = vine_declare_task(m,"./vine_example_gutenberg_script.sh filea.txt fileb.txt");
 
 			vine_task_add_input(t,script,"vine_example_gutenberg_script.sh",VINE_CACHE);
 			vine_task_add_input(t,files[i], "filea.txt", VINE_CACHE);
