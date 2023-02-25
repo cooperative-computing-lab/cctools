@@ -58,7 +58,7 @@ void itable_clear(struct itable *h, void (*delete_func)( void *obj ))
 	for(i = 0; i < h->bucket_count; i++) {
 		e = h->buckets[i];
 		while(e) {
-			delete_func(e->value);
+			if(delete_func) delete_func(e->value);
 			f = e->next;
 			free(e);
 			e = f;
