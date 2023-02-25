@@ -534,12 +534,12 @@ int vine_task_set_result(struct vine_task *t, vine_result_t new_result)
 	return t->result;
 }
 
-void vine_task_delete(struct vine_task *t)
+int vine_task_delete(struct vine_task *t)
 {
-	if(!t) return;
+	if(!t) return 0;
 
 	t->refcount--;
-	if(t->refcount>0) return;
+	if(t->refcount>0) return t->refcount;
 
 	free(t->command_line);
 	free(t->coprocess);
@@ -570,6 +570,8 @@ void vine_task_delete(struct vine_task *t)
 	rmsummary_delete(t->resources_allocated);
 
 	free(t);
+
+	return 0;
 }
 
 const char * vine_task_get_command( struct vine_task *t )
