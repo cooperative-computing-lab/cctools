@@ -20,9 +20,28 @@ See the file COPYING for details.
 /* Internal use: when the worker uses the client library, do not recompute cached names. */
 int vine_hack_do_not_compute_cached_name = 0;
 
-/* Create a new file object with the given properties. */
+/* Returns file refcount. If refcount is 0, the file has been deleted. */
+int vine_file_delete(struct vine_file *f)
+{
+	if(f) {
+		f->refcount--;
+		if(f->refcount>0) {
+			return f->refcount;
+		}
 
-struct vine_file *vine_file_create(const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task )
+		vine_task_delete(f->mini_task);
+		free(f->source);
+		free(f->cached_name);
+		free(f->file_id);
+		free(f->data);
+		free(f);
+	}
+
+	return 0;
+}
+
+/* Create a new file object with the given properties. */
+struct vine_file *vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task )
 {
 	struct vine_file *f;
 
@@ -60,6 +79,8 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		}
 	}
 
+	f->file_id = vine_file_id(f);
+
 	f->refcount = 1;
 
 	return f;
@@ -72,25 +93,6 @@ struct vine_file *vine_file_clone( struct vine_file *f )
 	if(!f) return 0;
 	f->refcount++;
 	return f;
-}
-
-/*
-Request to delete a file object.
-Decrement the reference count and delete if zero.
-*/
-
-void vine_file_delete(struct vine_file *f)
-{
-	if(!f) return;
-
-	f->refcount--;
-	if(f->refcount>0) return;
-
-	vine_task_delete(f->mini_task);
-	free(f->source);
-	free(f->cached_name);
-	free(f->data);
-	free(f);
 }
 
 /* Return the contents of a buffer file, or null. */
@@ -150,7 +152,7 @@ struct vine_file * vine_file_untar( struct vine_file *f )
 	return vine_file_mini_task(t);
 }
 
-struct vine_file * vine_file_unponcho( struct vine_file *f)
+struct vine_file * vine_file_poncho( struct vine_file *f)
 {
 	struct vine_task *t = vine_task_create("./poncho_package_run --unpack-to output -e package.tar.gz");
 	char * poncho_path = path_which("poncho_package_run");
@@ -160,7 +162,7 @@ struct vine_file * vine_file_unponcho( struct vine_file *f)
 	return vine_file_mini_task(t);
 }
 
-struct vine_file * vine_file_unstarch( struct vine_file *f )
+struct vine_file * vine_file_starch( struct vine_file *f )
 {
 	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
 	vine_task_add_input(t,f,"package.sfx",VINE_CACHE);

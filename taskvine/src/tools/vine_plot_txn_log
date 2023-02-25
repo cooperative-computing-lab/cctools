@@ -28,6 +28,9 @@ manager_info = {"Start":-1,
                 "Transfers":[],
                 "TaskMap":{},
                 "TaskDone": {},
+                "Duties Sent":[],
+                "Duties Started": [],
+                "DutyMap":{}
                 }
 
 def parse_manager(log):
@@ -76,6 +79,12 @@ def parse_manager(log):
                 manager_info["Marked Done"].append(time - manager_info["Start"])
             continue
 
+        if subject == "DUTY":
+            if event == "SENT":
+                manager_info["Duties Sent"].append(time - manager_info["Start"])
+            elif event == "STARTED":
+                manager_info["Duties Started"].append(time - manager_info["Start"])
+
 def parse_tasks(log):
     lines = open(log, 'r').read().splitlines()
     for line in lines:
@@ -117,8 +126,12 @@ def parse_tasks(log):
 
         if subject == "TASK":
             if event == "RUNNING":
-                manager_info["Tasks Sent"].append(time - manager_info["Start"])
-                manager_info["TaskMap"].update([(int(target), arg.split()[0])])
+                prev_value = manager_info["TaskMap"].get(int(target), None)
+                if prev_value == None:
+                    manager_info["TaskMap"].update([(int(target), (arg.split()[0], time - manager_info["Start"], None) )])
+                elif prev_value != None and prev_value[2] == None:
+                    manager_info["TaskMap"].update([(int(target), (arg.split()[0], time - manager_info["Start"], manager_info["TaskMap"][int(target)][1] ))])
+                    
             elif event == "WAITING_RETRIEVAL":
                 manager_info["Waiting Retrieval"].append(time - manager_info["Start"])
                 manager_info["TaskDone"].update([(int(target), time - manager_info["Start"])])
@@ -127,41 +140,67 @@ def parse_tasks(log):
                 
             continue
 
+        if subject == "DUTY":
+            if event == "SENT":
+                manager_info["Duties Sent"].append(time - manager_info["Start"])
+            elif event == "STARTED":
+                manager_info["Duties Started"].append(time - manager_info["Start"])
+                manager_info["DutyMap"].update([(int(target), (arg, time - manager_info["Start"], 0))])
+
+            continue
+
 def plot_tasks(title='Manager Info', all_info=False, save=None, connections=False, disconnections=False,
                 resources=False, cache_updates=False, tasks_sent=False, waiting_retrieval=False, 
                 marked_done=False, input_transfers=False, output_transfers=False, xticks=None, yticks=None):
 
     dcache = manager_info["CacheTime"]
     dtasks = manager_info["TaskMap"]
+    tasks_sent = [manager_info["TaskMap"][x][1] for x in sorted(manager_info["TaskMap"])]
+    duties_sent =  [manager_info["DutyMap"][x][1] for x in sorted(manager_info["DutyMap"])]
+    task_failure_ids = [x for x in sorted(manager_info["TaskMap"]) if manager_info["TaskMap"][x][2] != None]
 
     task_cachetime = {}
+    duty_cachetime = {}
 
     # map cache update time to task id
-    for task, worker in dtasks.items():
+    for task, (worker, _, _) in dtasks.items():
         for cworker, cachetime in dcache.items():
             if worker == cworker:
                 task_cachetime.update([(task, cachetime)])
 
+    for duty, (worker, _, _) in manager_info["DutyMap"].items():
+        for cworker, cachetime in dcache.items():
+            if worker == cworker:
+                duty_cachetime.update([(duty, cachetime)])
+
     stimes = list(task_cachetime.values())
     times = [float(t) for t in stimes]
 
-    ys = range(len(manager_info["Tasks Sent"]))
+    ys = [x for x in sorted(manager_info["TaskMap"])]
 
+    duty_ys = [int(x) for x in sorted(manager_info["DutyMap"])]
+    duty_times = [float(duty_cachetime[x]) for x in duty_ys]
+    
     dwidths = sorted(manager_info["TaskDone"].items())
     lwidths = [float(i[1]) for i in dwidths]
-    widths = [i[0] - i[1] for i in zip(lwidths, manager_info["Tasks Sent"])]
+    widths = [i[0] - i[1] for i in zip(lwidths, tasks_sent)]
+    failure_widths = [ (manager_info["TaskDone"][x] - manager_info["TaskMap"][x][2])  for x in task_failure_ids]
 
-    plt.barh(ys, width=widths, left=manager_info["Tasks Sent"], label="Tasks")
+    plt.barh(task_failure_ids, width=failure_widths, left=[manager_info["TaskMap"][x][2] for x in task_failure_ids], label="Failures", color="red")
+    plt.barh(ys, width=widths, left=tasks_sent, label="Tasks", color="blue")
     
     if input_transfers or all_info:
-        plt.barh(ys, width=times, left=manager_info["Tasks Sent"], color="orange", label="Transfers")
+        plt.barh(ys + duty_ys, width=times + duty_times, left=tasks_sent + duties_sent, color="orange", label="Transfers")
     if waiting_retrieval or all_info:
         plt.plot(manager_info["Waiting Retrieval"], ys, "r+", label="Waiting Retrieval")
     if marked_done or all_info:
         plt.plot(manager_info["Marked Done"], ys, "g+", label="Marked Done")
     
+    plt.tick_params(axis='both', which='major', labelsize=15)
     plt.legend()
     plt.show()
+    if save:
+        plt.savefig(save)
    
 def plot_manager(title='Manager Info', all_info=False, save=None, connections=False, disconnections=False,
                 resources=False, cache_updates=False, tasks_sent=False, waiting_retrieval=False, 
@@ -260,7 +299,7 @@ def parse_workers(log):
                 if worker_id not in worker_info:
                     worker_info[worker_id] = {"host":worker_address, "connect time":time, "tasks":{}, 
                                             "cache_updates":[],"first_task":float('inf'), "resources":[],
-                                            "input_transfers":[], "output_transfers":[]}
+                                            "input_transfers":[], "output_transfers":[], "duties":{}}
             elif event == "DISCONNECTION":
                 reason = arg.strip()
                 if reason == "FAILURE":
@@ -307,6 +346,14 @@ def parse_workers(log):
                     worker_info[worker_id]["tasks"][taskid]["worker_start"] = worker_start
                     worker_info[worker_id]["tasks"][taskid]["worker_stop"] = worker_end
             continue
+            
+        if subject == "DUTY":
+            if event == "SENT":
+                worker_id = arg
+                worker_info[worker_id]["duties"][target] = {"sent":time, "started": -1}
+            elif event == "STARTED":
+                worker_id = arg
+                worker_info[worker_id]["duties"][target]["started"] = time
 
 
 def plot_resource_updates(origin):
@@ -359,6 +406,15 @@ def plot_cache_updates(origin):
                         fetch_lefts.append(left)
                         fetch_ys.append(y)
                         fetch_widths.append(width)
+                for duty in worker_info[worker]["duties"]:
+                    duty_info = worker_info[worker]["duties"][duty]
+                    if duty_info["sent"] < cache_update[0] and duty_info["started"] > cache_update[0]:
+                        width = cache_update[0] - duty_info["sent"]
+                        left = duty_info["sent"] - ref
+                        worker_info[worker]["duties"][duty]["sent"] = cache_update[0]
+                        fetch_lefts.append(left)
+                        fetch_ys.append(y)
+                        fetch_widths.append(width)
 
             # DOING THE MINITASK
             elif cache_update[2].startswith("task"):
@@ -372,12 +428,21 @@ def plot_cache_updates(origin):
                         minitask_lefts.append(left)
                         minitask_ys.append(y)
                         minitask_widths.append(width)
+                for duty in worker_info[worker]["duties"]:
+                    duty_info = worker_info[worker]["duties"][duty]
+                    if duty_info["sent"] < cache_update[0] and duty_info["started"] > cache_update[0]:
+                        width = cache_update[0] - duty_info["sent"]
+                        left = duty_info["sent"] - ref
+                        worker_info[worker]["duties"][duty]["sent"] = cache_update[0]
+                        minitask_lefts.append(left)
+                        minitask_ys.append(y)
+                        minitask_widths.append(width)
             else:
                 x = cache_update[0] - ref
                 if x > 0:
                     xs.append(x)
                     ys.append(y)
-
+    
     plt.plot(xs , ys, '+', color="orange", label='Cache Updates')
     plt.barh(minitask_ys, minitask_widths, left=minitask_lefts, color="red", label='Minitask')
     plt.barh(fetch_ys, fetch_widths, left=fetch_lefts, color="mistyrose", label='Curl URL')
