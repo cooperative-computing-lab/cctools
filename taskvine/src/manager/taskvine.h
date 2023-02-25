@@ -745,7 +745,7 @@ struct vine_task * vine_declare_task( struct vine_manager *m, const char *comman
 /** Submit a task to a manager.
 Once a task is submitted to a manager, it is not longer under the user's
 control and should not be inspected until returned via @ref vine_wait.
-Once returned, it is safe to re-submit the same take object via @ref vine_submit.
+Once returned, it may be inspected and then deleted with @ref vine_task_drop.
 @param m A manager object
 @param t A task object returned from @ref vine_task_create.
 @return An integer task_id assigned to the submitted task.
@@ -767,7 +767,7 @@ void vine_manager_remove_duty( struct vine_manager *q, const char *name );
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.
 If a task has completed, the corresponding task object will be returned by this function.
-The caller may examine the task and then dispose of it using @ref vine_task_delete.
+The caller may examine the task and then dispose of it using @ref vine_drop_task.
 
 If the task ran to completion, then the <tt>result</tt> field will be zero and the <tt>return_status</tt>
 field will contain the Unix exit code of the task.
@@ -1046,20 +1046,23 @@ void vine_set_catalog_servers(struct vine_manager *m, const char *hosts);
 /** Cancel a submitted task using its task id and remove it from manager.
 @param m A manager object
 @param id The task_id returned from @ref vine_submit.
-@return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
+@return The task description of the cancelled task, or null if the task was not found in manager.
+The returned task must be deleted with @ref vine_drop_task when done.
 */
 struct vine_task *vine_cancel_by_task_id(struct vine_manager *m, int id);
 
 /** Cancel a submitted task using its tag and remove it from manager.
 @param m A manager object
 @param tag The tag name assigned to task using @ref vine_task_set_tag.
-@return The task description of the cancelled task, or null if the task was not found in manager. The returned task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
+@return The task description of the cancelled task, or null if the task was not found in manager.
+The returned task must be deleted with @ref vine_drop_task when done.
 */
 struct vine_task *vine_cancel_by_task_tag(struct vine_manager *m, const char *tag);
 
 /** Cancel all submitted tasks and remove them from the manager.
 @param m A manager object
-@return A struct list of all of the tasks canceled.  Each task must be deleted with @ref vine_task_delete or resubmitted with @ref vine_submit.
+@return A struct list of all of the tasks canceled.
+Each task must be deleted with @ref vine_drop_task when done.
 */
 struct list * vine_tasks_cancel(struct vine_manager *m);
 
