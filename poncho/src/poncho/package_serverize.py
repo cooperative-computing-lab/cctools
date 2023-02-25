@@ -15,7 +15,7 @@ import ast
 import tarfile
 import hashlib
 
-shebang = "#! /usr/bin/env python\n\n"
+shebang = "#! /usr/bin/env python3\n\n"
 
 tv_network_code = \
 '''
