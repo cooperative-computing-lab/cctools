@@ -15,11 +15,11 @@ See the file COPYING for details.
 
 #include "taskvine.h"
 
-int vine_file_replica_table_insert(struct vine_worker_info *w, const char *cachename, struct vine_remote_file_info *remote_info);
+int vine_file_replica_table_insert(struct vine_worker_info *w, const char *cachename, struct vine_file_replica *remote_info);
 
-struct vine_remote_file_info *vine_file_replica_table_remove(struct vine_worker_info *w, const char *cachename);
+struct vine_file_replica *vine_file_replica_table_remove(struct vine_worker_info *w, const char *cachename);
 
-struct vine_remote_file_info *vine_file_replica_table_lookup(struct vine_worker_info *w, const char *cachename);
+struct vine_file_replica *vine_file_replica_table_lookup(struct vine_worker_info *w, const char *cachename);
 
 struct vine_worker_info *vine_file_replica_table_find_worker(struct vine_manager *q, const char *cachename);
 
