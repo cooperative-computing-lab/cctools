@@ -2021,6 +2021,8 @@ class Manager(object):
     def declare_buffer(self, buffer=None):
         # because of the swig typemap, vine_declare_buffer(m, buffer, size) is changed
         # to a function with just two arguments.
+        if isinstance(buffer, str):
+            buffer = bytes(buffer, "utf-8")
         f = vine_declare_buffer(self._taskvine, buffer)
         return File(f)
 
