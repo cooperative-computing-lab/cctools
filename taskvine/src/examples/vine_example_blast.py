@@ -35,12 +35,20 @@ if __name__ == "__main__":
     landmark = m.declare_untar(landmark_url)
 
     for i in range(10):
-        t = vine.Task("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file")
+        t = vine.Task(
+            {
+                "cmd" : "blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file",
+                "inputs" : {"query.file" : query, "blastdir" : blast, "landmark" : landmark},
+                "env" : {"BLASTDB" : "landmark"}
+            }
+        )
 
-        t.add_input(query, "query.file", cache=True)
-        t.add_input(blast, "blastdir", cache=True )
-        t.add_input(landmark, "landmark", cache=True )
-        t.set_env_var("BLASTDB", value="landmark")
+        # t = vine.Task("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file")
+
+        # t.add_input(query, "query.file", cache=True)
+        # t.add_input(blast, "blastdir", cache=True )
+        # t.add_input(landmark, "landmark", cache=True )
+        # t.set_env_var("BLASTDB", value="landmark")
 
         task_id = m.submit(t)
 

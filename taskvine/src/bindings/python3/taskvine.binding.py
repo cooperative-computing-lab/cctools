@@ -81,12 +81,32 @@ class Task(object):
     # Create a new task specification.
     #
     # @param self       Reference to the current task object.
-    # @param command    The shell command line to be exected by the task.
-    def __init__(self, command):
+    # @param task_info    Either the shell command line to be exected by the task or a dictionary containing specified task parameters.
+    def __init__(self, task_info):
         self._task = None
 
-        self._task = vine_task_create(command)
-        if not self._task:
+        if isinstance(task_info, str):
+            command = task_info
+            self._task = vine_task_create(command)
+            if not self._task:
+                raise Exception("Unable to create internal Task structure")
+        elif isinstance(task_info, dict):
+            if "cmd" not in task_info.keys():
+                raise Exception("No command given")
+            command = task_info["cmd"]
+            self._task = vine_task_create(command)
+            if not self._task:
+                raise Exception("Unable to create internal Task structure")
+            if "inputs" in task_info.keys():
+                for key, value in task_info["inputs"].items():
+                    self.add_input(value, key, cache=True)
+            if "outputs" in task_info.keys():
+                for key, value in task_info["outputs"].items():
+                    self.add_output(value, key, cache=True)
+            if "env" in task_info.keys():
+                for key, value in task_info["env"].items():
+                    self.set_env_var(key, value=value)
+        else:
             raise Exception("Unable to create internal Task structure")
 
     def __del__(self):
