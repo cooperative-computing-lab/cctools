@@ -21,7 +21,7 @@ a simple text comparison of each pair of files.
 #include <errno.h>
 #include <unistd.h>
 
-#define URL_COUNT 5
+#define URL_COUNT 25 
 
 const char *urls[URL_COUNT] =
 {
