@@ -52,7 +52,7 @@ if __name__ == "__main__":
         # are using is the one being sent to the workers.
         command = "./gzip < %s > %s" % (infile, outfile)
 
-        t = m.declareTask(command)
+        t = m.declare_task(command)
 
         # gzip is the same across all tasks, so we can cache it in the workers.
         # Note that when adding a file, we have to name its local name

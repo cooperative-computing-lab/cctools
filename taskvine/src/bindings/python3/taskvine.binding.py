@@ -78,7 +78,7 @@ class File(object):
 # This class is used to create a task specification to be submitted to a @ref taskvine::Manager.
 class Task(object):
 
-    # Private constructor method used by TaskVine.Manager.declareTask
+    # Private constructor method used by TaskVine.Manager.declare_task
     
     def __init__(self, _task ):
         self._task = _task
@@ -1526,7 +1526,7 @@ class Manager(object):
     # similar methods.  Once fully elaborated, call @ref submit
     # to submit the task for execution.
 
-    def declareTask(self, command):
+    def declare_task(self, command):
         return Task( vine_declare_task(self._taskvine, command ) )
     
     ##

@@ -49,17 +49,25 @@ if __name__ == "__main__":
     m = vine.Manager()
     print("listening on port", m.port)
 
+    print("declaring files...")
+
+    urlfiles = []
+    for i in range(url_count):
+        urlfiles.append(m.declare_url(urls[i]))
+
+    print("declaring tasks....")
+
     for i in range(url_count):
         for j in range(url_count):
-            t = m.declareTask("./vine_example_gutenberg_script.sh filea.txt fileb.txt")
+            t = m.declare_task("./vine_example_gutenberg_script.sh filea.txt fileb.txt")
 
             t.add_input_file(
                 "vine_example_gutenberg_script.sh",
                 "vine_example_gutenberg_script.sh",
                 cache=True,
             )
-            t.add_input_url(urls[i], "filea.txt", cache=True)
-            t.add_input_url(urls[j], "fileb.txt", cache=True)
+            t.add_input(urlfiles[i], "filea.txt", cache=True)
+            t.add_input(urlfiles[j], "fileb.txt", cache=True)
 
             t.set_cores(1)
 
