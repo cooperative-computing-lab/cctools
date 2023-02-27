@@ -574,7 +574,7 @@ class Task(object):
     @property
     def result_string(self):
         result = vine_result_string(vine_task_get_result(self._task))
-        return result.tolower().replace("_", " ")
+        return result.lower().replace("_", " ")
 
     ##
     # Return True if task executed and its command terminated normally.
