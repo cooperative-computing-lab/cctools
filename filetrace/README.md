@@ -1,16 +1,16 @@
-# File Trace
+# filetrace
 
-File trace is a command line tool that summarizes the output of the linux debug tool [strace](https://github.com/strace/strace) to help users view what files a program accesses and better understand a program's dependencies.
+filetrace is a command line tool that summarizes the output of the linux debug tool [strace](https://github.com/strace/strace) to help users view what files a program accesses and better understand a program's dependencies.
 
 ## Usage
 
-File trace can be called directly from the command line using:
+filetrace can be called directly from the command line using:
 
 ```sh
-$ file_trace <command_to_excecute>
+$ filetrace <command_to_excecute>
 ```
 
-File trace also has optional command line flags:
+filetrace also has optional command line flags:
 
 * `-d <num>`  : how many levels deep to summarise
 * `-t <num>`: only show the top \<num> of results on the summary page
@@ -34,25 +34,25 @@ File trace also has optional command line flags:
 
 #### Note
 
-Due to strace only being available on linux, file_trace is also works on linux
+Due to strace only being available on linux, filetrace is also works on linux
 
 ## Examples
 
 ### Using file trace on `touch`
 
-file_trace can be run simply by typing `file_trace` before the command you would like to execute.
+filetrace can be run simply by typing `filetrace` before the command you would like to execute.
 
 To see all the files `touch` accesses when creating a blank file named "this" we can use:
 
 ```sh
-file_trace touch this
+filetrace touch this
 ```
 
 
 
 <img src="./img/touch_command.png" style="zoom:50%;" />
 
-After running `file_trace` created the three file with different levels of verbosity
+After running `filetrace` created the three file with different levels of verbosity
 
 <img src="./img/touch_out1.png" style="zoom:50%;" />
 
