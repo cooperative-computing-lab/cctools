@@ -9,3 +9,5 @@ cat $2 | tr " " "\n" | sort | uniq -c | sort -rn | head -10l > b.tmp
 
 diff a.tmp b.tmp
 
+exit 0
+

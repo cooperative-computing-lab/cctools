@@ -2075,7 +2075,9 @@ class Manager(object):
         proxy_c = None
         if proxy:
             proxy_c = proxy._file
-        self._file = vine_declare_xrootd(self._taskvine, source, proxy_c)
+        f = vine_declare_xrootd(self._taskvine, source, proxy_c)
+        return File(f)
+
 
 
 

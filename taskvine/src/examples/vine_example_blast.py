@@ -38,7 +38,7 @@ if __name__ == "__main__":
     for i in range(10):
         t = vine.Task("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file")
 
-        t.add_input(query, "query.file", cache=True)
+        t.add_input(query_buffer, "query.file", cache=True)
         t.add_input(blast, "blastdir", cache=True )
 
         t.add_input(landmark, "landmark", cache=True )

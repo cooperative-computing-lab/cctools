@@ -76,8 +76,8 @@ if __name__ == "__main__":
         print("submitted task (id# " + str(task_id) + "): count_events()")
     print("waiting for tasks to complete...")
 
-    while not q.empty():
-        t = q.wait(5)
+    while not m.empty():
+        t = m.wait(5)
         if t:
             if t.successful():
                 print(f"task {t.id} processed a file with {t.output} events")

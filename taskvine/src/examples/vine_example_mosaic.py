@@ -24,8 +24,8 @@ import sys
 
 def process_result(t):
     if t:
-        if t.succesful():
-            print(f"task {t.id} result: {t.std_output}")
+        if t.successful():
+            print(f"task {t.id} done: {t.command}")
         elif t.completed():
             print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
         else:
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 
         m.submit(t)
 
-        print("submitted task {t.id}: {t.command}")
+        print(f"submitted task {t.id}: {t.command}")
 
 
     print("waiting for tasks to complete...")

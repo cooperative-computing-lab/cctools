@@ -29,21 +29,24 @@ if __name__ == "__main__":
 
     n = 3
     for i in range(n):
-        output = "output." + str(i)
         t = vine.Task("./vine_example_watch_trickle.sh > output")
-        t.add_input_file(
-            "vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", cache=True
-        )
-        t.add_output_file(output, "output", watch=True)
+
+        input_script = m.declare_file("vine_example_watch_trickle.sh")
+        t.add_input(input_script, "vine_example_watch_trickle.sh", cache=True)
+
+        output = m.declare_file(f"output.{i}")
+        t.add_output(output, "output", watch=True)
+
         t.set_cores(1)
+
         m.submit(t)
 
     print("Waiting for tasks to complete...")
 
-    while not q.empty():
-        t = q.wait(5)
+    while not m.empty():
+        t = m.wait(5)
         if t:
-            if t.succesful():
+            if t.successful():
                 print(f"task {t.id} result: {t.std_output}")
             elif t.completed():
                 print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")

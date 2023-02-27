@@ -21,7 +21,7 @@ if __name__ == "__main__":
     print("listening on port", m.port)
 
     print("reducing array...")
-    m.tree_reduce(find_max, chunksize=3)
+    max_number = m.tree_reduce(find_max, numbers, chunksize=3)
 
-    print(f"maximum number is {t.output}")
+    print(f"maximum number is {max_number}")
 
