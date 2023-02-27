@@ -579,6 +579,43 @@ class Task(object):
         return vine_result_string(vine_task_get_result(self._task))
 
     ##
+    # Return True if task executed and its command terminated normally.
+    # If True, the exit code of the command can be retrieved with @ref
+    # exit_code. If False, the error condition can be retrieved with @ref
+    # result and @result_string.  It must be called only after the task
+    # completes execution.
+    # @code
+    # >>> # completed tasks with a failed command execution:
+    # >>> print(t.completed())
+    # True
+    # >>> print(t.exit_code)
+    # 1
+    # >>> # task with an error condition:
+    # >>> print(t.completed())
+    # False
+    # >>> print(t.result_string)
+    # MAX_RETRIES
+    # @endcode
+    def completed(self):
+        return self.result == VINE_RESULT_SUCCESS
+
+    ##
+    # Return True if task executed successfully, (i.e. its command terminated
+    # normally with exit code 0 and produced all its declared output files).
+    # Differs from @ref completed in that the exit code of the command should
+    # be zero.
+    # It must be called only after the task completes execution.
+    # @code
+    # >>> # completed tasks with a failed command execution:
+    # >>> print(t.completed())
+    # True
+    # >>> print(t.successful())
+    # False
+    # @endcode
+    def successful(self):
+        return self.completed() and self.exit_code == 0
+
+    ##
     # Return various integer performance metrics about a completed task.
     # Must be called only after the task completes execution.
     #
