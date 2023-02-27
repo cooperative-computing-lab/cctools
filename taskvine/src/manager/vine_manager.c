@@ -1217,7 +1217,7 @@ static int expire_waiting_tasks(struct vine_manager *q)
 
 		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time)
 		{
-			vine_task_set_result(t, VINE_RESULT_TASK_TIMEOUT);
+			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
@@ -1530,7 +1530,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		if(t->exit_code == RM_OVERFLOW) {
 			vine_task_set_result(t, VINE_RESULT_RESOURCE_EXHAUSTION);
 		} else if(t->exit_code == RM_TIME_EXPIRE) {
-			vine_task_set_result(t, VINE_RESULT_TASK_TIMEOUT);
+			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
 		}
 	}
 
@@ -3764,13 +3764,13 @@ const char *vine_result_string(vine_result_t result) {
 			str = "SUCCESS";
 			break;
 		case VINE_RESULT_INPUT_MISSING:
-			str = "INPUT_MISS";
+			str = "INPUT_MISSING";
 			break;
 		case VINE_RESULT_OUTPUT_MISSING:
-			str = "OUTPUT_MISS";
+			str = "OUTPUT_MISSING";
 			break;
 		case VINE_RESULT_STDOUT_MISSING:
-			str = "STDOUT_MISS";
+			str = "STDOUT_MISSING";
 			break;
 		case VINE_RESULT_SIGNAL:
 			str = "SIGNAL";
@@ -3778,8 +3778,8 @@ const char *vine_result_string(vine_result_t result) {
 		case VINE_RESULT_RESOURCE_EXHAUSTION:
 			str = "RESOURCE_EXHAUSTION";
 			break;
-		case VINE_RESULT_TASK_TIMEOUT:
-			str = "END_TIME";
+		case VINE_RESULT_MAX_END_TIME:
+			str = "MAX_END_TIME";
 			break;
 		case VINE_RESULT_UNKNOWN:
 			str = "UNKNOWN";
@@ -3790,11 +3790,8 @@ const char *vine_result_string(vine_result_t result) {
 		case VINE_RESULT_MAX_RETRIES:
 			str = "MAX_RETRIES";
 			break;
-		case VINE_RESULT_TASK_MAX_RUN_TIME:
+		case VINE_RESULT_MAX_WALL_TIME:
 			str = "MAX_WALL_TIME";
-			break;
-		case VINE_RESULT_DISK_ALLOC_FULL:
-			str = "DISK_FULL";
 			break;
 		case VINE_RESULT_RMONITOR_ERROR:
 			str = "MONITOR_ERROR";
@@ -4923,8 +4920,7 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t) {
 		case VINE_RESULT_SUCCESS:
 		case VINE_RESULT_SIGNAL:
 		case VINE_RESULT_RESOURCE_EXHAUSTION:
-		case VINE_RESULT_TASK_MAX_RUN_TIME:
-		case VINE_RESULT_DISK_ALLOC_FULL:
+		case VINE_RESULT_MAX_WALL_TIME:
 		case VINE_RESULT_OUTPUT_TRANSFER_ERROR:
 			if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
 				vine_txn_log_write_category(q, c);
@@ -4946,7 +4942,7 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t) {
 			break;
 		case VINE_RESULT_INPUT_MISSING:
 		case VINE_RESULT_OUTPUT_MISSING:
-		case VINE_RESULT_TASK_TIMEOUT:
+		case VINE_RESULT_MAX_END_TIME:
 		case VINE_RESULT_UNKNOWN:
 		case VINE_RESULT_FORSAKEN:
 		case VINE_RESULT_MAX_RETRIES:

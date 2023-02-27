@@ -572,11 +572,12 @@ class Task(object):
     # Must be called only after the task completes execution.
     # @code
     # >>> print(t.result_string)
-    # 'SUCCESS'
+    # 'success'
     # @endcode
     @property
     def result_string(self):
-        return vine_result_string(vine_task_get_result(self._task))
+        result = vine_result_string(vine_task_get_result(self._task))
+        return result.tolower().replace("_", " ")
 
     ##
     # Return True if task executed and its command terminated normally.
