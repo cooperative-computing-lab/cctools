@@ -36,17 +36,34 @@ typedef enum {
 } vine_file_t;
 
 struct vine_file {
-	vine_file_t type;       // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
-	int length;		// Length of source data, if known.
-	char *source;		// Name of source file, url, buffer.
-	char *cached_name;	// Name of file in the worker's cache directory.
-	char *data;		// Raw data for an input or output buffer.
+	vine_file_t type;   // Type of data source: VINE_FILE, VINE_BUFFER, VINE_URL, etc.
+	char *source;       // Name of source file, url, buffer.
+	char *cached_name;  // Name of file in the worker's cache directory.
+	char *file_id;      // Unique name of this source and cached_name
+	size_t size;        // Length of source data, if known.
+	char *data;         // Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
-	int refcount;		// Number of references from a task object, delete when zero.
+	int refcount;       // Number of references from a task object, delete when zero.
 };
 
-struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, int length, vine_file_t type, struct vine_task *mini_task );
+struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task );
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source );
+
+struct vine_file *vine_file_clone( struct vine_file *f );
+
+/* Decreases reference count of file, and frees if zero. */
+int vine_file_delete( struct vine_file *f );
+
+struct vine_file *vine_file_local( const char *source );
+struct vine_file *vine_file_url( const char *source );
+struct vine_file *vine_file_temp();
+struct vine_file *vine_file_buffer( const char *buffer, size_t size );
+struct vine_file *vine_file_empty_dir( );
+struct vine_file *vine_file_mini_task( struct vine_task *t );
+struct vine_file *vine_file_untar( struct vine_file *f );
+struct vine_file *vine_file_poncho( struct vine_file *f );
+struct vine_file *vine_file_starch( struct vine_file *f );
+struct vine_file *vine_file_xrootd( const char *source, struct vine_file *proxy );
 
 #endif

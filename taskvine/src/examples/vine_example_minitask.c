@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 /*
-An example of a task using a minitask (vine_file_untar) to unpack a dependency before using it.
+An example of a task using a minitask (vine_declare_untar) to unpack a dependency before using it.
 */
 
 #include "taskvine.h"
@@ -34,11 +34,13 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	struct vine_file *package = vine_file_untar(vine_file_url(CCTOOLS_URL));
+
+	struct vine_file *url = vine_declare_url(m, CCTOOLS_URL);
+	struct vine_file *package = vine_declare_untar(m, url);
 
 	for(i=0;i<10;i++) {
 		struct vine_task *task = vine_task_create("ls -lR cctools | wc -l");
-		vine_task_add_input(task,package,"cctools",VINE_CACHE);		
+		vine_task_add_input(task,package,"cctools",VINE_CACHE);
 		int task_id = vine_submit(m, task);
 
 		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(task) );
@@ -63,8 +65,9 @@ int main(int argc, char *argv[])
 
 	printf("all tasks complete!\n");
 
-	vine_file_delete(package);
 	vine_delete(m);
 
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -20,9 +20,28 @@ See the file COPYING for details.
 /* Internal use: when the worker uses the client library, do not recompute cached names. */
 int vine_hack_do_not_compute_cached_name = 0;
 
-/* Create a new file object with the given properties. */
+/* Returns file refcount. If refcount is 0, the file has been deleted. */
+int vine_file_delete(struct vine_file *f)
+{
+	if(f) {
+		f->refcount--;
+		if(f->refcount>0) {
+			return f->refcount;
+		}
 
-struct vine_file *vine_file_create(const char *source, const char *cached_name, const char *data, int length, vine_file_t type, struct vine_task *mini_task )
+		vine_task_delete(f->mini_task);
+		free(f->source);
+		free(f->cached_name);
+		free(f->file_id);
+		free(f->data);
+		free(f);
+	}
+
+	return 0;
+}
+
+/* Create a new file object with the given properties. */
+struct vine_file *vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task )
 {
 	struct vine_file *f;
 
@@ -32,12 +51,14 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 
 	f->source = xxstrdup(source);
 	f->type = type;
-	f->length = length;
+	f->size = size;
 	f->mini_task = mini_task;
 
 	if(data) {
-		f->data = malloc(length);
-		memcpy(f->data,data,length);
+		/* Terminate with a null, just in case the user tries to treat this as a C string. */
+		f->data = malloc(size+1);
+		memcpy(f->data,data,size);
+		f->data[size] = 0;
 	} else {
 		f->data = 0;
 	}
@@ -53,8 +74,12 @@ struct vine_file *vine_file_create(const char *source, const char *cached_name, 
 		/* This may give us the actual size of the object along the way. */
 		ssize_t totalsize = 0;
 		f->cached_name = vine_cached_name(f,&totalsize);
-		if(length==0) f->length = totalsize;
+		if(size==0) {
+			f->size = totalsize;
+		}
 	}
+
+	f->file_id = vine_file_id(f);
 
 	f->refcount = 1;
 
@@ -70,23 +95,18 @@ struct vine_file *vine_file_clone( struct vine_file *f )
 	return f;
 }
 
-/*
-Request to delete a file object.
-Decrement the reference count and delete if zero.
-*/
+/* Return the contents of a buffer file, or null. */
 
-void vine_file_delete(struct vine_file *f)
+const char * vine_file_contents( struct vine_file *f )
 {
-	if(!f) return;
+	return f->data;
+}
 
-	f->refcount--;
-	if(f->refcount>0) return;
+/* Return the size of any kind of file. */
 
-	vine_task_delete(f->mini_task);
-	free(f->source);
-	free(f->cached_name);
-	free(f->data);
-	free(f);
+size_t vine_file_size( struct vine_file *f )
+{
+	return f->size;
 }
 
 struct vine_file * vine_file_local( const char *source )
@@ -101,7 +121,7 @@ struct vine_file * vine_file_url( const char *source )
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source )
 {
-	return vine_file_create(source,f->cached_name,0,f->length,VINE_URL,0);
+	return vine_file_create(source,f->cached_name,0,f->size,VINE_URL,0);
 }
 
 struct vine_file * vine_file_temp()
@@ -109,9 +129,9 @@ struct vine_file * vine_file_temp()
 	return vine_file_create("temp",0,0,0,VINE_TEMP,0);
 }
 
-struct vine_file * vine_file_buffer( const char *buffer_name,const char *data, int length )
+struct vine_file * vine_file_buffer( const char *data, size_t size )
 {
-	return vine_file_create(buffer_name,0,data,length,VINE_BUFFER,0);
+	return vine_file_create("buffer",0,data,size,VINE_BUFFER,0);
 }
 
 struct vine_file * vine_file_empty_dir()
@@ -132,7 +152,7 @@ struct vine_file * vine_file_untar( struct vine_file *f )
 	return vine_file_mini_task(t);
 }
 
-struct vine_file * vine_file_unponcho( struct vine_file *f)
+struct vine_file * vine_file_poncho( struct vine_file *f)
 {
 	struct vine_task *t = vine_task_create("./poncho_package_run --unpack-to output -e package.tar.gz");
 	char * poncho_path = path_which("poncho_package_run");
@@ -142,7 +162,7 @@ struct vine_file * vine_file_unponcho( struct vine_file *f)
 	return vine_file_mini_task(t);
 }
 
-struct vine_file * vine_file_unstarch( struct vine_file *f )
+struct vine_file * vine_file_starch( struct vine_file *f )
 {
 	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
 	vine_task_add_input(t,f,"package.sfx",VINE_CACHE);

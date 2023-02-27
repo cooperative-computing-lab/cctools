@@ -461,15 +461,8 @@ void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
 
 void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_buffer("unnamed",data,length);
+	struct vine_file *f = vine_file_buffer(data,length);
 	vine_task_add_input(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
-}
-
-void vine_task_add_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags)
-{
-	struct vine_file *f = vine_file_buffer(buffer_name,0,0);
-	vine_task_add_output(t,f,remote_name,flags);
 	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
@@ -572,40 +565,6 @@ void vine_task_delete(struct vine_task *t)
 	rmsummary_delete(t->resources_allocated);
 
 	free(t);
-}
-
-static struct vine_file * find_output_buffer( struct vine_task *t, const char *name )
-{
-	struct vine_mount *m;
-
-	LIST_ITERATE(t->output_mounts,m) {
-		struct vine_file *f = m->file;
-		if(f->type==VINE_BUFFER && !strcmp(f->source,name)) {
-			return f;
-		}
-	}
-
-	return 0;
-}
-
-const char * vine_task_get_output_buffer( struct vine_task *t, const char *buffer_name )
-{
-	struct vine_file *f = find_output_buffer(t,buffer_name);
-	if(f) {
-		return f->data;
-	} else {
-		return 0;
-	}
-}
-
-int vine_task_get_output_buffer_length( struct vine_task *t, const char *buffer_name )
-{
-	struct vine_file *f = find_output_buffer(t,buffer_name);
-	if(f) {
-		return f->length;
-	} else {
-		return 0;
-	}
 }
 
 const char * vine_task_get_command( struct vine_task *t )

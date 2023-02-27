@@ -51,13 +51,18 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	struct vine_file *software = vine_file_untar(vine_file_url(BLAST_URL));
-	struct vine_file *database = vine_file_untar(vine_file_url(LANDMARK_URL));
-	
+	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL);
+	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL);
+
+	struct vine_file *software = vine_declare_untar(m, blast_url);
+	struct vine_file *database = vine_declare_untar(m, landm_url);
+
+
 	for(i=0;i<10;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 
-		vine_task_add_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
+		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string));
+		vine_task_add_input(t, query, "query.file", VINE_NOCACHE);
 		vine_task_add_input(t,software,"blastdir", VINE_CACHE );
 		vine_task_add_input(t,database,"landmark", VINE_CACHE );
 		vine_task_set_env_var(t,"BLASTDB","landmark");
@@ -86,10 +91,9 @@ int main(int argc, char *argv[])
 
 	printf("all tasks complete!\n");
 
-	vine_file_delete(software);
-	vine_file_delete(database);
-	
 	vine_delete(m);
 
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */
