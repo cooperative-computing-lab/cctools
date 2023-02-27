@@ -1155,10 +1155,6 @@ static int task_resources_fit_eventually(struct vine_task *t)
 	struct vine_resources *r;
 
 	r = local_resources;
-	debug(D_VINE, "MAX CORES: %ld, CORES REQUESTED: %f", r->cores.largest, t->resources_requested->cores);
-	debug(D_VINE, "MAX MEM: %ld, MEM REQUESTED: %f", r->memory.largest, t->resources_requested->memory);
-	debug(D_VINE, "MAX DISK: %ld, DISK REQUESTED: %f", r->disk.largest, t->resources_requested->disk);
-	debug(D_VINE, "MAX GPUS: %ld, GPUS REQUESTED: %f", r->gpus.largest, t->resources_requested->gpus);
 
 	return
 		(t->resources_requested->cores  <= r->cores.largest) &&
