@@ -34,7 +34,6 @@
 # conda install -y -p my-minimal-env pip and conda install other modules, etc.
 # conda run -p my-minimal-env conda-pack
 
-
 import taskvine as vine
 
 def divide(dividend, divisor):
@@ -57,7 +56,7 @@ def main():
         if t:
             x = t.output
             if isinstance(x, vine.PythonTaskNoResult):
-                print("Task {} failed and did not generate a result.".format(t.id))
+                print(f"Task {t.id} failed and did not generate a result.")
             else:
                 sum += x
         print(sum)

@@ -76,12 +76,14 @@ if __name__ == "__main__":
         print("submitted task (id# " + str(task_id) + "): count_events()")
     print("waiting for tasks to complete...")
 
-    while not m.empty():
-        t = m.wait(5)
+    while not q.empty():
+        t = q.wait(5)
         if t:
-            if t.result == vine.VINE_RESULT_SUCCESS:
+            if t.succesful():
                 print(f"task {t.id} processed a file with {t.output} events")
+            elif t.completed():
+                print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
             else:
-                print(f"task {t.id} failed: {t.result_string}")
+                print(f"task {t.id} failed with status {t.result_string}")
 
     print("all tasks complete!")

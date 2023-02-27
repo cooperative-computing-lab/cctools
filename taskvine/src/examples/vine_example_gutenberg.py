@@ -49,35 +49,33 @@ if __name__ == "__main__":
     m = vine.Manager()
     print("listening on port", m.port)
 
-    for i in range(url_count):
-        for j in range(url_count):
-            t = vine.Task("./vine_example_gutenberg_script.sh filea.txt fileb.txt")
+    for (i, url_a) in enumerate(urls):
+        for (j, url_b) in enumerate(urls):
 
+            t = vine.Task("./vine_example_gutenberg_script.sh file_a.txt file_b.txt")
             t.add_input_file(
                 "vine_example_gutenberg_script.sh",
                 "vine_example_gutenberg_script.sh",
                 cache=True,
             )
-            t.add_input_url(urls[i], "filea.txt", cache=True)
-            t.add_input_url(urls[j], "fileb.txt", cache=True)
+
+            t.add_input_url(url_a, "file_a.txt", cache=True)
+            t.add_input_url(url_b, "file_b.txt", cache=True)
 
             t.set_cores(1)
 
-            task_id = m.submit(t)
-
-            print("submitted task (id# " + str(task_id) + "):", t.command)
+            m.submit(t)
+            print(f"submitted task {t.id}: {t.command}")
 
     print("waiting for tasks to complete...")
-
     while not m.empty():
         t = m.wait(5)
         if t:
-            r = t.result
-            id = t.id
-
-            if r == vine.VINE_RESULT_SUCCESS:
-                print("task", id, "output:", t.std_output)
+            if t.succesful():
+                print(f"task {t.id} result: {t.std_output}")
+            elif t.completed():
+                print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
             else:
-                print("task", id, "failed:", t.result_string)
+                print(f"task {t.id} failed with status {t.result_string}")
 
     print("all tasks complete!")

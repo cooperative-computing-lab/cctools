@@ -818,7 +818,7 @@ class PythonTask(Task):
     @property
     def output(self):
         if not self._output_loaded:
-            if self.result == VINE_RESULT_SUCCESS:
+            if self.successful():
                 try:
                     with open(os.path.join(self._tmpdir, "out_{}.p".format(self._id)), "rb") as f:
                         self._output = dill.load(f)

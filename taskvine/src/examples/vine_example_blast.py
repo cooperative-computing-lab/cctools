@@ -22,9 +22,10 @@ KMKILELPFASGDLSMLVLLPDEVSDLERIEKTINFEKLTEWTNPNTMEKRRVKVYLPQMKIEEKYNLTS
 VLMALGMTDLFIPSANLTGISSAESLKISQAVHGAFMELSEDGIEMAGSTGVIEDIKHSPESEQFRADHP
 FLFLIKHNPTNTIVYFGRYWSP"""
 
+
 if __name__ == "__main__":
     m = vine.Manager()
-    print("listening on port", m.port)
+    print(f"listening on {m.port}")
 
     query_buffer = m.declare_buffer(query)
 
@@ -39,24 +40,22 @@ if __name__ == "__main__":
 
         t.add_input(query, "query.file", cache=True)
         t.add_input(blast, "blastdir", cache=True )
+
         t.add_input(landmark, "landmark", cache=True )
         t.set_env_var("BLASTDB", value="landmark")
 
         task_id = m.submit(t)
-
-        print("submitted task (id# " + str(task_id) + "):", t.command)
+        print(f"submitted task {t.id}: {t.command}")
 
     print("waiting for tasks to complete...")
-
     while not m.empty():
         t = m.wait(5)
         if t:
-            r = t.result
-            id = t.id
-
-            if r == vine.VINE_RESULT_SUCCESS:
-                print("task", id, "output:", t.std_output)
+            if t.succesful():
+                print(f"task {t.id} result: {t.std_output}")
+            elif t.completed():
+                print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
             else:
-                print("task", id, "failed:", t.result_string)
+                print(f"task {t.id} failed with status {t.result_string}")
 
     print("all tasks complete!")

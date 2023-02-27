@@ -4,11 +4,12 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-# This example program shows the behavior of the VINE_WATCH flag.
+# This example program shows the behavior of the watch parameter when adding an
+# output file to a task.
 
 # If a task produces output to a file incrementally as it runs,
 # it can be helpful to see that output piece by piece as it
-# is produced. By simply adding the VINE_WATCH flag to the output
+# is produced. By simply adding watch=True to the output
 # of the program, taskvine will periodically check for output
 # and return it to the manager while each task runs.  When the
 # task completes, any remaining output is fetched.
@@ -39,17 +40,17 @@ if __name__ == "__main__":
 
     print("Waiting for tasks to complete...")
 
-    while not m.empty():
-        t = m.wait(5)
+    while not q.empty():
+        t = q.wait(5)
         if t:
-            r = t.result
-            id = t.id
-
-            if r == vine.VINE_RESULT_SUCCESS:
-                print("task", id, "output:", t.std_output)
+            if t.succesful():
+                print(f"task {t.id} result: {t.std_output}")
+            elif t.completed():
+                print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
             else:
-                print("task", id, "failed:", t.result_string)
+                print(f"task {t.id} failed with status {t.result_string}")
 
+        # print to the console the contents of the files being watched
         for i in range(n):
             try:
                 with open(f"output.{i}") as f:
