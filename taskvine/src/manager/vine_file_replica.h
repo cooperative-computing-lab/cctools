@@ -9,15 +9,15 @@ See the file COPYING for details.
 
 #include "taskvine.h"
 
-struct vine_remote_file_info {
+struct vine_file_replica {
 	int64_t           size;
 	time_t            mtime;
 	timestamp_t       transfer_time;
 	uint8_t           in_cache;
 };
 
-struct vine_remote_file_info * vine_remote_file_info_create( int64_t size, time_t mtime );
-void vine_remote_file_info_delete( struct vine_remote_file_info *rinfo );
+struct vine_file_replica * vine_file_replica_create( int64_t size, time_t mtime );
+void vine_file_replica_delete( struct vine_file_replica *rinfo );
 
 #endif
 
