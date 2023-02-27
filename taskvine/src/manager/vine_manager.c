@@ -2686,7 +2686,6 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 		/* Provide a substitute file object to describe the peer. */
 		if(m->file->type != VINE_MINI_TASK) 
 		{
-			vine_file_delete(m->substitute);
 			if((peer = vine_file_replica_table_find_worker(q, m->file->cached_name)))
 			{
 				char *peer_source =  string_format("worker://%s:%d/%s", peer->transfer_addr, peer->transfer_port, m->file->cached_name);
