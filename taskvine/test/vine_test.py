@@ -190,7 +190,7 @@ if __name__ == '__main__':
     t.set_time_max(1)
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, vine.VINE_RESULT_TASK_MAX_RUN_TIME, 9)
+    report_task(t, vine.VINE_RESULT_MAX_WALL_TIME, 9)
 
     # should run in the alloted absolute time
     t = vine.Task("/bin/sleep 1")
