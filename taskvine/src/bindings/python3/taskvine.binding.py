@@ -728,6 +728,12 @@ except Exception:
     # However, that type does not exist in Python 2
     pythontask_available = False
 
+try:
+    from poncho import package_serverize
+    poncho_available = True
+except Exception:
+    poncho_available = False
+
 
 class PythonTask(Task):
     ##
@@ -1565,6 +1571,55 @@ class Manager(object):
     def install_duty(self, task, name):
         self._duty_table[name] = task
         vine_manager_install_duty(self._taskvine, task._task, "duty_coprocess:" + name)
+
+    # Turn a single python function or list of python functions into a Library
+    #
+    #
+    # @param self            Reference to the current manager object.
+    # @param name            Name of the library to be created
+    # @param function_list   List of all functions to be included in the library
+    def create_library_from_functions(self, name, *function_list):
+        # MAKE LIBRARY FROM FILE
+        # HASH IN FUNCTION NAMES
+        # ensure poncho python library is available
+        if poncho_available == False:
+            raise("The poncho module is not available. Cannot create duty.")
+        # positional arguments are the list of functions to include in the library
+        functions_hash = package_serverize.functions_hash(function_list)
+        library_cache_path = f"./vine-library-cache/{functions_hash}"
+        network_fnc_path = f"{library_cache_path}/network.py"
+        env_path = f"{library_cache_path}/library_env.tar.gz"
+        if not os.path.exists("vine-library-cache"):
+            os.mkdir("vine-library-cache")
+        if os.path.isfile(network_fnc_path) and os.path.isfile(env_path):
+            pass
+        else:
+            if os.path.exists(library_cache_path):
+                shutil.rmtree(library_cache_path)
+            os.mkdir(library_cache_path)
+            package_serverize.create_network_function_from_code(library_cache_path, function_list, name)
+            os.chmod(network_fnc_path, 0o775)
+        t = Task("./poncho_package_run -e package python ./network.py")
+        f = self.declare_poncho(self.declare_file(env_path))
+        t.add_input(f, "package")
+        t.add_input_file(network_fnc_path, "network.py")
+        t.add_input_file(shutil.which('poncho_package_run'), "poncho_package_run")
+        return t
+
+    # Turn a network function created with poncho_package_serverize into a library
+    #
+    #
+    # @param self            Reference to the current manager object.
+    # @param name            Name of the library to be created
+    # @param network_file    Name of the network file
+    # @param env_file        Name of the environment file
+    def create_library_from_files(self, name, network_file, env_file):
+        t = Task(f"./poncho_package_run -e package python network.py")
+        f = self.declare_poncho(self.declare_file(env_file))
+        t.add_input(f, "package")
+        t.add_input_file(network_file, "network.py")
+        t.add_input_file(shutil.which('poncho_package_run'), "poncho_package_run")
+        return t
 
     ##
     # Remove a duty from all connected workers
