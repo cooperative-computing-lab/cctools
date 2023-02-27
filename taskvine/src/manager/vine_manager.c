@@ -2792,10 +2792,10 @@ static int receive_tasks_from_worker( struct vine_manager *q, struct vine_worker
 	int tasks_received = 0;
 
 	/* if the function was called, receive at least one task */
-	int max_to_receive = MAX(1, q->max_receives - count_received_so_far);
+	int max_to_receive = MAX(1, q->max_retrievals - count_received_so_far);
 
 	/* if appropriate, receive all the tasks from the worker */
-	if(q->retrieve_complete_per_worker) {
+	if(q->worker_retrievals) {
 		max_to_receive = itable_size(w->current_tasks);
 	}
 
@@ -3258,9 +3258,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 
 	q->wait_for_workers = 0;
 
-	q->max_receives = 1;
-	q->prefer_receives = 0;
-	q->retrieve_complete_per_worker = 1;
+	q->max_retrievals = 1;
+	q->worker_retrievals = 1;
 
 	q->proportional_resources = 1;
 	q->proportional_whole_tasks = 1;
@@ -4245,9 +4244,9 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		q->busy_waiting_flag = 0;
 
 		// retrieve results from workers
-		// if retrieve_complete_per_worker, then all the tasks from a worker
+		// if worker_retrievals, then all the tasks from a worker
 		// are retrieved. (this is the default)
-		// otherwise, retrieve at most q->max_receives (default is 1)
+		// otherwise, retrieve at most q->max_retrievals (default is 1)
 		int received = 0;
 		BEGIN_ACCUM_TIME(q, time_receive);
 		do {
@@ -4279,10 +4278,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				}
 			}
 
-			if(q->prefer_receives) {
-				continue;
-			}
-		} while(received < q->max_receives);
+		} while(q->max_retrievals < 0 || received < q->max_retrievals);
 		END_ACCUM_TIME(q, time_receive);
 
 		// expired tasks
@@ -4676,14 +4672,11 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "max-receives")) {
-		q->max_receives = MAX(1, (int)value);
+	} else if(!strcmp(name, "max-retrievals")) {
+		q->max_retrievals = MIN(-1, (int)value);
 
-	} else if(!strcmp(name, "prefer-receives")) {
-		q->prefer_receives = MAX(0, (int)value);
-
-	} else if(!strcmp(name, "retrieve-complete-per-worker")) {
-		q->retrieve_complete_per_worker = MAX(0, (int)value);
+	} else if(!strcmp(name, "worker-retrievals")) {
+		q->worker_retrievals = MAX(0, (int)value);
 
 	} else if(!strcmp(name, "force-proportional-resources") || !strcmp(name, "proportional-resources")) {
 		q->proportional_resources = MAX(0, (int)value);
