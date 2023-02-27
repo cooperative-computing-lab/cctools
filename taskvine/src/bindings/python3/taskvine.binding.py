@@ -98,7 +98,7 @@ class Task(object):
             pass
 
     @staticmethod
-    def _determine_file_flags(cache=False, unpack=False, watch=False, failure_only=False, success_only=False):
+    def _determine_file_flags(cache=False, watch=False, failure_only=False, success_only=False):
         flags = VINE_NOCACHE
         if cache:
             flags |= VINE_CACHE
@@ -335,26 +335,23 @@ class Task(object):
     ##
     # Add any output object to a task.
     #
-    # @param self           Reference to the current task object.
-    # @param file           A file object of class @ref File, such as from @ref declare_file, or @ref declare_buffer
-    # @param remote_name    The name of the file at the execution site.
-    # @param flags          May be zero to indicate no special handling, or any
-    #                       of the @ref vine_file_flags_t or'd together The most common are:
-    #                       - @ref VINE_NOCACHE (default)
-    #                       - @ref VINE_CACHE
+    # @param self          Reference to the current task object.
+    # @param file          A file object of class @ref File, such as from @ref declare_file, or @ref declare_buffer
+    # @param remote_name   The name of the file at the execution site.
+    # @param watch         Watch the output file and send back changes as the task runs.
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
+    # @param success_only  Whether the file should be retrieved only when the task succeeds. Default is False.
+    # @param failure_only  Whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
     #
     # For example:
     # @code
     # >>> file = m.declare_file("output.txt")
     # >>> task.add_output(file,"out")
     # @endcode
-
-    def add_output(self, file, remote_name, flags=None, cache=None, failure_only=None):
+    def add_output(self, file, remote_name, watch=False, cache=False, failure_only=None, success_only=None):
         # SWIG expects strings
         remote_name = str(remote_name)
-        flags = Task._determine_file_flags(flags, cache, failure_only)
+        flags = Task._determine_file_flags(cache, watch, failure_only, success_only)
         return vine_task_add_output(self._task, file._file, remote_name, flags)
 
     ##
