@@ -66,6 +66,7 @@ def main():
             print(f"Network function received task: {line}", file=sys.stderr, flush=True)
             if len(line) >= 0:
                 function_name, event_size = line.split(" ")
+                # receive sandbox for output_files
                 sandbox = input()
                 if not sandbox:
                     print("Unable to read sandbox: exiting", file=sys.stderr)
@@ -119,7 +120,7 @@ def main():
 
                     break
             else:
-                print("Network function could not read from worker\n", file=sys.stderr)
+                print("Network function could not read from worker\\n", file=sys.stderr)
     return 0
 
 '''
