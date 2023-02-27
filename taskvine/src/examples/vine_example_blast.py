@@ -51,7 +51,7 @@ if __name__ == "__main__":
     while not m.empty():
         t = m.wait(5)
         if t:
-            if t.succesful():
+            if t.successful():
                 print(f"task {t.id} result: {t.std_output}")
             elif t.completed():
                 print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
