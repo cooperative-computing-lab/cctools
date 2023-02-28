@@ -17,7 +17,7 @@ import hashlib
 
 shebang = "#! /usr/bin/env python3\n\n"
 
-tv_network_code = \
+vine_network_code = \
 '''
 import socket
 import json
@@ -92,7 +92,7 @@ def main():
                         if p == 0:
                             response =globals()[function_name](event)
                             os.write(write, json.dumps(response).encode("utf-8"))
-                            os._exit(-1)
+                            os._exit(0)
                         elif p < 0:
                             print('Network function: unable to fork', file=sys.stderr)
                             response = { 
@@ -207,7 +207,7 @@ def main():
                         if p == 0:
                             response =globals()[function_name](event)
                             os.write(write, json.dumps(response).encode("utf-8"))
-                            os._exit(-1)
+                            os._exit(0)
                         elif p < 0:
                             print('Network function: unable to fork', file=sys.stderr)
                             response = { 
@@ -279,7 +279,7 @@ def create_network_function(path, funcs, dest, version):
 	if version == "work_queue":
 		output_file.write(wq_network_code)
 	elif version == "task_vine":
-		output_file.write(tv_network_code)
+		output_file.write(vine_network_code)
 	# write name function code into it
 	output_file.write(f"{name_source_code}\n")
 	# iterate over every function the user requested and attempt to put it into the network function
