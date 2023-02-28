@@ -44,13 +44,14 @@ if __name__ == "__main__":
     print("listening on port %d..." % q.port)
 
     # We create and dispatch a task for each filename given in the argument list
-    for i in range(1, len(sys.argv)):
-        infile = "%s" % sys.argv[i]
-        outfile = "%s.gz" % sys.argv[i]
+    for infile in sys.argv[1:]:
+        outfile = f"{infile}.gz"
 
         # Note that we write ./gzip here, to guarantee that the gzip version we
         # are using is the one being sent to the workers.
-        command = "./gzip < %s > %s" % (infile, outfile)
+        # Also, all tasks will get the same command. Taskvine will map infile
+        # and outfile to the actual files as tasks are executed.
+        command = "./gzip < infile > outfile"
 
         t = vine.Task(command)
 
@@ -63,27 +64,22 @@ if __name__ == "__main__":
         # files to be compressed are different across all tasks, so we do not
         # cache them. This is, of course, application specific. Sometimes you may
         # want to cache an output file if is the input of a later task.
-        t.add_input_file(infile, infile, cache=False)
-        t.add_output_file(outfile, outfile, cache=False)
+        t.add_input_file(infile, "infile", cache=False)
+        t.add_output_file(outfile, "outfile", cache=False)
 
         # Once all files has been specified, we are ready to submit the task to the queue.
-        task_id = q.submit(t)
-        print("submitted task (id# %d): %s" % (task_id, t.command))
+        q.submit(t)
+        print(f"submitted task {t.id}: {t.command}")
 
     print("waiting for tasks to complete...")
     while not q.empty():
         t = q.wait(5)
         if t:
-            print(
-                "task (id# %d) complete: %s (return code %d)"
-                % (t.id, t.command, t.exit_code)
-            )
-            if t.exit_code != 0:
-                # The task failed. Error handling (e.g., resubmit with new parameters, examine logs, etc.) here
-                pass
-        # task object will be garbage collected by Python automatically when it goes out of scope
+            if t.successful():
+                print(f"task {t.id} result: {t.std_output}")
+            elif t.completed():
+                print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
+            else:
+                print(f"task {t.id} failed with status {t.result_string}")
 
     print("all tasks complete!")
-
-    # taskvine object will be garbage collected by Python automatically when it goes out of scope
-    sys.exit(0)
