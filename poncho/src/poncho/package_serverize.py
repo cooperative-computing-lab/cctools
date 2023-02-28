@@ -278,7 +278,7 @@ def create_network_function(path, funcs, dest, version):
 	# write network code into it
 	if version == "work_queue":
 		output_file.write(wq_network_code)
-	elif version == "task_vine":
+	elif version == "taskvine":
 		output_file.write(vine_network_code)
 	# write name function code into it
 	output_file.write(f"{name_source_code}\n")
