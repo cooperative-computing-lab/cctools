@@ -13,6 +13,7 @@ import os
 import ast
 import tarfile
 import hashlib
+import inspect
 
 shebang = "#! /usr/bin/env python\n\n"
 
@@ -112,7 +113,7 @@ def main():
 
                     break
             else:
-                print("Network function could not read from worker\n", file=sys.stderr)
+                print("Network function could not read from worker\\n", file=sys.stderr)
     return 0
 
 '''
@@ -183,10 +184,10 @@ def sort_spec(spec):
     return json.dumps(sorted(conda_deps) + nested_deps, sort_keys=True).encode("utf-8")
 
 def search_env_for_spec(envpath):
+    env_spec = None
     if os.path.exists(envpath) and envpath.endswith(".tar.gz"):
         print("Cached environment found, checking if it is compatiable with new network function")
         with tarfile.open(envpath) as env_tar:
-            env_spec = None
             for member in env_tar:
                 if member.name == "conda_spec.yml":
                     with env_tar.extractfile(member) as f:
@@ -213,3 +214,13 @@ def pack_network_function(path, envpath):
         print("Cached package is out of date, rebuilding")
         create.pack_env("/tmp/tmp.json", envpath)
 
+def functions_hash(functions):
+    source_code = "".join([inspect.getsource(fnc) for fnc in functions]) + "".join([fnc.__name__ for fnc in functions])
+    return hashlib.md5(source_code.encode("utf-8")).hexdigest()
+
+def create_network_function_from_code(path, functions, name):
+    with open(path + "/tmp_network.py", "w") as temp_source_file:
+        temp_source_file.write("".join([inspect.getsource(fnc) for fnc in functions]))
+        temp_source_file.write(f"def name():\n\treturn '{name}'")
+    create_network_function(path + "/tmp_network.py", [fnc.__name__ for fnc in functions], path + "/network.py")
+    pack_network_function(path + "/network.py", path + "/library_env.tar.gz")
