@@ -592,7 +592,7 @@ class Task(object):
     # >>> print(t.completed())
     # False
     # >>> print(t.result_string)
-    # MAX_RETRIES
+    # max retries
     # @endcode
     def completed(self):
         return self.result == VINE_RESULT_SUCCESS
