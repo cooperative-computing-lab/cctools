@@ -2091,7 +2091,7 @@ class RemoteTask(Task):
     # has the worker directly call the function.
     def set_exec_method(self, remote_task_exec_method):
         if remote_task_exec_method not in ["fork", "direct"]:
-            print("Error, vine_exec_method must either be fork or direct, chosing fork by default")
+            print("Error, vine_exec_method must either be fork or direct, choosing fork by default")
             remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
