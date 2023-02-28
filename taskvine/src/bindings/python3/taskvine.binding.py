@@ -2086,13 +2086,13 @@ class RemoteTask(Task):
     ##
     # Specify how the remote task should execute
     # @param self                     Reference to the current remote task object
-    # @param remote_task_exec_method  Can be one of "fork", "direct", or
-    # "thread". Fork creates a child process to execute the function, direct
-    # has the worker directly call the function, and thread spawns a thread to
-    # execute the function
+    # @param remote_task_exec_method  Can be either of "fork" or "direct".
+    # Fork creates a child process to execute the function and direct
+    # has the worker directly call the function.
     def set_exec_method(self, remote_task_exec_method):
-        if remote_task_exec_method not in ["fork", "direct", "thread"]:
-            print("Error, vine_exec_method must be one of fork, direct, or thread")
+        if remote_task_exec_method not in ["fork", "direct"]:
+            print("Error, vine_exec_method must either be fork or direct, chosing fork by default")
+            remote_task_exec_method = "fork"
         self._event["remote_task_exec_method"] = remote_task_exec_method
 
 

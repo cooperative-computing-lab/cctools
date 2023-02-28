@@ -23,12 +23,9 @@ import json
 import os
 import sys
 import threading
-import queue
 
 def remote_execute(func):
-    def remote_wrapper(event, q=None):
-        if q:
-            event = json.loads(event)
+    def remote_wrapper(event):
         kwargs = event["fn_kwargs"]
         args = event["fn_args"]
         try:
@@ -41,9 +38,7 @@ def remote_execute(func):
                 "Result": str(e),
                 "StatusCode": 500 
             }
-        if not q:
-            return response
-        q.put(response)
+        return response
     return remote_wrapper
     
 read, write = os.pipe() 
@@ -83,15 +78,7 @@ def main():
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
                     print('Network function: recieved event: {}'.format(event), file=sys.stderr)
-                    if exec_method == "thread":
-                        # create a forked process for function handler
-                        os.chdir(sandbox)
-                        q = queue.Queue()
-                        p = threading.Thread(target=globals()[function_name], args=(event_str, q))
-                        p.start()
-                        p.join()
-                        response = json.dumps(q.get())
-                    elif exec_method == "direct":
+                    if exec_method == "direct":
                         os.chdir(sandbox)
                         response = json.dumps(globals()[function_name](event))
                     else:
