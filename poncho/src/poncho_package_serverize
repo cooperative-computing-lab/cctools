@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from poncho import package_serverize as serverize
 import argparse
 if __name__ == "__main__":
