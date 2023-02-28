@@ -204,7 +204,7 @@ if __name__ == '__main__':
     t.set_time_end((time.time() + 2) * 1e6)
     q.submit(t)
     t = q.wait(30)
-    report_task(t, vine.VINE_RESULT_TASK_TIMEOUT, 9)
+    report_task(t, vine.VINE_RESULT_MAX_END_TIME, 9)
 
     # Pull down data from a url and unpack it via a minitask.
     # Note that we use a local file url of a small tarball to test the mechanism without placing a load on the network.
