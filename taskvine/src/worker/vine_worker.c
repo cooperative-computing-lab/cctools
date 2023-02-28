@@ -625,7 +625,7 @@ static void expire_procs_running()
 	ITABLE_ITERATE(procs_running,pid,p) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
-			p->result = VINE_RESULT_TASK_TIMEOUT;
+			p->result = VINE_RESULT_MAX_END_TIME;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -1000,7 +1000,7 @@ static void enforce_processes_max_running_time()
 					p->task->task_id,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
-			p->result = VINE_RESULT_TASK_MAX_RUN_TIME;
+			p->result = VINE_RESULT_MAX_WALL_TIME;
 			kill(pid, SIGKILL);
 		}
 	}

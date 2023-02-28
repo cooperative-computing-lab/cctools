@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# copyright (C) 2021- The University of Notre Dame
+# copyright (C) 2023- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
@@ -51,16 +51,17 @@ def main():
 
         q.submit(p_task)
 
-    sum = 0
+    total_sum = 0
     while not q.empty():
         t = q.wait(5)
         if t:
             x = t.output
             if isinstance(x, vine.PythonTaskNoResult):
-                print("Task {} failed and did not generate a result.".format(t.id))
+                print(f"Task {t.id} failed and did not generate a result.")
             else:
-                sum += x
-        print(sum)
+                total_sum += x
+        print(total_sum)
+
 
 if __name__ == '__main__':
     main()

@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 	int i;
 
 	// runtime logs will be written to vine_example_poncho_worker_info/%Y-%m-%dT%H:%M:%S
-	vine_set_runtime_info_path("vine_example_poncho_worker_info");
+	vine_set_runtime_info_path("vine_example_poncho_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
@@ -32,16 +32,16 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	struct vine_file *script = vine_declare_file(m, "python_example.py");
+	struct vine_file *script = vine_declare_file(m, "script_example_for_poncho.py");
 
 	struct vine_file *poncho_tarball = vine_declare_file(m, "package.tar.gz");
 	struct vine_file *poncho_expansion = vine_declare_poncho(m, poncho_tarball);
 
 	for(i=0;i<5;i++) {
 
-		struct vine_task *task = vine_task_create("python python_example.py");
+		struct vine_task *task = vine_task_create("python my_script.py");
 
-		vine_task_add_input(task, script, "python_example.py", VINE_CACHE);
+		vine_task_add_input(task, script, "my_script.py", VINE_CACHE);
 		vine_task_add_input(task, poncho_expansion, "package", VINE_CACHE);
 
 		int task_id = vine_submit(m, task);
