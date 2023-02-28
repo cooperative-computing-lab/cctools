@@ -2,16 +2,17 @@
 
 import os
 import sys
+import re
 
 # Funtions
 def usage():
     """ prints the usage """
     print("""
-        File trace can be called directly from the command line using:
+        filetrace can be called directly from the command line using:
 
-            $ file_trace <command_to_excecute>
+            $ filetrace <command_to_excecute>
 
-        File trace also has optional command line flags:
+        filetrace also has optional command line flags:
 
             * -d <num>  : how many levels deep to summarise
             * -t <num>  : only show the top <num> of results on the summary page
@@ -22,7 +23,7 @@ def usage():
 def create_trace_file(arg):
     """ Runs strace and redirects its output to <name>.fout1.txt """
     arguments = ' '.join(arg)
-    os.system(f'strace -f {arguments} 2> {arg[0]}.fout1.txt')
+    os.system(f'strace -f -y --trace=file,read {arguments} 2> {arg[0]}.fout1.txt')
 
 
 def create_dict(name):
@@ -30,11 +31,11 @@ def create_dict(name):
         properties = [action, freq, size, parent, command]
     """
     path_dict = {}
-    properties = ['?', 0, 0,"", ""]
 
     with open(name + ".fout1.txt") as file:
         for line in file:
-            if "openat" in line:
+            properties = ['?', 0, 0,"", ""]
+            if "openat" in line or "stat" in line:
                 try:
                     path = line.split('"')[1]
 
@@ -43,20 +44,15 @@ def create_dict(name):
 
                     path_dict[path] = properties.copy()
 
-                    properties[1] = 0
                 except IndexError:
                     continue
-            elif "stat" in line: # separate if statment becasue unexpected behavior is an or is used
+            if "read" in line:
                 try:
-                    path = line.split('"')[1]
-
-                    properties[1] = path_dict.get(path, properties)[1] + 1
-                    properties[4] = line
-
+                    path = re.search('<.+>,',line).group(0).replace('<','').replace('>,','')
+                    bytes_written = re.search('= [0-9]+$',line).group(0).replace('= ','')
+                    properties[2] = path_dict.get(path, properties)[2] + int(bytes_written)
                     path_dict[path] = properties.copy()
-
-                    properties[1] = 0
-                except IndexError:
+                except (IndexError, AttributeError) as e:
                     continue
 
     return path_dict 
@@ -106,11 +102,13 @@ def print_summary_2(path_dict, name):
     action, and path of each entry
     """
     f = open(name + ".fout2.txt", "w")
+    f.write(f"freq action path\n")
     for path, properties in path_dict.items():
         action = properties[0]
         freq = properties[1]
+        size = properties[2]
     
-        f.write(f" {freq:2}  {action:2}  {path}\n")
+        f.write(f" {freq:2}    {action:2}   {path}\n")
             
     f.close()
 
@@ -166,8 +164,8 @@ def find_major_directories(path_dict, top, dirLvl, name):
     f.close()
 
 def end_of_execute(name):
-    print("\n----- ftrace -----")
-    print("ftrace completed\n\nCreated summaries:")
+    print("\n----- filetrace -----")
+    print("filetrace completed\n\nCreated summaries:")
 
     print(f"{name}.fout1.txt : output of strace")
     print(f"{name}.fout2.txt : the action and frequency performed on each file")
@@ -185,21 +183,20 @@ def main():
 
     while arguments and arguments[0].startswith('-'):
         arg = arguments.pop(0)
-        match arg:
-            case "--clean":
-                os.system("rm ./*fout*.txt")
-                print("removed ftrace files")
-                sys.exit(0)
-            case '--help':
-                usage()
-            case '-h':
-                usage()
-            case '-d':
-                dirLvl = (int(arguments.pop(0)) + 1)
-            case '-t': 
-                top = int(arguments.pop(0))
-            case other:
-                pass
+        if arg == "--clean":
+            os.system("rm ./*fout*.txt")
+            print("removed ftrace files")
+            sys.exit(0)
+        elif arg == '--help':
+            usage()
+        elif arg == '-h':
+            usage()
+        elif arg == '-d':
+            dirLvl = (int(arguments.pop(0)) + 1)
+        elif arg == '-t': 
+            top = int(arguments.pop(0))
+        else:
+            continue
                 
     name = arguments[0]
 
@@ -211,6 +208,7 @@ def main():
     end_of_execute(name)
 
     sys.exit(0)
+
 
 if __name__ == '__main__':
     main()
