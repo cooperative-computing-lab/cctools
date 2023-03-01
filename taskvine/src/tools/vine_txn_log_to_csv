@@ -29,6 +29,7 @@ import math
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plticker
 import pandas as pd
+from pathlib import Path
 import sys
 
 plt.style.use('tableau-colorblind10')
@@ -69,13 +70,16 @@ class Manager:
         self.workers = None
         self.transfers = None
 
+    def write_tables(self, filename, index):
+        name = Path(filename).stem
+        tables = ["tasks", "workers", "transfers"]
+        for (table, df) in zip(tables, [self.tasks, self.workers, self.transfers]):
+            df.to_csv(f"{name}_{index}_{table}.csv", index=False)
 
     def make_tables(self):
         self.tasks = self.make_table_tasks()
         self.workers = self.make_table_workers()
         self.transfers = self.make_table_transfers()
-
-        print(self.tasks[["task_id", "slot"]])
 
     def make_table_tasks(self):
         all_tasks = []
@@ -115,6 +119,10 @@ class ParseTxn:
         self.cm = None  # current manager
 
         self._parse()
+
+    def write_tables(self, filename):
+        for (i, m) in enumerate(self.managers.values()):
+            m.write_tables(filename, i)
 
     def _next_line(self):
         with open(self._log) as l:
@@ -337,7 +345,9 @@ class TxnPlot:
 
         if self.opts.output:
             plt.savefig(self.opts.output)
-        plt.show()
+
+        if self.opts.display or not self.opts.output:
+            plt.show()
 
     def plot(self, fig, manager):
         return NotImplemented
@@ -353,10 +363,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Plot TaskVine workflow information from a transaction log file.')
 
     parser.add_argument('log', help='Path to transaction log file')
-    parser.add_argument('mode', help='information to plot. One of workers, tasks, manager, or csv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
-    parser.add_argument('title', nargs='?', default ='TaskVine', help='Title of the plot')
-    parser.add_argument('output', nargs='?', default = None, help='output name of the plot/csv generated')
-    parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-running-task, or first-worker', default=["manager-start"])
+    parser.add_argument('output', nargs='?', default=None, help='output name of the plot/csv generated. If not given, assumes --display')
+    parser.add_argument('--mode', help='information to plot. One of workers, tasks, manager, or csv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
+    parser.add_argument('--title', nargs='?', default='TaskVine', help='Title of the plot')
+    parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default=["first-transfer"])
+    parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
     parser.add_argument('--width', nargs='?', help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', help='height in inches. Default is 2/3 of width', default=None)
     parser.add_argument('--all-info', action='store_true', help='display all from the transaction log')
@@ -377,6 +388,13 @@ if __name__ == "__main__":
 
     p = ParseTxn(args.log)
 
-    TxnPlotWorkers(p.managers, args)
+    if args.mode == "csv":
+        p.write_tables(args.output)
+    elif args.mode == "workers":
+        TxnPlotWorkers(p.managers, args)
+    elif args.mode == "tasks":
+        TxnPlotWorkers(p.managers, args)
+    elif args.mode == "manager":
+        TxnPlotWorkers(p.managers, args)
 
 
