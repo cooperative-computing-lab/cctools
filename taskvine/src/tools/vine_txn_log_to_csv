@@ -32,8 +32,6 @@ import pandas as pd
 from pathlib import Path
 import sys
 
-plt.style.use('tableau-colorblind10')
-
 resources_names = "cores memory disk gpus".split()
 task_report_names = "time_worker_start time_worker_end time_commit_start time_commit_end time_input_mgr time_output_mgr size_input_mgr size_output_mgr".split()
 
@@ -209,6 +207,8 @@ class ParseTxn:
             for (slot, (task_id, attempt_number)) in self.cm.worker_used_slots[worker_id].items():
                 self.cm.tasks_attempts[task_id][attempt_number]["reason"] = "DISCONNECTION"
                 self.cm.tasks_attempts[task_id][attempt_number]["DISCONNECTION"] = time
+                self.cm.tasks_attempts[task_id][attempt_number]["last_state"] = "DISCONNECTION"
+                self.cm.tasks_attempts[task_id][attempt_number]["last_state_time"] = time
                 heapq.heappush(self.cm.worker_free_slots[worker_id], slot)
         elif event == "RESOURCES":
             hostport = self.cm.last_host_port[worker_id]
@@ -249,40 +249,41 @@ class ParseTxn:
         if event == "WAITING":
             (category, allocation, attempt_number, arg) = arg.split()
             self.cm.task_last_attempt[task_id] = attempt_number
-            self.cm.tasks_attempts[task_id][attempt_number]["task_id"] = task_id
-            self.cm.tasks_attempts[task_id][attempt_number]["attempt_number"] = attempt_number
-            self.cm.tasks_attempts[task_id][attempt_number]["category"] = category
-            self.cm.tasks_attempts[task_id][attempt_number]["last_state"] = event
-            self.cm.tasks_attempts[task_id][attempt_number][event] = time
-            self.arg_to_resources(self.cm.tasks_attempts[task_id][attempt_number], "requested_", arg)
-            self.cm.tasks_attempts[task_id][attempt_number]["duty"] = pd.NA   # we do not know if it a duty
-        else:
-            la = self.cm.task_last_attempt[task_id]
-            ca = self.cm.tasks_attempts[task_id][la]
-            ca["last_state"] = event
-            ca[event] = time
 
-            if event == "RUNNING":
-                (worker_id, allocation, arg) = arg.split()
-                slot = self._next_slot(worker_id)
-                ca["worker_id"] = worker_id
-                ca["slot"] = slot
-                self.cm.worker_used_slots[worker_id][slot] = (task_id, la)
-                self.arg_to_resources(ca, "allocated_", arg)
-                ca["DISCONNECTION"] = pd.NA  # add field to keep time in case of worker disconnection
-            elif event == "WAITING_RETRIEVAL":
-                pass
-            elif event == "RETRIEVED":
-                (reason, exit_code, l, m) = arg.split()
-                ca["reason"] = reason
-                ca["exit_code"] = exit_code
-                self.arg_to_task_report(ca, m)
-                self.arg_to_resources(ca, "measured_", m)
-                slot = ca["slot"]
-                del self.cm.worker_used_slots[ca["worker_id"]][slot]
-                heapq.heappush(self.cm.worker_free_slots[ca["worker_id"]], slot)
-            elif event == "DONE":
-                pass
+        la = self.cm.task_last_attempt[task_id]
+        ca = self.cm.tasks_attempts[task_id][la]
+
+        ca[event] = time
+        ca["last_state"] = event
+        ca["last_state_time"] = time
+
+        if event == "WAITING":
+            ca["task_id"] = task_id
+            ca["attempt_number"] = attempt_number
+            ca["category"] = category
+            self.arg_to_resources(ca, "requested_", arg)
+            ca["duty"] = pd.NA   # we do not know if it a duty
+        elif event == "RUNNING":
+            (worker_id, allocation, arg) = arg.split()
+            slot = self._next_slot(worker_id)
+            ca["worker_id"] = worker_id
+            ca["slot"] = slot
+            self.cm.worker_used_slots[worker_id][slot] = (task_id, la)
+            self.arg_to_resources(ca, "allocated_", arg)
+            ca["DISCONNECTION"] = pd.NA  # add field to keep time in case of worker disconnection
+        elif event == "WAITING_RETRIEVAL":
+            pass
+        elif event == "RETRIEVED":
+            (reason, exit_code, l, m) = arg.split()
+            ca["reason"] = reason
+            ca["exit_code"] = exit_code
+            self.arg_to_task_report(ca, m)
+            self.arg_to_resources(ca, "measured_", m)
+            slot = ca["slot"]
+            del self.cm.worker_used_slots[ca["worker_id"]][slot]
+            heapq.heappush(self.cm.worker_free_slots[ca["worker_id"]], slot)
+        elif event == "DONE":
+            pass
 
     def _parse(self):
         for (time, manager_pid, subject, target, event, arg) in self._next_line():
@@ -301,15 +302,10 @@ class ParseTxn:
 
 class TxnPlot:
     def __init__(self, managers, opts):
-        """
-                title='TaskVine', all_info=False, output=None, origin="manager-start", all_info=False,
-                cache_updates=False, resource_updates=False, connections=False, disconnections=False,
-                tasks_commit=False, tasks_waiting_retrieval=False, tasks_done=False,
-                input_transfers=False, output_transfers=False, xticks=None, yticks=None, tex=False):
-        """
         self.managers = managers
         self.opts = opts
 
+        plt.style.use('tableau-colorblind10')
         if opts.tex:
             font = {'family' : 'serif',
                     'serif': ['Computer Modern Roman'],
@@ -318,6 +314,8 @@ class TxnPlot:
             plt.rc('font', **font)
             plt.rc('text', usetex=True)
 
+        self.colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
         height = opts.height if opts.height else opts.width * (2/3)
 
         self.fig = plt.figure(constrained_layout=True, figsize=(opts.width, height))
@@ -325,16 +323,27 @@ class TxnPlot:
         self.display_plot()
 
     def determine_origin(self, m):
-        return 0
+        spec = self.opts.origin
+        if spec == "manager-start":
+            return 0
+        if spec == "first-waiting-task":
+            return m.tasks["WAITING"].min()
+        if spec == "first-transfer":
+            return m.transfers["time"].min()
+        if spec == "first-worker":
+            return m.workers["CONNECTION"].min()
 
     def display_plot(self):
         plt.title(self.opts.title)
 
         for (i, m) in enumerate(self.managers.values()):
             s = self.subs[0, i]
+            plot_origin = self.determine_origin(m)
             self.plot(s, m)
 
-            origin = self.determine_origin(m)
+            s.axis(xmin=plot_origin)
+            s.xaxis.set_major_formatter(plticker.FuncFormatter(lambda x,pos: "{}, {}, {:.0f}".format(x, pos, x-plot_origin)))
+
             if self.opts.xticks:
                 s.xaxis.set_major_locator(plticker.MultipleLocator(base=opts.xticks))
             if self.opts.yticks:
@@ -342,6 +351,7 @@ class TxnPlot:
 
             s.tick_params(axis='both', which='major', labelsize=15)
             s.legend()
+
 
         if self.opts.output:
             plt.savefig(self.opts.output)
@@ -366,7 +376,7 @@ if __name__ == "__main__":
     parser.add_argument('output', nargs='?', default=None, help='output name of the plot/csv generated. If not given, assumes --display')
     parser.add_argument('--mode', help='information to plot. One of workers, tasks, manager, or csv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
     parser.add_argument('--title', nargs='?', default='TaskVine', help='Title of the plot')
-    parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default=["first-transfer"])
+    parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default="first-transfer")
     parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
     parser.add_argument('--width', nargs='?', help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', help='height in inches. Default is 2/3 of width', default=None)
