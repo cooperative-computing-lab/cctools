@@ -23,7 +23,7 @@ def usage():
 def create_trace_file(arg):
     """ Runs strace and redirects its output to <name>.fout1.txt """
     arguments = ' '.join(arg)
-    os.system(f'strace -f -y --trace=file,read {arguments} 2> {arg[0]}.fout1.txt')
+    os.system(f'strace -f -y --trace=file,read,write {arguments} 2> {arg[0]}.fout1.txt')
 
 
 def create_dict(name):
@@ -37,20 +37,22 @@ def create_dict(name):
             properties = ['?', 0, 0,"", ""]
             if "openat" in line or "stat" in line:
                 try:
-                    path = line.split('"')[1]
+                    #path = line.split('"')[1]
+                    path = re.search('<.+>',line).group(0).replace('<','').replace('>','')
 
                     properties[1] = path_dict.get(path, properties)[1] + 1
                     properties[4] = line
 
                     path_dict[path] = properties.copy()
 
-                except IndexError:
+                except (IndexError, AttributeError) as e:
                     continue
-            if "read" in line:
+            if "read" in line or "write" in line:
                 try:
                     path = re.search('<.+>,',line).group(0).replace('<','').replace('>,','')
                     bytes_written = re.search('= [0-9]+$',line).group(0).replace('= ','')
-                    properties[2] = path_dict.get(path, properties)[2] + int(bytes_written)
+                    properties = path_dict.get(path, properties)
+                    properties[2] = properties[2] + int(bytes_written)
                     path_dict[path] = properties.copy()
                 except (IndexError, AttributeError) as e:
                     continue
@@ -102,13 +104,13 @@ def print_summary_2(path_dict, name):
     action, and path of each entry
     """
     f = open(name + ".fout2.txt", "w")
-    f.write(f"freq action path\n")
+    f.write(f"freq action bytes path\n")
     for path, properties in path_dict.items():
         action = properties[0]
         freq = properties[1]
         size = properties[2]
     
-        f.write(f" {freq:2}    {action:2}   {path}\n")
+        f.write(f" {freq:2}    {action:2}{size:8} {path}\n")
             
     f.close()
 
@@ -160,8 +162,9 @@ def find_major_directories(path_dict, top, dirLvl, name):
         count += 1
         if count >= top:
             break
-
+            
     f.close()
+
 
 def end_of_execute(name):
     print("\n----- filetrace -----")
@@ -197,6 +200,9 @@ def main():
             top = int(arguments.pop(0))
         else:
             continue
+
+    if len(arguments) == 0:
+        usage()
                 
     name = arguments[0]
 
@@ -208,7 +214,6 @@ def main():
     end_of_execute(name)
 
     sys.exit(0)
-
 
 if __name__ == '__main__':
     main()
