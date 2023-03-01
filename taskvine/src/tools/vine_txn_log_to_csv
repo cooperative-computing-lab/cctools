@@ -33,7 +33,8 @@ from pathlib import Path
 import sys
 
 resources_names = "cores memory disk gpus".split()
-task_report_names = "time_worker_start time_worker_end time_commit_start time_commit_end time_input_mgr time_output_mgr size_input_mgr size_output_mgr".split()
+task_report_abs = "time_worker_start time_worker_end time_commit_start time_commit_end".split()
+task_report_all = "time_input_mgr time_output_mgr size_input_mgr size_output_mgr".split() + task_report_abs
 
 
 class Manager:
@@ -99,6 +100,9 @@ class Manager:
                 keys = worker.keys()
             all_workers.append([ worker[k] for k in keys ])
         workers_df = pd.DataFrame(all_workers, columns=keys)
+
+        # fill up disconnect times for workers that survive the manager
+        workers_df[workers_df["DISCONNECTION"].isna()]["DISCONNECTION"] = self.termination
         return workers_df
 
     def make_table_transfers(self):
@@ -175,7 +179,10 @@ class ParseTxn:
         self.arg_to_values(ca, prefix, resources_names, arg)
 
     def arg_to_task_report(self, ca, arg):
-        self.arg_to_values(ca, "", task_report_names, arg)
+        self.arg_to_values(ca, "", task_report_all, arg)
+        for r in task_report_abs:
+            ca[f"{r}"] -= self.cm.origin
+
 
     def _parse_manager(self, time, manager_pid, event):
         if event == "START":
@@ -198,6 +205,7 @@ class ParseTxn:
             self.cm.worker_lifetime[(worker_id,hostport)]["worker_id"] = worker_id
             self.cm.worker_lifetime[(worker_id,hostport)]["hostport"] = hostport
             self.cm.worker_lifetime[(worker_id,hostport)][event] = time
+            self.cm.worker_lifetime[(worker_id,hostport)]["DISCONNECTION"] = pd.NA
             self.cm.worker_free_slots[worker_id] = []
         elif event == "DISCONNECTION":
             reason = arg
@@ -246,6 +254,9 @@ class ParseTxn:
             pass
 
     def _parse_task(self, time, manager_pid, task_id, event, arg):
+        if int(task_id) > 1000: 
+            return
+
         if event == "WAITING":
             (category, allocation, attempt_number, arg) = arg.split()
             self.cm.task_last_attempt[task_id] = attempt_number
@@ -342,7 +353,8 @@ class TxnPlot:
             self.plot(s, m)
 
             s.axis(xmin=plot_origin)
-            s.xaxis.set_major_formatter(plticker.FuncFormatter(lambda x,pos: "{}, {}, {:.0f}".format(x, pos, x-plot_origin)))
+            s.xaxis.set_major_formatter(plticker.FuncFormatter(lambda x,pos: "{:.0f}".format(x-plot_origin)))
+            s.yaxis.set_major_formatter(plticker.FuncFormatter(lambda x,pos: "{:.0f}".format(x)))
 
             if self.opts.xticks:
                 s.xaxis.set_major_locator(plticker.MultipleLocator(base=opts.xticks))
@@ -368,6 +380,62 @@ class TxnPlotWorkers(TxnPlot):
         fig.set_ylabel("worker")
         fig.set_xlabel("time")
 
+        ts = manager.tasks
+        xs = manager.transfers
+        ws = manager.workers
+
+        gs = ts.groupby("worker_id")
+
+        edgecolor = "#FFFFFFAA"
+
+        legend = { "tasks executing": self.colors[0] }
+
+
+
+        base_slot=0
+        for i, (wid,g) in enumerate(gs):
+            g["slot"] += base_slot+1  # slot 1 for cache updates, 0 for transfers
+            dt = g[g["reason"] != "DISCONNECTION"]
+            y = g["slot"]
+
+            if not self.opts.hide_cache_updates:
+                legend["cache updates"] = self.colors[1],
+                cu = xs[ (xs["worker_id"] == wid) & (xs["direction"] == "CACHE_UPDATE") ]
+                fig.barh(base_slot+1, left=cu["start"], width=cu["wall_time"], color=self.colors[1], linewidth=1, edgecolor=edgecolor)
+
+            if not self.opts.hide_transfers:
+                legend["inputs from manager"] = self.colors[2],
+                cu = xs[ (xs["worker_id"] == wid) & (xs["direction"] == "INPUT") ]
+                fig.barh(base_slot+0, left=cu["start"], width=cu["wall_time"], color=self.colors[2], linewidth=1, edgecolor=edgecolor)
+
+                legend["outputs from manager"] = self.colors[3],
+                cu = xs[ (xs["worker_id"] == wid) & (xs["direction"] == "OUTPUT") ]
+                fig.barh(base_slot+0, left=cu["start"], width=cu["wall_time"], color=self.colors[3], linewidth=1, edgecolor=edgecolor)
+
+            if not self.opts.hide_submit:
+                legend["tasks waiting for input"] = self.colors[4],
+                fig.barh(y, left=g["RUNNING"], width=g["last_state_time"]-g["RUNNING"], color=self.colors[4], linewidth=1, edgecolor=edgecolor)
+
+            fig.barh(dt["slot"], left=dt["time_worker_start"], width=dt["last_state_time"]-dt["time_worker_start"], color=self.colors[0], linewidth=1, edgecolor=edgecolor)
+
+            if not self.opts.hide_waiting_retrieval:
+                legend["results waiting retrieval"] = self.colors[5],
+                fig.plot(dt["WAITING_RETRIEVAL"], dt["slot"]+0.2, 'H', color=self.colors[5])
+
+            if not self.opts.hide_done:
+                legend["tasks done"] = self.colors[6],
+                legend["tasks failed"] = self.colors[7],
+
+                st = g[g["reason"] == "SUCCESS"]
+                ft = g[(g["reason"] != "SUCCESS") & (g["reason"] != "DISCONNECTION")]
+                fig.plot(st["last_state_time"], st["slot"], '8', color=self.colors[6])
+                fig.plot(ft["last_state_time"], ft["slot"], 'X', color=self.colors[7])
+
+            base_slot = g["slot"].max() + 1
+
+
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Plot TaskVine workflow information from a transaction log file.')
@@ -380,16 +448,15 @@ if __name__ == "__main__":
     parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
     parser.add_argument('--width', nargs='?', help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', help='height in inches. Default is 2/3 of width', default=None)
-    parser.add_argument('--all-info', action='store_true', help='display all from the transaction log')
-    parser.add_argument('--cache-updates', action='store_true', help='display cache updates')
-    parser.add_argument('--resource-updates', action='store_true', help='display resource updates')
-    parser.add_argument('--connections', action='store_true', help='display worker connections')
-    parser.add_argument('--disconnections', action='store_true', help='display worker disconnections')
-    parser.add_argument('--tasks-commit', action='store_true', help='display when tasks are committed to a worker')
-    parser.add_argument('--tasks-waiting-retrieval', action='store_true', help='display when tasks are waiting retrieval')
-    parser.add_argument('--tasks-done', action='store_true', help='display when tasks are marked done')
-    parser.add_argument('--input-transfers', action='store_true', help='display input transfers')
-    parser.add_argument('--output-transfers', action='store_true', help='display output transfers')
+
+    parser.add_argument('--hide-cache-updates', action='store_true', help='do not display cache updates')
+    parser.add_argument('--hide-resource-updates', action='store_true', help='do not display resource updates')
+    parser.add_argument('--hide-connections', action='store_true', help='do not display worker connections/disconnections')
+    parser.add_argument('--hide-submit', action='store_true', help='do not display when tasks are submitted to a worker waiting for inputs')
+    parser.add_argument('--hide-waiting-retrieval', action='store_true', help='do not display when tasks are waiting retrieval')
+    parser.add_argument('--hide-done', action='store_true', help='do not display when tasks are marked done')
+    parser.add_argument('--hide-transfers', action='store_true', help='do not display output transfers')
+
     parser.add_argument('--flip-tasks', action='store_true', help='flip colors between tasks')
     parser.add_argument('--xticks', nargs=1, help='change the step size for x ticks <step_size>')
     parser.add_argument('--yticks', nargs=1, help='change the step size for y ticks <step_size>')
