@@ -17,7 +17,7 @@ import inspect
 
 shebang = "#! /usr/bin/env python\n\n"
 
-network_code = \
+library_network_code = \
 '''
 import socket
 import json
@@ -128,7 +128,7 @@ init_function = \
 
 '''
 
-def create_network_function(path, funcs, dest):
+def create_library_code(path, funcs, dest):
 	import_modules = []
 	function_source_code = []
 	name_source_code = ""
@@ -158,10 +158,10 @@ def create_network_function(path, funcs, dest):
 	for import_module in import_modules:
 		output_file.write(f"{import_module}\n")
 	# write network code into it
-	output_file.write(network_code)
+	output_file.write(library_network_code)
 	# write name function code into it
 	output_file.write(f"{name_source_code}\n")
-	# iterate over every function the user requested and attempt to put it into the network function
+	# iterate over every function the user requested and attempt to put it into the library code
 	for function_code in function_source_code:
 		output_file.write("@remote_execute\n")
 		output_file.write(function_code)
@@ -186,7 +186,7 @@ def sort_spec(spec):
 def search_env_for_spec(envpath):
     env_spec = None
     if os.path.exists(envpath) and envpath.endswith(".tar.gz"):
-        print("Cached environment found, checking if it is compatiable with new network function")
+        print("Cached environment found, checking if it is compatiable with new library code")
         with tarfile.open(envpath) as env_tar:
             for member in env_tar:
                 if member.name == "conda_spec.yml":
@@ -199,7 +199,7 @@ def search_env_for_spec(envpath):
         print("No environment found at output path, creating new environment")
     return env_spec
 
-def pack_network_function(path, envpath):
+def pack_library_code(path, envpath):
     prev_env_spec = search_env_for_spec(envpath)
 
     new_env = analyze.create_spec(path)
@@ -214,13 +214,18 @@ def pack_network_function(path, envpath):
         print("Cached package is out of date, rebuilding")
         create.pack_env("/tmp/tmp.json", envpath)
 
-def functions_hash(functions):
+def generate_functions_hash(functions):
+    # combine function names and function bodies to create a unique hash of the functions
     source_code = "".join([inspect.getsource(fnc) for fnc in functions]) + "".join([fnc.__name__ for fnc in functions])
     return hashlib.md5(source_code.encode("utf-8")).hexdigest()
 
-def create_network_function_from_code(path, functions, name):
-    with open(path + "/tmp_network.py", "w") as temp_source_file:
+def serverize_library_from_code(path, functions, name):
+    tmp_library_path = f"{path}/tmp_library.py"
+    # write out functions into a temporary python file
+    with open(tmp_library_path, "w") as temp_source_file:
         temp_source_file.write("".join([inspect.getsource(fnc) for fnc in functions]))
         temp_source_file.write(f"def name():\n\treturn '{name}'")
-    create_network_function(path + "/tmp_network.py", [fnc.__name__ for fnc in functions], path + "/network.py")
-    pack_network_function(path + "/network.py", path + "/library_env.tar.gz")
+    # create the final library code from that temporary file
+    create_library_code(tmp_library_path, [fnc.__name__ for fnc in functions], path + "/library_code.py")
+    # and pack it into an environment
+    pack_library_code(path + "/library_code.py", path + "/library_env.tar.gz")
