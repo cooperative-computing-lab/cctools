@@ -61,14 +61,14 @@ typedef enum {
 	VINE_WORKER_DISCONNECT_FAILURE
 } vine_worker_disconnect_reason_t;
 
-/* States known about duties */
+/* States known about libraries */
 
 typedef enum {
-	VINE_DUTY_WAITING = 0,
-	VINE_DUTY_SENT,
-	VINE_DUTY_STARTED,
-	VINE_DUTY_FAILURE
-} vine_duty_state_t;
+	VINE_LIBRARY_WAITING = 0,
+	VINE_LIBRARY_SENT,
+	VINE_LIBRARY_STARTED,
+	VINE_LIBRARY_FAILURE
+} vine_library_state_t;
 
 struct vine_worker_info;
 struct vine_task;
@@ -102,7 +102,7 @@ struct vine_manager {
 	struct list   *ready_list;      /* List of vine_task that are waiting to execute. */
 	struct list   *task_info_list;  /* List of last N vine_task_infos for computing capacity. */
 	struct hash_table *categories;  /* Maps category_name -> struct category */
-	struct hash_table *duties;      /* Maps duty name -> vine_task of duty with that name. */
+	struct hash_table *libraries;      /* Maps library name -> vine_task of library with that name. */
 
 	/* Primary data structures for tracking worker state. */
 

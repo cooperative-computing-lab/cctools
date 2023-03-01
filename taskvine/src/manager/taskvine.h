@@ -766,17 +766,17 @@ Once returned, it is safe to re-submit the same take object via @ref vine_submit
 */
 int vine_submit(struct vine_manager *m, struct vine_task *t);
 
-/** Indicate the duty to be installed on all workers connected to the manager.
-The duty is expected to run on all workers until they disconnect from the manager.
+/** Indicate the library to be installed on all workers connected to the manager.
+The library is expected to run on all workers until they disconnect from the manager.
 @param t A task object.
-@param name The duty to be installed
+@param name The library to be installed
 */
-void vine_manager_install_duty( struct vine_manager *q, struct vine_task *t, const char *name );
+void vine_manager_install_library( struct vine_manager *q, struct vine_task *t, const char *name );
 
-/** Indicate the duty to be removed from all connected workers
-@param name The duty to be removed
+/** Indicate the library to be removed from all connected workers
+@param name The library to be removed
 */
-void vine_manager_remove_duty( struct vine_manager *q, const char *name );
+void vine_manager_remove_library( struct vine_manager *q, const char *name );
 
 /** Wait for a task to complete.
 This call will block until either a task has completed, the timeout has expired, or the manager is empty.

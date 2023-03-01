@@ -216,8 +216,8 @@ struct list *coprocess_list = NULL;
 
 static char *factory_name = NULL;
 
-struct list *duty_list = NULL;
-struct hash_table *duty_ids = NULL;
+struct list *library_list = NULL;
+struct hash_table *library_ids = NULL;
 
 struct vine_cache *global_cache = 0;
 
@@ -503,7 +503,7 @@ static int start_process( struct vine_process *p, struct link *manager )
 		itable_insert(procs_complete,p->task->task_id,p);
 		return 0;
 	}
-	if (!p->coprocess || vine_process_get_duty_name(p)) {
+	if (!p->coprocess || vine_process_get_library_name(p)) {
 		cores_allocated += t->resources_requested->cores;
 		memory_allocated += t->resources_requested->memory;
 		disk_allocated += t->resources_requested->disk;
@@ -517,20 +517,20 @@ static int start_process( struct vine_process *p, struct link *manager )
 	pid = vine_process_execute(p);
 	if(pid<0) fatal("unable to fork process for task_id %d!",p->task->task_id);
 	if (p->coprocess) {
-		char *duty_name = NULL;
-		int duty_id = -1, iterate_id;
+		char *library_name = NULL;
+		int library_id = -1, iterate_id;
 
-		HASH_TABLE_ITERATE(duty_ids,duty_name,iterate_id) {
+		HASH_TABLE_ITERATE(library_ids,library_name,iterate_id) {
 			if (iterate_id == p->task->task_id){
-				duty_id = iterate_id;
+				library_id = iterate_id;
 				break;
 			}
 		}
-		if (duty_id > 0) {
+		if (library_id > 0) {
 			list_push_tail(coprocess_list, p->coprocess);
-			hash_table_insert(features, duty_name, (void **) 1);
+			hash_table_insert(features, library_name, (void **) 1);
 			send_features(manager);
-			send_message(manager, "info duty-update %d %d\n", p->task->task_id, VINE_DUTY_STARTED);
+			send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
 			send_resource_update(manager);
 		}
 	}
@@ -550,7 +550,7 @@ static void reap_process( struct vine_process *p, struct link *manager )
 {
 	p->execution_end = timestamp_get();
 
-	if (!p->coprocess || vine_process_get_duty_name(p)) {
+	if (!p->coprocess || vine_process_get_library_name(p)) {
 		cores_allocated  -= p->task->resources_requested->cores;
 		memory_allocated -= p->task->resources_requested->memory;
 		disk_allocated   -= p->task->resources_requested->disk;
@@ -867,8 +867,8 @@ static int do_kill(int task_id)
 		if (p->coprocess) {
 			hash_table_remove(features, p->coprocess->name);
 			list_remove(coprocess_list, p->coprocess);
-			list_remove(duty_list, p->coprocess->name);
-			hash_table_remove(duty_ids, p->coprocess->name);			
+			list_remove(library_list, p->coprocess->name);
+			hash_table_remove(library_ids, p->coprocess->name);			
 		}
 		vine_process_kill(p);
 		cores_allocated -= p->task->resources_requested->cores;
@@ -1083,16 +1083,16 @@ static int handle_manager(struct link *manager)
 				kill_all_tasks();
 				r = 1;
 			}
-		} else if(sscanf(line, "kill_duty %" SCNd64, &length) == 1) {
-			char *duty_name = malloc(length+1);
-			link_read(manager,duty_name,length,time(0)+active_timeout);
-			duty_name[length] = 0;
-			task_id = (long int)hash_table_lookup(duty_ids, duty_name);
-			debug(D_VINE,"rx: killing duty %s %" SCNd64, duty_name, task_id);
+		} else if(sscanf(line, "kill_library %" SCNd64, &length) == 1) {
+			char *library_name = malloc(length+1);
+			link_read(manager,library_name,length,time(0)+active_timeout);
+			library_name[length] = 0;
+			task_id = (long int)hash_table_lookup(library_ids, library_name);
+			debug(D_VINE,"rx: killing library %s %" SCNd64, library_name, task_id);
 			kill(((struct vine_process *)itable_lookup(procs_table, task_id))->pid, SIGKILL);
-			list_remove(duty_list, duty_name);
-			hash_table_remove(features, duty_name);
-			hash_table_remove(duty_ids, duty_name);
+			list_remove(library_list, library_name);
+			hash_table_remove(features, library_name);
+			hash_table_remove(library_ids, library_name);
 			list_remove(coprocess_list, ((struct vine_process *)itable_lookup(procs_table, task_id))->coprocess);
 			r = do_kill(task_id);
 		} else if(!strncmp(line, "release", 8)) {
@@ -1108,13 +1108,13 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
 			r = 1;
-		} else if(sscanf(line,"duty %" SCNd64 " %" SCNd64,&length, &task_id)==2) {
-			char *duty_name = malloc(length+1);
-			link_read(manager,duty_name,length,time(0)+active_timeout);
-			duty_name[length] = 0;
-			debug(D_VINE,"rx: duty %s, id %" SCNd64, duty_name, task_id);
-			list_push_tail(duty_list, duty_name);
-			hash_table_insert(duty_ids, duty_name, (void **)task_id);
+		} else if(sscanf(line,"library %" SCNd64 " %" SCNd64,&length, &task_id)==2) {
+			char *library_name = malloc(length+1);
+			link_read(manager,library_name,length,time(0)+active_timeout);
+			library_name[length] = 0;
+			debug(D_VINE,"rx: library %s, id %" SCNd64, library_name, task_id);
+			list_push_tail(library_list, library_name);
+			hash_table_insert(library_ids, library_name, (void **)task_id);
 			r = 1;
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
@@ -2199,8 +2199,8 @@ int main(int argc, char *argv[])
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
 	coprocess_list = list_create();
-	duty_list = list_create();
-	duty_ids = hash_table_create(0, 0);
+	library_list = list_create();
+	library_ids = hash_table_create(0, 0);
 
 	watcher = vine_watcher_create();
 

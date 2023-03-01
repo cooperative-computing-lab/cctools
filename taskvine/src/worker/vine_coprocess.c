@@ -120,7 +120,7 @@ int vine_coprocess_setup(struct vine_coprocess *coprocess)
 		}
 		if (!strcmp(key, "name")) {
             if(item->type == JX_STRING) {
-                name = string_format("duty_coprocess:%s", item->u.string_value);
+                name = string_format("library_coprocess:%s", item->u.string_value);
             }
 		}
 		else {

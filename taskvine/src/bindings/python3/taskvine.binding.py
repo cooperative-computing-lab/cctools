@@ -13,7 +13,7 @@
 # See the <a href=http://cctools.readthedocs.io/en/latest/taskvine>TaskVine Manual</a> for complete documentation.
 #
 # - @ref Manager
-# - @ref Task / @ref PythonTask / @ref RemoteTask
+# - @ref Task / @ref PythonTask / @ref FunctionCall
 # - @ref File
 # - @ref Factory
 #
@@ -912,7 +912,7 @@ class Manager(object):
         self._stats = None
         self._stats_hierarchy = None
         self._task_table = {}
-        self._duty_table = {}
+        self._library_table = {}
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -1562,74 +1562,85 @@ class Manager(object):
         return task_id
 
     ##
-    # Submit a duty to install on all connected workers
+    # Submit a library to install on all connected workers
     #
     #
     # @param self   Reference to the current manager object.
     # @param task   A task description created from @ref taskvine::Task.
-    # @param name   Name of the duty to be installed.
-    def install_duty(self, task, name):
-        self._duty_table[name] = task
-        vine_manager_install_duty(self._taskvine, task._task, "duty_coprocess:" + name)
-
-    # Turn a single python function or list of python functions into a Library
-    #
-    #
-    # @param self            Reference to the current manager object.
-    # @param name            Name of the library to be created
-    # @param function_list   List of all functions to be included in the library
-    def create_library_from_functions(self, name, *function_list):
-        # MAKE LIBRARY FROM FILE
-        # HASH IN FUNCTION NAMES
-        # ensure poncho python library is available
-        if poncho_available == False:
-            raise("The poncho module is not available. Cannot create duty.")
-        # positional arguments are the list of functions to include in the library
-        functions_hash = package_serverize.functions_hash(function_list)
-        library_cache_path = f"./vine-library-cache/{functions_hash}"
-        network_fnc_path = f"{library_cache_path}/network.py"
-        env_path = f"{library_cache_path}/library_env.tar.gz"
-        if not os.path.exists("vine-library-cache"):
-            os.mkdir("vine-library-cache")
-        if os.path.isfile(network_fnc_path) and os.path.isfile(env_path):
-            pass
-        else:
-            if os.path.exists(library_cache_path):
-                shutil.rmtree(library_cache_path)
-            os.mkdir(library_cache_path)
-            package_serverize.create_network_function_from_code(library_cache_path, function_list, name)
-            os.chmod(network_fnc_path, 0o775)
-        t = Task("./poncho_package_run -e package python ./network.py")
-        f = self.declare_poncho(self.declare_file(env_path))
-        t.add_input(f, "package")
-        t.add_input_file(network_fnc_path, "network.py")
-        t.add_input_file(shutil.which('poncho_package_run'), "poncho_package_run")
-        return t
-
-    # Turn a network function created with poncho_package_serverize into a library
-    #
-    #
-    # @param self            Reference to the current manager object.
-    # @param name            Name of the library to be created
-    # @param network_file    Name of the network file
-    # @param env_file        Name of the environment file
-    def create_library_from_files(self, name, network_file, env_file):
-        t = Task(f"./poncho_package_run -e package python network.py")
-        f = self.declare_poncho(self.declare_file(env_file))
-        t.add_input(f, "package")
-        t.add_input_file(network_file, "network.py")
-        t.add_input_file(shutil.which('poncho_package_run'), "poncho_package_run")
-        return t
+    def install_library(self, task):
+        self._library_table[task.library_name] = task
+        vine_manager_install_library(self._taskvine, task._task, task.library_name)
 
     ##
-    # Remove a duty from all connected workers
+    # Remove a library from all connected workers
     #
     #
     # @param self   Reference to the current manager object.
-    # @param name   Name of the duty to be removed.
-    def remove_duty(self, name):
-        del self._duty_table[name]
-        vine_manager_remove_duty(self._taskvine, "duty_coprocess:" + name)
+    # @param name   Name of the library to be removed.
+    def remove_library(self, name):
+        del self._library_table[name]
+        vine_manager_remove_library(self._taskvine, name)
+
+    # Turn a list of python functions into a Library
+    #
+    #
+    # @param self            Reference to the current manager object.
+    # @param name            Name of the Library to be created
+    # @param function_list   List of all functions to be included in the library
+    def create_library_from_functions(self, name, *function_list):
+        # ensure poncho python library is available
+        if poncho_available == False:
+            raise("The poncho module is not available. Cannot create Library.")
+        # positional arguments are the list of functions to include in the library
+        # create a unique hash of a combination of function names and bodies
+        functions_hash = package_serverize.generate_functions_hash(function_list)
+
+        # create path for caching library code and environment based on function hash
+        library_cache_path = f"./vine-library-cache/{functions_hash}"
+        library_code_path = f"{library_cache_path}/library_code.py"
+        library_env_path = f"{library_cache_path}/library_env.tar.gz"
+
+        # library cache folder doesn't exist, create it
+        if not os.path.exists("vine-library-cache"):
+            os.mkdir("vine-library-cache")
+        # if the library code and environment exist, move on to creating the Library Task
+        if os.path.isfile(library_code_path) and os.path.isfile(library_env_path):
+            pass
+        else:
+            # check if the cache entry exits, and create it if it doesn't exist 
+            if not os.path.exists(library_cache_path):
+                os.mkdir(library_cache_path)
+            # create library code and environment
+            package_serverize.serverize_library_from_code(library_cache_path, function_list, name)
+            # enable correct permissions for library code
+            os.chmod(library_code_path, 0o775)
+        
+        # create Task to execute the Library
+        t = LibraryTask("./poncho_package_run -e package python ./library_code.py", name)
+        # declare the environment
+        f = self.declare_poncho(self.declare_file(library_env_path))
+        t.add_input(f, "package")
+        # declare the library code as an input
+        t.add_input_file(library_code_path, "library_code.py")
+        # add poncho_package_run to be able to execute the Library
+        t.add_input_file(shutil.which('poncho_package_run'), "poncho_package_run")
+        return t
+
+    # Turn Library code created with poncho_package_serverize into a Library Task
+    #
+    #
+    # @param self            Reference to the current manager object.
+    # @param library_path    Path of the file which contains the library code - the output of poncho_package_serverize
+    # @param env_path        Path of the environment file which contains the environment capable of running the Library
+    def create_library_from_files(self, name, library_path, env_path):
+        if poncho_available == False:
+            raise("The poncho module is not available. Cannot create library.")
+        t = LibraryTask(f"./poncho_package_run -e package python ./library_code.py", name)
+        f = self.declare_poncho(self.declare_file(env_path))
+        t.add_input(f, "package")
+        t.add_input_file(library_path, "library_code.py")
+        t.add_input_file(shutil.which('poncho_package_run'), "poncho_package_run")
+        return t
 
     ##
     # Wait for tasks to complete.
@@ -1862,7 +1873,7 @@ class Manager(object):
             end = min(len(seq), start + chunksize)
 
             event = json.dumps({name: seq[start:end]})
-            p_task = RemoteTask(fn, event, coprocess)
+            p_task = FunctionCall(fn, event, coprocess)
 
             p_task.set_tag(str(i))
             self.submit(p_task)
@@ -1906,7 +1917,7 @@ class Manager(object):
         for item in itertools.product(seq1, seq2):
             if num == chunksize:
                 event = json.dumps({name: task})
-                p_task = RemoteTask(fn, event, coprocess)
+                p_task = FunctionCall(fn, event, coprocess)
                 p_task.set_tag(str(num_task))
                 self.submit(p_task)
                 tasks[p_task.id] = num_task
@@ -1919,7 +1930,7 @@ class Manager(object):
 
         if len(task) > 0:
             event = json.dumps({name: task})
-            p_task = RemoteTask(fn, event, coprocess)
+            p_task = FunctionCall(fn, event, coprocess)
             p_task.set_tag(str(num_task))
             self.submit(p_task)
             tasks[p_task.id] = num_task
@@ -1968,7 +1979,7 @@ class Manager(object):
                 end = min(len(seq), start + chunksize)
 
                 event = json.dumps({name: seq[start:end]})
-                p_task = RemoteTask(fn, event, coprocess)
+                p_task = FunctionCall(fn, event, coprocess)
 
                 p_task.set_tag(str(i))
                 self.submit(p_task)
@@ -2095,19 +2106,18 @@ class Manager(object):
 
 
 ##
-# \class RemoteTask
+# \class FunctionCall
 #
-# TaskVine RemoteTask object
+# TaskVine FunctionCall object
 #
-# This class represents a task specialized to execute remotely-defined functions at workers.
-class RemoteTask(Task):
+# This class represents a task specialized to execute functions in a Library running on a worker.
+class FunctionCall(Task):
     ##
-    # Create a new remote task specification.
+    # Create a new FunctionCall specification.
     #
-    # @param self       Reference to the current remote task object.
+    # @param self       Reference to the current FunctionCall object.
     # @param fn         The name of the function to be executed on the coprocess
     # @param coprocess  The name of the coprocess which has the function you wish to execute. The coprocess should have a name() method that returns this
-    # @param
     # @param command    The shell command line to be exected by the task.
     # @param args       positional arguments used in function to be executed by task. Can be mixed with kwargs
     # @param kwargs	    keyword arguments used in function to be executed by task.
@@ -2116,7 +2126,7 @@ class RemoteTask(Task):
         self._event = {}
         self._event["fn_kwargs"] = kwargs
         self._event["fn_args"] = args
-        Task.set_coprocess(self, "duty_coprocess:" + coprocess)
+        Task.set_coprocess(self, "library_coprocess:" + coprocess)
 
     ##
     # Finalizes the task definition once the manager that will execute is run.
@@ -2451,3 +2461,20 @@ def rmsummary_snapshots(self):
 
 
 rmsummary.snapshots = property(rmsummary_snapshots)
+
+##
+# \class LibraryTask
+#
+# TaskVine LibraryTask object
+#
+# This class represents a task specialized to running a coprocess that contains Python functions at the worker
+class LibraryTask(Task):
+    ##
+    # Create a new LibraryTask task specification.
+    #
+    # @param self       Reference to the current remote task object.
+    # @param fn         The command for this LibraryTask to run
+    # @param name       The name of this Library.
+    def __init__(self, fn, name):
+        Task.__init__(self, fn)
+        self.library_name = "library_coprocess:" + name
