@@ -1,0 +1,382 @@
+#! /usr/bin/env python
+
+# Copyright (C) 2023- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+# transactions log format:
+# time manager_pid MANAGER manager_pid START|END
+# time manager_pid WORKER worker_id CONNECTION host:port
+# time manager_pid WORKER worker_id DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)
+# time manager_pid WORKER worker_id RESOURCES {resources}
+# time manager_pid WORKER worker_id CACHE_UPDATE filename sizeinmb walltime
+# time manager_pid WORKER worker_id TRANSFER (INPUT|OUTPUT) filename sizeinmb walltime
+# time manager_pid CATEGORY name MAX {resources_max_per_task}
+# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}
+# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
+# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) attempt_number {resources_requested}\n");
+# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
+# time manager_pid TASK task_id WAITING_RETRIEVAL worker_id
+# time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
+# time manager_pid DUTY task_id (WAITING|SENT|STARTED|FAILURE) worker_id
+
+
+from collections import defaultdict
+import argparse
+import heapq
+import json
+import math
+import matplotlib.pyplot as plt
+import matplotlib.pyplot as plticker
+import pandas as pd
+import sys
+
+plt.style.use('tableau-colorblind10')
+
+resources_names = "cores memory disk gpus".split()
+task_report_names = "time_worker_start time_worker_end time_commit_start time_commit_end time_input_mgr time_output_mgr size_input_mgr size_output_mgr".split()
+
+
+class Manager:
+    def __init__(self, manager_pid, origin):
+        self.origin = origin
+        self.termination = origin  # yet unknown
+
+        self.pid = manager_pid
+
+        # [task_id][attempt_number] -> attempt_info
+        self.tasks_attempts = defaultdict( lambda: defaultdict( lambda: defaultdict( lambda: pd.NA )))
+
+        # [task_id] -> attempt_number
+        self.task_last_attempt = {}
+
+        # [(worker_id,hostport)] -> worker_info
+        self.worker_lifetime = defaultdict(lambda: defaultdict( lambda: pd.NA ))
+
+        # [(worker_id,hostport)] -> transfer
+        self.worker_transfers = defaultdict(lambda: [])
+
+        # [worker_id] -> available slots (heapq)
+        self.worker_free_slots = {}
+
+        # [worker_id][slot] -> (task_id,attempt_number)
+        self.worker_used_slots = defaultdict(lambda: {})
+
+        # [worker_id] -> hostport
+        self.last_host_port = {}
+
+        self.tasks = None
+        self.workers = None
+        self.transfers = None
+
+
+    def make_tables(self):
+        self.tasks = self.make_table_tasks()
+        self.workers = self.make_table_workers()
+        self.transfers = self.make_table_transfers()
+
+        print(self.tasks[["task_id", "slot"]])
+
+    def make_table_tasks(self):
+        all_tasks = []
+        keys = None
+        for attempts in self.tasks_attempts.values():
+            for attempt in attempts.values():
+                if not keys:
+                    keys = attempt.keys()
+                all_tasks.append([ attempt[k] for k in keys ])
+        tasks_df = pd.DataFrame(all_tasks, columns=keys)
+        tasks_df["measured_wall_time"] = tasks_df["time_worker_end"] - tasks_df["time_worker_start"]
+        return tasks_df
+
+    def make_table_workers(self):
+        all_workers = []
+        keys = None
+        for worker in self.worker_lifetime.values():
+            if not keys:
+                keys = worker.keys()
+            all_workers.append([ worker[k] for k in keys ])
+        workers_df = pd.DataFrame(all_workers, columns=keys)
+        return workers_df
+
+    def make_table_transfers(self):
+        all_transfers = []
+        keys = "worker_id hostport time direction filetype filename size start wall_time".split()
+        for per_worker in self.worker_transfers.values():
+            all_transfers.extend(per_worker)
+        transfers_df = pd.DataFrame(all_transfers, columns=keys)
+        return transfers_df
+
+
+class ParseTxn:
+    def __init__(self, logfile):
+        self._log = logfile
+        self.managers = {}
+        self.cm = None  # current manager
+
+        self._parse()
+
+    def _next_line(self):
+        with open(self._log) as l:
+            for line in l:
+                try:
+                    if line.startswith("#"):
+                        continue
+                    (time, manager_pid, subject, target, event, *arg) = line.split(maxsplit=5)
+                    try:
+                        arg = arg[0].strip()
+                    except IndexError:
+                        arg = None
+                except ValueError:
+                    continue
+
+                time = float(time)/1000000
+                if self.cm and self.cm.pid == manager_pid:
+                    time -= self.cm.origin
+
+                yield (time, manager_pid, subject, target, event, arg)
+
+    def arg_to_xfer(self, worker_id, hostport, time, direction, arg):
+        filename, size, wall_time = arg.split()
+        wall_time = float(wall_time)
+        try:
+            (filetype, rest) = filename.split("-", maxsplit=1)
+        except:
+            filetype = "file"
+
+        start = time
+        if filetype in ["url", "task"]:
+            start = time - wall_time
+
+        return [worker_id, hostport, time, direction, filetype, filename, float(size), start, wall_time]
+
+    def arg_to_values(self, ca, prefix, names, arg):
+        # values of the form [value, "units"]
+        def value(res):
+            if not res:
+                return pd.NA
+            n = float(res[0])
+            if math.isnan(n) or n < 0: 
+                return pd.NA
+            else:
+                return n
+        from_json = json.loads(arg)
+        for r in names:
+            v = value(from_json.get(r, None))
+            ca[f"{prefix}{r}"] = v
+
+    def arg_to_resources(self, ca, prefix, arg):
+        self.arg_to_values(ca, prefix, resources_names, arg)
+
+    def arg_to_task_report(self, ca, arg):
+        self.arg_to_values(ca, "", task_report_names, arg)
+
+    def _parse_manager(self, time, manager_pid, event):
+        if event == "START":
+            self.cm = Manager(manager_pid, time)
+            self.managers[manager_pid] = self.cm
+        elif event == "END":
+            self.cm.make_tables()
+            self.cm = None
+
+    def _next_slot(self, worker_id):
+        free = self.cm.worker_free_slots[worker_id]
+        if not free:
+            heapq.heappush(free, len(self.cm.worker_used_slots[worker_id]) + 1)
+        return heapq.heappop(free)
+
+    def _parse_worker(self, time, manager_pid, worker_id, event, arg):
+        if event == "CONNECTION":
+            hostport = arg
+            self.cm.last_host_port[worker_id] = hostport
+            self.cm.worker_lifetime[(worker_id,hostport)]["worker_id"] = worker_id
+            self.cm.worker_lifetime[(worker_id,hostport)]["hostport"] = hostport
+            self.cm.worker_lifetime[(worker_id,hostport)][event] = time
+            self.cm.worker_free_slots[worker_id] = []
+        elif event == "DISCONNECTION":
+            reason = arg
+            hostport = self.cm.last_host_port[worker_id]
+            self.cm.worker_lifetime[(worker_id,hostport)][event] = time
+            self.cm.worker_lifetime[(worker_id,hostport)]["reason"] = reason
+            for (slot, (task_id, attempt_number)) in self.cm.worker_used_slots[worker_id].items():
+                self.cm.tasks_attempts[task_id][attempt_number]["reason"] = "DISCONNECTION"
+                self.cm.tasks_attempts[task_id][attempt_number]["DISCONNECTION"] = time
+                heapq.heappush(self.cm.worker_free_slots[worker_id], slot)
+        elif event == "RESOURCES":
+            hostport = self.cm.last_host_port[worker_id]
+            self.arg_to_resources(self.cm.worker_lifetime[(worker_id,hostport)], "", arg)
+        elif event == "CACHE_UPDATE":
+            hostport = self.cm.last_host_port[worker_id]
+            xfer = self.arg_to_xfer(worker_id, hostport, time, event, arg)
+            self.cm.worker_transfers[(worker_id,hostport)].append(xfer)
+        elif event == "TRANSFER":
+            hostport = self.cm.last_host_port[worker_id]
+            (direction, arg) = arg.split(maxsplit=1)
+            xfer = self.arg_to_xfer(worker_id, hostport, time, direction, arg)
+            self.cm.worker_transfers[(worker_id,hostport)].append(xfer)
+
+    def _parse_category(self, time, manager_pid, category, event, arg):
+        if event == "MAX":
+            pass
+        elif event == "MIN":
+            pass
+        elif event == "FIRST":
+            (mode, arg) = arg.split(maxsplit=1)
+            pass
+
+    def _parse_duty(self, time, manager_pid, task_id, event, arg):
+        la = self.cm.task_last_attempt[task_id]
+        ca = self.cm.tasks_attempts[task_id][la]
+
+        if event == "WAITING":
+            pass
+        elif event == "SENT":
+            pass
+        elif event == "STARTED":
+            ca["duty"] = time
+        elif event == "FAILURE":
+            pass
+
+    def _parse_task(self, time, manager_pid, task_id, event, arg):
+        if event == "WAITING":
+            (category, allocation, attempt_number, arg) = arg.split()
+            self.cm.task_last_attempt[task_id] = attempt_number
+            self.cm.tasks_attempts[task_id][attempt_number]["task_id"] = task_id
+            self.cm.tasks_attempts[task_id][attempt_number]["attempt_number"] = attempt_number
+            self.cm.tasks_attempts[task_id][attempt_number]["category"] = category
+            self.cm.tasks_attempts[task_id][attempt_number]["last_state"] = event
+            self.cm.tasks_attempts[task_id][attempt_number][event] = time
+            self.arg_to_resources(self.cm.tasks_attempts[task_id][attempt_number], "requested_", arg)
+            self.cm.tasks_attempts[task_id][attempt_number]["duty"] = pd.NA   # we do not know if it a duty
+        else:
+            la = self.cm.task_last_attempt[task_id]
+            ca = self.cm.tasks_attempts[task_id][la]
+            ca["last_state"] = event
+            ca[event] = time
+
+            if event == "RUNNING":
+                (worker_id, allocation, arg) = arg.split()
+                slot = self._next_slot(worker_id)
+                ca["worker_id"] = worker_id
+                ca["slot"] = slot
+                self.cm.worker_used_slots[worker_id][slot] = (task_id, la)
+                self.arg_to_resources(ca, "allocated_", arg)
+                ca["DISCONNECTION"] = pd.NA  # add field to keep time in case of worker disconnection
+            elif event == "WAITING_RETRIEVAL":
+                pass
+            elif event == "RETRIEVED":
+                (reason, exit_code, l, m) = arg.split()
+                ca["reason"] = reason
+                ca["exit_code"] = exit_code
+                self.arg_to_task_report(ca, m)
+                self.arg_to_resources(ca, "measured_", m)
+                slot = ca["slot"]
+                del self.cm.worker_used_slots[ca["worker_id"]][slot]
+                heapq.heappush(self.cm.worker_free_slots[ca["worker_id"]], slot)
+            elif event == "DONE":
+                pass
+
+    def _parse(self):
+        for (time, manager_pid, subject, target, event, arg) in self._next_line():
+            self.termination = time  # set each last time know to the termination time of the manager
+
+            if subject == "MANAGER":
+                self._parse_manager(time, manager_pid, event)
+            elif subject == "WORKER":
+                self._parse_worker(time, manager_pid, target, event, arg)
+            elif subject == "CATEGORY":
+                self._parse_category(time, manager_pid, target, event, arg)
+            elif subject == "DUTY":
+                self._parse_duty(time, manager_pid, target, event, arg)
+            elif subject == "TASK":
+                self._parse_task(time, manager_pid, target, event, arg)
+
+class TxnPlot:
+    def __init__(self, managers, opts):
+        """
+                title='TaskVine', all_info=False, output=None, origin="manager-start", all_info=False,
+                cache_updates=False, resource_updates=False, connections=False, disconnections=False,
+                tasks_commit=False, tasks_waiting_retrieval=False, tasks_done=False,
+                input_transfers=False, output_transfers=False, xticks=None, yticks=None, tex=False):
+        """
+        self.managers = managers
+        self.opts = opts
+
+        if opts.tex:
+            font = {'family' : 'serif',
+                    'serif': ['Computer Modern Roman'],
+                    'weight' : 'normal',
+                    'size'   : 11}
+            plt.rc('font', **font)
+            plt.rc('text', usetex=True)
+
+        height = opts.height if opts.height else opts.width * (2/3)
+
+        self.fig = plt.figure(constrained_layout=True, figsize=(opts.width, height))
+        self.subs = self.fig.subplots(nrows=1, ncols=len(managers), squeeze=False)
+        self.display_plot()
+
+    def determine_origin(self, m):
+        return 0
+
+    def display_plot(self):
+        plt.title(self.opts.title)
+
+        for (i, m) in enumerate(self.managers.values()):
+            s = self.subs[0, i]
+            self.plot(s, m)
+
+            origin = self.determine_origin(m)
+            if self.opts.xticks:
+                s.xaxis.set_major_locator(plticker.MultipleLocator(base=opts.xticks))
+            if self.opts.yticks:
+                s.yaxis.set_major_locator(plticker.MultipleLocator(base=opts.yticks))
+
+            s.tick_params(axis='both', which='major', labelsize=15)
+            s.legend()
+
+        if self.opts.output:
+            plt.savefig(self.opts.output)
+        plt.show()
+
+    def plot(self, fig, manager):
+        return NotImplemented
+
+
+class TxnPlotWorkers(TxnPlot):
+    def plot(self, fig, manager):
+        fig.set_ylabel("worker")
+        fig.set_xlabel("time")
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Plot TaskVine workflow information from a transaction log file.')
+
+    parser.add_argument('log', help='Path to transaction log file')
+    parser.add_argument('mode', help='information to plot. One of workers, tasks, manager, or csv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
+    parser.add_argument('title', nargs='?', default ='TaskVine', help='Title of the plot')
+    parser.add_argument('output', nargs='?', default = None, help='output name of the plot/csv generated')
+    parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-running-task, or first-worker', default=["manager-start"])
+    parser.add_argument('--width', nargs='?', help='width in inches', default=12)
+    parser.add_argument('--height', nargs='?', help='height in inches. Default is 2/3 of width', default=None)
+    parser.add_argument('--all-info', action='store_true', help='display all from the transaction log')
+    parser.add_argument('--cache-updates', action='store_true', help='display cache updates')
+    parser.add_argument('--resource-updates', action='store_true', help='display resource updates')
+    parser.add_argument('--connections', action='store_true', help='display worker connections')
+    parser.add_argument('--disconnections', action='store_true', help='display worker disconnections')
+    parser.add_argument('--tasks-commit', action='store_true', help='display when tasks are committed to a worker')
+    parser.add_argument('--tasks-waiting-retrieval', action='store_true', help='display when tasks are waiting retrieval')
+    parser.add_argument('--tasks-done', action='store_true', help='display when tasks are marked done')
+    parser.add_argument('--input-transfers', action='store_true', help='display input transfers')
+    parser.add_argument('--output-transfers', action='store_true', help='display output transfers')
+    parser.add_argument('--flip-tasks', action='store_true', help='flip colors between tasks')
+    parser.add_argument('--xticks', nargs=1, help='change the step size for x ticks <step_size>')
+    parser.add_argument('--yticks', nargs=1, help='change the step size for y ticks <step_size>')
+    parser.add_argument('--tex', action='store_true', help='use tex fonts')
+    args = parser.parse_args()
+
+    p = ParseTxn(args.log)
+
+    TxnPlotWorkers(p.managers, args)
+
+
