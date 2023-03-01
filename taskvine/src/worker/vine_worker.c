@@ -421,12 +421,12 @@ Send an asynchronmous message to the manager indicating that an item was success
 void vine_worker_send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
 {
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
-	if(transfer_id) {
-		send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
-		free(transfer_id);
-	} else {
-		send_message(manager,"cache-update %s %lld %lld X\n",cachename,(long long)size,(long long)transfer_time);
+	if(!transfer_id) {
+		transfer_id = xxstrdup("X");
 	}
+
+	send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
+	free(transfer_id);
 }
 
 /*

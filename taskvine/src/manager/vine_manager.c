@@ -307,10 +307,11 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 	char cachename[VINE_LINE_MAX];
 	long long size;
 	long long transfer_time;
+	long long start_time;
 	char id[VINE_LINE_MAX];
 
-	if(sscanf(line,"cache-update %s %lld %lld %s",cachename,&size,&transfer_time, id)==4) {
-		struct vine_file_replica *remote_info = vine_file_replica_table_lookup(w, cachename); 
+	if(sscanf(line,"cache-update %s %lld %lld %lld %s",cachename,&size,&transfer_time,&start_time,id)==5) {
+		struct vine_file_replica *remote_info = vine_file_replica_table_lookup(w, cachename);
 
 		if(!remote_info) {
 			/*
@@ -328,7 +329,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 
 		vine_current_transfers_remove(q, id);
 
-		vine_txn_log_write_cache_update(q,w,size,transfer_time,cachename);
+		vine_txn_log_write_cache_update(q,w,size,transfer_time,start_time,cachename);
 	}
 
 	return VINE_MSG_PROCESSED;
