@@ -237,7 +237,7 @@ void vine_txn_log_write_worker_resources(struct vine_manager *q, struct vine_wor
 }
 
 
-void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_mount *m, struct vine_file *f, size_t size_in_bytes, int time_in_usecs, int is_input )
+void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_mount *m, struct vine_file *f, size_t size_in_bytes, int time_in_usecs, int start_in_usecs, int is_input )
 {
 	struct buffer B;
 	buffer_init(&B);
