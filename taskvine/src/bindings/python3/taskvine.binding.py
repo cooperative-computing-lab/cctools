@@ -1601,8 +1601,10 @@ class Manager(object):
     #
     #
     # @param self   Reference to the current manager object.
-    # @param task   A task description created from @ref taskvine::Task.
+    # @param task   A Library Task description created from create_library_from_functions or create_library_from_files
     def install_library(self, task):
+        if not isinstance(task, LibraryTask):
+            raise("Please provide a LibraryTask as the task argument")
         self._library_table[task.library_name] = task
         vine_manager_install_library(self._taskvine, task._task, task.library_name)
 
