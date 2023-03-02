@@ -22,7 +22,9 @@
 
 
 from collections import defaultdict
+from pathlib import Path
 import argparse
+import datetime
 import heapq
 import json
 import math
@@ -30,8 +32,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plticker
 import pandas as pd
-from pathlib import Path
 import sys
+from functools import partial
 
 resources_names = "cores memory disk gpus".split()
 task_report_abs = "time_worker_start time_worker_end time_commit_start time_commit_end".split()
@@ -260,9 +262,9 @@ class ParseTxn:
             pass
 
     def _parse_task(self, time, manager_pid, task_id, event, arg):
-        if int(task_id) > 100:
-            #return
-            pass
+        if int(task_id) > 400:
+            return
+
         if event == "WAITING":
             (category, allocation, attempt_number, arg) = arg.split()
             self.cm.task_last_attempt[task_id] = attempt_number
@@ -339,6 +341,17 @@ class TxnPlot:
         self.fig = plt.figure(constrained_layout=True, figsize=(opts.width, height))
         self.subs = self.fig.subplots(nrows=1, ncols=len(managers), squeeze=False)
 
+        # default legend
+        self.legend = {
+                "cache updates": 'C1',
+                "inputs from manager": 'C3',
+                "outputs to manager": 'C5',
+                "tasks waiting for cache": 'C4',
+                "tasks executing": 'C0',
+                "tasks waiting retrieval": 'C6',
+                "tasks failures": 'red',
+                }
+
         self.display_plot()
 
     def determine_origin(self, m):
@@ -352,6 +365,28 @@ class TxnPlot:
         if spec == "first-worker":
             return m.workers["CONNECTION"].min()
 
+    def make_tick_time(self, origin, x, pos):
+        def roundb(b, x):
+            return b * math.ceil(x/b)
+
+        # round seconds to multiples of 5
+        t = roundb(5, x - origin)
+        u = "s"
+        if t > 900:
+            # round minutes to multiples of 5
+            t = roundb(5, t/60)
+            u = "m"
+        else:
+            t = roundb(1, t/3600)
+            u = "h"
+        return "{:.0f}{}".format(t, u)
+
+    def bh(self, fig, slots, left, width, color, **kwargs):
+        # bar plot with some defaults
+        args = { "left": left, "width": width, "color": color, "linewidth": 0.5, "align": "edge", "edgecolor": color }
+        args.update(kwargs)
+        fig.barh(slots, **args)
+
     def display_plot(self):
         plt.title(self.opts.title)
 
@@ -362,9 +397,12 @@ class TxnPlot:
             self.plot(s, m, plot_origin)
 
             s.axis(xmin=plot_origin, xmax=m.termination)
-            s.xaxis.set_major_formatter(plticker.FuncFormatter(lambda x,pos: "{:.0f}".format(x-plot_origin)))
+            s.set_xticks([plot_origin, m.termination])
+            s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_origin)))
+            s.set_xlabel("time")
 
             s.tick_params(axis='both', which='major', labelsize=15)
+            s.legend(handles=[mpl.patches.Patch(color=c, label=l) for (l,c) in self.legend.items()])
 
         if self.opts.output:
             plt.savefig(self.opts.output)
@@ -376,70 +414,45 @@ class TxnPlot:
         return NotImplemented
 
 
+class TxnPlotTasks(TxnPlot):
+    pass
+
+
 class TxnPlotWorkers(TxnPlot):
+    def plot_by_worker(self, fig, worker, worker_times, worker_xfers, base_slot):
+        slot_count = worker["slot"].nunique() + 2  # + 2 for the "slot" for cache update and transfers
+        worker["slot"] += base_slot + 1   # slot 0 for cache updates, 1 for input/output
 
-    def bh(self, fig, slots, left, width, color, **kwargs):
-        args = { "left": left, "width": width, "color": color, "linewidth": 0.5, "align": "edge", "edgecolor": color }
-        args.update(kwargs)
+        dt = worker[worker["reason"] != "DISCONNECTION"]
+        y = worker["slot"]
 
-        fig.barh(slots, **args)
+        # plot times from this wid
+        self.bh(fig, base_slot, worker_times["CONNECTION"], worker_times["DISCONNECTION"] - worker_times["CONNECTION"], "C9", height=slot_count, edgecolor="#00000010")
 
-    def plot_by_worker(self, fig, worker, base_slot, legend):
-            slot_count = worker["slot"].nunique() + 2  # + 2 for the "slot" for cache update and transfers
-            worker["slot"] += base_slot + 1   # slot 0 for cache updates, 1 for input/output
+        cu = worker_xfers[ worker_xfers["direction"] == "CACHE_UPDATE" ]
+        self.bh(fig, base_slot+0.1, cu["start_time"], cu["wall_time"], self.legend["cache updates"], height=0.7)
 
-            dt = worker[worker["reason"] != "DISCONNECTION"]
-            y = worker["slot"]
+        cu = worker_xfers[ worker_xfers["direction"] == "INPUT" ]
+        self.bh(fig, base_slot+1, cu["start_time"], cu["wall_time"], self.legend["inputs from manager"])
 
-            tw = ws[ws["worker_id"] == wid]
+        cu = worker_xfers[ worker_xfers["direction"] == "OUTPUT" ]
+        self.bh(fig, base_slot+1, cu["start_time"], cu["wall_time"], self.legend["outputs to manager"])
 
-            if not self.opts.hide_connections:
-                #legend["workers"] = 'C9'
-                self.bh(fig, base_slot, tw["CONNECTION"], tw["DISCONNECTION"] - tw["CONNECTION"], "C9", height=slot_count, edgecolor="#00000010")
+        self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting for cache"], edgecolor="#00000010")
 
-            if not self.opts.hide_cache_updates:
-                legend["cache updates"] = 'C1'
-                cu = xs[ (xs["worker_id"] == wid) & (xs["direction"] == "CACHE_UPDATE") ]
-                self.bh(fig, base_slot+0.1, cu["start_time"], cu["wall_time"], legend["cache updates"], height=0.7)
+        self.bh(fig, dt["slot"], dt["time_worker_start"], dt["time_worker_end"]-dt["time_worker_start"], self.legend["tasks executing"], edgecolor="#00000010")
 
-            if not self.opts.hide_transfers:
-                legend["inputs from manager"] = 'C3'
-                cu = xs[ (xs["worker_id"] == wid) & (xs["direction"] == "INPUT") ]
-                self.bh(fig, base_slot+1, cu["start_time"], cu["wall_time"], legend["inputs from manager"])
+        st = worker[worker["reason"] == "SUCCESS"]
+        self.bh(fig, st["slot"], st["time_worker_end"], st["RETRIEVED"]-st["time_worker_end"], self.legend["tasks waiting retrieval"], edgecolor="#00000010")
 
-                legend["outputs to manager"] = 'C5'
-                cu = xs[ (xs["worker_id"] == wid) & (xs["direction"] == "OUTPUT") ]
-                self.bh(fig, base_slot+1, cu["start_time"], cu["wall_time"], legend["outputs to manager"])
+        ft = worker[(worker["reason"] != "SUCCESS") & (worker["reason"] != "DISCONNECTION")]
+        self.bh(fig, ft["slot"], ft["time_worker_end"], ft["RETRIEVED"]-ft["time_worker_end"], self.legend["tasks failures"], edgecolor="#00000010")
 
-            if not self.opts.hide_submit:
-                legend["tasks waiting for cache"] = 'C4'
-                self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], legend["tasks waiting for cache"], edgecolor="#00000010")
-
-            legend["tasks executing"] = 'C0'
-            self.bh(fig, dt["slot"], dt["time_worker_start"], dt["last_state_time"]-dt["time_worker_start"], legend["tasks executing"], edgecolor="#00000010")
-
-            if not self.opts.hide_waiting_retrieval:
-                legend["results waiting retrieval"] = 'C2'
-                fig.plot(dt["WAITING_RETRIEVAL"], dt["slot"]+0.2,
-                        'H', color='C5')
-
-            if not self.opts.hide_done:
-                legend["tasks done"] = 'C6'
-                legend["tasks failed"] = 'C7'
-
-                st = worker[worker["reason"] == "SUCCESS"]
-                ft = worker[(worker["reason"] != "SUCCESS") & (worker["reason"] != "DISCONNECTION")]
-                fig.plot(st["last_state_time"], st["slot"],
-                        '8', 'C6')
-                fig.plot(ft["last_state_time"], ft["slot"],
-                        'X', 'C7')
-
-            return worker["slot"].max() + 1
+        return worker["slot"].max() + 1
 
 
     def plot(self, fig, manager, plot_origin):
         fig.set_ylabel("worker")
-        fig.set_xlabel("time")
 
         ts = manager.tasks
         xs = manager.transfers
@@ -449,19 +462,17 @@ class TxnPlotWorkers(TxnPlot):
         by_min_connects = ws.groupby("worker_id")["CONNECTION"].min().sort_values().index
         gsd = {wid: g  for (wid, g) in gs}
 
-        legend = {}
-
         base_slot=0
         for wid in by_min_connects:
             worker = gsd.get(wid, None)
-            if worker:
-                base_slot = self.plot_by_worker(fig, worker, base_slot)
+            worker_times = ws[ws["worker_id"] == wid]
+            worker_xfers = xs[xs["worker_id"] == wid]
 
-        fig.set_xticks([plot_origin, manager.termination])
+            if worker is not None:
+                base_slot = self.plot_by_worker(fig, worker, worker_times, worker_xfers, base_slot)
+
         fig.set_yticks((0, base_slot))
         fig.set_yticklabels(["0", str(gs.ngroups)])  # ytick number of workers
-
-        fig.legend(handles=[mpl.patches.Patch(color=c, label=l) for (l,c) in legend.items()])
 
 
 if __name__ == "__main__":
@@ -472,17 +483,12 @@ if __name__ == "__main__":
     parser.add_argument('output', nargs='?', default=None, help='output name of the plot/csv generated. If not given, assumes --display')
     parser.add_argument('--mode', help='information to plot. One of workers, tasks, manager, or csv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
     parser.add_argument('--title', nargs='?', default='TaskVine', help='Title of the plot')
-    parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default="first-transfer")
+    parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default="first-worker")
     parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
     parser.add_argument('--width', nargs='?', help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', help='height in inches. Default is 2/3 of width', default=None)
 
     parser.add_argument('--hide-cache-updates', action='store_true', help='do not display cache updates')
-    parser.add_argument('--hide-resource-updates', action='store_true', help='do not display resource updates')
-    parser.add_argument('--hide-connections', action='store_true', help='do not display worker connections/disconnections')
-    parser.add_argument('--hide-submit', action='store_true', help='do not display when tasks are submitted to a worker waiting for inputs')
-    parser.add_argument('--hide-waiting-retrieval', action='store_true', help='do not display when tasks are waiting retrieval')
-    parser.add_argument('--hide-done', action='store_true', help='do not display when tasks are marked done')
     parser.add_argument('--hide-transfers', action='store_true', help='do not display output transfers')
 
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
