@@ -244,9 +244,9 @@ void vine_txn_log_write_transfer(struct vine_manager *q, struct vine_worker_info
 	buffer_printf(&B, "WORKER %s TRANSFER ", w->workerid);
 	buffer_printf(&B, is_input ? "INPUT":"OUTPUT");
 	buffer_printf(&B, " %s", m->remote_name);
-	buffer_printf(&B, " %ld", size_in_bytes);
-	buffer_printf(&B, " %lu", time_in_usecs);
-	buffer_printf(&B, " %lu", start_in_usecs);
+	buffer_printf(&B, " %lld", (long long) size_in_bytes);
+	buffer_printf(&B, " %llu", (unsigned long long) time_in_usecs);
+	buffer_printf(&B, " %llu", (unsigned long long) start_in_usecs);
 
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
@@ -259,9 +259,9 @@ void vine_txn_log_write_cache_update(struct vine_manager *q, struct vine_worker_
 	buffer_init(&B);
 	buffer_printf(&B, "WORKER %s CACHE_UPDATE", w->workerid);
 	buffer_printf(&B, " %s", name);
-	buffer_printf(&B, " %ld", size_in_bytes);
-	buffer_printf(&B, " %lu", time_in_usecs);
-	buffer_printf(&B, " %lu", start_in_usecs);
+	buffer_printf(&B, " %lld", (long long) size_in_bytes);
+	buffer_printf(&B, " %llu", (unsigned long long) time_in_usecs);
+	buffer_printf(&B, " %llu", (unsigned long long) start_in_usecs);
 
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
