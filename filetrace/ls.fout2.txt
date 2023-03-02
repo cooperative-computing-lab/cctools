@@ -1,0 +1,14 @@
+freq action bytes path
+   1    S        0 /sys/fs/selinux
+   1    S        0 /selinux
+   1    R      928 /usr/lib64/libselinux.so.1
+   1    R      896 /usr/lib64/libpcre2-8.so.0.7.1
+   1    R      896 /usr/lib64/libcap.so.2.48
+   1    R      864 /usr/lib64/libc-2.28.so
+   1    R      832 /usr/lib64/libpthread-2.28.so
+   1    R      832 /usr/lib64/libdl-2.28.so
+   1    R      399 /proc/filesystems
+   1    R        0 /usr/lib/locale/locale-archive
+   1    R        0 /etc/ld.so.cache
+   1    R        0 /escnfs/home/jdolak/courses-personal/research/cctools/filetrace
+   0    ?       74 /dev/pts/162

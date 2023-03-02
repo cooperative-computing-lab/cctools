@@ -28,25 +28,27 @@ def create_trace_file(arg):
 
 def create_dict(name):
     """ creates path_dict which the key is the file path and the value is its properties: 
-        properties = [action, freq, size, parent, command]
+        properties = [action, freq, size, parent, command, reads, writes]
     """
     path_dict = {}
 
     with open(name + ".fout1.txt") as file:
         for line in file:
-            properties = ['?', 0, 0,"", ""]
+            properties = ['?', 0, 0,"", "", 0 , 0]
             if "openat" in line or "stat" in line:
-                try:
-                    #path = line.split('"')[1]
-                    path = re.search('<.+>',line).group(0).replace('<','').replace('>','')
+                try: # Try get file path
+                    path = re.search('</.+>',line).group(0).replace('<','').replace('>','')
+                except AttributeError: # AttributeError if file not found
+                    try: # find path for ENOENT
+                        path = line.split('"')[1]
+                    except IndexError:
+                        continue
+                properties = path_dict.get(path, properties)
+                properties[1] += 1
+                properties[4] = line
+                properties = file_actions(properties)
+                path_dict[path] = properties.copy()
 
-                    properties[1] = path_dict.get(path, properties)[1] + 1
-                    properties[4] = line
-
-                    path_dict[path] = properties.copy()
-
-                except (IndexError, AttributeError) as e:
-                    continue
             if "read" in line or "write" in line:
                 try:
                     path = re.search('<.+>,',line).group(0).replace('<','').replace('>,','')
@@ -57,10 +59,12 @@ def create_dict(name):
                 except (IndexError, AttributeError) as e:
                     continue
 
+    path_dict = dict(sorted(path_dict.items(), key=lambda x:x[1], reverse=True))
+
     return path_dict 
 
 
-def file_actions(path_dict, name):
+def file_actions(properties):
     """ Lablels the action for each path:
         A  : read but file not found
         R  : Read only
@@ -68,36 +72,33 @@ def file_actions(path_dict, name):
         RW : Read and write
         S  : stat
     """
-    for path, properties in path_dict.items():
-        command = properties[4]
+    command = properties[4]
 
-        if "openat" in command:
-            if "ENOENT" in command:
-                action = 'A'
-            elif "RDONLY" in command:
-                action = 'R'
-            elif "WRONLY" in command:
-                action = 'W'
-            elif "RDWR" in command:
-                action = 'RW'
-            else:
-                action = '?'
+    if "openat" in command:
+        if "ENOENT" in command:
+            action = 'A'
+        elif "RDONLY" in command:
+            action = 'R'
+            properties[5] += 1
+        elif "WRONLY" in command:
+            action = 'W'
+            properties[6] += 1
+        elif "RDWR" in command:
+            action = 'WR'
+            properties[5] += 1
+            properties[6] += 1
+        else:
+            action = '?'
+        if (properties[5] > 0) and (properties[6] > 0):
+            action = 'WR'
 
-            properties[0] = action
-            path_dict[path] = properties
+    elif "stat" in command:
+        action = 'S'
+    
+    properties[0] = action
 
-        elif "stat" in command:
-            try:
-                action = 'S'
-                properties[0] = action
-                path_dict[path] = properties
-            except IndexError:
-                continue
-     
-    path_dict = dict(sorted(path_dict.items(), key=lambda x:x[1], reverse=True))
-
-    return path_dict
-
+    return properties
+    
     
 def print_summary_2(path_dict, name):
     """ Creates the file <name>.fout2.txt which contains the freqency,
@@ -110,7 +111,7 @@ def print_summary_2(path_dict, name):
         freq = properties[1]
         size = properties[2]
     
-        f.write(f" {freq:2}    {action:2}{size:8} {path}\n")
+        f.write(f"{freq:4}    {action:2}{size:8} {path}\n")
             
     f.close()
 
@@ -118,12 +119,12 @@ def print_summary_2(path_dict, name):
 def find_major_directories(path_dict, top, dirLvl, name):
     """ creates <name>.fout3.txt which summarizes the most frequently accesed paths """
     count = 0
-
-    f = open(name + ".fout3.txt", "w")
-    f.write("\nMajor Directories\n\n")
     major_dict = {}
     reads_dict = {}
     writes_dict = {}
+
+    f = open(name + ".fout3.txt", "w")
+    f.write("\nMajor Directories\n\n")
 
     for path, properties in path_dict.items():
         action = properties[0]
@@ -141,24 +142,24 @@ def find_major_directories(path_dict, top, dirLvl, name):
     reads_dict = dict(sorted(reads_dict.items(), key=lambda x:x[1], reverse=True))
     writes_dict = dict(sorted(writes_dict.items(), key=lambda x:x[1], reverse=True))
 
-    for path, value in major_dict.items():
-        f.write(f"{major_dict.get(path):2}  {path}\n")
+    for path in major_dict:
+        f.write(f"{major_dict[path]:2}  {path}\n")
+        count += 1
+        if count >= top:
+            break
+    count = 0
+
+    f.write("\nMajor Reads\n\n")
+    for path in reads_dict:
+        f.write(f"{reads_dict[path]:2}  {path}\n")
         count += 1
         if count >= top:
             break
 
     count = 0
-
-    f.write("\nMajor Reads\n\n")
-    for path, value in reads_dict.items():
-        f.write(f"{reads_dict.get(path):2}  {path}\n")
-        count += 1
-        if count >= top:
-            break
-    
     f.write("\nMajor Writes\n\n")
-    for path, value in writes_dict.items():
-        f.write(f"{writes_dict.get(path):2}  {path}\n")
+    for path in writes_dict:
+        f.write(f"{writes_dict[path]:2}  {path}\n")
         count += 1
         if count >= top:
             break
@@ -208,7 +209,6 @@ def main():
 
     create_trace_file(arguments[0:])
     path_dict = create_dict(name)
-    path_dict = file_actions(path_dict, name)
     print_summary_2(path_dict, name)
     find_major_directories(path_dict,top,dirLvl,name)
     end_of_execute(name)
