@@ -3,6 +3,20 @@
 import os
 import sys
 import re
+import operator
+# from filetrace_subprocess import *
+
+# Classes
+class Properties:
+    def __init__(self, path="",action = '?',freq = 0, size = 0 , command = "", read_freq = 0, write_freq = 0, sub_pid = 0):
+        self.path = path
+        self.action = action
+        self.freq = freq
+        self.size = size
+        self.command = command
+        self.read_freq = read_freq
+        self.write_freq = write_freq
+        self.sub_pid = sub_pid
 
 # Funtions
 def usage():
@@ -20,6 +34,7 @@ def usage():
         """)
     sys.exit(0)
 
+
 def create_trace_file(arg):
     """ Runs strace and redirects its output to <name>.fout1.txt """
     arguments = ' '.join(arg)
@@ -34,7 +49,7 @@ def create_dict(name):
 
     with open(name + ".fout1.txt") as file:
         for line in file:
-            properties = ['?', 0, 0,"", "", 0 , 0]
+            
             if "openat" in line or "stat" in line:
                 try: # Try get file path
                     path = re.search('</.+>',line).group(0).replace('<','').replace('>','')
@@ -43,61 +58,61 @@ def create_dict(name):
                         path = line.split('"')[1]
                     except IndexError:
                         continue
-                properties = path_dict.get(path, properties)
-                properties[1] += 1
-                properties[4] = line
-                properties = file_actions(properties)
-                path_dict[path] = properties.copy()
+                                        
+                if path not in path_dict: 
+                        path_dict[path] = Properties(path=path, command=line)
+
+                path_dict[path].action = file_actions(path_dict, path)
+                path_dict[path].freq += 1
 
             if "read" in line or "write" in line:
                 try:
                     path = re.search('<.+>,',line).group(0).replace('<','').replace('>,','')
                     bytes_written = re.search('= [0-9]+$',line).group(0).replace('= ','')
-                    properties = path_dict.get(path, properties)
-                    properties[2] = properties[2] + int(bytes_written)
-                    path_dict[path] = properties.copy()
+
+                    if path not in path_dict: 
+                        path_dict[path] = Properties(path=path, size=int(bytes_written))
+                 
+                    path_dict[path].size += int(bytes_written)
+                    
                 except (IndexError, AttributeError) as e:
                     continue
-
-    path_dict = dict(sorted(path_dict.items(), key=lambda x:x[1], reverse=True))
 
     return path_dict 
 
 
-def file_actions(properties):
+def file_actions(path_dict, path):
     """ Lablels the action for each path:
         A  : read but file not found
         R  : Read only
         W  : Write only
         RW : Read and write
         S  : stat
-    """
-    command = properties[4]
+    """ 
+    command = path_dict[path].command
 
     if "openat" in command:
         if "ENOENT" in command:
             action = 'A'
         elif "RDONLY" in command:
             action = 'R'
-            properties[5] += 1
+            path_dict[path].read_freq += 1
         elif "WRONLY" in command:
             action = 'W'
-            properties[6] += 1
+            path_dict[path].write_freq += 1
         elif "RDWR" in command:
             action = 'WR'
-            properties[5] += 1
-            properties[6] += 1
+            path_dict[path].read_freq += 1
+            path_dict[path].write_freq += 1
         else:
             action = '?'
-        if (properties[5] > 0) and (properties[6] > 0):
+        if (path_dict[path].read_freq > 0) and (path_dict[path].write_freq > 0):
             action = 'WR'
 
     elif "stat" in command:
         action = 'S'
     
-    properties[0] = action
-
-    return properties
+    return action
     
     
 def print_summary_2(path_dict, name):
@@ -106,13 +121,15 @@ def print_summary_2(path_dict, name):
     """
     f = open(name + ".fout2.txt", "w")
     f.write(f"freq action bytes path\n")
-    for path, properties in path_dict.items():
-        action = properties[0]
-        freq = properties[1]
-        size = properties[2]
+     
+    for file in sorted(path_dict.values(), key=operator.attrgetter('action','freq','size') , reverse=True):
+        action = file.action
+        freq = file.freq
+        size = file.size
+        path = file.path
     
         f.write(f"{freq:4}    {action:2}{size:8} {path}\n")
-            
+
     f.close()
 
 
@@ -126,17 +143,17 @@ def find_major_directories(path_dict, top, dirLvl, name):
     f = open(name + ".fout3.txt", "w")
     f.write("\nMajor Directories\n\n")
 
-    for path, properties in path_dict.items():
-        action = properties[0]
-        freq = properties[1]
+    for path in path_dict:
+        action = path_dict[path].action
+        freq = path_dict[path].freq
 
         short_path = '/'.join(path.split('/')[0:dirLvl])
         major_dict[short_path] = major_dict.get(short_path, 0) + freq
         
         if action == 'R':
-            reads_dict[short_path] = major_dict.get(short_path)
+            reads_dict[short_path] = reads_dict.get(short_path, 0) + freq
         elif action == 'W':
-            writes_dict[short_path] = major_dict.get(short_path)
+            writes_dict[short_path] = writes_dict.get(short_path, 0) + freq
     
     major_dict = dict(sorted(major_dict.items(), key=lambda x:x[1], reverse=True))
     reads_dict = dict(sorted(reads_dict.items(), key=lambda x:x[1], reverse=True))
@@ -178,7 +195,6 @@ def end_of_execute(name):
 
 
 # Main
-
 def main():
     top=5
     dirLvl=6
@@ -211,6 +227,9 @@ def main():
     path_dict = create_dict(name)
     print_summary_2(path_dict, name)
     find_major_directories(path_dict,top,dirLvl,name)
+
+    # create_subprocess_dict(path_dict)
+
     end_of_execute(name)
 
     sys.exit(0)
