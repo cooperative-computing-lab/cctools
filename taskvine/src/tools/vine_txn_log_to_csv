@@ -376,8 +376,8 @@ class TxnPlot:
             # round minutes to multiples of 5
             t = roundb(5, t/60)
             u = "m"
-        else:
-            t = roundb(1, t/3600)
+        elif t > 3600 * 24:
+            t = roundb(1, t/(3600 * 24))
             u = "h"
         return "{:.0f}{}".format(t, u)
 
