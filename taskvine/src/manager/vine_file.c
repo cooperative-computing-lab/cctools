@@ -41,7 +41,7 @@ int vine_file_delete(struct vine_file *f)
 }
 
 /* Create a new file object with the given properties. */
-struct vine_file *vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task )
+struct vine_file *vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task, vine_file_share_peer_mode_t share_peer_mode)
 {
 	struct vine_file *f;
 
@@ -53,6 +53,7 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 	f->type = type;
 	f->size = size;
 	f->mini_task = mini_task;
+	f->share_peer_mode = share_peer_mode;
 
 	if(data) {
 		/* Terminate with a null, just in case the user tries to treat this as a C string. */
@@ -111,37 +112,37 @@ size_t vine_file_size( struct vine_file *f )
 
 struct vine_file * vine_file_local( const char *source )
 {
-	return vine_file_create(source,0,0,0,VINE_FILE,0);
+	return vine_file_create(source,0,0,0,VINE_FILE,0,0);
 }
 
 struct vine_file * vine_file_url( const char *source )
 {
-	return vine_file_create(source,0,0,0,VINE_URL,0);
+	return vine_file_create(source,0,0,0,VINE_URL,0,0);
 }
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source )
 {
-	return vine_file_create(source,f->cached_name,0,f->size,VINE_URL,0);
+	return vine_file_create(source,f->cached_name,0,f->size,VINE_URL,0,0);
 }
 
 struct vine_file * vine_file_temp()
 {
-	return vine_file_create("temp",0,0,0,VINE_TEMP,0);
+	return vine_file_create("temp",0,0,0,VINE_TEMP,0,0);
 }
 
 struct vine_file * vine_file_buffer( const char *data, size_t size )
 {
-	return vine_file_create("buffer",0,data,size,VINE_BUFFER,0);
+	return vine_file_create("buffer",0,data,size,VINE_BUFFER,0,0);
 }
 
 struct vine_file * vine_file_empty_dir()
 {
-	return vine_file_create("unnamed",0,0,0,VINE_EMPTY_DIR,0);
+	return vine_file_create("unnamed",0,0,0,VINE_EMPTY_DIR,0,0);
 }
 
 struct vine_file * vine_file_mini_task( struct vine_task *t )
 {
-	return vine_file_create(t->command_line,0,0,0,VINE_MINI_TASK,t);
+	return vine_file_create(t->command_line,0,0,0,VINE_MINI_TASK,t,VINE_PEER_NOSHARE);
 }
 
 struct vine_file * vine_file_untar( struct vine_file *f )

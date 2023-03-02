@@ -418,15 +418,15 @@ static int send_keepalive(struct link *manager, int force_resources)
 Send an asynchronmous message to the manager indicating that an item was successfully loaded into the cache, along with its size in bytes and transfer time in usec.
 */
 
-void vine_worker_send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
+void vine_worker_send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time, timestamp_t transfer_start )
 {
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
-	if(transfer_id) {
-		send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
-		free(transfer_id);
-	} else {
-		send_message(manager,"cache-update %s %lld %lld X\n",cachename,(long long)size,(long long)transfer_time);
+	if(!transfer_id) {
+		transfer_id = xxstrdup("X");
 	}
+
+	send_message(manager,"cache-update %s %lld %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time,(long long)transfer_start,transfer_id);
+	free(transfer_id);
 }
 
 /*
@@ -625,7 +625,7 @@ static void expire_procs_running()
 	ITABLE_ITERATE(procs_running,pid,p) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
-			p->result = VINE_RESULT_TASK_TIMEOUT;
+			p->result = VINE_RESULT_MAX_END_TIME;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -1000,7 +1000,7 @@ static void enforce_processes_max_running_time()
 					p->task->task_id,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
-			p->result = VINE_RESULT_TASK_MAX_RUN_TIME;
+			p->result = VINE_RESULT_MAX_WALL_TIME;
 			kill(pid, SIGKILL);
 		}
 	}

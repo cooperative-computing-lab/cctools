@@ -14,7 +14,7 @@
 import taskvine as vine
 import sys
 
-urls = [
+urls_sources = [
     "http://www.gutenberg.org/files/1960/1960.txt",
     "http://www.gutenberg.org/files/1961/1961.txt",
     "http://www.gutenberg.org/files/1962/1962.txt",
@@ -43,41 +43,42 @@ urls = [
     "http://www.gutenberg.org/files/1987/1987.txt",
 ]
 
-url_count = 25
-
 if __name__ == "__main__":
     m = vine.Manager()
     print("listening on port", m.port)
 
-    for i in range(url_count):
-        for j in range(url_count):
-            t = vine.Task("./vine_example_gutenberg_script.sh filea.txt fileb.txt")
+    # declare all urls in the manager:
+    urls = map(lambda u: m.declare_url(u), urls_sources)
 
-            t.add_input_file(
-                "vine_example_gutenberg_script.sh",
-                "vine_example_gutenberg_script.sh",
-                cache=True,
-            )
-            t.add_input_url(urls[i], "filea.txt", cache=True)
-            t.add_input_url(urls[j], "fileb.txt", cache=True)
+    # script to process the files
+    my_script = m.declare_file("vine_example_gutenberg_script.sh")
+
+    for (i, url_a) in enumerate(urls):
+        for (j, url_b) in enumerate(urls):
+
+            if url_a == url_b:
+                continue
+
+            t = vine.Task("./my_script file_a.txt file_b.txt")
+            t.add_input(my_script, "my_script", cache=True)
+
+            t.add_input(url_a, "file_a.txt", cache=True)
+            t.add_input(url_b, "file_b.txt", cache=True)
 
             t.set_cores(1)
 
-            task_id = m.submit(t)
-
-            print("submitted task (id# " + str(task_id) + "):", t.command)
+            m.submit(t)
+            print(f"submitted task {t.id}: {t.command}")
 
     print("waiting for tasks to complete...")
-
     while not m.empty():
         t = m.wait(5)
         if t:
-            r = t.result
-            id = t.id
-
-            if r == vine.VINE_RESULT_SUCCESS:
-                print("task", id, "output:", t.std_output)
+            if t.successful():
+                print(f"task {t.id} result: {t.std_output}")
+            elif t.completed():
+                print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
             else:
-                print("task", id, "failed:", t.result_string)
+                print(f"task {t.id} failed with status {t.result_string}")
 
     print("all tasks complete!")
