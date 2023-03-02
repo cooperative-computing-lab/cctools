@@ -342,7 +342,7 @@ vine_result_code_t vine_manager_get_output_file( struct vine_manager *q, struct 
 
 		debug(D_VINE, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 
-		vine_txn_log_write_transfer(q, w, t, m, f, total_bytes, sum_time, 0);
+		vine_txn_log_write_transfer(q, w, t, m, f, total_bytes, sum_time, open_time, 0);
 	}
 
 	// If we failed to *transfer* the output file, then that is a hard

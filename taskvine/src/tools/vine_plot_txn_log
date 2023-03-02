@@ -309,10 +309,10 @@ def parse_workers(log):
             elif event == "RESOURCES":
                 worker_info[worker_id]["resources"].append(time)
             elif event == "CACHE_UPDATE":
-                (filename, sizeinmb, walltime) = arg.split()
+                (filename, sizeinmb, walltime, starttime) = arg.split()
                 worker_info[worker_id]["cache_updates"].append([time, float(walltime)/1000000, filename])
             elif event == "TRANSFER":
-                (direction, filename, sizeinmb, walltime) = arg.split()
+                (direction, filename, sizeinmb, walltime, starttime) = arg.split()
                 if direction == "INPUT":
                     worker_info[worker_id]["input_transfers"].append([time, float(walltime)/1000000])
                 elif direction == "OUTPUT":
