@@ -262,7 +262,7 @@ class ParseTxn:
             pass
 
     def _parse_task(self, time, manager_pid, task_id, event, arg):
-        if int(task_id) > 400:
+        if int(task_id) > 4001000:
             return
 
         if event == "WAITING":
@@ -415,7 +415,31 @@ class TxnPlot:
 
 
 class TxnPlotTasks(TxnPlot):
-    pass
+    def plot(self, fig, manager, plot_origin):
+
+        # consider tasks for which we have a full time report
+        dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"]
+        y = dt["task_id"]
+
+
+        self.bh(fig, y, dt["time_commit_start"], dt["time_input_mgr"], self.legend["inputs from manager"])
+
+        self.bh(fig, y, dt["time_commit_end"],  dt["time_worker_start"] - dt["time_commit_end"], self.legend["cache updates"])
+
+        del self.legend["tasks waiting for cache"] # already covered above
+
+        self.bh(fig, y, dt["time_worker_start"],  dt["time_worker_end"] - dt["time_worker_start"], self.legend["tasks executing"])
+
+        self.bh(fig, y, dt["time_worker_end"],  dt["RETRIEVED"] - dt["time_worker_end"], self.legend["tasks waiting retrieval"])
+
+        self.bh(fig, y, dt["RETRIEVED"] - dt["time_output_mgr"],  dt["time_output_mgr"], self.legend["outputs to manager"])
+
+        del self.legend["tasks failures"] # already covered above
+
+        fig.set_ylabel("tasks")
+        fig.set_yticks([0, len(dt.index)])
+        fig.set_yticklabels(["0", str(len(dt.index))])  # ytick number of workers
+
 
 
 class TxnPlotWorkers(TxnPlot):
@@ -452,8 +476,6 @@ class TxnPlotWorkers(TxnPlot):
 
 
     def plot(self, fig, manager, plot_origin):
-        fig.set_ylabel("worker")
-
         ts = manager.tasks
         xs = manager.transfers
         ws = manager.workers
@@ -471,6 +493,7 @@ class TxnPlotWorkers(TxnPlot):
             if worker is not None:
                 base_slot = self.plot_by_worker(fig, worker, worker_times, worker_xfers, base_slot)
 
+        fig.set_ylabel("worker")
         fig.set_yticks((0, base_slot))
         fig.set_yticklabels(["0", str(gs.ngroups)])  # ytick number of workers
 
@@ -501,7 +524,7 @@ if __name__ == "__main__":
     elif args.mode == "workers":
         TxnPlotWorkers(p.managers, args)
     elif args.mode == "tasks":
-        TxnPlotWorkers(p.managers, args)
+        TxnPlotTasks(p.managers, args)
     elif args.mode == "manager":
         TxnPlotWorkers(p.managers, args)
 
