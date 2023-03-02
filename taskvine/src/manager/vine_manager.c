@@ -307,10 +307,11 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 	char cachename[VINE_LINE_MAX];
 	long long size;
 	long long transfer_time;
+	long long start_time;
 	char id[VINE_LINE_MAX];
 
-	if(sscanf(line,"cache-update %s %lld %lld %s",cachename,&size,&transfer_time, id)==4) {
-		struct vine_file_replica *remote_info = vine_file_replica_table_lookup(w, cachename); 
+	if(sscanf(line,"cache-update %s %lld %lld %lld %s",cachename,&size,&transfer_time,&start_time,id)==5) {
+		struct vine_file_replica *remote_info = vine_file_replica_table_lookup(w, cachename);
 
 		if(!remote_info) {
 			/*
@@ -328,7 +329,7 @@ static int handle_cache_update( struct vine_manager *q, struct vine_worker_info 
 
 		vine_current_transfers_remove(q, id);
 
-		vine_txn_log_write_cache_update(q,w,size,transfer_time,cachename);
+		vine_txn_log_write_cache_update(q,w,size,transfer_time,start_time,cachename);
 	}
 
 	return VINE_MSG_PROCESSED;
@@ -1218,7 +1219,7 @@ static int expire_waiting_tasks(struct vine_manager *q)
 
 		if(t->resources_requested->end > 0 && t->resources_requested->end <= current_time)
 		{
-			vine_task_set_result(t, VINE_RESULT_TASK_TIMEOUT);
+			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			expired++;
 		} else if(t->max_retries > 0 && t->try_count > t->max_retries) {
@@ -1531,7 +1532,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 		if(t->exit_code == RM_OVERFLOW) {
 			vine_task_set_result(t, VINE_RESULT_RESOURCE_EXHAUSTION);
 		} else if(t->exit_code == RM_TIME_EXPIRE) {
-			vine_task_set_result(t, VINE_RESULT_TASK_TIMEOUT);
+			vine_task_set_result(t, VINE_RESULT_MAX_END_TIME);
 		}
 	}
 
@@ -2685,7 +2686,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 
 		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
-		if(m->file->type != VINE_MINI_TASK) 
+		if(m->file->share_peer_mode != VINE_PEER_NOSHARE) 
 		{
 			if((peer = vine_file_replica_table_find_worker(q, m->file->cached_name)))
 			{
@@ -3759,13 +3760,13 @@ const char *vine_result_string(vine_result_t result) {
 			str = "SUCCESS";
 			break;
 		case VINE_RESULT_INPUT_MISSING:
-			str = "INPUT_MISS";
+			str = "INPUT_MISSING";
 			break;
 		case VINE_RESULT_OUTPUT_MISSING:
-			str = "OUTPUT_MISS";
+			str = "OUTPUT_MISSING";
 			break;
 		case VINE_RESULT_STDOUT_MISSING:
-			str = "STDOUT_MISS";
+			str = "STDOUT_MISSING";
 			break;
 		case VINE_RESULT_SIGNAL:
 			str = "SIGNAL";
@@ -3773,8 +3774,8 @@ const char *vine_result_string(vine_result_t result) {
 		case VINE_RESULT_RESOURCE_EXHAUSTION:
 			str = "RESOURCE_EXHAUSTION";
 			break;
-		case VINE_RESULT_TASK_TIMEOUT:
-			str = "END_TIME";
+		case VINE_RESULT_MAX_END_TIME:
+			str = "MAX_END_TIME";
 			break;
 		case VINE_RESULT_UNKNOWN:
 			str = "UNKNOWN";
@@ -3785,11 +3786,8 @@ const char *vine_result_string(vine_result_t result) {
 		case VINE_RESULT_MAX_RETRIES:
 			str = "MAX_RETRIES";
 			break;
-		case VINE_RESULT_TASK_MAX_RUN_TIME:
+		case VINE_RESULT_MAX_WALL_TIME:
 			str = "MAX_WALL_TIME";
-			break;
-		case VINE_RESULT_DISK_ALLOC_FULL:
-			str = "DISK_FULL";
 			break;
 		case VINE_RESULT_RMONITOR_ERROR:
 			str = "MONITOR_ERROR";
@@ -4918,8 +4916,7 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t) {
 		case VINE_RESULT_SUCCESS:
 		case VINE_RESULT_SIGNAL:
 		case VINE_RESULT_RESOURCE_EXHAUSTION:
-		case VINE_RESULT_TASK_MAX_RUN_TIME:
-		case VINE_RESULT_DISK_ALLOC_FULL:
+		case VINE_RESULT_MAX_WALL_TIME:
 		case VINE_RESULT_OUTPUT_TRANSFER_ERROR:
 			if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
 				vine_txn_log_write_category(q, c);
@@ -4941,7 +4938,7 @@ void vine_accumulate_task(struct vine_manager *q, struct vine_task *t) {
 			break;
 		case VINE_RESULT_INPUT_MISSING:
 		case VINE_RESULT_OUTPUT_MISSING:
-		case VINE_RESULT_TASK_TIMEOUT:
+		case VINE_RESULT_MAX_END_TIME:
 		case VINE_RESULT_UNKNOWN:
 		case VINE_RESULT_FORSAKEN:
 		case VINE_RESULT_MAX_RETRIES:

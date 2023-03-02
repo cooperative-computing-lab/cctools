@@ -62,6 +62,9 @@ char *vine_runtime_directory_create() {
      * interpreted as a suffix to vine_runtime_info_path.
      *
      * VINE_RUNTIME_INFO_DIR has the subdirectories: logs and staging
+     *
+     * A cache directory is also created as a sibling of VINE_RUNTIME_INFO_DIR.
+     * The intention is that cache is shared between subsequent runs.
      */
 
 	char *runtime_dir = NULL;
@@ -123,6 +126,14 @@ char *vine_get_runtime_path_log(struct vine_manager *m, const char *path) {
 
 char *vine_get_runtime_path_staging(struct vine_manager *m, const char *path) {
     return string_format("%s/staging/%s", m->runtime_directory, path ? path : "");
+}
+
+char *vine_get_runtime_path_caching(struct vine_manager *m, const char *path) {
+    char abs[PATH_MAX];
+    char *tmp = string_format("%s/../vine-cache/%s", m->runtime_directory, path);
+    path_collapse(tmp, abs, 1);
+    free(tmp);
+    return xxstrdup(abs);
 }
 
 void vine_set_runtime_info_path(const char *path) {

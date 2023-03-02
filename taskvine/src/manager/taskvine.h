@@ -48,6 +48,11 @@ typedef enum {
 	VINE_SUCCESS_ONLY = 8, /**< Only return this output file if the task succeeded. */
 } vine_file_flags_t;
 
+typedef enum {
+	VINE_PEER_SHARE = 0, /**< Schedule this file to be shared between peers where available. (default) **/
+	VINE_PEER_NOSHARE = 1  /**< Do not schedule this file to be shared between peers. **/
+} vine_file_share_peer_mode_t;
+
 /** Select overall scheduling algorithm for matching tasks to workers. */
 
 typedef enum {
@@ -70,14 +75,13 @@ typedef enum {
 	VINE_RESULT_STDOUT_MISSING      = 4,      /**< The task ran but its stdout has been truncated **/
 	VINE_RESULT_SIGNAL              = 1 << 3, /**< The task was terminated with a signal **/
 	VINE_RESULT_RESOURCE_EXHAUSTION = 2 << 3, /**< The task used more resources than requested **/
-	VINE_RESULT_TASK_TIMEOUT        = 3 << 3, /**< The task ran after the specified (absolute since epoch) end time. **/
+	VINE_RESULT_MAX_END_TIME        = 3 << 3, /**< The task ran after the specified (absolute since epoch) end time. **/
 	VINE_RESULT_UNKNOWN             = 4 << 3, /**< The result could not be classified. **/
 	VINE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was not a task error **/
 	VINE_RESULT_MAX_RETRIES         = 6 << 3, /**< The task could not be completed successfully in the given number of retries. **/
-	VINE_RESULT_TASK_MAX_RUN_TIME   = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
-	VINE_RESULT_DISK_ALLOC_FULL     = 8 << 3, /**< The task filled its loop device allocation but needed more space. **/
-	VINE_RESULT_RMONITOR_ERROR      = 9 << 3, /**< The task failed because the monitor did not produce a summary report. **/
-	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 10 << 3  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
+	VINE_RESULT_MAX_WALL_TIME       = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
+	VINE_RESULT_RMONITOR_ERROR      = 8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
+	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
 } vine_result_t;
 
 /** Possible states of a task, given by @ref vine_task_state */
