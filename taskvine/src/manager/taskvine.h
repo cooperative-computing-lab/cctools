@@ -49,9 +49,9 @@ typedef enum {
 } vine_file_flags_t;
 
 typedef enum {
-	VINE_SHAREOK = 0, /**< Schedule this file to be shared between peers where available. (default) **/
-	VINE_NOSHARE = 1  /**< Do not schedule this file to be shared between peers. **/
-} vine_file_transfer_flags_t;
+	VINE_PEER_SHARE = 0, /**< Schedule this file to be shared between peers where available. (default) **/
+	VINE_PEER_NOSHARE = 1  /**< Do not schedule this file to be shared between peers. **/
+} vine_file_share_peer_mode_t;
 
 /** Select overall scheduling algorithm for matching tasks to workers. */
 
