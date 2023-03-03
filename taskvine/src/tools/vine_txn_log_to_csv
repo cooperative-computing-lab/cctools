@@ -418,7 +418,7 @@ class TxnPlotTasks(TxnPlot):
     def plot(self, fig, manager, plot_origin):
 
         # consider tasks for which we have a full time report
-        dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"]
+        dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"].sort_by("time_commit_start")
         y = dt["task_id"]
 
 
