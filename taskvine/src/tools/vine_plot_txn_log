@@ -450,11 +450,41 @@ class TxnPlot:
         return NotImplemented
 
 
+class TxnPlotManager(TxnPlot):
+    def line(self, fig, cu, xtime, color):
+        norm = max(1, len(cu.index))
+        fig.plot(cu["one"].cumsum()/norm, cu[xtime], color=color)
+
+    def plot(self, fig, manager):
+        ts = manager.tasks
+        xs = manager.transfers
+        ws = manager.workers
+
+        xs["one"] = 1
+        ts["one"] = 1
+
+        xs["end_time"] = xs["start_time"] + xs["wall_time"]
+        xs.sort_values("end_time", ignore_index=True, inplace=True)
+
+        cu = xs[xs["direction"] == "CACHE_UPDATE"][["end_time", "one"]]
+        self.line(fig, cu, "end_time", color=self.legend["cache updates"])
+
+        cu = xs[xs["direction"] == "INPUT"][["end_time", "one"]]
+        self.line(fig, cu, "end_time", color=self.legend["inputs from manager"])
+
+        cu = xs[xs["direction"] == "OUTPUT"][["end_time", "one"]]
+        self.line(fig, cu, "end_time", color=self.legend["outputs to manager"])
+
+        fig.set_ylabel("Percentage")
+        fig.set_yticks([0, 1])
+        fig.set_yticklabels(["0", "100%"])
+
+
 class TxnPlotTasks(TxnPlot):
     def plot(self, fig, manager):
 
         # consider tasks for which we have a full time report
-        dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"].sort_values("time_commit_start")
+        dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"].sort_values("time_commit_start", ignore_index=True)
         y = dt["task_id"]
 
 
@@ -560,6 +590,6 @@ if __name__ == "__main__":
     elif args.mode == "tasks":
         TxnPlotTasks(p.managers, args)
     elif args.mode == "manager":
-        print("not implemented")
+        TxnPlotManager(p.managers, args)
 
 
