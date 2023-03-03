@@ -454,7 +454,7 @@ class TxnPlotTasks(TxnPlot):
     def plot(self, fig, manager):
 
         # consider tasks for which we have a full time report
-        dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"].sort_by("time_commit_start")
+        dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"].sort_values("time_commit_start")
         y = dt["task_id"]
 
 
@@ -543,7 +543,7 @@ if __name__ == "__main__":
     parser.add_argument('--mode', choices="workers tasks manager csv".split(), help='information to plot. sv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
     parser.add_argument('--title', nargs='?', default='TaskVine', help='Title of the plot')
     parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default="first-worker")
-    parser.add_argument('--end', nargs='?', help='change plot end time. One of manager-end, last-task', default="manager-end")
+    parser.add_argument('--end', nargs='?', help='change plot end time. One of manager-end, last-task', default="last-task")
     parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
     parser.add_argument('--width', nargs='?', help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', help='height in inches. Default is 2/3 of width', default=None)
