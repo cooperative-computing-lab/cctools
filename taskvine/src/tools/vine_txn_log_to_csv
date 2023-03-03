@@ -560,6 +560,6 @@ if __name__ == "__main__":
     elif args.mode == "tasks":
         TxnPlotTasks(p.managers, args)
     elif args.mode == "manager":
-        TxnPlotManager(p.managers, args)
+        return NotImplemented
 
 
