@@ -118,12 +118,35 @@ class Manager:
 
 
 class ParseTxn:
-    def __init__(self, logfile):
+    def __init__(self, logfile, tasks_range_spec=None):
         self._log = logfile
         self.managers = {}
         self.cm = None  # current manager
 
+        self.tasks_range = self.expand_range(tasks_range_spec)
+
         self._parse()
+
+    def expand_range(self, tasks_range_spec):
+        start, end, step = 1, None, 1
+
+        if tasks_range_spec:
+            rest = tasks_range_spec.split(",")
+            (start, *rest) = rest
+            start = max(1, int(start)) if start else 1
+            if rest:
+                (end, *step) = rest
+                end = max(start+1, int(end)) if end else None
+                step = max(1, int(step[0])) if step else 1
+        return (start,end,step)
+
+    def check_task_range(self, task_id):
+        (start, end, step) = self.tasks_range
+        if start and task_id < start:
+            return False
+        if end and task_id >= end:
+            return False
+        return 0 == (task_id + start) % step
 
     def write_tables(self, filename):
         for (i, m) in enumerate(self.managers.values()):
@@ -262,7 +285,9 @@ class ParseTxn:
             pass
 
     def _parse_task(self, time, manager_pid, task_id, event, arg):
-        if int(task_id) > 4001000:
+        task_id = int(task_id)
+
+        if not self.check_task_range(task_id):
             return
 
         if event == "WAITING":
@@ -348,7 +373,7 @@ class TxnPlot:
                 "outputs to manager": 'C5',
                 "tasks waiting for cache": 'C4',
                 "tasks executing": 'C0',
-                "tasks waiting retrieval": 'C6',
+                "tasks waiting retrieval": 'C8',
                 "tasks failures": 'red',
                 }
 
@@ -358,12 +383,21 @@ class TxnPlot:
         spec = self.opts.origin
         if spec == "manager-start":
             return 0
-        if spec == "first-waiting-task":
+        elif spec == "first-waiting-task":
             return m.tasks["WAITING"].min()
-        if spec == "first-transfer":
+        elif spec == "first-transfer":
             return m.transfers["time"].min()
-        if spec == "first-worker":
+        elif spec == "first-worker":
             return m.workers["CONNECTION"].min()
+        return 0
+
+    def determine_end(self, m):
+        spec = self.opts.end
+        if spec == "manager-end":
+            return m.termination
+        elif spec == "last-task":
+            return m.tasks["last_state_time"].max()
+        return m.termination
 
     def make_tick_time(self, origin, x, pos):
         def roundb(b, x):
@@ -383,7 +417,7 @@ class TxnPlot:
 
     def bh(self, fig, slots, left, width, color, **kwargs):
         # bar plot with some defaults
-        args = { "left": left, "width": width, "color": color, "linewidth": 0.5, "align": "edge", "edgecolor": color }
+        args = { "left": left, "width": width, "color": color, "linewidth": 0.5, "align": "edge", "edgecolor": "#00000010" }
         args.update(kwargs)
         fig.barh(slots, **args)
 
@@ -393,11 +427,13 @@ class TxnPlot:
         for (i, m) in enumerate(self.managers.values()):
             s = self.subs[0, i]
 
-            plot_origin = self.determine_origin(m)
-            self.plot(s, m, plot_origin)
+            self.plot(s, m)
 
-            s.axis(xmin=plot_origin, xmax=m.termination)
-            s.set_xticks([plot_origin, m.termination])
+            plot_origin = self.determine_origin(m)
+            plot_end = self.determine_end(m)
+
+            s.axis(xmin=plot_origin, xmax=plot_end)
+            s.set_xticks([plot_origin, plot_end])
             s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_origin)))
             s.set_xlabel("time")
 
@@ -410,12 +446,12 @@ class TxnPlot:
         if self.opts.display or not self.opts.output:
             plt.show()
 
-    def plot(self, fig, manager, plot_origin):
+    def plot(self, fig, manager):
         return NotImplemented
 
 
 class TxnPlotTasks(TxnPlot):
-    def plot(self, fig, manager, plot_origin):
+    def plot(self, fig, manager):
 
         # consider tasks for which we have a full time report
         dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"].sort_by("time_commit_start")
@@ -444,38 +480,38 @@ class TxnPlotTasks(TxnPlot):
 
 class TxnPlotWorkers(TxnPlot):
     def plot_by_worker(self, fig, worker, worker_times, worker_xfers, base_slot):
-        slot_count = worker["slot"].nunique() + 2  # + 2 for the "slot" for cache update and transfers
-        worker["slot"] += base_slot + 1   # slot 0 for cache updates, 1 for input/output
+        slot_count = worker["slot"].nunique() + 2  # + 2 for the "slots" for cache update, and transfers
+        worker["slot"] += base_slot+1 # slot 0 for cache updates, 1 for transfers
 
         dt = worker[worker["reason"] != "DISCONNECTION"]
         y = worker["slot"]
 
         # plot times from this wid
-        self.bh(fig, base_slot, worker_times["CONNECTION"], worker_times["DISCONNECTION"] - worker_times["CONNECTION"], "C9", height=slot_count, edgecolor="#00000010")
+        self.bh(fig, base_slot, worker_times["CONNECTION"], worker_times["DISCONNECTION"] - worker_times["CONNECTION"], "C9", height=slot_count)
 
         cu = worker_xfers[ worker_xfers["direction"] == "CACHE_UPDATE" ]
         self.bh(fig, base_slot+0.1, cu["start_time"], cu["wall_time"], self.legend["cache updates"], height=0.7)
 
         cu = worker_xfers[ worker_xfers["direction"] == "INPUT" ]
-        self.bh(fig, base_slot+1, cu["start_time"], cu["wall_time"], self.legend["inputs from manager"])
+        self.bh(fig, base_slot+1, cu["start_time"], cu["wall_time"].clip(lower=1.0), self.legend["inputs from manager"])
 
         cu = worker_xfers[ worker_xfers["direction"] == "OUTPUT" ]
-        self.bh(fig, base_slot+1, cu["start_time"], cu["wall_time"], self.legend["outputs to manager"])
+        self.bh(fig, base_slot+1, cu["start_time"], cu["wall_time"].clip(lower=1.0), self.legend["outputs to manager"])
 
-        self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting for cache"], edgecolor="#00000010")
+        self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting for cache"])
 
-        self.bh(fig, dt["slot"], dt["time_worker_start"], dt["time_worker_end"]-dt["time_worker_start"], self.legend["tasks executing"], edgecolor="#00000010")
+        self.bh(fig, dt["slot"], dt["time_worker_start"], dt["time_worker_end"]-dt["time_worker_start"], self.legend["tasks executing"])
 
         st = worker[worker["reason"] == "SUCCESS"]
-        self.bh(fig, st["slot"], st["time_worker_end"], st["RETRIEVED"]-st["time_worker_end"], self.legend["tasks waiting retrieval"], edgecolor="#00000010")
+        self.bh(fig, st["slot"], st["time_worker_end"], st["RETRIEVED"]-st["time_worker_end"], self.legend["tasks waiting retrieval"])
 
         ft = worker[(worker["reason"] != "SUCCESS") & (worker["reason"] != "DISCONNECTION")]
-        self.bh(fig, ft["slot"], ft["time_worker_end"], ft["RETRIEVED"]-ft["time_worker_end"], self.legend["tasks failures"], edgecolor="#00000010")
+        self.bh(fig, ft["slot"], ft["time_worker_end"], ft["RETRIEVED"]-ft["time_worker_end"], self.legend["tasks failures"])
 
         return worker["slot"].max() + 1
 
 
-    def plot(self, fig, manager, plot_origin):
+    def plot(self, fig, manager):
         ts = manager.tasks
         xs = manager.transfers
         ws = manager.workers
@@ -504,20 +540,18 @@ if __name__ == "__main__":
 
     parser.add_argument('log', help='Path to transaction log file')
     parser.add_argument('output', nargs='?', default=None, help='output name of the plot/csv generated. If not given, assumes --display')
-    parser.add_argument('--mode', help='information to plot. One of workers, tasks, manager, or csv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
+    parser.add_argument('--mode', choices="workers tasks manager csv".split(), help='information to plot. sv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
     parser.add_argument('--title', nargs='?', default='TaskVine', help='Title of the plot')
     parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default="first-worker")
+    parser.add_argument('--end', nargs='?', help='change plot end time. One of manager-end, last-task', default="manager-end")
     parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
     parser.add_argument('--width', nargs='?', help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', help='height in inches. Default is 2/3 of width', default=None)
-
-    parser.add_argument('--hide-cache-updates', action='store_true', help='do not display cache updates')
-    parser.add_argument('--hide-transfers', action='store_true', help='do not display output transfers')
-
+    parser.add_argument('--tasks-range', nargs='?', help='range of tasks ids to plot as start[,[end][,step]] ', default="1,,1")
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
     args = parser.parse_args()
 
-    p = ParseTxn(args.log)
+    p = ParseTxn(args.log, args.tasks_range)
 
     if args.mode == "csv":
         p.write_tables(args.output)
@@ -526,6 +560,6 @@ if __name__ == "__main__":
     elif args.mode == "tasks":
         TxnPlotTasks(p.managers, args)
     elif args.mode == "manager":
-        TxnPlotWorkers(p.managers, args)
+        TxnPlotManager(p.managers, args)
 
 
