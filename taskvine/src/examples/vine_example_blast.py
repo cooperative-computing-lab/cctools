@@ -37,11 +37,9 @@ if __name__ == "__main__":
 
     for i in range(10):
         t = vine.Task(
-            {
-                "cmd" : "blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file",
-                "inputs" : {"query.file" : query, "blastdir" : blast, "landmark" : landmark},
-                "env" : {"BLASTDB" : "landmark"}
-            }
+            command = "blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file",
+            inputs = {query : "query.file", blast : "blastdir", landmark : "landmark"},
+            env = {"BLASTDB" : "landmark"}
         )
 
         # t = vine.Task("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file")
