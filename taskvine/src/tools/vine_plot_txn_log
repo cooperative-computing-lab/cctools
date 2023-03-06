@@ -419,6 +419,8 @@ class TxnPlot:
         # bar plot with some defaults
         args = { "left": left, "width": width, "color": color, "linewidth": 0.5, "align": "edge", "edgecolor": "#00000010" }
         args.update(kwargs)
+        if not args["edgecolor"]:
+            args["edgecolor"] = color
         fig.barh(slots, **args)
 
     def display_plot(self):
@@ -488,17 +490,17 @@ class TxnPlotTasks(TxnPlot):
         y = dt["task_id"]
 
 
-        self.bh(fig, y, dt["time_commit_start"], dt["time_input_mgr"], self.legend["inputs from manager"])
+        self.bh(fig, y, dt["time_commit_start"], dt["time_input_mgr"], self.legend["inputs from manager"], edgecolor=None)
 
-        self.bh(fig, y, dt["time_commit_end"],  dt["time_worker_start"] - dt["time_commit_end"], self.legend["cache updates"])
+        self.bh(fig, y, dt["time_commit_end"],  dt["time_worker_start"] - dt["time_commit_end"], self.legend["cache updates"], edgecolor=None)
 
         del self.legend["tasks waiting for cache"] # already covered above
 
-        self.bh(fig, y, dt["time_worker_start"],  dt["time_worker_end"] - dt["time_worker_start"], self.legend["tasks executing"])
+        self.bh(fig, y, dt["time_worker_start"],  dt["time_worker_end"] - dt["time_worker_start"], self.legend["tasks executing"], edgecolor=None)
 
-        self.bh(fig, y, dt["time_worker_end"],  dt["RETRIEVED"] - dt["time_worker_end"], self.legend["tasks waiting retrieval"])
+        self.bh(fig, y, dt["time_worker_end"],  dt["RETRIEVED"] - dt["time_worker_end"], self.legend["tasks waiting retrieval"], edgecolor=None)
 
-        self.bh(fig, y, dt["RETRIEVED"] - dt["time_output_mgr"],  dt["time_output_mgr"], self.legend["outputs to manager"])
+        self.bh(fig, y, dt["RETRIEVED"] - dt["time_output_mgr"],  dt["time_output_mgr"], self.legend["outputs to manager"], edgecolor=None)
 
         del self.legend["tasks failures"] # already covered above
 
