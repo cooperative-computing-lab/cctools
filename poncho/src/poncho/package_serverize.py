@@ -63,9 +63,9 @@ def main():
             if len(line) >= 0:
                 function_name, event_size = line.split(" ")
                 # receive sandbox for output_files
-                sandbox = input()
-                if not sandbox:
-                    print("Unable to read sandbox: exiting", file=sys.stderr)
+                function_sandbox = input()
+                if not function_sandbox:
+                    print("Unable to read function call's sandbox: exiting", file=sys.stderr)
                     exit(0)
                 if event_size:
                     # receive the bytes containing the event and turn it into a string
@@ -80,13 +80,24 @@ def main():
                     exec_method = event.get("remote_task_exec_method", None)
                     print('Network function: recieved event: {}'.format(event), file=sys.stderr)
                     if exec_method == "direct":
-                        os.chdir(sandbox)
-                        response = json.dumps(globals()[function_name](event))
+                        library_sandbox = os.getcwd()
+                        try:
+                            os.chdir(function_sandbox)
+                            response = json.dumps(globals()[function_name](event))
+                        except Exception as e:
+                            print(f'Network Function: Function call failed due to {e}', file=sys.stderr)
+                            response = {
+                                "Result": f"Function call failed: {e}",
+                                "StatusCode": 500
+                            }
+                        finally:
+                            os.chdir(library_sandbox)
+
                     else:
                         p = os.fork()
                         if p == 0:
-                            os.chdir(sandbox)
-                            response =globals()[function_name](event)
+                            os.chdir(function_sandbox)
+                            response = globals()[function_name](event)
                             os.write(write, json.dumps(response).encode("utf-8"))
                             os._exit(0)
                         elif p < 0:
