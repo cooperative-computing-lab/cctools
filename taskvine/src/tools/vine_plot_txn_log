@@ -488,23 +488,32 @@ class TxnPlotManager(TxnPlot):
 
 class TxnPlotTasks(TxnPlot):
     def plot(self, fig, manager):
+        manager.tasks.sort_values("time_commit_start", ignore_index=True, inplace=True)
 
-        # consider tasks for which we have a full time report
-        dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"].sort_values("time_commit_start", ignore_index=True)
-        y = dt["task_id"]
+        # divided tasks on whether we have a full report
+        at = manager.tasks
+        lt = manager.tasks[manager.tasks["reason"] == "DISCONNECTION"]
+        dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"]
 
+        del self.legend["workers lifetime"] # not show in this plot
 
-        self.bh(fig, y, dt["time_commit_start"], dt["time_input_mgr"], self.legend["inputs from manager"], edgecolor=None)
+        cu = at[at["size_input_mgr"] > 0]
+        self.bh(fig, cu.index, cu["time_commit_start"], cu["time_input_mgr"], self.legend["inputs from manager"], edgecolor=None)
 
-        self.bh(fig, y, dt["time_commit_end"],  dt["time_worker_start"] - dt["time_commit_end"], self.legend["cache updates"], edgecolor=None)
+        cu = at[at["size_output_mgr"] > 0]
+        self.bh(fig, cu.index, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"], self.legend["outputs to manager"], edgecolor=None)
+
+        self.bh(fig, dt.index, dt["time_commit_end"],  dt["time_worker_start"] - dt["time_commit_end"], self.legend["cache updates"], edgecolor=None)
 
         del self.legend["tasks waiting for cache"] # already covered above
 
-        self.bh(fig, y, dt["time_worker_start"],  dt["time_worker_end"] - dt["time_worker_start"], self.legend["tasks executing"], edgecolor=None)
+        self.bh(fig, lt.index, lt["time_commit_end"],  lt["last_state_time"] - lt["time_commit_end"], self.legend["tasks lost on disconnection"], edgecolor=None)
 
-        self.bh(fig, y, dt["time_worker_end"],  dt["RETRIEVED"] - dt["time_worker_end"], self.legend["tasks waiting retrieval"], edgecolor=None)
+        self.bh(fig, dt.index, dt["time_worker_start"],  dt["time_worker_end"] - dt["time_worker_start"], self.legend["tasks executing"], edgecolor=None)
 
-        self.bh(fig, y, dt["RETRIEVED"] - dt["time_output_mgr"],  dt["time_output_mgr"], self.legend["outputs to manager"], edgecolor=None)
+        self.bh(fig, dt.index, dt["time_worker_end"],  dt["RETRIEVED"] - dt["time_worker_end"], self.legend["tasks waiting retrieval"], edgecolor=None)
+
+        self.bh(fig, dt.index, dt["RETRIEVED"] - dt["time_output_mgr"],  dt["time_output_mgr"], self.legend["outputs to manager"], edgecolor=None)
 
         del self.legend["tasks failures"] # already covered above
 
@@ -528,11 +537,14 @@ class TxnPlotWorkers(TxnPlot):
         cu = worker_xfers[ worker_xfers["direction"] == "CACHE_UPDATE" ]
         self.bh(fig, base_slot+0.1, cu["start_time"], cu["wall_time"], self.legend["cache updates"], height=0.7)
 
-        cu = worker_xfers[ worker_xfers["direction"] == "INPUT" ]
-        self.bh(fig, base_slot+1, cu["start_time"], cu["wall_time"].clip(lower=1.0), self.legend["inputs from manager"])
+        # select tasks that needed inputs or outputs, and plot that.  we prefer this
+        # information from tasks rather than transfer records, as there is only
+        # at most one record per task.
+        cu = worker[worker["size_input_mgr"] > 0]
+        self.bh(fig, base_slot+1, cu["time_commit_start"], cu["time_input_mgr"].clip(lower=1.0), self.legend["inputs from manager"])
 
-        cu = worker_xfers[ worker_xfers["direction"] == "OUTPUT" ]
-        self.bh(fig, base_slot+1, cu["start_time"], cu["wall_time"].clip(lower=1.0), self.legend["outputs to manager"])
+        cu = worker[worker["size_output_mgr"] > 0]
+        self.bh(fig, base_slot+1, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"].clip(lower=1.0), self.legend["outputs to manager"])
 
         self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting for cache"])
 
