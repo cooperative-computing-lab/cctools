@@ -138,8 +138,6 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 				struct jx *m = resources_with_io_report(t, box);
 				jx_print_buffer(m, &B);
 				jx_delete(m);
-
-				rmsummary_print_buffer(&B, box, 1);
 			} else if(state == VINE_TASK_WAITING_RETRIEVAL) {
 				/* do not add any info */
 			}
