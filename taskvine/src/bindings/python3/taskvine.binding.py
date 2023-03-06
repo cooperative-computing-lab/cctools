@@ -1034,6 +1034,12 @@ class Manager(object):
         return vine_get_runtime_path_staging(self._taskvine, None)
 
     ##
+    # Get the caching directory of the manager
+    @property
+    def cache_directory(self):
+        return vine_get_runtime_path_caching(self._taskvine, None)
+
+    ##
     # Get manager statistics.
     # @code
     # >>> print(q.stats)
