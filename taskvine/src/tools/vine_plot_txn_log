@@ -371,15 +371,16 @@ class TxnPlot:
 
         # default legend
         self.legend = {
+                "workers lifetime": 'C9',
+                "tasks executing": 'C0',
+                "tasks waiting for cache": 'C7',
+                "tasks lost on disconnection": 'pink',
+                "tasks waiting retrieval": 'C2',
+                "tasks failures": 'C8',
                 "cache updates": 'C1',
                 "inputs from manager": 'C3',
                 "outputs to manager": 'C5',
-                "tasks waiting for cache": 'C4',
-                "tasks executing": 'C0',
-                "tasks waiting retrieval": 'C8',
-                "tasks failures": 'red',
                 }
-
         self.display_plot()
 
     def determine_origin(self, m):
