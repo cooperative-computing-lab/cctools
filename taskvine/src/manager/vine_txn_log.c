@@ -55,7 +55,15 @@ void vine_txn_log_write_header( struct vine_manager *q )
 }
 
 static struct jx *resources_with_io_report(const struct vine_task *t, const struct rmsummary *s) {
-	struct jx *m = rmsummary_to_json(s, /* only resources */ 1);
+
+	struct jx *m = NULL;
+
+	if(s) {
+		m = rmsummary_to_json(s, /* only resources */ 1);
+	} else {
+		m = jx_object(0);
+	}
+
 	if(t->time_when_commit_start > 0) {
 		/* if time_when_commit_start, then we now for sure the task was
 		 * submitted to some worker, and that bytes sent makes sense. */
