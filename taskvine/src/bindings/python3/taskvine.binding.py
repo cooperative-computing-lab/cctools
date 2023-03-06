@@ -1164,17 +1164,23 @@ class Manager(object):
         return vine_task_state(self._taskvine, task_id)
 
     ##
-    # Enables resource monitoring of tasks in the manager, and writes a summary
-    # per task to the directory given. Additionally, all summaries are
-    # consolidate into the file all_summaries-PID.log
+    ## Enables resource monitoring for tasks. The resources measured are
+    # available in the resources_measured member of the respective vine_task. A
+    # file VINE_RUNTIME_INFO_DIR/vine-logs/monitor/resources.log is also
+    # generated with resources per task.
+    # @param self   Reference to the current manager object.
+    # @param watchdog If not 0, kill tasks that exhaust declared resources.
+    # @param time_series If not 0, generate a time series of resources per task
+    # in VINE_RUNTIME_INFO_DIR/vine-logs/monitor/ (WARNING: for long running
+    # tasks these files may reach gigabyte sizes. This function is mostly used
+    # for debugging.)
     #
     # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
     # @param self   Reference to the current manager object.
-    # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
-    def enable_monitoring(self, dirname=None, watchdog=True):
-        return vine_enable_monitoring(self._taskvine, dirname, watchdog)
+    def enable_monitoring(self, watchdog=True, time_series=False):
+        return vine_enable_monitoring(self._taskvine, watchdog, time_series)
 
     ##
     # As @ref enable_monitoring, but it also generates a time series and a

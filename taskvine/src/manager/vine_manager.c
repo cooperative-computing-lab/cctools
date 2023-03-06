@@ -936,23 +936,24 @@ static void delete_uncacheable_files( struct vine_manager *q, struct vine_worker
 
 /* Determine the resource monitor file name that should be associated with this task. */
 
-static char *monitor_file_name(struct vine_manager *q, struct vine_task *t, const char *ext) {
+static char *monitor_file_name(struct vine_manager *q, struct vine_task *t, const char *ext, int keep) {
 	char *dir;
 
 	int free_dir = 0;
 
 	if(t->monitor_output_directory) {
+		/* if output directory from task, we always keep the summaries generated. */
 		dir = t->monitor_output_directory;
-	} else if(q->monitor_output_directory) {
-		dir = q->monitor_output_directory;
 	} else {
-		dir = vine_get_runtime_path_staging(q, NULL);
-		free_dir = 1;
+		if(keep) {
+			dir = q->monitor_output_directory;
+		} else {
+			dir = vine_get_runtime_path_staging(q, NULL);
+			free_dir = 1;
+		}
 	}
 
-	char *name = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME "%s",
-			dir, getpid(), t->task_id, ext ? ext : "");
-
+	char *name = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME "%s", dir, t->task_id, ext ? ext : "");
 	if(free_dir) {
 		free(dir);
 	}
@@ -961,10 +962,8 @@ static char *monitor_file_name(struct vine_manager *q, struct vine_task *t, cons
 }
 
 /* Extract the resources consumed by a task by reading the appropriate resource monitor file. */
-
 static void read_measured_resources(struct vine_manager *q, struct vine_task *t) {
-
-	char *summary = monitor_file_name(q, t, ".summary");
+	char *summary = monitor_file_name(q, t, ".summary", 0);
 
 	if(t->resources_measured) {
 		rmsummary_delete(t->resources_measured);
@@ -996,55 +995,48 @@ void resource_monitor_append_report(struct vine_manager *q, struct vine_task *t)
 	if(q->monitor_mode == VINE_MON_DISABLED)
 		return;
 
-	char *summary = monitor_file_name(q, t, ".summary");
+	char *summary = monitor_file_name(q, t, ".summary", 0);
 
-	if(q->monitor_output_directory) {
-		int monitor_fd = fileno(q->monitor_file);
+	int monitor_fd = fileno(q->monitor_file);
 
-		struct flock lock;
-		lock.l_type   = F_WRLCK;
-		lock.l_start  = 0;
-		lock.l_whence = SEEK_SET;
-		lock.l_len    = 0;
+	struct flock lock;
+	lock.l_type   = F_WRLCK;
+	lock.l_start  = 0;
+	lock.l_whence = SEEK_SET;
+	lock.l_len    = 0;
 
-		fcntl(monitor_fd, F_SETLKW, &lock);
+	fcntl(monitor_fd, F_SETLKW, &lock);
 
-		if(!t->resources_measured)
-		{
-			fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->task_id);
-		}
-
-		FILE *fs = fopen(summary, "r");
-		if(fs) {
-			copy_stream_to_stream(fs, q->monitor_file);
-			fclose(fs);
-		}
-
-		fprintf(q->monitor_file, "\n");
-
-		lock.l_type   = F_ULOCK;
-		fcntl(monitor_fd, F_SETLK, &lock);
+	if(!t->resources_measured)
+	{
+		fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->task_id);
 	}
+
+	FILE *fs = fopen(summary, "r");
+	if(fs) {
+		copy_stream_to_stream(fs, q->monitor_file);
+		fclose(fs);
+	}
+
+	fprintf(q->monitor_file, "\n");
+
+	lock.l_type   = F_ULOCK;
+	fcntl(monitor_fd, F_SETLK, &lock);
+
 
 	/* Remove individual summary file unless it is named specifically. */
 	int keep = 0;
-	if(t->monitor_output_directory)
-		keep = 1;
-
-	if(q->monitor_mode & VINE_MON_FULL && q->monitor_output_directory)
-		keep = 1;
-
-	if(!keep)
+	if(!t->monitor_output_directory) {
 		unlink(summary);
+	}
 
 	free(summary);
 }
 
 /* Compress old time series files so as to avoid accumulating infinite resource monitoring data. */
-
 static void resource_monitor_compress_logs(struct vine_manager *q, struct vine_task *t) {
-	char *series    = monitor_file_name(q, t, ".series");
-	char *debug_log = monitor_file_name(q, t, ".debug");
+	char *series    = monitor_file_name(q, t, ".series", 1);
+	char *debug_log = monitor_file_name(q, t, ".debug", 1);
 
 	char *command = string_format("gzip -9 -q %s %s", series, debug_log);
 
@@ -3264,75 +3256,49 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	return q;
 }
 
-int vine_enable_monitoring(struct vine_manager *q, const char *monitor_output_directory, int watchdog)
+int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 {
-	if(!q)
+	if(!q) {
 		return 0;
+	}
 
 	q->monitor_mode = VINE_MON_DISABLED;
 	q->monitor_exe = resource_monitor_locate(NULL);
-
-	if(q->monitor_output_directory) {
-		free(q->monitor_output_directory);
-		q->monitor_output_directory = NULL;
-	}
-
-	if(!q->monitor_exe)
-	{
+	if(!q->monitor_exe) {
 		warn(D_VINE, "Could not find the resource monitor executable. Disabling monitoring.\n");
 		return 0;
 	}
 
-	if(monitor_output_directory) {
-		q->monitor_output_directory = xxstrdup(monitor_output_directory);
-
-		if(!create_dir(q->monitor_output_directory, 0777)) {
-			fatal("Could not create monitor output directory - %s (%s)", q->monitor_output_directory, strerror(errno));
-		}
-
-		q->monitor_summary_filename = string_format("%s/vine-%d.summaries", q->monitor_output_directory, getpid());
-		q->monitor_file             = fopen(q->monitor_summary_filename, "a");
-
-		if(!q->monitor_file)
-		{
-			fatal("Could not open monitor log file for writing: '%s'\n", q->monitor_summary_filename);
-		}
-
+	if(!q->monitor_output_directory) {
+		q->monitor_output_directory = vine_get_runtime_path_log(q, "monitor");
 	}
 
-	if(q->measured_local_resources)
-		rmsummary_delete(q->measured_local_resources);
+	if(!create_dir(q->monitor_output_directory, 0777)) {
+		warn("Could not create monitor output directory - %s (%s)", q->monitor_output_directory, strerror(errno));
+	}
 
+	summaries_file = string_format("%s/resources.log", q->monitor_output_directory);
+	q->monitor_file  = fopen(summaries_file, "a");
+	if(!q->monitor_file) {
+		fatal("Could not open monitor log file for writing: '%s'\n", summaries_file);
+	}
+
+	if(q->measured_local_resources) {
+		rmsummary_delete(q->measured_local_resources);
+	}
 	q->measured_local_resources = rmonitor_measure_process(getpid());
+
+
 	q->monitor_mode = VINE_MON_SUMMARY;
+	if(series) {
+		q->monitor_mode = VINE_MON_FULL;
+	}
 
 	if(watchdog) {
 		q->monitor_mode |= VINE_MON_WATCHDOG;
 	}
 
 	return 1;
-}
-
-int vine_enable_monitoring_full(struct vine_manager *q, const char *monitor_output_directory, int watchdog) {
-	char *dir = NULL;
-	if(monitor_output_directory) {
-		dir = xxstrdup(monitor_output_directory);
-	} else {
-		dir = vine_get_runtime_path_log(q, "monitor");
-	}
-
-	int status = vine_enable_monitoring(q, dir, 1);
-	free(dir);
-
-	if(status) {
-		q->monitor_mode = VINE_MON_FULL;
-
-		if(watchdog) {
-			q->monitor_mode |= VINE_MON_WATCHDOG;
-		}
-	}
-
-	return status;
 }
 
 int vine_enable_peer_transfers(struct vine_manager *q) {
@@ -3605,20 +3571,18 @@ void vine_disable_monitoring(struct vine_manager *q) {
 		free(q->monitor_exe);
 	if(q->monitor_output_directory)
 		free(q->monitor_output_directory);
-	if(q->monitor_summary_filename)
-		free(q->monitor_summary_filename);
 }
 
 void vine_monitor_add_files(struct vine_manager *q, struct vine_task *t) {
 	vine_task_add_input_file(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, VINE_CACHE);
 
-	char *summary  = monitor_file_name(q, t, ".summary");
+	char *summary  = monitor_file_name(q, t, ".summary", 0);
 	vine_task_add_output_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", VINE_NOCACHE);
 	free(summary);
 
-	if(q->monitor_mode & VINE_MON_FULL && (q->monitor_output_directory || t->monitor_output_directory)) {
-		char *debug  = monitor_file_name(q, t, ".debug");
-		char *series = monitor_file_name(q, t, ".series");
+	if(q->monitor_mode & VINE_MON_FULL) {
+		char *debug  = monitor_file_name(q, t, ".debug", 1);
+		char *series = monitor_file_name(q, t, ".series", 1);
 
 		vine_task_add_output_file(t, debug, RESOURCE_MONITOR_REMOTE_NAME ".debug", VINE_NOCACHE);
 		vine_task_add_output_file(t, series, RESOURCE_MONITOR_REMOTE_NAME ".series", VINE_NOCACHE);
@@ -4673,11 +4637,15 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->proportional_whole_tasks = MAX(0, (int)value);
 
 	} else if(!strcmp(name, "file-source-max-transfers")){
-		q->file_source_max_transfers = MAX(1, (int)value); 
+		q->file_source_max_transfers = MAX(1, (int)value);
 
 	} else if(!strcmp(name, "worker-source-max-transfers")){
 		q->worker_source_max_transfers = MAX(1, (int)value);
-	
+
+	} else if(!strcmp(name, "monitor-interval")) {
+		/* 0 means use monitor's default */
+		q->monitor_interval = MAX(0, (int)value);
+
 	} else {
 		debug(D_NOTICE|D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
