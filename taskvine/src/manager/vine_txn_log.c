@@ -48,9 +48,33 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) attempt_number {resources_requested}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING_RETRIEVAL worker_id\n");
-	fprintf(q->txn_logfile, "# time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) exit_code {limits_exceeded} {resources_measured}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK task_id RETRIEVED (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) {limits_exceeded} {resources_measured}\n");
+	fprintf(q->txn_logfile, "# time manager_pid TASK task_id DONE (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) exit_code\n");
 	fprintf(q->txn_logfile, "# time manager_pid DUTY duty_id (WAITING|SENT|STARTED|FAILURE) worker_id");
 	fprintf(q->txn_logfile, "\n");
+}
+
+static struct jx *resources_with_io_report(const struct vine_task *t, const struct rmsummary *s) {
+    struct jx *m = rmsummary_to_json(s, /* only resources */ 1);
+    if(t->time_when_commit_start > 0) {
+        /* if time_when_commit_start, then we now for sure the task was
+         * submitted to some worker, and that bytes sent makes sense. */
+
+        jx_insert(m, jx_string("size_input_mgr"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
+        jx_insert(m, jx_string("time_input_mgr"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
+        jx_insert(m, jx_string("time_commit_end"), jx_arrayv(jx_double(t->time_when_commit_end/((double) ONE_SECOND)), jx_string("s"), NULL));
+        jx_insert(m, jx_string("time_commit_start"), jx_arrayv(jx_double(t->time_when_commit_start/((double) ONE_SECOND)), jx_string("s"), NULL));
+    }
+
+    if(t->time_when_retrieval > 0) {
+        /* if time_when_retrieval, then information about execution is available */
+        jx_insert(m, jx_string("size_output_mgr"), jx_arrayv(jx_double(t->bytes_received/((double) MEGABYTE)), jx_string("MB"), NULL));
+        jx_insert(m, jx_string("time_output_mgr"), jx_arrayv(jx_double((t->time_when_done - t->time_when_retrieval)/((double) ONE_SECOND)), jx_string("s"), NULL));
+        jx_insert(m, jx_string("time_worker_end"), jx_arrayv(jx_double(t->time_workers_execute_last_end/((double) ONE_SECOND)), jx_string("s"), NULL));
+        jx_insert(m, jx_string("time_worker_start"), jx_arrayv(jx_double(t->time_workers_execute_last_start/((double) ONE_SECOND)), jx_string("s"), NULL));
+    }
+
+    return m;
 }
 
 void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
@@ -73,7 +97,10 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 		rmsummary_print_buffer(&B, vine_manager_task_resources_min(q, t), 1);
 	} else if(state == VINE_TASK_CANCELED) {
 			/* do not add any info */
-	} else if(state == VINE_TASK_RETRIEVED || state == VINE_TASK_DONE) {
+    } else if (state == VINE_TASK_DONE) {
+		buffer_printf(&B, " %s ", vine_result_string(t->result));
+		buffer_printf(&B, " %d ", t->exit_code);
+	} else if(state == VINE_TASK_RETRIEVED) {
 		buffer_printf(&B, " %s ", vine_result_string(t->result));
 		buffer_printf(&B, " %d ", t->exit_code);
 
@@ -87,18 +114,7 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
             buffer_printf(&B, " {} ");
         }
 
-        struct jx *m = rmsummary_to_json(t->resources_measured, /* only resources */ 1);
-        jx_insert(m, jx_string("size_output_mgr"), jx_arrayv(jx_double(t->bytes_received/((double) MEGABYTE)), jx_string("MB"), NULL));
-        jx_insert(m, jx_string("size_input_mgr"), jx_arrayv(jx_double(t->bytes_sent/((double) MEGABYTE)), jx_string("MB"), NULL));
-
-        jx_insert(m, jx_string("time_output_mgr"), jx_arrayv(jx_double((t->time_when_done - t->time_when_retrieval)/((double) ONE_SECOND)), jx_string("s"), NULL));
-        jx_insert(m, jx_string("time_input_mgr"), jx_arrayv(jx_double((t->time_when_commit_end - t->time_when_commit_start)/((double) ONE_SECOND)), jx_string("s"), NULL));
-
-        jx_insert(m, jx_string("time_worker_end"), jx_arrayv(jx_double(t->time_workers_execute_last_end/((double) ONE_SECOND)), jx_string("s"), NULL));
-        jx_insert(m, jx_string("time_worker_start"), jx_arrayv(jx_double(t->time_workers_execute_last_start/((double) ONE_SECOND)), jx_string("s"), NULL));
-
-        jx_insert(m, jx_string("time_commit_end"), jx_arrayv(jx_double(t->time_when_commit_end/((double) ONE_SECOND)), jx_string("s"), NULL));
-        jx_insert(m, jx_string("time_commit_start"), jx_arrayv(jx_double(t->time_when_commit_start/((double) ONE_SECOND)), jx_string("s"), NULL));
+        struct jx *m = resources_with_io_report(t, t->resources_measured);
         jx_print_buffer(m, &B);
         jx_delete(m);
 	} else {
@@ -110,6 +126,11 @@ void vine_txn_log_write_task(struct vine_manager *q, struct vine_task *t)
 				const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
 				buffer_printf(&B, " %s ", allocation);
 				const struct rmsummary *box = itable_lookup(w->current_tasks_boxes, t->task_id);
+
+                struct jx *m = resources_with_io_report(t, box);
+                jx_print_buffer(m, &B);
+                jx_delete(m);
+
 				rmsummary_print_buffer(&B, box, 1);
 			} else if(state == VINE_TASK_WAITING_RETRIEVAL) {
 				/* do not add any info */
