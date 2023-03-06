@@ -519,7 +519,7 @@ class TxnPlotTasks(TxnPlot):
 
         fig.set_ylabel("tasks")
         fig.set_yticks([0, len(dt.index)])
-        fig.set_yticklabels(["0", str(len(dt.index))])  # ytick number of workers
+        fig.set_yticklabels(["1", str(len(dt.index)+1)])  # ytick number of workers
 
 
 
