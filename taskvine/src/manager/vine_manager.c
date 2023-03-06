@@ -3264,7 +3264,7 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	return q;
 }
 
-int vine_enable_monitoring(struct vine_manager *q, char *monitor_output_directory, int watchdog)
+int vine_enable_monitoring(struct vine_manager *q, const char *monitor_output_directory, int watchdog)
 {
 	if(!q)
 		return 0;
@@ -3313,8 +3313,16 @@ int vine_enable_monitoring(struct vine_manager *q, char *monitor_output_director
 	return 1;
 }
 
-int vine_enable_monitoring_full(struct vine_manager *q, char *monitor_output_directory, int watchdog) {
-	int status = vine_enable_monitoring(q, monitor_output_directory, 1);
+int vine_enable_monitoring_full(struct vine_manager *q, const char *monitor_output_directory, int watchdog) {
+	char *dir = NULL;
+	if(monitor_output_directory) {
+		dir = xxstrdup(monitor_output_directory);
+	} else {
+		dir = vine_get_runtime_path_log(q, "monitor");
+	}
+
+	int status = vine_enable_monitoring(q, dir, 1);
+	free(dir);
 
 	if(status) {
 		q->monitor_mode = VINE_MON_FULL;
@@ -3327,8 +3335,7 @@ int vine_enable_monitoring_full(struct vine_manager *q, char *monitor_output_dir
 	return status;
 }
 
-int vine_enable_peer_transfers(struct vine_manager *q) 
-{
+int vine_enable_peer_transfers(struct vine_manager *q) {
 	debug(D_VINE, "Peer Transfers enabled");
 	q->peer_transfers_enabled = 1;
 	return 1;

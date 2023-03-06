@@ -872,7 +872,7 @@ resources_measured from vine_task is updated.  @return 1 on success, 0 if
 @param watchdog if not 0, kill tasks that exhaust declared resources.
 @return 1 on success, o if monitoring was not enabled.
 */
-int vine_enable_monitoring(struct vine_manager *m, char *monitor_output_directory, int watchdog);
+int vine_enable_monitoring(struct vine_manager *m, const char *monitor_output_directory, int watchdog);
 
 /** Enables resource monitoring on the give manager.
 As @ref vine_enable_monitoring, but it generates a time series and a
@@ -883,7 +883,7 @@ gigabyte sizes. This function is mostly used for debugging.)
 @param watchdog if not 0, kill tasks that exhaust declared resources.
 @return 1 on success, 0 if monitoring was not enabled.
 */
-int vine_enable_monitoring_full(struct vine_manager *m, char *monitor_output_directory, int watchdog);
+int vine_enable_monitoring_full(struct vine_manager *m, const char *monitor_output_directory, int watchdog);
 
 /** Enable taskvine peer transfers to be scheduled by the manager **/
 int vine_enable_peer_transfers(struct vine_manager *m);
