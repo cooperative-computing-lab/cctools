@@ -230,6 +230,9 @@ class ParseTxn:
         return heapq.heappop(free)
 
     def _parse_worker(self, time, manager_pid, worker_id, event, arg):
+        if not worker_id.startswith("worker-"):
+            return
+
         if event == "CONNECTION":
             hostport = arg
             self.cm.last_host_port[worker_id] = hostport
