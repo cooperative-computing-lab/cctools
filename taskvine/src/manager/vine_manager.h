@@ -145,16 +145,14 @@ struct vine_manager {
 	/* Logging configuration. */
 
     char *runtime_directory;
-	FILE *perf_logfile; /* Performance logfile for tracking metrics by time. */
-	FILE *txn_logfile;  /* Transaction logfile for recording every event of interest. */
+	FILE *perf_logfile;        /* Performance logfile for tracking metrics by time. */
+	FILE *txn_logfile;         /* Transaction logfile for recording every event of interest. */
 
 	/* Resource monitoring configuration. */
 
 	vine_monitoring_mode_t monitor_mode;
-	FILE *monitor_file;
-	char *monitor_output_directory;
 	char *monitor_exe;
-    int *monitor_interval;
+    int monitor_interval;
 
 	struct rmsummary *measured_local_resources;
 	struct rmsummary *current_max_worker;

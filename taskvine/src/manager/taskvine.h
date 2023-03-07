@@ -860,12 +860,11 @@ void vine_set_name(struct vine_manager *m, const char *name);
 const char *vine_get_name(struct vine_manager *m);
 
 /** Enables resource monitoring for tasks. The resources measured are available
-in the resources_measured member of the respective vine_task. A file
-VINE_RUNTIME_INFO_DIR/vine-logs/monitor/resources.log is also generated with resources per task.
+in the resources_measured member of the respective vine_task.
 @param m A manager object
 @param watchdog If not 0, kill tasks that exhaust declared resources.
 @param time_series If not 0, generate a time series of resources per task in
-VINE_RUNTIME_INFO_DIR/vine-logs/monitor/ (WARNING: for long running tasks these
+VINE_RUNTIME_INFO_DIR/vine-logs/time-series/ (WARNING: for long running tasks these
 files may reach gigabyte sizes. This function is mostly used for debugging.)
 @return 1 on success, 0 if monitoring could not be enabled.
 */
@@ -1119,6 +1118,7 @@ void vine_set_manager_preferred_connection(struct vine_manager *m, const char *p
  - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
  - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
  - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
+ - "monitor-interval" Maximum number of seconds between resource monitor measurements. If less than 1, use default (5s). (default=5)
  - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
  - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
  - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
