@@ -1680,7 +1680,7 @@ class Manager(object):
     # @param self            Reference to the current manager object.
     # @param library_path    Path of the file which contains the library code - the output of poncho_package_serverize
     # @param env_path        Path of the environment file which contains the environment capable of running the Library
-    def create_library_from_files(self, name, library_path, env_path):
+    def create_library_from_serverized_files(self, name, library_path, env_path):
         if poncho_available == False:
             raise("The poncho module is not available. Cannot create library.")
         t = LibraryTask(f"./poncho_package_run -e package python ./library_code.py", name)
@@ -1689,6 +1689,16 @@ class Manager(object):
         t.add_input_file(library_path, "library_code.py")
         t.add_input_file(shutil.which('poncho_package_run'), "poncho_package_run")
         return t
+
+    # Create a Library task from arbitrary inputs
+    #
+    #
+    # @param self            Reference to the current manager object.
+    # @param executable_path Path of the file which contains the library executable
+    # @param name            Name of the library to be created
+    def create_library_from_command(self, executable_path, name):
+        t = LibraryTask("./library_exe", name)
+        t.add_input_file(executable_path, "library_exe")
 
     ##
     # Wait for tasks to complete.
