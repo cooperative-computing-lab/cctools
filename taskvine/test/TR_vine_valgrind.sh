@@ -67,7 +67,7 @@ EOF
 
 clean()
 {
-	rm -f manager.script vine_benchmark_info manager.port manager.exitcode manager.valgrind worker.log worker.exitcode worker.valgrind output.* input.*
+	rm -rf manager.script vine_benchmark_info manager.port manager.exitcode manager.valgrind worker.log worker.exitcode worker.valgrind output.* input.*
 }
 
 dispatch "$@"

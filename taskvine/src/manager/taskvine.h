@@ -48,6 +48,11 @@ typedef enum {
 	VINE_SUCCESS_ONLY = 8, /**< Only return this output file if the task succeeded. */
 } vine_file_flags_t;
 
+typedef enum {
+	VINE_PEER_SHARE = 0, /**< Schedule this file to be shared between peers where available. (default) **/
+	VINE_PEER_NOSHARE = 1  /**< Do not schedule this file to be shared between peers. **/
+} vine_file_share_peer_mode_t;
+
 /** Select overall scheduling algorithm for matching tasks to workers. */
 
 typedef enum {
@@ -70,14 +75,13 @@ typedef enum {
 	VINE_RESULT_STDOUT_MISSING      = 4,      /**< The task ran but its stdout has been truncated **/
 	VINE_RESULT_SIGNAL              = 1 << 3, /**< The task was terminated with a signal **/
 	VINE_RESULT_RESOURCE_EXHAUSTION = 2 << 3, /**< The task used more resources than requested **/
-	VINE_RESULT_TASK_TIMEOUT        = 3 << 3, /**< The task ran after the specified (absolute since epoch) end time. **/
+	VINE_RESULT_MAX_END_TIME        = 3 << 3, /**< The task ran after the specified (absolute since epoch) end time. **/
 	VINE_RESULT_UNKNOWN             = 4 << 3, /**< The result could not be classified. **/
 	VINE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was not a task error **/
 	VINE_RESULT_MAX_RETRIES         = 6 << 3, /**< The task could not be completed successfully in the given number of retries. **/
-	VINE_RESULT_TASK_MAX_RUN_TIME   = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
-	VINE_RESULT_DISK_ALLOC_FULL     = 8 << 3, /**< The task filled its loop device allocation but needed more space. **/
-	VINE_RESULT_RMONITOR_ERROR      = 9 << 3, /**< The task failed because the monitor did not produce a summary report. **/
-	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 10 << 3  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
+	VINE_RESULT_MAX_WALL_TIME       = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
+	VINE_RESULT_RMONITOR_ERROR      = 8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
+	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
 } vine_result_t;
 
 /** Possible states of a task, given by @ref vine_task_state */
@@ -855,31 +859,16 @@ void vine_set_name(struct vine_manager *m, const char *name);
 */
 const char *vine_get_name(struct vine_manager *m);
 
-/** Enables resource monitoring on the give manager.
-It generates a resource summary per task, which is written to the given
-directory. It also creates all_summaries-PID.log, that consolidates all
-summaries into a single. If monitor_output_dirname is NULL, vine_task is
-updated with the resources measured, and no summary file is kept unless
-explicitely given by vine_task's monitor_output_file.
+/** Enables resource monitoring for tasks. The resources measured are available
+in the resources_measured member of the respective vine_task.
 @param m A manager object
-@param monitor_output_directory The name of the output directory. If NULL,
-summaries are kept only when monitor_output_directory is set per task, but
-resources_measured from vine_task is updated.  @return 1 on success, 0 if
-@param watchdog if not 0, kill tasks that exhaust declared resources.
-@return 1 on success, o if monitoring was not enabled.
+@param watchdog If not 0, kill tasks that exhaust declared resources.
+@param time_series If not 0, generate a time series of resources per task in
+VINE_RUNTIME_INFO_DIR/vine-logs/time-series/ (WARNING: for long running tasks these
+files may reach gigabyte sizes. This function is mostly used for debugging.)
+@return 1 on success, 0 if monitoring could not be enabled.
 */
-int vine_enable_monitoring(struct vine_manager *m, char *monitor_output_directory, int watchdog);
-
-/** Enables resource monitoring on the give manager.
-As @ref vine_enable_monitoring, but it generates a time series and a
-monitor debug file (WARNING: for long running tasks these files may reach
-gigabyte sizes. This function is mostly used for debugging.)
-@param m A manager object.
-@param monitor_output_directory The name of the output directory.
-@param watchdog if not 0, kill tasks that exhaust declared resources.
-@return 1 on success, 0 if monitoring was not enabled.
-*/
-int vine_enable_monitoring_full(struct vine_manager *m, char *monitor_output_directory, int watchdog);
+int vine_enable_monitoring(struct vine_manager *m, int watchdog, int time_series);
 
 /** Enable taskvine peer transfers to be scheduled by the manager **/
 int vine_enable_peer_transfers(struct vine_manager *m);
@@ -1129,6 +1118,7 @@ void vine_set_manager_preferred_connection(struct vine_manager *m, const char *p
  - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
  - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
  - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
+ - "monitor-interval" Maximum number of seconds between resource monitor measurements. If less than 1, use default (5s). (default=5)
  - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
  - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
  - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)

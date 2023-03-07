@@ -98,7 +98,7 @@ class Task(object):
             pass
 
     @staticmethod
-    def _determine_file_flags(cache=False, unpack=False, watch=False, failure_only=False, success_only=False):
+    def _determine_file_flags(cache=False, watch=False, failure_only=False, success_only=False):
         flags = VINE_NOCACHE
         if cache:
             flags |= VINE_CACHE
@@ -335,26 +335,23 @@ class Task(object):
     ##
     # Add any output object to a task.
     #
-    # @param self           Reference to the current task object.
-    # @param file           A file object of class @ref File, such as from @ref declare_file, or @ref declare_buffer
-    # @param remote_name    The name of the file at the execution site.
-    # @param flags          May be zero to indicate no special handling, or any
-    #                       of the @ref vine_file_flags_t or'd together The most common are:
-    #                       - @ref VINE_NOCACHE (default)
-    #                       - @ref VINE_CACHE
+    # @param self          Reference to the current task object.
+    # @param file          A file object of class @ref File, such as from @ref declare_file, or @ref declare_buffer
+    # @param remote_name   The name of the file at the execution site.
+    # @param watch         Watch the output file and send back changes as the task runs.
     # @param cache         Whether the file should be cached at workers (True/False)
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs).
+    # @param success_only  Whether the file should be retrieved only when the task succeeds. Default is False.
+    # @param failure_only  Whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
     #
     # For example:
     # @code
     # >>> file = m.declare_file("output.txt")
     # >>> task.add_output(file,"out")
     # @endcode
-
-    def add_output(self, file, remote_name, flags=None, cache=None, failure_only=None):
+    def add_output(self, file, remote_name, watch=False, cache=False, failure_only=None, success_only=None):
         # SWIG expects strings
         remote_name = str(remote_name)
-        flags = Task._determine_file_flags(flags, cache, failure_only)
+        flags = Task._determine_file_flags(cache, watch, failure_only, success_only)
         return vine_task_add_output(self._task, file._file, remote_name, flags)
 
     ##
@@ -572,11 +569,49 @@ class Task(object):
     # Must be called only after the task completes execution.
     # @code
     # >>> print(t.result_string)
-    # 'SUCCESS'
+    # 'success'
     # @endcode
     @property
     def result_string(self):
-        return vine_result_string(vine_task_get_result(self._task))
+        result = vine_result_string(vine_task_get_result(self._task))
+        return result.lower().replace("_", " ")
+
+    ##
+    # Return True if task executed and its command terminated normally.
+    # If True, the exit code of the command can be retrieved with @ref
+    # exit_code. If False, the error condition can be retrieved with @ref
+    # result and @result_string.  It must be called only after the task
+    # completes execution.
+    # @code
+    # >>> # completed tasks with a failed command execution:
+    # >>> print(t.completed())
+    # True
+    # >>> print(t.exit_code)
+    # 1
+    # >>> # task with an error condition:
+    # >>> print(t.completed())
+    # False
+    # >>> print(t.result_string)
+    # max retries
+    # @endcode
+    def completed(self):
+        return self.result == VINE_RESULT_SUCCESS
+
+    ##
+    # Return True if task executed successfully, (i.e. its command terminated
+    # normally with exit code 0 and produced all its declared output files).
+    # Differs from @ref completed in that the exit code of the command should
+    # be zero.
+    # It must be called only after the task completes execution.
+    # @code
+    # >>> # completed tasks with a failed command execution:
+    # >>> print(t.completed())
+    # True
+    # >>> print(t.successful())
+    # False
+    # @endcode
+    def successful(self):
+        return self.completed() and self.exit_code == 0
 
     ##
     # Return various integer performance metrics about a completed task.
@@ -781,7 +816,7 @@ class PythonTask(Task):
     @property
     def output(self):
         if not self._output_loaded:
-            if self.result == VINE_RESULT_SUCCESS:
+            if self.successful():
                 try:
                     with open(os.path.join(self._tmpdir, "out_{}.p".format(self._id)), "rb") as f:
                         self._output = dill.load(f)
@@ -999,6 +1034,12 @@ class Manager(object):
         return vine_get_runtime_path_staging(self._taskvine, None)
 
     ##
+    # Get the caching directory of the manager
+    @property
+    def cache_directory(self):
+        return vine_get_runtime_path_caching(self._taskvine, None)
+
+    ##
     # Get manager statistics.
     # @code
     # >>> print(q.stats)
@@ -1123,17 +1164,21 @@ class Manager(object):
         return vine_task_state(self._taskvine, task_id)
 
     ##
-    # Enables resource monitoring of tasks in the manager, and writes a summary
-    # per task to the directory given. Additionally, all summaries are
-    # consolidate into the file all_summaries-PID.log
+    ## Enables resource monitoring for tasks. The resources measured are
+    # available in the resources_measured member of the respective vine_task.
+    # @param self   Reference to the current manager object.
+    # @param watchdog If not 0, kill tasks that exhaust declared resources.
+    # @param time_series If not 0, generate a time series of resources per task
+    # in VINE_RUNTIME_INFO_DIR/vine-logs/time-series/ (WARNING: for long running
+    # tasks these files may reach gigabyte sizes. This function is mostly used
+    # for debugging.)
     #
     # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
     # @param self   Reference to the current manager object.
-    # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
-    def enable_monitoring(self, dirname=None, watchdog=True):
-        return vine_enable_monitoring(self._taskvine, dirname, watchdog)
+    def enable_monitoring(self, watchdog=True, time_series=False):
+        return vine_enable_monitoring(self._taskvine, watchdog, time_series)
 
     ##
     # As @ref enable_monitoring, but it also generates a time series and a
@@ -1534,6 +1579,7 @@ class Manager(object):
     # - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
     # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
     # - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
+    # - monitor-interval Maximum number of seconds between resource monitor measurements. If less than 1, use default (5s).
     # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
     # - "wait_retrieve_many" Parameter to alter how vine_wait works. If set to 0, vine_wait breaks out of the while loop whenever a task changes to VINE_TASK_DONE (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
     # @param value The value to set the parameter to.
@@ -1983,6 +2029,8 @@ class Manager(object):
     def declare_buffer(self, buffer=None):
         # because of the swig typemap, vine_declare_buffer(m, buffer, size) is changed
         # to a function with just two arguments.
+        if isinstance(buffer, str):
+            buffer = bytes(buffer, "utf-8")
         f = vine_declare_buffer(self._taskvine, buffer)
         return File(f)
 
@@ -2035,7 +2083,9 @@ class Manager(object):
         proxy_c = None
         if proxy:
             proxy_c = proxy._file
-        self._file = vine_declare_xrootd(self._taskvine, source, proxy_c)
+        f = vine_declare_xrootd(self._taskvine, source, proxy_c)
+        return File(f)
+
 
 
 

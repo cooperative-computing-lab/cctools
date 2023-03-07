@@ -145,16 +145,14 @@ struct vine_manager {
 	/* Logging configuration. */
 
     char *runtime_directory;
-	FILE *perf_logfile; /* Performance logfile for tracking metrics by time. */
-	FILE *txn_logfile;  /* Transaction logfile for recording every event of interest. */
+	FILE *perf_logfile;        /* Performance logfile for tracking metrics by time. */
+	FILE *txn_logfile;         /* Transaction logfile for recording every event of interest. */
 
 	/* Resource monitoring configuration. */
 
 	vine_monitoring_mode_t monitor_mode;
-	FILE *monitor_file;
-	char *monitor_output_directory;
-	char *monitor_summary_filename;
 	char *monitor_exe;
+    int monitor_interval;
 
 	struct rmsummary *measured_local_resources;
 	struct rmsummary *current_max_worker;
@@ -239,7 +237,7 @@ int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
 
 
 /* The expected format of files created by the resource monitor.*/
-#define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-%d-task-%d"
+#define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
 #define RESOURCE_MONITOR_REMOTE_NAME_EVENTS RESOURCE_MONITOR_REMOTE_NAME "events.json"
 

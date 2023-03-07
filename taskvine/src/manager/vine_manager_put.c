@@ -10,7 +10,8 @@ See the file COPYING for details.
 #include "vine_file.h"
 #include "vine_mount.h"
 #include "vine_protocol.h"
-#include "vine_remote_file_info.h"
+#include "vine_file_replica.h"
+#include "vine_file_replica_table.h"
 #include "vine_txn_log.h"
 #include "vine_current_transfers.h"
 
@@ -289,7 +290,7 @@ static vine_result_code_t vine_manager_put_input_file(struct vine_manager *q, st
 
 		// Write to the transaction log.
 		if(f->type == VINE_FILE || f->type == VINE_BUFFER) {
-			vine_txn_log_write_transfer(q, w, t, m, f, total_bytes, elapsed_time, 1);
+			vine_txn_log_write_transfer(q, w, t, m, f, total_bytes, elapsed_time, open_time, 1);
 		}
 
 		// Avoid division by zero below.
@@ -349,7 +350,7 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	}
 
 	/* Has this file already been sent and cached? */
-	struct vine_remote_file_info *remote_info = hash_table_lookup(w->current_files,f->cached_name);
+	struct vine_file_replica *remote_info = vine_file_replica_table_lookup(w,f->cached_name);
 
 	/*
 	If so, check that it hasn't changed, and return success.
@@ -381,8 +382,8 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	/* If the send succeeded, then record the cached information. */
 	if(result==VINE_SUCCESS) {
 		if(m->flags & VINE_CACHE) {
-			struct vine_remote_file_info *remote_info = vine_remote_file_info_create(info.st_size,info.st_mtime);
-			hash_table_insert(w->current_files,f->cached_name,remote_info);
+			struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size,info.st_mtime);
+			vine_file_replica_table_insert(w,f->cached_name,remote_info);
 		}
 	}
 	

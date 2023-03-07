@@ -132,7 +132,7 @@ struct jx * jx_objectv( const char *key, struct jx *value, ... ) {
 
 	while(key) {
 		assert(value);
-		jx_insert(object,jx_string(xxstrdup(key)),value);
+		jx_insert(object,jx_string(key),value);
 		key = va_arg(args,char *);
 		value = va_arg(args,struct jx *);
 	}
