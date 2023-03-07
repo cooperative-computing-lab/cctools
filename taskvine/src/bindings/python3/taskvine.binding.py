@@ -1699,6 +1699,7 @@ class Manager(object):
     def create_library_from_command(self, executable_path, name):
         t = LibraryTask("./library_exe", name)
         t.add_input_file(executable_path, "library_exe")
+        return t
 
     ##
     # Wait for tasks to complete.
