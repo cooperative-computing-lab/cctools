@@ -878,16 +878,30 @@ these limits. You can enable monitoring and enforcement as follows:
     # Measure the resources used by tasks, but do not terminate tasks that go above
     # declared resources:
     m.enable_monitoring(watchdog=False)
+
+    # Measure the resources used by tasks, but do not terminate tasks that go
+    # above declared resources, and generate a time series per task. These time
+    # series are written to the logs directory `vine-logs/time-series`.
+    # Use with caution, as time series for long running tasks may be in the
+    # order of gigabytes. 
+    vine_enable_monitoring(m,watchdog=False,time_series=True)
     ```
 
 === "C"
     ```C
-    # Measure the resources used by tasks, and terminate tasks that go above their
-    # resources:
+    /* Measure the resources used by tasks, and terminate tasks that go above their
+    resources: */
+    vine_enable_monitoring(m,1,0)
+
+    /* Measure the resources used by tasks, but do not terminate tasks that go above
+    declared resources: */
     vine_enable_monitoring(m,0,0)
 
-    # Measure the resources used by tasks, but do not terminate tasks that go above
-    # declared resources:
+    /* Measure the resources used by tasks, but do not terminate tasks that go
+    above # declared resources, and generate a time series per task. These time
+    series are written to the logs directory `vine-logs/time-series`.
+    Use with caution, as time series for long running tasks may be in the
+    order of gigabytes. */
     vine_enable_monitoring(m,0,1)
     ```
 
@@ -944,7 +958,7 @@ report format is JSON, as its filename has the form
 === "C"
     ```C
     struct vine_task *t = vine_task_create(...);
-    vine_set_monitor_output("my-resources-output");
+    vine_task_set_monitor_output(t, "my-resources-output");
     ...
     int taskid = vine_submti(m, t);
     ```
