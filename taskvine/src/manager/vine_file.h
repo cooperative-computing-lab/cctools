@@ -44,10 +44,10 @@ struct vine_file {
 	char *data;         // Raw data for an input or output buffer.
 	struct vine_task *mini_task; // Mini task used to generate the desired output file.
 	int refcount;       // Number of references from a task object, delete when zero.
-	vine_file_share_peer_mode_t share_peer_mode; // whether or not to transfer this file between workers.
+	vine_file_flags_t flags; // whether or not to transfer this file between workers.
 };
 
-struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task, vine_file_share_peer_mode_t share_peer_mode);
+struct vine_file * vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task, vine_file_flags_t flags);
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source );
 

@@ -41,7 +41,7 @@ int vine_file_delete(struct vine_file *f)
 }
 
 /* Create a new file object with the given properties. */
-struct vine_file *vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task, vine_file_share_peer_mode_t share_peer_mode)
+struct vine_file *vine_file_create( const char *source, const char *cached_name, const char *data, size_t size, vine_file_t type, struct vine_task *mini_task, vine_file_flags_t flags)
 {
 	struct vine_file *f;
 
@@ -53,7 +53,7 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 	f->type = type;
 	f->size = size;
 	f->mini_task = mini_task;
-	f->share_peer_mode = share_peer_mode;
+	f->flags = flags;
 
 	if(data) {
 		/* Terminate with a null, just in case the user tries to treat this as a C string. */
