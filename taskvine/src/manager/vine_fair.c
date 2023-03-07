@@ -9,7 +9,6 @@ See the file COPYING for details.
 #include "debug.h"
 #include "jx_pretty_print.h"
 #include "rmonitor.h"
-//#include "rmonitor_types.h"
 #include "rmonitor_poll.h"
 #include "xxmalloc.h"
 
