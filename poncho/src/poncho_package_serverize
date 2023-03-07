@@ -13,6 +13,6 @@ if __name__ == "__main__":
     if args.function is None:
         print("Error, must specify at least one function")
         exit()
-    serverize.create_library_code(args.src, args.function, args.dest)
+    serverize.create_library_code(args.src, args.function, args.dest, args.version)
     if args.pack:
         serverize.pack_library_code(args.src, args.pack)
