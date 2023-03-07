@@ -1581,6 +1581,7 @@ class Manager(object):
     # - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
     # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
     # - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
+    # - monitor-interval Maximum number of seconds between resource monitor measurements. If less than 1, use default (5s).
     # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
     # - "wait_retrieve_many" Parameter to alter how vine_wait works. If set to 0, vine_wait breaks out of the while loop whenever a task changes to VINE_TASK_DONE (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
     # @param value The value to set the parameter to.
