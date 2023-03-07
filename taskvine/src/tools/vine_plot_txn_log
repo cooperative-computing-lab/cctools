@@ -513,8 +513,6 @@ class TxnPlotTasks(TxnPlot):
 
         self.bh(fig, dt.index, dt["time_worker_end"],  dt["RETRIEVED"] - dt["time_worker_end"], self.legend["tasks waiting retrieval"], edgecolor=None)
 
-        self.bh(fig, dt.index, dt["RETRIEVED"] - dt["time_output_mgr"],  dt["time_output_mgr"], self.legend["outputs to manager"], edgecolor=None)
-
         del self.legend["tasks failures"] # already covered above
 
         fig.set_ylabel("tasks")
