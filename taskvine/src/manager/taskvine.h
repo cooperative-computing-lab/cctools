@@ -654,6 +654,16 @@ in that order. If no proxy is present, the transfer is tried without authenticat
 struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy );
 
 
+/** Create a file object of a remote file accessible from a chirp server.
+@param m A manager object
+@param server The chirp server address of the form "hostname[:port"]"
+@param source The name of the file in the server
+@param ticket If not NULL, a file object that provides a chirp an authentication ticket
+@return A file object to use in @ref vine_task_add_input
+*/
+struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket );
+
+
 /** Create a scratch file object.
 A scratch file has no initial content, but is created
 as the output of a task, and may be consumed by other tasks.

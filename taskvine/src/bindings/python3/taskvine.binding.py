@@ -2086,6 +2086,21 @@ class Manager(object):
         f = vine_declare_xrootd(self._taskvine, source, proxy_c)
         return File(f)
 
+    ##
+    # Declare a file from accessible from an xrootd server.
+    #
+    # @param self   The manager to register this file.
+    # @param server The chirp server address of the form "hostname[:port"]"
+    # @param source The name of the file in the server
+    # @param ticket If not NULL, a file object that provides a chirp an authentication ticket
+    # @return A file object to use in @ref Task.add_input
+    def declare_chirp(self, server, source, ticket=None):
+        ticket_c = None
+        if ticket:
+            ticket_c = ticket._file
+        f = vine_declare_chirp(self._taskvine, server, source, ticket_c)
+        return File(f)
+
 
 
 
