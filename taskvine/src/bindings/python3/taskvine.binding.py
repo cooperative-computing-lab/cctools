@@ -90,21 +90,113 @@ class Task(object):
         if not self._task:
             raise Exception("Unable to create internal Task structure")
         
+        if "coprocess" in task_info.keys():
+            self.set_coprocess(task_info["coprocess"])
+        if "scheduler" in task_info.keys():
+            self.set_scheduler(task_info["scheduler"])
+        if "tag" in task_info.keys():
+            self.set_tag(task_info["tag"])
+        if "category" in task_info.keys():
+            self.set_category(task_info["category"])
+        if "features" in task_info.keys():
+            if isinstance(task_info["features"], str):
+                self.add_feature(task_info["features"])
+            elif isinstance(task_info["features"], list):
+                for feature in task_info["features"]:
+                    self.add_feature(feature)
+            else:
+                raise Exception("Unable to create internal Task structure")
+        if "input_files" in task_info.keys():
+           for key, value in task_info["input_files"].items():
+                if isinstance(value, str):
+                    self.add_input_file(key, value)
+                elif isinstance(value, dict):
+                    self.add_input_file(key, **value)
+                else:
+                    raise Exception("Unable to create internal Task structure")
+        if "input_urls" in task_info.keys():
+            for key, value in task_info["input_urls"].items():
+                if isinstance(value, str):
+                    self.add_input_url(key, value)
+                elif isinstance(value, dict):
+                    self.add_input_url(key, **value)
+                else:
+                    raise Exception("Unable to create internal Task structure")
+        if "input_mini_tasks" in task_info.keys():
+            for key, value in task_info["input_mini_tasks"].items():
+                if isinstance(value, str):
+                    self.add_input_mini_task(key, value)
+                elif isinstance(value, dict):
+                    self.add_input_mini_task(key, **value)
+                else:
+                    raise Exception("Unable to create internal Task structure")
         if "inputs" in task_info.keys():
             for key, value in task_info["inputs"].items():
                 if isinstance(value, str):
-                    self.add_input(key, value, cache=True)
+                    self.add_input(key, value)
                 elif isinstance(value, dict):
                     self.add_input(key, **value)
+                else:
+                    raise Exception("Unable to create internal Task structure")
+        if "empty_dirs" in task_info.keys():
+            if isinstance(task_info["empty_dirs"], str):
+                self.add_empty_dir(task_info["empty_dirs"])
+            elif isinstance(task_info["empty_dirs"], list):
+                for empty_dir in task_info["empty_dirs"]:
+                    self.add_empty_dir(empty_dir)
+            else:
+                raise Exception("Unable to create internal Task structure")
+        if "input_buffers" in task_info.keys():
+            for key, value in task_info["input_buffers"].items():
+                if isinstance(value, str):
+                    self.add_input_buffer(key, value)
+                elif isinstance(value, dict):
+                    self.add_input_buffer(key, **value)
+                else:
+                    raise Exception("Unable to create internal Task structure")
+        if "output_files" in task_info.keys():
+            for key, value in task_info["output_files"].items():
+                if isinstance(value, str):
+                    self.add_output_file(key, value)
+                elif isinstance(value, dict):
+                    self.add_output_file(key, **value)
+                else:
+                    raise Exception("Unable to create internal Task structure")
         if "outputs" in task_info.keys():
             for key, value in task_info["outputs"].items():
                 if isinstance(value, str):
-                    self.add_output(key, value, cache=True)
+                    self.add_output(key, value)
                 elif isinstance(value, dict):
                     self.add_output(key, **value)
+                else:
+                    raise Exception("Unable to create internal Task structure")
+        if "snapshot_file" in task_info.keys():
+            self.set_snapshot_file(task_info["snapshot_file"])
+        if "retries"in task_info.keys():
+            self.set_retries(task_info["retries"])
+        if "cores"in task_info.keys():
+            self.set_cores(task_info["cores"])
+        if "memory"in task_info.keys():
+            self.set_memory(task_info["memory"])
+        if "disk"in task_info.keys():
+            self.set_disk(task_info["disk"])
+        if "gpus"in task_info.keys():
+            self.set_gpus(task_info["gpus"])
+        if "priority"in task_info.keys():
+            self.set_priority(task_info["priority"])
+        if "time_end"in task_info.keys():
+            self.set_time_end(int(task_info["time_end"]))
+        if "time_start"in task_info.keys():
+            self.set_time_start(int(task_info["time_start"]))
+        if "time_max"in task_info.keys():
+            self.set_time_max(int(task_info["time_max"]))
+        if "time_min"in task_info.keys():
+            self.set_time_min(int(task_info["time_min"]))
         if "env" in task_info.keys():
             for key, value in task_info["env"].items():
-                self.set_env_var(key, value=value)
+                self.set_env_var(key, value)
+        if "monitor_output"in task_info.keys():
+            self.set_monitor_output(task_info["monitor_output"])
 
     def __del__(self):
         try:

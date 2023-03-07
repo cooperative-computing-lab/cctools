@@ -225,6 +225,13 @@ Here is how to describe the files needed by this task:
     # when the name at manager is the same as the exection site, we can write instead:
     t.add_input_file("my-file",     cache = False)
     t.add_output_file("my-file.gz", cache = False)
+
+    # files can also be described when the task is declared:
+     t = vine.Task(
+        command = "./gzip < my-file > my-file.gz",
+        input_files = {"/usr/bin/gzip" : {remote_name : "gzip, cache : True}, "my-file" : {remote_name : "my-file", cache : False}},
+        output_files = {"my-file.gz : {remote_name : "my-file.gz", cache = False}}
+    )
     ```
 
 === "C"
@@ -265,6 +272,14 @@ when the task is complete.
     t.set_cores(2)
     t.set_memory(4096)
     t.set_tag("config-4.5.0")
+
+    # this can once again be done at task declaration as well:
+     t = vine.Task(
+        command = "./gzip < my-file > my-file.gz",
+        cores = 2,
+        memory = 4096,
+        tag = "config-4.5.0"
+     )
     ```
 
 === "C"
@@ -691,6 +706,17 @@ as in the following example:
     t.set_gpus(0)                      # task does not need a gpu
     t.set_time_max(100)        # task is allowed to run in 100 seconds
     t.set_time_min(10)         # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
+
+    # these can be set when the task is declared as well:
+     t = vine.Task(
+        command = "./gzip < my-file > my-file.gz",
+        cores = 1,
+        memory = 1024,
+        disk = 4096,
+        gpus = 0,
+        time_max = 100,
+        time_min = 10
+    )
     ```
 
 === "C"
@@ -939,6 +965,12 @@ report format is JSON, as its filename has the form
     t.set_monitor_output("my-resources-output")
     ...
     taskid = m.submit(t)
+
+    # this can be set at declaration as well:
+     t = vine.Task(
+        command = ...,
+        monitor_output = "my-resources-output"
+     )
     ```
 
 === "C"
@@ -996,6 +1028,12 @@ compute some efficient defaults. To assign a task to a category:
 === "Python"
     ```python
     t.set_category('my-category-a')
+
+    # alternatively:
+     t = vine.Task(
+        command = ...,
+        category = 'my-category-a'
+     )
     ```
 
 === "C"
@@ -1224,6 +1262,12 @@ limit on the number of retries:
 === "Python"
     ```python
     t.set_retries(5)   # Task will be try at most 6 times (5 retries).
+
+    # this can be done at task declaration as well:
+     t = vine.Task(
+        command = ...,
+        retries = 5
+     )
     ```
 
 === "C"
@@ -1404,8 +1448,10 @@ either their `taskid` or `tag`. For example:
 === "Python"
     ```python
     # create task as usual and tag it with an arbitrary string.
-    t = vine.Task(...)
-    t.set_tag("my-tag")
+    t = vine.Task(
+        command = ...,
+        tag = "my-tag"
+    )
 
     taskid = m.submit(t)
 
