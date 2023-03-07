@@ -2404,7 +2404,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
-	printf( " %-30s Specify the number of coprocesses for serverless functions that the worker should maintain. Default is allocating 1 coprocess per core.\n", "--coprocesses-total=<number>");
+	printf( " %-30s Specify the number of coprocesses for serverless functions that the worker should maintain. Default is consuming all worker resources to allocate 1 coprocess per core.\n", "--coprocesses-total=<number>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2918,7 +2918,6 @@ int main(int argc, char *argv[])
 		}
 		coprocess_resources = work_queue_resources_create();
 		coprocess_info = work_queue_coprocess_initalize_all_coprocesses(coprocess_cores, coprocess_memory, coprocess_disk, coprocess_gpus, total_resources, coprocess_resources, coprocess_command, number_of_coprocess_instances);
-		printf("HUH %p\n", coprocess_resources);
 		coprocess_name = xxstrdup(coprocess_info[0].name);
 		hash_table_insert(features, coprocess_name, (void **) 1);
 	}
