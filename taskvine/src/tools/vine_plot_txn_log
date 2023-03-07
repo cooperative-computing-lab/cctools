@@ -541,10 +541,10 @@ class TxnPlotWorkers(TxnPlot):
         # information from tasks rather than transfer records, as there is only
         # at most one record per task.
         cu = worker[worker["size_input_mgr"] > 0]
-        self.bh(fig, base_slot+1, cu["time_commit_start"], cu["time_input_mgr"].clip(lower=1.0), self.legend["inputs from manager"])
+        self.bh(fig, base_slot+1, cu["time_commit_start"], cu["time_input_mgr"], self.legend["inputs from manager"])
 
         cu = worker[worker["size_output_mgr"] > 0]
-        self.bh(fig, base_slot+1, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"].clip(lower=1.0), self.legend["outputs to manager"])
+        self.bh(fig, base_slot+1, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"], self.legend["outputs to manager"])
 
         self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting for cache"])
 
