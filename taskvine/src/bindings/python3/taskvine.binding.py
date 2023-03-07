@@ -1164,17 +1164,21 @@ class Manager(object):
         return vine_task_state(self._taskvine, task_id)
 
     ##
-    # Enables resource monitoring of tasks in the manager, and writes a summary
-    # per task to the directory given. Additionally, all summaries are
-    # consolidate into the file all_summaries-PID.log
+    ## Enables resource monitoring for tasks. The resources measured are
+    # available in the resources_measured member of the respective vine_task.
+    # @param self   Reference to the current manager object.
+    # @param watchdog If not 0, kill tasks that exhaust declared resources.
+    # @param time_series If not 0, generate a time series of resources per task
+    # in VINE_RUNTIME_INFO_DIR/vine-logs/time-series/ (WARNING: for long running
+    # tasks these files may reach gigabyte sizes. This function is mostly used
+    # for debugging.)
     #
     # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
     # @param self   Reference to the current manager object.
-    # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
-    def enable_monitoring(self, dirname=None, watchdog=True):
-        return vine_enable_monitoring(self._taskvine, dirname, watchdog)
+    def enable_monitoring(self, watchdog=True, time_series=False):
+        return vine_enable_monitoring(self._taskvine, watchdog, time_series)
 
     ##
     # As @ref enable_monitoring, but it also generates a time series and a
@@ -1575,6 +1579,7 @@ class Manager(object):
     # - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
     # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
     # - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
+    # - monitor-interval Maximum number of seconds between resource monitor measurements. If less than 1, use default (5s).
     # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
     # - "wait_retrieve_many" Parameter to alter how vine_wait works. If set to 0, vine_wait breaks out of the while loop whenever a task changes to VINE_TASK_DONE (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
     # @param value The value to set the parameter to.
