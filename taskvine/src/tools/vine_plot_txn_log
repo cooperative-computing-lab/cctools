@@ -176,7 +176,7 @@ class ParseTxn:
         filename, size, wall_time, start_time = arg.split()
         size = float(size)/1e6
         wall_time = float(wall_time)/1e6
-        start_time = float(wall_time)/1e6
+        start_time = float(start_time)/1e6
 
         if start_time < self.cm.origin:
             # guard for cases when start time was unknown 
@@ -323,7 +323,7 @@ class ParseTxn:
         elif event == "RETRIEVED":
             (reason, exit_code, l, m) = arg.split()
             ca["reason"] = reason
-            ca["exit_code"] = exit_code
+            ca["exit_code"] = int(exit_code)
             self.arg_to_task_report(ca, m)
             self.arg_to_resources(ca, "measured_", m)
             slot = ca["slot"]
@@ -366,7 +366,7 @@ class TxnPlot:
         height = opts.height if opts.height else opts.width * (2/3)
 
 
-        self.fig = plt.figure(constrained_layout=True, figsize=(opts.width, height))
+        self.fig = plt.figure(constrained_layout=True, figsize=(opts.width, height), dpi=opts.dpi)
         self.subs = self.fig.subplots(nrows=1, ncols=len(managers), squeeze=False)
 
         # default legend
@@ -374,9 +374,9 @@ class TxnPlot:
                 "workers lifetime": 'C9',
                 "tasks executing": 'C0',
                 "tasks waiting for cache": 'C7',
-                "tasks lost on disconnection": 'pink',
+                "tasks lost on disconnection": 'C8',
                 "tasks waiting retrieval": 'C2',
-                "tasks failures": 'C8',
+                "tasks failures": 'red',
                 "cache updates": 'C1',
                 "inputs from manager": 'C3',
                 "outputs to manager": 'C5',
@@ -513,8 +513,6 @@ class TxnPlotTasks(TxnPlot):
 
         self.bh(fig, dt.index, dt["time_worker_end"],  dt["RETRIEVED"] - dt["time_worker_end"], self.legend["tasks waiting retrieval"], edgecolor=None)
 
-        self.bh(fig, dt.index, dt["RETRIEVED"] - dt["time_output_mgr"],  dt["time_output_mgr"], self.legend["outputs to manager"], edgecolor=None)
-
         del self.legend["tasks failures"] # already covered above
 
         fig.set_ylabel("tasks")
@@ -541,20 +539,19 @@ class TxnPlotWorkers(TxnPlot):
         # information from tasks rather than transfer records, as there is only
         # at most one record per task.
         cu = worker[worker["size_input_mgr"] > 0]
-        self.bh(fig, base_slot+1, cu["time_commit_start"], cu["time_input_mgr"].clip(lower=1.0), self.legend["inputs from manager"])
+        self.bh(fig, base_slot+1, cu["time_commit_start"], cu["time_input_mgr"], self.legend["inputs from manager"])
 
         cu = worker[worker["size_output_mgr"] > 0]
-        self.bh(fig, base_slot+1, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"].clip(lower=1.0), self.legend["outputs to manager"])
+        self.bh(fig, base_slot+1, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"], self.legend["outputs to manager"])
 
         self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting for cache"])
 
         self.bh(fig, dt["slot"], dt["time_worker_start"], dt["time_worker_end"]-dt["time_worker_start"], self.legend["tasks executing"])
 
-        st = worker[worker["reason"] == "SUCCESS"]
-        self.bh(fig, st["slot"], st["time_worker_end"], st["RETRIEVED"]-st["time_worker_end"], self.legend["tasks waiting retrieval"])
+        self.bh(fig, worker["slot"], worker["time_worker_end"], worker["RETRIEVED"]-worker["time_worker_end"], self.legend["tasks waiting retrieval"])
 
-        ft = worker[(worker["reason"] != "SUCCESS") & (worker["reason"] != "DISCONNECTION")]
-        self.bh(fig, ft["slot"], ft["time_worker_end"], ft["RETRIEVED"]-ft["time_worker_end"], self.legend["tasks failures"])
+        ft = dt[(dt["reason"] != "SUCCESS") | ((dt["reason"] == "SUCCESS") & (dt["exit_code"] != 0))]
+        self.bh(fig, ft["slot"], ft["RETRIEVED"] - 0.5, 0.5, self.legend["tasks failures"])
 
         return worker["slot"].max() + 1
 
@@ -592,10 +589,11 @@ if __name__ == "__main__":
     parser.add_argument('--title', nargs='?', default='TaskVine', help='Title of the plot')
     parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default="first-worker")
     parser.add_argument('--end', nargs='?', help='change plot end time. One of manager-end, last-task', default="last-task")
+    parser.add_argument('--tasks-range', nargs='?', help='range of tasks ids to plot as start[,[end][,step]] ', default="1,,1")
     parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
     parser.add_argument('--width', nargs='?', type=float, help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', type=float, help='height in inches. Default is 2/3 of width', default=None)
-    parser.add_argument('--tasks-range', nargs='?', help='range of tasks ids to plot as start[,[end][,step]] ', default="1,,1")
+    parser.add_argument('--dpi', nargs='?', type=int, help='output image resoulution', default=300)
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
     args = parser.parse_args()
 
