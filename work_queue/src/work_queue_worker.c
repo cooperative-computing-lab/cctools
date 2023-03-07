@@ -232,6 +232,7 @@ static char *coprocess_command = NULL;
 static char *coprocess_name = NULL;
 static int number_of_coprocess_instances = 0;
 struct work_queue_coprocess *coprocess_info = NULL;
+struct work_queue_resources *coprocess_resources = NULL;
 
 static int coprocess_cores = -1;
 static int coprocess_memory = -1;
@@ -417,7 +418,7 @@ static void send_resource_update(struct link *manager)
 	}
 
 	if (coprocess_info != NULL) {
-		work_queue_coprocess_resources_send(manager,coprocess_info->coprocess_resources,stoptime);
+		work_queue_coprocess_resources_send(manager,coprocess_resources,stoptime);
 	}
 
 	work_queue_resources_send(manager,total_resources,stoptime);
@@ -2403,7 +2404,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 	printf( " %-30s Start an arbitrary process when the worker starts up and kill the process when the worker shuts down.\n", "--coprocess <executable>");
-	printf( " %-30s Specify the number of coprocesses for serverless functions that the worker should maintain. A coprocess must be specified.\n", "--coprocesses-total=<number>");
+	printf( " %-30s Specify the number of coprocesses for serverless functions that the worker should maintain. Default is allocating 1 coprocess per core.\n", "--coprocesses-total=<number>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2895,16 +2896,31 @@ int main(int argc, char *argv[])
 		total_resources->disk.total,
 		total_resources->gpus.total);
 
-	if(coprocess_command && (number_of_coprocess_instances > 0)) {
-		coprocess_info = work_queue_coprocess_initalize_all_coprocesses(coprocess_cores, coprocess_memory, coprocess_disk, coprocess_gpus, total_resources, coprocess_command, number_of_coprocess_instances);
+	if(coprocess_command) {
+		// if the user did not specify the number of instances, or they specified 0, automatically allocate 1 coprocess per core.
+		if (number_of_coprocess_instances == 0) {
+			number_of_coprocess_instances = total_resources->cores.total;
+		}
+		else {
+			// if manual resource allocation, issue warning messages if the user overallocates worker resources
+			if ( (coprocess_cores * number_of_coprocess_instances) > total_resources->cores.total ) {
+				debug(D_WQ, "Warning: cores allocated to coprocesses is greater than cores allocated to worker\n");
+			}
+			else if  ((coprocess_memory * number_of_coprocess_instances) > total_resources->memory.total ) {
+				debug(D_WQ, "Warning: memory allocated to coprocesses is greater than cores allocated to worker\n");
+			}
+			else if  ((coprocess_disk * number_of_coprocess_instances) > total_resources->disk.total ) {
+				debug(D_WQ, "Warning: disk allocated to coprocesses is greater than cores allocated to worker\n");
+			}
+			else if  ((coprocess_gpus * number_of_coprocess_instances) > total_resources->gpus.total ) {
+				debug(D_WQ, "Warning: gpus allocated to coprocesses is greater than cores allocated to worker\n");
+			}
+		}
+		coprocess_resources = work_queue_resources_create();
+		coprocess_info = work_queue_coprocess_initalize_all_coprocesses(coprocess_cores, coprocess_memory, coprocess_disk, coprocess_gpus, total_resources, coprocess_resources, coprocess_command, number_of_coprocess_instances);
+		printf("HUH %p\n", coprocess_resources);
 		coprocess_name = xxstrdup(coprocess_info[0].name);
 		hash_table_insert(features, coprocess_name, (void **) 1);
-	}
-	else {
-		if (number_of_coprocess_instances != 0)
-		{
-			fatal("No coprocess specified but number of coprocesses given\n");
-		}
 	}
 
 	while(1) {
@@ -2963,7 +2979,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (coprocess_command && number_of_coprocess_instances > 0) {
-		work_queue_coprocess_shutdown_all_coprocesses(coprocess_info, number_of_coprocess_instances);
+		work_queue_coprocess_shutdown_all_coprocesses(coprocess_info, coprocess_resources, number_of_coprocess_instances);
 		free(coprocess_command);
 		free(coprocess_name);
 	}
