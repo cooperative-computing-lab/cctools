@@ -176,7 +176,7 @@ class ParseTxn:
         filename, size, wall_time, start_time = arg.split()
         size = float(size)/1e6
         wall_time = float(wall_time)/1e6
-        start_time = float(wall_time)/1e6
+        start_time = float(start_time)/1e6
 
         if start_time < self.cm.origin:
             # guard for cases when start time was unknown 
