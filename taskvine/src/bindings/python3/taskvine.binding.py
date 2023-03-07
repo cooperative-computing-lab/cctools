@@ -1165,13 +1165,11 @@ class Manager(object):
 
     ##
     ## Enables resource monitoring for tasks. The resources measured are
-    # available in the resources_measured member of the respective vine_task. A
-    # file VINE_RUNTIME_INFO_DIR/vine-logs/monitor/resources.log is also
-    # generated with resources per task.
+    # available in the resources_measured member of the respective vine_task.
     # @param self   Reference to the current manager object.
     # @param watchdog If not 0, kill tasks that exhaust declared resources.
     # @param time_series If not 0, generate a time series of resources per task
-    # in VINE_RUNTIME_INFO_DIR/vine-logs/monitor/ (WARNING: for long running
+    # in VINE_RUNTIME_INFO_DIR/vine-logs/time-series/ (WARNING: for long running
     # tasks these files may reach gigabyte sizes. This function is mostly used
     # for debugging.)
     #
