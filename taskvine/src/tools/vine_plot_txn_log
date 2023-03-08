@@ -317,6 +317,7 @@ class ParseTxn:
             ca["slot"] = slot
             self.cm.worker_used_slots[worker_id][slot] = (task_id, la)
             self.arg_to_resources(ca, "allocated_", arg)
+            self.arg_to_task_report(ca, arg)
             ca["DISCONNECTION"] = pd.NA  # add field to keep time in case of worker disconnection
         elif event == "WAITING_RETRIEVAL":
             pass
@@ -527,6 +528,7 @@ class TxnPlotWorkers(TxnPlot):
         worker["slot"] += base_slot+1 # slot 0 for cache updates, 1 for transfers
 
         dt = worker[worker["reason"] != "DISCONNECTION"]
+        lt = worker[worker["reason"] == "DISCONNECTION"]
         y = worker["slot"]
 
         # plot times from this wid
@@ -547,8 +549,9 @@ class TxnPlotWorkers(TxnPlot):
         self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting for cache"])
 
         self.bh(fig, dt["slot"], dt["time_worker_start"], dt["time_worker_end"]-dt["time_worker_start"], self.legend["tasks executing"])
+        self.bh(fig, lt["slot"], lt["time_commit_end"],  lt["last_state_time"] - lt["time_commit_end"], self.legend["tasks lost on disconnection"])
 
-        self.bh(fig, worker["slot"], worker["time_worker_end"], worker["RETRIEVED"]-worker["time_worker_end"], self.legend["tasks waiting retrieval"])
+        self.bh(fig, dt["slot"], dt["time_worker_end"], dt["RETRIEVED"]-dt["time_worker_end"], self.legend["tasks waiting retrieval"])
 
         ft = dt[(dt["reason"] != "SUCCESS") | ((dt["reason"] == "SUCCESS") & (dt["exit_code"] != 0))]
         self.bh(fig, ft["slot"], ft["RETRIEVED"] - 0.5, 0.5, self.legend["tasks failures"])
@@ -574,7 +577,7 @@ class TxnPlotWorkers(TxnPlot):
             if worker is not None:
                 base_slot = self.plot_by_worker(fig, worker, worker_times, worker_xfers, base_slot)
 
-        fig.set_ylabel("worker")
+        fig.set_ylabel("workers")
         fig.set_yticks((0, base_slot))
         fig.set_yticklabels(["0", str(gs.ngroups)])  # ytick number of workers
 
