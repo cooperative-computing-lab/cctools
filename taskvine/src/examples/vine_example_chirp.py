@@ -4,10 +4,10 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-# This example shows how to declare an xrootd file so that it can be cached at
+# This example shows how to declare an chirp file so that it can be cached at
 # the workers.
-# It assumes that uproot is installed where workers are executed. If this is
-# not the case, a poncho recipe to construct this environment is:
+# It assumes that chirp is installed where workers are executed. If this is
+# not the case, a poncho recipe to construct this environment is also given.
 #
 
 import taskvine as vine
@@ -23,7 +23,7 @@ def count_lines(chirp_file):
             lines += 1
     return lines
 
-# construct a poncho environment to execute the tasks. only needed if the chirp
+# construct a poncho environment to execute the tasks. Only needed if the chirp
 # executables are not available where the workers execute
 def create_env(env_name):
     import json
@@ -59,8 +59,8 @@ if __name__ == "__main__":
 
     env_with_chirp = None
     # uncomment the following lines only if workers don't have chirp available
-    env_with_chirp = "chirp_py_env.tar.gz"
-    create_env(env_with_chirp)
+    #env_with_chirp = "chirp_py_env.tar.gz"
+    #create_env(env_with_chirp)
 
     m = vine.Manager()
     print("listening on port", m.port)

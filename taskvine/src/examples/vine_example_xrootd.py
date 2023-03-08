@@ -7,7 +7,7 @@
 # This example shows how to declare an xrootd file so that it can be cached at
 # the workers.
 # It assumes that uproot is installed where workers are executed. If this is
-# not the case, a poncho recipe to construct this environment is:
+# not the case, a poncho recipe to construct this environment is also given.
 #
 
 import taskvine as vine
@@ -26,7 +26,7 @@ def count_events(root_file):
         return len(h['Events'])
 
 
-# construct a poncho environment to execute the tasks only needed if uproot and
+# construct a poncho environment to execute the tasks. Only needed if uproot and
 # xrootd are not available where the workers execute
 def create_env(env_name):
     import json
