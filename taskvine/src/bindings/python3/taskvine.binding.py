@@ -1638,7 +1638,7 @@ class Manager(object):
     def create_library_from_functions(self, name, *function_list):
         # ensure poncho python library is available
         if poncho_available == False:
-            raise("The poncho module is not available. Cannot create Library.")
+            raise TypeError("The poncho module is not available. Cannot create Library.")
         # positional arguments are the list of functions to include in the library
         # create a unique hash of a combination of function names and bodies
         functions_hash = package_serverize.generate_functions_hash(function_list)
@@ -1658,6 +1658,7 @@ class Manager(object):
             # check if the cache entry exits, and create it if it doesn't exist 
             if not os.path.exists(library_cache_path):
                 os.mkdir(library_cache_path)
+            print("No cached Library code and environment found, regenerating...")
             # create library code and environment
             package_serverize.serverize_library_from_code(library_cache_path, function_list, name)
             # enable correct permissions for library code
@@ -1682,7 +1683,7 @@ class Manager(object):
     # @param env_path        Path of the environment file which contains the environment capable of running the Library
     def create_library_from_serverized_files(self, name, library_path, env_path):
         if poncho_available == False:
-            raise("The poncho module is not available. Cannot create library.")
+            raise ModuleNotFoundError("The poncho module is not available. Cannot create library.")
         t = LibraryTask(f"./poncho_package_run -e package python ./library_code.py", name)
         f = self.declare_poncho(self.declare_file(env_path))
         t.add_input(f, "package")
