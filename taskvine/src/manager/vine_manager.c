@@ -5041,5 +5041,11 @@ struct vine_file *vine_declare_xrootd( struct vine_manager *m, const char *sourc
 	return vine_manager_declare_file(m, t);
 }
 
+struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket )
+{
+	struct vine_file *t = vine_file_chirp(server, source, ticket);
+	return vine_manager_declare_file(m, t);
+}
+
 
 /* vim: set noexpandtab tabstop=4: */
