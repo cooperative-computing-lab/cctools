@@ -224,7 +224,7 @@ struct vine_file * vine_file_chirp( const char *server, const char *source, stru
 {
 	char *command = string_format(
 			"chirp_get %s %s %s output.chirp",
-			ticket ? "--tickets=ticket.chirp" : "",
+			ticket ? "--auth=ticket --tickets=ticket.chirp" : "",
 			server,
 			source);
 
