@@ -167,49 +167,53 @@ def print_subprocess_summary(subprocess_dict, name):
 
 def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
     """ creates <name>.fout3.txt which summarizes the most frequently accesed paths """
-    major_dict = {}
-    reads_dict = {}
-    writes_dict = {}
+    major_dict = defaultdict(lambda :[0,0])
+    reads_dict = defaultdict(lambda :[0,0])
+    writes_dict = defaultdict(lambda :[0,0])
 
     f = open(name + ".fout3.txt", "w")
-    f.write("\nMajor Directories\n\n")
 
     for path in path_dict:
         action = path_dict[path].action
         freq = path_dict[path].freq
+        size = path_dict[path].size
         sub_pid = path_dict[path].sub_pid
 
         short_path = '/'.join(path.split('/')[0:dirLvl])
 
-        major_dict[short_path] = major_dict.get(short_path, 0) + freq
+        major_dict[short_path][0] += freq
+        major_dict[short_path][1] += size
         
         if action == 'R':
-            reads_dict[short_path] = reads_dict.get(short_path, 0) + freq
-        elif action == 'W':
-            writes_dict[short_path] = writes_dict.get(short_path, 0) + freq
+            reads_dict[short_path][0] += freq
+            reads_dict[short_path][1] += size
+        elif action == 'W' or action == 'WR':
+            writes_dict[short_path][0] += freq
+            writes_dict[short_path][1] += size
 
         if sub_pid:
             for pid in sub_pid:
                 subprocess_dict[pid]['files'].append(path_dict[path])
     
-    major_dict = dict(sorted(major_dict.items(), key=lambda x:x[1], reverse=True))
-    reads_dict = dict(sorted(reads_dict.items(), key=lambda x:x[1], reverse=True))
-    writes_dict = dict(sorted(writes_dict.items(), key=lambda x:x[1], reverse=True))
+    major_dict = dict(sorted(major_dict.items(), key=lambda x:x[1][1], reverse=True))
+    reads_dict = dict(sorted(reads_dict.items(), key=lambda x:x[1][1], reverse=True))
+    writes_dict = dict(sorted(writes_dict.items(), key=lambda x:x[1][1], reverse=True))
 
+    f.write("\nMajor Directories\n\n")
     for index, path in enumerate(major_dict,1):
-        f.write(f"{major_dict[path]:2}  {path}\n")
+        f.write(f"{major_dict[path][1]:6} {major_dict[path][0]:2}  {path}\n")
         if index == top:
             break
 
     f.write("\nMajor Reads\n\n")
     for index, path in enumerate(reads_dict,1):
-        f.write(f"{reads_dict[path]:2}  {path}\n")
+        f.write(f"{reads_dict[path][1]:6} {reads_dict[path][0]:2}  {path}\n")
         if index == top:
             break
 
     f.write("\nMajor Writes\n\n")
     for index, path in enumerate(writes_dict,1):
-        f.write(f"{writes_dict[path]:2}  {path}\n")
+        f.write(f"{writes_dict[path][1]:6} {writes_dict[path][0]:2}  {path}\n")
         if index == top:
             break
 
@@ -223,6 +227,7 @@ def end_of_execute(name):
     print(f"{name}.fout1.txt : output of strace")
     print(f"{name}.fout2.txt : the action and frequency performed on each file")
     print(f"{name}.fout3.txt : summary of all the actions")
+    print(f"{name}.fout4.txt : summary of files accessed by subprocesses")
     print("\n")
 
 
@@ -258,7 +263,7 @@ def main():
     create_trace_file(arguments[0:])
     path_dict, subprocess_dict = create_dict(name)
     print_summary_2(path_dict, name)
-    find_major_directories(path_dict, subprocess_dict, top,dirLvl, name)
+    find_major_directories(path_dict, subprocess_dict, top, dirLvl, name)
 
     print_subprocess_summary(subprocess_dict, name)
 
