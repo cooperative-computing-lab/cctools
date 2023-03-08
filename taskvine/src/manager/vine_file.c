@@ -220,4 +220,26 @@ struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy
 }
 
 
+struct vine_file * vine_file_chirp( const char *server, const char *source, struct vine_file *ticket )
+{
+	char *command = string_format(
+			"chirp_get %s %s %s output.chirp",
+			ticket ? "--auth=ticket --tickets=ticket.chirp" : "",
+			server,
+			source);
+
+	struct vine_task *t = vine_task_create(command);
+
+	vine_task_add_output(t,vine_file_local("output.chirp"),"output.chirp",VINE_CACHE);
+
+	if(ticket) {
+		vine_task_add_input(t,ticket,"ticket.chirp",VINE_CACHE);
+	}
+
+	free(command);
+
+	return vine_file_mini_task(t);
+}
+
+
 /* vim: set noexpandtab tabstop=4: */

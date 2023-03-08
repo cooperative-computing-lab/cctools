@@ -1273,17 +1273,21 @@ class Manager(object):
         return vine_task_state(self._taskvine, task_id)
 
     ##
-    # Enables resource monitoring of tasks in the manager, and writes a summary
-    # per task to the directory given. Additionally, all summaries are
-    # consolidate into the file all_summaries-PID.log
+    ## Enables resource monitoring for tasks. The resources measured are
+    # available in the resources_measured member of the respective vine_task.
+    # @param self   Reference to the current manager object.
+    # @param watchdog If not 0, kill tasks that exhaust declared resources.
+    # @param time_series If not 0, generate a time series of resources per task
+    # in VINE_RUNTIME_INFO_DIR/vine-logs/time-series/ (WARNING: for long running
+    # tasks these files may reach gigabyte sizes. This function is mostly used
+    # for debugging.)
     #
     # Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
     #
     # @param self   Reference to the current manager object.
-    # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
-    def enable_monitoring(self, dirname=None, watchdog=True):
-        return vine_enable_monitoring(self._taskvine, dirname, watchdog)
+    def enable_monitoring(self, watchdog=True, time_series=False):
+        return vine_enable_monitoring(self._taskvine, watchdog, time_series)
 
     ##
     # As @ref enable_monitoring, but it also generates a time series and a
@@ -1684,6 +1688,7 @@ class Manager(object):
     # - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
     # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
     # - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
+    # - monitor-interval Maximum number of seconds between resource monitor measurements. If less than 1, use default (5s).
     # - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)
     # - "wait_retrieve_many" Parameter to alter how vine_wait works. If set to 0, vine_wait breaks out of the while loop whenever a task changes to VINE_TASK_DONE (wait_retrieve_one mode). If set to 1, vine_wait does not break, but continues recieving and dispatching tasks. This occurs until no task is sent or recieved, at which case it breaks out of the while loop (wait_retrieve_many mode). (default=0)
     # @param value The value to set the parameter to.
@@ -2094,6 +2099,7 @@ class Manager(object):
     #
     # @param self    The manager to register this file
     # @param path    The path to the local file
+    # @return A file object to use in @ref Task.add_input or @ref Task.add_output
     def declare_file(self, path):
         f = vine_declare_file(self._taskvine, path)
         return File(f)
@@ -2103,6 +2109,7 @@ class Manager(object):
     # output of a task, and may be consumed by other tasks.
     #
     # @param manager    The manager to register this file
+    # @return A file object to use in @ref Task.add_input or @ref Task.add_output
     def declare_temp(self):
         f = vine_declare_temp(self._taskvine)
         return File(f)
@@ -2112,6 +2119,7 @@ class Manager(object):
     #
     # @param self    The manager to register this file
     # @param url     The url of the file.
+    # @return A file object to use in @ref Task.add_input
     def declare_url(self, url):
         url = str(url)
         f = vine_declare_url(self._taskvine, url)
@@ -2122,6 +2130,7 @@ class Manager(object):
     #
     # @param self    The manager to register this file
     # @param buffer  The contents of the buffer, or None for an empty output buffer
+    # @return A file object to use in @ref Task.add_input
     #
     # For example:
     # @code
@@ -2143,6 +2152,7 @@ class Manager(object):
     #
     # @param self     The manager to register this file
     # @param minitask The task to execute in order to produce a file
+    # @return A file object to use in @ref Task.add_input
     def declare_minitask(self, minitask):
         f = vine_declare_mini_task(self._taskvine, minitask._task)
         return File(f)
@@ -2152,6 +2162,7 @@ class Manager(object):
     #
     # @param manager    The manager to register this file
     # @param tarball    The file object to un-tar
+    # @return A file object to use in @ref Task.add_input
     def declare_untar(self, tarball):
         f = vine_declare_untar(self._taskvine, tarball._file)
         return File(f)
@@ -2161,6 +2172,7 @@ class Manager(object):
     #
     # @param self    The manager to register this file
     # @param package The poncho or conda-pack environment tarball
+    # @return A file object to use in @ref Task.add_input
     def declare_poncho(self, package):
         f = vine_declare_poncho(self._taskvine, package._file)
         return File(f)
@@ -2170,6 +2182,7 @@ class Manager(object):
     #
     # @param self    The manager to register this file
     # @param starch  The startch .sfx file
+    # @return A file object to use in @ref Task.add_input
     def declare_starch(self, starch):
         f = vine_declare_starch(self._taskvine, starch._file)
         return File(f)
@@ -2183,11 +2196,27 @@ class Manager(object):
     #               environment variable X509_USER_PROXY and the file
     #               "$TMPDIR/$UID" are considered in that order. If no proxy is
     #               present, the transfer is tried without authentication.
+    # @return A file object to use in @ref Task.add_input
     def declare_xrootd(self, source, proxy=None):
         proxy_c = None
         if proxy:
             proxy_c = proxy._file
         f = vine_declare_xrootd(self._taskvine, source, proxy_c)
+        return File(f)
+
+    ##
+    # Declare a file from accessible from an xrootd server.
+    #
+    # @param self   The manager to register this file.
+    # @param server The chirp server address of the form "hostname[:port"]"
+    # @param source The name of the file in the server
+    # @param ticket If not NULL, a file object that provides a chirp an authentication ticket
+    # @return A file object to use in @ref Task.add_input
+    def declare_chirp(self, server, source, ticket=None):
+        ticket_c = None
+        if ticket:
+            ticket_c = ticket._file
+        f = vine_declare_chirp(self._taskvine, server, source, ticket_c)
         return File(f)
 
 

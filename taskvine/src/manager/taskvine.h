@@ -654,6 +654,16 @@ in that order. If no proxy is present, the transfer is tried without authenticat
 struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy );
 
 
+/** Create a file object of a remote file accessible from a chirp server.
+@param m A manager object
+@param server The chirp server address of the form "hostname[:port"]"
+@param source The name of the file in the server
+@param ticket If not NULL, a file object that provides a chirp an authentication ticket
+@return A file object to use in @ref vine_task_add_input
+*/
+struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket );
+
+
 /** Create a scratch file object.
 A scratch file has no initial content, but is created
 as the output of a task, and may be consumed by other tasks.
@@ -859,31 +869,16 @@ void vine_set_name(struct vine_manager *m, const char *name);
 */
 const char *vine_get_name(struct vine_manager *m);
 
-/** Enables resource monitoring on the give manager.
-It generates a resource summary per task, which is written to the given
-directory. It also creates all_summaries-PID.log, that consolidates all
-summaries into a single. If monitor_output_dirname is NULL, vine_task is
-updated with the resources measured, and no summary file is kept unless
-explicitely given by vine_task's monitor_output_file.
+/** Enables resource monitoring for tasks. The resources measured are available
+in the resources_measured member of the respective vine_task.
 @param m A manager object
-@param monitor_output_directory The name of the output directory. If NULL,
-summaries are kept only when monitor_output_directory is set per task, but
-resources_measured from vine_task is updated.  @return 1 on success, 0 if
-@param watchdog if not 0, kill tasks that exhaust declared resources.
-@return 1 on success, o if monitoring was not enabled.
+@param watchdog If not 0, kill tasks that exhaust declared resources.
+@param time_series If not 0, generate a time series of resources per task in
+VINE_RUNTIME_INFO_DIR/vine-logs/time-series/ (WARNING: for long running tasks these
+files may reach gigabyte sizes. This function is mostly used for debugging.)
+@return 1 on success, 0 if monitoring could not be enabled.
 */
-int vine_enable_monitoring(struct vine_manager *m, char *monitor_output_directory, int watchdog);
-
-/** Enables resource monitoring on the give manager.
-As @ref vine_enable_monitoring, but it generates a time series and a
-monitor debug file (WARNING: for long running tasks these files may reach
-gigabyte sizes. This function is mostly used for debugging.)
-@param m A manager object.
-@param monitor_output_directory The name of the output directory.
-@param watchdog if not 0, kill tasks that exhaust declared resources.
-@return 1 on success, 0 if monitoring was not enabled.
-*/
-int vine_enable_monitoring_full(struct vine_manager *m, char *monitor_output_directory, int watchdog);
+int vine_enable_monitoring(struct vine_manager *m, int watchdog, int time_series);
 
 /** Enable taskvine peer transfers to be scheduled by the manager **/
 int vine_enable_peer_transfers(struct vine_manager *m);
@@ -1133,6 +1128,7 @@ void vine_set_manager_preferred_connection(struct vine_manager *m, const char *p
  - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
  - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
  - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
+ - "monitor-interval" Maximum number of seconds between resource monitor measurements. If less than 1, use default (5s). (default=5)
  - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
  - "hungry-minimum" Mimimum number of tasks to consider manager not hungry. (default=10)
  - "wait-for-workers" Mimimum number of workers to connect before starting dispatching tasks. (default=0)

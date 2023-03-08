@@ -904,16 +904,30 @@ these limits. You can enable monitoring and enforcement as follows:
     # Measure the resources used by tasks, but do not terminate tasks that go above
     # declared resources:
     m.enable_monitoring(watchdog=False)
+
+    # Measure the resources used by tasks, but do not terminate tasks that go
+    # above declared resources, and generate a time series per task. These time
+    # series are written to the logs directory `vine-logs/time-series`.
+    # Use with caution, as time series for long running tasks may be in the
+    # order of gigabytes. 
+    vine_enable_monitoring(m,watchdog=False,time_series=True)
     ```
 
 === "C"
     ```C
-    # Measure the resources used by tasks, and terminate tasks that go above their
-    # resources:
+    /* Measure the resources used by tasks, and terminate tasks that go above their
+    resources: */
+    vine_enable_monitoring(m,1,0)
+
+    /* Measure the resources used by tasks, but do not terminate tasks that go above
+    declared resources: */
     vine_enable_monitoring(m,0,0)
 
-    # Measure the resources used by tasks, but do not terminate tasks that go above
-    # declared resources:
+    /* Measure the resources used by tasks, but do not terminate tasks that go
+    above # declared resources, and generate a time series per task. These time
+    series are written to the logs directory `vine-logs/time-series`.
+    Use with caution, as time series for long running tasks may be in the
+    order of gigabytes. */
     vine_enable_monitoring(m,0,1)
     ```
 
@@ -976,7 +990,7 @@ report format is JSON, as its filename has the form
 === "C"
     ```C
     struct vine_task *t = vine_task_create(...);
-    vine_set_monitor_output("my-resources-output");
+    vine_task_set_monitor_output(t, "my-resources-output");
     ...
     int taskid = vine_submti(m, t);
     ```
@@ -1835,6 +1849,7 @@ change.
 | proportional-resources | If set to 0, do not assign resources proportionally to tasks. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
 | proportional-whole-tasks | Round up resource proportions such that only an integer number of tasks could be fit in the worker. The default is to use proportions. (See [task resources.](#task-resources) | 1 |
 | hungry-minimum          | Smallest number of waiting tasks in the queue before declaring it hungry | 10 |
+| monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
 | wait-retrieve-many      | Rather than immediately returning when a task is done, `m.wait(timeout)` retrieves and dispatches as many tasks<br> as `timeout` allows. Warning: This may exceed the capacity of the manager to receive results. | 0 |
