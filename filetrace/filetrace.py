@@ -4,11 +4,11 @@ import os
 import sys
 import re
 import operator
-# from filetrace_subprocess import *
+from collections import defaultdict
 
 # Classes
 class Properties:
-    def __init__(self, path="",action = '?',freq = 0, size = 0 , command = "", read_freq = 0, write_freq = 0, sub_pid = 0):
+    def __init__(self, path="",action = '?',freq = 0, size = 0 , command = "", read_freq = 0, write_freq = 0, sub_pid = []):
         self.path = path
         self.action = action
         self.freq = freq
@@ -16,7 +16,7 @@ class Properties:
         self.command = command
         self.read_freq = read_freq
         self.write_freq = write_freq
-        self.sub_pid = sub_pid
+        self.sub_pid = sub_pid.copy()
 
 # Funtions
 def usage():
@@ -46,10 +46,11 @@ def create_dict(name):
         properties = [action, freq, size, parent, command, reads, writes]
     """
     path_dict = {}
+    subprocess_dict = {}
+    path = False
 
     with open(name + ".fout1.txt") as file:
-        for line in file:
-            
+        for line in file: 
             if "openat" in line or "stat" in line:
                 try: # Try get file path
                     path = re.search('</.+>',line).group(0).replace('<','').replace('>','')
@@ -65,6 +66,9 @@ def create_dict(name):
                 path_dict[path].action = file_actions(path_dict, path)
                 path_dict[path].freq += 1
 
+                if line.startswith('[pid '):
+                    path_dict[path].sub_pid.append(re.search('\[pid [0-9]+\]',line).group(0).replace('[pid ','').replace(']',''))
+
             if "read" in line or "write" in line:
                 try:
                     path = re.search('<.+>,',line).group(0).replace('<','').replace('>,','')
@@ -78,7 +82,10 @@ def create_dict(name):
                 except (IndexError, AttributeError) as e:
                     continue
 
-    return path_dict 
+            if "execve" in line:
+                find_subprocess(line,subprocess_dict) 
+
+    return path_dict, subprocess_dict 
 
 
 def file_actions(path_dict, path):
@@ -106,6 +113,7 @@ def file_actions(path_dict, path):
             path_dict[path].write_freq += 1
         else:
             action = '?'
+
         if (path_dict[path].read_freq > 0) and (path_dict[path].write_freq > 0):
             action = 'WR'
 
@@ -120,22 +128,45 @@ def print_summary_2(path_dict, name):
     action, and path of each entry
     """
     f = open(name + ".fout2.txt", "w")
-    f.write(f"freq action bytes path\n")
+    f.write(f"action bytes freq path\n")
      
-    for file in sorted(path_dict.values(), key=operator.attrgetter('action','freq','size') , reverse=True):
+    for file in sorted(path_dict.values(), key=operator.attrgetter('action','size','freq') , reverse=True):
         action = file.action
         freq = file.freq
         size = file.size
         path = file.path
     
-        f.write(f"{freq:4}    {action:2}{size:8} {path}\n")
+        f.write(f"{action:>4}{size:8}{freq:4}  {path}\n")
+
+    f.close()
+
+def find_subprocess(line, subprocess_dict): 
+    if re.search('\[pid [0-9]+\]',line): 
+        pid = re.search('\[pid [0-9]+\]',line).group(0).replace('[pid ','').replace(']','')
+        command = str(re.search('\[".+\]',line).group(0)).strip('[]').replace('", "',' ')
+        subprocess_dict[pid] = {"command" : command, "files": []}
+    return
+
+def print_subprocess_summary(subprocess_dict, name):
+    """ Creates the file <name>.fout4.txt which contains the details of the subprocesses
+    """
+    f = open(name + ".fout4.txt", "w")
+    f.write(f"Subproccesses: \n\n")
+     
+    for pid in subprocess_dict:
+        command = subprocess_dict[pid]['command']
+    
+        f.write(f"pid : {pid} : {command}\n")
+
+        for file in subprocess_dict[pid]['files']:
+            f.write(f'\t{file.action:4}{file.path}\n')
+        f.write("\n\n")
 
     f.close()
 
 
-def find_major_directories(path_dict, top, dirLvl, name):
+def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
     """ creates <name>.fout3.txt which summarizes the most frequently accesed paths """
-    count = 0
     major_dict = {}
     reads_dict = {}
     writes_dict = {}
@@ -146,41 +177,42 @@ def find_major_directories(path_dict, top, dirLvl, name):
     for path in path_dict:
         action = path_dict[path].action
         freq = path_dict[path].freq
+        sub_pid = path_dict[path].sub_pid
 
         short_path = '/'.join(path.split('/')[0:dirLvl])
+
         major_dict[short_path] = major_dict.get(short_path, 0) + freq
         
         if action == 'R':
             reads_dict[short_path] = reads_dict.get(short_path, 0) + freq
         elif action == 'W':
             writes_dict[short_path] = writes_dict.get(short_path, 0) + freq
+
+        if sub_pid:
+            for pid in sub_pid:
+                subprocess_dict[pid]['files'].append(path_dict[path])
     
     major_dict = dict(sorted(major_dict.items(), key=lambda x:x[1], reverse=True))
     reads_dict = dict(sorted(reads_dict.items(), key=lambda x:x[1], reverse=True))
     writes_dict = dict(sorted(writes_dict.items(), key=lambda x:x[1], reverse=True))
 
-    for path in major_dict:
+    for index, path in enumerate(major_dict,1):
         f.write(f"{major_dict[path]:2}  {path}\n")
-        count += 1
-        if count >= top:
+        if index == top:
             break
-    count = 0
 
     f.write("\nMajor Reads\n\n")
-    for path in reads_dict:
+    for index, path in enumerate(reads_dict,1):
         f.write(f"{reads_dict[path]:2}  {path}\n")
-        count += 1
-        if count >= top:
+        if index == top:
             break
 
-    count = 0
     f.write("\nMajor Writes\n\n")
-    for path in writes_dict:
+    for index, path in enumerate(writes_dict,1):
         f.write(f"{writes_dict[path]:2}  {path}\n")
-        count += 1
-        if count >= top:
+        if index == top:
             break
-            
+
     f.close()
 
 
@@ -224,11 +256,11 @@ def main():
     name = arguments[0]
 
     create_trace_file(arguments[0:])
-    path_dict = create_dict(name)
+    path_dict, subprocess_dict = create_dict(name)
     print_summary_2(path_dict, name)
-    find_major_directories(path_dict,top,dirLvl,name)
+    find_major_directories(path_dict, subprocess_dict, top,dirLvl, name)
 
-    # create_subprocess_dict(path_dict)
+    print_subprocess_summary(subprocess_dict, name)
 
     end_of_execute(name)
 
