@@ -227,10 +227,29 @@ Here is how to describe the files needed by this task:
     t.add_output_file("my-file.gz", cache = False)
 
     # files can also be described when the task is declared:
+    gzip_file = m.declare_file("/usr/bin/gzip")
+    my_file = m.declare_file("my-file")
+    my_gz_file = m.declare_file("my-file.gz")
+
      t = vine.Task(
         command = "./gzip < my-file > my-file.gz",
-        input_files = {"/usr/bin/gzip" : {remote_name : "gzip, cache : True}, "my-file" : {remote_name : "my-file", cache : False}},
-        output_files = {"my-file.gz : {remote_name : "my-file.gz", cache = False}}
+        input_files = {
+            gzip_file : {
+                remote_name : "gzip", 
+                cache : True
+                }, 
+            my_file : {
+                remote_name : 
+                "my-file", 
+                cache : False
+            }
+        },
+        output_files = {
+            my_gz_file : {
+                remote_name : "my-file.gz", 
+                cache = False
+            }
+        }
     )
     ```
 
