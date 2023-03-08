@@ -82,8 +82,10 @@ def create_dict(name):
                 except (IndexError, AttributeError) as e:
                     continue
 
+            if "strace: Process " in line:
+                find_pid(line, subprocess_dict)
             if "execve" in line:
-                find_subprocess(line,subprocess_dict) 
+                find_command(line,subprocess_dict) 
 
     return path_dict, subprocess_dict 
 
@@ -140,12 +142,17 @@ def print_summary_2(path_dict, name):
 
     f.close()
 
-def find_subprocess(line, subprocess_dict): 
+def find_command(line, subprocess_dict): 
     if re.search('\[pid [0-9]+\]',line): 
         pid = re.search('\[pid [0-9]+\]',line).group(0).replace('[pid ','').replace(']','')
         command = str(re.search('\[".+\]',line).group(0)).strip('[]').replace('", "',' ')
         subprocess_dict[pid] = {"command" : command, "files": []}
     return
+
+def find_pid(line, subprocess_dict):
+    if re.search('strace: Process [0-9]+',line): 
+        pid = re.search('strace: Process [0-9]+',line).group(0).replace('strace: Process ','')
+        subprocess_dict[pid] = {"command" : "", "files": []} 
 
 def print_subprocess_summary(subprocess_dict, name):
     """ Creates the file <name>.fout4.txt which contains the details of the subprocesses
