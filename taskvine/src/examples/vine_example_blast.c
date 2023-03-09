@@ -77,7 +77,6 @@ int main(int argc, char *argv[])
 	printf("manager %s is listening on port %d...\n", vine_get_name(m), vine_port(m));
 
 	vine_enable_monitoring(m, 1, 1);
-	vine_tune(m, "monitor-interval", 1);
 	
 	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL);
 	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL);
