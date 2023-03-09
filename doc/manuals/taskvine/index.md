@@ -1481,6 +1481,10 @@ either their `taskid` or `tag`. For example:
 === "Python"
     ```python
     # create task as usual and tag it with an arbitrary string.
+    t = vine.Task(...)
+    t.set_tag("my-tag")
+
+    # or set tag in task declaration
     t = vine.Task(
         command = ...,
         tag = "my-tag"
