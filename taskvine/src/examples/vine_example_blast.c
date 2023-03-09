@@ -10,11 +10,11 @@ It performs a BLAST search of the "Landmark" model organism database.
 It works by constructing tasks that download the blast executable
 and landmark database from NCBI, and then performs a short query.
 
-The query is provided by a string (but presented to the task as a file.)
+Each task in the workflow performs a query of the database using
+16 (random) query strings generated at the manager.
 Both the downloads are automatically unpacked, cached, and shared
-across all workers efficiently.
+with all the same tasks on the worker.
 */
-
 
 #include "taskvine.h"
 
@@ -28,14 +28,19 @@ across all workers efficiently.
 
 #define LANDMARK_URL "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz"
 
+/* Number of characters in each query */
 #define QUERY_LENGTH 128
 
+/* Number of queries in each task */
 #define QUERY_COUNT 16
 
+/* Number of tasks to generate */
 #define TASK_COUNT 1000
 
+/* Permitted letters in an amino acid sequence */
 const char* amino_letters = "ACGTUiRYKMSWBDHVN";
 
+/* Make a sequence in a query */
 static void make_sequence(char* q, int s) {
 	int i;
 	int prfix_len = strlen(">query\n");
@@ -48,6 +53,9 @@ static void make_sequence(char* q, int s) {
 	*(q+i) = '\n';
 }
 
+/* Create a query string consisting of
+{query_count} sequences of {query_length} characters.
+*/
 static char* make_query() {
 	int query_size = sizeof(char) * (strlen(">query\n") + QUERY_LENGTH + 1) * QUERY_COUNT + 1;
 	char* q = malloc(query_size);
@@ -74,16 +82,20 @@ int main(int argc, char *argv[])
 	}
 	
 	vine_set_name(m, "blast-example");
-	printf("manager %s is listening on port %d...\n", vine_get_name(m), vine_port(m));
+	printf("TaskVine listening on %d\n", vine_port(m));
 
 	vine_enable_monitoring(m, 1, 1);
 	
+    vine_enable_peer_transfers(m);
+
+    printf("Declaring files...");
 	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL);
 	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL);
 
 	struct vine_file *software = vine_declare_untar(m, blast_url);
 	struct vine_file *database = vine_declare_untar(m, landm_url);
 
+    printf("Declaring tasks...");
 	char* query_string;
 	for(i=0;i<TASK_COUNT;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
