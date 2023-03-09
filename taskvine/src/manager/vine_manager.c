@@ -2471,16 +2471,6 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 		w->resources->disk.inuse      += box->disk;
 		w->resources->gpus.inuse      += box->gpus;
 	}
-
-	char *name;
-	struct vine_task *t;
-	HASH_TABLE_ITERATE(w->libraries,name,t) {
-		box = t->resources_requested;
-		w->resources->cores.inuse     += box->cores;
-		w->resources->memory.inuse    += box->memory;
-		w->resources->disk.inuse      += box->disk;
-		w->resources->gpus.inuse      += box->gpus;
-	}
 }
 
 static void update_max_worker(struct vine_manager *q, struct vine_worker_info *w) {
@@ -3829,10 +3819,14 @@ void vine_manager_remove_library( struct vine_manager *q, const char *name ) {
 		if(w->features) {
 			vine_manager_send(q,w,"kill_library %ld\n", strlen(name));
 			vine_manager_send(q,w,"%s", name);
+			struct vine_task *library = hash_table_lookup(w->libraries, name);
 			hash_table_remove(w->features, name);
 			hash_table_remove(w->libraries, name);
+			rmsummary_delete(itable_lookup(w->current_tasks_boxes, library->task_id));
+			itable_remove(w->current_tasks_boxes, library->task_id);
 		}
 	}
+	hash_table_remove(q->libraries, name);
 }
 
 static void handle_library_update(struct vine_manager *q, struct vine_worker_info *w, const char *line) {

@@ -275,7 +275,7 @@ pid_t vine_process_execute(struct vine_process *p )
 		p->pid = fork();
 	} else {
 		p->coprocess = vine_coprocess_initialize_coprocess(p->task->command_line);
-		vine_coprocess_specify_resources(p->coprocess, p->task->resources_requested);
+		vine_coprocess_specify_resources(p->coprocess);
 		p->pid = vine_coprocess_start(p->coprocess, p->sandbox);
 	}
 

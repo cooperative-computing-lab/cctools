@@ -381,13 +381,6 @@ static void send_resource_update(struct link *manager)
 		end_time = worker_start_time + (manual_wall_time_option * 1e6);
 	}
 
-	if (list_size(coprocess_list) != 0) {
-		list_first_item(coprocess_list);
-		struct vine_coprocess *coprocess = list_next_item(coprocess_list);
-		vine_resources_debug(coprocess->coprocess_resources);
-		vine_coprocess_resources_send(manager,coprocess->coprocess_resources,stoptime);
-	}
-
 	vine_resources_send(manager,total_resources,stoptime);
 	send_message(manager, "info end_of_resource_update %d\n", 0);
 }
