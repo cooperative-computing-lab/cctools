@@ -286,7 +286,7 @@ void vine_coprocess_measure_resources(struct list *coprocess_list) {
 		}
 		struct rmsummary *resources = rmonitor_measure_process(coprocess->pid);
 		if (!resources) {
-			return;
+			return
 		}
 		debug(D_VINE, "Measuring resources of coprocess with pid %d\n", coprocess->pid);
 		debug(D_VINE, "cores: %lf, memory: %lf, disk: %lf, gpus: %lf\n", resources->cores, resources->memory + resources->swap_memory, resources->disk, resources->gpus);
