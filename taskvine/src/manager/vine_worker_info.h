@@ -55,9 +55,9 @@ struct vine_worker_info {
 
 	/* Resources and features that describe this worker. */
 	struct vine_resources *resources;
-	struct vine_resources *coprocess_resources;
-	struct hash_table   *features;
+	struct hash_table     *features;
 	struct vine_stats     *stats;
+	struct hash_table     *libraries;
 
 	/* Current files and tasks that have been transfered to this worker */
 	struct hash_table   *current_files;

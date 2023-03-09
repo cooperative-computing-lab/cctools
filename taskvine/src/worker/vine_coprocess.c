@@ -203,7 +203,7 @@ int vine_coprocess_check(struct vine_coprocess *coprocess)
     return 1;
 }
 
-char *vine_coprocess_run(const char *function_name, const char *function_input, struct vine_coprocess *coprocess) {
+char *vine_coprocess_run(const char *function_name, const char *function_input, struct vine_coprocess *coprocess, const char *sandbox) {
 	int timeout = 60000000; // one minute, can be changed
 
 	timestamp_t curr_time = timestamp_get();
@@ -212,6 +212,11 @@ char *vine_coprocess_run(const char *function_name, const char *function_input, 
 	int bytes_sent = link_printf(coprocess->write_link, stoptime, "%s %ld\n", function_name, strlen(function_input));
 	if(bytes_sent < 0) {
 		fatal("could not send input data size: %s", strerror(errno));
+	}
+
+	bytes_sent = link_printf(coprocess->write_link, stoptime, "%s\n", sandbox);
+	if(bytes_sent < 0) {
+		fatal("could not send input data: %s", strerror(errno));
 	}
 
 	bytes_sent = link_printf(coprocess->write_link, stoptime, "%s\n", function_input);
@@ -280,7 +285,9 @@ void vine_coprocess_measure_resources(struct list *coprocess_list) {
 			continue;
 		}
 		struct rmsummary *resources = rmonitor_measure_process(coprocess->pid);
-
+		if (!resources) {
+			return;
+		}
 		debug(D_VINE, "Measuring resources of coprocess with pid %d\n", coprocess->pid);
 		debug(D_VINE, "cores: %lf, memory: %lf, disk: %lf, gpus: %lf\n", resources->cores, resources->memory + resources->swap_memory, resources->disk, resources->gpus);
 		debug(D_VINE, "Max resources available to coprocess:\ncores: %"PRId64 " memory: %"PRId64 " disk: %"PRId64 " gpus: %"PRId64 "\n", coprocess->coprocess_resources->cores.total, coprocess->coprocess_resources->memory.total, coprocess->coprocess_resources->disk.total, coprocess->coprocess_resources->gpus.total);

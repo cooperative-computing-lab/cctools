@@ -28,9 +28,9 @@ struct vine_worker_info * vine_worker_create( struct link * lnk )
 	w->workerid = 0;
 
 	w->resources = vine_resources_create();
-	w->coprocess_resources = vine_resources_create();
 	w->features  = hash_table_create(0,0);
 	w->stats     = calloc(1, sizeof(struct vine_stats));
+	w->libraries = hash_table_create(0,0);
 
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
@@ -58,9 +58,9 @@ void vine_worker_delete( struct vine_worker_info *w )
 	free(w->hashkey);
 
 	vine_resources_delete(w->resources);
-	vine_resources_delete(w->coprocess_resources);
 	hash_table_clear(w->features, 0);
 	hash_table_delete(w->features);
+	hash_table_delete(w->libraries);
 	free(w->stats);
 
 	hash_table_clear(w->current_files,(void*)vine_file_replica_delete);

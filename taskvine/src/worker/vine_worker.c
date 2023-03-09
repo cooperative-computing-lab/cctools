@@ -503,12 +503,11 @@ static int start_process( struct vine_process *p, struct link *manager )
 		itable_insert(procs_complete,p->task->task_id,p);
 		return 0;
 	}
-	if (!p->coprocess || vine_process_get_library_name(p)) {
-		cores_allocated += t->resources_requested->cores;
-		memory_allocated += t->resources_requested->memory;
-		disk_allocated += t->resources_requested->disk;
-		gpus_allocated += t->resources_requested->gpus;
-	}
+	cores_allocated += t->resources_requested->cores;
+	memory_allocated += t->resources_requested->memory;
+	disk_allocated += t->resources_requested->disk;
+	gpus_allocated += t->resources_requested->gpus;
+
 
 	if(t->resources_requested->gpus>0) {
 		vine_gpus_allocate(t->resources_requested->gpus,t->task_id);
@@ -550,12 +549,10 @@ static void reap_process( struct vine_process *p, struct link *manager )
 {
 	p->execution_end = timestamp_get();
 
-	if (!p->coprocess || vine_process_get_library_name(p)) {
-		cores_allocated  -= p->task->resources_requested->cores;
-		memory_allocated -= p->task->resources_requested->memory;
-		disk_allocated   -= p->task->resources_requested->disk;
-		gpus_allocated   -= p->task->resources_requested->gpus;
-	}
+	cores_allocated  -= p->task->resources_requested->cores;
+	memory_allocated -= p->task->resources_requested->memory;
+	disk_allocated   -= p->task->resources_requested->disk;
+	gpus_allocated   -= p->task->resources_requested->gpus;
 
 	vine_gpus_free(p->task->task_id);
 

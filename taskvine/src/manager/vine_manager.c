@@ -2153,15 +2153,7 @@ static vine_msg_code_t handle_resource( struct vine_manager *q, struct vine_work
 			inuse = w->resources->workers.inuse;
 			w->resources->workers = r;
 			w->resources->workers.inuse = inuse;
-		} else if(string_prefix_is(resource_name, "coprocess_cores")) {
-			w->coprocess_resources->cores = r;
-		} else if(string_prefix_is(resource_name, "coprocess_memory")) {
-			w->coprocess_resources->memory = r;
-		} else if(string_prefix_is(resource_name, "coprocess_disk")) {
-			w->coprocess_resources->disk = r;
-		} else if(string_prefix_is(resource_name, "coprocess_gpus")) {
-			w->coprocess_resources->gpus = r;
-		}
+		} 
 	} else {
 		return VINE_MSG_FAILURE;
 	}
@@ -2466,11 +2458,6 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	w->resources->disk.inuse   = 0;
 	w->resources->gpus.inuse   = 0;
 
-	w->coprocess_resources->cores.inuse  = 0;
-	w->coprocess_resources->memory.inuse = 0;
-	w->coprocess_resources->disk.inuse   = 0;
-	w->coprocess_resources->gpus.inuse   = 0;
-
 	update_max_worker(q, w);
 
 	if(w->resources->workers.total < 1)
@@ -2479,20 +2466,20 @@ static void count_worker_resources(struct vine_manager *q, struct vine_worker_in
 	}
 
 	ITABLE_ITERATE(w->current_tasks_boxes,task_id,box) {
-		struct vine_task *t = itable_lookup(w->current_tasks, task_id);
-		if (!t) continue;
-		if (t->coprocess) {
-			w->coprocess_resources->cores.inuse     += box->cores;
-			w->coprocess_resources->memory.inuse    += box->memory;
-			w->coprocess_resources->disk.inuse      += box->disk;
-			w->coprocess_resources->gpus.inuse      += box->gpus;
-		}
-		else {
-			w->resources->cores.inuse     += box->cores;
-			w->resources->memory.inuse    += box->memory;
-			w->resources->disk.inuse      += box->disk;
-			w->resources->gpus.inuse      += box->gpus;
-		}
+		w->resources->cores.inuse     += box->cores;
+		w->resources->memory.inuse    += box->memory;
+		w->resources->disk.inuse      += box->disk;
+		w->resources->gpus.inuse      += box->gpus;
+	}
+
+	char *name;
+	struct vine_task *t;
+	HASH_TABLE_ITERATE(w->libraries,name,t) {
+		box = t->resources_requested;
+		w->resources->cores.inuse     += box->cores;
+		w->resources->memory.inuse    += box->memory;
+		w->resources->disk.inuse      += box->disk;
+		w->resources->gpus.inuse      += box->gpus;
 	}
 }
 
@@ -3772,12 +3759,21 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 }
 
 static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vine_worker_info *w, const char *name) {
+
+	// setup the Library Task by cloning the original and giving it a unique taskid
 	struct vine_task *t = vine_task_clone(hash_table_lookup(q->libraries, name));
 	t->task_id = q->next_task_id;
 	q->next_task_id++;
+	t->hostname = xxstrdup(w->hostname);
+	t->addrport = xxstrdup(w->addrport);
+
+	// send the Library Task to the worker
 	vine_manager_send(q,w, "library %lld %lld\n",  (long long) strlen(name), (long long)t->task_id);
 	link_putlstring(w->link, name, strlen(name), time(0) + q->short_timeout);
 	vine_result_code_t result = start_one_task(q, w, t);
+	
+	// insert the task into the worker's library table to track resource allocations
+	hash_table_insert(w->libraries, name, t);
 
 	vine_txn_log_write_library_update(q, w, t->task_id, VINE_LIBRARY_SENT);
 
@@ -3834,6 +3830,7 @@ void vine_manager_remove_library( struct vine_manager *q, const char *name ) {
 			vine_manager_send(q,w,"kill_library %ld\n", strlen(name));
 			vine_manager_send(q,w,"%s", name);
 			hash_table_remove(w->features, name);
+			hash_table_remove(w->libraries, name);
 		}
 	}
 }
