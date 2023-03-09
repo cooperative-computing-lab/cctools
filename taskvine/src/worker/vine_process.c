@@ -322,7 +322,7 @@ pid_t vine_process_execute(struct vine_process *p )
 			char *input = load_input_file(p->task);
 
 			// call invoke_coprocess_function
-		 	char *output = vine_coprocess_run(p->task->command_line, input, p->coprocess, p->sandbox);
+		 	char *output = vine_coprocess_run(p->task->command_line, input, p->coprocess);
 
 			// write data to output file
 			full_write(p->output_fd, output, strlen(output));

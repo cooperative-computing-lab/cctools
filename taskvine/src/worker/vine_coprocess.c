@@ -203,7 +203,7 @@ int vine_coprocess_check(struct vine_coprocess *coprocess)
     return 1;
 }
 
-char *vine_coprocess_run(const char *function_name, const char *function_input, struct vine_coprocess *coprocess, const char *sandbox) {
+char *vine_coprocess_run(const char *function_name, const char *function_input, struct vine_coprocess *coprocess) {
 	int timeout = 60000000; // one minute, can be changed
 
 	timestamp_t curr_time = timestamp_get();
@@ -212,11 +212,6 @@ char *vine_coprocess_run(const char *function_name, const char *function_input, 
 	int bytes_sent = link_printf(coprocess->write_link, stoptime, "%s %ld\n", function_name, strlen(function_input));
 	if(bytes_sent < 0) {
 		fatal("could not send input data size: %s", strerror(errno));
-	}
-
-	bytes_sent = link_printf(coprocess->write_link, stoptime, "%s\n", sandbox);
-	if(bytes_sent < 0) {
-		fatal("could not send input data: %s", strerror(errno));
 	}
 
 	bytes_sent = link_printf(coprocess->write_link, stoptime, "%s\n", function_input);
