@@ -1991,7 +1991,8 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param path    The path to the local file
     # @return A file object to use in @ref Task.add_input or @ref Task.add_output
-    def declare_file(self, path, flags=None):
+    def declare_file(self, path, flags=False):
+        flags = Task._determine_file_flags(flags)
         f = vine_declare_file(self._taskvine, path, flags)
         return File(f)
 
@@ -2011,7 +2012,8 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param url     The url of the file.
     # @return A file object to use in @ref Task.add_input
-    def declare_url(self, url, flags=None):
+    def declare_url(self, url, flags=False):
+        flags = Task._determine_file_flags(flags)
         url = str(url)
         f = vine_declare_url(self._taskvine, url, flags)
         return File(f)
@@ -2030,9 +2032,10 @@ class Manager(object):
     # >>> print(f.contents())
     # >>> "hello pirate ♆"
     # @endcode
-    def declare_buffer(self, buffer=None, flags=None):
+    def declare_buffer(self, buffer=None, flags=False):
         # because of the swig typemap, vine_declare_buffer(m, buffer, size) is changed
         # to a function with just two arguments.
+        flags = Task._determine_file_flags(flags)
         if isinstance(buffer, str):
             buffer = bytes(buffer, "utf-8")
         f = vine_declare_buffer(self._taskvine, buffer, flags)
