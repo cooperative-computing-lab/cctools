@@ -111,10 +111,13 @@ def main():
     while not m.empty():
             t = m.wait(5)
             if t:
-                weights, error = json.loads(t.output)["Result"]
-                if error < best_error:
-                    best_weights = weights
-                    best_error = error
+                try:
+                    weights, error = json.loads(t.output)["Result"]
+                    if error < best_error:
+                        best_weights = weights
+                        best_error = error
+                except:
+                    print(f"Error reading result of task {t.task_id}")
     print(f"The best weights are: {best_weights}")
     print(f"With an RMS error of {best_error}")
 
