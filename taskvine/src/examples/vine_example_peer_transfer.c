@@ -4,18 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-/*
-This example shows some of the data handling features of taskvine.
-It performs a BLAST search of the "Landmark" model organism database.
-It works by constructing tasks that download the blast executable
-and landmark database from NCBI, and then performs a short query.
-
-The query is provided by a string (but presented to the task as a file.)
-Both the downloads are automatically unpacked, cached, and shared
-with all the same tasks on the worker.
-*/
-
-
 #include "taskvine.h"
 
 #include <stdio.h>
@@ -24,26 +12,16 @@ with all the same tasks on the worker.
 #include <errno.h>
 #include <unistd.h>
 
-const char *query_string = ">P01013 GENE X PROTEIN (OVALBUMIN-RELATED)\n\
-		QIKDLLVSSSTDLDTTLVLVNAIYFKGMWKTAFNAEDTREMPFHVTKQESKPVQMMCMNNSFNVATLPAE\n\
-		KMKILELPFASGDLSMLVLLPDEVSDLERIEKTINFEKLTEWTNPNTMEKRRVKVYLPQMKIEEKYNLTS\n\
-		VLMALGMTDLFIPSANLTGISSAESLKISQAVHGAFMELSEDGIEMAGSTGVIEDIKHSPESEQFRADHP\n\
-		FLFLIKHNPTNTIVYFGRYWSP\n\
-";
-
-#define BLAST_URL "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz"
+#define BLAST_URL "https://mirrors.slackware.com/slackware/slackware-iso/slackware-12.0-iso/slackware-12.0-install-d1.iso"
 
 #define LANDMARK_URL "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz"
-
 int main(int argc, char *argv[])
 {
 	struct vine_manager *m;
 	struct vine_task *t;
 	int i;
 
-	//runtime logs will be written to vine_example_peer_info/%Y-%m-%dT%H:%M:%S
-	vine_set_runtime_info_path("vine_example_peer_transfer_info");
-
+	vine_set_runtime_info_path("vine_example_blast_info");
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));
@@ -51,31 +29,34 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	if(argv[1] &&(strcmp(argv[1], "-peer") == 0)){
-		printf("Peer transfers enabled\n");
+	//vine_enable_debug_log(m,"manager.log");
+	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
+//	vine_enable_perf_log(m, "my.perf.log");
+	//vine_enable_transactions_log(m, "my.tr.log");
+	
+	vine_tune(m, "wait-for-workers", 500);	
+			
+
+	if(argv[1] && strcmp(argv[1],"-peer") == 0){
 		vine_enable_peer_transfers(m);
 		vine_tune(m, "file-source-max-transfers", 2);
 	}
 
-	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL, 0);
-	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL, 0);
+	if(argv[2]){
+		vine_tune(m, "worker-source-max-transfers", atoi(argv[2]));
+	}
+ 
+	struct vine_file *database = vine_declare_untar(m, vine_declare_url(m, LANDMARK_URL, VINE_PEER_SHARE));
+	if(argv[3]){
+		for(i=0;i<atoi(argv[3]);i++) {
+			struct vine_task *t = vine_task_create("ls -l slackware*; sleep 30");
+	  
+			vine_task_add_input(t,database,"slackware", VINE_NOCACHE );
 
-	struct vine_file *software = vine_declare_untar(m, blast_url);
-	struct vine_file *database = vine_declare_untar(m, landm_url);
+			int task_id = vine_submit(m, t);
 
-	for(i=0;i<1000;i++) {
-		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
-
-		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string), 0);
-
-		vine_task_add_input(t, query, "query.file", VINE_NOCACHE);
-		vine_task_add_input(t,software,"blastdir", VINE_CACHE );
-		vine_task_add_input(t,database,"landmark", VINE_CACHE );
-		vine_task_set_env_var(t,"BLASTDB","landmark");
-
-		int task_id = vine_submit(m, t);
-
-		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );
+			printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );
+		}
 	}
 
 	printf("waiting for tasks to complete...\n");
@@ -101,5 +82,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
-/* vim: set noexpandtab tabstop=4: */
