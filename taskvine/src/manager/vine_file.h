@@ -56,10 +56,10 @@ struct vine_file *vine_file_clone( struct vine_file *f );
 /* Decreases reference count of file, and frees if zero. */
 int vine_file_delete( struct vine_file *f );
 
-struct vine_file *vine_file_local( const char *source );
-struct vine_file *vine_file_url( const char *source );
+struct vine_file *vine_file_local( const char *source, vine_file_flags_t flags );
+struct vine_file *vine_file_url( const char *source, vine_file_flags_t flags );
 struct vine_file *vine_file_temp();
-struct vine_file *vine_file_buffer( const char *buffer, size_t size );
+struct vine_file *vine_file_buffer( const char *buffer, size_t size, vine_file_flags_t flags );
 struct vine_file *vine_file_empty_dir( );
 struct vine_file *vine_file_mini_task( struct vine_task *t );
 struct vine_file *vine_file_untar( struct vine_file *f );

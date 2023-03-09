@@ -69,8 +69,8 @@ int main(int argc, char *argv[])
 
 	vine_enable_peer_transfers(m);
 
-	struct vine_file *convert = vine_declare_file(m, "convert.sfx");
-	struct vine_file *image = vine_declare_url(m, "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg");
+	struct vine_file *convert = vine_declare_file(m, "convert.sfx", 0);
+	struct vine_file *image = vine_declare_url(m, "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", 0);
 
 	struct vine_file *temp_file[36];
 

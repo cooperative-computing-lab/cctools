@@ -4978,37 +4978,37 @@ struct vine_file *vine_manager_lookup_file( struct vine_manager *m, const char *
 	return hash_table_lookup(m->file_table, file_id);
 }
 
-struct vine_file *vine_declare_file( struct vine_manager *m, const char *source )
+struct vine_file *vine_declare_file( struct vine_manager *m, const char *source, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_local(source);
+	struct vine_file *f = vine_file_local(source, flags);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_url( struct vine_manager *m, const char *source )
+struct vine_file *vine_declare_url( struct vine_manager *m, const char *source, vine_file_flags_t flags )
 {
-	struct vine_file *f = vine_file_url(source);
+	struct vine_file *f = vine_file_url(source, flags);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_temp( struct vine_manager *m )
+struct vine_file *vine_declare_temp( struct vine_manager *m)
 {
 	struct vine_file *f = vine_file_temp();
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size )
+struct vine_file *vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_buffer(buffer, size);
+	struct vine_file *f = vine_file_buffer(buffer, size, flags);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_empty_dir( struct vine_manager *m )
+struct vine_file *vine_declare_empty_dir( struct vine_manager *m)
 {
 	struct vine_file *f = vine_file_empty_dir();
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *t )
+struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *t)
 {
 	struct vine_file *f = vine_file_mini_task(t);
 	return vine_manager_declare_file(m, f);

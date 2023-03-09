@@ -632,7 +632,7 @@ size_t vine_file_size( struct vine_file *f );
 @param source The path of the file on the local filesystem
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
-struct vine_file * vine_declare_file( struct vine_manager *m, const char *source );
+struct vine_file * vine_declare_file( struct vine_manager *m, const char *source, vine_file_flags_t flags );
 
 
 /** Declare a file object from a remote URL.
@@ -640,7 +640,7 @@ struct vine_file * vine_declare_file( struct vine_manager *m, const char *source
 @param url The URL address of the object in text form.
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_url( struct vine_manager *m, const char *url );
+struct vine_file * vine_declare_url( struct vine_manager *m, const char *url, vine_file_flags_t flags );
 
 
 /** Create a file object of a remote file accessible from an xrootd server.
@@ -680,7 +680,7 @@ struct vine_file * vine_declare_temp( struct vine_manager *m );
 @param size The length of the buffer, in bytes.
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
-struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size );
+struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size, vine_file_flags_t flags );
 
 
 /** Create a file object representing an empty directory.

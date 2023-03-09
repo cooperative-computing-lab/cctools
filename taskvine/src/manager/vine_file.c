@@ -110,12 +110,12 @@ size_t vine_file_size( struct vine_file *f )
 	return f->size;
 }
 
-struct vine_file * vine_file_local( const char *source )
+struct vine_file * vine_file_local( const char *source, vine_file_flags_t flags )
 {
 	return vine_file_create(source,0,0,0,VINE_FILE,0,0);
 }
 
-struct vine_file * vine_file_url( const char *source )
+struct vine_file * vine_file_url( const char *source, vine_file_flags_t flags )
 {
 	return vine_file_create(source,0,0,0,VINE_URL,0,0);
 }
@@ -130,7 +130,7 @@ struct vine_file * vine_file_temp()
 	return vine_file_create("temp",0,0,0,VINE_TEMP,0,0);
 }
 
-struct vine_file * vine_file_buffer( const char *data, size_t size )
+struct vine_file * vine_file_buffer( const char *data, size_t size, vine_file_flags_t flags )
 {
 	return vine_file_create("buffer",0,data,size,VINE_BUFFER,0,0);
 }
@@ -149,7 +149,7 @@ struct vine_file * vine_file_untar( struct vine_file *f )
 {
 	struct vine_task *t = vine_task_create("mkdir output && tar xf input -C output");
 	vine_task_add_input(t,f,"input",VINE_CACHE);
-	vine_task_add_output(t,vine_file_local("output"),"output",VINE_CACHE);
+	vine_task_add_output(t,vine_file_local("output", 0),"output",VINE_CACHE);
 	return vine_file_mini_task(t);
 }
 
@@ -157,9 +157,9 @@ struct vine_file * vine_file_poncho( struct vine_file *f)
 {
 	struct vine_task *t = vine_task_create("./poncho_package_run --unpack-to output -e package.tar.gz");
 	char * poncho_path = path_which("poncho_package_run");
-	vine_task_add_input(t, vine_file_local(poncho_path), "poncho_package_run", VINE_CACHE);
+	vine_task_add_input(t, vine_file_local(poncho_path, 0), "poncho_package_run", VINE_CACHE);
 	vine_task_add_input(t, f, "package.tar.gz", VINE_CACHE);
-	vine_task_add_output(t, vine_file_local("output"), "output", VINE_CACHE);
+	vine_task_add_output(t, vine_file_local("output", 0), "output", VINE_CACHE);
 	return vine_file_mini_task(t);
 }
 
@@ -167,7 +167,7 @@ struct vine_file * vine_file_starch( struct vine_file *f )
 {
 	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
 	vine_task_add_input(t,f,"package.sfx",VINE_CACHE);
-	vine_task_add_output(t,vine_file_local("output"),"output",VINE_CACHE);
+	vine_task_add_output(t,vine_file_local("output", 0),"output",VINE_CACHE);
 	return vine_file_mini_task(t);
 }
 
@@ -199,7 +199,7 @@ struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy
 	if(!proxy) {
 		char *proxy_filename = find_x509_proxy();
 		if(proxy_filename) {
-			proxy = vine_file_local(proxy_filename);
+			proxy = vine_file_local(proxy_filename, 0);
 			free(proxy_filename);
 		}
 	}
@@ -207,7 +207,7 @@ struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy
 	char *command = string_format("xrdcp %s output.root", source);
 	struct vine_task *t = vine_task_create(command);
 
-	vine_task_add_output(t,vine_file_local("output.root"),"output.root",VINE_CACHE);
+	vine_task_add_output(t,vine_file_local("output.root", 0),"output.root",VINE_CACHE);
 
 	if(proxy) {
 		vine_task_set_env_var(t, "X509_USER_PROXY", "proxy509");
