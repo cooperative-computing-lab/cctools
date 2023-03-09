@@ -2346,12 +2346,10 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 			/* when cores are unspecified, they are set to 0 if gpus are specified.
 			 * Otherwise they get a proportion according to specified
 			 * resources. Tasks will get at least one core. */
-			if(limits->cores < 0) {
-				if(limits->gpus > 0) {
-					limits->cores = 0;
-				} else {
-					limits->cores = MAX(1, floor(w->resources->cores.largest * max_proportion));
-				}
+			if(limits->cores < 0 && limits->gpus > 0) {
+				limits->cores = 0;
+			} else {
+				limits->cores = MAX(1, MAX(limits->cores, floor(w->resources->cores.largest * max_proportion)));
 			}
 
 			if(limits->gpus < 0) {
@@ -2359,13 +2357,12 @@ struct rmsummary *vine_manager_choose_resources_for_task( struct vine_manager *q
 				limits->gpus = 0;
 			}
 
-			if(limits->memory < 0) {
-				limits->memory = MAX(1, floor(w->resources->memory.largest * max_proportion));
-			}
+			limits->memory = MAX(1, MAX(limits->memory, floor(w->resources->memory.largest * max_proportion)));
 
-			if(limits->disk < 0) {
-				limits->disk = MAX(1, floor(w->resources->disk.largest * max_proportion));
-			}
+			/* worker's disk is shared even among tasks that are not running,
+			 * thus the proportion is modified by the current overcommit
+			 * multiplier */
+			limits->disk = MAX(1, MAX(limits->disk, floor(w->resources->disk.largest * max_proportion / q->resource_submit_multiplier)));
 		}
 	}
 
