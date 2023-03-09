@@ -381,9 +381,9 @@ class TxnPlot:
         self.legend = {
                 "workers lifetime": 'C9',
                 "tasks executing": 'C0',
-                "tasks waiting for cache": 'C7',
+                "tasks waiting at worker": 'C7',
                 "tasks lost on disconnection": 'C8',
-                "tasks waiting retrieval": 'C2',
+                "results waiting retrieval": 'C2',
                 "tasks failures": 'red',
                 "cache updates": 'C1',
                 "inputs from manager": 'C3',
@@ -513,13 +513,13 @@ class TxnPlotTasks(TxnPlot):
 
         self.bh(fig, dt.index, dt["time_commit_end"],  dt["time_worker_start"] - dt["time_commit_end"], self.legend["cache updates"], edgecolor=None)
 
-        del self.legend["tasks waiting for cache"] # already covered above
+        del self.legend["tasks waiting at worker"] # already covered above
 
         self.bh(fig, lt.index, lt["time_commit_end"],  lt["last_state_time"] - lt["time_commit_end"], self.legend["tasks lost on disconnection"], edgecolor=None)
 
         self.bh(fig, dt.index, dt["time_worker_start"],  dt["time_worker_end"] - dt["time_worker_start"], self.legend["tasks executing"], edgecolor=None)
 
-        self.bh(fig, dt.index, dt["time_worker_end"],  dt["RETRIEVED"] - dt["time_worker_end"], self.legend["tasks waiting retrieval"], edgecolor=None)
+        self.bh(fig, dt.index, dt["time_worker_end"],  dt["RETRIEVED"] - dt["time_worker_end"], self.legend["results waiting retrieval"], edgecolor=None)
 
         del self.legend["tasks failures"] # already covered above
 
@@ -553,12 +553,12 @@ class TxnPlotWorkers(TxnPlot):
         cu = worker[worker["size_output_mgr"] > 0]
         self.bh(fig, base_slot+1, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"], self.legend["outputs to manager"])
 
-        self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting for cache"])
+        self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting at worker"])
 
         self.bh(fig, dt["slot"], dt["time_worker_start"], dt["time_worker_end"]-dt["time_worker_start"], self.legend["tasks executing"])
         self.bh(fig, lt["slot"], lt["time_commit_end"],  lt["last_state_time"] - lt["time_commit_end"], self.legend["tasks lost on disconnection"])
 
-        self.bh(fig, dt["slot"], dt["time_worker_end"], dt["RETRIEVED"]-dt["time_worker_end"], self.legend["tasks waiting retrieval"])
+        self.bh(fig, dt["slot"], dt["time_worker_end"], dt["RETRIEVED"]-dt["time_worker_end"], self.legend["results waiting retrieval"])
 
         ft = dt[(dt["reason"] != "SUCCESS") | ((dt["reason"] == "SUCCESS") & (dt["exit_code"] != 0))]
         self.bh(fig, ft["slot"], ft["RETRIEVED"] - 0.5, 0.5, self.legend["tasks failures"])
