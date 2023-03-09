@@ -88,24 +88,25 @@ class Manager:
         keys = None
         for attempts in self.tasks_attempts.values():
             for attempt in attempts.values():
-                if not keys:
-                    keys = attempt.keys()
-                all_tasks.append([ attempt[k] for k in keys ])
-        tasks_df = pd.DataFrame(all_tasks, columns=keys)
-        tasks_df["measured_wall_time"] = tasks_df["time_worker_end"] - tasks_df["time_worker_start"]
+                all_tasks.append(attempt)
+        tasks_df = pd.DataFrame.from_records(all_tasks)
+        try:
+            tasks_df["measured_wall_time"] = tasks_df["time_worker_end"] - tasks_df["time_worker_start"]
+        except KeyError:
+            print(f"No tasks that finished was found in the log for manager pid {self.pid}")
+            sys.exit(1)
+
         return tasks_df
 
     def make_table_workers(self):
         all_workers = []
         keys = None
         for worker in self.worker_lifetime.values():
-            if not keys:
-                keys = worker.keys()
-            all_workers.append([ worker[k] for k in keys ])
-        workers_df = pd.DataFrame(all_workers, columns=keys)
+            all_workers.append(worker)
+        workers_df = pd.DataFrame.from_records(all_workers)
 
         # fill up disconnect times for workers that survive the manager
-        workers_df[workers_df["DISCONNECTION"].isna()]["DISCONNECTION"] = self.termination
+        workers_df.loc[workers_df["DISCONNECTION"].isna(), ("DISCONNECTION",)] = self.termination
         return workers_df
 
     def make_table_transfers(self):
@@ -350,6 +351,12 @@ class ParseTxn:
             elif subject == "TASK":
                 self._parse_task(time, manager_pid, target, event, arg)
 
+        if self.cm:
+            # if self.cm still assigned, then END record missing. Here we force
+            # the generation of tables in that case. This is useful when
+            # plotting partial logs while the workflow is still active.
+            self.cm.make_tables()
+
 class TxnPlot:
     def __init__(self, managers, opts):
         self.managers = managers
@@ -494,7 +501,7 @@ class TxnPlotTasks(TxnPlot):
         # divided tasks on whether we have a full report
         at = manager.tasks
         lt = manager.tasks[manager.tasks["reason"] == "DISCONNECTION"]
-        dt = manager.tasks[manager.tasks["reason"] != "DISCONNECTION"]
+        dt = manager.tasks[~manager.tasks["RETRIEVED"].isna()]
 
         del self.legend["workers lifetime"] # not show in this plot
 
@@ -527,7 +534,7 @@ class TxnPlotWorkers(TxnPlot):
         slot_count = worker["slot"].nunique() + 2  # + 2 for the "slots" for cache update, and transfers
         worker["slot"] += base_slot+1 # slot 0 for cache updates, 1 for transfers
 
-        dt = worker[worker["reason"] != "DISCONNECTION"]
+        dt = worker[~worker["RETRIEVED"].isna()]
         lt = worker[worker["reason"] == "DISCONNECTION"]
         y = worker["slot"]
 
