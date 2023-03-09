@@ -230,7 +230,7 @@ struct vine_file * vine_file_chirp( const char *server, const char *source, stru
 
 	struct vine_task *t = vine_task_create(command);
 
-	vine_task_add_output(t,vine_file_local("output.chirp"),"output.chirp",VINE_CACHE);
+	vine_task_add_output(t,vine_file_local("output.chirp", 0),"output.chirp",VINE_CACHE);
 
 	if(ticket) {
 		vine_task_add_input(t,ticket,"ticket.chirp",VINE_CACHE);
