@@ -12,7 +12,6 @@ See the file COPYING for details.
 #include <errno.h>
 #include <unistd.h>
 
-#define BLAST_URL "https://mirrors.slackware.com/slackware/slackware-iso/slackware-12.0-iso/slackware-12.0-install-d1.iso"
 
 #define LANDMARK_URL "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz"
 int main(int argc, char *argv[])
@@ -51,7 +50,7 @@ int main(int argc, char *argv[])
 		for(i=0;i<atoi(argv[3]);i++) {
 			struct vine_task *t = vine_task_create("ls -l slackware*; sleep 30");
 	  
-			vine_task_add_input(t,database,"slackware", VINE_NOCACHE );
+			vine_task_add_input(t,database,"landmark", VINE_NOCACHE );
 
 			int task_id = vine_submit(m, t);
 
