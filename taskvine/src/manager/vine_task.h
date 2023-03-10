@@ -30,8 +30,8 @@ struct vine_task {
 	char *tag;                   /**< An optional user-defined logical name for the task. */
 	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref vine_task_set_category. If no explicit category is given, the label "default" is used. **/
 
-	char *monitor_output_directory;	/**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref vine_enable_monitoring */
-	char *monitor_snapshot_file;    /**< Filename the monitor checks to produce snapshots. */
+	char *monitor_output_directory;	     /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref vine_enable_monitoring */
+	struct vine_file *monitor_snapshot_file;  /**< Filename the monitor checks to produce snapshots. */
 
 	struct list *input_mounts;    /**< The mounted files expected as inputs. */
 	struct list *output_mounts;   /**< The mounted files expected as outputs. */

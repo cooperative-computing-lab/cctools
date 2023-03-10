@@ -608,7 +608,7 @@ For more information, consult the manual of the resource_monitor.
 @param monitor_snapshot_file A filename.
 */
 
-void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file);
+void vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file);
 
 //@}
 

@@ -151,7 +151,7 @@ struct vine_manager {
 	/* Resource monitoring configuration. */
 
 	vine_monitoring_mode_t monitor_mode;
-	char *monitor_exe;
+	struct vine_file *monitor_exe;
     int monitor_interval;
 
 	struct rmsummary *measured_local_resources;
