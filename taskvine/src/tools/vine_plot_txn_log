@@ -121,15 +121,17 @@ class Manager:
         def free_slot(index):
             heapq.heappush(free_slots, used_slots.pop(index))
 
+        if expand_waiting:
+            ts["time_worker_end"] = ts["time_worker_end"].combine(ts["last_state_time"], lambda x,y: y if pd.isna(x) else x)
+
         events = []
         for (index, row) in ts[ts["worker_id"] == worker_id].iterrows():
             # event tuple is: (index, start, time)
             if expand_waiting:
                 events.append((index, True,  row["RUNNING"]))
-                events.append((index, False, row["time_worker_end"] or row["last_state_time"]))
             else:
                 events.append((index, True,  row["time_worker_start"]))
-                events.append((index, False, row["time_worker_end"]))
+            events.append((index, False, row["time_worker_end"]))
 
         events.sort(key=lambda s: s[2])
 
@@ -362,7 +364,12 @@ class ParseTxn:
             ca["exit_code"] = int(exit_code)
             self.arg_to_task_report(ca, m)
             self.arg_to_resources(ca, "measured_", m)
-            del self.cm.tasks_on_worker[ca["worker_id"]][task_id]
+            try:
+                del self.cm.tasks_on_worker[ca["worker_id"]][task_id]
+            except KeyError:
+                # got the message of the worker disconnecting before the
+                # retrieved transaction. Mark the task as not a disconnection
+                self.cm.tasks_attempts[task_id][la]["DISCONNECTION"] = pd.NA
         elif event == "DONE":
             pass
 
@@ -594,12 +601,12 @@ class TxnPlotWorkers(TxnPlot):
         self.bh(fig, base_slot+1, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"], self.legend["outputs to manager"])
 
         if self.opts.expand_waiting:
-            # when not showing all the tasks waiting at the worker, the following causes many overlaps.
-            starts = worker["time_worker_start"].combine(worker["last_state_time"], lambda x,y: x or y) 
-            self.bh(fig, y, worker["RUNNING"], starts - worker["RUNNING"], self.legend["tasks waiting at worker"])
+            self.bh(fig, dt["slot"], dt["RUNNING"], dt["time_worker_start"] - dt["RUNNING"], self.legend["tasks waiting at worker"])
+            self.bh(fig, lt["slot"], lt["time_commit_end"], lt["last_state_time"] - lt["time_commit_start"], color=self.legend["tasks lost on disconnection"])
+        else:
+            pass
 
         self.bh(fig, dt["slot"], dt["time_worker_start"], dt["time_worker_end"]-dt["time_worker_start"], self.legend["tasks executing"])
-        self.bh(fig, lt["slot"], lt["time_commit_end"],  lt["last_state_time"] - lt["time_commit_end"], self.legend["tasks lost on disconnection"])
 
         self.bh(fig, dt["slot"], dt["time_worker_end"], dt["RETRIEVED"]-dt["time_worker_end"], self.legend["results waiting retrieval"])
 
@@ -630,6 +637,9 @@ class TxnPlotWorkers(TxnPlot):
         fig.set_ylabel("workers")
         fig.set_yticks((0, base_slot))
         fig.set_yticklabels(["0", str(gs.ngroups)])  # ytick number of workers
+
+        if not self.opts.expand_waiting:
+            del self.legend["tasks waiting at worker"]
 
 
 if __name__ == "__main__":
