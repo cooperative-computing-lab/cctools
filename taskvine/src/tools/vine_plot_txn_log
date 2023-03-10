@@ -403,6 +403,8 @@ class TxnPlot:
             plt.rc('font', **font)
             plt.rc('text', usetex=True)
 
+        mpl.style.use('fast')
+
         height = opts.height if opts.height else opts.width * (2/3)
 
 
@@ -412,15 +414,16 @@ class TxnPlot:
         # default legend
         self.legend = {
                 "workers lifetime": 'C9',
-                "tasks executing": 'C0',
                 "tasks waiting at worker": 'C7',
-                "tasks lost on disconnection": 'C8',
-                "results waiting retrieval": 'C2',
+                "tasks executing": 'C0',
+                "tasks lost on disconnection": 'lightcoral',
+                "results waiting retrieval": 'C8',
                 "tasks failures": 'red',
                 "cache updates": 'C1',
                 "inputs from manager": 'C3',
                 "outputs to manager": 'C5',
                 }
+
         self.display_plot()
 
     def determine_origin(self, m):
@@ -475,8 +478,6 @@ class TxnPlot:
         for (i, m) in enumerate(self.managers.values()):
             s = self.subs[0, i]
 
-            self.plot(s, m)
-
             plot_origin = self.determine_origin(m)
             plot_end = self.determine_end(m)
 
@@ -484,15 +485,20 @@ class TxnPlot:
             s.set_xticks([plot_origin, plot_end])
             s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_origin)))
             s.set_xlabel("time")
-
             s.tick_params(axis='both', which='major', labelsize=15)
-            s.legend(handles=[mpl.patches.Patch(color=c, label=l) for (l,c) in self.legend.items()])
+
+            self.plot(s, m)
+            self.set_legend(s)
 
         if self.opts.output:
             plt.savefig(self.opts.output)
 
         if self.opts.display or not self.opts.output:
             plt.show()
+
+    def set_legend(self, fig):
+        handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend.items()]
+        fig.legend(loc='upper left', handles=handles)
 
     def plot(self, fig, manager):
         return NotImplemented
