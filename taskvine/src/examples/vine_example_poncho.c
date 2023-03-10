@@ -32,10 +32,10 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	struct vine_file *script = vine_declare_file(m, "script_example_for_poncho.py", 0);
+	struct vine_file *script = vine_declare_file(m, "script_example_for_poncho.py", VINE_SHARE);
 
-	struct vine_file *poncho_tarball = vine_declare_file(m, "package.tar.gz", 0);
-	struct vine_file *poncho_expansion = vine_declare_poncho(m, poncho_tarball, 0);
+	struct vine_file *poncho_tarball = vine_declare_file(m, "package.tar.gz", VINE_SHARE);
+	struct vine_file *poncho_expansion = vine_declare_poncho(m, poncho_tarball, VINE_SHARE);
 
 	for(i=0;i<5;i++) {
 

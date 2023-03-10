@@ -49,8 +49,8 @@ typedef enum {
 } vine_mount_flags_t;
 
 typedef enum {
-	VINE_PEER_SHARE = 1, /**< Schedule this file to be shared between peers where available. (default) **/
-	VINE_PEER_NOSHARE = 2  /**< Do not schedule this file to be shared between peers. **/
+	VINE_PEER_SHARE = 0, /**< Schedule this file to be shared between peers where available. (default) */
+	VINE_PEER_NOSHARE    /**< Do not schedule this file to be shared between peers. */
 	/*
 	 * Move caching flags to here
 	 */
