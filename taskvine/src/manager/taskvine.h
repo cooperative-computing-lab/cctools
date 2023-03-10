@@ -25,8 +25,8 @@ no special capabilities.
 From the application perspective, the programmer creates a manager with @ref vine_create,
 defines a number of tasks with @ref vine_task_create, submits the tasks to the manager
 with @ref vine_submit, and then monitors completion with @ref vine_wait.
-Tasks are further described by attaching data objects via @ref vine_task_add_input_file,
-@ref vine_task_add_input_url and related functions.
+Tasks are further described by attaching data objects via @ref vine_task_add_input,
+@ref vine_task_add_ouput and related functions.
 
 The taskvine framework provides a large number of fault tolerance, resource management,
 and performance monitoring features that enable the construction of applications that
@@ -227,8 +227,8 @@ struct vine_stats {
 //@{
 
 /** Create a new task object.
-Once created and elaborated with functions such as @ref vine_task_add_input_file
-and @ref vine_task_add_input_buffer, the task should be passed to @ref vine_submit.
+Once created and elaborated with functions such as @ref vine_task_add_input
+and @ref vine_task_add_output, the task should be passed to @ref vine_submit.
 @param full_command The shell command line or coprocess functions to be
 executed by the task.  If null, the command will be given later by @ref
 vine_task_set_command
@@ -687,6 +687,12 @@ struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buff
 
 
 /** Create a file object representing an empty directory.
+This is very occasionally needed for applications that expect
+certain directories to exist in the working directory, prior to producing output.
+This function does not transfer any data to the task, but just creates
+a directory in its working sandbox.  If you want to transfer an entire
+directory worth of data to a task, use @ref vine_declare_file and give a
+directory name.
 @param m A manager object
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
@@ -694,6 +700,11 @@ struct vine_file * vine_declare_empty_dir( struct vine_manager *m );
 
 
 /** Create a file object produced from a mini-task
+Attaches a task definition to produce an input file by running a Unix command.
+This mini-task will be run on demand in order to produce the desired input file.
+This is useful if an input requires some prior step such as transferring,
+renaming, or unpacking to be useful.  A mini-task should be a short-running
+activity with minimal resource consumpion.
 @param m A manager object
 @param mini_task The task which produces the file
 @return A file object to use in @ref vine_task_add_input

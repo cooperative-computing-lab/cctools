@@ -35,8 +35,8 @@ int main(int argc, char *argv[])
 	printf("listening on port %d...\n", vine_port(m));
 
 
-	struct vine_file *url = vine_declare_url(m, CCTOOLS_URL, VINE_SHARE);
-	struct vine_file *package = vine_declare_untar(m, url, VINE_SHARE);
+	struct vine_file *url = vine_declare_url(m, CCTOOLS_URL, VINE_PEER_SHARE);
+	struct vine_file *package = vine_declare_untar(m, url, VINE_PEER_SHARE);
 
 	for(i=0;i<10;i++) {
 		struct vine_task *task = vine_task_create("ls -lR cctools | wc -l");
