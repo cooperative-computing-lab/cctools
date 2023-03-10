@@ -2631,7 +2631,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 
 		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
-		if(m->file->flags |= VINE_PEER_SHARE) 
+		if((m->file->flags |= VINE_PEER_SHARE)) 
 		{
 			if((peer = vine_file_replica_table_find_worker(q, m->file->cached_name)))
 			{
