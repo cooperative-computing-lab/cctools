@@ -2056,8 +2056,9 @@ class Manager(object):
     # @param self     The manager to register this file
     # @param minitask The task to execute in order to produce a file
     # @return A file object to use in @ref Task.add_input
-    def declare_minitask(self, minitask):
-        f = vine_declare_mini_task(self._taskvine, minitask._task)
+    def declare_minitask(self, minitask, cache=False, share=False):
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_mini_task(self._taskvine, minitask._task, flags)
         return File(f)
 
     ##
@@ -2066,8 +2067,9 @@ class Manager(object):
     # @param manager    The manager to register this file
     # @param tarball    The file object to un-tar
     # @return A file object to use in @ref Task.add_input
-    def declare_untar(self, tarball):
-        f = vine_declare_untar(self._taskvine, tarball._file)
+    def declare_untar(self, tarball, cache=False, share=False):
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_untar(self._taskvine, tarball._file, flags)
         return File(f)
 
     ##
@@ -2076,8 +2078,9 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param package The poncho or conda-pack environment tarball
     # @return A file object to use in @ref Task.add_input
-    def declare_poncho(self, package):
-        f = vine_declare_poncho(self._taskvine, package._file)
+    def declare_poncho(self, package, cache=False, share=False):
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_poncho(self._taskvine, package._file, flags)
         return File(f)
 
     ##
@@ -2086,8 +2089,9 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param starch  The startch .sfx file
     # @return A file object to use in @ref Task.add_input
-    def declare_starch(self, starch):
-        f = vine_declare_starch(self._taskvine, starch._file)
+    def declare_starch(self, starch, cache=False, share=False):
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_starch(self._taskvine, starch._file, flags)
         return File(f)
 
     ##
@@ -2100,11 +2104,12 @@ class Manager(object):
     #               "$TMPDIR/$UID" are considered in that order. If no proxy is
     #               present, the transfer is tried without authentication.
     # @return A file object to use in @ref Task.add_input
-    def declare_xrootd(self, source, proxy=None):
+    def declare_xrootd(self, source, proxy=None, cache=False, share=False):
         proxy_c = None
         if proxy:
             proxy_c = proxy._file
-        f = vine_declare_xrootd(self._taskvine, source, proxy_c)
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_xrootd(self._taskvine, source, proxy_c, flags)
         return File(f)
 
     ##
