@@ -60,10 +60,9 @@ class Manager:
         self.worker_transfers = defaultdict(lambda: [])
 
         # [worker_id] -> available slots (heapq)
-        self.worker_free_slots = {}
 
-        # [worker_id][slot] -> (task_id,attempt_number)
-        self.worker_used_slots = defaultdict(lambda: {})
+        # [worker_id][task_id] -> attempt_number
+        self.tasks_on_worker = defaultdict(lambda: {})
 
         # [worker_id] -> hostport
         self.last_host_port = {}
@@ -72,18 +71,18 @@ class Manager:
         self.workers = None
         self.transfers = None
 
-    def write_tables(self, filename, index):
+    def write_tables(self, filename, order_in_log):
         name = Path(filename).stem
         tables = ["tasks", "workers", "transfers"]
         for (table, df) in zip(tables, [self.tasks, self.workers, self.transfers]):
-            df.to_csv(f"{name}_{index}_{table}.csv", index=False)
+            df.to_csv(f"{name}_{order_in_log}_{table}.csv", index=False)
 
-    def make_tables(self):
-        self.tasks = self.make_table_tasks()
+    def make_tables(self, expand_waiting):
+        self.tasks = self.make_table_tasks(expand_waiting)
         self.workers = self.make_table_workers()
         self.transfers = self.make_table_transfers()
 
-    def make_table_tasks(self):
+    def make_table_tasks(self, expand_waiting=False):
         all_tasks = []
         keys = None
         for attempts in self.tasks_attempts.values():
@@ -93,10 +92,55 @@ class Manager:
         try:
             tasks_df["measured_wall_time"] = tasks_df["time_worker_end"] - tasks_df["time_worker_start"]
         except KeyError:
-            print(f"No tasks that finished was found in the log for manager pid {self.pid}")
+            print(f"No tasks that finished were found in the log for manager pid {self.pid}")
             sys.exit(1)
 
-        return tasks_df
+        return self.assign_slots(tasks_df, expand_waiting)
+
+
+    def assign_slots(self, ts, expand_waiting):
+        ts["slot"] = pd.NA
+        if expand_waiting:
+            # keep attempts that were dispatched to some worker
+            ts = ts[~ts["RUNNING"].isna()]
+        else:
+            # when showing only execution slots, we do not have enough
+            # information to plot tasks lost on disconnection
+            ts = ts[~ts["RETRIEVED"].isna()]
+
+        for worker_id in ts["worker_id"].unique():
+            self.assign_slots_worker(ts, worker_id, expand_waiting)
+        return ts
+
+    def assign_slots_worker(self, ts, worker_id, expand_waiting):
+        free_slots = []
+        used_slots = {}
+
+        def next_slot(index):
+            used_slots[index] = heapq.heappop(free_slots) if free_slots else 1+len(used_slots)
+            return used_slots[index]
+
+        def free_slot(index):
+            heapq.heappush(free_slots, used_slots.pop(index))
+
+        events = []
+        for (index, row) in ts[ts["worker_id"] == worker_id].iterrows():
+            # event tuple is: (index, start, time)
+            if expand_waiting:
+                events.append((index, True,  row["RUNNING"]))
+                events.append((index, False, row["time_worker_end"] or row["last_state_time"]))
+            else:
+                events.append((index, True,  row["time_worker_start"]))
+                events.append((index, False, row["time_worker_end"]))
+
+        events.sort(key=lambda s: s[2])
+
+        for (index, start, time) in events:
+            if start:
+                ts.loc[index, "slot"] = next_slot(index)
+            else:
+                free_slot(index)
+
 
     def make_table_workers(self):
         all_workers = []
@@ -119,11 +163,12 @@ class Manager:
 
 
 class ParseTxn:
-    def __init__(self, logfile, tasks_range_spec=None):
+    def __init__(self, logfile, expand_waiting=False, tasks_range_spec=None):
         self._log = logfile
         self.managers = {}
         self.cm = None  # current manager
 
+        self.expand_waiting = expand_waiting
         self.tasks_range = self.expand_range(tasks_range_spec)
 
         self._parse()
@@ -221,14 +266,8 @@ class ParseTxn:
             self.cm = Manager(manager_pid, time)
             self.managers[manager_pid] = self.cm
         elif event == "END":
-            self.cm.make_tables()
+            self.cm.make_tables(self.expand_waiting)
             self.cm = None
-
-    def _next_slot(self, worker_id):
-        free = self.cm.worker_free_slots[worker_id]
-        if not free:
-            heapq.heappush(free, len(self.cm.worker_used_slots[worker_id]) + 1)
-        return heapq.heappop(free)
 
     def _parse_worker(self, time, manager_pid, worker_id, event, arg):
         if not worker_id.startswith("worker-"):
@@ -241,18 +280,17 @@ class ParseTxn:
             self.cm.worker_lifetime[(worker_id,hostport)]["hostport"] = hostport
             self.cm.worker_lifetime[(worker_id,hostport)][event] = time
             self.cm.worker_lifetime[(worker_id,hostport)]["DISCONNECTION"] = pd.NA
-            self.cm.worker_free_slots[worker_id] = []
         elif event == "DISCONNECTION":
             reason = arg
             hostport = self.cm.last_host_port[worker_id]
             self.cm.worker_lifetime[(worker_id,hostport)][event] = time
             self.cm.worker_lifetime[(worker_id,hostport)]["reason"] = reason
-            for (slot, (task_id, attempt_number)) in self.cm.worker_used_slots[worker_id].items():
+            for (task_id, attempt_number) in self.cm.tasks_on_worker[worker_id].items():
                 self.cm.tasks_attempts[task_id][attempt_number]["reason"] = "DISCONNECTION"
                 self.cm.tasks_attempts[task_id][attempt_number]["DISCONNECTION"] = time
                 self.cm.tasks_attempts[task_id][attempt_number]["last_state"] = "DISCONNECTION"
                 self.cm.tasks_attempts[task_id][attempt_number]["last_state_time"] = time
-                heapq.heappush(self.cm.worker_free_slots[worker_id], slot)
+            self.cm.tasks_on_worker.clear()
         elif event == "RESOURCES":
             hostport = self.cm.last_host_port[worker_id]
             self.arg_to_resources(self.cm.worker_lifetime[(worker_id,hostport)], "", arg)
@@ -313,10 +351,8 @@ class ParseTxn:
             ca["duty"] = pd.NA   # we do not know if it a duty
         elif event == "RUNNING":
             (worker_id, allocation, arg) = arg.split()
-            slot = self._next_slot(worker_id)
+            self.cm.tasks_on_worker[worker_id][task_id] = la
             ca["worker_id"] = worker_id
-            ca["slot"] = slot
-            self.cm.worker_used_slots[worker_id][slot] = (task_id, la)
             self.arg_to_resources(ca, "allocated_", arg)
             self.arg_to_task_report(ca, arg)
             ca["DISCONNECTION"] = pd.NA  # add field to keep time in case of worker disconnection
@@ -328,9 +364,7 @@ class ParseTxn:
             ca["exit_code"] = int(exit_code)
             self.arg_to_task_report(ca, m)
             self.arg_to_resources(ca, "measured_", m)
-            slot = ca["slot"]
-            del self.cm.worker_used_slots[ca["worker_id"]][slot]
-            heapq.heappush(self.cm.worker_free_slots[ca["worker_id"]], slot)
+            del self.cm.tasks_on_worker[ca["worker_id"]][task_id]
         elif event == "DONE":
             pass
 
@@ -355,7 +389,7 @@ class ParseTxn:
             # if self.cm still assigned, then END record missing. Here we force
             # the generation of tables in that case. This is useful when
             # plotting partial logs while the workflow is still active.
-            self.cm.make_tables()
+            self.cm.make_tables(self.expand_waiting)
 
 class TxnPlot:
     def __init__(self, managers, opts):
@@ -600,6 +634,7 @@ if __name__ == "__main__":
     parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default="first-worker")
     parser.add_argument('--end', nargs='?', help='change plot end time. One of manager-end, last-task', default="last-task")
     parser.add_argument('--tasks-range', nargs='?', help='range of tasks ids to plot as start[,[end][,step]] ', default="1,,1")
+    parser.add_argument('--expand-waiting', action='store_true', help='show complete lifetime of waiting tasks at the worker')
     parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
     parser.add_argument('--width', nargs='?', type=float, help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', type=float, help='height in inches. Default is 2/3 of width', default=None)
@@ -607,7 +642,7 @@ if __name__ == "__main__":
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
     args = parser.parse_args()
 
-    p = ParseTxn(args.log, args.tasks_range)
+    p = ParseTxn(args.log, args.expand_waiting, args.tasks_range)
 
     if args.mode == "csv":
         p.write_tables(args.output)
