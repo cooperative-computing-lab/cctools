@@ -32,7 +32,6 @@ int vine_file_delete(struct vine_file *f)
 		vine_task_delete(f->mini_task);
 		free(f->source);
 		free(f->cached_name);
-		free(f->file_id);
 		free(f->data);
 		free(f);
 	}
@@ -84,8 +83,6 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 			f->size = totalsize;
 		}
 	}
-
-	f->file_id = vine_file_id(f);
 
 	f->refcount = 1;
 

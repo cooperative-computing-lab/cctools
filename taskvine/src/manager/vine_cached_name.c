@@ -326,17 +326,3 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 }
 
 
-char *vine_file_id( const struct vine_file *f )
-{
-	unsigned char digest[MD5_DIGEST_LENGTH];
-	const char *hash;
-
-    assert(f->cached_name);
-
-    char *content = string_format("%s%s", f->cached_name, f->source ? f->source : "");
-    md5_buffer(content,strlen(content),digest);
-    hash = md5_to_string(digest);
-    free(content);
-
-    return xxstrdup(hash);
-}
