@@ -59,8 +59,6 @@ class Manager:
         # [(worker_id,hostport)] -> transfer
         self.worker_transfers = defaultdict(lambda: [])
 
-        # [worker_id] -> available slots (heapq)
-
         # [worker_id][task_id] -> attempt_number
         self.tasks_on_worker = defaultdict(lambda: {})
 
@@ -587,7 +585,10 @@ class TxnPlotWorkers(TxnPlot):
         cu = worker[worker["size_output_mgr"] > 0]
         self.bh(fig, base_slot+1, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"], self.legend["outputs to manager"])
 
-        self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting at worker"])
+        if self.opts.expand_waiting:
+            # when not showing all the tasks waiting at the worker, the following causes many overlaps.
+            starts = worker["time_worker_start"].combine(worker["last_state_time"], lambda x,y: x or y) 
+            self.bh(fig, y, worker["RUNNING"], starts - worker["RUNNING"], self.legend["tasks waiting at worker"])
 
         self.bh(fig, dt["slot"], dt["time_worker_start"], dt["time_worker_end"]-dt["time_worker_start"], self.legend["tasks executing"])
         self.bh(fig, lt["slot"], lt["time_commit_end"],  lt["last_state_time"] - lt["time_commit_end"], self.legend["tasks lost on disconnection"])
