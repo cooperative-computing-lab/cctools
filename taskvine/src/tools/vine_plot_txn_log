@@ -429,6 +429,8 @@ class TxnPlot:
             return 0
         elif spec == "first-waiting-task":
             return m.tasks["WAITING"].min()
+        elif spec == "first-dispatched-task":
+            return m.tasks["time_commit_start"].min()
         elif spec == "first-transfer":
             return m.transfers["time"].min()
         elif spec == "first-worker":
@@ -632,7 +634,7 @@ if __name__ == "__main__":
     parser.add_argument('output', nargs='?', default=None, help='output name of the plot/csv generated. If not given, assumes --display')
     parser.add_argument('--mode', choices="workers tasks manager csv".split(), default="workers", help='information to plot. sv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
     parser.add_argument('--title', nargs='?', default='TaskVine', help='Title of the plot')
-    parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default="first-worker")
+    parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-dispatched-task, first-transfer, or first-worker', default="first-worker")
     parser.add_argument('--end', nargs='?', help='change plot end time. One of manager-end, last-task', default="last-task")
     parser.add_argument('--tasks-range', nargs='?', help='range of tasks ids to plot as start[,[end][,step]] ', default="1,,1")
     parser.add_argument('--expand-waiting', action='store_true', help='show complete lifetime of waiting tasks at the worker')
