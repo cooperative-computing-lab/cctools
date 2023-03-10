@@ -53,7 +53,12 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 	f->type = type;
 	f->size = size;
 	f->mini_task = mini_task;
-	f->flags = flags;
+
+	if(flags == 0) {
+		f->flags = VINE_PEER_NOSHARE; // | VINE_CACHE ?
+	} else {
+		f->flags = flags;
+	}
 
 	if(data) {
 		/* Terminate with a null, just in case the user tries to treat this as a C string. */
@@ -112,12 +117,12 @@ size_t vine_file_size( struct vine_file *f )
 
 struct vine_file * vine_file_local( const char *source, vine_file_flags_t flags )
 {
-	return vine_file_create(source,0,0,0,VINE_FILE,0,0);
+	return vine_file_create(source,0,0,0,VINE_FILE,0,flags);
 }
 
 struct vine_file * vine_file_url( const char *source, vine_file_flags_t flags )
 {
-	return vine_file_create(source,0,0,0,VINE_URL,0,0);
+	return vine_file_create(source,0,0,0,VINE_URL,0,flags);
 }
 
 struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *source )
@@ -132,7 +137,7 @@ struct vine_file * vine_file_temp()
 
 struct vine_file * vine_file_buffer( const char *data, size_t size, vine_file_flags_t flags )
 {
-	return vine_file_create("buffer",0,data,size,VINE_BUFFER,0,0);
+	return vine_file_create("buffer",0,data,size,VINE_BUFFER,0,flags);
 }
 
 struct vine_file * vine_file_empty_dir()
@@ -140,35 +145,35 @@ struct vine_file * vine_file_empty_dir()
 	return vine_file_create("unnamed",0,0,0,VINE_EMPTY_DIR,0,0);
 }
 
-struct vine_file * vine_file_mini_task( struct vine_task *t )
+struct vine_file * vine_file_mini_task( struct vine_task *t, vine_file_flags_t flags )
 {
-	return vine_file_create(t->command_line,0,0,0,VINE_MINI_TASK,t,VINE_PEER_NOSHARE);
+	return vine_file_create(t->command_line,0,0,0,VINE_MINI_TASK,t,flags);
 }
 
-struct vine_file * vine_file_untar( struct vine_file *f )
+struct vine_file * vine_file_untar( struct vine_file *f, vine_file_flags_t flags )
 {
 	struct vine_task *t = vine_task_create("mkdir output && tar xf input -C output");
 	vine_task_add_input(t,f,"input",VINE_CACHE);
-	vine_task_add_output(t,vine_file_local("output", 0),"output",VINE_CACHE);
-	return vine_file_mini_task(t);
+	vine_task_add_output(t,vine_file_local("output", flags),"output",VINE_CACHE);
+	return vine_file_mini_task(t, 0);
 }
 
-struct vine_file * vine_file_poncho( struct vine_file *f)
+struct vine_file * vine_file_poncho( struct vine_file *f, vine_file_flags_t flags )
 {
 	struct vine_task *t = vine_task_create("./poncho_package_run --unpack-to output -e package.tar.gz");
 	char * poncho_path = path_which("poncho_package_run");
 	vine_task_add_input(t, vine_file_local(poncho_path, 0), "poncho_package_run", VINE_CACHE);
 	vine_task_add_input(t, f, "package.tar.gz", VINE_CACHE);
-	vine_task_add_output(t, vine_file_local("output", 0), "output", VINE_CACHE);
-	return vine_file_mini_task(t);
+	vine_task_add_output(t, vine_file_local("output", flags), "output", VINE_CACHE);
+	return vine_file_mini_task(t, 0);
 }
 
-struct vine_file * vine_file_starch( struct vine_file *f )
+struct vine_file * vine_file_starch( struct vine_file *f, vine_file_flags_t flags )
 {
 	struct vine_task *t = vine_task_create("SFX_DIR=output SFX_EXTRACT_ONLY=1 ./package.sfx");
 	vine_task_add_input(t,f,"package.sfx",VINE_CACHE);
-	vine_task_add_output(t,vine_file_local("output", 0),"output",VINE_CACHE);
-	return vine_file_mini_task(t);
+	vine_task_add_output(t,vine_file_local("output", flags),"output",VINE_CACHE);
+	return vine_file_mini_task(t, 0);
 }
 
 
@@ -194,7 +199,7 @@ static char * find_x509_proxy()
 	return NULL;
 }
 
-struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy )
+struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy, vine_file_flags_t flags )
 {
 	if(!proxy) {
 		char *proxy_filename = find_x509_proxy();
@@ -216,7 +221,7 @@ struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy
 
 	free(command);
 
-	return vine_file_mini_task(t);
+	return vine_file_mini_task(t, flags);
 }
 
 
@@ -238,7 +243,7 @@ struct vine_file * vine_file_chirp( const char *server, const char *source, stru
 
 	free(command);
 
-	return vine_file_mini_task(t);
+	return vine_file_mini_task(t, 0);
 }
 
 

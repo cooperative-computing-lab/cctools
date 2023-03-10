@@ -54,8 +54,8 @@ int main(int argc, char *argv[])
 	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL, 0);
 	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL, 0);
 
-	struct vine_file *software = vine_declare_untar(m, blast_url);
-	struct vine_file *database = vine_declare_untar(m, landm_url);
+	struct vine_file *software = vine_declare_untar(m, blast_url, 0);
+	struct vine_file *database = vine_declare_untar(m, landm_url, 0);
 
 
 	for(i=0;i<10;i++) {

@@ -49,8 +49,8 @@ typedef enum {
 } vine_mount_flags_t;
 
 typedef enum {
-	VINE_PEER_SHARE = 0, /**< Schedule this file to be shared between peers where available. (default) **/
-	VINE_PEER_NOSHARE = 1  /**< Do not schedule this file to be shared between peers. **/
+	VINE_PEER_SHARE = 1, /**< Schedule this file to be shared between peers where available. (default) **/
+	VINE_PEER_NOSHARE = 2  /**< Do not schedule this file to be shared between peers. **/
 	/*
 	 * Move caching flags to here
 	 */
@@ -654,7 +654,7 @@ environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
 in that order. If no proxy is present, the transfer is tried without authentication.
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy );
+struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy, vine_file_flags_t flags );
 
 
 /** Create a file object of a remote file accessible from a chirp server.
@@ -698,7 +698,7 @@ struct vine_file * vine_declare_empty_dir( struct vine_manager *m );
 @param mini_task The task which produces the file
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *mini_task );
+struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *mini_task, vine_file_flags_t flags);
 
 
 /** Create a file object by unpacking a tar archive.
@@ -707,14 +707,14 @@ by tar, and so this function supports extensions .tar, .tar.gz, .tgz, tar.bz2, a
 @param m A manager object
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_untar( struct vine_manager *m, struct vine_file *f );
+struct vine_file * vine_declare_untar( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags);
 
 
 /** Create a file object by unpacking a poncho package
 @param m A manager object
 @param f A file object corresponding to poncho or conda-pack tarball
 */
-struct vine_file * vine_declare_poncho( struct vine_manager *m, struct vine_file *f );
+struct vine_file * vine_declare_poncho( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags );
 
 
 /** Create a file object by unpacking a starch package.
@@ -722,7 +722,7 @@ struct vine_file * vine_declare_poncho( struct vine_manager *m, struct vine_file
 @param f A file object representing a sfx archive.
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file *f );
+struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags );
 
 
 /** Delete a file object

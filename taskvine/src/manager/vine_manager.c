@@ -2631,7 +2631,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 
 		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
-		if(m->file->flags != VINE_PEER_NOSHARE) 
+		if(m->file->flags |= VINE_PEER_SHARE) 
 		{
 			if((peer = vine_file_replica_table_find_worker(q, m->file->cached_name)))
 			{
@@ -5008,37 +5008,37 @@ struct vine_file *vine_declare_empty_dir( struct vine_manager *m)
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *t)
+struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *t, vine_file_flags_t flags)
 {
-	struct vine_file *f = vine_file_mini_task(t);
+	struct vine_file *f = vine_file_mini_task(t, flags);
 	return vine_manager_declare_file(m, f);
 }
 
-struct vine_file *vine_declare_untar( struct vine_manager *m, struct vine_file *f)
+struct vine_file *vine_declare_untar( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags)
 {
-	struct vine_file *t = vine_file_untar(f);
+	struct vine_file *t = vine_file_untar(f, flags);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_declare_poncho( struct vine_manager *m, struct vine_file *f)
+struct vine_file *vine_declare_poncho( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags)
 {
-	struct vine_file *t = vine_file_poncho(f);
+	struct vine_file *t = vine_file_poncho(f, flags);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_declare_starch( struct vine_manager *m, struct vine_file *f)
+struct vine_file *vine_declare_starch( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags)
 {
-	struct vine_file *t = vine_file_starch(f);
+	struct vine_file *t = vine_file_starch(f, flags);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy)
+struct vine_file *vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy, vine_file_flags_t flags)
 {
-	struct vine_file *t = vine_file_xrootd(source, proxy);
+	struct vine_file *t = vine_file_xrootd(source, proxy, flags);
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket )
+struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket)
 {
 	struct vine_file *t = vine_file_chirp(server, source, ticket);
 	return vine_manager_declare_file(m, t);
