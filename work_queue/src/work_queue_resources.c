@@ -91,6 +91,9 @@ void work_queue_resources_send( struct link *manager, struct work_queue_resource
 
 void work_queue_coprocess_resources_send( struct link *manager, struct work_queue_resources *r, time_t stoptime ) 
 {
+	if (!r) {
+		return;
+	}
 	debug(D_WQ, "Sending coprocess resource description to manager:");
 	work_queue_resource_send(manager, &r->disk,    "coprocess_disk",   stoptime);
 	work_queue_resource_send(manager, &r->memory,  "coprocess_memory", stoptime);
