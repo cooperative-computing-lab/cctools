@@ -98,7 +98,7 @@ class Task(object):
             pass
 
     @staticmethod
-    def _determine_file_flags(cache=False, watch=False, failure_only=False, success_only=False):
+    def _determine_mount_flags(cache=False, watch=False, failure_only=False, success_only=False):
         flags = VINE_NOCACHE
         if cache:
             flags |= VINE_CACHE
@@ -108,6 +108,15 @@ class Task(object):
             flags |= VINE_FAILURE_ONLY
         if success_only:
             flags |= VINE_SUCCESS_ONLY
+        return flags
+
+    @staticmethod
+    def _determine_file_flags(cache=False, peer_transfer=False):
+        flags = VINE_NOCACHE|VINE_PEER_NOSHARE
+        if cache:
+            flags |= VINE_CACHE
+        if peer_transfer:
+            flags |= VINE_PEER_SHARE
         return flags
 
     ##
@@ -207,7 +216,7 @@ class Task(object):
         else:
             remote_name = os.path.basename(local_name)
 
-        flags = Task._determine_file_flags(cache)
+        flags = Task._determine_mount_flags(cache)
         return vine_task_add_input_file(self._task, local_name, remote_name, flags)
 
     ##
@@ -230,7 +239,7 @@ class Task(object):
         if url:
             url = str(url)
 
-        flags = Task._determine_file_flags(cache)
+        flags = Task._determine_mount_flags(cache)
         return vine_task_add_input_url(self._task, url, remote_name, flags)
 
     ##
@@ -254,7 +263,7 @@ class Task(object):
     def add_input_mini_task(self, mini_task, remote_name, cache=False):
         if remote_name:
             remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache=cache)
+        flags = Task._determine_mount_flags(cache=cache)
         # The minitask must be duplicated, because the C object becomes "owned"
         # by the parent task and will be deleted when the parent task goes away.
         copy_of_mini_task = vine_task_clone(mini_task._task)
@@ -278,7 +287,7 @@ class Task(object):
     def add_input(self, file, remote_name, cache=None, failure_only=None):
         # SWIG expects strings
         remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache=cache, failure_only=None)
+        flags = Task._determine_mount_flags(cache=cache, failure_only=None)
         return vine_task_add_input(self._task, file._file, remote_name, flags)
 
     ##
@@ -300,7 +309,7 @@ class Task(object):
     def add_input_buffer(self, buffer, remote_name, cache=False):
         if remote_name:
             remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache)
+        flags = Task._determine_mount_flags(cache)
         return vine_task_add_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
     ##
@@ -329,7 +338,7 @@ class Task(object):
         else:
             remote_name = os.path.basename(local_name)
 
-        flags = Task._determine_file_flags(cache=cache, watch=watch, failure_only=failure_only, success_only=success_only)
+        flags = Task._determine_mount_flags(cache=cache, watch=watch, failure_only=failure_only, success_only=success_only)
         return vine_task_add_output_file(self._task, local_name, remote_name, flags)
 
     ##
@@ -351,7 +360,7 @@ class Task(object):
     def add_output(self, file, remote_name, watch=False, cache=False, failure_only=None, success_only=None):
         # SWIG expects strings
         remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache, watch, failure_only, success_only)
+        flags = Task._determine_mount_flags(cache, watch, failure_only, success_only)
         return vine_task_add_output(self._task, file._file, remote_name, flags)
 
     ##
@@ -1991,8 +2000,9 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param path    The path to the local file
     # @return A file object to use in @ref Task.add_input or @ref Task.add_output
-    def declare_file(self, path):
-        f = vine_declare_file(self._taskvine, path)
+    def declare_file(self, path, cache=False, share=False):
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_file(self._taskvine, path, flags)
         return File(f)
 
     ##
@@ -2011,9 +2021,10 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param url     The url of the file.
     # @return A file object to use in @ref Task.add_input
-    def declare_url(self, url):
+    def declare_url(self, url, cache=False, share=False):
+        flags = Task._determine_file_flags(cache, share)
         url = str(url)
-        f = vine_declare_url(self._taskvine, url)
+        f = vine_declare_url(self._taskvine, url, flags)
         return File(f)
 
     ##
@@ -2030,12 +2041,13 @@ class Manager(object):
     # >>> print(f.contents())
     # >>> "hello pirate ♆"
     # @endcode
-    def declare_buffer(self, buffer=None):
+    def declare_buffer(self, buffer=None, cache=False, share=False):
         # because of the swig typemap, vine_declare_buffer(m, buffer, size) is changed
         # to a function with just two arguments.
+        flags = Task._determine_file_flags(cache, share)
         if isinstance(buffer, str):
             buffer = bytes(buffer, "utf-8")
-        f = vine_declare_buffer(self._taskvine, buffer)
+        f = vine_declare_buffer(self._taskvine, buffer, flags)
         return File(f)
 
     ##
@@ -2044,8 +2056,9 @@ class Manager(object):
     # @param self     The manager to register this file
     # @param minitask The task to execute in order to produce a file
     # @return A file object to use in @ref Task.add_input
-    def declare_minitask(self, minitask):
-        f = vine_declare_mini_task(self._taskvine, minitask._task)
+    def declare_minitask(self, minitask, cache=False, share=False):
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_mini_task(self._taskvine, minitask._task, flags)
         return File(f)
 
     ##
@@ -2054,8 +2067,9 @@ class Manager(object):
     # @param manager    The manager to register this file
     # @param tarball    The file object to un-tar
     # @return A file object to use in @ref Task.add_input
-    def declare_untar(self, tarball):
-        f = vine_declare_untar(self._taskvine, tarball._file)
+    def declare_untar(self, tarball, cache=False, share=False):
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_untar(self._taskvine, tarball._file, flags)
         return File(f)
 
     ##
@@ -2064,8 +2078,9 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param package The poncho or conda-pack environment tarball
     # @return A file object to use in @ref Task.add_input
-    def declare_poncho(self, package):
-        f = vine_declare_poncho(self._taskvine, package._file)
+    def declare_poncho(self, package, cache=False, share=False):
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_poncho(self._taskvine, package._file, flags)
         return File(f)
 
     ##
@@ -2074,8 +2089,9 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param starch  The startch .sfx file
     # @return A file object to use in @ref Task.add_input
-    def declare_starch(self, starch):
-        f = vine_declare_starch(self._taskvine, starch._file)
+    def declare_starch(self, starch, cache=False, share=False):
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_starch(self._taskvine, starch._file, flags)
         return File(f)
 
     ##
@@ -2088,11 +2104,12 @@ class Manager(object):
     #               "$TMPDIR/$UID" are considered in that order. If no proxy is
     #               present, the transfer is tried without authentication.
     # @return A file object to use in @ref Task.add_input
-    def declare_xrootd(self, source, proxy=None):
+    def declare_xrootd(self, source, proxy=None, cache=False, share=False):
         proxy_c = None
         if proxy:
             proxy_c = proxy._file
-        f = vine_declare_xrootd(self._taskvine, source, proxy_c)
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_xrootd(self._taskvine, source, proxy_c, flags)
         return File(f)
 
     ##
