@@ -4950,7 +4950,7 @@ void vine_declare_delete(struct vine_manager *m, struct vine_file *f)
 	}
 
 	if(f->refcount == 1) {
-		hash_table_remove(m->file_table, f->file_id);
+		hash_table_remove(m->file_table, f->cached_name);
 	}
 
 	vine_file_delete(f);
@@ -4962,20 +4962,24 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 		return NULL;
 	}
 
-	struct vine_file *previous = vine_manager_lookup_file(m, f->file_id);
+	assert(f->cached_name);
+	struct vine_file *previous = vine_manager_lookup_file(m, f->cached_name);
+
 	if(previous) {
 	/* This file has been declared before. We delete the new instance and
 	 * return previous. */
 		vine_file_delete(f);
 		f = previous;
+	} else {
+		hash_table_insert(m->file_table, f->cached_name, f);
 	}
 
 	return f;
 }
 
-struct vine_file *vine_manager_lookup_file( struct vine_manager *m, const char *file_id )
+struct vine_file *vine_manager_lookup_file( struct vine_manager *m, const char *cached_name )
 {
-	return hash_table_lookup(m->file_table, file_id);
+	return hash_table_lookup(m->file_table, cached_name);
 }
 
 struct vine_file *vine_declare_file( struct vine_manager *m, const char *source, vine_file_flags_t flags)
