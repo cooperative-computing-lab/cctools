@@ -1537,10 +1537,9 @@ static void workspace_delete()
 	printf( "vine_worker: deleting workspace %s\n", workspace);
 
 	/*
-	Note that we cannot use trash_file here because the trash dir
-	is inside the workspace.  Abort if we really cannot clean up.
+	Note that we cannot use trash_file here because the trash dir is inside the
+	workspace. The whole workspace is being deleted anyway.
 	*/
-
 	unlink_recursive(workspace);
 	free(workspace);
 }
@@ -2189,7 +2188,6 @@ int main(int argc, char *argv[])
 	setenv("VINE_SANDBOX", workspace, 0);
 
 	// change to workspace
-	
 	chdir(workspace);
 
 	unlink_recursive("cache");
@@ -2281,9 +2279,6 @@ int main(int argc, char *argv[])
 		vine_coprocess_shutdown_all_coprocesses(coprocess_list);
 		list_delete(coprocess_list);
 	}
-	
-	trash_file("cache");
-	trash_empty();
 
 	workspace_delete();
 
