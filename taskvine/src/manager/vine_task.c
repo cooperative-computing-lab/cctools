@@ -416,7 +416,7 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 	}
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
-	
+
 	list_push_tail(t->input_mounts, m);
 }
 
@@ -431,7 +431,7 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 	}
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
-	
+
 	list_push_tail(t->output_mounts, m);
 }
 

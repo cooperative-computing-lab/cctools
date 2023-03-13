@@ -23,7 +23,7 @@ struct vine_mount * vine_mount_create( struct vine_file *file, const char *remot
 
 	/* Add a reference each time a file is connected. */
 	m->file->refcount++;
-	
+
 	return m;
 }
 
