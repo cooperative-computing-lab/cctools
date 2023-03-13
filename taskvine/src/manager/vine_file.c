@@ -55,7 +55,7 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 	f->mini_task = mini_task;
 
 	if(flags == 0) {
-		f->flags = VINE_PEER_NOSHARE; // | VINE_CACHE ?
+		f->flags = VINE_PEER_NOSHARE | VINE_CACHE_NEVER;
 	} else {
 		f->flags = flags;
 	}
@@ -79,7 +79,12 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 		/* Otherwise we need to figure it out ourselves from the content. */
 		/* This may give us the actual size of the object along the way. */
 		ssize_t totalsize = 0;
-		f->cached_name = vine_cached_name(f,&totalsize);
+		if(f->flags & VINE_CACHE_ALWAYS){
+			f->cached_name = vine_cached_name(f,&totalsize);
+		}
+		else{
+			f->cached_name = vine_random_name(f,&totalsize);
+		}
 		if(size==0) {
 			f->size = totalsize;
 		}

@@ -50,7 +50,10 @@ typedef enum {
 
 typedef enum {
 	VINE_PEER_SHARE = 1, /**< Schedule this file to be shared between peers where available. (default) **/
-	VINE_PEER_NOSHARE = 2  /**< Do not schedule this file to be shared between peers. **/
+	VINE_PEER_NOSHARE = 2, /**< Do not schedule this file to be shared between peers. **/
+	VINE_CACHE_NEVER = 4, /**< File remains in cache until consumed. **/
+	VINE_CACHE_WORKFLOW = 8, /**< File remains in cache until workflow ends (default). **/
+	VINE_CACHE_ALWAYS = 16, /**< File remains in cache until the worker teminates. **/
 	/*
 	 * Move caching flags to here
 	 */

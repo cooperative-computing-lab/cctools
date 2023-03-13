@@ -258,6 +258,48 @@ char *make_mini_task_cached_name(const struct vine_file *f)
 }
 
 /*
+Generates a random cached name of a file object.
+Returns a string that must be freed with free().
+*/
+
+char *vine_random_name( const struct vine_file *f, ssize_t *totalsize )
+{
+	char *hash, *name;
+	char random[17];
+
+	switch(f->type){
+		case VINE_FILE:
+			string_cookie(random,16);
+			name = string_format("file-rnd-%s",random);
+			break;
+		case VINE_EMPTY_DIR:
+			name = string_format("empty");
+			break;
+		case VINE_MINI_TASK:
+			string_cookie(random,16);
+			name = string_format("task-rnd-%s",random);
+			break;
+		case VINE_URL:
+			string_cookie(random,16);
+			name = string_format("url-rnd-%s",random);
+			break;
+		case VINE_TEMP:
+			string_cookie(random,16);
+			name = string_format("temp-rnd-%s",random);
+			break;
+		case VINE_BUFFER:
+			string_cookie(random,16);
+			name = string_format("buffer-rnd-%s",random);
+			break;
+		default:
+			fatal("invalid file type %d",f->type);
+			name = strdup("notreached");
+			break;
+	}
+	return name;
+}
+
+/*
 Compute the cached name of a file object, based on its type.
 Returns a string that must be freed with free().
 */
