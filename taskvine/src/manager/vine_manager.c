@@ -4219,6 +4219,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				// manager time statistics.
 				events++;
 				END_ACCUM_TIME(q, time_internal);
+				break;
 			}
 		}
 
@@ -4248,10 +4249,10 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// are retrieved. (this is the default)
 		// otherwise, retrieve at most q->max_retrievals (default is 1)
 		int received = 0;
+		int no_ready_tasks = !task_state_any(q, VINE_TASK_READY);
 		BEGIN_ACCUM_TIME(q, time_receive);
 		do {
 			int received_at_least_one = 0;
-
 			char *key;
 			struct vine_worker_info *w;
 
@@ -4278,7 +4279,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				}
 			}
 
-		} while(q->max_retrievals < 0 || received < q->max_retrievals);
+		} while(received < q->max_retrievals || no_ready_tasks);
 		END_ACCUM_TIME(q, time_receive);
 
 		// expired tasks
@@ -4673,7 +4674,7 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 		q->wait_for_workers = MAX(0, (int)value);
 
 	} else if(!strcmp(name, "max-retrievals")) {
-		q->max_retrievals = MIN(-1, (int)value);
+		q->max_retrievals = MAX(1, (int)value);
 
 	} else if(!strcmp(name, "worker-retrievals")) {
 		q->worker_retrievals = MAX(0, (int)value);
