@@ -84,7 +84,8 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 		}
 	}
 
-	f->refcount = 1;
+	/* file has been created, but it is not referenced by any task, or manager yet. */
+	f->refcount = 0;
 
 	return f;
 }
