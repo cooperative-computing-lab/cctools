@@ -22,6 +22,15 @@ import taskvine as vine
 import os
 import sys
 
+def process_result(t):
+    if t:
+        if t.successful():
+            print(f"task {t.id} done: {t.command}")
+        elif t.completed():
+            print(f"task {t.id} completed with an executin error, exit code {t.exit_code}")
+        else:
+            print(f"task {t.id} failed with status {t.result_string}")
+
 if __name__ == "__main__":
 
     try:
@@ -47,19 +56,19 @@ if __name__ == "__main__":
         sys.exit(1)
 
     m = vine.Manager()
-    print("listening on port", m.port)
+    print(f"listening on port {m.port}")
 
     temp_files = []
     for i in range(0, 36):
-        temp_files.append(vine.FileTemp())
+        temp_files.append(m.declare_temp())
 
-    montage_file = vine.FileLocal("montage.sfx");
-    convert_file = vine.FileLocal("convert.sfx");
-    image_file = vine.FileURL("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg");
-    
+    montage_file = m.declare_file("montage.sfx")
+    convert_file = m.declare_file("convert.sfx")
+    image_file = m.declare_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg")
+
     for i in range(0, 36):
         outfile = str(i) + ".cat.jpg"
-        command = "./convert.sfx -swirl " + str(i*10) + " cat.jpg output.jpg"
+        command = f"./convert.sfx -swirl {i*10} cat.jpg output.jpg"
 
         t = vine.Task(command)
         t.add_input(convert_file, "convert.sfx", cache=True)
@@ -68,32 +77,30 @@ if __name__ == "__main__":
 
         t.set_cores(1)
 
-        task_id = m.submit(t)
+        m.submit(t)
 
-        print("Submitted task (id# " + str(task_id) + "): " + command)
+        print(f"submitted task {t.id}: {t.command}")
 
-    print("Waiting for tasks to complete...")
 
+    print("waiting for tasks to complete...")
     while not m.empty():
         t = m.wait(5)
         if t:
-            r = t.result
-            id = t.id
-
-            if r == vine.VINE_RESULT_SUCCESS:
-                print("Task " + str(id) + " complete: " + command)
-            else:
-                print("Task " + str(id) + " failed: " + command)
+            process_result(t)
 
     print("Combining images into mosaic.jpg...")
-
     t = vine.Task("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg")
     t.add_input(montage_file, "montage.sfx", cache=True)
-    for i in range(0, 36):
-        t.add_input(temp_files[i],str(i*10)+".cat.jpg",cache=False)
-    t.add_output_file("mosaic.jpg", cache=False)
 
+    for i in range(0, 36):
+        t.add_input(temp_files[i],f"{i*10}.cat.jpg",cache=False)
+    t.add_output_file("mosaic.jpg", cache=False)
     m.submit(t)
-    t = m.wait(vine.VINE_WAIT_FOREVER)
+
+    print("waiting for final task to complete...")
+    while not m.empty():
+        t = m.wait(5)
+        if t:
+            process_result(t)
 
     print("All tasks complete!")

@@ -1,607 +1,621 @@
 #! /usr/bin/env python
 
-# Copyright (C) 2022- The University of Notre Dame
+# Copyright (C) 2023- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-from collections import Counter
-import matplotlib.pyplot as plt
-import time
-import sys
+# transactions log format:
+# time manager_pid MANAGER manager_pid START|END
+# time manager_pid WORKER worker_id CONNECTION host:port
+# time manager_pid WORKER worker_id DISCONNECTION (UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT)
+# time manager_pid WORKER worker_id RESOURCES {resources}
+# time manager_pid WORKER worker_id CACHE_UPDATE filename size_in_mb wall_time_us start_time_us
+# time manager_pid WORKER worker_id TRANSFER (INPUT|OUTPUT) filename size_in_mb wall_time_us start_time_us
+# time manager_pid CATEGORY name MAX {resources_max_per_task}
+# time manager_pid CATEGORY name MIN {resources_min_per_task_per_worker}
+# time manager_pid CATEGORY name FIRST (FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT) {resources_requested}
+# time manager_pid TASK task_id WAITING category_name (FIRST_RESOURCES|MAX_RESOURCES) attempt_number {resources_requested}\n");
+# time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
+# time manager_pid TASK task_id WAITING_RETRIEVAL worker_id
+# time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
+# time manager_pid DUTY task_id (WAITING|SENT|STARTED|FAILURE) worker_id
+
+
+from collections import defaultdict
+from pathlib import Path
 import argparse
+import datetime
+import heapq
 import json
+import math
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.pyplot as plticker
+import pandas as pd
+import sys
+from functools import partial
 
-plt.style.use('tableau-colorblind10')
-worker_info = {}
-worker_of_task = {}
-first_running = float('inf')
-manager_start = -1
-manager_info = {"Start":-1,
-                "Connections":[],
-                "Disconnections":[],
-                "Resource Updates":[],
-                "Cache Updates":[],
-                "CacheTime":{},
-                "Tasks Sent":[],
-                "Waiting Retrieval":[],
-                "Marked Done":[],
-                "Transfers":[],
-                "TaskMap":{},
-                "TaskDone": {},
-                }
+resources_names = "cores memory disk gpus".split()
+task_report_abs = "time_worker_start time_worker_end time_commit_start time_commit_end".split()
+task_report_all = "time_input_mgr time_output_mgr size_input_mgr size_output_mgr".split() + task_report_abs
 
-def parse_manager(log):
-    lines = open(log, 'r').read().splitlines()
-    for line in lines:
-        if line.startswith("#"):
-            continue
+
+class Manager:
+    def __init__(self, manager_pid, origin):
+        self.origin = origin
+        self.termination = 0  # yet unknown
+
+        self.pid = manager_pid
+
+        # [task_id][attempt_number] -> attempt_info
+        self.tasks_attempts = defaultdict( lambda: defaultdict( lambda: defaultdict( lambda: pd.NA )))
+
+        # [task_id] -> attempt_number
+        self.task_last_attempt = {}
+
+        # [(worker_id,hostport)] -> worker_info
+        self.worker_lifetime = defaultdict(lambda: defaultdict( lambda: pd.NA ))
+
+        # [(worker_id,hostport)] -> transfer
+        self.worker_transfers = defaultdict(lambda: [])
+
+        # [worker_id] -> available slots (heapq)
+        self.worker_free_slots = {}
+
+        # [worker_id][slot] -> (task_id,attempt_number)
+        self.worker_used_slots = defaultdict(lambda: {})
+
+        # [worker_id] -> hostport
+        self.last_host_port = {}
+
+        self.tasks = None
+        self.workers = None
+        self.transfers = None
+
+    def write_tables(self, filename, index):
+        name = Path(filename).stem
+        tables = ["tasks", "workers", "transfers"]
+        for (table, df) in zip(tables, [self.tasks, self.workers, self.transfers]):
+            df.to_csv(f"{name}_{index}_{table}.csv", index=False)
+
+    def make_tables(self):
+        self.tasks = self.make_table_tasks()
+        self.workers = self.make_table_workers()
+        self.transfers = self.make_table_transfers()
+
+    def make_table_tasks(self):
+        all_tasks = []
+        keys = None
+        for attempts in self.tasks_attempts.values():
+            for attempt in attempts.values():
+                all_tasks.append(attempt)
+        tasks_df = pd.DataFrame.from_records(all_tasks)
+        try:
+            tasks_df["measured_wall_time"] = tasks_df["time_worker_end"] - tasks_df["time_worker_start"]
+        except KeyError:
+            print(f"No tasks that finished was found in the log for manager pid {self.pid}")
+            sys.exit(1)
+
+        return tasks_df
+
+    def make_table_workers(self):
+        all_workers = []
+        keys = None
+        for worker in self.worker_lifetime.values():
+            all_workers.append(worker)
+        workers_df = pd.DataFrame.from_records(all_workers)
+
+        # fill up disconnect times for workers that survive the manager
+        workers_df.loc[workers_df["DISCONNECTION"].isna(), ("DISCONNECTION",)] = self.termination
+        return workers_df
+
+    def make_table_transfers(self):
+        all_transfers = []
+        keys = "worker_id hostport time direction filetype filename size wall_time start_time".split()
+        for per_worker in self.worker_transfers.values():
+            all_transfers.extend(per_worker)
+        transfers_df = pd.DataFrame(all_transfers, columns=keys)
+        return transfers_df
+
+
+class ParseTxn:
+    def __init__(self, logfile, tasks_range_spec=None):
+        self._log = logfile
+        self.managers = {}
+        self.cm = None  # current manager
+
+        self.tasks_range = self.expand_range(tasks_range_spec)
+
+        self._parse()
+
+    def expand_range(self, tasks_range_spec):
+        start, end, step = 1, None, 1
+
+        if tasks_range_spec:
+            rest = tasks_range_spec.split(",")
+            (start, *rest) = rest
+            start = max(1, int(start)) if start else 1
+            if rest:
+                (end, *step) = rest
+                end = max(start+1, int(end)) if end else None
+                step = max(1, int(step[0])) if step else 1
+        return (start,end,step)
+
+    def check_task_range(self, task_id):
+        (start, end, step) = self.tasks_range
+        if start and task_id < start:
+            return False
+        if end and task_id >= end:
+            return False
+        return 0 == (task_id + start) % step
+
+    def write_tables(self, filename):
+        for (i, m) in enumerate(self.managers.values()):
+            m.write_tables(filename, i)
+
+    def _next_line(self):
+        with open(self._log) as l:
+            for line in l:
+                try:
+                    if line.startswith("#"):
+                        continue
+                    (time, manager_pid, subject, target, event, *arg) = line.split(maxsplit=5)
+                    try:
+                        arg = arg[0].strip()
+                    except IndexError:
+                        arg = None
+                except ValueError:
+                    continue
+
+                time = float(time)/1000000
+                if self.cm and self.cm.pid == manager_pid:
+                    time -= self.cm.origin
+
+                yield (time, manager_pid, subject, target, event, arg)
+
+    def arg_to_xfer(self, worker_id, hostport, time, direction, arg):
+        filename, size, wall_time, start_time = arg.split()
+        size = float(size)/1e6
+        wall_time = float(wall_time)/1e6
+        start_time = float(start_time)/1e6
+
+        if start_time < self.cm.origin:
+            # guard for cases when start time was unknown 
+            start_time = time - wall_time
+        else:
+            start_time -= self.cm.origin
 
         try:
-            (time, managerpid, subject, target, event, arg) = line.split(maxsplit=5)
-        except ValueError:
-            try:
-                (time, managerpid, subject, target, event) = line.split(maxsplit=4)
-            except ValueError:
-                continue
+            (filetype, rest) = filename.split("-", maxsplit=1)
+        except:
+            filetype = "file"
 
-        time = float(time)/1000000
-        
-        if subject == "MANAGER":
-            managerpid = target
-            if event == "START":
-                manager_info["Start"] = time
-            continue
-        if subject == "WORKER":
-            worker_id = target
-            if worker_id == "(null)":
-                continue
-            if event == "CONNECTION":
-                manager_info["Connections"].append(time - manager_info["Start"])
-            elif event == "DISCONNECTION":
-                manager_info["Disconnections"].append(time - manager_info["Start"])
-            elif event == "RESOURCES":
-                manager_info["Resource Updates"].append(time - manager_info["Start"])
-            elif event == "CACHE_UPDATE":
-                manager_info["Cache Updates"].append(time - manager_info["Start"])
-            elif event == "TRANSFER":
-                manager_info["Transfers"].append(time - manager_info["Start"])
-            continue
+        return [worker_id, hostport, time, direction, filetype, filename, size, wall_time, start_time]
 
-        if subject == "TASK":
-            if event == "RUNNING":
-                manager_info["Tasks Sent"].append(time - manager_info["Start"])
-            elif event == "WAITING_RETRIEVAL":
-                manager_info["Waiting Retrieval"].append(time - manager_info["Start"])
-            elif event == "DONE":
-                manager_info["Marked Done"].append(time - manager_info["Start"])
-            continue
-
-def parse_tasks(log):
-    lines = open(log, 'r').read().splitlines()
-    for line in lines:
-        if line.startswith("#"):
-            continue
-
-        try:
-            (time, managerpid, subject, target, event, arg) = line.split(maxsplit=5)
-        except ValueError:
-            try:
-                (time, managerpid, subject, target, event) = line.split(maxsplit=4)
-            except ValueError:
-                continue
-
-        time = float(time)/1000000
-        
-        if subject == "MANAGER":
-            managerpid = target
-            if event == "START":
-                manager_info["Start"] = time
-            continue
-        if subject == "WORKER":
-            worker_id = target
-            if worker_id == "(null)":
-                continue
-            if event == "CONNECTION":
-                manager_info["Connections"].append(time - manager_info["Start"])
-            elif event == "DISCONNECTION":
-                manager_info["Disconnections"].append(time - manager_info["Start"])
-            elif event == "RESOURCES":
-                manager_info["Resource Updates"].append(time - manager_info["Start"])
-            elif event == "CACHE_UPDATE":
-                manager_info["Cache Updates"].append(time - manager_info["Start"])
-                if float(arg.split()[-1]) != 0:
-                    manager_info["CacheTime"].update([(worker_id, arg.split()[-1])])
-            elif event == "TRANSFER":
-                manager_info["Transfers"].append(time - manager_info["Start"])
-            continue
-
-        if subject == "TASK":
-            if event == "RUNNING":
-                manager_info["Tasks Sent"].append(time - manager_info["Start"])
-                manager_info["TaskMap"].update([(int(target), arg.split()[0])])
-            elif event == "WAITING_RETRIEVAL":
-                manager_info["Waiting Retrieval"].append(time - manager_info["Start"])
-                manager_info["TaskDone"].update([(int(target), time - manager_info["Start"])])
-            elif event == "DONE":
-                manager_info["Marked Done"].append(time - manager_info["Start"])
-                
-            continue
-
-def plot_tasks(title='Manager Info', all_info=False, save=None, connections=False, disconnections=False,
-                resources=False, cache_updates=False, tasks_sent=False, waiting_retrieval=False, 
-                marked_done=False, input_transfers=False, output_transfers=False, xticks=None, yticks=None):
-
-    dcache = manager_info["CacheTime"]
-    dtasks = manager_info["TaskMap"]
-
-    task_cachetime = {}
-
-    # map cache update time to task id
-    for task, worker in dtasks.items():
-        for cworker, cachetime in dcache.items():
-            if worker == cworker:
-                task_cachetime.update([(task, cachetime)])
-
-    stimes = list(task_cachetime.values())
-    times = [float(t) for t in stimes]
-
-    ys = range(len(manager_info["Tasks Sent"]))
-
-    dwidths = sorted(manager_info["TaskDone"].items())
-    lwidths = [float(i[1]) for i in dwidths]
-    widths = [i[0] - i[1] for i in zip(lwidths, manager_info["Tasks Sent"])]
-
-    plt.barh(ys, width=widths, left=manager_info["Tasks Sent"], label="Tasks")
-    
-    if input_transfers or all_info:
-        plt.barh(ys, width=times, left=manager_info["Tasks Sent"], color="orange", label="Transfers")
-    if waiting_retrieval or all_info:
-        plt.plot(manager_info["Waiting Retrieval"], ys, "r+", label="Waiting Retrieval")
-    if marked_done or all_info:
-        plt.plot(manager_info["Marked Done"], ys, "g+", label="Marked Done")
-    
-    plt.legend()
-    plt.show()
-   
-def plot_manager(title='Manager Info', all_info=False, save=None, connections=False, disconnections=False,
-                resources=False, cache_updates=False, tasks_sent=False, waiting_retrieval=False, 
-                marked_done=False, input_transfers=False, output_transfers=False, xticks=None, yticks=None):
-
-    for category in manager_info:
-        if category == "Start":
-            continue
-        if not connections and not all_info and category == "Connections":
-            continue
-        if not disconnections and not all_info and category == "Disconnections":
-            continue
-        if not resources and not all_info and category == "Resource Updates":
-            continue
-        if not cache_updates and not all_info and category == "Cache Updates":
-            continue
-        if not tasks_sent and not all_info and category == "Tasks Sent":
-            continue
-        if not waiting_retrieval and not all_info and category == "Waiting Retrieval":
-            continue
-        if not marked_done and not all_info and category == "Marked Done":
-            continue
-        if not input_transfers and not all_info and category == "Input Transfers":
-            continue
-        if not output_transfers and not all_info and category == "Output Transfers":
-            continue
-        count = 1
-        total = len(manager_info[category])
-        xs = []
-        ys = []
-        for data in manager_info[category]:
-            xs.append(data)
-            ys.append(count/total)
-            count += 1
-        plt.plot(xs, ys, label=category)
-
-    plt.title(title)
-    plt.ylabel("Percent of each event completed")
-    plt.xlabel("Time")
-    plt.legend()
-    if xticks:
-        tick_list = [int(xticks[0])]
-        s = tick_list[0]
-        plt.xlim(left=s)
-        for x in range(int(xticks[2])):
-            s += int(xticks[1])
-            tick_list.append(s)
-        plt.xticks(tick_list)
-        plt.xlim(right=s)
-    if yticks:
-        tick_list = [int(yticks[0])]
-        s = tick_list[0]
-        plt.ylim(left=s)
-        for x in range(int(yticks[2])):
-            s += int(yticks[1])
-            tick_list.append(s)
-        plt.yticks(tick_list)
-        plt.ylim(right=s)
-    plt.tick_params(axis='both', which='major', labelsize=15)
-    if save:
-        plt.savefig(save)
-    plt.show()
-
-def parse_workers(log):
-    fail_count = 0
-    filename = log
-    lines = open(log, 'r').read().splitlines()
-    for line in lines:
-        if line.startswith("#"):
-            continue
-
-        try:
-            (time, managerpid, subject, target, event, arg) = line.split(maxsplit=5)
-        except ValueError:
-            try:
-                (time, managerpid, subject, target, event) = line.split(maxsplit=4)
-            except ValueError:
-                continue
-
-        time = int(time)/1000000
-
-        if subject == "MANAGER":
-            managerpid = target
-            if event == "START":
-                global manager_start
-                manager_start = time
-            continue
-
-        if subject == "WORKER":
-            worker_id = target
-            if worker_id == "(null)":
-                continue
-
-            if event == "CONNECTION":
-                worker_address = arg.strip()
-                if worker_id not in worker_info:
-                    worker_info[worker_id] = {"host":worker_address, "connect time":time, "tasks":{}, 
-                                            "cache_updates":[],"first_task":float('inf'), "resources":[],
-                                            "input_transfers":[], "output_transfers":[]}
-            elif event == "DISCONNECTION":
-                reason = arg.strip()
-                if reason == "FAILURE":
-                    fail_count += 1
-                if worker_id in worker_info:
-                    worker_info[worker_id]["disconnect time"] = time
-            elif event == "RESOURCES":
-                worker_info[worker_id]["resources"].append(time)
-            elif event == "CACHE_UPDATE":
-                (filename, sizeinmb, walltime) = arg.split()
-                worker_info[worker_id]["cache_updates"].append([time, float(walltime)/1000000, filename])
-            elif event == "TRANSFER":
-                (direction, filename, sizeinmb, walltime) = arg.split()
-                if direction == "INPUT":
-                    worker_info[worker_id]["input_transfers"].append([time, float(walltime)/1000000])
-                elif direction == "OUTPUT":
-                    worker_info[worker_id]["output_transfers"].append([time, float(walltime)/1000000])
-            continue
-
-        if subject == "TASK":
-            taskid = target
-            if event == "RUNNING":
-                (worker_id, step, resources) = arg.split(maxsplit=2)
-                resources = json.loads(resources)
-                worker_info[worker_id]["tasks"][taskid] = {"start":time, "stop":-1}
-                worker_of_task[taskid] = worker_id
-                if time < worker_info[worker_id]["first_task"]:
-                    worker_info[worker_id]["first_task"] = time
-                global first_running
-                if time < first_running:
-                    first_running = time
-            elif event == "WAITING_RETRIEVAL":
-                worker_id = arg.strip()
-                worker_info[worker_id]["tasks"][taskid]["stop"] = time
-            elif event == "DONE":
-                (reason, exit_code, limits, measured) = arg.split(maxsplit=3)
-                limits = json.loads(limits)
-                measured = json.loads(measured)
-                worker_start = float(measured["time_worker_start"][0])
-                worker_end = float(measured["time_worker_end"][0])
-                if reason == "SUCCESS":
-                    worker_id = worker_of_task[taskid]
-                    worker_info[worker_id]["tasks"][taskid]["done"] = time
-                    worker_info[worker_id]["tasks"][taskid]["worker_start"] = worker_start
-                    worker_info[worker_id]["tasks"][taskid]["worker_stop"] = worker_end
-            continue
-
-
-def plot_resource_updates(zero):
-    xs = []
-    ys = []
-    y = 0
-    ref = manager_start
-    for worker in worker_info:
-        if zero == "ManagerFirstTask":
-            ref = first_running
-        elif zero == "WorkerFirstTask":
-            ref = worker_info[worker]["first_task"]
-        y += 1
-        for resource_update in worker_info[worker]["resources"]:
-            x = resource_update - ref
-            if x > 0:
-                xs.append(x)
-                ys.append(y)
-    plt.plot(xs , ys, 'm+', label='Resource Updates')
-
-def plot_cache_updates(zero):
-    xs = []
-    ys = []
-
-    fetch_lefts=[]
-    fetch_ys=[]
-    fetch_widths=[]
-
-    minitask_lefts=[]
-    minitask_ys=[]
-    minitask_widths=[]
-    ref = manager_start
-    y = 0
-    for worker in worker_info:
-        if zero == "ManagerFirstTask":
-            ref = first_running
-        elif zero == "WorkerFirstTask":
-            ref = worker_info[worker]["first_task"]
-        y += 1
-        for cache_update in worker_info[worker]["cache_updates"]:
-            #  GETTING THE URL
-            if cache_update[2].startswith("url"):
-                for task in worker_info[worker]["tasks"]:
-                    task_info = worker_info[worker]["tasks"][task]
-                    update_time = cache_update[0]
-                    if task_info["start"] < update_time and task_info["stop"] > update_time:
-                        width = update_time - task_info["start"]
-                        left =  task_info["start"] - ref
-                        worker_info[worker]["tasks"][task]["start"] = update_time
-                        fetch_lefts.append(left)
-                        fetch_ys.append(y)
-                        fetch_widths.append(width)
-
-            # DOING THE MINITASK
-            elif cache_update[2].startswith("task"):
-                for task in worker_info[worker]["tasks"]:
-                    task_info = worker_info[worker]["tasks"][task]
-                    update_time = cache_update[0]
-                    if task_info["start"] < update_time and task_info["stop"] > update_time:
-                        width = update_time - task_info["start"]
-                        left =  task_info["start"] - ref
-                        worker_info[worker]["tasks"][task]["start"] = update_time
-                        minitask_lefts.append(left)
-                        minitask_ys.append(y)
-                        minitask_widths.append(width)
+    def arg_to_values(self, ca, prefix, names, arg):
+        # values of the form [value, "units"]
+        def value(res):
+            if not res:
+                return pd.NA
+            n = float(res[0])
+            if math.isnan(n) or n < 0: 
+                return pd.NA
             else:
-                x = cache_update[0] - ref
-                if x > 0:
-                    xs.append(x)
-                    ys.append(y)
+                return n
+        from_json = json.loads(arg)
+        for r in names:
+            v = value(from_json.get(r, None))
+            ca[f"{prefix}{r}"] = v
 
-    plt.plot(xs , ys, '+', color="orange", label='Cache Updates')
-    plt.barh(minitask_ys, minitask_widths, left=minitask_lefts, color="red", label='Minitask')
-    plt.barh(fetch_ys, fetch_widths, left=fetch_lefts, color="mistyrose", label='Curl URL')
+    def arg_to_resources(self, ca, prefix, arg):
+        self.arg_to_values(ca, prefix, resources_names, arg)
 
-def plot_workers(title='Worker Info', all_info=False, save=None, cache_updates=False, flip=False, resources=False, 
-                    marked_done=False, input_transfers=False, output_transfers=False, xticks=None, yticks=None, 
-                    zero=None, worker_time=False):
-    count = 0
-    start = "start"
-    stop = "stop"
-    ref = manager_start
-    if worker_time:
-        start = "worker_start"
-        stop = "worker_stop"
-    done_xs = []
-    done_ys = []
-    wr_xs = []
-    wr_ys = []
-    it_lefts = []
-    ot_lefts = []
-    it_ys = []
-    ot_ys = []
-    it_widths = []
-    ot_widths = []
-
-    ys = []
-    ys2 = []
-    widths= []
-    widths2 = []
-    lefts = []
-    lefts2 = []
-    zero = []
-    # PLOT CACHE UPDATES
-    if all_info or cache_updates:
-        plot_cache_updates(zero)
-        
-    # PLOT RESOURCES REPORTS
-    if all_info or resources:
-        plot_resource_updates(zero)
-
-    for worker in worker_info:
-        if zero == "ManagerFirstTask":
-            ref = first_running
-        elif zero == "WorkerFirstTask":
-            ref = worker_info[worker]["first_task"]
-    
-        count += 1
-
-        if "tasks" in worker_info[worker]:
-
-            t_count = 1
-            
-            for task in worker_info[worker]["tasks"]:
-                if "start" not in worker_info[worker]["tasks"][task] or "stop" not in worker_info[worker]["tasks"][task]:
-                        break
-                if worker_info[worker]["tasks"][task]["stop"] == -1:
-                        break
-
-                # DONE MARKERS
-                if "done" in worker_info[worker]["tasks"][task]:
-                    x = worker_info[worker]["tasks"][task]["done"] - ref
-                    done_xs.append(x)
-                    done_ys.append(count)
-                # WAITING RETRIEVAL MARKERS
-                if "stop" in worker_info[worker]["tasks"][task] and worker_time:
-                    x = worker_info[worker]["tasks"][task]["stop"] - ref
-                    wr_xs.append(x)
-                    wr_ys.append(count)
-
-                # TASKS
-                if flip:
-                    if t_count%2 == 1:
-                        widths.append(worker_info[worker]["tasks"][task][stop] - worker_info[worker]["tasks"][task][start])
-                        lefts.append(worker_info[worker]["tasks"][task]["start"] - ref)
-                        ys.append(count)
-                    else:
-                        widths2.append(worker_info[worker]["tasks"][task][stop] - worker_info[worker]["tasks"][task][start])
-                        lefts2.append(worker_info[worker]["tasks"][task]["start"] - ref)
-                        ys2.append(count)
-                    t_count += 1
-                else:
-                    widths.append(worker_info[worker]["tasks"][task][stop] - worker_info[worker]["tasks"][task][start])
-                    lefts.append(worker_info[worker]["tasks"][task]["start"] - ref)
-                    ys.append(count)
-
-                # INPUT TRANSFERS
-                if all_info or input_transfers:
-                    for transfer in worker_info[worker]["input_transfers"]:
-                        it_lefts.append(transfer[0] - ref)
-                        it_ys.append(count)
-                        it_widths.append(transfer[1])
-                # OUTPUT TRANSFERS
-                if all_info or output_transfers:
-                    for transfer in worker_info[worker]["output_transfers"]:
-                        ot_lefts.append(transfer[0] - ref)
-                        ot_ys.append(count)
-                        ot_widths.append(transfer[1])
-
-    # PLOT TASKS
-    if flip:
-        plt.barh(ys, widths, left=lefts, color="blue", label='Tasks')
-        plt.barh(ys2, widths2, left=lefts2, color="darkblue", label='Tasks')
-    else:
-        plt.barh(ys, widths, left=lefts, color='blue', label='Tasks')
-    # PLOT DONE MARKERS
-    if all_info or marked_done:
-        plt.plot(done_xs, done_ys, 'g+', label='Marked Done')
-    # PLOT DONE MARKERS
-    if worker_time:
-        plt.plot(wr_xs, wr_ys, 'r+', label='Waiting Retrieval')
-    # PLOT INPUT TRANSFERS
-    if all_info or input_transfers:
-        plt.barh(it_ys, it_widths, left=it_lefts, color="black", label='Input Transfers')
-    # PLOT OUTPUT TRANSFERS
-    if all_info or output_transfers:
-        plt.barh(ot_ys, ot_widths, left=ot_lefts, color="blue", label='Output Transfers')
-
-    plt.title(title)
-    plt.ylabel("Worker Number")
-    plt.xlabel("time")
-    plt.tick_params(axis='both', which='major', labelsize=15)
-    plt.legend()
-    if xticks:
-        tick_list = [int(xticks[0])]
-        s = tick_list[0]
-        plt.xlim(left=s)
-        for x in range(int(xticks[2])):
-            s += int(xticks[1])
-            tick_list.append(s)
-        plt.xticks(tick_list)
-        plt.xlim(right=s)
-    if yticks:
-        tick_list = [int(yticks[0])]
-        s = tick_list[0]
-        plt.ylim(left=s)
-        for x in range(int(yticks[2])):
-            s += int(yticks[1])
-            tick_list.append(s)
-        plt.yticks(tick_list)
-        plt.ylim(right=s)
-    if save:
-        plt.savefig(save)
-    plt.show()
+    def arg_to_task_report(self, ca, arg):
+        self.arg_to_values(ca, "", task_report_all, arg)
+        for r in task_report_abs:
+            ca[f"{r}"] -= self.cm.origin
 
 
-    
+    def _parse_manager(self, time, manager_pid, event):
+        if event == "START":
+            self.cm = Manager(manager_pid, time)
+            self.managers[manager_pid] = self.cm
+        elif event == "END":
+            self.cm.make_tables()
+            self.cm = None
+
+    def _next_slot(self, worker_id):
+        free = self.cm.worker_free_slots[worker_id]
+        if not free:
+            heapq.heappush(free, len(self.cm.worker_used_slots[worker_id]) + 1)
+        return heapq.heappop(free)
+
+    def _parse_worker(self, time, manager_pid, worker_id, event, arg):
+        if not worker_id.startswith("worker-"):
+            return
+
+        if event == "CONNECTION":
+            hostport = arg
+            self.cm.last_host_port[worker_id] = hostport
+            self.cm.worker_lifetime[(worker_id,hostport)]["worker_id"] = worker_id
+            self.cm.worker_lifetime[(worker_id,hostport)]["hostport"] = hostport
+            self.cm.worker_lifetime[(worker_id,hostport)][event] = time
+            self.cm.worker_lifetime[(worker_id,hostport)]["DISCONNECTION"] = pd.NA
+            self.cm.worker_free_slots[worker_id] = []
+        elif event == "DISCONNECTION":
+            reason = arg
+            hostport = self.cm.last_host_port[worker_id]
+            self.cm.worker_lifetime[(worker_id,hostport)][event] = time
+            self.cm.worker_lifetime[(worker_id,hostport)]["reason"] = reason
+            for (slot, (task_id, attempt_number)) in self.cm.worker_used_slots[worker_id].items():
+                self.cm.tasks_attempts[task_id][attempt_number]["reason"] = "DISCONNECTION"
+                self.cm.tasks_attempts[task_id][attempt_number]["DISCONNECTION"] = time
+                self.cm.tasks_attempts[task_id][attempt_number]["last_state"] = "DISCONNECTION"
+                self.cm.tasks_attempts[task_id][attempt_number]["last_state_time"] = time
+                heapq.heappush(self.cm.worker_free_slots[worker_id], slot)
+        elif event == "RESOURCES":
+            hostport = self.cm.last_host_port[worker_id]
+            self.arg_to_resources(self.cm.worker_lifetime[(worker_id,hostport)], "", arg)
+        elif event == "CACHE_UPDATE":
+            hostport = self.cm.last_host_port[worker_id]
+            xfer = self.arg_to_xfer(worker_id, hostport, time, event, arg)
+            self.cm.worker_transfers[(worker_id,hostport)].append(xfer)
+        elif event == "TRANSFER":
+            hostport = self.cm.last_host_port[worker_id]
+            (direction, arg) = arg.split(maxsplit=1)
+            xfer = self.arg_to_xfer(worker_id, hostport, time, direction, arg)
+            self.cm.worker_transfers[(worker_id,hostport)].append(xfer)
+
+    def _parse_category(self, time, manager_pid, category, event, arg):
+        if event == "MAX":
+            pass
+        elif event == "MIN":
+            pass
+        elif event == "FIRST":
+            (mode, arg) = arg.split(maxsplit=1)
+            pass
+
+    def _parse_duty(self, time, manager_pid, task_id, event, arg):
+        la = self.cm.task_last_attempt[task_id]
+        ca = self.cm.tasks_attempts[task_id][la]
+
+        if event == "WAITING":
+            pass
+        elif event == "SENT":
+            pass
+        elif event == "STARTED":
+            ca["duty"] = time
+        elif event == "FAILURE":
+            pass
+
+    def _parse_task(self, time, manager_pid, task_id, event, arg):
+        task_id = int(task_id)
+
+        if not self.check_task_range(task_id):
+            return
+
+        if event == "WAITING":
+            (category, allocation, attempt_number, arg) = arg.split()
+            self.cm.task_last_attempt[task_id] = attempt_number
+
+        la = self.cm.task_last_attempt[task_id]
+        ca = self.cm.tasks_attempts[task_id][la]
+
+        ca[event] = time
+        ca["last_state"] = event
+        ca["last_state_time"] = time
+
+        if event == "WAITING":
+            ca["task_id"] = task_id
+            ca["attempt_number"] = attempt_number
+            ca["category"] = category
+            self.arg_to_resources(ca, "requested_", arg)
+            ca["duty"] = pd.NA   # we do not know if it a duty
+        elif event == "RUNNING":
+            (worker_id, allocation, arg) = arg.split()
+            slot = self._next_slot(worker_id)
+            ca["worker_id"] = worker_id
+            ca["slot"] = slot
+            self.cm.worker_used_slots[worker_id][slot] = (task_id, la)
+            self.arg_to_resources(ca, "allocated_", arg)
+            self.arg_to_task_report(ca, arg)
+            ca["DISCONNECTION"] = pd.NA  # add field to keep time in case of worker disconnection
+        elif event == "WAITING_RETRIEVAL":
+            pass
+        elif event == "RETRIEVED":
+            (reason, exit_code, l, m) = arg.split()
+            ca["reason"] = reason
+            ca["exit_code"] = int(exit_code)
+            self.arg_to_task_report(ca, m)
+            self.arg_to_resources(ca, "measured_", m)
+            slot = ca["slot"]
+            del self.cm.worker_used_slots[ca["worker_id"]][slot]
+            heapq.heappush(self.cm.worker_free_slots[ca["worker_id"]], slot)
+        elif event == "DONE":
+            pass
+
+    def _parse(self):
+        for (time, manager_pid, subject, target, event, arg) in self._next_line():
+            if self.cm and self.cm.pid == manager_pid:
+                # set each last time know to the termination time of the manager
+                self.cm.termination = time 
+
+            if subject == "MANAGER":
+                self._parse_manager(time, manager_pid, event)
+            elif subject == "WORKER":
+                self._parse_worker(time, manager_pid, target, event, arg)
+            elif subject == "CATEGORY":
+                self._parse_category(time, manager_pid, target, event, arg)
+            elif subject == "DUTY":
+                self._parse_duty(time, manager_pid, target, event, arg)
+            elif subject == "TASK":
+                self._parse_task(time, manager_pid, target, event, arg)
+
+        if self.cm:
+            # if self.cm still assigned, then END record missing. Here we force
+            # the generation of tables in that case. This is useful when
+            # plotting partial logs while the workflow is still active.
+            self.cm.make_tables()
+
+class TxnPlot:
+    def __init__(self, managers, opts):
+        self.managers = managers
+        self.opts = opts
+
+        plt.style.use('tableau-colorblind10')
+        if opts.tex:
+            font = {'family' : 'serif',
+                    'serif': ['Computer Modern Roman'],
+                    'weight' : 'normal',
+                    'size'   : 11}
+            plt.rc('font', **font)
+            plt.rc('text', usetex=True)
+
+        height = opts.height if opts.height else opts.width * (2/3)
+
+
+        self.fig = plt.figure(constrained_layout=True, figsize=(opts.width, height), dpi=opts.dpi)
+        self.subs = self.fig.subplots(nrows=1, ncols=len(managers), squeeze=False)
+
+        # default legend
+        self.legend = {
+                "workers lifetime": 'C9',
+                "tasks executing": 'C0',
+                "tasks waiting at worker": 'C7',
+                "tasks lost on disconnection": 'C8',
+                "results waiting retrieval": 'C2',
+                "tasks failures": 'red',
+                "cache updates": 'C1',
+                "inputs from manager": 'C3',
+                "outputs to manager": 'C5',
+                }
+        self.display_plot()
+
+    def determine_origin(self, m):
+        spec = self.opts.origin
+        if spec == "manager-start":
+            return 0
+        elif spec == "first-waiting-task":
+            return m.tasks["WAITING"].min()
+        elif spec == "first-transfer":
+            return m.transfers["time"].min()
+        elif spec == "first-worker":
+            return m.workers["CONNECTION"].min()
+        return 0
+
+    def determine_end(self, m):
+        spec = self.opts.end
+        if spec == "manager-end":
+            return m.termination
+        elif spec == "last-task":
+            return m.tasks["last_state_time"].max()
+        return m.termination
+
+    def make_tick_time(self, origin, x, pos):
+        def roundb(b, x):
+            return b * math.ceil(x/b)
+
+        # round seconds to multiples of 5
+        t = roundb(5, x - origin)
+        u = "s"
+        if t > 900:
+            # round minutes to multiples of 5
+            t = roundb(5, t/60)
+            u = "m"
+        elif t > 3600 * 24:
+            t = roundb(1, t/(3600 * 24))
+            u = "h"
+        return "{:.0f}{}".format(t, u)
+
+    def bh(self, fig, slots, left, width, color, **kwargs):
+        # bar plot with some defaults
+        args = { "left": left, "width": width, "color": color, "linewidth": 0.5, "align": "edge", "edgecolor": "#00000010" }
+        args.update(kwargs)
+        if not args["edgecolor"]:
+            args["edgecolor"] = color
+        fig.barh(slots, **args)
+
+    def display_plot(self):
+        plt.title(self.opts.title)
+
+        for (i, m) in enumerate(self.managers.values()):
+            s = self.subs[0, i]
+
+            self.plot(s, m)
+
+            plot_origin = self.determine_origin(m)
+            plot_end = self.determine_end(m)
+
+            s.axis(xmin=plot_origin, xmax=plot_end)
+            s.set_xticks([plot_origin, plot_end])
+            s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_origin)))
+            s.set_xlabel("time")
+
+            s.tick_params(axis='both', which='major', labelsize=15)
+            s.legend(handles=[mpl.patches.Patch(color=c, label=l) for (l,c) in self.legend.items()])
+
+        if self.opts.output:
+            plt.savefig(self.opts.output)
+
+        if self.opts.display or not self.opts.output:
+            plt.show()
+
+    def plot(self, fig, manager):
+        return NotImplemented
+
+
+class TxnPlotManager(TxnPlot):
+    def line(self, fig, cu, xtime, color):
+        norm = max(1, len(cu.index))
+        fig.plot(cu["one"].cumsum()/norm, cu[xtime], color=color)
+
+    def plot(self, fig, manager):
+        ts = manager.tasks
+        xs = manager.transfers
+        ws = manager.workers
+
+        xs["one"] = 1
+        ts["one"] = 1
+
+        xs["end_time"] = xs["start_time"] + xs["wall_time"]
+        xs.sort_values("end_time", ignore_index=True, inplace=True)
+
+        cu = xs[xs["direction"] == "CACHE_UPDATE"][["end_time", "one"]]
+        self.line(fig, cu, "end_time", color=self.legend["cache updates"])
+
+        cu = xs[xs["direction"] == "INPUT"][["end_time", "one"]]
+        self.line(fig, cu, "end_time", color=self.legend["inputs from manager"])
+
+        cu = xs[xs["direction"] == "OUTPUT"][["end_time", "one"]]
+        self.line(fig, cu, "end_time", color=self.legend["outputs to manager"])
+
+        fig.set_ylabel("Percentage")
+        fig.set_yticks([0, 1])
+        fig.set_yticklabels(["0", "100%"])
+
+
+class TxnPlotTasks(TxnPlot):
+    def plot(self, fig, manager):
+        manager.tasks.sort_values("time_commit_start", ignore_index=True, inplace=True)
+
+        # divided tasks on whether we have a full report
+        at = manager.tasks
+        lt = manager.tasks[manager.tasks["reason"] == "DISCONNECTION"]
+        dt = manager.tasks[~manager.tasks["RETRIEVED"].isna()]
+
+        del self.legend["workers lifetime"] # not show in this plot
+
+        cu = at[at["size_input_mgr"] > 0]
+        self.bh(fig, cu.index, cu["time_commit_start"], cu["time_input_mgr"], self.legend["inputs from manager"], edgecolor=None)
+
+        cu = at[at["size_output_mgr"] > 0]
+        self.bh(fig, cu.index, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"], self.legend["outputs to manager"], edgecolor=None)
+
+        self.bh(fig, dt.index, dt["time_commit_end"],  dt["time_worker_start"] - dt["time_commit_end"], self.legend["cache updates"], edgecolor=None)
+
+        del self.legend["tasks waiting at worker"] # already covered above
+
+        self.bh(fig, lt.index, lt["time_commit_end"],  lt["last_state_time"] - lt["time_commit_end"], self.legend["tasks lost on disconnection"], edgecolor=None)
+
+        self.bh(fig, dt.index, dt["time_worker_start"],  dt["time_worker_end"] - dt["time_worker_start"], self.legend["tasks executing"], edgecolor=None)
+
+        self.bh(fig, dt.index, dt["time_worker_end"],  dt["RETRIEVED"] - dt["time_worker_end"], self.legend["results waiting retrieval"], edgecolor=None)
+
+        del self.legend["tasks failures"] # already covered above
+
+        fig.set_ylabel("tasks")
+        fig.set_yticks([0, len(dt.index)])
+        fig.set_yticklabels(["1", str(len(dt.index)+1)])  # ytick number of workers
+
+
+
+class TxnPlotWorkers(TxnPlot):
+    def plot_by_worker(self, fig, worker, worker_times, worker_xfers, base_slot):
+        slot_count = worker["slot"].nunique() + 2  # + 2 for the "slots" for cache update, and transfers
+        worker["slot"] += base_slot+1 # slot 0 for cache updates, 1 for transfers
+
+        dt = worker[~worker["RETRIEVED"].isna()]
+        lt = worker[worker["reason"] == "DISCONNECTION"]
+        y = worker["slot"]
+
+        # plot times from this wid
+        self.bh(fig, base_slot, worker_times["CONNECTION"], worker_times["DISCONNECTION"] - worker_times["CONNECTION"], "C9", height=slot_count)
+
+        cu = worker_xfers[ worker_xfers["direction"] == "CACHE_UPDATE" ]
+        self.bh(fig, base_slot+0.1, cu["start_time"], cu["wall_time"], self.legend["cache updates"], height=0.7)
+
+        # select tasks that needed inputs or outputs, and plot that.  we prefer this
+        # information from tasks rather than transfer records, as there is only
+        # at most one record per task.
+        cu = worker[worker["size_input_mgr"] > 0]
+        self.bh(fig, base_slot+1, cu["time_commit_start"], cu["time_input_mgr"], self.legend["inputs from manager"])
+
+        cu = worker[worker["size_output_mgr"] > 0]
+        self.bh(fig, base_slot+1, cu["RETRIEVED"]-cu["time_output_mgr"], cu["time_output_mgr"], self.legend["outputs to manager"])
+
+        self.bh(fig, y, worker["RUNNING"], worker["last_state_time"]-worker["RUNNING"], self.legend["tasks waiting at worker"])
+
+        self.bh(fig, dt["slot"], dt["time_worker_start"], dt["time_worker_end"]-dt["time_worker_start"], self.legend["tasks executing"])
+        self.bh(fig, lt["slot"], lt["time_commit_end"],  lt["last_state_time"] - lt["time_commit_end"], self.legend["tasks lost on disconnection"])
+
+        self.bh(fig, dt["slot"], dt["time_worker_end"], dt["RETRIEVED"]-dt["time_worker_end"], self.legend["results waiting retrieval"])
+
+        ft = dt[(dt["reason"] != "SUCCESS") | ((dt["reason"] == "SUCCESS") & (dt["exit_code"] != 0))]
+        self.bh(fig, ft["slot"], ft["RETRIEVED"] - 0.5, 0.5, self.legend["tasks failures"])
+
+        return worker["slot"].max() + 1
+
+
+    def plot(self, fig, manager):
+        ts = manager.tasks
+        xs = manager.transfers
+        ws = manager.workers
+
+        gs = ts.groupby("worker_id", sort=False)
+        by_min_connects = ws.groupby("worker_id")["CONNECTION"].min().sort_values().index
+        gsd = {wid: g  for (wid, g) in gs}
+
+        base_slot=0
+        for wid in by_min_connects:
+            worker = gsd.get(wid, None)
+            worker_times = ws[ws["worker_id"] == wid]
+            worker_xfers = xs[xs["worker_id"] == wid]
+
+            if worker is not None:
+                base_slot = self.plot_by_worker(fig, worker, worker_times, worker_xfers, base_slot)
+
+        fig.set_ylabel("workers")
+        fig.set_yticks((0, base_slot))
+        fig.set_yticklabels(["0", str(gs.ngroups)])  # ytick number of workers
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Plot worker information from transaction lof file.')
+
+    parser = argparse.ArgumentParser(description='Plot TaskVine workflow information from a transaction log file.')
+
     parser.add_argument('log', help='Path to transaction log file')
-    parser.add_argument('mode', help='changes mode in which information can be diplayed (-Workers|-Tasks|-Manager)')
-    parser.add_argument('title', nargs='?', default ='Worker Info', help='Title of the plot')
-    parser.add_argument('save', nargs='?', default = None, help='Save Figure')
-    parser.add_argument('-a', action='store_true', help='display all from the transaction log')
-    parser.add_argument('-f', action='store_true', help='flip colors between tasks')
-    parser.add_argument('-u', action='store_true', help='display cache updates')
-    parser.add_argument('-r', action='store_true', help='display resource updates')
-    parser.add_argument('-d', action='store_true', help='display disconnections')
-    parser.add_argument('-c', action='store_true', help='display connections')
-    parser.add_argument('-m', action='store_true', help='display marked done')
-    parser.add_argument('-w', action='store_true', help='display waiting retrieval')
-    parser.add_argument('-i', action='store_true', help='display input transfers')
-    parser.add_argument('-o', action='store_true', help='display output transfers')
-    parser.add_argument('-s', action='store_true', help='display tasks sent')
-    parser.add_argument('-x', nargs=3, help='change scale for x ticks -x <start> <step_size> <steps>')
-    parser.add_argument('-y', nargs=3, help='change scale for y ticks -y <start> <step_size> <steps>')
-    parser.add_argument('-z', nargs=1, help='changes refrence point for 0 Default: manager start (WorkerFirstTask|ManagerFirstTask)')
-    parser.add_argument('--worker-time', action='store_true', help='uses time measured on worker')
+    parser.add_argument('output', nargs='?', default=None, help='output name of the plot/csv generated. If not given, assumes --display')
+    parser.add_argument('--mode', choices="workers tasks manager csv".split(), default="workers", help='information to plot. sv. If csv, write dataframes for tasks, workers and transfers to disk instead.')
+    parser.add_argument('--title', nargs='?', default='TaskVine', help='Title of the plot')
+    parser.add_argument('--origin', nargs='?', help='change plot origin. One of manager-start, first-waiting-task, first-transfer, or first-worker', default="first-worker")
+    parser.add_argument('--end', nargs='?', help='change plot end time. One of manager-end, last-task', default="last-task")
+    parser.add_argument('--tasks-range', nargs='?', help='range of tasks ids to plot as start[,[end][,step]] ', default="1,,1")
+    parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
+    parser.add_argument('--width', nargs='?', type=float, help='width in inches', default=12)
+    parser.add_argument('--height', nargs='?', type=float, help='height in inches. Default is 2/3 of width', default=None)
+    parser.add_argument('--dpi', nargs='?', type=int, help='output image resoulution', default=300)
     parser.add_argument('--tex', action='store_true', help='use tex fonts')
     args = parser.parse_args()
 
-    if args.tex:
-        font = {'family' : 'serif',
-                'serif': ['Computer Modern Roman'],
-                'weight' : 'normal',
-                'size'   : 11}
-        plt.rc('font', **font)
-        plt.rc('text', usetex=True)
+    p = ParseTxn(args.log, args.tasks_range)
 
-    if args.mode == "Workers":
-        parse_workers(args.log)
-        plot_workers(title=args.title,
-                    all_info=args.a,
-                    save=args.save,
-                    flip=args.f,
-                    cache_updates=args.u,
-                    resources=args.r,
-                    marked_done=args.m,
-                    input_transfers=args.i,
-                    output_transfers=args.o,
-                    xticks = args.x,
-                    yticks = args.y,
-                    zero=args.z,
-                    worker_time = args.worker_time)
-    elif args.mode == "Manager":
-        parse_manager(args.log)
-        plot_manager(title=args.title,
-                    save=args.save,
-                    all_info=args.a,
-                    connections = args.c,
-                    disconnections = args.d,
-                    resources=args.r,
-                    cache_updates=args.u,
-                    tasks_sent=args.s,
-                    waiting_retrieval=args.w,
-                    marked_done=args.m,
-                    xticks = args.x,
-                    yticks = args.y,
-                    input_transfers=args.i,
-                    output_transfers=args.o)
-    elif args.mode == "Tasks":
-        parse_tasks(args.log)
-        plot_tasks(title=args.title,
-                    save=args.save,
-                    all_info=args.a,
-                    connections = args.c,
-                    disconnections = args.d,
-                    resources=args.r,
-                    cache_updates=args.u,
-                    tasks_sent=args.s,
-                    waiting_retrieval=args.w,
-                    marked_done=args.m,
-                    xticks = args.x,
-                    yticks = args.y,
-                    input_transfers=args.i,
-                    output_transfers=args.o)
+    if args.mode == "csv":
+        p.write_tables(args.output)
+    elif args.mode == "workers":
+        TxnPlotWorkers(p.managers, args)
+    elif args.mode == "tasks":
+        TxnPlotTasks(p.managers, args)
+    elif args.mode == "manager":
+        TxnPlotManager(p.managers, args)
+
+

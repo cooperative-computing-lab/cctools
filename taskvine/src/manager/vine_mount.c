@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <stdlib.h>
 
-struct vine_mount * vine_mount_create( struct vine_file *file, const char *remote_name, vine_file_flags_t flags, struct vine_file *substitute )
+struct vine_mount * vine_mount_create( struct vine_file *file, const char *remote_name, vine_mount_flags_t flags, struct vine_file *substitute )
 {
 	struct vine_mount *m = malloc(sizeof(*m));
 	m->file = file;

@@ -7,14 +7,17 @@ See the file COPYING for details.
 #include "vine_file.h"
 #include "vine_task.h"
 #include "vine_protocol.h"
+#include "vine_checksum.h"
 
 #include "stringtools.h"
 #include "md5.h"
 #include "debug.h"
+#include "xxmalloc.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
 
 /*
 For a given task and file, generate the name under which the file
@@ -120,14 +123,15 @@ static vine_url_cache_t get_url_properties( const char *url, char *tag )
 	*/
 
 	if(!strncmp(url,"file://",7)) {
-		char *hash = md5_file_or_dir(&url[7]);
+		ssize_t totalsize;
+		char *hash = vine_checksum_any(&url[7],&totalsize);
 		strcpy(tag,hash);
 		free(hash);
 		return VINE_FOUND_MD5;
 	}
 
 	/* Otherwise, proceed to use curl to get the headers. */
-	
+
 	char *command = string_format("curl -IL --verbose --stderr /dev/stdout \"%s\"",url);
 
 	FILE *stream = popen(command, "r");
@@ -189,11 +193,11 @@ static char *make_url_cached_name( const struct vine_file *f )
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	char *content;
 	const char *hash;
-	const char *method;		
-	
+	const char *method;
+
 	debug(D_VINE,"fetching headers for url %s",f->source);
-	
-       	vine_url_cache_t val = get_url_properties(f->source,tag);
+
+vine_url_cache_t val = get_url_properties(f->source,tag);
 
 	switch(val){
 		case VINE_FOUND_NONE:
@@ -201,7 +205,7 @@ static char *make_url_cached_name( const struct vine_file *f )
 			method = "md5-url";
 			content = string_format("%s",f->source);
 			md5_buffer(content,strlen(content),digest);
-			hash = md5_string(digest);
+			hash = md5_to_string(digest);
 			free(content);
 			break;
 		case VINE_FOUND_LAST_MODIFIED:
@@ -209,7 +213,7 @@ static char *make_url_cached_name( const struct vine_file *f )
 			method = "md5-lm";
 			content = string_format("%s-%s",f->source,tag);
 			md5_buffer(content,strlen(content),digest);
-			hash = md5_string(digest);
+			hash = md5_to_string(digest);
 			free(content);
 			break;
 		case VINE_FOUND_ETAG:
@@ -217,7 +221,7 @@ static char *make_url_cached_name( const struct vine_file *f )
 			method = "md5-et";
 			content = string_format("%s-%s",f->source,tag);
 			md5_buffer(content,strlen(content),digest);
-			hash = md5_string(digest);
+			hash = md5_to_string(digest);
 			free(content);
 			break;
 		case VINE_FOUND_MD5:	
@@ -244,13 +248,13 @@ char *make_mini_task_cached_name(const struct vine_file *f)
 
 	char *taskstr = vine_task_to_json(f->mini_task);
 	char *buffer = string_format("%s:%s",taskstr,f->source);
-	
+
 	md5_buffer(buffer,strlen(buffer),digest);
 
 	free(buffer);
 	free(taskstr);
-	
-	return strdup(md5_string(digest));
+
+	return strdup(md5_to_string(digest));
 }
 
 /*
@@ -258,7 +262,7 @@ Compute the cached name of a file object, based on its type.
 Returns a string that must be freed with free().
 */
 
-char *vine_cached_name( const struct vine_file *f )
+char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 {
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	char *hash, *name;
@@ -266,7 +270,7 @@ char *vine_cached_name( const struct vine_file *f )
 
 	switch(f->type) {
 		case VINE_FILE:
-			hash = md5_file_or_dir(f->source);
+			hash = vine_checksum_any(f->source,totalsize);
 			if(hash) {
 				/* An existing file is identified by its content. */
 				name = string_format("file-md5-%s",hash);
@@ -301,9 +305,9 @@ char *vine_cached_name( const struct vine_file *f )
 			break;
 		case VINE_BUFFER:
 			if(f->data) {
-				/* If the buffer exists, then checksum the content. */ 
-				md5_buffer(f->data, f->length, digest);
-				const char *hash = md5_string(digest);
+				/* If the buffer exists, then checksum the content. */
+				md5_buffer(f->data, f->size, digest);
+				const char *hash = md5_to_string(digest);
 				name = string_format("buffer-md5-%s",hash);
 			} else {
 				/* If the buffer doesn't exist yet, then give a random name. */
@@ -319,4 +323,20 @@ char *vine_cached_name( const struct vine_file *f )
 	}
 
 	return name;
+}
+
+
+char *vine_file_id( const struct vine_file *f )
+{
+	unsigned char digest[MD5_DIGEST_LENGTH];
+	const char *hash;
+
+    assert(f->cached_name);
+
+    char *content = string_format("%s%s", f->cached_name, f->source ? f->source : "");
+    md5_buffer(content,strlen(content),digest);
+    hash = md5_to_string(digest);
+    free(content);
+
+    return xxstrdup(hash);
 }

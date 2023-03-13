@@ -418,15 +418,15 @@ static int send_keepalive(struct link *manager, int force_resources)
 Send an asynchronmous message to the manager indicating that an item was successfully loaded into the cache, along with its size in bytes and transfer time in usec.
 */
 
-void vine_worker_send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
+void vine_worker_send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time, timestamp_t transfer_start )
 {
 	char *transfer_id = hash_table_remove(current_transfers, cachename);
-	if(transfer_id) {
-		send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
-		free(transfer_id);
-	} else {
-		send_message(manager,"cache-update %s %lld %lld X\n",cachename,(long long)size,(long long)transfer_time);
+	if(!transfer_id) {
+		transfer_id = xxstrdup("X");
 	}
+
+	send_message(manager,"cache-update %s %lld %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time,(long long)transfer_start,transfer_id);
+	free(transfer_id);
 }
 
 /*
@@ -471,7 +471,7 @@ static void report_worker_ready( struct link *manager )
 	domain_name_cache_guess(hostname);
 	send_message(manager,"taskvine %d %s %s %s %d.%d.%d\n",VINE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_message(manager, "info worker-id %s\n", worker_id);
-	vine_init_update(global_cache, manager);
+	vine_cache_scan(global_cache, manager);
 
 	send_features(manager);
 	send_transfer_address(manager);
@@ -530,12 +530,13 @@ static int start_process( struct vine_process *p, struct link *manager )
 			list_push_tail(coprocess_list, p->coprocess);
 			hash_table_insert(features, duty_name, (void **) 1);
 			send_features(manager);
+			send_message(manager, "info duty-update %d %d\n", p->task->task_id, VINE_DUTY_STARTED);
 			send_resource_update(manager);
 		}
 	}
 
 	itable_insert(procs_running,p->pid,p);
-	
+
 	return 1;
 }
 
@@ -624,7 +625,7 @@ static void expire_procs_running()
 	ITABLE_ITERATE(procs_running,pid,p) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
-			p->result = VINE_RESULT_TASK_TIMEOUT;
+			p->result = VINE_RESULT_MAX_END_TIME;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -999,7 +1000,7 @@ static void enforce_processes_max_running_time()
 					p->task->task_id,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
-			p->result = VINE_RESULT_TASK_MAX_RUN_TIME;
+			p->result = VINE_RESULT_MAX_WALL_TIME;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -1379,7 +1380,7 @@ static int workspace_create()
 	// Setup working space(dir)
 	if(!workspace) {
 		const char *workdir = system_tmp_dir(user_specified_workdir);
-		workspace = string_format("%s/worker-%d", workdir, (int) getuid());
+		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
 
 	printf( "vine_worker: creating workspace %s\n", workspace);
@@ -1540,7 +1541,7 @@ static void workspace_delete()
 	is inside the workspace.  Abort if we really cannot clean up.
 	*/
 
-
+	unlink_recursive(workspace);
 	free(workspace);
 }
 
@@ -1790,7 +1791,7 @@ void set_worker_id()
 	unsigned char digest[MD5_DIGEST_LENGTH];
 
 	md5_buffer(salt_and_pepper, strlen(salt_and_pepper), digest);
-	worker_id = string_format("worker-%s", md5_string(digest));
+	worker_id = string_format("worker-%s", md5_to_string(digest));
 
 	free(salt_and_pepper);
 }
@@ -2188,7 +2189,10 @@ int main(int argc, char *argv[])
 	setenv("VINE_SANDBOX", workspace, 0);
 
 	// change to workspace
+	
 	chdir(workspace);
+
+	unlink_recursive("cache");
 
 	procs_running  = itable_create(0);
 	procs_table    = itable_create(0);
@@ -2277,6 +2281,9 @@ int main(int argc, char *argv[])
 		vine_coprocess_shutdown_all_coprocesses(coprocess_list);
 		list_delete(coprocess_list);
 	}
+	
+	trash_file("cache");
+	trash_empty();
 
 	workspace_delete();
 

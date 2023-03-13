@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    wait_time = 30 
+    wait_time = 30
 
     with open(path.join(test_dir, input_file), 'w') as f:
         f.write('hello world\n')
@@ -124,21 +124,23 @@ if __name__ == '__main__':
     report_task(t, vine.VINE_RESULT_SUCCESS, 0, [path.join(test_dir, 'outs', output)])
 
     # Execute a task that only communicates through buffers:
+    inbuf   = q.declare_buffer(bytes("This is only a test!", "utf-8"))
+    outbuf1 = q.declare_buffer()
+    outbuf2 = q.declare_buffer()
 
-    original = "This is only a test!";
     t = vine.Task("cp input.txt output1.txt && cp input.txt output2.txt")
-    t.add_input_buffer(original,"input.txt")
-    t.add_output_buffer("out1","output1.txt")
-    t.add_output_buffer("out2","output2.txt")
+    t.add_input(inbuf,"input.txt")
+    t.add_output(outbuf1,"output1.txt")
+    t.add_output(outbuf2,"output2.txt")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
-    if t.get_output_buffer("out1") != original or t.get_output_buffer("out2") != original:
-        print("incorrect output:\nout1: {}\nout2: {}\n".format(t.get_output_buffer("out1"),t.get_output_buffer("out2")))
+    if outbuf1.contents() != inbuf.contents() or outbuf2.contents() != inbuf.contents():
+        print("incorrect output:\nout1: {}\nout2: {}\n".format(outbuf1.contents(),outbuf2.contents()))
         sys.exit(1)
     else:
-        print("buffer outputs match the inputs.")
+        print("buffer outputs match: {}".format(inbuf.contents()))
 
 
 
@@ -188,7 +190,7 @@ if __name__ == '__main__':
     t.set_time_max(1)
     q.submit(t)
     t = q.wait(wait_time)
-    report_task(t, vine.VINE_RESULT_TASK_MAX_RUN_TIME, 9)
+    report_task(t, vine.VINE_RESULT_MAX_WALL_TIME, 9)
 
     # should run in the alloted absolute time
     t = vine.Task("/bin/sleep 1")
@@ -202,17 +204,17 @@ if __name__ == '__main__':
     t.set_time_end((time.time() + 2) * 1e6)
     q.submit(t)
     t = q.wait(30)
-    report_task(t, vine.VINE_RESULT_TASK_TIMEOUT, 9)
+    report_task(t, vine.VINE_RESULT_MAX_END_TIME, 9)
 
     # Pull down data from a url and unpack it via a minitask.
     # Note that we use a local file url of a small tarball to test the mechanism without placing a load on the network.
-    f = vine.FileUntar(vine.FileURL("file://dummy.tar.gz"))
+    f = q.declare_untar(q.declare_url("file://dummy.tar.gz"))
     t = vine.Task("ls -lR cctools | wc -l")
     t.add_input(f,"cctools",cache=True)
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
-    
+
     # Create an explicit minitask description to run curl
     minitask = vine.Task("curl https://www.nd.edu -o output");
     minitask.add_output_file("output","output",cache=True);

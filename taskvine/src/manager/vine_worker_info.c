@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 #include "vine_worker_info.h"
-#include "vine_remote_file_info.h"
+#include "vine_file_replica.h"
 #include "vine_protocol.h"
 #include "vine_task.h"
 #include "vine_resources.h"
@@ -63,7 +63,7 @@ void vine_worker_delete( struct vine_worker_info *w )
 	hash_table_delete(w->features);
 	free(w->stats);
 
-	hash_table_clear(w->current_files,(void*)vine_remote_file_info_delete);
+	hash_table_clear(w->current_files,(void*)vine_file_replica_delete);
 	hash_table_delete(w->current_files);
 	itable_delete(w->current_tasks);
 	itable_delete(w->current_tasks_boxes);

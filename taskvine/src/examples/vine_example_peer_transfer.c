@@ -12,7 +12,7 @@ and landmark database from NCBI, and then performs a short query.
 
 The query is provided by a string (but presented to the task as a file.)
 Both the downloads are automatically unpacked, cached, and shared
-with all the same tasks on the worker.
+across all workers efficiently.
 */
 
 
@@ -41,8 +41,8 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
-    //runtime logs will be written to vine_example_peer_info/%Y-%m-%dT%H:%M:%S
-	vine_set_runtime_info_path("vine_example_peer_transfer_info");
+	//runtime logs will be written to vine_example_blast_info/%Y-%m-%dT%H:%M:%S
+	vine_set_runtime_info_path("vine_example_blast_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
@@ -51,20 +51,24 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	if(argv[1] &&(strcmp(argv[1], "-peer") == 0)){
-		printf("Peer transfers enabled\n");
-		vine_enable_peer_transfers(m);
-		vine_tune(m, "file-source-max-transfers", 2);
-	}
+	printf("Peer transfers enabled\n");
+	vine_enable_peer_transfers(m);
+	vine_tune(m, "file-source-max-transfers", 2);
 
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
+	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL, VINE_PEER_SHARE);
+	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL, VINE_PEER_SHARE);
 
-	for(i=0;i<1000;i++) {
+	struct vine_file *software = vine_declare_untar(m, blast_url, 0);
+	struct vine_file *database = vine_declare_untar(m, landm_url, 0);
+
+
+	for(i=0;i<100;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
-	  
-		vine_task_add_input_buffer(t,query_string,strlen(query_string),"query.file", VINE_NOCACHE);
-		vine_task_add_input(t, vine_file_untar(vine_file_url(BLAST_URL)), "blastdir", VINE_CACHE);
-		vine_task_add_input(t, vine_file_untar(vine_file_url(LANDMARK_URL)), "landmark", VINE_CACHE);
+
+		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string), 0);
+		vine_task_add_input(t, query, "query.file", VINE_NOCACHE);
+		vine_task_add_input(t,software,"blastdir", VINE_CACHE );
+		vine_task_add_input(t,database,"landmark", VINE_CACHE );
 		vine_task_set_env_var(t,"BLASTDB","landmark");
 
 		int task_id = vine_submit(m, t);
@@ -95,3 +99,5 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

@@ -8,7 +8,10 @@ See the file COPYING for details.
 #define VINE_CACHED_NAME_H
 
 #include "vine_file.h"
+#include <sys/types.h>
 
-char *vine_cached_name( const struct vine_file *f );
+char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize );
+
+char *vine_file_id( const struct vine_file *f );
 
 #endif

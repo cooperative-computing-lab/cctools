@@ -61,6 +61,15 @@ typedef enum {
 	VINE_WORKER_DISCONNECT_FAILURE
 } vine_worker_disconnect_reason_t;
 
+/* States known about duties */
+
+typedef enum {
+	VINE_DUTY_WAITING = 0,
+	VINE_DUTY_SENT,
+	VINE_DUTY_STARTED,
+	VINE_DUTY_FAILURE
+} vine_duty_state_t;
+
 struct vine_worker_info;
 struct vine_task;
 struct vine_file;
@@ -103,6 +112,10 @@ struct vine_manager {
 	struct hash_table *workers_with_available_results;  /* Maps link -> vine_worker_info */
 	struct hash_table *current_transfer_table; 	/* Maps uuid -> struct transfer_pair */
 
+	/* Primary data structures for tracking files. */
+
+    struct hash_table *file_table;      /* Maps fileid -> struct vine_file.* */
+
 	/* Primary scheduling controls. */
 
 	vine_schedule_t worker_selection_algorithm;    /* Mode for selecting best worker for task in main scheduler. */
@@ -132,16 +145,14 @@ struct vine_manager {
 	/* Logging configuration. */
 
     char *runtime_directory;
-	FILE *perf_logfile; /* Performance logfile for tracking metrics by time. */
-	FILE *txn_logfile;  /* Transaction logfile for recording every event of interest. */
+	FILE *perf_logfile;        /* Performance logfile for tracking metrics by time. */
+	FILE *txn_logfile;         /* Transaction logfile for recording every event of interest. */
 
 	/* Resource monitoring configuration. */
 
 	vine_monitoring_mode_t monitor_mode;
-	FILE *monitor_file;
-	char *monitor_output_directory;
-	char *monitor_summary_filename;
 	char *monitor_exe;
+    int monitor_interval;
 
 	struct rmsummary *measured_local_resources;
 	struct rmsummary *current_max_worker;
@@ -178,6 +189,11 @@ struct vine_manager {
 These are not public API functions, but utility methods that may
 be called on the manager object by other elements of the manager process.
 */
+
+/* Declares file f. If a file with the same f->file_id is already declared, f
+ * is ****deleted**** and the previous file is returned. Otherwise f is returned. */
+struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_file *f);
+struct vine_file *vine_manager_lookup_file(struct vine_manager *q, const char *file_id);
 
 /* Send a printf-style message to a remote worker. */
 #ifndef SWIG
@@ -223,7 +239,7 @@ int vine_enable_transactions_log(struct vine_manager *m, const char *logfile);
 
 
 /* The expected format of files created by the resource monitor.*/
-#define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-%d-task-%d"
+#define RESOURCE_MONITOR_TASK_LOCAL_NAME "vine-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
 #define RESOURCE_MONITOR_REMOTE_NAME_EVENTS RESOURCE_MONITOR_REMOTE_NAME "events.json"
 

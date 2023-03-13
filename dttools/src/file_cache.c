@@ -41,7 +41,7 @@ static void cached_name(struct file_cache *c, const char *path, char *lpath)
 {
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	md5_buffer(path, strlen(path), digest);
-	sprintf(lpath, "%s/%02x/%s", c->root, digest[0], md5_string(digest));
+	sprintf(lpath, "%s/%02x/%s", c->root, digest[0], md5_to_string(digest));
 }
 
 static void txn_name(struct file_cache *c, const char *path, char *txn)
@@ -50,7 +50,7 @@ static void txn_name(struct file_cache *c, const char *path, char *txn)
 	char shortname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess_short(shortname);
 	md5_buffer(path, strlen(path), digest);
-	sprintf(txn, "%s/txn/%s.%s.%d.XXXXXX", c->root, md5_string(digest), shortname, (int) getpid());
+	sprintf(txn, "%s/txn/%s.%s.%d.XXXXXX", c->root, md5_to_string(digest), shortname, (int) getpid());
 }
 
 static int wait_for_running_txn(struct file_cache *c, const char *path)
@@ -63,7 +63,7 @@ static int wait_for_running_txn(struct file_cache *c, const char *path)
 	const char *checksum;
 
 	md5_buffer(path, strlen(path), digest);
-	checksum = md5_string(digest);
+	checksum = md5_to_string(digest);
 
 	txn[0] = 0;
 
