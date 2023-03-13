@@ -725,11 +725,12 @@ struct vine_file * vine_declare_poncho( struct vine_manager *m, struct vine_file
 struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags );
 
 
-/** Delete a file object
+/** Request to remove a file
+Decrement the reference count and delete if zero.
 @param m A manager object
 @param f A file object
 */
-void vine_declare_delete( struct vine_manager *m, struct vine_file *f );
+void vine_remove_file( struct vine_manager *m, struct vine_file *f );
 
 
 //@}

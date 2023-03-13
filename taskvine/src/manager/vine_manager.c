@@ -2996,49 +2996,6 @@ static struct vine_task *find_task_by_tag(struct vine_manager *q, const char *ta
 	return NULL;
 }
 
-/*
-Invalidate all remote cached files that match the given name.
-Search for workers with that file, cancel any tasks using that
-file, and then remove it.
-*/
-
-static void vine_remove_file_internal(struct vine_manager *q, const char *filename)
-{
-	char *key;
-	struct vine_worker_info *w;
-	HASH_TABLE_ITERATE(q->worker_table,key,w) {
-
-		if(!vine_file_replica_table_lookup(w, filename))
-			continue;
-
-		struct vine_task *t;
-		uint64_t task_id;
-		ITABLE_ITERATE(w->current_tasks,task_id,t) {
-
-			struct vine_mount *m;
-			LIST_ITERATE(t->input_mounts,m) {
-				if(strcmp(filename, m->file->cached_name) == 0) {
-					cancel_task_on_worker(q, t, VINE_TASK_READY);
-					continue;
-				}
-			}
-
-			LIST_ITERATE(t->output_mounts,m) {
-				if(strcmp(filename, m->file->cached_name) == 0) {
-					cancel_task_on_worker(q, t, VINE_TASK_READY);
-					continue;
-				}
-			}
-		}
-
-		delete_worker_file(q, w, filename, 0, 0);
-	}
-}
-
-void vine_remove_file(struct vine_manager *q, struct vine_file *f )
-{
-	vine_remove_file_internal(q, f->cached_name);
-}
 
 /******************************************************/
 /************* taskvine public functions *************/
@@ -4940,20 +4897,64 @@ int vine_set_task_id_min(struct vine_manager *q, int minid) {
 /* File functions */
 
 /*
-Request to delete a file by its id
+Request to remove a file
 Decrement the reference count and delete if zero.
 */
-void vine_declare_delete(struct vine_manager *m, struct vine_file *f)
+void vine_remove_file(struct vine_manager *m, struct vine_file *f)
 {
 	if(!f) {
 		return;
 	}
 
-	if(f->refcount == 1) {
-		hash_table_remove(m->file_table, f->cached_name);
+	const char *filename = f->cached_name;
+
+	char *key;
+	struct vine_worker_info *w;
+	HASH_TABLE_ITERATE(m->worker_table,key,w) {
+
+		if(!vine_file_replica_table_lookup(w, filename))
+			continue;
+
+		struct vine_task *t;
+		uint64_t task_id;
+		ITABLE_ITERATE(w->current_tasks,task_id,t) {
+
+			struct vine_mount *mnt;
+			LIST_ITERATE(t->input_mounts,mnt) {
+				if(strcmp(filename, mnt->file->cached_name) == 0) {
+					cancel_task_on_worker(m, t, VINE_TASK_READY);
+					continue;
+				}
+			}
+
+			LIST_ITERATE(t->output_mounts,mnt) {
+				if(strcmp(filename, mnt->file->cached_name) == 0) {
+					cancel_task_on_worker(m, t, VINE_TASK_READY);
+					continue;
+				}
+			}
+		}
+
+		int should_preserve = 0;
+		int file_cache_flags = 0;
+		//file_cache_flags = f->flags & VINE_CACHE_FOREVER; eventually...
+
+		delete_worker_file(m, w, filename, file_cache_flags, should_preserve);
 	}
 
-	vine_file_delete(f);
+	if(hash_table_lookup(m->file_table, f->cached_name)) {
+		/* delete the reference added when declaring the file. */
+		/* the rest of the references, if any, will be deleted as the tasks
+		 * that reference the file are deleted. */
+
+		vine_file_delete(f);
+		hash_table_remove(m->file_table, f->cached_name);
+	}
+}
+
+struct vine_file *vine_manager_lookup_file( struct vine_manager *m, const char *cached_name )
+{
+	return hash_table_lookup(m->file_table, cached_name);
 }
 
 struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_file *f)
@@ -4972,14 +4973,13 @@ struct vine_file *vine_manager_declare_file(struct vine_manager *m, struct vine_
 		f = previous;
 	} else {
 		hash_table_insert(m->file_table, f->cached_name, f);
+
+		/* This is a new file. Increase refcount to keep track of the reference
+		 * from the manager. */
+		f->refcount += 1;
 	}
 
 	return f;
-}
-
-struct vine_file *vine_manager_lookup_file( struct vine_manager *m, const char *cached_name )
-{
-	return hash_table_lookup(m->file_table, cached_name);
 }
 
 struct vine_file *vine_declare_file( struct vine_manager *m, const char *source, vine_file_flags_t flags)
