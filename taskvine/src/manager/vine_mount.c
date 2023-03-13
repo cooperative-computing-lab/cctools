@@ -31,7 +31,7 @@ void vine_mount_delete( struct vine_mount *m )
 {
 	if(!m) return;
 	vine_file_delete(m->file);
-	if(m->remote_name) free(m->remote_name);
+	free(m->remote_name);
 	free(m);
 }
 

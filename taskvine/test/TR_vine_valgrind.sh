@@ -6,7 +6,7 @@ export PATH=../src/tools:../src/worker:$PATH
 
 export CORES=4
 export TASKS=20
-export VALGRIND="valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all"
+export VALGRIND="valgrind --error-exitcode=1 --leak-check=full"
 
 check_needed()
 {

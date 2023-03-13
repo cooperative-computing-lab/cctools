@@ -868,7 +868,7 @@ static int do_kill(int task_id)
 			hash_table_remove(features, p->coprocess->name);
 			list_remove(coprocess_list, p->coprocess);
 			list_remove(duty_list, p->coprocess->name);
-			hash_table_remove(duty_ids, p->coprocess->name);			
+			hash_table_remove(duty_ids, p->coprocess->name);
 		}
 		vine_process_kill(p);
 		cores_allocated -= p->task->resources_requested->cores;
