@@ -264,7 +264,7 @@ Returns a string that must be freed with free().
 
 char *vine_random_name( const struct vine_file *f, ssize_t *totalsize )
 {
-	char *hash, *name;
+	char *name;
 	char random[17];
 
 	switch(f->type){
