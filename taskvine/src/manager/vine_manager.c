@@ -2633,7 +2633,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 
 		/* If not, then search for an available peer to provide it. */
 		/* Provide a substitute file object to describe the peer. */
-		if((m->file->flags |= VINE_PEER_SHARE)) 
+		if((m->file->flags & VINE_PEER_SHARE))
 		{
 			if((peer = vine_file_replica_table_find_worker(q, m->file->cached_name)))
 			{
@@ -2642,7 +2642,7 @@ static int vine_manager_transfer_capacity_available(struct vine_manager *q, stru
 				free(peer_source);
 				found_match = 1;
 				break;
-			}	
+			}
 		}
 
 		/* If that resulted in a match, move on to the next file. */
@@ -3175,11 +3175,13 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 	}
 
 	q->monitor_mode = VINE_MON_DISABLED;
-	q->monitor_exe = resource_monitor_locate(NULL);
-	if(!q->monitor_exe) {
+	char *exe = resource_monitor_locate(NULL);
+	if(!exe) {
 		warn(D_VINE, "Could not find the resource monitor executable. Disabling monitoring.\n");
 		return 0;
 	}
+
+	q->monitor_exe = vine_declare_file(q, exe, VINE_PEER_SHARE);
 
 	if(series) {
 		char *series_file = vine_get_runtime_path_log(q, "time-series");
@@ -3411,22 +3413,23 @@ void vine_disable_monitoring(struct vine_manager *q) {
 		return;
 
 	q->monitor_mode = VINE_MON_DISABLED;
-	free(q->monitor_exe);
+
+	//to do: delete vine file of monitor_exe
 }
 
 void vine_monitor_add_files(struct vine_manager *q, struct vine_task *t) {
-	vine_task_add_input_file(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, VINE_CACHE);
+	vine_task_add_input(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, VINE_CACHE);
 
 	char *summary  = monitor_file_name(q, t, ".summary", 0);
-	vine_task_add_output_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", VINE_NOCACHE);
+	vine_task_add_output(t, vine_declare_file(q, summary, VINE_PEER_NOSHARE), RESOURCE_MONITOR_REMOTE_NAME ".summary", VINE_NOCACHE);
 	free(summary);
 
 	if(q->monitor_mode & VINE_MON_FULL) {
 		char *debug  = monitor_file_name(q, t, ".debug", 1);
 		char *series = monitor_file_name(q, t, ".series", 1);
 
-		vine_task_add_output_file(t, debug, RESOURCE_MONITOR_REMOTE_NAME ".debug", VINE_NOCACHE);
-		vine_task_add_output_file(t, series, RESOURCE_MONITOR_REMOTE_NAME ".series", VINE_NOCACHE);
+		vine_task_add_output(t, vine_declare_file(q, debug, VINE_PEER_NOSHARE), RESOURCE_MONITOR_REMOTE_NAME ".debug", VINE_NOCACHE);
+		vine_task_add_output(t, vine_declare_file(q, series, VINE_PEER_NOSHARE), RESOURCE_MONITOR_REMOTE_NAME ".series", VINE_NOCACHE);
 
 		free(debug);
 		free(series);

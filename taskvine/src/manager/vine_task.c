@@ -139,7 +139,7 @@ static struct list *vine_task_string_list_clone(struct list *string_list)
 struct vine_task *vine_task_clone(const struct vine_task *task)
 {
 	if(!task) return 0;
-	
+
 	struct vine_task *new = vine_task_create(task->command_line);
 
 	/* Static features of task are copied. */
@@ -472,14 +472,12 @@ void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_t
 	vine_task_add_input(t,f,remote_name,flags);
 }
 
-void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file) {
+void vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file) {
 
 	assert(monitor_snapshot_file);
 
-	free(t->monitor_snapshot_file);
-	t->monitor_snapshot_file = xxstrdup(monitor_snapshot_file);
-
-	vine_task_add_input_file(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, VINE_CACHE);
+	t->monitor_snapshot_file = monitor_snapshot_file;
+	vine_task_add_input(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, VINE_CACHE);
 }
 
 void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm)
@@ -540,7 +538,6 @@ void vine_task_delete(struct vine_task *t)
 	free(t->category);
 
 	free(t->monitor_output_directory);
-	free(t->monitor_snapshot_file);
 
 	list_clear(t->input_mounts,(void*)vine_mount_delete);
 	list_delete(t->input_mounts);

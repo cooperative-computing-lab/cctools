@@ -25,8 +25,8 @@ no special capabilities.
 From the application perspective, the programmer creates a manager with @ref vine_create,
 defines a number of tasks with @ref vine_task_create, submits the tasks to the manager
 with @ref vine_submit, and then monitors completion with @ref vine_wait.
-Tasks are further described by attaching data objects via @ref vine_task_add_input_file,
-@ref vine_task_add_input_url and related functions.
+Tasks are further described by attaching data objects via @ref vine_task_add_input,
+@ref vine_task_add_ouput and related functions.
 
 The taskvine framework provides a large number of fault tolerance, resource management,
 and performance monitoring features that enable the construction of applications that
@@ -230,8 +230,8 @@ struct vine_stats {
 //@{
 
 /** Create a new task object.
-Once created and elaborated with functions such as @ref vine_task_add_input_file
-and @ref vine_task_add_input_buffer, the task should be passed to @ref vine_submit.
+Once created and elaborated with functions such as @ref vine_task_add_input
+and @ref vine_task_add_output, the task should be passed to @ref vine_submit.
 @param full_command The shell command line or coprocess functions to be
 executed by the task.  If null, the command will be given later by @ref
 vine_task_set_command
@@ -265,70 +265,6 @@ will only be sent to workers running the coprocess.
 */
 void vine_task_set_coprocess( struct vine_task *t, const char *name );
 
-/** Attach an input file or directory to a task.
-@param t A task object.
-@param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.
-@param remote_name The name that the file/directory will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags	May be zero or more of the following @ref vine_mount_flags_t logical-ored together:
-- @ref VINE_CACHE indicates that the file/directory should be cached for later tasks. (recommended)
-- @ref VINE_NOCACHE indicates that the file should not be cached.
-*/
-void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags);
-
-/** Attach an output file or directory to a task.
-@param t A task object.
-@param local_name The name of the file/directory in the manager's filesystem.  May be any relative or absolute path name.
-@param remote_name The name that the file/directory will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags    May be zero or more of the following @ref vine_mount_flags_t logical-ored together:
-- @ref VINE_CACHE indicates that the file/directory should be cached for later tasks. (recommended)
-- @ref VINE_NOCACHE indicates that the file should not be cached.
-- @ref VINE_WATCH indicates that the worker will watch the output file as it is created, and incrementally return the file to the manager as the task runs (The frequency of these updates is entirely dependent upon the system load.  If the manager is busy interacting with many workers, output updates will be less frequent.)
-- @ref VINE_FAILURE_ONLY indicates the file should only be returned if the task fails.
-- @ref VINE_SUCCESS_ONLY indicates the file should only be returned if the task succeeds.
-*/
-void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags);
-
-/** Add a url as an input for a task.
-@param t A task object.
-@param url The source URL to be accessed to provide the file.
-@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_mount_flags_t logical-ored together. See @ref vine_task_add_input_file.
-*/
-void vine_task_add_input_url(struct vine_task *t, const char *url, const char *remote_name, vine_mount_flags_t flags);
-
-/** Add a file produced by a mini-task.
-Attaches a task definition to produce an input file by running a Unix command.
-This mini-task will be run on demand in order to produce the desired input file.
-This is useful if an input requires some prior step such as transferring,
-renaming, or unpacking to be useful.  A mini-task should be a short-running
-activity with minimal resource consumpion.
-@param t A task object.
-@param mini_task The mini-task to attach to the parent task.
-@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_mount_flags_t logical-ored together. See @ref vine_task_add_input_file.
-*/
-void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags);
-
-/** Add an input buffer to a task.
-@param t A task object.
-@param data The data to be passed as an input file.
-@param length The length of the buffer, in bytes
-@param remote_name The name that the file will be given in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-@param flags May be zero or more @ref vine_mount_flags_t or'd together. See @ref vine_task_add_input_file.
-*/
-
-void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags);
-
-/** Add an empty directory to a task.
-This is very occasionally needed for applications that expect
-certain directories to exist in the working directory, prior to producing output.
-This function does not transfer any data to the task, but just creates
-a directory in its working sandbox.  If you want to transfer an
-entire directory worth of data to a task, use @ref vine_task_add_input_file and simply give a directory name.
-@param t A task object.
-@param remote_name The name of the empty directory in the task sandbox.  Must be a relative path name: it may not begin with a slash.
-*/
-void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name );
 
 /** Add a general file object as a input to a task.
 @param t A task object.
@@ -611,7 +547,7 @@ For more information, consult the manual of the resource_monitor.
 @param monitor_snapshot_file A filename.
 */
 
-void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file);
+void vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file);
 
 //@}
 
@@ -690,6 +626,12 @@ struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buff
 
 
 /** Create a file object representing an empty directory.
+This is very occasionally needed for applications that expect
+certain directories to exist in the working directory, prior to producing output.
+This function does not transfer any data to the task, but just creates
+a directory in its working sandbox.  If you want to transfer an entire
+directory worth of data to a task, use @ref vine_declare_file and give a
+directory name.
 @param m A manager object
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
@@ -697,6 +639,11 @@ struct vine_file * vine_declare_empty_dir( struct vine_manager *m );
 
 
 /** Create a file object produced from a mini-task
+Attaches a task definition to produce an input file by running a Unix command.
+This mini-task will be run on demand in order to produce the desired input file.
+This is useful if an input requires some prior step such as transferring,
+renaming, or unpacking to be useful.  A mini-task should be a short-running
+activity with minimal resource consumpion.
 @param m A manager object
 @param mini_task The task which produces the file
 @return A file object to use in @ref vine_task_add_input

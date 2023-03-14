@@ -69,8 +69,8 @@ int main(int argc, char *argv[])
 
 	vine_enable_peer_transfers(m);
 
-	struct vine_file *convert = vine_declare_file(m, "convert.sfx", 0);
-	struct vine_file *image = vine_declare_url(m, "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", 0);
+	struct vine_file *convert = vine_declare_file(m, "convert.sfx", VINE_PEER_SHARE);
+	struct vine_file *image = vine_declare_url(m, "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", VINE_PEER_SHARE);
 
 	struct vine_file *temp_file[36];
 
@@ -122,8 +122,9 @@ int main(int argc, char *argv[])
 		sprintf(filename,"%d.cat.jpg",i);
 		vine_task_add_input(t,temp_file[i],filename,VINE_NOCACHE);
 	}
-	vine_task_add_input_file(t,"montage.sfx","montage.sfx",VINE_CACHE);
-	vine_task_add_output_file(t,"mosaic.jpg","mosaic.jpg",VINE_NOCACHE);
+
+	vine_task_add_input(t,vine_declare_file(m,"montage.sfx",VINE_PEER_SHARE),"montage.sfx",VINE_CACHE);
+	vine_task_add_output(t,vine_declare_file(m,"mosaic.jpg",VINE_PEER_SHARE),"mosaic.jpg",VINE_NOCACHE);
 
 	int task_id = vine_submit(m,t);
 	printf("Submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );
