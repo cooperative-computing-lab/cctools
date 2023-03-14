@@ -3304,16 +3304,6 @@ int vine_set_password_file( struct vine_manager *q, const char *file )
 	return copy_file_to_buffer(file,&q->password,NULL)>0;
 }
 
-static void vine_file_delete_force(struct vine_file *f) {
-	if(!f) {
-		return;
-	}
-
-	int refcount;
-	do {
-		refcount = vine_file_delete(f);
-	} while(refcount > 0);
-}
 
 void vine_delete(struct vine_manager *q)
 {
@@ -3344,7 +3334,7 @@ void vine_delete(struct vine_manager *q)
 	hash_table_clear(q->current_transfer_table,(void*)vine_current_transfers_delete);
 	hash_table_delete(q->current_transfer_table);
 
-	hash_table_clear(q->file_table,(void*)vine_file_delete_force);
+	hash_table_clear(q->file_table,(void*)vine_file_delete);
 	hash_table_delete(q->file_table);
 
 	char *key;
