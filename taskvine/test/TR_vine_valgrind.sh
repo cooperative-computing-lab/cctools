@@ -6,7 +6,7 @@ export PATH=../src/tools:../src/worker:$PATH
 
 export CORES=4
 export TASKS=20
-export VALGRIND="valgrind --error-exitcode=1 --leak-check=full"
+export VALGRIND="valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes"
 
 check_needed()
 {
@@ -50,16 +50,22 @@ EOF
 
 	overall=0
 
-	if [ "$manager" != 0 ]
+	if [ "$manager" = 0 ]
 	then
+		echo "valgrind did not found errors with the manager."
+	else
 		echo "valgrind found errors with the manager."
-		[ -f manager.valgrind ] && cat manager.valgrind && overall=1
+		[ -f manager.valgrind ] && cat manager.valgrind
+		overall=1
 	fi
 
-	if [ "$worker" != 0 ]
+	if [ "$worker" = 0 ]
 	then
+		echo "valgrind did not found errors with the worker."
+	else
 		echo "valgrind found errors with the worker"
-		[ -f worker.valgrind ] && cat worker.valgrind && overall=1
+		[ -f worker.valgrind ] && cat worker.valgrind
+		overall=1
 	fi
 
 	return ${overall}

@@ -534,6 +534,8 @@ void vine_task_delete(struct vine_task *t)
 {
 	if(!t) return;
 
+	debug(D_VINE, "task delete: %d\n", t->task_id);
+
 	free(t->command_line);
 	free(t->coprocess);
 	free(t->tag);

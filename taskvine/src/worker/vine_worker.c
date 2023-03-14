@@ -811,13 +811,14 @@ Accept a mini_task that is executed on demand to produce a specific file.
 static int do_put_mini_task( struct link *manager, time_t stoptime, const char *cache_name, int64_t size, int mode, const char *source )
 {
 	struct vine_task *mini_task = do_task_body(manager,0,stoptime);
+	debug(D_VINE, "task create: %d\n", mini_task->task_id);
 	if(!mini_task) return 0;
 
 	/* XXX hacky hack -- the single output of the task must have the target cachename */
 	struct vine_mount *output_mount = list_peek_head(mini_task->output_mounts);
 	free(output_mount->file->cached_name);
 	output_mount->file->cached_name = strdup(cache_name);
-	
+
 	return vine_cache_queue_command(global_cache,mini_task,cache_name,size,mode);
 }
 
