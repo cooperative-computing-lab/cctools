@@ -52,23 +52,27 @@ int main(int argc, char *argv[])
 	printf("listening on port %d...\n", vine_port(m));
 
 	printf("Peer transfers enabled\n");
+	// When enabled, all files declared as cachable are candidates for peer
+	// transfers. This can be disabled on a per file basis with the flag
+	// VINE_PEER_NOSHARE when declaring the file.
 	vine_enable_peer_transfers(m);
+
 	vine_tune(m, "file-source-max-transfers", 2);
 
-	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL, VINE_PEER_SHARE);
-	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL, VINE_PEER_SHARE);
+	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL, VINE_CACHE);
+	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL, VINE_CACHE);
 
-	struct vine_file *software = vine_declare_untar(m, blast_url, VINE_PEER_SHARE);
-	struct vine_file *database = vine_declare_untar(m, landm_url, VINE_PEER_SHARE);
+	struct vine_file *software = vine_declare_untar(m, blast_url, VINE_CACHE);
+	struct vine_file *database = vine_declare_untar(m, landm_url, VINE_CACHE);
 
 
 	for(i=0;i<100;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 
-		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string), VINE_PEER_SHARE);
-		vine_task_add_input(t, query, "query.file", VINE_NOCACHE);
-		vine_task_add_input(t,software,"blastdir", VINE_CACHE );
-		vine_task_add_input(t,database,"landmark", VINE_CACHE );
+		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string), VINE_CACHE_NEVER);
+		vine_task_add_input(t, query, "query.file", 0);
+		vine_task_add_input(t,software,"blastdir", 0);
+		vine_task_add_input(t,database,"landmark", 0);
 		vine_task_set_env_var(t,"BLASTDB","landmark");
 
 		int task_id = vine_submit(m, t);

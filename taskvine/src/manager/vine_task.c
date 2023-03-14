@@ -456,7 +456,7 @@ void vine_task_add_input_url(struct vine_task *t, const char *file_url, const ch
 void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
 {
 	struct vine_file *f = vine_file_empty_dir();
-	vine_task_add_input(t,f,remote_name,VINE_NOCACHE);
+	vine_task_add_input(t,f,remote_name,0);
 }
 
 void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags)
@@ -477,7 +477,7 @@ void vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_
 	assert(monitor_snapshot_file);
 
 	t->monitor_snapshot_file = monitor_snapshot_file;
-	vine_task_add_input(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, VINE_CACHE);
+	vine_task_add_input(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, 0);
 }
 
 void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm)

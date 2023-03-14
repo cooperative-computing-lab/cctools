@@ -59,13 +59,13 @@ if __name__ == "__main__":
         # Note that when adding a file, we have to name its local name
         # (e.g. gzip_path), and its remote name (e.g. "gzip"). Unlike the
         # following line, more often than not these are the same.
-        t.add_input_file(gzip_path, "gzip", cache=True)
+        t.add_input(m.declare_file(gzip_path, cache=True), "gzip")
 
         # files to be compressed are different across all tasks, so we do not
         # cache them. This is, of course, application specific. Sometimes you may
         # want to cache an output file if is the input of a later task.
-        t.add_input_file(infile, "infile", cache=False)
-        t.add_output_file(outfile, "outfile", cache=False)
+        t.add_input(m.declare_file(infile, cache=False), "infile")
+        t.add_output(m.declare_file(outfile, cache=False), "outfile")
 
         # Once all files has been specified, we are ready to submit the task to the queue.
         q.submit(t)

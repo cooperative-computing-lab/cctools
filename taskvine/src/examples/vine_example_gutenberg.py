@@ -48,10 +48,10 @@ if __name__ == "__main__":
     print("listening on port", m.port)
 
     # declare all urls in the manager:
-    urls = map(lambda u: m.declare_url(u), urls_sources)
+    urls = map(lambda u: m.declare_url(u, cache=True), urls_sources)
 
     # script to process the files
-    my_script = m.declare_file("vine_example_gutenberg_script.sh")
+    my_script = m.declare_file("vine_example_gutenberg_script.sh", cache=True)
 
     for (i, url_a) in enumerate(urls):
         for (j, url_b) in enumerate(urls):
@@ -60,10 +60,10 @@ if __name__ == "__main__":
                 continue
 
             t = vine.Task("./my_script file_a.txt file_b.txt")
-            t.add_input(my_script, "my_script", cache=True)
+            t.add_input(my_script, "my_script")
 
-            t.add_input(url_a, "file_a.txt", cache=True)
-            t.add_input(url_b, "file_b.txt", cache=True)
+            t.add_input(url_a, "file_a.txt")
+            t.add_input(url_b, "file_b.txt")
 
             t.set_cores(1)
 
