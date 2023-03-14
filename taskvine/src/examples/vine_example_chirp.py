@@ -67,10 +67,10 @@ if __name__ == "__main__":
 
     # define the authentication ticket to use.
     ticket_file = None
-    #ticket_file = m.declare_file("myticket.ticket")
+    #ticket_file = m.declare_file("myticket.ticket", cache=True)
 
     t = vine.PythonTask(count_lines, "mychirp.file")
-    t.add_input(m.declare_chirp(chirp_server, test_filename, ticket_file), "mychirp.file", cache=True)
+    t.add_input(m.declare_chirp(chirp_server, test_filename, ticket_file, cache=True), "mychirp.file")
     t.set_environment(env_with_chirp)
 
     task_id = m.submit(t)
