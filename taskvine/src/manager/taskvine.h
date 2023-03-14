@@ -41,22 +41,17 @@ expected events.
 /** Select optional handling for input and output files: caching, unpacking, watching, etc. **/
 
 typedef enum {
-	VINE_NOCACHE  = 0, /**< Do not cache file at execution site. (default) */
-	VINE_CACHE    = 1, /**< Cache file at execution site for later use. */
-	VINE_WATCH    = 2, /**< Watch the output file and send back changes as the task runs. */
-	VINE_FAILURE_ONLY = 4,/**< Only return this output file if the task failed.  (Useful for returning large log files.) */
-	VINE_SUCCESS_ONLY = 8, /**< Only return this output file if the task succeeded. */
+	VINE_TRANSFER_ALWAYS = 0, /**< Always transfer this file when needed (only option for input files, see below for output files). */
+	VINE_WATCH = 1,           /**< Watch the output file and send back changes as the task runs. */
+	VINE_FAILURE_ONLY = 2,    /**< Only return this output file if the task failed.  (Useful for returning large log files.) */
+	VINE_SUCCESS_ONLY = 4,    /**< Only return this output file if the task succeeded. */
 } vine_mount_flags_t;
 
 typedef enum {
-	VINE_PEER_SHARE = 1, /**< Schedule this file to be shared between peers where available. (default) **/
-	VINE_PEER_NOSHARE = 2, /**< Do not schedule this file to be shared between peers. **/
-	VINE_CACHE_NEVER = 4, /**< File remains in cache until consumed. **/
-	VINE_CACHE_WORKFLOW = 8, /**< File remains in cache until workflow ends (default). **/
-	VINE_CACHE_ALWAYS = 16, /**< File remains in cache until the worker teminates. **/
-	/*
-	 * Move caching flags to here
-	 */
+	VINE_CACHE_NEVER = 0,  /**< Do not cache file at execution site. (default) */
+	VINE_CACHE = 1,        /**< File remains in cache until workflow ends. */
+	VINE_CACHE_ALWAYS = 3, /**< File remains in cache until the worker teminates. **/
+	VINE_PEER_NOSHARE = 4  /**< Schedule this file to be shared between peers where available. See @vine_enable_peer_transfers **/
 } vine_file_flags_t;
 
 /** Select overall scheduling algorithm for matching tasks to workers. */
