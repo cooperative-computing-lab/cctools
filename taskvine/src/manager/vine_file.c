@@ -145,6 +145,9 @@ struct vine_file * vine_file_empty_dir()
 
 struct vine_file * vine_file_mini_task( struct vine_task *t, vine_file_flags_t flags )
 {
+	//remove share flag for minitasks, as what it is shared is their output files.
+	flags &= ~VINE_PEER_SHARE;
+
 	return vine_file_create(t->command_line,0,0,0,VINE_MINI_TASK,t,flags);
 }
 
