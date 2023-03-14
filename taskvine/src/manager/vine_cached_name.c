@@ -266,29 +266,25 @@ char *vine_random_name( const struct vine_file *f, ssize_t *totalsize )
 {
 	char *name;
 	char random[17];
+	string_cookie(random,16);
 
 	switch(f->type){
 		case VINE_FILE:
-			string_cookie(random,16);
 			name = string_format("file-rnd-%s",random);
 			break;
 		case VINE_EMPTY_DIR:
 			name = string_format("empty");
 			break;
 		case VINE_MINI_TASK:
-			string_cookie(random,16);
 			name = string_format("task-rnd-%s",random);
 			break;
 		case VINE_URL:
-			string_cookie(random,16);
 			name = string_format("url-rnd-%s",random);
 			break;
 		case VINE_TEMP:
-			string_cookie(random,16);
 			name = string_format("temp-rnd-%s",random);
 			break;
 		case VINE_BUFFER:
-			string_cookie(random,16);
 			name = string_format("buffer-rnd-%s",random);
 			break;
 		default:
@@ -308,7 +304,6 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 {
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	char *hash, *name;
-	char random[17];
 
 	switch(f->type) {
 		case VINE_FILE:
@@ -319,8 +314,7 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 				free(hash);
 			} else {
 				/* A pending file gets a random name. */
-				string_cookie(random,16);
-				name = string_format("file-rnd-%s",random);
+				name = vine_random_name(f, totalsize);
 			}
 			break;
 		case VINE_EMPTY_DIR:
@@ -342,8 +336,7 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 		case VINE_TEMP:
 			/* An empty temporary file gets a random name. */
 			/* Until we later have a better name for it.*/
-			string_cookie(random,16);
-			name = string_format("temp-rnd-%s",random);
+			name = vine_random_name(f, totalsize);
 			break;
 		case VINE_BUFFER:
 			if(f->data) {
@@ -354,8 +347,7 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 			} else {
 				/* If the buffer doesn't exist yet, then give a random name. */
 				/* Until we later have a better name for it.*/
-				string_cookie(random,16);
-				name = string_format("buffer-rnd-%s",random);
+				name = vine_random_name(f, totalsize);
 			}
 			break;
 		default:
