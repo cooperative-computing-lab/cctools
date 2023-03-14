@@ -2428,11 +2428,13 @@ static vine_result_code_t start_one_task(struct vine_manager *q, struct vine_wor
 	vine_result_code_t result = vine_manager_put_task(q,w,t,command_line,limits,0);
 
 	free(command_line);
-	
+
 	if(result==VINE_SUCCESS) {
 		itable_insert(w->current_tasks_boxes, t->task_id, limits);
 		rmsummary_merge_override(t->resources_allocated, limits);
 		debug(D_VINE, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
+	} else {
+		rmsummary_delete(limits);
 	}
 
 	return result;
