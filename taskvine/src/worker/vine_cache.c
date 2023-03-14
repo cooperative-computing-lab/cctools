@@ -154,8 +154,12 @@ Add a file to the cache manager (already created in the proper place) and note i
 
 int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode,0);
-	hash_table_insert(c->table,cachename,f);
+	struct cache_file *f = hash_table_lookup(c->table,cachename);
+	if(!f) {
+		f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode,0);
+		hash_table_insert(c->table,cachename,f);
+	}
+
 	f->complete = 1;
 	return 1;
 }
