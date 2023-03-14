@@ -12,6 +12,4 @@ See the file COPYING for details.
 
 char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize );
 
-char *vine_file_id( const struct vine_file *f );
-
 #endif
