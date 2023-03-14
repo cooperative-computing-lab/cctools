@@ -210,46 +210,46 @@ if __name__ == '__main__':
     # Note that we use a local file url of a small tarball to test the mechanism without placing a load on the network.
     f = q.declare_untar(q.declare_url("file://dummy.tar.gz"))
     t = vine.Task("ls -lR cctools | wc -l")
-    t.add_input(f,"cctools",cache=True)
+    t.add_input(f,"cctools")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # Create an explicit minitask description to run curl
     minitask = vine.Task("curl https://www.nd.edu -o output");
-    minitask.add_output_file("output","output",cache=True);
+    minitask.add_output_file("output","output")
 
     # Now generate an input file from a shell command:
     t = vine.Task("wc -l infile")
-    t.add_input_mini_task(minitask,"infile",cache=True);
+    t.add_input_mini_task(minitask,"infile")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # second time should have it cached (though we can't tell from here)
     t = vine.Task("wc -l infile")
-    t.add_input_mini_task(minitask,"infile",cache=True);
+    t.add_input_mini_task(minitask,"infile")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # Now generate an input file from a shell command:
     t = vine.Task("wc -l infile")
-    t.add_input_url("https://www.nd.edu","infile",cache=True)
+    t.add_input_url("https://www.nd.edu","infile")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # second time should have it cached (though we can't tell from here)
     t = vine.Task("wc -l infile")
-    t.add_input_url("https://www.nd.edu","infile",cache=True)
+    t.add_input_url("https://www.nd.edu","infile")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_SUCCESS, 0)
 
     # generate an invalid remote input file, should get an input missing error.
     t = vine.Task("wc -l infile")
-    t.add_input_url("https://pretty-sure-this-is-not-a-valid-url.com","infile",cache=True)
+    t.add_input_url("https://pretty-sure-this-is-not-a-valid-url.com","infile")
     q.submit(t)
     t = q.wait(wait_time)
     report_task(t, vine.VINE_RESULT_INPUT_MISSING, 1)
