@@ -916,7 +916,7 @@ static void delete_worker_files( struct vine_manager *q, struct vine_worker_info
 	if(!mount_list) return;
 	struct vine_mount *m;
 	LIST_ITERATE(mount_list,m) {
-		delete_worker_file(q, w, m->file->cached_name, m->flags, except_flags);
+		delete_worker_file(q, w, m->file->cached_name, m->file->flags, except_flags);
 	}
 }
 
@@ -931,8 +931,8 @@ static void delete_task_output_files(struct vine_manager *q, struct vine_worker_
 
 static void delete_uncacheable_files( struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t )
 {
-	delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
-	delete_worker_files(q, w, t->output_mounts, VINE_CACHE );
+	delete_worker_files(q, w, t->input_mounts, VINE_CACHE_ALWAYS | VINE_CACHE_WORKFLOW );
+	delete_worker_files(q, w, t->output_mounts, VINE_CACHE_ALWAYS | VINE_CACHE_WORKFLOW );
 }
 
 /* Determine the resource monitor file name that should be associated with this task. */
@@ -1393,7 +1393,7 @@ static vine_result_code_t get_result(struct vine_manager *q, struct vine_worker_
 
 	if(task_status == VINE_RESULT_FORSAKEN) {
 		// Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
+		delete_worker_files(q, w, t->input_mounts, VINE_CACHE_ALWAYS | VINE_CACHE_WORKFLOW );
 
 		/* task will be resubmitted, so we do not update any of the execution stats */
 		reap_task_from_worker(q, w, t, VINE_TASK_READY);
@@ -2968,7 +2968,7 @@ static int cancel_task_on_worker(struct vine_manager *q, struct vine_task *t, vi
 		debug(D_VINE, "Task with id %d has been cancelled at worker %s (%s) and removed.", t->task_id, w->hostname, w->addrport);
 
 		//Delete any input files that are not to be cached.
-		delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
+		delete_worker_files(q, w, t->input_mounts, VINE_CACHE_ALWAYS | VINE_CACHE_WORKFLOW );
 
 		//Delete all output files since they are not needed as the task was cancelled.
 		delete_worker_files(q, w, t->output_mounts, 0);
@@ -4371,7 +4371,7 @@ struct list * vine_tasks_cancel(struct vine_manager *q)
 		vine_manager_send(q,w,"kill -1\n");
 		ITABLE_ITERATE(w->current_tasks,task_id,t) {
 			//Delete any input files that are not to be cached.
-			delete_worker_files(q, w, t->input_mounts, VINE_CACHE );
+			delete_worker_files(q, w, t->input_mounts, VINE_CACHE_ALWAYS | VINE_CACHE_WORKFLOW );
 
 			//Delete all output files since they are not needed as the task was canceled.
 			delete_worker_files(q, w, t->output_mounts, 0);
