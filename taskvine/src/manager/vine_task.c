@@ -416,7 +416,7 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 	}
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
-	
+
 	list_push_tail(t->input_mounts, m);
 }
 
@@ -431,7 +431,7 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 	}
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
-	
+
 	list_push_tail(t->output_mounts, m);
 }
 
@@ -439,35 +439,30 @@ void vine_task_add_input_file(struct vine_task *t, const char *local_name, const
 {
 	struct vine_file *f = vine_file_local(local_name, 0);
 	vine_task_add_input(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
 void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_local(local_name, 0);
 	vine_task_add_output(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
 void vine_task_add_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_url(file_url, 0);
 	vine_task_add_input(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
 void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
 {
 	struct vine_file *f = vine_file_empty_dir();
 	vine_task_add_input(t,f,remote_name,VINE_NOCACHE);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
 void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags)
 {
 	struct vine_file *f = vine_file_buffer(data,length,0);
 	vine_task_add_input(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
 void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags)
@@ -475,7 +470,6 @@ void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_t
 	/* XXX mini task must have a single output file */
 	struct vine_file *f = vine_file_mini_task(mini_task, 0);
 	vine_task_add_input(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
 void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file) {

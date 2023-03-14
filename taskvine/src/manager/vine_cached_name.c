@@ -125,9 +125,14 @@ static vine_url_cache_t get_url_properties( const char *url, char *tag )
 	if(!strncmp(url,"file://",7)) {
 		ssize_t totalsize;
 		char *hash = vine_checksum_any(&url[7],&totalsize);
-		strcpy(tag,hash);
-		free(hash);
-		return VINE_FOUND_MD5;
+		if(hash) {
+			strcpy(tag,hash);
+			free(hash);
+			return VINE_FOUND_MD5;
+		}  else {
+			return VINE_FOUND_NONE;
+		}
+
 	}
 
 	/* Otherwise, proceed to use curl to get the headers. */
@@ -197,7 +202,7 @@ static char *make_url_cached_name( const struct vine_file *f )
 
 	debug(D_VINE,"fetching headers for url %s",f->source);
 
-vine_url_cache_t val = get_url_properties(f->source,tag);
+	vine_url_cache_t val = get_url_properties(f->source,tag);
 
 	switch(val){
 		case VINE_FOUND_NONE:
@@ -326,17 +331,3 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 }
 
 
-char *vine_file_id( const struct vine_file *f )
-{
-	unsigned char digest[MD5_DIGEST_LENGTH];
-	const char *hash;
-
-    assert(f->cached_name);
-
-    char *content = string_format("%s%s", f->cached_name, f->source ? f->source : "");
-    md5_buffer(content,strlen(content),digest);
-    hash = md5_to_string(digest);
-    free(content);
-
-    return xxstrdup(hash);
-}
