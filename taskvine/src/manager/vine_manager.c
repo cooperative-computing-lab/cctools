@@ -2717,6 +2717,62 @@ static int send_one_task( struct vine_manager *q )
 	return 0;
 }
 
+
+static int prune_worker( struct vine_manager *q, struct vine_worker_info *w ) {
+	// Shutdown worker if appropriate.
+	if ( w->factory_name ) {
+		struct vine_factory_info *f = vine_factory_info_lookup(q,w->factory_name);
+		if ( f && f->connected_workers > f->max_workers && itable_size(w->current_tasks) < 1 ) {
+			debug(D_VINE, "Final task received from worker %s, shutting down.", w->hostname);
+			shut_down_worker(q, w);
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/*
+Finding a worker that has tasks waiting to be retrieved, then fetch the outputs
+of those tasks. Returns the number of tasks received.
+*/
+static int receive_tasks_from_worker( struct vine_manager *q, struct vine_worker_info *w, int count_received_so_far )
+{
+    struct vine_task *t;
+    uint64_t task_id;
+
+	int tasks_received = 0;
+
+	/* if the function was called, receive at least one task */
+	int max_to_receive = MAX(1, q->max_retrievals - count_received_so_far);
+
+	/* if appropriate, receive all the tasks from the worker */
+	if(q->worker_retrievals) {
+		max_to_receive = itable_size(w->current_tasks);
+	}
+
+	get_available_results(q, w);
+	hash_table_remove(q->workers_with_available_results, w->hashkey);
+	hash_table_firstkey(q->workers_with_available_results);
+
+    ITABLE_ITERATE(w->current_tasks,task_id,t) {
+        if( t->state==VINE_TASK_WAITING_RETRIEVAL) {
+            fetch_output_from_worker(q, w, task_id);
+			compute_manager_load(q, 1);
+			tasks_received++;
+
+			if(tasks_received >= max_to_receive) {
+				break;
+			}
+		}
+	}
+
+	prune_worker(q, w);
+
+    return tasks_received;
+}
+
+
 /*
 Advance the state of the system by finding any task that is
 waiting to be retrieved, then fetch the outputs of that task,
@@ -2732,21 +2788,15 @@ static int receive_one_task( struct vine_manager *q )
 		if( t->state==VINE_TASK_WAITING_RETRIEVAL ) {
 			struct vine_worker_info *w = t->worker;
 			fetch_output_from_worker(q, w, task_id);
-			// Shutdown worker if appropriate.
-			if ( w->factory_name ) {
-				struct vine_factory_info *f = vine_factory_info_lookup(q,w->factory_name);
-				if ( f && f->connected_workers > f->max_workers &&
-						itable_size(w->current_tasks) < 1 ) {
-					debug(D_VINE, "Final task received from worker %s, shutting down.", w->hostname);
-					shut_down_worker(q, w);
-				}
-			}
+			prune_worker(q, w);
+
 			return 1;
 		}
 	}
 
 	return 0;
 }
+
 
 /*
 Sends keepalives to check if connected workers are responsive,
@@ -3118,6 +3168,9 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 	q->hungry_minimum = 10;
 
 	q->wait_for_workers = 0;
+
+	q->max_retrievals = 1;
+	q->worker_retrievals = 1;
 
 	q->proportional_resources = 1;
 	q->proportional_whole_tasks = 1;
@@ -3942,16 +3995,6 @@ static int poll_active_workers(struct vine_manager *q, int stoptime )
 		}
 	}
 
-	if(hash_table_size(q->workers_with_available_results) > 0) {
-		char *key;
-		struct vine_worker_info *w;
-		HASH_TABLE_ITERATE(q->workers_with_available_results,key,w) {
-			get_available_results(q, w);
-			hash_table_remove(q->workers_with_available_results, key);
-			hash_table_firstkey(q->workers_with_available_results);
-		}
-	}
-
 	END_ACCUM_TIME(q, time_status_msgs);
 
 	return workers_failed;
@@ -3984,7 +4027,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
    - task completed?                         Yes: return completed task to user
    - update catalog if appropriate
    - retrieve workers status messages
-   - tasks waiting to be retrieved?          Yes: retrieve one task and go to S.
+   - tasks waiting to be retrieved?          Yes: retrieve all tasks from one worker.
    - tasks waiting to be dispatched?         Yes: dispatch one task and go to S.
    - send keepalives to appropriate workers
    - disconnect slow workers
@@ -4009,12 +4052,12 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 	int result;
 	struct vine_task *t = NULL;
-	// time left?
 
+	// time left?
 	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
-		// task completed?
+		// tasks completed?
 		if (t == NULL)
 		{
 			if(tag) {
@@ -4027,6 +4070,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			} else {
 				t = task_state_any(q, VINE_TASK_RETRIEVED);
 			}
+
 			if(t) {
 				change_task_state(q, t, VINE_TASK_DONE);
 
@@ -4040,10 +4084,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 				// manager time statistics.
 				events++;
 				END_ACCUM_TIME(q, time_internal);
-
-				if(!q->wait_retrieve_many) {
-					break;
-				}
+				break;
 			}
 		}
 
@@ -4066,19 +4107,45 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 			// returning and retrieving tasks.
 		}
 
-
 		q->busy_waiting_flag = 0;
 
-		// tasks waiting to be retrieved?
+		// retrieve results from workers
+		// if worker_retrievals, then all the tasks from a worker
+		// are retrieved. (this is the default)
+		// otherwise, retrieve at most q->max_retrievals (default is 1)
+		int received = 0;
+		int no_ready_tasks = !task_state_any(q, VINE_TASK_READY);
 		BEGIN_ACCUM_TIME(q, time_receive);
-		result = receive_one_task(q);
+		do {
+			int received_at_least_one = 0;
+			char *key;
+			struct vine_worker_info *w;
+
+			HASH_TABLE_ITERATE(q->workers_with_available_results,key,w) {
+				received += receive_tasks_from_worker(q, w, received);
+				events += received;
+				compute_manager_load(q, 1);
+				received_at_least_one = 1;
+				break; //do one worker at a time
+			}
+
+			// tasks waiting to be retrieved?
+			if(!received_at_least_one) {
+				if(receive_one_task(q)) {
+					// retrieved at least one task
+					received++;
+					events++;
+					compute_manager_load(q, 1);
+					received_at_least_one = 1;
+				} else {
+					// didn't received a task this cycle, thus there are no
+					// task to be received
+					break;
+				}
+			}
+
+		} while(q->max_retrievals < 0 || received < q->max_retrievals || no_ready_tasks);
 		END_ACCUM_TIME(q, time_receive);
-		if(result) {
-			// retrieved at least one task
-			events++;
-			compute_manager_load(q, 1);
-			continue;
-		}
 
 		// expired tasks
 		BEGIN_ACCUM_TIME(q, time_internal);
@@ -4159,6 +4226,7 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 		// return if manager is empty and something interesting already happened
 		// in this wait.
 		if(events > 0) {
+			if(task_state_any(q, VINE_TASK_RETRIEVED) && t == NULL) continue;
 			BEGIN_ACCUM_TIME(q, time_internal);
 			int done = !task_state_any(q, VINE_TASK_RUNNING) && !task_state_any(q, VINE_TASK_READY) && !task_state_any(q, VINE_TASK_WAITING_RETRIEVAL);
 			END_ACCUM_TIME(q, time_internal);
@@ -4475,8 +4543,11 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "wait-for-workers")) {
 		q->wait_for_workers = MAX(0, (int)value);
 
-	} else if(!strcmp(name, "wait-retrieve-many")){
-		q->wait_retrieve_many = MAX(0, (int)value);
+	} else if(!strcmp(name, "max-retrievals")) {
+		q->max_retrievals = MAX(-1, (int)value);
+
+	} else if(!strcmp(name, "worker-retrievals")) {
+		q->worker_retrievals = MAX(0, (int)value);
 
 	} else if(!strcmp(name, "force-proportional-resources") || !strcmp(name, "proportional-resources")) {
 		q->proportional_resources = MAX(0, (int)value);
@@ -4493,7 +4564,6 @@ int vine_tune(struct vine_manager *q, const char *name, double value)
 	} else if(!strcmp(name, "monitor-interval")) {
 		/* 0 means use monitor's default */
 		q->monitor_interval = MAX(0, (int)value);
-
 	} else {
 		debug(D_NOTICE|D_VINE, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;

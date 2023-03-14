@@ -1806,7 +1806,9 @@ change.
 | monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
-| wait-retrieve-many      | Rather than immediately returning when a task is done, `m.wait(timeout)` retrieves and dispatches as many tasks<br> as `timeout` allows. Warning: This may exceed the capacity of the manager to receive results. | 0 |
+| max-retrievals | Sets the max number of tasks to retrievals per manager wait(). If less than 1, the manager prefers to retrievals all completed tasks before dispatching new tasks to workers. | 1 |
+| worker-retrievals | If 1, retrievals all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
+
 
 === "Python"
     ```python
