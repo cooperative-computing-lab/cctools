@@ -817,7 +817,7 @@ static int do_put_mini_task( struct link *manager, time_t stoptime, const char *
 	struct vine_mount *output_mount = list_peek_head(mini_task->output_mounts);
 	free(output_mount->file->cached_name);
 	output_mount->file->cached_name = strdup(cache_name);
-	
+
 	return vine_cache_queue_command(global_cache,mini_task,cache_name,size,mode);
 }
 
@@ -868,7 +868,7 @@ static int do_kill(int task_id)
 			hash_table_remove(features, p->coprocess->name);
 			list_remove(coprocess_list, p->coprocess);
 			list_remove(duty_list, p->coprocess->name);
-			hash_table_remove(duty_ids, p->coprocess->name);			
+			hash_table_remove(duty_ids, p->coprocess->name);
 		}
 		vine_process_kill(p);
 		cores_allocated -= p->task->resources_requested->cores;
@@ -1537,10 +1537,9 @@ static void workspace_delete()
 	printf( "vine_worker: deleting workspace %s\n", workspace);
 
 	/*
-	Note that we cannot use trash_file here because the trash dir
-	is inside the workspace.  Abort if we really cannot clean up.
+	Note that we cannot use trash_file here because the trash dir is inside the
+	workspace. The whole workspace is being deleted anyway.
 	*/
-
 	unlink_recursive(workspace);
 	free(workspace);
 }
@@ -2189,7 +2188,6 @@ int main(int argc, char *argv[])
 	setenv("VINE_SANDBOX", workspace, 0);
 
 	// change to workspace
-	
 	chdir(workspace);
 
 	unlink_recursive("cache");
@@ -2281,9 +2279,6 @@ int main(int argc, char *argv[])
 		vine_coprocess_shutdown_all_coprocesses(coprocess_list);
 		list_delete(coprocess_list);
 	}
-	
-	trash_file("cache");
-	trash_empty();
 
 	workspace_delete();
 
