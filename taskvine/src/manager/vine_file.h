@@ -65,6 +65,6 @@ struct vine_file *vine_file_untar( struct vine_file *f, vine_file_flags_t flags 
 struct vine_file *vine_file_poncho( struct vine_file *f, vine_file_flags_t flags );
 struct vine_file *vine_file_starch( struct vine_file *f, vine_file_flags_t flags );
 struct vine_file *vine_file_xrootd( const char *source, struct vine_file *proxy, vine_file_flags_t flags );
-struct vine_file *vine_file_chirp( const char *server, const char *source, struct vine_file *ticket );
+struct vine_file *vine_file_chirp( const char *server, const char *source, struct vine_file *ticket, vine_file_flags_t flags );
 
 #endif

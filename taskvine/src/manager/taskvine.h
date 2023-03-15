@@ -598,7 +598,7 @@ struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *sour
 @param ticket If not NULL, a file object that provides a chirp an authentication ticket
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket );
+struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket, vine_file_flags_t flags );
 
 
 /** Create a scratch file object.

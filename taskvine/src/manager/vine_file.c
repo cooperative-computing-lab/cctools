@@ -226,7 +226,7 @@ struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy
 }
 
 
-struct vine_file * vine_file_chirp( const char *server, const char *source, struct vine_file *ticket )
+struct vine_file * vine_file_chirp( const char *server, const char *source, struct vine_file *ticket, vine_file_flags_t flags )
 {
 	char *command = string_format(
 			"chirp_get %s %s %s output.chirp",
@@ -244,7 +244,7 @@ struct vine_file * vine_file_chirp( const char *server, const char *source, stru
 
 	free(command);
 
-	return vine_file_mini_task(t, 0);
+	return vine_file_mini_task(t, flags);
 }
 
 

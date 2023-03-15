@@ -2151,11 +2151,12 @@ class Manager(object):
     # @param share   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
     # @return A file object to use in @ref Task.add_input
-    def declare_chirp(self, server, source, ticket=None):
+    def declare_chirp(self, server, source, ticket=None, cache=False, share=True):
         ticket_c = None
         if ticket:
             ticket_c = ticket._file
-        f = vine_declare_chirp(self._taskvine, server, source, ticket_c)
+        flags = Task._determine_file_flags(cache, share)
+        f = vine_declare_chirp(self._taskvine, server, source, ticket_c, flags)
         return File(f)
 
 
