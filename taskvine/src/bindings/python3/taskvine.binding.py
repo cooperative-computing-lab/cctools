@@ -2002,12 +2002,12 @@ class Manager(object):
     # @param cache   If True or 'workflow', cache the file at workers for reuse
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
-    # @param share   Whether the file can be transfered between workers when
+    # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
     # @return
     # A file object to use in @ref Task.add_input or @ref Task.add_output
-    def declare_file(self, path, cache=False, share=True):
-        flags = Task._determine_file_flags(cache, share)
+    def declare_file(self, path, cache=False, peer_transfer=True):
+        flags = Task._determine_file_flags(cache, peer_transfer)
         f = vine_declare_file(self._taskvine, path, flags)
         return File(f)
 
@@ -2019,7 +2019,7 @@ class Manager(object):
     # @param cache   If True or 'workflow', cache the file at workers for reuse
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
-    # @param share   Whether the file can be transfered between workers when
+    # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
     # @return A file object to use in @ref Task.add_input or @ref Task.add_output
     def declare_temp(self):
@@ -2034,11 +2034,11 @@ class Manager(object):
     # @param cache   If True or 'workflow', cache the file at workers for reuse
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
-    # @param share   Whether the file can be transfered between workers when
+    # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
     # @return A file object to use in @ref Task.add_input
-    def declare_url(self, url, cache=False, share=True):
-        flags = Task._determine_file_flags(cache, share)
+    def declare_url(self, url, cache=False, peer_transfer=True):
+        flags = Task._determine_file_flags(cache, peer_transfer)
         url = str(url)
         f = vine_declare_url(self._taskvine, url, flags)
         return File(f)
@@ -2051,7 +2051,7 @@ class Manager(object):
     # @param cache   If True or 'workflow', cache the file at workers for reuse
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
-    # @param share   Whether the file can be transfered between workers when
+    # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
     # @return A file object to use in @ref Task.add_input
     #
@@ -2062,10 +2062,10 @@ class Manager(object):
     # >>> print(f.contents())
     # >>> "hello pirate ♆"
     # @endcode
-    def declare_buffer(self, buffer=None, cache=False, share=True):
+    def declare_buffer(self, buffer=None, cache=False, peer_transfer=True):
         # because of the swig typemap, vine_declare_buffer(m, buffer, size) is changed
         # to a function with just two arguments.
-        flags = Task._determine_file_flags(cache, share)
+        flags = Task._determine_file_flags(cache, peer_transfer)
         if isinstance(buffer, str):
             buffer = bytes(buffer, "utf-8")
         f = vine_declare_buffer(self._taskvine, buffer, flags)
@@ -2077,8 +2077,8 @@ class Manager(object):
     # @param self     The manager to register this file
     # @param minitask The task to execute in order to produce a file
     # @return A file object to use in @ref Task.add_input
-    def declare_minitask(self, minitask, cache=False, share=True):
-        flags = Task._determine_file_flags(cache, share)
+    def declare_minitask(self, minitask, cache=False, peer_transfer=True):
+        flags = Task._determine_file_flags(cache, peer_transfer)
         f = vine_declare_mini_task(self._taskvine, minitask._task, flags)
         return File(f)
 
@@ -2088,8 +2088,8 @@ class Manager(object):
     # @param manager    The manager to register this file
     # @param tarball    The file object to un-tar
     # @return A file object to use in @ref Task.add_input
-    def declare_untar(self, tarball, cache=False, share=True):
-        flags = Task._determine_file_flags(cache, share)
+    def declare_untar(self, tarball, cache=False, peer_transfer=True):
+        flags = Task._determine_file_flags(cache, peer_transfer)
         f = vine_declare_untar(self._taskvine, tarball._file, flags)
         return File(f)
 
@@ -2099,8 +2099,8 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param package The poncho or conda-pack environment tarball
     # @return A file object to use in @ref Task.add_input
-    def declare_poncho(self, package, cache=False, share=True):
-        flags = Task._determine_file_flags(cache, share)
+    def declare_poncho(self, package, cache=False, peer_transfer=True):
+        flags = Task._determine_file_flags(cache, peer_transfer)
         f = vine_declare_poncho(self._taskvine, package._file, flags)
         return File(f)
 
@@ -2110,8 +2110,8 @@ class Manager(object):
     # @param self    The manager to register this file
     # @param starch  The startch .sfx file
     # @return A file object to use in @ref Task.add_input
-    def declare_starch(self, starch, cache=False, share=True):
-        flags = Task._determine_file_flags(cache, share)
+    def declare_starch(self, starch, cache=False, peer_transfer=True):
+        flags = Task._determine_file_flags(cache, peer_transfer)
         f = vine_declare_starch(self._taskvine, starch._file, flags)
         return File(f)
 
@@ -2127,14 +2127,14 @@ class Manager(object):
     # @param cache   If True or 'workflow', cache the file at workers for reuse
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
-    # @param share   Whether the file can be transfered between workers when
+    # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
     # @return A file object to use in @ref Task.add_input
-    def declare_xrootd(self, source, proxy=None, cache=False, share=True):
+    def declare_xrootd(self, source, proxy=None, cache=False, peer_transfer=True):
         proxy_c = None
         if proxy:
             proxy_c = proxy._file
-        flags = Task._determine_file_flags(cache, share)
+        flags = Task._determine_file_flags(cache, peer_transfer)
         f = vine_declare_xrootd(self._taskvine, source, proxy_c, flags)
         return File(f)
 
@@ -2148,14 +2148,15 @@ class Manager(object):
     # @param cache   If True or 'workflow', cache the file at workers for reuse
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
-    # @param share   Whether the file can be transfered between workers when
+    # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
     # @return A file object to use in @ref Task.add_input
-    def declare_chirp(self, server, source, ticket=None):
+    def declare_chirp(self, server, source, ticket=None, cache=False, peer_transfer=True):
         ticket_c = None
         if ticket:
             ticket_c = ticket._file
-        f = vine_declare_chirp(self._taskvine, server, source, ticket_c)
+        flags = Task._determine_file_flags(cache, peer_transfer)
+        f = vine_declare_chirp(self._taskvine, server, source, ticket_c, flags)
         return File(f)
 
 
