@@ -488,12 +488,20 @@ const char * vine_task_get_hostname( struct vine_task *t );
 
 /** Get a performance metric of a completed task.
 @param t A task object.
-@param name The name of a performance metric:
+@param name The name of a performance metric.
 @return The metric value, or zero if an invalid name is given.
 */
 
 int64_t vine_task_get_metric( struct vine_task *t, const char *name );
 
+
+/** Get resource information (e.g., cores, memory, and disk) of a completed task.
+@param t A task object.
+@param name One of: "allocated", "requested", or "measured". For measured resources see @ref vine_enable_monitoring.
+@return The metric value, or zero if an invalid name is given.
+*/
+
+const struct rmsummary *vine_task_get_resources( struct vine_task *t, const char *name );
 
 /** When monitoring, indicates a json-encoded file that instructs the
 monitor to take a snapshot of the task resources. Snapshots appear in the JSON
