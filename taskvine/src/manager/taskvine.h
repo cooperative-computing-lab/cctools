@@ -567,6 +567,11 @@ size_t vine_file_size( struct vine_file *f );
 /** Declare a file object from a local file
 @param m A manager object
 @param source The path of the file on the local filesystem
+@param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
+the default), to cache it only for the current manager (VINE_CACHE), or to
+cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
+or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
+workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
 struct vine_file * vine_declare_file( struct vine_manager *m, const char *source, vine_file_flags_t flags );
@@ -575,6 +580,11 @@ struct vine_file * vine_declare_file( struct vine_manager *m, const char *source
 /** Declare a file object from a remote URL.
 @param m A manager object
 @param url The URL address of the object in text form.
+@param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
+the default), to cache it only for the current manager (VINE_CACHE), or to
+cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
+or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
+workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 @return A file object to use in @ref vine_task_add_input
 */
 struct vine_file * vine_declare_url( struct vine_manager *m, const char *url, vine_file_flags_t flags );
@@ -586,6 +596,11 @@ struct vine_file * vine_declare_url( struct vine_manager *m, const char *url, vi
 @param proxy A proxy file object (e.g. from @ref vine_file_local) of a X509 proxy to use. If NULL, the
 environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
 in that order. If no proxy is present, the transfer is tried without authentication.
+@param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
+the default), to cache it only for the current manager (VINE_CACHE), or to
+cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
+or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
+workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 @return A file object to use in @ref vine_task_add_input
 */
 struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy, vine_file_flags_t flags );
@@ -596,6 +611,11 @@ struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *sour
 @param server The chirp server address of the form "hostname[:port"]"
 @param source The name of the file in the server
 @param ticket If not NULL, a file object that provides a chirp an authentication ticket
+@param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
+the default), to cache it only for the current manager (VINE_CACHE), or to
+cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
+or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
+workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 @return A file object to use in @ref vine_task_add_input
 */
 struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket, vine_file_flags_t flags );
@@ -615,6 +635,11 @@ struct vine_file * vine_declare_temp( struct vine_manager *m );
 @param name The abstract name of the buffer.
 @param buffer The contents of the buffer.
 @param size The length of the buffer, in bytes.
+@param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
+the default), to cache it only for the current manager (VINE_CACHE), or to
+cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
+or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
+workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 @return A file object to use in @ref vine_task_add_input, and @ref vine_task_add_output
 */
 struct vine_file * vine_declare_buffer( struct vine_manager *m, const char *buffer, size_t size, vine_file_flags_t flags );
@@ -638,9 +663,14 @@ Attaches a task definition to produce an input file by running a Unix command.
 This mini-task will be run on demand in order to produce the desired input file.
 This is useful if an input requires some prior step such as transferring,
 renaming, or unpacking to be useful.  A mini-task should be a short-running
-activity with minimal resource consumpion.
+activity with minimal resource consumption.
 @param m A manager object
 @param mini_task The task which produces the file
+@param flags Whether to never cache the output of the mini task at the workers (VINE_CACHE_NEVER,
+the default), to cache it only for the current manager (VINE_CACHE), or to
+cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
+or'ed (|) with VINE_PEER_NOSHARE if the file should not be transfered among
+workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 @return A file object to use in @ref vine_task_add_input
 */
 struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_task *mini_task, vine_file_flags_t flags);
@@ -650,6 +680,10 @@ struct vine_file *vine_declare_mini_task( struct vine_manager *m, struct vine_ta
 The archive may be compressed in any of the ways supported
 by tar, and so this function supports extensions .tar, .tar.gz, .tgz, tar.bz2, and so forth.
 @param m A manager object
+@param flags Whether to never cache the output directory of untar at the workers (VINE_CACHE_NEVER,
+the default), to cache it only for the current manager (VINE_CACHE), or to
+cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). VINE_PEER_NOSHARE
+has no meaning for this declaration, as the output directory is never transferred among workers.
 @return A file object to use in @ref vine_task_add_input
 */
 struct vine_file * vine_declare_untar( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags);
@@ -658,6 +692,12 @@ struct vine_file * vine_declare_untar( struct vine_manager *m, struct vine_file 
 /** Create a file object by unpacking a poncho package
 @param m A manager object
 @param f A file object corresponding to poncho or conda-pack tarball
+@param flags Whether to never cache the expanded poncho environment at the workers (VINE_CACHE_NEVER,
+the default), to cache it only for the current manager (VINE_CACHE), or to
+cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). VINE_PEER_NOSHARE
+has no meaning for this declaration, as the expanded environment is never
+transferred among workers.
+@return A file object to use in @ref vine_task_add_input
 */
 struct vine_file * vine_declare_poncho( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags );
 
@@ -665,6 +705,11 @@ struct vine_file * vine_declare_poncho( struct vine_manager *m, struct vine_file
 /** Create a file object by unpacking a starch package.
 @param m A manager object
 @param f A file object representing a sfx archive.
+@param flags Whether to never cache the expanded starch archive at the workers (VINE_CACHE_NEVER,
+the default), to cache it only for the current manager (VINE_CACHE), or to
+cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). VINE_PEER_NOSHARE
+has no meaning for this declaration, as the expanded starch archive is never
+transferred among workers.
 @return A file object to use in @ref vine_task_add_input
 */
 struct vine_file * vine_declare_starch( struct vine_manager *m, struct vine_file *f, vine_file_flags_t flags );
