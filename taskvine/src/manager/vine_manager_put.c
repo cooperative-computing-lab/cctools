@@ -384,14 +384,12 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	/* Now send the actual file. */
 	vine_result_code_t result = vine_manager_put_input_file(q,w,t,m,file_to_send);
 
-	/* If the send succeeded, then record the cached information. */
+	/* If the send succeeded, then record it in the worker */
 	if(result==VINE_SUCCESS) {
-		if(m->flags & VINE_CACHE) {
-			struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size,info.st_mtime);
-			vine_file_replica_table_insert(w,f->cached_name,remote_info);
-		}
+		struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size,info.st_mtime);
+		vine_file_replica_table_insert(w,f->cached_name,remote_info);
 	}
-	
+
 	return result;
 }
 
