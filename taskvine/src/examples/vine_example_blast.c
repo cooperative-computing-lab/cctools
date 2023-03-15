@@ -99,6 +99,8 @@ int main(int argc, char *argv[])
 	//these files among themselves. If peer transfers are not enabled, files
 	//may originate only from the manager or their respective mini tasks (e.g.
 	//url declarations).
+	// When peer transfers are enabled, it can be disabled on a per file basis
+	// with the flag VINE_PEER_NOSHARE when declaring the file.
 	vine_enable_peer_transfers(m);
 
 	printf("Declaring files...");
