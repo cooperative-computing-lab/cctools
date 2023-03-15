@@ -47,6 +47,8 @@ typedef enum {
 	VINE_SUCCESS_ONLY = 4,    /**< Only return this output file if the task succeeded. */
 } vine_mount_flags_t;
 
+// To see if file should be cached, used: (flags & VINE_CACHE). If it should
+// remain at workers after disconnection, use ((flags & VINE_CACHE_ALWAYS) == VINE_CACHE_ALWAYS)
 typedef enum {
 	VINE_CACHE_NEVER = 0,  /**< Do not cache file at execution site. (default) */
 	VINE_CACHE = 1,        /**< File remains in cache until workflow ends. */

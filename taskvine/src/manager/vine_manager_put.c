@@ -326,10 +326,10 @@ Send a single input file, if it is not already noted in the worker's cache.
 If already cached, check that the file has not changed.
 */
 
-static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_mount *m, struct vine_file *f)
+static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_mount *m, struct vine_file *f)
 {
 	struct stat info;
-	
+
 	if(f->type==VINE_FILE) {
 		/* If a regular file, check its status on the local filesystem. */
 		int result = lstat(f->source,&info);
@@ -359,12 +359,17 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	mtime was sent in file transfers, and then returned by
 	cache-update messages.
 	*/
-	
 	if(remote_info) {
 		if(f->type==VINE_FILE && (info.st_size!=remote_info->size || ((info.st_mtime!=remote_info->mtime) && (remote_info->mtime!=0)))) {
 			debug(D_NOTICE|D_VINE,"File %s has changed since it was first cached!",f->source);
 			debug(D_NOTICE|D_VINE,"You may be getting inconsistent results.");
 		}
+
+		if(!(f->flags & VINE_CACHE)) {
+			debug(D_VINE,"File %s is not marked as a cachable file, but it is used by more than one task. Marking as cachable.", f->source);
+			f->flags |= VINE_CACHE;
+		}
+
 		/* If the file is already cached, don't send it. */
 		return VINE_SUCCESS;
 	}
@@ -379,14 +384,12 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	/* Now send the actual file. */
 	vine_result_code_t result = vine_manager_put_input_file(q,w,t,m,file_to_send);
 
-	/* If the send succeeded, then record the cached information. */
+	/* If the send succeeded, then record it in the worker */
 	if(result==VINE_SUCCESS) {
-		if(m->flags & VINE_CACHE) {
-			struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size,info.st_mtime);
-			vine_file_replica_table_insert(w,f->cached_name,remote_info);
-		}
+		struct vine_file_replica *remote_info = vine_file_replica_create(info.st_size,info.st_mtime);
+		vine_file_replica_table_insert(w,f->cached_name,remote_info);
 	}
-	
+
 	return result;
 }
 
@@ -398,7 +401,7 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 
 	if(t->input_mounts) {
 		LIST_ITERATE(t->input_mounts,m) {
-			vine_result_code_t result = vine_manager_put_input_file_if_not_cached(q,w,t,m,m->file);
+			vine_result_code_t result = vine_manager_put_input_file_if_needed(q,w,t,m,m->file);
 			if(result != VINE_SUCCESS) return result;
 		}
 	}
