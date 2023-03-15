@@ -359,12 +359,17 @@ static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_
 	mtime was sent in file transfers, and then returned by
 	cache-update messages.
 	*/
-	
 	if(remote_info) {
 		if(f->type==VINE_FILE && (info.st_size!=remote_info->size || ((info.st_mtime!=remote_info->mtime) && (remote_info->mtime!=0)))) {
 			debug(D_NOTICE|D_VINE,"File %s has changed since it was first cached!",f->source);
 			debug(D_NOTICE|D_VINE,"You may be getting inconsistent results.");
 		}
+
+		if(!(f->flags & VINE_CACHE)) {
+			debug(D_VINE,"File %s is not marked as a cachable file, but it is used by more than one task. Marking as cachable.", f->source);
+			f->flags |= VINE_CACHE;
+		}
+
 		/* If the file is already cached, don't send it. */
 		return VINE_SUCCESS;
 	}
