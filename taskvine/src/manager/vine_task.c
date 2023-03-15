@@ -609,7 +609,6 @@ const char * vine_task_get_hostname( struct vine_task *t )
 }
 
 #define METRIC(x) if(!strcmp(name,#x)) return t->x;
-
 int64_t vine_task_get_metric( struct vine_task *t, const char *name )
 {
 	METRIC(time_when_submitted);
@@ -624,6 +623,15 @@ int64_t vine_task_get_metric( struct vine_task *t, const char *name )
 	METRIC(bytes_received);
 	METRIC(bytes_sent);
 	METRIC(bytes_transferred);
+	return 0;
+}
+
+#define RESOURCES(x) if(!strcmp(name,#x)) return t->resources_ ## x;
+const struct rmsummary *vine_task_get_resources( struct vine_task *t, const char *name )
+{
+	RESOURCES(measured);
+	RESOURCES(requested);
+	RESOURCES(allocated);
 	return 0;
 }
 
