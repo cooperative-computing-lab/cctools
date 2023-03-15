@@ -326,10 +326,10 @@ Send a single input file, if it is not already noted in the worker's cache.
 If already cached, check that the file has not changed.
 */
 
-static vine_result_code_t vine_manager_put_input_file_if_not_cached(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_mount *m, struct vine_file *f)
+static vine_result_code_t vine_manager_put_input_file_if_needed(struct vine_manager *q, struct vine_worker_info *w, struct vine_task *t, struct vine_mount *m, struct vine_file *f)
 {
 	struct stat info;
-	
+
 	if(f->type==VINE_FILE) {
 		/* If a regular file, check its status on the local filesystem. */
 		int result = lstat(f->source,&info);
@@ -401,7 +401,7 @@ vine_result_code_t vine_manager_put_input_files( struct vine_manager *q, struct 
 
 	if(t->input_mounts) {
 		LIST_ITERATE(t->input_mounts,m) {
-			vine_result_code_t result = vine_manager_put_input_file_if_not_cached(q,w,t,m,m->file);
+			vine_result_code_t result = vine_manager_put_input_file_if_needed(q,w,t,m,m->file);
 			if(result != VINE_SUCCESS) return result;
 		}
 	}
