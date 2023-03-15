@@ -141,6 +141,8 @@ static void release_all_workers( struct vine_manager *q );
 static void vine_manager_send_duty_to_workers(struct vine_manager *q, const char *name, time_t stoptime);
 static void vine_manager_send_duties_to_workers(struct vine_manager *q, time_t stoptime);
 
+static void delete_worker_file( struct vine_manager *q, struct vine_worker_info *w, const char *filename, int flags, int except_flags );
+
 /* Return the number of workers matching a given type: WORKER, STATUS, etc */
 
 static int count_workers( struct vine_manager *q, vine_worker_type_t type )
@@ -740,8 +742,6 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 
 	vine_current_transfers_wipe_worker(q, w);
 
-	hash_table_clear(w->current_files,(void*)vine_file_replica_delete);
-
 	ITABLE_ITERATE(w->current_tasks,task_id,t) {
 		if (t->time_when_commit_end >= t->time_when_commit_start) {
 			timestamp_t delta_time = timestamp_get() - t->time_when_commit_end;
@@ -763,6 +763,17 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	itable_clear(w->current_tasks_boxes);
 
 	w->finished_tasks = 0;
+
+
+	char *cached_name = NULL;
+	struct vine_file_replica *info = NULL;
+	HASH_TABLE_ITERATE(w->current_files, cached_name, info) {
+		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
+		//delete all files, but those meant to stay at the worker
+		delete_worker_file(q, w, f->cached_name, f->flags, (~VINE_CACHE & VINE_CACHE_ALWAYS));
+	}
+
+	hash_table_clear(w->current_files,(void*)vine_file_replica_delete);
 }
 
 #define accumulate_stat(qs, ws, field) (qs)->field += (ws)->field
