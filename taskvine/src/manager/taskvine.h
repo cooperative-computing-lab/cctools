@@ -642,7 +642,7 @@ or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
 workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket, vine_file_flags_t flags );
+struct vine_file * vine_declare_chirp( struct vine_manager *m, const char *server, const char *source, struct vine_file *ticket, struct vine_file *env, vine_file_flags_t flags );
 
 
 /** Create a scratch file object.
