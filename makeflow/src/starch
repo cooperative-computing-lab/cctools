@@ -130,7 +130,7 @@ __ARCHIVE__
 '''
 
 RUN_SH = '''#!/bin/sh
-SFX_DIR=$(dirname $( cd -- "$( dirname -- "$0" )" &> /dev/null && pwd ))
+SFX_DIR=$(dirname $( cd -- "$( dirname -- "$0" )" > /dev/null 2>&1 && pwd ))
 
 if [ -d "$SFX_DIR/env" ]; then
     for f in $SFX_DIR/env/*; do
@@ -188,7 +188,7 @@ fi
 RUN_IN_ENV = '''#!/bin/sh
 export SFX_ENV=1
 
-SFX_DIR=$(dirname $( cd -- "$( dirname -- "$0" )" &> /dev/null && pwd ))
+SFX_DIR=$(dirname $( cd -- "$( dirname -- "$0" )" > /dev/null 2>&1 && pwd ))
 
 exec $SFX_DIR/bin/run.sh "$@"
 '''
