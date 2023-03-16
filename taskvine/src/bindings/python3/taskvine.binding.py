@@ -54,6 +54,11 @@ class File(object):
     def __init__(self, internal_file):
         self._file = internal_file
 
+    def __bool__(self):
+        # We need this because the len of some files is 0, which would evaluate
+        # to false.
+        return True
+
     ##
     # Return the contents of a file object as a string.
     # Typically used to return the contents of an output buffer.
