@@ -259,83 +259,6 @@ class Task(object):
         return vine_task_add_feature(self._task, name)
 
     ##
-    # Add a local input file to a task.
-    #
-    # @param self          Reference to the current task object.
-    # @param local_name    The name of the file on local disk or shared filesystem.
-    # @param remote_name   The name of the file at the execution site.
-    # @param cache         Whether the file should be cached at workers. Default is False.
-    #
-    # For example:
-    # @code
-    # # The following are equivalent
-    # >>> task.add_input_file("/etc/hosts")
-    # >>> task.add_input_file("/etc/hosts", "hosts")
-    # @endcode
-    def add_input_file(self, local_name, remote_name=None):
-        # swig expects strings:
-        if local_name:
-            local_name = str(local_name)
-
-        if remote_name:
-            remote_name = str(remote_name)
-        else:
-            remote_name = os.path.basename(local_name)
-
-        flags = Task._determine_mount_flags()
-        return vine_task_add_input_file(self._task, local_name, remote_name, flags)
-
-    ##
-    # Add an input url to a task.
-    #
-    # @param self          Reference to the current task object.
-    # @param url           The url of the file to provide.
-    # @param remote_name   The name of the file as seen by the task.
-    # @param cache         Whether the file should be cached at workers (True/False)
-    #
-    # For example:
-    # @code
-    # >>> task.add_input_url("http://www.google.com/","google.txt")
-    # @endcode
-    def add_input_url(self, url, remote_name):
-        # swig expects strings
-        if remote_name:
-            remote_name = str(remote_name)
-
-        if url:
-            url = str(url)
-
-        flags = Task._determine_mount_flags()
-        return vine_task_add_input_url(self._task, url, remote_name, flags)
-
-    ##
-    # Add an input file produced by a mini task description.
-    # The mini-task will be executed at the worker and produce
-    # a cacheable file that can be shared among multiple tasks.
-    # @param self           A task object.
-    # @param mini_task      A task object that will produce the desired file.
-    #                       The task object must generate a single output file named by @ref add_output_file.
-    # @param remote_name    The name of the file as seen by the primary task.
-    # @param cache         Whether the file should be cached at workers (True/False)
-    #
-    # For example:
-    # @code
-    # >>> # Create a mini-task:
-    # >>> mini_task = Task("curl http://www.apnews.com > output.txt");
-    # >>> mini_task.add_output_file("output.txt","output.txt");
-    # >>> # Attach the output of the mini-task as the input of a main task:
-    # >>> task.add_input_mini_task(mini_task, "infile.txt")
-    # @endcode
-    def add_input_mini_task(self, mini_task, remote_name):
-        if remote_name:
-            remote_name = str(remote_name)
-        flags = Task._determine_mount_flags()
-        # The minitask must be duplicated, because the C object becomes "owned"
-        # by the parent task and will be deleted when the parent task goes away.
-        copy_of_mini_task = vine_task_clone(mini_task._task)
-        return vine_task_add_input_mini_task(self._task, copy_of_mini_task, remote_name, flags)
-
-    ##
     # Add any input object to a task.
     #
     # @param self          Reference to the current task object.
@@ -355,57 +278,6 @@ class Task(object):
         remote_name = str(remote_name)
         flags = Task._determine_mount_flags()
         return vine_task_add_input(self._task, file._file, remote_name, flags)
-
-    ##
-    # Add an empty directory to the task.
-    # @param self           Reference to the current task object.
-    # @param remote_name    The name of the directory at the remote execution site.
-    def add_empty_dir(self, remote_name=None):
-        if remote_name:
-            remote_name = str(remote_name)
-        return vine_task_add_empty_dir(self._task, remote_name)
-
-    ##
-    # Add an input buffer to the task.
-    #
-    # @param self           Reference to the current task object.
-    # @param buffer         The contents of the buffer to pass as input.
-    # @param remote_name    The name of the remote file to create.
-    # @param cache          Whether the file should be cached at workers (True/False)
-    def add_input_buffer(self, buffer, remote_name):
-        if remote_name:
-            remote_name = str(remote_name)
-        flags = Task._determine_mount_flags()
-        return vine_task_add_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
-
-    ##
-    # Add a local output file to a task
-    #
-    # @param self          Reference to the current task object.
-    # @param local_name    The name of the file on local disk or shared filesystem.
-    # @param remote_name   The name of the file at the execution site.
-    # @param cache         Whether the file should be cached at workers. Default is False.
-    # @param watch         Watch the output file and send back changes as the task runs.
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
-    # @param success_only  For output files, whether the file should be retrieved only when the task succeeds. Default is False.
-    #
-    # For example:
-    # @code
-    # # The following are equivalent
-    # >>> task.add_input_file("/etc/hosts")
-    # >>> task.add_input_file("/etc/hosts", "hosts")
-    # @endcode
-    def add_output_file(self, local_name, remote_name=None, watch=False, failure_only=False, success_only=False):
-        if local_name:
-            local_name = str(local_name)
-
-        if remote_name:
-            remote_name = str(remote_name)
-        else:
-            remote_name = os.path.basename(local_name)
-
-        flags = Task._determine_mount_flags(watch=watch, failure_only=failure_only, success_only=success_only)
-        return vine_task_add_output_file(self._task, local_name, remote_name, flags)
 
     ##
     # Add any output object to a task.
@@ -863,7 +735,6 @@ class PythonTask(Task):
             raise RuntimeError("PythonTask is not available. The dill module is missing.")
 
         self._pp_run = None
-        self._env_file = None
         self._output_loaded = False
         self._output = None
         self._tmpdir = None
@@ -893,7 +764,7 @@ class PythonTask(Task):
         self._serialize_python_function(*self._fn_def)
         self._fn_def = None  # avoid possible memory leak
         self._create_wrapper()
-        self._add_IO_files()
+        self._add_IO_files(manager)
 
     ##
     # returns the result of a python task as a python variable
@@ -914,19 +785,16 @@ class PythonTask(Task):
             self._output_loaded = True
         return self._output
 
-    def set_environment(self, env_file):
+    def set_environment(self, env_file, remote_name="run_env_dir"):
         if env_file:
-            self._env_file = env_file
-            self._pp_run = shutil.which("poncho_package_run")
+            self.add_input(env_file, remote_name)
+            remote_env_dir = remote_name
+        else:
+            remote_env_dir = None
 
-            if not self._pp_run:
-                raise RuntimeError("Could not find poncho_package_run in PATH.")
+        self._command = self._python_function_command(remote_env_dir)
+        vine_task_set_command(self._task, self._command)
 
-            self._command = self._python_function_command()
-            vine_task_set_command(self._task, self._command)
-
-            self.add_input_file(self._env_file)
-            self.add_input_file(self._pp_run)
 
     def __del__(self):
         try:
@@ -942,24 +810,27 @@ class PythonTask(Task):
         with open(os.path.join(self._tmpdir, self._args_file), "wb") as wf:
             dill.dump([args, kwargs], wf, recurse=True)
 
-    def _python_function_command(self):
-        if self._env_file:
+    def _python_function_command(self, remote_env_dir=None):
+        if remote_env_dir:
             py_exec = "python"
         else:
             py_exec = f"python{sys.version_info[0]}"
 
-        command = "{py_exec} {wrapper} {function} {args} {out}".format(py_exec=py_exec, wrapper=self._wrapper, function=self._func_file, args=self._args_file, out=self._out_file)
-
-        if self._env_file:
-            command = './{pprun} -e {tar} --unpack-to "$VINE_SANDBOX"/{unpack}-env {cmd}'.format(pprun=os.path.basename(self._pp_run), unpack=os.path.basename(self._env_file), tar=os.path.basename(self._env_file), cmd=command)
+        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._out_file}"
+        if remote_env_dir:
+            # assumes poncho_package_run is in the expanded env
+            command = f'{remote_env_dir}/bin/poncho_package_run -e {remote_env_dir} {cmd}'
 
         return command
 
-    def _add_IO_files(self):
-        self.add_input_file(os.path.join(self._tmpdir, self._wrapper))
-        self.add_input_file(os.path.join(self._tmpdir, self._func_file))
-        self.add_input_file(os.path.join(self._tmpdir, self._args_file))
-        self.add_output_file(os.path.join(self._tmpdir, self._out_file))
+    def _add_IO_files(self, manager):
+        def add_files(method, *files):
+            for name in files:
+                source=os.path.join(self._tmpdir, name)
+                f = manager.declare_file(source, cache=False)
+                method(f, name)
+        add_files(self.add_input, self._wrapper, self._func_file, self._args_file)
+        add_files(self.add_output, self._out_file)
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
@@ -2310,7 +2181,8 @@ class RemoteTask(Task):
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
-        self.add_input_buffer(json.dumps(self._event), "infile")
+        f = manager.declare_buffer(json.dumps(self._event))
+        self.add_input(f, "infile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This
