@@ -54,6 +54,11 @@ class File(object):
     def __init__(self, internal_file):
         self._file = internal_file
 
+    def __bool__(self):
+        # We need this because the len of some files is 0, which would evaluate
+        # to false.
+        return True
+
     ##
     # Return the contents of a file object as a string.
     # Typically used to return the contents of an output buffer.
@@ -520,6 +525,16 @@ class Task(object):
     # @param filename       The name of the snapshot events specification
     def set_snapshot_file(self, filename):
         return vine_task_set_snapshot_file(self._task, filename)
+
+    ##
+    # Adds an execution environment to the task. The environment file specified
+    # is expected to expand to a directory with a bin/run_in_env file that will wrap
+    # the task command (e.g. a poncho or a starch file). If specified multiple times,
+    # environments are nested in the order given (i.e. first added is the first applied).
+    # @param t A task object.
+    # @param f The environment file.
+    def add_environment(self, f):
+        return vine_task_add_environment(self._task, f._file)
 
     ##
     # Indicate the number of times the task should be retried. If 0 (the
@@ -2240,19 +2255,27 @@ class Manager(object):
     # @param self   The manager to register this file.
     # @param server The chirp server address of the form "hostname[:port"]"
     # @param source The name of the file in the server
-    # @param ticket If not NULL, a file object that provides a chirp an authentication ticket
+    # @param ticket If not None, a file object that provides a chirp an authentication ticket
+    # @param env    If not None, an environment file (e.g poncho or starch)
+    #               that contains the chirp executables. Otherwise assume chirp is available
+    #               at the worker.
     # @param cache   If True or 'workflow', cache the file at workers for reuse
     #                until the end of the workflow. If 'always', the file is cache until the
     #                end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
     # @return A file object to use in @ref Task.add_input
-    def declare_chirp(self, server, source, ticket=None, cache=False, peer_transfer=True):
+    def declare_chirp(self, server, source, ticket=None, env=None, cache=False, peer_transfer=True):
         ticket_c = None
         if ticket:
             ticket_c = ticket._file
+
+        env_c = None
+        if env:
+            env_c = env._file
+
         flags = Task._determine_file_flags(cache, peer_transfer)
-        f = vine_declare_chirp(self._taskvine, server, source, ticket_c, flags)
+        f = vine_declare_chirp(self._taskvine, server, source, ticket_c, env_c, flags)
         return File(f)
 
 
