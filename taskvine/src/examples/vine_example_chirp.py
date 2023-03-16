@@ -23,28 +23,12 @@ def count_lines(chirp_file):
             lines += 1
     return lines
 
-# construct a poncho environment to execute the tasks. Only needed if the chirp
+
+# construct a starch environment to execute the tasks. Only needed if the chirp
 # executables are not available where the workers execute
 def create_env(env_name):
-    import json
-    import tempfile
     import subprocess
-    py_version = f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}"
-
-    if os.path.exists(env_name):
-        return
-
-    env = {
-            "conda": {
-                "channels": ["conda-forge"],
-                "dependencies": [f"python={py_version}", "dill", "cctools"]
-                }
-            }
-
-    with tempfile.NamedTemporaryFile("w", prefix="poncho-spec", encoding="utf8", dir=os.getcwd()) as f:
-        json.dump(env, f)
-        f.flush()
-        subprocess.run(["poncho_package_create", f.name, env_name], check=True)
+    subprocess.run(["starch", "-x", "chirp_get", "-c", "chirp_get", env_name], check=True)
 
 
 if __name__ == "__main__":
@@ -56,10 +40,9 @@ if __name__ == "__main__":
         print(f"Prints the number of lines of test_filename from chirp_server")
         sys.exit(1)
 
-
     env_with_chirp = None
     # uncomment the following lines only if workers don't have chirp available
-    #env_with_chirp = "chirp_py_env.tar.gz"
+    #env_with_chirp = "chirp_get.sfx"
     #create_env(env_with_chirp)
 
     m = vine.Manager()
@@ -70,8 +53,15 @@ if __name__ == "__main__":
     #ticket_file = m.declare_file("myticket.ticket", cache=True)
 
     t = vine.PythonTask(count_lines, "mychirp.file")
-    t.add_input(m.declare_chirp(chirp_server, test_filename, ticket_file, cache=True), "mychirp.file")
-    t.set_environment(env_with_chirp)
+
+    if env_with_chirp:
+        sf = m.declare_file("chirp_get.sfx", cache="always")
+        env_file = m.declare_starch(sf, cache="always")
+    else:
+        env_file = None
+
+    chirp_file = m.declare_chirp(chirp_server, test_filename, ticket_file, env=env_file, cache=True)
+    t.add_input(chirp_file, "mychirp.file")
 
     task_id = m.submit(t)
     print("submitted task (id# " + str(task_id) + "): count_lines()")
