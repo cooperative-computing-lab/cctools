@@ -463,20 +463,23 @@ class TxnPlot:
             end = m.termination
         return end
 
-    def make_tick_time(self, origin, x, pos):
+    def make_tick_time(self, origin, end, x, pos):
         def roundb(b, x):
             return b * math.ceil(x/b)
 
         # round seconds to multiples of 5
         t = roundb(5, x - origin)
         u = "s"
-        if t > 900:
-            # round minutes to multiples of 5
-            t = roundb(5, t/60)
+        if end > 900:
+            # round to minutes
+            t = roundb(1, t/60)
             u = "m"
-        elif t > 3600 * 24:
+        elif end > 3600 * 24:
             t = roundb(1, t/(3600 * 24))
             u = "h"
+        if x != end:
+            # print units only for last value
+            u = ""
         return "{:.0f}{}".format(t, u)
 
     def bh(self, fig, slots, left, width, color, **kwargs):
@@ -497,8 +500,13 @@ class TxnPlot:
             plot_end = self.determine_end(m)
 
             s.axis(xmin=plot_origin, xmax=plot_end)
-            s.set_xticks([plot_origin, plot_end])
-            s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_origin)))
+
+            ticks = [ plot_origin + i*(plot_end-plot_origin)/self.opts.time_ticks_n for i in range(self.opts.time_ticks_n+1) ]
+            ticks.extend(self.opts.time_tick)
+            ticks.sort()
+            s.set_xticks(ticks)
+
+            s.xaxis.set_major_formatter(plticker.FuncFormatter(partial(self.make_tick_time, plot_origin, plot_end)))
             s.set_xlabel("time")
             s.tick_params(axis='both', which='major', labelsize=15)
 
@@ -664,6 +672,8 @@ if __name__ == "__main__":
     parser.add_argument('--expand-waiting', action='store_true', help='show complete lifetime of waiting tasks at the worker')
     parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
     parser.add_argument('--legend', nargs='?', help='position of the legend. ("best" may take longer to render.) ', choices=['upper right', 'upper left', 'lower right', 'lower left', 'best'], default='upper left')
+    parser.add_argument('--time-ticks-n', nargs='?', type=int, help='number of time ticks (adds a time tick every (origin-end)/time-ticks-n)', default=1)
+    parser.add_argument('--time-tick', nargs='?', type=int, action='append', help="tick value to add, in seconds from manager's start. May be specified multiple times.", default=[])
     parser.add_argument('--width', nargs='?', type=float, help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', type=float, help='height in inches. Default is 2/3 of width', default=None)
     parser.add_argument('--dpi', nargs='?', type=int, help='output image resoulution', default=300)
@@ -671,6 +681,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     p = ParseTxn(args.log, args.expand_waiting, args.tasks_range)
+
+    if args.time_ticks_n < 1:
+        p.error("Minimum --time-ticks-n is 1")
 
     if args.mode == "csv":
         p.write_tables(args.output)
