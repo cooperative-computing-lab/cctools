@@ -472,6 +472,21 @@ void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_t
 	vine_task_add_input(t,f,remote_name,flags);
 }
 
+void vine_task_add_environment(struct vine_task *t, struct vine_file *environment_file) {
+
+	assert(environment_file);
+
+	char *env_name = string_format("__vine_env_%s", environment_file->cached_name);
+
+	vine_task_add_input(t, environment_file, env_name, 0);
+
+	char *new_cmd = string_format("%s/bin/run_in_env %s", env_name, t->command_line);
+	vine_task_set_command(t, new_cmd);
+
+	free(env_name);
+}
+
+
 void vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file) {
 
 	assert(monitor_snapshot_file);

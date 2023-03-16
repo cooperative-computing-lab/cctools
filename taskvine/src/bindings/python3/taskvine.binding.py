@@ -527,6 +527,16 @@ class Task(object):
         return vine_task_set_snapshot_file(self._task, filename)
 
     ##
+    # Adds an execution environment to the task. The environment file specified
+    # is expected to expand to a directory with a bin/run_in_env file that will wrap
+    # the task command (e.g. a poncho or a starch file). If specified multiple times,
+    # environments are nested in the order given (i.e. first added is the first applied).
+    # @param t A task object.
+    # @param f The environment file.
+    def add_environment(self, f):
+        return vine_task_add_environment(self._task, f._file)
+
+    ##
     # Indicate the number of times the task should be retried. If 0 (the
     # default), the task is tried indefinitely. A task that did not succeed
     # after the given number of retries is returned with result
