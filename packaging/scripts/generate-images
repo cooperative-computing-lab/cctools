@@ -590,6 +590,9 @@ Bootstrap: docker
 From: $dist:$version
 
 %post
+	export DEBIAN_FRONTEND=noninteractive
+	export DEBCONF_NONINTERACTIVE_SEEN=true
+
 	@{[join("\n\t", @steps)]}
 
 EOF
