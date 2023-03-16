@@ -125,9 +125,14 @@ static vine_url_cache_t get_url_properties( const char *url, char *tag )
 	if(!strncmp(url,"file://",7)) {
 		ssize_t totalsize;
 		char *hash = vine_checksum_any(&url[7],&totalsize);
-		strcpy(tag,hash);
-		free(hash);
-		return VINE_FOUND_MD5;
+		if(hash) {
+			strcpy(tag,hash);
+			free(hash);
+			return VINE_FOUND_MD5;
+		}  else {
+			return VINE_FOUND_NONE;
+		}
+
 	}
 
 	/* Otherwise, proceed to use curl to get the headers. */
@@ -197,7 +202,7 @@ static char *make_url_cached_name( const struct vine_file *f )
 
 	debug(D_VINE,"fetching headers for url %s",f->source);
 
-vine_url_cache_t val = get_url_properties(f->source,tag);
+	vine_url_cache_t val = get_url_properties(f->source,tag);
 
 	switch(val){
 		case VINE_FOUND_NONE:
@@ -258,6 +263,44 @@ char *make_mini_task_cached_name(const struct vine_file *f)
 }
 
 /*
+Generates a random cached name of a file object.
+Returns a string that must be freed with free().
+*/
+
+char *vine_random_name( const struct vine_file *f, ssize_t *totalsize )
+{
+	char *name;
+	char random[17];
+	string_cookie(random,16);
+
+	switch(f->type){
+		case VINE_FILE:
+			name = string_format("file-rnd-%s",random);
+			break;
+		case VINE_EMPTY_DIR:
+			name = string_format("empty");
+			break;
+		case VINE_MINI_TASK:
+			name = string_format("task-rnd-%s",random);
+			break;
+		case VINE_URL:
+			name = string_format("url-rnd-%s",random);
+			break;
+		case VINE_TEMP:
+			name = string_format("temp-rnd-%s",random);
+			break;
+		case VINE_BUFFER:
+			name = string_format("buffer-rnd-%s",random);
+			break;
+		default:
+			fatal("invalid file type %d",f->type);
+			name = strdup("notreached");
+			break;
+	}
+	return name;
+}
+
+/*
 Compute the cached name of a file object, based on its type.
 Returns a string that must be freed with free().
 */
@@ -266,7 +309,6 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 {
 	unsigned char digest[MD5_DIGEST_LENGTH];
 	char *hash, *name;
-	char random[17];
 
 	switch(f->type) {
 		case VINE_FILE:
@@ -277,8 +319,7 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 				free(hash);
 			} else {
 				/* A pending file gets a random name. */
-				string_cookie(random,16);
-				name = string_format("file-rnd-%s",random);
+				name = vine_random_name(f, totalsize);
 			}
 			break;
 		case VINE_EMPTY_DIR:
@@ -300,8 +341,7 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 		case VINE_TEMP:
 			/* An empty temporary file gets a random name. */
 			/* Until we later have a better name for it.*/
-			string_cookie(random,16);
-			name = string_format("temp-rnd-%s",random);
+			name = vine_random_name(f, totalsize);
 			break;
 		case VINE_BUFFER:
 			if(f->data) {
@@ -312,8 +352,7 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 			} else {
 				/* If the buffer doesn't exist yet, then give a random name. */
 				/* Until we later have a better name for it.*/
-				string_cookie(random,16);
-				name = string_format("buffer-rnd-%s",random);
+				name = vine_random_name(f, totalsize);
 			}
 			break;
 		default:
@@ -326,17 +365,3 @@ char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize )
 }
 
 
-char *vine_file_id( const struct vine_file *f )
-{
-	unsigned char digest[MD5_DIGEST_LENGTH];
-	const char *hash;
-
-    assert(f->cached_name);
-
-    char *content = string_format("%s%s", f->cached_name, f->source ? f->source : "");
-    md5_buffer(content,strlen(content),digest);
-    hash = md5_to_string(digest);
-    free(content);
-
-    return xxstrdup(hash);
-}

@@ -62,18 +62,18 @@ if __name__ == "__main__":
     for i in range(0, 36):
         temp_files.append(m.declare_temp())
 
-    montage_file = m.declare_file("montage.sfx")
-    convert_file = m.declare_file("convert.sfx")
-    image_file = m.declare_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg")
+    montage_file = m.declare_file("montage.sfx", cache=True)
+    convert_file = m.declare_file("convert.sfx", cache=True)
+    image_file = m.declare_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", cache=True)
 
     for i in range(0, 36):
         outfile = str(i) + ".cat.jpg"
         command = f"./convert.sfx -swirl {i*10} cat.jpg output.jpg"
 
         t = vine.Task(command)
-        t.add_input(convert_file, "convert.sfx", cache=True)
-        t.add_input(image_file,"cat.jpg",cache=True)
-        t.add_output(temp_files[i],"output.jpg",cache=True)
+        t.add_input(convert_file, "convert.sfx")
+        t.add_input(image_file,"cat.jpg")
+        t.add_output(temp_files[i],"output.jpg")
 
         t.set_cores(1)
 
@@ -90,11 +90,12 @@ if __name__ == "__main__":
 
     print("Combining images into mosaic.jpg...")
     t = vine.Task("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg")
-    t.add_input(montage_file, "montage.sfx", cache=True)
+    t.add_input(montage_file, "montage.sfx")
 
     for i in range(0, 36):
-        t.add_input(temp_files[i],f"{i*10}.cat.jpg",cache=False)
-    t.add_output_file("mosaic.jpg", cache=False)
+        t.add_input(temp_files[i],f"{i*10}.cat.jpg")
+
+    t.add_output_file(m.declare_file("mosaic.jpg"))
     m.submit(t)
 
     print("waiting for final task to complete...")

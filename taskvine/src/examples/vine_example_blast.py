@@ -47,23 +47,22 @@ if __name__ == "__main__":
 
     print(f"Declaring files...")
 
-    blast_url = m.declare_url("https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz")
+    blast_url = m.declare_url("https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz", cache=True)
     blast = m.declare_untar(blast_url)
 
-    landmark_url = m.declare_url("https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz")
+    landmark_url = m.declare_url("https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz", cache=True)
     landmark = m.declare_untar(landmark_url)
 
     m.enable_peer_transfers()
-    
+
     print(f"Declaring tasks...")
 
     for i in range(task_count):
         query = m.declare_buffer(make_query_text())
-
        t = vine.Task(
             command = "blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file",
             inputs = {
-              query : {"remote_name" : query.file", "cache" : False},
+              query : {"remote_name" : "query.file", "cache" : False},
               blast : {"remote_name" : "blastdir", "cache" : True},
               landmark : {"remote_name" : "landmark", "cache" : True}
             },

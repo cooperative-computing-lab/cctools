@@ -57,6 +57,10 @@ struct cache_file * cache_file_create( vine_cache_type_t type, const char *sourc
 
 void cache_file_delete( struct cache_file *f )
 {
+	if(f->mini_task) {
+		vine_task_delete(f->mini_task);
+	}
+
 	free(f->source);
 	free(f);
 }
@@ -150,8 +154,12 @@ Add a file to the cache manager (already created in the proper place) and note i
 
 int vine_cache_addfile( struct vine_cache *c, int64_t size, int mode, const char *cachename )
 {
-	struct cache_file *f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode,0);
-	hash_table_insert(c->table,cachename,f);
+	struct cache_file *f = hash_table_lookup(c->table,cachename);
+	if(!f) {
+		f = cache_file_create(VINE_CACHE_FILE,"manager",size,mode,0);
+		hash_table_insert(c->table,cachename,f);
+	}
+
 	f->complete = 1;
 	return 1;
 }
@@ -197,13 +205,13 @@ int vine_cache_remove( struct vine_cache *c, const char *cachename )
 {
 	struct cache_file *f = hash_table_remove(c->table,cachename);
 	if(!f) return 0;
-	
+
 	char *cache_path = vine_cache_full_path(c,cachename);
 	trash_file(cache_path);
 	free(cache_path);
 
 	cache_file_delete(f);
-	
+
 	return 1;
 
 }
@@ -389,13 +397,13 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	int result = 0;
 
 	timestamp_t transfer_start = timestamp_get();
-	
+
 	switch(f->type) {
 		case VINE_CACHE_FILE:
 			debug(D_VINE,"cache: manager already delivered %s",cachename);
 			result = 1;
 			break;
-		  
+
 		case VINE_CACHE_TRANSFER:
 			debug(D_VINE,"cache: transferring %s to %s",f->source,cachename);
 			result = do_transfer(c,f->source,cache_path,&error_message);
@@ -409,16 +417,16 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 
 	chmod(cache_path,f->mode);
 
-	// Set the permissions as originally indicated.	
+	// Set the permissions as originally indicated.
 
 	timestamp_t transfer_end = timestamp_get();
 	timestamp_t transfer_time = transfer_end - transfer_start;
-	
+
 	/*
 	Although the prior command may have succeeded, check the actual desired
 	file in the cache to make sure that it is complete.
 	*/
-	
+
 	if(result) {
 		int64_t nbytes, nfiles;
 		if(path_disk_size_info_get(cache_path,&nbytes,&nfiles)==0) {
@@ -442,13 +450,13 @@ int vine_cache_ensure( struct vine_cache *c, const char *cachename, struct link 
 	the manager that the cached object is invalid.
 	This task will fail in the sandbox setup stage.
 	*/
-	
+
 	if(!result) {
 		if(!error_message) error_message = strdup("unknown");
 		vine_worker_send_cache_invalid(manager,cachename,error_message);
 		vine_cache_remove(c,cachename);
 	}
-	
+
 	if(error_message) free(error_message);
 	free(cache_path);
 	return result;

@@ -69,8 +69,8 @@ int main(int argc, char *argv[])
 
 	vine_enable_peer_transfers(m);
 
-	struct vine_file *convert = vine_declare_file(m, "convert.sfx");
-	struct vine_file *image = vine_declare_url(m, "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg");
+	struct vine_file *convert = vine_declare_file(m, "convert.sfx", VINE_CACHE);
+	struct vine_file *image = vine_declare_url(m, "https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", VINE_CACHE);
 
 	struct vine_file *temp_file[36];
 
@@ -86,9 +86,9 @@ int main(int argc, char *argv[])
 
 		t = vine_task_create(command);
 
-		vine_task_add_input(t,convert,"convert.sfx",VINE_CACHE);
-		vine_task_add_input(t,image,"cat.jpg", VINE_CACHE );
-		vine_task_add_output(t,temp_file[i],outfile,VINE_CACHE);
+		vine_task_add_input(t,convert,"convert.sfx",0);
+		vine_task_add_input(t,image,"cat.jpg",0);
+		vine_task_add_output(t,temp_file[i],outfile,0);
 
 		vine_task_set_cores(t,1);
 
@@ -120,10 +120,11 @@ int main(int argc, char *argv[])
 	for(i=0;i<36;i++) {
 		char filename[256];
 		sprintf(filename,"%d.cat.jpg",i);
-		vine_task_add_input(t,temp_file[i],filename,VINE_NOCACHE);
+		vine_task_add_input(t,temp_file[i],filename,0);
 	}
-	vine_task_add_input_file(t,"montage.sfx","montage.sfx",VINE_CACHE);
-	vine_task_add_output_file(t,"mosaic.jpg","mosaic.jpg",VINE_NOCACHE);
+
+	vine_task_add_input(t,vine_declare_file(m,"montage.sfx",VINE_CACHE),"montage.sfx",0);
+	vine_task_add_output(t,vine_declare_file(m,"mosaic.jpg",VINE_CACHE_NEVER),"mosaic.jpg",0);
 
 	int task_id = vine_submit(m,t);
 	printf("Submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );

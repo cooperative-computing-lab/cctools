@@ -11,7 +11,6 @@ See the file COPYING for details.
 #include <sys/types.h>
 
 char *vine_cached_name( const struct vine_file *f, ssize_t *totalsize );
-
-char *vine_file_id( const struct vine_file *f );
+char *vine_random_name( const struct vine_file *f, ssize_t *totalsize );
 
 #endif

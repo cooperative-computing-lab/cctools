@@ -69,11 +69,11 @@ int main(int argc, char *argv[])
 	printf("listening on port %d...\n", vine_port(m));
 
 	printf("setting up input files...\n");
-	struct vine_file *script = vine_declare_file(m, "vine_example_gutenberg_script.sh");
+	struct vine_file *script = vine_declare_file(m, "vine_example_gutenberg_script.sh", VINE_CACHE);
 	struct vine_file *files[URL_COUNT];
 
 	for(i=0;i<URL_COUNT;i++) {
-		files[i] = vine_declare_url(m, urls[i]);
+		files[i] = vine_declare_url(m, urls[i], VINE_CACHE);
 	}
 
 	printf("submitting tasks...\n");
@@ -81,9 +81,9 @@ int main(int argc, char *argv[])
 		for(j=0;j<URL_COUNT;j++) {
 			struct vine_task *t = vine_task_create("./vine_example_gutenberg_script.sh filea.txt fileb.txt");
 
-			vine_task_add_input(t,script,"vine_example_gutenberg_script.sh",VINE_CACHE);
-			vine_task_add_input(t,files[i], "filea.txt", VINE_CACHE);
-			vine_task_add_input(t,files[j], "fileb.txt", VINE_CACHE);
+			vine_task_add_input(t, script, "vine_example_gutenberg_script.sh", 0);
+			vine_task_add_input(t, files[i], "filea.txt", 0);
+			vine_task_add_input(t, files[j], "fileb.txt", 0);
 
 			vine_task_set_cores(t,1);
 

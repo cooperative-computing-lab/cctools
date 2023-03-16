@@ -10,11 +10,11 @@ It performs a BLAST search of the "Landmark" model organism database.
 It works by constructing tasks that download the blast executable
 and landmark database from NCBI, and then performs a short query.
 
-The query is provided by a string (but presented to the task as a file.)
+Each task in the workflow performs a query of the database using
+16 (random) query strings generated at the manager.
 Both the downloads are automatically unpacked, cached, and shared
-across all workers efficiently.
+with all the same tasks on the worker.
 */
-
 
 #include "taskvine.h"
 
@@ -24,16 +24,48 @@ across all workers efficiently.
 #include <errno.h>
 #include <unistd.h>
 
-const char *query_string = ">P01013 GENE X PROTEIN (OVALBUMIN-RELATED)\n\
-		QIKDLLVSSSTDLDTTLVLVNAIYFKGMWKTAFNAEDTREMPFHVTKQESKPVQMMCMNNSFNVATLPAE\n\
-		KMKILELPFASGDLSMLVLLPDEVSDLERIEKTINFEKLTEWTNPNTMEKRRVKVYLPQMKIEEKYNLTS\n\
-		VLMALGMTDLFIPSANLTGISSAESLKISQAVHGAFMELSEDGIEMAGSTGVIEDIKHSPESEQFRADHP\n\
-		FLFLIKHNPTNTIVYFGRYWSP\n\
-";
-
 #define BLAST_URL "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz"
 
 #define LANDMARK_URL "https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz"
+
+/* Number of characters in each query */
+#define QUERY_LENGTH 128
+
+/* Number of queries in each task */
+#define QUERY_COUNT 16
+
+/* Number of tasks to generate */
+#define TASK_COUNT 1000
+
+/* Permitted letters in an amino acid sequence */
+const char* amino_letters = "ACGTUiRYKMSWBDHVN";
+
+/* Make a sequence in a query */
+static void make_sequence(char* q, int s) {
+	int i;
+	int prfix_len = strlen(">query\n");
+	int sequence_size = sizeof(char) * (prfix_len + QUERY_LENGTH + 1);
+	strcpy(q+s*sequence_size, ">query\n");
+	int start = s * sequence_size + prfix_len;
+	for (i = start; i < start + QUERY_LENGTH; ++i) {
+		*(q+i) = amino_letters[random()%strlen(amino_letters)];
+	}
+	*(q+i) = '\n';
+}
+
+/* Create a query string consisting of
+{query_count} sequences of {query_length} characters.
+*/
+static char* make_query() {
+	int query_size = sizeof(char) * (strlen(">query\n") + QUERY_LENGTH + 1) * QUERY_COUNT + 1;
+	char* q = malloc(query_size);
+	int i;
+	for (i = 0; i < QUERY_COUNT; ++i) {
+		make_sequence(q, i);
+	}
+	*(q+query_size-1) = '\0';
+	return q;
+}
 
 int main(int argc, char *argv[])
 {
@@ -41,35 +73,45 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
-	//runtime logs will be written to vine_example_blast_info/%Y-%m-%dT%H:%M:%S
-	vine_set_runtime_info_path("vine_example_blast_info");
+	vine_set_runtime_info_path("runtime_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
 	if(!m) {
 		printf("couldn't create manager: %s\n", strerror(errno));
 		return 1;
 	}
-	printf("listening on port %d...\n", vine_port(m));
+	
+	vine_set_name(m, "blast-example");
+	printf("TaskVine listening on %d\n", vine_port(m));
 
-	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL);
-	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL);
+	vine_enable_monitoring(m, 1, 0);
+	vine_enable_peer_transfers(m);
 
-	struct vine_file *software = vine_declare_untar(m, blast_url);
-	struct vine_file *database = vine_declare_untar(m, landm_url);
+	printf("Declaring files...");
+	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL, VINE_CACHE);
+	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL, VINE_CACHE);
 
+	struct vine_file *software = vine_declare_untar(m, blast_url, VINE_CACHE);
+	struct vine_file *database = vine_declare_untar(m, landm_url, VINE_CACHE);
 
-	for(i=0;i<10;i++) {
+	printf("Declaring tasks...");
+	char* query_string;
+	for(i=0;i<TASK_COUNT;i++) {
 		struct vine_task *t = vine_task_create("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file");
 
-		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string));
-		vine_task_add_input(t, query, "query.file", VINE_NOCACHE);
-		vine_task_add_input(t,software,"blastdir", VINE_CACHE );
-		vine_task_add_input(t,database,"landmark", VINE_CACHE );
+		query_string = make_query();
+		struct vine_file *query = vine_declare_buffer(m, query_string, strlen(query_string), VINE_CACHE_NEVER);
+		vine_task_add_input(t, query, "query.file", 0);
+
+		vine_task_add_input(t,software,"blastdir", 0);
+		vine_task_add_input(t,database,"landmark", 0);
+
 		vine_task_set_env_var(t,"BLASTDB","landmark");
 
 		int task_id = vine_submit(m, t);
 
 		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(t) );
+		free(query_string);
 	}
 
 	printf("waiting for tasks to complete...\n");
@@ -95,5 +137,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
-/* vim: set noexpandtab tabstop=4: */
