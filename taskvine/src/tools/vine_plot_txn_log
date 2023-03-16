@@ -513,7 +513,7 @@ class TxnPlot:
 
     def set_legend(self, fig):
         handles = [mpl.patches.Patch(color=c, label=l) for l,c in self.legend.items()]
-        fig.legend(loc='upper left', handles=handles)
+        fig.legend(loc=self.opts.legend, handles=handles)
 
     def plot(self, fig, manager):
         return NotImplemented
@@ -663,6 +663,7 @@ if __name__ == "__main__":
     parser.add_argument('--tasks-range', nargs='?', help='range of tasks ids to plot as start[,[end][,step]] ', default="1,,1")
     parser.add_argument('--expand-waiting', action='store_true', help='show complete lifetime of waiting tasks at the worker')
     parser.add_argument('--display', action='store_true', help='show plot using matplotlib internal viewer')
+    parser.add_argument('--legend', nargs='?', help='position of the legend. ("best" may take longer to render.) ', choices=['upper right', 'upper left', 'lower right', 'lower left', 'best'], default='upper left')
     parser.add_argument('--width', nargs='?', type=float, help='width in inches', default=12)
     parser.add_argument('--height', nargs='?', type=float, help='height in inches. Default is 2/3 of width', default=None)
     parser.add_argument('--dpi', nargs='?', type=int, help='output image resoulution', default=300)
