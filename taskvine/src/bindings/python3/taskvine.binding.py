@@ -91,6 +91,9 @@ class Task(object):
     def __init__(self, command, **task_info):
         self._task = None
 
+        if isinstance(command, dict):
+            raise TypeError(f"{command} is not a str. Did you mean **{command}?")
+
         self._task = vine_task_create(command)
         if not self._task:
             raise Exception("Unable to create internal Task structure")
@@ -113,70 +116,32 @@ class Task(object):
                     self.add_feature(feature)
             else:
                 raise Exception("Unable to create internal Task structure")
-        if "input_files" in task_info:
-           for key, value in task_info["input_files"].items():
-                if isinstance(value, str):
-                    self.add_input_file(key, value)
-                elif isinstance(value, dict):
-                    self.add_input_file(key, **value)
-                else:
-                    raise Exception("Unable to create internal Task structure")
-        if "input_urls" in task_info:
-            for key, value in task_info["input_urls"].items():
-                if isinstance(value, str):
-                    self.add_input_url(key, value)
-                elif isinstance(value, dict):
-                    self.add_input_url(key, **value)
-                else:
-                    raise Exception("Unable to create internal Task structure")
-        if "input_mini_tasks" in task_info:
-            for key, value in task_info["input_mini_tasks"].items():
-                if isinstance(value, str):
-                    self.add_input_mini_task(key, value)
-                elif isinstance(value, dict):
-                    self.add_input_mini_task(key, **value)
-                else:
-                    raise Exception("Unable to create internal Task structure")
+
         if "inputs" in task_info:
             for key, value in task_info["inputs"].items():
-                if isinstance(value, str):
-                    self.add_input(key, value)
-                elif isinstance(value, dict):
-                    self.add_input(key, **value)
+                if not isinstance(key, File):
+                    raise TypeError(f"{key} is not a TaskVine file")
+                if isinstance(value, dict):
+                    parameters = value
+                elif isinstance(value, str):
+                    parameters = { "remote_name": value }
                 else:
-                    raise Exception("Unable to create internal Task structure")
-        if "empty_dirs" in task_info:
-            if isinstance(task_info["empty_dirs"], str):
-                self.add_empty_dir(task_info["empty_dirs"])
-            elif isinstance(task_info["empty_dirs"], list):
-                for empty_dir in task_info["empty_dirs"]:
-                    self.add_empty_dir(empty_dir)
-            else:
-                raise Exception("Unable to create internal Task structure")
-        if "input_buffers" in task_info:
-            for key, value in task_info["input_buffers"].items():
-                if isinstance(value, str):
-                    self.add_input_buffer(key, value)
-                elif isinstance(value, dict):
-                    self.add_input_buffer(key, **value)
-                else:
-                    raise Exception("Unable to create internal Task structure")
-        if "output_files" in task_info:
-            for key, value in task_info["output_files"].items():
-                if isinstance(value, str):
-                    self.add_output_file(key, value)
-                elif isinstance(value, dict):
-                    self.add_output_file(key, **value)
-                else:
-                    raise Exception("Unable to create internal Task structure")
+                    raise TypeError(f"{value} is not a str or dict")
+                self.add_input(key, **parameters)
+
         if "outputs" in task_info:
             for key, value in task_info["outputs"].items():
-                if isinstance(value, str):
-                    self.add_output(key, value)
-                elif isinstance(value, dict):
-                    self.add_output(key, **value)
+                if not isinstance(key, File):
+                    raise TypeError(f"{key} is not a TaskVine file")
+                if isinstance(value, dict):
+                    parameters = value
+                elif isinstance(value, str):
+                    parameters = { "remote_name": value }
                 else:
-                    raise Exception("Unable to create internal Task structure")
+                    raise TypeError(f"{value} is not a str or dict")
+                print(f"self.add_output({key}, {parameters})")
+                self.add_output(key, **parameters)
+
         if "env" in task_info:
             for key, value in task_info["env"].items():
                 self.set_env_var(key, value)
@@ -188,7 +153,7 @@ class Task(object):
         except Exception:
             # ignore exceptions, in case task has been already collected
             pass
-            
+
     def _set_from_dict(self, task_info, key):
         try:
             value = task_info[key]
