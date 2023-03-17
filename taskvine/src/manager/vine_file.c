@@ -130,7 +130,10 @@ struct vine_file * vine_file_substitute_url( struct vine_file *f, const char *so
 
 struct vine_file * vine_file_temp()
 {
-	return vine_file_create("temp",0,0,0,VINE_TEMP,0,0);
+	// temp files are always cached at workers until explicitely removed.
+	vine_file_flags_t flags = VINE_CACHE;
+
+	return vine_file_create("temp",0,0,0,VINE_TEMP,0,flags);
 }
 
 struct vine_file * vine_file_buffer( const char *data, size_t size, vine_file_flags_t flags )
