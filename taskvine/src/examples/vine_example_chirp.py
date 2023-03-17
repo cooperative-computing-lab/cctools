@@ -12,6 +12,7 @@
 
 import taskvine as vine
 
+import argparse
 import os
 import sys
 
@@ -28,45 +29,71 @@ def count_lines(chirp_file):
 # executables are not available where the workers execute
 def create_env(env_name):
     import subprocess
-    subprocess.run(["starch", "-x", "chirp_get", "-c", "chirp_get", env_name], check=True)
+    # add the executables chirp, chirp_get, and chirp_put to the env_name starch file.
+    # these executables are assumed to be in the current $PATH.
+    # by default, the starch file will execute the chirp command.
 
+    if os.path.exists(env_name):
+        print(f"reusing existing {env_name} starch file...")
+    else:
+        print(f"creating {env_name} starch file...")
+        subprocess.run(["starch", "-x", "chirp_get", "-x", "chirp_put", "-x", "chirp", "-c", "chirp", env_name], check=True)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+            prog="vine_example_chirp.py",
+            description="TaskVine example on how to declare a file from a chirp server as an input. Prints the number of lines of filename from chirp_server")
 
-    try:
-        (chirp_server, test_filename) = sys.argv[1:]
-    except Exception:
-        print(f"Usage: {sys.argv[0]} chirp_server test_filename [auth_ticket_file]")
-        print(f"Prints the number of lines of test_filename from chirp_server")
-        sys.exit(1)
+    parser.add_argument('chirp_server', action='store', help='the chirp server where the file is located')
+    parser.add_argument('filename', action='store', help='the name of the file')
+    parser.add_argument('--ticket', action='store', help='optional server authentication ticket', default=None)
+    parser.add_argument('--create-env', action='store_true', help='whether to create mini environment to ensure chirp is available at the worker.', default=False)
 
-    env_with_chirp = None
-    # uncomment the following lines only if workers don't have chirp available
-    #env_with_chirp = "chirp_get.sfx"
-    #create_env(env_with_chirp)
+    args = parser.parse_args()
 
+    # create the chirp environment if needed. This just creates the environment
+    # in a local file, but does not registers it with a manager. The
+    # environment created comes from a starch file.
+    env_filename = None
+    if args.create_env:
+        env_filename = "chirp_client.sfx"
+        create_env(env_filename)
+
+    # create the manager to now listen to connections, and register files and
+    # tasks.
     m = vine.Manager()
-    print("listening on port", m.port)
+    print(f"logs in {m.logging_directory}")
+    print(f"listening on port {m.port}")
 
-    # define the authentication ticket to use.
-    ticket_file = None
-    #ticket_file = m.declare_file("myticket.ticket", cache=True)
+    # declare ticket and env file if needed. These vine files that can
+    # be used as input to tasks.
+    ticket = None
+    if args.ticket:
+        ticket = m.declare_file(args.ticket, cache=True)
 
+    env = None
+    if env_filename:
+        env = m.declare_starch(env_filename, cache=True)
+
+    # declaring the file as coming from chirp server
+    chirp_file = m.declare_chirp(args.chirp_server, args.filename, ticket=ticket, env=env, cache=True)
+
+    # create a task from the python function count_lines. The function will
+    # operate on the file "mychirp.file", with is the name that the input file
+    # will get in the task sandbox when executing remotely.
     t = vine.PythonTask(count_lines, "mychirp.file")
 
-    if env_with_chirp:
-        sf = m.declare_file("chirp_get.sfx", cache="always")
-        env_file = m.declare_starch(sf, cache="always")
-    else:
-        env_file = None
-
-    chirp_file = m.declare_chirp(chirp_server, test_filename, ticket_file, env=env_file, cache=True)
+    # the chrip file is added as an input of the task and mapped to
+    # mychirp.file when the task executes.
     t.add_input(chirp_file, "mychirp.file")
 
     task_id = m.submit(t)
     print("submitted task (id# " + str(task_id) + "): count_lines()")
-
     print("waiting for tasks to complete...")
+
+    print("please create a worker in another terminal. E.g., for a local worker:")
+    print(f"vine_worker localhost {m.port}")
+
     while not m.empty():
         t = m.wait(5)
         if t:
