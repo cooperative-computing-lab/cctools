@@ -1979,11 +1979,6 @@ class Manager(object):
     # output of a task, and may be consumed by other tasks.
     #
     # @param manager    The manager to register this file
-    # @param cache   If True or 'workflow', cache the file at workers for reuse
-    #                until the end of the workflow. If 'always', the file is cache until the
-    #                end-of-life of the worker. Default is False (file is not cache).
-    # @param peer_transfer   Whether the file can be transfered between workers when
-    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
     # @return A file object to use in @ref Task.add_input or @ref Task.add_output
     def declare_temp(self):
         f = vine_declare_temp(self._taskvine)
