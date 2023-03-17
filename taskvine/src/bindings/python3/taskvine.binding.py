@@ -2095,6 +2095,15 @@ class Manager(object):
         return File(f)
 
     ##
+    # Remove file from workers, undeclare it at the manager.
+    # Note that this does not remove the file's local copy at the manager, if any.
+    #
+    # @param self    The manager to register this file
+    # @param file    The file object
+    def remove_file(self, file):
+        vine_remove_file(self._taskvine, file._file)
+
+    ##
     # Declare an anonymous file has no initial content, but is created as the
     # output of a task, and may be consumed by other tasks.
     #
