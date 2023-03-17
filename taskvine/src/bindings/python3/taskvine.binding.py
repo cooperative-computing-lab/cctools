@@ -2174,9 +2174,13 @@ class Manager(object):
     # Declare a file that sets up a poncho environment
     #
     # @param self    The manager to register this file
-    # @param package The poncho or conda-pack environment tarball
+    # @param package The poncho environment tarball. Either a vine file or a
+    #                string representing a local file.
     # @return A file object to use in @ref Task.add_input
     def declare_poncho(self, package, cache=False, peer_transfer=True):
+        if isinstance(package, str):
+            package = self.declare_file(package, cache=True)
+
         flags = Task._determine_file_flags(cache, peer_transfer)
         f = vine_declare_poncho(self._taskvine, package._file, flags)
         return File(f)
@@ -2185,9 +2189,13 @@ class Manager(object):
     # Declare a file create a file by unpacking a starch package.
     #
     # @param self    The manager to register this file
-    # @param starch  The startch .sfx file
+    # @param starch  The startch .sfx file. Either a vine file or a string
+    #                representing a local file.
     # @return A file object to use in @ref Task.add_input
     def declare_starch(self, starch, cache=False, peer_transfer=True):
+        if isinstance(starch, str):
+            starch = self.declare_file(starch, cache=True)
+
         flags = Task._determine_file_flags(cache, peer_transfer)
         f = vine_declare_starch(self._taskvine, starch._file, flags)
         return File(f)
