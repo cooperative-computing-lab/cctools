@@ -197,7 +197,7 @@ static char * find_x509_proxy()
 	return NULL;
 }
 
-struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy, vine_file_flags_t flags )
+struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy, struct vine_file *env, vine_file_flags_t flags )
 {
 	if(!proxy) {
 		char *proxy_filename = find_x509_proxy();
@@ -215,6 +215,10 @@ struct vine_file * vine_file_xrootd( const char *source, struct vine_file *proxy
 	if(proxy) {
 		vine_task_set_env_var(t, "X509_USER_PROXY", "proxy509");
 		vine_task_add_input(t,proxy,"proxy509.pem",0);
+	}
+
+	if(env) {
+		vine_task_add_environment(t, env);
 	}
 
 	free(command);
