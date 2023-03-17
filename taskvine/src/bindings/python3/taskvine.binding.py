@@ -1116,6 +1116,12 @@ class Manager(object):
     ##
     # Get the staging directory of the manager
     @property
+    def logging_directory(self):
+        return vine_get_runtime_path_log(self._taskvine, None)
+
+    ##
+    # Get the staging directory of the manager
+    @property
     def staging_directory(self):
         return vine_get_runtime_path_staging(self._taskvine, None)
 
