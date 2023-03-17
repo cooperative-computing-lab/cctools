@@ -769,11 +769,17 @@ static void cleanup_worker(struct vine_manager *q, struct vine_worker_info *w)
 	struct vine_file_replica *info = NULL;
 	HASH_TABLE_ITERATE(w->current_files, cached_name, info) {
 		struct vine_file *f = hash_table_lookup(q->file_table, cached_name);
-		//delete all files, but those meant to stay at the worker
-		delete_worker_file(q, w, f->cached_name, f->flags, (~VINE_CACHE & VINE_CACHE_ALWAYS));
-	}
 
-	hash_table_clear(w->current_files,(void*)vine_file_replica_delete);
+		//check that the manager actually knows about that file, as the file
+		//may correspond to a cache-update of a file that has not been declared
+		//yet.
+		if(f) {
+			//delete all files, but those meant to stay at the worker
+			delete_worker_file(q, w, f->cached_name, f->flags, (~VINE_CACHE & VINE_CACHE_ALWAYS));
+		} else {
+			vine_file_replica_delete(info);
+		}
+	}
 }
 
 #define accumulate_stat(qs, ws, field) (qs)->field += (ws)->field
