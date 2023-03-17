@@ -104,15 +104,18 @@ int main(int argc, char *argv[])
 	vine_enable_peer_transfers(m);
 
 	printf("Declaring files...");
-	//These files do not change across vine runs, thus we cache them with VINE_CACHE_ALWAYS,
+	
+    //These archival files are only needed once right after download as they will be 
+    //transformed to the actual software files in `vine_declare_untar` below.
+	//These declarations only register the files with the manager, but do not
+	//associate them with any task (yet).
+	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL, VINE_CACHE_NEVER);
+	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL, VINE_CACHE_NEVER);
+    
+    //These files do not change across vine runs, thus we cache them with VINE_CACHE_ALWAYS,
 	//which keeps the files at the workers even when the current manager terminates.
 	//The files cached in this way are removed when the worker terminates.
 	//For files that should be only kept per workflow, use VINE_CACHE.
-	//These declarations only register the files with the manager, but do not
-	//associate them with any task (yet).
-	struct vine_file *blast_url = vine_declare_url(m, BLAST_URL, VINE_CACHE_ALWAYS);
-	struct vine_file *landm_url = vine_declare_url(m, LANDMARK_URL, VINE_CACHE_ALWAYS);
-
 	//An untar declaration is an example of a mini task. The untar declaration
 	//takes as an input another file (int this case an url), and unpacks it.
 	//The name of the directory to which it appears in each task sandbox is set
