@@ -557,9 +557,9 @@ void vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_
 
 /** Adds an execution environment to the task. The environment file specified
 is expected to expand to a directory with a bin/run_in_env file that will
-wrap the task command (e.g. a poncho or a starch file). If specified multiple
-times, environments are nested in the order given (i.e. first added is the
-first applied).
+wrap the task command (e.g. a poncho, starch file, or any other vine mini_task
+that creates such a wrapper). If specified multiple times, environments are
+nested in the order given (i.e. first added is the first applied).
 @param t A task object.
 @param f The environment file.
 */
@@ -619,6 +619,7 @@ struct vine_file * vine_declare_url( struct vine_manager *m, const char *url, vi
 @param proxy A proxy file object (e.g. from @ref vine_file_local) of a X509 proxy to use. If NULL, the
 environment variable X509_USER_PROXY and the file "$TMPDIR/$UID" are considered
 in that order. If no proxy is present, the transfer is tried without authentication.
+@param env    If not NULL, an environment file (e.g poncho or starch, see @ref vine_task_add_environment) that contains the xrootd executables. Otherwise assume xrootd is available at the worker.
 @param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
 the default), to cache it only for the current manager (VINE_CACHE), or to
 cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be
@@ -626,7 +627,7 @@ or'ed (|) with VINE_PEER_NOSHARE if the file should not be transferred among
 workers when peer transfers are enabled (@ref vine_enable_peer_transfers).
 @return A file object to use in @ref vine_task_add_input
 */
-struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy, vine_file_flags_t flags );
+struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy, struct vine_file *env, vine_file_flags_t flags );
 
 
 /** Create a file object of a remote file accessible from a chirp server.
@@ -634,7 +635,7 @@ struct vine_file * vine_declare_xrootd( struct vine_manager *m, const char *sour
 @param server The chirp server address of the form "hostname[:port"]"
 @param source The name of the file in the server
 @param ticket If not NULL, a file object that provides a chirp an authentication ticket
-@param env    If not NULL, an environment file (e.g poncho or starch) that contains the chirp executables. Otherwise assume chirp is available at the worker.
+@param env    If not NULL, an environment file (e.g poncho or starch, see @ref vine_task_add_environment) that contains the chirp executables. Otherwise assume chirp is available at the worker.
 @param flags Whether to never cache the file at the workers (VINE_CACHE_NEVER,
 the default), to cache it only for the current manager (VINE_CACHE), or to
 cache it for the lifetime of the worker (VINE_CACHE_ALWAYS). Cache flags can be

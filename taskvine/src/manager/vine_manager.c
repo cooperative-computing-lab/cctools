@@ -5109,9 +5109,9 @@ struct vine_file *vine_declare_starch( struct vine_manager *m, struct vine_file 
 	return vine_manager_declare_file(m, t);
 }
 
-struct vine_file *vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy, vine_file_flags_t flags)
+struct vine_file *vine_declare_xrootd( struct vine_manager *m, const char *source, struct vine_file *proxy, struct vine_file *env, vine_file_flags_t flags)
 {
-	struct vine_file *t = vine_file_xrootd(source, proxy, flags);
+	struct vine_file *t = vine_file_xrootd(source, proxy, env, flags);
 	return vine_manager_declare_file(m, t);
 }
 

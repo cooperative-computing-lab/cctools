@@ -52,14 +52,18 @@ def create_env(env_name):
 
 if __name__ == "__main__":
 
-    env_with_xrootd = None
-    # uncomment the following lines only if workers don't have uproot and xrootd
-    # available
-    # env_with_xrootd = "xrootd_py_env.tar.gz"
-    # create_env(env_with_xrootd)
-
     m = vine.Manager()
     print("listening on port", m.port)
+
+
+    env = None
+    # uncomment the following lines only if workers don't have uproot and xrootd
+    # available
+    # env_filename = "xrootd_py_env.tar.gz"
+    # create_env(env_filename)
+    # package = m.declare_file(env_filename, cache=True)
+    # env = m.declare_poncho(package, cache=True)
+    # m.declare_xrootd(env_filename, env=env, cache=True)
 
     # define the authentication file to use.
     # if not give, taskvine will try to find one in the default places
@@ -69,8 +73,8 @@ if __name__ == "__main__":
 
     for root_file in root_files:
         t = vine.PythonTask(count_events, "myroot.file")
-        t.add_input(m.declare_xrootd(root_file, proxy_file, cache=True), "myroot.file")
-        t.set_environment(env_with_xrootd)
+        f = m.declare_xrootd(root_file, proxy_file, env_with_xrootd, cache=True)
+        t.add_input(m.declare_xrootd(root_file, proxy_file, f, cache=True), "myroot.file")
 
         task_id = m.submit(t)
         print("submitted task (id# " + str(task_id) + "): count_events()")

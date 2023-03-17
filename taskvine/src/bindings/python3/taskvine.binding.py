@@ -494,7 +494,8 @@ class Task(object):
     ##
     # Adds an execution environment to the task. The environment file specified
     # is expected to expand to a directory with a bin/run_in_env file that will wrap
-    # the task command (e.g. a poncho or a starch file). If specified multiple times,
+    # the task command (e.g. a poncho or a starch file, or any other vine mini_task
+    # that creates such a wrapper). If specified multiple times,
     # environments are nested in the order given (i.e. first added is the first applied).
     # @param t A task object.
     # @param f The environment file.
@@ -2200,18 +2201,26 @@ class Manager(object):
     #               environment variable X509_USER_PROXY and the file
     #               "$TMPDIR/$UID" are considered in that order. If no proxy is
     #               present, the transfer is tried without authentication.
-    # @param cache   If True or 'workflow', cache the file at workers for reuse
-    #                until the end of the workflow. If 'always', the file is cache until the
-    #                end-of-life of the worker. Default is False (file is not cache).
+    # @param env    If not None, an environment file (e.g poncho or starch, see Task.add_environment)
+    #               that contains the xrootd executables. Otherwise assume xrootd is available
+    #               at the worker.
+    # @param cache  If True or 'workflow', cache the file at workers for reuse
+    #               until the end of the workflow. If 'always', the file is cache until the
+    #               end-of-life of the worker. Default is False (file is not cache).
     # @param peer_transfer   Whether the file can be transfered between workers when
     #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
     # @return A file object to use in @ref Task.add_input
-    def declare_xrootd(self, source, proxy=None, cache=False, peer_transfer=True):
+    def declare_xrootd(self, source, proxy=None, env=None, cache=False, peer_transfer=True):
         proxy_c = None
         if proxy:
             proxy_c = proxy._file
+
+        env_c = None
+        if env:
+            env_c = env._file
+
         flags = Task._determine_file_flags(cache, peer_transfer)
-        f = vine_declare_xrootd(self._taskvine, source, proxy_c, flags)
+        f = vine_declare_xrootd(self._taskvine, source, proxy_c, env_c, flags)
         return File(f)
 
     ##
