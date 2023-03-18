@@ -94,6 +94,10 @@ class Task(object):
         if isinstance(command, dict):
             raise TypeError(f"{command} is not a str. Did you mean **{command}?")
 
+        # python dels regular tasks when they go out of scope.
+        # mini tasks are freed when the manager frees their associated file structure
+        self._manager_will_free = False
+
         self._task = vine_task_create(command)
         if not self._task:
             raise Exception("Unable to create internal Task structure")
@@ -148,6 +152,8 @@ class Task(object):
 
     def __del__(self):
         try:
+            if self._manager_will_free:
+                return
             if self._task:
                 vine_task_delete(self._task)
         except Exception:
@@ -2038,6 +2044,10 @@ class Manager(object):
     def declare_minitask(self, minitask, cache=False, peer_transfer=True):
         flags = Task._determine_file_flags(cache, peer_transfer)
         f = vine_declare_mini_task(self._taskvine, minitask._task, flags)
+
+        # minitasks are freed when the manager frees its related file structure
+        minitask._manager_will_free = True
+
         return File(f)
 
     ##
