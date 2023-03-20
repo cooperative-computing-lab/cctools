@@ -84,6 +84,20 @@ def _download_micromamba(env_dir):
 
     return os.path.join(env_dir, "bin", "micromamba")
 
+def _copy_run_in_env(env_dir):
+    candidate = shutil.which('poncho_package_run')
+    if not candidate:
+        logger.error('could not find poncho_package_run. Please add it to the PATH.')
+        sys.exit(1)
+
+    shutil.copy(candidate, f'{env_dir}/env/bin/poncho_package_run')
+    with open(f'{env_dir}/env/bin/run_in_env', "w") as f:
+        f.write('#! /bin/sh\n')
+        f.write('env_dir=$(dirname $( cd -- "$( dirname -- "$0" )" > /dev/null 2>&1 && pwd ))\n')
+        f.write('exec "${env_dir}"/bin/poncho_package_run -e ${env_dir} "$@"\n')
+    os.chmod(f'{env_dir}/env/bin/run_in_env', 0o755)
+
+
 def pack_env(spec, output, conda_executable=None, download_micromamba=None):
     # record packages installed as editable from pip
     local_pip_pkgs = _find_local_pip()
@@ -116,6 +130,8 @@ def pack_env(spec, output, conda_executable=None, download_micromamba=None):
 
         logger.info('copying spec to environment...')
         shutil.copy(f'{env_dir}/conda_spec.yml', f'{env_dir}/env/conda_spec.yml')
+
+        _copy_run_in_env(env_dir)
 
         logger.info('generating environment file...')
 
