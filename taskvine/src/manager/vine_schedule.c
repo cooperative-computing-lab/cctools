@@ -122,10 +122,13 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 		if( check_worker_against_task(q, w, t) ) {
 			task_cached_bytes = 0;
 			LIST_ITERATE(t->input_mounts,m) {
-				if(m->file->type == VINE_FILE  && (m->flags & VINE_CACHE)) {
-					remote_info = hash_table_lookup(w->current_files, m->file->cached_name);
-					if(remote_info)
+				remote_info = hash_table_lookup(w->current_files, m->file->cached_name);
+				if(remote_info) {
+					if(m->file->type == VINE_FILE) {
 						task_cached_bytes += remote_info->size;
+					}
+				} else if(m->file->flags & VINE_STRICT_INPUT) {
+					break;
 				}
 			}
 
@@ -456,4 +459,41 @@ void vine_schedule_check_for_large_tasks( struct vine_manager *q )
 	}
 
 	rmsummary_delete(largest_unfit_task);
+}
+
+
+/*
+Determine whether there is a worker that can fit the task and that has all its strict inputs.
+*/
+int vine_schedule_check_inputs(struct vine_manager *q, struct vine_task *t)
+{
+	char *key;
+	struct vine_worker_info *w;
+	struct vine_file_replica *remote_info;
+	struct vine_mount *m;
+
+	if(!t->has_strict_inputs) {
+		return 1;
+	}
+
+	HASH_TABLE_ITERATE(q->worker_table,key,w) {
+		if( !is_task_larger_than_worker(q, t, w) ) {
+			int missing_input = 0;
+			LIST_ITERATE(t->input_mounts,m) {
+				if(m->file->flags & VINE_STRICT_INPUT) {
+					remote_info = hash_table_lookup(w->current_files, m->file->cached_name);
+					if(!remote_info) {
+						missing_input = 1;
+						break;
+					}
+				}
+			}
+
+			if(!missing_input) {
+				return 1;
+			}
+		}
+	}
+
+	return 0;
 }

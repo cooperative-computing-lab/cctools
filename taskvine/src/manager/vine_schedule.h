@@ -20,5 +20,6 @@ This module is private to the manager and should not be invoked by the end user.
 
 struct vine_worker_info *vine_schedule_task_to_worker( struct vine_manager *q, struct vine_task *t );
 void vine_schedule_check_for_large_tasks( struct vine_manager *q );
+int vine_schedule_check_inputs(struct vine_manager *q, struct vine_task *t);
 
 #endif
