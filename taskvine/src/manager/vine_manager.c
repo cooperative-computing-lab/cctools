@@ -3662,6 +3662,9 @@ const char *vine_result_string(vine_result_t result) {
 		case VINE_RESULT_OUTPUT_TRANSFER_ERROR:
 			str = "OUTPUT_TRANSFER_ERROR";
 			break;
+		case VINE_RESULT_WORKER_MISSING:
+			str = "WORKER_MISSING";
+			break;
 	}
 
 	return str;

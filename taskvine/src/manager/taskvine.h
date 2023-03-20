@@ -41,10 +41,11 @@ expected events.
 /** Select optional handling for input and output files: caching, unpacking, watching, etc. **/
 
 typedef enum {
-	VINE_TRANSFER_ALWAYS = 0, /**< Always transfer this file when needed (only option for input files, see below for output files). */
-	VINE_WATCH = 1,           /**< Watch the output file and send back changes as the task runs. */
-	VINE_FAILURE_ONLY = 2,    /**< Only return this output file if the task failed.  (Useful for returning large log files.) */
-	VINE_SUCCESS_ONLY = 4,    /**< Only return this output file if the task succeeded. */
+	VINE_TRANSFER_ALWAYS = 0, /**< Always transfer this file when needed. */
+	VINE_STRICT_INPUT  = 1,   /**< Never transfer this input file to a worker for execution. Task won't be dispatched to a worker unless file is already cached there.*/
+	VINE_WATCH = 2,           /**< Watch the output file and send back changes as the task runs. */
+	VINE_FAILURE_ONLY = 4,    /**< Only return this output file if the task failed.  (Useful for returning large log files.) */
+	VINE_SUCCESS_ONLY = 8,    /**< Only return this output file if the task succeeded. */
 } vine_mount_flags_t;
 
 // To see if file should be cached, used: (flags & VINE_CACHE). If it should
@@ -84,7 +85,8 @@ typedef enum {
 	VINE_RESULT_MAX_RETRIES         = 6 << 3, /**< The task could not be completed successfully in the given number of retries. **/
 	VINE_RESULT_MAX_WALL_TIME       = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
 	VINE_RESULT_RMONITOR_ERROR      = 8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
-	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
+	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3,  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
+	VINE_RESULT_WORKER_MISSING      = 10 << 3 /**< The task failed because no worker could satisfy strict input file requirements. */
 } vine_result_t;
 
 /** Possible states of a task, given by @ref vine_task_state */
