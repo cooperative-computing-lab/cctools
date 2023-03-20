@@ -1211,7 +1211,7 @@ static int enforce_waiting_strict_inputs(struct vine_manager *q)
 		count--;
 
 		t = list_pop_head(q->ready_list);
-		if(t->has_strict_inputs && !vine_schedule_check_inputs(q, t)) {
+		if(t->has_fixed_locations && !vine_schedule_check_inputs(q, t)) {
 			vine_task_set_result(t, VINE_RESULT_WORKER_MISSING);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			terminated++;
@@ -3796,7 +3796,7 @@ int vine_submit(struct vine_manager *q, struct vine_task *t)
 	/* Issue warnings if the files are set up strangely. */
 	vine_task_check_consistency(t);
 
-	if(t->has_strict_inputs) {
+	if(t->has_fixed_locations) {
 		vine_task_set_scheduler(t, VINE_SCHEDULE_FILES);
 	}
 

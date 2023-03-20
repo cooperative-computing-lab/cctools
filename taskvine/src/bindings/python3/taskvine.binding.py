@@ -180,7 +180,7 @@ class Task(object):
         if success_only:
             flags |= VINE_SUCCESS_ONLY
         if strict_input:
-            flags |= VINE_STRICT_INPUT
+            flags |= VINE_FIXED_LOCATION
         return flags
 
     @staticmethod

@@ -42,7 +42,7 @@ expected events.
 
 typedef enum {
 	VINE_TRANSFER_ALWAYS = 0, /**< Always transfer this file when needed. */
-	VINE_STRICT_INPUT  = 1,   /**< Never transfer this input file to a worker for execution. Task won't be dispatched to a worker unless file is already cached there.*/
+	VINE_FIXED_LOCATION  = 1,   /**< Never transfer input files with this flag to a worker for execution. Task won't be dispatched to a worker unless file is already cached there.*/
 	VINE_WATCH = 2,           /**< Watch the output file and send back changes as the task runs. */
 	VINE_FAILURE_ONLY = 4,    /**< Only return this output file if the task failed.  (Useful for returning large log files.) */
 	VINE_SUCCESS_ONLY = 8,    /**< Only return this output file if the task succeeded. */

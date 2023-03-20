@@ -127,7 +127,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 					if(m->file->type == VINE_FILE) {
 						task_cached_bytes += remote_info->size;
 					}
-				} else if(m->file->flags & VINE_STRICT_INPUT) {
+				} else if(m->file->flags & VINE_FIXED_LOCATION) {
 					break;
 				}
 			}
@@ -472,7 +472,7 @@ int vine_schedule_check_inputs(struct vine_manager *q, struct vine_task *t)
 	struct vine_file_replica *remote_info;
 	struct vine_mount *m;
 
-	if(!t->has_strict_inputs) {
+	if(!t->has_fixed_locations) {
 		return 1;
 	}
 
@@ -480,7 +480,7 @@ int vine_schedule_check_inputs(struct vine_manager *q, struct vine_task *t)
 		if( !is_task_larger_than_worker(q, t, w) ) {
 			int missing_input = 0;
 			LIST_ITERATE(t->input_mounts,m) {
-				if(m->file->flags & VINE_STRICT_INPUT) {
+				if(m->file->flags & VINE_FIXED_LOCATION) {
 					remote_info = hash_table_lookup(w->current_files, m->file->cached_name);
 					if(!remote_info) {
 						missing_input = 1;

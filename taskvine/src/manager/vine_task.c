@@ -415,7 +415,7 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 		fatal("%s: invalid remote name %s: cannot start with a slash.",__func__,remote_name);
 	}
 
-	t->has_strict_inputs |= flags & VINE_STRICT_INPUT;
+	t->has_fixed_locations |= flags & VINE_FIXED_LOCATION;
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
 
