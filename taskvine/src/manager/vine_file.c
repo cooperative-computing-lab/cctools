@@ -161,9 +161,10 @@ struct vine_file * vine_file_untar( struct vine_file *f, vine_file_flags_t flags
 
 struct vine_file * vine_file_poncho( struct vine_file *f, vine_file_flags_t flags )
 {
-	struct vine_task *t = vine_task_create("./poncho_package_run --unpack-to output -e package.tar.gz");
-	char * poncho_path = path_which("poncho_package_run");
-	vine_task_add_input(t, vine_file_local(poncho_path, VINE_CACHE_ALWAYS), "poncho_package_run", 0);
+	char *cmd = string_format("mkdir output && tar xf package.tar.gz -C output && output/bin/run_in_env");
+	struct vine_task *t = vine_task_create(cmd);
+	free(cmd);
+
 	vine_task_add_input(t, f, "package.tar.gz", 0);
 	vine_task_add_output(t, vine_file_local("output", flags), "output", 0);
 	return vine_file_mini_task(t, 0);
