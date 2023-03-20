@@ -102,6 +102,11 @@ if __name__ == "__main__":
     # myroot.file when the task executes.
     t.add_input(f, "myroot.file")
 
+    # add the python environment to the task if needed. This will wrap the
+    # command line so that it executes in the environment defined above.
+    if env:
+        t.add_environment(env)
+
     task_id = m.submit(t)
 
     print("submitted task (id# " + str(task_id) + "): count_events()")
