@@ -7,7 +7,7 @@
 # This example shows how to declare an chirp file so that it can be cached at
 # the workers.
 # It assumes that chirp is installed where workers are executed. If this is
-# not the case, a poncho recipe to construct this environment is also given.
+# not the case, a starch recipe to construct this environment is also given.
 #
 
 import taskvine as vine

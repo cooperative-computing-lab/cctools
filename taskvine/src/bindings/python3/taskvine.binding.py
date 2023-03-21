@@ -791,17 +791,6 @@ class PythonTask(Task):
             self._output_loaded = True
         return self._output
 
-    def set_environment(self, env_file, remote_name="run_env_dir"):
-        if env_file:
-            self.add_input(env_file, remote_name)
-            remote_env_dir = remote_name
-        else:
-            remote_env_dir = None
-
-        self._command = self._python_function_command(remote_env_dir)
-        vine_task_set_command(self._task, self._command)
-
-
     def __del__(self):
         try:
             if self._tmpdir and os.path.exists(self._tmpdir):
@@ -823,10 +812,6 @@ class PythonTask(Task):
             py_exec = f"python{sys.version_info[0]}"
 
         command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._out_file}"
-        if remote_env_dir:
-            # assumes poncho_package_run is in the expanded env
-            command = f'{remote_env_dir}/bin/poncho_package_run -e {remote_env_dir} {cmd}'
-
         return command
 
     def _add_IO_files(self, manager):
@@ -1713,7 +1698,7 @@ class Manager(object):
             if num == chunksize:
                 p_task = PythonTask(fpairs, fn, task)
                 if env:
-                    p_task.set_environment(env)
+                    p_task.add_environment(env)
 
                 p_task.set_tag(str(num_task))
                 self.submit(p_task)

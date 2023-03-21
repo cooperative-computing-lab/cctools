@@ -23,16 +23,22 @@
 #
 # By default, the task will run assuming that the worker is executing inside an
 # appropiate  python environment. If this is not the case, an environment file
-# can be specified with: `t.set_environment("env.tar.gz")`, in which
-# env.tar.gz is created with the conda-pack module, and has at least a python
-# installation, the dill module, and the conda module.
+# can be specified with: `t.add_environment("env.tar.gz")`, in which
+# env.tar.gz is created with the poncho_package_create tool, and has at least a python
+# installation, with dill.
 #
-# A minimal conda environment 'my-minimal-env.tar.gz' can be created with:
+# A minimal conda environment 'env.tar.gz' can be created with:
 #
-# conda create -y -p my-minimal-env python=3.8 dill conda
-# conda install -y -p my-minimal-env -c conda-forge conda-pack
-# conda install -y -p my-minimal-env pip and conda install other modules, etc.
-# conda run -p my-minimal-env conda-pack
+# poncho spec in a json file: spec.json (change python version to your current python installation)
+"""
+{
+    "conda": {
+        "channels": ["conda-forge"],
+        "dependencies": ["python=3.X", "dill"]
+    }
+}
+"""
+# poncho_package_create spec.json env.tar.gz
 
 
 import taskvine as vine
@@ -43,11 +49,17 @@ def divide(dividend, divisor):
 
 def main():
     q = vine.Manager(9123)
+
+
+    env_file = None
+    # if python environment is missing, create an environment as explained
+    # above,  and uncomment next line.
+    # env_file = m.declare_poncho("env.tar.gz", cache=True)
+    env_file = q.declare_poncho("output.tar.gz", cache=True)
+
     for i in range(1, 16):
         p_task = vine.PythonTask(divide, 1, i**2)
-
-        # if python environment is missing at worker...
-        #p_task.set_environment("env.tar.gz")
+        p_task.add_environment(env_file)
 
         q.submit(p_task)
 
@@ -60,7 +72,7 @@ def main():
                 print(f"Task {t.id} failed and did not generate a result.")
             else:
                 total_sum += x
-        print(total_sum)
+            print(total_sum)
 
 
 if __name__ == '__main__':
