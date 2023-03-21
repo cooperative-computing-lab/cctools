@@ -86,7 +86,7 @@ typedef enum {
 	VINE_RESULT_MAX_WALL_TIME       = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
 	VINE_RESULT_RMONITOR_ERROR      = 8 << 3, /**< The task failed because the monitor did not produce a summary report. **/
 	VINE_RESULT_OUTPUT_TRANSFER_ERROR = 9 << 3,  /**< The task failed because an output could be transfered to the manager (not enough disk space, incorrect write permissions. */
-	VINE_RESULT_WORKER_MISSING      = 10 << 3 /**< The task failed because no worker could satisfy strict input file requirements. */
+	VINE_RESULT_FIXED_LOCATION_MISSING = 10 << 3 /**< The task failed because no worker could satisfy the fixed location input file requirements. */
 } vine_result_t;
 
 /** Possible states of a task, given by @ref vine_task_state */

@@ -1212,7 +1212,7 @@ static int enforce_waiting_fixed_locations(struct vine_manager *q)
 
 		t = list_pop_head(q->ready_list);
 		if(t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
-			vine_task_set_result(t, VINE_RESULT_WORKER_MISSING);
+			vine_task_set_result(t, VINE_RESULT_FIXED_LOCATION_MISSING);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			terminated++;
 		} else {
@@ -3690,8 +3690,8 @@ const char *vine_result_string(vine_result_t result) {
 		case VINE_RESULT_OUTPUT_TRANSFER_ERROR:
 			str = "OUTPUT_TRANSFER_ERROR";
 			break;
-		case VINE_RESULT_WORKER_MISSING:
-			str = "WORKER_MISSING";
+		case VINE_RESULT_FIXED_LOCATION_MISSING:
+			str = "FIXED_LOCATION_MISSING";
 			break;
 	}
 
