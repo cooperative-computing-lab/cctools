@@ -159,7 +159,7 @@ static struct vine_resources * local_resources = 0;
 struct vine_resources * total_resources = 0;
 struct vine_resources * total_resources_last = 0;
 
-static int64_t last_taskx_received  = 0;
+static int64_t last_task_received  = 0;
 
 /* 0 means not given as a command line option. */
 static int64_t manual_cores_option = 0;
