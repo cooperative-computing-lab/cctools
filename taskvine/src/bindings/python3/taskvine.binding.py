@@ -881,15 +881,17 @@ class Manager(object):
     # @param run_info_path Directory to write log and staging files per run. If None, defaults to "vine-run-info"
     # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
+    # @param status_display_interval Number of seconds between updates to the jupyter status display. None, or less than 1 disables it.
     #
     # @see vine_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, run_info_path="vine-run-info", ssl=None):
+    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, run_info_path="vine-run-info", ssl=None, status_display_interval=None):
         self._shutdown = shutdown
         self._taskvine = None
         self._stats = None
         self._stats_hierarchy = None
         self._task_table = {}
         self._duty_table = {}
+        self._info_widget = None
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -902,6 +904,9 @@ class Manager(object):
             pass
         except ValueError:
             raise ValueError("port should be a single integer, or a sequence of two integers")
+
+        if status_display_interval and status_display_interval >= 1:
+            self._info_widget = JupyterDisplay(interval=status_display_interval)
 
         try:
             if run_info_path:
@@ -917,15 +922,19 @@ class Manager(object):
 
             if name:
                 vine_set_name(self._taskvine, name)
+
+            self._update_status_display()
         except Exception:
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
+
 
     def _free_manager(self):
         try:
             if self._taskvine:
                 if self._shutdown:
                     self.shutdown_workers(0)
+                self._update_status_display(force=True)
                 vine_delete(self._taskvine)
                 self._taskvine = None
         except Exception:
@@ -933,6 +942,7 @@ class Manager(object):
             pass
 
     def __del__(self):
+        self._update_status_display(force=True)
         self._free_manager()
 
     def _setup_ssl(self, ssl):
@@ -956,6 +966,14 @@ class Manager(object):
             print(f"could not create temporary SSL key and cert {e}.\n{output}")
             raise e
         return (key, cert)
+
+    def _update_status_display(self, force=False):
+        try:
+            if self._info_widget and self._info_widget.active():
+                self._info_widget.update(self, force)
+        except Exception as e:
+            # no exception should cause the queue to fail
+            print(f"status display error {e}", file=sys.stderr)
 
     ##
     # Get the project name of the manager.
@@ -1599,8 +1617,12 @@ class Manager(object):
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
     def wait_for_tag(self, tag, timeout=VINE_WAIT_FOREVER):
+        self._update_status_display()
         task_pointer = vine_wait_for_tag(self._taskvine, tag, timeout)
         if task_pointer:
+            if self.empty():
+                # if last task in queue, update display
+                self._update_status_display(force=True)
             task = self._task_table[vine_task_get_id(task_pointer)]
             del self._task_table[vine_task_get_id(task_pointer)]
             return task
