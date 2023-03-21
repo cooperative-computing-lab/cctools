@@ -1676,7 +1676,7 @@ class Manager(object):
     def create_library_from_command(self, executable_path, name):
         t = LibraryTask("./library_exe", name)
         f = self.declare_file(executable_path)
-        t.add_input_file(f, "library_exe")
+        t.add_input(f, "library_exe")
         return t
 
     ##
