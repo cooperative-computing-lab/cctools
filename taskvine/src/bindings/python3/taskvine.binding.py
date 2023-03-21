@@ -1642,9 +1642,11 @@ class Manager(object):
         f = self.declare_poncho(self.declare_file(library_env_path))
         t.add_input(f, "package")
         # declare the library code as an input
-        t.add_input_file(library_code_path, "library_code.py")
+        f = self.declare_file(library_code_path)
+        t.add_input(f, "library_code.py")
         # add poncho_package_run to be able to execute the Library
-        t.add_input_file(shutil.which('poncho_package_run'), "poncho_package_run")
+        f = self.declare_file(shutil.which('poncho_package_run'))
+        t.add_input(f, "poncho_package_run")
         return t
 
     # Turn Library code created with poncho_package_serverize into a Library Task
@@ -1659,8 +1661,10 @@ class Manager(object):
         t = LibraryTask(f"./poncho_package_run -e package python ./library_code.py", name)
         f = self.declare_poncho(self.declare_file(env_path))
         t.add_input(f, "package")
-        t.add_input_file(library_path, "library_code.py")
-        t.add_input_file(shutil.which('poncho_package_run'), "poncho_package_run")
+        f = self.declare_file(library_path)
+        t.add_input(f, "library_code.py")
+        f = self.declare_file(shutil.which("poncho_package_run"))
+        t.add_input(f, "poncho_package_run")
         return t
 
     # Create a Library task from arbitrary inputs
@@ -1671,7 +1675,8 @@ class Manager(object):
     # @param name            Name of the library to be created
     def create_library_from_command(self, executable_path, name):
         t = LibraryTask("./library_exe", name)
-        t.add_input_file(executable_path, "library_exe")
+        f = self.declare_file(executable_path)
+        t.add_input_file(f, "library_exe")
         return t
 
     ##

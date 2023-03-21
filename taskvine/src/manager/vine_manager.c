@@ -3857,6 +3857,7 @@ static void handle_library_update(struct vine_manager *q, struct vine_worker_inf
 
 	if(state == VINE_LIBRARY_STARTED) {
 		debug(D_VINE, "Library %d started on %s\n", library_id, w->workerid);
+		itable_remove(w->current_tasks_boxes, library_id);
 	}
 
 	vine_txn_log_write_library_update(q, w, library_id, state);
