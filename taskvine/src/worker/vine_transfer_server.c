@@ -98,6 +98,10 @@ void vine_transfer_server_start( struct vine_cache *cache )
 {
 	transfer_link = link_serve(0);
 
+	if(!transfer_link) {
+		fatal("unable to find a port to start a transfer server.");
+	}
+
 	transfer_server_pid = fork();
 	if(transfer_server_pid==0) {
 		// consider closing additional resources here?
