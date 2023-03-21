@@ -31,8 +31,8 @@ if __name__ == "__main__":
     for i in range(n):
         t = vine.Task("./vine_example_watch_trickle.sh > output")
 
-        input_script = m.declare_file("vine_example_watch_trickle.sh")
-        t.add_input(input_script, "vine_example_watch_trickle.sh", cache=True)
+        input_script = m.declare_file("vine_example_watch_trickle.sh", cache=True)
+        t.add_input(input_script, "vine_example_watch_trickle.sh")
 
         output = m.declare_file(f"output.{i}")
         t.add_output(output, "output", watch=True)

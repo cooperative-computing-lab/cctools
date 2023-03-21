@@ -54,6 +54,11 @@ class File(object):
     def __init__(self, internal_file):
         self._file = internal_file
 
+    def __bool__(self):
+        # We need this because the len of some files is 0, which would evaluate
+        # to false.
+        return True
+
     ##
     # Return the contents of a file object as a string.
     # Typically used to return the contents of an output buffer.
@@ -82,32 +87,108 @@ class Task(object):
     #
     # @param self       Reference to the current task object.
     # @param command    The shell command line to be exected by the task.
-    def __init__(self, command):
+    # @param task_info  Optional dictionary containing specified task parameters.
+    def __init__(self, command, **task_info):
         self._task = None
+
+        if isinstance(command, dict):
+            raise TypeError(f"{command} is not a str. Did you mean **{command}?")
+
+        # python dels regular tasks when they go out of scope.
+        # mini tasks are freed when the manager frees their associated file structure
+        self._manager_will_free = False
 
         self._task = vine_task_create(command)
         if not self._task:
             raise Exception("Unable to create internal Task structure")
 
+        attributes = [
+            "coprocess", "scheduler", "tag", "category",
+            "snapshot_file", "retries", "cores", "memory",
+            "disk", "gpus", "priority", "time_end",
+            "time_start", "time_max", "time_min", "monitor_output"
+        ]
+
+        for key in attributes:
+            self._set_from_dict(task_info, key)
+
+        if "features" in task_info:
+            if isinstance(task_info["features"], str):
+                self.add_feature(task_info["features"])
+            elif isinstance(task_info["features"], list):
+                for feature in task_info["features"]:
+                    self.add_feature(feature)
+            else:
+                raise Exception("Unable to create internal Task structure")
+
+        if "inputs" in task_info:
+            for key, value in task_info["inputs"].items():
+                if not isinstance(key, File):
+                    raise TypeError(f"{key} is not a TaskVine file")
+                if isinstance(value, dict):
+                    parameters = value
+                elif isinstance(value, str):
+                    parameters = { "remote_name": value }
+                else:
+                    raise TypeError(f"{value} is not a str or dict")
+                self.add_input(key, **parameters)
+
+        if "outputs" in task_info:
+            for key, value in task_info["outputs"].items():
+                if not isinstance(key, File):
+                    raise TypeError(f"{key} is not a TaskVine file")
+                if isinstance(value, dict):
+                    parameters = value
+                elif isinstance(value, str):
+                    parameters = { "remote_name": value }
+                else:
+                    raise TypeError(f"{value} is not a str or dict")
+                print(f"self.add_output({key}, {parameters})")
+                self.add_output(key, **parameters)
+
+        if "env" in task_info:
+            for key, value in task_info["env"].items():
+                self.set_env_var(key, value)
+
     def __del__(self):
         try:
+            if self._manager_will_free:
+                return
             if self._task:
                 vine_task_delete(self._task)
         except Exception:
             # ignore exceptions, in case task has been already collected
             pass
 
+    def _set_from_dict(self, task_info, key):
+        try:
+            value = task_info[key]
+            method = f"set_{key}"
+            setter = getattr(self, method)
+            setter(value)
+        except KeyError:
+            pass
+
     @staticmethod
-    def _determine_file_flags(cache=False, watch=False, failure_only=False, success_only=False):
-        flags = VINE_NOCACHE
-        if cache:
-            flags |= VINE_CACHE
+    def _determine_mount_flags(watch=False, failure_only=False, success_only=False):
+        flags = VINE_TRANSFER_ALWAYS
         if watch:
             flags |= VINE_WATCH
         if failure_only:
             flags |= VINE_FAILURE_ONLY
         if success_only:
             flags |= VINE_SUCCESS_ONLY
+        return flags
+
+    @staticmethod
+    def _determine_file_flags(cache=False, peer_transfer=False):
+        flags = VINE_CACHE_NEVER
+        if cache is True or cache == "workflow":
+            flags |= VINE_CACHE
+        if cache == "always":
+            flags |= VINE_CACHE_ALWAYS
+        if not peer_transfer:
+            flags |= VINE_PEER_NOSHARE
         return flags
 
     ##
@@ -184,83 +265,6 @@ class Task(object):
         return vine_task_add_feature(self._task, name)
 
     ##
-    # Add a local input file to a task.
-    #
-    # @param self          Reference to the current task object.
-    # @param local_name    The name of the file on local disk or shared filesystem.
-    # @param remote_name   The name of the file at the execution site.
-    # @param cache         Whether the file should be cached at workers. Default is False.
-    #
-    # For example:
-    # @code
-    # # The following are equivalent
-    # >>> task.add_input_file("/etc/hosts", cache = True)
-    # >>> task.add_input_file("/etc/hosts", "hosts", cache = True)
-    # @endcode
-    def add_input_file(self, local_name, remote_name=None, cache=False):
-        # swig expects strings:
-        if local_name:
-            local_name = str(local_name)
-
-        if remote_name:
-            remote_name = str(remote_name)
-        else:
-            remote_name = os.path.basename(local_name)
-
-        flags = Task._determine_file_flags(cache)
-        return vine_task_add_input_file(self._task, local_name, remote_name, flags)
-
-    ##
-    # Add an input url to a task.
-    #
-    # @param self          Reference to the current task object.
-    # @param url           The url of the file to provide.
-    # @param remote_name   The name of the file as seen by the task.
-    # @param cache         Whether the file should be cached at workers (True/False)
-    #
-    # For example:
-    # @code
-    # >>> task.add_input_url("http://www.google.com/","google.txt",cache=True)
-    # @endcode
-    def add_input_url(self, url, remote_name, cache=False):
-        # swig expects strings
-        if remote_name:
-            remote_name = str(remote_name)
-
-        if url:
-            url = str(url)
-
-        flags = Task._determine_file_flags(cache)
-        return vine_task_add_input_url(self._task, url, remote_name, flags)
-
-    ##
-    # Add an input file produced by a mini task description.
-    # The mini-task will be executed at the worker and produce
-    # a cacheable file that can be shared among multiple tasks.
-    # @param self           A task object.
-    # @param mini_task      A task object that will produce the desired file.
-    #                       The task object must generate a single output file named by @ref add_output_file.
-    # @param remote_name    The name of the file as seen by the primary task.
-    # @param cache         Whether the file should be cached at workers (True/False)
-    #
-    # For example:
-    # @code
-    # >>> # Create a mini-task:
-    # >>> mini_task = Task("curl http://www.apnews.com > output.txt");
-    # >>> mini_task.add_output_file("output.txt","output.txt");
-    # >>> # Attach the output of the mini-task as the input of a main task:
-    # >>> task.add_input_mini_task(mini_task,"infile.txt",cache=True)
-    # @endcode
-    def add_input_mini_task(self, mini_task, remote_name, cache=False):
-        if remote_name:
-            remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache=cache)
-        # The minitask must be duplicated, because the C object becomes "owned"
-        # by the parent task and will be deleted when the parent task goes away.
-        copy_of_mini_task = vine_task_clone(mini_task._task)
-        return vine_task_add_input_mini_task(self._task, copy_of_mini_task, remote_name, flags)
-
-    ##
     # Add any input object to a task.
     #
     # @param self          Reference to the current task object.
@@ -273,64 +277,13 @@ class Task(object):
     # @code
     # >>> url = m.declare_url(http://somewhere.edu/data.tgz)
     # >>> f = m.declare_untar(url)
-    # >>> task.add_input(f,"data",cache=True)
+    # >>> task.add_input(f,"data")
     # @endcode
-    def add_input(self, file, remote_name, cache=None, failure_only=None):
+    def add_input(self, file, remote_name):
         # SWIG expects strings
         remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache=cache, failure_only=None)
+        flags = Task._determine_mount_flags()
         return vine_task_add_input(self._task, file._file, remote_name, flags)
-
-    ##
-    # Add an empty directory to the task.
-    # @param self           Reference to the current task object.
-    # @param remote_name    The name of the directory at the remote execution site.
-    def add_empty_dir(self, remote_name=None):
-        if remote_name:
-            remote_name = str(remote_name)
-        return vine_task_add_empty_dir(self._task, remote_name)
-
-    ##
-    # Add an input buffer to the task.
-    #
-    # @param self           Reference to the current task object.
-    # @param buffer         The contents of the buffer to pass as input.
-    # @param remote_name    The name of the remote file to create.
-    # @param cache          Whether the file should be cached at workers (True/False)
-    def add_input_buffer(self, buffer, remote_name, cache=False):
-        if remote_name:
-            remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache)
-        return vine_task_add_input_buffer(self._task, buffer, len(buffer), remote_name, flags)
-
-    ##
-    # Add a local output file to a task
-    #
-    # @param self          Reference to the current task object.
-    # @param local_name    The name of the file on local disk or shared filesystem.
-    # @param remote_name   The name of the file at the execution site.
-    # @param cache         Whether the file should be cached at workers. Default is False.
-    # @param watch         Watch the output file and send back changes as the task runs.
-    # @param failure_only  For output files, whether the file should be retrieved only when the task fails (e.g., debug logs). Default is False.
-    # @param success_only  For output files, whether the file should be retrieved only when the task succeeds. Default is False.
-    #
-    # For example:
-    # @code
-    # # The following are equivalent
-    # >>> task.add_input_file("/etc/hosts", cache = True)
-    # >>> task.add_input_file("/etc/hosts", "hosts", cache = True)
-    # @endcode
-    def add_output_file(self, local_name, remote_name=None, cache=False, watch=False, failure_only=False, success_only=False):
-        if local_name:
-            local_name = str(local_name)
-
-        if remote_name:
-            remote_name = str(remote_name)
-        else:
-            remote_name = os.path.basename(local_name)
-
-        flags = Task._determine_file_flags(cache=cache, watch=watch, failure_only=failure_only, success_only=success_only)
-        return vine_task_add_output_file(self._task, local_name, remote_name, flags)
 
     ##
     # Add any output object to a task.
@@ -348,10 +301,10 @@ class Task(object):
     # >>> file = m.declare_file("output.txt")
     # >>> task.add_output(file,"out")
     # @endcode
-    def add_output(self, file, remote_name, watch=False, cache=False, failure_only=None, success_only=None):
+    def add_output(self, file, remote_name, watch=False, failure_only=None, success_only=None):
         # SWIG expects strings
         remote_name = str(remote_name)
-        flags = Task._determine_file_flags(cache, watch, failure_only, success_only)
+        flags = Task._determine_mount_flags(watch, failure_only, success_only)
         return vine_task_add_output(self._task, file._file, remote_name, flags)
 
     ##
@@ -415,6 +368,17 @@ class Task(object):
     # @param filename       The name of the snapshot events specification
     def set_snapshot_file(self, filename):
         return vine_task_set_snapshot_file(self._task, filename)
+
+    ##
+    # Adds an execution environment to the task. The environment file specified
+    # is expected to expand to a directory with a bin/run_in_env file that will wrap
+    # the task command (e.g. a poncho or a starch file, or any other vine mini_task
+    # that creates such a wrapper). If specified multiple times,
+    # environments are nested in the order given (i.e. first added is the first applied).
+    # @param t A task object.
+    # @param f The environment file.
+    def add_environment(self, f):
+        return vine_task_add_environment(self._task, f._file)
 
     ##
     # Indicate the number of times the task should be retried. If 0 (the
@@ -783,7 +747,6 @@ class PythonTask(Task):
             raise RuntimeError("PythonTask is not available. The dill module is missing.")
 
         self._pp_run = None
-        self._env_file = None
         self._output_loaded = False
         self._output = None
         self._tmpdir = None
@@ -813,7 +776,7 @@ class PythonTask(Task):
         self._serialize_python_function(*self._fn_def)
         self._fn_def = None  # avoid possible memory leak
         self._create_wrapper()
-        self._add_IO_files()
+        self._add_IO_files(manager)
 
     ##
     # returns the result of a python task as a python variable
@@ -834,20 +797,6 @@ class PythonTask(Task):
             self._output_loaded = True
         return self._output
 
-    def set_environment(self, env_file):
-        if env_file:
-            self._env_file = env_file
-            self._pp_run = shutil.which("poncho_package_run")
-
-            if not self._pp_run:
-                raise RuntimeError("Could not find poncho_package_run in PATH.")
-
-            self._command = self._python_function_command()
-            vine_task_set_command(self._task, self._command)
-
-            self.add_input_file(self._env_file, cache=True)
-            self.add_input_file(self._pp_run, cache=True)
-
     def __del__(self):
         try:
             if self._tmpdir and os.path.exists(self._tmpdir):
@@ -862,24 +811,23 @@ class PythonTask(Task):
         with open(os.path.join(self._tmpdir, self._args_file), "wb") as wf:
             dill.dump([args, kwargs], wf, recurse=True)
 
-    def _python_function_command(self):
-        if self._env_file:
+    def _python_function_command(self, remote_env_dir=None):
+        if remote_env_dir:
             py_exec = "python"
         else:
             py_exec = f"python{sys.version_info[0]}"
 
-        command = "{py_exec} {wrapper} {function} {args} {out}".format(py_exec=py_exec, wrapper=self._wrapper, function=self._func_file, args=self._args_file, out=self._out_file)
-
-        if self._env_file:
-            command = './{pprun} -e {tar} --unpack-to "$VINE_SANDBOX"/{unpack}-env {cmd}'.format(pprun=os.path.basename(self._pp_run), unpack=os.path.basename(self._env_file), tar=os.path.basename(self._env_file), cmd=command)
-
+        command = f"{py_exec} {self._wrapper} {self._func_file} {self._args_file} {self._out_file}"
         return command
 
-    def _add_IO_files(self):
-        self.add_input_file(os.path.join(self._tmpdir, self._wrapper), cache=True)
-        self.add_input_file(os.path.join(self._tmpdir, self._func_file), cache=False)
-        self.add_input_file(os.path.join(self._tmpdir, self._args_file), cache=False)
-        self.add_output_file(os.path.join(self._tmpdir, self._out_file), cache=False)
+    def _add_IO_files(self, manager):
+        def add_files(method, *files):
+            for name in files:
+                source=os.path.join(self._tmpdir, name)
+                f = manager.declare_file(source, cache=False)
+                method(f, name)
+        add_files(self.add_input, self._wrapper, self._func_file, self._args_file)
+        add_files(self.add_output, self._out_file)
 
     ##
     # creates the wrapper script which will execute the function. pickles output.
@@ -939,15 +887,17 @@ class Manager(object):
     # @param run_info_path Directory to write log and staging files per run. If None, defaults to "vine-run-info"
     # @param ssl        A tuple of filenames (ssl_key, ssl_cert) in pem format, or True.
     #                   If not given, then TSL is not activated. If True, a self-signed temporary key and cert are generated.
+    # @param status_display_interval Number of seconds between updates to the jupyter status display. None, or less than 1 disables it.
     #
     # @see vine_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, run_info_path="vine-run-info", ssl=None):
+    def __init__(self, port=VINE_DEFAULT_PORT, name=None, shutdown=False, run_info_path="vine-run-info", ssl=None, status_display_interval=None):
         self._shutdown = shutdown
         self._taskvine = None
         self._stats = None
         self._stats_hierarchy = None
         self._task_table = {}
         self._library_table = {}
+        self._info_widget = None
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -960,6 +910,9 @@ class Manager(object):
             pass
         except ValueError:
             raise ValueError("port should be a single integer, or a sequence of two integers")
+
+        if status_display_interval and status_display_interval >= 1:
+            self._info_widget = JupyterDisplay(interval=status_display_interval)
 
         try:
             if run_info_path:
@@ -975,15 +928,19 @@ class Manager(object):
 
             if name:
                 vine_set_name(self._taskvine, name)
+
+            self._update_status_display()
         except Exception:
             sys.stderr.write("Unable to create internal taskvine structure.")
             raise
+
 
     def _free_manager(self):
         try:
             if self._taskvine:
                 if self._shutdown:
                     self.shutdown_workers(0)
+                self._update_status_display(force=True)
                 vine_delete(self._taskvine)
                 self._taskvine = None
         except Exception:
@@ -991,6 +948,7 @@ class Manager(object):
             pass
 
     def __del__(self):
+        self._update_status_display(force=True)
         self._free_manager()
 
     def _setup_ssl(self, ssl):
@@ -1015,6 +973,14 @@ class Manager(object):
             raise e
         return (key, cert)
 
+    def _update_status_display(self, force=False):
+        try:
+            if self._info_widget and self._info_widget.active():
+                self._info_widget.update(self, force)
+        except Exception as e:
+            # no exception should cause the queue to fail
+            print(f"status display error {e}", file=sys.stderr)
+
     ##
     # Get the project name of the manager.
     # @code
@@ -1032,6 +998,12 @@ class Manager(object):
     @property
     def port(self):
         return vine_port(self._taskvine)
+
+    ##
+    # Get the staging directory of the manager
+    @property
+    def logging_directory(self):
+        return vine_get_runtime_path_log(self._taskvine, None)
 
     ##
     # Get the staging directory of the manager
@@ -1725,8 +1697,12 @@ class Manager(object):
     # @param timeout    The number of seconds to wait for a completed task
     #                   before returning.
     def wait_for_tag(self, tag, timeout=VINE_WAIT_FOREVER):
+        self._update_status_display()
         task_pointer = vine_wait_for_tag(self._taskvine, tag, timeout)
         if task_pointer:
+            if self.empty():
+                # if last task in queue, update display
+                self._update_status_display(force=True)
             task = self._task_table[vine_task_get_id(task_pointer)]
             del self._task_table[vine_task_get_id(task_pointer)]
             return task
@@ -1824,7 +1800,7 @@ class Manager(object):
             if num == chunksize:
                 p_task = PythonTask(fpairs, fn, task)
                 if env:
-                    p_task.set_environment(env)
+                    p_task.add_environment(env)
 
                 p_task.set_tag(str(num_task))
                 self.submit(p_task)
@@ -2070,15 +2046,33 @@ class Manager(object):
     #
     # @param self    The manager to register this file
     # @param path    The path to the local file
-    def declare_file(self, path):
-        f = vine_declare_file(self._taskvine, path)
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'always', the file is cache until the
+    #                end-of-life of the worker. Default is False (file is not cache).
+    # @param peer_transfer   Whether the file can be transfered between workers when
+    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
+    # @return
+    # A file object to use in @ref Task.add_input or @ref Task.add_output
+    def declare_file(self, path, cache=False, peer_transfer=True):
+        flags = Task._determine_file_flags(cache, peer_transfer)
+        f = vine_declare_file(self._taskvine, path, flags)
         return File(f)
+
+    ##
+    # Remove file from workers, undeclare it at the manager.
+    # Note that this does not remove the file's local copy at the manager, if any.
+    #
+    # @param self    The manager to register this file
+    # @param file    The file object
+    def remove_file(self, file):
+        vine_remove_file(self._taskvine, file._file)
 
     ##
     # Declare an anonymous file has no initial content, but is created as the
     # output of a task, and may be consumed by other tasks.
     #
     # @param manager    The manager to register this file
+    # @return A file object to use in @ref Task.add_input or @ref Task.add_output
     def declare_temp(self):
         f = vine_declare_temp(self._taskvine)
         return File(f)
@@ -2088,9 +2082,16 @@ class Manager(object):
     #
     # @param self    The manager to register this file
     # @param url     The url of the file.
-    def declare_url(self, url):
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'always', the file is cache until the
+    #                end-of-life of the worker. Default is False (file is not cache).
+    # @param peer_transfer   Whether the file can be transfered between workers when
+    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref Task.add_input
+    def declare_url(self, url, cache=False, peer_transfer=True):
+        flags = Task._determine_file_flags(cache, peer_transfer)
         url = str(url)
-        f = vine_declare_url(self._taskvine, url)
+        f = vine_declare_url(self._taskvine, url, flags)
         return File(f)
 
     ##
@@ -2098,6 +2099,12 @@ class Manager(object):
     #
     # @param self    The manager to register this file
     # @param buffer  The contents of the buffer, or None for an empty output buffer
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'always', the file is cache until the
+    #                end-of-life of the worker. Default is False (file is not cache).
+    # @param peer_transfer   Whether the file can be transfered between workers when
+    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref Task.add_input
     #
     # For example:
     # @code
@@ -2106,12 +2113,13 @@ class Manager(object):
     # >>> print(f.contents())
     # >>> "hello pirate ♆"
     # @endcode
-    def declare_buffer(self, buffer=None):
+    def declare_buffer(self, buffer=None, cache=False, peer_transfer=True):
         # because of the swig typemap, vine_declare_buffer(m, buffer, size) is changed
         # to a function with just two arguments.
+        flags = Task._determine_file_flags(cache, peer_transfer)
         if isinstance(buffer, str):
             buffer = bytes(buffer, "utf-8")
-        f = vine_declare_buffer(self._taskvine, buffer)
+        f = vine_declare_buffer(self._taskvine, buffer, flags)
         return File(f)
 
     ##
@@ -2119,8 +2127,14 @@ class Manager(object):
     #
     # @param self     The manager to register this file
     # @param minitask The task to execute in order to produce a file
-    def declare_minitask(self, minitask):
-        f = vine_declare_mini_task(self._taskvine, minitask._task)
+    # @return A file object to use in @ref Task.add_input
+    def declare_minitask(self, minitask, cache=False, peer_transfer=True):
+        flags = Task._determine_file_flags(cache, peer_transfer)
+        f = vine_declare_mini_task(self._taskvine, minitask._task, flags)
+
+        # minitasks are freed when the manager frees its related file structure
+        minitask._manager_will_free = True
+
         return File(f)
 
     ##
@@ -2128,26 +2142,40 @@ class Manager(object):
     #
     # @param manager    The manager to register this file
     # @param tarball    The file object to un-tar
-    def declare_untar(self, tarball):
-        f = vine_declare_untar(self._taskvine, tarball._file)
+    # @return A file object to use in @ref Task.add_input
+    def declare_untar(self, tarball, cache=False, peer_transfer=True):
+        flags = Task._determine_file_flags(cache, peer_transfer)
+        f = vine_declare_untar(self._taskvine, tarball._file, flags)
         return File(f)
 
     ##
     # Declare a file that sets up a poncho environment
     #
     # @param self    The manager to register this file
-    # @param package The poncho or conda-pack environment tarball
-    def declare_poncho(self, package):
-        f = vine_declare_poncho(self._taskvine, package._file)
+    # @param package The poncho environment tarball. Either a vine file or a
+    #                string representing a local file.
+    # @return A file object to use in @ref Task.add_input
+    def declare_poncho(self, package, cache=False, peer_transfer=True):
+        if isinstance(package, str):
+            package = self.declare_file(package, cache=True)
+
+        flags = Task._determine_file_flags(cache, peer_transfer)
+        f = vine_declare_poncho(self._taskvine, package._file, flags)
         return File(f)
 
     ##
     # Declare a file create a file by unpacking a starch package.
     #
     # @param self    The manager to register this file
-    # @param starch  The startch .sfx file
-    def declare_starch(self, starch):
-        f = vine_declare_starch(self._taskvine, starch._file)
+    # @param starch  The startch .sfx file. Either a vine file or a string
+    #                representing a local file.
+    # @return A file object to use in @ref Task.add_input
+    def declare_starch(self, starch, cache=False, peer_transfer=True):
+        if isinstance(starch, str):
+            starch = self.declare_file(starch, cache=True)
+
+        flags = Task._determine_file_flags(cache, peer_transfer)
+        f = vine_declare_starch(self._taskvine, starch._file, flags)
         return File(f)
 
     ##
@@ -2159,11 +2187,55 @@ class Manager(object):
     #               environment variable X509_USER_PROXY and the file
     #               "$TMPDIR/$UID" are considered in that order. If no proxy is
     #               present, the transfer is tried without authentication.
-    def declare_xrootd(self, source, proxy=None):
+    # @param env    If not None, an environment file (e.g poncho or starch, see Task.add_environment)
+    #               that contains the xrootd executables. Otherwise assume xrootd is available
+    #               at the worker.
+    # @param cache  If True or 'workflow', cache the file at workers for reuse
+    #               until the end of the workflow. If 'always', the file is cache until the
+    #               end-of-life of the worker. Default is False (file is not cache).
+    # @param peer_transfer   Whether the file can be transfered between workers when
+    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref Task.add_input
+    def declare_xrootd(self, source, proxy=None, env=None, cache=False, peer_transfer=True):
         proxy_c = None
         if proxy:
             proxy_c = proxy._file
-        f = vine_declare_xrootd(self._taskvine, source, proxy_c)
+
+        env_c = None
+        if env:
+            env_c = env._file
+
+        flags = Task._determine_file_flags(cache, peer_transfer)
+        f = vine_declare_xrootd(self._taskvine, source, proxy_c, env_c, flags)
+        return File(f)
+
+    ##
+    # Declare a file from accessible from an xrootd server.
+    #
+    # @param self   The manager to register this file.
+    # @param server The chirp server address of the form "hostname[:port"]"
+    # @param source The name of the file in the server
+    # @param ticket If not None, a file object that provides a chirp an authentication ticket
+    # @param env    If not None, an environment file (e.g poncho or starch)
+    #               that contains the chirp executables. Otherwise assume chirp is available
+    #               at the worker.
+    # @param cache   If True or 'workflow', cache the file at workers for reuse
+    #                until the end of the workflow. If 'always', the file is cache until the
+    #                end-of-life of the worker. Default is False (file is not cache).
+    # @param peer_transfer   Whether the file can be transfered between workers when
+    #                peer transfers are enabled (see @ref enable_peer_transfers). Default is True.
+    # @return A file object to use in @ref Task.add_input
+    def declare_chirp(self, server, source, ticket=None, env=None, cache=False, peer_transfer=True):
+        ticket_c = None
+        if ticket:
+            ticket_c = ticket._file
+
+        env_c = None
+        if env:
+            env_c = env._file
+
+        flags = Task._determine_file_flags(cache, peer_transfer)
+        f = vine_declare_chirp(self._taskvine, server, source, ticket_c, env_c, flags)
         return File(f)
 
 
@@ -2200,7 +2272,8 @@ class FunctionCall(Task):
     # @param self 	Reference to the current python task object
     # @param manager Manager to which the task was submitted
     def submit_finalize(self, manager):
-        self.add_input_buffer(json.dumps(self._event), "infile")
+        f = manager.declare_buffer(json.dumps(self._event))
+        self.add_input(f, "infile")
 
     ##
     # Specify function arguments. Accepts arrays and dictionaries. This

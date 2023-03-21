@@ -7,17 +7,16 @@
 # This example shows how to declare an xrootd file so that it can be cached at
 # the workers.
 # It assumes that uproot is installed where workers are executed. If this is
-# not the case, a poncho recipe to construct this environment is:
+# not the case, a poncho recipe to construct this environment is also given.
 #
 
 import taskvine as vine
 
+import argparse
 import os
 import sys
 
-root_files = [
-    "root://eospublic.cern.ch//eos/opendata/cms/derived-data/AOD2NanoAODOutreachTool/ForHiggsTo4Leptons/SMHiggsToZZTo4L.root",
-]
+root_file = "root://eospublic.cern.ch//eos/opendata/cms/derived-data/AOD2NanoAODOutreachTool/ForHiggsTo4Leptons/SMHiggsToZZTo4L.root"
 
 # define a python task that will be apply to each of the files.
 def count_events(root_file):
@@ -26,7 +25,7 @@ def count_events(root_file):
         return len(h['Events'])
 
 
-# construct a poncho environment to execute the tasks only needed if uproot and
+# construct a poncho environment to execute the tasks. Only needed if uproot and
 # xrootd are not available where the workers execute
 def create_env(env_name):
     import json
@@ -35,7 +34,9 @@ def create_env(env_name):
     py_version = f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}"
 
     if os.path.exists(env_name):
-        return
+        print(f"reusing existing {env_name} poncho environment...")
+    else:
+        print(f"creating {env_name} poncho environment...")
 
     env = {
             "conda": {
@@ -51,30 +52,68 @@ def create_env(env_name):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+            prog="vine_example_xrootd.py",
+            description="TaskVine example on how to declare a file from xrootd as an input. Prints the number of events in the file.")
 
-    env_with_xrootd = None
-    # uncomment the following lines only if workers don't have uproot and xrootd
-    # available
-    # env_with_xrootd = "xrootd_py_env.tar.gz"
-    # create_env(env_with_xrootd)
+    parser.add_argument('root_file', nargs='?', action='store', help='the input xrootd file', default=root_file)
+    parser.add_argument('--proxy', action='store', help='optional x509 authentication proxy', default=None)
+    parser.add_argument('--create-env', action='store_true', help='whether to create environment to ensure xrootd is available at the worker.', default=False)
 
+    args = parser.parse_args()
+
+    # create the poncho environment with xrootd if needed. This environment
+    # ensures that xrootd is available at the execution site.
+    # this just creates the environment in a local file, but does not declare
+    # it to the manager yet.
+    env_filename = None
+    if args.create_env:
+        env_filename = "xrootd_py_env.tar.gz"
+        create_env(env_filename)
+
+
+    # create the manager to now listen to connections, and register files and
+    # tasks.
     m = vine.Manager()
-    print("listening on port", m.port)
+    print(f"logs in {m.logging_directory}")
+    print(f"listening on port {m.port}")
 
-    # define the authentication file to use.
-    # if not give, taskvine will try to find one in the default places
-    # (X509_USER_PROXY, or /tmp/x509up_uUID)
-    proxy_file = None
-    # proxy_file = vine.declare_file("myproxy.pem")
+    # declare proxy and env file if needed. These vine files that can
+    # be used as input to tasks.
+    # if a proxy is not give, taskvine will try to find one in the default
+    # places (X509_USER_PROXY, or /tmp/x509up_uUID)
+    proxy = None
+    if args.proxy:
+        proxy = m.declare_file(args.proxy, cache=True)
 
-    for root_file in root_files:
-        t = vine.PythonTask(count_events, "myroot.file")
-        t.add_input(m.declare_xrootd(root_file, proxy_file), "myroot.file", cache=True)
-        t.set_environment(env_with_xrootd)
+    env = None
+    if env_filename:
+        env = m.declare_poncho(env_filename, cache=True)
 
-        task_id = m.submit(t)
-        print("submitted task (id# " + str(task_id) + "): count_events()")
+    # declaring the root file, with proxy and env as needed.
+    f = m.declare_xrootd(root_file, proxy, env=env, cache=True)
+
+    # create a task from the python function count_events. The function will
+    # operate on the file "myroot.file", with is the name that the input file
+    # will get in the task sandbox when executing remotely.
+    t = vine.PythonTask(count_events, "myroot.file")
+
+    # the xrootd file is added as an input of the task and mapped to
+    # myroot.file when the task executes.
+    t.add_input(f, "myroot.file")
+
+    # add the python environment to the task if needed. This will wrap the
+    # command line so that it executes in the environment defined above.
+    if env:
+        t.add_environment(env)
+
+    task_id = m.submit(t)
+
+    print("submitted task (id# " + str(task_id) + "): count_events()")
     print("waiting for tasks to complete...")
+
+    print("please create a worker in another terminal. E.g., for a local worker:")
+    print(f"vine_worker localhost {m.port}")
 
     while not m.empty():
         t = m.wait(5)

@@ -30,8 +30,8 @@ struct vine_task {
 	char *tag;                   /**< An optional user-defined logical name for the task. */
 	char *category;              /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref vine_task_set_category. If no explicit category is given, the label "default" is used. **/
 
-	char *monitor_output_directory;	/**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref vine_enable_monitoring */
-	char *monitor_snapshot_file;    /**< Filename the monitor checks to produce snapshots. */
+	char *monitor_output_directory;	     /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref vine_enable_monitoring */
+	struct vine_file *monitor_snapshot_file;  /**< Filename the monitor checks to produce snapshots. */
 
 	struct list *input_mounts;    /**< The mounted files expected as inputs. */
 	struct list *output_mounts;   /**< The mounted files expected as outputs. */
@@ -98,5 +98,15 @@ const char *vine_task_state_to_string( vine_task_state_t task_state );
 
 struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t );
 char * vine_task_to_json(struct vine_task *t);
+
+
+/** Attach an input or outputs to tasks without declaring files to manager.
+ * Only really useful at the worker where tasks are created without a manager. */
+void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags);
+void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags);
+void vine_task_add_input_url(struct vine_task *t, const char *url, const char *remote_name, vine_mount_flags_t flags);
+void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags);
+void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags);
+void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name );
 
 #endif

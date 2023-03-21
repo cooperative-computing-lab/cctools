@@ -9,40 +9,66 @@
 # It works by constructing tasks that download the blast executable
 # and landmark database from NCBI, and then performs a short query.
 
-# The query is provided by a string (but presented to the task as a file.)
+# Each task in the workflow performs a query of the database using
+# 16 (random) query strings generated at the manager.
 # Both the downloads are automatically unpacked, cached, and shared
 # with all the same tasks on the worker.
 
 import taskvine as vine
 import sys
+import random
 
-query = """>P01013 GENE X PROTEIN (OVALBUMIN-RELATED)
-QIKDLLVSSSTDLDTTLVLVNAIYFKGMWKTAFNAEDTREMPFHVTKQESKPVQMMCMNNSFNVATLPAE
-KMKILELPFASGDLSMLVLLPDEVSDLERIEKTINFEKLTEWTNPNTMEKRRVKVYLPQMKIEEKYNLTS
-VLMALGMTDLFIPSANLTGISSAESLKISQAVHGAFMELSEDGIEMAGSTGVIEDIKHSPESEQFRADHP
-FLFLIKHNPTNTIVYFGRYWSP"""
+# Permitted letters in an amino acid sequence
+amino_letters="ACGTUiRYKMSWBDHVN"
 
+# Number of characters in each query
+query_length = 128
+
+# Number of queries in each task.
+query_count = 16
+
+# Number of tasks to generate
+task_count = 1000
+
+# Create a query string consisting of
+# {query_count} sequences of {query_length} characters.
+
+def make_query_text():
+    return "".join(
+        ">query\n"+"".join(
+            random.choice(amino_letters)
+            for x in range(query_length))+"\n"
+        for y in range(query_count)
+        )
 
 if __name__ == "__main__":
     m = vine.Manager()
-    print(f"listening on {m.port}")
+    print(f"TaskVine listening on {m.port}")
 
-    query_buffer = m.declare_buffer(query)
+    print(f"Declaring files...")
 
-    blast_url = m.declare_url("https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz")
+    blast_url = m.declare_url("https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.13.0+-x64-linux.tar.gz", cache=True)
     blast = m.declare_untar(blast_url)
 
-    landmark_url = m.declare_url("https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz")
+    landmark_url = m.declare_url("https://ftp.ncbi.nlm.nih.gov/blast/db/landmark.tar.gz", cache=True)
     landmark = m.declare_untar(landmark_url)
 
-    for i in range(10):
-        t = vine.Task("blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file")
+    m.enable_peer_transfers()
 
-        t.add_input(query_buffer, "query.file", cache=True)
-        t.add_input(blast, "blastdir", cache=True )
+    print(f"Declaring tasks...")
 
-        t.add_input(landmark, "landmark", cache=True )
-        t.set_env_var("BLASTDB", value="landmark")
+    for i in range(task_count):
+        query = m.declare_buffer(make_query_text())
+       t = vine.Task(
+            command = "blastdir/ncbi-blast-2.13.0+/bin/blastp -db landmark -query query.file",
+            inputs = {
+              query : {"remote_name" : "query.file", "cache" : False},
+              blast : {"remote_name" : "blastdir", "cache" : True},
+              landmark : {"remote_name" : "landmark", "cache" : True}
+            },
+            env = {"BLASTDB" : "landmark"},
+            cores = 1
+        )
 
         task_id = m.submit(t)
         print(f"submitted task {t.id}: {t.command}")

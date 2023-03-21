@@ -16,8 +16,9 @@ all: $(TARGETS)
 
 vine_wrap.c taskvine.py: taskvine.i taskvine.binding.py
 	@echo "SWIG taskvine.i (python)"
-	@$(CCTOOLS_SWIG) -o vine_wrap.c -python -py3 -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/manager taskvine.i
+	@$(CCTOOLS_SWIG) -o vine_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/taskvine/src/manager taskvine.i
 	@cat -u taskvine.binding.py >> taskvine.py
+	@cat -u StatusDisplay.py >> taskvine.py
 
 $(DSPYTHONSO): vine_wrap.o $(EXTERNAL_DEPENDENCIES)
 

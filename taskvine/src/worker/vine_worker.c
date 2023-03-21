@@ -159,7 +159,7 @@ static struct vine_resources * local_resources = 0;
 struct vine_resources * total_resources = 0;
 struct vine_resources * total_resources_last = 0;
 
-static int64_t last_task_received  = 0;
+static int64_t last_taskx_received  = 0;
 
 /* 0 means not given as a command line option. */
 static int64_t manual_cores_option = 0;
@@ -807,7 +807,7 @@ static int do_put_mini_task( struct link *manager, time_t stoptime, const char *
 	struct vine_mount *output_mount = list_peek_head(mini_task->output_mounts);
 	free(output_mount->file->cached_name);
 	output_mount->file->cached_name = strdup(cache_name);
-	
+
 	return vine_cache_queue_command(global_cache,mini_task,cache_name,size,mode);
 }
 
@@ -1527,10 +1527,9 @@ static void workspace_delete()
 	printf( "vine_worker: deleting workspace %s\n", workspace);
 
 	/*
-	Note that we cannot use trash_file here because the trash dir
-	is inside the workspace.  Abort if we really cannot clean up.
+	Note that we cannot use trash_file here because the trash dir is inside the
+	workspace. The whole workspace is being deleted anyway.
 	*/
-
 	unlink_recursive(workspace);
 	free(workspace);
 }
@@ -2179,7 +2178,6 @@ int main(int argc, char *argv[])
 	setenv("VINE_SANDBOX", workspace, 0);
 
 	// change to workspace
-	
 	chdir(workspace);
 
 	unlink_recursive("cache");
@@ -2271,9 +2269,6 @@ int main(int argc, char *argv[])
 		vine_coprocess_shutdown_all_coprocesses(coprocess_list);
 		list_delete(coprocess_list);
 	}
-	
-	trash_file("cache");
-	trash_empty();
 
 	workspace_delete();
 

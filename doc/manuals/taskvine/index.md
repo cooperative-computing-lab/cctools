@@ -225,6 +225,32 @@ Here is how to describe the files needed by this task:
     # when the name at manager is the same as the exection site, we can write instead:
     t.add_input_file("my-file",     cache = False)
     t.add_output_file("my-file.gz", cache = False)
+
+    # files can also be described when the task is declared:
+    gzip_file = m.declare_file("/usr/bin/gzip")
+    my_file = m.declare_file("my-file")
+    my_gz_file = m.declare_file("my-file.gz")
+
+     t = vine.Task(
+        command = "./gzip < my-file > my-file.gz",
+        input_files = {
+            gzip_file : {
+                remote_name : "gzip", 
+                cache : True
+                }, 
+            my_file : {
+                remote_name : 
+                "my-file", 
+                cache : False
+            }
+        },
+        output_files = {
+            my_gz_file : {
+                remote_name : "my-file.gz", 
+                cache = False
+            }
+        }
+    )
     ```
 
 === "C"
@@ -265,6 +291,14 @@ when the task is complete.
     t.set_cores(2)
     t.set_memory(4096)
     t.set_tag("config-4.5.0")
+
+    # this can once again be done at task declaration as well:
+     t = vine.Task(
+        command = "./gzip < my-file > my-file.gz",
+        cores = 2,
+        memory = 4096,
+        tag = "config-4.5.0"
+     )
     ```
 
 === "C"
@@ -691,6 +725,17 @@ as in the following example:
     t.set_gpus(0)                      # task does not need a gpu
     t.set_time_max(100)        # task is allowed to run in 100 seconds
     t.set_time_min(10)         # task needs at least 10 seconds to run (see vine_worker --wall-time option above)
+
+    # these can be set when the task is declared as well:
+     t = vine.Task(
+        command = "./gzip < my-file > my-file.gz",
+        cores = 1,
+        memory = 1024,
+        disk = 4096,
+        gpus = 0,
+        time_max = 100,
+        time_min = 10
+    )
     ```
 
 === "C"
@@ -953,6 +998,12 @@ report format is JSON, as its filename has the form
     t.set_monitor_output("my-resources-output")
     ...
     taskid = m.submit(t)
+
+    # this can be set at declaration as well:
+     t = vine.Task(
+        command = ...,
+        monitor_output = "my-resources-output"
+     )
     ```
 
 === "C"
@@ -1010,6 +1061,12 @@ compute some efficient defaults. To assign a task to a category:
 === "Python"
     ```python
     t.set_category('my-category-a')
+
+    # alternatively:
+     t = vine.Task(
+        command = ...,
+        category = 'my-category-a'
+     )
     ```
 
 === "C"
@@ -1238,6 +1295,12 @@ limit on the number of retries:
 === "Python"
     ```python
     t.set_retries(5)   # Task will be try at most 6 times (5 retries).
+
+    # this can be done at task declaration as well:
+     t = vine.Task(
+        command = ...,
+        retries = 5
+     )
     ```
 
 === "C"
@@ -1420,6 +1483,12 @@ either their `taskid` or `tag`. For example:
     # create task as usual and tag it with an arbitrary string.
     t = vine.Task(...)
     t.set_tag("my-tag")
+
+    # or set tag in task declaration
+    t = vine.Task(
+        command = ...,
+        tag = "my-tag"
+    )
 
     taskid = m.submit(t)
 
@@ -1806,7 +1875,9 @@ change.
 | monitor-interval        | Maximum number of seconds between resource monitor measurements. If less than 1, use default. | 5 |
 | resource-submit-multiplier | Assume that workers have `resource x resources-submit-multiplier` available.<br> This overcommits resources at the worker, causing tasks to be sent to workers that cannot be immediately executed.<br>The extra tasks wait at the worker until resources become available. | 1 |
 | wait-for-workers        | Do not schedule any tasks until `wait-for-workers` are connected. | 0 |
-| wait-retrieve-many      | Rather than immediately returning when a task is done, `m.wait(timeout)` retrieves and dispatches as many tasks<br> as `timeout` allows. Warning: This may exceed the capacity of the manager to receive results. | 0 |
+| max-retrievals | Sets the max number of tasks to retrievals per manager wait(). If less than 1, the manager prefers to retrievals all completed tasks before dispatching new tasks to workers. | 1 |
+| worker-retrievals | If 1, retrievals all completed tasks from a worker when retrieving results, even if going above the parameter max-retrievals . Otherwise, if 0, retrieve just one task before deciding to dispatch new tasks or connect new workers. | 1 |
+
 
 === "Python"
     ```python

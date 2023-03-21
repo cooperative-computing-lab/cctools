@@ -19,9 +19,34 @@
 # use of arbitrary workers without regard to their software environment.
 
 import taskvine as vine
+
+import argparse
 import os
 import sys
 
+
+
+# construct a starch environment that ensures convert and montage are available
+# when the task executes at the worker.
+def create_env(env_name, convert="convert", montage="montage"):
+    import subprocess
+    # add the executables convert, and montage to the env_name starch file.
+    # these executables are assumed to be in the current $PATH if a full path was not specified.
+    # by default, the starch file will execute the convert command.
+
+    if os.path.exists(env_name):
+        print(f"reusing existing {env_name} starch file...")
+    else:
+        try:
+            print(f"creating {env_name} starch file...")
+            subprocess.run(["starch", "-x", "convert", "-x", "montage", "-c", "montage", env_name], check=True)
+        except subprocess.CalledProcessError:
+            print("could not create environment.")
+            print("check that starch is in $PATH, and check that ImageMagick executables are in $PATH,")
+            print("or provide their location at the command line.")
+
+
+# helper function to report final status of a task
 def process_result(t):
     if t:
         if t.successful():
@@ -31,70 +56,100 @@ def process_result(t):
         else:
             print(f"task {t.id} failed with status {t.result_string}")
 
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+            prog="vine_example_mosaic.py",
+            description="This example TaskVine program produces a mosaic of images, each one transformed with a different amount of swirl. Each task consumes remote data accessed via url, cached and shared among all tasks on that machine. Also each task is executed in a mini environment that ensures that the required executables and libraries are available at the worker.")
 
-    try:
-        convert = sys.argv[1]
-        montage = sys.argv[2]
-    except IndexError:
-        convert = "/usr/bin/convert"
-        montage = "/usr/bin/montage"
+    parser.add_argument('--convert', action='store', help='path to the convert ImageMagick executable.', default="convert")
+    parser.add_argument('--montage', action='store', help='path to the montage ImageMagick executable.', default="montage")
+    args = parser.parse_args()
 
-    print(f"Checking that {convert} is installed...")
-    if not os.access(convert, os.X_OK):
-        print(sys.argv[0], f": {convert} is not installed: this won't work at all.")
-        sys.exit(1)
-
-    print(f"Converting {convert} into convert.sfx...")
-    if os.system(f"starch -x {convert} -c convert convert.sfx") != 0:
-        print(sys.argv[0], ": failed to run starch, is it in your PATH?")
-        sys.exit(1)
-
-    print(f"Converting {montage} into montage.sfx...")
-    if os.system(f"starch -x {montage} -c montage montage.sfx") != 0:
-        print(sys.argv[0], ": failed to run starch, is it in your PATH?")
-        sys.exit(1)
+    env_filename = "convert_montage.sfx"
+    create_env(env_filename)
 
     m = vine.Manager()
     print(f"listening on port {m.port}")
 
-    temp_files = []
-    for i in range(0, 36):
-        temp_files.append(m.declare_temp())
+    # declare the environment just created as a starch file.
+    # when this env is associated with a task, it will be expanded and wrap its
+    # command.
+    env = m.declare_starch(env_filename)
 
-    montage_file = m.declare_file("montage.sfx")
-    convert_file = m.declare_file("convert.sfx")
-    image_file = m.declare_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg")
+    # source image to which all the operations will be applied
+    image_file = m.declare_url("https://upload.wikimedia.org/wikipedia/commons/7/74/A-Cat.jpg", cache=True)
 
-    for i in range(0, 36):
-        outfile = str(i) + ".cat.jpg"
-        command = f"./convert.sfx -swirl {i*10} cat.jpg output.jpg"
+
+    # the image_file will be rotated in steps of 10 degrees by the tasks. The
+    # result of these rotations is kept in a vine temporary file. These
+    # temporary files stay at the workers for task reuse, and are not
+    # transfered back to the manager as outputs.
+
+    # swirl angle -> vine temporary file
+    convert_temporary_outputs = {}
+
+    # from 0 to 360, by steps of 10 degrees
+    for angle in range(0, 360, 10):
+        # the command the task will execute. The convert executable will be
+        # provided by the starch environment.
+        # note that all tasks will produce as a result a file named output.jpg
+        # in their respective sandboxes. It is this file that will be declared
+        # as temporary file.
+        command = f"convert -swirl {angle} cat.jpg output.jpg"
 
         t = vine.Task(command)
-        t.add_input(convert_file, "convert.sfx", cache=True)
-        t.add_input(image_file,"cat.jpg",cache=True)
-        t.add_output(temp_files[i],"output.jpg",cache=True)
+        t.add_environment(env)
 
+        # add the main source image
+        t.add_input(image_file,"cat.jpg")
+
+        # declare the temporary file, associate it with output.jpg, and record
+        # it for future use in montage.
+        f = m.declare_temp()
+        convert_temporary_outputs[angle] = f
+        t.add_output(f, "output.jpg")
+
+        # specify that tasks won't use more than one core. This allows the
+        # manager to dispatch as many tasks to a worker as its number of cores.
         t.set_cores(1)
 
         m.submit(t)
-
         print(f"submitted task {t.id}: {t.command}")
 
+    print("waiting for convert tasks to complete...")
+    print("please create a worker in another terminal. E.g., for a local worker:")
+    print(f"vine_worker localhost {m.port}")
 
-    print("waiting for tasks to complete...")
     while not m.empty():
         t = m.wait(5)
         if t:
             process_result(t)
 
-    print("Combining images into mosaic.jpg...")
-    t = vine.Task("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 mosaic.jpg")
-    t.add_input(montage_file, "montage.sfx", cache=True)
+        # local image name to use for the temporary file when the convert task
+        # executes.
+        outfile = f"{angle}.cat.jpg"
 
-    for i in range(0, 36):
-        t.add_input(temp_files[i],f"{i*10}.cat.jpg",cache=False)
-    t.add_output_file("mosaic.jpg", cache=False)
+    print("Combining images into mosaic.jpg...")
+
+    # create a tasks that combines the results of all the convert tasks.
+    # each convert temporary output will be mapped to an {angle}.cat.jpg file.
+    # the montage executable will be provided by the starch environment
+    t = vine.Task("montage `ls *.cat.jpg | sort -n` -tile 6x6 -geometry 128x128+0+0 output_of_montage.jpg")
+    t.add_environment(env)
+
+    for (angle, f) in convert_temporary_outputs.items():
+        convert_output = f"{angle}.cat.jpg"
+        t.add_input(f, convert_output)
+
+    # declare the final image file
+    final_montage = m.declare_file("mosaic.jpg")
+
+    # add the final output, mapping mosaic.jpg to the file generated by montage: output_of_montage.jpg
+    # note that output_of_montage.jpg could have been named mosaic.jpg, as
+    # final_montage refers to the file in the manager's filesystem, not the
+    # task sandbox.
+    t.add_output(final_montage, "output_of_montage.jpg")
     m.submit(t)
 
     print("waiting for final task to complete...")
@@ -102,5 +157,13 @@ if __name__ == "__main__":
         t = m.wait(5)
         if t:
             process_result(t)
+    print("all tasks complete!")
 
-    print("All tasks complete!")
+
+    print("deleting temporary files at the worker.")
+    # now that we are done using the temporary files, we can delete them from the workers.
+    # in this small example this is not strictly necessary, as these files are
+    # deleted from workers once the manager terminates.
+    for f in convert_temporary_outputs.values():
+        m.remove_file(f)
+

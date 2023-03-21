@@ -44,13 +44,17 @@ int main(int argc, char *argv[])
 	}
 	printf("Listening on port %d...\n", vine_port(m));
 
+	struct vine_file *executable = vine_declare_file(m, "vine_example_watch_trickle.sh", VINE_CACHE);
+
 	int i;
 	for(i=0;i<10;i++) {
-		char output[256];
-		sprintf(output,"output.%d",i);
+		char output_name[256];
+		sprintf(output_name,"output.%d",i);
+		struct vine_file *output_file = vine_declare_file(m, output_name, VINE_CACHE);
+
 		t = vine_task_create("./vine_example_watch_trickle.sh > output");
-		vine_task_add_input_file(t, "vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", VINE_CACHE );
-		vine_task_add_output_file(t, output, "output", VINE_WATCH );
+		vine_task_add_input(t, executable, "vine_example_watch_trickle.sh", 0);
+		vine_task_add_output(t, output_file, "output", VINE_WATCH );
 		vine_task_set_cores(t,1);
 		vine_submit(m, t);
 	}

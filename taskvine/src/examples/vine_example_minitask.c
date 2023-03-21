@@ -35,12 +35,12 @@ int main(int argc, char *argv[])
 	printf("listening on port %d...\n", vine_port(m));
 
 
-	struct vine_file *url = vine_declare_url(m, CCTOOLS_URL);
-	struct vine_file *package = vine_declare_untar(m, url);
+	struct vine_file *url = vine_declare_url(m, CCTOOLS_URL, VINE_CACHE);
+	struct vine_file *package = vine_declare_untar(m, url, VINE_CACHE);
 
 	for(i=0;i<10;i++) {
 		struct vine_task *task = vine_task_create("ls -lR cctools | wc -l");
-		vine_task_add_input(task,package,"cctools",VINE_CACHE);
+		vine_task_add_input(task,package,"cctools",0);
 		int task_id = vine_submit(m, task);
 
 		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(task) );
