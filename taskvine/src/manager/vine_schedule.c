@@ -20,6 +20,29 @@ See the file COPYING for details.
 #include <limits.h>
 #include <math.h>
 
+/* check whether worker has all fixed locations required for task */
+int check_fixed_location_worker(struct vine_manager *m, struct vine_worker_info *w, struct vine_task *t)
+{
+	int all_present = 1;
+	struct vine_mount *mt;
+	struct vine_file_replica *remote_info;
+
+	if(t->has_fixed_locations) {
+		LIST_ITERATE(t->input_mounts,mt) {
+			if(mt->file->flags & VINE_FIXED_LOCATION) {
+				remote_info = hash_table_lookup(w->current_files, mt->file->cached_name);
+				if(!remote_info) {
+					all_present = 0;
+					break;
+				}
+			}
+		}
+	}
+
+	return all_present;
+}
+
+
 /*
 Check if this task is compatible with this given worker by considering
 resources availability, features, blocklist, and all other relevant factors.
@@ -70,6 +93,8 @@ static int check_worker_against_task(struct vine_manager *q, struct vine_worker_
 		ok = 0;
 	}
 
+	rmsummary_delete(l);
+
 	//if worker's end time has not been received
 	if(w->end_time < 0){
 		ok = 0;
@@ -86,16 +111,21 @@ static int check_worker_against_task(struct vine_manager *q, struct vine_worker_
 		}
 	}
 
-	rmsummary_delete(l);
+	if(t->has_fixed_locations && !check_fixed_location_worker(q, w, t)) {
+		ok = 0;
+	}
 
 	if(t->feature_list) {
-		if(!w->features)
-			return 0;
-
-		char *feature;
-		LIST_ITERATE(t->feature_list,feature) {
-			if(!hash_table_lookup(w->features, feature))
-				return 0;
+		if(!w->features) {
+			ok = 0;
+		} else {
+			char *feature;
+			LIST_ITERATE(t->feature_list,feature) {
+				if(!hash_table_lookup(w->features, feature)) {
+					ok = 0;
+					break;
+				}
+			}
 		}
 	}
 
@@ -123,12 +153,8 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 			task_cached_bytes = 0;
 			LIST_ITERATE(t->input_mounts,m) {
 				remote_info = hash_table_lookup(w->current_files, m->file->cached_name);
-				if(remote_info) {
-					if(m->file->type == VINE_FILE) {
+				if(remote_info && m->file->type == VINE_FILE) {
 						task_cached_bytes += remote_info->size;
-					}
-				} else if(m->file->flags & VINE_FIXED_LOCATION) {
-					break;
 				}
 			}
 
@@ -465,33 +491,14 @@ void vine_schedule_check_for_large_tasks( struct vine_manager *q )
 /*
 Determine whether there is a worker that can fit the task and that has all its strict inputs.
 */
-int vine_schedule_check_inputs(struct vine_manager *q, struct vine_task *t)
+int vine_schedule_check_fixed_location(struct vine_manager *q, struct vine_task *t)
 {
 	char *key;
 	struct vine_worker_info *w;
-	struct vine_file_replica *remote_info;
-	struct vine_mount *m;
-
-	if(!t->has_fixed_locations) {
-		return 1;
-	}
 
 	HASH_TABLE_ITERATE(q->worker_table,key,w) {
-		if( !is_task_larger_than_worker(q, t, w) ) {
-			int missing_input = 0;
-			LIST_ITERATE(t->input_mounts,m) {
-				if(m->file->flags & VINE_FIXED_LOCATION) {
-					remote_info = hash_table_lookup(w->current_files, m->file->cached_name);
-					if(!remote_info) {
-						missing_input = 1;
-						break;
-					}
-				}
-			}
-
-			if(!missing_input) {
-				return 1;
-			}
+		if(check_fixed_location_worker(q, w, t)) {
+			return 1;
 		}
 	}
 

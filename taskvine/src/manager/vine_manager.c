@@ -1199,7 +1199,7 @@ static int expire_waiting_tasks(struct vine_manager *q)
 Consider the set of tasks that are waiting with strict inputs
 Terminate those to which no such worker exists.
 */
-static int enforce_waiting_strict_inputs(struct vine_manager *q)
+static int enforce_waiting_fixed_locations(struct vine_manager *q)
 {
 	struct vine_task *t;
 	int terminated = 0;
@@ -1211,7 +1211,7 @@ static int enforce_waiting_strict_inputs(struct vine_manager *q)
 		count--;
 
 		t = list_pop_head(q->ready_list);
-		if(t->has_fixed_locations && !vine_schedule_check_inputs(q, t)) {
+		if(t->has_fixed_locations && !vine_schedule_check_fixed_location(q, t)) {
 			vine_task_set_result(t, VINE_RESULT_WORKER_MISSING);
 			change_task_state(q, t, VINE_TASK_RETRIEVED);
 			terminated++;
@@ -4194,20 +4194,11 @@ static struct vine_task *vine_wait_internal(struct vine_manager *q, int timeout,
 
 		// expired tasks
 		BEGIN_ACCUM_TIME(q, time_internal);
-		result = expire_waiting_tasks(q);
+		result  = expire_waiting_tasks(q);
+		result |= enforce_waiting_fixed_locations(q);
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
-			// expired at least one task
-			events++;
-			compute_manager_load(q, 1);
-			continue;
-		}
-
-		// tasks with no strict inputs available
-		BEGIN_ACCUM_TIME(q, time_internal);
-		result = enforce_waiting_strict_inputs(q);
-		END_ACCUM_TIME(q, time_internal);
-		if(result) {
+			// expired or ended at least one task
 			events++;
 			compute_manager_load(q, 1);
 			continue;
