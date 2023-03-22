@@ -2320,10 +2320,10 @@ class Factory(object):
     ##
     # Create a factory for the given batch_type and manager name.
     #
-    # `manager_name` or, `manager_host_port` should be specified.
+    # One of `manager_name`, `manager_host_port`, or `manager` should be specified.
     # If factory_binary or worker_binary is not
     # specified, $PATH will be searched.
-    def __init__(self, batch_type, manager_name=None, manager_host_port=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
+    def __init__(self, batch_type="local", manager=None, manager_host_port=None, manager_name=None, factory_binary=None, worker_binary=None, log_file=os.devnull):
         self._config_file = None
         self._factory_proc = None
         self._log_file = log_file
@@ -2332,30 +2332,41 @@ class Factory(object):
 
         self._opts = {}
 
-        self._set_manager(manager_name, manager_host_port)
+        self._set_manager(batch_type, manager, manager_host_port, manager_name)
+
         self._opts["batch-type"] = batch_type
         self._opts["worker-binary"] = self._find_exe(worker_binary, "vine_worker")
         self._factory_binary = self._find_exe(factory_binary, "vine_factory")
+
         self._opts["scratch-dir"] = None
+        if manager:
+            self._opts["scratch-dir"] = manager.staging_directory
 
-    def _set_manager(self, manager_name, manager_host_port):
-        if not (manager_name or manager_host_port):
-            raise ValueError("Either manager_name or, manager_host_port should be specified.")
 
-        if manager_name and manager_host_port:
-            raise ValueError("Master should be specified by a name, or by a host and port. Not both.")
+    def _set_manager(self, batch_type, manager, manager_host_port, manager_name):
+        if not (manager or manager_host_port or manager_name):
+            raise ValueError("Either manager, manager_host_port, or manager_name or manager should be specified.")
 
         if manager_name:
             self._opts["manager-name"] = manager_name
-            return
+
+        if manager:
+            if batch_type == "local":
+                manager_host_port = f"localhost:{manager.port}"
+            elif manager.name:
+                self._opts["manager-name"] = manager_name
+
+            if manager.using_ssl:
+                self._opts["ssl"] = True
 
         if manager_host_port:
             try:
                 (host, port) = [x for x in manager_host_port.split(":") if x]
                 self._opts["manager-host"] = host
                 self._opts["manager-port"] = port
+                return
             except (TypeError, ValueError):
-                raise ValueError("manager_name is not of the form HOST:PORT")
+                raise ValueError("manager_host_port is not of the form HOST:PORT")
 
     def _find_exe(self, path, default):
         if path is None:
@@ -2493,8 +2504,6 @@ class Factory(object):
         self._factory_proc.wait()
         self._factory_proc = None
         self._config_file = None
-        if self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
-            shutil.rmtree(self.scratch_dir)
 
     def __enter__(self):
         return self.start()
@@ -2506,8 +2515,8 @@ class Factory(object):
         if self._factory_proc is not None:
             self.stop()
 
-        if os and shutil and self._staging_dir:
-            shutil.rmtree(self._staging_dir)
+        if shutil and self._scratch_safe_to_delete and self.scratch_dir and os.path.exists(self.scratch_dir):
+            shutil.rmtree(self.scratch_dir)
 
     def _write_config(self):
         if self._config_file is None:
