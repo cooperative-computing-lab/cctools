@@ -225,7 +225,7 @@ int manager_workers_needed_by_resource(struct jx *j) {
 
 struct list* do_direct_query( const char *manager_host, int manager_port )
 {
-	const char * query_string = "queue";
+	const char *query_string = "manager";
 
 	struct link *l;
 
