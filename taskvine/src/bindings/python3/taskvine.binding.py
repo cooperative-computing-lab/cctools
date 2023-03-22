@@ -281,7 +281,9 @@ class Task(object):
     # @endcode
     def add_input(self, file, remote_name):
         # SWIG expects strings
-        remote_name = str(remote_name)
+        if not isinstance(remote_name, str):
+            raise TypeError(f"remote_name {remote_name} is not a str")
+
         flags = Task._determine_mount_flags()
         return vine_task_add_input(self._task, file._file, remote_name, flags)
 
@@ -303,7 +305,9 @@ class Task(object):
     # @endcode
     def add_output(self, file, remote_name, watch=False, failure_only=None, success_only=None):
         # SWIG expects strings
-        remote_name = str(remote_name)
+        if not isinstance(remote_name, str):
+            raise TypeError(f"remote_name {remote_name} is not a str")
+
         flags = Task._determine_mount_flags(watch, failure_only, success_only)
         return vine_task_add_output(self._task, file._file, remote_name, flags)
 
@@ -2027,7 +2031,10 @@ class Manager(object):
     # @return A file object to use in @ref Task.add_input
     def declare_url(self, url, cache=False, peer_transfer=True):
         flags = Task._determine_file_flags(cache, peer_transfer)
-        url = str(url)
+
+        if not isinstance(url, str):
+            raise TypeError(f"url {url} is not a str")
+
         f = vine_declare_url(self._taskvine, url, flags)
         return File(f)
 
