@@ -62,56 +62,54 @@ def library_network_code():
         while True:
             while True:
                 # wait for message from worker about what function to execute
-                line = input()
-                print(f"Network function received task", file=sys.stderr, flush=True)
-                if len(line) >= 0:
-                    function_name, event_size = line.split(" ")
-                    if event_size:
-                        # receive the bytes containing the event and turn it into a string
-                        event_str = input()
-                        if len(event_str) != int(event_size):
-                            print(event_str, len(event_str), event_size, file=sys.stderr)
-                            print("Size of event does not match what was sent: exiting", file=sys.stderr)
-                            exit(0)
-                        # turn the event into a python dictionary
-                        event = json.loads(event_str)
-                        # see if the user specified an execution method
-                        exec_method = event.get("remote_task_exec_method", None)
-                        if exec_method == "thread":
-                            # create a forked process for function handler
-                            q = queue.Queue()
-                            p = threading.Thread(target=globals()[function_name], args=(event_str, q))
-                            p.start()
-                            p.join()
-                            response = json.dumps(q.get())
-                        elif exec_method == "direct":
-                            response = json.dumps(globals()[function_name](event))
+                try:
+                    line = input()
+                # if the worker closed the pipe connected to the input of this process, we should just exit
+                except EOFError:
+                    exit(0)
+                function_name, event_size = line.split(" ")
+                if event_size:
+                    # receive the bytes containing the event and turn it into a string
+                    event_str = input()
+                    if len(event_str) != int(event_size):
+                        print(event_str, len(event_str), event_size, file=sys.stderr)
+                        print("Size of event does not match what was sent: exiting", file=sys.stderr)
+                        exit(0)
+                    # turn the event into a python dictionary
+                    event = json.loads(event_str)
+                    # see if the user specified an execution method
+                    exec_method = event.get("remote_task_exec_method", None)
+                    if exec_method == "thread":
+                        # create a forked process for function handler
+                        q = queue.Queue()
+                        p = threading.Thread(target=globals()[function_name], args=(event_str, q))
+                        p.start()
+                        p.join()
+                        response = json.dumps(q.get())
+                    elif exec_method == "direct":
+                        response = json.dumps(globals()[function_name](event))
+                    else:
+                        p = os.fork()
+                        if p == 0:
+                            response =globals()[function_name](event)
+                            os.write(write, json.dumps(response).encode("utf-8"))
+                            os._exit(0)
+                        elif p < 0:
+                            print(f'Library code: unable to fork to execute {function_name}', file=sys.stderr)
+                            response = { 
+                                "Result": "unable to fork",
+                                "StatusCode": 500 
+                            }
                         else:
-                            p = os.fork()
-                            if p == 0:
-                                response =globals()[function_name](event)
-                                os.write(write, json.dumps(response).encode("utf-8"))
-                                os._exit(0)
-                            elif p < 0:
-                                print('Network function: unable to fork', file=sys.stderr)
-                                response = { 
-                                    "Result": "unable to fork",
-                                    "StatusCode": 500 
-                                }
-                            else:
-                                chunk = os.read(read, 65536).decode("utf-8")
-                                all_chunks = [chunk]
-                                while (len(chunk) >= 65536):
-                                    chunk = os.read(read, 65536).decode("utf-8")
-                                    all_chunks.append(chunk)
-                                response = "".join(all_chunks)
-                                os.waitid(os.P_PID, p, os.WEXITED)
-
-                        print(response, flush=True)
-
-                        break
-                else:
-                    print("Network function could not read from worker\n", file=sys.stderr)
+                            max_read = 65536
+                            chunk = os.read(read, max_read).decode("utf-8")
+                            all_chunks = [chunk]
+                            while (len(chunk) >= max_read):
+                                chunk = os.read(read, max_read).decode("utf-8")
+                                all_chunks.append(chunk)
+                            response = "".join(all_chunks)
+                            os.waitid(os.P_PID, p, os.WEXITED)
+                    print(response, flush=True)
         return 0
 
 def wq_network_code():
@@ -155,7 +153,7 @@ def wq_network_code():
             s.bind(('localhost', 0))
         except Exception as e:
             s.close()
-            print(e)
+            print(e, file=sys.stderr)
             exit(1)
         # information to print to stdout for worker
         config = {
@@ -187,7 +185,6 @@ def wq_network_code():
                         event = json.loads(event_str)
                         # see if the user specified an execution method
                         exec_method = event.get("remote_task_exec_method", None)
-                        print('Network function: recieved event: {}'.format(event), file=sys.stderr)
                         os.chdir(f"t.{task_id}")
                         if exec_method == "thread":
                             # create a forked process for function handler
@@ -205,16 +202,17 @@ def wq_network_code():
                                 os.write(write, json.dumps(response).encode("utf-8"))
                                 os._exit(0)
                             elif p < 0:
-                                print('Network function: unable to fork', file=sys.stderr)
+                                print(f'Network function: unable to fork to execute {function_name}', file=sys.stderr)
                                 response = { 
                                     "Result": "unable to fork",
                                     "StatusCode": 500 
                                 }
                             else:
-                                chunk = os.read(read, 65536).decode("utf-8")
+                                max_read = 65536
+                                chunk = os.read(read, max_read).decode("utf-8")
                                 all_chunks = [chunk]
-                                while (len(chunk) >= 65536):
-                                    chunk = os.read(read, 65536).decode("utf-8")
+                                while (len(chunk) >= max_read):
+                                    chunk = os.read(read, max_read).decode("utf-8")
                                     all_chunks.append(chunk)
                                 response = "".join(all_chunks).encode("utf-8")
                                 os.waitid(os.P_PID, p, os.WEXITED)

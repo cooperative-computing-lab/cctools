@@ -35,6 +35,7 @@ import textwrap
 import shutil
 import atexit
 import time
+from pathlib import Path
 
 def set_port_range(low_port, high_port):
     if low_port > high_port:
@@ -1610,26 +1611,22 @@ class Manager(object):
     def create_library_from_functions(self, name, *function_list):
         # ensure poncho python library is available
         if poncho_available == False:
-            raise TypeError("The poncho module is not available. Cannot create Library.")
+            raise ModuleNotFoundError("The poncho module is not available. Cannot create Library.")
         # positional arguments are the list of functions to include in the library
         # create a unique hash of a combination of function names and bodies
         functions_hash = package_serverize.generate_functions_hash(function_list)
 
         # create path for caching library code and environment based on function hash
-        library_cache_path = f"./vine-library-cache/{functions_hash}"
+        library_cache_path = f"{self.cache_directory}/vine-library-cache/{functions_hash}"
         library_code_path = f"{library_cache_path}/library_code.py"
         library_env_path = f"{library_cache_path}/library_env.tar.gz"
 
         # library cache folder doesn't exist, create it
-        if not os.path.exists("vine-library-cache"):
-            os.mkdir("vine-library-cache")
+        Path( library_cache_path ).mkdir(mode=0o755, parents=True, exist_ok=True)
         # if the library code and environment exist, move on to creating the Library Task
         if os.path.isfile(library_code_path) and os.path.isfile(library_env_path):
             pass
         else:
-            # check if the cache entry exits, and create it if it doesn't exist 
-            if not os.path.exists(library_cache_path):
-                os.mkdir(library_cache_path)
             print("No cached Library code and environment found, regenerating...")
             # create library code and environment
             package_serverize.serverize_library_from_code(library_cache_path, function_list, name)
@@ -1637,16 +1634,13 @@ class Manager(object):
             os.chmod(library_code_path, 0o775)
         
         # create Task to execute the Library
-        t = LibraryTask("./poncho_package_run -e package python ./library_code.py", name)
+        t = LibraryTask("python ./library_code.py", name)
         # declare the environment
         f = self.declare_poncho(self.declare_file(library_env_path))
-        t.add_input(f, "package")
+        t.add_environment(f)
         # declare the library code as an input
         f = self.declare_file(library_code_path)
         t.add_input(f, "library_code.py")
-        # add poncho_package_run to be able to execute the Library
-        f = self.declare_file(shutil.which('poncho_package_run'))
-        t.add_input(f, "poncho_package_run")
         return t
 
     # Turn Library code created with poncho_package_serverize into a Library Task
@@ -1658,13 +1652,11 @@ class Manager(object):
     def create_library_from_serverized_files(self, name, library_path, env_path):
         if poncho_available == False:
             raise ModuleNotFoundError("The poncho module is not available. Cannot create library.")
-        t = LibraryTask(f"./poncho_package_run -e package python ./library_code.py", name)
+        t = LibraryTask("python ./library_code.py", name)
         f = self.declare_poncho(self.declare_file(env_path))
-        t.add_input(f, "package")
+        t.add_environment(f)
         f = self.declare_file(library_path)
         t.add_input(f, "library_code.py")
-        f = self.declare_file(shutil.which("poncho_package_run"))
-        t.add_input(f, "poncho_package_run")
         return t
 
     # Create a Library task from arbitrary inputs
@@ -1673,10 +1665,14 @@ class Manager(object):
     # @param self            Reference to the current manager object.
     # @param executable_path Path of the file which contains the library executable
     # @param name            Name of the library to be created
-    def create_library_from_command(self, executable_path, name):
+    # @param env_path        Optional argument to include a path to an environment to run the Library in
+    def create_library_from_command(self, executable_path, name, env_path=None):
         t = LibraryTask("./library_exe", name)
         f = self.declare_file(executable_path)
         t.add_input(f, "library_exe")
+        if env_path:
+            f = self.declare_poncho(self.declare_file(library_env_path))
+            t.add_environment(f)
         return t
 
     ##
