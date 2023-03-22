@@ -546,7 +546,7 @@ int link_ssl_wrap_accept(struct link *link, const char *key, const char *cert) {
 		int ret = SSL_accept(link->ssl);
 		if(ret <= 0) {
 			debug(D_SSL, "ssl accept failed from %s port %d", link->raddr, link->rport);
-			ERR_print_errors_cb(_ssl_errors_cb, NULL);
+			ERR_print_errors_cb(_ssl_errors_cb, /* use warn */ (void *) 1);
 			ret = 0;
 		}
 
@@ -747,7 +747,6 @@ ssize_t read_aux(struct link *link, char *data, size_t count) {
 					link_sleep(link, LINK_FOREVER, 0, 1);
 					break;
 				default:
-					ERR_print_errors_cb(_ssl_errors_cb, 0);
 					return result;
 					break;
 			}
@@ -774,7 +773,6 @@ ssize_t write_aux(struct link *link, const char *data, size_t count) {
 					link_sleep(link, LINK_FOREVER, 0, 1);
 					break;
 				default:
-					ERR_print_errors_cb(_ssl_errors_cb, 0);
 					return result;
 					break;
 			}

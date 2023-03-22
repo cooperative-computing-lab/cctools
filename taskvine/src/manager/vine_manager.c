@@ -3120,6 +3120,8 @@ struct vine_manager *vine_ssl_create(int port, const char *key, const char *cert
 		link_address_local(q->manager_link, address, &q->port);
 	}
 
+	debug(D_VINE,"manager start");
+
 	q->runtime_directory = runtime_dir;
 
 	q->ssl_key = key ? strdup(key) : 0;
@@ -3460,7 +3462,7 @@ void vine_delete(struct vine_manager *q)
 	free(q->stats_disconnected_workers);
 	free(q->stats_measure);
 
-	debug(D_VINE, "manager log end\n");
+	debug(D_VINE, "manager end\n");
 
 	free(q);
 }
