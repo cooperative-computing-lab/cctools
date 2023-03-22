@@ -916,7 +916,7 @@ class Manager(object):
             self._stats = vine_stats()
             self._stats_hierarchy = vine_stats()
 
-            ssl_key, ssl_cert = self._setup_ssl(ssl)
+            ssl_key, ssl_cert = self._setup_ssl(ssl, run_info_path)
             self._taskvine = vine_ssl_create(port, ssl_key, ssl_cert)
 
             if ssl_key:
@@ -950,19 +950,22 @@ class Manager(object):
         self._update_status_display(force=True)
         self._free_manager()
 
-    def _setup_ssl(self, ssl):
+    def _setup_ssl(self, ssl, run_info_path):
         if not ssl:
             return (None, None)
 
         if ssl is not True:
             return ssl
 
-        (tmp, key) = tempfile.mkstemp(dir=self.staging_directory, prefix="key")
+        (tmp, key) = tempfile.mkstemp(dir=run_info_path, prefix="key")
         os.close(tmp)
-        (tmp, cert) = tempfile.mkstemp(dir=self.staging_directory, prefix="cert")
+        (tmp, cert) = tempfile.mkstemp(dir=run_info_path, prefix="cert")
         os.close(tmp)
 
-        cmd = f"openssl req -x509 -newkey rsa:4096 -keyout {key} -out {cert} x-sha256 -days 365 -nodes -batch".split()
+        atexit.register(lambda: os.path.exists(key) and os.unlink(key))
+        atexit.register(lambda: os.path.exists(cert) and os.unlink(cert))
+
+        cmd = f"openssl req -x509 -newkey rsa:4096 -keyout {key} -out {cert} -sha256 -days 365 -nodes -batch".split()
 
         output = ""
         try:
