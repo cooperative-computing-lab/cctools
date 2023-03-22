@@ -892,6 +892,7 @@ class Manager(object):
         self._task_table = {}
         self._duty_table = {}
         self._info_widget = None
+        self._using_ssl = False
 
         # if we were given a range ports, rather than a single port to try.
         lower, upper = None, None
@@ -917,6 +918,10 @@ class Manager(object):
 
             ssl_key, ssl_cert = self._setup_ssl(ssl)
             self._taskvine = vine_ssl_create(port, ssl_key, ssl_cert)
+
+            if ssl_key:
+                self._using_ssl = True
+
             if not self._taskvine:
                 raise Exception("Could not create manager on port {}".format(port))
 
@@ -992,6 +997,15 @@ class Manager(object):
     @property
     def port(self):
         return vine_port(self._taskvine)
+
+    ##
+    # Whether the manager is using ssl to talk to workers
+    # @code
+    # >>> print(q.using_ssl)
+    # @endcode
+    @property
+    def using_ssl(self):
+        return self._using_ssl
 
     ##
     # Get the staging directory of the manager
