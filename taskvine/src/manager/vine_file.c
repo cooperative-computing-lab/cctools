@@ -48,6 +48,10 @@ struct vine_file *vine_file_create( const char *source, const char *cached_name,
 
 	memset(f, 0, sizeof(*f));
 
+	if(!source) {
+		fatal("%s: invalid null source argument",__func__);
+	}
+
 	f->source = xxstrdup(source);
 	f->type = type;
 	f->size = size;
