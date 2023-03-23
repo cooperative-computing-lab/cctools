@@ -1654,7 +1654,7 @@ class Manager(object):
             raise ModuleNotFoundError("The poncho module is not available. Cannot create library.")
         t = LibraryTask("python ./library_code.py", name)
         if env_path:
-            # string environment
+            # if path to environment
             if isinstance(env_path, str):
                 env = self.declare_poncho(env_path, cache=True)
                 t.add_environment(env)
@@ -1677,7 +1677,7 @@ class Manager(object):
         f = self.declare_file(executable_path)
         t.add_input(f, "library_exe")
         if env_path:
-            # path to environment
+            # if path to environment
             if isinstance(env_path, str):
                 env = self.declare_poncho(env_path, cache=True)
                 t.add_environment(env)
