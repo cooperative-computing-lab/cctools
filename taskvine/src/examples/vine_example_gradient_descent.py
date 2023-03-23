@@ -20,6 +20,7 @@ import taskvine as vine
 import json
 import numpy as np
 import random
+import argparse
 
 # this is the function we will pack into a Library Task.
 # arguments:
@@ -30,10 +31,10 @@ import random
 # max_iterations:   maximum number of iterations of weight updates to perform
 # min_error:        continue training until the difference in error between
 #                   iterations is less than this value - or max_iterations is reached.
-# learning_rate:    how much to update the weights each iteration.
+# learning_rate:    how much to update the weights each iteration
 #
 # It returns the optimized set of weights
-def batch_gradient_descent(train_data, test_data, number_of_params=100, max_iterations=100000000, min_error=1e-02, learning_rate=0.0005):
+def batch_gradient_descent(train_data, test_data, number_of_params, max_iterations, min_error, learning_rate):
     # Note that we import the python modules again inside the function. This is
     # because this function will be executed remotely independent from this
     # current python program.
@@ -78,7 +79,7 @@ def batch_gradient_descent(train_data, test_data, number_of_params=100, max_iter
     return [w_next.tolist(), calculate_error(w_next).item()]
 
 
-def main():
+def main(number_of_params, max_iterations, min_error, learning_rate):
     m = vine.Manager()
     print("listening on port", m.port)
 
@@ -117,8 +118,12 @@ def main():
     for i in range(20):
         # the name of the function to be called is batch_gradient_descent, and
         # the name of the Library that it lives in is gradient_descent_library
-        # arguments are train_data, and test_data
-        t = vine.FunctionCall("batch_gradient_descent", "gradient_descent_library", train_data, test_data)
+        # arguments are train_data, test_data, and iterations control
+        t = vine.FunctionCall(
+                "batch_gradient_descent",
+                "gradient_descent_library",
+                train_data, test_data,
+                number_of_params, max_iterations, min_error, learning_rate)
 
         # specify resources used by FunctionCall
         t.set_cores(1)
@@ -145,4 +150,14 @@ def main():
     print(f"With an RMS error of {best_error}")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+            prog="vine_example_gradient_descent.py",
+            description="This shows an example of using Library Tasks and FunctionCall Tasks. Gradient descent is an algorithm used to optimize the weights of machine learning models and regressions.")
+
+    parser.add_argument('--params',     nargs='?', type=int, help='the number of parameters/basis functions in the model', default=100);
+    parser.add_argument('--iterations', nargs='?', type=int, help='maximum number of iterations of weight updates to perform', default=100000000)
+    parser.add_argument('--error', nargs='?', type=float, help='stop when the fit error is less than this value', default=1e-02)
+    parser.add_argument('--rate', nargs='?', type=float, help='how much to update the weights each iteration', default=0.0005)
+    args = parser.parse_args()
+
+    main(args.params, args.iterations, args.error, args.rate)
