@@ -43,7 +43,6 @@ def create_trace_file(arg):
 
 def create_dict(name):
     """ creates path_dict which the key is the file path and the value is its properties: 
-        properties = [action, freq, size, parent, command, reads, writes]
     """
     path_dict = {}
     subprocess_dict = {}
@@ -53,7 +52,7 @@ def create_dict(name):
         for line in file: 
             if "openat" in line or "stat" in line:
                 try: # Try get file path
-                    path = re.search('</.+>',line).group(0).replace('<','').replace('>','')
+                    path = re.search('</.+>',line).group(0).strip('<>')
                 except AttributeError: # AttributeError if file not found
                     try: # find path for ENOENT
                         path = line.split('"')[1]
@@ -61,8 +60,10 @@ def create_dict(name):
                         continue
                                         
                 if path not in path_dict: 
-                        path_dict[path] = Properties(path=path, command=line)
+                        path_dict[path] = Properties(path=path)
 
+
+                path_dict[path].command = line
                 path_dict[path].action = file_actions(path_dict, path)
                 path_dict[path].freq += 1
 
@@ -71,7 +72,7 @@ def create_dict(name):
 
             if "read" in line or "write" in line:
                 try:
-                    path = re.search('<.+>,',line).group(0).replace('<','').replace('>,','')
+                    path = re.search('<.+>,',line).group(0).strip('<>,')
                     bytes_written = re.search('= [0-9]+$',line).group(0).replace('= ','')
 
                     if path not in path_dict: 
@@ -82,9 +83,9 @@ def create_dict(name):
                 except (IndexError, AttributeError) as e:
                     continue
 
-            if "strace: Process " in line:
+            if "strace: Process " in line: # new process created
                 find_pid(line, subprocess_dict)
-            if "execve" in line:
+            if "execve" in line: # finds command associated with process
                 find_command(line,subprocess_dict) 
 
     return path_dict, subprocess_dict 
@@ -102,7 +103,7 @@ def file_actions(path_dict, path):
 
     if "openat" in command:
         if "ENOENT" in command:
-            action = 'A'
+            action = 'OU'
         elif "RDONLY" in command:
             action = 'R'
             path_dict[path].read_freq += 1
@@ -120,8 +121,11 @@ def file_actions(path_dict, path):
             action = 'WR'
 
     elif "stat" in command:
-        action = 'S'
-    
+        if "ENOENT" in command:
+            action = 'SU'
+        else:
+            action = 'S'
+
     return action
     
     
@@ -145,14 +149,17 @@ def print_summary_2(path_dict, name):
 def find_command(line, subprocess_dict): 
     if re.search('\[pid [0-9]+\]',line): 
         pid = re.search('\[pid [0-9]+\]',line).group(0).replace('[pid ','').replace(']','')
-        command = str(re.search('\[".+\]',line).group(0)).strip('[]').replace('", "',' ')
-        subprocess_dict[pid] = {"command" : command, "files": []}
+        try:
+            command = str(re.search('\[".+\]',line).group(0)).strip('[]').replace('", "',' ')
+            subprocess_dict[pid] = {"command" : command, "files": set()}
+        except AttributeError:
+            pass
     return
 
 def find_pid(line, subprocess_dict):
     if re.search('strace: Process [0-9]+',line): 
         pid = re.search('strace: Process [0-9]+',line).group(0).replace('strace: Process ','')
-        subprocess_dict[pid] = {"command" : "", "files": []} 
+        subprocess_dict[pid] = {"command" : "", "files": set()} 
 
 def print_subprocess_summary(subprocess_dict, name):
     """ Creates the file <name>.fout4.txt which contains the details of the subprocesses
@@ -166,7 +173,7 @@ def print_subprocess_summary(subprocess_dict, name):
         f.write(f"pid : {pid} : {command}\n")
 
         for file in subprocess_dict[pid]['files']:
-            f.write(f'\t{file.action:4}{file.path}\n')
+            f.write(f'  {pid}   {file.action:4}{file.path}\n')
         f.write("\n\n")
 
     f.close()
@@ -199,8 +206,11 @@ def find_major_directories(path_dict, subprocess_dict, top, dirLvl, name):
             writes_dict[short_path][1] += size
 
         if sub_pid:
-            for pid in sub_pid:
-                subprocess_dict[pid]['files'].append(path_dict[path])
+            try:
+                for pid in sub_pid:
+                    subprocess_dict[pid]['files'].add(path_dict[path])
+            except KeyError:
+                pass
     
     major_dict = dict(sorted(major_dict.items(), key=lambda x:x[1][1], reverse=True))
     reads_dict = dict(sorted(reads_dict.items(), key=lambda x:x[1][1], reverse=True))
