@@ -3774,11 +3774,14 @@ static int vine_manager_send_library_to_worker(struct vine_manager *q, struct vi
 	q->next_task_id++;
 	t->hostname = xxstrdup(w->hostname);
 	t->addrport = xxstrdup(w->addrport);
+	t->worker = w;
+	change_task_state(q, t, VINE_TASK_READY);
 
 	// send the Library Task to the worker
 	vine_manager_send(q,w, "library %lld %lld\n",  (long long) strlen(name), (long long)t->task_id);
 	link_putlstring(w->link, name, strlen(name), time(0) + q->short_timeout);
 	vine_result_code_t result = start_one_task(q, w, t);
+	change_task_state(q, t, VINE_TASK_RUNNING);
 	
 	// insert the task into the worker's library table to track resource allocations
 	hash_table_insert(w->libraries, name, t);
@@ -3861,6 +3864,16 @@ static void handle_library_update(struct vine_manager *q, struct vine_worker_inf
 		debug(D_VINE, "Library %d started on %s\n", library_id, w->workerid);
 		itable_remove(w->current_tasks_boxes, library_id);
 	}
+
+	char *name;
+	struct vine_task *t;
+
+	HASH_TABLE_ITERATE(w->libraries,name,t) {
+		if (t->task_id == library_id) {
+			change_task_state(q, t, VINE_TASK_DONE);
+			break;
+		}
+	};
 
 	vine_txn_log_write_library_update(q, w, library_id, state);
 }

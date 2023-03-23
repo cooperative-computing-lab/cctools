@@ -18,7 +18,7 @@
 # time manager_pid TASK task_id RUNNING worker_id (FIRST_RESOURCES|MAX_RESOURCES) {resources_allocated}
 # time manager_pid TASK task_id WAITING_RETRIEVAL worker_id
 # time manager_pid TASK task_id (RETRIEVED|DONE) (SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION) exit_code {limits_exceeded} {resources_measured}
-# time manager_pid DUTY task_id (WAITING|SENT|STARTED|FAILURE) worker_id
+# time manager_pid LIBRARY task_id (WAITING|SENT|STARTED|FAILURE) worker_id
 
 
 from collections import defaultdict
@@ -83,16 +83,18 @@ class Manager:
     def make_table_tasks(self, expand_waiting=False):
         all_tasks = []
         keys = None
+        print(self.tasks_attempts.values())
         for attempts in self.tasks_attempts.values():
             for attempt in attempts.values():
                 all_tasks.append(attempt)
         tasks_df = pd.DataFrame.from_records(all_tasks)
+        print(tasks_df)
         try:
             tasks_df["measured_wall_time"] = tasks_df["time_worker_end"] - tasks_df["time_worker_start"]
         except KeyError:
             print(f"No tasks that finished were found in the log for manager pid {self.pid}")
             sys.exit(1)
-
+        
         return self.assign_slots(tasks_df, expand_waiting)
 
 
@@ -313,16 +315,16 @@ class ParseTxn:
             (mode, arg) = arg.split(maxsplit=1)
             pass
 
-    def _parse_duty(self, time, manager_pid, task_id, event, arg):
+    def _parse_library(self, time, manager_pid, task_id, event, arg):
+        if event == "SENT":
+            self.cm.task_last_attempt[task_id] = 0
         la = self.cm.task_last_attempt[task_id]
         ca = self.cm.tasks_attempts[task_id][la]
 
-        if event == "WAITING":
-            pass
-        elif event == "SENT":
+        if event == "SENT":
             pass
         elif event == "STARTED":
-            ca["duty"] = time
+            ca["library"] = time
         elif event == "FAILURE":
             pass
 
@@ -348,7 +350,7 @@ class ParseTxn:
             ca["attempt_number"] = attempt_number
             ca["category"] = category
             self.arg_to_resources(ca, "requested_", arg)
-            ca["duty"] = pd.NA   # we do not know if it a duty
+            ca["library"] = pd.NA   # we do not know if it a library
         elif event == "RUNNING":
             (worker_id, allocation, arg) = arg.split()
             self.cm.tasks_on_worker[worker_id][task_id] = la
@@ -385,8 +387,8 @@ class ParseTxn:
                 self._parse_worker(time, manager_pid, target, event, arg)
             elif subject == "CATEGORY":
                 self._parse_category(time, manager_pid, target, event, arg)
-            elif subject == "DUTY":
-                self._parse_duty(time, manager_pid, target, event, arg)
+            elif subject == "LIBRARY":
+                self._parse_library(time, manager_pid, target, event, arg)
             elif subject == "TASK":
                 self._parse_task(time, manager_pid, target, event, arg)
 
