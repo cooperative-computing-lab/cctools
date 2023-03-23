@@ -4,33 +4,43 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-# This shows an example of using Library Tasks and FunctionInvocation Tasks.
-# Gradient descent is an algorithm used to optimize the weights of machine learning models and regressions.
-# Running multiple instances of gradient descent can be used to overcome local minima and approach the global minimum for the best model possible.
+# This shows an example of using Library Tasks and FunctionCall Tasks.
+# Gradient descent is an algorithm used to optimize the weights of machine
+# learning models and regressions.  Running multiple instances of gradient
+# descent can be used to overcome local minima and approach the global minimum
+# for the best model possible.
 
-# The manager first creates a Library Task that includes the code for the gradient descent algorithm, and installs it on connected workers.
-# The manager then creates FunctionInvocation Task that run individual instance of gradient descent for a randomized model.
-# The manager runs many of these tasks, and returns the set of weights that had the lowest overall error.
+# The manager first creates a Library Task that includes the code for the
+# gradient descent algorithm, and installs it on connected workers.  The
+# manager then creates FunctionCall Task that run individual instance of
+# gradient descent for a randomized model.  The manager runs many of these
+# tasks, and returns the set of weights that had the lowest overall error.
 
 import taskvine as vine
 import json
 import numpy as np
 import random
 
-# this is the function we will pack into a Library Task. It accepts a list of training data, a list of testing data, and returns the optimized set of weights.
-# the model used is a simple linear regression with polynomial basis functions.
-def batch_gradient_descent(train_data, test_data):
+# this is the function we will pack into a Library Task.
+# arguments:
+# train_data:       List of data to train a model with simple linear regression
+#                   with polynomial basis functions
+# test_data:        List of data to test the fit of the model
+# number_of_params: the number of parameters/basis functions in the model
+# max_iterations:   maximum number of iterations of weight updates to perform
+# min_error:        continue training until the difference in error between
+#                   iterations is less than this value - or max_iterations is reached.
+# learning_rate:    how much to update the weights each iteration.
+#
+# It returns the optimized set of weights
+def batch_gradient_descent(train_data, test_data, number_of_params=100, max_iterations=100000000, min_error=1e-02, learning_rate=0.0005):
+    # Note that we import the python modules again inside the function. This is
+    # because this function will be executed remotely independent from this
+    # current python program.
     import random
     import time
     import numpy as np
-    # the number of parameters/basis functions in the model (M).
-    NUMBER_OF_PARAMS = 100
-    # maximum number of iterations of weight updates to perform.
-    MAX_ITERATIONS = 100000000
-    # continue training until the difference in error between iterations is less than this value - or MAX_ITERATIONS is reached.
-    MIN_ERROR = 1e-02
-    # how much to update the weights each iteration.
-    LEARNING_RATE = 0.0005
+
     # seed the random number generator to ensure this model has a random set of weights
     random.seed(time.time())
 
@@ -39,26 +49,34 @@ def batch_gradient_descent(train_data, test_data):
     test_data = np.array(test_data)
 
     # compute the phi matrix. each row is a different x_i, and each column is (x_i)^n where n is the column number
-    phi = np.matrix([[x[0] ** i for i in range(NUMBER_OF_PARAMS)] for x in train_data])
+    phi = np.matrix([[x[0] ** i for i in range(number_of_params)] for x in train_data])
+
     # ground truth observed value in the training data
     observed_values = np.matrix([[x[1]] for x in train_data])
+
     # initial randomized w matrix
-    w_initial = np.matrix([[random.random()] for x in range(NUMBER_OF_PARAMS)])
+    w_initial = np.matrix([[random.random()] for x in range(number_of_params)])
+
 
     # calculuate the RMS error of the set of weights passed in the argument and return it
     def calculate_error(w_i):
         return 1 / 2 * (phi @ w_i - observed_values).T @ (phi @ w_i - observed_values)
+
     # compute the batch gradient descent algorithm
-    for i in range(MAX_ITERATIONS):
+    for i in range(max_iterations):
         # update the next set of weights
-        w_next = w_initial - LEARNING_RATE * (phi.T @ phi @ w_initial - phi.T @ observed_values)
+        w_next = w_initial - learning_rate * (phi.T @ phi @ w_initial - phi.T @ observed_values)
+
         # if the error is below our threshold, we are finished!
-        if calculate_error(w_initial) - calculate_error(w_next) < MIN_ERROR:
+        if calculate_error(w_initial) - calculate_error(w_next) < min_error:
             break
+
         # otherwise, get ready to update the weights again
         w_initial = w_next
+
     # return the final set of weights, and the error
     return [w_next.tolist(), calculate_error(w_next).item()]
+
 
 def main():
     m = vine.Manager()
@@ -69,16 +87,19 @@ def main():
 
     # create Library Task from batch_gradient_descent function, and call it gradient_descent_library
     t = m.create_library_from_functions("gradient_descent_library", batch_gradient_descent)
+
     # specify resources used by Library Task
     t.set_cores(1)
     t.set_memory(2000)
     t.set_disk(2000)
+
     # install the Library Task on all workers that will connected to the manager
     m.install_library(t)
 
     # create our data by sampling 1000 points off a sin curve and adding noise
-    # can change the function to perform a regression of different functions, or even input other kinds of data
-    x_data = np.linspace(0, 1, 1000) 
+    # can change the function to perform a regression of different functions,
+    # or even input other kinds of data
+    x_data = np.linspace(0, 1, 1000)
     t_data = np.sin(x_data*2*np.pi) + np.random.normal(loc=0, scale=0.1, size=x_data.shape)
 
     # split data into training and test data
@@ -94,9 +115,11 @@ def main():
 
     # Create FunctionCall Tasks to run the gradient descent operations
     for i in range(20):
-        # the name of the function to be called is batch_gradient_descent, and the name of the Library that it lives in is gradient_descent_library
+        # the name of the function to be called is batch_gradient_descent, and
+        # the name of the Library that it lives in is gradient_descent_library
         # arguments are train_data, and test_data
         t = vine.FunctionCall("batch_gradient_descent", "gradient_descent_library", train_data, test_data)
+
         # specify resources used by FunctionCall
         t.set_cores(1)
         t.set_disk(500)
