@@ -1623,12 +1623,13 @@ class Manager(object):
         del self._library_table[name]
         vine_manager_remove_library(self._taskvine, name)
 
+    ##
     # Turn a list of python functions into a Library
-    #
     #
     # @param self            Reference to the current manager object.
     # @param name            Name of the Library to be created
     # @param function_list   List of all functions to be included in the library
+    # @returns               A task to be used with @ref Manager.install_library.
     def create_library_from_functions(self, name, *function_list):
         # ensure poncho python library is available
         if poncho_available == False:
@@ -1653,58 +1654,61 @@ class Manager(object):
             package_serverize.serverize_library_from_code(library_cache_path, function_list, name)
             # enable correct permissions for library code
             os.chmod(library_code_path, 0o775)
-        
+
         # create Task to execute the Library
         t = LibraryTask("python ./library_code.py", name)
         # declare the environment
-        f = self.declare_poncho(library_env_path)
+        f = self.declare_poncho(library_env_path, cache=True)
         t.add_environment(f)
         # declare the library code as an input
-        f = self.declare_file(library_code_path)
+        f = self.declare_file(library_code_path, cache=True)
         t.add_input(f, "library_code.py")
         return t
 
+    ##
     # Turn Library code created with poncho_package_serverize into a Library Task
     #
-    #
     # @param self            Reference to the current manager object.
-    # @param library_path    Path of the file which contains the library code - the output of poncho_package_serverize
-    # @param env_path        Path of the environment file which contains the environment capable of running the Library. Also can be a vine File object. Optional if no environment needed.
-    def create_library_from_serverized_files(self, name, library_path, env_path=None):
+    # @param library_path    Filename of the library (i.e., the output of poncho_package_serverize)
+    # @param env             Environment to run the library. Either a vine file
+    #                        that expands to an environment (see @ref Task.add_environment), or a path
+    #                        to a poncho environment.
+    # @returns               A task to be used with @ref Manager.install_library.
+    def create_library_from_serverized_files(self, name, library_path, env=None):
         if poncho_available == False:
             raise ModuleNotFoundError("The poncho module is not available. Cannot create library.")
         t = LibraryTask("python ./library_code.py", name)
-        if env_path:
-            # if path to environment
-            if isinstance(env_path, str):
-                env = self.declare_poncho(env_path, cache=True)
+        if env:
+            if isinstance(env, str):
+                env = self.declare_poncho(env, cache=True)
                 t.add_environment(env)
-            # vine file environment
             else:
-                t.add_environment(env_path)
-        f = self.declare_file(library_path)
+                t.add_environment(env)
+        f = self.declare_file(library_path, cache=True)
         t.add_input(f, "library_code.py")
+
         return t
 
+    ##
     # Create a Library task from arbitrary inputs
     #
-    #
-    # @param self            Reference to the current manager object.
-    # @param executable_path Path of the file which contains the library executable
+    # @param self            Reference to the current manager object
+    # @param executable_path Filename of the library executable
     # @param name            Name of the library to be created
-    # @param env_path        Optional argument to include a path to an environment to run the Library in. Can also be a vine File object.
-    def create_library_from_command(self, executable_path, name, env_path=None):
+    # @param env             Environment to run the library. Either a vine file
+    #                        that expands to an environment (see @ref Task.add_environment), or a path
+    #                        to a poncho environment.
+    # @returns               A task to be used with @ref Manager.install_library
+    def create_library_from_command(self, executable_path, name, env=None):
         t = LibraryTask("./library_exe", name)
-        f = self.declare_file(executable_path)
+        f = self.declare_file(executable_path, cache=True)
         t.add_input(f, "library_exe")
-        if env_path:
-            # if path to environment
-            if isinstance(env_path, str):
-                env = self.declare_poncho(env_path, cache=True)
+        if env:
+            if isinstance(env, str):
+                env = self.declare_poncho(env, cache=True)
                 t.add_environment(env)
-            # vine file environment
             else:
-                t.add_environment(env_path)
+                t.add_environment(env)
         return t
 
     ##
