@@ -1636,7 +1636,7 @@ class Manager(object):
         # create Task to execute the Library
         t = LibraryTask("python ./library_code.py", name)
         # declare the environment
-        f = self.declare_poncho(self.declare_file(library_env_path))
+        f = self.declare_poncho(library_env_path)
         t.add_environment(f)
         # declare the library code as an input
         f = self.declare_file(library_code_path)
@@ -1648,13 +1648,19 @@ class Manager(object):
     #
     # @param self            Reference to the current manager object.
     # @param library_path    Path of the file which contains the library code - the output of poncho_package_serverize
-    # @param env_path        Path of the environment file which contains the environment capable of running the Library
-    def create_library_from_serverized_files(self, name, library_path, env_path):
+    # @param env_path        Path of the environment file which contains the environment capable of running the Library. Also can be a vine File object. Optional if no environment needed.
+    def create_library_from_serverized_files(self, name, library_path, env_path=None):
         if poncho_available == False:
             raise ModuleNotFoundError("The poncho module is not available. Cannot create library.")
         t = LibraryTask("python ./library_code.py", name)
-        f = self.declare_poncho(self.declare_file(env_path))
-        t.add_environment(f)
+        if env_path:
+            # string environment
+            if isinstance(env_path, str):
+                env = self.declare_poncho(env_path, cache=True)
+                t.add_environment(env)
+            # vine file environment
+            else:
+                t.add_environment(env_path)
         f = self.declare_file(library_path)
         t.add_input(f, "library_code.py")
         return t
@@ -1665,14 +1671,19 @@ class Manager(object):
     # @param self            Reference to the current manager object.
     # @param executable_path Path of the file which contains the library executable
     # @param name            Name of the library to be created
-    # @param env_path        Optional argument to include a path to an environment to run the Library in
+    # @param env_path        Optional argument to include a path to an environment to run the Library in. Can also be a vine File object.
     def create_library_from_command(self, executable_path, name, env_path=None):
         t = LibraryTask("./library_exe", name)
         f = self.declare_file(executable_path)
         t.add_input(f, "library_exe")
         if env_path:
-            f = self.declare_poncho(self.declare_file(library_env_path))
-            t.add_environment(f)
+            # path to environment
+            if isinstance(env_path, str):
+                env = self.declare_poncho(env_path, cache=True)
+                t.add_environment(env)
+            # vine file environment
+            else:
+                t.add_environment(env_path)
         return t
 
     ##
