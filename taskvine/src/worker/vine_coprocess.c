@@ -27,10 +27,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-#define COPROCESS_CORES_DEFAULT 1
-#define COPROCESS_MEMORY_DEFAULT 500
-#define COPROCESS_DISK_DEFAULT 500
-#define COPROCESS_GPUS_DEFAULT 0
+extern struct vine_resources *total_resources;
 
 static int coprocess_max_timeout = 1000 * 60 * 5; // set max timeout to 5 minutes
 
@@ -120,7 +117,7 @@ int vine_coprocess_setup(struct vine_coprocess *coprocess)
 		}
 		if (!strcmp(key, "name")) {
             if(item->type == JX_STRING) {
-                name = string_format("duty_coprocess:%s", item->u.string_value);
+                name = string_format("library_coprocess:%s", item->u.string_value);
             }
 		}
 		else {
@@ -245,17 +242,12 @@ struct vine_coprocess *vine_coprocess_initialize_coprocess(char *coprocess_comma
 	return coprocess;
 }
 
-void vine_coprocess_specify_resources(struct vine_coprocess *coprocess, struct rmsummary *allocated_resources) {
-	int coprocess_cores_normalized  = ( (allocated_resources->cores > 0)  ? allocated_resources->cores  : COPROCESS_CORES_DEFAULT);
-	int coprocess_memory_normalized = ( (allocated_resources->memory > 0) ? allocated_resources->memory : COPROCESS_MEMORY_DEFAULT);
-	int coprocess_disk_normalized   = ( (allocated_resources->disk > 0)   ? allocated_resources->disk   : COPROCESS_DISK_DEFAULT);
-	int coprocess_gpus_normalized   = ( (allocated_resources->gpus > 0)   ? allocated_resources->gpus   : COPROCESS_GPUS_DEFAULT);
-	
+void vine_coprocess_specify_resources(struct vine_coprocess *coprocess) {
 	coprocess->coprocess_resources = vine_resources_create();
-	coprocess->coprocess_resources->cores.total  = coprocess_cores_normalized;
-	coprocess->coprocess_resources->memory.total = coprocess_memory_normalized;
-	coprocess->coprocess_resources->disk.total   = coprocess_disk_normalized;
-	coprocess->coprocess_resources->gpus.total   = coprocess_gpus_normalized;
+	coprocess->coprocess_resources->cores.total  = total_resources->cores.total;
+	coprocess->coprocess_resources->memory.total = total_resources->memory.total;
+	coprocess->coprocess_resources->disk.total   = total_resources->disk.total;
+	coprocess->coprocess_resources->gpus.total   = total_resources->gpus.total;	
 }
 
 void vine_coprocess_shutdown_all_coprocesses(struct list *coprocess_list) {
@@ -280,7 +272,9 @@ void vine_coprocess_measure_resources(struct list *coprocess_list) {
 			continue;
 		}
 		struct rmsummary *resources = rmonitor_measure_process(coprocess->pid);
-
+		if (!resources) {
+			return;
+		}
 		debug(D_VINE, "Measuring resources of coprocess with pid %d\n", coprocess->pid);
 		debug(D_VINE, "cores: %lf, memory: %lf, disk: %lf, gpus: %lf\n", resources->cores, resources->memory + resources->swap_memory, resources->disk, resources->gpus);
 		debug(D_VINE, "Max resources available to coprocess:\ncores: %"PRId64 " memory: %"PRId64 " disk: %"PRId64 " gpus: %"PRId64 "\n", coprocess->coprocess_resources->cores.total, coprocess->coprocess_resources->memory.total, coprocess->coprocess_resources->disk.total, coprocess->coprocess_resources->gpus.total);

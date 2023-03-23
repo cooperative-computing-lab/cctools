@@ -50,7 +50,7 @@ void vine_txn_log_write_header( struct vine_manager *q )
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id WAITING_RETRIEVAL worker_id\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id RETRIEVED (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) {limits_exceeded} {resources_measured}\n");
 	fprintf(q->txn_logfile, "# time manager_pid TASK task_id DONE (SUCCESS|UNKNOWN|INPUT_MISSING|OUTPUT_MISSING|STDOUT_MISSING|SIGNAL|RESOURCE_EXHAUSTION|MAX_RETRIES|MAX_END_TIME|MAX_WALL_TIME|FORSAKEN) exit_code\n");
-	fprintf(q->txn_logfile, "# time manager_pid DUTY duty_id (WAITING|SENT|STARTED|FAILURE) worker_id");
+	fprintf(q->txn_logfile, "# time manager_pid LIBRARY library_id (WAITING|SENT|STARTED|FAILURE) worker_id");
 	fprintf(q->txn_logfile, "\n");
 }
 
@@ -310,29 +310,29 @@ void vine_txn_log_write_manager(struct vine_manager *q, const char *event)
 }
 
 
-void vine_txn_log_write_duty_update(struct vine_manager *q, struct vine_worker_info *w, int duty_id, vine_duty_state_t state) {
+void vine_txn_log_write_library_update(struct vine_manager *q, struct vine_worker_info *w, int library_id, vine_library_state_t state) {
 	struct buffer B;
 	buffer_init(&B);
-	buffer_printf(&B, "DUTY %d", duty_id);
+	buffer_printf(&B, "LIBRARY %d", library_id);
 
-	const char *status = "UNKNOWN";
-	switch(state) {
-		case VINE_DUTY_WAITING:
-			status = "WAITING";
-			break;
-		case VINE_DUTY_SENT:
-			status = "SENT";
-			break;
-		case VINE_DUTY_STARTED:
-			status = "STARTED";
-			break;
-		case VINE_DUTY_FAILURE:
-			status = "FAILURE";
-			break;
-	}
+    const char *status = "UNKNOWN";
+    switch(state) {
+        case VINE_LIBRARY_WAITING:
+            status = "WAITING";
+            break;
+        case VINE_LIBRARY_SENT:
+            status = "SENT";
+            break;
+        case VINE_LIBRARY_STARTED:
+            status = "STARTED";
+            break;
+        case VINE_LIBRARY_FAILURE:
+            status = "FAILURE";
+            break;
+    }
 
-	buffer_printf(&B, " %s", status);
-	buffer_printf(&B, " %s", w->workerid);
+    buffer_printf(&B, " %s", status);
+    buffer_printf(&B, " %s", w->workerid);
 
 	vine_txn_log_write(q, buffer_tostring(&B));
 	buffer_free(&B);
