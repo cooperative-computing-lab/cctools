@@ -213,13 +213,19 @@ UNTAR_SCRIPT=$(mktemp poncho_package_run.XXXXXX)
 cat > "${UNTAR_SCRIPT}" << EOF
 if [[ ! -e "${UNPACK_TO}"/.poncho_package_run_expanded ]]
 then
-    logmsg expanding environment file ${ENV_NAME}
 
-    # Directory is empty. It is safe to untar.
-    if ! tar -xf "${ENV_NAME}" -C "${UNPACK_TO}"
+    # only untar if it does not look like the directory already has an untared
+    # environment. (E.g. another process performed the untar before poncho_package_run)
+    if [[ -f ${UNPACK_TO}/bin/conda-unpack ]]
     then
-        errmsg could not uncompress environment: ${ENV_NAME}
-        exit 1
+        logmsg directory already expanded but not relocated
+    else
+        logmsg expanding environment file ${ENV_NAME}
+        if ! tar -xf "${ENV_NAME}" -C "${UNPACK_TO}"
+        then
+            errmsg could not uncompress environment: ${ENV_NAME}
+            exit 1
+        fi
     fi
 
     export PATH=${UNPACK_TO}/bin:${PATH}
@@ -232,7 +238,7 @@ then
 
     /bin/date > "${UNPACK_TO}"/.poncho_package_run_expanded
 else
-    logmsg directory ${UNPACK_TO} is not empty. Not expanding environment file again
+    logmsg directory ${UNPACK_TO} is not empty. Not setting environment file again
 fi
 exit 0
 EOF

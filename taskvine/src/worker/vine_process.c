@@ -52,8 +52,8 @@ Create temporary directories inside as well.
 
 extern char * workspace;
 
-extern struct list *duty_list;
-extern struct hash_table *duty_ids;
+extern struct list *library_list;
+extern struct hash_table *library_ids;
 
 static int create_sandbox_dir( struct vine_process *p )
 {
@@ -271,11 +271,11 @@ pid_t vine_process_execute(struct vine_process *p )
 
 	p->execution_start = timestamp_get();
 
-	if (!vine_process_get_duty_name(p)) {
+	if (!vine_process_get_library_name(p)) {
 		p->pid = fork();
 	} else {
 		p->coprocess = vine_coprocess_initialize_coprocess(p->task->command_line);
-		vine_coprocess_specify_resources(p->coprocess, p->task->resources_requested);
+		vine_coprocess_specify_resources(p->coprocess);
 		p->pid = vine_coprocess_start(p->coprocess, p->sandbox);
 	}
 
@@ -426,12 +426,12 @@ int vine_process_measure_disk(struct vine_process *p, int max_time_on_measuremen
 	return result;
 }
 
-char * vine_process_get_duty_name( struct vine_process *p) {
-	char *duty_name;
-	int duty_id;
-	HASH_TABLE_ITERATE(duty_ids,duty_name,duty_id) {
-		if (duty_id == p->task->task_id) {
-			return duty_name;
+char * vine_process_get_library_name( struct vine_process *p) {
+	char *library_name;
+	int library_id;
+	HASH_TABLE_ITERATE(library_ids,library_name,library_id) {
+		if (library_id == p->task->task_id) {
+			return library_name;
 		}
 	}
 	return 0;

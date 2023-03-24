@@ -89,15 +89,6 @@ void vine_resources_send( struct link *manager, struct vine_resources *r, time_t
 	link_printf(manager, stoptime, "resource tag %"PRId64"\n", r->tag);
 }
 
-void vine_coprocess_resources_send( struct link *manager, struct vine_resources *r, time_t stoptime )
-{
-	debug(D_VINE, "Sending resource description to manager:");
-	vine_resource_send(manager, &r->disk,    "coprocess_disk",   stoptime);
-	vine_resource_send(manager, &r->memory,  "coprocess_memory", stoptime);
-	vine_resource_send(manager, &r->gpus,    "coprocess_gpus",   stoptime);
-	vine_resource_send(manager, &r->cores,   "coprocess_cores",  stoptime);
-}
-
 void vine_resources_debug( struct vine_resources *r )
 {
 	vine_resource_debug(&r->workers, "workers");

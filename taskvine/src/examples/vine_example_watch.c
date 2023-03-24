@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 	struct vine_manager *m;
 	struct vine_task *t;
 
-    //runtime logs will be written to vine_example_watch_info/%Y-%m-%dT%H:%M:%S
+	//runtime logs will be written to vine_example_watch_info/%Y-%m-%dT%H:%M:%S
 	vine_set_runtime_info_path("vine_example_watch_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
@@ -44,13 +44,17 @@ int main(int argc, char *argv[])
 	}
 	printf("Listening on port %d...\n", vine_port(m));
 
+	struct vine_file *executable = vine_declare_file(m, "vine_example_watch_trickle.sh", VINE_CACHE);
+
 	int i;
 	for(i=0;i<10;i++) {
-		char output[256];
-		sprintf(output,"output.%d",i);
+		char output_name[256];
+		sprintf(output_name,"output.%d",i);
+		struct vine_file *output_file = vine_declare_file(m, output_name, VINE_CACHE);
+
 		t = vine_task_create("./vine_example_watch_trickle.sh > output");
-		vine_task_add_input_file(t, "vine_example_watch_trickle.sh", "vine_example_watch_trickle.sh", VINE_CACHE );
-		vine_task_add_output_file(t, output, "output", VINE_WATCH );
+		vine_task_add_input(t, executable, "vine_example_watch_trickle.sh", 0);
+		vine_task_add_output(t, output_file, "output", VINE_WATCH );
 		vine_task_set_cores(t,1);
 		vine_submit(m, t);
 	}

@@ -2,18 +2,17 @@
 from poncho import package_serverize as serverize
 import argparse
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Creates a network function based on an input file and function")
-    parser.add_argument('--src', help='Source file that contains the function to be serverized')
+    parser = argparse.ArgumentParser(description="Creates Library code based on an input file and function. Allows the running of FunctionCall instances.")
+    parser.add_argument('--src', help='Source file that contains the function(s) to be serverized')
     parser.add_argument('--function', action='append', help='Name of the function in filename to be serverized')
-    parser.add_argument('--pack', help='Optional argument. If given, will create an environment to run the network function at this path')
-    parser.add_argument('--dest', help='Destination path for the output network function')
+    parser.add_argument('--pack', help='Optional argument. If given, will create a poncho environment to run the function')
+    parser.add_argument('--dest', help='Destination path for the library file')
+    parser.add_argument('--version', choices=['work_queue', 'taskvine'], help='Version of serverless (work_queue or taskvine)', required=True)
     args = parser.parse_args()
     
     if args.function is None:
         print("Error, must specify at least one function")
         exit()
-    if not args.pack:
-        serverize.create_network_function(args.src, args.function, args.dest)
-    else:
-        serverize.create_network_function(args.src, args.function, args.dest)
-        serverize.pack_network_function(args.src, args.pack)
+    serverize.create_library_code(args.src, args.function, args.dest, args.version)
+    if args.pack:
+        serverize.pack_library_code(args.src, args.pack)

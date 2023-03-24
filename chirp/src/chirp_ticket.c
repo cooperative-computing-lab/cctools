@@ -177,8 +177,8 @@ void chirp_ticket_name(const char *pk, char *ticket_subject, char *ticket_filena
 	md5_init(&context);
 	md5_update(&context, (const unsigned char *) pk, strlen(pk));
 	md5_final(digest, &context);
-	sprintf(ticket_subject, TICKET_SUBJECT_FORMAT, md5_string(digest));
-	sprintf(ticket_filename, "/" TICKET_FILENAME_FORMAT, md5_string(digest));
+	sprintf(ticket_subject, TICKET_SUBJECT_FORMAT, md5_to_string(digest));
+	sprintf(ticket_filename, "/" TICKET_FILENAME_FORMAT, md5_to_string(digest));
 }
 
 void chirp_ticket_filename(char *ticket_filename, const char *ticket_subject, const char *digest)
@@ -232,7 +232,7 @@ const char *chirp_ticket_digest(const char *pk)
 	md5_init(&context);
 	md5_update(&context, (const unsigned char *) pk, strlen(pk));
 	md5_final(digest, &context);
-	return md5_string(digest);	/* static memory */
+	return md5_to_string(digest);	/* static memory */
 }
 
 /* vim: set noexpandtab tabstop=4: */

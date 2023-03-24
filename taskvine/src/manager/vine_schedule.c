@@ -9,7 +9,7 @@ See the file COPYING for details.
 #include "vine_blocklist.h"
 #include "vine_file.h"
 #include "vine_mount.h"
-#include "vine_remote_file_info.h"
+#include "vine_file_replica.h"
 
 #include "debug.h"
 #include "rmsummary.h"
@@ -50,12 +50,7 @@ static int check_worker_against_task(struct vine_manager *q, struct vine_worker_
 	}
 
 	struct rmsummary *l = vine_manager_choose_resources_for_task(q, w, t);
-	struct vine_resources *r = NULL;
-	if (t->coprocess == NULL) {
-		r = w->resources;
-	} else {
-		r = w->coprocess_resources;
-	}
+	struct vine_resources *r = w->resources;
 
 	int ok = 1;
 
@@ -120,7 +115,7 @@ static struct vine_worker_info *find_worker_by_files(struct vine_manager *q, str
 	struct vine_worker_info *best_worker = 0;
 	int64_t most_task_cached_bytes = 0;
 	int64_t task_cached_bytes;
-	struct vine_remote_file_info *remote_info;
+	struct vine_file_replica *remote_info;
 	struct vine_mount *m;
 
 	HASH_TABLE_ITERATE(q->worker_table,key,w) {

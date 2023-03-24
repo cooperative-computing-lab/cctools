@@ -94,9 +94,9 @@ extract() {
 }
 
 run() {
-    # make the extraction directory easily available in run.sh
+    # make the extraction directory easily available in bin/run.sh
     export SFX_DIR
-    $SFX_DIR/run.sh "$@"
+    $SFX_DIR/bin/run.sh "$@"
     SFX_EXIT_STATUS=$?
 }
 
@@ -130,7 +130,7 @@ __ARCHIVE__
 '''
 
 RUN_SH = '''#!/bin/sh
-SFX_DIR=`dirname $0`
+SFX_DIR=$(dirname $( cd -- "$( dirname -- "$0" )" > /dev/null 2>&1 && pwd ))
 
 if [ -d "$SFX_DIR/env" ]; then
     for f in $SFX_DIR/env/*; do
@@ -169,19 +169,31 @@ then
     echo SFX_EXTRACT_ONLY=1  Extract package, but do not run a command.
     echo SFX_KEEP=1          Do not remove extracted package when command finishes.
     echo SFX_DIR=DIR         Extract to DIR, instead of a temporary directory. Implies SFX_KEEP=1
+    echo SFX_ENV=1           Execute the arguments given as a command inside the starch environment
+
     exit 0
 fi
 
 if [ -n "$SFX_EXEC" ]
 then
     $SFX_EXEC "$@"
+elif [ "$SFX_ENV" = 1 ]
+then
+    "$@"
 else
     {cmd} "$@"
 fi
 '''
 
-# Create SFX
+RUN_IN_ENV = '''#!/bin/sh
+export SFX_ENV=1
 
+SFX_DIR=$(dirname $( cd -- "$( dirname -- "$0" )" > /dev/null 2>&1 && pwd ))
+
+exec $SFX_DIR/bin/run.sh "$@"
+'''
+
+# Create SFX
 def create_sfx(sfx_path, executables, libraries, data, environments, command):
     """ Create self-extracting executable
 
@@ -189,7 +201,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         bin         Executables
         lib         Libraries
         env         Environment Scripts (static)
-        run.sh      Script that contains command
+        bin/run.sh  Script that contains command
     """
 
     tmp_file = NamedTemporaryFile()
@@ -229,14 +241,24 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         logging.debug('    adding environment script: %s (%s)' % (env_name, real_path))
         archive.addfile(env_info, open(real_path, 'rb'))
 
-    run_info = TarInfo('run.sh')
+    run_info = TarInfo('bin/run.sh')
     run_info_data  = RUN_SH.format(cmd=command)
     run_info.mode  = int('755', 8)
     run_info.mtime = time()
     run_info.size  = len(run_info_data)
 
-    logging.debug('adding run.sh...')
+    run_in_env_info = TarInfo('bin/run_in_env')
+    run_in_env_info_data  = RUN_IN_ENV
+    run_in_env_info.mode  = int('755', 8)
+    run_in_env_info.mtime = time()
+    run_in_env_info.size  = len(run_in_env_info_data)
+
+    logging.debug('adding bin/run.sh...')
     archive.addfile(run_info, BytesIO(run_info_data.encode('utf-8')))
+
+    logging.debug('adding bin/run_in_env...')
+    archive.addfile(run_in_env_info, BytesIO(run_in_env_info_data.encode('utf-8')))
+
     archive.close()
 
     logging.debug('creating sfx...')

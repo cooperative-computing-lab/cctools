@@ -246,6 +246,9 @@ static int fast_terminate_from_signal = 0;           /* Whether to stop monitori
 														terminates. (e.g., if receiving two terminating signals
 														in less than a second. */
 
+double max_peak_cores_interval = 180;   /* wall time in seconds for the peak cores window. Processes that run for
+										   less than this time will report cores_avg as peak cores. */
+
 
 char *catalog_task_readable_name = NULL;
 char *catalog_uuid    = NULL;
@@ -257,6 +260,7 @@ uint64_t catalog_interval = 0;
 uint64_t catalog_last_update_time = 0;
 
 int64_t catalog_interval_default = 30;
+
 
 /***
  * Utility functions (open log files, proc files, measure time)
@@ -856,10 +860,10 @@ void rmonitor_summary_header()
     if(log_series)
     {
 	    fprintf(log_series, "# Units:\n");
-	    fprintf(log_series, "# wall_clock and cpu_time in microseconds\n");
+	    fprintf(log_series, "# wall_clock and cpu_time in seconds\n");
 	    fprintf(log_series, "# virtual, resident and swap memory in megabytes.\n");
 	    fprintf(log_series, "# disk in megabytes.\n");
-	    fprintf(log_series, "# bandwidth in bits/s.\n");
+	    fprintf(log_series, "# bandwidth in Mbps.\n");
 	    fprintf(log_series, "# cpu_time, bytes_read, bytes_written, bytes_sent, and bytes_received show cummulative values.\n");
 	    fprintf(log_series, "# wall_clock, max_concurrent_processes, virtual, resident, swap, files, and disk show values at the sample point.\n");
 
@@ -896,8 +900,6 @@ struct peak_cores_sample {
 double peak_cores(double wall_time, double cpu_time) {
 	static struct list *samples = NULL;
 
-	double max_separation = 180 + 2*interval; /* at least three minutes and a complete interval */
-
 	if(!samples) {
 		samples = list_create();
 
@@ -914,12 +916,12 @@ double peak_cores(double wall_time, double cpu_time) {
 
 	struct peak_cores_sample *head;
 
-	/* Drop entries older than max_separation, unless we only have two samples. */
+	/* Drop entries older than max_peak_cores_interval, unless we only have two samples. */
 	while((head = list_peek_head(samples))) {
 		if(list_size(samples) < 2) {
 			break;
 		}
-		else if( head->wall_time + max_separation < tail->wall_time) {
+		else if( head->wall_time + max_peak_cores_interval < tail->wall_time) {
 			list_pop_head(samples);
 			free(head);
 		} else {
@@ -932,12 +934,12 @@ double peak_cores(double wall_time, double cpu_time) {
 	double diff_wall = MAX(0, tail->wall_time - head->wall_time);
 	double diff_cpu  = MAX(0, tail->cpu_time  - head->cpu_time);
 
-	if(tail->wall_time - summary->start < max_separation) {
+	if(tail->wall_time - summary->start < max_peak_cores_interval) {
 		/* hack to elimiate noise. if we have not collected enough samples,
-		 * use max_separation as the wall_time. This eliminates short noisy
+		 * use max_peak_cores_interval as the wall_time. This eliminates short noisy
 		 * burst at the beginning of the execution, but also triggers limits
 		 * checks for extreme offenders. */
-		diff_wall = max_separation;
+		diff_wall = max_peak_cores_interval;
 	}
 
 	return ((double) diff_cpu) / diff_wall;
@@ -1020,7 +1022,13 @@ void rmonitor_log_row(struct rmsummary *tr)
 	{
 		fprintf(log_series,  "%s", rmsummary_resource_to_str("start", tr->wall_time + summary->start, 0));
 		fprintf(log_series, " %s", rmsummary_resource_to_str("cpu_time", tr->cpu_time, 0));
-		fprintf(log_series, " %s", rmsummary_resource_to_str("cores", tr->cores, 0));
+
+		if(tr->wall_time > max_peak_cores_interval) {
+			fprintf(log_series, " %s", rmsummary_resource_to_str("cores", tr->cores, 0));
+		} else {
+			fprintf(log_series, " %s", rmsummary_resource_to_str("cores", tr->cores_avg, 0));
+		}
+
 		fprintf(log_series, " %s", rmsummary_resource_to_str("max_concurrent_processes", tr->max_concurrent_processes, 0));
 		fprintf(log_series, " %s", rmsummary_resource_to_str("virtual_memory", tr->virtual_memory, 0));
 		fprintf(log_series, " %s", rmsummary_resource_to_str("memory", tr->memory, 0));

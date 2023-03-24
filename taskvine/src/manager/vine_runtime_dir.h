@@ -25,4 +25,7 @@ char *vine_get_runtime_path_log(struct vine_manager *m, const char *path);
 /* Returns path relative to the staging runtime directory */
 char *vine_get_runtime_path_staging(struct vine_manager *m, const char *path);
 
+/* Returns path relative to the cache runtime directory */
+char *vine_get_runtime_path_caching(struct vine_manager *m, const char *path);
+
 #endif

@@ -40,6 +40,8 @@ int submit_tasks(struct vine_manager *q, int input_size, int run_time, int outpu
 	sprintf(gen_input_cmd, "dd if=/dev/zero of=%s bs=1048576 count=%d",input_file,input_size);
 	system(gen_input_cmd);
 
+	struct vine_file *input = vine_declare_file(q, input_file, VINE_CACHE);
+
 	/*
 	Note that bs=1m and similar are not portable across various
 	implementations of dd, so we spell it out as bs=1048576
@@ -50,12 +52,13 @@ int submit_tasks(struct vine_manager *q, int input_size, int run_time, int outpu
 
 		sprintf(output_file, "output.%d",ntasks);
 		sprintf(command, "dd if=/dev/zero of=outfile bs=1048576 count=%d; sleep %d", output_size, run_time );
+		struct vine_file *output = vine_declare_file(q, output_file, VINE_PEER_NOSHARE);
 
 		ntasks++;
 
 		struct vine_task *t = vine_task_create(command);
-		vine_task_add_input_file(t, input_file, "infile", VINE_CACHE);
-		vine_task_add_output_file(t, output_file, "outfile", VINE_NOCACHE);
+		vine_task_add_input(t, input, "infile", 0);
+		vine_task_add_output(t, output, "outfile", 0);
 		vine_task_set_cores(t,1);
 
 		if(category && strlen(category) > 0)
@@ -191,7 +194,7 @@ int main(int argc, char *argv[])
 
 	if(monitor_flag) {
 		unlink_recursive("vine_benchmark_monitor");
-		vine_enable_monitoring(q, "vine_benchmark_monitorr", 1);
+		vine_enable_monitoring(q, 1, 0);
 		vine_set_category_mode(q, NULL, VINE_ALLOCATION_MODE_MAX_THROUGHPUT);
 	}
 

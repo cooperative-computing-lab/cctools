@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include <assert.h>
 #include <string.h>
 #include <math.h>
+#include "random.h"
 
 struct vine_task *vine_task_create(const char *command_line)
 {
@@ -70,7 +71,11 @@ void vine_task_clean( struct vine_task *t, int full_clean )
 	t->time_when_commit_start = 0;
 	t->time_when_commit_end   = 0;
 	t->time_when_retrieval    = 0;
+	t->time_when_done = 0;
+
 	t->time_workers_execute_last = 0;
+	t->time_workers_execute_last_start = 0;
+	t->time_workers_execute_last_end = 0;
 
 	t->bytes_sent = 0;
 	t->bytes_received = 0;
@@ -134,7 +139,7 @@ static struct list *vine_task_string_list_clone(struct list *string_list)
 struct vine_task *vine_task_clone(const struct vine_task *task)
 {
 	if(!task) return 0;
-	
+
 	struct vine_task *new = vine_task_create(task->command_line);
 
 	/* Static features of task are copied. */
@@ -400,7 +405,7 @@ void vine_task_check_consistency( struct vine_task *t )
 	hash_table_delete(table);
 }
 
-void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags )
+void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags )
 {
 	if(!t || !f || !f->source || !remote_name) {
 		fatal("%s: invalid null argument.",__func__);
@@ -411,11 +416,11 @@ void vine_task_add_input( struct vine_task *t, struct vine_file *f, const char *
 	}
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
-	
+
 	list_push_tail(t->input_mounts, m);
 }
 
-void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_file_flags_t flags )
+void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char *remote_name, vine_mount_flags_t flags )
 {
 	if(!t || !f || !f->source || !remote_name) {
 		fatal("%s: invalid null argument.",__func__);
@@ -426,68 +431,68 @@ void vine_task_add_output( struct vine_task *t, struct vine_file *f, const char 
 	}
 
 	struct vine_mount *m = vine_mount_create(f,remote_name,flags,0);
-	
+
 	list_push_tail(t->output_mounts, m);
 }
 
-void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_input_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
 {
-	struct vine_file *f = vine_file_local(local_name);
+	struct vine_file *f = vine_file_local(local_name, 0);
 	vine_task_add_input(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
-void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_output_file(struct vine_task *t, const char *local_name, const char *remote_name, vine_mount_flags_t flags)
 {
-	struct vine_file *f = vine_file_local(local_name);
+	struct vine_file *f = vine_file_local(local_name, 0);
 	vine_task_add_output(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
-void vine_task_add_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_input_url(struct vine_task *t, const char *file_url, const char *remote_name, vine_mount_flags_t flags)
 {
-	struct vine_file *f = vine_file_url(file_url);
+	struct vine_file *f = vine_file_url(file_url, 0);
 	vine_task_add_input(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
 void vine_task_add_empty_dir( struct vine_task *t, const char *remote_name )
 {
 	struct vine_file *f = vine_file_empty_dir();
-	vine_task_add_input(t,f,remote_name,VINE_NOCACHE);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
+	vine_task_add_input(t,f,remote_name,0);
 }
 
-void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_input_buffer(struct vine_task *t, const char *data, int length, const char *remote_name, vine_mount_flags_t flags)
 {
-	struct vine_file *f = vine_file_buffer("unnamed",data,length);
+	struct vine_file *f = vine_file_buffer(data,length,0);
 	vine_task_add_input(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
-void vine_task_add_output_buffer(struct vine_task *t, const char *buffer_name, const char *remote_name, vine_file_flags_t flags)
-{
-	struct vine_file *f = vine_file_buffer(buffer_name,0,0);
-	vine_task_add_output(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
-}
-
-void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_file_flags_t flags)
+void vine_task_add_input_mini_task(struct vine_task *t, struct vine_task *mini_task, const char *remote_name, vine_mount_flags_t flags)
 {
 	/* XXX mini task must have a single output file */
-	struct vine_file *f = vine_file_mini_task(mini_task);
+	struct vine_file *f = vine_file_mini_task(mini_task, 0);
 	vine_task_add_input(t,f,remote_name,flags);
-	vine_file_delete(f); // Remove one ref because this is a hidden create.
 }
 
-void vine_task_set_snapshot_file(struct vine_task *t, const char *monitor_snapshot_file) {
+void vine_task_add_environment(struct vine_task *t, struct vine_file *environment_file) {
+
+	assert(environment_file);
+
+	char *env_name = string_format("__vine_env_%s", environment_file->cached_name);
+
+	vine_task_add_input(t, environment_file, env_name, 0);
+
+	char *new_cmd = string_format("%s/bin/run_in_env %s", env_name, t->command_line);
+	vine_task_set_command(t, new_cmd);
+
+	free(env_name);
+}
+
+
+void vine_task_set_snapshot_file(struct vine_task *t, struct vine_file *monitor_snapshot_file) {
 
 	assert(monitor_snapshot_file);
 
-	free(t->monitor_snapshot_file);
-	t->monitor_snapshot_file = xxstrdup(monitor_snapshot_file);
-
-	vine_task_add_input_file(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, VINE_CACHE);
+	t->monitor_snapshot_file = monitor_snapshot_file;
+	vine_task_add_input(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, 0);
 }
 
 void vine_task_set_scheduler(struct vine_task *t, vine_schedule_t algorithm)
@@ -548,7 +553,6 @@ void vine_task_delete(struct vine_task *t)
 	free(t->category);
 
 	free(t->monitor_output_directory);
-	free(t->monitor_snapshot_file);
 
 	list_clear(t->input_mounts,(void*)vine_mount_delete);
 	list_delete(t->input_mounts);
@@ -571,40 +575,6 @@ void vine_task_delete(struct vine_task *t)
 	rmsummary_delete(t->resources_allocated);
 
 	free(t);
-}
-
-static struct vine_file * find_output_buffer( struct vine_task *t, const char *name )
-{
-	struct vine_mount *m;
-
-	LIST_ITERATE(t->output_mounts,m) {
-		struct vine_file *f = m->file;
-		if(f->type==VINE_BUFFER && !strcmp(f->source,name)) {
-			return f;
-		}
-	}
-
-	return 0;
-}
-
-const char * vine_task_get_output_buffer( struct vine_task *t, const char *buffer_name )
-{
-	struct vine_file *f = find_output_buffer(t,buffer_name);
-	if(f) {
-		return f->data;
-	} else {
-		return 0;
-	}
-}
-
-int vine_task_get_output_buffer_length( struct vine_task *t, const char *buffer_name )
-{
-	struct vine_file *f = find_output_buffer(t,buffer_name);
-	if(f) {
-		return f->length;
-	} else {
-		return 0;
-	}
 }
 
 const char * vine_task_get_command( struct vine_task *t )
@@ -654,7 +624,6 @@ const char * vine_task_get_hostname( struct vine_task *t )
 }
 
 #define METRIC(x) if(!strcmp(name,#x)) return t->x;
-
 int64_t vine_task_get_metric( struct vine_task *t, const char *name )
 {
 	METRIC(time_when_submitted);
@@ -669,6 +638,15 @@ int64_t vine_task_get_metric( struct vine_task *t, const char *name )
 	METRIC(bytes_received);
 	METRIC(bytes_sent);
 	METRIC(bytes_transferred);
+	return 0;
+}
+
+#define RESOURCES(x) if(!strcmp(name,#x)) return t->resources_ ## x;
+const struct rmsummary *vine_task_get_resources( struct vine_task *t, const char *name )
+{
+	RESOURCES(measured);
+	RESOURCES(requested);
+	RESOURCES(allocated);
 	return 0;
 }
 
@@ -723,6 +701,11 @@ static void priority_add_to_jx(struct jx *j, double priority)
 	free(str);
 }
 
+/*
+Converts a task into JX format for the purpose of performance
+and status reporting, without file details.
+*/
+
 struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 {
 	struct jx *j = jx_object(0);
@@ -766,3 +749,42 @@ struct jx * vine_task_to_jx( struct vine_manager *q, struct vine_task *t )
 
 	return j;
 }
+
+/*
+Converts a task into a JSON string for the purposes of provenance.
+This function must include all of the functional inputs to a task
+that affect its outputs (command, environment, sandbox) but not
+performance and resource details that do not affect the output.
+*/
+
+char * vine_task_to_json(struct vine_task *t)
+{
+	char * buffer;
+	char * file_buffer;
+
+	struct vine_mount *m;
+
+	buffer = string_format("{\ncmd = \"%s\"\n", t->command_line);
+
+	if(t->input_mounts){
+		buffer = string_combine(buffer, "inputs = ");
+		LIST_ITERATE(t->input_mounts,m) {
+			file_buffer = string_format("{ name: \"%s\", content: \"%s\"}, ", m->remote_name, m->file->cached_name);
+			buffer = string_combine(buffer, file_buffer);
+			free(file_buffer);
+		}
+		buffer = string_combine(buffer, "\n");
+	}
+
+	if(t->output_mounts){
+		buffer = string_combine(buffer, "outputs = ");
+		LIST_ITERATE(t->output_mounts,m) {
+			file_buffer = string_format("{ name: \"%s\" }, ", m->remote_name);
+			buffer = string_combine(buffer, file_buffer);
+			free(file_buffer);
+		}
+		buffer = string_combine(buffer, "\n");
+	}
+	return buffer;
+}
+

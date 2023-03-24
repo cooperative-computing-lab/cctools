@@ -2,7 +2,6 @@
 
 import sys, json
 import work_queue as wq
-
 import socket
 import json
 import os
@@ -10,6 +9,12 @@ import sys
 import threading
 import queue
 
+import socket
+import json
+import os
+import sys
+import threading
+import queue
 def remote_execute(func):
     def remote_wrapper(event, q=None):
         if q:
@@ -32,11 +37,11 @@ def remote_execute(func):
     return remote_wrapper
     
 read, write = os.pipe() 
-
 def send_configuration(config):
     config_string = json.dumps(config)
-    print(len(config_string) + 1, "\n", config_string + "\n", flush=True)
-
+    config_cmd = f"{len(config_string) + 1}\n{config_string}\n"
+    sys.stdout.write(config_cmd)
+    sys.stdout.flush()
 def main():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -46,15 +51,12 @@ def main():
         s.close()
         print(e)
         exit(1)
-
     # information to print to stdout for worker
     config = {
             "name": name(),
             "port": s.getsockname()[1],
             }
-
     send_configuration(config)
-
     while True:
         s.listen()
         conn, addr = s.accept()
@@ -69,7 +71,8 @@ def main():
                 # actually read the size of the event
                 input_spec = conn.recv(size).decode('utf-8').split()
                 function_name = input_spec[0]
-                event_size = int(input_spec[1])
+                task_id = int(input_spec[1])
+                event_size = int(input_spec[2])
             try:
                 if event_size:
                     # receive the bytes containing the event and turn it into a string
@@ -79,6 +82,7 @@ def main():
                     # see if the user specified an execution method
                     exec_method = event.get("remote_task_exec_method", None)
                     print('Network function: recieved event: {}'.format(event), file=sys.stderr)
+                    os.chdir(f"t.{task_id}")
                     if exec_method == "thread":
                         # create a forked process for function handler
                         q = queue.Queue()
@@ -108,26 +112,19 @@ def main():
                                 all_chunks.append(chunk)
                             response = "".join(all_chunks).encode("utf-8")
                             os.waitid(os.P_PID, p, os.WEXITED)
-
                     response_size = len(response)
-
                     size_msg = "{}\n".format(response_size)
-
                     # send the size of response
                     conn.sendall(size_msg.encode('utf-8'))
-
                     # send response
                     conn.sendall(response)
-
+                    os.chdir("..")
                     break
             except Exception as e:
                 print("Network function encountered exception ", str(e), file=sys.stderr)
     return 0
-
 def name():
-	return "my_coprocess"
-
-
+    return 'my_coprocess'
 @remote_execute
 def add(x, y):
     return x + y
@@ -142,6 +139,7 @@ def no_arguments_test(a, b, c):
     return a + b + c
 @remote_execute
 def exception_test():
-    raise Exception("I will raise an exception")
+    raise Exception('I will raise an exception')
 if __name__ == "__main__":
 	main()
+

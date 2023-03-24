@@ -216,8 +216,8 @@ struct list *coprocess_list = NULL;
 
 static char *factory_name = NULL;
 
-struct list *duty_list = NULL;
-struct hash_table *duty_ids = NULL;
+struct list *library_list = NULL;
+struct hash_table *library_ids = NULL;
 
 struct vine_cache *global_cache = 0;
 
@@ -381,13 +381,6 @@ static void send_resource_update(struct link *manager)
 		end_time = worker_start_time + (manual_wall_time_option * 1e6);
 	}
 
-	if (list_size(coprocess_list) != 0) {
-		list_first_item(coprocess_list);
-		struct vine_coprocess *coprocess = list_next_item(coprocess_list);
-		vine_resources_debug(coprocess->coprocess_resources);
-		vine_coprocess_resources_send(manager,coprocess->coprocess_resources,stoptime);
-	}
-
 	vine_resources_send(manager,total_resources,stoptime);
 	send_message(manager, "info end_of_resource_update %d\n", 0);
 }
@@ -418,18 +411,15 @@ static int send_keepalive(struct link *manager, int force_resources)
 Send an asynchronmous message to the manager indicating that an item was successfully loaded into the cache, along with its size in bytes and transfer time in usec.
 */
 
-void vine_worker_send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time )
+void vine_worker_send_cache_update( struct link *manager, const char *cachename, int64_t size, timestamp_t transfer_time, timestamp_t transfer_start )
 {
-	char *transfer_id;
-	if((transfer_id = hash_table_lookup(current_transfers, cachename))){
-		send_message(manager,"cache-update %s %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time, transfer_id);
-	} else {
-		send_message(manager,"cache-update %s %lld %lld X\n",cachename,(long long)size,(long long)transfer_time);
+	char *transfer_id = hash_table_remove(current_transfers, cachename);
+	if(!transfer_id) {
+		transfer_id = xxstrdup("X");
 	}
-	if(transfer_id)
-	{
-		hash_table_remove(current_transfers, cachename);
-	}
+
+	send_message(manager,"cache-update %s %lld %lld %lld %s\n",cachename,(long long)size,(long long)transfer_time,(long long)transfer_start,transfer_id);
+	free(transfer_id);
 }
 
 /*
@@ -438,12 +428,13 @@ Send an asynchronous message to the manager indicating that an item previously q
 
 void vine_worker_send_cache_invalid( struct link *manager, const char *cachename, const char *message )
 {
-	char *transfer_id;
 	int length = strlen(message);
-	if((transfer_id = hash_table_lookup(current_transfers, cachename))){
+	char *transfer_id = hash_table_remove(current_transfers, cachename);
+	if(transfer_id) {
 		debug(D_VINE, "Sending Cache invalid transfer id: %s", transfer_id);
 		send_message(manager,"cache-invalid %s %d %s\n",cachename, length, transfer_id);
-	}else{
+		free(transfer_id);
+	} else {
 		send_message(manager,"cache-invalid %s %d\n",cachename,length);
 	}
 	link_write(manager,message,length,time(0)+active_timeout);
@@ -473,7 +464,7 @@ static void report_worker_ready( struct link *manager )
 	domain_name_cache_guess(hostname);
 	send_message(manager,"taskvine %d %s %s %s %d.%d.%d\n",VINE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_message(manager, "info worker-id %s\n", worker_id);
-	vine_init_update(global_cache, manager);
+	vine_cache_scan(global_cache, manager);
 
 	send_features(manager);
 	send_transfer_address(manager);
@@ -505,12 +496,11 @@ static int start_process( struct vine_process *p, struct link *manager )
 		itable_insert(procs_complete,p->task->task_id,p);
 		return 0;
 	}
-	if (!p->coprocess || vine_process_get_duty_name(p)) {
-		cores_allocated += t->resources_requested->cores;
-		memory_allocated += t->resources_requested->memory;
-		disk_allocated += t->resources_requested->disk;
-		gpus_allocated += t->resources_requested->gpus;
-	}
+	cores_allocated += t->resources_requested->cores;
+	memory_allocated += t->resources_requested->memory;
+	disk_allocated += t->resources_requested->disk;
+	gpus_allocated += t->resources_requested->gpus;
+
 
 	if(t->resources_requested->gpus>0) {
 		vine_gpus_allocate(t->resources_requested->gpus,t->task_id);
@@ -519,25 +509,26 @@ static int start_process( struct vine_process *p, struct link *manager )
 	pid = vine_process_execute(p);
 	if(pid<0) fatal("unable to fork process for task_id %d!",p->task->task_id);
 	if (p->coprocess) {
-		char *duty_name = NULL;
-		int duty_id = -1, iterate_id;
+		char *library_name = NULL;
+		int library_id = -1, iterate_id;
 
-		HASH_TABLE_ITERATE(duty_ids,duty_name,iterate_id) {
+		HASH_TABLE_ITERATE(library_ids,library_name,iterate_id) {
 			if (iterate_id == p->task->task_id){
-				duty_id = iterate_id;
+				library_id = iterate_id;
 				break;
 			}
 		}
-		if (duty_id > 0) {
+		if (library_id > 0) {
 			list_push_tail(coprocess_list, p->coprocess);
-			hash_table_insert(features, duty_name, (void **) 1);
+			hash_table_insert(features, library_name, (void **) 1);
 			send_features(manager);
+			send_message(manager, "info library-update %d %d\n", p->task->task_id, VINE_LIBRARY_STARTED);
 			send_resource_update(manager);
 		}
 	}
 
 	itable_insert(procs_running,p->pid,p);
-	
+
 	return 1;
 }
 
@@ -551,12 +542,10 @@ static void reap_process( struct vine_process *p, struct link *manager )
 {
 	p->execution_end = timestamp_get();
 
-	if (!p->coprocess || vine_process_get_duty_name(p)) {
-		cores_allocated  -= p->task->resources_requested->cores;
-		memory_allocated -= p->task->resources_requested->memory;
-		disk_allocated   -= p->task->resources_requested->disk;
-		gpus_allocated   -= p->task->resources_requested->gpus;
-	}
+	cores_allocated  -= p->task->resources_requested->cores;
+	memory_allocated -= p->task->resources_requested->memory;
+	disk_allocated   -= p->task->resources_requested->disk;
+	gpus_allocated   -= p->task->resources_requested->gpus;
 
 	vine_gpus_free(p->task->task_id);
 
@@ -626,7 +615,7 @@ static void expire_procs_running()
 	ITABLE_ITERATE(procs_running,pid,p) {
 		if(p->task->resources_requested->end > 0 && current_time > p->task->resources_requested->end)
 		{
-			p->result = VINE_RESULT_TASK_TIMEOUT;
+			p->result = VINE_RESULT_MAX_END_TIME;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -818,7 +807,7 @@ static int do_put_mini_task( struct link *manager, time_t stoptime, const char *
 	struct vine_mount *output_mount = list_peek_head(mini_task->output_mounts);
 	free(output_mount->file->cached_name);
 	output_mount->file->cached_name = strdup(cache_name);
-	
+
 	return vine_cache_queue_command(global_cache,mini_task,cache_name,size,mode);
 }
 
@@ -868,8 +857,8 @@ static int do_kill(int task_id)
 		if (p->coprocess) {
 			hash_table_remove(features, p->coprocess->name);
 			list_remove(coprocess_list, p->coprocess);
-			list_remove(duty_list, p->coprocess->name);
-			hash_table_remove(duty_ids, p->coprocess->name);			
+			list_remove(library_list, p->coprocess->name);
+			hash_table_remove(library_ids, p->coprocess->name);			
 		}
 		vine_process_kill(p);
 		cores_allocated -= p->task->resources_requested->cores;
@@ -1001,7 +990,7 @@ static void enforce_processes_max_running_time()
 					p->task->task_id,
 					rmsummary_resource_to_str("wall_time", (now - p->execution_start)/1e6, 1),
 					rmsummary_resource_to_str("wall_time", p->task->resources_requested->wall_time, 1));
-			p->result = VINE_RESULT_TASK_MAX_RUN_TIME;
+			p->result = VINE_RESULT_MAX_WALL_TIME;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -1084,16 +1073,16 @@ static int handle_manager(struct link *manager)
 				kill_all_tasks();
 				r = 1;
 			}
-		} else if(sscanf(line, "kill_duty %" SCNd64, &length) == 1) {
-			char *duty_name = malloc(length+1);
-			link_read(manager,duty_name,length,time(0)+active_timeout);
-			duty_name[length] = 0;
-			task_id = (long int)hash_table_lookup(duty_ids, duty_name);
-			debug(D_VINE,"rx: killing duty %s %" SCNd64, duty_name, task_id);
+		} else if(sscanf(line, "kill_library %" SCNd64, &length) == 1) {
+			char *library_name = malloc(length+1);
+			link_read(manager,library_name,length,time(0)+active_timeout);
+			library_name[length] = 0;
+			task_id = (long int)hash_table_lookup(library_ids, library_name);
+			debug(D_VINE,"rx: killing library %s %" SCNd64, library_name, task_id);
 			kill(((struct vine_process *)itable_lookup(procs_table, task_id))->pid, SIGKILL);
-			list_remove(duty_list, duty_name);
-			hash_table_remove(features, duty_name);
-			hash_table_remove(duty_ids, duty_name);
+			list_remove(library_list, library_name);
+			hash_table_remove(features, library_name);
+			hash_table_remove(library_ids, library_name);
 			list_remove(coprocess_list, ((struct vine_process *)itable_lookup(procs_table, task_id))->coprocess);
 			r = do_kill(task_id);
 		} else if(!strncmp(line, "release", 8)) {
@@ -1109,13 +1098,13 @@ static int handle_manager(struct link *manager)
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(manager);
 			r = 1;
-		} else if(sscanf(line,"duty %" SCNd64 " %" SCNd64,&length, &task_id)==2) {
-			char *duty_name = malloc(length+1);
-			link_read(manager,duty_name,length,time(0)+active_timeout);
-			duty_name[length] = 0;
-			debug(D_VINE,"rx: duty %s, id %" SCNd64, duty_name, task_id);
-			list_push_tail(duty_list, duty_name);
-			hash_table_insert(duty_ids, duty_name, (void **)task_id);
+		} else if(sscanf(line,"library %" SCNd64 " %" SCNd64,&length, &task_id)==2) {
+			char *library_name = malloc(length+1);
+			link_read(manager,library_name,length,time(0)+active_timeout);
+			library_name[length] = 0;
+			debug(D_VINE,"rx: library %s, id %" SCNd64, library_name, task_id);
+			list_push_tail(library_list, library_name);
+			hash_table_insert(library_ids, library_name, (void **)task_id);
 			r = 1;
 		} else {
 			debug(D_VINE, "Unrecognized manager message: %s.\n", line);
@@ -1381,7 +1370,7 @@ static int workspace_create()
 	// Setup working space(dir)
 	if(!workspace) {
 		const char *workdir = system_tmp_dir(user_specified_workdir);
-		workspace = string_format("%s/worker-%d", workdir, (int) getuid());
+		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
 
 	printf( "vine_worker: creating workspace %s\n", workspace);
@@ -1538,11 +1527,10 @@ static void workspace_delete()
 	printf( "vine_worker: deleting workspace %s\n", workspace);
 
 	/*
-	Note that we cannot use trash_file here because the trash dir
-	is inside the workspace.  Abort if we really cannot clean up.
+	Note that we cannot use trash_file here because the trash dir is inside the
+	workspace. The whole workspace is being deleted anyway.
 	*/
-
-
+	unlink_recursive(workspace);
 	free(workspace);
 }
 
@@ -1792,7 +1780,7 @@ void set_worker_id()
 	unsigned char digest[MD5_DIGEST_LENGTH];
 
 	md5_buffer(salt_and_pepper, strlen(salt_and_pepper), digest);
-	worker_id = string_format("worker-%s", md5_string(digest));
+	worker_id = string_format("worker-%s", md5_to_string(digest));
 
 	free(salt_and_pepper);
 }
@@ -2192,13 +2180,15 @@ int main(int argc, char *argv[])
 	// change to workspace
 	chdir(workspace);
 
+	unlink_recursive("cache");
+
 	procs_running  = itable_create(0);
 	procs_table    = itable_create(0);
 	procs_waiting  = list_create();
 	procs_complete = itable_create(0);
 	coprocess_list = list_create();
-	duty_list = list_create();
-	duty_ids = hash_table_create(0, 0);
+	library_list = list_create();
+	library_ids = hash_table_create(0, 0);
 
 	watcher = vine_watcher_create();
 

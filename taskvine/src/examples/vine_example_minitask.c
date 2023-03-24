@@ -5,7 +5,7 @@ See the file COPYING for details.
 */
 
 /*
-An example of a task using a minitask (vine_file_untar) to unpack a dependency before using it.
+An example of a task using a minitask (vine_declare_untar) to unpack a dependency before using it.
 */
 
 #include "taskvine.h"
@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	struct vine_task *t;
 	int i;
 
-    //runtime logs will be written to vine_example_minitask_info/%Y-%m-%dT%H:%M:%S
+	//runtime logs will be written to vine_example_minitask_info/%Y-%m-%dT%H:%M:%S
 	vine_set_runtime_info_path("vine_example_minitask_info");
 
 	m = vine_create(VINE_DEFAULT_PORT);
@@ -34,13 +34,13 @@ int main(int argc, char *argv[])
 	}
 	printf("listening on port %d...\n", vine_port(m));
 
-	vine_set_scheduler(m,VINE_SCHEDULE_FILES);
+
+	struct vine_file *url = vine_declare_url(m, CCTOOLS_URL, VINE_CACHE);
+	struct vine_file *package = vine_declare_untar(m, url, VINE_CACHE);
 
 	for(i=0;i<10;i++) {
-
-		struct vine_file *infile = vine_file_untar(vine_file_url(CCTOOLS_URL));
 		struct vine_task *task = vine_task_create("ls -lR cctools | wc -l");
-		vine_task_add_input(task,infile,"cctools",VINE_CACHE);		
+		vine_task_add_input(task,package,"cctools",0);
 		int task_id = vine_submit(m, task);
 
 		printf("submitted task (id# %d): %s\n", task_id, vine_task_get_command(task) );
@@ -69,3 +69,5 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+
+/* vim: set noexpandtab tabstop=4: */

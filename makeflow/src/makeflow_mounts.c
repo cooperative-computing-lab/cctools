@@ -180,11 +180,11 @@ int mount_check(const char *source, const char *target, file_type *s_type) {
 	return 0;
 }
 
-/* md5_cal_source calculates the checksum of a file path.
+/* md5_of_string_source calculates the checksum of a file path.
  * @param source: the source location of a dependency, which can be a local file path or http URL.
  * @is_local: whether source is a lcoal path.
  */
-char *md5_cal_source(const char *source, int is_local) {
+char *md5_of_string_source(const char *source, int is_local) {
 	char *cache_name = NULL;
 
 	if(is_local) {
@@ -197,14 +197,14 @@ char *md5_cal_source(const char *source, int is_local) {
 			return NULL;
 		}
 
-		cache_name = md5_cal(s_real);
+		cache_name = md5_of_string(s_real);
 
 		if(!cache_name) {
-			debug(D_DEBUG, "md5_cal(%s) failed: %s!\n", s_real, strerror(errno));
+			debug(D_DEBUG, "md5_of_string(%s) failed: %s!\n", s_real, strerror(errno));
 		}
 		free(s_real);
 	} else {
-		cache_name = md5_cal(source);
+		cache_name = md5_of_string(source);
 	}
 	return cache_name;
 }
@@ -276,9 +276,9 @@ int mount_install(const char *source, const char *target, const char *cache_dir,
 	}
 
 	/* calculate the filename in the cache dir */
-	cache_name = md5_cal_source(source, *type == DAG_FILE_SOURCE_LOCAL);
+	cache_name = md5_of_string_source(source, *type == DAG_FILE_SOURCE_LOCAL);
 	if(!cache_name) {
-		debug(D_DEBUG, "md5_cal_source(%s) failed: %s!\n", source, strerror(errno));
+		debug(D_DEBUG, "md5_of_string_source(%s) failed: %s!\n", source, strerror(errno));
 		return -1;
 	}
 
@@ -647,7 +647,7 @@ int makeflow_mount_check_target(struct dag *d) {
 		if(!df->source)
 			continue;
 
-		cache_name = md5_cal_source(df->source, (strncmp(df->source, "http://", 7) && strncmp(df->source, "https://", 8)));
+		cache_name = md5_of_string_source(df->source, (strncmp(df->source, "http://", 7) && strncmp(df->source, "https://", 8)));
 		if(!cache_name) {
 			return -1;
 		}

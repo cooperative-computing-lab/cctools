@@ -167,7 +167,7 @@ char *work_queue_coprocess_start(struct work_queue_coprocess *coprocess) {
         if (dup2(coprocess->pipe_out[1], 1) < 0) {
             fatal("coprocess could not attach pipe to stdout: %s\n", strerror(errno));
         }
-        execlp(coprocess->command, coprocess->command, (char *) 0);
+        execl("/bin/sh", "sh", "-c", coprocess->command, (char *) 0);
         fatal("failed to execute %s: %s\n", coprocess->command, strerror(errno));
 	}
     else {
@@ -199,7 +199,7 @@ int work_queue_coprocess_check(struct work_queue_coprocess *coprocess)
     return 1;
 }
 
-char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess) {
+char *work_queue_coprocess_run(const char *function_name, const char *function_input, struct work_queue_coprocess *coprocess, int task_id) {
 	char addr[DOMAIN_NAME_MAX];
 	int timeout = 60000000; // one minute, can be changed
 
@@ -229,7 +229,7 @@ char *work_queue_coprocess_run(const char *function_name, const char *function_i
 
 	curr_time = timestamp_get();
 	stoptime = curr_time + timeout;
-	int bytes_sent = link_printf(coprocess->network_link, stoptime, "%s %ld\n", function_name, strlen(function_input));
+	int bytes_sent = link_printf(coprocess->network_link, stoptime, "%s %d %ld\n", function_name, task_id, strlen(function_input));
 	if(bytes_sent < 0) {
 		fatal("could not send input data size: %s", strerror(errno));
 	}
@@ -256,12 +256,17 @@ struct work_queue_coprocess *work_queue_coprocess_find_state(struct work_queue_c
 	return NULL;
 }
 
-struct work_queue_coprocess *work_queue_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct work_queue_resources *total_resources, char *coprocess_command, int number_of_coprocess_instances) {
+struct work_queue_coprocess *work_queue_coprocess_initalize_all_coprocesses(int coprocess_cores, int coprocess_memory, int coprocess_disk, int coprocess_gpus, struct work_queue_resources *total_resources, struct work_queue_resources *coprocess_resources, char *coprocess_command, int number_of_coprocess_instances) {
 	if (number_of_coprocess_instances <= 0) return NULL;
 	int coprocess_cores_normalized  = ( (coprocess_cores > 0)  ? coprocess_cores  : total_resources->cores.total);
 	int coprocess_memory_normalized = ( (coprocess_memory > 0) ? coprocess_memory : total_resources->memory.total);
 	int coprocess_disk_normalized   = ( (coprocess_disk > 0)   ? coprocess_disk   : total_resources->disk.total);
 	int coprocess_gpus_normalized   = ( (coprocess_gpus > 0)   ? coprocess_gpus   : total_resources->gpus.total);
+
+	coprocess_resources->cores.total = coprocess_cores_normalized;
+	coprocess_resources->memory.total = coprocess_memory_normalized;
+	coprocess_resources->disk.total = coprocess_disk_normalized;
+	coprocess_resources->gpus.total = coprocess_gpus_normalized;
 
 	struct work_queue_coprocess * coprocess_info = malloc(sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
 	memset(coprocess_info, 0, sizeof(struct work_queue_coprocess) * number_of_coprocess_instances);
@@ -279,7 +284,7 @@ struct work_queue_coprocess *work_queue_coprocess_initalize_all_coprocesses(int 
 	return coprocess_info;
 }
 
-void work_queue_coprocess_shutdown_all_coprocesses(struct work_queue_coprocess *coprocess_info, int number_of_coprocess_instances) {
+void work_queue_coprocess_shutdown_all_coprocesses(struct work_queue_coprocess *coprocess_info, struct work_queue_resources *coprocess_resources, int number_of_coprocess_instances) {
 	if (number_of_coprocess_instances <= 0) return;
 	work_queue_coprocess_shutdown(coprocess_info, number_of_coprocess_instances);
 	for (int coprocess_num = 0; coprocess_num < number_of_coprocess_instances; coprocess_num++){
@@ -292,6 +297,7 @@ void work_queue_coprocess_shutdown_all_coprocesses(struct work_queue_coprocess *
 		work_queue_resources_delete(curr_coprocess->coprocess_resources);
 	}
 	free(coprocess_info);
+	work_queue_resources_delete(coprocess_resources);
 }
 
 void work_queue_coprocess_measure_resources(struct work_queue_coprocess *coprocess_info, int number_of_coprocesses) {

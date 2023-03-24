@@ -34,7 +34,7 @@ documentation and/or software.
 
 #include <sys/mman.h>
 #include <sys/stat.h>
-
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -357,7 +357,7 @@ int md5_file(const char *filename, unsigned char digest[MD5_DIGEST_LENGTH])
 	return 1;
 }
 
-const char *md5_string(unsigned char digest[16])
+const char *md5_to_string(unsigned char digest[16])
 {
 	static char str[33];
 	int i;
@@ -368,21 +368,14 @@ const char *md5_string(unsigned char digest[16])
 	return str;
 }
 
-char *md5_cal(const char *s) {
-	unsigned char digest[MD5_DIGEST_LENGTH_HEX];
-	md5_context_t context;
-	char *p = NULL;
-
-	p = malloc(sizeof(char) * (MD5_DIGEST_LENGTH_HEX+1));
-	if(!p) {
-		return NULL;
-	}
-
+char *md5_of_string(const char *s)
+{
+ 	unsigned char digest[MD5_DIGEST_LENGTH_HEX];
+ 	md5_context_t context;
 	md5_init(&context);
-	md5_update(&context, (const unsigned char *)s, strlen(s));
-	md5_final(digest, &context);
-	sprintf(p, "%s", md5_string(digest));
-	return p;
+ 	md5_update(&context, (const unsigned char *)s, strlen(s));
+ 	md5_final(digest, &context);
+	return strdup(md5_to_string(digest));
 }
 
 /* vim: set noexpandtab tabstop=4: */
