@@ -2561,7 +2561,9 @@ class Factory(object):
     # may be useful to provision workers from inside a Jupyter notebook.
     def start(self):
         if self._factory_proc is not None:
-            raise RuntimeError("Factory was already started")
+            # if factory already running, just update its config
+            self._write_config()
+            return
 
         if not self.scratch_dir:
             candidate = os.getcwd()
