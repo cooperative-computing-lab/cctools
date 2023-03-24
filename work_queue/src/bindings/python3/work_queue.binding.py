@@ -1880,6 +1880,28 @@ class WorkQueue(object):
         return None
 
     ##
+    # Should return a dictionary with information for the status display.
+    # This method is meant to be overriden by custom applications.
+    #
+    # The dictionary should be of the form:
+    #
+    # { "application_info" : {"values" : dict, "units" : dict} }
+    #
+    # where "units" is an optional dictionary that indicates the units of the
+    # corresponding key in "values".
+    #
+    # @param self       Reference to the current work queue object.
+    #
+    # For example:
+    # @code
+    # >>> myapp.application_info()
+    # {'application_info': {'values': {'size_max_output': 0.361962, 'current_chunksize': 65536}, 'units': {'size_max_output': 'MB'}}}
+    # @endcode
+    def application_info(self):
+        return None
+
+
+    ##
     # Maps a function to elements in a sequence using work_queue
     #
     # Similar to regular map function in python
@@ -2209,27 +2231,6 @@ class RemoteTask(Task):
         if remote_task_exec_method not in ["fork", "direct", "thread"]:
             print("Error, work_queue_exec_method must be one of fork, direct, or thread")
         self._event["remote_task_exec_method"] = remote_task_exec_method
-
-    ##
-    # Should return a dictionary with information for the status display.
-    # This method is meant to be overriden by custom applications.
-    #
-    # The dictionary should be of the form:
-    #
-    # { "application_info" : {"values" : dict, "units" : dict} }
-    #
-    # where "units" is an optional dictionary that indicates the units of the
-    # corresponding key in "values".
-    #
-    # @param self       Reference to the current work queue object.
-    #
-    # For example:
-    # @code
-    # >>> myapp.application_info()
-    # {'application_info': {'values': {'size_max_output': 0.361962, 'current_chunksize': 65536}, 'units': {'size_max_output': 'MB'}}}
-    # @endcode
-    def application_info(self):
-        return None
 
 
 ##
