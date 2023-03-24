@@ -317,15 +317,13 @@ class JupyterDisplay(StatusDisplay):
 
     def make_row(self, cells_info, fmt=None):
         if not fmt:
-
             def fmt(v):
-                JupyterDisplay.cell_fmt.substitute(value=v)
+                return JupyterDisplay.cell_fmt.substitute(value=v)
 
             try:
                 if cells_info[0][-1] == "!":
-
                     def fmt(v):
-                        JupyterDisplay.cell_over_fmt.substitute(value=v)
+                        return JupyterDisplay.cell_over_fmt.substitute(value=v)
 
             except IndexError:
                 pass
