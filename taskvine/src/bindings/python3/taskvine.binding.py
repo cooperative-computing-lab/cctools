@@ -992,7 +992,7 @@ class Manager(object):
                 self._info_widget.update(self, force)
         except Exception as e:
             # no exception should cause the queue to fail
-            print(f"status display error {e}", file=sys.stderr)
+            print(f"status display error: {e}", file=sys.stderr)
 
     ##
     # Get the project name of the manager.
@@ -1082,7 +1082,7 @@ class Manager(object):
     # tasks_info = q.status("tasks")
     # @endcode
     def status(self, request):
-        info_raw = vine_get_status(self._work_manager, request)
+        info_raw = vine_get_status(self._taskvine, request)
         info_json = json.loads(info_raw)
         del info_raw
         return info_json
@@ -1761,6 +1761,27 @@ class Manager(object):
             task = self._task_table[vine_task_get_id(task_pointer)]
             del self._task_table[vine_task_get_id(task_pointer)]
             return task
+        return None
+
+    ##
+    # Should return a dictionary with information for the status display.
+    # This method is meant to be overriden by custom applications.
+    #
+    # The dictionary should be of the form:
+    #
+    # { "application_info" : {"values" : dict, "units" : dict} }
+    #
+    # where "units" is an optional dictionary that indicates the units of the
+    # corresponding key in "values".
+    #
+    # @param self       Reference to the current work queue object.
+    #
+    # For example:
+    # @code
+    # >>> myapp.application_info()
+    # {'application_info': {'values': {'size_max_output': 0.361962, 'current_chunksize': 65536}, 'units': {'size_max_output': 'MB'}}}
+    # @endcode
+    def application_info(self):
         return None
 
     ##
