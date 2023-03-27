@@ -981,7 +981,6 @@ static void read_measured_resources(struct vine_manager *q, struct vine_task *t)
 	t->resources_measured = rmsummary_parse_file_single(summary);
 
 	if(t->resources_measured) {
-		t->resources_measured->category = xxstrdup(t->category);
 		t->exit_code = t->resources_measured->exit_status;
 
 		/* cleanup noise in cores value, otherwise small fluctuations trigger new

@@ -1778,7 +1778,6 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 	t->resources_measured = rmsummary_parse_file_single(summary);
 
 	if(t->resources_measured) {
-		t->resources_measured->category = xxstrdup(t->category);
 		t->return_status = t->resources_measured->exit_status;
 
 		/* cleanup noise in cores value, otherwise small fluctuations trigger new
