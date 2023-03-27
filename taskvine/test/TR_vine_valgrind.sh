@@ -6,7 +6,7 @@ export PATH=../src/tools:../src/worker:$PATH
 
 export CORES=4
 export TASKS=20
-export VALGRIND="valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes"
+export VALGRIND="valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes --track-fds=yes"
 
 check_needed()
 {
@@ -31,7 +31,7 @@ quit
 EOF
 
 	echo "starting manager"
-	(${VALGRIND} --log-file=manager.valgrind -- vine_benchmark -Z manager.port < manager.script; echo $? > manager.exitcode ) &
+	(${VALGRIND} --log-file=manager.valgrind -- vine_benchmark -m -Z manager.port < manager.script; echo $? > manager.exitcode ) &
 
 	echo "waiting for manager to get ready"
 	wait_for_file_creation manager.port 15
