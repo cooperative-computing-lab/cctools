@@ -113,7 +113,7 @@ or system-specific details where possible.
         ],
         "dependencies": [
             "python=3.11.0=he550d4f_1_cpython",
-            "numpy=1.24,
+            "numpy=1.24",
             "matplotlib",
             "pip",
             {
