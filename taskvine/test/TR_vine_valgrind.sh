@@ -55,18 +55,18 @@ EOF
 		echo "valgrind did not found errors with the manager."
 	else
 		echo "valgrind found errors with the manager."
-		[ -f manager.valgrind ] && cat manager.valgrind
 		overall=1
 	fi
+	[ -f manager.valgrind ] && cat manager.valgrind
 
 	if [ "$worker" = 0 ]
 	then
 		echo "valgrind did not found errors with the worker."
 	else
 		echo "valgrind found errors with the worker"
-		[ -f worker.valgrind ] && cat worker.valgrind
 		overall=1
 	fi
+	[ -f worker.valgrind ] && cat worker.valgrind
 
 	return ${overall}
 }
