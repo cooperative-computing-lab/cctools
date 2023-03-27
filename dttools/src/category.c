@@ -186,6 +186,8 @@ static void category_clear_histogram(struct histogram *h) {
 		}
 	}
 
+	free(buckets);
+
 	histogram_clear(h);
 }
 

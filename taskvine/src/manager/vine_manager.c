@@ -981,7 +981,6 @@ static void read_measured_resources(struct vine_manager *q, struct vine_task *t)
 	t->resources_measured = rmsummary_parse_file_single(summary);
 
 	if(t->resources_measured) {
-		t->resources_measured->category = xxstrdup(t->category);
 		t->exit_code = t->resources_measured->exit_status;
 
 		/* cleanup noise in cores value, otherwise small fluctuations trigger new
@@ -3228,6 +3227,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 	}
 
 	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE_ALWAYS);
+	free(exe);
 
 	if(series) {
 		char *series_file = vine_get_runtime_path_log(q, "time-series");
@@ -3440,6 +3440,8 @@ void vine_delete(struct vine_manager *q)
 	free(q->stats_measure);
 
 	debug(D_VINE, "manager end\n");
+
+	debug_close();
 
 	free(q);
 }
