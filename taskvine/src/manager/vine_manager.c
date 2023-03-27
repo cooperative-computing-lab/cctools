@@ -3441,6 +3441,8 @@ void vine_delete(struct vine_manager *q)
 
 	debug(D_VINE, "manager end\n");
 
+	debug_close();
+
 	free(q);
 }
 
