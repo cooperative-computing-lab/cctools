@@ -3228,6 +3228,7 @@ int vine_enable_monitoring(struct vine_manager *q, int watchdog, int series)
 	}
 
 	q->monitor_exe = vine_declare_file(q, exe, VINE_CACHE_ALWAYS);
+	free(exe);
 
 	if(series) {
 		char *series_file = vine_get_runtime_path_log(q, "time-series");
