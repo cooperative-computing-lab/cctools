@@ -634,7 +634,7 @@ of environments: [poncho](../poncho/index.md), which is based on conda-pack;
 and [starch](../man_pages/starch.md) a lightweight package useful when the
 manager and workers run the same linux version. Mini tasks can be used to
 create environments not natively supported, as we will show later to construct
-environments for AppTainer (i.e., singularity containers).
+environments for Apptainer (i.e., singularity containers).
 
 #### Poncho
 
@@ -651,7 +651,7 @@ my_poncho_spec.json
         ],
         "dependencies": [
             "python=3.10",
-            "numpy=1.24.2
+            "numpy=1.24.2"
         ]
     }
 }
@@ -718,31 +718,34 @@ env
 
 where `run_in_env` is an executable file (usually a shell script) that takes as
 an argument a command line to execute. In the rest of this section we will show
-how to construct an environment that runs its command line inside an AppTainer
+how to construct an environment that runs its command line inside an Apptainer
 container.
 
-Our script `run_in_env` script simply calls AppTainer with the desired image, and
+##### Apptainer Custom Environment
+
+Our script `run_in_env` script simply calls Apptainer with the desired image, and
 mounts the task's sandbox as the home directory:
 
+**run_command_in_apptainer.sh**
 ```shell
-#! /bin/sh
-# run_in_env to wrap tasks with an AppTainer container
-
-# get the directory that contains the environment from the location of this
-# run_in_env script
-env_dir =$(dirname $( cd -- "$( dirname -- "$0" )" > /dev/null 2>&1 && pwd ))
-
-# execute the command line with the container image "myimage.img"
-exec apptainer run --home "${VINE_SANDBOX:-.}" "${env_dir}/myimage.img" "$@"
+--8<-- "taskvine/examples/run_command_in_apptainer.sh"
 ```
 
-To start, we can manually construct the needed directory structure as follows.
-(However, these steps may also be automated with a mini task.)
+To start, we can manually construct in the command line the needed directory
+structure as follows. Later will be automate these steps with a mini task.
 
 ```sh
+# ensure the right execution permissions for the script
+chmod 755 run_command_in_apptainer.sh
+
+# construct the needed directory structure
 mkdir -p my_env/bin
-cp path/to/run_in_env env/bin/
-cp path/to/myimage.img env/
+
+# copy the apptainer script to the expected run_in_env location
+cp run_command_in_apptainer.sh my_env/bin/run_in_env
+
+# copy the desired image to the environment's directory
+cp path/to/my_image.img my_env/image.img
 ```
 
 Now we are ready to declare the environment from its local directory "my_env":
@@ -753,14 +756,56 @@ Now we are ready to declare the environment from its local directory "my_env":
 
     env = m.declare_file("my_env", cache=True)
     t.add_environment(env)
+
+    m.submit(t)
     ```
 
+=== "C"
     ```C
     struct vine_task *t = vine_task_create("/bin/echo from inside apptainer!");
 
-    struct vine_file *env = vine_declare_file("my_env", cache=True);
+    struct vine_file *env = vine_declare_file(m, "my_env", VINE_CACHE);
     vine_task_add_environment(env);
+
+    vine_submit(t);
     ```
+
+
+##### Apptainer Custom Environment with a Mini Task
+
+In the previous section we manually built the directory structure needed for
+the environment. This is not very flexible, as we need to create one such
+directory per container image that we would like to use. Instead, we can use a
+mini task to construct the environment structure directly on the workers.
+
+
+=== "Python"
+    ```python
+    # construct the mini task. We only need the mini task for its sandbox to
+    # create the environment structure, thus we use the command ":" as no-op.
+    mt = Task(":")
+
+    runner = m.declare_file("run_command_in_apptainer.sh", cache=True)
+    image  = m.declare_file("path/to/my_image.img", cache=True)
+
+    mt.add_input(runner, "env_dir/bin/run_in_env")
+    mt.add_input(image,  "env_dir/image.img")
+
+    # the output of the mini task is the environment directory
+    mt.add_output(image,  "env_dir")
+
+    # tell the manager that this is a mini task.
+    env = m.declare_mini_task(mt)
+
+    # now we define our regular task, and attach the environment to it.
+    t = Task("/bin/echo from inside apptainer!")
+    t.add_environment(env)
+
+    m.submit(t)
+    ```
+
+You can see the complete example [here](examples/vine_example_apptainer_env.py)
+
 
 
 ### Caching Behaviour
