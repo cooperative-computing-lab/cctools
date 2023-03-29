@@ -53,7 +53,7 @@ struct vine_task *vine_task_create(const char *command_line)
 	t->resource_request   = CATEGORY_ALLOCATION_FIRST;
 	t->worker_selection_algorithm = VINE_SCHEDULE_UNSET;
 
-	t->state = VINE_TASK_READY;
+	t->state = VINE_TASK_UNKNOWN;
 
 	t->result = VINE_RESULT_UNKNOWN;
 	t->exit_code = -1;
