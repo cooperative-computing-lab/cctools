@@ -202,6 +202,11 @@ void vine_txn_log_write_category(struct vine_manager *q, struct category *c)
 
 void vine_txn_log_write_worker(struct vine_manager *q, struct vine_worker_info *w, int leaving, vine_worker_disconnect_reason_t reason_leaving)
 {
+	if(reason_leaving == VINE_WORKER_DISCONNECT_STATUS_WORKER) {
+		/* status worker should not generate a transaction */
+		return;
+	}
+
 	struct buffer B;
 	buffer_init(&B);
 
