@@ -48,11 +48,16 @@ def create_dict(name):
     subprocess_dict = {}
     path = False
 
+    path1_regex = re.compile('</.+>')
+    path2_regex = re.compile('<.+>,')
+    pid1_regex = re.compile('\[pid [0-9]+\]')
+    pid2_regex = re.compile('= [0-9]+$')
+
     with open(name + ".fout1.txt") as file:
         for line in file: 
             if "openat" in line or "stat" in line:
                 try: # Try get file path
-                    path = re.search('</.+>',line).group(0).strip('<>')
+                    path = path1_regex.search(line).group(0).strip('<>')
                 except AttributeError: # AttributeError if file not found
                     try: # find path for ENOENT
                         path = line.split('"')[1]
@@ -68,12 +73,12 @@ def create_dict(name):
                 path_dict[path].freq += 1
 
                 if line.startswith('[pid '):
-                    path_dict[path].sub_pid.append(re.search('\[pid [0-9]+\]',line).group(0).replace('[pid ','').replace(']',''))
+                    path_dict[path].sub_pid.append(pid1_regex.search(line).group(0).replace('[pid ','').replace(']',''))
 
             if "read" in line or "write" in line:
                 try:
-                    path = re.search('<.+>,',line).group(0).strip('<>,')
-                    bytes_written = re.search('= [0-9]+$',line).group(0).replace('= ','')
+                    path = path2_regex.search(line).group(0).strip('<>,')
+                    bytes_written = pid2_regex.search(line).group(0).replace('= ','')
 
                     if path not in path_dict: 
                         path_dict[path] = Properties(path=path, size=int(bytes_written))
@@ -147,8 +152,9 @@ def print_summary_2(path_dict, name):
     f.close()
 
 def find_command(line, subprocess_dict): 
-    if re.search('\[pid [0-9]+\]',line): 
-        pid = re.search('\[pid [0-9]+\]',line).group(0).replace('[pid ','').replace(']','')
+    pid1_regex = re.compile('\[pid [0-9]+\]')
+    if pid1_regex.search(line): 
+        pid = pid1_regex.search(line).group(0).replace('[pid ','').replace(']','')
         try:
             command = str(re.search('\[".+\]',line).group(0)).strip('[]').replace('", "',' ')
             subprocess_dict[pid] = {"command" : command, "files": set()}
